@@ -1051,6 +1051,32 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 
+	// Validate the action once and map it to a literal so the command never
+	// receives a value derived from the request.
+	verb := "restart"
+	switch action {
+	case "start":
+		verb = "start"
+	case "stop":
+		verb = "stop"
+	}
+
+	// A `systemctl --user` unit runs under the same user as the daemon, so it
+	// can be controlled directly without the root helper.
+	if scope, scopeName := gh6_serviceScope("gextto.service"); scopeName == "user" {
+		go func() {
+			time.Sleep(800 * time.Millisecond)
+			_ = exec.Command("systemctl", append(append([]string{}, scope...), verb, "gextto.service")...).Run()
+		}()
+		jsonResponse(w, map[string]any{
+			"ok":      true,
+			"action":  action,
+			"scope":   "user",
+			"message": "azione sul servizio richiesta",
+		})
+		return
+	}
+
 	const restartHelper = "/usr/local/bin/gextto-restart"
 	if _, err := os.Stat(restartHelper); err != nil {
 		jsonError(w, http.StatusPreconditionRequired, "Helper di riavvio non installato. Da root, una volta: sudo install -m 0755 scripts/gextto-restart /usr/local/bin/gextto-restart && sudo install -m 0440 systemd/gextto.sudoers /etc/sudoers.d/gextto")
@@ -1063,15 +1089,6 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	go func() {
 		time.Sleep(800 * time.Millisecond)
-		// Map the validated action to a literal so the command never receives a
-		// value derived from the request.
-		verb := "restart"
-		switch action {
-		case "start":
-			verb = "start"
-		case "stop":
-			verb = "stop"
-		}
 		_ = exec.Command("sudo", "-n", restartHelper, verb).Run()
 	}()
 	jsonResponse(w, map[string]any{

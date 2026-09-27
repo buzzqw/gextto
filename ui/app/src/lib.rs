@@ -1306,26 +1306,25 @@ pub fn App() -> impl IntoView {
         }
     });
     let next_cycle = Signal::derive(move || {
-        let (refresh, parsed) = data.with(|current| {
-            let refresh = current
-                .config
-                .get("refresh_secs")
-                .and_then(Value::as_u64)
-                .unwrap_or(0);
-            let parsed = current
+        // The daemon publishes the authoritative next-cycle timestamp; it also
+        // knows about cycles persisted before the last restart. Without it the
+        // countdown fell back to "now" and stayed pinned at refresh_secs.
+        let next_at = data.with(|current| {
+            current
                 .status
-                .get("last_cycle")
-                .and_then(|cycle| cycle.get("last_started_at"))
+                .get("next_cycle_at")
                 .and_then(Value::as_str)
-                .map(js_sys::Date::parse)
-                .filter(|value| !value.is_nan())
-                .unwrap_or_else(|| now_ms.get());
-            (refresh, parsed)
+                .filter(|value| !value.is_empty())
+                .map(|value| value.to_string())
         });
-        if refresh == 0 {
+        let Some(next_at) = next_at else {
+            return "—".to_string();
+        };
+        let parsed = js_sys::Date::parse(&next_at);
+        if parsed.is_nan() {
             return "—".to_string();
         }
-        let remaining = parsed + refresh as f64 * 1000.0 - now_ms.get();
+        let remaining = parsed - now_ms.get();
         tr(data, &format_remaining_seconds((remaining / 1000.0) as i64))
     });
     // Live torrent figures, always visible in the top bar. Lette con `with`

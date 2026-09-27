@@ -314,13 +314,33 @@ func gh6_seenEntries(w http.ResponseWriter, r *http.Request, s *AppState, kind s
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
 }
 
-func gh6_systemctlField(verb, unit string) string {
-	output, _ := exec.Command("systemctl", verb, unit).Output()
+func gh6_systemctlField(scope []string, verb, unit string) string {
+	args := append(append([]string{}, scope...), verb, unit)
+	output, _ := exec.Command("systemctl", args...).Output()
 	value := strings.TrimSpace(string(output))
 	if value == "" {
 		return "unknown"
 	}
 	return value
+}
+
+// gh6_serviceScope returns the systemd scope arguments for a local unit. When
+// the daemon itself runs as a `systemctl --user` unit (the checkout installer),
+// querying the system scope reports "inactive"/"not-found" even though the
+// service is healthy; prefer the user scope when its unit file is present.
+func gh6_serviceScope(unit string) ([]string, string) {
+	base := os.Getenv("XDG_CONFIG_HOME")
+	if base == "" {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			return nil, "system"
+		}
+		base = filepath.Join(home, ".config")
+	}
+	if _, err := os.Stat(filepath.Join(base, "systemd", "user", unit)); err == nil {
+		return []string{"--user"}, "user"
+	}
+	return nil, "system"
 }
 
 func gh6_servicesProbe(rawURL string, timeout time.Duration) (int, bool, string) {
@@ -1074,10 +1094,12 @@ func SeriesList(w http.ResponseWriter, r *http.Request, s *AppState) {
 // ServicesStatus implements `services_status`.
 func ServicesStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	const unit = "gextto.service"
+	scope, scopeName := gh6_serviceScope(unit)
 	service := map[string]any{
 		"unit":    unit,
-		"active":  gh6_systemctlField("is-active", unit),
-		"enabled": gh6_systemctlField("is-enabled", unit),
+		"scope":   scopeName,
+		"active":  gh6_systemctlField(scope, "is-active", unit),
+		"enabled": gh6_systemctlField(scope, "is-enabled", unit),
 	}
 	cfg := latestConfig(s)
 	indexers := []map[string]any{}

@@ -484,6 +484,21 @@ func Status(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if movies, series, err := s.db.SeenCounts(); err == nil {
 		seenMovies, seenSeries = movies, series
 	}
+	// Next scheduled cycle. Derive it from the persisted start time (the same
+	// source the scheduler uses to resume after a restart) and fall back to the
+	// in-memory snapshot while a cycle is running. Without this the UI only saw
+	// the in-memory value, which is null after a restart; the countdown then
+	// collapsed to a constant equal to refresh_secs.
+	var nextCycleAt any
+	if cfg.RefreshSecs > 0 {
+		start, ok := s.db.LastCycleAt()
+		if snapshot := s.last_cycle.Snapshot(); snapshot.LastStartedAt != nil && (!ok || snapshot.LastStartedAt.After(start)) {
+			start, ok = *snapshot.LastStartedAt, true
+		}
+		if ok {
+			nextCycleAt = start.Add(time.Duration(cfg.RefreshSecs) * time.Second).UTC().Format(time.RFC3339)
+		}
+	}
 	jsonResponse(w, map[string]any{
 		"name":            "gextto",
 		"version":         "1.0." + constants.Build,
@@ -491,6 +506,7 @@ func Status(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"dry_run":         cfg.DryRun,
 		"setup_completed": SetupComplete(cfg),
 		"last_cycle":      s.last_cycle.Snapshot(),
+		"next_cycle_at":   nextCycleAt,
 		"torrent_stats":   s.torrents.Stats(),
 		"seen": map[string]any{
 			"movies": seenMovies,
