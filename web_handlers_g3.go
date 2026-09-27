@@ -373,7 +373,7 @@ func MovieMetadataSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	source := strings.ToLower(strings.TrimSpace(input.Source))
-	ctx, cancel := context.WithTimeout(context.Background(), gh3ExternalSearchTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), gh3ExternalSearchTimeout)
 	defer cancel()
 	items := []any{}
 	var lookupErr error
@@ -425,7 +425,7 @@ func PlexRefresh(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	endpoint := strings.TrimRight(strings.TrimSpace(url), "/") + "/library/sections/all/refresh"
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	response, err := HTTPGet(ctx, endpoint, map[string]string{"X-Plex-Token": token})
 	if err != nil {
@@ -675,7 +675,7 @@ func SimklScrobble(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	client := (&SimklClient{}).FromSettings(cfg.Settings)
-	value, err := client.MarkWatched(context.Background(), input.Payload)
+	value, err := client.MarkWatched(r.Context(), input.Payload)
 	if err != nil {
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return

@@ -856,6 +856,8 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		term = &value
 	}
 	client := &http.Client{Timeout: 45 * time.Second}
+	// Health probes are request-bound: a client that navigates away stops them.
+	ctx := r.Context()
 
 	tasks := []func() map[string]any{}
 	if term != nil {
@@ -865,7 +867,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		for _, feed := range cfg.FeedURLs {
 			feed := feed
 			tasks = append(tasks, func() map[string]any {
-				items, err := FetchFeed(context.Background(), feed, cfg.FlaresolverrURL, feedMaxPages, maxAgeDays, oldRatio)
+				items, err := FetchFeed(ctx, feed, cfg.FlaresolverrURL, feedMaxPages, maxAgeDays, oldRatio)
 				if err != nil {
 					return map[string]any{"kind": "feed", "name": feed, "ok": false, "results": int64(0), "error": err.Error()}
 				}
@@ -878,7 +880,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			indexer := indexer
 			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznab(context.Background(), indexer, *term)
+				items, err := FetchTorznab(ctx, indexer, *term)
 				if err != nil {
 					return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}
 				}
@@ -888,7 +890,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		for _, engine := range cfg.WebsearchEngines {
 			engine := engine
 			tasks = append(tasks, func() map[string]any {
-				items, err := runWebEngine(context.Background(), engine, *term, cfg.FlaresolverrURL)
+				items, err := runWebEngine(ctx, engine, *term, cfg.FlaresolverrURL)
 				if err != nil {
 					return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
 				}
@@ -899,7 +901,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		for _, feed := range cfg.FeedURLs {
 			feed := feed
 			tasks = append(tasks, func() map[string]any {
-				request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, feed, nil)
+				request, err := http.NewRequestWithContext(ctx, http.MethodGet, feed, nil)
 				if err != nil {
 					return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
 				}
@@ -918,7 +920,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			indexer := indexer
 			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznab(context.Background(), indexer, "ita")
+				items, err := FetchTorznab(ctx, indexer, "ita")
 				if err != nil {
 					return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}
 				}
@@ -928,7 +930,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		for _, engine := range cfg.WebsearchEngines {
 			engine := engine
 			tasks = append(tasks, func() map[string]any {
-				items, err := runWebEngine(context.Background(), engine, "ita", cfg.FlaresolverrURL)
+				items, err := runWebEngine(ctx, engine, "ita", cfg.FlaresolverrURL)
 				if err != nil {
 					return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
 				}

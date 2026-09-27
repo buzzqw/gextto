@@ -396,7 +396,7 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 		tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-		ctx, cancel := context.WithTimeout(context.Background(), gh6ExternalSearchTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), gh6ExternalSearchTimeout)
 		defer cancel()
 		item, err := tmdb.MovieDetails(ctx, externalID)
 		if err != nil {
@@ -420,7 +420,7 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 			jsonError(w, http.StatusConflict, "TVDB API key is not configured")
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), gh6ExternalSearchTimeout)
+		ctx, cancel := context.WithTimeout(r.Context(), gh6ExternalSearchTimeout)
 		defer cancel()
 		item, err := tvdb.MovieDetails(ctx, externalID)
 		if err != nil {
@@ -1237,7 +1237,7 @@ func SimklWatchlist(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusConflict, "Simkl non configurato")
 		return
 	}
-	value, err := client.Watchlist(context.Background())
+	value, err := client.Watchlist(r.Context())
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
@@ -1266,7 +1266,7 @@ func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 		window = *input.Window
 	}
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	ctx := context.Background()
+	ctx := r.Context()
 	mode := ""
 	if input.Mode != nil {
 		mode = *input.Mode
