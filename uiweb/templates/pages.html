@@ -124,8 +124,20 @@
     <div class="panel-body">
       <label class="field"><span>Feed RSS (un URL per riga)</span><textarea data-library-feeds rows="3"></textarea></label>
       <label class="field"><span>Indexer Torznab (JSON)</span><textarea data-library-indexers rows="5"></textarea></label>
+      <label class="field"><span>Serie monitorizzate (JSON)</span><textarea data-library-series rows="4"></textarea></label>
+      <label class="field"><span>Film monitorizzati (JSON)</span><textarea data-library-movies rows="4"></textarea></label>
       <div class="form-actions"><button class="btn sm primary" data-library-save>Salva libreria</button><small class="muted" data-library-message></small></div>
-      <p class="hint">Serie, film, filtri per sorgente, tag-dir ed event hook si gestiscono dalla UI classica.</p>
+    </div>
+  </div>
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>Configurazione avanzata</h3></div>
+    <div class="panel-body">
+      {{range .Editors}}
+      <div data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}">
+        <label class="field"><span>{{.Label}}</span><textarea rows="4"></textarea></label>
+        <div class="form-actions"><button class="btn sm primary">Salva</button><small class="muted"></small></div>
+      </div>
+      {{end}}
     </div>
   </div>
   <p class="muted">Ogni campo si salva singolarmente. I valori sensibili non vengono mai mostrati.</p>

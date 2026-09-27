@@ -83,7 +83,25 @@ type uiSettingsTabData struct {
 }
 
 type uiSettingsPage struct {
-	Tabs []uiSettingsTabData
+	Tabs    []uiSettingsTabData
+	Editors []uiJSONEditor
+}
+
+// uiJSONEditor is a generic JSON editor for a structured configuration
+// endpoint: GET to load, POST to save. It keeps the new UI self-sufficient for
+// configurations that the classic UI edited with bespoke widgets.
+type uiJSONEditor struct {
+	Label    string
+	GetPath  string
+	PostPath string
+	Hint     string
+}
+
+var uiJSONEditors = []uiJSONEditor{
+	{Label: "Filtri per sorgente", GetPath: "/api/config/source-filters", PostPath: "/api/config/source-filters"},
+	{Label: "Regole tag → cartella", GetPath: "/api/tag-dir-rules", PostPath: "/api/tag-dir-rules"},
+	{Label: "Event hook", GetPath: "/api/event-hooks", PostPath: "/api/event-hooks"},
+	{Label: "Cartelle osservate", GetPath: "/api/watched-folders", PostPath: "/api/watched-folders"},
 }
 
 // uiSettingsPageFrom builds the settings page from the generated index and the
@@ -138,6 +156,7 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 	if len(other.Fields) > 0 {
 		page.Tabs = append(page.Tabs, other)
 	}
+	page.Editors = uiJSONEditors
 	return page
 }
 

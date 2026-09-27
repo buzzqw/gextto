@@ -304,11 +304,15 @@
     var library = null;
     var feedsInput = libraryEditor.querySelector("[data-library-feeds]");
     var indexersInput = libraryEditor.querySelector("[data-library-indexers]");
+    var seriesInput = libraryEditor.querySelector("[data-library-series]");
+    var moviesInput = libraryEditor.querySelector("[data-library-movies]");
     var libraryMessage = libraryEditor.querySelector("[data-library-message]");
     api("/api/config/library", "GET").then(function (data) {
       library = data || {};
       if (feedsInput) feedsInput.value = (library.feed_urls || []).join("\n");
       if (indexersInput) indexersInput.value = JSON.stringify(library.indexers || [], null, 2);
+      if (seriesInput) seriesInput.value = JSON.stringify(library.series || [], null, 2);
+      if (moviesInput) moviesInput.value = JSON.stringify(library.movies || [], null, 2);
     }).catch(function (error) {
       if (libraryMessage) libraryMessage.textContent = error.message;
     });
@@ -324,6 +328,14 @@
         try { library.indexers = JSON.parse(indexersInput.value || "[]"); }
         catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
       }
+      if (seriesInput) {
+        try { library.series = JSON.parse(seriesInput.value || "[]"); }
+        catch (error) { alert("Serie JSON non valido: " + error.message); return; }
+      }
+      if (moviesInput) {
+        try { library.movies = JSON.parse(moviesInput.value || "[]"); }
+        catch (error) { alert("Film JSON non valido: " + error.message); return; }
+      }
       saveLibrary.disabled = true;
       api("/api/config/library", "POST", library).then(function () {
         if (libraryMessage) libraryMessage.textContent = "Libreria salvata";
@@ -332,6 +344,28 @@
       }).then(function () { saveLibrary.disabled = false; });
     });
   }
+
+  // ---- generic JSON editors ----------------------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-json-editor]"), function (editor) {
+    var textarea = editor.querySelector("textarea");
+    var message = editor.querySelector("small");
+    var button = editor.querySelector("button");
+    api(editor.getAttribute("data-get"), "GET").then(function (data) {
+      if (textarea) textarea.value = JSON.stringify(data, null, 2);
+    }).catch(function (error) { if (message) message.textContent = error.message; });
+    if (!button) return;
+    button.addEventListener("click", function () {
+      var parsed;
+      try { parsed = JSON.parse((textarea && textarea.value) || "null"); }
+      catch (error) { alert("JSON non valido: " + error.message); return; }
+      button.disabled = true;
+      api(editor.getAttribute("data-post"), "POST", parsed).then(function () {
+        if (message) message.textContent = "Salvato";
+      }).catch(function (error) {
+        alert("Salvataggio non riuscito: " + error.message);
+      }).then(function () { button.disabled = false; });
+    });
+  });
 
   // ---- OAuth / PIN flows (Trakt, Simkl) -----------------------------------
   document.addEventListener("click", function (event) {
