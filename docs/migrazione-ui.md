@@ -831,3 +831,30 @@ da migrare prima di rimuovere Rust:
 
 La rimozione di Rust/WASM/cargo-leptos va fatta solo dopo aver migrato questi tre
 punti, altrimenti si perderebbero funzioni.
+
+
+---
+
+## 20. Dettagli e ultimi flussi migrati
+
+Completati nella nuova UI (nessun fallback):
+- **Dettaglio Serie TV** (`/?view=series&series=<nome>`): elenco episodi con
+  azioni `ignore`/`force`/`redownload`/`search`/`delete` sugli endpoint
+  `/api/episodes/...`; colonna nome della lista che apre il dettaglio.
+- **Dettaglio Film** (`/?view=movies&movie=<id>`): modifica inline
+  (`POST /api/movies/{id}`), `search`/`redownload`/`metadata`/`delete`,
+  corrispondenze archivio e storico.
+- **Fumetti**: azioni attiva/disattiva/elimina, coda download
+  (`/api/comics/downloads` con pausa/riprendi/rimuovi) e ricerca link GetComics
+  (`POST /api/comics/links` → pulsanti `POST /api/comics/download` per
+  download_now/direct/torrent/magnet/mega).
+- **Traduzioni i18n**: lingua attiva, modifica inline delle chiavi, import YAML,
+  export YAML, elimina lingua.
+
+### Uniche voci ancora in `/legacy`
+1. **Fumetti**: assegnazione del *tag* ai download e **pianificazione
+   settimanale** (`/api/comics/weekly/*`).
+2. Eventuale ricerca metadati film alternativa (`/api/movies/{id}/metadata/search`).
+
+Tutto il resto è nella nuova UI. Leptos resta montato su `/legacy` finché non
+dai il via alla rimozione.
