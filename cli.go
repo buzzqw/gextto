@@ -47,6 +47,8 @@ const (
 	// CommandMigrate copies and renames a legacy data directory into the
 	// current gextto layout.
 	CommandMigrate
+	// CommandTUI opens the interactive terminal interface.
+	CommandTUI
 )
 
 // Command is a parsed command line.
@@ -65,6 +67,11 @@ type Command struct {
 	From string
 	To   string
 
+	// TUI fields.
+	TUIURL   string
+	TUIToken string
+	TUILang  string
+
 	// Update fields.
 	Options UpdateOptions
 }
@@ -82,6 +89,9 @@ func Parse(args []string) Command {
 	}
 	if len(args) > 0 && args[0] == "migrate" {
 		return parseMigrate(args[1:])
+	}
+	if len(args) > 0 && args[0] == "tui" {
+		return parseTUI(args[1:])
 	}
 
 	if hasFlag(args, "--help", "-h") {
@@ -172,6 +182,31 @@ func parseMigrate(args []string) Command {
 	return Command{Kind: CommandMigrate, From: from, To: to}
 }
 
+func parseTUI(args []string) Command {
+	command := Command{Kind: CommandTUI}
+	for index := 0; index < len(args); index++ {
+		value := args[index]
+		switch {
+		case (value == "--url" || value == "-u") && index+1 < len(args):
+			command.TUIURL = args[index+1]
+			index++
+		case strings.HasPrefix(value, "--url="):
+			command.TUIURL = value[len("--url="):]
+		case value == "--token" && index+1 < len(args):
+			command.TUIToken = args[index+1]
+			index++
+		case strings.HasPrefix(value, "--token="):
+			command.TUIToken = value[len("--token="):]
+		case (value == "--lang" || value == "-l") && index+1 < len(args):
+			command.TUILang = args[index+1]
+			index++
+		case strings.HasPrefix(value, "--lang="):
+			command.TUILang = value[len("--lang="):]
+		}
+	}
+	return command
+}
+
 func parseUpdate(args []string) UpdateOptions {
 	options := UpdateOptions{Restart: true}
 	for index := 0; index < len(args); index++ {
@@ -231,6 +266,7 @@ func Usage() string {
 
 USAGE:
     %s [OPTIONS]
+    %s tui [--url <url>] [--token <token>] [--lang it|en]
     %s import --from-copy <dir> [--data-dir <dir>]
     %s migrate --from <dir> [--to <dir>]
     %s --update [OPTIONS]
@@ -240,6 +276,11 @@ OPTIONS:
     -V, --version         Show the installed version and exit
     --config <file>       Configuration file (default: gextto.json)
     --dry-run             Never start real downloads
+
+TUI OPTIONS:
+    -u, --url <url>       Daemon URL (default: GEXTTO_URL or http://127.0.0.1:5000)
+    --token <token>       API token (default: GEXTTO_API_TOKEN)
+    -l, --lang <it|en>    Interface language (default: daemon language)
 
 MIGRATE OPTIONS:
     --from <dir>          Source data directory to migrate (required)
@@ -255,7 +296,7 @@ UPDATE OPTIONS:
     --no-restart          Do not restart the service after updating
 `,
 		constants.AppName, constants.Version, appAbout,
-		constants.AppName, constants.AppName, constants.AppName, constants.AppName,
+		constants.AppName, constants.AppName, constants.AppName, constants.AppName, constants.AppName,
 		DefaultRepo,
 	)
 }

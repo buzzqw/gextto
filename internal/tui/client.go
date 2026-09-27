@@ -1,0 +1,485 @@
+package tui
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+)
+
+// Torrent mirrors the JSON returned by /api/torrents.
+type Torrent struct {
+	Hash            string   `json:"hash"`
+	Name            string   `json:"name"`
+	State           string   `json:"state"`
+	Progress        float64  `json:"progress"`
+	TotalSize       uint64   `json:"total_size"`
+	TotalDone       uint64   `json:"total_done"`
+	AllTimeDownload uint64   `json:"all_time_download"`
+	AllTimeUpload   uint64   `json:"all_time_upload"`
+	DownloadRate    uint64   `json:"download_rate"`
+	UploadRate      uint64   `json:"upload_rate"`
+	NumPeers        int64    `json:"num_peers"`
+	NumSeeds        int64    `json:"num_seeds"`
+	QueuePosition   int64    `json:"queue_position"`
+	SeedRatio       *float64 `json:"seed_ratio"`
+	SeedDays        *float64 `json:"seed_days"`
+	HasMetadata     bool     `json:"has_metadata"`
+	AutoManaged     bool     `json:"auto_managed"`
+	IsSeeding       bool     `json:"is_seeding"`
+	Archived        bool     `json:"archived"`
+	SavePath        string   `json:"save_path"`
+	CurrentTracker  string   `json:"current_tracker"`
+	Source          string   `json:"source"`
+	Reason          string   `json:"reason"`
+	TorrentVersion  string   `json:"torrent_version"`
+	Error           string   `json:"error"`
+	DownloadLimit   int64    `json:"download_limit"`
+	UploadLimit     int64    `json:"upload_limit"`
+}
+
+// TorrentDetail is the response of /api/torrents/{hash}.
+type TorrentDetail struct {
+	OK       bool    `json:"ok"`
+	Magnet   string  `json:"magnet"`
+	NoRename bool    `json:"no_rename"`
+	Torrent  Torrent `json:"torrent"`
+}
+
+// TorrentStats is the summary block of /api/status.
+type TorrentStats struct {
+	Count       int64 `json:"count"`
+	Downloading int64 `json:"downloading"`
+	Queued      int64 `json:"queued"`
+	Seeding     int64 `json:"seeding"`
+	Stalled     int64 `json:"stalled"`
+}
+
+// LastCycle is the last cycle summary of /api/status.
+type LastCycle struct {
+	Scraped          int64   `json:"scraped"`
+	Candidates       int64   `json:"candidates"`
+	DownloadsStarted int64   `json:"downloads_started"`
+	GapsFilled       int64   `json:"gaps_filled"`
+	Errors           int64   `json:"errors"`
+	LastStartedAt    *string `json:"last_started_at"`
+}
+
+// Seen counts feed entries.
+type Seen struct {
+	Movies int64 `json:"movies"`
+	Series int64 `json:"series"`
+	Groups int64 `json:"groups"`
+}
+
+// Status mirrors /api/status.
+type Status struct {
+	Name         string       `json:"name"`
+	Version      string       `json:"version"`
+	Active       bool         `json:"active"`
+	DryRun       bool         `json:"dry_run"`
+	NextCycleAt  *string      `json:"next_cycle_at"`
+	TorrentStats TorrentStats `json:"torrent_stats"`
+	LastCycle    LastCycle    `json:"last_cycle"`
+	Seen         Seen         `json:"seen"`
+}
+
+// PathCheck is one health path entry.
+type PathCheck struct {
+	Label    string `json:"label"`
+	Path     string `json:"path"`
+	Exists   bool   `json:"exists"`
+	Writable bool   `json:"writable"`
+}
+
+// DiskInfo is one mounted disk.
+type DiskInfo struct {
+	Mount      string `json:"mount"`
+	Filesystem string `json:"filesystem"`
+	TotalBytes uint64 `json:"total_bytes"`
+	FreeBytes  uint64 `json:"free_bytes"`
+}
+
+// RamDiskInfo describes the RAM disk.
+type RamDiskInfo struct {
+	Path       string `json:"path"`
+	TotalBytes uint64 `json:"total_bytes"`
+	FreeBytes  uint64 `json:"free_bytes"`
+}
+
+// Health mirrors /api/health.
+type Health struct {
+	Status               string       `json:"status"`
+	ProcessID            int64        `json:"process_id"`
+	ResidentBytes        uint64       `json:"resident_bytes"`
+	MemoryTotalBytes     uint64       `json:"memory_total_bytes"`
+	MemoryAvailableBytes uint64       `json:"memory_available_bytes"`
+	CPUPercent           *float64     `json:"cpu_percent"`
+	ProcessCPUPercent    *float64     `json:"process_cpu_percent"`
+	LoadAverage          *float64     `json:"load_average"`
+	DiskTotalBytes       uint64       `json:"disk_total_bytes"`
+	DiskFreeBytes        uint64       `json:"disk_free_bytes"`
+	UptimeSeconds        uint64       `json:"uptime_seconds"`
+	ProcessUptimeSeconds uint64       `json:"process_uptime_seconds"`
+	TrashFileCount       uint64       `json:"trash_file_count"`
+	TrashBytes           uint64       `json:"trash_bytes"`
+	DataDirWritable      bool         `json:"data_dir_writable"`
+	Paths                []PathCheck  `json:"paths"`
+	Disks                []DiskInfo   `json:"disks"`
+	Ramdisk              *RamDiskInfo `json:"ramdisk"`
+	LastErrors           []string     `json:"last_errors"`
+}
+
+// Event is one entry of /api/torrent-events.
+type Event struct {
+	Kind     string `json:"kind"`
+	Hash     string `json:"hash"`
+	Name     string `json:"name"`
+	SavePath string `json:"save_path"`
+	Message  string `json:"message"`
+}
+
+// APIError carries the HTTP status of a failed request.
+type APIError struct {
+	Status int
+	Detail string
+}
+
+func (e *APIError) Error() string {
+	if e.Detail == "" {
+		return fmt.Sprintf("HTTP %d", e.Status)
+	}
+	return fmt.Sprintf("HTTP %d: %s", e.Status, e.Detail)
+}
+
+// Client talks to a running gextto daemon over HTTP.
+type Client struct {
+	base  string
+	token string
+	http  *http.Client
+}
+
+// NewClient builds a client for base (e.g. http://127.0.0.1:5000).
+func NewClient(base, token string) *Client {
+	return &Client{
+		base:  strings.TrimRight(strings.TrimSpace(base), "/"),
+		token: strings.TrimSpace(token),
+		http:  &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *Client) do(request *http.Request) (*http.Response, error) {
+	if c.token != "" {
+		request.Header.Set("X-Gextto-Token", c.token)
+	}
+	request.Header.Set("Accept", "application/json")
+	return c.http.Do(request)
+}
+
+func (c *Client) decode(response *http.Response, out any) error {
+	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		detail, _ := io.ReadAll(io.LimitReader(response.Body, 512))
+		return &APIError{Status: response.StatusCode, Detail: strings.TrimSpace(string(detail))}
+	}
+	if out == nil {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return nil
+	}
+	return json.NewDecoder(response.Body).Decode(out)
+}
+
+func (c *Client) get(ctx context.Context, path string, out any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+path, nil)
+	if err != nil {
+		return err
+	}
+	response, err := c.do(request)
+	if err != nil {
+		return err
+	}
+	return c.decode(response, out)
+}
+
+func (c *Client) postJSON(ctx context.Context, path string, body any, out any) error {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+path, bytes.NewReader(encoded))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := c.do(request)
+	if err != nil {
+		return err
+	}
+	return c.decode(response, out)
+}
+
+// Status fetches the daemon summary.
+func (c *Client) Status(ctx context.Context) (Status, error) {
+	var status Status
+	err := c.get(ctx, "/api/status", &status)
+	return status, err
+}
+
+// Torrents fetches the session torrents (already sorted by name).
+func (c *Client) Torrents(ctx context.Context) ([]Torrent, error) {
+	var torrents []Torrent
+	err := c.get(ctx, "/api/torrents", &torrents)
+	if torrents == nil {
+		torrents = []Torrent{}
+	}
+	return torrents, err
+}
+
+// TorrentDetail fetches one torrent with its magnet and no-rename flag.
+func (c *Client) TorrentDetail(ctx context.Context, hash string) (TorrentDetail, error) {
+	var detail TorrentDetail
+	err := c.get(ctx, "/api/torrents/"+url.PathEscape(hash), &detail)
+	return detail, err
+}
+
+// TorrentCollection fetches trackers, files or peers for a torrent.
+func (c *Client) TorrentCollection(ctx context.Context, hash, kind string) ([]map[string]any, error) {
+	var raw map[string]json.RawMessage
+	if err := c.get(ctx, "/api/torrents/"+url.PathEscape(hash)+"/"+kind, &raw); err != nil {
+		return nil, err
+	}
+	items := []map[string]any{}
+	if payload, ok := raw[kind]; ok {
+		_ = json.Unmarshal(payload, &items)
+	}
+	return items, nil
+}
+
+// Logs fetches the last log lines.
+func (c *Client) Logs(ctx context.Context, limit int) ([]string, error) {
+	var response struct {
+		Items []string `json:"items"`
+	}
+	err := c.get(ctx, fmt.Sprintf("/api/logs?limit=%d", limit), &response)
+	if response.Items == nil {
+		response.Items = []string{}
+	}
+	return response.Items, err
+}
+
+// Health fetches the system health report.
+func (c *Client) Health(ctx context.Context) (Health, error) {
+	var health Health
+	err := c.get(ctx, "/api/health", &health)
+	return health, err
+}
+
+// Events fetches the recent torrent events.
+func (c *Client) Events(ctx context.Context) ([]Event, error) {
+	var events []Event
+	err := c.get(ctx, "/api/torrent-events", &events)
+	if events == nil {
+		events = []Event{}
+	}
+	return events, err
+}
+
+// RunCycle starts a cycle (full, series, movies or comics).
+func (c *Client) RunCycle(ctx context.Context, domain string) (map[string]any, error) {
+	path := "/api/run_now"
+	if domain != "" && domain != "full" {
+		path += "?domain=" + url.QueryEscape(domain)
+	}
+	var result map[string]any
+	err := c.postJSON(ctx, path, map[string]any{}, &result)
+	return result, err
+}
+
+// AddMagnet adds a magnet or torrent URL.
+func (c *Client) AddMagnet(ctx context.Context, magnet string) error {
+	return c.postJSON(ctx, "/api/send-magnet", map[string]any{"magnet": magnet}, nil)
+}
+
+// AddTorrentFile uploads a .torrent file.
+func (c *Client) AddTorrentFile(ctx context.Context, path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("empty file")
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/api/upload-torrent", bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/x-bittorrent")
+	response, err := c.do(request)
+	if err != nil {
+		return err
+	}
+	return c.decode(response, nil)
+}
+
+// Search runs a manual search.
+func (c *Client) Search(ctx context.Context, query string) ([]map[string]any, error) {
+	var response struct {
+		Results []map[string]any `json:"results"`
+	}
+	if err := c.postJSON(ctx, "/api/search", map[string]any{"query": query}, &response); err != nil {
+		return nil, err
+	}
+	if response.Results == nil {
+		response.Results = []map[string]any{}
+	}
+	return response.Results, nil
+}
+
+// AddRelease queues one search result.
+func (c *Client) AddRelease(ctx context.Context, release map[string]any) error {
+	return c.postJSON(ctx, "/api/search/add", map[string]any{"release": release}, nil)
+}
+
+// Pause pauses a torrent.
+func (c *Client) Pause(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/pause", map[string]any{}, nil)
+}
+
+// Resume resumes a torrent.
+func (c *Client) Resume(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/resume", map[string]any{}, nil)
+}
+
+// Restart restarts a torrent.
+func (c *Client) Restart(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/restart", map[string]any{}, nil)
+}
+
+// Recheck forces a data check.
+func (c *Client) Recheck(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/recheck", map[string]any{}, nil)
+}
+
+// Reannounce re-announces to trackers.
+func (c *Client) Reannounce(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/reannounce", map[string]any{}, nil)
+}
+
+// Remove removes a torrent, optionally deleting its files.
+func (c *Client) Remove(ctx context.Context, hash string, deleteFiles, blocklist bool) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/remove",
+		map[string]any{"delete_files": deleteFiles, "blocklist": blocklist}, nil)
+}
+
+// Pin pins a torrent.
+func (c *Client) Pin(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/torrents/pin", map[string]any{"hash": hash}, nil)
+}
+
+// Unpin clears the pin.
+func (c *Client) Unpin(ctx context.Context) error {
+	return c.postJSON(ctx, "/api/torrents/unpin", map[string]any{}, nil)
+}
+
+// SetNoRename toggles the no-rename flag.
+func (c *Client) SetNoRename(ctx context.Context, hash string, value bool) error {
+	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/no_rename", map[string]any{"value": value}, nil)
+}
+
+// RemoveCompleted removes completed torrents that reached their seed limit.
+func (c *Client) RemoveCompleted(ctx context.Context, deleteFiles bool) (map[string]any, error) {
+	var result map[string]any
+	err := c.postJSON(ctx, "/api/torrents/remove_completed", map[string]any{"delete_files": deleteFiles}, &result)
+	return result, err
+}
+
+// SetSpeedLimits sets the global KiB/s limits.
+func (c *Client) SetSpeedLimits(ctx context.Context, downloadKib, uploadKib int64) error {
+	return c.postJSON(ctx, "/api/set-speed-limits",
+		map[string]any{"download_kib": downloadKib, "upload_kib": uploadKib}, nil)
+}
+
+// CleanTrash empties the trash.
+func (c *Client) CleanTrash(ctx context.Context) (map[string]any, error) {
+	var result map[string]any
+	err := c.postJSON(ctx, "/api/maintenance/clean-trash", map[string]any{"force": true}, &result)
+	return result, err
+}
+
+// Language asks the daemon for its active UI language.
+func (c *Client) Language(ctx context.Context) (string, error) {
+	var response struct {
+		Lang string `json:"lang"`
+	}
+	if err := c.get(ctx, "/api/i18n/active", &response); err != nil {
+		return "", err
+	}
+	return response.Lang, nil
+}
+
+// StreamLogs consumes the SSE log stream until ctx is cancelled. snapshots
+// replaces the buffer, lines appends single entries.
+func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines func(string)) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/logs/stream?limit=500", nil)
+	if err != nil {
+		return err
+	}
+	if c.token != "" {
+		request.Header.Set("X-Gextto-Token", c.token)
+	}
+	request.Header.Set("Accept", "text/event-stream")
+	response, err := c.http.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		return &APIError{Status: response.StatusCode}
+	}
+	reader := bufio.NewReader(response.Body)
+	var data []string
+	for {
+		raw, err := reader.ReadString('\n')
+		if err != nil {
+			if len(data) > 0 {
+				c.emitEvent(strings.Join(data, "\n"), snapshots, lines)
+			}
+			return err
+		}
+		line := strings.TrimRight(raw, "\r\n")
+		switch {
+		case strings.HasPrefix(line, "data:"):
+			data = append(data, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
+		case line == "" && len(data) > 0:
+			c.emitEvent(strings.Join(data, "\n"), snapshots, lines)
+			data = nil
+		}
+	}
+}
+
+func (c *Client) emitEvent(payload string, snapshots func([]string), lines func(string)) {
+	var value map[string]any
+	if err := json.Unmarshal([]byte(payload), &value); err != nil {
+		return
+	}
+	if snapshot, ok := value["snapshot"].([]any); ok {
+		converted := make([]string, 0, len(snapshot))
+		for _, entry := range snapshot {
+			converted = append(converted, fmt.Sprint(entry))
+		}
+		if snapshots != nil {
+			snapshots(converted)
+		}
+		return
+	}
+	if line, ok := value["line"]; ok && lines != nil {
+		lines(fmt.Sprint(line))
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/messages"
+	"github.com/buzzqw/gextto/internal/tui"
 )
 
 func main() {
@@ -46,6 +47,17 @@ func main() {
 		fmt.Println(string(encoded))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "migrate failed:", err)
+			os.Exit(1)
+		}
+		return
+	case gextto.CommandTUI:
+		err := tui.Run(context.Background(), tui.Options{
+			URL:   command.TUIURL,
+			Token: command.TUIToken,
+			Lang:  command.TUILang,
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "tui:", err)
 			os.Exit(1)
 		}
 		return

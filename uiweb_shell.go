@@ -81,7 +81,11 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))
 
 	if cfg.RefreshSecs > 0 {
-		if start, ok := s.db.LastCycleAt(); ok {
+		start, ok := s.db.LastCycleAt()
+		if snapshot := s.last_cycle.Snapshot(); snapshot.LastStartedAt != nil && (!ok || snapshot.LastStartedAt.After(start)) {
+			start, ok = *snapshot.LastStartedAt, true
+		}
+		if ok {
 			remaining := int64(start.Add(durationFromSeconds(cfg.RefreshSecs)).Sub(time.Now()).Seconds())
 			if remaining < 0 {
 				remaining = 0
