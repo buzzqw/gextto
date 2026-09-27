@@ -29,7 +29,7 @@ mkdir -p "$(dirname "$OUT")"
 (
     cd "$ROOT"
     CGO_ENABLED=1 go build -trimpath \
-        -ldflags "-s -w -X gextto/internal/constants.Version=$VERSION -X gextto/internal/constants.Build=$BUILD" \
+        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
         -o "$OUT" ./cmd/gexttod
 )
 printf 'built %s (version %s, build %s)\n' "$OUT" "$VERSION" "$BUILD"
