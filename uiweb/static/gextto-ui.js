@@ -106,4 +106,116 @@
 
   document.addEventListener("visibilitychange", schedule);
   schedule();
+
+  // ---- generic list pages -------------------------------------------------
+  function esc(value) {
+    return String(value === null || value === undefined ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function humanBytes(value) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB", "TB", "PB"];
+    var index = 0;
+    while (n >= 1024 && index < units.length - 1) { n /= 1024; index++; }
+    return (index === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + units[index];
+  }
+  function fmt(value, format) {
+    if (value === null || value === undefined || value === "") return "";
+    switch (format) {
+      case "bool": return value ? "Sì" : "No";
+      case "bytes": return humanBytes(value);
+      case "rate": return humanBytes(value) + "/s";
+      case "percent": return Number(value).toFixed(1) + "%";
+      default: return String(value);
+    }
+  }
+  function renderTable(container) {
+    var panel = container.closest(".panel");
+    var table = panel.querySelector("table");
+    var thead = panel.querySelector("[data-ui-head]");
+    var tbody = panel.querySelector("[data-ui-body]");
+    var count = panel.querySelector("[data-ui-count]");
+    var searchInput = panel.querySelector("[data-ui-search]");
+    var endpoint = container.getAttribute("data-endpoint");
+    var itemsKey = container.getAttribute("data-items") || "items";
+    var columns = JSON.parse(container.getAttribute("data-columns") || "[]");
+    var actions = JSON.parse(container.getAttribute("data-actions") || "[]");
+    var empty = container.getAttribute("data-empty") || "Nessun elemento.";
+    var searchParam = container.getAttribute("data-search") || "";
+    function fetchAndRender() {
+      var url = endpoint;
+      if (searchParam && searchInput && searchInput.value) {
+        url += (url.indexOf("?") >= 0 ? "&" : "?") + searchParam + "=" + encodeURIComponent(searchInput.value);
+      }
+      api(url, "GET").then(function (data) {
+        var items = itemsKey ? (data[itemsKey] || []) : (Array.isArray(data) ? data : []);
+        if (!columns.length && items.length) {
+          columns = Object.keys(items[0]).filter(function (key) {
+            var value = items[0][key];
+            return value === null || typeof value !== "object";
+          }).slice(0, 8).map(function (key) { return { key: key, label: key }; });
+        }
+        var colspan = columns.length + (actions.length ? 1 : 0);
+        thead.innerHTML = "<tr>" + columns.map(function (column) {
+          return "<th>" + esc(column.label) + "</th>";
+        }).join("") + (actions.length ? "<th>Azioni</th>" : "") + "</tr>";
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td class="muted" colspan="' + colspan + '">' + esc(empty) + "</td></tr>";
+        } else {
+          tbody.innerHTML = items.map(function (row) {
+            var cells = columns.map(function (column) {
+              return "<td>" + esc(fmt(row[column.key], column.format)) + "</td>";
+            }).join("");
+            var actionsHtml = "";
+            if (actions.length) {
+              actionsHtml = '<td class="row-actions">' + actions.map(function (action) {
+                var path = action.path.replace(/\{([a-z_]+)\}/g, function (_, key) {
+                  return encodeURIComponent(row[key]);
+                });
+                var confirmAttr = action.confirm ? ' data-confirm="' + esc(action.confirm) + '"' : "";
+                return '<button class="btn sm ' + (action.class || "") + '" data-api="' + esc(path) +
+                  '" data-method="' + esc(action.method || "POST") + '" data-body="' + esc(action.body || "{}") +
+                  '"' + confirmAttr + ">" + esc(action.label) + "</button>";
+              }).join(" ") + "</td>";
+            }
+            return "<tr>" + cells + actionsHtml + "</tr>";
+          }).join("");
+        }
+        if (count) count.textContent = items.length + " voci";
+      }).catch(function (error) {
+        tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
+      });
+    }
+    container._refetch = fetchAndRender;
+    var refresh = panel.querySelector("[data-ui-refresh]");
+    if (refresh) refresh.addEventListener("click", fetchAndRender);
+    if (searchInput) searchInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") { event.preventDefault(); fetchAndRender(); }
+    });
+    fetchAndRender();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-ui-table]"), renderTable);
+
+  // ---- generic actions ----------------------------------------------------
+  document.addEventListener("click", function (event) {
+    var element = event.target.closest("[data-api]");
+    if (!element) return;
+    var confirmMessage = element.getAttribute("data-confirm");
+    if (confirmMessage && !confirm(confirmMessage)) return;
+    var body = {};
+    try { body = JSON.parse(element.getAttribute("data-body") || "{}"); } catch (error) { body = {}; }
+    element.disabled = true;
+    api(element.getAttribute("data-api"), element.getAttribute("data-method") || "POST", body)
+      .then(function () {
+        var container = element.closest(".panel") &&
+          element.closest(".panel").querySelector("[data-ui-table]");
+        if (container && container._refetch) { container._refetch(); return; }
+        if (partials[view]) { load(); return; }
+        location.reload();
+      })
+      .catch(function (error) { alert("Azione non riuscita: " + error.message); })
+      .then(function () { element.disabled = false; });
+  });
 })();

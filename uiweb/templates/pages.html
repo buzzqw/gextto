@@ -1,0 +1,51 @@
+{{define "table"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>{{.Title}}</h3>
+      <small class="muted" data-ui-count></small>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar" style="margin-bottom:10px">
+        {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+        <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead data-ui-head></thead>
+          <tbody data-ui-body>
+            <tr><td class="muted">Caricamento…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div data-ui-table
+           data-endpoint="{{.Endpoint}}"
+           data-items="{{.ItemsKey}}"
+           data-columns="{{.ColumnsJSON}}"
+           data-actions="{{.ActionsJSON}}"
+           data-empty="{{.Empty}}"
+           data-search="{{.SearchParam}}"></div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "actions"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Title}}</h3></div>
+    <div class="panel-body">
+      {{range .Sections}}
+      <div class="field span-full" style="margin:6px 0 8px"><span>{{.Label}}</span>{{if .Hint}}<small class="hint">{{.Hint}}</small>{{end}}</div>
+      <div class="toolbar" style="margin-bottom:14px">
+        {{range .Buttons}}
+        <button class="btn sm {{.Class}}"
+          data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"
+          {{if .Confirm}}data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}

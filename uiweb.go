@@ -247,14 +247,14 @@ func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Title:   uiPageLabel(view),
 		Page:    view,
 		Groups:  uiNavigation(view),
-		Content: uiPageContent(s, view),
+		Content: uiPageContent(s, r, view),
 	})
 }
 
 // uiPageContent builds the view-model of the requested page. Pages that are not
 // migrated yet get the placeholder model, which links back to the legacy UI so
 // no functionality is ever missing.
-func uiPageContent(s *AppState, view string) any {
+func uiPageContent(s *AppState, r *http.Request, view string) any {
 	switch view {
 	case "dashboard":
 		return uiDashboardDataFrom(s)
@@ -268,9 +268,17 @@ func uiPageContent(s *AppState, view string) any {
 		return uiManualDataFrom()
 	case "license":
 		return uiLicenseData{Text: uiLicenseText}
-	default:
-		return map[string]any{"Title": uiPageLabel(view)}
 	}
+	if spec, ok := uiTableSpecFor(view); ok {
+		if spec.Search && r != nil {
+			spec.Query = r.URL.Query().Get(spec.SearchParam)
+		}
+		return spec
+	}
+	if page, ok := uiActionsPageFor(view); ok {
+		return page
+	}
+	return map[string]any{"Title": uiPageLabel(view)}
 }
 
 // UiPartialDashboard renders the dashboard with server-side data.

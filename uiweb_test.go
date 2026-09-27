@@ -120,6 +120,35 @@ func TestUiServerRenderedPages(t *testing.T) {
 	}
 }
 
+func TestUiListAndActionPages(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	cases := map[string]string{
+		"series":       `data-endpoint="/api/series"`,
+		"movies":       `data-endpoint="/api/movies"`,
+		"gaps":         `data-endpoint="/api/gaps"`,
+		"archive":      `data-endpoint="/api/archive"`,
+		"blocklist":    `/api/blocklist/{hash}/remove`,
+		"maintenance":  `/api/database/rescore`,
+		"integrations": `/api/jellyfin/test`,
+	}
+	for view, marker := range cases {
+		code, _, body := webGet(t, server, "/ui?view="+view)
+		if code != http.StatusOK || !strings.Contains(string(body), marker) {
+			t.Fatalf("GET /ui?view=%s -> %d, missing %q", view, code, marker)
+		}
+	}
+	// Settings/Esplora/Fumetti still point to the legacy UI (no functionality lost).
+	for _, view := range []string{"settings", "search", "comics"} {
+		code, _, body := webGet(t, server, "/ui?view="+view)
+		if code != http.StatusOK || !strings.Contains(string(body), "Apri la UI classica") {
+			t.Fatalf("GET /ui?view=%s -> %d, missing legacy fallback", view, code)
+		}
+	}
+}
+
 func TestUiStateLabelParity(t *testing.T) {
 	cases := map[string]string{
 		"downloading":          "In scarico",

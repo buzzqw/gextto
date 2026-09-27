@@ -34,6 +34,8 @@
       {{else if eq .Page "logs"}}{{template "logs" .Content}}
       {{else if eq .Page "manual"}}{{template "manual" .Content}}
       {{else if eq .Page "license"}}{{template "license" .Content}}
+      {{else if or (eq .Page "series") (eq .Page "movies") (eq .Page "gaps") (eq .Page "archive") (eq .Page "blocklist")}}{{template "table" .Content}}
+      {{else if or (eq .Page "maintenance") (eq .Page "integrations")}}{{template "actions" .Content}}
       {{else}}{{template "unavailable" .Content}}{{end}}
     </main>
   </div>
