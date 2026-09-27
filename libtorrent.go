@@ -1,0 +1,1777 @@
+package gextto
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"math"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+	"unsafe"
+
+	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
+)
+
+// NativeTorrentStatus mirrors the bridge's gextto_lt_status ABI record.
+// Text fields are converted to Go strings at the cgo boundary.
+type NativeTorrentStatus struct {
+	Hash            string
+	Name            string
+	SavePath        string
+	Progress        float64
+	State           int32
+	Paused          int32
+	DownloadRate    int32
+	UploadRate      int32
+	NumPeers        int32
+	NumSeeds        int32
+	DownloadLimit   int32
+	UploadLimit     int32
+	AllTimeUpload   int64
+	AllTimeDownload int64
+	SeedingSeconds  int64
+	QueuePosition   int32
+	HasMetadata     int32
+	AutoManaged     int32
+	TorrentVersion  int32
+	TotalSize       int64
+	TotalDone       int64
+}
+
+// NativeTorrentEvent mirrors the bridge's gextto_lt_event ABI record.
+type NativeTorrentEvent struct {
+	Kind     int32
+	Hash     string
+	Name     string
+	SavePath string
+}
+
+// NativePeer mirrors the bridge's gextto_lt_peer ABI record.
+type NativePeer struct {
+	Address      string
+	Client       string
+	DownloadRate int32
+	UploadRate   int32
+	NumPieces    int32
+	Seed         int32
+}
+
+// NativeTracker mirrors the bridge's gextto_lt_tracker ABI record.
+type NativeTracker struct {
+	URL    string
+	Tier   int32
+	Status int32
+}
+
+// NativeFile mirrors the bridge's gextto_lt_file ABI record.
+type NativeFile struct {
+	Path       string
+	Size       int64
+	Downloaded int64
+	Priority   int32
+}
+
+// AddOptions are the options applied when a torrent is added, based on
+// qBittorrent's rich AddTorrentParams.
+type AddOptions struct {
+	// Paused adds the torrent in pause (no data transfer until resumed).
+	Paused bool
+	// Sequential enables per-torrent sequential download.
+	Sequential bool
+	// SeedMode assumes the data is already complete and skips the hash check.
+	SeedMode bool
+	// QueueTop moves the torrent to the top of the queue.
+	QueueTop bool
+	// FirstLast prioritises the first and last piece of every file.
+	FirstLast bool
+	// StopAtMetadata pauses automatically as soon as metadata is received.
+	StopAtMetadata bool
+}
+
+// Flags is the bitmask consumed by the native `*_ex` entry points.
+func (o AddOptions) Flags() int32 {
+	var flags int32
+	if o.Paused {
+		flags |= 1
+	}
+	if o.Sequential {
+		flags |= 1 << 1
+	}
+	if o.SeedMode {
+		flags |= 1 << 2
+	}
+	if o.QueueTop {
+		flags |= 1 << 3
+	}
+	return flags
+}
+
+// TrackerEntry is one (tier, URL) pair passed to SetTrackers.
+type TrackerEntry struct {
+	Tier int32
+	URL  string
+}
+
+// seedLimit is the per-torrent seed stop rule persisted in seed_limits.json.
+type seedLimit struct {
+	Ratio float64 `json:"ratio"`
+	Days  int64   `json:"days"`
+}
+
+// LibtorrentClient owns the native session and the live torrent bookkeeping.
+type LibtorrentClient struct {
+	torrentsMu sync.RWMutex
+	torrents   map[string]models.TorrentView
+
+	stalledMu sync.RWMutex
+	stalled   map[string]struct{}
+
+	// firstLastPending holds torrents waiting for metadata to apply first/last
+	// piece priorities.
+	firstLastMu      sync.RWMutex
+	firstLastPending map[string]struct{}
+
+	// stopAtMetadata holds torrents to pause as soon as metadata arrives.
+	stopAtMetadataMu sync.RWMutex
+	stopAtMetadata   map[string]struct{}
+
+	session  unsafe.Pointer
+	configDB string
+	stateDir string
+
+	// recheckMu guards the persisted per-torrent re-check times.
+	recheckMu sync.Mutex
+
+	// DryRun is true when no native session was created.
+	DryRun bool
+}
+
+// extraSettingsLines converts extra libtorrent settings (chiave=valore lines)
+// into bridge commands: numbers as `i:`, booleans as `b:`, text as `s:`. Empty
+// or `#` lines are ignored.
+func extraSettingsLines(raw string) []string {
+	var lines []string
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		lowered := strings.ToLower(value)
+		switch lowered {
+		case "true", "false", "yes", "no", "on", "off":
+			flag := 0
+			if lowered == "true" || lowered == "yes" || lowered == "on" {
+				flag = 1
+			}
+			lines = append(lines, fmt.Sprintf("b:%s=%d", key, flag))
+		default:
+			if number, err := strconv.ParseInt(value, 10, 64); err == nil {
+				lines = append(lines, fmt.Sprintf("i:%s=%d", key, number))
+			} else {
+				lines = append(lines, fmt.Sprintf("s:%s=%s", key, value))
+			}
+		}
+	}
+	return lines
+}
+
+// LibtorrentVersion returns the libtorrent version string from the bridge.
+func LibtorrentVersion() string {
+	return cgoLtVersion()
+}
+
+// TrimMemory returns freed C++/libtorrent heap pages to the operating system.
+// Called after transfers and cycles so the resident size falls back instead of
+// staying at the download peak.
+func TrimMemory() {
+	cgoTrimMemory()
+}
+
+// FreeSpaceBytes returns the free space in bytes for the filesystem containing
+// path, or nil when it cannot be determined.
+func FreeSpaceBytes(path string) *uint64 {
+	var stats syscall.Statfs_t
+	if err := syscall.Statfs(path, &stats); err != nil {
+		return nil
+	}
+	available := saturatingMulUint64(stats.Bavail, uint64(stats.Frsize))
+	return &available
+}
+
+func saturatingMulUint64(a, b uint64) uint64 {
+	if a != 0 && b > math.MaxUint64/a {
+		return math.MaxUint64
+	}
+	return a * b
+}
+
+// PathOnRamdisk is true when savePath lies inside the ramdisk directory
+// (component-wise, following symlinks when possible).
+func PathOnRamdisk(savePath, ramdisk string) bool {
+	resolve := func(path string) string {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return resolved
+		}
+		return path
+	}
+	save := resolve(savePath)
+	ram := resolve(ramdisk)
+	if save == ram {
+		return true
+	}
+	prefix := ram
+	if !strings.HasSuffix(prefix, string(os.PathSeparator)) {
+		prefix += string(os.PathSeparator)
+	}
+	return strings.HasPrefix(save, prefix)
+}
+
+// RamdiskFits decides whether a torrent of totalSize bytes fits on the RAM
+// disk. uncommittedBytes is the space still to be written there by other
+// in-flight torrents.
+func RamdiskFits(thresholdBytes, marginBytes, freeBytes, uncommittedBytes, totalSize uint64) error {
+	return RamdiskFitsRemaining(thresholdBytes, marginBytes, freeBytes, uncommittedBytes, totalSize, totalSize)
+}
+
+// RamdiskFitsRemaining is the space-aware variant: the size threshold still
+// applies to the whole torrent (a file larger than the RAM disk must never be
+// staged there), but the free-space requirement is checked against the bytes
+// that still have to be written (remainingBytes), not the full size.
+//
+// This matters for a download that is already mostly on the RAM disk: with the
+// full size it would be relocated mid-transfer (risking a corrupted or reset
+// file) even though only a small tail is left. Relocating on the remaining
+// bytes keeps a nearly complete torrent in place.
+func RamdiskFitsRemaining(thresholdBytes, marginBytes, freeBytes, uncommittedBytes, totalSize, remainingBytes uint64) error {
+	gib := 1024.0 * 1024.0 * 1024.0
+	if thresholdBytes > 0 && totalSize > thresholdBytes {
+		return fmt.Errorf("file too large for the RAM disk: %.2f GB > threshold %.2f GB",
+			float64(totalSize)/gib, float64(thresholdBytes)/gib)
+	}
+	effectiveFree := uint64(0)
+	if freeBytes > uncommittedBytes {
+		effectiveFree = freeBytes - uncommittedBytes
+	}
+	required := remainingBytes + marginBytes
+	if required < remainingBytes {
+		required = math.MaxUint64
+	}
+	if effectiveFree < required {
+		return fmt.Errorf("insufficient RAM disk space (free %.2f GB, reserved by other downloads %.2f GB, remaining to write %.2f GB, margin %.2f GB)",
+			float64(freeBytes)/gib, float64(uncommittedBytes)/gib, float64(remainingBytes)/gib, float64(marginBytes)/gib)
+	}
+	return nil
+}
+
+func nativeState(state int32, paused bool) string {
+	if paused {
+		return "paused"
+	}
+	switch state {
+	case 1:
+		return "checking_files"
+	case 2:
+		return "downloading_metadata"
+	case 3:
+		return "downloading"
+	case 4:
+		return "finished"
+	case 5:
+		return "seeding"
+	case 7:
+		return "checking_resume_data"
+	default:
+		return "unknown"
+	}
+}
+
+// preferredDownloadPath returns the download directory for automatic
+// acquisitions: RAM disk first (size still unknown), then the temporary disk,
+// then the final directory.
+func preferredDownloadPath(cfg *Config) string {
+	var candidates []string
+	if cfg.RamdiskEnabled() {
+		if dir := cfg.RamdiskDir(); dir != nil {
+			candidates = append(candidates, *dir)
+		}
+	}
+	if cfg.LibtorrentTempDir != nil {
+		candidates = append(candidates, *cfg.LibtorrentTempDir)
+	}
+	candidates = append(candidates, cfg.LibtorrentDir)
+	explicit := cfg.RamdiskMinFreeBytes()
+	minimumFree := explicit
+	if explicit == 0 {
+		minimumFree = cfg.RamdiskMarginBytes()
+	}
+	for _, path := range candidates {
+		if !pathIsDir(path) {
+			continue
+		}
+		if free := FreeSpaceBytes(path); free != nil && *free >= minimumFree {
+			return path
+		}
+	}
+	return cfg.LibtorrentDir
+}
+
+func pathIsDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// RamdiskUncommittedBytes is the number of bytes still to be written on the RAM
+// disk by torrents other than excludeHash.
+func (c *LibtorrentClient) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {
+	c.torrentsMu.RLock()
+	defer c.torrentsMu.RUnlock()
+	var total uint64
+	for _, torrent := range c.torrents {
+		if strings.EqualFold(torrent.Hash, excludeHash) {
+			continue
+		}
+		if !PathOnRamdisk(torrent.SavePath, ramdisk) {
+			continue
+		}
+		remaining := torrent.TotalSize - torrent.TotalDone
+		if remaining < 0 {
+			remaining = 0
+		}
+		total += uint64(remaining)
+	}
+	return total
+}
+
+// NewLibtorrentClient creates the native session (unless dry-run) and restores
+// any fastresume state.
+func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
+	dryRun := cfg.DryRun || !cfg.LibtorrentEnabled
+	var session unsafe.Pointer
+	if !dryRun {
+		connectionsLimit := int64(200)
+		if value, ok := cfg.Settings["libtorrent_connections_limit"]; ok {
+			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
+				connectionsLimit = parsed
+			}
+		}
+		raw, errMessage := cgoLtCreate(
+			cfg.Libtorrent.PortMin,
+			cfg.Libtorrent.PortMax,
+			limitBytesFromKib(cfg.Libtorrent.DownloadLimitKib),
+			limitBytesFromKib(cfg.Libtorrent.UploadLimitKib),
+			clampMin1(cfg.Libtorrent.ActiveDownloads),
+			clampMin1(cfg.Libtorrent.ActiveSeeds),
+			clampMin1(cfg.Libtorrent.ActiveLimit),
+			clampMin1(connectionsLimit),
+			boolToUint8(cfg.Libtorrent.Dht),
+			boolToUint8(cfg.Libtorrent.Pex),
+			boolToUint8(cfg.Libtorrent.Lsd),
+			boolToUint8(cfg.Libtorrent.Upnp),
+			boolToUint8(cfg.Libtorrent.Natpmp),
+		)
+		if raw == nil {
+			return nil, fmt.Errorf("cannot create libtorrent session: %s", errMessage)
+		}
+		session = raw
+	}
+	client := &LibtorrentClient{
+		torrents:         make(map[string]models.TorrentView),
+		stalled:          make(map[string]struct{}),
+		firstLastPending: make(map[string]struct{}),
+		stopAtMetadata:   make(map[string]struct{}),
+		session:          session,
+		configDB:         filepath.Join(cfg.DataDir, "gextto_config.db"),
+		stateDir:         cfg.StateDir,
+		DryRun:           dryRun,
+	}
+	if session != nil {
+		runtime.SetFinalizer(client, func(c *LibtorrentClient) {
+			if c.session != nil {
+				cgoLtDestroy(c.session)
+			}
+		})
+	}
+	if err := client.restore(cfg.StateDir); err != nil {
+		return nil, err
+	}
+	if err := client.applyExtendedSettings(cfg); err != nil {
+		return nil, err
+	}
+	client.RecheckRestoredAtZero()
+	client.RecheckRestoredSuspicious()
+	return client, nil
+}
+
+func boolToUint8(value bool) uint8 {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func clampMin1(value int64) int32 {
+	if value < 1 {
+		value = 1
+	}
+	if value > math.MaxInt32 {
+		value = math.MaxInt32
+	}
+	return int32(value)
+}
+
+func limitBytesFromKib(kib int64) int32 {
+	if kib <= 0 {
+		return 0
+	}
+	value := kib
+	if value > math.MaxInt64/1024 {
+		value = math.MaxInt64
+	} else {
+		value = value * 1024
+	}
+	if value > math.MaxInt32 {
+		value = math.MaxInt32
+	}
+	return int32(value)
+}
+
+// RecheckRestoredSuspicious forces a re-check of torrents that fastresume
+// restored as complete while their data on disk is missing or zero-filled. A
+// relocated or externally truncated file would otherwise be treated as present
+// and could be archived as a broken copy.
+func (c *LibtorrentClient) RecheckRestoredSuspicious() int {
+	if c.session == nil {
+		return 0
+	}
+	checked := 0
+	for _, torrent := range c.List() {
+		if !torrent.HasMetadata || torrent.Progress < 99.99 {
+			continue
+		}
+		if c.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
+			continue
+		}
+		files, ok, err := c.Files(torrent.Hash)
+		if err != nil || !ok {
+			continue
+		}
+		suspicious := false
+		for _, file := range files {
+			if file.Size <= 0 {
+				continue
+			}
+			path := filepath.Join(torrent.SavePath, filepath.FromSlash(file.Path))
+			if fileSuspiciouslyEmpty(path) {
+				suspicious = true
+				logging.Warn("completed torrent has missing or zero-filled data; forcing a re-check",
+					"hash", torrent.Hash, "name", torrent.Name, "file", file.Path)
+				break
+			}
+		}
+		if suspicious {
+			if ok, err := c.ForceRecheck(torrent.Hash); err == nil && ok {
+				checked++
+			}
+		}
+	}
+	if checked > 0 {
+		logging.Info("re-checking completed torrents with inconsistent data on disk", "checked", checked)
+	}
+	return checked
+}
+
+// RecheckRestoredAtZero verifies paused torrents whose progress reads 0 but
+// whose data is on disk, so the real completion percentage is shown again.
+// recheckStatePath is where the last automatic re-check time per torrent is
+// persisted, so a large pack is not re-read from the NAS at every restart.
+func (c *LibtorrentClient) recheckStatePath() string {
+	return filepath.Join(c.stateDir, "recheck_state.json")
+}
+
+func (c *LibtorrentClient) recheckTimes() map[string]int64 {
+	c.recheckMu.Lock()
+	defer c.recheckMu.Unlock()
+	return c.recheckTimesLocked()
+}
+
+func (c *LibtorrentClient) recheckTimesLocked() map[string]int64 {
+	times := map[string]int64{}
+	if data, err := os.ReadFile(c.recheckStatePath()); err == nil {
+		_ = json.Unmarshal(data, &times)
+	}
+	return times
+}
+
+func (c *LibtorrentClient) writeRecheckTimes(times map[string]int64) {
+	data, err := json.Marshal(times)
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(c.stateDir, 0o755)
+	_ = utils.AtomicWrite(c.recheckStatePath(), data)
+}
+
+// recentlyRechecked reports whether hash was automatically re-checked within the
+// given window.
+func (c *LibtorrentClient) recentlyRechecked(hash string, window time.Duration) bool {
+	at, ok := c.recheckTimes()[strings.ToLower(hash)]
+	if !ok {
+		return false
+	}
+	return time.Since(time.Unix(at, 0)) < window
+}
+
+// markRechecked records that hash was re-checked now.
+func (c *LibtorrentClient) markRechecked(hash string) {
+	c.recheckMu.Lock()
+	defer c.recheckMu.Unlock()
+	times := c.recheckTimesLocked()
+	times[strings.ToLower(hash)] = time.Now().Unix()
+	// Bound the file.
+	if len(times) > 4096 {
+		compact := map[string]int64{}
+		cutoff := time.Now().Add(-30 * 24 * time.Hour).Unix()
+		for key, value := range times {
+			if value >= cutoff {
+				compact[key] = value
+			}
+		}
+		times = compact
+	}
+	c.writeRecheckTimes(times)
+}
+
+// recheckGuardWindow is how long an automatic re-check of the same torrent is
+// suppressed. Re-reading multi-gigabyte packs from the NAS is expensive and
+// usually gives the same result; explicit manual checks always run.
+const recheckGuardWindow = 12 * time.Hour
+
+func (c *LibtorrentClient) RecheckRestoredAtZero() int {
+	if c.session == nil {
+		return 0
+	}
+	checked := 0
+	for _, torrent := range c.List() {
+		state := strings.ToLower(torrent.State)
+		paused := strings.Contains(state, "paus") || strings.Contains(state, "coda")
+		_, statErr := os.Stat(torrent.SavePath)
+		dataExists := statErr == nil
+		if !torrent.HasMetadata || !paused || torrent.Progress >= 0.5 || !dataExists {
+			continue
+		}
+		// Do not re-read a large pack from the NAS at every restart.
+		if c.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
+			continue
+		}
+		ok, err := c.ForceRecheck(torrent.Hash)
+		if err == nil && ok {
+			checked++
+		}
+	}
+	if checked > 0 {
+		logging.Info("verifying restored paused torrents to recover progress", "checked", checked)
+	}
+	return checked
+}
+
+// ApplySettings re-applies the extended libtorrent settings to the running
+// session.
+func (c *LibtorrentClient) ApplySettings(cfg *Config) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	if err := c.applyExtendedSettings(cfg); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// LoadIPFilter loads a local ipfilter file into the live session, returning the
+// number of rules.
+func (c *LibtorrentClient) LoadIPFilter(path string) (int, error) {
+	if c.session == nil {
+		return 0, nil
+	}
+	loaded, rules, errMessage := cgoLtLoadIPFilter(c.session, path)
+	if loaded == 0 {
+		return 0, fmt.Errorf("libtorrent ip filter not applied: %s", errMessage)
+	}
+	if rules < 0 {
+		rules = 0
+	}
+	logging.Info("IP filter loaded", "rules", rules, "path", path)
+	return int(rules), nil
+}
+
+// SetGlobalSpeedLimits applies global download/upload rate limits (KiB/s,
+// 0 = unlimited) to the live session.
+func (c *LibtorrentClient) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	dl := saturatingMulInt64(ltMaxInt64(downloadKib, 0), 1024)
+	ul := saturatingMulInt64(ltMaxInt64(uploadKib, 0), 1024)
+	payload := fmt.Sprintf("i:download_rate_limit=%d\ni:upload_rate_limit=%d", dl, ul)
+	applied, errMessage := cgoLtApplySettings(c.session, payload)
+	if applied == 0 {
+		return false, fmt.Errorf("libtorrent speed limits not applied: %s", errMessage)
+	}
+	return true, nil
+}
+
+func ltMaxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func saturatingMulInt64(a, b int64) int64 {
+	if a == 0 || b == 0 {
+		return 0
+	}
+	if a > 0 && b > 0 {
+		if a > math.MaxInt64/b {
+			return math.MaxInt64
+		}
+		return a * b
+	}
+	if a < 0 && b < 0 {
+		if a < math.MaxInt64/b {
+			return math.MaxInt64
+		}
+		return a * b
+	}
+	if a < 0 {
+		if a < math.MinInt64/b {
+			return math.MinInt64
+		}
+	} else {
+		if b < math.MinInt64/a {
+			return math.MinInt64
+		}
+	}
+	return a * b
+}
+
+func (c *LibtorrentClient) applyExtendedSettings(cfg *Config) error {
+	if c.session == nil {
+		return nil
+	}
+	lt := &cfg.Libtorrent
+	cacheLabel := "auto"
+	if lt.CacheSize > 0 {
+		cacheLabel = fmt.Sprintf("%d MB", lt.CacheSize*16/1024)
+	}
+	limitLabel := func(kib int64) string {
+		if kib > 0 {
+			return fmt.Sprintf("%d KB/s", kib)
+		}
+		return "unlimited"
+	}
+	logging.Info(fmt.Sprintf("🧠 libtorrent memory: cache %s, max connections %d, I/O threads %d, base bandwidth %s down / %s up",
+		cacheLabel, lt.ConnectionsLimit, lt.AioThreads, limitLabel(lt.DownloadLimitKib), limitLabel(lt.UploadLimitKib)))
+	var lines []string
+	addInt := func(key string, value int64) {
+		if value >= 0 {
+			lines = append(lines, fmt.Sprintf("i:%s=%d", key, value))
+		}
+	}
+	addBool := func(key string, value bool) {
+		flag := 0
+		if value {
+			flag = 1
+		}
+		lines = append(lines, fmt.Sprintf("b:%s=%d", key, flag))
+	}
+	addText := func(key, value string) {
+		if strings.TrimSpace(value) != "" {
+			lines = append(lines, fmt.Sprintf("s:%s=%s", key, strings.TrimSpace(value)))
+		}
+	}
+	addInt("connections_limit", lt.ConnectionsLimit)
+	addInt("upload_slots_limit", lt.UploadSlotsLimit)
+	addInt("half_open_limit", lt.HalfOpenLimit)
+	addInt("alert_queue_size", lt.AlertQueueSize)
+	addInt("max_connections_per_torrent", lt.MaxConnectionsPerTorrent)
+	addInt("max_uploads_per_torrent", lt.MaxUploadsPerTorrent)
+	addInt("aio_threads", lt.AioThreads)
+	addInt("cache_size", lt.CacheSize)
+	addInt("cache_expiry", lt.CacheExpiry)
+	addInt("download_rate_limit", saturatingMulInt64(ltMaxInt64(lt.DownloadLimitKib, 0), 1024))
+	addInt("upload_rate_limit", saturatingMulInt64(ltMaxInt64(lt.UploadLimitKib, 0), 1024))
+	addInt("announce_interval", lt.AnnounceInterval)
+	addInt("torrent_connect_boost", lt.TorrentConnectBoost)
+	addBool("enable_utp", lt.Utp)
+	addBool("prefer_rc4", lt.PreferRc4)
+	addBool("announce_to_all_trackers", lt.AnnounceToAllTrackers)
+	addBool("announce_to_all_tiers", lt.AnnounceToAllTiers)
+	addBool("allow_multiple_connections_per_ip", lt.AllowMultipleConnectionsPerIp)
+	addBool("apply_ip_filter", lt.ApplyIpFilter)
+	addBool("dont_count_slow_torrents", lt.DontCountSlowTorrents)
+	policy := lt.Encryption
+	if policy < 0 {
+		policy = 0
+	}
+	if policy > 2 {
+		policy = 2
+	}
+	addInt("in_enc_policy", policy)
+	addInt("out_enc_policy", policy)
+	if lt.ProxyType > 0 {
+		addInt("proxy_type", lt.ProxyType)
+		addText("proxy_host", lt.ProxyHost)
+		addInt("proxy_port", lt.ProxyPort)
+		addText("proxy_username", lt.ProxyUser)
+		addText("proxy_password", lt.ProxyPassword)
+	}
+	addText("ip_filter_path", lt.IpFilterPath)
+	addText("listen_interfaces", effectiveListenInterfaces(lt))
+	// Killswitch VPN: forza il traffico in uscita sulla scheda scelta.
+	addText("outgoing_interfaces", lt.OutgoingInterface)
+	addText("dht_bootstrap_nodes", lt.DhtBootstrapNodes)
+	for _, line := range extraSettingsLines(cfg.Settings["libtorrent_extra_settings"]) {
+		lines = append(lines, line)
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	payload := strings.Join(lines, "\n")
+	applied, errMessage := cgoLtApplySettings(c.session, payload)
+	if applied == 0 {
+		logging.Warn("some libtorrent settings were not applied", "error", errMessage)
+	}
+	return nil
+}
+
+// Add adds a magnet using the default options.
+func (c *LibtorrentClient) Add(magnet string, cfg *Config) (bool, error) {
+	return c.AddWithPath(magnet, cfg, nil)
+}
+
+// AddWithPath adds a magnet, preferring preferredPath when it is an existing
+// directory.
+func (c *LibtorrentClient) AddWithPath(magnet string, cfg *Config, preferredPath *string) (bool, error) {
+	return c.AddWithOptions(magnet, cfg, preferredPath, AddOptions{})
+}
+
+// resolveSavePath applies the `preferred_path.filter(is_dir).unwrap_or_else`.
+func resolveSavePath(preferredPath *string, cfg *Config) string {
+	if preferredPath != nil && pathIsDir(*preferredPath) {
+		return *preferredPath
+	}
+	return preferredDownloadPath(cfg)
+}
+
+// AddWithOptions adds a magnet with explicit AddOptions.
+func (c *LibtorrentClient) AddWithOptions(magnet string, cfg *Config, preferredPath *string, options AddOptions) (bool, error) {
+	clean, ok := utils.SanitizeMagnet(magnet, nil)
+	if !ok {
+		return false, fmt.Errorf("invalid magnet")
+	}
+	hash, ok := utils.MagnetHash(clean)
+	if !ok {
+		return false, fmt.Errorf("missing info hash")
+	}
+	c.torrentsMu.RLock()
+	_, exists := c.torrents[hash]
+	c.torrentsMu.RUnlock()
+	if exists {
+		return false, nil
+	}
+	savePath := resolveSavePath(preferredPath, cfg)
+	if c.session != nil {
+		if err := os.MkdirAll(savePath, 0o755); err != nil {
+			return false, err
+		}
+		added, errMessage := cgoLtAddEx(c.session, clean, savePath, options.Flags())
+		if added == 0 {
+			return false, fmt.Errorf("libtorrent add failed: %s", errMessage)
+		}
+		if err := c.applyStoredLimits(hash); err != nil {
+			return false, err
+		}
+	} else if c.DryRun {
+		logging.Info("dry-run: torrent accepted, not started")
+	} else {
+		return false, fmt.Errorf("libtorrent session is unavailable")
+	}
+	c.registerDeferredOptions(hash, clean, options)
+	c.ClearStalled(hash)
+	state := "downloading_metadata"
+	if c.DryRun {
+		state = "dry-run"
+	}
+	c.torrentsMu.Lock()
+	c.torrents[hash] = models.TorrentView{
+		Hash:            hash,
+		Name:            clean,
+		Progress:        0.0,
+		State:           state,
+		DownloadRate:    0,
+		UploadRate:      0,
+		SavePath:        savePath,
+		DownloadLimit:   -1,
+		UploadLimit:     -1,
+		AllTimeUpload:   0,
+		AllTimeDownload: 0,
+		SeedingSeconds:  0,
+		QueuePosition:   -1,
+		NumPeers:        0,
+		NumSeeds:        0,
+		SeedRatio:       -1.0,
+		SeedDays:        -1,
+		HasMetadata:     false,
+		AutoManaged:     false,
+		TorrentVersion:  "",
+		TotalSize:       0,
+		TotalDone:       0,
+		Stalled:         false,
+	}
+	c.torrentsMu.Unlock()
+	return true, nil
+}
+
+// AddTorrentFile adds a `.torrent` file, returning its infohash. A nil hash
+// means no native session is available (the `Ok(None)` case).
+func (c *LibtorrentClient) AddTorrentFile(torrentPath, savePath string) (*string, error) {
+	if c.session == nil {
+		return nil, nil
+	}
+	added, hash, errMessage := cgoLtAddFile(c.session, torrentPath, savePath)
+	if added == 0 {
+		return nil, fmt.Errorf("libtorrent torrent-file add failed: %s", errMessage)
+	}
+	return &hash, nil
+}
+
+// AddTorrentFileEx is AddTorrentFile with AddOptions applied at add time.
+func (c *LibtorrentClient) AddTorrentFileEx(torrentPath, savePath string, options AddOptions) (*string, error) {
+	if c.session == nil {
+		return nil, nil
+	}
+	added, hash, errMessage := cgoLtAddFileEx(c.session, torrentPath, savePath, options.Flags())
+	if added == 0 {
+		return nil, fmt.Errorf("libtorrent torrent-file add failed: %s", errMessage)
+	}
+	return &hash, nil
+}
+
+// AddFileWithPath adds a `.torrent` selecting the folder like AddWithPath.
+func (c *LibtorrentClient) AddFileWithPath(torrentPath string, cfg *Config, preferredPath *string) (bool, error) {
+	return c.AddFileWithOptions(torrentPath, cfg, preferredPath, AddOptions{})
+}
+
+// AddFileWithOptions adds a `.torrent` file with explicit AddOptions.
+func (c *LibtorrentClient) AddFileWithOptions(torrentPath string, cfg *Config, preferredPath *string, options AddOptions) (bool, error) {
+	savePath := resolveSavePath(preferredPath, cfg)
+	if err := os.MkdirAll(savePath, 0o755); err != nil {
+		return false, err
+	}
+	hash, err := c.AddTorrentFileEx(torrentPath, savePath, options)
+	if err != nil {
+		return false, err
+	}
+	if hash != nil {
+		c.registerDeferredOptions(*hash, "", options)
+		return true, nil
+	}
+	if c.DryRun {
+		logging.Info("dry-run: torrent file accepted, not started")
+		return true, nil
+	}
+	return false, nil
+}
+
+// registerDeferredOptions records options that can only be applied once
+// metadata is available.
+func (c *LibtorrentClient) registerDeferredOptions(hash, name string, options AddOptions) {
+	normalized := strings.ToLower(hash)
+	if options.FirstLast {
+		c.firstLastMu.Lock()
+		c.firstLastPending[normalized] = struct{}{}
+		c.firstLastMu.Unlock()
+	}
+	if options.StopAtMetadata {
+		c.stopAtMetadataMu.Lock()
+		c.stopAtMetadata[normalized] = struct{}{}
+		c.stopAtMetadataMu.Unlock()
+	}
+	if options.Sequential {
+		if _, err := c.SetTorrentSequential(normalized, true); err != nil {
+			logging.Debug("could not apply sequential option", "error", err, "name", name)
+		}
+	}
+}
+
+// EnforceDeferredOptions applies pending first/last priorities and
+// metadata-only pauses.
+func (c *LibtorrentClient) EnforceDeferredOptions(torrents []models.TorrentView) {
+	c.firstLastMu.RLock()
+	pendingFirstLast := make(map[string]struct{}, len(c.firstLastPending))
+	for hash := range c.firstLastPending {
+		pendingFirstLast[hash] = struct{}{}
+	}
+	c.firstLastMu.RUnlock()
+	c.stopAtMetadataMu.RLock()
+	pendingStop := make(map[string]struct{}, len(c.stopAtMetadata))
+	for hash := range c.stopAtMetadata {
+		pendingStop[hash] = struct{}{}
+	}
+	c.stopAtMetadataMu.RUnlock()
+	if len(pendingFirstLast) == 0 && len(pendingStop) == 0 {
+		return
+	}
+	for _, torrent := range torrents {
+		if !torrent.HasMetadata {
+			continue
+		}
+		if _, ok := pendingFirstLast[torrent.Hash]; ok {
+			c.firstLastMu.Lock()
+			delete(c.firstLastPending, torrent.Hash)
+			c.firstLastMu.Unlock()
+			if _, err := c.SetFirstLast(torrent.Hash, true); err != nil {
+				logging.Debug("first/last piece priorities unavailable", "hash", torrent.Hash, "error", err)
+			} else {
+				logging.Debug("first/last piece priorities applied", "hash", torrent.Hash)
+			}
+		}
+		if _, ok := pendingStop[torrent.Hash]; ok {
+			c.stopAtMetadataMu.Lock()
+			delete(c.stopAtMetadata, torrent.Hash)
+			c.stopAtMetadataMu.Unlock()
+			if torrent.State != "paused" {
+				if _, err := c.Pause(torrent.Hash); err != nil {
+					logging.Debug("metadata-only pause failed", "hash", torrent.Hash, "error", err)
+				} else {
+					logging.Info("⏸️ metadata received, torrent paused (metadata-only add)", "hash", torrent.Hash, "name", torrent.Name)
+				}
+			}
+		}
+	}
+}
+
+// SetTorrentSequential toggles per-torrent sequential download.
+func (c *LibtorrentClient) SetTorrentSequential(hash string, enabled bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetTorrentSequential(c.session, strings.ToLower(hash), boolToInt32(enabled))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent sequential failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// QueueTop moves a torrent to the top of the queue.
+func (c *LibtorrentClient) QueueTop(hash string) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtQueueTop(c.session, strings.ToLower(hash))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent queue top failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// SetFirstLast prioritises the first and last piece of every file.
+func (c *LibtorrentClient) SetFirstLast(hash string, enabled bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetFirstLast(c.session, strings.ToLower(hash), boolToInt32(enabled))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent first/last failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// SetFilePriorities sets the per-file download priority (0 skipped … 7 max).
+func (c *LibtorrentClient) SetFilePriorities(hash string, priorities []int32) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetFilePriorities(c.session, strings.ToLower(hash), priorities)
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent file priorities failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// WebSeeds adds or removes HTTP/FTP web seeds (one URL per line in urls).
+func (c *LibtorrentClient) WebSeeds(hash, urls string, remove bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtAddWebSeeds(c.session, strings.ToLower(hash), urls, boolToInt32(remove))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent web seed failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// SetTrackers replaces the tracker list.
+func (c *LibtorrentClient) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	parts := make([]string, 0, len(trackers))
+	for _, tracker := range trackers {
+		parts = append(parts, fmt.Sprintf("%d|%s", tracker.Tier, strings.TrimSpace(tracker.URL)))
+	}
+	payload := strings.Join(parts, "\n")
+	ok, errMessage := cgoLtSetTrackers(c.session, strings.ToLower(hash), payload)
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent tracker update failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// SetSuperSeeding enables/disables libtorrent super seeding on a torrent.
+func (c *LibtorrentClient) SetSuperSeeding(hash string, enabled bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetSuperSeeding(c.session, strings.ToLower(hash), boolToInt32(enabled))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent super seeding failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// TorrentFilePath returns the path of the `.torrent` metadata saved on the
+// metadata-received event, if any.
+func (c *LibtorrentClient) TorrentFilePath(hash string) (string, bool) {
+	path := filepath.Join(c.stateDir, strings.ToLower(hash)+".torrent")
+	if fileExists(path) {
+		return path, true
+	}
+	return "", false
+}
+
+// AddTorrentFileWithPath is AddFileWithPath returning the infohash.
+func (c *LibtorrentClient) AddTorrentFileWithPath(torrentPath string, cfg *Config, preferredPath *string) (*string, error) {
+	return c.AddTorrentFileWithOptions(torrentPath, cfg, preferredPath, AddOptions{})
+}
+
+// AddTorrentFileWithOptions is AddTorrentFileWithPath with AddOptions.
+func (c *LibtorrentClient) AddTorrentFileWithOptions(torrentPath string, cfg *Config, preferredPath *string, options AddOptions) (*string, error) {
+	savePath := resolveSavePath(preferredPath, cfg)
+	if err := os.MkdirAll(savePath, 0o755); err != nil {
+		return nil, err
+	}
+	hash, err := c.AddTorrentFileEx(torrentPath, savePath, options)
+	if err != nil {
+		return nil, err
+	}
+	if hash != nil {
+		c.registerDeferredOptions(*hash, "", options)
+	}
+	return hash, nil
+}
+
+// List returns the live torrent statuses.
+func (c *LibtorrentClient) List() []models.TorrentView {
+	if c.session == nil {
+		c.torrentsMu.RLock()
+		result := make([]models.TorrentView, 0, len(c.torrents))
+		for _, torrent := range c.torrents {
+			result = append(result, torrent)
+		}
+		c.torrentsMu.RUnlock()
+		sort.Slice(result, func(i, j int) bool { return result[i].Hash < result[j].Hash })
+		return result
+	}
+	statuses := cgoLtStatuses(c.session)
+	limits, err := c.seedLimits()
+	if err != nil {
+		logging.Warn("cannot read per-torrent seed limits", "error", err)
+		limits = map[string]seedLimit{}
+	}
+	result := make([]models.TorrentView, 0, len(statuses))
+	for _, status := range statuses {
+		hash := strings.ToLower(status.Hash)
+		c.stalledMu.RLock()
+		_, stalled := c.stalled[hash]
+		c.stalledMu.RUnlock()
+		limit, hasLimit := limits[hash]
+		state := nativeState(status.State, status.Paused != 0)
+		if stalled {
+			state = "stalled"
+		}
+		progress := math.Max(0.0, math.Min(100.0, status.Progress))
+		downloadRate := uint64(0)
+		if status.DownloadRate > 0 {
+			downloadRate = uint64(status.DownloadRate)
+		}
+		uploadRate := uint64(0)
+		if status.UploadRate > 0 {
+			uploadRate = uint64(status.UploadRate)
+		}
+		seedRatio := -1.0
+		seedDays := int64(-1)
+		if hasLimit {
+			seedRatio = limit.Ratio
+			seedDays = limit.Days
+		}
+		torrentVersion := ""
+		switch status.TorrentVersion {
+		case 1:
+			torrentVersion = "v1"
+		case 2:
+			torrentVersion = "v2"
+		case 3:
+			torrentVersion = "hybrid"
+		}
+		totalSize := status.TotalSize
+		if totalSize < 0 {
+			totalSize = 0
+		}
+		totalDone := status.TotalDone
+		if totalDone < 0 {
+			totalDone = 0
+		}
+		result = append(result, models.TorrentView{
+			Hash:            hash,
+			Name:            status.Name,
+			SavePath:        status.SavePath,
+			Progress:        progress,
+			State:           state,
+			DownloadRate:    downloadRate,
+			UploadRate:      uploadRate,
+			DownloadLimit:   int64(status.DownloadLimit),
+			UploadLimit:     int64(status.UploadLimit),
+			AllTimeUpload:   status.AllTimeUpload,
+			AllTimeDownload: status.AllTimeDownload,
+			SeedingSeconds:  status.SeedingSeconds,
+			QueuePosition:   int(status.QueuePosition),
+			NumPeers:        int(status.NumPeers),
+			NumSeeds:        int(status.NumSeeds),
+			SeedRatio:       seedRatio,
+			SeedDays:        seedDays,
+			HasMetadata:     status.HasMetadata != 0,
+			AutoManaged:     status.AutoManaged != 0,
+			TorrentVersion:  torrentVersion,
+			TotalSize:       totalSize,
+			TotalDone:       totalDone,
+			Stalled:         stalled,
+		})
+	}
+	return result
+}
+
+// PollEvents drains the pending lifecycle events.
+func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
+	if c.session == nil {
+		return nil
+	}
+	native := cgoLtEvents(c.session)
+	result := make([]models.TorrentEvent, 0, len(native))
+	for _, event := range native {
+		hash := strings.ToLower(event.Hash)
+		name := event.Name
+		kind := "unknown"
+		switch event.Kind {
+		case 1:
+			kind = "metadata_received"
+		case 2:
+			kind = "torrent_finished"
+		case 3:
+			kind = "storage_moved"
+		case 4:
+			kind = "storage_move_failed"
+		case 5:
+			kind = "torrent_checked"
+		}
+		if kind == "metadata_received" {
+			if err := c.saveTorrentMetadata(hash); err != nil {
+				logging.Warn("cannot persist torrent metadata", "hash", hash, "name", name, "error", err)
+			}
+		}
+		result = append(result, models.TorrentEvent{
+			Kind:     kind,
+			Hash:     hash,
+			Name:     name,
+			SavePath: event.SavePath,
+		})
+	}
+	return result
+}
+
+func (c *LibtorrentClient) saveTorrentMetadata(hash string) error {
+	if c.session == nil {
+		return nil
+	}
+	if err := os.MkdirAll(c.stateDir, 0o755); err != nil {
+		return err
+	}
+	normalized := strings.ToLower(hash)
+	path := filepath.Join(c.stateDir, normalized+".torrent")
+	saved, errMessage := cgoLtSaveTorrent(c.session, normalized, path)
+	if saved == 0 {
+		return fmt.Errorf("libtorrent metadata save failed: %s", errMessage)
+	}
+	return nil
+}
+
+// PromoteMetadata promotes metadata-only torrents out of the queue.
+func (c *LibtorrentClient) PromoteMetadata() {
+	if c.session != nil {
+		cgoLtPromoteMetadata(c.session)
+	}
+}
+
+// EnsureAutoManaged re-arms the queue's auto-management on torrents that have
+// metadata and are not paused.
+func (c *LibtorrentClient) EnsureAutoManaged() int {
+	if c.session != nil {
+		return cgoLtEnsureAutoManaged(c.session)
+	}
+	return 0
+}
+
+// AdjustQueue applies the dynamic queue policy for the effective global
+// download limit.
+func (c *LibtorrentClient) AdjustQueue(cfg *Config, effectiveDownloadKib int64) {
+	if c.session == nil {
+		return
+	}
+	toBytes := func(kib int64) int32 {
+		value := saturatingMulInt64(kib, 1024)
+		if value < 0 {
+			value = 0
+		}
+		if value > math.MaxInt32 {
+			value = math.MaxInt32
+		}
+		return int32(value)
+	}
+	enabled := int32(0)
+	if cfg.Libtorrent.DynamicQueue {
+		enabled = 1
+	}
+	cgoLtAdjustQueue(c.session,
+		enabled,
+		clampMin1(cfg.Libtorrent.ActiveDownloads),
+		clampMin1(cfg.Libtorrent.DynamicQueueMin),
+		clampMin1(cfg.Libtorrent.DynamicQueueMax),
+		clampMin1(cfg.Libtorrent.ActiveSeeds),
+		clampMin1(cfg.Libtorrent.ActiveLimit),
+		toBytes(effectiveDownloadKib),
+	)
+}
+
+// MoveStorage moves a torrent's data to destination.
+func (c *LibtorrentClient) MoveStorage(hash, destination string) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	moved, errMessage := cgoLtMoveStorage(c.session, strings.ToLower(hash), destination)
+	if moved == 0 {
+		return false, fmt.Errorf("libtorrent move storage failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// Peers returns the peers of a torrent. The boolean is false when no session is
+// available (the `Ok(None)` case).
+func (c *LibtorrentClient) Peers(hash string) ([]models.PeerView, bool, error) {
+	if c.session == nil {
+		return nil, false, nil
+	}
+	count, native, errMessage := cgoLtPeers(c.session, strings.ToLower(hash))
+	if count == 0 && errMessage != "" {
+		return nil, false, fmt.Errorf("libtorrent peer query failed: %s", errMessage)
+	}
+	result := make([]models.PeerView, 0, len(native))
+	for _, peer := range native {
+		downloadRate := uint64(0)
+		if peer.DownloadRate > 0 {
+			downloadRate = uint64(peer.DownloadRate)
+		}
+		uploadRate := uint64(0)
+		if peer.UploadRate > 0 {
+			uploadRate = uint64(peer.UploadRate)
+		}
+		result = append(result, models.PeerView{
+			Address:      peer.Address,
+			Client:       peer.Client,
+			DownloadRate: downloadRate,
+			UploadRate:   uploadRate,
+			Pieces:       int(peer.NumPieces),
+			Seed:         peer.Seed != 0,
+		})
+	}
+	return result, true, nil
+}
+
+// Trackers returns the trackers of a torrent.
+func (c *LibtorrentClient) Trackers(hash string) ([]models.TrackerView, bool, error) {
+	if c.session == nil {
+		return nil, false, nil
+	}
+	count, native, errMessage := cgoLtTrackers(c.session, strings.ToLower(hash))
+	if count == 0 && errMessage != "" {
+		return nil, false, fmt.Errorf("libtorrent tracker query failed: %s", errMessage)
+	}
+	result := make([]models.TrackerView, 0, len(native))
+	for _, tracker := range native {
+		result = append(result, models.TrackerView{URL: tracker.URL, Tier: int(tracker.Tier)})
+	}
+	return result, true, nil
+}
+
+// Files returns the files of a torrent.
+func (c *LibtorrentClient) Files(hash string) ([]models.FileView, bool, error) {
+	if c.session == nil {
+		return nil, false, nil
+	}
+	count, native, errMessage := cgoLtFiles(c.session, strings.ToLower(hash))
+	if count == 0 && errMessage != "" {
+		return nil, false, fmt.Errorf("libtorrent file query failed: %s", errMessage)
+	}
+	result := make([]models.FileView, 0, len(native))
+	for _, file := range native {
+		result = append(result, models.FileView{
+			Path:       file.Path,
+			Size:       file.Size,
+			Downloaded: file.Downloaded,
+			Priority:   int(file.Priority),
+		})
+	}
+	return result, true, nil
+}
+
+// Pause pauses a torrent.
+func (c *LibtorrentClient) Pause(hash string) (bool, error) {
+	return c.controlPaused(hash, true)
+}
+
+// Resume resumes a torrent and clears its stalled marker.
+func (c *LibtorrentClient) Resume(hash string) (bool, error) {
+	result, err := c.controlPaused(hash, false)
+	if err != nil {
+		return false, err
+	}
+	c.ClearStalled(hash)
+	return result, nil
+}
+
+func (c *LibtorrentClient) controlPaused(hash string, paused bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetPaused(c.session, strings.ToLower(hash), boolToInt32(paused))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// MarkStalled keeps the local marker and the native state in sync.
+func (c *LibtorrentClient) MarkStalled(hash string) (bool, error) {
+	paused, err := c.Pause(hash)
+	if err != nil {
+		return false, err
+	}
+	if paused {
+		c.stalledMu.Lock()
+		c.stalled[strings.ToLower(hash)] = struct{}{}
+		c.stalledMu.Unlock()
+	}
+	return paused, nil
+}
+
+// ClearStalled removes a torrent from the stalled set.
+func (c *LibtorrentClient) ClearStalled(hash string) {
+	c.stalledMu.Lock()
+	delete(c.stalled, strings.ToLower(hash))
+	c.stalledMu.Unlock()
+}
+
+// Restart restarts a torrent without removing its handle, data, or resume
+// state.
+func (c *LibtorrentClient) Restart(hash string) (bool, error) {
+	if ok, err := c.Pause(hash); err != nil || !ok {
+		return false, err
+	}
+	if _, err := c.Resume(hash); err != nil {
+		return false, err
+	}
+	return c.Reannounce(hash)
+}
+
+// SetPin pins or unpins a torrent from the auto-managed queue.
+func (c *LibtorrentClient) SetPin(hash string, pinned bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetPin(c.session, strings.ToLower(hash), boolToInt32(pinned))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent pin failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// SetSequential toggles sequential download for the whole session.
+func (c *LibtorrentClient) SetSequential(enabled bool) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtSetSequential(c.session, boolToInt32(enabled))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent sequential failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+// ForceRecheck forces a full hash check of a torrent.
+func (c *LibtorrentClient) ForceRecheck(hash string) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtForceRecheck(c.session, strings.ToLower(hash))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent recheck failed: %s", errMessage)
+	}
+	c.markRechecked(hash)
+	return true, nil
+}
+
+// Reannounce forces a tracker announce.
+func (c *LibtorrentClient) Reannounce(hash string) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	ok, errMessage := cgoLtReannounce(c.session, strings.ToLower(hash))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent reannounce failed: %s", errMessage)
+	}
+	return true, nil
+}
+
+func boolToInt32(value bool) int32 {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+// storedLimits reads the per-torrent byte limits persisted in the config DB.
+func (c *LibtorrentClient) storedLimits(hash string) (int32, int32, bool, error) {
+	if !fileExists(c.configDB) {
+		return 0, 0, false, nil
+	}
+	conn, err := OpenConfigDB(c.configDB)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	defer conn.Close()
+	var downloadLimit, uploadLimit int64
+	err = conn.QueryRow(
+		"SELECT dl_bytes,ul_bytes FROM torrent_limits WHERE lower(info_hash)=?1",
+		strings.ToLower(hash),
+	).Scan(&downloadLimit, &uploadLimit)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return int32(downloadLimit), int32(uploadLimit), true, nil
+}
+
+func (c *LibtorrentClient) seedLimitsPath() string {
+	return filepath.Join(c.stateDir, "seed_limits.json")
+}
+
+func (c *LibtorrentClient) seedLimits() (map[string]seedLimit, error) {
+	path := c.seedLimitsPath()
+	if !fileExists(path) {
+		return map[string]seedLimit{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	stored := map[string]seedLimit{}
+	if err := json.Unmarshal(data, &stored); err != nil {
+		return nil, err
+	}
+	result := make(map[string]seedLimit, len(stored))
+	for hash, limit := range stored {
+		result[strings.ToLower(hash)] = limit
+	}
+	return result, nil
+}
+
+func (c *LibtorrentClient) saveSeedLimit(hash string, ratio float64, days int64) error {
+	if err := os.MkdirAll(c.stateDir, 0o755); err != nil {
+		return err
+	}
+	limits, err := c.seedLimits()
+	if err != nil {
+		return err
+	}
+	limits[strings.ToLower(hash)] = seedLimit{Ratio: ratio, Days: days}
+	data, err := json.MarshalIndent(limits, "", "  ")
+	if err != nil {
+		return err
+	}
+	return utils.AtomicWrite(c.seedLimitsPath(), data)
+}
+
+func (c *LibtorrentClient) clearSeedLimit(hash string) error {
+	limits, err := c.seedLimits()
+	if err != nil {
+		return err
+	}
+	if _, ok := limits[strings.ToLower(hash)]; !ok {
+		return nil
+	}
+	delete(limits, strings.ToLower(hash))
+	data, err := json.MarshalIndent(limits, "", "  ")
+	if err != nil {
+		return err
+	}
+	return utils.AtomicWrite(c.seedLimitsPath(), data)
+}
+
+func (c *LibtorrentClient) applyStoredLimits(hash string) error {
+	downloadLimit, uploadLimit, ok, err := c.storedLimits(hash)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	applied, errMessage := cgoLtSetLimits(c.session, hash, downloadLimit, uploadLimit)
+	if applied == 0 {
+		return fmt.Errorf("libtorrent apply saved limits failed: %s", errMessage)
+	}
+	return nil
+}
+
+// SetLimits sets per-torrent byte limits and persists the seed stop rule.
+func (c *LibtorrentClient) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
+	if c.session == nil {
+		return false, nil
+	}
+	if downloadLimit < -1 || uploadLimit < -1 || downloadLimit > math.MaxInt32 || uploadLimit > math.MaxInt32 {
+		return false, fmt.Errorf("limits must be between -1 and %d bytes/s", int64(math.MaxInt32))
+	}
+	if math.IsInf(seedRatio, 0) || math.IsNaN(seedRatio) || seedRatio < -1.0 || seedDays < -1 {
+		return false, fmt.Errorf("seed limits must be -1, 0, or a positive value")
+	}
+	normalized := strings.ToLower(hash)
+	ok, errMessage := cgoLtSetLimits(c.session, normalized, int32(downloadLimit), int32(uploadLimit))
+	if ok == 0 {
+		return false, fmt.Errorf("libtorrent set limits failed: %s", errMessage)
+	}
+	conn, err := OpenConfigDB(c.configDB)
+	if err != nil {
+		return false, err
+	}
+	defer conn.Close()
+	if _, err := conn.Exec("CREATE TABLE IF NOT EXISTS torrent_limits (info_hash TEXT PRIMARY KEY, dl_bytes INTEGER NOT NULL DEFAULT -1, ul_bytes INTEGER NOT NULL DEFAULT -1, updated_at TEXT NOT NULL DEFAULT (datetime('now')));"); err != nil {
+		return false, err
+	}
+	if _, err := conn.Exec("INSERT INTO torrent_limits(info_hash,dl_bytes,ul_bytes,updated_at) VALUES (?1,?2,?3,datetime('now')) ON CONFLICT(info_hash) DO UPDATE SET dl_bytes=excluded.dl_bytes,ul_bytes=excluded.ul_bytes,updated_at=excluded.updated_at", normalized, downloadLimit, uploadLimit); err != nil {
+		return false, err
+	}
+	if seedRatio >= 0.0 || seedDays >= 0 {
+		if err := c.saveSeedLimit(normalized, seedRatio, seedDays); err != nil {
+			return false, err
+		}
+	} else {
+		if err := c.clearSeedLimit(normalized); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func (c *LibtorrentClient) restore(stateDir string) error {
+	if c.session == nil {
+		return nil
+	}
+	restored, warning := cgoLtRestore(c.session, stateDir)
+	if warning != "" {
+		logging.Warn("some fastresume files were not restored", "warning", warning)
+	}
+	if restored > 0 {
+		logging.Info(fmt.Sprintf("♻️ libtorrent state restored: %d torrent(s) resume where they left off", restored))
+	}
+	return nil
+}
+
+// Shutdown saves resume data for the running session.
+// tevArchivedCopyPresent reports whether the DB points at an existing archived
+// regular file for this torrent. A "completed" row whose file is gone (or was
+// never placed) must not suppress post-processing again.
+func tevArchivedCopyPresent(db *Database, hash string) bool {
+	processed, err := db.TorrentProcessed(hash)
+	if err != nil || processed == nil || strings.TrimSpace(*processed) == "" {
+		return false
+	}
+	info, err := os.Stat(*processed)
+	return err == nil && !info.IsDir()
+}
+
+// tevIgnoreRepeatedCompletion mirrors the "already completed" guard but only
+// when the archived copy is really on disk.
+func tevIgnoreRepeatedCompletion(db *Database, hash, name string) bool {
+	status, err := db.TorrentStatus(hash)
+	if err != nil || status == nil || *status != "completed" {
+		return false
+	}
+	if tevArchivedCopyPresent(db, hash) {
+		logging.Debug("ignoring completion for an already archived torrent", "hash", hash, "name", name)
+		return true
+	}
+	logging.Warn("re-processing a completed torrent whose archived copy is missing",
+		"hash", hash, "name", name)
+	return false
+}
+
+func (c *LibtorrentClient) Shutdown(cfg *Config) error {
+	if c.session == nil {
+		return nil
+	}
+	saved, errMessage := cgoLtSaveResume(c.session, cfg.StateDir)
+	if saved == 0 {
+		// Destroy the session anyway so buffered pieces are flushed.
+		cgoLtDestroy(c.session)
+		c.session = nil
+		return fmt.Errorf("libtorrent fastresume shutdown failed: %s", errMessage)
+	}
+	logging.Info("libtorrent shutdown: resume data saved")
+	// Close the session explicitly: the destructor drains libtorrent's disk
+	// queue and flushes buffered pieces to the files. Without it the saved
+	// bitfield can be ahead of the bytes actually on disk, so a restart
+	// re-checks, discards them and re-downloads.
+	cgoLtDestroy(c.session)
+	c.session = nil
+	logging.Info("libtorrent session closed cleanly (buffered pieces flushed)")
+	return nil
+}
+
+// Remove removes a torrent, optionally deleting its files and resume data.
+func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
+	if c.session != nil {
+		ok, errMessage := cgoLtRemove(c.session, strings.ToLower(hash), boolToInt32(deleteFiles))
+		if ok == 0 {
+			return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
+		}
+	}
+	normalized := strings.ToLower(hash)
+	c.ClearStalled(normalized)
+	c.torrentsMu.RLock()
+	name := "unnamed torrent"
+	if torrent, ok := c.torrents[normalized]; ok && strings.TrimSpace(torrent.Name) != "" {
+		name = torrent.Name
+	}
+	c.torrentsMu.RUnlock()
+	// Remove resume data as well, otherwise libtorrent restores the torrent on
+	// restart and it reappears in Downloads, undoing the removal.
+	_ = os.Remove(filepath.Join(c.stateDir, normalized+".fastresume"))
+	_ = os.Remove(filepath.Join(c.stateDir, normalized+".torrent"))
+	if err := c.clearSeedLimit(normalized); err != nil {
+		logging.Warn("could not clear removed torrent seed limits", "hash", normalized, "name", name, "error", err)
+	}
+	c.torrentsMu.Lock()
+	_, existed := c.torrents[normalized]
+	delete(c.torrents, normalized)
+	c.torrentsMu.Unlock()
+	return existed || c.session != nil, nil
+}
+
+// Stats summarises the session state as a JSON-marshalable object.
+func (c *LibtorrentClient) Stats() map[string]any {
+	list := c.List()
+	nativeCount := uint32(0)
+	if c.session != nil {
+		nativeCount = cgoLtTorrentCount(c.session)
+	}
+	downloading := 0
+	stalled := 0
+	seeding := 0
+	queued := 0
+	metadataPending := 0
+	for _, torrent := range list {
+		if torrent.State == "downloading" {
+			downloading++
+		}
+		if torrent.Stalled {
+			stalled++
+		}
+		if torrent.State == "seeding" {
+			seeding++
+		}
+		if torrent.State == "paused" && torrent.HasMetadata {
+			queued++
+		}
+		if !torrent.HasMetadata {
+			metadataPending++
+		}
+	}
+	return map[string]any{
+		"count":            len(list),
+		"native_count":     nativeCount,
+		"downloading":      downloading,
+		"stalled":          stalled,
+		"seeding":          seeding,
+		"queued":           queued,
+		"metadata_pending": metadataPending,
+		"integrated":       c.session != nil,
+		"dry_run":          c.DryRun,
+	}
+}
+
+// StateDir returns the configured state directory.
+func (c *LibtorrentClient) StateDir(cfg *Config) string {
+	return cfg.StateDir
+}
+
+// effectiveListenInterfaces is the effective `listen_interfaces`. When an
+// outgoing interface (VPN killswitch) is configured and the listen interface
+// does not already specify a port, the listener is bound to the same adapter.
+func effectiveListenInterfaces(lt *LibtorrentSettings) string {
+	listen := strings.TrimSpace(lt.ListenInterfaces)
+	outgoing := strings.TrimSpace(lt.OutgoingInterface)
+	if listen != "" {
+		if !strings.Contains(listen, ":") && !strings.Contains(listen, ",") && !strings.Contains(listen, "[") {
+			return fmt.Sprintf("%s:%d", listen, lt.PortMin)
+		}
+		return listen
+	}
+	if outgoing != "" {
+		return fmt.Sprintf("%s:%d", outgoing, lt.PortMin)
+	}
+	return ""
+}

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Build the gextto daemon with the version and build number compiled in.
+#
+#   scripts/build-daemon.sh              # use the current build number
+#   GEXTTO_BUMP_BUILD=1 scripts/...      # increment the build number first
+#   GEXTTO_BUILD=1234 scripts/...        # force a specific number (CI)
+#   GEXTTO_BINARY=/path/gexttod scripts/...
+#
+# The build number is what `gexttod --version` prints and identifies the exact
+# binary.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUT="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
+
+VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
+[[ -n "$VERSION" ]] || VERSION="0.1.0"
+
+if [[ -n "${GEXTTO_BUILD:-}" ]]; then
+    BUILD="$GEXTTO_BUILD"
+elif [[ "${GEXTTO_BUMP_BUILD:-0}" == "1" ]]; then
+    BUILD="$("$ROOT/scripts/next-build-number.sh")"
+else
+    BUILD="$(tr -dc '0-9' < "$ROOT/build_number" 2>/dev/null || true)"
+    [[ -n "$BUILD" ]] || BUILD=1000
+fi
+
+mkdir -p "$(dirname "$OUT")"
+(
+    cd "$ROOT"
+    CGO_ENABLED=1 go build -trimpath \
+        -ldflags "-s -w -X gextto/internal/constants.Version=$VERSION -X gextto/internal/constants.Build=$BUILD" \
+        -o "$OUT" ./cmd/gexttod
+)
+printf 'built %s (version %s, build %s)\n' "$OUT" "$VERSION" "$BUILD"

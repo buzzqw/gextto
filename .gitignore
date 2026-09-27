@@ -1,0 +1,36 @@
+# Runtime data: databases, logs, downloads, torrent state
+data/
+data-acceptance/
+gextto-data/
+
+# Build artefacts
+bin/
+*.tar.gz
+*.tar.gz.sha256
+__pycache__/
+coverage.out
+*.coverprofile
+*.prof
+*.tmp
+*.pid
+
+# The monotonic build number is generated per build, never committed.
+build_number
+
+# Local configuration and secrets
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.log.*
+.env
+.env.*
+gextto.json
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
+.opencode/
+.claude/

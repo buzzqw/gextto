@@ -1,0 +1,470 @@
+// Package models defines the shared domain types of gextto.
+package models
+
+import (
+	"strings"
+	"time"
+)
+
+// Quality is the parsed technical quality of a release.
+type Quality struct {
+	Resolution        string   `json:"resolution"`
+	Source            string   `json:"source"`
+	Codec             string   `json:"codec"`
+	Audio             string   `json:"audio"`
+	HDR               string   `json:"hdr"`
+	Group             string   `json:"group"`
+	IsIta             bool     `json:"is_ita"`
+	IsDV              bool     `json:"is_dv"`
+	IsRepack          bool     `json:"is_repack"`
+	IsProper          bool     `json:"is_proper"`
+	IsReal            bool     `json:"is_real"`
+	Language          string   `json:"language"`
+	Languages         []string `json:"languages"`
+	HasSubtitle       bool     `json:"has_subtitle"`
+	SubtitleLanguages []string `json:"subtitle_languages"`
+	// HardcodedSubs marks burned-in subtitles (HC/hardcoded): refused by a
+	// built-in rule.
+	HardcodedSubs bool `json:"hardcoded_subs"`
+}
+
+// ScoreBreakdownItem is one labelled component of the quality score.
+type ScoreBreakdownItem struct {
+	Label string
+	Value int64
+}
+
+// ScoreBreakdown splits the base score by category (also used by the UI score
+// simulator).
+func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
+	resolution := int64(0)
+	switch q.Resolution {
+	case "2160p":
+		resolution = 2000
+	case "1080p":
+		resolution = 1000
+	case "720p":
+		resolution = 400
+	case "576p":
+		resolution = 80
+	}
+	source := int64(0)
+	switch q.Source {
+	case "bluray":
+		source = 300
+	case "remux":
+		source = 280
+	case "webdl":
+		source = 200
+	case "webrip":
+		source = 150
+	case "hdtv":
+		source = 50
+	case "dvdrip":
+		source = 20
+	}
+	codec := int64(0)
+	switch q.Codec {
+	case "h265", "x265", "hevc":
+		codec = 200
+	case "h264", "x264", "avc":
+		codec = 50
+	}
+	audio := int64(0)
+	switch {
+	case strings.Contains(q.Audio, "truehd"):
+		audio = 150
+	case strings.Contains(q.Audio, "dts-hd"):
+		audio = 120
+	case strings.Contains(q.Audio, "dts"):
+		audio = 100
+	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
+		audio = 80
+	case strings.Contains(q.Audio, "ac3") || strings.Contains(q.Audio, "5.1"):
+		audio = 50
+	case strings.Contains(q.Audio, "aac"):
+		audio = 30
+	case strings.Contains(q.Audio, "mp3"):
+		audio = 10
+	}
+	hdr := int64(0)
+	if q.HDR != "" {
+		hdr = 100
+	}
+	dv := int64(0)
+	if q.IsDV {
+		dv = 300
+	}
+	proper := int64(0)
+	if q.IsProper {
+		proper = 75
+	}
+	repack := int64(0)
+	if q.IsRepack {
+		repack = 50
+	}
+	real := int64(0)
+	if q.IsReal {
+		real = 100
+	}
+	return []ScoreBreakdownItem{
+		{"Risoluzione", resolution},
+		{"Sorgente", source},
+		{"Codec", codec},
+		{"Audio", audio},
+		{"HDR", hdr},
+		{"Dolby Vision", dv},
+		{"Proper", proper},
+		{"Repack", repack},
+		{"Real", real},
+	}
+}
+
+// Score returns the total quality score.
+func (q *Quality) Score() int64 {
+	var total int64
+	for _, item := range q.ScoreBreakdown() {
+		total += item.Value
+	}
+	return total
+}
+
+// HasHDR reports any recognised HDR flavour (Dolby Vision included).
+func (q *Quality) HasHDR() bool { return q.IsDV || q.HDR != "" }
+
+// IsRemux reports whether the source is a full-quality REMUX.
+func (q *Quality) IsRemux() bool { return q.Source == "remux" }
+
+// ResolutionRank returns the numeric resolution rank.
+func (q *Quality) ResolutionRank() int {
+	switch q.Resolution {
+	case "2160p":
+		return 6
+	case "1080p":
+		return 5
+	case "720p":
+		return 4
+	case "576p":
+		return 3
+	case "480p":
+		return 2
+	case "360p":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// SourceRank returns the numeric source rank.
+func (q *Quality) SourceRank() int {
+	switch q.Source {
+	case "bluray", "remux":
+		return 5
+	case "webdl":
+		return 4
+	case "webrip":
+		return 3
+	case "dvdrip":
+		return 2
+	case "hdtv":
+		return 1
+	default:
+		return 0
+	}
+}
+
+// UpgradeReason explains why q may replace old, or "" when the change is not
+// worth a re-download.
+func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff int64) string {
+	newRes := q.ResolutionRank()
+	oldRes := old.ResolutionRank()
+	if newRes > oldRes {
+		return "resolution"
+	}
+	if old.Source == "hdtv" && q.Source == "webdl" && newRes >= oldRes {
+		return "source"
+	}
+	if q.IsRemux() && !old.IsRemux() && newRes >= oldRes && newScore >= oldScore {
+		return "remux"
+	}
+	if q.HasHDR() && !old.HasHDR() && newRes >= oldRes {
+		return "hdr"
+	}
+	if q.IsRepack && !old.IsRepack && newRes >= oldRes && q.SourceRank() >= old.SourceRank() {
+		return "repack"
+	}
+	if old.Source == "unknown" && q.Source != "unknown" && q.sameNonSourceQuality(old) {
+		return ""
+	}
+	if newScore > oldScore && newScore-oldScore >= minScoreDiff {
+		return "score"
+	}
+	return ""
+}
+
+// sameNonSourceQuality compares the quality fields that are not the source.
+func (q *Quality) sameNonSourceQuality(other *Quality) bool {
+	return q.Resolution == other.Resolution &&
+		q.Codec == other.Codec &&
+		q.Audio == other.Audio &&
+		q.HDR == other.HDR &&
+		q.IsDV == other.IsDV &&
+		q.IsRepack == other.IsRepack &&
+		q.IsProper == other.IsProper &&
+		q.IsReal == other.IsReal
+}
+
+// ScoreWithSettings applies user score overrides from the settings map.
+func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
+	score := q.Score()
+	adjust := func(key string, def int64, active bool) {
+		if !active {
+			return
+		}
+		if value, ok := settings[key]; ok {
+			if parsed, err := parseInt64(value); err == nil {
+				score += parsed - def
+			}
+		}
+	}
+	for _, item := range []struct {
+		res string
+		def int64
+	}{
+		{"2160p", 2000}, {"1080p", 1000}, {"720p", 400}, {"576p", 80},
+	} {
+		adjust("score_res_"+item.res, item.def, q.Resolution == item.res)
+	}
+	for _, item := range []struct {
+		src string
+		def int64
+	}{
+		{"bluray", 300}, {"remux", 280}, {"webdl", 200}, {"webrip", 150},
+		{"hdtv", 50}, {"dvdrip", 20},
+	} {
+		adjust("score_source_"+item.src, item.def, q.Source == item.src)
+	}
+	for _, item := range []struct {
+		codec string
+		def   int64
+	}{
+		{"h265", 200}, {"h264", 50}, {"x265", 200}, {"x264", 50}, {"hevc", 200}, {"avc", 50},
+	} {
+		adjust("score_codec_"+item.codec, item.def, q.Codec == item.codec)
+	}
+	for _, item := range []struct {
+		audio string
+		def   int64
+	}{
+		{"truehd", 150}, {"dts-hd", 120}, {"dts", 100}, {"ddp", 80}, {"eac3", 80},
+		{"ac3", 50}, {"5.1", 50}, {"aac", 30}, {"mp3", 10},
+	} {
+		adjust("score_audio_"+item.audio, item.def, strings.Contains(q.Audio, item.audio))
+	}
+	adjust("score_bonus_dv", 300, q.IsDV)
+	adjust("score_bonus_hdr", 100, q.HDR != "")
+	adjust("score_bonus_proper", 75, q.IsProper)
+	adjust("score_bonus_repack", 50, q.IsRepack)
+	adjust("score_bonus_real", 100, q.IsReal)
+	groupKey := "score_group_" + strings.ToLower(q.Group)
+	if value, ok := settings[groupKey]; ok {
+		if parsed, err := parseInt64(value); err == nil {
+			score += parsed
+		}
+	}
+	return score
+}
+
+// ArchiveQualityIndex holds the best quality found on disk for each
+// (season, episode) in a series folder.
+type ArchiveQualityIndex struct {
+	Best map[[2]int64]ArchiveQuality
+}
+
+// ArchiveQuality pairs a Quality with its score.
+type ArchiveQuality struct {
+	Quality Quality
+	Score   int64
+}
+
+// BestFor returns the best archived quality for a season/episode.
+func (a *ArchiveQualityIndex) BestFor(season, episode int64) (ArchiveQuality, bool) {
+	if a == nil || a.Best == nil {
+		return ArchiveQuality{}, false
+	}
+	value, ok := a.Best[[2]int64{season, episode}]
+	return value, ok
+}
+
+// IsEmpty reports whether the index holds no entries.
+func (a *ArchiveQualityIndex) IsEmpty() bool { return a == nil || len(a.Best) == 0 }
+
+// LiveDownloads describes the torrents currently in the libtorrent session.
+type LiveDownloads struct {
+	Hashes   map[string]struct{}
+	Episodes map[LiveEpisodeKey]struct{}
+}
+
+// LiveEpisodeKey is the (series, season, episode) key used by LiveDownloads.
+type LiveEpisodeKey struct {
+	Series  string
+	Season  int64
+	Episode int64
+}
+
+// IsEmpty reports whether nothing is currently downloading.
+func (l *LiveDownloads) IsEmpty() bool {
+	return l == nil || (len(l.Hashes) == 0 && len(l.Episodes) == 0)
+}
+
+// ApprovalContext carries extra data for the approval decision.
+type ApprovalContext struct {
+	Archive       *ArchiveQualityIndex
+	Live          *LiveDownloads
+	ForbidUpgrade bool
+	GapEpisode    bool
+}
+
+// Release is a candidate release discovered from a source.
+type Release struct {
+	Title        string    `json:"title"`
+	Magnet       string    `json:"magnet"`
+	TorrentURL   *string   `json:"torrent_url"`
+	Source       string    `json:"source"`
+	Quality      Quality   `json:"quality"`
+	Kind         string    `json:"kind"`
+	Series       *string   `json:"series"`
+	Season       *int64    `json:"season"`
+	Episode      *int64    `json:"episode"`
+	IsPack       bool      `json:"is_pack"`
+	EpisodeRange []int64   `json:"episode_range"`
+	Year         *int64    `json:"year"`
+	DiscoveredAt time.Time `json:"discovered_at"`
+	SizeBytes    int64     `json:"size_bytes"`
+	Seeders      int64     `json:"seeders"`
+	Peers        int64     `json:"peers"`
+}
+
+// TorrentMeta stores the release associated with a torrent hash.
+type TorrentMeta struct {
+	Release Release `json:"release"`
+}
+
+// CycleStats summarises a scrape cycle.
+type CycleStats struct {
+	Scraped          int            `json:"scraped"`
+	Candidates       int            `json:"candidates"`
+	DownloadsStarted int            `json:"downloads_started"`
+	GapsFilled       int            `json:"gaps_filled"`
+	Errors           int            `json:"errors"`
+	ErrorDetails     map[string]int `json:"error_details"`
+	LastStartedAt    *time.Time     `json:"last_started_at"`
+}
+
+// Error records a categorised cycle error.
+func (c *CycleStats) Error(category string) {
+	c.Errors++
+	if c.ErrorDetails == nil {
+		c.ErrorDetails = map[string]int{}
+	}
+	c.ErrorDetails[category]++
+}
+
+// TorrentView is the live status of a torrent in the session.
+type TorrentView struct {
+	Hash            string  `json:"hash"`
+	Name            string  `json:"name"`
+	Progress        float64 `json:"progress"`
+	State           string  `json:"state"`
+	DownloadRate    uint64  `json:"download_rate"`
+	UploadRate      uint64  `json:"upload_rate"`
+	SavePath        string  `json:"save_path"`
+	DownloadLimit   int64   `json:"download_limit"`
+	UploadLimit     int64   `json:"upload_limit"`
+	AllTimeUpload   int64   `json:"all_time_upload"`
+	AllTimeDownload int64   `json:"all_time_download"`
+	SeedingSeconds  int64   `json:"seeding_seconds"`
+	QueuePosition   int     `json:"queue_position"`
+	NumPeers        int     `json:"num_peers"`
+	NumSeeds        int     `json:"num_seeds"`
+	SeedRatio       float64 `json:"seed_ratio"`
+	SeedDays        int64   `json:"seed_days"`
+	HasMetadata     bool    `json:"has_metadata"`
+	AutoManaged     bool    `json:"auto_managed"`
+	TorrentVersion  string  `json:"torrent_version"`
+	TotalSize       int64   `json:"total_size"`
+	TotalDone       int64   `json:"total_done"`
+	Stalled         bool    `json:"stalled"`
+}
+
+// ProviderStatus is the escalating backoff state of one source.
+type ProviderStatus struct {
+	Provider          string `json:"provider"`
+	Kind              string `json:"kind"`
+	Level             int64  `json:"level"`
+	DisabledTill      string `json:"disabled_till"`
+	MostRecentFailure string `json:"most_recent_failure"`
+	LastError         string `json:"last_error"`
+}
+
+// TorrentEvent is a lifecycle event emitted by the torrent session.
+type TorrentEvent struct {
+	Kind     string `json:"kind"`
+	Hash     string `json:"hash"`
+	Name     string `json:"name"`
+	SavePath string `json:"save_path"`
+}
+
+// PeerView is one peer of a torrent.
+type PeerView struct {
+	Address      string `json:"address"`
+	Client       string `json:"client"`
+	DownloadRate uint64 `json:"download_rate"`
+	UploadRate   uint64 `json:"upload_rate"`
+	Pieces       int    `json:"pieces"`
+	Seed         bool   `json:"seed"`
+}
+
+// TrackerView is one tracker of a torrent.
+type TrackerView struct {
+	URL  string `json:"url"`
+	Tier int    `json:"tier"`
+}
+
+// FileView is one file of a torrent.
+type FileView struct {
+	Path       string `json:"path"`
+	Size       int64  `json:"size"`
+	Downloaded int64  `json:"downloaded"`
+	Priority   int    `json:"priority"`
+}
+
+func parseInt64(value string) (int64, error) {
+	var result int64
+	var negative bool
+	started := false
+	for i, r := range value {
+		if i == 0 && r == '-' {
+			negative = true
+			continue
+		}
+		if r < '0' || r > '9' {
+			return 0, errInvalid
+		}
+		result = result*10 + int64(r-'0')
+		started = true
+	}
+	if !started {
+		return 0, errInvalid
+	}
+	if negative {
+		return -result, nil
+	}
+	return result, nil
+}
+
+type simpleErr string
+
+func (e simpleErr) Error() string { return string(e) }
+
+const errInvalid simpleErr = "invalid integer"

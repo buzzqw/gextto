@@ -1,0 +1,595 @@
+package gextto
+
+// engine.go implements the core module: the scrape/search engine that fans
+// a cycle out to HTML/RSS feeds, Torznab indexers and web engines, applies the
+// global filters and reports the per-source outcome.
+//
+// Cross-module calls rely on the sibling implements `rss.go` (`FetchFeed`,
+// `FetchTorznabFlareSolverr`) and `websearch.go` (`SearchWithTimeout`,
+// `TakeEngineFailures`, `EngineFailure`); see the note at the bottom of this
+// file for the exact signatures.
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/cache"
+	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/rules"
+	"github.com/buzzqw/gextto/internal/utils"
+)
+
+// Engine fans a scrape or a single title search out to every configured
+// source. `db` is optional: `nil` in read-only tools that never touch the
+// archive database.
+type Engine struct {
+	client *http.Client
+	db     *Database
+}
+
+// Concurrency and timeout budgets, copied verbatim .
+const (
+	queryConcurrency       = 2
+	feedConcurrency        = 4
+	feedFetchBudget        = 75 * time.Second
+	automaticSearchTimeout = 90 * time.Second
+	manualSearchTimeout    = 15 * time.Second
+)
+
+// NewEngine builds the default engine, mirroring `Engine::new`.
+func NewEngine() *Engine {
+	return &Engine{
+		client: &http.Client{Timeout: 75 * time.Second},
+	}
+}
+
+// WithDB binds the engine to the archive database so provider backoff survives
+// restarts and is shared with the rest of the daemon.
+func (e *Engine) WithDB(db *Database) *Engine {
+	return &Engine{client: NewEngine().client, db: db}
+}
+
+// FetchTorrent downloads a `.torrent` file from a feed that does not expose a
+// magnet. The full URL is never logged: it can carry a passkey.
+func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, error) {
+	payload, status, err := HTTPGetBytes(ctx, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if status < 200 || status >= 300 {
+		host := "feed"
+		if parsed, err := url.Parse(rawURL); err == nil && parsed.Hostname() != "" {
+			host = parsed.Hostname()
+		}
+		return nil, fmt.Errorf("HTTP %d fetching torrent from %s", status, host)
+	}
+	return payload, nil
+}
+
+// ScrapeAll scans every configured feed and then searches every enabled series
+// and movie on the Torznab indexers and web engines, returning the unique
+// releases that survive the global filters.
+func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, error) {
+	var all []models.Release
+	maxPages := cfg.FeedMaxPages()
+	maxAgeDays := cfg.MaxReleaseAgeDays
+	oldRatio := cfg.StopOnOldPageRatio()
+	// Each cycle reports only its own sources: drop anything accumulated since
+	// the previous drain (e.g. manual searches from the UI).
+	_ = logging.TakeSourceStats()
+	logging.Info(fmt.Sprintf(
+		"🔎 Step 1/2: scanning %d sources (HTML/RSS feeds)",
+		len(cfg.FeedURLs),
+	))
+
+	// Feed fan-out, bounded by `feedConcurrency`, scheduled in config order.
+	feedResults := make([][]models.Release, len(cfg.FeedURLs))
+	var feedWG sync.WaitGroup
+	feedSem := make(chan struct{}, feedConcurrency)
+	for i, feedURL := range cfg.FeedURLs {
+		feedWG.Add(1)
+		feedSem <- struct{}{}
+		go func(index int, rawURL string) {
+			defer feedWG.Done()
+			defer func() { <-feedSem }()
+			feedResults[index] = e.scrapeFeed(ctx, cfg, rawURL, maxPages, maxAgeDays, oldRatio)
+		}(i, feedURL)
+	}
+	feedWG.Wait()
+	for _, items := range feedResults {
+		all = append(all, items...)
+	}
+
+	// One readable summary instead of one line per feed.
+	feedsReleases := len(all)
+	feedStats := logging.TakeSourceStats()
+	breakdown := sourceBreakdown(feedStats)
+	if breakdown == "" {
+		breakdown = "none"
+	}
+	logging.Info(fmt.Sprintf(
+		"🌐 Sources: %d releases from %d feeds — %s",
+		feedsReleases,
+		len(cfg.FeedURLs),
+		breakdown,
+	))
+	// Persist the detail-page cache right after the feed phase: the indexer
+	// searches below can take minutes, and a restart would otherwise throw away
+	// every magnet resolved in this cycle.
+	cache.Save()
+
+	// Build the per-target search list.
+	type searchTarget struct {
+		Query string
+		IDs   [][2]string
+	}
+	var targets []searchTarget
+	for _, series := range cfg.Series {
+		if !series.Enabled {
+			continue
+		}
+		// Pass the real external ids to Torznab: `tvdbid` with the TVDB id and
+		// `tmdbid` with the TMDB id.
+		var ids [][2]string
+		if strings.TrimSpace(series.TvdbID) != "" {
+			ids = append(ids, [2]string{"tvdbid", strings.TrimSpace(series.TvdbID)})
+		}
+		if strings.TrimSpace(series.TmdbID) != "" {
+			ids = append(ids, [2]string{"tmdbid", strings.TrimSpace(series.TmdbID)})
+		}
+		targets = append(targets, searchTarget{Query: series.Name, IDs: ids})
+	}
+	for _, movie := range cfg.Movies {
+		if !movie.Enabled {
+			continue
+		}
+		targets = append(targets, searchTarget{Query: fmt.Sprintf("%s %s", movie.Name, movie.Year)})
+	}
+	targetsTotal := len(targets)
+	logging.Info(fmt.Sprintf(
+		"🔎 Step 2/2: searching %d series/movies (Torznab indexers + web engines)",
+		targetsTotal,
+	))
+
+	// Title search fan-out, bounded by `queryConcurrency`.
+	type searchResult struct {
+		Query string
+		Items []models.Release
+	}
+	results := make([]searchResult, len(targets))
+	var searchWG sync.WaitGroup
+	searchSem := make(chan struct{}, queryConcurrency)
+	for i, target := range targets {
+		searchWG.Add(1)
+		searchSem <- struct{}{}
+		go func(index int, query string, ids [][2]string) {
+			defer searchWG.Done()
+			defer func() { <-searchSem }()
+			started := time.Now()
+			searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
+			items := searchOneWithDB(searchCtx, cfg, query, ids, nil, e.db, false)
+			timedOut := errors.Is(searchCtx.Err(), context.DeadlineExceeded)
+			cancel()
+			if timedOut {
+				logging.Warn("scheduled title search timed out",
+					"query", query,
+					"timeout_secs", int(automaticSearchTimeout.Seconds()))
+				items = nil
+			}
+			logging.Debug("scheduled title search completed",
+				"query", query,
+				"elapsed_ms", time.Since(started).Milliseconds(),
+				"results", len(items))
+			results[index] = searchResult{Query: query, Items: items}
+		}(i, target.Query, target.IDs)
+	}
+	searchWG.Wait()
+
+	// "Compatible" count: a release is only useful when it passes the global
+	// filters and those of the searched series/movie (language, quality,
+	// exclude, subtitles). This keeps the log from announcing releases that
+	// will never be downloaded.
+	usable := func(query string, items []models.Release) int {
+		for i := range cfg.Series {
+			series := &cfg.Series[i]
+			if series.Name != query {
+				continue
+			}
+			count := 0
+			for j := range items {
+				if cfg.ReleaseAllowed(&items[j]) &&
+					cfg.SeriesReleaseAllowed(series, &items[j].Quality, items[j].Title) {
+					count++
+				}
+			}
+			return count
+		}
+		for i := range cfg.Movies {
+			movie := &cfg.Movies[i]
+			if fmt.Sprintf("%s %s", movie.Name, movie.Year) != query {
+				continue
+			}
+			count := 0
+			for j := range items {
+				if cfg.ReleaseAllowed(&items[j]) && cfg.MovieReleaseAllowed(movie, &items[j].Quality) {
+					count++
+				}
+			}
+			return count
+		}
+		count := 0
+		for j := range items {
+			if cfg.ReleaseAllowed(&items[j]) {
+				count++
+			}
+		}
+		return count
+	}
+
+	targetsDone := 0
+	targetsWithHits := 0
+	step2Usable := 0
+	for _, result := range results {
+		targetsDone++
+		compatible := usable(result.Query, result.Items)
+		if compatible > 0 {
+			targetsWithHits++
+			step2Usable += compatible
+			// Per-target detail is diagnostic only. The cycle already reports
+			// the total in "Step 2/2 complete".
+			logging.Debug("🔎 compatible releases", "query", result.Query, "compatible", compatible)
+		} else {
+			logging.Debug("🔎 search: no matching releases", "query", result.Query, "found", len(result.Items))
+		}
+		all = append(all, result.Items...)
+	}
+	logging.Info(fmt.Sprintf(
+		"🔎 Step 2/2 complete: %d targets analyzed · %d with compatible releases · %d compatible releases",
+		targetsDone,
+		targetsWithHits,
+		step2Usable,
+	))
+	engineFailures := TakeEngineFailures()
+	if len(engineFailures) > 0 {
+		detail := make([]string, 0, len(engineFailures))
+		for _, failure := range engineFailures {
+			detail = append(detail, fmt.Sprintf("%s (%d)", failure.Engine, failure.Count))
+		}
+		logging.Warn("⚠️ Web engines unreachable in this cycle: " + strings.Join(detail, ", "))
+	}
+
+	seen := map[string]struct{}{}
+	kept := make([]models.Release, 0, len(all))
+	for _, release := range all {
+		if reason := cfg.AllReleaseDeniedReason(&release); reason != "" {
+			if cfg.ReleaseIsMonitored(&release) {
+				rules.LogRejection(&release, reason)
+			}
+			continue
+		}
+		// A feed with only a `.torrent` link (e.g. TorrentLeech) has no magnet:
+		// do not drop it here, the infohash is resolved in the cycle. In that
+		// case deduplicate by URL.
+		var dedupKey string
+		if hash, ok := utils.MagnetHash(release.Magnet); ok {
+			dedupKey = hash
+		} else if release.TorrentURL != nil {
+			dedupKey = "url:" + *release.TorrentURL
+		} else {
+			logging.Debug("filter skipped",
+				"title", release.Title,
+				"source", release.Source,
+				"reason", "missing magnet hash")
+			continue
+		}
+		if _, duplicate := seen[dedupKey]; duplicate {
+			logging.Debug("filter skipped duplicate",
+				"title", release.Title,
+				"source", release.Source,
+				"reason", "duplicate infohash")
+			continue
+		}
+		seen[dedupKey] = struct{}{}
+		kept = append(kept, release)
+	}
+	all = kept
+	logging.Info(fmt.Sprintf("✅ Scraping: %d unique releases after filters", len(all)))
+	sourceStats := append([]logging.SourceStatEntry{}, feedStats...)
+	sourceStats = append(sourceStats, logging.TakeSourceStats()...)
+	printSourceReport(sourceStats)
+	cache.Save()
+	return all, nil
+}
+
+// scrapeFeed runs one feed inside its backoff window and total time budget,
+// updating the provider backoff and the per-source stats.
+func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, maxPages int, maxAgeDays int64, oldRatio float64) []models.Release {
+	feed := feedLabel(rawURL)
+	source := feedSourceName(rawURL)
+	// Skip sources inside their backoff window instead of hammering them once
+	// more every cycle.
+	if e.db != nil {
+		if blocked, err := e.db.ProviderBlocked("feed", source); err == nil && blocked {
+			logging.Debug("feed skipped (backoff)", "feed", feed)
+			return nil
+		}
+	}
+	fetchCtx, cancel := context.WithTimeout(ctx, feedFetchBudget)
+	defer cancel()
+	items, err := FetchFeed(fetchCtx, rawURL, cfg.FlaresolverrURL, maxPages, maxAgeDays, oldRatio)
+	if err == nil {
+		logging.SourceOK("feed", source, len(items))
+		logging.Debug("RSS feed analyzed", "feed", feed, "items", len(items))
+		if e.db != nil {
+			_ = e.db.ProviderSuccess("feed", source)
+		}
+		return items
+	}
+	message := utils.RedactURLSecrets(err.Error())
+	if errors.Is(err, context.DeadlineExceeded) {
+		message = fmt.Sprintf("feed exceeded the %ds total time budget", int(feedFetchBudget.Seconds()))
+	} else if strings.Contains(message, "decoding response body") {
+		// Cloudflare sometimes closes the stream halfway: reqwest reports it as
+		// a decoding error. Say it plainly.
+		message = "connection interrupted before the feed was complete"
+	}
+	logging.SourceFail("feed", source, message)
+	logging.Warn(fmt.Sprintf("⚠️ RSS feed unavailable — %s: %s", feed, message))
+	if e.db != nil {
+		_ = e.db.ProviderFailure("feed", source, message)
+	}
+	return nil
+}
+
+// SearchQuery is the gap-fill title search: the whole fan-out is bounded by the
+// automatic timeout.
+func (e *Engine) SearchQuery(ctx context.Context, cfg *Config, query string) []models.Release {
+	searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
+	defer cancel()
+	items := e.SearchQueryIDs(searchCtx, cfg, query, nil)
+	if errors.Is(searchCtx.Err(), context.DeadlineExceeded) {
+		logging.Warn("gap-fill title search timed out",
+			"query", query,
+			"timeout_secs", int(automaticSearchTimeout.Seconds()))
+		return []models.Release{}
+	}
+	return items
+}
+
+// SearchQueryManual is the interactive search: Torznab indexers stay available
+// for their whole search, while the web engines get a short overall budget.
+func (e *Engine) SearchQueryManual(ctx context.Context, cfg *Config, query string) []models.Release {
+	timeout := manualSearchTimeout
+	return searchOneWithDB(ctx, cfg, query, nil, &timeout, e.db, false)
+}
+
+// SearchQueryManualAll keeps globally rejected releases visible so the user can
+// inspect or manually queue them. Automatic acquisition still uses the filtered
+// methods above.
+func (e *Engine) SearchQueryManualAll(ctx context.Context, cfg *Config, query string) []models.Release {
+	timeout := manualSearchTimeout
+	return searchOneWithDB(ctx, cfg, query, nil, &timeout, e.db, true)
+}
+
+// SearchQueryIDs searches with explicit external ids (`tvdbid`/`tmdbid`).
+func (e *Engine) SearchQueryIDs(ctx context.Context, cfg *Config, query string, externalIDs [][2]string) []models.Release {
+	return searchOneWithDB(ctx, cfg, query, externalIDs, nil, e.db, false)
+}
+
+// searchOneWithDB runs the indexer and web fan-outs concurrently, then applies
+// the global filters (unless `includeRejected`) and deduplicates by infohash.
+func searchOneWithDB(
+	ctx context.Context,
+	cfg *Config,
+	query string,
+	externalIDs [][2]string,
+	webTimeout *time.Duration,
+	providerDB *Database,
+	includeRejected bool,
+) []models.Release {
+	var all []models.Release
+	// Load the disabled set once, then exclude those providers from the fan-out.
+	blockedProviders := map[[2]string]struct{}{}
+	if providerDB != nil {
+		if value, err := providerDB.BlockedProviders(); err == nil {
+			blockedProviders = value
+		}
+	}
+	var indexers []IndexerConfig
+	for _, indexer := range cfg.Indexers {
+		if !indexer.Enabled {
+			continue
+		}
+		if _, blocked := blockedProviders[[2]string{"indexer", indexer.Name}]; blocked {
+			continue
+		}
+		indexers = append(indexers, indexer)
+	}
+
+	type indexerResult struct {
+		Name  string
+		Query string
+		Items []models.Release
+		Err   error
+	}
+	indexerResults := make([]indexerResult, len(indexers))
+	var indexerWG sync.WaitGroup
+	for i, indexer := range indexers {
+		indexerWG.Add(1)
+		go func(index int, indexer IndexerConfig) {
+			defer indexerWG.Done()
+			logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
+			items, err := FetchTorznabFlareSolverr(ctx, indexer, query, externalIDs, cfg.FlaresolverrURL)
+			indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
+		}(i, indexer)
+	}
+
+	var webResults []models.Release
+	var webWG sync.WaitGroup
+	webWG.Add(1)
+	go func() {
+		defer webWG.Done()
+		if len(cfg.WebsearchEngines) == 0 {
+			return
+		}
+		webResults = SearchWithTimeout(ctx, cfg, query, webTimeout)
+		logging.Debug("web search completed", "query", query, "results", len(webResults))
+	}()
+
+	indexerWG.Wait()
+	for _, result := range indexerResults {
+		if result.Err == nil {
+			logging.SourceOK("indexer", result.Name, len(result.Items))
+			if providerDB != nil {
+				_ = providerDB.ProviderSuccess("indexer", result.Name)
+			}
+			logging.Debug("indexer search completed",
+				"indexer", result.Name,
+				"results", len(result.Items),
+				"query", result.Query)
+			all = append(all, result.Items...)
+		} else {
+			message := utils.RedactURLSecrets(result.Err.Error())
+			logging.SourceFail("indexer", result.Name, message)
+			if providerDB != nil {
+				_ = providerDB.ProviderFailure("indexer", result.Name, message)
+			}
+			logging.Warn("indexer search failed",
+				"indexer", result.Name,
+				"query", result.Query,
+				"error", message)
+		}
+	}
+	webWG.Wait()
+	all = append(all, webResults...)
+
+	seen := map[string]struct{}{}
+	kept := make([]models.Release, 0, len(all))
+	for _, release := range all {
+		if !includeRejected {
+			if reason := cfg.AllReleaseDeniedReason(&release); reason != "" {
+				if cfg.ReleaseIsMonitored(&release) {
+					rules.LogRejection(&release, reason)
+				}
+				continue
+			}
+		}
+		if hash, ok := utils.MagnetHash(release.Magnet); ok {
+			if _, duplicate := seen[hash]; !duplicate {
+				seen[hash] = struct{}{}
+				kept = append(kept, release)
+			}
+		}
+	}
+	return kept
+}
+
+// printSourceReport is one readable line per source (feed, indexer, web engine)
+// telling the user whether it worked and how many releases it produced.
+// Aggregated per cycle: attempts repeat for every query, so a raw per-attempt
+// log would flood.
+func printSourceReport(stats []logging.SourceStatEntry) {
+	if len(stats) == 0 {
+		return
+	}
+	// Detailed per-source reporting is useful for diagnostics, but can produce
+	// dozens of lines per cycle. The summary ("Sources: ..." and unreachable
+	// engine warnings) remains at INFO/WARN level.
+	logging.Debug("📡 SOURCE REPORT — outcomes of every source in this cycle")
+	for _, entry := range stats {
+		stat := entry.Stats
+		lastError := stat.LastError
+		if lastError == "" {
+			lastError = "unknown error"
+		}
+		switch {
+		case stat.Fail == 0:
+			logging.Debug(fmt.Sprintf("   ✅ [%s] %s: %d run(s), %d releases", entry.Kind, entry.Name, stat.OK, stat.Results))
+		case stat.OK == 0:
+			logging.Debug(fmt.Sprintf("   ❌ [%s] %s: %d failure(s) — %s", entry.Kind, entry.Name, stat.Fail, lastError))
+		default:
+			logging.Debug(fmt.Sprintf("   ⚠️ [%s] %s: %d ok / %d failed, %d releases — %s", entry.Kind, entry.Name, stat.OK, stat.Fail, stat.Results, lastError))
+		}
+	}
+}
+
+// sourceBreakdown renders the per-feed outcome for the "Sources:" summary.
+func sourceBreakdown(stats []logging.SourceStatEntry) string {
+	var parts []string
+	for _, entry := range stats {
+		if entry.Kind != "feed" {
+			continue
+		}
+		stat := entry.Stats
+		switch {
+		case stat.Fail > 0 && stat.OK == 0:
+			parts = append(parts, entry.Name+": error")
+		case stat.Fail > 0:
+			parts = append(parts, fmt.Sprintf("%s: %d (%d error)", entry.Name, stat.Results, stat.Fail))
+		default:
+			parts = append(parts, fmt.Sprintf("%s: %d", entry.Name, stat.Results))
+		}
+	}
+	return strings.Join(parts, " | ")
+}
+
+// feedSourceName maps a feed URL to the stable provider name used by the
+// backoff table and the source report.
+func feedSourceName(rawURL string) string {
+	lower := strings.ToLower(rawURL)
+	switch {
+	case strings.Contains(lower, "ext.to") || strings.Contains(lower, "extto"):
+		return "ExtTo"
+	case strings.Contains(lower, "torrentgalaxy") || strings.Contains(lower, "tgx"):
+		return "TGx"
+	case strings.Contains(lower, "torrentleech"):
+		return "TorrentLeech"
+	case strings.Contains(lower, "knaben"):
+		return "Knaben"
+	case strings.Contains(lower, "eztv"):
+		return "EZTV"
+	}
+	if parsed, err := url.Parse(rawURL); err == nil && parsed.Hostname() != "" {
+		return parsed.Hostname()
+	}
+	return feedLabel(rawURL)
+}
+
+// feedLabel is the short human label (host + path) shown in the feed log lines.
+func feedLabel(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		if index := strings.IndexByte(rawURL, '?'); index >= 0 {
+			return rawURL[:index]
+		}
+		return rawURL
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		host = "feed"
+	}
+	path := strings.TrimRight(parsed.Path, "/")
+	if path == "" {
+		return host
+	}
+	return host + path
+}
+
+// Cross-module calls reconciled with the shared ports:
+//
+//	rss.FetchFeed(ctx, rawURL string, flaresolverr *string, maxPages int,
+// maxAgeDays int64, oldRatio float64) ([]models.Release, error)
+//	rss.FetchTorznabFlareSolverr(ctx, indexer IndexerConfig, query string,
+// externalIDs [][2]string, flaresolverr *string)
+// ([]models.Release, error)
+//	websearch.SearchWithTimeout(ctx, cfg *Config, query string,
+// timeout *time.Duration) []models.Release
+//	websearch.TakeEngineFailures() []EngineFailure
+// with EngineFailure{Engine string; Count int}

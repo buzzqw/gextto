@@ -1,0 +1,9 @@
+# Allows the gextto daemon user to restart the service without a password.
+#
+# Install (one-off, as root):
+#   sudo install -m 0440 systemd/gextto.sudoers /etc/sudoers.d/gextto
+#
+# The rule is limited to the helper installed at /usr/local/bin/gextto-restart,
+# which only accepts restart|start|stop|status on gextto.service: no arbitrary
+# command. Replace CHANGE_ME_USER with the user that runs the daemon.
+CHANGE_ME_USER ALL=(root) NOPASSWD: /usr/local/bin/gextto-restart

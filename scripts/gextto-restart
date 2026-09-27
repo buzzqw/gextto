@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Restart the gextto service without interactive privileges.
+#
+# It supports both deployment styles:
+#   - a systemd *user* unit in ~/.config/systemd/user/gextto.service;
+#   - a system unit installed by install.sh (/etc/systemd/system/gextto.service).
+#
+# Install (one-off, to allow a non-root user to restart the system service):
+#   sudo install -m 0755 scripts/gextto-restart /usr/local/bin/gextto-restart
+#   sudo install -m 0440 systemd/gextto.sudoers /etc/sudoers.d/gextto
+#
+# The script accepts a single optional verb (restart by default) so a generic
+# sudoers rule can never run arbitrary commands.
+set -euo pipefail
+
+action="${1:-restart}"
+case "$action" in
+    restart | start | stop | status)
+        ;;
+    *)
+        echo "uso: gextto-restart [restart|start|stop|status]" >&2
+        exit 2
+        ;;
+esac
+
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/gextto.service" ]]; then
+    exec systemctl --no-block --user "$action" gextto.service
+fi
+exec systemctl --no-block "$action" gextto.service
