@@ -425,6 +425,26 @@ Notifications, Paths, Translations**. Unsaved changes are highlighted with a
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
+### Performance: RAM and CPU
+
+The daemon's own logic is negligible; with libtorrent active almost all the cost
+is the engine while it has torrents in the session. To lower RAM and CPU:
+
+- **RAM** — the values that matter are the **disk cache** (`cache_size`, 16 KiB
+  blocks) and `max_queued_disk_bytes`. The **Optimise** button (or *continuous
+  optimisation*) sizes them to the host RAM; the values suggested by
+  `/api/system/lt_mem_suggest` work too. The daemon returns memory to the OS
+  (`malloc_trim`) after completions, after every cycle and every 15 minutes, so
+  the RSS does not stay at the download peak.
+- **CPU** — enable the **dynamic queue** and *Do not count slow torrents in
+  active slots*: zero-rate torrents do not hold a slot and **stalled** ones are
+  paused and retried instead of spinning. If CPU is busy, lower
+  `connections_limit` and `aio_threads`. Fewer active torrents — and no "dead"
+  torrent without seeders — mean less DHT/tracker churn.
+- **Diagnosis** — `GET /api/torrents/{hash}/why` explains why a torrent is not
+  downloading (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …);
+  *Health* shows the real process and session RAM/CPU.
+
 ### Configuring a Torznab indexer
 
 For Jackett:

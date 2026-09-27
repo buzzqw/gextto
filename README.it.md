@@ -437,6 +437,32 @@ schermata. Indice rapido:
 | `GEXTTO_USER` | Installer: utente di servizio da creare/usare (default `gextto`) |
 | `GEXTTO_SKIP_PACKAGES` | Installer: `1` salta l'installazione dei pacchetti di sistema |
 
+## Uso delle risorse
+
+- La logica del daemon è trascurabile: con libtorrent disabilitato un'istanza
+  senza sessione sta a **0% CPU e ~30 MB RSS** (misurato) e l'heap Go resta
+  nell'ordine di pochi MB. Con libtorrent attivo, CPU e RAM sono spese quasi
+  interamente dal motore quando ha torrent (DHT, announce ai tracker, peer e
+  cache su disco), non dai loop del daemon.
+- **RAM**: i consumatori principali sono la cache disco di libtorrent
+  (`cache_size`, in blocchi da 16 KiB) e il budget di scritture in coda
+  (`max_queued_disk_bytes`). Il daemon chiama `malloc_trim` dopo i
+  completamenti, dopo ogni ciclo e ogni 15 minuti, così la memoria dell'arena
+  liberata torna al sistema invece di restare al picco del download. RAM
+  totale/libera in `/api/health`; `/api/system/lt_mem_suggest` suggerisce i
+  valori per la macchina.
+- **CPU**: la coda è dinamica (`libtorrent_dynamic_queue`), i torrent lenti o a
+  0 B/s non occupano slot attivi (`dont_count_slow_torrents`) e i torrent
+  stalled vengono messi in pausa e ritentati invece di girare a vuoto.
+  *Configurazione → libtorrent → **Ottimizza*** (o `libtorrent_auto_optimize`)
+  dimensiona cache, buffer e coda sull'hardware. Lo snapshot dei torrent è
+  calcolato una volta per tick del worker (cache breve) invece di una query di
+  stato per torrent a ogni loop.
+- Parametri utili: `connections_limit`, `aio_threads`, `active_downloads` /
+  `active_seeds`, `mixed_mode_algorithm`, `cache_size`,
+  `max_queued_disk_bytes`. Meno torrent attivi o morti significano meno traffico
+  DHT/tracker e CPU/RAM più basse.
+
 ## Affidabilità
 
 - **Isolamento dei panic**: i worker in background girano sotto un watchdog che

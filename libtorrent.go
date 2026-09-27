@@ -199,6 +199,14 @@ type LibtorrentClient struct {
 	configDB string
 	stateDir string
 
+	// listCache memoises the torrent snapshot for a very short TTL so several
+	// reads in the same worker tick (and concurrent UI polls) share one
+	// libtorrent status query.
+	listMu    sync.Mutex
+	listAt    time.Time
+	listItems []models.TorrentView
+	listValid bool
+
 	// recheckMu guards the persisted per-torrent re-check times.
 	recheckMu sync.Mutex
 
@@ -1151,8 +1159,40 @@ func (c *LibtorrentClient) AddTorrentFileWithOptions(torrentPath string, cfg *Co
 	return hash, nil
 }
 
-// List returns the live torrent statuses.
+// listCacheTTL bounds how long a torrent snapshot is reused. The background
+// worker polls every 750 ms and reads the list several times per tick, and the
+// UI polls every few seconds: a short cache collapses those reads into one
+// libtorrent status query (and one per-torrent seed-limit DB read) without
+// making the data visibly stale.
+const listCacheTTL = 500 * time.Millisecond
+
+// List returns the live torrent statuses. Repeated calls within listCacheTTL
+// reuse one snapshot to avoid redundant libtorrent status marshalling.
 func (c *LibtorrentClient) List() []models.TorrentView {
+	c.listMu.Lock()
+	if c.listValid && time.Since(c.listAt) < listCacheTTL {
+		out := make([]models.TorrentView, len(c.listItems))
+		copy(out, c.listItems)
+		c.listMu.Unlock()
+		return out
+	}
+	c.listMu.Unlock()
+
+	result := c.listUncached()
+
+	c.listMu.Lock()
+	c.listItems = result
+	c.listAt = time.Now()
+	c.listValid = true
+	c.listMu.Unlock()
+
+	out := make([]models.TorrentView, len(result))
+	copy(out, result)
+	return out
+}
+
+// listUncached builds a fresh torrent snapshot.
+func (c *LibtorrentClient) listUncached() []models.TorrentView {
 	if c.session == nil {
 		c.torrentsMu.RLock()
 		result := make([]models.TorrentView, 0, len(c.torrents))

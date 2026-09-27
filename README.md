@@ -433,6 +433,29 @@ every screen. Quick index:
 | `GEXTTO_USER` | Installer: service account to create/use (default `gextto`) |
 | `GEXTTO_SKIP_PACKAGES` | Installer: `1` skips system package installation |
 
+## Resource usage
+
+- The daemon's own logic is negligible: with the libtorrent engine disabled, a
+  session-less instance sits at **0% CPU and ~30 MB RSS** (measured), and its Go
+  heap stays in the low megabytes. With libtorrent active, CPU and RAM are spent
+  almost entirely by the engine while it has torrents (DHT, tracker announces,
+  peers and the disk cache), not by the daemon's loops.
+- **RAM**: libtorrent's disk cache (`cache_size`, in 16 KiB blocks) and the
+  queued-disk budget (`max_queued_disk_bytes`) are the main consumers. The
+  daemon calls `malloc_trim` after completions, after every cycle and every 15
+  minutes, so freed arena memory returns to the OS instead of staying at the
+  download peak. Total/free RAM is in `/api/health`; `/api/system/lt_mem_suggest`
+  suggests engine values for the host.
+- **CPU**: the queue is dynamic (`libtorrent_dynamic_queue`), slow/zero-rate
+  torrents do not occupy active slots (`dont_count_slow_torrents`) and stalled
+  torrents are paused and retried instead of spinning. *Configuration →
+  libtorrent → **Ottimizza*** (or `libtorrent_auto_optimize`) sizes cache,
+  buffers and queue to the hardware. A torrent snapshot is taken once per worker
+  tick (short-lived cache) instead of one status query per torrent per loop.
+- Useful knobs: `connections_limit`, `aio_threads`, `active_downloads` /
+  `active_seeds`, `mixed_mode_algorithm`, `cache_size`, `max_queued_disk_bytes`.
+  Fewer active or dead torrents mean less DHT/tracker churn and lower CPU/RAM.
+
 ## Reliability
 
 - **Panic isolation**: background workers run under a watchdog that logs and

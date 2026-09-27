@@ -435,6 +435,26 @@ la barra “Salva tutte”.
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
+### Prestazioni: RAM e CPU
+
+La logica del daemon è trascurabile; con libtorrent attivo il costo è quasi tutto
+del motore finché ha torrent in sessione. Per ridurre RAM e CPU:
+
+- **RAM** — i valori che contano sono la **cache disco** (`cache_size`, blocchi
+  da 16 KiB) e `max_queued_disk_bytes`. Il pulsante **Ottimizza** (o
+  *Ottimizzazione continua*) li dimensiona in base alla RAM; puoi anche usare i
+  valori suggeriti da `/api/system/lt_mem_suggest`. Il daemon libera la memoria
+  al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e ogni 15
+  minuti, così l'RSS non resta al picco del download.
+- **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli
+  slot attivi*: i torrent a 0 B/s non occupano slot e quelli **stalled** vengono
+  messi in pausa e ritentati invece di girare a vuoto. Se la CPU è occupata,
+  riduci `connections_limit` e `aio_threads`. Meno torrent attivi — e nessun
+  torrent "morto" senza seeder — significano meno traffico DHT/tracker.
+- **Diagnosi** — `GET /api/torrents/{hash}/why` spiega perché un torrent non
+  scarica (`dead_swarm`, `no_peers`, `no_connected_seed`, `stalled`, …); *Salute*
+  mostra RAM/CPU reali del processo e della sessione.
+
 ### Configurare un indexer Torznab
 
 Per Jackett:
