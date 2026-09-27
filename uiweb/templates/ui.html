@@ -62,17 +62,15 @@
     </header>
     <div class="content" id="ui-page" data-view="{{.Page}}">
       {{if eq .Page "dashboard"}}{{template "dashboard" .Content}}
-      {{else if eq .Page "downloads"}}{{template "torrents" .Content}}
+      {{else if eq .Page "downloads"}}{{template "downloads" .Content}}
+      {{else if eq .Page "panels"}}{{template "pages_panels" .Content}}
       {{else if eq .Page "health"}}{{template "health" .Content}}
       {{else if eq .Page "logs"}}{{template "logs" .Content}}
       {{else if eq .Page "manual"}}{{template "manual" .Content}}
       {{else if eq .Page "license"}}{{template "license" .Content}}
-      {{else if or (eq .Page "series") (eq .Page "movies") (eq .Page "gaps") (eq .Page "archive") (eq .Page "blocklist") (eq .Page "comics")}}{{template "table" .Content}}
       {{else if eq .Page "search"}}{{template "search" .Content}}
       {{else if eq .Page "series-detail"}}{{template "series_detail" .Content}}
       {{else if eq .Page "movie-detail"}}{{template "movie_detail" .Content}}
-      {{else if eq .Page "maintenance"}}{{template "actions" .Content}}
-      {{else if eq .Page "integrations"}}{{template "integrations" .Content}}
       {{else if eq .Page "settings"}}{{template "settings" .Content}}
       {{else}}{{template "unavailable" .Content}}{{end}}
     </div>
@@ -198,11 +196,15 @@
     </div>
   </div>
   {{end}}
+  {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}
 
 {{define "torrents"}}
-<div class="view">
+<div class="view">{{template "torrents_body" .}}</div>
+{{end}}
+
+{{define "torrents_body"}}
   <div class="panel">
     <div class="panel-head">
       <h3>Scarico</h3>
@@ -249,7 +251,6 @@
   </div>
 </div>
 {{end}}
-
 {{define "health"}}
 <div class="view">
   <div class="grid-4">
@@ -284,6 +285,7 @@
     </div>
   </div>
   {{end}}
+  {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}
 

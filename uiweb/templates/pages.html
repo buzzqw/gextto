@@ -1,60 +1,131 @@
+{{define "table_panel"}}
+<div class="panel">
+  <div class="panel-head">
+    <h3>{{.Title}}</h3>
+    <small class="muted" data-ui-count></small>
+  </div>
+  <div class="panel-body">
+    {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+    <div class="toolbar" style="margin-bottom:10px">
+      {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+      <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead data-ui-head></thead>
+        <tbody data-ui-body>
+          <tr><td class="muted">Caricamento…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div data-ui-table
+         data-endpoint="{{.Endpoint}}"
+         data-items="{{.ItemsKey}}"
+         data-columns="{{.ColumnsJSON}}"
+         data-actions="{{.ActionsJSON}}"
+         data-empty="{{.Empty}}"
+         data-search="{{.SearchParam}}"></div>
+  </div>
+</div>
+{{end}}
+
 {{define "table"}}
+<div class="view">{{template "table_panel" .}}</div>
+{{end}}
+
+{{define "action_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Label}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="toolbar">
+      {{range .Buttons}}
+      <button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "form_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}">
+      {{range .Fields}}
+      <label class="field"><span>{{.Label}}</span>
+        {{if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" placeholder="{{.Placeholder}}" rows="3">{{.Value}}</textarea>
+        {{else if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+        {{else}}<input class="input" name="{{.Name}}" type="{{if .Kind}}{{.Kind}}{{else}}text{{end}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
+        {{end}}
+      </label>
+      {{end}}
+      <div class="form-actions">
+        <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>
+        <small class="muted" data-form-message></small>
+      </div>
+      <pre class="output" data-form-output hidden></pre>
+    </form>
+  </div>
+</div>
+{{end}}
+
+{{define "section"}}
+{{if eq .Kind "table"}}{{template "table_panel" .Table}}
+{{else if eq .Kind "actions"}}{{template "action_section" .Action}}
+{{else if eq .Kind "form"}}{{template "form_section" .Form}}
+{{else if eq .Kind "progress"}}{{template "progress_section" .Progress}}
+{{else if eq .Kind "links"}}{{template "links_section" .Links}}
+{{else if eq .Kind "comics_links"}}{{template "comics_links" .}}
+{{end}}
+{{end}}
+
+{{define "links_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="toolbar">
+      {{range .Links}}<a class="btn sm" href="{{.Href}}" title="{{.Hint}}">{{.Label}}</a>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "progress_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    <div class="progress"><span data-progress-bar style="width:0%"></span></div>
+    <p class="muted" data-progress-text>in attesa…</p>
+    <div data-progress data-endpoint="{{.Endpoint}}" hidden></div>
+  </div>
+</div>
+{{end}}
+
+{{define "comics_links"}}
+<div class="panel" data-comics-download>
+  <div class="panel-head"><h3>Scarica da GetComics</h3></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <input class="input" data-comics-post placeholder="URL del post GetComics" />
+      <button class="btn sm primary" data-comics-links>Trova link</button>
+      <small class="muted" data-comics-message></small>
+    </div>
+    <div data-comics-results></div>
+  </div>
+</div>
+{{end}}
+
+{{define "pages_panels"}}
+<div class="view">{{range .Sections}}{{template "section" .}}{{end}}</div>
+{{end}}
+
+{{define "downloads"}}
 <div class="view">
-  <div class="panel">
-    <div class="panel-head">
-      <h3>{{.Title}}</h3>
-      <small class="muted" data-ui-count></small>
-    </div>
-    <div class="panel-body">
-      {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-      <div class="toolbar" style="margin-bottom:10px">
-        {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
-        <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead data-ui-head></thead>
-          <tbody data-ui-body>
-            <tr><td class="muted">Caricamento…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div data-ui-table
-           data-endpoint="{{.Endpoint}}"
-           data-items="{{.ItemsKey}}"
-           data-columns="{{.ColumnsJSON}}"
-           data-actions="{{.ActionsJSON}}"
-           data-empty="{{.Empty}}"
-           data-search="{{.SearchParam}}"></div>
-    </div>
-  </div>
-  {{if .Comics}}
-  <div class="panel" style="margin-top:14px">
-    <div class="panel-head"><h3>Download in corso</h3><small class="muted" data-ui-count></small></div>
-    <div class="panel-body">
-      <div class="toolbar" style="margin-bottom:10px"><button class="btn sm" data-ui-refresh title="Ricarica i download">Aggiorna</button></div>
-      <div class="table-wrap"><table class="data-table"><thead data-ui-head></thead><tbody data-ui-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>
-      <div data-ui-table
-           data-endpoint="/api/comics/downloads"
-           data-items=""
-           data-columns="{{.DownloadsColumnsJSON}}"
-           data-actions="{{.DownloadsActionsJSON}}"
-           data-empty="Nessun download in corso."
-           data-search=""></div>
-    </div>
-  </div>
-  <div class="panel" style="margin-top:14px" data-comics-download>
-    <div class="panel-head"><h3>Scarica da GetComics</h3></div>
-    <div class="panel-body">
-      <div class="toolbar">
-        <input data-comics-post placeholder="URL del post GetComics" style="min-width:320px" />
-        <button class="btn sm primary" data-comics-links title="Trova i link nel post">Trova link</button>
-        <small class="muted" data-comics-message></small>
-      </div>
-      <div data-comics-results></div>
-    </div>
-  </div>
-  {{end}}
+  {{template "torrents_body" .Torrents}}
+  {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}
 
@@ -94,6 +165,18 @@
         </table>
       </div>
       <p class="hint">Ricerca su feed, indexer e motori web (fino a 90 s).</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Aggiungi da TMDB/TVDB</h3></div>
+    <div class="panel-body">
+      <form class="form-grid" data-json-form data-endpoint="/api/tmdb/search">
+        <label class="field"><span>Tipo</span><select class="input" name="kind"><option value="series" selected>Serie TV</option><option value="movie">Film</option></select></label>
+        <label class="field"><span>Titolo</span><input class="input" name="query" placeholder="es. Il Signore degli Anelli" /></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message></small></div>
+        <pre class="output" data-form-output hidden></pre>
+      </form>
+      <p class="hint">Usa l'ID TMDB restituito in "Aggiungi serie/film" nelle pagine Serie TV / Film.</p>
     </div>
   </div>
 </div>

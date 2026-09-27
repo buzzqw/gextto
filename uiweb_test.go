@@ -448,6 +448,25 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 	add := func(method, path string) {
 		checks = append(checks, method+" "+normalize(path))
 	}
+	addPanels := func(sections []uiPageSection) {
+		for _, section := range sections {
+			if section.Kind == "table" && section.Table.Endpoint != "" {
+				add("GET", section.Table.Endpoint)
+				for _, action := range decodeActions(t, section.Table.ActionsJSON) {
+					add(action.Method, action.Path)
+				}
+			}
+			if section.Kind == "form" && section.Form.Path != "" {
+				add(section.Form.Method, section.Form.Path)
+			}
+			for _, button := range section.Action.Buttons {
+				if button.Path != "" {
+					add(button.Method, button.Path)
+				}
+			}
+		}
+	}
+	state := newTestAppState(t)
 
 	// Table pages and their row actions.
 	for _, view := range []string{"series", "movies", "gaps", "archive", "blocklist", "comics"} {
@@ -479,6 +498,16 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 	for _, button := range uiActionsPageButtons(uiIntegrationsPageFrom(newTestAppState(t)).Sections) {
 		add(button.Method, button.Path)
 	}
+	// Panels pages: library, archive, comics, maintenance, integrations and the
+	// download page. Every section table/action/form must map to a real route.
+	for _, view := range []string{"series", "movies", "gaps", "archive", "blocklist", "comics", "maintenance", "integrations"} {
+		page, ok := uiPanelsPageFor(view, state)
+		if !ok {
+			t.Fatalf("missing panels page %s", view)
+		}
+		addPanels(page.Sections)
+	}
+	addPanels(uiDownloadsPageFor(state).Panels)
 	// Search page.
 	search, _ := uiSearchPageFor("search")
 	add("POST", search.Endpoint)

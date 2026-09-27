@@ -101,6 +101,7 @@ type uiDashboardData struct {
 	Recent           []uiRecentDownload
 	FeedMatches      []uiFeedMatch
 	Upcoming         []uiUpcoming
+	Panels           []uiPageSection
 }
 
 type uiConsumption struct {
@@ -161,6 +162,7 @@ type uiHealthData struct {
 	DiskUsedPct   string
 	Uptime        string
 	ProcessUptime string
+	Panels        []uiPageSection
 }
 
 // uiLogsData is the view-model of the Log page.
@@ -295,6 +297,10 @@ func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		renderPage = "series-detail"
 	case uiMovieDetail:
 		renderPage = "movie-detail"
+	case uiPanelsPage:
+		renderPage = "panels"
+	case uiDownloadsPage:
+		renderPage = "downloads"
 	}
 	cfg := latestConfig(s)
 	uiRender(w, http.StatusOK, "shell", uiShellData{
@@ -314,7 +320,7 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 	case "dashboard":
 		return uiDashboardDataFrom(s)
 	case "downloads":
-		return uiTorrentsDataFrom(s)
+		return uiDownloadsPageFor(s)
 	case "health":
 		return uiHealthDataFrom(s)
 	case "logs":
@@ -329,8 +335,6 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 			tab = r.URL.Query().Get("tab")
 		}
 		return uiSettingsPageFrom(s, tab)
-	case "integrations":
-		return uiIntegrationsPageFrom(s)
 	}
 	if view == "series" && r != nil {
 		if detail, ok := uiSeriesDetailFrom(s, r); ok {
@@ -342,14 +346,14 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 			return detail
 		}
 	}
+	if page, ok := uiPanelsPageFor(view, s); ok {
+		return page
+	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		if spec.Search && r != nil {
 			spec.Query = r.URL.Query().Get(spec.SearchParam)
 		}
 		return spec
-	}
-	if page, ok := uiActionsPageFor(view); ok {
-		return page
 	}
 	if page, ok := uiSearchPageFor(view); ok {
 		return page
@@ -465,6 +469,17 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 			data.NextCycle = logging.HumanDuration(remaining)
 		}
 	}
+	data.Panels = []uiPageSection{
+		sectionTable(uiTableSpec{
+			Title:    "Prossime uscite",
+			Endpoint: "/api/calendar",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "series", Label: "Serie"}, {Key: "episode", Label: "Episodio"},
+			}),
+			Empty: "Nessuna uscita in programma.",
+		}),
+	}
 	return data
 }
 
@@ -496,6 +511,28 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 		DiskUsedPct:   usedPct,
 		Uptime:        logging.HumanDuration(saturatingInt64(health.UptimeSeconds)),
 		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
+		Panels: []uiPageSection{
+			sectionTable(uiTableSpec{
+				Title:    "Stato sorgenti",
+				Endpoint: "/api/sources/health",
+				ItemsKey: "items",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
+					{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
+				}),
+				Empty: "Nessuna sorgente da verificare.",
+			}),
+			sectionTable(uiTableSpec{
+				Title:    "Stato provider",
+				Endpoint: "/api/providers/status",
+				ItemsKey: "items",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "provider", Label: "Provider"}, {Key: "status", Label: "Stato"},
+					{Key: "message", Label: "Messaggio"}, {Key: "checked_at", Label: "Verificato"},
+				}),
+				Empty: "Nessun provider verificato.",
+			}),
+		},
 	}
 }
 

@@ -157,8 +157,11 @@
       case "bytes": return humanBytes(value);
       case "rate": return humanBytes(value) + "/s";
       case "percent": return Number(value).toFixed(1) + "%";
-      default: return String(value);
     }
+    if (typeof value === "object") {
+      return value.name || value.title || value.label || JSON.stringify(value);
+    }
+    return String(value);
   }
   function renderTable(container) {
     var panel = container.closest(".panel");
@@ -738,6 +741,58 @@
       }
     }
   }
+
+  // ---- generic JSON forms (section forms) ---------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-json-form]"), function (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var body = {};
+      Array.prototype.forEach.call(form.querySelectorAll("[name]"), function (field) {
+        var value = field.value;
+        if (field.type === "number") value = Number(value);
+        body[field.name] = value;
+      });
+      var button = form.querySelector("button[type=submit]");
+      var message = form.querySelector("[data-form-message]");
+      var output = form.querySelector("[data-form-output]");
+      if (button) button.disabled = true;
+      api(form.getAttribute("data-endpoint"), form.getAttribute("data-method") || "POST", body).then(function (data) {
+        if (message) message.textContent = "Fatto";
+        if (output && data !== undefined && data !== null && data !== "") {
+          output.hidden = false;
+          output.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+        }
+      }).catch(function (error) {
+        alert("Operazione non riuscita: " + error.message);
+      }).then(function () { if (button) button.disabled = false; });
+    });
+  });
+
+  // ---- progress polling ---------------------------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-progress]"), function (node) {
+    var endpoint = node.getAttribute("data-endpoint");
+    var panel = node.closest(".panel");
+    var bar = panel.querySelector("[data-progress-bar]");
+    var text = panel.querySelector("[data-progress-text]");
+    function poll() {
+      api(endpoint, "GET").then(function (data) {
+        var progress = data && data.progress ? data.progress : data;
+        if (!progress) return;
+        var total = Number(progress.total) || 0;
+        var current = Number(progress.current) || 0;
+        var pct = total > 0 ? Math.min(100, Math.round(current / total * 100)) : (progress.running ? 0 : 100);
+        if (bar) bar.style.width = pct + "%";
+        if (text) {
+          text.textContent = (progress.running ? "in corso" : "inattivo") +
+            (progress.series ? " · " + progress.series : "") + " · " + current + "/" + total +
+            (progress.errors ? " · errori " + progress.errors : "") +
+            (progress.message ? " · " + progress.message : "");
+        }
+      }).catch(function () { /* keep the previous value */ });
+    }
+    poll();
+    setInterval(poll, 3000);
+  });
 
   // ---- OAuth / PIN flows (Trakt, Simkl) -----------------------------------
   document.addEventListener("click", function (event) {

@@ -1,0 +1,456 @@
+package gextto
+
+// uiweb_sections.go defines the reusable page sections (table, actions, form,
+// progress, comics link finder) and builds them for every menu, so the new UI
+// exposes the same data and actions as the classic one.
+
+// uiPageSection is one block of a panel page.
+type uiPageSection struct {
+	Kind     string // table | actions | form | progress | comics_links | links
+	Table    uiTableSpec
+	Action   uiActionSection
+	Form     uiFormSection
+	Progress uiProgressSection
+	Links    uiLinksSection
+}
+
+type uiLinkItem struct {
+	Label string
+	Href  string
+	Hint  string
+}
+
+type uiLinksSection struct {
+	Title string
+	Hint  string
+	Links []uiLinkItem
+}
+
+type uiFormOption struct {
+	Value    string
+	Label    string
+	Selected bool
+}
+
+type uiFormField struct {
+	Name        string
+	Label       string
+	Placeholder string
+	Value       string
+	Kind        string // text | number | area | select
+	Options     []uiFormOption
+}
+
+type uiFormSection struct {
+	Title  string
+	Hint   string
+	Path   string
+	Method string
+	Submit string
+	Fields []uiFormField
+}
+
+type uiProgressSection struct {
+	Title    string
+	Endpoint string
+}
+
+// uiPanelsPage is a page made of reusable sections.
+type uiPanelsPage struct {
+	Sections []uiPageSection
+}
+
+type uiDownloadsPage struct {
+	Torrents uiTorrentsData
+	Panels   []uiPageSection
+}
+
+func sectionTable(spec uiTableSpec) uiPageSection {
+	return uiPageSection{Kind: "table", Table: spec}
+}
+
+func sectionActions(section uiActionSection) uiPageSection {
+	return uiPageSection{Kind: "actions", Action: section}
+}
+
+func sectionForm(form uiFormSection) uiPageSection {
+	if form.Method == "" {
+		form.Method = "POST"
+	}
+	return uiPageSection{Kind: "form", Form: form}
+}
+
+func sectionProgress(title, endpoint string) uiPageSection {
+	return uiPageSection{Kind: "progress", Progress: uiProgressSection{Title: title, Endpoint: endpoint}}
+}
+
+func sectionComicsLinks() uiPageSection {
+	return uiPageSection{Kind: "comics_links"}
+}
+
+func sectionLinks(section uiLinksSection) uiPageSection {
+	return uiPageSection{Kind: "links", Links: section}
+}
+
+func boolField(name, label string, value bool) uiFormField {
+	return uiFormField{Name: name, Label: label, Kind: "select", Options: []uiFormOption{
+		{Value: "true", Label: "Sì", Selected: value},
+		{Value: "false", Label: "No", Selected: !value},
+	}}
+}
+
+// uiPanelsPageFor builds the section list of the pages that need more than one
+// panel (library, archive, comics, maintenance, integrations).
+func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
+	cfg := latestConfig(s)
+	switch view {
+	case "series":
+		spec, _ := uiTableSpecFor("series")
+		return uiPanelsPage{Sections: []uiPageSection{
+			sectionTable(spec),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi o cerca una serie (TMDB/TVDB)",
+				Hint:  "Cerca su TMDB/TVDB e aggiungi con i dati già compilati, oppure inserisci l'ID manualmente.",
+				Path:  "/api/tmdb/add", Submit: "Aggiungi serie",
+				Fields: []uiFormField{
+					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "series", Label: "Serie TV", Selected: true}, {Value: "movie", Label: "Film"}}},
+					{Name: "name", Label: "Nome", Placeholder: "Nome serie"},
+					{Name: "tmdb_id", Label: "TMDB ID", Placeholder: "es. 1399"},
+					{Name: "year", Label: "Anno"},
+					{Name: "quality", Label: "Qualità", Placeholder: "es. 1080p"},
+					{Name: "language", Label: "Lingua", Placeholder: "es. ita"},
+					{Name: "seasons", Label: "Stagioni", Placeholder: "es. 1-5 o *"},
+					{Name: "exclude", Label: "Escludi", Placeholder: "parole da escludere"},
+				},
+			}),
+		}}, true
+	case "movies":
+		spec, _ := uiTableSpecFor("movies")
+		return uiPanelsPage{Sections: []uiPageSection{
+			sectionTable(spec),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi un film (TMDB/TVDB)",
+				Path:  "/api/tmdb/add", Submit: "Aggiungi film",
+				Fields: []uiFormField{
+					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "movie", Label: "Film", Selected: true}, {Value: "series", Label: "Serie TV"}}},
+					{Name: "name", Label: "Titolo"},
+					{Name: "tmdb_id", Label: "TMDB ID"},
+					{Name: "year", Label: "Anno"},
+					{Name: "quality", Label: "Qualità"},
+					{Name: "language", Label: "Lingua"},
+				},
+			}),
+		}}, true
+	case "gaps":
+		spec, _ := uiTableSpecFor("gaps")
+		return uiPanelsPage{Sections: []uiPageSection{
+			sectionTable(spec),
+			sectionForm(uiFormSection{
+				Title: "Cerca un episodio mancante",
+				Hint:  "Cerca una release specifica per serie/stagione/episodio e accodala dai risultati.",
+				Path:  "/api/missing/search", Submit: "Cerca",
+				Fields: []uiFormField{
+					{Name: "series", Label: "Serie"},
+					{Name: "season", Label: "Stagione", Kind: "number"},
+					{Name: "episode", Label: "Episodio", Kind: "number"},
+				},
+			}),
+		}}, true
+	case "archive":
+		spec, _ := uiTableSpecFor("archive")
+		spec.ActionsJSON = uiJSON([]uiAction{
+			{Label: "Scarica", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`},
+			{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/archive/delete", Body: `{"magnet":"{magnet}"}`, Confirm: "Eliminare questa voce dall'archivio?"},
+		})
+		return uiPanelsPage{Sections: []uiPageSection{
+			sectionTable(spec),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi all'archivio",
+				Hint:  "Incolla un magnet e (opzionale) titolo e sorgente per registrarlo nell'archivio.",
+				Path:  "/api/archive/add", Submit: "Aggiungi",
+				Fields: []uiFormField{
+					{Name: "title", Label: "Titolo"},
+					{Name: "magnet", Label: "Magnet", Kind: "area", Placeholder: "magnet:?xt=urn:btih:…"},
+					{Name: "source", Label: "Sorgente"},
+				},
+			}),
+		}}, true
+	case "blocklist":
+		spec, _ := uiTableSpecFor("blocklist")
+		return uiPanelsPage{Sections: []uiPageSection{sectionTable(spec)}}, true
+	case "comics":
+		spec, _ := uiTableSpecFor("comics")
+		return uiPanelsPage{Sections: []uiPageSection{
+			sectionTable(spec),
+			sectionActions(uiActionSection{Label: "Ciclo fumetti", Buttons: []uiActionButton{
+				{Label: "Avvia ciclo fumetti", Class: "primary", Method: "POST", Path: "/api/comics/cycle", Body: "{}"},
+			}}),
+			sectionForm(uiFormSection{
+				Title: "Esplora GetComics", Path: "/api/comics/explore", Submit: "Cerca",
+				Fields: []uiFormField{{Name: "query", Label: "Titolo fumetto", Placeholder: "es. Poison Ivy #41"}},
+			}),
+			sectionTable(uiTableSpec{
+				Title:    "Download in corso",
+				Endpoint: "/api/comics/downloads",
+				ItemsKey: "",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "title", Label: "Titolo"}, {Key: "method", Label: "Metodo"}, {Key: "status", Label: "Stato"},
+					{Key: "progress", Label: "Avanzamento", Format: "percent"},
+					{Key: "downloaded_bytes", Label: "Scaricato", Format: "bytes"},
+					{Key: "speed_bytes", Label: "Velocità", Format: "rate"}, {Key: "tag", Label: "Tag"},
+				}),
+				ActionsJSON: uiJSON([]uiAction{
+					{Label: "Pausa", Method: "POST", Path: "/api/comics/downloads/{id}/pause", Body: "{}"},
+					{Label: "Riprendi", Method: "POST", Path: "/api/comics/downloads/{id}/resume", Body: "{}"},
+					{Label: "Rimuovi", Class: "danger", Method: "POST", Path: "/api/comics/downloads/{id}/remove", Body: "{}", Confirm: "Rimuovere questo download?"},
+				}),
+				Empty: "Nessun download in corso.",
+			}),
+			sectionTable(uiTableSpec{
+				Title:    "Storico fumetti",
+				Endpoint: "/api/comics/history",
+				ItemsKey: "items",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "title", Label: "Titolo"}, {Key: "sent_at", Label: "Inviato"},
+					{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "post_url", Label: "Post"},
+				}),
+				ActionsJSON: uiJSON([]uiAction{
+					{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/comics/history/delete", Body: `{"url":"{post_url}"}`, Confirm: "Eliminare questa voce dallo storico?"},
+				}),
+				Empty: "Storico vuoto.",
+			}),
+			sectionForm(uiFormSection{
+				Title: "Pianificazione settimanale", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",
+				Fields: []uiFormField{
+					boolField("enabled", "Weekly attivo", false),
+					{Name: "from_date", Label: "Dal (YYYY.MM.DD)"},
+				},
+			}),
+			sectionForm(uiFormSection{
+				Title: "Link del weekly", Path: "/api/comics/weekly/links", Submit: "Trova link",
+				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto (YYYY.MM.DD)"}},
+			}),
+			sectionComicsLinks(),
+		}}, true
+	case "maintenance":
+		return uiPanelsPage{Sections: uiMaintenanceSections(s, cfg)}, true
+	case "integrations":
+		return uiPanelsPage{Sections: uiIntegrationSections(s, cfg)}, true
+	}
+	return uiPanelsPage{}, false
+}
+
+func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
+	return []uiPageSection{
+		sectionActions(uiActionSection{Label: "Database", Hint: "Operazioni sui database applicativi.", Buttons: []uiActionButton{
+			{Label: "Ricalcola punteggi", Class: "primary", Method: "POST", Path: "/api/database/rescore", Body: "{}"},
+			{Label: "Pulizia duplicati", Method: "POST", Path: "/api/maintenance/clean-duplicates", Body: "{}"},
+			{Label: "Pota database", Method: "POST", Path: "/api/db/prune", Body: "{}"},
+			{Label: "VACUUM", Method: "POST", Path: "/api/db/action", Body: `{"action":"vacuum"}`},
+		}}),
+		sectionActions(uiActionSection{Label: "Archivio, rinomina e pulizie", Buttons: []uiActionButton{
+			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
+			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
+			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
+			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
+			{Label: "Backfill MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
+			{Label: "Crea backup", Method: "POST", Path: "/api/backup", Body: "{}"},
+		}}),
+		sectionActions(uiActionSection{Label: "Servizio e installazione", Hint: "Operazioni sensibili eseguite dal daemon.", Buttons: []uiActionButton{
+			{Label: "Controlla porte", Method: "GET", Path: "/api/config/check-ports", Body: ""},
+			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?"},
+			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?"},
+		}}),
+		sectionProgress("Progresso rinomina", "/api/rename-progress"),
+		sectionTable(uiTableSpec{
+			Title:    "Stato sorgenti",
+			Endpoint: "/api/sources/health",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
+				{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
+			}),
+			Empty: "Nessuna sorgente da verificare.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Cestino",
+			Endpoint: "/api/trash",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "Nome"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
+				{Key: "is_dir", Label: "Cartella", Format: "bool"},
+			}),
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/trash/delete", Body: `{"names":["{name}"]}`, Confirm: "Eliminare definitivamente questo file?"},
+			}),
+			Empty: "Cestino vuoto.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Database",
+			Endpoint: "/api/db/info",
+			ItemsKey: "files",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "File"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
+				{Key: "exists", Label: "Presente", Format: "bool"},
+			}),
+			Empty: "Nessun database.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Porte",
+			Endpoint: "/api/config/check-ports",
+			ItemsKey: "ports",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "port", Label: "Porta"}, {Key: "available", Label: "Libera", Format: "bool"},
+				{Key: "tcp_available", Label: "TCP", Format: "bool"}, {Key: "udp_available", Label: "UDP", Format: "bool"},
+			}),
+			Empty: "Nessuna porta da verificare.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "RAM disk",
+			Endpoint: "/api/ramdisk",
+			ItemsKey: "paths",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "path", Label: "Percorso"}, {Key: "filesystem", Label: "Filesystem"},
+				{Key: "exists", Label: "Presente", Format: "bool"},
+				{Key: "free_bytes", Label: "Liberi", Format: "bytes"},
+				{Key: "total_bytes", Label: "Totali", Format: "bytes"},
+			}),
+			Empty: "Nessun RAM disk configurato.",
+		}),
+	}
+}
+
+func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
+	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
+	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
+	return []uiPageSection{
+		sectionActions(uiActionSection{Label: "Trakt", Hint: "Avvia il flusso di accesso e poi conferma il codice.", Buttons: []uiActionButton{
+			{Label: "Avvia accesso", Class: "primary", Method: "POST", Path: "/api/trakt/auth/start", Body: "{}"},
+			{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}"},
+			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}"},
+			{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}"},
+		}}),
+		sectionForm(uiFormSection{
+			Title: "Trakt — impostazioni", Path: "/api/trakt/settings", Submit: "Salva Trakt",
+			Fields: []uiFormField{
+				{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", "")},
+				{Name: "trakt_client_secret", Label: "Client secret", Kind: "text"},
+				{Name: "trakt_calendar_days", Label: "Giorni calendario", Value: traktCalendarDays},
+				boolField("trakt_watchlist_sync", "Sincronizza watchlist", settingsBool(cfg, "trakt_watchlist_sync", false)),
+				boolField("trakt_scrobble_enabled", "Scrobble", settingsBool(cfg, "trakt_scrobble_enabled", false)),
+			},
+		}),
+		sectionActions(uiActionSection{Label: "Simkl", Buttons: []uiActionButton{
+			{Label: "Avvia PIN", Class: "primary", Method: "POST", Path: "/api/simkl/auth/start", Body: "{}"},
+			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}"},
+			{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}"},
+		}}),
+		sectionForm(uiFormSection{
+			Title: "Simkl — impostazioni", Path: "/api/simkl/settings", Submit: "Salva Simkl",
+			Fields: []uiFormField{
+				{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", "")},
+				{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays},
+				{Name: "simkl_watchlist_status", Label: "Stato watchlist", Kind: "select", Options: []uiFormOption{
+					{Value: "plantowatch", Label: "Da guardare", Selected: settingsOr(cfg, "simkl_watchlist_status", "plantowatch") == "plantowatch"},
+					{Value: "watching", Label: "In visione", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "watching"},
+					{Value: "completed", Label: "Completato", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "completed"},
+				}},
+				boolField("simkl_mark_watched", "Segna come visto", settingsBool(cfg, "simkl_mark_watched", false)),
+			},
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Watchlist Trakt",
+			Endpoint: "/api/trakt/watchlist",
+			ItemsKey: "",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
+			}),
+			Empty: "Watchlist vuota o Trakt non configurato.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Calendario Trakt",
+			Endpoint: "/api/trakt/calendar",
+			ItemsKey: "",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
+			}),
+			Empty: "Nessuna uscita o Trakt non configurato.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:       "Watchlist Simkl",
+			Endpoint:    "/api/simkl/watchlist",
+			ItemsKey:    "shows",
+			ColumnsJSON: uiJSON([]uiColumn{{Key: "show", Label: "Serie"}}),
+			Empty:       "Watchlist vuota o Simkl non configurato.",
+		}),
+		sectionLinks(uiLinksSection{
+			Title: "Handler del browser",
+			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
+			Links: []uiLinkItem{
+				{Label: "Magnet handler", Href: "/api/browser-handlers/download?file=gextto-magnet"},
+				{Label: "Torrent handler", Href: "/api/browser-handlers/download?file=gextto-torrent"},
+				{Label: "Magnet .desktop", Href: "/api/browser-handlers/download?file=gextto-magnet.desktop"},
+				{Label: "Torrent .desktop", Href: "/api/browser-handlers/download?file=gextto-torrent.desktop"},
+				{Label: "install.sh", Href: "/api/browser-handlers/download?file=install.sh"},
+			},
+		}),
+		sectionActions(uiActionSection{Label: "Browser e media server", Hint: "Installa gli handler magnet/.torrent nel browser o aggiorna le librerie.", Buttons: []uiActionButton{
+			{Label: "Test Jellyfin", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
+			{Label: "Aggiorna Jellyfin", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
+			{Label: "Test Plex", Method: "POST", Path: "/api/plex/test", Body: "{}"},
+			{Label: "Aggiorna Plex", Method: "POST", Path: "/api/plex/refresh", Body: "{}"},
+			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
+			{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
+		}}),
+	}
+}
+
+// uiDownloadsPageFor builds the download page with the torrent table plus the
+// tag and temporary-limit panels of the classic interface.
+func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
+	return uiDownloadsPage{
+		Torrents: uiTorrentsDataFrom(s),
+		Panels: []uiPageSection{
+			sectionActions(uiActionSection{Label: "Limiti temporanei", Hint: "Applica un limite globale per un periodo, poi torna ai valori configurati.", Buttons: []uiActionButton{
+				{Label: "1 ora", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"download_kib":0,"upload_kib":0,"minutes":60}`},
+				{Label: "24 ore", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"download_kib":0,"upload_kib":0,"minutes":1440}`},
+				{Label: "Disattiva", Class: "danger", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"clear":true}`},
+				{Label: "Applica impostazioni", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}"},
+				{Label: "Ottimizza", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}"},
+			}}),
+			sectionForm(uiFormSection{
+				Title: "Limiti temporanei personalizzati", Path: "/api/torrents/temp-limits", Submit: "Applica",
+				Fields: []uiFormField{
+					{Name: "download_kib", Label: "Download (KiB/s, 0 = illimitato)", Kind: "number", Value: "0"},
+					{Name: "upload_kib", Label: "Upload (KiB/s, 0 = illimitato)", Kind: "number", Value: "0"},
+					{Name: "minutes", Label: "Durata (minuti)", Kind: "number", Value: "60"},
+				},
+			}),
+			sectionTable(uiTableSpec{
+				Title:       "Tag dei download (HTTP/fumetti)",
+				Endpoint:    "/api/download-tags",
+				ItemsKey:    "items",
+				ColumnsJSON: uiJSON([]uiColumn{{Key: "", Label: "Tag"}}),
+				Empty:       "Nessun tag.",
+			}),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi tag ai download", Path: "/api/download-tags", Submit: "Aggiungi",
+				Fields: []uiFormField{{Name: "tag", Label: "Nuovo tag"}},
+			}),
+			sectionTable(uiTableSpec{
+				Title:       "Tag dei torrent",
+				Endpoint:    "/api/torrent-tags",
+				ItemsKey:    "items",
+				ColumnsJSON: uiJSON([]uiColumn{{Key: "hash", Label: "Hash"}, {Key: "tag", Label: "Tag"}}),
+				Empty:       "Nessun tag.",
+			}),
+			sectionForm(uiFormSection{
+				Title: "Assegna un tag a un torrent", Path: "/api/torrent-tags", Submit: "Assegna",
+				Fields: []uiFormField{
+					{Name: "hash", Label: "Hash"},
+					{Name: "tag", Label: "Tag"},
+				},
+			}),
+		},
+	}
+}
