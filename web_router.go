@@ -195,6 +195,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/torrent-events", TorrentEvents)
 	handle(s, mux, "GET /api/torrent-no-rename", TorrentNoRenameList)
 	handle(s, mux, "POST /api/torrents", AddTorrentHandler)
+	handle(s, mux, "GET /api/torrent-backend", TorrentBackendStatus)
+	handle(s, mux, "POST /api/torrent-backend/test", TorrentBackendTest)
 	handle(s, mux, "GET /api/blocklist", BlocklistEntries)
 	handle(s, mux, "POST /api/blocklist/{hash}/remove", RemoveBlocklistEntry)
 	handle(s, mux, "POST /api/torrents/{hash}/mark_failed", MarkTorrentFailed)

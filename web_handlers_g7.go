@@ -680,7 +680,9 @@ func gh7_setting_key_allowed(key string) bool {
 		"min_free_space_gb", "trash_retention_days", "archive_retention_days", "archive_cleanup_enabled",
 		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",
 		"move_episodes", "rename_verify_interval", "auto_remove_completed", "telegram_bot_token",
-		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password":
+		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
+		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
+		"qbittorrent_category", "qbittorrent_request_timeout_secs":
 		return true
 	}
 	return false
