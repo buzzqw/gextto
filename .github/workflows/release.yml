@@ -49,7 +49,7 @@ jobs:
           scripts/package-linux.sh --label "${GITHUB_REF_NAME}"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             gextto-linux-*.tar.gz
