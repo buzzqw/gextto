@@ -232,6 +232,18 @@ func (s *AppState) setActiveEngine(engine TorrentEngine) {
 	s.engine_mu.Unlock()
 }
 
+// hasTorrentEngine reports whether any engine (embedded or alternative) is
+// wired. It guards handlers that must not dereference a nil embedded client in
+// a partially constructed AppState (route smoke tests).
+func (s *AppState) hasTorrentEngine() bool {
+	if s == nil {
+		return false
+	}
+	s.engine_mu.RLock()
+	defer s.engine_mu.RUnlock()
+	return s.torrent_engine != nil || s.torrents != nil
+}
+
 // ---------------------------------------------------------------------------
 // path mapping (Gextto paths <-> backend paths)
 // ---------------------------------------------------------------------------

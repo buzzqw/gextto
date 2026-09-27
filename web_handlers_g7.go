@@ -825,7 +825,7 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if magnet == "" {
 		magnet = "magnet:?xt=urn:btih:" + hash
 	}
-	if s.torrents != nil {
+	if s.hasTorrentEngine() {
 		if trackers, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
 			for _, tracker := range trackers {
 				if !strings.Contains(magnet, tracker.URL) {
@@ -973,7 +973,7 @@ func ReannounceTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 // RemoveTorrent handles DELETE /api/torrents/{hash}.
 func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	gh7_blocklist_mismatched_pack(s.torrents, s.db, hash)
+	gh7_blocklist_mismatched_pack(s.activeEngine(), s.db, hash)
 	deleteFiles := gh7_torrent_files_are_disposable(s.db, hash)
 	removed, err := s.activeEngine().Remove(hash, deleteFiles)
 	if err == nil && removed && s.db != nil {

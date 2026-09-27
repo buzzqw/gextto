@@ -962,7 +962,7 @@ func MarkTorrentFailed(w http.ResponseWriter, r *http.Request, s *AppState) {
 			break
 		}
 	}
-	if gh4_removeFailedTorrent(s.torrents, hash) {
+	if gh4_removeFailedTorrent(s.activeEngine(), hash) {
 		_ = s.db.MarkTorrentRemovedAt(hash)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "removed": removed, "upgrade_restored": restored})

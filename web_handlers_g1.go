@@ -639,7 +639,7 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	identityMismatch := gh1_blocklistMismatchedPack(s.torrents, s.db, hash)
+	identityMismatch := gh1_blocklistMismatchedPack(s.activeEngine(), s.db, hash)
 	if input.Blocklist && !identityMismatch {
 		if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
 			_ = s.db.Blocklist(&meta.Release, "manual")
