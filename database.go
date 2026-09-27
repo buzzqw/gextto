@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/backoff"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
@@ -739,7 +740,9 @@ func (d *Database) migrate() error {
 		{"blocklist", "movie_name", "TEXT DEFAULT ''"},
 		{"blocklist", "movie_year", "INTEGER"},
 	} {
-		_ = ensureColumn(d.db, column.table, column.name, column.definition)
+		if err := ensureColumn(d.db, column.table, column.name, column.definition); err != nil {
+			logging.Warn("schema migration: cannot ensure column", "table", column.table, "column", column.name, "error", err)
+		}
 	}
 	// "Visti nei feed": tutte le release che passano dalle sorgenti.
 	if _, err := d.db.Exec(databaseFeedSeenSchema); err != nil {
@@ -782,16 +785,24 @@ func (d *Database) migrate() error {
 		{"episodes", "media_info_json", "TEXT DEFAULT ''"},
 		{"movies", "media_info_json", "TEXT DEFAULT ''"},
 	} {
-		_ = ensureColumn(d.db, column.table, column.name, column.definition)
+		if err := ensureColumn(d.db, column.table, column.name, column.definition); err != nil {
+			logging.Warn("schema migration: cannot ensure column", "table", column.table, "column", column.name, "error", err)
+		}
 	}
 	// I torrent già rimossi prima dell'introduzione di `removed_at` devono
 	// comunque comparire nello "Storico download".
-	_, _ = d.db.Exec("UPDATE torrent_meta SET removed_at=COALESCE(NULLIF(completed_at,''), updated_at) WHERE status='removed' AND removed_at IS NULL")
+	if _, err := d.db.Exec("UPDATE torrent_meta SET removed_at=COALESCE(NULLIF(completed_at,''), updated_at) WHERE status='removed' AND removed_at IS NULL"); err != nil {
+		logging.Warn("schema migration: torrent removed_at backfill failed", "error", err)
+	}
 	// Le righe registrate prima di salvare la sorgente hanno il dato dentro
 	// `metadata_json`: lo si riporta nella colonna dedicata.
-	_, _ = d.db.Exec("UPDATE torrent_meta SET source=COALESCE(json_extract(metadata_json,'$.release.source'),'') WHERE COALESCE(source,'')='' AND COALESCE(metadata_json,'')<>''")
+	if _, err := d.db.Exec("UPDATE torrent_meta SET source=COALESCE(json_extract(metadata_json,'$.release.source'),'') WHERE COALESCE(source,'')='' AND COALESCE(metadata_json,'')<>''"); err != nil {
+		logging.Warn("schema migration: torrent source backfill failed", "error", err)
+	}
 	// Indici di espressione per le ricerche case-insensitive sugli hash.
-	_, _ = d.db.Exec("CREATE INDEX IF NOT EXISTS idx_torrent_meta_hash_lower ON torrent_meta(lower(hash)); CREATE INDEX IF NOT EXISTS idx_episodes_magnet_lower ON episodes(lower(magnet_hash)); CREATE INDEX IF NOT EXISTS idx_movies_magnet_lower ON movies(lower(magnet_hash));")
+	if _, err := d.db.Exec("CREATE INDEX IF NOT EXISTS idx_torrent_meta_hash_lower ON torrent_meta(lower(hash)); CREATE INDEX IF NOT EXISTS idx_episodes_magnet_lower ON episodes(lower(magnet_hash)); CREATE INDEX IF NOT EXISTS idx_movies_magnet_lower ON movies(lower(magnet_hash));"); err != nil {
+		logging.Warn("schema migration: lower(hash) indexes failed", "error", err)
+	}
 	return nil
 }
 
