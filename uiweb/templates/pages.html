@@ -205,6 +205,24 @@
       {{end}}
     </div>
   </div>
+  <div class="panel" style="margin-bottom:14px" data-i18n-editor>
+    <div class="panel-head"><h3>Traduzioni</h3></div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <label class="field"><span>Lingua attiva</span>
+          <select data-i18n-language>
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <a class="btn sm" data-i18n-export target="_blank" rel="noopener" title="Scarica le traduzioni in YAML">Esporta YAML</a>
+        <button class="btn sm danger" data-i18n-delete title="Elimina tutte le traduzioni della lingua">Elimina lingua</button>
+      </div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Chiave</th><th>Valore</th><th></th></tr></thead><tbody data-i18n-body></tbody></table></div>
+      <label class="field" style="margin-top:10px"><span>Importa YAML</span><textarea data-i18n-yaml rows="4"></textarea></label>
+      <div class="form-actions"><button class="btn sm primary" data-i18n-import>Importa</button><small class="muted" data-i18n-message></small></div>
+    </div>
+  </div>
   <p class="muted">Ogni campo si salva singolarmente. I valori sensibili non vengono mai mostrati.</p>
   {{range .Tabs}}
   <div class="panel" style="margin-bottom:14px">

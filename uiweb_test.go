@@ -157,6 +157,34 @@ func TestUiListAndActionPages(t *testing.T) {
 	}
 }
 
+func TestUiDetailAndEditorPages(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	for _, name := range []string{"series_detail", "movie_detail"} {
+		if uiwebTemplates.Lookup(name) == nil {
+			t.Fatalf("template %s not registered", name)
+		}
+	}
+	checks := []struct {
+		path   string
+		marker string
+	}{
+		{"/ui?view=settings", `data-i18n-editor`},
+		{"/ui?view=settings", `data-json-editor`},
+		{"/ui?view=series", `series_link`},
+		{"/ui?view=movies", `movie_link`},
+		{"/ui?view=comics", `/api/comics/{id}/enabled`},
+	}
+	for _, check := range checks {
+		code, _, body := webGet(t, server, check.path)
+		if code != http.StatusOK || !strings.Contains(string(body), check.marker) {
+			t.Fatalf("GET %s -> %d, missing %q", check.path, code, check.marker)
+		}
+	}
+}
+
 func TestUiStateLabelParity(t *testing.T) {
 	cases := map[string]string{
 		"downloading":          "In scarico",

@@ -231,6 +231,64 @@
     });
   });
 
+  // ---- i18n editor --------------------------------------------------------
+  var i18nEditor = document.querySelector("[data-i18n-editor]");
+  if (i18nEditor) {
+    var langSelect = i18nEditor.querySelector("[data-i18n-language]");
+    var i18nBody = i18nEditor.querySelector("[data-i18n-body]");
+    var i18nExport = i18nEditor.querySelector("[data-i18n-export]");
+    var i18nMessage = i18nEditor.querySelector("[data-i18n-message]");
+    function loadI18n() {
+      if (i18nExport) i18nExport.href = "/api/i18n/export/" + encodeURIComponent(langSelect.value);
+      api("/api/i18n?lang=" + encodeURIComponent(langSelect.value), "GET").then(function (data) {
+        var items = (data && data.items) || [];
+        if (!items.length) {
+          i18nBody.innerHTML = '<tr><td class="muted" colspan="3">Nessuna traduzione.</td></tr>';
+          return;
+        }
+        i18nBody.innerHTML = items.map(function (item) {
+          return '<tr><td class="truncate">' + esc(item.key) + "</td>" +
+            '<td><input data-i18n-key="' + esc(item.key) + '" value="' + esc(item.value) + '" /></td>' +
+            '<td><button class="btn sm" data-i18n-save="' + esc(item.key) + '">Salva</button></td></tr>';
+        }).join("");
+      }).catch(function (error) { if (i18nMessage) i18nMessage.textContent = error.message; });
+    }
+    api("/api/i18n/active", "GET").then(function (data) {
+      if (data && data.lang) langSelect.value = data.lang;
+      loadI18n();
+    }).catch(function () { loadI18n(); });
+    langSelect.addEventListener("change", function () {
+      api("/api/i18n/language", "POST", { lang: langSelect.value }).then(function () { loadI18n(); })
+        .catch(function (error) { alert("Cambio lingua non riuscito: " + error.message); });
+    });
+    i18nBody.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-i18n-save]");
+      if (!button) return;
+      var key = button.getAttribute("data-i18n-save");
+      var input = i18nBody.querySelector('[data-i18n-key="' + key.replace(/(["\\])/g, "\\$1") + '"]');
+      button.disabled = true;
+      api("/api/i18n", "POST", { lang: langSelect.value, key: key, value: input ? input.value : "" })
+        .then(function () { if (i18nMessage) i18nMessage.textContent = "Salvato"; })
+        .catch(function (error) { alert("Salvataggio non riuscito: " + error.message); })
+        .then(function () { button.disabled = false; });
+    });
+    var i18nImport = i18nEditor.querySelector("[data-i18n-import]");
+    if (i18nImport) i18nImport.addEventListener("click", function () {
+      var area = i18nEditor.querySelector("[data-i18n-yaml]");
+      i18nImport.disabled = true;
+      api("/api/i18n/import/" + encodeURIComponent(langSelect.value), "POST", { yaml: area ? area.value : "" })
+        .then(function () { if (i18nMessage) i18nMessage.textContent = "Importato"; loadI18n(); })
+        .catch(function (error) { alert("Import non riuscito: " + error.message); })
+        .then(function () { i18nImport.disabled = false; });
+    });
+    var i18nDelete = i18nEditor.querySelector("[data-i18n-delete]");
+    if (i18nDelete) i18nDelete.addEventListener("click", function () {
+      if (!confirm("Eliminare tutte le traduzioni della lingua " + langSelect.value + "?")) return;
+      api("/api/i18n/" + encodeURIComponent(langSelect.value), "DELETE", {}).then(function () { loadI18n(); })
+        .catch(function (error) { alert("Eliminazione non riuscita: " + error.message); });
+    });
+  }
+
   // ---- generic actions ----------------------------------------------------
   document.addEventListener("click", function (event) {
     var element = event.target.closest("[data-api]");
