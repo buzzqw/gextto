@@ -215,72 +215,92 @@
 </div>
 {{end}}
 
+{{define "settings_field"}}
+<form class="card setting" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
+  <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
+  {{if eq .Kind "bool"}}
+  <select class="input" data-setting-input id="input-{{.Key}}">
+    <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
+    <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
+  </select>
+  {{else if eq .Kind "area"}}
+  <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3">{{.Value}}</textarea>
+  {{else if eq .Kind "secret"}}
+  <input class="input" type="password" data-setting-input id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
+  {{else}}
+  <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" />
+  {{end}}
+  <div class="setting-foot">
+    <code class="setting-key">{{.Key}}</code>
+    <button class="btn sm primary" type="submit">Salva</button>
+  </div>
+</form>
+{{end}}
+
 {{define "settings"}}
-<div class="view">
-  <div class="panel" data-library-editor>
-    <div class="panel-head"><h3>Libreria e sorgenti</h3></div>
-    <div class="panel-body">
-      <label class="field"><span>Feed RSS (un URL per riga)</span><textarea data-library-feeds rows="3"></textarea></label>
-      <label class="field"><span>Indexer Torznab (JSON)</span><textarea data-library-indexers rows="5"></textarea></label>
-      <label class="field"><span>Serie monitorizzate (JSON)</span><textarea data-library-series rows="4"></textarea></label>
-      <label class="field"><span>Film monitorizzati (JSON)</span><textarea data-library-movies rows="4"></textarea></label>
+<div class="view settings-view" data-settings-index="{{.SearchIndexJSON}}">
+  <div class="settings-head">
+    <input type="search" class="input settings-search" data-settings-search placeholder="Cerca tra le impostazioni…" autocomplete="off" />
+    <div class="chip-row">
+      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}">{{.Label}}{{if .Count}}<span class="chip-count">{{.Count}}</span>{{end}}</a>{{end}}
+    </div>
+    <div class="card settings-results" data-settings-results hidden></div>
+  </div>
+
+  <div class="settings-body" data-settings-body>
+    {{if .Fields}}
+    <div class="settings-grid">
+      {{range .Fields}}{{template "settings_field" .}}{{end}}
+    </div>
+    {{end}}
+    {{if and (not .Fields) (not (or .ShowSources .ShowLibrary .ShowEditors .ShowI18n))}}
+    <p class="muted">Nessuna impostazione in questa sezione.</p>
+    {{end}}
+
+    {{if .ShowSources}}
+    <div class="card editor-card" data-sources-editor>
+      <h3>Feed e indexer</h3>
+      <label class="field"><span>Feed RSS (un URL per riga)</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
+      <label class="field"><span>Indexer Torznab (JSON)</span><textarea class="input" data-sources-indexers rows="6"></textarea></label>
+      <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva sorgenti</button><small class="muted" data-sources-message></small></div>
+    </div>
+    {{end}}
+
+    {{if .ShowEditors}}
+    {{range .Editors}}
+    <div class="card editor-card" data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}" data-unwrap="{{.Unwrap}}" data-wrap="{{.Wrap}}">
+      <h3>{{.Label}}</h3>
+      <textarea class="input" data-json-text rows="5"></textarea>
+      <div class="form-actions"><button class="btn sm primary" data-json-save>Salva</button><small class="muted" data-json-message></small></div>
+    </div>
+    {{end}}
+    {{end}}
+
+    {{if .ShowLibrary}}
+    <div class="card editor-card" data-library-editor>
+      <h3>Libreria</h3>
+      <label class="field"><span>Serie monitorizzate (JSON)</span><textarea class="input" data-library-series rows="6"></textarea></label>
+      <label class="field"><span>Film monitorizzati (JSON)</span><textarea class="input" data-library-movies rows="6"></textarea></label>
       <div class="form-actions"><button class="btn sm primary" data-library-save>Salva libreria</button><small class="muted" data-library-message></small></div>
     </div>
-  </div>
-  <div class="panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>Configurazione avanzata</h3></div>
-    <div class="panel-body">
-      {{range .Editors}}
-      <div data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}" data-unwrap="{{.Unwrap}}" data-wrap="{{.Wrap}}">
-        <label class="field"><span>{{.Label}}</span><textarea rows="4"></textarea></label>
-        <div class="form-actions"><button class="btn sm primary">Salva</button><small class="muted"></small></div>
-      </div>
-      {{end}}
-    </div>
-  </div>
-  <div class="panel" style="margin-bottom:14px" data-i18n-editor>
-    <div class="panel-head"><h3>Traduzioni</h3></div>
-    <div class="panel-body">
+    {{end}}
+
+    {{if .ShowI18n}}
+    <div class="card editor-card" data-i18n-editor>
+      <h3>Traduzioni</h3>
       <div class="toolbar">
-        <label class="field"><span>Lingua attiva</span>
-          <select data-i18n-language>
-            <option value="it">Italiano</option>
-            <option value="en">English</option>
-          </select>
-        </label>
+        <select class="input" data-i18n-language>
+          <option value="it">Italiano</option>
+          <option value="en">English</option>
+        </select>
         <a class="btn sm" data-i18n-export target="_blank" rel="noopener" title="Scarica le traduzioni in YAML">Esporta YAML</a>
         <button class="btn sm danger" data-i18n-delete title="Elimina tutte le traduzioni della lingua">Elimina lingua</button>
       </div>
       <div class="table-wrap"><table class="data-table"><thead><tr><th>Chiave</th><th>Valore</th><th></th></tr></thead><tbody data-i18n-body></tbody></table></div>
-      <label class="field" style="margin-top:10px"><span>Importa YAML</span><textarea data-i18n-yaml rows="4"></textarea></label>
+      <label class="field"><span>Importa YAML</span><textarea class="input" data-i18n-yaml rows="4"></textarea></label>
       <div class="form-actions"><button class="btn sm primary" data-i18n-import>Importa</button><small class="muted" data-i18n-message></small></div>
     </div>
+    {{end}}
   </div>
-  <p class="muted">Ogni campo si salva singolarmente. I valori sensibili non vengono mai mostrati.</p>
-  {{range .Tabs}}
-  <div class="panel" style="margin-bottom:14px">
-    <div class="panel-head"><h3>{{.Label}}</h3></div>
-    <div class="panel-body">
-      {{range .Fields}}
-      <form class="settings-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
-        <label>{{.Label}}</label>
-        {{if eq .Kind "bool"}}
-        <select data-setting-input>
-          <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
-          <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
-        </select>
-        {{else if eq .Kind "area"}}
-        <textarea data-setting-input rows="2">{{.Value}}</textarea>
-        {{else if eq .Kind "secret"}}
-        <input type="password" data-setting-input value="" placeholder="non visualizzato" />
-        {{else}}
-        <input data-setting-input value="{{.Value}}" />
-        {{end}}
-        <div class="form-actions"><button class="btn sm primary">Salva</button></div>
-      </form>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
 </div>
 {{end}}

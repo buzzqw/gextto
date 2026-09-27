@@ -585,27 +585,48 @@
     if (document.visibilityState === "visible") refreshShellMetrics();
   }, 4000);
 
-  // ---- library editor (feeds + indexers + series/movies) ------------------
+  // ---- sources editor (feeds + indexers) ----------------------------------
   // Feeds live in the `url` setting, indexers in the `indexers` setting (the
-  // classic UI saves them the same way via /api/config/settings); series and
-  // movies go through /api/config/library.
+  // classic UI saves them the same way via /api/config/settings).
+  var sourcesEditor = document.querySelector("[data-sources-editor]");
+  if (sourcesEditor) {
+    var feedsInput = sourcesEditor.querySelector("[data-sources-feeds]");
+    var indexersInput = sourcesEditor.querySelector("[data-sources-indexers]");
+    var sourcesMessage = sourcesEditor.querySelector("[data-sources-message]");
+    api("/api/config", "GET").then(function (config) {
+      config = config || {};
+      if (feedsInput) feedsInput.value = (config.feed_urls || []).join("\n");
+      if (indexersInput) indexersInput.value = JSON.stringify(config.indexers || [], null, 2);
+    }).catch(function (error) { if (sourcesMessage) sourcesMessage.textContent = error.message; });
+    var saveSources = sourcesEditor.querySelector("[data-sources-save]");
+    if (saveSources) saveSources.addEventListener("click", function () {
+      var feeds = ((feedsInput && feedsInput.value) || "").split("\n").map(function (line) {
+        return line.trim();
+      }).filter(function (line) { return line !== ""; });
+      var indexers;
+      try { indexers = JSON.parse((indexersInput && indexersInput.value) || "[]"); }
+      catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
+      saveSources.disabled = true;
+      Promise.all([
+        api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }),
+        api("/api/config/settings", "POST", { key: "indexers", value: JSON.stringify(indexers) })
+      ]).then(function () {
+        if (sourcesMessage) sourcesMessage.textContent = "Sorgenti salvate";
+      }).catch(function (error) {
+        alert("Salvataggio non riuscito: " + error.message);
+      }).then(function () { saveSources.disabled = false; });
+    });
+  }
+
+  // ---- library editor (series + movies) -----------------------------------
   var libraryEditor = document.querySelector("[data-library-editor]");
   if (libraryEditor) {
     var library = null;
-    var libraryConfig = null;
-    var feedsInput = libraryEditor.querySelector("[data-library-feeds]");
-    var indexersInput = libraryEditor.querySelector("[data-library-indexers]");
     var seriesInput = libraryEditor.querySelector("[data-library-series]");
     var moviesInput = libraryEditor.querySelector("[data-library-movies]");
     var libraryMessage = libraryEditor.querySelector("[data-library-message]");
-    Promise.all([
-      api("/api/config", "GET"),
-      api("/api/config/library", "GET")
-    ]).then(function (results) {
-      libraryConfig = results[0] || {};
-      library = results[1] || {};
-      if (feedsInput) feedsInput.value = (libraryConfig.feed_urls || []).join("\n");
-      if (indexersInput) indexersInput.value = JSON.stringify(libraryConfig.indexers || [], null, 2);
+    api("/api/config/library", "GET").then(function (data) {
+      library = data || {};
       if (seriesInput) seriesInput.value = JSON.stringify(library.series || [], null, 2);
       if (moviesInput) moviesInput.value = JSON.stringify(library.movies || [], null, 2);
     }).catch(function (error) {
@@ -613,27 +634,15 @@
     });
     var saveLibrary = libraryEditor.querySelector("[data-library-save]");
     if (saveLibrary) saveLibrary.addEventListener("click", function () {
-      if (!library || !libraryConfig) return;
-      var feeds = [];
-      if (feedsInput) {
-        feeds = (feedsInput.value || "").split("\n").map(function (line) {
-          return line.trim();
-        }).filter(function (line) { return line !== ""; });
-      }
-      var indexers, series, movies;
-      try { indexers = JSON.parse(indexersInput.value || "[]"); }
-      catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
-      try { series = JSON.parse(seriesInput.value || "[]"); }
+      if (!library) return;
+      var series, movies;
+      try { series = JSON.parse((seriesInput && seriesInput.value) || "[]"); }
       catch (error) { alert("Serie JSON non valido: " + error.message); return; }
-      try { movies = JSON.parse(moviesInput.value || "[]"); }
+      try { movies = JSON.parse((moviesInput && moviesInput.value) || "[]"); }
       catch (error) { alert("Film JSON non valido: " + error.message); return; }
       saveLibrary.disabled = true;
-      Promise.all([
-        api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }),
-        api("/api/config/settings", "POST", { key: "indexers", value: JSON.stringify(indexers) }),
-        api("/api/config/library", "POST", { series: series, movies: movies })
-      ]).then(function () {
-        if (libraryMessage) libraryMessage.textContent = "Libreria e sorgenti salvate";
+      api("/api/config/library", "POST", { series: series, movies: movies }).then(function () {
+        if (libraryMessage) libraryMessage.textContent = "Libreria salvata";
       }).catch(function (error) {
         alert("Salvataggio non riuscito: " + error.message);
       }).then(function () { saveLibrary.disabled = false; });
@@ -642,9 +651,9 @@
 
   // ---- generic JSON editors ----------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-json-editor]"), function (editor) {
-    var textarea = editor.querySelector("textarea");
-    var message = editor.querySelector("small");
-    var button = editor.querySelector("button");
+    var textarea = editor.querySelector("[data-json-text]");
+    var message = editor.querySelector("[data-json-message]");
+    var button = editor.querySelector("[data-json-save]");
     var unwrap = editor.getAttribute("data-unwrap") || "";
     var wrap = editor.getAttribute("data-wrap") || "";
     api(editor.getAttribute("data-get"), "GET").then(function (data) {
@@ -666,6 +675,56 @@
       }).then(function () { button.disabled = false; });
     });
   });
+
+  // ---- settings search ----------------------------------------------------
+  var settingsView = document.querySelector("[data-settings-index]");
+  if (settingsView) {
+    var settingsIndex = [];
+    try { settingsIndex = JSON.parse(settingsView.getAttribute("data-settings-index") || "[]"); }
+    catch (error) { settingsIndex = []; }
+    var searchInput = settingsView.querySelector("[data-settings-search]");
+    var resultsBox = settingsView.querySelector("[data-settings-results]");
+    var settingsBody = settingsView.querySelector("[data-settings-body]");
+    if (searchInput) searchInput.addEventListener("input", function () {
+      var query = (searchInput.value || "").trim().toLowerCase();
+      var cards = settingsBody ? settingsBody.querySelectorAll("[data-setting-key]") : [];
+      Array.prototype.forEach.call(cards, function (card) {
+        var key = (card.getAttribute("data-setting-key") || "").toLowerCase();
+        var labelNode = card.querySelector(".setting-label");
+        var label = (labelNode && labelNode.textContent || "").toLowerCase();
+        var match = query === "" || key.indexOf(query) >= 0 || label.indexOf(query) >= 0;
+        card.style.display = match ? "" : "none";
+      });
+      if (!resultsBox) return;
+      if (query.length < 2) {
+        resultsBox.hidden = true;
+        resultsBox.innerHTML = "";
+        return;
+      }
+      var matches = settingsIndex.filter(function (entry) {
+        return (entry.label || "").toLowerCase().indexOf(query) >= 0 ||
+          (entry.key || "").toLowerCase().indexOf(query) >= 0;
+      }).slice(0, 30);
+      resultsBox.hidden = false;
+      if (!matches.length) {
+        resultsBox.innerHTML = '<p class="muted">Nessuna impostazione trovata.</p>';
+        return;
+      }
+      resultsBox.innerHTML = matches.map(function (entry) {
+        var href = "/?view=settings&amp;tab=" + encodeURIComponent(entry.tab);
+        if (entry.key) href += "#setting-" + encodeURIComponent(entry.key);
+        return '<a class="settings-result" href="' + href + '">' + esc(entry.label) +
+          (entry.key ? " <code>" + esc(entry.key) + "</code>" : "") + "</a>";
+      }).join("");
+    });
+    if (location.hash && location.hash.indexOf("#setting-") === 0) {
+      var target = document.getElementById(location.hash.slice(1));
+      if (target) {
+        var field = target.querySelector("[data-setting-input]");
+        if (field) field.focus();
+      }
+    }
+  }
 
   // ---- OAuth / PIN flows (Trakt, Simkl) -----------------------------------
   document.addEventListener("click", function (event) {

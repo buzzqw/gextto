@@ -174,8 +174,10 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 		path   string
 		marker string
 	}{
-		{"/ui?view=settings", `data-i18n-editor`},
-		{"/ui?view=settings", `data-json-editor`},
+		{"/ui?view=settings&tab=i18n", `data-i18n-editor`},
+		{"/ui?view=settings&tab=advanced", `data-json-editor`},
+		{"/ui?view=settings&tab=sources", `data-sources-editor`},
+		{"/ui?view=settings&tab=libreria", `data-library-editor`},
 		{"/ui?view=series", `series_link`},
 		{"/ui?view=movies", `movie_link`},
 		{"/ui?view=comics", `/api/comics/{id}/enabled`},
@@ -291,18 +293,40 @@ func TestUiMovieFormKeepsMetadata(t *testing.T) {
 	}
 }
 
-// TestUiSettingsHidesEmptyTab ensures the "Punteggi" entry (whose keys are
-// dynamic and live under "Altro") does not render as an empty section.
-func TestUiSettingsHidesEmptyTab(t *testing.T) {
+// TestUiSettingsTabsAndSearch verifies the redesigned settings page: one tab
+// rendered at a time, chip navigation, a searchable index and the special
+// editors reachable through their own tabs.
+func TestUiSettingsTabsAndSearch(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
+
 	code, _, body := webGet(t, server, "/ui?view=settings")
+	html := string(body)
 	if code != http.StatusOK {
 		t.Fatalf("settings -> %d", code)
 	}
-	if strings.Contains(string(body), ">Punteggi<") {
-		t.Fatal("empty Punteggi tab should be hidden")
+	for _, marker := range []string{`data-settings-index=`, `data-settings-search`, `class="chip`, `data-setting-key="`, `settings-grid`} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("settings page missing %q", marker)
+		}
+	}
+	// Each tab query selects exactly one section.
+	for path, marker := range map[string]string{
+		"/ui?view=settings&tab=i18n":     "data-i18n-editor",
+		"/ui?view=settings&tab=advanced": "data-json-editor",
+		"/ui?view=settings&tab=sources":  "data-sources-editor",
+		"/ui?view=settings&tab=libreria": "data-library-editor",
+	} {
+		code, _, body := webGet(t, server, path)
+		if code != http.StatusOK || !strings.Contains(string(body), marker) {
+			t.Fatalf("GET %s -> %d, missing %q", path, code, marker)
+		}
+	}
+	// An unknown tab falls back to the first available tab, never a blank page.
+	code, _, body = webGet(t, server, "/ui?view=settings&tab=does-not-exist")
+	if code != http.StatusOK || !strings.Contains(string(body), "settings-grid") {
+		t.Fatalf("unknown tab should fall back, got %d", code)
 	}
 }
 

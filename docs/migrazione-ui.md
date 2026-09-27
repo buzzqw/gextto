@@ -903,3 +903,26 @@ esiste nel router), `TestUiMagnetURLScheme`, `TestUiMovieFormKeepsMetadata`,
 Esito: `go build`/`go vet`/`go test ./...` verdi (anche `-tags anacrolix`);
 21/21 pagine con HTML bilanciato (parser), 16/16 pagine 200, nessun `ZgotmplZ`,
 nessuna API key in pagina.
+
+
+---
+
+## 22. Redesign mobile-first (clone funzionale, aspetto moderno)
+
+Su richiesta: clone **funzionale** della UI classica/rextto, non una copia
+dell'aspetto, che deve essere migliore, mobile-friendly e moderno. In caso di
+dubbio ci si allinea a rextto.
+
+- **Foglio di stile proprio e moderno** (`uiweb/static/gextto-ui.css`): design
+  token, tema scuro/chiaro, card, chip, pulsanti e input touch (>= 44 px),
+  font 16 px per evitare lo zoom iOS, tabelle con scroll orizzontale.
+- **Shell responsive come rextto**: su mobile la sidebar diventa una barra
+  orizzontale in alto con il gruppo "Sistema" comprimibile; da 901 px in su è
+  ancorata a sinistra con marchio, contatori e stato.
+- **Configurazione rifatta**: una **scheda per volta** (`?view=settings&tab=`),
+  chip di navigazione con conteggio, **ricerca globale** sull'indice con salto
+  alla scheda e focus del campo, card per ogni impostazione con chiave e salvataggio
+  singolo. I contenuti speciali sono schede dedicate: Sorgenti (feed + indexer),
+  Avanzate (editor JSON), Libreria (serie/film), Traduzioni (i18n), Punteggi.
+  La pagina iniziale passa da ~139 KB a ~50 KB.
+- I value sensibili restano mascherati; i boolean conservano la grafia originale.

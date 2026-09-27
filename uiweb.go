@@ -284,7 +284,11 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 	case "license":
 		return uiLicenseData{Text: uiLicenseText}
 	case "settings":
-		return uiSettingsPageFrom(s)
+		tab := ""
+		if r != nil {
+			tab = r.URL.Query().Get("tab")
+		}
+		return uiSettingsPageFrom(s, tab)
 	case "integrations":
 		return uiIntegrationsPageFrom(s)
 	}

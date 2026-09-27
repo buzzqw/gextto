@@ -112,14 +112,23 @@ func uiBoolValues(value string) (bool, string, string) {
 	return false, "true", "false"
 }
 
-type uiSettingsTabData struct {
+type uiSettingsTabRef struct {
+	ID     string
 	Label  string
-	Fields []uiSettingField
+	Active bool
+	Count  int
 }
 
 type uiSettingsPage struct {
-	Tabs    []uiSettingsTabData
-	Editors []uiJSONEditor
+	Tabs            []uiSettingsTabRef
+	ActiveID        string
+	Fields          []uiSettingField
+	ShowSources     bool
+	ShowLibrary     bool
+	ShowEditors     bool
+	ShowI18n        bool
+	Editors         []uiJSONEditor
+	SearchIndexJSON string
 }
 
 // uiJSONEditor is a generic JSON editor for a structured configuration
@@ -143,34 +152,42 @@ var uiJSONEditors = []uiJSONEditor{
 	{Label: "Cartelle osservate", GetPath: "/api/watched-folders", PostPath: "/api/watched-folders", Unwrap: "items"},
 }
 
-// uiSettingsPageFrom builds the settings page from the generated index and the
-// live values, so every key the classic UI exposes stays editable.
-func uiSettingsPageFrom(s *AppState) uiSettingsPage {
+type uiSearchEntry struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Tab   string `json:"tab"`
+}
+
+// uiSettingsPageFrom builds one settings tab from the generated index and the
+// live values, so every key the classic UI exposes stays editable. Only the
+// active tab is rendered, which keeps the page small and usable on mobile.
+func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	cfg := latestConfig(s)
-	tabIndex := map[string]int{}
-	page := uiSettingsPage{}
+
+	labels := map[string]string{}
+	order := []string{}
 	for _, tab := range uiSettingsTabs {
-		tabIndex[tab.ID] = len(page.Tabs)
-		page.Tabs = append(page.Tabs, uiSettingsTabData{Label: tab.Label})
+		labels[tab.ID] = tab.Label
+		order = append(order, tab.ID)
 	}
+	fieldsByTab := map[string][]uiSettingField{}
 	for _, def := range uiSettingsIndex {
-		position, ok := tabIndex[def.Tab]
-		if !ok {
+		if _, ok := labels[def.Tab]; !ok {
 			continue
 		}
 		value := ""
 		if raw, present := cfg.Settings[def.Key]; present {
 			value = raw
 		}
-		page.Tabs[position].Fields = append(page.Tabs[position].Fields, uiSettingFieldFor(def.Key, def.Label, value))
+		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], uiSettingFieldFor(def.Key, def.Label, value))
 	}
+
 	// Any persisted setting not covered by the generated index (score groups,
 	// backup, integrations, ...) is still editable, grouped under "Altro".
 	indexed := map[string]struct{}{}
 	for _, def := range uiSettingsIndex {
 		indexed[def.Key] = struct{}{}
 	}
-	other := uiSettingsTabData{Label: "Altro"}
 	keys := make([]string, 0, len(cfg.Settings))
 	for key := range cfg.Settings {
 		if _, ok := indexed[key]; ok {
@@ -180,21 +197,88 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		other.Fields = append(other.Fields, uiSettingFieldFor(key, key, cfg.Settings[key]))
+		target := "altro"
+		if strings.HasPrefix(strings.ToLower(key), "score") {
+			target = "scores"
+		}
+		fieldsByTab[target] = append(fieldsByTab[target], uiSettingFieldFor(key, key, cfg.Settings[key]))
 	}
-	if len(other.Fields) > 0 {
-		page.Tabs = append(page.Tabs, other)
+	if len(fieldsByTab["altro"]) > 0 {
+		labels["altro"] = "Altro"
+		order = append(order, "altro")
 	}
-	// Hide tabs with no fields (e.g. "Punteggi" whose keys are dynamic and live
-	// in "Altro") so the page never shows an empty section.
-	nonEmpty := page.Tabs[:0]
-	for _, tab := range page.Tabs {
-		if len(tab.Fields) > 0 {
-			nonEmpty = append(nonEmpty, tab)
+	labels["libreria"] = "Libreria"
+	order = append(order, "libreria")
+
+	special := map[string]bool{"sources": true, "advanced": true, "libreria": true, "i18n": true}
+	tabs := make([]uiSettingsTabRef, 0, len(order))
+	for _, id := range order {
+		if len(fieldsByTab[id]) == 0 && !special[id] {
+			continue
+		}
+		tabs = append(tabs, uiSettingsTabRef{ID: id, Label: labels[id], Count: len(fieldsByTab[id])})
+	}
+	if len(tabs) == 0 {
+		tabs = append(tabs, uiSettingsTabRef{ID: "daemon", Label: "Daemon"})
+	}
+
+	active := strings.TrimSpace(activeTab)
+	valid := false
+	for _, tab := range tabs {
+		if tab.ID == active {
+			valid = true
+			break
 		}
 	}
-	page.Tabs = nonEmpty
-	page.Editors = uiJSONEditors
+	if !valid {
+		active = tabs[0].ID
+		for _, tab := range tabs {
+			if tab.ID == "daemon" {
+				active = "daemon"
+				break
+			}
+		}
+	}
+	for index := range tabs {
+		tabs[index].Active = tabs[index].ID == active
+	}
+
+	page := uiSettingsPage{
+		Tabs:     tabs,
+		ActiveID: active,
+		Fields:   fieldsByTab[active],
+		Editors:  uiJSONEditors,
+	}
+	page.ShowSources = active == "sources"
+	page.ShowLibrary = active == "libreria"
+	page.ShowEditors = active == "advanced"
+	page.ShowI18n = active == "i18n"
+
+	entries := make([]uiSearchEntry, 0, len(cfg.Settings))
+	for _, def := range uiSettingsIndex {
+		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab})
+	}
+	for _, key := range keys {
+		tab := "altro"
+		if strings.HasPrefix(strings.ToLower(key), "score") {
+			tab = "scores"
+		}
+		entries = append(entries, uiSearchEntry{Key: key, Label: key, Tab: tab})
+	}
+	// Special editors have no single setting key: point the search at their tab.
+	for _, entry := range []uiSearchEntry{
+		{Key: "", Label: "Feed RSS", Tab: "sources"},
+		{Key: "", Label: "Indexer Torznab (Jackett / Prowlarr)", Tab: "sources"},
+		{Key: "", Label: "Filtri per sorgente", Tab: "advanced"},
+		{Key: "", Label: "Regole tag → cartella", Tab: "advanced"},
+		{Key: "", Label: "Event hook", Tab: "advanced"},
+		{Key: "", Label: "Cartelle osservate", Tab: "advanced"},
+		{Key: "", Label: "Libreria (serie e film)", Tab: "libreria"},
+		{Key: "", Label: "Traduzioni", Tab: "i18n"},
+	} {
+		entries = append(entries, entry)
+	}
+	page.SearchIndexJSON = uiJSON(entries)
 	return page
 }
 
