@@ -26,14 +26,17 @@
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin"
     }).then(function (response) {
-      if (response.status === 401) {
-        throw new Error("token API mancante o non valido");
-      }
-      if (!response.ok) {
-        throw new Error("HTTP " + response.status);
-      }
       var type = response.headers.get("content-type") || "";
-      return type.indexOf("application/json") >= 0 ? response.json() : response.text();
+      var isJSON = type.indexOf("application/json") >= 0;
+      if (!response.ok) {
+        return (isJSON ? response.json().catch(function () { return null; }) : Promise.resolve(null))
+          .then(function (data) {
+            var message = data && data.error ? String(data.error) : "HTTP " + response.status;
+            if (response.status === 401) message = "token API mancante o non valido";
+            throw new Error(message);
+          });
+      }
+      return isJSON ? response.json() : response.text();
     });
   }
 
@@ -51,7 +54,7 @@
       })
       .catch(function (error) {
         page.innerHTML = '<div class="view"><div class="alert">Impossibile caricare i dati: ' +
-          String(error.message) + "</div></div>";
+          esc(error.message) + "</div></div>";
       });
   }
 
@@ -113,6 +116,13 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  // safeHref returns an escaped href only for http/https/magnet links, so a
+  // malicious release or comic field cannot inject javascript: URLs.
+  function safeHref(value) {
+    var href = String(value === null || value === undefined ? "" : value).trim();
+    if (!/^(https?:|magnet:)/i.test(href)) return "";
+    return esc(href);
+  }
   function humanBytes(value) {
     var n = Number(value);
     if (!isFinite(n) || n <= 0) return "0 B";
@@ -173,9 +183,15 @@
               if (column.format === "movie_link") {
                 return '<td><a href="/?view=movies&amp;movie=' + encodeURIComponent(row.id) + '" title="Apri il dettaglio del film">' + esc(value) + "</a></td>";
               }
-              if (column.format === "url") {
+              if (column.format === "url" || column.format === "getcomics") {
                 if (!value) return "<td></td>";
-                return '<td><a href="' + esc(value) + '" target="_blank" rel="noopener">apri</a></td>';
+                var href = String(value);
+                if (column.format === "getcomics" && href.charAt(0) === "/") {
+                  href = "https://getcomics.org" + href;
+                }
+                href = safeHref(href);
+                if (!href) return "<td></td>";
+                return '<td><a href="' + href + '" target="_blank" rel="noopener">apri</a></td>';
               }
               return "<td>" + esc(value) + "</td>";
             }).join("");
@@ -354,10 +370,16 @@
       event.preventDefault();
       var key = form.getAttribute("data-setting-key");
       var input = form.querySelector("[data-setting-input]");
+      var button = form.querySelector("button");
       var secret = input && input.type === "password";
       var value = input ? input.value : "";
-      if (secret && value === "") return;
-      var button = form.querySelector("button");
+      if (secret && value === "") {
+        if (button) {
+          button.textContent = "Inserisci un valore";
+          setTimeout(function () { button.textContent = "Salva"; }, 1500);
+        }
+        return;
+      }
       if (button) button.disabled = true;
       api("/api/config/settings", "POST", { key: key, value: value })
         .then(function () {
@@ -397,8 +419,8 @@
           return;
         }
         tbody.innerHTML = items.map(function (row, index) {
-          var magnet = esc(row.magnet || "");
-          var title = row.magnet ? '<a href="' + magnet + '">' + esc(row.title) + "</a>" : esc(row.title);
+          var magnet = safeHref(row.magnet || "");
+          var title = magnet ? '<a href="' + magnet + '">' + esc(row.title) + "</a>" : esc(row.title);
           return '<tr><td class="truncate">' + title +
             '</td><td class="numeric">' + esc(row.seeders || 0) +
             '</td><td class="numeric">' + humanBytes(row.size_bytes) +
@@ -427,19 +449,27 @@
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-search-post]"), renderSearch);
 
-  // ---- library editor (feeds + indexers) ----------------------------------
+  // ---- library editor (feeds + indexers + series/movies) ------------------
+  // Feeds live in the `url` setting, indexers in the `indexers` setting (the
+  // classic UI saves them the same way via /api/config/settings); series and
+  // movies go through /api/config/library.
   var libraryEditor = document.querySelector("[data-library-editor]");
   if (libraryEditor) {
     var library = null;
+    var libraryConfig = null;
     var feedsInput = libraryEditor.querySelector("[data-library-feeds]");
     var indexersInput = libraryEditor.querySelector("[data-library-indexers]");
     var seriesInput = libraryEditor.querySelector("[data-library-series]");
     var moviesInput = libraryEditor.querySelector("[data-library-movies]");
     var libraryMessage = libraryEditor.querySelector("[data-library-message]");
-    api("/api/config/library", "GET").then(function (data) {
-      library = data || {};
-      if (feedsInput) feedsInput.value = (library.feed_urls || []).join("\n");
-      if (indexersInput) indexersInput.value = JSON.stringify(library.indexers || [], null, 2);
+    Promise.all([
+      api("/api/config", "GET"),
+      api("/api/config/library", "GET")
+    ]).then(function (results) {
+      libraryConfig = results[0] || {};
+      library = results[1] || {};
+      if (feedsInput) feedsInput.value = (libraryConfig.feed_urls || []).join("\n");
+      if (indexersInput) indexersInput.value = JSON.stringify(libraryConfig.indexers || [], null, 2);
       if (seriesInput) seriesInput.value = JSON.stringify(library.series || [], null, 2);
       if (moviesInput) moviesInput.value = JSON.stringify(library.movies || [], null, 2);
     }).catch(function (error) {
@@ -447,27 +477,27 @@
     });
     var saveLibrary = libraryEditor.querySelector("[data-library-save]");
     if (saveLibrary) saveLibrary.addEventListener("click", function () {
-      if (!library) return;
+      if (!library || !libraryConfig) return;
+      var feeds = [];
       if (feedsInput) {
-        library.feed_urls = (feedsInput.value || "").split("\n").map(function (line) {
+        feeds = (feedsInput.value || "").split("\n").map(function (line) {
           return line.trim();
         }).filter(function (line) { return line !== ""; });
       }
-      if (indexersInput) {
-        try { library.indexers = JSON.parse(indexersInput.value || "[]"); }
-        catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
-      }
-      if (seriesInput) {
-        try { library.series = JSON.parse(seriesInput.value || "[]"); }
-        catch (error) { alert("Serie JSON non valido: " + error.message); return; }
-      }
-      if (moviesInput) {
-        try { library.movies = JSON.parse(moviesInput.value || "[]"); }
-        catch (error) { alert("Film JSON non valido: " + error.message); return; }
-      }
+      var indexers, series, movies;
+      try { indexers = JSON.parse(indexersInput.value || "[]"); }
+      catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
+      try { series = JSON.parse(seriesInput.value || "[]"); }
+      catch (error) { alert("Serie JSON non valido: " + error.message); return; }
+      try { movies = JSON.parse(moviesInput.value || "[]"); }
+      catch (error) { alert("Film JSON non valido: " + error.message); return; }
       saveLibrary.disabled = true;
-      api("/api/config/library", "POST", library).then(function () {
-        if (libraryMessage) libraryMessage.textContent = "Libreria salvata";
+      Promise.all([
+        api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }),
+        api("/api/config/settings", "POST", { key: "indexers", value: JSON.stringify(indexers) }),
+        api("/api/config/library", "POST", { series: series, movies: movies })
+      ]).then(function () {
+        if (libraryMessage) libraryMessage.textContent = "Libreria e sorgenti salvate";
       }).catch(function (error) {
         alert("Salvataggio non riuscito: " + error.message);
       }).then(function () { saveLibrary.disabled = false; });
@@ -479,16 +509,21 @@
     var textarea = editor.querySelector("textarea");
     var message = editor.querySelector("small");
     var button = editor.querySelector("button");
+    var unwrap = editor.getAttribute("data-unwrap") || "";
+    var wrap = editor.getAttribute("data-wrap") || "";
     api(editor.getAttribute("data-get"), "GET").then(function (data) {
-      if (textarea) textarea.value = JSON.stringify(data, null, 2);
+      var payload = (unwrap && data && data[unwrap] !== undefined) ? data[unwrap] : data;
+      if (textarea) textarea.value = JSON.stringify(payload, null, 2);
     }).catch(function (error) { if (message) message.textContent = error.message; });
     if (!button) return;
     button.addEventListener("click", function () {
       var parsed;
       try { parsed = JSON.parse((textarea && textarea.value) || "null"); }
       catch (error) { alert("JSON non valido: " + error.message); return; }
+      var body = parsed;
+      if (wrap) { body = {}; body[wrap] = parsed; }
       button.disabled = true;
-      api(editor.getAttribute("data-post"), "POST", parsed).then(function () {
+      api(editor.getAttribute("data-post"), "POST", body).then(function () {
         if (message) message.textContent = "Salvato";
       }).catch(function (error) {
         alert("Salvataggio non riuscito: " + error.message);

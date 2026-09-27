@@ -93,7 +93,7 @@
           <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
         </table>
       </div>
-      <p class="hint">Ricerca su feed, indexer e motori web (fino a 90 s). La gestione avanzata è nella UI classica.</p>
+      <p class="hint">Ricerca su feed, indexer e motori web (fino a 90 s).</p>
     </div>
   </div>
 </div>
@@ -190,6 +190,12 @@
         <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" /></label>
         <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" /></label>
         <label class="field"><span>Lingua</span><input name="language" value="{{.Language}}" /></label>
+        <label class="field"><span>Sottotitoli</span><input name="subtitle" value="{{.Subtitle}}" /></label>
+        <label class="field"><span>Escludi</span><input name="exclude" value="{{.Exclude}}" title="Parole da escludere nella ricerca di questo film" /></label>
+        <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
+        <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
+        <input type="hidden" name="language_requirements" value="{{.LanguageRequirements}}" />
+        <input type="hidden" name="subtitle_requirements" value="{{.SubtitleRequirements}}" />
         <div class="form-actions"><button class="btn sm primary" type="submit">Salva</button><small class="muted"></small></div>
       </form>
       <div class="toolbar" style="margin-top:10px">
@@ -199,7 +205,7 @@
         <button class="btn sm danger" data-api="/api/movies/{{.ID}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questo film?">Elimina</button>
       </div>
       {{if .Matches}}<div class="field span-full" style="margin-top:12px"><span>Corrispondenze archivio</span></div>
-      <ul class="hint">{{range .Matches}}<li><a href="{{.Magnet}}">{{.Title}}</a> <span class="muted">{{.Source}}</span></li>{{end}}</ul>{{end}}
+      <ul class="hint">{{range .Matches}}<li>{{if .Magnet}}<a href="{{.Magnet}}" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}} <span class="muted">{{.Source}}</span></li>{{end}}</ul>{{end}}
       {{if .History}}<div class="field span-full" style="margin-top:12px"><span>Storico</span></div>
       <div class="table-wrap"><table class="data-table"><thead><tr><th>Titolo</th><th>Qualità</th><th>Dimensione</th></tr></thead><tbody>
       {{range .History}}<tr><td class="truncate">{{.Title}}</td><td class="numeric">{{.QualityScore}}</td><td class="numeric">{{humanBytes .SizeBytes}}</td></tr>{{end}}
@@ -225,7 +231,7 @@
     <div class="panel-head"><h3>Configurazione avanzata</h3></div>
     <div class="panel-body">
       {{range .Editors}}
-      <div data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}">
+      <div data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}" data-unwrap="{{.Unwrap}}" data-wrap="{{.Wrap}}">
         <label class="field"><span>{{.Label}}</span><textarea rows="4"></textarea></label>
         <div class="form-actions"><button class="btn sm primary">Salva</button><small class="muted"></small></div>
       </div>

@@ -93,20 +93,24 @@ type uiSettingsPage struct {
 }
 
 // uiJSONEditor is a generic JSON editor for a structured configuration
-// endpoint: GET to load, POST to save. It keeps the new UI self-sufficient for
-// configurations that the classic UI edited with bespoke widgets.
+// endpoint: GET to load, POST to save. Some endpoints return a wrapper object
+// ({"items":[...]}) but expect a bare array on POST, or expect a wrapped object;
+// Unwrap extracts the payload from the GET response and Wrap rewraps it before
+// POST so the round-trip is lossless.
 type uiJSONEditor struct {
 	Label    string
 	GetPath  string
 	PostPath string
 	Hint     string
+	Unwrap   string
+	Wrap     string
 }
 
 var uiJSONEditors = []uiJSONEditor{
-	{Label: "Filtri per sorgente", GetPath: "/api/config/source-filters", PostPath: "/api/config/source-filters"},
-	{Label: "Regole tag → cartella", GetPath: "/api/tag-dir-rules", PostPath: "/api/tag-dir-rules"},
-	{Label: "Event hook", GetPath: "/api/event-hooks", PostPath: "/api/event-hooks"},
-	{Label: "Cartelle osservate", GetPath: "/api/watched-folders", PostPath: "/api/watched-folders"},
+	{Label: "Filtri per sorgente", GetPath: "/api/config/source-filters", PostPath: "/api/config/source-filters", Unwrap: "filters", Wrap: "filters"},
+	{Label: "Regole tag → cartella", GetPath: "/api/tag-dir-rules", PostPath: "/api/tag-dir-rules", Unwrap: "items"},
+	{Label: "Event hook", GetPath: "/api/event-hooks", PostPath: "/api/event-hooks", Unwrap: "items"},
+	{Label: "Cartelle osservate", GetPath: "/api/watched-folders", PostPath: "/api/watched-folders", Unwrap: "items"},
 }
 
 // uiSettingsPageFrom builds the settings page from the generated index and the
@@ -161,6 +165,15 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 	if len(other.Fields) > 0 {
 		page.Tabs = append(page.Tabs, other)
 	}
+	// Hide tabs with no fields (e.g. "Punteggi" whose keys are dynamic and live
+	// in "Altro") so the page never shows an empty section.
+	nonEmpty := page.Tabs[:0]
+	for _, tab := range page.Tabs {
+		if len(tab.Fields) > 0 {
+			nonEmpty = append(nonEmpty, tab)
+		}
+	}
+	page.Tabs = nonEmpty
 	page.Editors = uiJSONEditors
 	return page
 }
@@ -172,10 +185,21 @@ func uiSettingKind(key, value string) string {
 			return "secret"
 		}
 	}
+	// A structured value (e.g. the `indexers` JSON) can embed credentials even
+	// when its key does not: never render those in clear.
+	loweredValue := strings.ToLower(value)
+	for _, secret := range []string{`"api_key"`, `"password"`, `"token"`, `"secret"`} {
+		if strings.Contains(loweredValue, secret) {
+			return "secret"
+		}
+	}
 	for _, area := range []string{"mappings", "extra_settings", "blacklist", "content_filters", "dht_bootstrap_nodes"} {
 		if strings.Contains(lowered, area) {
 			return "area"
 		}
+	}
+	if strings.Contains(value, "\n") {
+		return "area"
 	}
 	if value == "true" || value == "false" || value == "yes" || value == "no" {
 		return "bool"
@@ -276,7 +300,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "from_date", Label: "Dal"},
 				{Key: "enabled", Label: "Attivo", Format: "bool"},
 				{Key: "latest_downloaded_title", Label: "Ultimo scaricato"},
-				{Key: "tag_url", Label: "Sorgente", Format: "url"},
+				{Key: "tag_url", Label: "Sorgente", Format: "getcomics"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
 				{Label: "Attiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":true}`},

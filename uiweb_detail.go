@@ -1,9 +1,11 @@
 package gextto
 
 import (
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
 )
@@ -42,22 +44,39 @@ type uiSeriesDetail struct {
 
 type uiMovieMatch struct {
 	Title  string
-	Magnet string
+	Magnet template.URL
 	Source string
 }
 
 type uiMovieDetail struct {
-	ID       int64
-	Name     string
-	Year     string
-	Quality  string
-	Language string
-	TmdbID   string
-	TvdbID   string
-	Overview string
-	Enabled  bool
-	History  []MovieHistory
-	Matches  []uiMovieMatch
+	ID                   int64
+	Name                 string
+	Year                 string
+	Quality              string
+	Language             string
+	TmdbID               string
+	TvdbID               string
+	Overview             string
+	Subtitle             string
+	Exclude              string
+	LanguageRequirements string
+	SubtitleRequirements string
+	Enabled              bool
+	History              []MovieHistory
+	Matches              []uiMovieMatch
+}
+
+// uiMagnetURL only trusts links with a safe scheme so the archive match links
+// keep working (html/template would otherwise rewrite unknown schemes to
+// "#ZgotmplZ") without allowing javascript: injection.
+func uiMagnetURL(value string) template.URL {
+	lowered := strings.ToLower(strings.TrimSpace(value))
+	for _, scheme := range []string{"magnet:", "http://", "https://"} {
+		if strings.HasPrefix(lowered, scheme) {
+			return template.URL(value)
+		}
+	}
+	return ""
 }
 
 // uiSeriesDetailFrom returns the series detail when the `series` query selects a
@@ -155,15 +174,19 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		return uiMovieDetail{}, false
 	}
 	detail := uiMovieDetail{
-		ID:       movie.ID,
-		Name:     movie.Name,
-		Year:     movie.Year,
-		Quality:  movie.Quality,
-		Language: movie.Language,
-		TmdbID:   movie.TmdbID,
-		TvdbID:   movie.TvdbID,
-		Overview: movie.Overview,
-		Enabled:  movie.Enabled,
+		ID:                   movie.ID,
+		Name:                 movie.Name,
+		Year:                 movie.Year,
+		Quality:              movie.Quality,
+		Language:             movie.Language,
+		TmdbID:               movie.TmdbID,
+		TvdbID:               movie.TvdbID,
+		Overview:             movie.Overview,
+		Subtitle:             movie.Subtitle,
+		Exclude:              movie.Exclude,
+		LanguageRequirements: movie.LanguageRequirements,
+		SubtitleRequirements: movie.SubtitleRequirements,
+		Enabled:              movie.Enabled,
 	}
 	if all, err := s.db.DownloadedMovies(200); err == nil {
 		for _, item := range all {
@@ -181,7 +204,7 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 			if index >= 20 {
 				break
 			}
-			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: entry[1], Source: entry[2]})
+			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2]})
 		}
 	}
 	return detail, true
