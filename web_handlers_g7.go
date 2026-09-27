@@ -14,7 +14,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -565,7 +564,7 @@ func gh7_fetch_ipfilter(ctx context.Context, rawURL string) ([]byte, string) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
-	data, err := io.ReadAll(resp.Body)
+	data, err := readLimitedBody(resp.Body, maxFeedResponseBytes)
 	if err != nil {
 		return nil, err.Error()
 	}
@@ -576,7 +575,7 @@ func gh7_fetch_ipfilter(ctx context.Context, rawURL string) ([]byte, string) {
 			return nil, err.Error()
 		}
 		defer reader.Close()
-		text, err := io.ReadAll(reader)
+		text, err := readLimitedBody(reader, maxDecompressedBytes)
 		if err != nil {
 			return nil, err.Error()
 		}
@@ -595,7 +594,7 @@ func gh7_fetch_ipfilter(ctx context.Context, rawURL string) ([]byte, string) {
 				if err != nil {
 					return nil, err.Error()
 				}
-				text, err := io.ReadAll(handle)
+				text, err := readLimitedBody(handle, maxDecompressedBytes)
 				handle.Close()
 				if err != nil {
 					return nil, err.Error()

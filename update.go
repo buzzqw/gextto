@@ -229,11 +229,19 @@ func updateDownload(ctx context.Context, url, destination string) error {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("download failed for %s: HTTP %s", url, response.Status)
 	}
-	data, err := io.ReadAll(response.Body)
+	file, err := os.Create(destination)
 	if err != nil {
+		return fmt.Errorf("cannot write %s: %w", destination, err)
+	}
+	// Stream to disk with a cap instead of buffering the whole archive in
+	// memory. A failed/oversized download leaves no partial file behind.
+	if err := copyLimited(file, response.Body, maxUpdateBytes); err != nil {
+		_ = file.Close()
+		_ = os.Remove(destination)
 		return fmt.Errorf("cannot read the download from %s: %w", url, err)
 	}
-	if err := os.WriteFile(destination, data, 0o644); err != nil {
+	if err := file.Close(); err != nil {
+		_ = os.Remove(destination)
 		return fmt.Errorf("cannot write %s: %w", destination, err)
 	}
 	return nil
@@ -260,7 +268,7 @@ func verifyRemoteChecksum(ctx context.Context, archive, checksumURL string) erro
 		fmt.Println("  checksum:   not published by this release (continuing)")
 		return nil
 	}
-	body, err := io.ReadAll(response.Body)
+	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
 	if err != nil {
 		return err
 	}

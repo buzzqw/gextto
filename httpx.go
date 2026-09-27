@@ -15,6 +15,42 @@ var defaultHTTPClient = &http.Client{
 	Timeout: 90 * time.Second,
 }
 
+// Response size limits. They are intentionally generous: the goal is to avoid
+// unbounded memory use from a misconfigured feed or a hostile server, not to
+// cap legitimate content.
+const (
+	maxAPIResponseBytes  = 32 << 20  // JSON/API replies
+	maxFeedResponseBytes = 64 << 20  // RSS/HTML feeds and .torrent files
+	maxDecompressedBytes = 512 << 20 // decompressed archives (e.g. blocklists)
+	maxUpdateBytes       = 512 << 20 // self-update payloads
+)
+
+// readLimitedBody reads at most limit bytes from r; a larger body is an error
+// so a misconfigured or hostile response cannot exhaust memory.
+func readLimitedBody(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("response body exceeds the %d byte limit", limit)
+	}
+	return data, nil
+}
+
+// copyLimited streams src into dst, failing when the source is larger than
+// limit. It never buffers the whole body.
+func copyLimited(dst io.Writer, src io.Reader, limit int64) error {
+	written, err := io.Copy(dst, io.LimitReader(src, limit+1))
+	if err != nil {
+		return err
+	}
+	if written > limit {
+		return fmt.Errorf("response body exceeds the %d byte limit", limit)
+	}
+	return nil
+}
+
 // HTTPRequest performs an HTTP request with the given headers and body.
 func HTTPRequest(ctx context.Context, method, rawURL string, headers map[string]string, body []byte, contentType string) (*http.Response, error) {
 	var reader io.Reader
@@ -46,7 +82,7 @@ func HTTPGetBytes(ctx context.Context, rawURL string, headers map[string]string)
 		return nil, 0, err
 	}
 	defer response.Body.Close()
-	payload, err := io.ReadAll(response.Body)
+	payload, err := readLimitedBody(response.Body, maxFeedResponseBytes)
 	if err != nil {
 		return nil, response.StatusCode, err
 	}
@@ -66,7 +102,7 @@ func HTTPPostJSON(ctx context.Context, rawURL string, headers map[string]string,
 		return nil, 0, err
 	}
 	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
+	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
 	if err != nil {
 		return nil, response.StatusCode, err
 	}

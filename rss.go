@@ -521,7 +521,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 	if response.StatusCode >= 400 {
 		return "", fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	body, err := io.ReadAll(response.Body)
+	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
 	if err != nil {
 		return "", err
 	}
@@ -625,7 +625,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 			body, err = read_knaben_stream(response)
 		} else {
 			var payload []byte
-			payload, err = io.ReadAll(response.Body)
+			payload, err = readLimitedBody(response.Body, maxFeedResponseBytes)
 			body = string(payload)
 		}
 		if err != nil {
@@ -1376,7 +1376,7 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		contentType = torznabContentType(body)
 	default:
 		contentType = response.Header.Get("Content-Type")
-		payload, readErr := io.ReadAll(response.Body)
+		payload, readErr := readLimitedBody(response.Body, maxFeedResponseBytes)
 		if readErr != nil {
 			return nil, readErr
 		}

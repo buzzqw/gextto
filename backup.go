@@ -271,15 +271,32 @@ func copyFile(source, destination string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.Create(destination)
+	// Write a sibling .partial file and rename it into place: the destination is
+	// always a complete copy or absent, never truncated by an interruption.
+	tmp := destination + ".partial"
+	out, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {
 		_ = out.Close()
+		_ = os.Remove(tmp)
 		return err
 	}
-	return out.Close()
+	if err := out.Sync(); err != nil {
+		_ = out.Close()
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, destination); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // ftpEndpoint appends the default FTP port when the user did not specify one

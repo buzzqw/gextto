@@ -1054,13 +1054,13 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
-		identity, _ := io.ReadAll(response.Body)
+		identity, _ := readLimitedBody(response.Body, maxAPIResponseBytes)
 		machine := gh4_derefString(gh4_xmlAttribute(string(identity), "machineIdentifier"))
 		server := ""
 		if root, rootErr := get("/"); rootErr == nil {
 			defer root.Body.Close()
 			if root.StatusCode >= 200 && root.StatusCode < 300 {
-				body, _ := io.ReadAll(root.Body)
+				body, _ := readLimitedBody(root.Body, maxAPIResponseBytes)
 				server = gh4_derefString(gh4_xmlAttribute(string(body), "friendlyName"))
 			}
 		}
