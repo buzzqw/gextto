@@ -145,8 +145,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 		}
 	}
 
-	if cfg.Active && !cfg.DryRun {
-		logging.Warn("active mode requested: make sure no legacy instance is using the same ports")
+	if conflicts := gextto.ListenConflicts(&cfg); len(conflicts) > 0 {
+		logging.Warn("listen address already in use: stop the other instance (legacy extto/rextto or a previous Gextto) before starting",
+			"addresses", conflicts)
 	}
 
 	state := gextto.NewAppState(

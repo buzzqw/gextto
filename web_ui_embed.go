@@ -57,9 +57,12 @@ func uiBundleAvailable() bool {
 	return false
 }
 
-// uiPackageHandler serves `/pkg/*` from disk when present, else embedded.
+// uiPackageHandler serves `/pkg/*` from disk when a complete bundle is present
+// (ui.js exists), else from the embedded one. Checking for ui.js prevents an
+// incomplete build directory (e.g. only ui.css) from shadowing the embedded
+// bundle and breaking the UI.
 func uiPackageHandler() http.Handler {
-	if info, err := os.Stat(UiPkgDir()); err == nil && info.IsDir() {
+	if info, err := os.Stat(filepath.Join(UiPkgDir(), "ui.js")); err == nil && !info.IsDir() {
 		return http.StripPrefix("/pkg/", http.FileServer(http.Dir(UiPkgDir())))
 	}
 	if sub, ok := embeddedUISub(); ok {

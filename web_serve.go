@@ -60,6 +60,39 @@ func shutdownServers(servers ...*http.Server) {
 	}
 }
 
+// ListenConflicts reports the configured listen addresses that are already in
+// use by another process, so the daemon can warn only when there is a real
+// conflict (a legacy extto/rextto, or a previous Gextto) instead of doing it
+// unconditionally at every start. It binds and immediately releases each
+// address; a non-EADDRINUSE error is ignored here because Serve will surface it
+// with a proper message.
+func ListenConflicts(cfg *Config) []string {
+	if cfg == nil {
+		return nil
+	}
+	conflicts := []string{}
+	seen := map[string]struct{}{}
+	for _, address := range []string{cfg.Listen, cfg.EngineListen} {
+		address = strings.TrimSpace(address)
+		if address == "" {
+			continue
+		}
+		if _, ok := seen[address]; ok {
+			continue
+		}
+		seen[address] = struct{}{}
+		listener, err := net.Listen("tcp", address)
+		if err != nil {
+			if errors.Is(err, syscall.EADDRINUSE) {
+				conflicts = append(conflicts, address)
+			}
+			continue
+		}
+		_ = listener.Close()
+	}
+	return conflicts
+}
+
 // Serve binds the web and engine listeners, starts the background workers and
 // blocks until the process receives SIGINT/SIGTERM, then shuts down gracefully.
 func Serve(state *AppState) error {

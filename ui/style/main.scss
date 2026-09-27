@@ -509,22 +509,26 @@ pre.output { max-height: 260px; overflow: auto; margin: 0; padding: 12px; border
 .data-table.torrent-table { table-layout: fixed; min-width: 1240px; }
 .data-table.torrent-table td:first-child { min-width: 0; }
 .data-table.torrent-table th:nth-child(1), .data-table.torrent-table td:nth-child(1) { width: 3%; }
-.data-table.torrent-table th:nth-child(2), .data-table.torrent-table td:nth-child(2) { width: 27%; }
+.data-table.torrent-table th:nth-child(2), .data-table.torrent-table td:nth-child(2) { width: 32%; }
 .data-table.torrent-table th:nth-child(3), .data-table.torrent-table td:nth-child(3) { width: 8%; }
-.data-table.torrent-table th:nth-child(4), .data-table.torrent-table td:nth-child(4) { width: 9%; }
-.data-table.torrent-table th:nth-child(5), .data-table.torrent-table td:nth-child(5) { width: 7%; }
+.data-table.torrent-table th:nth-child(4), .data-table.torrent-table td:nth-child(4) { width: 8%; }
+.data-table.torrent-table th:nth-child(5), .data-table.torrent-table td:nth-child(5) { width: 12%; }
 .data-table.torrent-table th:nth-child(6), .data-table.torrent-table td:nth-child(6) { width: 7%; }
-.data-table.torrent-table th:nth-child(7), .data-table.torrent-table td:nth-child(7) { width: 8%; }
-.data-table.torrent-table th:nth-child(8), .data-table.torrent-table td:nth-child(8) { width: 6%; }
-.data-table.torrent-table th:nth-child(9), .data-table.torrent-table td:nth-child(9) { width: 5%; }
-.data-table.torrent-table th:nth-child(10), .data-table.torrent-table td:nth-child(10) { width: 20%; }
+.data-table.torrent-table th:nth-child(7), .data-table.torrent-table td:nth-child(7) { width: 5%; }
+.data-table.torrent-table th:nth-child(8), .data-table.torrent-table td:nth-child(8) { width: 5%; }
+.data-table.torrent-table th:nth-child(9), .data-table.torrent-table td:nth-child(9) { width: 20%; }
 /* Le celle numeriche sono allineate a destra: allinea anche le intestazioni. */
 .data-table .th-sort { display: block; width: 100%; text-align: inherit; }
+.data-table.torrent-table th:nth-child(4),
 .data-table.torrent-table th:nth-child(5),
 .data-table.torrent-table th:nth-child(6),
 .data-table.torrent-table th:nth-child(7),
-.data-table.torrent-table th:nth-child(8),
-.data-table.torrent-table th:nth-child(9) { text-align: right; }
+.data-table.torrent-table th:nth-child(8) { text-align: right; }
+.data-table.torrent-table th:nth-child(4), .data-table.torrent-table td:nth-child(4) { padding-left: 6px; padding-right: 6px; }
+.torrent-speed-head { display: flex; justify-content: flex-end; gap: 6px; }
+.torrent-speed-head .th-sort { width: auto; }
+.torrent-speed-cell { white-space: nowrap; }
+.torrent-speed-cell span + span { margin-left: 7px; }
 .disk-row { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .disk-row .mono { max-width: 55%; }
 .live-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }

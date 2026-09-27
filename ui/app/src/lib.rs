@@ -3699,8 +3699,7 @@ fn Downloads(data: RwSignal<Data>) -> impl IntoView {
                             <th><button type="button" class="th-sort" title=ctx_tr("Ordina per nome") on:click=move |_| set_sort("name")>{ctx_tr("Nome")}</button></th>
                             <th>{ctx_tr("Stato")}</th>
                             <th><button type="button" class="th-sort" title=ctx_tr("Ordina per progresso") on:click=move |_| set_sort("progress")>{ctx_tr("Progresso")}</button></th>
-                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di download") on:click=move |_| set_sort("dl")>{ctx_tr("↓")}</button></th>
-                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di upload") on:click=move |_| set_sort("ul")>{ctx_tr("↑")}</button></th>
+                            <th><span class="torrent-speed-head"><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di download") on:click=move |_| set_sort("dl")>{ctx_tr("↓")}</button><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di upload") on:click=move |_| set_sort("ul")>{ctx_tr("↑")}</button></span></th>
                             <th><button type="button" class="th-sort" title=ctx_tr("Ordina per tempo stimato (ETA)") on:click=move |_| set_sort("eta")>{ctx_tr("ETA")}</button></th>
                             <th><button type="button" class="th-sort" title=ctx_tr("Ordina per numero di peer e seeder") on:click=move |_| set_sort("peers")>{ctx_tr("Peer / Seed")}</button></th>
                             <th><button type="button" class="th-sort" title=ctx_tr("Ordina per ratio di condivisione") on:click=move |_| set_sort("ratio")>{ctx_tr("Ratio")}</button></th>
@@ -3959,8 +3958,7 @@ fn HttpDownloadRow(id: String, data: RwSignal<Data>, selected: RwSignal<Vec<Stri
                 }><span style=move || format!("width:{:.0}%", progress.get().unwrap_or(0.0).clamp(0.0, 100.0))></span></div>
                 <small class="muted">{move || progress.get().map(|value| format!("{value:.1}%")).unwrap_or_else(|| "—".into())}</small>
             </td>
-            <td class="numeric">{move || format!("{}/s", size(&row.get(), "download_rate"))}</td>
-            <td class="numeric">"—"</td>
+            <td class="numeric torrent-speed-cell"><span>"↓ "{move || format!("{}/s", size(&row.get(), "download_rate"))}</span><span>"↑ —"</span></td>
             <td class="numeric" title=ctx_tr("Tempo stimato al completamento")>{move || eta_label(data, &row.get())}</td>
             <td class="numeric">"—"</td>
             <td class="numeric">"—"</td>
@@ -3979,7 +3977,7 @@ fn HttpDownloadRow(id: String, data: RwSignal<Data>, selected: RwSignal<Vec<Stri
         </tr>
         <Show when=move || expanded.get()>
             <tr>
-                <td colspan="10">
+                <td colspan="9">
                     <div class="modal-backdrop" on:click=move |_| expanded.set(false)>
                         <div class="modal torrent-modal" on:click=move |event: leptos::ev::MouseEvent| event.stop_propagation()>
                             <div class="modal-head">
@@ -4018,7 +4016,7 @@ fn HttpDownloadRow(id: String, data: RwSignal<Data>, selected: RwSignal<Vec<Stri
         </Show>
         <Show when=move || remove_confirm.get()>
             <tr>
-                <td colspan="10">
+                <td colspan="9">
                     <div class="modal-backdrop" on:click=move |_| remove_confirm.set(false)>
                         <div class="modal" on:click=move |event: leptos::ev::MouseEvent| event.stop_propagation()>
                             <div class="modal-head">
@@ -4226,8 +4224,7 @@ fn TorrentRow(hash: String, data: RwSignal<Data>, selected: RwSignal<Vec<String>
                 }><span style=move || format!("width:{:.0}%", progress.get().clamp(0.0, 100.0))></span></div>
                 <small class="muted">{move || format!("{:.1}%", progress.get())}</small>
             </td>
-            <td class="numeric">{move || format!("{}/s", size(&item.get(), "download_rate"))}</td>
-            <td class="numeric">{move || format!("{}/s", size(&item.get(), "upload_rate"))}</td>
+            <td class="numeric torrent-speed-cell"><span>"↓ "{move || format!("{}/s", size(&item.get(), "download_rate"))}</span><span>"↑ "{move || format!("{}/s", size(&item.get(), "upload_rate"))}</span></td>
             <td class="numeric" title=ctx_tr("Tempo stimato al completamento")>{move || eta_label(data, &item.get())}</td>
             <td class="numeric" title=ctx_tr("Peer connessi / Seed")>{move || format!("{}: {} · {}: {}", tr(data, "Peer"), number(&item.get(), "num_peers"), tr(data, "Seed"), number(&item.get(), "num_seeds"))}</td>
             <td class="numeric" title=ctx_tr("Rapporto upload/download")>{move || ratio_label(&item.get())}</td>
@@ -4242,7 +4239,7 @@ fn TorrentRow(hash: String, data: RwSignal<Data>, selected: RwSignal<Vec<String>
         </tr>
         <Show when=move || expanded.get()>
             <tr>
-                <td colspan="10">
+                <td colspan="9">
                     <div class="modal-backdrop" on:click=move |_| expanded.set(false)>
                         <div class="modal torrent-modal" on:click=move |event: leptos::ev::MouseEvent| event.stop_propagation()>
                             <div class="modal-head">
@@ -4458,7 +4455,7 @@ fn TorrentRow(hash: String, data: RwSignal<Data>, selected: RwSignal<Vec<String>
         </Show>
         <Show when=move || remove_confirm.get()>
             <tr>
-                <td colspan="10">
+                <td colspan="9">
                     <div class="modal-backdrop" on:click=move |_| remove_confirm.set(false)>
                         <div class="modal remove-modal" style="width:min(720px,calc(100vw - 24px))" on:click=move |event: leptos::ev::MouseEvent| event.stop_propagation()>
                             <div class="modal-head">
