@@ -26,23 +26,29 @@ import (
 )
 
 // durationFromSeconds converts a non-negative seconds count to a time.Duration,
-// saturating at the maximum representable duration instead of overflowing when
-// the source is a large uint64 (CodeQL go/incorrect-integer-conversion).
+// saturating when the value would exceed the range of an int64 millisecond
+// count instead of silently overflowing (CodeQL go/incorrect-integer-conversion).
 func durationFromSeconds(seconds uint64) time.Duration {
-	const maxSeconds = uint64(math.MaxInt64) / uint64(time.Second)
-	if seconds > maxSeconds {
-		seconds = maxSeconds
+	if seconds > uint64(math.MaxInt64) {
+		return time.Duration(math.MaxInt64)
 	}
-	return time.Duration(seconds) * time.Second
+	value := time.Duration(seconds)
+	if max := time.Duration(math.MaxInt64); value > max/time.Second {
+		return max
+	}
+	return value * time.Second
 }
 
 // durationFromHours is durationFromSeconds expressed in hours.
 func durationFromHours(hours uint64) time.Duration {
-	const maxHours = uint64(math.MaxInt64) / uint64(time.Hour)
-	if hours > maxHours {
-		hours = maxHours
+	if hours > uint64(math.MaxInt64) {
+		return time.Duration(math.MaxInt64)
 	}
-	return time.Duration(hours) * time.Hour
+	value := time.Duration(hours)
+	if max := time.Duration(math.MaxInt64); value > max/time.Hour {
+		return max
+	}
+	return value * time.Hour
 }
 
 // ---------------------------------------------------------------------------
