@@ -27,6 +27,7 @@ type fakeQB struct {
 	calls     map[string]int
 	forms     map[string]url.Values
 	locations map[string]string
+	exports   int
 }
 
 func newFakeQB() *fakeQB {
@@ -124,6 +125,9 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	case "/api/v2/torrents/files":
 		_ = json.NewEncoder(w).Encode([]qbittorrent.File{{Name: "movie.mkv", Size: 1000, Progress: 0.5, Priority: 1}})
+	case "/api/v2/torrents/export":
+		f.exports++
+		_, _ = w.Write([]byte("d4:infod4:name8:meta.bin ee"))
 	case "/api/v2/torrents/trackers":
 		_ = json.NewEncoder(w).Encode([]qbittorrent.Tracker{{URL: "udp://tracker", Status: 2, NumPeers: 4}})
 	case "/api/v2/sync/torrentPeers":
@@ -388,5 +392,77 @@ func TestQbittorrentEngineContextHonoursRequestContext(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("request context already done")
 	default:
+	}
+}
+
+func TestQbittorrentEnginePersistsTorrentFile(t *testing.T) {
+	fake, engine, downloads := newFakeQBEngine(t)
+	fake.setTorrents([]qbittorrent.Torrent{{
+		Hash: "abc", Name: "x", State: "downloading", Progress: 0.5, Size: 100, SavePath: downloads,
+	}})
+	engine.List()
+	target := filepath.Join(engine.settings.stateDir, "abc.torrent")
+	if !fileExists(target) {
+		t.Fatalf(".torrent not persisted at %s", target)
+	}
+	if fake.exports == 0 {
+		t.Fatal("export endpoint was not called")
+	}
+	// A second sync must not re-export.
+	before := fake.exports
+	engine.List()
+	if fake.exports != before {
+		t.Fatalf("re-exported an existing .torrent: %d -> %d", before, fake.exports)
+	}
+}
+
+func TestQbittorrentEngineAdjustQueue(t *testing.T) {
+	fake, engine, downloads := newFakeQBEngine(t)
+	fake.setTorrents([]qbittorrent.Torrent{
+		{Hash: "aaa", Name: "a", State: "downloading", Progress: 0.1, Size: 100, Priority: 1, SavePath: downloads},
+		{Hash: "bbb", Name: "b", State: "downloading", Progress: 0.1, Size: 100, Priority: 2, SavePath: downloads},
+		{Hash: "ccc", Name: "c", State: "downloading", Progress: 0.1, Size: 100, Priority: 3, SavePath: downloads},
+	})
+	cfg := DefaultConfig()
+	cfg.Libtorrent.ActiveDownloads = 2
+
+	engine.AdjustQueue(&cfg, 0)
+	if total := fake.calls["/api/v2/torrents/stop"] + fake.calls["/api/v2/torrents/pause"]; total != 1 {
+		t.Fatalf("pause commands = %d, want 1", total)
+	}
+	// The highest queue position (ccc) is the one paused.
+	if got := fake.forms["/api/v2/torrents/stop"].Get("hashes"); got != "" && got != "ccc" {
+		t.Fatalf("paused hashes = %q, want ccc", got)
+	}
+	// Idempotent: no further pause.
+	engine.AdjustQueue(&cfg, 0)
+	if total := fake.calls["/api/v2/torrents/stop"] + fake.calls["/api/v2/torrents/pause"]; total != 1 {
+		t.Fatalf("pause commands after second call = %d, want 1", total)
+	}
+	// Free a slot: one of the active torrents becomes a seeder, so ccc must be
+	// resumed.
+	fake.setTorrents([]qbittorrent.Torrent{
+		{Hash: "aaa", Name: "a", State: "uploading", Progress: 1, Size: 100, Priority: 1, SavePath: downloads},
+		{Hash: "bbb", Name: "b", State: "downloading", Progress: 0.1, Size: 100, Priority: 2, SavePath: downloads},
+		{Hash: "ccc", Name: "c", State: "stoppedDL", Progress: 0.1, Size: 100, Priority: 3, SavePath: downloads},
+	})
+	engine.AdjustQueue(&cfg, 0)
+	if total := fake.calls["/api/v2/torrents/start"] + fake.calls["/api/v2/torrents/resume"]; total != 1 {
+		t.Fatalf("resume commands = %d, want 1", total)
+	}
+}
+
+func TestQbittorrentEngineApplyOptimization(t *testing.T) {
+	fake, engine, _ := newFakeQBEngine(t)
+	result, err := engine.ApplyOptimization(nil)
+	if err != nil {
+		t.Fatalf("ApplyOptimization: %v", err)
+	}
+	if result["backend"] != BackendQbittorrent {
+		t.Fatalf("result = %+v", result)
+	}
+	encoded := fake.forms["/api/v2/app/setPreferences"].Get("json")
+	if !strings.Contains(encoded, "disk_cache") {
+		t.Fatalf("preferences = %q", encoded)
 	}
 }

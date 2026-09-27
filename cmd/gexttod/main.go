@@ -166,7 +166,7 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if shutdownErr := gextto.ShutdownTorrentEngine(state); shutdownErr != nil {
 		logging.Error("torrent engine shutdown failed", "error", shutdownErr)
 	}
-	if shutdownErr := torrents.Shutdown(&cfg); shutdownErr != nil {
+	if shutdownErr := gextto.ShutdownEmbedded(state, &cfg); shutdownErr != nil {
 		logging.Error("libtorrent shutdown did not save all fastresume data", "error", shutdownErr)
 	}
 	logCheckpoint("series", db.Checkpoint)

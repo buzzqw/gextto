@@ -56,6 +56,10 @@ type TorrentEngine interface {
 	Capabilities() map[string]bool
 
 	Stats() map[string]any
+	// AdjustQueue enforces Gextto's active-download slots on the backend. The
+	// embedded engine applies libtorrent's dynamic queue; the external engines
+	// implement the same policy with pause/start.
+	AdjustQueue(cfg *Config, effectiveDownloadKib int64)
 
 	Add(magnet string, cfg *Config) (bool, error)
 	AddWithPath(magnet string, cfg *Config, preferredPath *string) (bool, error)
@@ -138,7 +142,7 @@ var capabilityLevels = map[string]map[string]string{
 	},
 	BackendAnacrolix: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
-		"recheck": "full", "move": "none", "limits": "partial", "files": "full", "peers": "full",
+		"recheck": "full", "move": "partial", "limits": "partial", "files": "full", "peers": "full",
 		"trackers": "full", "events": "full", "stats": "full", "sequential": "none",
 		"first_last": "none", "seed_policy": "full", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "full", "categories": "none", "tags": "none", "sync": "none",
@@ -371,7 +375,6 @@ func ValidatePathMappings(mappings []PathMapping, required []string) error {
 type torrentEngineEmbeddedExtras interface {
 	PromoteMetadata()
 	EnsureAutoManaged() int
-	AdjustQueue(cfg *Config, effectiveDownloadKib int64)
 	EnforceDeferredOptions(torrents []models.TorrentView)
 	recentlyRechecked(hash string, window time.Duration) bool
 }

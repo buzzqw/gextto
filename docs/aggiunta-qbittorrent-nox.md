@@ -1010,10 +1010,12 @@ Cambiamenti non-breaking:
   `ReconcileRamdisk`, `EnforceSeedPolicy`, `RemoveSeededCompleted`,
   `HandleTorrentEvent`, detach) ora accettano la **narrow interface**
   `TorrentSession`: il motore è sostituibile senza duplicare la logica.
-- Il worker usa `state.activeEngine()`; gli hook libtorrent-only
-  (`PromoteMetadata`, `EnsureAutoManaged`, `AdjustQueue`, `EnforceDeferredOptions`,
-  `recentlyRechecked`) sono dietro un'interfaccia opzionale e vengono saltati dagli
-  altri backend.
+- Il worker usa `state.activeEngine()` e lo ri-risolve ad ogni tick (con mutex):
+  il backend è sostituibile a runtime senza che handler e automazioni divergano.
+  Gli hook libtorrent-only (`PromoteMetadata`, `EnsureAutoManaged`,
+  `EnforceDeferredOptions`, `recentlyRechecked`) sono dietro un'interfaccia
+  opzionale e vengono saltati dagli altri backend; `AdjustQueue` è invece nel
+  contratto comune e ogni backend applica la propria coda.
 - Gli handler HTTP generici (lista, add, pause/resume, remove, recheck, move,
   files/peers/trackers, limiti, priorità, pin, sequential) passano dal motore
   attivo. Gli endpoint libtorrent-only (`apply_settings`, `optimize_settings`,
@@ -1027,7 +1029,7 @@ Cambiamenti non-breaking:
 |---|---|---|---|
 | add/list/pause/resume/remove/recheck | full | full | full |
 | files/peers/trackers/events/stats | full | full | full |
-| move | full | full | none |
+| move | full | full | partial |
 | limits | full | full | partial |
 | sequential / first_last | full | full | none |
 | seed_policy | full | partial | full |
@@ -1053,28 +1055,69 @@ La matrice è verificata da `TestCapabilityParityIsComplete` ed esposta in
 5. `pause/resume` e `stop/start` convivono tra versioni con fallback intenzionale.
 6. Aggiunta l'etichettatura UI `moving` (`ui/app/src/lib.rs`).
 
-### 26.4 Gap residui e prossimi passi (non ancora fatti)
+### 26.4 Gap completati in questo passaggio
 
-- **Arbitraggio coda Gextto sopra qBittorrent**: `AdjustQueue` resta
-  libtorrent-only; con qBittorrent la coda attiva è gestita dalle preferenze del
-  demone. Va portato lo scheduler Gextto sopra `sync/maindata`.
-- **Migrazione (Fase 6)**: manifest persistente + macchina a stati
-  export/import/rollback non implementati. Oggi lo switch è un cambio di
-  impostazione con preflight, non una migrazione dei torrent attivi.
-- **Profilo Ottimizza per qBittorrent**: l'endpoint resta embedded-only; va
-  mappato su `app/setPreferences`.
-- **Persistenza `.torrent` per magnet aggiunti via qBittorrent**: da copiare in
-  `StateDir` appena i metadati sono disponibili.
-- **Selettore backend in UI**: oggi disponibile via impostazioni/API.
+- **Un solo motore attivo alla volta (critico)**: con `torrent_backend != embedded`
+  `NewLibtorrentClient` non crea alcuna sessione libtorrent e non ripristina
+  fastresume (`alternativeBackendActive`). Elimina la possibilità che due motori
+  scrivano sugli stessi file.
+- **Cambio di backend governato**: `POST /api/torrent-backend` valida
+  (preflight) e risponde `restart_required`; non installa mai un secondo motore a
+  runtime. Il nuovo motore entra in funzione al riavvio.
+- **Coda Gextto sopra qBittorrent**: `AdjustQueue` è nel contratto comune;
+  l'adapter qBittorrent impone gli slot di download attivi con pause/start,
+  disattiva la coda interna di qBittorrent (`queueing_enabled=false`) e tocca solo
+  i torrent che ha messo in pausa lui (nessun conflitto con la pausa utente).
+  Anche anacrolix implementa la coda.
+- **Persistenza `.torrent`**: l'adapter esporta e conserva in `StateDir` il
+  `.torrent` appena i metadati sono disponibili (endpoint `torrents/export`),
+  rendendo esportazione e migrazione indipendenti dalla ritenzione di qBittorrent.
+- **Profilo Ottimizza per qBittorrent**: `POST /api/torrents/optimize_settings`
+  applica ora un profilo cache disco MiB proporzionato alla RAM
+  (`disk_cache`, `disk_cache_ttl`, `use_os_cache`) invece di un errore.
+- **Migrazione**: `GET /api/torrent-migrations`, `POST /api/torrent-migrations/plan`
+  (dry-run + manifest persistente `torrent-migration.json`) e
+  `POST /api/torrent-migrations/cancel`. Il manifest elenca ogni torrent con
+  `.torrent`/magnet, path e stato; il passaggio dei file resta un'operazione
+  governata con riavvio, come da §14.
+- **Interfaccia**: nuova tab **Motore torrent** con selettore backend,
+  credenziali qBittorrent (password write-only), path mapping, pannello di stato
+  con matrice capability e pulsanti Test connessione / Verifica prerequisiti.
 
-### 26.5 Test
+### 26.5 Gap residui
+
+- **Hand-off automatico della migrazione**: il manifest è pronto, ma il
+  trasferimento effettivo dei torrent tra motori resta manuale/assistito (è la
+  parte a rischio più alto, §14.5).
+- **`optimize_settings` su anacrolix**: non applicabile (nessuna cache libtorrent).
+- **Path physical validation di qBittorrent**: Gextto verifica il path riportato
+  e ritenta; non può leggere il filesystem del processo remoto.
+
+### 26.6 Interfaccia (Fase 5)
+
+La tab **Motore torrent** (`ui/app/src/lib.rs`) permette di configurare e usare i
+backend senza toccare i file di configurazione:
+- selettore `torrent_backend` (embedded / qbittorrent / anacrolix);
+- URL, utente, password, categoria, tag, timeout, polling, path mapping;
+- pannello con backend attivo/configurato, matrice capability e stato;
+- pulsanti **Test connessione** (`/api/torrent-backend/test`) e **Verifica
+  prerequisiti** (`/api/torrent-backend/preflight`).
+
+`GET /api/config` espone le nuove chiavi (la password solo come
+`qbittorrent_password_configured`), e `scripts/check-ui-settings-index.sh`
+verifica che ogni campo sia nell'indice di ricerca.
+
+### 26.7 Test
 
 - `internal/qbittorrent`: file priority, tracker, share limits, force-start,
-  preferenze, limiti, toggle sequenziale idempotente.
+  preferenze, limiti, toggle sequenziale idempotente, export `.torrent`.
 - `qbittorrent_engine_test.go`: mapping/stati, pause/resume idempotenti, move +
   evento `storage_moved`, eventi metadata/completamento, offline con cache
   conservata, capability non supportate, files/peers/trackers, add con path
-  tradotto e categorie, scoperta hash su `.torrent`.
+  tradotto e categorie, scoperta hash su `.torrent`, persistenza `.torrent`,
+  scheduler di coda idempotente, profilo Ottimizza.
 - `torrent_engine_test.go`: parsing/validazione/traduzione path, preflight,
-  matrice, selezione backend, e un test handler end-to-end con motore finto
-  installato in `AppState`.
+  matrice, selezione backend, soppressione della sessione libtorrent con backend
+  alternativo, e un test handler end-to-end con motore finto in `AppState`.
+- `torrent_migration_test.go`: manifest vuoto, persistenza/caricamento,
+  rifiuto di target incompleti, elenco dei torrent gestiti.

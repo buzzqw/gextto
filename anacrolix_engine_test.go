@@ -29,6 +29,8 @@ func TestAnacrolixEngineCapabilityErrors(t *testing.T) {
 	cfg.DataDir = t.TempDir()
 	cfg.StateDir = filepath.Join(cfg.DataDir, "state")
 	cfg.LibtorrentDir = filepath.Join(cfg.DataDir, "downloads")
+	cfg.Libtorrent.PortMin = 0
+	cfg.Libtorrent.PortMax = 0
 	if err := os.MkdirAll(cfg.LibtorrentDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +41,9 @@ func TestAnacrolixEngineCapabilityErrors(t *testing.T) {
 	engine := engineIface.(*anacrolixEngine)
 	defer engine.Close()
 
-	if _, err := engine.MoveStorage("abc", "/tmp/x"); !isCapabilityUnavailable(err) {
-		t.Fatalf("MoveStorage err = %v", err)
+	// A move of an unknown torrent is a no-op, not an error.
+	if moved, err := engine.MoveStorage("deadbeef", "/tmp/x"); err != nil || moved {
+		t.Fatalf("MoveStorage(unknown) = %v, %v", moved, err)
 	}
 	if _, err := engine.SetLimits("abc", 1, 1, 1, 1); !isCapabilityUnavailable(err) {
 		t.Fatalf("SetLimits err = %v", err)
@@ -75,7 +78,9 @@ func TestAnacrolixEngineVerifiesLocalDataAndResumes(t *testing.T) {
 		t.Fatalf("write data: %v", err)
 	}
 
-	cfg := transferTestConfig(t, dir, freeTCPPort(t))
+	cfg := transferTestConfig(t, dir, 0)
+	cfg.Libtorrent.PortMin = 0
+	cfg.Libtorrent.PortMax = 0
 	engineIface, err := newAnacrolixEngineImpl(&cfg)
 	if err != nil {
 		t.Fatalf("newAnacrolixEngineImpl: %v", err)
@@ -173,5 +178,63 @@ func TestAnacrolixEventDiffing(t *testing.T) {
 	)
 	if !hasEventKind(engine.events, "metadata_received") || !hasEventKind(engine.events, "torrent_finished") {
 		t.Fatalf("events = %+v", engine.events)
+	}
+}
+
+func TestAnacrolixEngineMovesStorage(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping anacrolix storage move in short mode")
+	}
+	dir := t.TempDir()
+	payload := make([]byte, 128*1024)
+	for index := range payload {
+		payload[index] = byte((index * 7) % 256)
+	}
+	torrentBytes, infoHash := buildTorrentBytes(t, "move.bin", payload, 16384, "http://127.0.0.1:1/announce")
+	torrentPath := filepath.Join(dir, "move.torrent")
+	if err := os.WriteFile(torrentPath, torrentBytes, 0o644); err != nil {
+		t.Fatalf("write torrent: %v", err)
+	}
+	dataDir := filepath.Join(dir, "downloads")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "move.bin"), payload, 0o644); err != nil {
+		t.Fatalf("write data: %v", err)
+	}
+
+	cfg := transferTestConfig(t, dir, 0)
+	cfg.Libtorrent.PortMin = 0
+	cfg.Libtorrent.PortMax = 0
+	engineIface, err := newAnacrolixEngineImpl(&cfg)
+	if err != nil {
+		t.Fatalf("newAnacrolixEngineImpl: %v", err)
+	}
+	engine := engineIface.(*anacrolixEngine)
+	defer engine.Close()
+
+	if _, err := engine.AddTorrentFileEx(torrentPath, dataDir, AddOptions{}); err != nil {
+		t.Fatalf("AddTorrentFileEx: %v", err)
+	}
+	if !waitForProgress(engine, infoHash, 99.99, 30*time.Second) {
+		t.Fatalf("torrent did not complete: %+v", engine.List())
+	}
+
+	destination := filepath.Join(dir, "moved")
+	if moved, err := engine.MoveStorage(infoHash, destination); err != nil || !moved {
+		t.Fatalf("MoveStorage = %v, %v", moved, err)
+	}
+	if !waitForProgress(engine, infoHash, 99.99, 30*time.Second) {
+		t.Fatalf("torrent incomplete after move: %+v", engine.List())
+	}
+	if _, err := os.Stat(filepath.Join(destination, "move.bin")); err != nil {
+		t.Fatalf("data not present at destination: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, "move.bin")); err == nil {
+		t.Fatal("data still present at the old location")
+	}
+	view := findView(engine, infoHash)
+	if view == nil || view.SavePath != destination {
+		t.Fatalf("save path after move = %+v", view)
 	}
 }

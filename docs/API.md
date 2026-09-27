@@ -192,6 +192,9 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/torrent-backend` |
 | POST | `/api/torrent-backend/preflight` |
 | POST | `/api/torrent-backend/test` |
+| GET | `/api/torrent-migrations` |
+| POST | `/api/torrent-migrations/cancel` |
+| POST | `/api/torrent-migrations/plan` |
 | GET | `/api/torrent-events` |
 | GET | `/api/torrent-no-rename` |
 | GET | `/api/torrent-tags` |

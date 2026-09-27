@@ -3,6 +3,7 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -136,6 +137,37 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	}
 	if closer, ok := engine.(interface{ Close() error }); ok {
 		_ = closer.Close()
+	}
+}
+
+func TestAlternativeBackendSuppressesEmbeddedSession(t *testing.T) {
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	cfg.StateDir = filepath.Join(dir, "state")
+	cfg.LibtorrentDir = filepath.Join(dir, "downloads")
+	cfg.LibtorrentTempDir = nil
+	if err := os.MkdirAll(cfg.LibtorrentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg.DryRun = false
+	cfg.LibtorrentEnabled = true
+
+	if alternativeBackendActive(&cfg) {
+		t.Fatal("embedded backend must not suppress the libtorrent session")
+	}
+	cfg.Settings["torrent_backend"] = BackendQbittorrent
+	cfg.Settings["qbittorrent_url"] = "http://127.0.0.1:1"
+	if !alternativeBackendActive(&cfg) {
+		t.Fatal("expected the qbittorrent backend to suppress the embedded session")
+	}
+	client, err := NewLibtorrentClient(&cfg)
+	if err != nil {
+		t.Fatalf("NewLibtorrentClient: %v", err)
+	}
+	defer client.Shutdown(&cfg)
+	if !client.DryRun {
+		t.Fatal("the embedded libtorrent session must be session-less with an alternative backend")
 	}
 }
 

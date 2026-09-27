@@ -84,12 +84,14 @@ type qbittorrentEngine struct {
 	client   *qbittorrent.Client
 
 	categoryReady bool
+	queueManaged  bool
 
 	mu           sync.Mutex
 	cache        map[string]models.TorrentView
 	previous     map[string]models.TorrentView
 	events       []models.TorrentEvent
 	stalled      map[string]struct{}
+	policyPaused map[string]struct{}
 	pendingMoves map[string]string
 	lastSync     time.Time
 	lastErr      string
@@ -115,6 +117,7 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 		cache:        map[string]models.TorrentView{},
 		previous:     map[string]models.TorrentView{},
 		stalled:      map[string]struct{}{},
+		policyPaused: map[string]struct{}{},
 		pendingMoves: map[string]string{},
 	}, nil
 }
@@ -322,7 +325,126 @@ func (e *qbittorrentEngine) sync() error {
 	}
 	e.previous = next
 	e.cache = next
+	// Keep a Gextto-owned .torrent for every torrent whose metadata is known, so
+	// export and backend migration do not depend on qBittorrent retention.
+	for hash, view := range next {
+		if view.HasMetadata {
+			e.ensureTorrentFileLocked(hash)
+		}
+	}
 	return nil
+}
+
+// ensureTorrentFileLocked downloads and stores the .torrent once. Called with
+// e.mu held; failures are non-fatal (older qBittorrent has no export endpoint).
+func (e *qbittorrentEngine) ensureTorrentFileLocked(hash string) {
+	if e.settings.stateDir == "" {
+		return
+	}
+	target := filepath.Join(e.settings.stateDir, hash+".torrent")
+	if fileExists(target) {
+		return
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	data, err := e.client.ExportTorrent(ctx, hash)
+	if err != nil || len(data) == 0 {
+		return
+	}
+	if err := os.MkdirAll(e.settings.stateDir, 0o755); err != nil {
+		return
+	}
+	tmp := target + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, target)
+}
+
+// ensureQueueingLocked disables qBittorrent's own queue once: Gextto owns the
+// active-download decision, so the backend must not independently queue.
+func (e *qbittorrentEngine) ensureQueueingLocked() {
+	if e.queueManaged {
+		return
+	}
+	e.queueManaged = true
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": false}); err != nil {
+		logging.Debug("qbittorrent queueing disable skipped", "error", err.Error())
+	}
+}
+
+// AdjustQueue enforces Gextto's active-download slots above qBittorrent. It
+// only touches torrents it paused itself (policyPaused), so a user pause is
+// never overridden, and it is idempotent.
+func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
+	if cfg == nil {
+		return
+	}
+	limit := int(cfg.Libtorrent.ActiveDownloads)
+	if limit < 1 {
+		limit = 1
+	}
+	views := e.List()
+
+	e.mu.Lock()
+	e.ensureQueueingLocked()
+	type candidate struct {
+		hash string
+		pos  int
+		name string
+	}
+	var downloading []candidate
+	var paused []candidate
+	for _, view := range views {
+		switch view.State {
+		case "downloading":
+			downloading = append(downloading, candidate{view.Hash, view.QueuePosition, view.Name})
+		case "paused":
+			if _, ok := e.policyPaused[view.Hash]; ok {
+				paused = append(paused, candidate{view.Hash, view.QueuePosition, view.Name})
+			}
+		}
+	}
+	e.mu.Unlock()
+
+	less := func(items []candidate) {
+		sort.Slice(items, func(i, j int) bool {
+			if items[i].pos != items[j].pos {
+				return items[i].pos < items[j].pos
+			}
+			return items[i].hash < items[j].hash
+		})
+	}
+	less(downloading)
+	less(paused)
+
+	if len(downloading) > limit {
+		for _, item := range downloading[limit:] {
+			if _, err := e.Pause(item.hash); err != nil {
+				logging.Debug("queue pause failed", "hash", item.hash, "error", err.Error())
+				continue
+			}
+			e.mu.Lock()
+			e.policyPaused[item.hash] = struct{}{}
+			e.mu.Unlock()
+			logging.Info("📊 Queue: paused a torrent over the active slot limit", "name", item.name)
+		}
+		return
+	}
+	slots := limit - len(downloading)
+	for index := 0; index < slots && index < len(paused); index++ {
+		item := paused[index]
+		if _, err := e.Resume(item.hash); err != nil {
+			logging.Debug("queue resume failed", "hash", item.hash, "error", err.Error())
+			continue
+		}
+		e.mu.Lock()
+		delete(e.policyPaused, item.hash)
+		e.mu.Unlock()
+		logging.Info("📊 Queue: resumed a torrent into a free active slot", "name", item.name)
+	}
 }
 
 // diffLocked compares two snapshots and queues the normalized events.
@@ -417,6 +539,46 @@ func (e *qbittorrentEngine) Stats() map[string]any {
 		stats[key] = value
 	}
 	return stats
+}
+
+// ApplyOptimization applies a backend-appropriate disk-cache profile. It
+// deliberately does not copy libtorrent's block-based cache size: qBittorrent
+// exposes a MiB-based disk cache, so the same operational goal (a cache
+// proportional to RAM, bounded) is expressed with its own settings.
+func (e *qbittorrentEngine) ApplyOptimization(cfg *Config) (map[string]any, error) {
+	memoryMB := uint64(0)
+	if cfg != nil {
+		memoryMB = gh0_libtorrentOptimizationFor(cfg).memoryMB
+	}
+	cacheMB := int64(512)
+	switch {
+	case memoryMB > 0 && memoryMB < 2048:
+		cacheMB = 128
+	case memoryMB < 4096:
+		cacheMB = 256
+	case memoryMB < 8192:
+		cacheMB = 512
+	case memoryMB < 16384:
+		cacheMB = 1024
+	default:
+		cacheMB = 2048
+	}
+	prefs := map[string]any{
+		"disk_cache":     cacheMB,
+		"disk_cache_ttl": 300,
+		"use_os_cache":   true,
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetPreferences(ctx, prefs); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"backend":        BackendQbittorrent,
+		"memory_mb":      memoryMB,
+		"disk_cache_mb":  cacheMB,
+		"disk_cache_ttl": 300,
+	}, nil
 }
 
 // ---------------------------------------------------------------------------

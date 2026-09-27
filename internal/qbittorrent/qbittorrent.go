@@ -775,6 +775,14 @@ func (c *Client) DefaultSavePath(ctx context.Context) (string, error) {
 	return strings.TrimSpace(raw), nil
 }
 
+// ExportTorrent downloads the .torrent of a torrent (qBittorrent >= 4.6).
+// Older versions return 404 (ErrNotFound); callers must treat that as
+// "export unavailable", not as fatal.
+func (c *Client) ExportTorrent(ctx context.Context, hash string) ([]byte, error) {
+	query := url.Values{"hash": {strings.ToLower(hash)}}
+	return c.do(ctx, http.MethodGet, "/api/v2/torrents/export?"+query.Encode(), nil)
+}
+
 // Preferences returns the full application preferences document.
 func (c *Client) Preferences(ctx context.Context) (map[string]any, error) {
 	var prefs map[string]any

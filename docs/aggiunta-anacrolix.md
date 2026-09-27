@@ -968,7 +968,9 @@ Cosa funziona realmente (verificato da test dietro tag):
 - eventi normalizzati (`metadata_received`, `torrent_finished`, `torrent_error`)
   per diff di snapshot; pause/resume idempotenti via
   `Allow/DisallowDataDownload/Upload`; recheck via `VerifyData`; remove con o
-  senza file.
+  senza file;
+- **storage move** sicuro (quiesce → rename/copy → re-add) e coda Gextto
+  (`AdjustQueue`) con pause/resume degli slot attivi.
 
 ### 22.2 Capability dichiarate (nessun falso successo)
 
@@ -976,14 +978,15 @@ Rispetto alla tabella ottimistica del piano, queste operazioni **restituiscono
 `ErrCapabilityUnavailable`** perché anacrolix non le applica a runtime come
 libtorrent:
 
-- `MoveStorage` (lo storage base è legato all'aggiunta del torrent: farlo
-  mentre i file sono aperti rischia la corruzione; è una fase dedicata);
 - limiti per-torrent (`SetLimits`) e limiti globali a runtime;
 - flag sequenziale e first/last piece;
 - pin e upload mode.
 
+Il **move** è supportato ma parziale (richiede un `.torrent` persistito e
+quiesce del torrent), quindi la matrice lo marca `partial`.
+
 La capability matrix in `torrent_engine.go` riflette questa realtà
-(`move: none`, `limits: partial`, `sequential/first_last: none`,
+(`move: partial`, `limits: partial`, `sequential/first_last: none`,
 `ip_filter: none`) ed è verificata dai test.
 
 ### 22.3 Valutazione pro/contro aggiornata
@@ -1005,26 +1008,40 @@ La capability matrix in `torrent_engine.go` riflette questa realtà
 - MPL-2.0: obblighi di distribuzione se il binario con tag viene distribuito
   (il tag è opt-in, il default no).
 - Storage/resume diversi dal fastresume libtorrent: il completion store è codice
-  critico; il move resta un rischio alto, per questo è esplicitamente assente.
+  critico; il move è ora implementato ma resta un'operazione da trattare con
+  cautela (quiesce → move → re-add).
 - Le feature "nuove" del piano (piece diagnostics esposti in UI, download
   selettivo, verifica programmata, streaming) **non** sono ancora esposte come
   endpoint: la libreria le supporta, Gextto no.
 
-### 22.4 Gap residui e prossimi passi
+### 22.4 Gap completati in questo passaggio
 
-1. **Storage move** con macchina a stati (quiesce → copy/rename → re-add →
-   validate), come da piano.
-2. **Diagnostica pezzi** (`/pieces`, `/pieces/runs`) e **download selettivo**
+1. **Storage move**: quiesce (Disallow download/upload + `Drop`), move con
+   rename o copy+delete cross-filesystem, re-add dal `.torrent` persistito,
+   ripristino dello stato. Il completion store condiviso evita il re-download.
+   Richiede un `.torrent` persistito e rifiuta una destinazione già popolata.
+2. **Coda Gextto**: `AdjustQueue` applica gli slot di download attivi con
+   pause/resume, toccando solo i torrent messi in pausa dallo scheduler.
+3. **Migrazione**: stesso manifest/dry-run di qBittorrent
+   (`/api/torrent-migrations`), con verifica che anacrolix sia compilato.
+4. **Interfaccia**: tab **Motore torrent** con selettore, mapping percorsi e
+   pannello di stato (la matrice mostra anacrolix come backend con tag).
+
+### 22.5 Gap residui
+
+1. **Diagnostica pezzi** (`/pieces`, `/pieces/runs`) e **download selettivo**
    con profili film/serie/pack/fumetti.
-3. **IP blocklist**, bootstrap DHT e proxy non mappati.
-4. **Migrazione** embedded ↔ anacrolix, per ultima, con manifest e rollback.
-5. Esposizione della scelta backend in UI (oggi impostazioni/API).
+2. **IP blocklist**, bootstrap DHT e proxy non mappati da `cfg.Libtorrent`.
+3. **Hand-off automatico della migrazione** (il manifest è pronto; il
+   trasferimento resta governato con riavvio).
 
-### 22.5 Test
+### 22.6 Test
 
 `anacrolix_engine_test.go` (tag `anacrolix`):
 - conversioni priorità; capability non supportate;
 - verifica dati locali fino al 100%, pause/resume, remove con conservazione file;
 - **restart**: il torrent viene ricostruito dal manifest e resta completo senza
   riscaricare;
+- **storage move**: il file viene spostato, il torrent resta completo e il
+  `SavePath` riporta la nuova destinazione;
 - diff eventi metadata/completamento.

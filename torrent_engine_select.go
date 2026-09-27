@@ -20,6 +20,28 @@ import (
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
 
+// alternativeBackendActive reports whether a non-embedded backend will be
+// activated at startup. It mirrors selectTorrentEngine's validation (without
+// the connectivity probe) so NewLibtorrentClient can suppress its session
+// exactly when the alternative engine will really take over.
+func alternativeBackendActive(cfg *Config) bool {
+	if cfg == nil {
+		return false
+	}
+	switch TorrentBackendName(cfg) {
+	case BackendQbittorrent:
+		settings, err := qbittorrentSettingsFromConfig(cfg)
+		if err != nil || settings.Client.BaseURL == "" {
+			return false
+		}
+		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
+	case BackendAnacrolix:
+		return newAnacrolixEngine != nil
+	default:
+		return false
+	}
+}
+
 // newAnacrolixEngine is installed by the build-tagged anacrolix implementation.
 // It is nil in the default build, where anacrolix is not compiled in.
 var newAnacrolixEngine func(*Config) (TorrentEngine, error)
@@ -165,6 +187,17 @@ func ShutdownTorrentEngine(s *AppState) error {
 		return closer.Close()
 	}
 	return nil
+}
+
+// ShutdownEmbedded closes the embedded libtorrent client currently held by the
+// state. It must be used instead of a startup-local pointer because NewAppState
+// may replace the client with a fallback when an alternative backend fails to
+// activate.
+func ShutdownEmbedded(s *AppState, cfg *Config) error {
+	if s == nil || s.torrents == nil {
+		return nil
+	}
+	return s.torrents.Shutdown(cfg)
 }
 
 // ConfigureTorrentEngine installs the engine selected by the current settings.

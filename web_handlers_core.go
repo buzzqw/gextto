@@ -1049,8 +1049,21 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"rename_format":                        cfg.RenameFormat,
 		"rename_template":                      cfg.RenameTemplate,
 		"rename_episodes":                      cfg.RenameEpisodes,
-		"libtorrent":                           libtorrent,
-		"paths":                                paths,
+		// Torrent backend selection and its per-backend settings. The
+		// qBittorrent password is never echoed: only its presence is reported.
+		"torrent_backend":                  settingsOr(cfg, "torrent_backend", "embedded"),
+		"qbittorrent_url":                  settingsOr(cfg, "qbittorrent_url", ""),
+		"qbittorrent_username":             settingsOr(cfg, "qbittorrent_username", ""),
+		"qbittorrent_category":             settingsOr(cfg, "qbittorrent_category", ""),
+		"qbittorrent_tag":                  settingsOr(cfg, "qbittorrent_tag", ""),
+		"qbittorrent_request_timeout_secs": settingsOr(cfg, "qbittorrent_request_timeout_secs", "15"),
+		"qbittorrent_poll_interval_ms":     settingsOr(cfg, "qbittorrent_poll_interval_ms", "1500"),
+		"qbittorrent_path_mappings":        settingsOr(cfg, "qbittorrent_path_mappings", ""),
+		"qbittorrent_password_configured":  settingsNonEmpty(cfg, "qbittorrent_password"),
+		"anacrolix_path_mappings":          settingsOr(cfg, "anacrolix_path_mappings", ""),
+		"anacrolix_built":                  newAnacrolixEngine != nil,
+		"libtorrent":                       libtorrent,
+		"paths":                            paths,
 	})
 }
 

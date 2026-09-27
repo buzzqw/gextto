@@ -145,19 +145,51 @@ func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState
 	jsonResponse(w, map[string]any{"ok": true, "preflight": result})
 }
 
-// TorrentBackendActivate implements `POST /api/torrent-backend`: it re-reads
-// the settings and installs the configured engine. The activation is refused
-// when the preflight fails, leaving the previously active engine in place.
+// TorrentBackendActivate implements `POST /api/torrent-backend`: it validates
+// the configured engine and reports whether a restart is needed. A running
+// daemon never installs a second engine: switching the transfer plane changes
+// who owns the files, so it is applied at startup after a clean shutdown
+// (see docs/aggiunta-qbittorrent-nox.md §26.4).
 func TorrentBackendActivate(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	if err := ConfigureTorrentEngine(s, cfg); err != nil {
-		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
-		return
+	active := ActiveTorrentBackend(s).Name()
+	configured := TorrentBackendName(cfg)
+
+	// A backend different from the active one is only applied at restart.
+	if configured != active {
+		switch configured {
+		case BackendQbittorrent:
+			result := PreflightQbittorrent(cfg)
+			if err := validateBackendMappings(result.Mappings, requiredBackendPaths(cfg)); err != nil {
+				result.Errors = append(result.Errors, err.Error())
+				result.OK = false
+			}
+			if !result.OK {
+				jsonStatus(w, http.StatusConflict, map[string]any{
+					"ok": false, "preflight": result,
+					"error": firstOr(result.Errors, "preflight failed"),
+				})
+				return
+			}
+		case BackendAnacrolix:
+			if newAnacrolixEngine == nil {
+				jsonStatus(w, http.StatusConflict, map[string]any{
+					"ok": false, "error": "torrent_backend=anacrolix requires a build with the `anacrolix` tag",
+				})
+				return
+			}
+		}
+	}
+	message := "il motore attivo è già quello configurato"
+	if configured != active {
+		message = "riavvia Gextto per applicare il nuovo motore torrent"
 	}
 	jsonResponse(w, map[string]any{
-		"ok":         true,
-		"backend":    ActiveTorrentBackend(s).Name(),
-		"configured": TorrentBackendName(cfg),
+		"ok":               true,
+		"backend":          active,
+		"configured":       configured,
+		"restart_required": configured != active,
+		"message":          message,
 	})
 }
 

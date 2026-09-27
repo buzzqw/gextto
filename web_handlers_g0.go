@@ -1584,6 +1584,23 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 }
 
 func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
+	// On qBittorrent the same operational goal is expressed with the backend's
+	// own MiB-based disk cache preferences.
+	if qb, ok := s.activeEngine().(*qbittorrentEngine); ok {
+		result, err := qb.ApplyOptimization(latestConfig(s))
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		jsonStatus(w, http.StatusOK, map[string]any{
+			"ok":          true,
+			"applied":     true,
+			"backend":     BackendQbittorrent,
+			"optimized":   result,
+			"explanation": "Cache disco qBittorrent proporzionata alla RAM e limitata; le altre preferenze restano invariate.",
+		})
+		return
+	}
 	if _, err := s.requireEmbedded("optimize_settings"); err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return

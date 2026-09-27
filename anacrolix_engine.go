@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -106,14 +107,15 @@ type anacrolixEngine struct {
 	client     *torrent.Client
 	completion storage.PieceCompletion
 
-	mu       sync.Mutex
-	state    map[string]*anacrolixTorrent
-	previous map[string]models.TorrentView
-	events   []models.TorrentEvent
-	manifest map[string]string
-	samples  map[string]anacrolixSample
-	lastErr  string
-	closed   bool
+	mu           sync.Mutex
+	state        map[string]*anacrolixTorrent
+	previous     map[string]models.TorrentView
+	events       []models.TorrentEvent
+	manifest     map[string]string
+	samples      map[string]anacrolixSample
+	policyPaused map[string]struct{}
+	lastErr      string
+	closed       bool
 }
 
 var _ TorrentEngine = (*anacrolixEngine)(nil)
@@ -149,13 +151,14 @@ func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
 		return nil, fmt.Errorf("anacrolix: create client: %w", err)
 	}
 	engine := &anacrolixEngine{
-		settings:   settings,
-		client:     client,
-		completion: completion,
-		state:      map[string]*anacrolixTorrent{},
-		previous:   map[string]models.TorrentView{},
-		manifest:   map[string]string{},
-		samples:    map[string]anacrolixSample{},
+		settings:     settings,
+		client:       client,
+		completion:   completion,
+		state:        map[string]*anacrolixTorrent{},
+		previous:     map[string]models.TorrentView{},
+		manifest:     map[string]string{},
+		samples:      map[string]anacrolixSample{},
+		policyPaused: map[string]struct{}{},
 	}
 	engine.loadManifest()
 	engine.restore()
@@ -556,6 +559,68 @@ func (e *anacrolixEngine) Restart(hash string) (bool, error) {
 	return e.Resume(hash)
 }
 
+// AdjustQueue enforces Gextto's active-download slots on anacrolix. Only the
+// torrents this scheduler paused are resumed again, so a user pause is kept.
+func (e *anacrolixEngine) AdjustQueue(cfg *Config, _ int64) {
+	if cfg == nil {
+		return
+	}
+	limit := int(cfg.Libtorrent.ActiveDownloads)
+	if limit < 1 {
+		limit = 1
+	}
+	type candidate struct {
+		hash string
+		name string
+	}
+	var active []candidate
+	var paused []candidate
+	for _, view := range e.List() {
+		if view.Progress >= 99.99 {
+			continue
+		}
+		switch view.State {
+		case "downloading", "downloading_metadata", "stalled":
+			active = append(active, candidate{view.Hash, view.Name})
+		case "paused":
+			e.mu.Lock()
+			_, policy := e.policyPaused[view.Hash]
+			e.mu.Unlock()
+			if policy {
+				paused = append(paused, candidate{view.Hash, view.Name})
+			}
+		}
+	}
+	less := func(items []candidate) {
+		sort.Slice(items, func(i, j int) bool { return items[i].hash < items[j].hash })
+	}
+	less(active)
+	less(paused)
+	if len(active) > limit {
+		for _, item := range active[limit:] {
+			if _, err := e.Pause(item.hash); err != nil {
+				continue
+			}
+			e.mu.Lock()
+			e.policyPaused[item.hash] = struct{}{}
+			e.mu.Unlock()
+			logging.Info("📊 Queue: paused a torrent over the active slot limit", "name", item.name)
+		}
+		return
+	}
+	slots := limit - len(active)
+	for index := 0; index < slots && index < len(paused); index++ {
+		item := paused[index]
+		if _, err := e.Resume(item.hash); err != nil {
+			continue
+		}
+		e.mu.Lock()
+		delete(e.policyPaused, item.hash)
+		e.mu.Unlock()
+		logging.Info("📊 Queue: resumed a torrent into a free active slot", "name", item.name)
+	}
+}
+
 func (e *anacrolixEngine) Remove(hash string, deleteFiles bool) (bool, error) {
 	entry, ok := e.lookup(hash)
 	if !ok {
@@ -613,11 +678,115 @@ func (e *anacrolixEngine) Reannounce(hash string) (bool, error) {
 	return true, nil
 }
 
-// MoveStorage is a dedicated future phase for anacrolix: its storage base is
-// bound when the torrent is added. Refusing explicitly avoids moving files
-// while the engine still holds them open.
+// MoveStorage relocates a torrent's data and re-adds it with the new storage
+// base. anacrolix binds the storage directory when a torrent is added, so the
+// move is a quiesce (drop, which closes the file handles), a filesystem move,
+// then a re-add from the persisted .torrent. The shared piece-completion store
+// keeps the verified pieces, so no data is re-downloaded.
 func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
-	return false, backendCapabilityError(BackendAnacrolix, "move")
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" || strings.TrimSpace(destination) == "" {
+		return false, nil
+	}
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	if SamePath(entry.savePath, destination) {
+		return false, nil
+	}
+	if _, ok := TranslateGexttoToBackend(destination, e.settings.Mappings); !ok && len(e.settings.Mappings) > 0 {
+		return false, fmt.Errorf("%w: %s", ErrPathMappingMissing, destination)
+	}
+	name := entry.handle.Name()
+	if strings.TrimSpace(name) == "" {
+		return false, fmt.Errorf("anacrolix: cannot move a torrent without metadata")
+	}
+	torrentFile := filepath.Join(e.settings.MetadataDir, hash+".torrent")
+	if !fileExists(torrentFile) {
+		return false, fmt.Errorf("anacrolix: move requires a persisted .torrent for %s", hash)
+	}
+	source := filepath.Join(entry.savePath, name)
+	target := filepath.Join(destination, name)
+	if !pathWithin(source, entry.savePath) {
+		return false, fmt.Errorf("anacrolix: refusing unsafe source path %s", source)
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return false, fmt.Errorf("anacrolix: source data missing: %w", err)
+	}
+	if info.IsDir() {
+		if entries, readErr := os.ReadDir(source); readErr == nil && len(entries) > 0 {
+			return false, fmt.Errorf("anacrolix: destination already populated: %s", target)
+		}
+	} else if fileExists(target) {
+		return false, fmt.Errorf("anacrolix: destination file already exists: %s", target)
+	}
+	if err := os.MkdirAll(destination, 0o755); err != nil {
+		return false, err
+	}
+
+	// Quiesce and detach the torrent before touching its files. Removing it from
+	// the state map (under lock) keeps a concurrent List/sync from dereferencing
+	// a dropped handle.
+	wasPaused := entry.paused
+	entry.handle.DisallowDataDownload()
+	entry.handle.DisallowDataUpload()
+	e.mu.Lock()
+	delete(e.state, hash)
+	delete(e.policyPaused, hash)
+	e.mu.Unlock()
+	entry.handle.Drop()
+
+	readd := func(path string) {
+		if _, addErr := e.addTorrentFileInternal(torrentFile, path, AddOptions{Paused: wasPaused}, nil); addErr != nil {
+			logging.Error("anacrolix move: re-add failed", "hash", hash, "path", path, "error", addErr.Error())
+		}
+	}
+	if err := anacrolixMoveTree(source, target); err != nil {
+		// Put the torrent back where it was so it is never lost.
+		readd(entry.savePath)
+		return false, err
+	}
+	if _, err := e.addTorrentFileInternal(torrentFile, destination, AddOptions{Paused: wasPaused}, nil); err != nil {
+		// Try to restore the previous location rather than leaving it detached.
+		if moveErr := anacrolixMoveTree(target, source); moveErr == nil {
+			readd(entry.savePath)
+		}
+		return false, err
+	}
+	if !wasPaused {
+		if _, err := e.Resume(hash); err != nil {
+			logging.Debug("anacrolix move: resume after move failed", "hash", hash, "error", err.Error())
+		}
+	}
+	logging.Info("📁 anacrolix storage moved", "hash", hash, "from", entry.savePath, "to", destination)
+	return true, nil
+}
+
+// anacrolixMoveTree moves a file or directory, falling back to a copy+delete
+// across filesystems.
+func anacrolixMoveTree(source, target string) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	if err := os.Rename(source, target); err == nil {
+		return nil
+	}
+	info, err := os.Stat(source)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		if err := copyTree(source, target); err != nil {
+			return err
+		}
+		return os.RemoveAll(source)
+	}
+	if err := migrateCopyFile(source, target); err != nil {
+		return err
+	}
+	return os.Remove(source)
 }
 
 func (e *anacrolixEngine) MarkStalled(hash string) (bool, error) {

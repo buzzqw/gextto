@@ -39,12 +39,33 @@ func NewAppState(
 		config_cache:    &ConfigCache{},
 	}
 	// Install the configured transfer backend. A refused activation (invalid
-	// path mappings, an unavailable build tag) falls back to the embedded
-	// libtorrent engine instead of aborting the daemon: improving without
-	// breaking.
+	// path mappings, an unavailable build tag, a port conflict) falls back to
+	// the embedded libtorrent engine instead of aborting the daemon: improving
+	// without breaking.
 	if err := ConfigureTorrentEngine(state, cfg); err != nil {
 		logging.Warn("torrent backend activation refused; using embedded libtorrent", "error", err)
 		state.setActiveEngine(nil)
+		// The embedded session was suppressed to avoid two engines owning the
+		// same files. If the alternative backend then failed to activate, start
+		// the embedded session now so the daemon still transfers.
+		if !cfg.DryRun && cfg.LibtorrentEnabled && alternativeBackendActive(cfg) {
+			fallback := *cfg
+			settings := make(map[string]string, len(cfg.Settings))
+			for key, value := range cfg.Settings {
+				settings[key] = value
+			}
+			settings["torrent_backend"] = BackendEmbedded
+			fallback.Settings = settings
+			if client, clientErr := NewLibtorrentClient(&fallback); clientErr == nil {
+				if state.torrents != nil {
+					_ = state.torrents.Shutdown(cfg)
+				}
+				state.torrents = client
+				logging.Info("embedded libtorrent session started as fallback")
+			} else {
+				logging.Error("embedded libtorrent fallback failed", "error", clientErr)
+			}
+		}
 	}
 	return state
 }

@@ -675,9 +675,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
-			if extras != nil {
-				extras.AdjustQueue(cfg, effectiveDownloadKib)
-			}
+			torrents.AdjustQueue(cfg, effectiveDownloadKib)
 			// Queue visibility, like legacy extto ("📊 Queue: ..."): log when the
 			// number of active downloads changes, not on every tick.
 			snapshot := torrents.List()

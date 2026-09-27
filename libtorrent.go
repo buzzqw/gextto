@@ -427,7 +427,17 @@ func (c *LibtorrentClient) RamdiskUncommittedBytes(ramdisk string, excludeHash s
 // NewLibtorrentClient creates the native session (unless dry-run) and restores
 // any fastresume state.
 func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
-	dryRun := cfg.DryRun || !cfg.LibtorrentEnabled
+	// When another torrent backend (qBittorrent/anacrolix) is selected, the
+	// embedded libtorrent session must NOT be created: two engines writing the
+	// same files is the single most dangerous failure mode in the plans. The
+	// client still exists (so libtorrent-only endpoints can report a clean
+	// capability error) but has no native session and restores nothing.
+	alternative := alternativeBackendActive(cfg)
+	dryRun := cfg.DryRun || !cfg.LibtorrentEnabled || alternative
+	if alternative && !cfg.DryRun && cfg.LibtorrentEnabled {
+		logging.Info("libtorrent session not started: another torrent backend is selected",
+			"backend", TorrentBackendName(cfg))
+	}
 	var session unsafe.Pointer
 	if !dryRun {
 		connectionsLimit := int64(200)
