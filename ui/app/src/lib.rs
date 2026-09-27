@@ -492,6 +492,16 @@ fn number(value: &Value, key: &str) -> String {
         .unwrap_or_else(|| "0".into())
 }
 
+/// Percentuale del contenuto già disponibile presso un peer collegato.
+/// I backend espongono il progresso come frazione tra 0 e 1.
+fn peer_progress(value: &Value) -> String {
+    value
+        .get("progress")
+        .and_then(Value::as_f64)
+        .map(|progress| format!("{:.1}%", (progress * 100.0).clamp(0.0, 100.0)))
+        .unwrap_or_else(|| "—".into())
+}
+
 /// Splits text into lowercase alphanumeric tokens.
 fn filter_tokens(text: &str) -> Vec<String> {
     text.split(|c: char| !c.is_alphanumeric())
@@ -4380,8 +4390,8 @@ fn TorrentRow(hash: String, data: RwSignal<Data>, selected: RwSignal<Vec<String>
                                 </Show>
                                 <Show when=move || detail_tab.get() == "files">
                                     <div class="table-wrap">
-                                        <table class="data-table">
-                                            <thead><tr><th>{ctx_tr("File")}</th><th>{ctx_tr("Dimensione")}</th><th>{ctx_tr("Scaricato")}</th><th>{ctx_tr("Priorità")}</th></tr></thead>
+                                        <table class="data-table torrent-files-table">
+                                            <thead><tr><th>{ctx_tr("File")}</th><th class="numeric">{ctx_tr("Dimensione")}</th><th class="numeric">{ctx_tr("Scaricato")}</th><th class="numeric">{ctx_tr("Priorità")}</th></tr></thead>
                                             <tbody>
                                                 {move || files.get().iter().enumerate().map(|(index, file)| {
                                                     let priority = file.get("priority").and_then(Value::as_i64).unwrap_or(4);
@@ -4415,10 +4425,10 @@ fn TorrentRow(hash: String, data: RwSignal<Data>, selected: RwSignal<Vec<String>
                                 <Show when=move || detail_tab.get() == "peers">
                                     <div class="table-wrap">
                                         <table class="data-table">
-                                            <thead><tr><th>{ctx_tr("Indirizzo")}</th><th>{ctx_tr("Client")}</th><th>{ctx_tr("↓")}</th><th>{ctx_tr("↑")}</th><th>{ctx_tr("Seed")}</th></tr></thead>
+                                            <thead><tr><th>{ctx_tr("Indirizzo")}</th><th>{ctx_tr("Client")}</th><th>{ctx_tr("Progresso")}</th><th>{ctx_tr("↓")}</th><th>{ctx_tr("↑")}</th><th>{ctx_tr("Seed")}</th></tr></thead>
                                             <tbody>
                                                 {move || peers.get().iter().cloned().map(|peer| view! {
-                                                    <tr><td class="mono">{text(&peer, "address", "-")}</td><td class="muted">{text(&peer, "client", "?")}</td><td class="numeric">{size(&peer, "download_rate")}"/s"</td><td class="numeric">{size(&peer, "upload_rate")}"/s"</td><td>{if peer.get("seed").and_then(Value::as_bool).unwrap_or(false) { tr(data, "sì") } else { tr(data, "no") }}</td></tr>
+                                                    <tr><td class="mono">{text(&peer, "address", "-")}</td><td class="muted">{text(&peer, "client", "?")}</td><td class="numeric">{peer_progress(&peer)}</td><td class="numeric">{size(&peer, "download_rate")}"/s"</td><td class="numeric">{size(&peer, "upload_rate")}"/s"</td><td>{if peer.get("seed").and_then(Value::as_bool).unwrap_or(false) { tr(data, "sì") } else { tr(data, "no") }}</td></tr>
                                                 }).collect_view()}
                                             </tbody>
                                         </table>

@@ -394,12 +394,12 @@ func preferredDownloadPath(cfg *Config) string {
 }
 
 func pathIsDir(path string) bool {
-	info, err := os.Stat(path)
+	info, err := os.Stat(filepath.Clean(path))
 	return err == nil && info.IsDir()
 }
 
 func fileExists(path string) bool {
-	info, err := os.Stat(path)
+	info, err := os.Stat(filepath.Clean(path))
 	return err == nil && info.Mode().IsRegular()
 }
 

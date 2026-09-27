@@ -427,14 +427,19 @@ func (c *Client) add(ctx context.Context, magnet, torrentPath string, opts AddOp
 		field("firstLastPiecePrio", "true")
 	}
 	if torrentPath != "" && writeErr == nil {
-		var file *os.File
-		file, writeErr = os.Open(torrentPath)
-		if writeErr == nil {
-			defer file.Close()
-			var part io.Writer
-			part, writeErr = writer.CreateFormFile("torrents", filepath.Base(torrentPath))
+		clean := filepath.Clean(torrentPath)
+		if !filepath.IsAbs(clean) {
+			writeErr = fmt.Errorf("qbittorrent: torrent path must be absolute: %s", torrentPath)
+		} else {
+			var file *os.File
+			file, writeErr = os.Open(clean)
 			if writeErr == nil {
-				_, writeErr = io.Copy(part, file)
+				defer file.Close()
+				var part io.Writer
+				part, writeErr = writer.CreateFormFile("torrents", filepath.Base(clean))
+				if writeErr == nil {
+					_, writeErr = io.Copy(part, file)
+				}
 			}
 		}
 	}

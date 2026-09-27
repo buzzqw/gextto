@@ -346,6 +346,14 @@ label { color: var(--muted); font-size: 0.875rem; }
 .data-table td.numeric { text-align: right; font-variant-numeric: tabular-nums; }
 .table-wrap { overflow: auto; max-height: 68vh; border-radius: var(--radius); }
 .truncate { max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Dettaglio torrent: mantieni intestazioni e valori sulla stessa colonna,
+   soprattutto per i campi numerici allineati a destra. */
+.torrent-files-table { table-layout: fixed; }
+.torrent-files-table th:nth-child(1), .torrent-files-table td:nth-child(1) { width: 55%; min-width: 0; }
+.torrent-files-table th:nth-child(2), .torrent-files-table td:nth-child(2),
+.torrent-files-table th:nth-child(3), .torrent-files-table td:nth-child(3) { width: 16%; }
+.torrent-files-table th:nth-child(4), .torrent-files-table td:nth-child(4) { width: 13%; }
+.torrent-files-table td:first-child .truncate { max-width: 100%; }
 /* Anteprima rinomina: tabella a layout fisso così i nomi lunghi troncano
    invece di andare a capo, in una modale più larga. */
 .rename-table { table-layout: fixed; width: 100%; }

@@ -609,8 +609,11 @@ func randomToken() string {
 }
 
 // copyFileAtomically copies a file through a hidden sibling and publishes it
-// with one rename (implementation of `copy_file_atomically`).
+// with one rename (implementation of `copy_file_atomically`). Both paths are
+// normalized first so a crafted name cannot introduce “..“ traversal.
 func copyFileAtomically(source, target string) error {
+	source = filepath.Clean(source)
+	target = filepath.Clean(target)
 	parent := filepath.Dir(target)
 	if parent == "" {
 		return fmt.Errorf("target has no parent: %s", target)
