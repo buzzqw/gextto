@@ -582,6 +582,13 @@ func torrentEventWorker(configPath string, fallback *Config, torrents *Libtorren
 				"hash", torrent.Hash, "name", torrent.Name)
 		}
 	}
+	// Only torrents restored at startup can be considered "leftover failures".
+	// Captured here, before the event loop, so a torrent the user re-adds later
+	// is never detached because of a stale error row.
+	startupHashes := map[string]struct{}{}
+	for _, torrent := range torrents.List() {
+		startupHashes[strings.ToLower(torrent.Hash)] = struct{}{}
+	}
 	for {
 		time.Sleep(750 * time.Millisecond)
 		now := time.Now()
@@ -978,7 +985,7 @@ func torrentEventWorker(configPath string, fallback *Config, torrents *Libtorren
 			// release it now instead of waiting for the next allocation burst.
 			TrimMemory()
 		}
-		DetachErrorTorrents(torrents, db)
+		DetachErrorTorrents(torrents, db, startupHashes)
 		DetachCompletedArchivedSingles(torrents, db)
 		RejectActivePackIdentityMismatches(torrents, db)
 		// Remove completed torrents that have finished seeding (archived packs

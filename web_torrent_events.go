@@ -408,9 +408,15 @@ func tev_seedCopyWarningDue(warnings map[string]time.Time, hash string) bool {
 // detach sweeps
 // ---------------------------------------------------------------------------
 
-// DetachErrorTorrents implements `detach_error_torrents`.
-func DetachErrorTorrents(torrents *LibtorrentClient, db *Database) {
+// DetachErrorTorrents implements `detach_error_torrents`: it removes torrents
+// that were already in the session when the daemon started and are persisted as
+// `error` (a leftover from a previous run; files are kept). Torrents added later
+// are never detached this way, so re-adding a previously failed torrent works.
+func DetachErrorTorrents(torrents *LibtorrentClient, db *Database, startupHashes map[string]struct{}) {
 	for _, torrent := range torrents.List() {
+		if _, known := startupHashes[strings.ToLower(torrent.Hash)]; !known {
+			continue
+		}
 		status, err := db.TorrentStatus(torrent.Hash)
 		isError := err == nil && status != nil && *status == "error"
 		if !isError {
