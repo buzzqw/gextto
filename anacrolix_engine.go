@@ -1,0 +1,860 @@
+//go:build anacrolix
+
+package gextto
+
+// anacrolix_engine.go implements AnacrolixBackend, the native-Go torrent engine
+// behind the `anacrolix` build tag. The default build never compiles this file,
+// so the official libtorrent path and its dependency tree are untouched.
+//
+// See docs/aggiunta-anacrolix.md. Scope of this first implementation:
+//   - one `*torrent.Client` per process, file storage plus a persistent piece
+//     completion store;
+//   - magnet and `.torrent` add with per-torrent storage directories;
+//   - snapshot polling with the same normalized events as the qBittorrent
+//     adapter (completion, metadata, checks, errors);
+//   - resume after restart through the persisted `.torrent` + completion store;
+//   - explicit capability errors for the operations anacrolix cannot apply
+//     (per-torrent limits, storage move, sequential flag, global rate changes).
+//     Storage move and the richer piece-level features are the documented next
+//     phases, not silently faked.
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anacrolix/torrent/storage"
+
+	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
+)
+
+func init() {
+	newAnacrolixEngine = newAnacrolixEngineImpl
+}
+
+// anacrolixSettings is the resolved configuration of the adapter.
+type anacrolixSettings struct {
+	DataDir       string
+	MetadataDir   string
+	CompletionDB  string
+	ManifestPath  string
+	ListenPort    int
+	DHT           bool
+	PEX           bool
+	UTP           bool
+	TCP           bool
+	Trackers      bool
+	UPnP          bool
+	Hashers       int
+	MaxUnverified int64
+	DownloadLimit int64 // KiB/s, applied at creation only
+	UploadLimit   int64 // KiB/s, applied at creation only
+	Mappings      []PathMapping
+}
+
+func anacrolixSettingsFromConfig(cfg *Config) anacrolixSettings {
+	dataDir := cfg.LibtorrentDir
+	metadataDir := filepath.Join(cfg.DataDir, "anacrolix")
+	hashers := int(cfg.Libtorrent.MaxConnectionsPerTorrent)
+	_ = hashers
+	mappings, _ := ParsePathMappings(cfg.Settings["anacrolix_path_mappings"])
+	return anacrolixSettings{
+		DataDir:       dataDir,
+		MetadataDir:   metadataDir,
+		CompletionDB:  metadataDir,
+		ManifestPath:  filepath.Join(metadataDir, "manifest.json"),
+		ListenPort:    int(cfg.Libtorrent.PortMin),
+		DHT:           cfg.Libtorrent.Dht,
+		PEX:           cfg.Libtorrent.Pex,
+		UTP:           cfg.Libtorrent.Utp,
+		TCP:           true,
+		Trackers:      true,
+		UPnP:          cfg.Libtorrent.Upnp,
+		Hashers:       2,
+		MaxUnverified: 64 << 20,
+		DownloadLimit: cfg.Libtorrent.DownloadLimitKib,
+		UploadLimit:   cfg.Libtorrent.UploadLimitKib,
+		Mappings:      mappings,
+	}
+}
+
+// anacrolixTorrent is the adapter's per-torrent bookkeeping.
+type anacrolixTorrent struct {
+	handle     *torrent.Torrent
+	savePath   string
+	paused     bool
+	stalled    bool
+	uploadOnly bool
+}
+
+type anacrolixSample struct {
+	done int64
+	at   time.Time
+}
+
+// anacrolixEngine is a TorrentEngine backed by the in-process anacrolix client.
+type anacrolixEngine struct {
+	settings   anacrolixSettings
+	client     *torrent.Client
+	completion storage.PieceCompletion
+
+	mu       sync.Mutex
+	state    map[string]*anacrolixTorrent
+	previous map[string]models.TorrentView
+	events   []models.TorrentEvent
+	manifest map[string]string
+	samples  map[string]anacrolixSample
+	lastErr  string
+	closed   bool
+}
+
+var _ TorrentEngine = (*anacrolixEngine)(nil)
+
+func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
+	settings := anacrolixSettingsFromConfig(cfg)
+	if err := os.MkdirAll(settings.MetadataDir, 0o755); err != nil {
+		return nil, fmt.Errorf("anacrolix: create metadata dir: %w", err)
+	}
+	completion, err := storage.NewDefaultPieceCompletionForDir(settings.CompletionDB)
+	if err != nil {
+		return nil, fmt.Errorf("anacrolix: piece completion store: %w", err)
+	}
+	if persistent, ok := completion.(storage.PieceCompletionPersistenter); ok && !persistent.Persistent() {
+		logging.Warn("anacrolix piece completion is not persistent; a restart will re-check data")
+	}
+
+	clientCfg := torrent.NewDefaultClientConfig()
+	clientCfg.DataDir = settings.DataDir
+	clientCfg.ListenPort = settings.ListenPort
+	clientCfg.DisableUTP = !settings.UTP
+	clientCfg.DisableTCP = !settings.TCP
+	clientCfg.DisablePEX = !settings.PEX
+	clientCfg.NoDHT = !settings.DHT
+	clientCfg.NoDefaultPortForwarding = !settings.UPnP
+	clientCfg.DisableTrackers = !settings.Trackers
+	clientCfg.PieceHashersPerTorrent = settings.Hashers
+	clientCfg.MaxUnverifiedBytes = settings.MaxUnverified
+	clientCfg.DefaultStorage = storage.NewFileWithCompletion(settings.DataDir, completion)
+
+	client, err := torrent.NewClient(clientCfg)
+	if err != nil {
+		return nil, fmt.Errorf("anacrolix: create client: %w", err)
+	}
+	engine := &anacrolixEngine{
+		settings:   settings,
+		client:     client,
+		completion: completion,
+		state:      map[string]*anacrolixTorrent{},
+		previous:   map[string]models.TorrentView{},
+		manifest:   map[string]string{},
+		samples:    map[string]anacrolixSample{},
+	}
+	engine.loadManifest()
+	engine.restore()
+	logging.Info("anacrolix backend started", "data_dir", settings.DataDir, "listen_port", settings.ListenPort)
+	return engine, nil
+}
+
+func (e *anacrolixEngine) Name() string { return BackendAnacrolix }
+
+func (e *anacrolixEngine) Capabilities() map[string]bool {
+	return capabilitiesFor(BackendAnacrolix)
+}
+
+// ---------------------------------------------------------------------------
+// manifest
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) loadManifest() {
+	raw, err := os.ReadFile(e.settings.ManifestPath)
+	if err != nil {
+		return
+	}
+	_ = json.Unmarshal(raw, &e.manifest)
+}
+
+func (e *anacrolixEngine) saveManifest() {
+	encoded, err := json.MarshalIndent(e.manifest, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := e.settings.ManifestPath + ".tmp"
+	if err := os.WriteFile(tmp, encoded, 0o644); err != nil {
+		logging.Warn("anacrolix manifest write failed", "error", err.Error())
+		return
+	}
+	_ = os.Rename(tmp, e.settings.ManifestPath)
+}
+
+// restore re-adds the torrents known from a previous run. The piece completion
+// store supplies the verified pieces, so a restart does not re-download data.
+func (e *anacrolixEngine) restore() {
+	for hash, savePath := range e.manifest {
+		path := filepath.Join(e.settings.MetadataDir, hash+".torrent")
+		if !fileExists(path) {
+			continue
+		}
+		if _, err := e.addTorrentFileInternal(path, savePath, AddOptions{}, nil); err != nil {
+			logging.Warn("anacrolix restore failed", "hash", hash, "error", err.Error())
+		}
+	}
+}
+
+// persistTorrent keeps the .torrent for restart and re-export.
+func (e *anacrolixEngine) persistTorrent(hash string, mi *metainfo.MetaInfo) {
+	if mi == nil {
+		return
+	}
+	target := filepath.Join(e.settings.MetadataDir, hash+".torrent")
+	if fileExists(target) {
+		return
+	}
+	tmp := target + ".tmp"
+	file, err := os.Create(tmp)
+	if err != nil {
+		logging.Warn("anacrolix .torrent write failed", "hash", hash, "error", err.Error())
+		return
+	}
+	if err := mi.Write(file); err != nil {
+		file.Close()
+		_ = os.Remove(tmp)
+		logging.Warn("anacrolix .torrent encode failed", "hash", hash, "error", err.Error())
+		return
+	}
+	file.Close()
+	_ = os.Rename(tmp, target)
+}
+
+// ---------------------------------------------------------------------------
+// path handling
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) resolveSavePath(preferredPath *string, cfg *Config) (string, error) {
+	candidate := ""
+	if preferredPath != nil && strings.TrimSpace(*preferredPath) != "" {
+		candidate = strings.TrimSpace(*preferredPath)
+	} else if cfg != nil && strings.TrimSpace(cfg.LibtorrentDir) != "" {
+		candidate = cfg.LibtorrentDir
+	} else {
+		candidate = e.settings.DataDir
+	}
+	if _, ok := TranslateGexttoToBackend(candidate, e.settings.Mappings); !ok && len(e.settings.Mappings) > 0 {
+		return "", fmt.Errorf("%w: %s", ErrPathMappingMissing, candidate)
+	}
+	return candidate, nil
+}
+
+// ---------------------------------------------------------------------------
+// add
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) addOptionsFrom(options AddOptions) torrent.AddTorrentOpts {
+	opts := torrent.AddTorrentOpts{
+		DisallowDataDownload: options.Paused,
+		DisallowDataUpload:   options.Paused,
+	}
+	return opts
+}
+
+func (e *anacrolixEngine) register(handle *torrent.Torrent, savePath string, options AddOptions) *anacrolixTorrent {
+	entry := &anacrolixTorrent{
+		handle:     handle,
+		savePath:   savePath,
+		paused:     options.Paused,
+		uploadOnly: options.SeedMode,
+	}
+	hash := handle.InfoHash().HexString()
+	if options.SeedMode {
+		handle.DisallowDataDownload()
+	}
+	e.mu.Lock()
+	e.state[hash] = entry
+	e.manifest[hash] = savePath
+	e.mu.Unlock()
+	e.saveManifest()
+	return entry
+}
+
+func (e *anacrolixEngine) Add(magnet string, cfg *Config) (bool, error) {
+	return e.AddWithOptions(magnet, cfg, nil, AddOptions{})
+}
+
+func (e *anacrolixEngine) AddWithPath(magnet string, cfg *Config, preferredPath *string) (bool, error) {
+	return e.AddWithOptions(magnet, cfg, preferredPath, AddOptions{})
+}
+
+func (e *anacrolixEngine) AddWithOptions(magnet string, cfg *Config, preferredPath *string, options AddOptions) (bool, error) {
+	if strings.TrimSpace(magnet) == "" {
+		return false, nil
+	}
+	savePath, err := e.resolveSavePath(preferredPath, cfg)
+	if err != nil {
+		return false, err
+	}
+	spec, err := torrent.TorrentSpecFromMagnetUri(magnet)
+	if err != nil {
+		return false, fmt.Errorf("anacrolix: invalid magnet: %w", err)
+	}
+	opts := e.addOptionsFrom(options)
+	spec.AddTorrentOpts.DisallowDataDownload = opts.DisallowDataDownload
+	spec.AddTorrentOpts.DisallowDataUpload = opts.DisallowDataUpload
+	spec.AddTorrentOpts.Storage = storage.NewFileWithCompletion(savePath, e.completion)
+	handle, _, err := e.client.AddTorrentSpec(spec)
+	if err != nil {
+		return false, fmt.Errorf("anacrolix: add magnet: %w", err)
+	}
+	e.register(handle, savePath, options)
+	return true, nil
+}
+
+func (e *anacrolixEngine) AddFileWithPath(torrentPath string, cfg *Config, preferredPath *string) (bool, error) {
+	hash, err := e.AddTorrentFileWithOptions(torrentPath, cfg, preferredPath, AddOptions{})
+	if err != nil {
+		return false, err
+	}
+	return hash != nil, nil
+}
+
+func (e *anacrolixEngine) AddTorrentFile(torrentPath, savePath string) (*string, error) {
+	preferred := savePath
+	return e.AddTorrentFileWithOptions(torrentPath, nil, &preferred, AddOptions{})
+}
+
+func (e *anacrolixEngine) AddTorrentFileEx(torrentPath, savePath string, options AddOptions) (*string, error) {
+	preferred := savePath
+	return e.AddTorrentFileWithOptions(torrentPath, nil, &preferred, options)
+}
+
+func (e *anacrolixEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Config, preferredPath *string, options AddOptions) (*string, error) {
+	if !fileExists(torrentPath) {
+		return nil, fmt.Errorf("torrent file not found: %s", torrentPath)
+	}
+	savePath, err := e.resolveSavePath(preferredPath, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return e.addTorrentFileInternal(torrentPath, savePath, options, cfg)
+}
+
+func (e *anacrolixEngine) addTorrentFileInternal(torrentPath, savePath string, options AddOptions, cfg *Config) (*string, error) {
+	meta, err := metainfo.LoadFromFile(torrentPath)
+	if err != nil {
+		return nil, fmt.Errorf("anacrolix: load .torrent: %w", err)
+	}
+	spec, err := torrent.TorrentSpecFromMetaInfoErr(meta)
+	if err != nil {
+		return nil, fmt.Errorf("anacrolix: parse metainfo: %w", err)
+	}
+	opts := e.addOptionsFrom(options)
+	spec.AddTorrentOpts.DisallowDataDownload = opts.DisallowDataDownload
+	spec.AddTorrentOpts.DisallowDataUpload = opts.DisallowDataUpload
+	spec.AddTorrentOpts.Storage = storage.NewFileWithCompletion(savePath, e.completion)
+	handle, _, err := e.client.AddTorrentSpec(spec)
+	if err != nil {
+		return nil, fmt.Errorf("anacrolix: add torrent: %w", err)
+	}
+	e.register(handle, savePath, options)
+	hash := handle.InfoHash().HexString()
+	e.persistTorrent(hash, meta)
+	return &hash, nil
+}
+
+// ---------------------------------------------------------------------------
+// polling / events
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) toView(entry *anacrolixTorrent, now time.Time) models.TorrentView {
+	handle := entry.handle
+	hash := strings.ToLower(handle.InfoHash().HexString())
+	done := handle.BytesCompleted()
+	total := int64(0)
+	hasMetadata := false
+	if info := handle.Info(); info != nil {
+		total = info.TotalLength()
+		hasMetadata = true
+	}
+	progress := 0.0
+	if total > 0 {
+		progress = float64(done) / float64(total) * 100.0
+	}
+	state := "downloading"
+	switch {
+	case entry.paused:
+		state = "paused"
+	case !hasMetadata:
+		state = "downloading_metadata"
+	case handle.Seeding():
+		state = "seeding"
+	case entry.stalled:
+		state = "stalled"
+	}
+	if entry.uploadOnly {
+		state = "seeding"
+	}
+	sample := e.samples[hash]
+	downloadRate := uint64(0)
+	if !sample.at.IsZero() {
+		elapsed := now.Sub(sample.at).Seconds()
+		if elapsed > 0 && done >= sample.done {
+			downloadRate = uint64(float64(done-sample.done) / elapsed)
+		}
+	}
+	e.samples[hash] = anacrolixSample{done: done, at: now}
+	stats := handle.Stats()
+	view := models.TorrentView{
+		Hash:              hash,
+		Name:              handle.Name(),
+		SavePath:          entry.savePath,
+		Progress:          progress,
+		State:             state,
+		DownloadRate:      downloadRate,
+		DownloadRateTotal: downloadRate,
+		TotalSize:         total,
+		TotalDone:         done,
+		HasMetadata:       hasMetadata,
+		IsSeeding:         handle.Seeding(),
+		NumPeers:          stats.ActivePeers,
+		NumSeeds:          stats.ConnectedSeeders,
+		NumComplete:       stats.ConnectedSeeders,
+		NumIncomplete:     stats.TotalPeers,
+		AutoManaged:       true,
+		SeedRatio:         -1,
+		SeedDays:          -1,
+	}
+	view.Diagnosis, _, _ = DiagnoseTorrent(&view)
+	return view
+}
+
+// sync rebuilds the snapshot and queues lifecycle events for transitions.
+func (e *anacrolixEngine) sync() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return fmt.Errorf("anacrolix: client closed")
+	}
+	now := time.Now()
+	next := map[string]models.TorrentView{}
+	for hash, entry := range e.state {
+		view := e.toView(entry, now)
+		// Persist metadata as soon as it is available so a restart is safe.
+		if view.HasMetadata {
+			if info := entry.handle.Info(); info != nil && !fileExists(filepath.Join(e.settings.MetadataDir, hash+".torrent")) {
+				mi := entry.handle.Metainfo()
+				e.persistTorrent(hash, &mi)
+			}
+		}
+		next[hash] = view
+	}
+	for hash, view := range next {
+		if previous, ok := e.previous[hash]; ok {
+			e.diffLocked(previous, view)
+		}
+	}
+	e.previous = next
+	return nil
+}
+
+func (e *anacrolixEngine) diffLocked(previous, current models.TorrentView) {
+	if !previous.HasMetadata && current.HasMetadata {
+		e.events = append(e.events, models.TorrentEvent{Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath})
+	}
+	if previous.Progress < 99.99 && current.Progress >= 99.99 {
+		e.events = append(e.events, models.TorrentEvent{Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath})
+	}
+	if previous.State != "error" && current.State == "error" {
+		e.events = append(e.events, models.TorrentEvent{Kind: "torrent_error", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, Message: current.Error})
+	}
+}
+
+func (e *anacrolixEngine) List() []models.TorrentView {
+	_ = e.sync()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	result := make([]models.TorrentView, 0, len(e.previous))
+	for _, view := range e.previous {
+		result = append(result, view)
+	}
+	return result
+}
+
+func (e *anacrolixEngine) PollEvents() []models.TorrentEvent {
+	_ = e.sync()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.events) == 0 {
+		return nil
+	}
+	out := e.events
+	e.events = nil
+	return out
+}
+
+func (e *anacrolixEngine) Stats() map[string]any {
+	views := e.List()
+	stats := map[string]any{
+		"backend":        BackendAnacrolix,
+		"torrents":       len(views),
+		"session_loaded": e.client != nil,
+	}
+	if e.client != nil {
+		clientStats := e.client.Stats()
+		stats["active_peers"] = clientStats.ActivePeers
+		stats["total_peers"] = clientStats.TotalPeers
+		stats["bytes_read"] = clientStats.BytesReadData.Int64()
+		stats["bytes_written"] = clientStats.BytesWrittenData.Int64()
+	}
+	return stats
+}
+
+// ---------------------------------------------------------------------------
+// control
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) lookup(hash string) (*anacrolixTorrent, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	entry, ok := e.state[strings.ToLower(strings.TrimSpace(hash))]
+	return entry, ok
+}
+
+func (e *anacrolixEngine) Pause(hash string) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	entry.handle.DisallowDataDownload()
+	entry.handle.DisallowDataUpload()
+	e.mu.Lock()
+	entry.paused = true
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *anacrolixEngine) Resume(hash string) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	entry.handle.AllowDataDownload()
+	entry.handle.AllowDataUpload()
+	e.mu.Lock()
+	entry.paused = false
+	entry.stalled = false
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *anacrolixEngine) Restart(hash string) (bool, error) {
+	return e.Resume(hash)
+}
+
+func (e *anacrolixEngine) Remove(hash string, deleteFiles bool) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	name := entry.handle.Name()
+	entry.handle.Drop()
+	if deleteFiles {
+		content := filepath.Join(entry.savePath, name)
+		if name == "" || !pathWithin(content, entry.savePath) {
+			content = entry.savePath
+		}
+		if info, err := os.Stat(content); err == nil {
+			if info.IsDir() {
+				_ = os.RemoveAll(content)
+			} else {
+				_ = os.Remove(content)
+			}
+		}
+	}
+	e.mu.Lock()
+	delete(e.state, normalized)
+	delete(e.previous, normalized)
+	delete(e.samples, normalized)
+	delete(e.manifest, normalized)
+	e.mu.Unlock()
+	_ = os.Remove(filepath.Join(e.settings.MetadataDir, normalized+".torrent"))
+	e.saveManifest()
+	return true, nil
+}
+
+func (e *anacrolixEngine) ForceRecheck(hash string) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	if err := entry.handle.VerifyData(); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (e *anacrolixEngine) Reannounce(hash string) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	handle := entry.handle
+	mi := handle.Metainfo()
+	if len(mi.AnnounceList) == 0 {
+		return false, nil
+	}
+	handle.AddTrackers(mi.UpvertedAnnounceList())
+	return true, nil
+}
+
+// MoveStorage is a dedicated future phase for anacrolix: its storage base is
+// bound when the torrent is added. Refusing explicitly avoids moving files
+// while the engine still holds them open.
+func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "move")
+}
+
+func (e *anacrolixEngine) MarkStalled(hash string) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	e.mu.Lock()
+	entry.stalled = true
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *anacrolixEngine) ClearStalled(hash string) {
+	if entry, ok := e.lookup(hash); ok {
+		e.mu.Lock()
+		entry.stalled = false
+		e.mu.Unlock()
+	}
+}
+
+func (e *anacrolixEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {
+	var total uint64
+	for _, view := range e.List() {
+		if strings.EqualFold(view.Hash, excludeHash) || !PathOnRamdisk(view.SavePath, ramdisk) {
+			continue
+		}
+		if remaining := view.TotalSize - view.TotalDone; remaining > 0 {
+			total += uint64(remaining)
+		}
+	}
+	return total
+}
+
+// ---------------------------------------------------------------------------
+// inspection
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) Files(hash string) ([]models.FileView, bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return nil, false, nil
+	}
+	files := entry.handle.Files()
+	out := make([]models.FileView, 0, len(files))
+	for _, file := range files {
+		out = append(out, models.FileView{
+			Path:       file.Path(),
+			Size:       file.Length(),
+			Downloaded: file.BytesCompleted(),
+			Priority:   anacrolixPriorityToInt(file.Priority()),
+		})
+	}
+	return out, true, nil
+}
+
+func (e *anacrolixEngine) Peers(hash string) ([]models.PeerView, bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return nil, false, nil
+	}
+	conns := entry.handle.PeerConns()
+	out := make([]models.PeerView, 0, len(conns))
+	for _, conn := range conns {
+		stats := conn.Stats()
+		out = append(out, models.PeerView{
+			Address:      fmt.Sprintf("%s", conn.RemoteAddr),
+			Client:       conn.Network,
+			DownloadRate: uint64(stats.DownloadRate),
+			UploadRate:   uint64(stats.LastWriteUploadRate),
+			Pieces:       stats.RemotePieceCount,
+		})
+	}
+	return out, true, nil
+}
+
+func (e *anacrolixEngine) Trackers(hash string) ([]models.TrackerView, bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return nil, false, nil
+	}
+	mi := entry.handle.Metainfo()
+	list := mi.UpvertedAnnounceList()
+	out := []models.TrackerView{}
+	for tier, urls := range list {
+		for _, url := range urls {
+			out = append(out, models.TrackerView{URL: url, Tier: tier, Verified: true})
+		}
+	}
+	return out, true, nil
+}
+
+// ---------------------------------------------------------------------------
+// mutations not fully supported by anacrolix
+// ---------------------------------------------------------------------------
+
+func (e *anacrolixEngine) SetFilePriorities(hash string, priorities []int32) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	files := entry.handle.Files()
+	if len(priorities) != len(files) {
+		return false, fmt.Errorf("anacrolix: %d priorities for %d files", len(priorities), len(files))
+	}
+	for index, file := range files {
+		file.SetPriority(intToAnacrolixPriority(int(priorities[index])))
+	}
+	return true, nil
+}
+
+func (e *anacrolixEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	urls := make([]string, 0, len(trackers))
+	for _, tracker := range trackers {
+		if url := strings.TrimSpace(tracker.URL); url != "" {
+			urls = append(urls, url)
+		}
+	}
+	if len(urls) == 0 {
+		return false, nil
+	}
+	entry.handle.AddTrackers([][]string{urls})
+	return true, nil
+}
+
+func (e *anacrolixEngine) WebSeeds(hash, urls string, remove bool) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	if remove {
+		return false, backendCapabilityError(BackendAnacrolix, "web_seeds_remove")
+	}
+	list := strings.FieldsFunc(urls, func(r rune) bool { return r == ',' || r == '\n' })
+	entry.handle.AddWebSeeds(list)
+	return true, nil
+}
+
+func (e *anacrolixEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "per_torrent_limits")
+}
+
+func (e *anacrolixEngine) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "runtime_global_limits")
+}
+
+func (e *anacrolixEngine) SetMaxConnections(hash string, value int) (bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return false, nil
+	}
+	entry.handle.SetMaxEstablishedConns(value)
+	return true, nil
+}
+
+func (e *anacrolixEngine) SetMaxUploads(hash string, value int) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "per_torrent_uploads")
+}
+
+func (e *anacrolixEngine) SetPin(hash string, pinned bool) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "pin")
+}
+
+func (e *anacrolixEngine) SetSequential(enabled bool) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "sequential")
+}
+
+func (e *anacrolixEngine) AssociateStorage(hash, destination string) (bool, error) {
+	return false, backendCapabilityError(BackendAnacrolix, "associate_storage")
+}
+
+func (e *anacrolixEngine) TorrentFilePath(hash string) (string, bool) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return "", false
+	}
+	path := filepath.Join(e.settings.MetadataDir, hash+".torrent")
+	if fileExists(path) {
+		return path, true
+	}
+	return "", false
+}
+
+// Close releases the client and the completion store.
+func (e *anacrolixEngine) Close() error {
+	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		return nil
+	}
+	e.closed = true
+	e.mu.Unlock()
+	errs := e.client.Close()
+	if closer, ok := e.completion.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// priority conversion
+// ---------------------------------------------------------------------------
+
+func anacrolixPriorityToInt(priority torrent.PiecePriority) int {
+	switch {
+	case priority <= torrent.PiecePriorityNone:
+		return 0
+	case priority >= torrent.PiecePriorityNow:
+		return 7
+	case priority >= torrent.PiecePriorityHigh:
+		return 6
+	default:
+		return 1
+	}
+}
+
+func intToAnacrolixPriority(priority int) torrent.PiecePriority {
+	switch {
+	case priority <= 0:
+		return torrent.PiecePriorityNone
+	case priority >= 7:
+		return torrent.PiecePriorityNow
+	case priority >= 5:
+		return torrent.PiecePriorityHigh
+	default:
+		return torrent.PiecePriorityNormal
+	}
+}
+
+// context is referenced by future piece-check scheduling; keep the import used.
+var _ = context.Background

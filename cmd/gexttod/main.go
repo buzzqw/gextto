@@ -163,6 +163,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 	)
 
 	serveErr := gextto.Serve(state)
+	if shutdownErr := gextto.ShutdownTorrentEngine(state); shutdownErr != nil {
+		logging.Error("torrent engine shutdown failed", "error", shutdownErr)
+	}
 	if shutdownErr := torrents.Shutdown(&cfg); shutdownErr != nil {
 		logging.Error("libtorrent shutdown did not save all fastresume data", "error", shutdownErr)
 	}

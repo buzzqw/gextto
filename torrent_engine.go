@@ -138,12 +138,12 @@ var capabilityLevels = map[string]map[string]string{
 	},
 	BackendAnacrolix: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
-		"recheck": "full", "move": "full", "limits": "partial", "files": "full", "peers": "full",
-		"trackers": "full", "events": "full", "stats": "full", "sequential": "partial",
-		"first_last": "partial", "seed_policy": "full", "ramdisk": "none", "fastresume": "none",
+		"recheck": "full", "move": "none", "limits": "partial", "files": "full", "peers": "full",
+		"trackers": "full", "events": "full", "stats": "full", "sequential": "none",
+		"first_last": "none", "seed_policy": "full", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "full", "categories": "none", "tags": "none", "sync": "none",
 		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
-		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "full",
+		"ip_filter": "none", "session_stats": "partial", "web_seeds": "partial",
 	},
 }
 

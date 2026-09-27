@@ -683,7 +683,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
 		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
 		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
-		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings":
+		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "anacrolix_path_mappings":
 		return true
 	}
 	return false

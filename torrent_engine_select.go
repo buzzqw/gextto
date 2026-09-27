@@ -156,6 +156,17 @@ func PreflightQbittorrentWith(settings qbittorrentSettings) QbittorrentPreflight
 	return result
 }
 
+// ShutdownTorrentEngine releases the active engine when it owns process-level
+// resources (the anacrolix client, for example). The embedded engine is closed
+// by the daemon through LibtorrentClient.Shutdown.
+func ShutdownTorrentEngine(s *AppState) error {
+	engine := s.activeEngine()
+	if closer, ok := engine.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
 // ConfigureTorrentEngine installs the engine selected by the current settings.
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {

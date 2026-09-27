@@ -115,11 +115,27 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	if _, _, err := selectTorrentEngine(&cfg); err == nil {
 		t.Fatal("qbittorrent without url must be refused")
 	}
-	// anacrolix is not compiled in the default build.
+	// anacrolix is available only in builds compiled with the tag.
 	cfg2 := DefaultConfig()
+	cfg2.DataDir = t.TempDir()
+	cfg2.StateDir = filepath.Join(cfg2.DataDir, "state")
+	cfg2.LibtorrentDir = filepath.Join(cfg2.DataDir, "downloads")
 	cfg2.Settings["torrent_backend"] = BackendAnacrolix
-	if _, _, err := selectTorrentEngine(&cfg2); err == nil {
-		t.Fatal("anacrolix must be refused without the build tag")
+	engine, _, err := selectTorrentEngine(&cfg2)
+	if newAnacrolixEngine == nil {
+		if err == nil {
+			t.Fatal("anacrolix must be refused without the build tag")
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("anacrolix select with tag: %v", err)
+	}
+	if engine == nil || engine.Name() != BackendAnacrolix {
+		t.Fatalf("anacrolix engine = %v", engine)
+	}
+	if closer, ok := engine.(interface{ Close() error }); ok {
+		_ = closer.Close()
 	}
 }
 
