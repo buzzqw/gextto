@@ -117,6 +117,71 @@
 </div>
 {{end}}
 
+{{define "series_detail"}}
+<div class="view">
+  <div class="toolbar"><a class="btn sm" href="/?view=series">← Serie TV</a></div>
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Name}}</h3><small class="muted">{{.Quality}} · {{.Language}} · stagioni {{.Seasons}} · {{.Gaps}} mancanti</small></div>
+    <div class="panel-body">
+      <p class="muted">Percorso archivio: {{.ArchivePath}}</p>
+      {{if .Episodes}}
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th>Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
+        <tbody>
+        {{range .Episodes}}
+        <tr>
+          <td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td>
+          <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+          <td>{{.Status}}{{if .Ignored}} <span class="badge warn">ignorato</span>{{end}}</td>
+          <td class="numeric">{{.QualityScore}}</td>
+          <td class="numeric">{{humanBytes .SizeBytes}}</td>
+          <td class="row-actions">
+            <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca questa puntata">Cerca</button>
+            <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
+            <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile">Riscarica</button>
+            <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina">Elimina</button>
+          </td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table></div>
+      {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "movie_detail"}}
+<div class="view">
+  <div class="toolbar"><a class="btn sm" href="/?view=movies">← Film</a></div>
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
+    <div class="panel-body">
+      {{if .Overview}}<p>{{.Overview}}</p>{{end}}
+      <form data-movie-id="{{.ID}}">
+        <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" /></label>
+        <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" /></label>
+        <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" /></label>
+        <label class="field"><span>Lingua</span><input name="language" value="{{.Language}}" /></label>
+        <div class="form-actions"><button class="btn sm primary" type="submit">Salva</button><small class="muted"></small></div>
+      </form>
+      <div class="toolbar" style="margin-top:10px">
+        <button class="btn sm" data-api="/api/movies/{{.ID}}/search" data-method="POST" data-body="{}" title="Cerca release per questo film">Cerca</button>
+        <button class="btn sm" data-api="/api/movies/{{.ID}}/redownload" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile">Riscarica</button>
+        <button class="btn sm" data-api="/api/movies/{{.ID}}/metadata" data-method="POST" data-body='{"source":"tmdb"}' title="Applica i metadati TMDB">Aggiorna TMDB</button>
+        <button class="btn sm danger" data-api="/api/movies/{{.ID}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questo film?">Elimina</button>
+      </div>
+      {{if .Matches}}<div class="field span-full" style="margin-top:12px"><span>Corrispondenze archivio</span></div>
+      <ul class="hint">{{range .Matches}}<li><a href="{{.Magnet}}">{{.Title}}</a> <span class="muted">{{.Source}}</span></li>{{end}}</ul>{{end}}
+      {{if .History}}<div class="field span-full" style="margin-top:12px"><span>Storico</span></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Titolo</th><th>Qualità</th><th>Dimensione</th></tr></thead><tbody>
+      {{range .History}}<tr><td class="truncate">{{.Title}}</td><td class="numeric">{{.QualityScore}}</td><td class="numeric">{{humanBytes .SizeBytes}}</td></tr>{{end}}
+      </tbody></table></div>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{define "settings"}}
 <div class="view">
   <div class="panel" data-library-editor>

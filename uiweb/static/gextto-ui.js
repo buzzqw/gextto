@@ -150,7 +150,7 @@
         url += (url.indexOf("?") >= 0 ? "&" : "?") + searchParam + "=" + encodeURIComponent(searchInput.value);
       }
       api(url, "GET").then(function (data) {
-        var items = itemsKey ? (data[itemsKey] || []) : (Array.isArray(data) ? data : []);
+        var items = (itemsKey && data[itemsKey]) || (Array.isArray(data) ? data : []);
         if (!columns.length && items.length) {
           columns = Object.keys(items[0]).filter(function (key) {
             var value = items[0][key];
@@ -166,7 +166,18 @@
         } else {
           tbody.innerHTML = items.map(function (row) {
             var cells = columns.map(function (column) {
-              return "<td>" + esc(fmt(row[column.key], column.format)) + "</td>";
+              var value = fmt(row[column.key], column.format);
+              if (column.format === "series_link") {
+                return '<td><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
+              }
+              if (column.format === "movie_link") {
+                return '<td><a href="/?view=movies&amp;movie=' + encodeURIComponent(row.id) + '" title="Apri il dettaglio del film">' + esc(value) + "</a></td>";
+              }
+              if (column.format === "url") {
+                if (!value) return "<td></td>";
+                return '<td><a href="' + esc(value) + '" target="_blank" rel="noopener">apri</a></td>';
+              }
+              return "<td>" + esc(value) + "</td>";
             }).join("");
             var actionsHtml = "";
             if (actions.length) {
@@ -174,9 +185,13 @@
                 var path = action.path.replace(/\{([a-z_]+)\}/g, function (_, key) {
                   return encodeURIComponent(row[key]);
                 });
+                var body = (action.body || "{}").replace(/\{([a-z_]+)\}/g, function (_, key) {
+                  var encoded = JSON.stringify(row[key] == null ? "" : row[key]);
+                  return encoded.slice(1, -1);
+                });
                 var confirmAttr = action.confirm ? ' data-confirm="' + esc(action.confirm) + '"' : "";
                 return '<button class="btn sm ' + (action.class || "") + '" data-api="' + esc(path) +
-                  '" data-method="' + esc(action.method || "POST") + '" data-body="' + esc(action.body || "{}") +
+                  '" data-method="' + esc(action.method || "POST") + '" data-body="' + esc(body) +
                   '"' + confirmAttr + ">" + esc(action.label) + "</button>";
               }).join(" ") + "</td>";
             }
@@ -197,6 +212,24 @@
     fetchAndRender();
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-table]"), renderTable);
+
+  // ---- movie detail edit form ---------------------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-movie-id]"), function (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var id = form.getAttribute("data-movie-id");
+      var body = {};
+      Array.prototype.forEach.call(form.querySelectorAll("input[name]"), function (input) {
+        body[input.name] = input.value;
+      });
+      var message = form.querySelector("small");
+      api("/api/movies/" + encodeURIComponent(id), "POST", body).then(function () {
+        if (message) message.textContent = "Salvato";
+      }).catch(function (error) {
+        alert("Salvataggio non riuscito: " + error.message);
+      });
+    });
+  });
 
   // ---- generic actions ----------------------------------------------------
   document.addEventListener("click", function (event) {

@@ -243,11 +243,19 @@ func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if view == "" {
 		view = "dashboard"
 	}
+	content := uiPageContent(s, r, view)
+	renderPage := view
+	switch content.(type) {
+	case uiSeriesDetail:
+		renderPage = "series-detail"
+	case uiMovieDetail:
+		renderPage = "movie-detail"
+	}
 	uiRender(w, http.StatusOK, "shell", uiShellData{
 		Title:   uiPageLabel(view),
-		Page:    view,
+		Page:    renderPage,
 		Groups:  uiNavigation(view),
-		Content: uiPageContent(s, r, view),
+		Content: content,
 	})
 }
 
@@ -272,6 +280,16 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 		return uiSettingsPageFrom(s)
 	case "integrations":
 		return uiIntegrationsPageFrom(s)
+	}
+	if view == "series" && r != nil {
+		if detail, ok := uiSeriesDetailFrom(s, r); ok {
+			return detail
+		}
+	}
+	if view == "movies" && r != nil {
+		if detail, ok := uiMovieDetailFrom(s, r); ok {
+			return detail
+		}
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		if spec.Search && r != nil {

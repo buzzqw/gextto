@@ -195,7 +195,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Endpoint: "/api/series",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "Nome"},
+				{Key: "name", Label: "Nome", Format: "series_link"},
 				{Key: "seasons", Label: "Stagioni"},
 				{Key: "quality", Label: "Qualità"},
 				{Key: "language", Label: "Lingua"},
@@ -213,7 +213,14 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Title:    "Film",
 			Endpoint: "/api/movies",
 			ItemsKey: "items",
-			Empty:    "Nessun film monitorizzato.",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "Nome", Format: "movie_link"},
+				{Key: "year", Label: "Anno"},
+				{Key: "quality", Label: "Qualità"},
+				{Key: "language", Label: "Lingua"},
+				{Key: "enabled", Label: "Attivo", Format: "bool"},
+			}),
+			Empty: "Nessun film monitorizzato.",
 		}, true
 	case "gaps":
 		return uiTableSpec{
@@ -258,8 +265,21 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Title:    "Fumetti",
 			Endpoint: "/api/comics",
 			ItemsKey: "",
-			Empty:    "Nessun fumetto monitorizzato.",
-			Note:     "Gestione avanzata dei fumetti (link, download, tag) nella UI classica.",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "title", Label: "Titolo"},
+				{Key: "publisher", Label: "Editore"},
+				{Key: "from_date", Label: "Dal"},
+				{Key: "enabled", Label: "Attivo", Format: "bool"},
+				{Key: "latest_downloaded_title", Label: "Ultimo scaricato"},
+				{Key: "tag_url", Label: "Sorgente", Format: "url"},
+			}),
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Attiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":true}`},
+				{Label: "Disattiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":false}`},
+				{Label: "Elimina", Class: "danger", Method: "DELETE", Path: "/api/comics/{id}", Body: "{}", Confirm: "Eliminare questo fumetto monitorizzato?"},
+			}),
+			Empty: "Nessun fumetto monitorizzato.",
+			Note:  "Download, ricerca link e pianificazione settimanale restano nella UI classica (/legacy).",
 		}, true
 	default:
 		return uiTableSpec{}, false
