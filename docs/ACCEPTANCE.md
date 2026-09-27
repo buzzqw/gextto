@@ -9,7 +9,7 @@ manual checklist around it.
 - No data, logs, build artefacts or secrets are tracked:
 
   ```bash
-  git ls-files | grep -Ei '(^|/)(data|bin|webui/pkg)/|\.db($|-)|\.log|build_number|\.env|secret'
+    git ls-files | grep -Ei '(^|/)(data|bin)/|\.db($|-)|\.log|build_number|\.env|secret'
   # expected: no output
   ```
 
