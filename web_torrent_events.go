@@ -1326,8 +1326,15 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if !stopped {
 			value, err := torrents.Pause(torrent.Hash)
 			if err != nil {
-				logging.Warn("failed to stop torrent at seed limit",
-					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+				if torrentNotFoundError(err) {
+					// The torrent vanished between the listing and the pause
+					// (already removed elsewhere): nothing to stop, not a warning.
+					logging.Debug("seed-limit pause skipped: torrent already removed from the session",
+						"hash", torrent.Hash, "name", torrent.Name)
+				} else {
+					logging.Warn("failed to stop torrent at seed limit",
+						"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+				}
 			} else if value {
 				stopped = true
 				reason := "seed time reached"

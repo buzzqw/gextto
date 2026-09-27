@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -1448,6 +1449,42 @@ func (c *LibtorrentClient) torrentDisplayName(hash string) string {
 	return ""
 }
 
+// safeTorrentCopyName turns a torrent display name into a safe file name for
+// the `.torrent` copy folder. A magnet URI (seen before metadata arrives) or an
+// empty name falls back to the infohash, and overlong names are truncated so
+// the resulting file name cannot exceed the filesystem limit.
+func safeTorrentCopyName(name, hash string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	cleaned := strings.TrimSpace(name)
+	lowered := strings.ToLower(cleaned)
+	// A torrent added from a magnet can report the magnet URI as its name until
+	// metadata arrives (or even after sanitisation: "magnetxt=urnbtih..."). Use
+	// the infohash instead of a giant, invalid file name.
+	if cleaned == "" ||
+		strings.HasPrefix(lowered, "magnet:") ||
+		strings.Contains(lowered, "urn:btih") ||
+		strings.Contains(lowered, "urnbtih") {
+		return hash
+	}
+	cleaned = sanitizeInvalid(cleaned)
+	if cleaned == "" {
+		return hash
+	}
+	const maxBytes = 150
+	if len(cleaned) > maxBytes {
+		cleaned = cleaned[:maxBytes]
+		for len(cleaned) > 0 && !utf8.ValidString(cleaned) {
+			cleaned = cleaned[:len(cleaned)-1]
+		}
+		suffix := hash
+		if len(suffix) > 8 {
+			suffix = suffix[:8]
+		}
+		cleaned = cleaned + "-" + suffix
+	}
+	return cleaned
+}
+
 // copyTorrentFile copies the saved `.torrent` of a started torrent into the
 // configured folder so external tools can reuse it.
 func (c *LibtorrentClient) copyTorrentFile(hash, source string) {
@@ -1466,10 +1503,7 @@ func (c *LibtorrentClient) copyTorrentFile(hash, source string) {
 			}
 		}
 	}
-	name = sanitizeInvalid(name)
-	if name == "" {
-		name = strings.ToLower(hash)
-	}
+	name = safeTorrentCopyName(name, hash)
 	target := filepath.Join(dir, name+".torrent")
 	if err := copyFileAtomically(source, target); err != nil {
 		logging.Warn("cannot copy torrent file", "hash", hash, "target", target, "error", err)

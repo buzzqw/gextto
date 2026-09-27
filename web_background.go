@@ -831,11 +831,28 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					}
 				}
 				if found != nil {
-					logging.Info("torrent integrity check completed",
-						"hash", event.Hash, "name", event.Name, "state", found.State,
-						"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize)
+					// A routine re-check of an in-progress download is normal and
+					// must not spam the log. Surface it only when it reveals a
+					// discrepancy: a torrent error, or data that the database
+					// already considers completed but that is not actually
+					// complete on disk.
+					discrepancy := strings.TrimSpace(found.Error) != ""
+					if status, statusErr := db.TorrentStatus(event.Hash); statusErr == nil && status != nil &&
+						*status == "completed" && found.Progress < 99.99 {
+						discrepancy = true
+					}
+					if discrepancy {
+						logging.Warn("torrent integrity check found a discrepancy",
+							"hash", event.Hash, "name", event.Name, "state", found.State,
+							"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize,
+							"error", found.Error)
+					} else {
+						logging.Debug("torrent integrity check completed",
+							"hash", event.Hash, "name", event.Name, "state", found.State,
+							"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize)
+					}
 				} else {
-					logging.Info("torrent integrity check completed; torrent is no longer in the session",
+					logging.Debug("torrent integrity check completed; torrent is no longer in the session",
 						"hash", event.Hash, "name", event.Name)
 				}
 			}

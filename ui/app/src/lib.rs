@@ -2721,6 +2721,37 @@ fn setting_tooltip(key: &str) -> &'static str {
         "rename_verify_interval" => "Ogni quante ore verificare che i file archiviati/rinominati siano ancora presenti.",
         "move_episodes" => "Sposta gli episodi e i season pack nella cartella archivio invece di copiarli; i file spuri del pack vanno nel trash.",
         "debug_enabled" => "Attiva log dettagliati e diagnostiche periodiche (RAM, torrent, loop) per il debug.",
+        "torrent_backend" => "Motore che muove i byte: libtorrent integrato (default), qBittorrent-nox o anacrolix. Il cambio si applica al riavvio del servizio.",
+        "qbittorrent_url" => "Indirizzo della Web API di qBittorrent-nox (es. http://127.0.0.1:8080).",
+        "qbittorrent_username" => "Utente della Web API di qBittorrent.",
+        "qbittorrent_password" => "Password della Web API di qBittorrent (non viene mai mostrata).",
+        "qbittorrent_category" => "Categoria assegnata da Gextto ai torrent che gestisce.",
+        "qbittorrent_tag" => "Tag assegnato da Gextto ai torrent gestiti.",
+        "qbittorrent_request_timeout_secs" => "Timeout di ogni richiesta HTTP alla Web API di qBittorrent.",
+        "qbittorrent_poll_interval_ms" => "Ogni quanti millisecondi Gextto legge lo stato da qBittorrent.",
+        "qbittorrent_path_mappings" => "Una riga per cartella, formato percorso Gextto = percorso visto da qBittorrent. Serve se i due processi non condividono il filesystem.",
+        "anacrolix_data_dir" => "Cartella dati di anacrolix. Vuoto = usa libtorrent_dir.",
+        "anacrolix_listen_port" => "Porta in ascolto di anacrolix. Vuoto = usa la porta minima di libtorrent.",
+        "anacrolix_tcp" => "Abilita il trasporto TCP in anacrolix.",
+        "anacrolix_utp" => "Abilita il trasporto uTP in anacrolix.",
+        "anacrolix_dht" => "Abilita la DHT in anacrolix.",
+        "anacrolix_pex" => "Abilita lo scambio peer (PEX) in anacrolix.",
+        "anacrolix_trackers" => "Abilita i tracker HTTP/UDP in anacrolix.",
+        "anacrolix_upnp" => "Abilita UPnP/NAT-PMP per aprire le porte in anacrolix.",
+        "anacrolix_dht_bootstrap_nodes" => "Nodi bootstrap DHT separati da virgola. Vuoto = usa il valore libtorrent.",
+        "anacrolix_max_conns_per_torrent" => "Numero massimo di connessioni stabilite per torrent. Vuoto = valore libtorrent.",
+        "anacrolix_download_limit_kib" => "Limite globale di download in KiB/s applicato alla creazione del client. Vuoto = valore libtorrent.",
+        "anacrolix_upload_limit_kib" => "Limite globale di upload in KiB/s applicato alla creazione del client. Vuoto = valore libtorrent.",
+        "anacrolix_piece_hashers" => "Quanti pezzi verificare in parallelo per torrent.",
+        "anacrolix_max_unverified_mb" => "Massimo di byte non verificati tenuti in memoria (in MB).",
+        "anacrolix_ipfilter_path" => "File ipfilter.dat locale in formato eMule. Vuoto = usa il valore libtorrent.",
+        "anacrolix_apply_ip_filter" => "Applica il filtro IP locale alla creazione del client anacrolix.",
+        "anacrolix_proxy_type" => "Tipo di proxy. anacrolix supporta solo HTTP: SOCKS viene segnalato e ignorato.",
+        "anacrolix_proxy_host" => "Host del proxy HTTP per anacrolix.",
+        "anacrolix_proxy_port" => "Porta del proxy HTTP per anacrolix.",
+        "anacrolix_proxy_user" => "Utente del proxy HTTP per anacrolix.",
+        "anacrolix_proxy_password" => "Password del proxy HTTP per anacrolix (non viene mai mostrata).",
+        "anacrolix_path_mappings" => "Una riga per cartella, formato percorso Gextto = percorso visto da anacrolix.",
         _ => "",
     }
 }
@@ -7764,7 +7795,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
             </Show>
 
             <div class="toolbar" style="margin-top:14px">
-                <button class="btn sm primary" on:click=move |_| {
+                <button class="btn sm primary" title=ctx_tr("Controlla connessione e mappatura dei percorsi del motore configurato, senza applicare modifiche.") on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-backend/preflight", None).await {
                             Ok(_) => {
@@ -7776,7 +7807,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                     });
                 }>{ctx_tr("Verifica prerequisiti")}</button>
                 <Show when=move || configured.get() == "qbittorrent" || active.get() == "qbittorrent">
-                    <button class="btn sm" on:click=move |_| {
+                    <button class="btn sm" title=ctx_tr("Esegue il login a qBittorrent e mostra versione e numero di torrent.") on:click=move |_| {
                         spawn_local(async move {
                             match send("POST", "/api/torrent-backend/test", None).await {
                                 Ok(value) => message.set(format!(
@@ -7789,7 +7820,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                         });
                     }>{ctx_tr("Test connessione")}</button>
                 </Show>
-                <button class="btn sm" on:click=move |_| {
+                <button class="btn sm" title=ctx_tr("Verifica la configurazione e indica se serve un riavvio per applicare il motore selezionato.") on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-backend", None).await {
                             Ok(value) => {
@@ -7806,7 +7837,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                         }
                     });
                 }>{ctx_tr("Applica configurazione")}</button>
-                <button class="btn sm" on:click=move |_| reload.update(|value| *value += 1)>{ctx_tr("Aggiorna stato")}</button>
+                <button class="btn sm" title=ctx_tr("Rilegge backend attivo, stato connessione e capability.") on:click=move |_| reload.update(|value| *value += 1)>{ctx_tr("Aggiorna stato")}</button>
             </div>
             <small class="muted">{message}</small>
 
@@ -7815,7 +7846,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                 <small class="hint">{ctx_tr("Azioni applicate al motore attivo.")}</small>
             </div>
             <div class="toolbar">
-                <button class="btn sm" on:click=move |_| {
+                <button class="btn sm" title=ctx_tr("Applica un profilo cache proporzionato alla RAM: cache disco per libtorrent, preferenze disco per qBittorrent.") on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrents/optimize_settings", None).await {
                             Ok(_) => flash_text(data, "ok", "Profilo cache applicato".to_string()),
@@ -7823,7 +7854,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                         }
                     });
                 }>{ctx_tr("Ottimizza cache")}</button>
-                <button class="btn sm" on:click=move |_| {
+                <button class="btn sm" title=ctx_tr("Genera e salva il manifest dei torrent gestiti; il passaggio al motore configurato avviene al riavvio.") on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-migrations/plan", None).await {
                             Ok(value) => {
@@ -7841,7 +7872,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                         }
                     });
                 }>{ctx_tr("Pianifica migrazione")}</button>
-                <button class="btn sm" on:click=move |_| show_capabilities.update(|value| *value = !*value)>
+                <button class="btn sm" title=ctx_tr("Mostra o nasconde la matrice delle funzioni supportate dal motore attivo.") on:click=move |_| show_capabilities.update(|value| *value = !*value)>
                     {move || if show_capabilities.get() { ctx_tr("Nascondi capability").get() } else { ctx_tr("Mostra capability").get() }}
                 </button>
             </div>
@@ -7907,7 +7938,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                 <div class="mode-banner active" style="margin-top:14px">
                     <strong>{ctx_tr("Motore integrato")}</strong>
                     <span>{ctx_tr("Le impostazioni di rete, cache e coda sono nella scheda Libtorrent.")}</span>
-                    <button class="btn sm" on:click=move |_| {
+                    <button class="btn sm" title=ctx_tr("Apre la scheda Libtorrent con rete, cache, coda e porte.") on:click=move |_| {
                         if let Some(nav) = nav {
                             nav.tab.set("libtorrent".to_string());
                         }

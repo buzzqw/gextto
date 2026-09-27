@@ -16,6 +16,7 @@ package gextto
 // docs/aggiunta-qbittorrent-nox.md and docs/aggiunta-anacrolix.md).
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
 
 // TorrentSession is the narrow, engine-agnostic surface the automation layer
@@ -407,4 +409,17 @@ func (s *AppState) requireEmbedded(capability string) (*LibtorrentClient, error)
 // backendCapabilityError builds the canonical explicit "unsupported" error.
 func backendCapabilityError(backend, capability string) error {
 	return ErrCapabilityUnavailable{Backend: backend, Capability: capability}
+}
+
+// torrentNotFoundError reports whether an operation failed because the torrent
+// is no longer in the backend session. That is a benign race (the torrent was
+// removed between a listing and a command) and must not be logged as a warning.
+func torrentNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, qbittorrent.ErrNotFound) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "torrent not found")
 }
