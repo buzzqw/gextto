@@ -54,9 +54,10 @@ download_payload() {
   esac
 
   log "downloading ${REPO} ${RELEASE} (${arch})"
-  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}" -o "$work/$asset" \
+  local cachebust; cachebust="$(date +%s)"
+  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}?cachebust=${cachebust}" -o "$work/$asset" \
     || die "unable to download ${asset} from ${base}"
-  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}.sha256" -o "$work/${asset}.sha256" \
+  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}.sha256?cachebust=${cachebust}" -o "$work/${asset}.sha256" \
     || die "unable to download checksum for ${asset}"
   (cd "$work" && sha256sum -c "${asset}.sha256") \
     || die "checksum verification failed for ${asset}"
