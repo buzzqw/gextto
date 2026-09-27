@@ -129,6 +129,24 @@ func tev_torrentDisplayName(torrents TorrentSession, hash string) string {
 	return "unnamed torrent"
 }
 
+// tev_packFileNames renders a compact, bounded list of the outcomes of a season
+// pack so the log names what was kept and what was discarded without flooding.
+func tev_packFileNames(items []PackFileResult) string {
+	if len(items) == 0 {
+		return "nessuno"
+	}
+	const limit = 8
+	names := make([]string, 0, len(items))
+	for index, item := range items {
+		if index >= limit {
+			names = append(names, fmt.Sprintf("… e altri %d", len(items)-limit))
+			break
+		}
+		names = append(names, filepath.Base(item.Path))
+	}
+	return strings.Join(names, ", ")
+}
+
 // tev_removeFailedTorrent implements `remove_failed_torrent`: partial files are
 // deleted only when the download was incomplete; a completed/seeding torrent's
 // library is left untouched.
@@ -1879,6 +1897,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
 					return false, err
 				}
+				logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · nessun episodio tenuto · scartati %d: %s",
+					release.Title, len(processed), tev_packFileNames(processed)))
 				// Esito definitivo: il pack è stato scartato per intero. Esce
 				// dalla sessione e la sorgente va nel cestino.
 				tev_discardCompletedSource(cfg, db, torrents, &event, "season pack inferior to existing files")
@@ -1913,11 +1933,29 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			}
 			logging.Info(fmt.Sprintf("🎉 Season pack complete — «%s» · %d episodes · %s · archived to %s",
 				release.Title, len(episodes), logging.HumanBytesI64(size), destination))
-			discardedCount := 0
+			// Detail per file: which episodes were kept and which were discarded.
+			// The Python original logged this per file; the Rust port only kept
+			// the counts, which made a rejected episode impossible to trace.
+			keptDetail := []PackFileResult{}
+			discardedDetail := []PackFileResult{}
 			for _, item := range processed {
 				if item.Discarded {
-					discardedCount++
+					discardedDetail = append(discardedDetail, item)
+				} else {
+					keptDetail = append(keptDetail, item)
 				}
+			}
+			logging.Info(fmt.Sprintf("📦 Season pack detail — tenuti %d: %s · scartati %d: %s",
+				len(keptDetail), tev_packFileNames(keptDetail),
+				len(discardedDetail), tev_packFileNames(discardedDetail)))
+			discardedCount := len(discardedDetail)
+			discardedList := []any{}
+			for _, item := range discardedDetail {
+				discardedList = append(discardedList, map[string]any{
+					"episode": item.Episode,
+					"path":    item.Path,
+					"name":    filepath.Base(item.Path),
+				})
 			}
 			notificationErr := notifier.NotifyEvent("season_pack_completed", map[string]any{
 				"series":          release.Series,
@@ -1928,6 +1966,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				"new_count":       len(episodes),
 				"discarded_count": discardedCount,
 				"episodes":        episodes,
+				"discarded":       discardedList,
 			})
 			if notificationErr != nil {
 				logging.Warn("completion notification failed",
