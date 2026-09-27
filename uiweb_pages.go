@@ -294,9 +294,15 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 		}, true
 	case "archive":
 		return uiTableSpec{
-			Title:       "Archivio",
-			Endpoint:    "/api/archive",
-			ItemsKey:    "items",
+			Title:    "Archivio",
+			Endpoint: "/api/archive",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "title", Label: "Titolo"},
+				{Key: "source", Label: "Sorgente"},
+				{Key: "quality_score", Label: "Punteggio", Format: "number"},
+				{Key: "added_at", Label: "Aggiunto"},
+			}),
 			Empty:       "Archivio vuoto.",
 			Search:      true,
 			SearchParam: "q",

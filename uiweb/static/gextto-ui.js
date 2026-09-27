@@ -16,7 +16,9 @@
     }
   }
 
-  function api(path, method, body) {
+  var tokenPrompted = false;
+
+  function request(path, method, body) {
     var headers = { "Content-Type": "application/json" };
     var value = token();
     if (value) headers["X-Gextto-Token"] = value;
@@ -25,18 +27,36 @@
       headers: headers,
       body: body ? JSON.stringify(body) : undefined,
       credentials: "same-origin"
-    }).then(function (response) {
-      var type = response.headers.get("content-type") || "";
-      var isJSON = type.indexOf("application/json") >= 0;
-      if (!response.ok) {
-        return (isJSON ? response.json().catch(function () { return null; }) : Promise.resolve(null))
-          .then(function (data) {
-            var message = data && data.error ? String(data.error) : "HTTP " + response.status;
-            if (response.status === 401) message = "token API mancante o non valido";
-            throw new Error(message);
-          });
+    });
+  }
+
+  function handleResponse(response) {
+    var type = response.headers.get("content-type") || "";
+    var isJSON = type.indexOf("application/json") >= 0;
+    if (!response.ok) {
+      return (isJSON ? response.json().catch(function () { return null; }) : Promise.resolve(null))
+        .then(function (data) {
+          var message = data && data.error ? String(data.error) : "HTTP " + response.status;
+          if (response.status === 401) message = "token API mancante o non valido";
+          throw new Error(message);
+        });
+    }
+    return isJSON ? response.json() : response.text();
+  }
+
+  function api(path, method, body) {
+    return request(path, method, body).then(function (response) {
+      // The API can be protected by an optional token; the new UI has no form
+      // for it, so ask once and retry (the token is shared with the classic UI).
+      if (response.status === 401 && !tokenPrompted) {
+        tokenPrompted = true;
+        var entered = window.prompt("Token API Gextto (vuoto per annullare):");
+        if (entered) {
+          try { localStorage.setItem("gextto_api_token", entered); } catch (error) { /* ignore */ }
+        }
+        return request(path, method, body).then(handleResponse);
       }
-      return isJSON ? response.json() : response.text();
+      return handleResponse(response);
     });
   }
 
