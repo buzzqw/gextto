@@ -117,8 +117,17 @@ comprende:
 - `gexttod --config <file>` e `gexttod --dry-run` — usati dal servizio e per le
   prove locali.
 
-**Aggiornamento.** L'installer e `gexttod --update` installano lo stesso
-payload. `--update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
+**Installazione e aggiornamento.** A ogni push su `main` viene pubblicato un
+payload Linux `continuous` testato. L'installer ufficiale lo scarica, verifica il
+checksum SHA-256 e lo installa senza compilare Go o C++ sul server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | bash
+```
+
+Usa `GEXTTO_REPO` e `GEXTTO_RELEASE` per scegliere un repository o una release
+diversi. Installer e `gexttod --update` installano lo stesso payload.
+`--update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
 pubblicato quando presente, prepara i file e poi sostituisce l'eseguibile (con la
 UI web inclusa), la `lib/` e `run.sh` con rename atomici. Dati e configurazione in
 `GEXTTO_DATA_DIR` (default `/var/lib/gextto`) non vengono mai toccati: un
