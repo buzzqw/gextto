@@ -97,15 +97,37 @@
 {{define "dashboard"}}
 <div class="view">
   <div class="grid-4">
-    <div class="metric"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
+    <div class="metric"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
+    <div class="metric"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
+    <div class="metric"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
+    <div class="metric"><span class="metric-sub">Spazio libero</span><strong>{{humanBytesU .FreeSpace}}</strong></div>
+    <div class="metric"><span class="metric-sub">Visti nei feed</span><strong>{{.SeenGroups}}</strong></div>
+    <div class="metric"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
     <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
-    <div class="metric"><span class="metric-sub">Torrent</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
-    <div class="metric"><span class="metric-sub">Velocità</span><strong>{{humanRate .DownloadRate}}</strong><small class="muted">↓ · {{humanRate .UploadRate}} ↑</small></div>
+    <div class="metric"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Cerca</h3><small class="muted" data-ui-count></small></div>
+    <div class="panel-body">
+      <form class="search-row" data-ui-search-post data-endpoint="/api/search" data-results="results" data-add="/api/search/add">
+        <input type="search" placeholder="Cerca in archivio, indexer e motori web…" />
+        <button class="btn primary">Cerca</button>
+      </form>
+      <div class="table-wrap" style="margin-top:10px">
+        <table class="data-table">
+          <thead data-ui-head></thead>
+          <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3>Sessione</h3><small class="muted">{{.UpdatedAt}}</small></div>
       <div class="panel-body">
+        <div class="row"><span>Velocità</span><strong>{{humanRate .DownloadRate}} ↓ · {{humanRate .UploadRate}} ↑</strong></div>
         <div class="row"><span>In scarico</span><strong>{{.Downloading}}</strong></div>
         <div class="row"><span>In seed</span><strong>{{.Seeding}}</strong></div>
         <div class="row"><span>In pausa</span><strong>{{.Paused}}</strong></div>
@@ -123,10 +145,59 @@
       </div>
     </div>
   </div>
-  <div class="toolbar">
-    <button class="btn" data-action="run-cycle" title="Avvia subito un ciclo di ricerca e download">Avvia ciclo ora</button>
-    <button class="btn" data-action="refresh" title="Ricarica i dati mostrati">Aggiorna</button>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3>Prossima ricerca automatica</h3></div>
+      <div class="panel-body"><div class="row"><span>Prossimo ciclo</span><strong>{{.NextCycle}}</strong></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Consumo banda</h3></div>
+      <div class="panel-body">
+        <div class="row"><span>Totale storico</span><strong>{{humanBytes .Consumption.TotalBytes}}</strong></div>
+        <div class="row"><span>Ultimi 30 giorni</span><strong>{{humanBytes .Consumption.Last30}}</strong></div>
+        <div class="row"><span>Ultimi 7 giorni</span><strong>{{humanBytes .Consumption.Last7}}</strong></div>
+      </div>
+    </div>
   </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Azioni rapide</h3></div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <button class="btn primary" data-cycle="full" title="Cerca ora nuovi episodi, film e fumetti e riempi i gap">Avvia ciclo (tutto)</button>
+        <button class="btn" data-cycle="series" title="Ciclo limitato alle serie TV">Serie TV</button>
+        <button class="btn" data-cycle="movies" title="Ciclo limitato ai film">Film</button>
+        <button class="btn" data-cycle="comics" title="Ciclo limitato ai fumetti">Fumetti</button>
+        <button class="btn" data-api="/api/backup" data-method="POST" data-body="{}" title="Crea uno snapshot di backup dei database">Backup</button>
+        <button class="btn" data-action="refresh" title="Ricarica i dati mostrati">Aggiorna</button>
+      </div>
+    </div>
+  </div>
+
+  {{if .Recent}}
+  <div class="panel">
+    <div class="panel-head"><h3>Ultimi download</h3></div>
+    <div class="panel-body">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Titolo</th><th>Tipo</th><th>Qualità</th><th>Dimensione</th><th>Quando</th></tr></thead>
+          <tbody>
+            {{range .Recent}}
+            <tr>
+              <td class="truncate" title="{{.Name}}">{{.Name}}</td>
+              <td>{{.Kind}}{{if .Season}} S{{.Season}}E{{.Episode}}{{end}}</td>
+              <td class="numeric">{{.QualityScore}}</td>
+              <td class="numeric">{{humanBytes .SizeBytes}}</td>
+              <td class="muted">{{.DownloadedAt}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {{end}}
 </div>
 {{end}}
 

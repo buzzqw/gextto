@@ -89,6 +89,46 @@ type uiDashboardData struct {
 	CycleStarted      int
 	CycleGaps         int
 	CycleErrors       int
+	// Parity data from the classic dashboard.
+	SeriesConfigured int
+	MoviesConfigured int
+	ArchiveTotal     int64
+	FreeSpace        uint64
+	SeenGroups       int64
+	TrashCount       int64
+	NextCycle        string
+	Consumption      uiConsumption
+	Recent           []uiRecentDownload
+	FeedMatches      []uiFeedMatch
+	Upcoming         []uiUpcoming
+}
+
+type uiConsumption struct {
+	TotalBytes int64
+	Last30     int64
+	Last7      int64
+}
+
+type uiRecentDownload struct {
+	Name         string
+	Kind         string
+	Season       int64
+	Episode      int64
+	QualityScore int64
+	SizeBytes    int64
+	DownloadedAt string
+}
+
+type uiFeedMatch struct {
+	Title  string
+	Source string
+	Kind   string
+}
+
+type uiUpcoming struct {
+	Series  string
+	Episode string
+	AirDate string
 }
 
 // uiTorrentRow is one row of the Scarico table.
@@ -366,6 +406,65 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	data.CycleStarted = cycle.DownloadsStarted
 	data.CycleGaps = cycle.GapsFilled
 	data.CycleErrors = cycle.Errors
+
+	// Classic-dashboard data.
+	data.SeriesConfigured = len(cfg.Series)
+	data.MoviesConfigured = len(cfg.Movies)
+	if seenMovies, seenSeries, err := s.db.SeenCounts(); err == nil {
+		data.SeenGroups = seenMovies + seenSeries
+	}
+	if page, err := s.archive.BrowsePage("", 1, 1); err == nil && page != nil {
+		data.ArchiveTotal = page.Total
+	}
+	if stats, err := s.db.ConsumptionStats(); err == nil {
+		data.Consumption = uiConsumption{
+			TotalBytes: stats.TotalBytes,
+			Last30:     stats.Last30DaysBytes,
+			Last7:      stats.Last7DaysBytes,
+		}
+	}
+	if recent, err := s.db.RecentDownloads(8); err == nil {
+		for _, item := range recent {
+			data.Recent = append(data.Recent, uiRecentDownload{
+				Name:         item.Name,
+				Kind:         item.Kind,
+				Season:       uiDerefInt64(item.Season),
+				Episode:      uiDerefInt64(item.Episode),
+				QualityScore: item.QualityScore,
+				SizeBytes:    item.SizeBytes,
+				DownloadedAt: item.DownloadedAt,
+			})
+		}
+	}
+	trash := ""
+	if s.cfg.TrashPath != nil {
+		trash = *s.cfg.TrashPath
+	}
+	ramdisk := ""
+	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+		ramdisk = value
+	}
+	health := CheckWithPaths(&HealthPaths{
+		DataDir:      s.cfg.DataDir,
+		TrashPath:    trash,
+		DownloadPath: s.cfg.LibtorrentDir,
+		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
+		RamdiskPath:  ramdisk,
+	})
+	data.FreeSpace = health.DiskFreeBytes
+	if cfg.RefreshSecs > 0 {
+		start, ok := s.db.LastCycleAt()
+		if snapshot := s.last_cycle.Snapshot(); snapshot.LastStartedAt != nil && (!ok || snapshot.LastStartedAt.After(start)) {
+			start, ok = *snapshot.LastStartedAt, true
+		}
+		if ok {
+			remaining := int64(start.Add(durationFromSeconds(cfg.RefreshSecs)).Sub(time.Now()).Seconds())
+			if remaining < 0 {
+				remaining = 0
+			}
+			data.NextCycle = logging.HumanDuration(remaining)
+		}
+	}
 	return data
 }
 
@@ -550,6 +649,13 @@ func saturatingInt64(value uint64) int64 {
 		return math.MaxInt64
 	}
 	return int64(value)
+}
+
+func uiDerefInt64(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // uiwebStaticFS exposes the new UI static assets (/ui/static/*).

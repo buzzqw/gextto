@@ -293,6 +293,33 @@ func TestUiMovieFormKeepsMetadata(t *testing.T) {
 	}
 }
 
+// TestUiDashboardParity checks that the dashboard exposes the same data and
+// quick actions as the classic interface (metrics, global search, cycle
+// actions, consumption, recent downloads).
+func TestUiDashboardParity(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=dashboard")
+	if code != http.StatusOK {
+		t.Fatalf("dashboard -> %d", code)
+	}
+	html := string(body)
+	for _, marker := range []string{
+		"Serie TV configurate", "Film configurati", "Magnet in archivio", "Spazio libero",
+		"Visti nei feed", "Torrent in sessione", "Prossima ricerca automatica",
+		"Consumo banda", "Azioni rapide", "Ultimo ciclo", "Sessione",
+		`data-cycle="full"`, `data-cycle="series"`, `data-cycle="movies"`, `data-cycle="comics"`,
+		`data-ui-search-post`, `data-endpoint="/api/search"`, `data-add="/api/search/add"`,
+		`data-api="/api/backup"`,
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("dashboard missing %q", marker)
+		}
+	}
+}
+
 // TestUiSettingsTabsAndSearch verifies the redesigned settings page: one tab
 // rendered at a time, chip navigation, a searchable index and the special
 // editors reachable through their own tabs.
@@ -461,6 +488,11 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 	add("GET", "/api/config/library")
 	add("POST", "/api/config/library")
 	add("POST", "/api/config/settings")
+	// Dashboard quick actions and global search.
+	add("POST", "/api/run_now")
+	add("POST", "/api/backup")
+	add("POST", "/api/search")
+	add("POST", "/api/search/add")
 	for _, editor := range uiJSONEditors {
 		add("GET", editor.GetPath)
 		add("POST", editor.PostPath)

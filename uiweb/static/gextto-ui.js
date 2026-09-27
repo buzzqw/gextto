@@ -61,7 +61,6 @@
   }
 
   var partials = {
-    dashboard: "/ui/partial/dashboard",
     downloads: "/ui/partial/torrents"
   };
 
@@ -81,7 +80,7 @@
   var timer = null;
   function schedule() {
     if (timer) clearInterval(timer);
-    var interval = view === "downloads" ? 3000 : view === "dashboard" ? 10000 : 0;
+    var interval = view === "downloads" ? 3000 : 0;
     if (interval > 0) {
       timer = setInterval(function () {
         if (document.visibilityState === "visible") load();
@@ -501,6 +500,20 @@
       setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
       return;
     }
+  });
+
+  // Cycle buttons with a domain (Dashboard quick actions).
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-cycle]");
+    if (!button) return;
+    var domain = button.getAttribute("data-cycle") || "full";
+    var path = domain === "full" ? "/api/run_now" : "/api/run_now?domain=" + encodeURIComponent(domain);
+    button.disabled = true;
+    api(path, "POST", {}).then(function () {
+      button.textContent = "Avviato";
+    }).catch(function (error) {
+      alert("Ciclo non avviato: " + error.message);
+    }).then(function () { button.disabled = false; });
   });
 
   function storageGet(key) {
