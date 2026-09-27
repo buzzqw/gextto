@@ -926,3 +926,30 @@ dubbio ci si allinea a rextto.
   Avanzate (editor JSON), Libreria (serie/film), Traduzioni (i18n), Punteggi.
   La pagina iniziale passa da ~139 KB a ~50 KB.
 - I value sensibili restano mascherati; i boolean conservano la grafia originale.
+
+
+---
+
+## 23. Parità funzionale su tutti i menu
+
+Motore di sezioni riutilizzabile (tabella/azioni/form/progress/link) usato da
+tutti i menu; ogni sezione è coperta dal test `TestUiActionPathsAreRegistered`.
+
+- **Dashboard**: metriche, ricerca globale, azioni ciclo, consumo, ultimi
+  download, prossime uscite (calendario).
+- **Scarico**: limiti temporanei (preset e custom), applica/ottimizza, tag dei
+  download e dei torrent.
+- **Serie/Film/Esplora**: ricerca e aggiunta TMDB/TVDB.
+- **Mancanti**: ricerca per episodio.
+- **Archivio**: aggiunta, download per riga, eliminazione.
+- **Fumetti**: ciclo, esplora, coda download, storico (+elimina), weekly
+  (impostazioni e link), link finder.
+- **Manutenzione**: check porte, stato sorgenti, cestino (+elimina), info DB,
+  RAM disk, progresso rinomina live, riavvio servizio, import setup.
+- **Integrazioni**: impostazioni Trakt/Simkl, import watchlist, tabelle
+  watchlist e calendario, handler del browser.
+- **Salute**: stato sorgenti e stato provider.
+
+Dettagli minori non bloccanti: i risultati grezzi di "Esplora fumetti" e
+"Ricerca mancanti" sono mostrati come JSON; i grafici sparkline della Dashboard
+classica non sono replicati (i dati numerici sì).
