@@ -255,21 +255,21 @@ func TestAnacrolixEngineMovesStorage(t *testing.T) {
 }
 
 func TestAnacrolixNetworkMappings(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.Libtorrent.DhtBootstrapNodes = "router.bittorrent.com:6881, dht.example:6881\n10.0.0.1:1"
-	if nodes := anacrolixDhtNodes(&cfg); len(nodes) != 3 {
+	settings := anacrolixSettings{
+		DhtBootstrapNodes: "router.bittorrent.com:6881, dht.example:6881\n10.0.0.1:1",
+		ProxyType:         3,
+		ProxyHost:         "127.0.0.1",
+		ProxyPort:         8080,
+	}
+	if nodes := anacrolixDhtNodes(settings); len(nodes) != 3 {
 		t.Fatalf("dht nodes = %+v, want 3", nodes)
 	}
-
-	cfg.Libtorrent.ProxyType = 3
-	cfg.Libtorrent.ProxyHost = "127.0.0.1"
-	cfg.Libtorrent.ProxyPort = 8080
-	proxy := anacrolixHTTPProxy(&cfg)
+	proxy := anacrolixHTTPProxy(settings)
 	if proxy == nil || proxy.String() != "http://127.0.0.1:8080" {
 		t.Fatalf("proxy = %v", proxy)
 	}
-	cfg.Libtorrent.ProxyType = 2 // socks5: not supported by anacrolix
-	if anacrolixHTTPProxy(&cfg) != nil {
+	settings.ProxyType = 2 // socks5: not supported by anacrolix
+	if anacrolixHTTPProxy(settings) != nil {
 		t.Fatal("socks proxy must be ignored")
 	}
 
@@ -277,13 +277,52 @@ func TestAnacrolixNetworkMappings(t *testing.T) {
 	if err := os.WriteFile(path, []byte("test:1.2.4.0-1.2.4.255\n"), 0o644); err != nil {
 		t.Fatalf("write ipfilter: %v", err)
 	}
-	cfg.Libtorrent.ApplyIpFilter = true
-	cfg.Libtorrent.IpFilterPath = path
-	if anacrolixBlocklist(&cfg) == nil {
+	settings.ApplyIpFilter = true
+	settings.IpFilterPath = path
+	if anacrolixBlocklist(settings) == nil {
 		t.Fatal("valid ipfilter must load")
 	}
-	cfg.Libtorrent.IpFilterPath = filepath.Join(t.TempDir(), "missing.dat")
-	if anacrolixBlocklist(&cfg) != nil {
+	settings.IpFilterPath = filepath.Join(t.TempDir(), "missing.dat")
+	if anacrolixBlocklist(settings) != nil {
 		t.Fatal("missing ipfilter must be nil")
+	}
+}
+
+func TestAnacrolixDedicatedSettingsOverrideLibtorrent(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Libtorrent.Dht = true
+	cfg.Libtorrent.Utp = true
+	cfg.Libtorrent.PortMin = 6881
+	cfg.Settings["anacrolix_dht"] = "false"
+	cfg.Settings["anacrolix_utp"] = "false"
+	cfg.Settings["anacrolix_listen_port"] = "7000"
+	cfg.Settings["anacrolix_download_limit_kib"] = "2048"
+	cfg.Settings["anacrolix_max_conns_per_torrent"] = "80"
+	cfg.Settings["anacrolix_data_dir"] = "/custom/data"
+
+	settings := anacrolixSettingsFromConfig(&cfg)
+	if settings.DHT {
+		t.Fatal("anacrolix_dht=false must override the libtorrent DHT")
+	}
+	if settings.UTP {
+		t.Fatal("anacrolix_utp=false must override the libtorrent uTP")
+	}
+	if settings.ListenPort != 7000 {
+		t.Fatalf("listen port = %d, want 7000", settings.ListenPort)
+	}
+	if settings.DownloadLimit != 2048 {
+		t.Fatalf("download limit = %d, want 2048", settings.DownloadLimit)
+	}
+	if settings.MaxConnsPerTorrent != 80 {
+		t.Fatalf("max conns = %d, want 80", settings.MaxConnsPerTorrent)
+	}
+	if settings.DataDir != "/custom/data" {
+		t.Fatalf("data dir = %q", settings.DataDir)
+	}
+	// Unset keys fall back to the libtorrent values (no behavior change).
+	cfg.Settings = map[string]string{}
+	fallback := anacrolixSettingsFromConfig(&cfg)
+	if !fallback.DHT || !fallback.UTP || fallback.ListenPort != 6881 {
+		t.Fatalf("fallback settings = %+v", fallback)
 	}
 }

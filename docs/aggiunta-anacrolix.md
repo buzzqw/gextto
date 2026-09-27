@@ -1056,3 +1056,45 @@ La capability matrix in `torrent_engine.go` riflette questa realtà
 - **storage move**: il file viene spostato, il torrent resta completo e il
   `SavePath` riporta la nuova destinazione;
 - diff eventi metadata/completamento.
+
+---
+
+## 23. Parametri di configurazione per backend
+
+Gextto ha un livello **comune** (valido per qualsiasi motore) e un livello
+**specifico** per ogni client. Il livello specifico non altera il modello comune:
+coda, seed policy, stalled/retry, post-processing restano di Gextto.
+
+**Comuni (tutti i backend):** slot download/seed, ratio/seed time, soglie
+stalled e retry, preallocazione, policy di completamento, percorsi Gextto
+(`libtorrent_dir`, `libtorrent_temp_dir`, ramdisk), spazio minimo libero.
+
+**embedded (libtorrent):** il set `libtorrent_*` (rete, DHT/PEX/LSD/uTP, porte,
+cache, AIO, limiti, proxy, IP filter, cifratura, coda) nella tab *Libtorrent*.
+
+**qBittorrent:** `qbittorrent_url`, `qbittorrent_username`,
+`qbittorrent_password`, `qbittorrent_category`, `qbittorrent_tag`,
+`qbittorrent_request_timeout_secs`, `qbittorrent_poll_interval_ms`,
+`qbittorrent_path_mappings` (tab *Motore torrent*).
+
+**anacrolix:** da questo passaggio ogni parametro ha una chiave dedicata
+`anacrolix_*` con **fallback al valore libtorrent** quando è vuota, così il
+comportamento predefinito resta invariato:
+
+| Chiave | Fallback |
+|---|---|
+| `anacrolix_data_dir` | `libtorrent_dir` |
+| `anacrolix_listen_port` | porta minima libtorrent |
+| `anacrolix_tcp` / `anacrolix_utp` | `true` / libtorrent `utp` |
+| `anacrolix_dht` / `anacrolix_pex` | libtorrent `dht` / `pex` |
+| `anacrolix_trackers` / `anacrolix_upnp` | `true` / libtorrent `upnp` |
+| `anacrolix_dht_bootstrap_nodes` | libtorrent `dht_bootstrap_nodes` |
+| `anacrolix_max_conns_per_torrent` | libtorrent `max_connections_per_torrent` |
+| `anacrolix_download_limit_kib` / `anacrolix_upload_limit_kib` | limiti libtorrent |
+| `anacrolix_piece_hashers` / `anacrolix_max_unverified_mb` | 2 / 64 |
+| `anacrolix_ipfilter_path` / `anacrolix_apply_ip_filter` | libtorrent |
+| `anacrolix_proxy_type` / `_host` / `_port` / `_user` / `_password` | libtorrent |
+| `anacrolix_path_mappings` | nessuno (namespace identico) |
+
+Nota: i limiti globali anacrolix sono applicati **alla creazione** del client
+(nessun setter runtime): la modifica richiede un riavvio.

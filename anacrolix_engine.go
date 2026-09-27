@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,6 +38,7 @@ import (
 	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"golang.org/x/time/rate"
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
@@ -46,7 +48,10 @@ func init() {
 	newAnacrolixEngine = newAnacrolixEngineImpl
 }
 
-// anacrolixSettings is the resolved configuration of the adapter.
+// anacrolixSettings is the resolved configuration of the adapter. Every field
+// has a dedicated `anacrolix_*` setting with a fallback to the shared/libtorrent
+// value, so the backend is configurable on its own without changing the default
+// behavior.
 type anacrolixSettings struct {
 	DataDir       string
 	MetadataDir   string
@@ -64,31 +69,57 @@ type anacrolixSettings struct {
 	DownloadLimit int64 // KiB/s, applied at creation only
 	UploadLimit   int64 // KiB/s, applied at creation only
 	Mappings      []PathMapping
+
+	DhtBootstrapNodes  string
+	IpFilterPath       string
+	ApplyIpFilter      bool
+	ProxyType          int64
+	ProxyHost          string
+	ProxyPort          int64
+	ProxyUser          string
+	ProxyPassword      string
+	MaxConnsPerTorrent int
 }
 
 func anacrolixSettingsFromConfig(cfg *Config) anacrolixSettings {
-	dataDir := cfg.LibtorrentDir
+	dataDir := settingOrDefault(cfg.Settings, "anacrolix_data_dir", cfg.LibtorrentDir)
 	metadataDir := filepath.Join(cfg.DataDir, "anacrolix")
-	hashers := int(cfg.Libtorrent.MaxConnectionsPerTorrent)
-	_ = hashers
 	mappings, _ := ParsePathMappings(cfg.Settings["anacrolix_path_mappings"])
+	maxUnverifiedMB := settingsParseInt(cfg, "anacrolix_max_unverified_mb", 64)
+	if maxUnverifiedMB <= 0 {
+		maxUnverifiedMB = 64
+	}
+	hashers := settingsParseInt(cfg, "anacrolix_piece_hashers", 2)
+	if hashers <= 0 {
+		hashers = 2
+	}
 	return anacrolixSettings{
 		DataDir:       dataDir,
 		MetadataDir:   metadataDir,
 		CompletionDB:  metadataDir,
 		ManifestPath:  filepath.Join(metadataDir, "manifest.json"),
-		ListenPort:    int(cfg.Libtorrent.PortMin),
-		DHT:           cfg.Libtorrent.Dht,
-		PEX:           cfg.Libtorrent.Pex,
-		UTP:           cfg.Libtorrent.Utp,
-		TCP:           true,
-		Trackers:      true,
-		UPnP:          cfg.Libtorrent.Upnp,
-		Hashers:       2,
-		MaxUnverified: 64 << 20,
-		DownloadLimit: cfg.Libtorrent.DownloadLimitKib,
-		UploadLimit:   cfg.Libtorrent.UploadLimitKib,
+		ListenPort:    int(settingsParseInt(cfg, "anacrolix_listen_port", int64(cfg.Libtorrent.PortMin))),
+		DHT:           settingsBool(cfg, "anacrolix_dht", cfg.Libtorrent.Dht),
+		PEX:           settingsBool(cfg, "anacrolix_pex", cfg.Libtorrent.Pex),
+		UTP:           settingsBool(cfg, "anacrolix_utp", cfg.Libtorrent.Utp),
+		TCP:           settingsBool(cfg, "anacrolix_tcp", true),
+		Trackers:      settingsBool(cfg, "anacrolix_trackers", true),
+		UPnP:          settingsBool(cfg, "anacrolix_upnp", cfg.Libtorrent.Upnp),
+		Hashers:       int(hashers),
+		MaxUnverified: maxUnverifiedMB << 20,
+		DownloadLimit: settingsParseInt(cfg, "anacrolix_download_limit_kib", cfg.Libtorrent.DownloadLimitKib),
+		UploadLimit:   settingsParseInt(cfg, "anacrolix_upload_limit_kib", cfg.Libtorrent.UploadLimitKib),
 		Mappings:      mappings,
+
+		DhtBootstrapNodes:  settingOrDefault(cfg.Settings, "anacrolix_dht_bootstrap_nodes", cfg.Libtorrent.DhtBootstrapNodes),
+		IpFilterPath:       settingOrDefault(cfg.Settings, "anacrolix_ipfilter_path", cfg.Libtorrent.IpFilterPath),
+		ApplyIpFilter:      settingsBool(cfg, "anacrolix_apply_ip_filter", cfg.Libtorrent.ApplyIpFilter),
+		ProxyType:          settingsParseInt(cfg, "anacrolix_proxy_type", cfg.Libtorrent.ProxyType),
+		ProxyHost:          settingOrDefault(cfg.Settings, "anacrolix_proxy_host", cfg.Libtorrent.ProxyHost),
+		ProxyPort:          settingsParseInt(cfg, "anacrolix_proxy_port", cfg.Libtorrent.ProxyPort),
+		ProxyUser:          settingOrDefault(cfg.Settings, "anacrolix_proxy_user", cfg.Libtorrent.ProxyUser),
+		ProxyPassword:      settingOrDefault(cfg.Settings, "anacrolix_proxy_password", cfg.Libtorrent.ProxyPassword),
+		MaxConnsPerTorrent: int(settingsParseInt(cfg, "anacrolix_max_conns_per_torrent", cfg.Libtorrent.MaxConnectionsPerTorrent)),
 	}
 }
 
@@ -150,14 +181,27 @@ func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
 	clientCfg.PieceHashersPerTorrent = settings.Hashers
 	clientCfg.MaxUnverifiedBytes = settings.MaxUnverified
 	clientCfg.DefaultStorage = storage.NewFileWithCompletion(settings.DataDir, completion)
+	if settings.MaxConnsPerTorrent > 0 {
+		clientCfg.EstablishedConnsPerTorrent = settings.MaxConnsPerTorrent
+	}
+	// Per-client rate limits are only applied at creation: anacrolix has no
+	// runtime setter, so a change requires a restart (the API says so).
+	if settings.DownloadLimit > 0 {
+		bytes := settings.DownloadLimit * 1024
+		clientCfg.DownloadRateLimiter = rate.NewLimiter(rate.Limit(bytes), int(clampBurst(bytes)))
+	}
+	if settings.UploadLimit > 0 {
+		bytes := settings.UploadLimit * 1024
+		clientCfg.UploadRateLimiter = rate.NewLimiter(rate.Limit(bytes), int(clampBurst(bytes)))
+	}
 
-	// Map the libtorrent network settings that anacrolix can honour.
-	if cfg.Libtorrent.ApplyIpFilter {
-		if blocklist := anacrolixBlocklist(cfg); blocklist != nil {
+	// Map the network settings that anacrolix can honour.
+	if settings.ApplyIpFilter {
+		if blocklist := anacrolixBlocklist(settings); blocklist != nil {
 			clientCfg.IPBlocklist = blocklist
 		}
 	}
-	if proxy := anacrolixHTTPProxy(cfg); proxy != nil {
+	if proxy := anacrolixHTTPProxy(settings); proxy != nil {
 		clientCfg.HTTPProxy = http.ProxyURL(proxy)
 		logging.Info("anacrolix HTTP proxy configured", "proxy", proxy.Redacted())
 	}
@@ -166,7 +210,7 @@ func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("anacrolix: create client: %w", err)
 	}
-	if nodes := anacrolixDhtNodes(cfg); len(nodes) > 0 {
+	if nodes := anacrolixDhtNodes(settings); len(nodes) > 0 {
 		client.AddDhtNodes(nodes)
 	}
 	engine := &anacrolixEngine{
@@ -1084,8 +1128,8 @@ func intToAnacrolixPriority(priority int) torrent.PiecePriority {
 // anacrolixBlocklist loads the configured local ipfilter file (eMule format).
 // URLs are ignored: fetching them at startup would add a network dependency;
 // a remote filter can be refreshed by Gextto into a local file.
-func anacrolixBlocklist(cfg *Config) iplist.Ranger {
-	path := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+func anacrolixBlocklist(settings anacrolixSettings) iplist.Ranger {
+	path := strings.TrimSpace(settings.IpFilterPath)
 	if path == "" || !fileExists(path) {
 		return nil
 	}
@@ -1104,36 +1148,36 @@ func anacrolixBlocklist(cfg *Config) iplist.Ranger {
 	return ranger
 }
 
-// anacrolixHTTPProxy maps libtorrent's HTTP proxy settings (type 3/4) onto the
-// anacrolix HTTP proxy hook. SOCKS proxies are not supported by anacrolix and
-// are reported instead of silently ignored.
-func anacrolixHTTPProxy(cfg *Config) *url.URL {
-	switch cfg.Libtorrent.ProxyType {
+// anacrolixHTTPProxy maps an HTTP proxy (type 3/4) onto the anacrolix HTTP
+// proxy hook. SOCKS proxies are not supported by anacrolix and are reported
+// instead of silently ignored.
+func anacrolixHTTPProxy(settings anacrolixSettings) *url.URL {
+	switch settings.ProxyType {
 	case 3, 4: // http, http_pw
 	default:
-		if cfg.Libtorrent.ProxyType == 1 || cfg.Libtorrent.ProxyType == 2 || cfg.Libtorrent.ProxyType == 5 {
+		if settings.ProxyType == 1 || settings.ProxyType == 2 || settings.ProxyType == 5 {
 			logging.Warn("anacrolix does not support SOCKS proxies; proxy ignored",
-				"proxy_type", cfg.Libtorrent.ProxyType)
+				"proxy_type", settings.ProxyType)
 		}
 		return nil
 	}
-	host := strings.TrimSpace(cfg.Libtorrent.ProxyHost)
-	if host == "" || cfg.Libtorrent.ProxyPort <= 0 {
+	host := strings.TrimSpace(settings.ProxyHost)
+	if host == "" || settings.ProxyPort <= 0 {
 		return nil
 	}
 	proxy := &url.URL{
 		Scheme: "http",
-		Host:   net.JoinHostPort(host, strconv.FormatInt(cfg.Libtorrent.ProxyPort, 10)),
+		Host:   net.JoinHostPort(host, strconv.FormatInt(settings.ProxyPort, 10)),
 	}
-	if user := strings.TrimSpace(cfg.Libtorrent.ProxyUser); user != "" {
-		proxy.User = url.UserPassword(user, cfg.Libtorrent.ProxyPassword)
+	if user := strings.TrimSpace(settings.ProxyUser); user != "" {
+		proxy.User = url.UserPassword(user, settings.ProxyPassword)
 	}
 	return proxy
 }
 
 // anacrolixDhtNodes splits the configured DHT bootstrap list.
-func anacrolixDhtNodes(cfg *Config) []string {
-	raw := strings.TrimSpace(cfg.Libtorrent.DhtBootstrapNodes)
+func anacrolixDhtNodes(settings anacrolixSettings) []string {
+	raw := strings.TrimSpace(settings.DhtBootstrapNodes)
 	if raw == "" {
 		return nil
 	}
@@ -1151,6 +1195,18 @@ func anacrolixDhtNodes(cfg *Config) []string {
 		}
 	}
 	return out
+}
+
+// clampBurst keeps a rate limiter burst within a sane range.
+func clampBurst(bytes int64) int64 {
+	const minimum = 256 * 1024
+	if bytes < minimum {
+		return minimum
+	}
+	if bytes > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return bytes
 }
 
 // context is referenced by future piece-check scheduling; keep the import used.

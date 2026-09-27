@@ -207,6 +207,27 @@ const SETTINGS_INDEX: &[(&str, &str, &str)] = &[
     ("qBittorrent — intervallo polling (ms)", "backend", "qbittorrent_poll_interval_ms"),
     ("qBittorrent — mappatura percorsi", "backend", "qbittorrent_path_mappings"),
     ("anacrolix — mappatura percorsi", "backend", "anacrolix_path_mappings"),
+    ("anacrolix — cartella dati", "backend", "anacrolix_data_dir"),
+    ("anacrolix — porta in ascolto", "backend", "anacrolix_listen_port"),
+    ("anacrolix — TCP", "backend", "anacrolix_tcp"),
+    ("anacrolix — uTP", "backend", "anacrolix_utp"),
+    ("anacrolix — DHT", "backend", "anacrolix_dht"),
+    ("anacrolix — PEX", "backend", "anacrolix_pex"),
+    ("anacrolix — tracker", "backend", "anacrolix_trackers"),
+    ("anacrolix — UPnP/NAT-PMP", "backend", "anacrolix_upnp"),
+    ("anacrolix — nodi bootstrap DHT", "backend", "anacrolix_dht_bootstrap_nodes"),
+    ("anacrolix — connessioni max per torrent", "backend", "anacrolix_max_conns_per_torrent"),
+    ("anacrolix — download globale", "backend", "anacrolix_download_limit_kib"),
+    ("anacrolix — upload globale", "backend", "anacrolix_upload_limit_kib"),
+    ("anacrolix — hasher per torrent", "backend", "anacrolix_piece_hashers"),
+    ("anacrolix — max byte non verificati", "backend", "anacrolix_max_unverified_mb"),
+    ("anacrolix — IP filter locale", "backend", "anacrolix_ipfilter_path"),
+    ("anacrolix — applica IP filter", "backend", "anacrolix_apply_ip_filter"),
+    ("anacrolix — tipo proxy", "backend", "anacrolix_proxy_type"),
+    ("anacrolix — proxy host", "backend", "anacrolix_proxy_host"),
+    ("anacrolix — proxy porta", "backend", "anacrolix_proxy_port"),
+    ("anacrolix — proxy utente", "backend", "anacrolix_proxy_user"),
+    ("anacrolix — proxy password", "backend", "anacrolix_proxy_password"),
     ("Motore torrent — stato e capability", "backend", ""),
     ("qBittorrent — test connessione", "backend", ""),
     // scores
@@ -7160,6 +7181,15 @@ const TORRENT_BACKEND_OPTIONS: &[(&str, &str)] = &[
     ("qbittorrent", "qBittorrent-nox"),
     ("anacrolix", "anacrolix (tag)"),
 ];
+/// Tipi proxy (stessa scala libtorrent). anacrolix supporta solo HTTP.
+const ANACROLIX_PROXY_OPTIONS: &[(&str, &str)] = &[
+    ("0", "Nessuno"),
+    ("1", "SOCKS4"),
+    ("2", "SOCKS5"),
+    ("3", "HTTP"),
+    ("4", "HTTP con password"),
+    ("5", "SOCKS5 con password"),
+];
 const RENAME_FORMAT_OPTIONS: &[(&str, &str)] = &[
     ("base", "Base"),
     ("standard", "Standard"),
@@ -7933,8 +7963,29 @@ fn SettingsView(data: RwSignal<Data>) -> impl IntoView {
                         <AreaSetting label="qBittorrent — mappatura percorsi" setting_key="qbittorrent_path_mappings" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
                     </SettingGroup>
                     <SettingGroup title="anacrolix">
+                        <p class="hint">{move || if data.get().config.get("anacrolix_built").and_then(Value::as_bool).unwrap_or(false) { tr(data, "Backend anacrolix compilato. I parametri qui sotto valgono solo con questo backend; se vuoti ereditano i valori libtorrent.") } else { tr(data, "Backend anacrolix non compilato: serve un binario con il tag anacrolix. I valori restano salvabili.") }}</p>
+                        <TextSetting label="anacrolix — cartella dati (vuoto = libtorrent)" setting_key="anacrolix_data_dir" value=Signal::derive(move || raw(&data.get().config, "anacrolix_data_dir", "")) placeholder="vuoto = libtorrent_dir" />
+                        <TextSetting label="anacrolix — porta in ascolto (vuoto = libtorrent)" setting_key="anacrolix_listen_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_listen_port", "")) placeholder="vuoto = porta minima libtorrent" />
+                        <BooleanSetting label="anacrolix — TCP" setting_key="anacrolix_tcp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_tcp", "true")) />
+                        <BooleanSetting label="anacrolix — uTP" setting_key="anacrolix_utp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_utp", "true")) />
+                        <BooleanSetting label="anacrolix — DHT" setting_key="anacrolix_dht" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht", "true")) />
+                        <BooleanSetting label="anacrolix — PEX" setting_key="anacrolix_pex" value=Signal::derive(move || raw(&data.get().config, "anacrolix_pex", "true")) />
+                        <BooleanSetting label="anacrolix — tracker" setting_key="anacrolix_trackers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_trackers", "true")) />
+                        <BooleanSetting label="anacrolix — UPnP/NAT-PMP" setting_key="anacrolix_upnp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upnp", "true")) />
+                        <TextSetting label="anacrolix — nodi bootstrap DHT" setting_key="anacrolix_dht_bootstrap_nodes" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht_bootstrap_nodes", "")) placeholder="router.bittorrent.com:6881" />
+                        <TextSetting label="anacrolix — connessioni max per torrent (vuoto = libtorrent)" setting_key="anacrolix_max_conns_per_torrent" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_conns_per_torrent", "")) placeholder="vuoto = valore libtorrent" />
+                        <TextSetting label="anacrolix — download globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_download_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_download_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
+                        <TextSetting label="anacrolix — upload globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_upload_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upload_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
+                        <TextSetting label="anacrolix — hasher per torrent" setting_key="anacrolix_piece_hashers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_piece_hashers", "2")) placeholder="2" />
+                        <TextSetting label="anacrolix — max byte non verificati (MB)" setting_key="anacrolix_max_unverified_mb" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_unverified_mb", "64")) placeholder="64" />
+                        <TextSetting label="anacrolix — IP filter locale (vuoto = libtorrent)" setting_key="anacrolix_ipfilter_path" value=Signal::derive(move || raw(&data.get().config, "anacrolix_ipfilter_path", "")) placeholder="/path/ipfilter.dat" />
+                        <BooleanSetting label="anacrolix — applica IP filter" setting_key="anacrolix_apply_ip_filter" value=Signal::derive(move || raw(&data.get().config, "anacrolix_apply_ip_filter", "false")) />
+                        <SelectSetting label="anacrolix — tipo proxy" setting_key="anacrolix_proxy_type" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_type", "0")) options=ANACROLIX_PROXY_OPTIONS />
+                        <TextSetting label="anacrolix — proxy host" setting_key="anacrolix_proxy_host" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_host", "")) placeholder="127.0.0.1" />
+                        <TextSetting label="anacrolix — proxy porta" setting_key="anacrolix_proxy_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_port", "0")) placeholder="0" />
+                        <TextSetting label="anacrolix — proxy utente" setting_key="anacrolix_proxy_user" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_user", "")) placeholder="" />
+                        <SecretSetting label="anacrolix — proxy password" setting_key="anacrolix_proxy_password" />
                         <AreaSetting label="anacrolix — mappatura percorsi" setting_key="anacrolix_path_mappings" value=Signal::derive(move || raw(&data.get().config, "anacrolix_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
-                        <p class="hint">{move || if data.get().config.get("anacrolix_built").and_then(Value::as_bool).unwrap_or(false) { tr(data, "Backend anacrolix compilato in questo binario.") } else { tr(data, "Backend anacrolix non compilato: serve un binario con il tag anacrolix.") }}</p>
                     </SettingGroup>
                 </Panel>
             </Show>

@@ -1112,6 +1112,12 @@ backend senza toccare i file di configurazione:
 `qbittorrent_password_configured`), e `scripts/check-ui-settings-index.sh`
 verifica che ogni campo sia nell'indice di ricerca.
 
+Ogni backend ha il proprio set di parametri: quelli **comuni** (coda, seed
+policy, stalled/retry, post-processing, percorsi Gextto) valgono per tutti,
+mentre `libtorrent_*`, `qbittorrent_*` e `anacrolix_*` sono specifici del
+motore. Per anacrolix ogni chiave ha il fallback al valore libtorrent quando è
+vuota (vedi `docs/aggiunta-anacrolix.md` §23).
+
 ### 26.7 Test
 
 - `internal/qbittorrent`: file priority, tracker, share limits, force-start,
