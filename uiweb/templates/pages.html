@@ -266,8 +266,8 @@
         <label>{{.Label}}</label>
         {{if eq .Kind "bool"}}
         <select data-setting-input>
-          <option value="true" {{if eq .Value "true"}}selected{{end}}>Sì</option>
-          <option value="false" {{if ne .Value "true"}}selected{{end}}>No</option>
+          <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
+          <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
         </select>
         {{else if eq .Kind "area"}}
         <textarea data-setting-input rows="2">{{.Value}}</textarea>

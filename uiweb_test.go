@@ -322,6 +322,37 @@ func TestUiJSONEditorRoundTripShape(t *testing.T) {
 	}
 }
 
+// TestUiBoolValuesPreserveSpelling guards against the settings select rewriting
+// "yes" to "true" (or "1"/"on"), which would break strict readers such as the
+// comics weekly check.
+func TestUiBoolValuesPreserveSpelling(t *testing.T) {
+	cases := []struct {
+		value      string
+		want       bool
+		trueValue  string
+		falseValue string
+	}{
+		{"yes", true, "yes", "no"},
+		{"no", false, "yes", "no"},
+		{"YES", true, "yes", "no"},
+		{"true", true, "true", "false"},
+		{"1", true, "1", "0"},
+		{"0", false, "1", "0"},
+		{"on", true, "on", "off"},
+	}
+	for _, tc := range cases {
+		got, trueValue, falseValue := uiBoolValues(tc.value)
+		if got != tc.want || trueValue != tc.trueValue || falseValue != tc.falseValue {
+			t.Errorf("uiBoolValues(%q) = %v,%q,%q want %v,%q,%q",
+				tc.value, got, trueValue, falseValue, tc.want, tc.trueValue, tc.falseValue)
+		}
+	}
+	field := uiSettingFieldFor("gap_filling", "Gap filling", "yes")
+	if field.Kind != "bool" || !field.BoolValue || field.TrueValue != "yes" || field.FalseValue != "no" {
+		t.Fatalf("unexpected bool field: %+v", field)
+	}
+}
+
 // TestUiActionPathsAreRegistered is the formal check that every endpoint the new
 // UI links or posts to is actually served by the router. A typo or a removed
 // route would otherwise only surface as a broken button at runtime.

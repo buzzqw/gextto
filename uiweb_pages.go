@@ -80,6 +80,36 @@ type uiSettingField struct {
 	Label string
 	Value string
 	Kind  string // text|bool|area|secret
+	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
+	// keep the original spelling (yes/no, 1/0, on/off, true/false) so saving the
+	// select never turns a "yes" into a "true" that strict readers would reject.
+	BoolValue  bool
+	TrueValue  string
+	FalseValue string
+}
+
+// uiBoolPairs maps the boolean spellings accepted by the backend to their pair,
+// so the settings select preserves the value style the daemon already reads.
+func uiBoolValues(value string) (bool, string, string) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "yes":
+		return true, "yes", "no"
+	case "no":
+		return false, "yes", "no"
+	case "1":
+		return true, "1", "0"
+	case "0":
+		return false, "1", "0"
+	case "on":
+		return true, "on", "off"
+	case "off":
+		return false, "on", "off"
+	case "true":
+		return true, "true", "false"
+	case "false":
+		return false, "true", "false"
+	}
+	return false, "true", "false"
 }
 
 type uiSettingsTabData struct {
@@ -132,12 +162,7 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 		if raw, present := cfg.Settings[def.Key]; present {
 			value = raw
 		}
-		page.Tabs[position].Fields = append(page.Tabs[position].Fields, uiSettingField{
-			Key:   def.Key,
-			Label: def.Label,
-			Value: value,
-			Kind:  uiSettingKind(def.Key, value),
-		})
+		page.Tabs[position].Fields = append(page.Tabs[position].Fields, uiSettingFieldFor(def.Key, def.Label, value))
 	}
 	// Any persisted setting not covered by the generated index (score groups,
 	// backup, integrations, ...) is still editable, grouped under "Altro".
@@ -155,12 +180,7 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		other.Fields = append(other.Fields, uiSettingField{
-			Key:   key,
-			Label: key,
-			Value: cfg.Settings[key],
-			Kind:  uiSettingKind(key, cfg.Settings[key]),
-		})
+		other.Fields = append(other.Fields, uiSettingFieldFor(key, key, cfg.Settings[key]))
 	}
 	if len(other.Fields) > 0 {
 		page.Tabs = append(page.Tabs, other)
@@ -176,6 +196,14 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 	page.Tabs = nonEmpty
 	page.Editors = uiJSONEditors
 	return page
+}
+
+func uiSettingFieldFor(key, label, value string) uiSettingField {
+	field := uiSettingField{Key: key, Label: label, Value: value, Kind: uiSettingKind(key, value)}
+	if field.Kind == "bool" {
+		field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(value)
+	}
+	return field
 }
 
 func uiSettingKind(key, value string) string {
