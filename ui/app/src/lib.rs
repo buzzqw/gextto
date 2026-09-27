@@ -7174,13 +7174,6 @@ const SERIES_LANGUAGE_OPTIONS: &[(&str, &str)] = &[
     ("any", "Qualsiasi"),
 ];
 const BOOL_OPTIONS: &[(&str, &str)] = &[("true", "Sì"), ("false", "No")];
-/// Backend del piano di trasferimento. `anacrolix` è selezionabile solo in un
-/// binario compilato con il tag `anacrolix`.
-const TORRENT_BACKEND_OPTIONS: &[(&str, &str)] = &[
-    ("embedded", "libtorrent integrato"),
-    ("qbittorrent", "qBittorrent-nox"),
-    ("anacrolix", "anacrolix (tag)"),
-];
 /// Tipi proxy (stessa scala libtorrent). anacrolix supporta solo HTTP.
 const ANACROLIX_PROXY_OPTIONS: &[(&str, &str)] = &[
     ("0", "Nessuno"),
@@ -7608,14 +7601,58 @@ fn SettingsSaveBar() -> impl IntoView {
     }
 }
 
-/// Pannello del motore torrent attivo: backend selezionato/attivo, stato della
-/// connessione, matrice di capability e pulsanti di test/prerequisiti. I dati
-/// arrivano da GET /api/torrent-backend.
+/// Etichetta leggibile di un backend.
+fn backend_label(name: &str) -> &'static str {
+    match name {
+        "embedded" => "libtorrent integrato",
+        "qbittorrent" => "qBittorrent-nox",
+        "anacrolix" => "anacrolix",
+        _ => "sconosciuto",
+    }
+}
+
+/// Badge di una card-motore rispetto ad attivo/configurato.
+fn backend_card_badge(active: &str, configured: &str, candidate: &str) -> (&'static str, &'static str) {
+    if active == candidate && configured == candidate {
+        ("badge ok", "in uso")
+    } else if configured == candidate {
+        ("badge warn", "da applicare al riavvio")
+    } else if active == candidate {
+        ("badge", "attivo")
+    } else {
+        ("badge", "disponibile")
+    }
+}
+
+fn capability_badge_class(level: &str) -> &'static str {
+    match level {
+        "full" => "badge ok",
+        "partial" => "badge warn",
+        _ => "badge",
+    }
+}
+
+fn capability_level_label(level: &str) -> &'static str {
+    match level {
+        "full" => "completo",
+        "partial" => "parziale",
+        _ => "assente",
+    }
+}
+
+/// Pagina "Motore torrent": riepilogo di stato, scelta del motore e
+/// configurazione contestuale del solo motore selezionato. I dati di stato
+/// arrivano da GET /api/torrent-backend, la selezione da `torrent_backend`.
 #[component]
-fn TorrentBackendPanel(data: RwSignal<Data>) -> impl IntoView {
+fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
     let status = RwSignal::new(Value::Null);
-    let message = RwSignal::new(String::new());
     let reload = RwSignal::new(0u32);
+    let message = RwSignal::new(String::new());
+    let show_capabilities = RwSignal::new(false);
+    let nav = use_context::<SettingsNav>();
+
+    let selected = RwSignal::new(raw(&data.get_untracked().config, "torrent_backend", "embedded"));
+
     Effect::new(move |_| {
         reload.get();
         spawn_local(async move {
@@ -7625,6 +7662,48 @@ fn TorrentBackendPanel(data: RwSignal<Data>) -> impl IntoView {
             }
         });
     });
+
+    let active = Signal::derive(move || text(&status.get(), "backend", "embedded"));
+    let configured = Signal::derive(move || text(&status.get(), "configured", "embedded"));
+    let has_sync = Signal::derive(move || status.get().get("sync").is_some());
+    let connected = Signal::derive(move || {
+        status
+            .get()
+            .get("sync")
+            .and_then(|sync| sync.get("connected"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    });
+    let last_sync = Signal::derive(move || {
+        status
+            .get()
+            .get("sync")
+            .and_then(|sync| sync.get("last_sync"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    });
+    let anacrolix_built = Signal::derive(move || {
+        data.get()
+            .config
+            .get("anacrolix_built")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    });
+
+    let select = move |value: &'static str| {
+        selected.set(value.to_string());
+        spawn_local(async move {
+            let _ = send(
+                "POST",
+                "/api/config/settings",
+                Some(json!({"key": "torrent_backend", "value": value})),
+            )
+            .await;
+            trigger_refresh();
+        });
+    };
+
     let capability_rows = Signal::derive(move || {
         let mut rows: Vec<(String, String)> = Vec::new();
         if let Some(map) = status.get().get("capability_matrix").and_then(Value::as_object) {
@@ -7635,23 +7714,56 @@ fn TorrentBackendPanel(data: RwSignal<Data>) -> impl IntoView {
         rows.sort();
         rows
     });
+
     view! {
-        <Panel title="Motore torrent attivo">
-            <div class="toolbar" style="margin-bottom:8px">
-                <span class="badge ok">{move || {
-                    let backend = text(&status.get(), "backend", "-");
-                    let configured = text(&status.get(), "configured", "-");
-                    format!("attivo: {backend} · configurato: {configured}")
-                }}</span>
-                <button class="btn sm" on:click=move |_| reload.update(|value| *value += 1)>{ctx_tr("Aggiorna")}</button>
-                <button class="btn sm" on:click=move |_| {
-                    spawn_local(async move {
-                        match send("POST", "/api/torrent-backend/test", None).await {
-                            Ok(value) => message.set(format!("qBittorrent {} · {} torrent", text(&value, "app_version", "?"), value.get("torrents").and_then(Value::as_i64).unwrap_or(0))),
-                            Err(error) => message.set(error),
+        <Panel title="Motore torrent">
+            // ---- riepilogo di stato ----
+            <div class="live-grid">
+                <div class="live-card">
+                    <div class="live-head">
+                        <span class="muted">{ctx_tr("Motore attivo")}</span>
+                        <span class="badge ok">{move || backend_label(&active.get())}</span>
+                    </div>
+                    <small class="muted">{move || format!("identificativo: {}", active.get())}</small>
+                </div>
+                <div class="live-card">
+                    <div class="live-head">
+                        <span class="muted">{ctx_tr("Configurato")}</span>
+                        <span class=move || if configured.get() == active.get() { "badge ok" } else { "badge warn" }>
+                            {move || if configured.get() == active.get() { ctx_tr("in uso").get() } else { ctx_tr("da applicare").get() }}
+                        </span>
+                    </div>
+                    <small class="muted">{move || backend_label(&configured.get())}</small>
+                </div>
+                <div class="live-card">
+                    <div class="live-head">
+                        <span class="muted">{ctx_tr("Stato")}</span>
+                        <span class=move || if has_sync.get() { if connected.get() { "badge ok" } else { "badge err" } } else { "badge ok" }>
+                            {move || if has_sync.get() { if connected.get() { ctx_tr("connesso").get() } else { ctx_tr("non raggiungibile").get() } } else { ctx_tr("attivo").get() } }
+                        </span>
+                    </div>
+                    <small class="muted">{move || {
+                        if has_sync.get() && !last_sync.get().is_empty() {
+                            format!("ultima sincronizzazione: {}", last_sync.get())
+                        } else {
+                            ctx_tr("nessuna sincronizzazione esterna").get()
                         }
-                    });
-                }>{ctx_tr("Test connessione")}</button>
+                    }}</small>
+                </div>
+            </div>
+
+            <Show when=move || configured.get() != active.get()>
+                <div class="mode-banner" style="margin-top:12px">
+                    <strong>{ctx_tr("Riavvio necessario")}</strong>
+                    <span>{move || format!(
+                        "Il motore configurato ({}) si applica solo al riavvio di Gextto; nel frattempo resta attivo {}.",
+                        backend_label(&configured.get()),
+                        backend_label(&active.get()),
+                    )}</span>
+                </div>
+            </Show>
+
+            <div class="toolbar" style="margin-top:14px">
                 <button class="btn sm primary" on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-backend/preflight", None).await {
@@ -7663,23 +7775,46 @@ fn TorrentBackendPanel(data: RwSignal<Data>) -> impl IntoView {
                         }
                     });
                 }>{ctx_tr("Verifica prerequisiti")}</button>
+                <Show when=move || configured.get() == "qbittorrent" || active.get() == "qbittorrent">
+                    <button class="btn sm" on:click=move |_| {
+                        spawn_local(async move {
+                            match send("POST", "/api/torrent-backend/test", None).await {
+                                Ok(value) => message.set(format!(
+                                    "qBittorrent {} · {} torrent",
+                                    text(&value, "app_version", "?"),
+                                    value.get("torrents").and_then(Value::as_i64).unwrap_or(0),
+                                )),
+                                Err(error) => message.set(error),
+                            }
+                        });
+                    }>{ctx_tr("Test connessione")}</button>
+                </Show>
                 <button class="btn sm" on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-backend", None).await {
                             Ok(value) => {
                                 let restart = value.get("restart_required").and_then(Value::as_bool).unwrap_or(false);
-                                let message = if restart {
+                                let text = if restart {
                                     text(&value, "message", "Riavvia Gextto per applicare il nuovo motore.")
                                 } else {
-                                    "Il motore attivo è già quello configurato.".to_string()
+                                    "La configurazione è già attiva.".to_string()
                                 };
-                                flash_text(data, "ok", message);
+                                flash_text(data, "ok", text);
                                 reload.update(|value| *value += 1);
                             }
                             Err(error) => flash_text(data, "err", error),
                         }
                     });
-                }>{ctx_tr("Attiva backend")}</button>
+                }>{ctx_tr("Applica configurazione")}</button>
+                <button class="btn sm" on:click=move |_| reload.update(|value| *value += 1)>{ctx_tr("Aggiorna stato")}</button>
+            </div>
+            <small class="muted">{message}</small>
+
+            <div class="field span-full" style="margin:18px 0 6px">
+                <span>{ctx_tr("Manutenzione")}</span>
+                <small class="hint">{ctx_tr("Azioni applicate al motore attivo.")}</small>
+            </div>
+            <div class="toolbar">
                 <button class="btn sm" on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrents/optimize_settings", None).await {
@@ -7687,27 +7822,167 @@ fn TorrentBackendPanel(data: RwSignal<Data>) -> impl IntoView {
                             Err(error) => flash_text(data, "err", error),
                         }
                     });
-                }>{ctx_tr("Ottimizza")}</button>
+                }>{ctx_tr("Ottimizza cache")}</button>
                 <button class="btn sm" on:click=move |_| {
                     spawn_local(async move {
                         match send("POST", "/api/torrent-migrations/plan", None).await {
                             Ok(value) => {
-                                let items = value.get("manifest").and_then(|manifest| manifest.get("items")).and_then(Value::as_array).map(|items| items.len()).unwrap_or(0);
-                                flash_text(data, "ok", format!("Piano di migrazione salvato: {items} torrent. Il passaggio avviene al riavvio."));
+                                let items = value
+                                    .get("manifest")
+                                    .and_then(|manifest| manifest.get("items"))
+                                    .and_then(Value::as_array)
+                                    .map(|items| items.len())
+                                    .unwrap_or(0);
+                                flash_text(data, "ok", format!(
+                                    "Piano di migrazione salvato: {items} torrent. Il passaggio avviene al riavvio."
+                                ));
                             }
                             Err(error) => flash_text(data, "err", error),
                         }
                     });
                 }>{ctx_tr("Pianifica migrazione")}</button>
+                <button class="btn sm" on:click=move |_| show_capabilities.update(|value| *value = !*value)>
+                    {move || if show_capabilities.get() { ctx_tr("Nascondi capability").get() } else { ctx_tr("Mostra capability").get() }}
+                </button>
             </div>
-            <small class="muted">{message}</small>
-            <div class="grid-2">
-                <SettingGroup title="Capability">
-                    {move || capability_rows.get().into_iter().map(|(key, level)| view! {
-                        <div class="settings-row"><label>{key}</label><small class="muted">{level}</small></div>
+            <Show when=move || show_capabilities.get()>
+                <div class="grid-2" style="margin-top:10px">
+                    {move || capability_rows.get().into_iter().map(|(key, level)| {
+                        let class = capability_badge_class(&level);
+                        let label = capability_level_label(&level).to_string();
+                        view! { <div class="row"><span class="mono">{key}</span><span class=class>{label}</span></div> }
                     }).collect_view()}
-                </SettingGroup>
+                </div>
+            </Show>
+        </Panel>
+
+        // ---- scelta del motore ----
+        <Panel title="Scelta del motore">
+            <p class="muted">{ctx_tr("Gextto mantiene coda, automazioni e post-processing: scegli solo chi muove i byte. Il cambio si applica al prossimo riavvio del servizio.")}</p>
+            <div class="live-grid" id="setting-torrent_backend">
+                <div class="live-card"
+                    style=move || if selected.get() == "embedded" { "border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; cursor: pointer;" } else { "cursor: pointer;" }
+                    on:click=move |_| select("embedded")>
+                    <div class="live-head">
+                        <strong>"libtorrent integrato"</strong>
+                        {move || {
+                            let (class, label) = backend_card_badge(&active.get(), &configured.get(), "embedded");
+                            view! { <span class=class>{label}</span> }
+                        }}
+                    </div>
+                    <small class="muted">{ctx_tr("Motore C++ ufficiale, predefinito e più collaudato. Configurazione nella scheda Libtorrent.")}</small>
+                </div>
+                <div class="live-card"
+                    style=move || if selected.get() == "qbittorrent" { "border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; cursor: pointer;" } else { "cursor: pointer;" }
+                    on:click=move |_| select("qbittorrent")>
+                    <div class="live-head">
+                        <strong>"qBittorrent-nox"</strong>
+                        {move || {
+                            let (class, label) = backend_card_badge(&active.get(), &configured.get(), "qbittorrent");
+                            view! { <span class=class>{label}</span> }
+                        }}
+                    </div>
+                    <small class="muted">{ctx_tr("Motore esterno via Web API: utile se hai già qBittorrent o vuoi usare la sua interfaccia.")}</small>
+                </div>
+                <div class="live-card"
+                    style=move || if selected.get() == "anacrolix" { "border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; cursor: pointer;" } else { "cursor: pointer;" }
+                    on:click=move |_| select("anacrolix")>
+                    <div class="live-head">
+                        <strong>"anacrolix"</strong>
+                        {move || {
+                            if anacrolix_built.get() {
+                                let (class, label) = backend_card_badge(&active.get(), &configured.get(), "anacrolix");
+                                view! { <span class=class>{label}</span> }
+                            } else {
+                                view! { <span class="badge err">"non compilato"</span> }
+                            }
+                        }}
+                    </div>
+                    <small class="muted">{ctx_tr("Motore nativo Go (opzionale): diagnosi per pezzo e download selettivo. Richiede un binario col tag anacrolix.")}</small>
+                </div>
             </div>
+
+            // ---- configurazione contestuale ----
+            <Show when=move || selected.get() == "embedded">
+                <div class="mode-banner active" style="margin-top:14px">
+                    <strong>{ctx_tr("Motore integrato")}</strong>
+                    <span>{ctx_tr("Le impostazioni di rete, cache e coda sono nella scheda Libtorrent.")}</span>
+                    <button class="btn sm" on:click=move |_| {
+                        if let Some(nav) = nav {
+                            nav.tab.set("libtorrent".to_string());
+                        }
+                    }>{ctx_tr("Apri scheda Libtorrent")}</button>
+                </div>
+            </Show>
+
+            <Show when=move || selected.get() == "qbittorrent">
+                <div class="grid-2" style="margin-top:14px">
+                    <SettingGroup title="Connessione">
+                        <TextSetting label="URL Web API" setting_key="qbittorrent_url" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_url", "")) placeholder="http://127.0.0.1:8080" />
+                        <TextSetting label="Utente" setting_key="qbittorrent_username" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_username", "")) placeholder="admin" />
+                        <SecretSetting label="Password" setting_key="qbittorrent_password" />
+                        <TextSetting label="Timeout richieste (secondi)" setting_key="qbittorrent_request_timeout_secs" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_request_timeout_secs", "15")) placeholder="15" />
+                        <TextSetting label="Intervallo polling (ms)" setting_key="qbittorrent_poll_interval_ms" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_poll_interval_ms", "1500")) placeholder="1500" />
+                    </SettingGroup>
+                    <SettingGroup title="Organizzazione">
+                        <TextSetting label="Categoria" setting_key="qbittorrent_category" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_category", "")) placeholder="gextto" />
+                        <TextSetting label="Tag" setting_key="qbittorrent_tag" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_tag", "")) placeholder="gextto" />
+                        <p class="hint">{ctx_tr("Categoria e tag marcano i torrent gestiti da Gextto: i torrent senza marcatura restano non gestiti.")}</p>
+                    </SettingGroup>
+                    <div class="setting-group" style="grid-column: 1 / -1;">
+                        <h4>"Percorsi condivisi"</h4>
+                        <div class="setting-group-body">
+                            <AreaSetting label="Mappatura percorsi (Gextto=backend)" setting_key="qbittorrent_path_mappings" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
+                            <p class="hint">{ctx_tr("Una riga per cartella, nel formato percorso Gextto = percorso visto da qBittorrent. Obbligatoria se i due processi non condividono lo stesso filesystem.")}</p>
+                        </div>
+                    </div>
+                </div>
+            </Show>
+
+            <Show when=move || selected.get() == "anacrolix">
+                <div class="mode-banner" class:active=move || anacrolix_built.get() style="margin-top:14px">
+                    <strong>{move || if anacrolix_built.get() { ctx_tr("anacrolix compilato").get() } else { ctx_tr("anacrolix non compilato").get() }}</strong>
+                    <span>{move || if anacrolix_built.get() {
+                        ctx_tr("I parametri valgono solo con questo motore; se un campo è vuoto eredita il valore dalla scheda Libtorrent.").get()
+                    } else {
+                        ctx_tr("Serve un binario compilato con il tag anacrolix. I valori restano comunque salvabili.").get()
+                    }}</span>
+                </div>
+                <div class="grid-2" style="margin-top:14px">
+                    <SettingGroup title="Storage">
+                        <TextSetting label="Cartella dati (vuoto = libtorrent)" setting_key="anacrolix_data_dir" value=Signal::derive(move || raw(&data.get().config, "anacrolix_data_dir", "")) placeholder="vuoto = libtorrent_dir" />
+                        <AreaSetting label="Mappatura percorsi" setting_key="anacrolix_path_mappings" value=Signal::derive(move || raw(&data.get().config, "anacrolix_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
+                    </SettingGroup>
+                    <SettingGroup title="Rete">
+                        <TextSetting label="Porta in ascolto (vuoto = libtorrent)" setting_key="anacrolix_listen_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_listen_port", "")) placeholder="vuoto = porta minima libtorrent" />
+                        <BooleanSetting label="TCP" setting_key="anacrolix_tcp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_tcp", "true")) />
+                        <BooleanSetting label="uTP" setting_key="anacrolix_utp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_utp", "true")) />
+                        <BooleanSetting label="DHT" setting_key="anacrolix_dht" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht", "true")) />
+                        <BooleanSetting label="PEX" setting_key="anacrolix_pex" value=Signal::derive(move || raw(&data.get().config, "anacrolix_pex", "true")) />
+                        <BooleanSetting label="Tracker" setting_key="anacrolix_trackers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_trackers", "true")) />
+                        <BooleanSetting label="UPnP/NAT-PMP" setting_key="anacrolix_upnp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upnp", "true")) />
+                        <TextSetting label="Nodi bootstrap DHT" setting_key="anacrolix_dht_bootstrap_nodes" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht_bootstrap_nodes", "")) placeholder="router.bittorrent.com:6881" />
+                        <TextSetting label="Connessioni max per torrent (vuoto = libtorrent)" setting_key="anacrolix_max_conns_per_torrent" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_conns_per_torrent", "")) placeholder="vuoto = valore libtorrent" />
+                    </SettingGroup>
+                    <SettingGroup title="Prestazioni">
+                        <TextSetting label="Download globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_download_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_download_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
+                        <TextSetting label="Upload globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_upload_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upload_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
+                        <TextSetting label="Hasher per torrent" setting_key="anacrolix_piece_hashers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_piece_hashers", "2")) placeholder="2" />
+                        <TextSetting label="Max byte non verificati (MB)" setting_key="anacrolix_max_unverified_mb" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_unverified_mb", "64")) placeholder="64" />
+                        <p class="hint">{ctx_tr("I limiti globali si applicano alla creazione del client: la modifica richiede un riavvio.")}</p>
+                    </SettingGroup>
+                    <SettingGroup title="Sicurezza">
+                        <TextSetting label="IP filter locale (vuoto = libtorrent)" setting_key="anacrolix_ipfilter_path" value=Signal::derive(move || raw(&data.get().config, "anacrolix_ipfilter_path", "")) placeholder="/path/ipfilter.dat" />
+                        <BooleanSetting label="Applica IP filter" setting_key="anacrolix_apply_ip_filter" value=Signal::derive(move || raw(&data.get().config, "anacrolix_apply_ip_filter", "false")) />
+                        <SelectSetting label="Tipo proxy" setting_key="anacrolix_proxy_type" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_type", "0")) options=ANACROLIX_PROXY_OPTIONS />
+                        <TextSetting label="Proxy host" setting_key="anacrolix_proxy_host" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_host", "")) placeholder="127.0.0.1" />
+                        <TextSetting label="Proxy porta" setting_key="anacrolix_proxy_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_port", "0")) placeholder="0" />
+                        <TextSetting label="Proxy utente" setting_key="anacrolix_proxy_user" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_user", "")) placeholder="" />
+                        <SecretSetting label="Proxy password" setting_key="anacrolix_proxy_password" />
+                        <p class="hint">{ctx_tr("anacrolix supporta solo proxy HTTP: i tipi SOCKS vengono segnalati e ignorati.")}</p>
+                    </SettingGroup>
+                </div>
+            </Show>
         </Panel>
     }
 }
@@ -7948,46 +8223,7 @@ fn SettingsView(data: RwSignal<Data>) -> impl IntoView {
                 </Panel>
             </Show>
             <Show when=move || tab.get() == "backend">
-                <TorrentBackendPanel data />
-                <Panel title="Configurazione motore torrent">
-                    <p class="muted">{ctx_tr("Scegli quale motore BitTorrent muove i dati. Gextto mantiene coda, automazioni e post-processing. Il cambio si applica al riavvio del servizio; con un motore diverso da libtorrent la sessione integrata non parte, per evitare che due motori scrivano sugli stessi file.")}</p>
-                    <SelectSetting label="Motore torrent" setting_key="torrent_backend" value=Signal::derive(move || raw(&data.get().config, "torrent_backend", "embedded")) options=TORRENT_BACKEND_OPTIONS />
-                    <SettingGroup title="qBittorrent-nox">
-                        <TextSetting label="qBittorrent — URL Web API" setting_key="qbittorrent_url" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_url", "")) placeholder="http://127.0.0.1:8080" />
-                        <TextSetting label="qBittorrent — utente" setting_key="qbittorrent_username" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_username", "")) placeholder="admin" />
-                        <SecretSetting label="qBittorrent — password" setting_key="qbittorrent_password" />
-                        <TextSetting label="qBittorrent — categoria" setting_key="qbittorrent_category" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_category", "")) placeholder="gextto" />
-                        <TextSetting label="qBittorrent — tag" setting_key="qbittorrent_tag" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_tag", "")) placeholder="gextto" />
-                        <TextSetting label="qBittorrent — timeout richieste (secondi)" setting_key="qbittorrent_request_timeout_secs" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_request_timeout_secs", "15")) placeholder="15" />
-                        <TextSetting label="qBittorrent — intervallo polling (ms)" setting_key="qbittorrent_poll_interval_ms" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_poll_interval_ms", "1500")) placeholder="1500" />
-                        <AreaSetting label="qBittorrent — mappatura percorsi" setting_key="qbittorrent_path_mappings" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
-                    </SettingGroup>
-                    <SettingGroup title="anacrolix">
-                        <p class="hint">{move || if data.get().config.get("anacrolix_built").and_then(Value::as_bool).unwrap_or(false) { tr(data, "Backend anacrolix compilato. I parametri qui sotto valgono solo con questo backend; se vuoti ereditano i valori libtorrent.") } else { tr(data, "Backend anacrolix non compilato: serve un binario con il tag anacrolix. I valori restano salvabili.") }}</p>
-                        <TextSetting label="anacrolix — cartella dati (vuoto = libtorrent)" setting_key="anacrolix_data_dir" value=Signal::derive(move || raw(&data.get().config, "anacrolix_data_dir", "")) placeholder="vuoto = libtorrent_dir" />
-                        <TextSetting label="anacrolix — porta in ascolto (vuoto = libtorrent)" setting_key="anacrolix_listen_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_listen_port", "")) placeholder="vuoto = porta minima libtorrent" />
-                        <BooleanSetting label="anacrolix — TCP" setting_key="anacrolix_tcp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_tcp", "true")) />
-                        <BooleanSetting label="anacrolix — uTP" setting_key="anacrolix_utp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_utp", "true")) />
-                        <BooleanSetting label="anacrolix — DHT" setting_key="anacrolix_dht" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht", "true")) />
-                        <BooleanSetting label="anacrolix — PEX" setting_key="anacrolix_pex" value=Signal::derive(move || raw(&data.get().config, "anacrolix_pex", "true")) />
-                        <BooleanSetting label="anacrolix — tracker" setting_key="anacrolix_trackers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_trackers", "true")) />
-                        <BooleanSetting label="anacrolix — UPnP/NAT-PMP" setting_key="anacrolix_upnp" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upnp", "true")) />
-                        <TextSetting label="anacrolix — nodi bootstrap DHT" setting_key="anacrolix_dht_bootstrap_nodes" value=Signal::derive(move || raw(&data.get().config, "anacrolix_dht_bootstrap_nodes", "")) placeholder="router.bittorrent.com:6881" />
-                        <TextSetting label="anacrolix — connessioni max per torrent (vuoto = libtorrent)" setting_key="anacrolix_max_conns_per_torrent" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_conns_per_torrent", "")) placeholder="vuoto = valore libtorrent" />
-                        <TextSetting label="anacrolix — download globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_download_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_download_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
-                        <TextSetting label="anacrolix — upload globale (KiB/s, vuoto = libtorrent)" setting_key="anacrolix_upload_limit_kib" value=Signal::derive(move || raw(&data.get().config, "anacrolix_upload_limit_kib", "")) placeholder="vuoto = valore libtorrent" />
-                        <TextSetting label="anacrolix — hasher per torrent" setting_key="anacrolix_piece_hashers" value=Signal::derive(move || raw(&data.get().config, "anacrolix_piece_hashers", "2")) placeholder="2" />
-                        <TextSetting label="anacrolix — max byte non verificati (MB)" setting_key="anacrolix_max_unverified_mb" value=Signal::derive(move || raw(&data.get().config, "anacrolix_max_unverified_mb", "64")) placeholder="64" />
-                        <TextSetting label="anacrolix — IP filter locale (vuoto = libtorrent)" setting_key="anacrolix_ipfilter_path" value=Signal::derive(move || raw(&data.get().config, "anacrolix_ipfilter_path", "")) placeholder="/path/ipfilter.dat" />
-                        <BooleanSetting label="anacrolix — applica IP filter" setting_key="anacrolix_apply_ip_filter" value=Signal::derive(move || raw(&data.get().config, "anacrolix_apply_ip_filter", "false")) />
-                        <SelectSetting label="anacrolix — tipo proxy" setting_key="anacrolix_proxy_type" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_type", "0")) options=ANACROLIX_PROXY_OPTIONS />
-                        <TextSetting label="anacrolix — proxy host" setting_key="anacrolix_proxy_host" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_host", "")) placeholder="127.0.0.1" />
-                        <TextSetting label="anacrolix — proxy porta" setting_key="anacrolix_proxy_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_port", "0")) placeholder="0" />
-                        <TextSetting label="anacrolix — proxy utente" setting_key="anacrolix_proxy_user" value=Signal::derive(move || raw(&data.get().config, "anacrolix_proxy_user", "")) placeholder="" />
-                        <SecretSetting label="anacrolix — proxy password" setting_key="anacrolix_proxy_password" />
-                        <AreaSetting label="anacrolix — mappatura percorsi" setting_key="anacrolix_path_mappings" value=Signal::derive(move || raw(&data.get().config, "anacrolix_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
-                    </SettingGroup>
-                </Panel>
+                <TorrentBackendSettings data />
             </Show>
             <Show when=move || tab.get() == "scores">
                 <Panel title="Punteggi qualità">
