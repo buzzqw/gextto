@@ -529,6 +529,7 @@ eng:
   "In seed": "Seeding"
   "Ripristino": "Restoring"
   "In coda": "Queued"
+  "In attesa di seed": "Waiting for seeds"
   "Sconosciuto": "Unknown"
   "∞ (infinito)": "∞ (unlimited)"
   "globale": "global"

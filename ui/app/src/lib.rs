@@ -3066,6 +3066,7 @@ fn torrent_state_label(state: &str) -> (&'static str, &'static str) {
         "seeding" => ("In seed", "ok"),
         "checking_resume_data" => ("Ripristino", ""),
         "queued" => ("In coda", "warn"),
+        "stalled" => ("In attesa di seed", "warn"),
         _ if state.to_lowercase().contains("paus") => ("In pausa", "warn"),
         _ if state.to_lowercase().contains("coda") => ("In coda", "warn"),
         _ => ("Sconosciuto", ""),
