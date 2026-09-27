@@ -37,6 +37,11 @@ type uiTableSpec struct {
 	Search      bool
 	SearchParam string
 	Query       string
+	// Comics enables the extra panels of the comics page (download queue and
+	// GetComics link finder) and the columns/actions of the queue table.
+	Comics               bool
+	DownloadsColumnsJSON string
+	DownloadsActionsJSON string
 }
 
 // uiSearchPage drives the Esplora page: a query form, a generic result table and
@@ -278,8 +283,23 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Label: "Disattiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":false}`},
 				{Label: "Elimina", Class: "danger", Method: "DELETE", Path: "/api/comics/{id}", Body: "{}", Confirm: "Eliminare questo fumetto monitorizzato?"},
 			}),
-			Empty: "Nessun fumetto monitorizzato.",
-			Note:  "Download, ricerca link e pianificazione settimanale restano nella UI classica (/legacy).",
+			Empty:  "Nessun fumetto monitorizzato.",
+			Note:   "Tag dei download e pianificazione settimanale restano nella UI classica (/legacy).",
+			Comics: true,
+			DownloadsColumnsJSON: uiJSON([]uiColumn{
+				{Key: "title", Label: "Titolo"},
+				{Key: "method", Label: "Metodo"},
+				{Key: "status", Label: "Stato"},
+				{Key: "progress", Label: "Avanzamento", Format: "percent"},
+				{Key: "downloaded_bytes", Label: "Scaricato", Format: "bytes"},
+				{Key: "speed_bytes", Label: "Velocità", Format: "rate"},
+				{Key: "tag", Label: "Tag"},
+			}),
+			DownloadsActionsJSON: uiJSON([]uiAction{
+				{Label: "Pausa", Method: "POST", Path: "/api/comics/downloads/{id}/pause", Body: "{}"},
+				{Label: "Riprendi", Method: "POST", Path: "/api/comics/downloads/{id}/resume", Body: "{}"},
+				{Label: "Rimuovi", Class: "danger", Method: "POST", Path: "/api/comics/downloads/{id}/remove", Body: "{}", Confirm: "Rimuovere questo download?"},
+			}),
 		}, true
 	default:
 		return uiTableSpec{}, false

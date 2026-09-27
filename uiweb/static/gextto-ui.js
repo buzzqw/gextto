@@ -289,6 +289,44 @@
     });
   }
 
+  // ---- comics: GetComics link finder --------------------------------------
+  var comicsDownload = document.querySelector("[data-comics-download]");
+  if (comicsDownload) {
+    var comicsInput = comicsDownload.querySelector("[data-comics-post]");
+    var comicsMessage = comicsDownload.querySelector("[data-comics-message]");
+    var comicsResults = comicsDownload.querySelector("[data-comics-results]");
+    var comicsLinks = comicsDownload.querySelector("[data-comics-links]");
+    var comicGroups = [
+      { key: "download_now", label: "Download diretto", method: "download_now" },
+      { key: "direct", label: "File diretti", method: "direct" },
+      { key: "torrents", label: "Torrent", method: "torrent" },
+      { key: "magnets", label: "Magnet", method: "magnet" },
+      { key: "mega", label: "Mega", method: "mega" }
+    ];
+    comicsLinks.addEventListener("click", function () {
+      var postURL = comicsInput.value.trim();
+      if (!postURL) { alert("Inserisci l'URL del post GetComics"); return; }
+      comicsLinks.disabled = true;
+      if (comicsMessage) comicsMessage.textContent = "Ricerca in corso…";
+      api("/api/comics/links", "POST", { url: postURL }).then(function (data) {
+        var links = (data && data.links) || {};
+        var html = comicGroups.map(function (group) {
+          var values = links[group.key] || [];
+          if (!values.length) return "";
+          return '<div class="field span-full" style="margin-top:10px"><span>' + esc(group.label) + "</span></div>" +
+            '<div class="toolbar">' + values.map(function (value) {
+              var body = JSON.stringify({ url: value, method: group.method, title: "", post_url: postURL });
+              return '<button class="btn sm" data-api="/api/comics/download" data-method="POST" data-body="' + esc(body) + '" title="' + esc(value) + '">Scarica</button>';
+            }).join(" ") + "</div>";
+        }).join("");
+        comicsResults.innerHTML = html || '<p class="muted">Nessun link trovato.</p>';
+        if (comicsMessage) comicsMessage.textContent = "";
+      }).catch(function (error) {
+        if (comicsMessage) comicsMessage.textContent = error.message;
+      }).then(function () { comicsLinks.disabled = false; });
+    });
+  }
+
   // ---- generic actions ----------------------------------------------------
   document.addEventListener("click", function (event) {
     var element = event.target.closest("[data-api]");

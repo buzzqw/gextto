@@ -28,6 +28,33 @@
            data-search="{{.SearchParam}}"></div>
     </div>
   </div>
+  {{if .Comics}}
+  <div class="panel" style="margin-top:14px">
+    <div class="panel-head"><h3>Download in corso</h3><small class="muted" data-ui-count></small></div>
+    <div class="panel-body">
+      <div class="toolbar" style="margin-bottom:10px"><button class="btn sm" data-ui-refresh title="Ricarica i download">Aggiorna</button></div>
+      <div class="table-wrap"><table class="data-table"><thead data-ui-head></thead><tbody data-ui-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>
+      <div data-ui-table
+           data-endpoint="/api/comics/downloads"
+           data-items=""
+           data-columns="{{.DownloadsColumnsJSON}}"
+           data-actions="{{.DownloadsActionsJSON}}"
+           data-empty="Nessun download in corso."
+           data-search=""></div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:14px" data-comics-download>
+    <div class="panel-head"><h3>Scarica da GetComics</h3></div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <input data-comics-post placeholder="URL del post GetComics" style="min-width:320px" />
+        <button class="btn sm primary" data-comics-links title="Trova i link nel post">Trova link</button>
+        <small class="muted" data-comics-message></small>
+      </div>
+      <div data-comics-results></div>
+    </div>
+  </div>
+  {{end}}
 </div>
 {{end}}
 
