@@ -28,7 +28,13 @@
   </aside>
   <div class="content">
     <main id="ui-page" data-view="{{.Page}}">
-      <div class="loading">Caricamento…</div>
+      {{if eq .Page "dashboard"}}{{template "dashboard" .Content}}
+      {{else if eq .Page "downloads"}}{{template "torrents" .Content}}
+      {{else if eq .Page "health"}}{{template "health" .Content}}
+      {{else if eq .Page "logs"}}{{template "logs" .Content}}
+      {{else if eq .Page "manual"}}{{template "manual" .Content}}
+      {{else if eq .Page "license"}}{{template "license" .Content}}
+      {{else}}{{template "unavailable" .Content}}{{end}}
     </main>
   </div>
 </div>
@@ -129,6 +135,79 @@
       <p class="muted">Nessun torrent nella sessione.</p>
       {{end}}
     </div>
+  </div>
+</div>
+{{end}}
+
+{{define "health"}}
+<div class="view">
+  <div class="grid-4">
+    <div class="metric"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong></div>
+    <div class="metric"><span class="metric-sub">Memoria processo</span><strong>{{humanBytesU .Health.ResidentBytes}}</strong><small class="muted">su {{humanBytesU .Health.MemoryTotalBytes}}</small></div>
+    <div class="metric"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{humanBytesU .Health.DiskFreeBytes}} liberi</small></div>
+    <div class="metric"><span class="metric-sub">Uptime</span><strong>{{.Uptime}}</strong><small class="muted">processo {{.ProcessUptime}}</small></div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3>Percorsi</h3></div>
+      <div class="panel-body">
+        {{range .Health.Paths}}
+        <div class="row"><span>{{.Label}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · {{if .Exists}}presente{{else}}assente{{end}} · {{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></div>
+        {{end}}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Dischi</h3></div>
+      <div class="panel-body">
+        {{range .Health.Disks}}
+        <div class="row"><span>{{.Mount}} <small class="muted">{{.Filesystem}}</small></span><span class="muted">{{humanBytesU .FreeBytes}} / {{humanBytesU .TotalBytes}}</span></div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  {{if .Health.LastErrors}}
+  <div class="panel">
+    <div class="panel-head"><h3>Ultimi errori</h3></div>
+    <div class="panel-body">
+      {{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "logs"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Log</h3><small class="muted">ultime {{.Count}} righe</small></div>
+    <div class="panel-body"><pre class="log-view">{{range .Lines}}{{.}}
+{{end}}</pre></div>
+  </div>
+</div>
+{{end}}
+
+{{define "manual"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Manuale</h3></div>
+    <div class="panel-body manual-body">
+      {{range .Lines}}
+      {{if eq .Heading 1}}<h1>{{.Text}}</h1>
+      {{else if eq .Heading 2}}<h2>{{.Text}}</h2>
+      {{else if eq .Heading 3}}<h3>{{.Text}}</h3>
+      {{else if gt .Heading 0}}<h4>{{.Text}}</h4>
+      {{else}}<p>{{.Text}}</p>{{end}}
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "license"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Licenza</h3></div>
+    <div class="panel-body"><pre class="log-view">{{.Text}}</pre></div>
   </div>
 </div>
 {{end}}

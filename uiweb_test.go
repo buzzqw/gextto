@@ -82,37 +82,41 @@ func TestUiPartialTorrentsEscapesTorrentName(t *testing.T) {
 	}
 }
 
-func TestUiPartialsRequireTokenButShellIsPublic(t *testing.T) {
+func TestUiPagesArePublicOnLan(t *testing.T) {
 	state := newTestAppState(t)
-	token := "ui-secret-token"
-	if err := SaveSetting(state.cfg.DataDir, "api_token", token); err != nil {
+	// A token may be configured, but the new UI is meant for a trusted LAN and
+	// does not gate its pages or partials.
+	if err := SaveSetting(state.cfg.DataDir, "api_token", "lan-token"); err != nil {
 		t.Fatalf("save token: %v", err)
 	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	// The shell contains no data and stays public, like the legacy SPA shell.
-	if code, _, _ := webGet(t, server, "/ui"); code != http.StatusOK {
-		t.Fatalf("shell should be public: %d", code)
+	for _, path := range []string{"/ui", "/ui/partial/dashboard", "/ui/partial/torrents"} {
+		if code, _, _ := webGet(t, server, path); code != http.StatusOK {
+			t.Fatalf("GET %s -> %d, want 200", path, code)
+		}
 	}
-	// A data partial must require the token.
-	response, err := http.Get(server.URL + "/ui/partial/dashboard")
-	if err != nil {
-		t.Fatal(err)
+}
+
+func TestUiServerRenderedPages(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	cases := map[string]string{
+		"dashboard": "Stato daemon",
+		"downloads": "Scarico",
+		"health":    "Percorsi",
+		"logs":      "Log",
+		"manual":    "Manuale",
+		"license":   "Licenza",
 	}
-	response.Body.Close()
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("partial without token -> %d, want 401", response.StatusCode)
-	}
-	request, _ := http.NewRequest(http.MethodGet, server.URL+"/ui/partial/dashboard", nil)
-	request.Header.Set("x-gextto-token", token)
-	authorized, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authorized.Body.Close()
-	if authorized.StatusCode != http.StatusOK {
-		t.Fatalf("partial with token -> %d, want 200", authorized.StatusCode)
+	for view, marker := range cases {
+		code, _, body := webGet(t, server, "/ui?view="+view)
+		if code != http.StatusOK || !strings.Contains(string(body), marker) {
+			t.Fatalf("GET /ui?view=%s -> %d, missing %q", view, code, marker)
+		}
 	}
 }
 

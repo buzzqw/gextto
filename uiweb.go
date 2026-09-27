@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"math"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -30,9 +31,16 @@ import (
 //go:embed uiweb/templates/*.html uiweb/static/*
 var uiwebFS embed.FS
 
+//go:embed LICENSE
+var uiLicenseText string
+
+//go:embed docs/MANUAL.it.md
+var uiManualText string
+
 var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
-	"humanBytes": logging.HumanBytesI64,
-	"humanRate":  func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
+	"humanBytes":  logging.HumanBytesI64,
+	"humanBytesU": func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
+	"humanRate":   func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
 }).ParseFS(uiwebFS, "uiweb/templates/*.html"))
 
 // uiNavItem is one navigation entry of the new shell.
@@ -53,9 +61,10 @@ type uiNavGroup struct {
 
 // uiShellData renders the application frame.
 type uiShellData struct {
-	Title  string
-	Page   string
-	Groups []uiNavGroup
+	Title   string
+	Page    string
+	Groups  []uiNavGroup
+	Content any
 }
 
 // uiDashboardData is the view-model of the dashboard partial.
@@ -101,6 +110,36 @@ type uiTorrentsData struct {
 	Rows      []uiTorrentRow
 	Count     int
 	UpdatedAt string
+}
+
+// uiHealthData is the view-model of the Salute page.
+type uiHealthData struct {
+	Health        Health
+	DiskUsedPct   string
+	Uptime        string
+	ProcessUptime string
+}
+
+// uiLogsData is the view-model of the Log page.
+type uiLogsData struct {
+	Lines []string
+	Count int
+}
+
+// uiMdLine is one line of the minimal manual renderer.
+type uiMdLine struct {
+	Heading int
+	Text    string
+}
+
+// uiManualData is the view-model of the Manuale page.
+type uiManualData struct {
+	Lines []uiMdLine
+}
+
+// uiLicenseData is the view-model of the Licenza page.
+type uiLicenseData struct {
+	Text string
 }
 
 // uiNavDefinition mirrors the NAV_GROUPS of the current UI so the two
@@ -196,18 +235,42 @@ func uiRender(w http.ResponseWriter, status int, name string, data any) {
 	_, _ = w.Write(buffer.Bytes())
 }
 
-// UiPage serves the new shell. The dynamic region is filled by the client from
-// the authenticated partials, exactly like the legacy SPA loads its data.
+// UiPage serves the new shell with the requested page rendered server-side, so
+// the interface is usable even without JavaScript. The optional client script
+// only adds polling and actions.
 func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := strings.TrimSpace(r.URL.Query().Get("view"))
 	if view == "" {
 		view = "dashboard"
 	}
 	uiRender(w, http.StatusOK, "shell", uiShellData{
-		Title:  uiPageLabel(view),
-		Page:   view,
-		Groups: uiNavigation(view),
+		Title:   uiPageLabel(view),
+		Page:    view,
+		Groups:  uiNavigation(view),
+		Content: uiPageContent(s, view),
 	})
+}
+
+// uiPageContent builds the view-model of the requested page. Pages that are not
+// migrated yet get the placeholder model, which links back to the legacy UI so
+// no functionality is ever missing.
+func uiPageContent(s *AppState, view string) any {
+	switch view {
+	case "dashboard":
+		return uiDashboardDataFrom(s)
+	case "downloads":
+		return uiTorrentsDataFrom(s)
+	case "health":
+		return uiHealthDataFrom(s)
+	case "logs":
+		return uiLogsDataFrom(s)
+	case "manual":
+		return uiManualDataFrom()
+	case "license":
+		return uiLicenseData{Text: uiLicenseText}
+	default:
+		return map[string]any{"Title": uiPageLabel(view)}
+	}
 }
 
 // UiPartialDashboard renders the dashboard with server-side data.
@@ -217,12 +280,7 @@ func UiPartialDashboard(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // UiPartialTorrents renders the Scarico table with server-side data.
 func UiPartialTorrents(w http.ResponseWriter, r *http.Request, s *AppState) {
-	rows := uiTorrentRows(s)
-	uiRender(w, http.StatusOK, "torrents", uiTorrentsData{
-		Rows:      rows,
-		Count:     len(rows),
-		UpdatedAt: uiNowClock(),
-	})
+	uiRender(w, http.StatusOK, "torrents", uiTorrentsDataFrom(s))
 }
 
 // UiPartialUnavailable is the honest placeholder for pages not migrated yet:
@@ -265,6 +323,83 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	data.CycleGaps = cycle.GapsFilled
 	data.CycleErrors = cycle.Errors
 	return data
+}
+
+// uiHealthDataFrom builds the Salute view-model from the same health check used
+// by the JSON API, so the two pages cannot diverge.
+func uiHealthDataFrom(s *AppState) uiHealthData {
+	trash := ""
+	if s.cfg.TrashPath != nil {
+		trash = *s.cfg.TrashPath
+	}
+	ramdisk := ""
+	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
+		ramdisk = value
+	}
+	health := CheckWithPaths(&HealthPaths{
+		DataDir:      s.cfg.DataDir,
+		TrashPath:    trash,
+		DownloadPath: s.cfg.LibtorrentDir,
+		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
+		RamdiskPath:  ramdisk,
+	})
+	usedPct := "n/d"
+	if health.DiskTotalBytes > 0 {
+		used := health.DiskTotalBytes - health.DiskFreeBytes
+		usedPct = strconv.FormatFloat(float64(used)/float64(health.DiskTotalBytes)*100, 'f', 1, 64) + "%"
+	}
+	return uiHealthData{
+		Health:        health,
+		DiskUsedPct:   usedPct,
+		Uptime:        logging.HumanDuration(saturatingInt64(health.UptimeSeconds)),
+		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
+	}
+}
+
+// uiLogsDataFrom reads the same log tail the JSON API exposes.
+func uiLogsDataFrom(s *AppState) uiLogsData {
+	lines := coreTailLines(filepath.Join(s.cfg.DataDir, "gextto.log"), 500)
+	return uiLogsData{Lines: lines, Count: len(lines)}
+}
+
+// uiManualDataFrom renders the bundled Italian manual with a minimal, escaped
+// Markdown pass (headings and paragraphs only; lists and code stay readable).
+func uiManualDataFrom() uiManualData {
+	return uiManualData{Lines: uiManualLines(uiManualText)}
+}
+
+func uiManualLines(text string) []uiMdLine {
+	lines := make([]uiMdLine, 0, 256)
+	for _, raw := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "#") {
+			level := 0
+			for level < len(trimmed) && trimmed[level] == '#' {
+				level++
+			}
+			if level > 6 {
+				level = 6
+			}
+			lines = append(lines, uiMdLine{Heading: level, Text: strings.TrimSpace(trimmed[level:])})
+			continue
+		}
+		lines = append(lines, uiMdLine{Text: trimmed})
+	}
+	return lines
+}
+
+// uiTorrentsDataFrom builds the Scarico view-model for both the full page and
+// the polling partial.
+func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
+	rows := uiTorrentRows(s)
+	return uiTorrentsData{
+		Rows:      rows,
+		Count:     len(rows),
+		UpdatedAt: uiNowClock(),
+	}
 }
 
 func uiTorrentRows(s *AppState) []uiTorrentRow {

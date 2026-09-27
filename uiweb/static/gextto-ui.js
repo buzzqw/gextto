@@ -43,7 +43,8 @@
   };
 
   function load() {
-    var url = partials[view] || "/ui/partial/unavailable?view=" + encodeURIComponent(view);
+    var url = partials[view];
+    if (!url) return Promise.resolve();
     return api(url, "GET")
       .then(function (html) {
         page.innerHTML = html;
@@ -72,13 +73,13 @@
     var hash = element.getAttribute("data-hash") || "";
 
     if (action === "refresh") {
-      load();
+      if (partials[view]) { load(); } else { location.reload(); }
       return;
     }
     if (action === "run-cycle") {
       element.disabled = true;
       api("/api/run_now", "POST", {})
-        .then(load)
+        .then(function () { if (partials[view]) { load(); } else { location.reload(); } })
         .catch(function (error) { alert("Ciclo non avviato: " + error.message); })
         .then(function () { element.disabled = false; });
       return;
@@ -104,6 +105,5 @@
   });
 
   document.addEventListener("visibilitychange", schedule);
-  load();
   schedule();
 })();
