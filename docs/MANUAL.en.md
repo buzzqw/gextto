@@ -362,7 +362,16 @@ Notifications, Paths, Translations**. Unsaved changes are highlighted with a
   Results may identify the source as `jackett:TrackerName`.
 - **libtorrent** — connections/performance, protocols/trackers, security/proxy,
   RAM disk and ports, speed limits and scheduler; apply/optimise/update check.
-  The RAM disk section lists available `tmpfs`/`ramfs` mounts and lets you
+  If you move a torrent's storage to a folder that **already holds the data**,
+  it is not rejected: Gextto associates the torrent with the existing files and
+  re-checks them (seeds) instead of re-downloading. **Preallocate disk space**
+  (on by default) reserves the full size of every new
+  torrent up front: it avoids fragmentation on NAS/HDD and surfaces "no space"
+  immediately; it can be turned off per torrent in the add form. **Copy .torrent
+  files to** names a folder where Gextto copies the `.torrent` of every started
+  torrent (once metadata is available), handy to reuse it with another client or
+  as a backup. The RAM disk section lists available `tmpfs`/`ramfs` mounts and
+  lets you
   choose one. If no path is configured, its button creates and configures
   `/dev/shm/gextto`. The contents of `/dev/shm` are temporary and are lost
   when the machine reboots. Choosing a path automatically calculates the

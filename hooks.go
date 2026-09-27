@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -145,6 +146,12 @@ func ValidateHooks(hooks []EventHook) string {
 		}
 		if len(hook.Program) > 4096 || len(hook.Args) > 8192 || len(hook.Name) > 200 {
 			return "an event hook is too large"
+		}
+		// The program is executed directly (never through a shell): require an
+		// absolute path so a relative/ambiguous entry cannot resolve to an
+		// unexpected executable from PATH.
+		if !filepath.IsAbs(strings.TrimSpace(hook.Program)) {
+			return fmt.Sprintf("hook '%s' program must be an absolute path", strings.TrimSpace(hook.Name))
 		}
 		if hook.TimeoutSecs > 86_400 {
 			return "an event hook timeout exceeds 24h"

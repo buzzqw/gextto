@@ -395,6 +395,21 @@ type TorrentView struct {
 	TotalSize       int64   `json:"total_size"`
 	TotalDone       int64   `json:"total_done"`
 	Stalled         bool    `json:"stalled"`
+	// Rich status exposed by libtorrent that the UI and diagnostics can use.
+	Error             string  `json:"error"`
+	CurrentTracker    string  `json:"current_tracker"`
+	NumComplete       int     `json:"num_complete"`
+	NumIncomplete     int     `json:"num_incomplete"`
+	NumConnections    int     `json:"num_connections"`
+	ConnectCandidates int     `json:"connect_candidates"`
+	FinishedSeconds   int64   `json:"finished_seconds"`
+	ActiveSeconds     int64   `json:"active_seconds"`
+	IsSeeding         bool    `json:"is_seeding"`
+	Sequential        bool    `json:"sequential_download"`
+	SuperSeeding      bool    `json:"super_seeding"`
+	UploadMode        bool    `json:"upload_mode"`
+	ShareMode         bool    `json:"share_mode"`
+	DistributedCopies float64 `json:"distributed_copies"`
 }
 
 // ProviderStatus is the escalating backoff state of one source.
@@ -413,22 +428,36 @@ type TorrentEvent struct {
 	Hash     string `json:"hash"`
 	Name     string `json:"name"`
 	SavePath string `json:"save_path"`
+	Message  string `json:"message,omitempty"`
 }
 
 // PeerView is one peer of a torrent.
 type PeerView struct {
-	Address      string `json:"address"`
-	Client       string `json:"client"`
-	DownloadRate uint64 `json:"download_rate"`
-	UploadRate   uint64 `json:"upload_rate"`
-	Pieces       int    `json:"pieces"`
-	Seed         bool   `json:"seed"`
+	Address       string  `json:"address"`
+	Client        string  `json:"client"`
+	DownloadRate  uint64  `json:"download_rate"`
+	UploadRate    uint64  `json:"upload_rate"`
+	Pieces        int     `json:"pieces"`
+	Seed          bool    `json:"seed"`
+	Progress      float64 `json:"progress"`
+	TotalUpload   int64   `json:"total_upload"`
+	TotalDownload int64   `json:"total_download"`
+	Incoming      bool    `json:"incoming"`
+	Encrypted     bool    `json:"encrypted"`
+	Utp           bool    `json:"utp"`
 }
 
 // TrackerView is one tracker of a torrent.
 type TrackerView struct {
-	URL  string `json:"url"`
-	Tier int    `json:"tier"`
+	URL              string `json:"url"`
+	Tier             int    `json:"tier"`
+	Message          string `json:"message,omitempty"`
+	Fails            int    `json:"fails"`
+	NextAnnounce     int    `json:"next_announce"`
+	Verified         bool   `json:"verified"`
+	ScrapeIncomplete int    `json:"scrape_incomplete"`
+	ScrapeComplete   int    `json:"scrape_complete"`
+	ScrapeDownloaded int    `json:"scrape_downloaded"`
 }
 
 // FileView is one file of a torrent.

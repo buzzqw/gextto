@@ -6,6 +6,7 @@
 #include <libtorrent/read_resume_data.hpp>
 #include <libtorrent/session.hpp>
 #include <libtorrent/session_params.hpp>
+#include <libtorrent/session_stats.hpp>
 #include <libtorrent/settings_pack.hpp>
 #include <libtorrent/torrent_flags.hpp>
 #include <libtorrent/torrent_info.hpp>
@@ -21,9 +22,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -58,6 +61,17 @@ struct gextto_lt_session {
         settings.set_bool(lt::settings_pack::enable_lsd, lsd);
         settings.set_bool(lt::settings_pack::enable_upnp, upnp);
         settings.set_bool(lt::settings_pack::enable_natpmp, natpmp);
+        // Without this the session only emits error alerts (the default mask is
+        // 0x1): lifecycle events the wrapper relies on (metadata, finished,
+        // storage moved, checked) and every tracker/file/peer error would be
+        // silently dropped. Enable the categories we consume.
+        const auto alert_categories =
+            lt::alert_category::error | lt::alert_category::status | lt::alert_category::storage
+            | lt::alert_category::tracker | lt::alert_category::connect
+            | lt::alert_category::port_mapping | lt::alert_category::performance_warning
+            | lt::alert_category::dht | lt::alert_category::ip_block | lt::alert_category::stats;
+        settings.set_int(lt::settings_pack::alert_mask,
+            static_cast<int>(static_cast<std::uint32_t>(alert_categories)));
         return lt::session_params(std::move(settings));
     }
 
@@ -85,6 +99,9 @@ struct gextto_lt_session {
     bool dynamic_was_enabled = false;
     int dynamic_saturation = 0;
     int dynamic_underused = 0;
+    // Latest session counters from a `session_stats_alert` (see
+    // gextto_lt_session_stats).
+    std::map<std::string, std::int64_t> last_session_stats;
     // ETA-based queue order from the last pass; the queue is only reordered
     // when it actually changes, to avoid queue-position thrashing.
     std::vector<std::string> last_queue_order;
@@ -141,9 +158,20 @@ static void collect_events(gextto_lt_session* session) {
     std::vector<lt::alert*> alerts;
     session->session.pop_alerts(&alerts);
     for (auto* alert : alerts) {
+        // Session counters are not lifecycle events: snapshot them and move on.
+        if (auto* stats = lt::alert_cast<lt::session_stats_alert>(alert)) {
+            const auto metrics = lt::session_stats_metrics();
+            const auto counters = stats->counters();
+            for (auto const& metric : metrics) {
+                if (metric.value_index >= 0 && metric.value_index < static_cast<int>(counters.size()))
+                    session->last_session_stats[std::string(metric.name)] = counters[metric.value_index];
+            }
+            continue;
+        }
         int kind = 0;
         lt::torrent_handle handle;
         const char* moved_path = nullptr;
+        std::string message = alert->message();
         if (const auto* event = lt::alert_cast<lt::metadata_received_alert>(alert)) { kind = 1; handle = event->handle; handle.set_flags(lt::torrent_flags::auto_managed); }
         else if (const auto* event = lt::alert_cast<lt::torrent_finished_alert>(alert)) { kind = 2; handle = event->handle; }
         else if (const auto* event = lt::alert_cast<lt::storage_moved_alert>(alert)) { kind = 3; handle = event->handle; moved_path = event->storage_path(); }
@@ -152,13 +180,30 @@ static void collect_events(gextto_lt_session* session) {
         // exists, leaving the torrent on the RAM disk forever.
         else if (const auto* event = lt::alert_cast<lt::storage_moved_failed_alert>(alert)) { kind = 4; handle = event->handle; }
         else if (const auto* event = lt::alert_cast<lt::torrent_checked_alert>(alert)) { kind = 5; handle = event->handle; }
-        if (kind == 0 || !handle.is_valid()) continue;
-        auto status = handle.status(lt::torrent_handle::query_name | lt::torrent_handle::query_save_path);
+        // Error alerts: without an explicit alert_mask these were delivered but
+        // never surfaced. They carry a human-readable message via `message()`.
+        else if (const auto* event = lt::alert_cast<lt::torrent_error_alert>(alert)) { kind = 6; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::file_error_alert>(alert)) { kind = 7; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::tracker_error_alert>(alert)) { kind = 8; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::metadata_failed_alert>(alert)) { kind = 9; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::hash_failed_alert>(alert)) { kind = 10; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::save_resume_data_failed_alert>(alert)) { kind = 11; handle = event->handle; }
+        else if (const auto* event = lt::alert_cast<lt::torrent_removed_alert>(alert)) { kind = 12; handle = event->handle; }
+        // Session-level errors have no torrent handle.
+        else if (lt::alert_cast<lt::portmap_error_alert>(alert)) { kind = 13; }
+        else if (lt::alert_cast<lt::session_error_alert>(alert)) { kind = 14; }
+        if (kind == 0) continue;
+        const bool session_level = (kind == 13 || kind == 14);
+        if (!session_level && !handle.is_valid()) continue;
         gextto_lt_event output{};
         output.kind = kind;
-        copy_string(output.hash, sizeof(output.hash), hex_hash(handle));
-        copy_string(output.name, sizeof(output.name), status.name);
-        copy_string(output.save_path, sizeof(output.save_path), moved_path == nullptr ? status.save_path : moved_path);
+        if (handle.is_valid()) {
+            auto status = handle.status(lt::torrent_handle::query_name | lt::torrent_handle::query_save_path);
+            copy_string(output.hash, sizeof(output.hash), hex_hash(handle));
+            copy_string(output.name, sizeof(output.name), status.name);
+            copy_string(output.save_path, sizeof(output.save_path), moved_path == nullptr ? status.save_path : moved_path);
+        }
+        copy_string(output.message, sizeof(output.message), message);
         session->events.push_back(output);
     }
 }
@@ -435,20 +480,15 @@ int gextto_lt_add_file(gextto_lt_session* session, const char* torrent_path, con
     return 0;
 }
 
-// Add-time option flags shared by the `*_ex` entry points. The bitmask keeps
-// the ABI tiny and lets the Rust `AddOptions` struct grow without new C
-// signatures.
-enum GexttoAddFlags {
-    GEXTTO_ADD_PAUSED = 1,
-    GEXTTO_ADD_SEQUENTIAL = 2,
-    GEXTTO_ADD_SEED_MODE = 4,
-    GEXTTO_ADD_QUEUE_TOP = 8,
-};
-
+// Add-time option flags shared by the `*_ex` entry points. The constants are
+// declared in native/libtorrent_bridge.h so the Go layer and the bridge agree
+// on the ABI.
 static void gextto_apply_add_flags(lt::add_torrent_params& params, int flags) {
     if (flags & GEXTTO_ADD_PAUSED) params.flags |= lt::torrent_flags::paused;
     if (flags & GEXTTO_ADD_SEQUENTIAL) params.flags |= lt::torrent_flags::sequential_download;
     if (flags & GEXTTO_ADD_SEED_MODE) params.flags |= lt::torrent_flags::seed_mode;
+    if (flags & GEXTTO_ADD_PREALLOCATE) params.storage_mode = lt::storage_mode_allocate;
+    if (flags & GEXTTO_ADD_STOP_WHEN_READY) params.flags |= lt::torrent_flags::stop_when_ready;
 }
 
 int gextto_lt_add_ex(gextto_lt_session* session, const char* magnet, const char* save_path, int flags, char* error, size_t error_size) {
@@ -522,7 +562,8 @@ size_t gextto_lt_statuses(const gextto_lt_session* session, gextto_lt_status* ou
     if (session == nullptr) return 0;
     auto statuses = session->session.get_torrent_status(
         [](lt::torrent_status const&) { return true; },
-        lt::torrent_handle::query_name | lt::torrent_handle::query_save_path);
+        lt::torrent_handle::query_name | lt::torrent_handle::query_save_path
+            | lt::torrent_handle::query_accurate_download_counters);
     if (output == nullptr || capacity == 0) return statuses.size();
     const size_t count = std::min(capacity, statuses.size());
     for (size_t i = 0; i < count; ++i) {
@@ -531,21 +572,39 @@ size_t gextto_lt_statuses(const gextto_lt_session* session, gextto_lt_status* ou
         copy_string(output[i].hash, sizeof(output[i].hash), hex_hash(status.handle));
         copy_string(output[i].name, sizeof(output[i].name), status.name);
         copy_string(output[i].save_path, sizeof(output[i].save_path), status.save_path);
+        copy_string(output[i].error, sizeof(output[i].error), status.error);
+        copy_string(output[i].current_tracker, sizeof(output[i].current_tracker), status.current_tracker);
         output[i].progress = static_cast<double>(status.progress) * 100.0;
         output[i].state = static_cast<int>(status.state);
         output[i].paused = static_cast<bool>(status.flags & lt::torrent_flags::paused) ? 1 : 0;
         output[i].download_rate = status.download_rate;
         output[i].upload_rate = status.upload_rate;
+        output[i].download_payload_rate = status.download_payload_rate;
+        output[i].upload_payload_rate = status.upload_payload_rate;
         output[i].num_peers = status.num_peers;
         output[i].num_seeds = status.num_seeds;
+        output[i].num_complete = status.num_complete;
+        output[i].num_incomplete = status.num_incomplete;
+        output[i].num_connections = status.num_connections;
+        output[i].connect_candidates = status.connect_candidates;
         output[i].download_limit = status.handle.download_limit();
         output[i].upload_limit = status.handle.upload_limit();
         output[i].all_time_upload = status.all_time_upload;
         output[i].all_time_download = status.all_time_download;
         output[i].seeding_seconds = status.seeding_duration.count();
+        output[i].finished_time = std::chrono::duration_cast<std::chrono::seconds>(
+            status.finished_duration).count();
+        output[i].active_time = std::chrono::duration_cast<std::chrono::seconds>(
+            status.active_duration).count();
         output[i].queue_position = static_cast<int>(status.queue_position);
         output[i].has_metadata = status.has_metadata ? 1 : 0;
         output[i].auto_managed = static_cast<bool>(status.flags & lt::torrent_flags::auto_managed) ? 1 : 0;
+        output[i].is_seeding = status.is_seeding ? 1 : 0;
+        output[i].sequential_download = static_cast<bool>(status.flags & lt::torrent_flags::sequential_download) ? 1 : 0;
+        output[i].super_seeding = static_cast<bool>(status.flags & lt::torrent_flags::super_seeding) ? 1 : 0;
+        output[i].upload_mode = static_cast<bool>(status.flags & lt::torrent_flags::upload_mode) ? 1 : 0;
+        output[i].share_mode = static_cast<bool>(status.flags & lt::torrent_flags::share_mode) ? 1 : 0;
+        output[i].distributed_copies = status.distributed_copies;
         output[i].torrent_version = 0;
         output[i].total_size = status.total_wanted;
         output[i].total_done = status.total_wanted_done;
@@ -864,6 +923,15 @@ size_t gextto_lt_peers(gextto_lt_session* session, const char* hash, gextto_lt_p
             output[i].upload_rate = peers[i].payload_up_speed;
             output[i].num_pieces = peers[i].num_pieces;
             output[i].seed = static_cast<bool>(peers[i].flags & lt::peer_info::seed) ? 1 : 0;
+            int flags = 0;
+            if (peers[i].flags & lt::peer_info::seed) flags |= 1;
+            if (peers[i].source & lt::peer_info::incoming) flags |= 2;
+            if (peers[i].flags & (lt::peer_info::rc4_encrypted | lt::peer_info::plaintext_encrypted)) flags |= 4;
+            if (peers[i].flags & lt::peer_info::utp_socket) flags |= 8;
+            output[i].flags = flags;
+            output[i].progress = peers[i].progress * 100.0f;
+            output[i].total_upload = peers[i].total_upload;
+            output[i].total_download = peers[i].total_download;
         }
         return count;
     } catch (const std::exception& exception) {
@@ -884,6 +952,17 @@ size_t gextto_lt_trackers(gextto_lt_session* session, const char* hash, gextto_l
             output[i] = {};
             copy_string(output[i].url, sizeof(output[i].url), trackers[i].url);
             output[i].tier = trackers[i].tier;
+            output[i].verified = trackers[i].verified ? 1 : 0;
+            // Per-endpoint state lives in `endpoints` in libtorrent 2.0; the
+            // announce_entry fields are deprecated under ABI v2.
+            if (!trackers[i].endpoints.empty()) {
+                const auto& endpoint = trackers[i].endpoints.front();
+                copy_string(output[i].message, sizeof(output[i].message), endpoint.message);
+                output[i].fails = endpoint.fails;
+                output[i].scrape_incomplete = endpoint.scrape_incomplete;
+                output[i].scrape_complete = endpoint.scrape_complete;
+                output[i].scrape_downloaded = endpoint.scrape_downloaded;
+            }
         }
         return count;
     } catch (const std::exception& exception) {
@@ -934,6 +1013,29 @@ int gextto_lt_move_storage(gextto_lt_session* session, const char* hash, const c
         return 1;
     } catch (const std::exception& exception) {
         set_error(error, error_size, exception.what());
+    }
+    return 0;
+}
+
+int gextto_lt_associate_storage(gextto_lt_session* session, const char* hash, const char* destination, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    if (session == nullptr || hash == nullptr || destination == nullptr) {
+        set_error(error, error_size, "invalid associate storage parameters");
+        return 0;
+    }
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        // `reset_save_path` changes the save path without moving files and makes
+        // libtorrent re-check the data at the new location. When the destination
+        // already holds the payload this associates (and seeds) it instead of
+        // failing with "already exists".
+        handle.move_storage(destination, lt::move_flags_t::reset_save_path);
+        return 1;
+    } catch (const std::exception& exception) {
+        set_error(error, error_size, exception.what());
+    } catch (...) {
+        set_error(error, error_size, "unknown associate storage error");
     }
     return 0;
 }
@@ -1392,6 +1494,126 @@ int gextto_lt_save_resume(gextto_lt_session* session, const char* state_dir, cha
     } catch (...) {
         set_error(error, error_size, "unknown fastresume error");
     }
+    return 0;
+}
+
+int gextto_lt_set_max_connections(gextto_lt_session* session, const char* hash, int max_connections, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.set_max_connections(max_connections < 0 ? 0 : max_connections);
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown max-connections error"); }
+    return 0;
+}
+
+int gextto_lt_set_max_uploads(gextto_lt_session* session, const char* hash, int max_uploads, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.set_max_uploads(max_uploads < 0 ? 0 : max_uploads);
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown max-uploads error"); }
+    return 0;
+}
+
+int gextto_lt_set_upload_mode(gextto_lt_session* session, const char* hash, int enabled, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.set_upload_mode(enabled != 0);
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown upload-mode error"); }
+    return 0;
+}
+
+int gextto_lt_set_share_mode(gextto_lt_session* session, const char* hash, int enabled, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.set_share_mode(enabled != 0);
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown share-mode error"); }
+    return 0;
+}
+
+int gextto_lt_set_torrent_flag(gextto_lt_session* session, const char* hash, int flag, int enabled, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        lt::torrent_flags_t target;
+        switch (flag) {
+        case GEXTTO_TFLAG_APPLY_IP_FILTER: target = lt::torrent_flags::apply_ip_filter; break;
+        case GEXTTO_TFLAG_DISABLE_DHT: target = lt::torrent_flags::disable_dht; break;
+        case GEXTTO_TFLAG_DISABLE_PEX: target = lt::torrent_flags::disable_pex; break;
+        case GEXTTO_TFLAG_DISABLE_LSD: target = lt::torrent_flags::disable_lsd; break;
+        default: set_error(error, error_size, "unknown torrent flag"); return 0;
+        }
+        if (enabled) handle.set_flags(target); else handle.unset_flags(target);
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown torrent-flag error"); }
+    return 0;
+}
+
+int gextto_lt_scrape_tracker(gextto_lt_session* session, const char* hash, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.scrape_tracker();
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown scrape error"); }
+    return 0;
+}
+
+int gextto_lt_force_dht_announce(gextto_lt_session* session, const char* hash, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    try {
+        auto handle = find_torrent(session, hash);
+        if (!handle.is_valid()) { set_error(error, error_size, "torrent not found"); return 0; }
+        handle.force_dht_announce();
+        return 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown dht announce error"); }
+    return 0;
+}
+
+int gextto_lt_session_stats(gextto_lt_session* session, char* output, size_t output_size, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    if (session == nullptr || output == nullptr || output_size == 0) { set_error(error, error_size, "invalid session stats parameters"); return 0; }
+    try {
+        session->last_session_stats.clear();
+        session->session.post_session_stats();
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        while (session->last_session_stats.empty() && std::chrono::steady_clock::now() < deadline) {
+            collect_events(session);
+            if (session->last_session_stats.empty())
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+        std::ostringstream json;
+        json << "{";
+        bool first = true;
+        for (auto const& entry : session->last_session_stats) {
+            if (!first) json << ",";
+            first = false;
+            json << "\"" << entry.first << "\":" << entry.second;
+        }
+        json << "}";
+        copy_string(output, output_size, json.str());
+        return session->last_session_stats.empty() ? 0 : 1;
+    } catch (const std::exception& exception) { set_error(error, error_size, exception.what()); }
+    catch (...) { set_error(error, error_size, "unknown session stats error"); }
     return 0;
 }
 }

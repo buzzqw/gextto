@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // The settings UI reads these keys from GET /api/config; if the view omits them
@@ -103,6 +107,82 @@ func TestApiTokenSetAtRuntimeIsEnforced(t *testing.T) {
 	// Public liveness endpoints stay reachable.
 	if code, _, _ := webGet(t, server, "/api/health"); code != http.StatusOK {
 		t.Fatalf("health should stay public: %d", code)
+	}
+}
+
+func TestAddOptionsPreallocationAndStopFlags(t *testing.T) {
+	opts := AddOptions{Preallocate: true, StopWhenReady: true}
+	flags := opts.Flags()
+	if flags&(1<<4) == 0 {
+		t.Fatalf("preallocate flag bit missing: %b", flags)
+	}
+	if flags&(1<<5) == 0 {
+		t.Fatalf("stop-when-ready flag bit missing: %b", flags)
+	}
+}
+
+func TestLibtorrentPreallocateDefaultsToTrue(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Settings == nil {
+		cfg.Settings = map[string]string{}
+	}
+	if !cfg.LibtorrentPreallocate() {
+		t.Fatal("preallocation must default to true")
+	}
+	cfg.Settings["libtorrent_preallocate"] = "false"
+	if cfg.LibtorrentPreallocate() {
+		t.Fatal("explicit false ignored")
+	}
+	cfg.Settings["libtorrent_preallocate"] = "yes"
+	if !cfg.LibtorrentPreallocate() {
+		t.Fatal("explicit yes must enable preallocation")
+	}
+}
+
+func TestCopyTorrentFileHonoursSetting(t *testing.T) {
+	dir := t.TempDir()
+	client := &LibtorrentClient{configDB: filepath.Join(dir, "gextto_config.db"), stateDir: dir}
+	client.torrents = map[string]models.TorrentView{"abc": {Hash: "abc", Name: "My Torrent"}}
+
+	// Without the setting nothing is copied.
+	source := filepath.Join(dir, "src.torrent")
+	if err := os.WriteFile(source, []byte("torrent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	client.copyTorrentFile("abc", source)
+	outDir := filepath.Join(dir, "torrents")
+	if _, err := os.Stat(outDir); !os.IsNotExist(err) {
+		t.Fatalf("copy happened without the setting: %v", err)
+	}
+
+	// With the setting the .torrent is copied under the display name.
+	if err := SaveSetting(dir, "libtorrent_torrent_copy_dir", outDir); err != nil {
+		t.Fatal(err)
+	}
+	client.copyTorrentFile("abc", source)
+	target := filepath.Join(outDir, "My Torrent.torrent")
+	if data, err := os.ReadFile(target); err != nil || string(data) != "torrent" {
+		t.Fatalf("torrent not copied to %s: %v %q", target, err, data)
+	}
+}
+
+func TestLibtorrentSessionStatsEndpoint(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/api/libtorrent/session-stats")
+	if code != http.StatusOK {
+		t.Fatalf("session-stats -> %d: %s", code, body)
+	}
+	var result struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatalf("decode: %v (%s)", err, body)
+	}
+	if !result.OK {
+		t.Fatalf("session-stats not ok: %s", body)
 	}
 }
 

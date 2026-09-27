@@ -43,9 +43,14 @@ o disco locale).
 - **Torrent** — libtorrent embedded: coda, limiti, tag, peer, tracker, file,
   spostamento storage, politica di seeding, fastresume, killswitch VPN e recupero
   dopo riavvio. I torrent **stalled** vengono messi realmente in pausa e fuori
-  dagli slot attivi, poi riprovati automaticamente. In aggiunta: pausa, sequenziale, salta-verifica, cima-coda,
-  primo/ultimo pezzo, solo-metadati; priorità per-file, web seed, modifica
-  tracker, super seeding ed export `.torrent`/magnet nel dettaglio torrent.
+  dagli slot attivi, poi riprovati automaticamente. I nuovi download sono
+  **preallocati su disco** di default (interruttore nelle impostazioni e per
+  singolo torrent). In aggiunta: pausa, sequenziale, salta-verifica, cima-coda,
+  primo/ultimo pezzo, solo-metadati, preallocazione; priorità per-file, limiti
+  per-torrent di connessioni/upload, upload/share mode, web seed, modifica
+  tracker, scrape/DHT announce, super seeding ed export `.torrent`/magnet nel
+  dettaglio torrent. Il `.torrent` di ogni torrent avviato può essere copiato in
+  una cartella indicata.
 - **Fumetti** — monitoraggio GetComics e weekly pack. Ogni fumetto aggiunto
   (weekly pack, titolo monitorato o *Download Now*) riceve il tag **`Comic`**,
   così la regola *Percorsi NAS per categoria (tag)* lo instrada nella cartella
@@ -215,9 +220,11 @@ make build            # -> bin/gexttod
 CGO_ENABLED=1 go build -o bin/gexttod ./cmd/gexttod
 ```
 
-La UI web è inclusa nel binario con `//go:embed`, quindi non serve una build UI
-separata; un bundle su disco in `GEXTTO_UI_DIR` (o `<exe>/ui`) ha comunque la
-precedenza per lo sviluppo.
+La UI web è inclusa nel binario con `//go:embed` da `webui/pkg`, quindi una build
+normale non richiede passi UI. Il sorgente Leptos è in `ui/`; dopo averlo
+modificato, rigenera il bundle con `make ui` (servono `cargo leptos` e il target
+`wasm32-unknown-unknown`), che aggiorna `webui/pkg`. Un bundle su disco in
+`GEXTTO_UI_DIR` (o `<exe>/ui`) ha comunque la precedenza per lo sviluppo.
 
 Per una prova locale in modalità dry-run, senza download reali:
 

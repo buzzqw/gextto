@@ -897,6 +897,8 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"ramdisk_margin_gb":                 settingsOr(cfg, "libtorrent_ramdisk_margin_gb", "0.5"),
 		"ramdisk_min_free_bytes":            settingsOr(cfg, "libtorrent_ramdisk_min_free_bytes", ""),
 		"auto_optimize":                     settingsOr(cfg, "libtorrent_auto_optimize", "false"),
+		"preallocate":                       cfg.LibtorrentPreallocate(),
+		"torrent_copy_dir":                  settingsOr(cfg, "libtorrent_torrent_copy_dir", ""),
 	}
 
 	paths := map[string]any{

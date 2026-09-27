@@ -34,3 +34,8 @@ gextto.json
 .vscode/
 .opencode/
 .claude/
+
+# UI build output
+ui/target/
+ui/end2end/node_modules/
+ui/end2end/test-results/

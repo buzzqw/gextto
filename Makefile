@@ -25,6 +25,14 @@ vet:
 fmt:
 	gofmt -w .
 
+# Regenerate the embedded web UI from ui/ (needs cargo-leptos + wasm target).
+ui:
+	scripts/build-ui.sh
+
+# Fail when a UI setting is missing from the "Cerca impostazioni" index.
+check-ui:
+	scripts/check-ui-settings-index.sh
+
 tidy:
 	go mod tidy
 

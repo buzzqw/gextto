@@ -763,6 +763,9 @@ type AddTorrentInput struct {
 	QueueTop       bool    `json:"queue_top"`
 	FirstLast      bool    `json:"first_last"`
 	StopAtMetadata bool    `json:"stop_at_metadata"`
+	// Preallocate overrides the global `libtorrent_preallocate` setting for
+	// this add; nil means "use the global default".
+	Preallocate *bool `json:"preallocate"`
 }
 
 // ScorePreviewInput is the input of `score_preview`.
@@ -924,6 +927,9 @@ type TorrentLimits struct {
 	UploadLimit   int64    `json:"upload_limit"`
 	SeedRatio     *float64 `json:"seed_ratio"`
 	SeedDays      *int64   `json:"seed_days"`
+	// Per-torrent connection ceilings (nil = leave unchanged, 0 = unlimited).
+	MaxConnections *int64 `json:"max_connections"`
+	MaxUploads     *int64 `json:"max_uploads"`
 }
 
 // StoragePath is the input of `move_torrent_storage`.

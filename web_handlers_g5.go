@@ -1061,10 +1061,18 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusForbidden, "Utente non autorizzato al riavvio: installa la regola sudoers systemd/gextto.sudoers.")
 		return
 	}
-	requested := action
 	go func() {
 		time.Sleep(800 * time.Millisecond)
-		_ = exec.Command("sudo", "-n", restartHelper, requested).Run()
+		// Map the validated action to a literal so the command never receives a
+		// value derived from the request.
+		verb := "restart"
+		switch action {
+		case "start":
+			verb = "start"
+		case "stop":
+			verb = "stop"
+		}
+		_ = exec.Command("sudo", "-n", restartHelper, verb).Run()
 	}()
 	jsonResponse(w, map[string]any{
 		"ok":      true,

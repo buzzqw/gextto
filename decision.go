@@ -403,12 +403,12 @@ func ExplainWithArchive(
 		var detail string
 		if series != nil {
 			detail = fmt.Sprintf(
-				"Configurazione: qualità '%s', lingua '%s', sottotitoli '%s', esclusioni '%s'.",
+				"Configurazione — qualità: %s · lingua: %s · sottotitoli: %s · esclusioni: %s",
 				series.Quality, series.Language, series.Subtitle, series.Exclude,
 			)
 		} else if movie != nil {
 			detail = fmt.Sprintf(
-				"Configurazione: qualità '%s', lingua '%s', requisiti lingua '%s', sottotitoli '%s', requisiti sottotitoli '%s'.",
+				"Configurazione — qualità: %s · lingua: %s · requisiti lingua: %s · sottotitoli: %s · requisiti sottotitoli: %s",
 				movie.Quality,
 				movie.Language,
 				movie.LanguageRequirements,

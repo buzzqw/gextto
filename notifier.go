@@ -325,7 +325,7 @@ func (n *Notifier) sendEmail(event, body string) error {
 	if n.emailFrom == nil || n.emailTo == nil || n.emailPassword == nil {
 		return nil
 	}
-	from := *n.emailFrom
+	from := sanitizeEmailHeader(*n.emailFrom)
 	to := *n.emailTo
 	password := *n.emailPassword
 	host := n.emailSMTP
@@ -340,20 +340,40 @@ func (n *Notifier) sendEmail(event, body string) error {
 	}
 	recipients := []string{}
 	for _, recipient := range strings.Split(to, ",") {
-		recipient = strings.TrimSpace(recipient)
+		recipient = sanitizeEmailHeader(strings.TrimSpace(recipient))
 		if recipient != "" {
 			recipients = append(recipients, recipient)
 		}
 	}
-	subject := fmt.Sprintf("Gextto [%s]", event)
+	subject := sanitizeEmailHeader(fmt.Sprintf("Gextto [%s]", event))
 	message := buildEmailMessage(from, recipients, subject, body)
 	address := fmt.Sprintf("%s:%d", host, port)
 	auth := smtp.PlainAuth("", from, password, host)
 	return smtp.SendMail(address, auth, from, recipients, message)
 }
 
+// sanitizeEmailHeader strips CR/LF and NUL so a configured or event-derived
+// value cannot inject extra MIME headers (email header injection).
+func sanitizeEmailHeader(value string) string {
+	return strings.Map(func(character rune) rune {
+		switch character {
+		case '\r', '\n', 0:
+			return -1
+		default:
+			return character
+		}
+	}, value)
+}
+
 // buildEmailMessage renders a minimal text/plain MIME message.
 func buildEmailMessage(from string, recipients []string, subject, body string) []byte {
+	from = sanitizeEmailHeader(from)
+	subject = sanitizeEmailHeader(subject)
+	safeRecipients := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		safeRecipients = append(safeRecipients, sanitizeEmailHeader(recipient))
+	}
+	recipients = safeRecipients
 	var message strings.Builder
 	message.WriteString("From: " + from + "\r\n")
 	message.WriteString("To: " + strings.Join(recipients, ", ") + "\r\n")

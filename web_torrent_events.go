@@ -1665,12 +1665,42 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents *LibtorrentClient, 
 func HandleTorrentEvent(cfg *Config, torrents *LibtorrentClient, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, event models.TorrentEvent, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
 	logging.Debug("torrent completion processing started",
 		"hash", event.Hash, "kind", event.Kind, "name", event.Name, "save_path", event.SavePath)
+	// libtorrent error alerts are handled before the metadata lookup: some of
+	// them (tracker/file errors) can arrive before a release row exists, and
+	// session-level errors have no hash at all.
+	//
+	// Tracker errors are routine (dead or unreachable trackers are common and
+	// libtorrent retries them) so they stay at DEBUG and never change a
+	// torrent's state. A torrent/file error is a real problem: WARN + a
+	// notification, but the state is left to the normal completion handling so
+	// a transient error cannot silently stop an acquisition.
+	switch event.Kind {
+	case "tracker_error":
+		logging.Debug("libtorrent tracker error",
+			"hash", event.Hash, "name", event.Name, "message", event.Message)
+		return false, nil
+	case "torrent_error", "file_error", "hash_failed", "metadata_failed", "resume_save_failed":
+		logging.Warn("libtorrent reported an error",
+			"kind", event.Kind, "hash", event.Hash, "name", event.Name, "message", event.Message)
+		_ = notifier.NotifyEvent("torrent_error", map[string]any{
+			"hash":    event.Hash,
+			"kind":    event.Kind,
+			"name":    event.Name,
+			"error":   event.Message,
+			"message": event.Message,
+		})
+		return false, nil
+	case "portmap_error", "session_error":
+		logging.Warn("libtorrent session error", "kind", event.Kind, "message", event.Message)
+		return false, nil
+	}
 	metadata, err := db.TorrentMeta(event.Hash)
 	if err != nil {
 		return false, err
 	}
 	if metadata == nil {
-		logging.Warn("torrent alert has no registered release metadata",
+		// Expected for manually added or foreign torrents: not an error.
+		logging.Debug("torrent alert has no registered release metadata",
 			"hash", event.Hash, "kind", event.Kind, "name", event.Name)
 		return false, nil
 	}

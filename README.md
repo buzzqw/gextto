@@ -43,10 +43,13 @@ disk).
 - **Torrents** — embedded libtorrent: queue, limits, tags, peers, trackers,
   files, storage moves, seed policy, fastresume, VPN killswitch and restart
   recovery. **Stalled torrents are really paused and excluded from active slots**,
-  then resumed/reannounced automatically. Add options include pause, sequential, skip-check, queue-top,
-  first/last piece and metadata-only; per-file priorities, web seeds, tracker
-  editing, super seeding and `.torrent`/magnet export are in the torrent
-  details.
+  then resumed/reannounced automatically. New downloads are **preallocated on
+  disk** by default (toggle in the settings and per add). Add options include
+  pause, sequential, skip-check, queue-top, first/last piece, metadata-only and
+  preallocation; per-file priorities, per-torrent connection/upload caps,
+  upload/share mode, web seeds, tracker editing, tracker scrape/DHT announce,
+  super seeding and `.torrent`/magnet export are in the torrent details. The
+  `.torrent` of every started torrent can also be copied to a folder you choose.
 - **Comics** — GetComics monitoring and weekly packs. Every comic added (weekly
   pack, monitored title or *Download Now*) gets the **`Comic`** tag, so the
   *NAS paths per category (tag)* rule routes it to the configured folder.
@@ -216,9 +219,11 @@ make build            # -> bin/gexttod
 CGO_ENABLED=1 go build -o bin/gexttod ./cmd/gexttod
 ```
 
-The web UI is embedded in the binary with `//go:embed`, so there is no separate
-UI build step; an on-disk bundle in `GEXTTO_UI_DIR` (or `<exe>/ui`) still takes
-precedence for development.
+The web UI is embedded in the binary with `//go:embed` from `webui/pkg`, so a
+normal build needs no UI step. The Leptos source lives in `ui/`; after editing
+it, regenerate the bundle with `make ui` (needs `cargo leptos` and the
+`wasm32-unknown-unknown` target), which refreshes `webui/pkg`. An on-disk bundle
+in `GEXTTO_UI_DIR` (or `<exe>/ui`) still takes precedence for development.
 
 To run locally in dry-run mode, without real downloads:
 

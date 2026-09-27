@@ -367,7 +367,17 @@ la barra “Salva tutte”.
   Jackett. Nei risultati la sorgente può apparire come `jackett:NomeTracker`.
 - **libtorrent** — connessioni/prestazioni, protocolli/tracker, sicurezza/proxy,
   RAM disk e porte, limiti di velocità e scheduler; applica/ottimizza/verifica
-  aggiornamenti. In *Sicurezza, proxy e rete* l'**interfaccia VPN (killswitch)**
+  aggiornamenti. Se sposti lo storage di un torrent in una cartella che
+  **contiene già i dati**, non viene rifiutato: Gextto associa il torrent ai file
+  esistenti e li ricontrolla (seed) invece di riscaricarli. L'opzione
+  **Prealloca lo spazio su disco** (attiva di default)
+  riserva subito l'intera dimensione di ogni nuovo torrent: evita la
+  frammentazione su NAS/HDD e fa emergere subito la mancanza di spazio; puoi
+  disattivarla per singolo torrent quando lo aggiungi a mano. **Copia i file
+  .torrent in** indica una cartella in cui Gextto copia il `.torrent` di ogni
+  torrent avviato (appena i metadati sono disponibili), utile per riusarlo con
+  un altro client o come backup. In *Sicurezza,
+  proxy e rete* l'**interfaccia VPN (killswitch)**
   vincola ascolto e traffico in uscita a una scheda scelta (es. `tun0`, `wg0`);
   l'elenco è letto dal server e la modifica si applica dopo il riavvio.
   Nella sezione RAM disk Gextto mostra i `tmpfs`/`ramfs` disponibili e consente

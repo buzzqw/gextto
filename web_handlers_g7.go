@@ -910,10 +910,27 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	logging.Info("manual torrent storage move requested",
 		"hash", hash, "name", name, "destination", destination)
 	if _, statErr := os.Stat(target); statErr == nil {
-		errMsg := fmt.Sprintf("destination already contains the torrent data: %s", target)
-		logging.Warn("manual torrent storage move rejected before libtorrent: destination exists",
+		// The destination already holds the payload: associate it (change the
+		// save path and re-check) instead of failing. This turns a common case
+		// into an advantage — the torrent seeds from the files already on disk.
+		logging.Info("destination already contains the torrent data; associating existing files",
 			"hash", hash, "name", name, "destination", destination, "target", target)
-		jsonError(w, http.StatusConflict, errMsg)
+		associated, assocErr := s.torrents.AssociateStorage(hash, destination)
+		if assocErr != nil {
+			logging.Error("associate existing torrent data failed", "hash", hash, "name", name, "error", assocErr.Error())
+			jsonError(w, http.StatusBadRequest, assocErr.Error())
+			return
+		}
+		if !associated && !cfg.DryRun {
+			jsonError(w, http.StatusConflict, "torrent unavailable")
+			return
+		}
+		jsonStatus(w, http.StatusOK, map[string]any{
+			"ok":         true,
+			"associated": true,
+			"path":       destination,
+			"message":    "data già presente: torrent associato e in ricontrollo",
+		})
 		return
 	}
 	result, err := s.torrents.MoveStorage(hash, destination)
@@ -1213,6 +1230,34 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		seedDays = *input.SeedDays
 	}
 	result, err := s.torrents.SetLimits(hash, input.DownloadLimit, input.UploadLimit, seedRatio, seedDays)
+	if err != nil {
+		gh7_torrent_action(w, result, err)
+		return
+	}
+	if input.MaxConnections != nil || input.MaxUploads != nil {
+		maxConnections, maxUploads := int64(-1), int64(-1)
+		if input.MaxConnections != nil {
+			maxConnections = *input.MaxConnections
+		}
+		if input.MaxUploads != nil {
+			maxUploads = *input.MaxUploads
+		}
+		if maxConnections >= 0 {
+			if _, err := s.torrents.SetMaxConnections(hash, int(maxConnections)); err != nil {
+				jsonError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+		if maxUploads >= 0 {
+			if _, err := s.torrents.SetMaxUploads(hash, int(maxUploads)); err != nil {
+				jsonError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+		if err := s.torrents.SaveConnLimits(hash, maxConnections, maxUploads); err != nil {
+			logging.Warn("cannot persist torrent connection limits", "hash", hash, "error", err)
+		}
+	}
 	gh7_torrent_action(w, result, err)
 }
 

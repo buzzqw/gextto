@@ -753,6 +753,10 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	startPaused := input.StartPaused
 	noRename := input.NoRename
+	preallocate := cfg.LibtorrentPreallocate()
+	if input.Preallocate != nil {
+		preallocate = *input.Preallocate
+	}
 	options := AddOptions{
 		Paused:         startPaused,
 		Sequential:     input.Sequential,
@@ -760,6 +764,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		QueueTop:       input.QueueTop,
 		FirstLast:      input.FirstLast,
 		StopAtMetadata: input.StopAtMetadata,
+		Preallocate:    preallocate,
 	}
 	target := strings.TrimSpace(input.Magnet)
 	if strings.HasPrefix(target, "magnet:") {

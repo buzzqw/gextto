@@ -179,6 +179,23 @@ func cgoLtStatuses(session unsafe.Pointer) []NativeTorrentStatus {
 			TorrentVersion:  int32(status.torrent_version),
 			TotalSize:       int64(status.total_size),
 			TotalDone:       int64(status.total_done),
+
+			Error:             goStringFromChars(status.error[:]),
+			CurrentTracker:    goStringFromChars(status.current_tracker[:]),
+			DownloadPayload:   int32(status.download_payload_rate),
+			UploadPayload:     int32(status.upload_payload_rate),
+			NumComplete:       int32(status.num_complete),
+			NumIncomplete:     int32(status.num_incomplete),
+			NumConnections:    int32(status.num_connections),
+			ConnectCandidates: int32(status.connect_candidates),
+			FinishedSeconds:   int64(status.finished_time),
+			ActiveSeconds:     int64(status.active_time),
+			IsSeeding:         int32(status.is_seeding),
+			Sequential:        int32(status.sequential_download),
+			SuperSeeding:      int32(status.super_seeding),
+			UploadMode:        int32(status.upload_mode),
+			ShareMode:         int32(status.share_mode),
+			DistributedCopies: float32(status.distributed_copies),
 		}
 	}
 	return result
@@ -196,6 +213,7 @@ func cgoLtEvents(session unsafe.Pointer) []NativeTorrentEvent {
 			Hash:     goStringFromChars(event.hash[:]),
 			Name:     goStringFromChars(event.name[:]),
 			SavePath: goStringFromChars(event.save_path[:]),
+			Message:  goStringFromChars(event.message[:]),
 		}
 	}
 	return result
@@ -226,12 +244,16 @@ func cgoLtPeers(session unsafe.Pointer, hash string) (int, []NativePeer, string)
 	for i := 0; i < count; i++ {
 		peer := buffer[i]
 		result[i] = NativePeer{
-			Address:      goStringFromChars(peer.address[:]),
-			Client:       goStringFromChars(peer.client[:]),
-			DownloadRate: int32(peer.download_rate),
-			UploadRate:   int32(peer.upload_rate),
-			NumPieces:    int32(peer.num_pieces),
-			Seed:         int32(peer.seed),
+			Address:       goStringFromChars(peer.address[:]),
+			Client:        goStringFromChars(peer.client[:]),
+			DownloadRate:  int32(peer.download_rate),
+			UploadRate:    int32(peer.upload_rate),
+			NumPieces:     int32(peer.num_pieces),
+			Seed:          int32(peer.seed),
+			Flags:         int32(peer.flags),
+			Progress:      float32(peer.progress),
+			TotalUpload:   int64(peer.total_upload),
+			TotalDownload: int64(peer.total_download),
 		}
 	}
 	return count, result, goStringFromBytes(error)
@@ -249,9 +271,16 @@ func cgoLtTrackers(session unsafe.Pointer, hash string) (int, []NativeTracker, s
 	for i := 0; i < count; i++ {
 		tracker := buffer[i]
 		result[i] = NativeTracker{
-			URL:    goStringFromChars(tracker.url[:]),
-			Tier:   int32(tracker.tier),
-			Status: int32(tracker.status),
+			URL:              goStringFromChars(tracker.url[:]),
+			Message:          goStringFromChars(tracker.message[:]),
+			Tier:             int32(tracker.tier),
+			Status:           int32(tracker.status),
+			Fails:            int32(tracker.fails),
+			NextAnnounce:     int32(tracker.next_announce),
+			ScrapeIncomplete: int32(tracker.scrape_incomplete),
+			ScrapeComplete:   int32(tracker.scrape_complete),
+			ScrapeDownloaded: int32(tracker.scrape_downloaded),
+			Verified:         int32(tracker.verified),
 		}
 	}
 	return count, result, goStringFromBytes(error)
@@ -288,6 +317,18 @@ func cgoLtMoveStorage(session unsafe.Pointer, hash, destination string) (int32, 
 	moved := C.gextto_lt_move_storage(sess, chash, cdestination,
 		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
 	return int32(moved), goStringFromBytes(error)
+}
+
+func cgoLtAssociateStorage(session unsafe.Pointer, hash, destination string) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	cdestination := C.CString(destination)
+	defer C.free(unsafe.Pointer(cdestination))
+	error := errorBuffer()
+	ok := C.gextto_lt_associate_storage(sess, chash, cdestination,
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
 }
 
 func cgoLtSetPaused(session unsafe.Pointer, hash string, paused int32) (int32, string) {
@@ -454,4 +495,84 @@ func cgoLtSaveResume(session unsafe.Pointer, stateDir string) (int32, string) {
 	saved := C.gextto_lt_save_resume(sess, cStateDir,
 		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
 	return int32(saved), goStringFromBytes(error)
+}
+
+func cgoLtSetMaxConnections(session unsafe.Pointer, hash string, value int32) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_set_max_connections(sess, chash, C.int(value),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtSetMaxUploads(session unsafe.Pointer, hash string, value int32) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_set_max_uploads(sess, chash, C.int(value),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtSetUploadMode(session unsafe.Pointer, hash string, enabled int32) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_set_upload_mode(sess, chash, C.int(enabled),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtSetShareMode(session unsafe.Pointer, hash string, enabled int32) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_set_share_mode(sess, chash, C.int(enabled),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtSetTorrentFlag(session unsafe.Pointer, hash string, flag, enabled int32) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_set_torrent_flag(sess, chash, C.int(flag), C.int(enabled),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtScrapeTracker(session unsafe.Pointer, hash string) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_scrape_tracker(sess, chash,
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtForceDhtAnnounce(session unsafe.Pointer, hash string) (int32, string) {
+	sess := (*C.gextto_lt_session)(session)
+	chash := C.CString(hash)
+	defer C.free(unsafe.Pointer(chash))
+	error := errorBuffer()
+	ok := C.gextto_lt_force_dht_announce(sess, chash,
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(error)
+}
+
+func cgoLtSessionStats(session unsafe.Pointer) (int32, string, string) {
+	sess := (*C.gextto_lt_session)(session)
+	output := make([]byte, 32<<10)
+	error := errorBuffer()
+	ok := C.gextto_lt_session_stats(sess,
+		(*C.char)(unsafe.Pointer(&output[0])), C.size_t(len(output)),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	return int32(ok), goStringFromBytes(output), goStringFromBytes(error)
 }

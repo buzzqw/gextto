@@ -773,7 +773,13 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	hash, err := s.torrents.AddTorrentFile(path, cfg.LibtorrentDir)
+	// An explicit `save_path` lets the caller point the torrent at data that is
+	// already on disk (the torrent is then re-checked and seeded).
+	savePath := cfg.LibtorrentDir
+	if requested := strings.TrimSpace(r.URL.Query().Get("save_path")); requested != "" {
+		savePath = requested
+	}
+	hash, err := s.torrents.AddTorrentFileEx(path, savePath, AddOptions{Preallocate: cfg.LibtorrentPreallocate()})
 	if err != nil {
 		_ = os.Remove(path)
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})

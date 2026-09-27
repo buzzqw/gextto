@@ -653,6 +653,10 @@ func AddTorrentHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
+	preallocate := cfg.LibtorrentPreallocate()
+	if input.Preallocate != nil {
+		preallocate = *input.Preallocate
+	}
 	options := AddOptions{
 		Paused:         input.StartPaused,
 		Sequential:     input.Sequential,
@@ -660,6 +664,7 @@ func AddTorrentHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		QueueTop:       input.QueueTop,
 		FirstLast:      input.FirstLast,
 		StopAtMetadata: input.StopAtMetadata,
+		Preallocate:    preallocate,
 	}
 	var preferred *string
 	if input.SavePath != nil {

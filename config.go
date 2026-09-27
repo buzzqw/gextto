@@ -1002,6 +1002,28 @@ func (c *Config) RamdiskEnabled() bool {
 	return !explicitlyOff && c.RamdiskDir() != nil
 }
 
+// LibtorrentPreallocate reports whether new downloads reserve their full size
+// on disk up front (`storage_mode_allocate`) instead of growing sparsely.
+// Default true: it avoids fragmentation on NAS/HDD and surfaces "no space"
+// immediately. It can be overridden per add.
+func (c *Config) LibtorrentPreallocate() bool {
+	value, ok := c.Settings["libtorrent_preallocate"]
+	if !ok {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "no", "false", "0", "off":
+		return false
+	}
+	return true
+}
+
+// LibtorrentTorrentCopyDir is the optional folder where the `.torrent` file of
+// every started torrent is copied (empty disables the copy).
+func (c *Config) LibtorrentTorrentCopyDir() *string {
+	return configPathSetting(mapValue(c.Settings, "libtorrent_torrent_copy_dir"))
+}
+
 // RamdiskThresholdBytes is the maximum size (bytes) for a single torrent
 // admitted to the RAM disk.
 func (c *Config) RamdiskThresholdBytes() uint64 {

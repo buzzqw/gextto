@@ -21,6 +21,7 @@ struct gextto_lt_event {
     char hash[65];
     char name[512];
     char save_path[1024];
+    char message[512];
 };
 
 struct gextto_lt_peer {
@@ -30,12 +31,24 @@ struct gextto_lt_peer {
     int upload_rate;
     int num_pieces;
     int seed;
+    // Bitmask: 1 = seed, 2 = incoming, 4 = encrypted, 8 = uTP.
+    int flags;
+    float progress;
+    long long total_upload;
+    long long total_download;
 };
 
 struct gextto_lt_tracker {
     char url[640];
+    char message[512];
     int tier;
     int status;
+    int fails;
+    int next_announce;
+    int scrape_incomplete;
+    int scrape_complete;
+    int scrape_downloaded;
+    int verified;
 };
 
 struct gextto_lt_file {
@@ -49,22 +62,38 @@ struct gextto_lt_status {
     char hash[65];
     char name[512];
     char save_path[1024];
+    char error[256];
+    char current_tracker[640];
     double progress;
     int state;
     int paused;
     int download_rate;
     int upload_rate;
+    int download_payload_rate;
+    int upload_payload_rate;
     int num_peers;
     int num_seeds;
+    int num_complete;
+    int num_incomplete;
+    int num_connections;
+    int connect_candidates;
     int download_limit;
     int upload_limit;
     long long all_time_upload;
     long long all_time_download;
     long long seeding_seconds;
+    long long finished_time;
+    long long active_time;
     int queue_position;
     int has_metadata;
     int auto_managed;
     int torrent_version;
+    int is_seeding;
+    int sequential_download;
+    int super_seeding;
+    int upload_mode;
+    int share_mode;
+    float distributed_copies;
     long long total_size;
     long long total_done;
 };
@@ -113,6 +142,11 @@ size_t gextto_lt_files(struct gextto_lt_session* session, const char* hash,
     struct gextto_lt_file* output, size_t capacity, char* error, size_t error_size);
 int gextto_lt_move_storage(struct gextto_lt_session* session, const char* hash,
     const char* destination, char* error, size_t error_size);
+// Changes the save path without moving any file and re-checks the torrent at the
+// new path. Used when the destination already contains the data: the existing
+// files are associated (and seeded) instead of the operation failing.
+int gextto_lt_associate_storage(struct gextto_lt_session* session, const char* hash,
+    const char* destination, char* error, size_t error_size);
 int gextto_lt_set_paused(struct gextto_lt_session* session, const char* hash, int paused,
     char* error, size_t error_size);
 int gextto_lt_set_pin(struct gextto_lt_session* session, const char* hash, int pinned,
@@ -145,6 +179,45 @@ size_t gextto_lt_restore(struct gextto_lt_session* session, const char* state_di
     size_t error_size);
 int gextto_lt_save_resume(struct gextto_lt_session* session, const char* state_dir, char* error,
     size_t error_size);
+
+// Per-torrent controls that libtorrent exposes but were not wired before.
+int gextto_lt_set_max_connections(struct gextto_lt_session* session, const char* hash, int max_connections,
+    char* error, size_t error_size);
+int gextto_lt_set_max_uploads(struct gextto_lt_session* session, const char* hash, int max_uploads,
+    char* error, size_t error_size);
+// Note: libtorrent 2.0 removed `torrent_handle::set_name`; renaming a torrent's
+// display name is done by renaming its files (`rename_file`).
+int gextto_lt_set_upload_mode(struct gextto_lt_session* session, const char* hash, int enabled,
+    char* error, size_t error_size);
+int gextto_lt_set_share_mode(struct gextto_lt_session* session, const char* hash, int enabled,
+    char* error, size_t error_size);
+// Sets one per-torrent flag (see GEXTTO_TFLAG_*).
+int gextto_lt_set_torrent_flag(struct gextto_lt_session* session, const char* hash, int flag,
+    int enabled, char* error, size_t error_size);
+// Requests a tracker scrape and a DHT announce for one torrent.
+int gextto_lt_scrape_tracker(struct gextto_lt_session* session, const char* hash, char* error,
+    size_t error_size);
+int gextto_lt_force_dht_announce(struct gextto_lt_session* session, const char* hash, char* error,
+    size_t error_size);
+// Writes a JSON document with the session counters libtorrent reports.
+int gextto_lt_session_stats(struct gextto_lt_session* session, char* output, size_t output_size,
+    char* error, size_t error_size);
+
+enum {
+    GEXTTO_TFLAG_APPLY_IP_FILTER = 1,
+    GEXTTO_TFLAG_DISABLE_DHT = 2,
+    GEXTTO_TFLAG_DISABLE_PEX = 4,
+    GEXTTO_TFLAG_DISABLE_LSD = 8
+};
+
+enum {
+    GEXTTO_ADD_PAUSED = 1,
+    GEXTTO_ADD_SEQUENTIAL = 2,
+    GEXTTO_ADD_SEED_MODE = 4,
+    GEXTTO_ADD_QUEUE_TOP = 8,
+    GEXTTO_ADD_PREALLOCATE = 16,
+    GEXTTO_ADD_STOP_WHEN_READY = 32
+};
 
 #ifdef __cplusplus
 

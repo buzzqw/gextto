@@ -23,8 +23,14 @@ make build        # -> bin/gexttod (embedded web UI)
 ./bin/gexttod --version
 ```
 
-The web UI is embedded in the binary with `//go:embed`; there is no separate UI
-build step. Verify `webui/pkg/ui.js` and `webui/pkg/ui.wasm` are present in the
+The web UI is embedded in the binary with `//go:embed` from `webui/pkg`. When the
+Leptos source in `ui/` changed, regenerate the bundle first:
+
+```bash
+make ui           # cargo leptos build --release --frontend-only -> webui/pkg
+```
+
+Otherwise verify `webui/pkg/ui.js` and `webui/pkg/ui.wasm` are present in the
 tree so the embed stays complete.
 
 ## 3. Tests
