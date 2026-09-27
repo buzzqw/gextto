@@ -10,20 +10,20 @@ campi e i suoi dati, con gli stessi endpoint. Nessuna voce può sparire.
 |---|---|---|---|
 | 1 | `dashboard` | Dashboard | shell + partial (fatto) |
 | 2 | `downloads` | Scarico | shell + partial (fatto) |
-| 3 | `series` | Serie TV | da migrare (link a UI classica) |
-| 4 | `movies` | Film | da migrare (link a UI classica) |
-| 5 | `gaps` | Mancanti | da migrare (link a UI classica) |
-| 6 | `search` | Esplora | da migrare (link a UI classica) |
-| 7 | `archive` | Archivio | da migrare (link a UI classica) |
-| 8 | `comics` | Fumetti | da migrare (link a UI classica) |
-| 9 | `settings` | Configurazione | da migrare (link a UI classica) |
-| 10 | `integrations` | Integrazioni | da migrare (link a UI classica) |
-| 11 | `maintenance` | Manutenzione | da migrare (link a UI classica) |
-| 12 | `health` | Salute | da migrare (link a UI classica) |
-| 13 | `logs` | Log | da migrare (link a UI classica) |
-| 14 | `blocklist` | Blocklist | da migrare (link a UI classica) |
-| 15 | `manual` | Manuale | da migrare (link a UI classica) |
-| 16 | `license` | Licenza | da migrare (link a UI classica) |
+| 3 | `series` | Serie TV | migrata |
+| 4 | `movies` | Film | migrata |
+| 5 | `gaps` | Mancanti | migrata |
+| 6 | `search` | Esplora | migrata |
+| 7 | `archive` | Archivio | migrata |
+| 8 | `comics` | Fumetti | migrata |
+| 9 | `settings` | Configurazione | migrata |
+| 10 | `integrations` | Integrazioni | migrata |
+| 11 | `maintenance` | Manutenzione | migrata |
+| 12 | `health` | Salute | migrata |
+| 13 | `logs` | Log | migrata |
+| 14 | `blocklist` | Blocklist | migrata |
+| 15 | `manual` | Manuale | migrata |
+| 16 | `license` | Licenza | migrata |
 
 Totale pagine: **16**.
 

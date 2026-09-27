@@ -133,6 +133,9 @@ func TestUiListAndActionPages(t *testing.T) {
 		"blocklist":    `/api/blocklist/{hash}/remove`,
 		"maintenance":  `/api/database/rescore`,
 		"integrations": `/api/jellyfin/test`,
+		"settings":     `data-setting-key="`,
+		"search":       `data-ui-search-post`,
+		"comics":       `data-endpoint="/api/comics"`,
 	}
 	for view, marker := range cases {
 		code, _, body := webGet(t, server, "/ui?view="+view)
@@ -140,11 +143,16 @@ func TestUiListAndActionPages(t *testing.T) {
 			t.Fatalf("GET /ui?view=%s -> %d, missing %q", view, code, marker)
 		}
 	}
-	// Settings/Esplora/Fumetti still point to the legacy UI (no functionality lost).
-	for _, view := range []string{"settings", "search", "comics"} {
-		code, _, body := webGet(t, server, "/ui?view="+view)
-		if code != http.StatusOK || !strings.Contains(string(body), "Apri la UI classica") {
-			t.Fatalf("GET /ui?view=%s -> %d, missing legacy fallback", view, code)
+	// Every navigation page is now migrated: no page should fall back.
+	for _, item := range uiNavGroups {
+		for _, entry := range item.Items {
+			code, _, body := webGet(t, server, "/ui?view="+entry.ID)
+			if code != http.StatusOK {
+				t.Fatalf("GET /ui?view=%s -> %d", entry.ID, code)
+			}
+			if strings.Contains(string(body), "Apri la UI classica") {
+				t.Fatalf("page %s should be migrated, not a fallback", entry.ID)
+			}
 		}
 	}
 }

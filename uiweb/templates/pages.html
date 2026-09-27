@@ -6,6 +6,7 @@
       <small class="muted" data-ui-count></small>
     </div>
     <div class="panel-body">
+      {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
       <div class="toolbar" style="margin-bottom:10px">
         {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
         <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
@@ -47,5 +48,57 @@
       {{end}}
     </div>
   </div>
+</div>
+{{end}}
+
+{{define "search"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted" data-ui-count></small></div>
+    <div class="panel-body">
+      <form class="search-row" data-ui-search-post data-endpoint="{{.Endpoint}}" data-results="{{.ResultsKey}}" data-add="{{.AddPath}}">
+        <input type="search" placeholder="Cerca una release…" />
+        <button class="btn primary">Cerca</button>
+      </form>
+      <div class="table-wrap" style="margin-top:10px">
+        <table class="data-table">
+          <thead data-ui-head></thead>
+          <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
+        </table>
+      </div>
+      <p class="hint">Ricerca su feed, indexer e motori web (fino a 90 s). La gestione avanzata è nella UI classica.</p>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "settings"}}
+<div class="view">
+  <p class="muted">Ogni campo si salva singolarmente. I valori sensibili non vengono mai mostrati.</p>
+  {{range .Tabs}}
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-head"><h3>{{.Label}}</h3></div>
+    <div class="panel-body">
+      {{range .Fields}}
+      <form class="settings-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
+        <label>{{.Label}}</label>
+        {{if eq .Kind "bool"}}
+        <select data-setting-input>
+          <option value="true" {{if eq .Value "true"}}selected{{end}}>Sì</option>
+          <option value="false" {{if ne .Value "true"}}selected{{end}}>No</option>
+        </select>
+        {{else if eq .Kind "area"}}
+        <textarea data-setting-input rows="2">{{.Value}}</textarea>
+        {{else if eq .Kind "secret"}}
+        <input type="password" data-setting-input value="" placeholder="non visualizzato" />
+        {{else}}
+        <input data-setting-input value="{{.Value}}" />
+        {{end}}
+        <div class="form-actions"><button class="btn sm primary">Salva</button></div>
+      </form>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
 </div>
 {{end}}

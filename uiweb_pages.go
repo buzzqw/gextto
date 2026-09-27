@@ -1,6 +1,9 @@
 package gextto
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // uiweb_pages.go defines the data-driven list pages and action pages of the new
 // UI. They reuse the existing JSON APIs from the browser (small generic client)
@@ -29,9 +32,19 @@ type uiTableSpec struct {
 	ColumnsJSON string
 	ActionsJSON string
 	Empty       string
+	Note        string
 	Search      bool
 	SearchParam string
 	Query       string
+}
+
+// uiSearchPage drives the Esplora page: a query form, a generic result table and
+// an "add" action that posts the selected release exactly like the classic UI.
+type uiSearchPage struct {
+	Title      string
+	Endpoint   string
+	ResultsKey string
+	AddPath    string
 }
 
 type uiActionButton struct {
@@ -53,6 +66,70 @@ type uiActionSection struct {
 type uiActionsPage struct {
 	Title    string
 	Sections []uiActionSection
+}
+
+// uiSettingField is one editable setting in the new settings page.
+type uiSettingField struct {
+	Key   string
+	Label string
+	Value string
+	Kind  string // text|bool|area|secret
+}
+
+type uiSettingsTabData struct {
+	Label  string
+	Fields []uiSettingField
+}
+
+type uiSettingsPage struct {
+	Tabs []uiSettingsTabData
+}
+
+// uiSettingsPageFrom builds the settings page from the generated index and the
+// live values, so every key the classic UI exposes stays editable.
+func uiSettingsPageFrom(s *AppState) uiSettingsPage {
+	cfg := latestConfig(s)
+	tabIndex := map[string]int{}
+	page := uiSettingsPage{}
+	for _, tab := range uiSettingsTabs {
+		tabIndex[tab.ID] = len(page.Tabs)
+		page.Tabs = append(page.Tabs, uiSettingsTabData{Label: tab.Label})
+	}
+	for _, def := range uiSettingsIndex {
+		position, ok := tabIndex[def.Tab]
+		if !ok {
+			continue
+		}
+		value := ""
+		if raw, present := cfg.Settings[def.Key]; present {
+			value = raw
+		}
+		page.Tabs[position].Fields = append(page.Tabs[position].Fields, uiSettingField{
+			Key:   def.Key,
+			Label: def.Label,
+			Value: value,
+			Kind:  uiSettingKind(def.Key, value),
+		})
+	}
+	return page
+}
+
+func uiSettingKind(key, value string) string {
+	lowered := strings.ToLower(key)
+	for _, secret := range []string{"password", "token", "api_key", "secret"} {
+		if strings.Contains(lowered, secret) {
+			return "secret"
+		}
+	}
+	for _, area := range []string{"mappings", "extra_settings", "blacklist", "content_filters", "dht_bootstrap_nodes"} {
+		if strings.Contains(lowered, area) {
+			return "area"
+		}
+	}
+	if value == "true" || value == "false" || value == "yes" || value == "no" {
+		return "bool"
+	}
+	return "text"
 }
 
 func uiJSON(value any) string {
@@ -130,9 +207,30 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			}),
 			Empty: "Blocklist vuota.",
 		}, true
+	case "comics":
+		return uiTableSpec{
+			Title:    "Fumetti",
+			Endpoint: "/api/comics",
+			ItemsKey: "",
+			Empty:    "Nessun fumetto monitorizzato.",
+			Note:     "Gestione avanzata dei fumetti (link, download, tag) nella UI classica.",
+		}, true
 	default:
 		return uiTableSpec{}, false
 	}
+}
+
+// uiSearchPageFor defines the Esplora page.
+func uiSearchPageFor(view string) (uiSearchPage, bool) {
+	if view != "search" {
+		return uiSearchPage{}, false
+	}
+	return uiSearchPage{
+		Title:      "Esplora release",
+		Endpoint:   "/api/search",
+		ResultsKey: "results",
+		AddPath:    "/api/search/add",
+	}, true
 }
 
 // uiActionsPages are pages made of buttons that call existing endpoints.

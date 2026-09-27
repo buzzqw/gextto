@@ -776,3 +776,29 @@ da correggere prima di procedere.
 - Fasi 4–7 — una pagina per volta; le non migrate puntano alla UI classica.
 - Fase 8 — cutover e rimozione Rust: invariata; il rollback resta `/`.
 
+
+
+---
+
+## 18. Stato finale della migrazione (tutte le pagine)
+
+Tutte e 16 le pagine di navigazione sono ora servite dalla nuova UI Go, senza
+dipendere da Rust/WASM e senza perdere funzionalità:
+
+| Pagina | Tipo nuova UI |
+|---|---|
+| Dashboard | server-side |
+| Scarico | server-side + polling |
+| Salute | server-side (stesso health check) |
+| Log | server-side (stesso tail) |
+| Manuale | server-side (Markdown minimale) |
+| Licenza | server-side |
+| Serie TV / Film / Mancanti | tabella dati-driven (API esistenti) |
+| Archivio / Blocklist / Fumetti | tabella dati-driven (API esistenti) |
+| Configurazione | form per campo (147 chiavi, stessi label/tab) |
+| Esplora | ricerca + accoda (API esistenti) |
+| Manutenzione / Integrazioni | pulsanti azione (API esistenti) |
+
+La UI classica Leptos resta su `/` e può essere rimossa quando si vuole, senza
+migrazione dati. Le azioni riusano le stesse API JSON, quindi il contratto
+pubblico e i client esterni non cambiano.

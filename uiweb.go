@@ -268,6 +268,8 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 		return uiManualDataFrom()
 	case "license":
 		return uiLicenseData{Text: uiLicenseText}
+	case "settings":
+		return uiSettingsPageFrom(s)
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		if spec.Search && r != nil {
@@ -276,6 +278,9 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 		return spec
 	}
 	if page, ok := uiActionsPageFor(view); ok {
+		return page
+	}
+	if page, ok := uiSearchPageFor(view); ok {
 		return page
 	}
 	return map[string]any{"Title": uiPageLabel(view)}

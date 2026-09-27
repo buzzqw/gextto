@@ -218,4 +218,83 @@
       .catch(function (error) { alert("Azione non riuscita: " + error.message); })
       .then(function () { element.disabled = false; });
   });
+
+  // ---- settings forms -----------------------------------------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-setting-key]"), function (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var key = form.getAttribute("data-setting-key");
+      var input = form.querySelector("[data-setting-input]");
+      var secret = input && input.type === "password";
+      var value = input ? input.value : "";
+      if (secret && value === "") return;
+      var button = form.querySelector("button");
+      if (button) button.disabled = true;
+      api("/api/config/settings", "POST", { key: key, value: value })
+        .then(function () {
+          if (!button) return;
+          button.textContent = "Salvato";
+          setTimeout(function () { button.textContent = "Salva"; button.disabled = false; }, 1500);
+        })
+        .catch(function (error) {
+          alert("Salvataggio non riuscito: " + error.message);
+          if (button) button.disabled = false;
+        });
+    });
+  });
+
+  // ---- explore (search) ---------------------------------------------------
+  function renderSearch(form) {
+    var panel = form.closest(".panel");
+    var thead = panel.querySelector("[data-ui-head]");
+    var tbody = panel.querySelector("[data-ui-body]");
+    var count = panel.querySelector("[data-ui-count]");
+    var input = form.querySelector("input");
+    var endpoint = form.getAttribute("data-endpoint");
+    var resultsKey = form.getAttribute("data-results") || "results";
+    var addPath = form.getAttribute("data-add");
+    thead.innerHTML = "<tr><th>Titolo</th><th>Seed</th><th>Dimensione</th><th>Azioni</th></tr>";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var query = (input.value || "").trim();
+      if (!query) return;
+      tbody.innerHTML = '<tr><td class="muted">Ricerca in corso…</td></tr>';
+      api(endpoint, "POST", { query: query }).then(function (data) {
+        var items = data[resultsKey] || [];
+        form._items = items;
+        if (count) count.textContent = items.length + " risultati";
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td class="muted">Nessun risultato.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = items.map(function (row, index) {
+          var magnet = esc(row.magnet || "");
+          var title = row.magnet ? '<a href="' + magnet + '">' + esc(row.title) + "</a>" : esc(row.title);
+          return '<tr><td class="truncate">' + title +
+            '</td><td class="numeric">' + esc(row.seeders || 0) +
+            '</td><td class="numeric">' + humanBytes(row.size_bytes) +
+            "</td><td>" + (addPath
+              ? '<button class="btn sm primary" data-ui-add data-index="' + index + '">Accoda</button>'
+              : "") + "</td></tr>";
+        }).join("");
+      }).catch(function (error) {
+        tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
+      });
+    });
+    form.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-ui-add]");
+      if (!button) return;
+      var items = form._items || [];
+      var row = items[parseInt(button.getAttribute("data-index"), 10)];
+      if (!row) return;
+      button.disabled = true;
+      api(addPath, "POST", { release: row }).then(function () {
+        button.textContent = "Accodata";
+      }).catch(function (error) {
+        alert("Non accodata: " + error.message);
+        button.disabled = false;
+      });
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-ui-search-post]"), renderSearch);
 })();
