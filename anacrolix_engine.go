@@ -22,14 +22,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/iplist"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
 
@@ -146,9 +151,23 @@ func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
 	clientCfg.MaxUnverifiedBytes = settings.MaxUnverified
 	clientCfg.DefaultStorage = storage.NewFileWithCompletion(settings.DataDir, completion)
 
+	// Map the libtorrent network settings that anacrolix can honour.
+	if cfg.Libtorrent.ApplyIpFilter {
+		if blocklist := anacrolixBlocklist(cfg); blocklist != nil {
+			clientCfg.IPBlocklist = blocklist
+		}
+	}
+	if proxy := anacrolixHTTPProxy(cfg); proxy != nil {
+		clientCfg.HTTPProxy = http.ProxyURL(proxy)
+		logging.Info("anacrolix HTTP proxy configured", "proxy", proxy.Redacted())
+	}
+
 	client, err := torrent.NewClient(clientCfg)
 	if err != nil {
 		return nil, fmt.Errorf("anacrolix: create client: %w", err)
+	}
+	if nodes := anacrolixDhtNodes(cfg); len(nodes) > 0 {
+		client.AddDhtNodes(nodes)
 	}
 	engine := &anacrolixEngine{
 		settings:     settings,
@@ -879,6 +898,43 @@ func (e *anacrolixEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 	return out, true, nil
 }
 
+// PieceRuns exposes compact per-piece diagnostics for the piece inspector.
+func (e *anacrolixEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error) {
+	entry, ok := e.lookup(hash)
+	if !ok {
+		return nil, false, nil
+	}
+	runs := entry.handle.PieceStateRuns()
+	out := make([]TorrentPieceRun, 0, len(runs))
+	begin := 0
+	for _, run := range runs {
+		length := run.Length
+		if length <= 0 {
+			continue
+		}
+		out = append(out, TorrentPieceRun{
+			Begin: begin,
+			End:   begin + length - 1,
+			State: anacrolixPieceState(run.PieceState),
+		})
+		begin += length
+	}
+	return out, true, nil
+}
+
+func anacrolixPieceState(state torrent.PieceState) string {
+	switch {
+	case state.Complete && state.Ok:
+		return "complete"
+	case state.Hashing || state.QueuedForHash:
+		return "checking"
+	case state.Partial:
+		return "partial"
+	default:
+		return "missing"
+	}
+}
+
 // ---------------------------------------------------------------------------
 // mutations not fully supported by anacrolix
 // ---------------------------------------------------------------------------
@@ -1023,6 +1079,78 @@ func intToAnacrolixPriority(priority int) torrent.PiecePriority {
 	default:
 		return torrent.PiecePriorityNormal
 	}
+}
+
+// anacrolixBlocklist loads the configured local ipfilter file (eMule format).
+// URLs are ignored: fetching them at startup would add a network dependency;
+// a remote filter can be refreshed by Gextto into a local file.
+func anacrolixBlocklist(cfg *Config) iplist.Ranger {
+	path := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	if path == "" || !fileExists(path) {
+		return nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		logging.Warn("anacrolix ipfilter open failed", "path", path, "error", err.Error())
+		return nil
+	}
+	defer file.Close()
+	ranger, err := iplist.NewFromReader(file)
+	if err != nil {
+		logging.Warn("anacrolix ipfilter parse failed", "path", path, "error", err.Error())
+		return nil
+	}
+	logging.Info("anacrolix ipfilter loaded", "path", path)
+	return ranger
+}
+
+// anacrolixHTTPProxy maps libtorrent's HTTP proxy settings (type 3/4) onto the
+// anacrolix HTTP proxy hook. SOCKS proxies are not supported by anacrolix and
+// are reported instead of silently ignored.
+func anacrolixHTTPProxy(cfg *Config) *url.URL {
+	switch cfg.Libtorrent.ProxyType {
+	case 3, 4: // http, http_pw
+	default:
+		if cfg.Libtorrent.ProxyType == 1 || cfg.Libtorrent.ProxyType == 2 || cfg.Libtorrent.ProxyType == 5 {
+			logging.Warn("anacrolix does not support SOCKS proxies; proxy ignored",
+				"proxy_type", cfg.Libtorrent.ProxyType)
+		}
+		return nil
+	}
+	host := strings.TrimSpace(cfg.Libtorrent.ProxyHost)
+	if host == "" || cfg.Libtorrent.ProxyPort <= 0 {
+		return nil
+	}
+	proxy := &url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(host, strconv.FormatInt(cfg.Libtorrent.ProxyPort, 10)),
+	}
+	if user := strings.TrimSpace(cfg.Libtorrent.ProxyUser); user != "" {
+		proxy.User = url.UserPassword(user, cfg.Libtorrent.ProxyPassword)
+	}
+	return proxy
+}
+
+// anacrolixDhtNodes splits the configured DHT bootstrap list.
+func anacrolixDhtNodes(cfg *Config) []string {
+	raw := strings.TrimSpace(cfg.Libtorrent.DhtBootstrapNodes)
+	if raw == "" {
+		return nil
+	}
+	nodes := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', ';', '\n', '\r', ' ', '\t':
+			return true
+		}
+		return false
+	})
+	out := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		if trimmed := strings.TrimSpace(node); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 // context is referenced by future piece-check scheduling; keep the import used.

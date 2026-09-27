@@ -229,6 +229,9 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/torrents/{hash}/no_rename` |
 | POST | `/api/torrents/{hash}/pause` |
 | GET | `/api/torrents/{hash}/peers` |
+| GET | `/api/torrents/{hash}/pieces` |
+| GET | `/api/torrents/{hash}/pieces/runs` |
+| POST | `/api/torrents/{hash}/selective` |
 | POST | `/api/torrents/{hash}/reannounce` |
 | POST | `/api/torrents/{hash}/recheck` |
 | POST | `/api/torrents/{hash}/remove` |

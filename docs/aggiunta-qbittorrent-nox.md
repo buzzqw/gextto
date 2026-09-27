@@ -1077,18 +1077,23 @@ La matrice è verificata da `TestCapabilityParityIsComplete` ed esposta in
   (`disk_cache`, `disk_cache_ttl`, `use_os_cache`) invece di un errore.
 - **Migrazione**: `GET /api/torrent-migrations`, `POST /api/torrent-migrations/plan`
   (dry-run + manifest persistente `torrent-migration.json`) e
-  `POST /api/torrent-migrations/cancel`. Il manifest elenca ogni torrent con
-  `.torrent`/magnet, path e stato; il passaggio dei file resta un'operazione
-  governata con riavvio, come da §14.
+  `POST /api/torrent-migrations/cancel`. All'avvio, se il manifest ha come target
+  il backend attivo, i torrent vengono **reimportati automaticamente** dal
+  `.torrent`/magnet (idempotente, il manifest viene marcato completato). Il
+  passaggio dei file tra namespace diversi resta governato con riavvio, ma non
+  richiede più di ri-aggiungere a mano i torrent.
+- **Selettivo e diagnostica**: `POST /api/torrents/{hash}/selective` applica i
+  profili `all`/`video`/`skip_extras` (priorità file), `GET .../pieces` espone i
+  run di pezzi sui backend che li supportano.
 - **Interfaccia**: nuova tab **Motore torrent** con selettore backend,
   credenziali qBittorrent (password write-only), path mapping, pannello di stato
   con matrice capability e pulsanti Test connessione / Verifica prerequisiti.
 
 ### 26.5 Gap residui
 
-- **Hand-off automatico della migrazione**: il manifest è pronto, ma il
-  trasferimento effettivo dei torrent tra motori resta manuale/assistito (è la
-  parte a rischio più alto, §14.5).
+- **Rollback automatico della migrazione**: l'import all'avvio è idempotente e
+  il manifest è riproducibile, ma il rollback verso il backend di origine resta
+  un'operazione governata (è la parte a rischio più alto, §14.5).
 - **`optimize_settings` su anacrolix**: non applicabile (nessuna cache libtorrent).
 - **Path physical validation di qBittorrent**: Gextto verifica il path riportato
   e ritenta; non può leggere il filesystem del processo remoto.

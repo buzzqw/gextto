@@ -1010,9 +1010,9 @@ La capability matrix in `torrent_engine.go` riflette questa realtà
 - Storage/resume diversi dal fastresume libtorrent: il completion store è codice
   critico; il move è ora implementato ma resta un'operazione da trattare con
   cautela (quiesce → move → re-add).
-- Le feature "nuove" del piano (piece diagnostics esposti in UI, download
-  selettivo, verifica programmata, streaming) **non** sono ancora esposte come
-  endpoint: la libreria le supporta, Gextto no.
+- Le feature del piano sono ora esposte: **diagnostica pezzi** e **download
+  selettivo**; restano fuori verifica programmata e streaming (non richiesti per
+  il rilascio).
 
 ### 22.4 Gap completati in questo passaggio
 
@@ -1022,24 +1022,35 @@ La capability matrix in `torrent_engine.go` riflette questa realtà
    Richiede un `.torrent` persistito e rifiuta una destinazione già popolata.
 2. **Coda Gextto**: `AdjustQueue` applica gli slot di download attivi con
    pause/resume, toccando solo i torrent messi in pausa dallo scheduler.
-3. **Migrazione**: stesso manifest/dry-run di qBittorrent
-   (`/api/torrent-migrations`), con verifica che anacrolix sia compilato.
-4. **Interfaccia**: tab **Motore torrent** con selettore, mapping percorsi e
-   pannello di stato (la matrice mostra anacrolix come backend con tag).
+3. **Diagnostica pezzi**: `GET /api/torrents/{hash}/pieces` (e `/runs`) espone i
+   run di pezzi (complete/partial/checking/missing) via `PieceStateRuns`.
+4. **Download selettivo**: `POST /api/torrents/{hash}/selective` con profili
+   `all`/`video`/`skip_extras` (priorità file, video principale a priorità alta).
+5. **Rete**: blocklist locale (`iplist.NewFromReader`), nodi bootstrap DHT e
+   proxy HTTP mappati da `cfg.Libtorrent`; i proxy SOCKS sono segnalati come non
+   supportati invece di essere ignorati in silenzio.
+6. **Migrazione**: stesso manifest/dry-run di qBittorrent
+   (`/api/torrent-migrations`) con **import automatico all'avvio** sul backend
+   target.
+7. **Interfaccia**: tab **Motore torrent** con selettore, mapping percorsi e
+   pannello di stato.
 
 ### 22.5 Gap residui
 
-1. **Diagnostica pezzi** (`/pieces`, `/pieces/runs`) e **download selettivo**
-   con profili film/serie/pack/fumetti.
-2. **IP blocklist**, bootstrap DHT e proxy non mappati da `cfg.Libtorrent`.
-3. **Hand-off automatico della migrazione** (il manifest è pronto; il
-   trasferimento resta governato con riavvio).
+1. **Blocklist dinamica**: il filtro è applicato alla creazione del client; un
+   aggiornamento richiede un riavvio.
+2. **Limiti per-torrent** (`SetLimits`) e sequenziale: non applicabili a runtime
+   come libtorrent.
+3. **Rollback automatico della migrazione**: l'import è idempotente, il rollback
+   resta governato.
 
 ### 22.6 Test
 
 `anacrolix_engine_test.go` (tag `anacrolix`):
-- conversioni priorità; capability non supportate;
+- conversioni priorità; capability non supportate; mappature rete (DHT/proxy/
+  blocklist);
 - verifica dati locali fino al 100%, pause/resume, remove con conservazione file;
+- **diagnostica pezzi** completa sul dato verificato;
 - **restart**: il torrent viene ricostruito dal manifest e resta completo senza
   riscaricare;
 - **storage move**: il file viene spostato, il torrent resta completo e il

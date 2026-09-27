@@ -46,6 +46,21 @@ type TorrentSession interface {
 	RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64
 }
 
+// TorrentPieceRun is a compact run of consecutive pieces that share a state.
+// Exposed by GET /api/torrents/{hash}/pieces for backends that support it.
+type TorrentPieceRun struct {
+	Begin int    `json:"begin"`
+	End   int    `json:"end"`
+	State string `json:"state"`
+}
+
+// TorrentPieceInspector is implemented by backends that can expose per-piece
+// diagnostics. Backends without it must answer with a capability error, never
+// with fabricated data.
+type TorrentPieceInspector interface {
+	PieceRuns(hash string) ([]TorrentPieceRun, bool, error)
+}
+
 // TorrentEngine is the full surface shared by the HTTP API and the acquisition
 // path. Backends that cannot implement an operation must return an explicit
 // error (ErrCapabilityUnavailable) instead of pretending success.
@@ -147,7 +162,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "none", "seed_policy": "full", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "full", "categories": "none", "tags": "none", "sync": "none",
 		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
-		"ip_filter": "none", "session_stats": "partial", "web_seeds": "partial",
+		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
 	},
 }
 

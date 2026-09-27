@@ -97,6 +97,21 @@ func TestAnacrolixEngineVerifiesLocalDataAndResumes(t *testing.T) {
 	if !waitForProgress(engine, infoHash, 99.99, 30*time.Second) {
 		t.Fatalf("torrent did not verify local data: %+v", engine.List())
 	}
+	// Piece diagnostics report every piece as complete for verified data.
+	runs, found, err := engine.PieceRuns(infoHash)
+	if err != nil || !found || len(runs) == 0 {
+		t.Fatalf("PieceRuns = %+v, %v, %v", runs, found, err)
+	}
+	totalPieces := 0
+	for _, run := range runs {
+		totalPieces += run.End - run.Begin + 1
+		if run.State != "complete" {
+			t.Fatalf("piece run = %+v, want complete", run)
+		}
+	}
+	if totalPieces == 0 {
+		t.Fatal("no pieces reported")
+	}
 
 	// Pause and resume must be idempotent and reflected in the state.
 	if ok, err := engine.Pause(infoHash); err != nil || !ok {
@@ -236,5 +251,39 @@ func TestAnacrolixEngineMovesStorage(t *testing.T) {
 	view := findView(engine, infoHash)
 	if view == nil || view.SavePath != destination {
 		t.Fatalf("save path after move = %+v", view)
+	}
+}
+
+func TestAnacrolixNetworkMappings(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Libtorrent.DhtBootstrapNodes = "router.bittorrent.com:6881, dht.example:6881\n10.0.0.1:1"
+	if nodes := anacrolixDhtNodes(&cfg); len(nodes) != 3 {
+		t.Fatalf("dht nodes = %+v, want 3", nodes)
+	}
+
+	cfg.Libtorrent.ProxyType = 3
+	cfg.Libtorrent.ProxyHost = "127.0.0.1"
+	cfg.Libtorrent.ProxyPort = 8080
+	proxy := anacrolixHTTPProxy(&cfg)
+	if proxy == nil || proxy.String() != "http://127.0.0.1:8080" {
+		t.Fatalf("proxy = %v", proxy)
+	}
+	cfg.Libtorrent.ProxyType = 2 // socks5: not supported by anacrolix
+	if anacrolixHTTPProxy(&cfg) != nil {
+		t.Fatal("socks proxy must be ignored")
+	}
+
+	path := filepath.Join(t.TempDir(), "ipfilter.dat")
+	if err := os.WriteFile(path, []byte("test:1.2.4.0-1.2.4.255\n"), 0o644); err != nil {
+		t.Fatalf("write ipfilter: %v", err)
+	}
+	cfg.Libtorrent.ApplyIpFilter = true
+	cfg.Libtorrent.IpFilterPath = path
+	if anacrolixBlocklist(&cfg) == nil {
+		t.Fatal("valid ipfilter must load")
+	}
+	cfg.Libtorrent.IpFilterPath = filepath.Join(t.TempDir(), "missing.dat")
+	if anacrolixBlocklist(&cfg) != nil {
+		t.Fatal("missing ipfilter must be nil")
 	}
 }

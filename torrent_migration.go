@@ -19,6 +19,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // MigrationManifest is the persisted, replayable state of one migration.
@@ -29,6 +31,10 @@ type MigrationManifest struct {
 	Items       []MigrationItem `json:"items"`
 	Warnings    []string        `json:"warnings"`
 	Ready       bool            `json:"ready"`
+	// Imported and CompletedAt are set once the target backend re-imported the
+	// manifest at startup, so the import is not repeated.
+	Imported    int    `json:"imported,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
 }
 
 // MigrationItem is one torrent to preserve across a backend switch.
@@ -160,6 +166,70 @@ func LoadMigrationManifest(cfg *Config) (*MigrationManifest, error) {
 		return nil, err
 	}
 	return &manifest, nil
+}
+
+// ImportMigrationManifest re-adds the torrents of a pending manifest into the
+// active backend. It is safe at startup: it only acts when the manifest targets
+// the active backend and is not completed, and re-adding is idempotent. On
+// success the manifest is marked completed so a restart does not repeat it.
+func ImportMigrationManifest(s *AppState, cfg *Config) (int, []string, error) {
+	if s == nil || cfg == nil {
+		return 0, nil, nil
+	}
+	manifest, err := LoadMigrationManifest(cfg)
+	if err != nil || manifest == nil {
+		return 0, nil, err
+	}
+	active := ActiveTorrentBackend(s).Name()
+	if manifest.ToBackend != active {
+		return 0, nil, nil
+	}
+	if manifest.CompletedAt != "" {
+		return 0, nil, nil
+	}
+	engine := s.activeEngine()
+	imported := 0
+	var warnings []string
+	for _, item := range manifest.Items {
+		opts := AddOptions{Paused: item.Paused}
+		if item.TorrentFile != "" && fileExists(item.TorrentFile) {
+			savePath := item.SavePath
+			hash, addErr := engine.AddTorrentFileWithOptions(item.TorrentFile, cfg, &savePath, opts)
+			if addErr != nil {
+				warnings = append(warnings, fmt.Sprintf("%s: %v", item.Name, addErr))
+				continue
+			}
+			if hash != nil {
+				imported++
+			}
+			continue
+		}
+		if strings.HasPrefix(item.Magnet, "magnet:") {
+			savePath := item.SavePath
+			added, addErr := engine.AddWithOptions(item.Magnet, cfg, &savePath, opts)
+			if addErr != nil {
+				warnings = append(warnings, fmt.Sprintf("%s: %v", item.Name, addErr))
+				continue
+			}
+			if added {
+				imported++
+			}
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf("%s: nessuna sorgente reimportabile", item.Name))
+	}
+	if len(warnings) == 0 {
+		manifest.Imported = imported
+		manifest.CompletedAt = time.Now().UTC().Format(time.RFC3339)
+		if _, err := PersistMigrationManifest(cfg, *manifest); err != nil {
+			return imported, warnings, err
+		}
+		logging.Info("migrazione: torrent reimportati nel backend attivo",
+			"backend", active, "imported", imported)
+	} else {
+		logging.Warn("migrazione: alcuni torrent non sono stati reimportati", "warnings", len(warnings))
+	}
+	return imported, warnings, nil
 }
 
 // migrationPlanInput is the body of POST /api/torrent-migrations/plan.

@@ -67,5 +67,19 @@ func NewAppState(
 			}
 		}
 	}
+	// A pending migration manifest for the active backend is re-imported here:
+	// re-adding is idempotent and the manifest is marked completed on success.
+	if ActiveTorrentBackend(state).Name() != BackendEmbedded {
+		if imported, warnings, importErr := ImportMigrationManifest(state, cfg); importErr != nil {
+			logging.Warn("migration import failed", "error", importErr)
+		} else {
+			for _, warning := range warnings {
+				logging.Warn("migration import warning", "detail", warning)
+			}
+			if imported > 0 {
+				logging.Info("migration import completed", "imported", imported)
+			}
+		}
+	}
 	return state
 }
