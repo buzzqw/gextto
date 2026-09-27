@@ -126,7 +126,7 @@ func (w *noCacheWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func UiNoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path != "/" && !strings.HasPrefix(path, "/pkg/") && !strings.HasPrefix(path, "/ui") {
+		if path != "/" && path != "/legacy" && !strings.HasPrefix(path, "/pkg/") && !strings.HasPrefix(path, "/ui") {
 			next.ServeHTTP(w, r)
 			return
 		}

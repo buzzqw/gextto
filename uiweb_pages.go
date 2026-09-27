@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -110,6 +111,32 @@ func uiSettingsPageFrom(s *AppState) uiSettingsPage {
 			Value: value,
 			Kind:  uiSettingKind(def.Key, value),
 		})
+	}
+	// Any persisted setting not covered by the generated index (score groups,
+	// backup, integrations, ...) is still editable, grouped under "Altro".
+	indexed := map[string]struct{}{}
+	for _, def := range uiSettingsIndex {
+		indexed[def.Key] = struct{}{}
+	}
+	other := uiSettingsTabData{Label: "Altro"}
+	keys := make([]string, 0, len(cfg.Settings))
+	for key := range cfg.Settings {
+		if _, ok := indexed[key]; ok {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		other.Fields = append(other.Fields, uiSettingField{
+			Key:   key,
+			Label: key,
+			Value: cfg.Settings[key],
+			Kind:  uiSettingKind(key, cfg.Settings[key]),
+		})
+	}
+	if len(other.Fields) > 0 {
+		page.Tabs = append(page.Tabs, other)
 	}
 	return page
 }
@@ -257,8 +284,28 @@ func uiActionsPageFor(view string) (uiActionsPage, bool) {
 				{Label: "Crea backup", Method: "POST", Path: "/api/backup", Body: "{}"},
 			}},
 		}}, true
-	case "integrations":
-		return uiActionsPage{Title: "Integrazioni", Sections: []uiActionSection{
+	default:
+		return uiActionsPage{}, false
+	}
+}
+
+// uiIntegrationsPage carries the OAuth/PIN state and the media-server actions.
+type uiIntegrationsPage struct {
+	TraktConfigured    bool
+	TraktAuthenticated bool
+	SimklConfigured    bool
+	SimklAuthenticated bool
+	Sections           []uiActionSection
+}
+
+func uiIntegrationsPageFrom(s *AppState) uiIntegrationsPage {
+	cfg := latestConfig(s)
+	return uiIntegrationsPage{
+		TraktConfigured:    settingsNonEmpty(cfg, "trakt_client_id"),
+		TraktAuthenticated: settingsNonEmpty(cfg, "trakt_access_token"),
+		SimklConfigured:    settingsNonEmpty(cfg, "simkl_client_id"),
+		SimklAuthenticated: settingsNonEmpty(cfg, "simkl_access_token"),
+		Sections: []uiActionSection{
 			{Label: "Media server", Hint: "Verifica o aggiorna le librerie collegate.", Buttons: []uiActionButton{
 				{Label: "Test Jellyfin", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
 				{Label: "Aggiorna Jellyfin", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
@@ -269,12 +316,6 @@ func uiActionsPageFor(view string) (uiActionsPage, bool) {
 				{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
 				{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
 			}},
-			{Label: "Trakt / Simkl", Hint: "I flussi di accesso (OAuth/PIN) restano disponibili nella UI classica.", Buttons: []uiActionButton{
-				{Label: "Avvia Trakt", Method: "POST", Path: "/api/trakt/auth/start", Body: "{}"},
-				{Label: "Avvia Simkl", Method: "POST", Path: "/api/simkl/auth/start", Body: "{}"},
-			}},
-		}}, true
-	default:
-		return uiActionsPage{}, false
+		},
 	}
 }

@@ -209,7 +209,7 @@ func uiNavigation(view string) []uiNavGroup {
 			out.Items = append(out.Items, uiNavItem{
 				ID:           item.ID,
 				Label:        item.Label,
-				Href:         "/ui?view=" + item.ID,
+				Href:         "/?view=" + item.ID,
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,
@@ -270,6 +270,8 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 		return uiLicenseData{Text: uiLicenseText}
 	case "settings":
 		return uiSettingsPageFrom(s)
+	case "integrations":
+		return uiIntegrationsPageFrom(s)
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		if spec.Search && r != nil {

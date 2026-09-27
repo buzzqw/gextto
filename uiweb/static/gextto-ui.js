@@ -297,4 +297,68 @@
     });
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-search-post]"), renderSearch);
+
+  // ---- library editor (feeds + indexers) ----------------------------------
+  var libraryEditor = document.querySelector("[data-library-editor]");
+  if (libraryEditor) {
+    var library = null;
+    var feedsInput = libraryEditor.querySelector("[data-library-feeds]");
+    var indexersInput = libraryEditor.querySelector("[data-library-indexers]");
+    var libraryMessage = libraryEditor.querySelector("[data-library-message]");
+    api("/api/config/library", "GET").then(function (data) {
+      library = data || {};
+      if (feedsInput) feedsInput.value = (library.feed_urls || []).join("\n");
+      if (indexersInput) indexersInput.value = JSON.stringify(library.indexers || [], null, 2);
+    }).catch(function (error) {
+      if (libraryMessage) libraryMessage.textContent = error.message;
+    });
+    var saveLibrary = libraryEditor.querySelector("[data-library-save]");
+    if (saveLibrary) saveLibrary.addEventListener("click", function () {
+      if (!library) return;
+      if (feedsInput) {
+        library.feed_urls = (feedsInput.value || "").split("\n").map(function (line) {
+          return line.trim();
+        }).filter(function (line) { return line !== ""; });
+      }
+      if (indexersInput) {
+        try { library.indexers = JSON.parse(indexersInput.value || "[]"); }
+        catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
+      }
+      saveLibrary.disabled = true;
+      api("/api/config/library", "POST", library).then(function () {
+        if (libraryMessage) libraryMessage.textContent = "Libreria salvata";
+      }).catch(function (error) {
+        alert("Salvataggio non riuscito: " + error.message);
+      }).then(function () { saveLibrary.disabled = false; });
+    });
+  }
+
+  // ---- OAuth / PIN flows (Trakt, Simkl) -----------------------------------
+  document.addEventListener("click", function (event) {
+    var start = event.target.closest("[data-oauth-start]");
+    if (start) {
+      var panel = start.closest(".panel");
+      var output = panel.querySelector("[data-oauth-output]");
+      start.disabled = true;
+      api(start.getAttribute("data-oauth-start"), "POST", {})
+        .then(function (data) { if (output) output.textContent = JSON.stringify(data, null, 2); })
+        .catch(function (error) { if (output) output.textContent = error.message; })
+        .then(function () { start.disabled = false; });
+      return;
+    }
+    var poll = event.target.closest("[data-oauth-poll]");
+    if (poll) {
+      var panel2 = poll.closest(".panel");
+      var output2 = panel2.querySelector("[data-oauth-output]");
+      var input = panel2.querySelector("[data-oauth-code]");
+      var code = input ? input.value.trim() : "";
+      if (!code) { alert("Inserisci il codice di accesso"); return; }
+      poll.disabled = true;
+      api(poll.getAttribute("data-oauth-poll"), "POST", { code: code })
+        .then(function (data) { if (output2) output2.textContent = JSON.stringify(data, null, 2); })
+        .catch(function (error) { if (output2) output2.textContent = error.message; })
+        .then(function () { poll.disabled = false; });
+      return;
+    }
+  });
 })();

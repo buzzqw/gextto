@@ -72,8 +72,62 @@
 </div>
 {{end}}
 
+{{define "integrations"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>Trakt</h3></div>
+    <div class="panel-body">
+      <p class="muted">Stato: {{if .TraktAuthenticated}}autenticato{{else if .TraktConfigured}}configurato, non autenticato{{else}}non configurato{{end}}</p>
+      <div class="toolbar">
+        <button class="btn sm primary" data-oauth-start="/api/trakt/auth/start" title="Avvia il flusso di accesso Trakt">Avvia accesso</button>
+        <input data-oauth-code placeholder="codice" />
+        <button class="btn sm" data-oauth-poll="/api/trakt/auth/poll" title="Conferma il codice di accesso">Conferma</button>
+        <button class="btn sm" data-api="/api/trakt/auth/refresh" data-method="POST" data-body="{}" title="Rinnova il token">Refresh</button>
+        <button class="btn sm danger" data-api="/api/trakt/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
+      </div>
+      <pre class="output" data-oauth-output></pre>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Simkl</h3></div>
+    <div class="panel-body">
+      <p class="muted">Stato: {{if .SimklAuthenticated}}autenticato{{else if .SimklConfigured}}configurato, non autenticato{{else}}non configurato{{end}}</p>
+      <div class="toolbar">
+        <button class="btn sm primary" data-oauth-start="/api/simkl/auth/start" title="Avvia il flusso PIN Simkl">Avvia PIN</button>
+        <input data-oauth-code placeholder="codice" />
+        <button class="btn sm" data-oauth-poll="/api/simkl/auth/poll" title="Conferma il PIN">Conferma</button>
+        <button class="btn sm danger" data-api="/api/simkl/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
+      </div>
+      <pre class="output" data-oauth-output></pre>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Servizi</h3></div>
+    <div class="panel-body">
+      {{range .Sections}}
+      <div class="field span-full" style="margin:6px 0 8px"><span>{{.Label}}</span>{{if .Hint}}<small class="hint">{{.Hint}}</small>{{end}}</div>
+      <div class="toolbar" style="margin-bottom:14px">
+        {{range .Buttons}}
+        <button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{define "settings"}}
 <div class="view">
+  <div class="panel" data-library-editor>
+    <div class="panel-head"><h3>Libreria e sorgenti</h3></div>
+    <div class="panel-body">
+      <label class="field"><span>Feed RSS (un URL per riga)</span><textarea data-library-feeds rows="3"></textarea></label>
+      <label class="field"><span>Indexer Torznab (JSON)</span><textarea data-library-indexers rows="5"></textarea></label>
+      <div class="form-actions"><button class="btn sm primary" data-library-save>Salva libreria</button><small class="muted" data-library-message></small></div>
+      <p class="hint">Serie, film, filtri per sorgente, tag-dir ed event hook si gestiscono dalla UI classica.</p>
+    </div>
+  </div>
   <p class="muted">Ogni campo si salva singolarmente. I valori sensibili non vengono mai mostrati.</p>
   {{range .Tabs}}
   <div class="panel" style="margin-bottom:14px">

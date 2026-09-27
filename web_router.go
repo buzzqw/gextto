@@ -9,7 +9,8 @@ import "net/http"
 // auth and cache-control middleware that axum layered over the whole router.
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
-	handle(s, mux, "GET /{$}", Index)
+	handle(s, mux, "GET /{$}", UiPage)
+	handle(s, mux, "GET /legacy", Index)
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)
 	handle(s, mux, "GET /pkg/ui_bg.wasm", WasmAlias)

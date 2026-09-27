@@ -23,7 +23,7 @@
       {{end}}
     </nav>
     <div class="sidebar-foot">
-      <a class="nav-item" href="/" title="Torna alla UI classica (Leptos)">UI classica</a>
+      <a class="nav-item" href="/legacy" title="Torna alla UI classica (Leptos)">UI classica</a>
     </div>
   </aside>
   <div class="content">
@@ -36,7 +36,8 @@
       {{else if eq .Page "license"}}{{template "license" .Content}}
       {{else if or (eq .Page "series") (eq .Page "movies") (eq .Page "gaps") (eq .Page "archive") (eq .Page "blocklist") (eq .Page "comics")}}{{template "table" .Content}}
       {{else if eq .Page "search"}}{{template "search" .Content}}
-      {{else if or (eq .Page "maintenance") (eq .Page "integrations")}}{{template "actions" .Content}}
+      {{else if eq .Page "maintenance"}}{{template "actions" .Content}}
+      {{else if eq .Page "integrations"}}{{template "integrations" .Content}}
       {{else if eq .Page "settings"}}{{template "settings" .Content}}
       {{else}}{{template "unavailable" .Content}}{{end}}
     </main>
@@ -52,7 +53,7 @@
     <div class="panel-head"><h3>{{.Title}}</h3></div>
     <div class="panel-body">
       <p class="muted">Questa sezione non è ancora disponibile nella nuova interfaccia.</p>
-      <p><a class="btn" href="/">Apri la UI classica</a></p>
+      <p><a class="btn" href="/legacy">Apri la UI classica</a></p>
     </div>
   </div>
 </div>
