@@ -858,3 +858,48 @@ Completati nella nuova UI (nessun fallback):
 
 Tutto il resto è nella nuova UI. Leptos resta montato su `/legacy` finché non
 dai il via alla rimozione.
+
+
+---
+
+## 21. Controllo formale e completo della nuova UI
+
+Revisione di codice + test funzionali. Difetti trovati e corretti:
+
+1. **Perdita di metadati film** (grave): il form di modifica inviava solo
+   nome/anno/qualità/lingua, ma `UpdateMovie` sovrascrive `tmdb_id`, `tvdb_id`,
+   `subtitle`, `exclude`, `language_requirements`, `subtitle_requirements` con
+   il body. Ora il form rimanda i valori correnti (input visibili + hidden).
+2. **Link magnet rotti**: `html/template` riscriveva `magnet:` in `#ZgotmplZ`.
+   Ora passano come `template.URL` con scheme controllato (magnet/http/https).
+3. **Feed e indexer non salvati**: non sono in `/api/config/library` ma nelle
+   impostazioni `url` e `indexers` via `/api/config/settings`; l'editor libreria
+   ora usa gli endpoint corretti.
+4. **Editor JSON non round-trip**: `tag-dir-rules`, `event-hooks`,
+   `watched-folders` rispondono `{items:[...]}` ma accettano un array nudo in
+   POST; aggiunto unwrap/wrap per-editor. `source-filters` usa `{filters:[...]}`.
+5. **Boolean mostrati male** (grave): le impostazioni salvate come `"yes"`
+   (es. `gap_filling`, `libtorrent_dht`, weekly fumetti) apparivano come "No" e il
+   salvataggio le riscriveva `"false"`, disattivandole. Il select ora conserva la
+   grafia originale (yes/no, 1/0, on/off, true/false).
+6. **Segreti in chiaro**: la scheda "Altro" mostrava il JSON `indexers` con le API
+   key; ora i valori che contengono `api_key`/`password`/`token`/`secret` sono
+   mascherati come i campi segreti. Le schede senza campi (es. "Punteggi") sono
+   nascoste.
+7. **Fumetti**: il link "Sorgente" usava `tag_url` relativo (getcomics.org) come
+   link locale; ora viene risolto su getcomics.org.
+8. **Archivio**: la tabella auto-generata mostrava la colonna `magnet` (dump
+   enorme); ora ha colonne esplicite (titolo, sorgente, punteggio, aggiunto).
+9. **Messaggi d'errore**: il client ignorava il corpo JSON e mostrava solo
+   "HTTP 400"; ora mostra `error` del server. `href` nel JS limitati a
+   http/https/magnet. Su 401 chiede una volta il token API (condiviso con la UI
+   classica) e riprova.
+
+Verifiche aggiunte: `TestUiActionPathsAreRegistered` (ogni endpoint usato dalla UI
+esiste nel router), `TestUiMagnetURLScheme`, `TestUiMovieFormKeepsMetadata`,
+`TestUiSettingKindMasksStructuredSecrets`, `TestUiBoolValuesPreserveSpelling`,
+`TestUiJSONEditorRoundTripShape`, `TestUiSettingsHidesEmptyTab`.
+
+Esito: `go build`/`go vet`/`go test ./...` verdi (anche `-tags anacrolix`);
+21/21 pagine con HTML bilanciato (parser), 16/16 pagine 200, nessun `ZgotmplZ`,
+nessuna API key in pagina.

@@ -17,7 +17,7 @@
       <div class="nav-group{{if .Open}} open{{end}}">
         <div class="nav-group-label">{{.Label}}</div>
         {{range .Items}}
-        <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}">{{.Label}}</a>
+        <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>
         {{end}}
       </div>
       {{end}}
