@@ -476,13 +476,19 @@ func TestLibtorrentFastresumeSurvivesRestart(t *testing.T) {
 	}
 	defer restored.Shutdown(&secondCfg)
 
+	// Poll until libtorrent has finished the initial check of the existing data
+	// and reports the recovered progress. Reading the first non-nil status is
+	// racy: right after start the torrent can still be in `checking`, reporting
+	// 0%, so a fast machine and a slow CI runner disagree.
 	restoredProgress := 0.0
 	deadline = time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		current := findTorrent(restored, infoHash)
 		if current != nil {
 			restoredProgress = current.Progress
-			break
+			if restoredProgress >= observed*0.5 {
+				break
+			}
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
