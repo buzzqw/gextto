@@ -1181,23 +1181,17 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 			state = "stalled"
 		}
 		progress := math.Max(0.0, math.Min(100.0, status.Progress))
-		// Prefer the payload rate (what the user actually receives) and fall
-		// back to the total rate when libtorrent reports no payload activity.
-		downloadPayload := status.DownloadPayload
-		if downloadPayload <= 0 {
-			downloadPayload = status.DownloadRate
-		}
+		// Show the payload rate only: the total rate includes protocol overhead
+		// (handshakes, keepalives), so an idle or stalled torrent would otherwise
+		// display a small "fake" download speed. Total rates stay available in
+		// `download_rate_total`/`upload_rate_total` for diagnostics.
 		downloadRate := uint64(0)
-		if downloadPayload > 0 {
-			downloadRate = uint64(downloadPayload)
-		}
-		uploadPayload := status.UploadPayload
-		if uploadPayload <= 0 {
-			uploadPayload = status.UploadRate
+		if status.DownloadPayload > 0 {
+			downloadRate = uint64(status.DownloadPayload)
 		}
 		uploadRate := uint64(0)
-		if uploadPayload > 0 {
-			uploadRate = uint64(uploadPayload)
+		if status.UploadPayload > 0 {
+			uploadRate = uint64(status.UploadPayload)
 		}
 		seedRatio := -1.0
 		seedDays := int64(-1)
@@ -1223,29 +1217,31 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 			totalDone = 0
 		}
 		result = append(result, models.TorrentView{
-			Hash:            hash,
-			Name:            status.Name,
-			SavePath:        status.SavePath,
-			Progress:        progress,
-			State:           state,
-			DownloadRate:    downloadRate,
-			UploadRate:      uploadRate,
-			DownloadLimit:   int64(status.DownloadLimit),
-			UploadLimit:     int64(status.UploadLimit),
-			AllTimeUpload:   status.AllTimeUpload,
-			AllTimeDownload: status.AllTimeDownload,
-			SeedingSeconds:  status.SeedingSeconds,
-			QueuePosition:   int(status.QueuePosition),
-			NumPeers:        int(status.NumPeers),
-			NumSeeds:        int(status.NumSeeds),
-			SeedRatio:       seedRatio,
-			SeedDays:        seedDays,
-			HasMetadata:     status.HasMetadata != 0,
-			AutoManaged:     status.AutoManaged != 0,
-			TorrentVersion:  torrentVersion,
-			TotalSize:       totalSize,
-			TotalDone:       totalDone,
-			Stalled:         stalled,
+			Hash:              hash,
+			Name:              status.Name,
+			SavePath:          status.SavePath,
+			Progress:          progress,
+			State:             state,
+			DownloadRate:      downloadRate,
+			UploadRate:        uploadRate,
+			DownloadRateTotal: uint64(maxInt64(0, int64(status.DownloadRate))),
+			UploadRateTotal:   uint64(maxInt64(0, int64(status.UploadRate))),
+			DownloadLimit:     int64(status.DownloadLimit),
+			UploadLimit:       int64(status.UploadLimit),
+			AllTimeUpload:     status.AllTimeUpload,
+			AllTimeDownload:   status.AllTimeDownload,
+			SeedingSeconds:    status.SeedingSeconds,
+			QueuePosition:     int(status.QueuePosition),
+			NumPeers:          int(status.NumPeers),
+			NumSeeds:          int(status.NumSeeds),
+			SeedRatio:         seedRatio,
+			SeedDays:          seedDays,
+			HasMetadata:       status.HasMetadata != 0,
+			AutoManaged:       status.AutoManaged != 0,
+			TorrentVersion:    torrentVersion,
+			TotalSize:         totalSize,
+			TotalDone:         totalDone,
+			Stalled:           stalled,
 
 			Error:             status.Error,
 			CurrentTracker:    status.CurrentTracker,

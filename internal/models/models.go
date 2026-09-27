@@ -372,29 +372,32 @@ func (c *CycleStats) Error(category string) {
 
 // TorrentView is the live status of a torrent in the session.
 type TorrentView struct {
-	Hash            string  `json:"hash"`
-	Name            string  `json:"name"`
-	Progress        float64 `json:"progress"`
-	State           string  `json:"state"`
-	DownloadRate    uint64  `json:"download_rate"`
-	UploadRate      uint64  `json:"upload_rate"`
-	SavePath        string  `json:"save_path"`
-	DownloadLimit   int64   `json:"download_limit"`
-	UploadLimit     int64   `json:"upload_limit"`
-	AllTimeUpload   int64   `json:"all_time_upload"`
-	AllTimeDownload int64   `json:"all_time_download"`
-	SeedingSeconds  int64   `json:"seeding_seconds"`
-	QueuePosition   int     `json:"queue_position"`
-	NumPeers        int     `json:"num_peers"`
-	NumSeeds        int     `json:"num_seeds"`
-	SeedRatio       float64 `json:"seed_ratio"`
-	SeedDays        int64   `json:"seed_days"`
-	HasMetadata     bool    `json:"has_metadata"`
-	AutoManaged     bool    `json:"auto_managed"`
-	TorrentVersion  string  `json:"torrent_version"`
-	TotalSize       int64   `json:"total_size"`
-	TotalDone       int64   `json:"total_done"`
-	Stalled         bool    `json:"stalled"`
+	Hash         string  `json:"hash"`
+	Name         string  `json:"name"`
+	Progress     float64 `json:"progress"`
+	State        string  `json:"state"`
+	DownloadRate uint64  `json:"download_rate"`
+	UploadRate   uint64  `json:"upload_rate"`
+	// Total rates include protocol overhead; the fields above are payload-only.
+	DownloadRateTotal uint64  `json:"download_rate_total"`
+	UploadRateTotal   uint64  `json:"upload_rate_total"`
+	SavePath          string  `json:"save_path"`
+	DownloadLimit     int64   `json:"download_limit"`
+	UploadLimit       int64   `json:"upload_limit"`
+	AllTimeUpload     int64   `json:"all_time_upload"`
+	AllTimeDownload   int64   `json:"all_time_download"`
+	SeedingSeconds    int64   `json:"seeding_seconds"`
+	QueuePosition     int     `json:"queue_position"`
+	NumPeers          int     `json:"num_peers"`
+	NumSeeds          int     `json:"num_seeds"`
+	SeedRatio         float64 `json:"seed_ratio"`
+	SeedDays          int64   `json:"seed_days"`
+	HasMetadata       bool    `json:"has_metadata"`
+	AutoManaged       bool    `json:"auto_managed"`
+	TorrentVersion    string  `json:"torrent_version"`
+	TotalSize         int64   `json:"total_size"`
+	TotalDone         int64   `json:"total_done"`
+	Stalled           bool    `json:"stalled"`
 	// Rich status exposed by libtorrent that the UI and diagnostics can use.
 	Error             string  `json:"error"`
 	CurrentTracker    string  `json:"current_tracker"`
