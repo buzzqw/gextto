@@ -489,13 +489,15 @@ pre.output { max-height: 260px; overflow: auto; margin: 0; padding: 12px; border
 /* Storico download: la colonna "Cartella libreria / NAS" resta stretta, così il
    nome del file scaricato ha più spazio. */
 .data-table.history-table { table-layout: fixed; min-width: 900px; }
-.data-table.history-table th:nth-child(1) { width: 38%; }
-.data-table.history-table th:nth-child(2) { width: 14%; }
-.data-table.history-table th:nth-child(3) { width: 9%; }
-.data-table.history-table th:nth-child(4) { width: 6%; }
-.data-table.history-table th:nth-child(5) { width: 9%; }
-.data-table.history-table th:nth-child(6) { width: 11%; }
-.data-table.history-table th:nth-child(7) { width: 13%; }
+.data-table.history-table th:nth-child(1) { width: 42%; }
+.data-table.history-table th:nth-child(2) { width: 11%; }
+.data-table.history-table th:nth-child(3) { width: 6%; }
+.data-table.history-table th:nth-child(4) { width: 5%; }
+.data-table.history-table th:nth-child(5) { width: 8%; }
+.data-table.history-table th:nth-child(6) { width: 18%; }
+.data-table.history-table th:nth-child(7) { width: 10%; }
+.data-table.history-table th:nth-child(7), .data-table.history-table td:nth-child(7) { text-align: right; }
+.data-table.history-table td:nth-child(3) { padding-left: 6px; padding-right: 6px; }
 .data-table.torrent-table { table-layout: fixed; min-width: 1240px; }
 .data-table.torrent-table td:first-child { min-width: 0; }
 .data-table.torrent-table th:nth-child(1), .data-table.torrent-table td:nth-child(1) { width: 3%; }
