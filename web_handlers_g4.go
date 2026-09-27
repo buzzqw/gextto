@@ -271,7 +271,7 @@ func gh4_libtorrentAptCandidate() *string {
 }
 
 // gh4_torrentDisplayName mirrors the web module `torrent_display_name`.
-func gh4_torrentDisplayName(torrents *LibtorrentClient, hash string) string {
+func gh4_torrentDisplayName(torrents TorrentSession, hash string) string {
 	for _, torrent := range torrents.List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			if strings.TrimSpace(torrent.Name) != "" {
@@ -284,7 +284,7 @@ func gh4_torrentDisplayName(torrents *LibtorrentClient, hash string) string {
 }
 
 // gh4_removeFailedTorrent mirrors the web module `remove_failed_torrent`.
-func gh4_removeFailedTorrent(torrents *LibtorrentClient, hash string) bool {
+func gh4_removeFailedTorrent(torrents TorrentSession, hash string) bool {
 	name := gh4_torrentDisplayName(torrents, hash)
 	incomplete := false
 	for _, torrent := range torrents.List() {
@@ -434,7 +434,7 @@ func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	go func() {
-		added, err := s.torrents.Add(source, s.cfg)
+		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:
 			logging.Error("manual torrent add failed", "title", title, "error", err.Error())
@@ -477,7 +477,7 @@ func gh4_downloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
-	hash, err := s.torrents.AddTorrentFileWithOptions(path, s.cfg, nil, options)
+	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
 	_ = os.Remove(path)
 	if err != nil {
 		return nil, err
@@ -606,7 +606,7 @@ func gh4_addRawMagnet(s *AppState, source string) (int, any) {
 		}
 		return http.StatusAccepted, map[string]any{"ok": true}
 	}
-	added, err := s.torrents.Add(source, s.cfg)
+	added, err := s.activeEngine().Add(source, s.cfg)
 	if err != nil {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
 	}
@@ -673,7 +673,7 @@ func AddTorrentHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 			preferred = &trimmed
 		}
 	}
-	added, err := s.torrents.AddWithOptions(input.Magnet, cfg, preferred, options)
+	added, err := s.activeEngine().AddWithOptions(input.Magnet, cfg, preferred, options)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -956,7 +956,7 @@ func MarkTorrentFailed(w http.ResponseWriter, r *http.Request, s *AppState) {
 	restored, _ := s.db.RestoreUpgrade(hash)
 	_ = s.db.MarkTorrentError(hash, "manual failure")
 	removed := false
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			removed = true
 			break
@@ -1212,7 +1212,7 @@ func SetSpeedLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	_ = SaveSetting(s.cfg.DataDir, "libtorrent_ul_limit", strconv.FormatInt(upload, 10))
-	if _, err := s.torrents.SetGlobalSpeedLimits(download, upload); err != nil {
+	if _, err := s.activeEngine().SetGlobalSpeedLimits(download, upload); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1242,7 +1242,7 @@ func SetWebSeeds(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "no valid web seed URL")
 		return
 	}
-	ok, err := s.torrents.WebSeeds(hash, joined, input.Remove)
+	ok, err := s.activeEngine().WebSeeds(hash, joined, input.Remove)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

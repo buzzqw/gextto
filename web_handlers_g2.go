@@ -99,7 +99,7 @@ func gh2_storedDownloadTags(cfg *Config) []string {
 }
 
 // gh2_protectedTorrentPaths implements `protected_torrent_paths`.
-func gh2_protectedTorrentPaths(torrents *LibtorrentClient) map[string]struct{} {
+func gh2_protectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
 	protected := map[string]struct{}{}
 	for _, torrent := range torrents.List() {
 		files, ok, err := torrents.Files(torrent.Hash)
@@ -335,7 +335,7 @@ func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	execute := input.Execute
 	cfg := latestConfig(s)
-	protected := gh2_protectedTorrentPaths(s.torrents)
+	protected := gh2_protectedTorrentPaths(s.activeEngine())
 	preferred := cfg.DefaultLanguage()
 	candidates := []DuplicateCandidate{}
 	removed := 0
@@ -564,7 +564,7 @@ func PinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	hash := strings.ToLower(input.Hash)
-	result, err := s.torrents.SetPin(hash, true)
+	result, err := s.activeEngine().SetPin(hash, true)
 	if err == nil {
 		_ = SaveSetting(s.cfg.DataDir, "libtorrent_pinned_hash", hash)
 	}
@@ -775,7 +775,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 				preferred = &trimmed
 			}
 		}
-		added, err := s.torrents.AddWithOptions(target, cfg, preferred, options)
+		added, err := s.activeEngine().AddWithOptions(target, cfg, preferred, options)
 		if err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
@@ -829,7 +829,7 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	hash, err := s.torrents.AddTorrentFileWithOptions(path, cfg, &cfg.LibtorrentDir, options)
+	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, cfg, &cfg.LibtorrentDir, options)
 	if err != nil {
 		_ = os.Remove(path)
 		jsonError(w, http.StatusBadRequest, err.Error())
@@ -940,7 +940,7 @@ func SetSequential(w http.ResponseWriter, r *http.Request, s *AppState) {
 		value = "true"
 	}
 	_ = SaveSetting(s.cfg.DataDir, "libtorrent_sequential", value)
-	result, err := s.torrents.SetSequential(input.Enabled)
+	result, err := s.activeEngine().SetSequential(input.Enabled)
 	status, response := gh2_torrentAction(result, err)
 	jsonStatus(w, status, response)
 }
@@ -983,7 +983,7 @@ func StatsApi(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	jsonResponse(w, map[string]any{
 		"last_cycle":    s.last_cycle.Snapshot(),
-		"torrent_stats": s.torrents.Stats(),
+		"torrent_stats": s.activeEngine().Stats(),
 		"consumption":   consumption,
 	})
 }
@@ -1003,7 +1003,7 @@ func TorrentEvents(w http.ResponseWriter, r *http.Request, s *AppState) {
 // TorrentTrackers implements `torrent_trackers`.
 func TorrentTrackers(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	trackers, ok, err := s.torrents.Trackers(hash)
+	trackers, ok, err := s.activeEngine().Trackers(hash)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

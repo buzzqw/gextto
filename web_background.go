@@ -113,7 +113,7 @@ func bg_linkArchiveFile(db *Database, series string, season, episode int64, cfg 
 	}
 }
 
-func bg_protectedTorrentPaths(torrents *LibtorrentClient) map[string]struct{} {
+func bg_protectedTorrentPaths(torrents TorrentEngine) map[string]struct{} {
 	protected := map[string]struct{}{}
 	if torrents == nil {
 		return protected
@@ -441,7 +441,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// the 1080p. Execute only.
 	duplicatesRemoved := 0
 	if execute && cfg.CleanupUpgrades && !sourceOnly {
-		protected := bg_protectedTorrentPaths(s.torrents)
+		protected := bg_protectedTorrentPaths(s.activeEngine())
 		if removed, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, series.ArchivePath, protected); err == nil {
 			duplicatesRemoved = removed
 		} else {
@@ -519,7 +519,9 @@ func bg_i64PtrValue(value int64) *int64 {
 // torrent session policy (config reload, metadata promotion, queue/speed
 // policy, pin/sequential flags), processes lifecycle events and then applies the
 // seed/cleanup policy once per tick.
-func torrentEventWorker(configPath string, fallback *Config, torrents *LibtorrentClient, db *Database, comics *ComicsDb, eventLog *EventLog) {
+func torrentEventWorker(configPath string, fallback *Config, torrents TorrentEngine, db *Database, comics *ComicsDb, eventLog *EventLog) {
+	// Optional libtorrent-only hooks: nil for any other backend.
+	extras, _ := torrents.(torrentEngineEmbeddedExtras)
 	moveRequests := map[string]struct{}{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
 	seedCopyWarnings := map[string]time.Time{}
@@ -570,7 +572,7 @@ func torrentEventWorker(configPath string, fallback *Config, torrents *Libtorren
 		}
 		// Skip a torrent that was already re-checked recently: re-reading a
 		// multi-gigabyte pack from the NAS is expensive and gives the same result.
-		if torrents.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
+		if extras != nil && extras.recentlyRechecked(torrent.Hash, recheckGuardWindow) {
 			continue
 		}
 		status, statusErr := db.TorrentStatus(torrent.Hash)
@@ -649,25 +651,32 @@ func torrentEventWorker(configPath string, fallback *Config, torrents *Libtorren
 			lastConfigReload = now
 		}
 		if now.Sub(lastMetadataPromotion) >= 30*time.Second {
-			torrents.PromoteMetadata()
 			// Torrents without metadata that were just promoted lose
 			// `auto_managed`; when metadata arrives it must be re-armed, even if
-			// the alert was lost (e.g. fastresume restore).
-			rearmed := torrents.EnsureAutoManaged()
-			if rearmed > 0 {
-				logging.Info("auto-managed flag restored on running torrents", "rearmed", rearmed)
+			// the alert was lost (e.g. fastresume restore). These hooks are
+			// libtorrent-specific; other backends handle metadata themselves.
+			if extras != nil {
+				extras.PromoteMetadata()
+				rearmed := extras.EnsureAutoManaged()
+				if rearmed > 0 {
+					logging.Info("auto-managed flag restored on running torrents", "rearmed", rearmed)
+				}
 			}
 			lastMetadataPromotion = now
 		}
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
-			torrents.AdjustQueue(cfg, effectiveDownloadKib)
+			if extras != nil {
+				extras.AdjustQueue(cfg, effectiveDownloadKib)
+			}
 			// Queue visibility, like legacy extto ("📊 Queue: ..."): log when the
 			// number of active downloads changes, not on every tick.
 			snapshot := torrents.List()
 			// Apply add-time options that need metadata (first/last pieces) or that
 			// pause as soon as metadata arrives (metadata-only adds).
-			torrents.EnforceDeferredOptions(snapshot)
+			if extras != nil {
+				extras.EnforceDeferredOptions(snapshot)
+			}
 			active := 0
 			for _, torrent := range snapshot {
 				if torrent.State == "downloading" {
@@ -1225,7 +1234,7 @@ func bg_dirHasFiles(dir string) bool {
 // `libtorrent_temp_dir` (leftovers of completed or removed downloads). It skips
 // active torrent directories and too-recent ones, so a just-started download is
 // not disturbed.
-func bg_cleanupEmptyTempDirs(cfg *Config, torrents *LibtorrentClient) {
+func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 	if cfg.LibtorrentTempDir == nil {
 		return
 	}
@@ -1284,7 +1293,7 @@ func tempCleanupWorker(state *AppState) {
 	for {
 		time.Sleep(cleanupPeriod)
 		cfg := latestConfig(state)
-		bg_cleanupEmptyTempDirs(cfg, state.torrents)
+		bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
 	}
 }
 
@@ -1407,12 +1416,12 @@ func watchedFoldersWorker(state *AppState) {
 				var addErr error
 				if strings.HasSuffix(strings.ToLower(pathKey), ".magnet") {
 					if magnet := MagnetFromFile(path); magnet != nil {
-						result, addErr = state.torrents.AddWithPath(*magnet, cfg, nil)
+						result, addErr = state.activeEngine().AddWithPath(*magnet, cfg, nil)
 					} else {
 						addErr = fmt.Errorf("no magnet URI in %s", path)
 					}
 				} else {
-					result, addErr = state.torrents.AddFileWithPath(path, cfg, nil)
+					result, addErr = state.activeEngine().AddFileWithPath(path, cfg, nil)
 				}
 				if addErr != nil {
 					attempts := 0
@@ -1538,7 +1547,7 @@ func cycleWorker(state *AppState) {
 				state.archive,
 				state.comics,
 				notifier,
-				state.torrents,
+				state.activeEngine(),
 			)
 			if runErr != nil {
 				logging.Error("scheduled cycle failed", "error", runErr)

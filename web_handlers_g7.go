@@ -322,7 +322,7 @@ func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Co
 
 // gh7_torrent_display_name returns the real torrent name, falling back to
 // "unnamed torrent".
-func gh7_torrent_display_name(torrents *LibtorrentClient, hash string) string {
+func gh7_torrent_display_name(torrents TorrentSession, hash string) string {
 	if torrents == nil {
 		return "unnamed torrent"
 	}
@@ -359,7 +359,7 @@ func gh7_torrent_files_are_disposable(db *Database, hash string) bool {
 
 // gh7_mismatched_pack_release returns the configured release when the torrent's
 // real name identifies a different season.
-func gh7_mismatched_pack_release(torrents *LibtorrentClient, db *Database, hash string) *models.Release {
+func gh7_mismatched_pack_release(torrents TorrentSession, db *Database, hash string) *models.Release {
 	if db == nil {
 		return nil
 	}
@@ -384,7 +384,7 @@ func gh7_mismatched_pack_release(torrents *LibtorrentClient, db *Database, hash 
 
 // gh7_blocklist_mismatched_pack permanently blocklists a mismatched season
 // pack so gap filling cannot pick it again.
-func gh7_blocklist_mismatched_pack(torrents *LibtorrentClient, db *Database, hash string) bool {
+func gh7_blocklist_mismatched_pack(torrents TorrentSession, db *Database, hash string) bool {
 	release := gh7_mismatched_pack_release(torrents, db, hash)
 	if release == nil {
 		return false
@@ -682,7 +682,8 @@ func gh7_setting_key_allowed(key string) bool {
 		"move_episodes", "rename_verify_interval", "auto_remove_completed", "telegram_bot_token",
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
 		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
-		"qbittorrent_category", "qbittorrent_request_timeout_secs":
+		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
+		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings":
 		return true
 	}
 	return false
@@ -753,7 +754,7 @@ func ComicCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
 	}
-	count, err := RunComicsCycle(s.comics, client, s.notifier, defaultRoot, s.torrents, s.db, cfg)
+	count, err := RunComicsCycle(s.comics, client, s.notifier, defaultRoot, s.activeEngine(), s.db, cfg)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -825,7 +826,7 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		magnet = "magnet:?xt=urn:btih:" + hash
 	}
 	if s.torrents != nil {
-		if trackers, ok, err := s.torrents.Trackers(hash); err == nil && ok {
+		if trackers, ok, err := s.activeEngine().Trackers(hash); err == nil && ok {
 			for _, tracker := range trackers {
 				if !strings.Contains(magnet, tracker.URL) {
 					magnet += "&tr=" + gh7_form_urlencode(tracker.URL)
@@ -838,6 +839,10 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // IpfilterUpdate handles POST /api/torrents/ipfilter_update.
 func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("ip_filter"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	cfg := latestConfig(s)
 	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
 	if target == "" {
@@ -901,7 +906,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	name := hash
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			name = torrent.Name
 			break
@@ -916,7 +921,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// into an advantage — the torrent seeds from the files already on disk.
 		logging.Info("destination already contains the torrent data; associating existing files",
 			"hash", hash, "name", name, "destination", destination, "target", target)
-		associated, assocErr := s.torrents.AssociateStorage(hash, destination)
+		associated, assocErr := s.activeEngine().AssociateStorage(hash, destination)
 		if assocErr != nil {
 			logging.Error("associate existing torrent data failed", "hash", hash, "name", name, "error", assocErr.Error())
 			jsonError(w, http.StatusBadRequest, assocErr.Error())
@@ -934,7 +939,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	result, err := s.torrents.MoveStorage(hash, destination)
+	result, err := s.activeEngine().MoveStorage(hash, destination)
 	switch {
 	case err != nil:
 		logging.Error("manual torrent storage move failed to start",
@@ -961,7 +966,7 @@ func NetworkInterfacesView(w http.ResponseWriter, r *http.Request, s *AppState) 
 // ReannounceTorrent handles POST /api/torrents/{hash}/reannounce.
 func ReannounceTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	result, err := s.torrents.Reannounce(hash)
+	result, err := s.activeEngine().Reannounce(hash)
 	gh7_torrent_action(w, result, err)
 }
 
@@ -970,7 +975,7 @@ func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	gh7_blocklist_mismatched_pack(s.torrents, s.db, hash)
 	deleteFiles := gh7_torrent_files_are_disposable(s.db, hash)
-	removed, err := s.torrents.Remove(hash, deleteFiles)
+	removed, err := s.activeEngine().Remove(hash, deleteFiles)
 	if err == nil && removed && s.db != nil {
 		_ = s.db.MarkTorrentRemoved(hash)
 		_ = s.db.ForgetRemovedTorrent(hash)
@@ -981,7 +986,7 @@ func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 // ResumeTorrent handles POST /api/torrents/{hash}/resume.
 func ResumeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	result, err := s.torrents.Resume(hash)
+	result, err := s.activeEngine().Resume(hash)
 	gh7_torrent_action(w, result, err)
 }
 
@@ -1230,7 +1235,7 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if input.SeedDays != nil {
 		seedDays = *input.SeedDays
 	}
-	result, err := s.torrents.SetLimits(hash, input.DownloadLimit, input.UploadLimit, seedRatio, seedDays)
+	result, err := s.activeEngine().SetLimits(hash, input.DownloadLimit, input.UploadLimit, seedRatio, seedDays)
 	if err != nil {
 		gh7_torrent_action(w, result, err)
 		return
@@ -1244,19 +1249,21 @@ func SetTorrentLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 			maxUploads = *input.MaxUploads
 		}
 		if maxConnections >= 0 {
-			if _, err := s.torrents.SetMaxConnections(hash, int(maxConnections)); err != nil {
+			if _, err := s.activeEngine().SetMaxConnections(hash, int(maxConnections)); err != nil {
 				jsonError(w, http.StatusBadRequest, err.Error())
 				return
 			}
 		}
 		if maxUploads >= 0 {
-			if _, err := s.torrents.SetMaxUploads(hash, int(maxUploads)); err != nil {
+			if _, err := s.activeEngine().SetMaxUploads(hash, int(maxUploads)); err != nil {
 				jsonError(w, http.StatusBadRequest, err.Error())
 				return
 			}
 		}
-		if err := s.torrents.SaveConnLimits(hash, maxConnections, maxUploads); err != nil {
-			logging.Warn("cannot persist torrent connection limits", "hash", hash, "error", err)
+		if s.torrent_engine == nil {
+			if err := s.torrents.SaveConnLimits(hash, maxConnections, maxUploads); err != nil {
+				logging.Warn("cannot persist torrent connection limits", "hash", hash, "error", err)
+			}
 		}
 	}
 	gh7_torrent_action(w, result, err)

@@ -534,7 +534,7 @@ func Status(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"setup_completed": SetupComplete(cfg),
 		"last_cycle":      s.last_cycle.Snapshot(),
 		"next_cycle_at":   nextCycleAt,
-		"torrent_stats":   s.torrents.Stats(),
+		"torrent_stats":   s.activeEngine().Stats(),
 		"seen": map[string]any{
 			"movies": seenMovies,
 			"series": seenSeries,

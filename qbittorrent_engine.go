@@ -1,0 +1,1039 @@
+package gextto
+
+// qbittorrent_engine.go adapts the qBittorrent-nox Web API (internal/qbittorrent)
+// to the TorrentEngine contract. Gextto keeps the queue and the automation;
+// this adapter only moves bytes and reports state.
+//
+// Design decisions (see docs/aggiunta-qbittorrent-nox.md):
+//   - polling is the source of truth: every List() refreshes from
+//     /torrents/info and diffs the previous snapshot to emit lifecycle events,
+//     so a lost qBittorrent script or a restart cannot silently drop a
+//     completion;
+//   - operations are idempotent: a pause on an already-paused torrent is a
+//     no-op success, never an oscillating command;
+//   - path translation is explicit: the adapter refuses to hand qBittorrent a
+//     path it cannot map, and never deletes data when the API is unreachable;
+//   - unsupported operations return ErrCapabilityUnavailable instead of
+//     pretending success.
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/qbittorrent"
+)
+
+// qbittorrentSettings is the fully-resolved configuration of the adapter.
+type qbittorrentSettings struct {
+	Client       qbittorrent.Config
+	Category     string
+	Tag          string
+	Mappings     []PathMapping
+	PollInterval time.Duration
+	stateDir     string
+	dataDir      string
+}
+
+// qbittorrentSettingsFromConfig reads the qBittorrent settings from a Config.
+func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
+	timeout := 15 * time.Second
+	if value, ok := cfg.Settings["qbittorrent_request_timeout_secs"]; ok {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
+			timeout = time.Duration(parsed) * time.Second
+		}
+	}
+	poll := 1500 * time.Millisecond
+	if value, ok := cfg.Settings["qbittorrent_poll_interval_ms"]; ok {
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
+			poll = time.Duration(parsed) * time.Millisecond
+		}
+	}
+	mappings, err := ParsePathMappings(cfg.Settings["qbittorrent_path_mappings"])
+	if err != nil {
+		return qbittorrentSettings{}, err
+	}
+	return qbittorrentSettings{
+		Client: qbittorrent.Config{
+			BaseURL:        strings.TrimSpace(cfg.Settings["qbittorrent_url"]),
+			Username:       strings.TrimSpace(cfg.Settings["qbittorrent_username"]),
+			Password:       cfg.Settings["qbittorrent_password"],
+			RequestTimeout: timeout,
+		},
+		Category:     strings.TrimSpace(cfg.Settings["qbittorrent_category"]),
+		Tag:          strings.TrimSpace(cfg.Settings["qbittorrent_tag"]),
+		Mappings:     mappings,
+		PollInterval: poll,
+		stateDir:     cfg.StateDir,
+		dataDir:      cfg.DataDir,
+	}, nil
+}
+
+// qbittorrentEngine is a TorrentEngine backed by qBittorrent-nox.
+type qbittorrentEngine struct {
+	settings qbittorrentSettings
+	client   *qbittorrent.Client
+
+	categoryReady bool
+
+	mu           sync.Mutex
+	cache        map[string]models.TorrentView
+	previous     map[string]models.TorrentView
+	events       []models.TorrentEvent
+	stalled      map[string]struct{}
+	pendingMoves map[string]string
+	lastSync     time.Time
+	lastErr      string
+	connected    bool
+}
+
+var _ TorrentEngine = (*qbittorrentEngine)(nil)
+
+// newQbittorrentEngine builds the adapter. It does not connect: a qBittorrent
+// that is down at startup must degrade gracefully, not abort the daemon.
+func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
+	settings, err := qbittorrentSettingsFromConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client, err := qbittorrent.New(settings.Client)
+	if err != nil {
+		return nil, err
+	}
+	return &qbittorrentEngine{
+		settings:     settings,
+		client:       client,
+		cache:        map[string]models.TorrentView{},
+		previous:     map[string]models.TorrentView{},
+		stalled:      map[string]struct{}{},
+		pendingMoves: map[string]string{},
+	}, nil
+}
+
+func (e *qbittorrentEngine) Name() string { return BackendQbittorrent }
+
+func (e *qbittorrentEngine) Capabilities() map[string]bool {
+	return capabilitiesFor(BackendQbittorrent)
+}
+
+func (e *qbittorrentEngine) requestContext() (context.Context, context.CancelFunc) {
+	timeout := e.settings.Client.RequestTimeout
+	if timeout <= 0 {
+		timeout = 15 * time.Second
+	}
+	return context.WithTimeout(context.Background(), timeout)
+}
+
+// ---------------------------------------------------------------------------
+// state normalization
+// ---------------------------------------------------------------------------
+
+// qbmapRatio translates a qBittorrent ratio_limit into Gextto's convention
+// (>0 explicit limit, 0 infinite, <0 use the global policy).
+func qbmapRatio(limit float64) float64 {
+	switch {
+	case limit == -2:
+		return -1 // global
+	case limit == -1:
+		return 0 // infinite
+	case limit >= 0:
+		return limit
+	default:
+		return -1
+	}
+}
+
+// qbmapSeedDays translates a qBittorrent seeding-time limit (minutes) into
+// Gextto's day convention.
+func qbmapSeedDays(minutes int64) int64 {
+	switch {
+	case minutes == -2:
+		return -1
+	case minutes == -1:
+		return 0
+	case minutes > 0:
+		return (minutes + 1439) / 1440
+	default:
+		return -1
+	}
+}
+
+// toView maps one qBittorrent torrent into the Gextto TorrentView.
+func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
+	progress := t.Progress
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 1 {
+		progress = 1
+	}
+	totalSize := t.Size
+	if totalSize <= 0 {
+		totalSize = t.TotalSize
+	}
+	if totalSize < 0 {
+		totalSize = 0
+	}
+	totalDone := int64(progress * float64(totalSize))
+	if t.AmountLeft > 0 && totalSize >= t.AmountLeft {
+		totalDone = totalSize - t.AmountLeft
+	}
+	if totalDone < 0 {
+		totalDone = 0
+	}
+	if totalDone > totalSize && totalSize > 0 {
+		totalDone = totalSize
+	}
+	state := qbittorrent.NormalizeState(t.State)
+	savePath := t.SavePath
+	if translated, ok := TranslateBackendToGextto(savePath, e.settings.Mappings); ok {
+		savePath = translated
+	}
+	hasMetadata := t.State != "metaDL" && t.State != "forcedMetaDL" && totalSize > 0
+	numPeers := t.Peers
+	if numPeers == 0 {
+		numPeers = t.NumLeechs
+	}
+	numSeeds := t.Seeds
+	if numSeeds == 0 {
+		numSeeds = t.NumSeeds
+	}
+	errMessage := strings.TrimSpace(t.Error)
+	if errMessage == "" && (t.State == "error" || t.State == "missingFiles") {
+		errMessage = t.State
+	}
+	torrentVersion := ""
+	switch {
+	case t.InfohashV2 != "" && t.InfohashV1 != "":
+		torrentVersion = "hybrid"
+	case t.InfohashV2 != "":
+		torrentVersion = "v2"
+	case t.InfohashV1 != "":
+		torrentVersion = "v1"
+	}
+	view := models.TorrentView{
+		Hash:              strings.ToLower(t.Hash),
+		Name:              t.Name,
+		SavePath:          savePath,
+		Progress:          progress * 100.0,
+		State:             state,
+		DownloadRate:      uint64(maxInt64(0, t.DownloadRate)),
+		UploadRate:        uint64(maxInt64(0, t.UploadRate)),
+		DownloadRateTotal: uint64(maxInt64(0, t.DownloadRate)),
+		UploadRateTotal:   uint64(maxInt64(0, t.UploadRate)),
+		DownloadLimit:     t.DownloadLimit,
+		UploadLimit:       t.UploadLimit,
+		AllTimeUpload:     t.Uploaded,
+		AllTimeDownload:   t.Downloaded,
+		SeedingSeconds:    t.SeedingTime,
+		QueuePosition:     t.Priority,
+		NumPeers:          numPeers,
+		NumSeeds:          numSeeds,
+		NumComplete:       t.SeedsTotal,
+		NumIncomplete:     t.PeersTotal,
+		SeedRatio:         qbmapRatio(t.RatioLimit),
+		SeedDays:          qbmapSeedDays(t.SeedingLimit),
+		HasMetadata:       hasMetadata,
+		AutoManaged:       t.AutoManaged,
+		TorrentVersion:    torrentVersion,
+		TotalSize:         totalSize,
+		TotalDone:         totalDone,
+		CurrentTracker:    t.Tracker,
+		IsSeeding:         t.State == "uploading" || t.State == "forcedUP" || t.State == "stalledUP",
+		Sequential:        t.Sequential,
+		SuperSeeding:      t.SuperSeeding,
+		Error:             errMessage,
+		Stalled:           state == "stalled",
+	}
+	view.Diagnosis, _, _ = DiagnoseTorrent(&view)
+	return view
+}
+
+// ---------------------------------------------------------------------------
+// polling / reconciliation
+// ---------------------------------------------------------------------------
+
+// sync refreshes the cache from qBittorrent and emits lifecycle events for
+// every transition since the previous snapshot. When the API is unreachable the
+// cache is kept (stale) and the error is recorded: no destructive action may
+// follow a backend outage.
+func (e *qbittorrentEngine) sync() error {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	torrents, err := e.client.Torrents(ctx)
+	now := time.Now()
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if err != nil {
+		e.connected = false
+		e.lastErr = err.Error()
+		return err
+	}
+	e.connected = true
+	e.lastErr = ""
+	e.lastSync = now
+
+	next := make(map[string]models.TorrentView, len(torrents))
+	for _, t := range torrents {
+		view := e.toView(t)
+		if view.Hash == "" {
+			continue
+		}
+		if _, stalled := e.stalled[view.Hash]; stalled && view.State == "downloading" {
+			view.State = "stalled"
+			view.Stalled = true
+		}
+		next[view.Hash] = view
+	}
+	for hash, view := range next {
+		previous, known := e.previous[hash]
+		if !known {
+			continue
+		}
+		e.diffLocked(previous, view)
+	}
+	// A move completes when the reported save path reaches the requested
+	// destination (qBittorrent's setLocation is asynchronous).
+	for hash, destination := range e.pendingMoves {
+		view, ok := next[hash]
+		if !ok {
+			delete(e.pendingMoves, hash)
+			continue
+		}
+		if SamePath(view.SavePath, destination) {
+			e.events = append(e.events, models.TorrentEvent{
+				Kind:     "storage_moved",
+				Hash:     hash,
+				Name:     view.Name,
+				SavePath: view.SavePath,
+			})
+			delete(e.pendingMoves, hash)
+		}
+	}
+	e.previous = next
+	e.cache = next
+	return nil
+}
+
+// diffLocked compares two snapshots and queues the normalized events.
+func (e *qbittorrentEngine) diffLocked(previous, current models.TorrentView) {
+	if !previous.HasMetadata && current.HasMetadata {
+		e.events = append(e.events, models.TorrentEvent{
+			Kind: "metadata_received", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+		})
+	}
+	if previous.Progress < 99.99 && current.Progress >= 99.99 {
+		e.events = append(e.events, models.TorrentEvent{
+			Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+		})
+	}
+	if previous.State == "checking_files" && current.State != "checking_files" {
+		e.events = append(e.events, models.TorrentEvent{
+			Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath,
+		})
+	}
+	if previous.State != "error" && current.State == "error" {
+		e.events = append(e.events, models.TorrentEvent{
+			Kind: "torrent_error", Hash: current.Hash, Name: current.Name,
+			SavePath: current.SavePath, Message: current.Error,
+		})
+	}
+}
+
+// List returns the last synchronized snapshot, refreshing it first. A backend
+// outage yields the stale cache (or an empty list) instead of an error.
+func (e *qbittorrentEngine) List() []models.TorrentView {
+	_ = e.sync()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	result := make([]models.TorrentView, 0, len(e.cache))
+	for _, view := range e.cache {
+		result = append(result, view)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Hash < result[j].Hash })
+	return result
+}
+
+// PollEvents drains the lifecycle events accumulated by the snapshot diffs.
+func (e *qbittorrentEngine) PollEvents() []models.TorrentEvent {
+	_ = e.sync()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.events) == 0 {
+		return nil
+	}
+	out := e.events
+	e.events = nil
+	return out
+}
+
+// SyncStats exposes adapter health for the UI/API.
+func (e *qbittorrentEngine) SyncStats() map[string]any {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	stats := map[string]any{
+		"backend":      BackendQbittorrent,
+		"connected":    e.connected,
+		"torrents":     len(e.cache),
+		"poll_ms":      e.settings.PollInterval.Milliseconds(),
+		"pending_move": len(e.pendingMoves),
+	}
+	if !e.lastSync.IsZero() {
+		stats["last_sync"] = e.lastSync.UTC().Format(time.RFC3339)
+	}
+	if e.lastErr != "" {
+		stats["last_error"] = e.lastErr
+	}
+	return stats
+}
+
+// Stats returns the global transfer statistics in Gextto's shape.
+func (e *qbittorrentEngine) Stats() map[string]any {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	info, err := e.client.TransferInfo(ctx)
+	views := e.List()
+	stats := map[string]any{
+		"backend":        BackendQbittorrent,
+		"torrents":       len(views),
+		"dry_run":        false,
+		"session_loaded": err == nil,
+	}
+	if err != nil {
+		stats["error"] = err.Error()
+		return stats
+	}
+	for key, value := range info {
+		stats[key] = value
+	}
+	return stats
+}
+
+// ---------------------------------------------------------------------------
+// control operations (idempotent)
+// ---------------------------------------------------------------------------
+
+func (e *qbittorrentEngine) cachedState(hash string) (models.TorrentView, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	view, ok := e.cache[strings.ToLower(hash)]
+	return view, ok
+}
+
+func (e *qbittorrentEngine) Pause(hash string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if view, ok := e.cachedState(hash); ok && view.State == "paused" {
+		return true, nil
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Pause(ctx, hash); err != nil {
+		return false, err
+	}
+	e.mu.Lock()
+	if view, ok := e.cache[hash]; ok {
+		view.State = "paused"
+		e.cache[hash] = view
+	}
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) Resume(hash string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if view, ok := e.cachedState(hash); ok && view.State != "paused" {
+		return true, nil
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Resume(ctx, hash); err != nil {
+		return false, err
+	}
+	e.mu.Lock()
+	if view, ok := e.cache[hash]; ok {
+		view.State = "downloading"
+		e.cache[hash] = view
+	}
+	delete(e.stalled, hash)
+	e.mu.Unlock()
+	return true, nil
+}
+
+// Restart nudges a stalled torrent: reannounce plus resume if paused.
+func (e *qbittorrentEngine) Restart(hash string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Reannounce(ctx, hash); err != nil {
+		return false, err
+	}
+	if view, ok := e.cachedState(hash); ok && view.State == "paused" {
+		if err := e.client.Resume(ctx, hash); err != nil {
+			return false, err
+		}
+	}
+	e.mu.Lock()
+	delete(e.stalled, hash)
+	if view, ok := e.cache[hash]; ok {
+		view.State = "downloading"
+		e.cache[hash] = view
+	}
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) Remove(hash string, deleteFiles bool) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return false, nil
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Delete(ctx, deleteFiles, hash); err != nil {
+		return false, err
+	}
+	e.mu.Lock()
+	delete(e.cache, hash)
+	delete(e.previous, hash)
+	delete(e.stalled, hash)
+	delete(e.pendingMoves, hash)
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) ForceRecheck(hash string) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Recheck(ctx, hash); err != nil {
+		return false, err
+	}
+	e.mu.Lock()
+	if view, ok := e.cache[strings.ToLower(hash)]; ok {
+		view.State = "checking_files"
+		e.cache[strings.ToLower(hash)] = view
+	}
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) Reannounce(hash string) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.Reannounce(ctx, hash); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// MoveStorage asks qBittorrent to relocate a torrent. The API is
+// asynchronous: the returned true only means the request was accepted, and a
+// storage_moved event is emitted once the reported path reaches the target.
+func (e *qbittorrentEngine) MoveStorage(hash, destination string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" || strings.TrimSpace(destination) == "" {
+		return false, nil
+	}
+	if view, ok := e.cachedState(hash); ok && SamePath(view.SavePath, destination) {
+		return false, nil
+	}
+	backendDest, ok := TranslateGexttoToBackend(destination, e.settings.Mappings)
+	if !ok {
+		if len(e.settings.Mappings) == 0 {
+			backendDest = destination
+		} else {
+			return false, fmt.Errorf("%w: %s", ErrPathMappingMissing, destination)
+		}
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetLocation(ctx, backendDest, hash); err != nil {
+		return false, err
+	}
+	e.mu.Lock()
+	e.pendingMoves[hash] = destination
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) MarkStalled(hash string) (bool, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	e.mu.Lock()
+	e.stalled[hash] = struct{}{}
+	if view, ok := e.cache[hash]; ok {
+		view.State = "stalled"
+		view.Stalled = true
+		e.cache[hash] = view
+	}
+	e.mu.Unlock()
+	return true, nil
+}
+
+func (e *qbittorrentEngine) ClearStalled(hash string) {
+	e.mu.Lock()
+	delete(e.stalled, strings.ToLower(strings.TrimSpace(hash)))
+	e.mu.Unlock()
+}
+
+func (e *qbittorrentEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {
+	var total uint64
+	for _, view := range e.List() {
+		if strings.EqualFold(view.Hash, excludeHash) {
+			continue
+		}
+		if !PathOnRamdisk(view.SavePath, ramdisk) {
+			continue
+		}
+		remaining := view.TotalSize - view.TotalDone
+		if remaining > 0 {
+			total += uint64(remaining)
+		}
+	}
+	return total
+}
+
+// ---------------------------------------------------------------------------
+// inspection
+// ---------------------------------------------------------------------------
+
+func (e *qbittorrentEngine) Files(hash string) ([]models.FileView, bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	files, err := e.client.Files(ctx, hash)
+	if err != nil {
+		return nil, false, err
+	}
+	out := make([]models.FileView, 0, len(files))
+	for _, file := range files {
+		out = append(out, models.FileView{
+			Path:       file.Name,
+			Size:       file.Size,
+			Downloaded: int64(file.Progress * float64(file.Size)),
+			Priority:   file.Priority,
+		})
+	}
+	return out, true, nil
+}
+
+func (e *qbittorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	peers, err := e.client.Peers(ctx, hash)
+	if err != nil {
+		return nil, false, err
+	}
+	out := make([]models.PeerView, 0, len(peers))
+	for _, peer := range peers {
+		out = append(out, models.PeerView{
+			Address:       fmt.Sprintf("%s:%d", peer.IP, peer.Port),
+			Client:        peer.Client,
+			DownloadRate:  uint64(maxInt64(0, peer.DownSpeed)),
+			UploadRate:    uint64(maxInt64(0, peer.UpSpeed)),
+			Progress:      peer.Progress,
+			Seed:          peer.Progress >= 1.0,
+			TotalDownload: 0,
+			TotalUpload:   0,
+		})
+	}
+	return out, true, nil
+}
+
+func (e *qbittorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	trackers, err := e.client.Trackers(ctx, hash)
+	if err != nil {
+		return nil, false, err
+	}
+	out := make([]models.TrackerView, 0, len(trackers))
+	for _, tracker := range trackers {
+		// qBittorrent status: 0 disabled, 1 not contacted, 2 working,
+		// 3 updating, 4 not working.
+		out = append(out, models.TrackerView{
+			URL:            tracker.URL,
+			Message:        tracker.Message,
+			ScrapeComplete: tracker.NumPeers,
+			Verified:       tracker.Status == 2 || tracker.Status == 3,
+		})
+	}
+	return out, true, nil
+}
+
+// ---------------------------------------------------------------------------
+// mutations
+// ---------------------------------------------------------------------------
+
+func (e *qbittorrentEngine) SetFilePriorities(hash string, priorities []int32) (bool, error) {
+	if len(priorities) == 0 {
+		return false, nil
+	}
+	grouped := map[int][]int{}
+	for index, priority := range priorities {
+		grouped[int(priority)] = append(grouped[int(priority)], index)
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	for priority, ids := range grouped {
+		if err := e.client.SetFilePriorities(ctx, hash, ids, priority); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func (e *qbittorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
+	urls := make([]string, 0, len(trackers))
+	seen := map[string]struct{}{}
+	for _, tracker := range trackers {
+		url := strings.TrimSpace(tracker.URL)
+		if url == "" {
+			continue
+		}
+		if _, ok := seen[url]; ok {
+			continue
+		}
+		seen[url] = struct{}{}
+		urls = append(urls, url)
+	}
+	if len(urls) == 0 {
+		return false, nil
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.AddTrackers(ctx, hash, urls); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// WebSeeds is not exposed by the qBittorrent Web API.
+func (e *qbittorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error) {
+	return false, backendCapabilityError(BackendQbittorrent, "web_seeds")
+}
+
+func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	applied := false
+	if downloadLimit >= 0 {
+		if err := e.client.SetTorrentDownloadLimit(ctx, downloadLimit, hash); err != nil {
+			return false, err
+		}
+		applied = true
+	}
+	if uploadLimit >= 0 {
+		if err := e.client.SetTorrentUploadLimit(ctx, uploadLimit, hash); err != nil {
+			return false, err
+		}
+		applied = true
+	}
+	if seedRatio != 0 || seedDays != 0 {
+		ratio := -2.0
+		switch {
+		case seedRatio > 0:
+			ratio = seedRatio
+		case seedRatio == 0:
+			ratio = -1
+		}
+		minutes := int64(-2)
+		switch {
+		case seedDays > 0:
+			minutes = seedDays * 1440
+		case seedDays == 0:
+			minutes = -1
+		}
+		if err := e.client.SetShareLimits(ctx, ratio, minutes, hash); err != nil {
+			return false, err
+		}
+		applied = true
+	}
+	return applied, nil
+}
+
+func (e *qbittorrentEngine) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if downloadKib >= 0 {
+		if err := e.client.SetGlobalDownloadLimit(ctx, downloadKib*1024); err != nil {
+			return false, err
+		}
+	}
+	if uploadKib >= 0 {
+		if err := e.client.SetGlobalUploadLimit(ctx, uploadKib*1024); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// SetMaxConnections is a qBittorrent global preference, not per-torrent.
+func (e *qbittorrentEngine) SetMaxConnections(hash string, value int) (bool, error) {
+	return false, backendCapabilityError(BackendQbittorrent, "per_torrent_connections")
+}
+
+func (e *qbittorrentEngine) SetMaxUploads(hash string, value int) (bool, error) {
+	return false, backendCapabilityError(BackendQbittorrent, "per_torrent_uploads")
+}
+
+// SetPin maps "pinned" onto qBittorrent's force-start flag.
+func (e *qbittorrentEngine) SetPin(hash string, pinned bool) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if pinned {
+		hash = strings.ToLower(strings.TrimSpace(hash))
+		if hash == "" {
+			return false, nil
+		}
+		if err := e.client.SetForceStart(ctx, true, hash); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	hashes := e.allHashes()
+	if strings.TrimSpace(hash) != "" {
+		hashes = []string{strings.ToLower(strings.TrimSpace(hash))}
+	}
+	if len(hashes) == 0 {
+		return true, nil
+	}
+	if err := e.client.SetForceStart(ctx, false, hashes...); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (e *qbittorrentEngine) SetSequential(enabled bool) (bool, error) {
+	hashes := e.allHashes()
+	if len(hashes) == 0 {
+		return true, nil
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetSequentialDownload(ctx, enabled, hashes...); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// AssociateStorage cannot be expressed by the qBittorrent Web API.
+func (e *qbittorrentEngine) AssociateStorage(hash, destination string) (bool, error) {
+	return false, backendCapabilityError(BackendQbittorrent, "associate_storage")
+}
+
+// TorrentFilePath returns the .torrent copy Gextto persists for the hash.
+func (e *qbittorrentEngine) TorrentFilePath(hash string) (string, bool) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return "", false
+	}
+	for _, dir := range []string{e.stateDir(), e.dataDir()} {
+		if dir == "" {
+			continue
+		}
+		path := filepath.Join(dir, hash+".torrent")
+		if fileExists(path) {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func (e *qbittorrentEngine) allHashes() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	hashes := make([]string, 0, len(e.cache))
+	for hash := range e.cache {
+		hashes = append(hashes, hash)
+	}
+	sort.Strings(hashes)
+	return hashes
+}
+
+func (e *qbittorrentEngine) stateDir() string { return e.settings.stateDir }
+func (e *qbittorrentEngine) dataDir() string  { return e.settings.dataDir }
+
+// ---------------------------------------------------------------------------
+// add
+// ---------------------------------------------------------------------------
+
+func (e *qbittorrentEngine) ensureCategory(ctx context.Context) {
+	if e.settings.Category == "" || e.categoryReady {
+		return
+	}
+	if err := e.client.CreateCategory(ctx, e.settings.Category, ""); err != nil {
+		logging.Debug("qbittorrent category creation skipped", "category", e.settings.Category, "error", err.Error())
+	}
+	e.categoryReady = true
+}
+
+func (e *qbittorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) (string, error) {
+	candidate := ""
+	if preferredPath != nil && strings.TrimSpace(*preferredPath) != "" {
+		candidate = strings.TrimSpace(*preferredPath)
+	} else if cfg != nil {
+		candidate = cfg.LibtorrentDir
+	} else {
+		candidate = e.settings.dataDir
+	}
+	translated, ok := TranslateGexttoToBackend(candidate, e.settings.Mappings)
+	if !ok {
+		if len(e.settings.Mappings) == 0 {
+			// No mapping configured: the backend is assumed to share the
+			// namespace (native install).
+			return candidate, nil
+		}
+		return "", fmt.Errorf("%w: %s", ErrPathMappingMissing, candidate)
+	}
+	return translated, nil
+}
+
+func (e *qbittorrentEngine) addOptions(options AddOptions) qbittorrent.AddOptions {
+	return qbittorrent.AddOptions{
+		Category:   e.settings.Category,
+		Tags:       e.settings.Tag,
+		Paused:     options.Paused,
+		Sequential: options.Sequential,
+		FirstLast:  options.FirstLast,
+	}
+}
+
+func (e *qbittorrentEngine) Add(magnet string, cfg *Config) (bool, error) {
+	return e.AddWithOptions(magnet, cfg, nil, AddOptions{})
+}
+
+func (e *qbittorrentEngine) AddWithPath(magnet string, cfg *Config, preferredPath *string) (bool, error) {
+	return e.AddWithOptions(magnet, cfg, preferredPath, AddOptions{})
+}
+
+func (e *qbittorrentEngine) AddWithOptions(magnet string, cfg *Config, preferredPath *string, options AddOptions) (bool, error) {
+	if strings.TrimSpace(magnet) == "" {
+		return false, nil
+	}
+	savePath, err := e.resolveSavePath(preferredPath, cfg)
+	if err != nil {
+		return false, err
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	e.ensureCategory(ctx)
+	addOpts := e.addOptions(options)
+	addOpts.SavePath = savePath
+	hash, err := e.client.AddMagnet(ctx, magnet, addOpts)
+	if err != nil {
+		return false, err
+	}
+	if hash == "" {
+		logging.Warn("qbittorrent add returned no infohash (base32 magnet?)", "magnet", utilsRedactMagnet(magnet))
+	}
+	return true, nil
+}
+
+// AddFileWithPath returns the hash through AddTorrentFileWithOptions.
+func (e *qbittorrentEngine) AddFileWithPath(torrentPath string, cfg *Config, preferredPath *string) (bool, error) {
+	hash, err := e.AddTorrentFileWithOptions(torrentPath, cfg, preferredPath, AddOptions{})
+	if err != nil {
+		return false, err
+	}
+	return hash != nil, nil
+}
+
+func (e *qbittorrentEngine) AddTorrentFile(torrentPath, savePath string) (*string, error) {
+	preferred := savePath
+	return e.AddTorrentFileWithOptions(torrentPath, nil, &preferred, AddOptions{})
+}
+
+func (e *qbittorrentEngine) AddTorrentFileEx(torrentPath, savePath string, options AddOptions) (*string, error) {
+	preferred := savePath
+	return e.AddTorrentFileWithOptions(torrentPath, nil, &preferred, options)
+}
+
+func (e *qbittorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Config, preferredPath *string, options AddOptions) (*string, error) {
+	if !fileExists(torrentPath) {
+		return nil, fmt.Errorf("torrent file not found: %s", torrentPath)
+	}
+	savePath, err := e.resolveSavePath(preferredPath, cfg)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	e.ensureCategory(ctx)
+
+	before := e.currentHashSet()
+	addOpts := e.addOptions(options)
+	addOpts.SavePath = savePath
+	if err := e.client.AddTorrentFile(ctx, torrentPath, addOpts); err != nil {
+		return nil, err
+	}
+	// qBittorrent does not return the infohash: find the newly added torrent.
+	for attempt := 0; attempt < 4; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(150 * time.Millisecond):
+			}
+		}
+		torrents, listErr := e.client.Torrents(ctx)
+		if listErr != nil {
+			continue
+		}
+		for _, torrent := range torrents {
+			hash := strings.ToLower(torrent.Hash)
+			if _, existed := before[hash]; !existed {
+				e.persistTorrentCopy(hash, torrentPath)
+				return &hash, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+func (e *qbittorrentEngine) currentHashSet() map[string]struct{} {
+	_ = e.sync()
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	out := make(map[string]struct{}, len(e.cache))
+	for hash := range e.cache {
+		out[hash] = struct{}{}
+	}
+	return out
+}
+
+// persistTorrentCopy keeps a Gextto-owned `.torrent` so the hash can be
+// re-imported and exported even if qBittorrent is reset.
+func (e *qbittorrentEngine) persistTorrentCopy(hash, source string) {
+	dir := e.stateDir()
+	if dir == "" {
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		logging.Warn("cannot create torrent state directory", "dir", dir, "error", err.Error())
+		return
+	}
+	target := filepath.Join(dir, hash+".torrent")
+	if err := copyFileAtomically(source, target); err != nil {
+		logging.Warn("cannot persist qbittorrent .torrent copy", "hash", hash, "error", err.Error())
+	}
+}
+
+// ErrPathMappingMissing is returned when a path cannot be translated into the
+// backend namespace.
+var ErrPathMappingMissing = errors.New("backend path mapping missing")
+
+// utilsRedactMagnet keeps credentials out of logs.
+func utilsRedactMagnet(magnet string) string {
+	if len(magnet) > 80 {
+		return magnet[:80] + "…"
+	}
+	return magnet
+}

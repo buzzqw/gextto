@@ -897,7 +897,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 			runErr = err
 			break
 		}
-		hash, err := s.torrents.AddTorrentFile(path, target)
+		hash, err := s.activeEngine().AddTorrentFile(path, target)
 		if err != nil {
 			runErr = err
 			break
@@ -913,7 +913,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		result = map[string]any{"hash": *hash, "method": "torrent"}
 	case "magnet", "magnets":
-		ok, err := s.torrents.AddWithPath(input.Url, cfg, &target)
+		ok, err := s.activeEngine().AddWithPath(input.Url, cfg, &target)
 		if err != nil {
 			runErr = err
 			break
@@ -986,7 +986,7 @@ func MakeDirectory(w http.ResponseWriter, r *http.Request, s *AppState) {
 // ---------------------------------------------------------------------------
 
 func TorrentStats(w http.ResponseWriter, r *http.Request, s *AppState) {
-	jsonResponse(w, map[string]any{"ok": true, "stats": s.torrents.Stats()})
+	jsonResponse(w, map[string]any{"ok": true, "stats": s.activeEngine().Stats()})
 }
 
 // ---------------------------------------------------------------------------
@@ -1049,7 +1049,7 @@ func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, 
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		return nil, err.Error()
 	}
-	result, err := s.torrents.AddTorrentFileWithOptions(path, s.cfg, nil, AddOptions{})
+	result, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, AddOptions{})
 	_ = os.Remove(path)
 	if err != nil {
 		return nil, err.Error()
@@ -1084,10 +1084,10 @@ func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Relea
 		_ = s.db.SetTorrentReason(hash, "manual")
 	}
 	title := release.Title
-	torrents := s.torrents
+	engine := s.activeEngine()
 	cfg := s.cfg
 	go func() {
-		added, err := torrents.Add(source, cfg)
+		added, err := engine.Add(source, cfg)
 		if err != nil {
 			logging.Error("manual torrent add failed", "title", title, "error", err)
 		} else if added {
@@ -1131,7 +1131,7 @@ func gh0_addRawMagnet(ctx context.Context, s *AppState, source string) (int, map
 		}
 		return http.StatusAccepted, map[string]any{"ok": true}
 	}
-	added, err := s.torrents.Add(trimmed, s.cfg)
+	added, err := s.activeEngine().Add(trimmed, s.cfg)
 	if err != nil {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()}
 	}
@@ -1381,7 +1381,7 @@ func SetFilePriorities(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "too many file priorities")
 		return
 	}
-	ok, err := s.torrents.SetFilePriorities(hash, input.Priorities)
+	ok, err := s.activeEngine().SetFilePriorities(hash, input.Priorities)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -1399,7 +1399,7 @@ func SetFilePriorities(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func ExportTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	path, ok := s.torrents.TorrentFilePath(hash)
+	path, ok := s.activeEngine().TorrentFilePath(hash)
 	if !ok {
 		jsonError(w, http.StatusNotFound, "torrent file not available")
 		return
@@ -1424,7 +1424,7 @@ func RemoveTorrentLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	deleteFiles := input.DeleteFiles || gh0_torrentFilesAreDisposable(s.db, input.Hash)
-	removed, err := s.torrents.Remove(input.Hash, deleteFiles)
+	removed, err := s.activeEngine().Remove(input.Hash, deleteFiles)
 	if err == nil && removed {
 		_ = s.db.MarkTorrentRemoved(input.Hash)
 	}
@@ -1584,6 +1584,10 @@ func gh0_libtorrentOptimizationFor(cfg *Config) gh0_libtorrentOptimization {
 }
 
 func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("optimize_settings"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	cfg := latestConfig(s)
 	optimization := gh0_libtorrentOptimizationFor(cfg)
 	for _, change := range optimization.changes {
@@ -1641,7 +1645,7 @@ func SetTorrentLimitsLegacy(w http.ResponseWriter, r *http.Request, s *AppState)
 	if input.SeedDays != nil {
 		seedDays = *input.SeedDays
 	}
-	ok, err := s.torrents.SetLimits(
+	ok, err := s.activeEngine().SetLimits(
 		input.Hash,
 		saturatingMulInt64(input.DlKbps, 1024),
 		saturatingMulInt64(input.UlKbps, 1024),

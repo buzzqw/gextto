@@ -117,7 +117,7 @@ func tev_settingFloatOr(cfg *Config, key string, fallback float64) float64 {
 // ---------------------------------------------------------------------------
 
 // tev_torrentDisplayName implements `torrent_display_name`.
-func tev_torrentDisplayName(torrents *LibtorrentClient, hash string) string {
+func tev_torrentDisplayName(torrents TorrentSession, hash string) string {
 	for _, torrent := range torrents.List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			if strings.TrimSpace(torrent.Name) != "" {
@@ -132,7 +132,7 @@ func tev_torrentDisplayName(torrents *LibtorrentClient, hash string) string {
 // tev_removeFailedTorrent implements `remove_failed_torrent`: partial files are
 // deleted only when the download was incomplete; a completed/seeding torrent's
 // library is left untouched.
-func tev_removeFailedTorrent(torrents *LibtorrentClient, hash string) bool {
+func tev_removeFailedTorrent(torrents TorrentSession, hash string) bool {
 	name := tev_torrentDisplayName(torrents, hash)
 	incomplete := false
 	for _, torrent := range torrents.List() {
@@ -207,7 +207,7 @@ func RefreshMediaLibraries(cfg *Config) {
 // ---------------------------------------------------------------------------
 
 // tev_mismatchedPackRelease implements `mismatched_pack_release`.
-func tev_mismatchedPackRelease(torrents *LibtorrentClient, db *Database, hash string) *models.Release {
+func tev_mismatchedPackRelease(torrents TorrentSession, db *Database, hash string) *models.Release {
 	meta, err := db.TorrentMeta(hash)
 	if err != nil || meta == nil {
 		return nil
@@ -229,7 +229,7 @@ func tev_mismatchedPackRelease(torrents *LibtorrentClient, db *Database, hash st
 }
 
 // RejectActivePackIdentityMismatches implements `reject_active_pack_identity_mismatches`.
-func RejectActivePackIdentityMismatches(torrents *LibtorrentClient, db *Database) {
+func RejectActivePackIdentityMismatches(torrents TorrentSession, db *Database) {
 	for _, torrent := range torrents.List() {
 		release := tev_mismatchedPackRelease(torrents, db, torrent.Hash)
 		if release == nil {
@@ -293,7 +293,7 @@ func tev_scheduleStorageMoveRetry(retries map[string]StorageMoveRetry, hash, des
 }
 
 // RetryStorageMoves implements `retry_storage_moves`.
-func RetryStorageMoves(torrents *LibtorrentClient, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry) {
+func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry) {
 	now := time.Now()
 	hashes := make([]string, 0, len(retries))
 	for hash := range retries {
@@ -412,7 +412,7 @@ func tev_seedCopyWarningDue(warnings map[string]time.Time, hash string) bool {
 // that were already in the session when the daemon started and are persisted as
 // `error` (a leftover from a previous run; files are kept). Torrents added later
 // are never detached this way, so re-adding a previously failed torrent works.
-func DetachErrorTorrents(torrents *LibtorrentClient, db *Database, startupHashes map[string]struct{}) {
+func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes map[string]struct{}) {
 	for _, torrent := range torrents.List() {
 		if _, known := startupHashes[strings.ToLower(torrent.Hash)]; !known {
 			continue
@@ -435,7 +435,7 @@ func DetachErrorTorrents(torrents *LibtorrentClient, db *Database, startupHashes
 }
 
 // DetachCompletedArchivedSingles implements `detach_completed_archived_singles`.
-func DetachCompletedArchivedSingles(torrents *LibtorrentClient, db *Database) {
+func DetachCompletedArchivedSingles(torrents TorrentSession, db *Database) {
 	for _, torrent := range torrents.List() {
 		meta, _ := db.TorrentMeta(torrent.Hash)
 		status, _ := db.TorrentStatus(torrent.Hash)
@@ -509,7 +509,7 @@ func tev_stallExpired(lastProgressAt *time.Time, lastDone *int64, now time.Time,
 }
 
 // MonitorStalled implements `monitor_stalled`.
-func MonitorStalled(cfg *Config, torrents *LibtorrentClient, db *Database, notifier *Notifier, watch map[string]StallWatch) {
+func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, watch map[string]StallWatch) {
 	stallAfterMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_after_min", 60.0)
 	retryMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_retry_min", 60.0)
 	giveupMinutes := tev_configuredStallGiveupMinutes(cfg)
@@ -653,7 +653,7 @@ func MonitorStalled(cfg *Config, torrents *LibtorrentClient, db *Database, notif
 // ---------------------------------------------------------------------------
 
 // MonitorMetadata implements `monitor_metadata`.
-func MonitorMetadata(cfg *Config, torrents *LibtorrentClient, db *Database, notifier *Notifier, waitStart, firstSeen map[string]time.Time) {
+func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen map[string]time.Time) {
 	const timeout = 600 * time.Second
 	giveupMinutes := tev_settingFloatOr(cfg, "libtorrent_metadata_giveup_min", 1440.0)
 	if giveupMinutes <= 0 {
@@ -844,7 +844,7 @@ func tev_completedSourceDisposable(db *Database, hash, savePath string) bool {
 // ---------------------------------------------------------------------------
 
 // RemoveSeededCompleted implements `remove_seeded_completed`.
-func RemoveSeededCompleted(cfg *Config, torrents *LibtorrentClient, db *Database, postSeedMoves map[string]struct{}) {
+func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}) {
 	for _, torrent := range torrents.List() {
 		if _, ok := postSeedMoves[torrent.Hash]; ok {
 			continue
@@ -913,7 +913,7 @@ func tev_clearEmptyDestination(destination, name string) {
 }
 
 // tev_postSeedRelocate implements `post_seed_relocate`.
-func tev_postSeedRelocate(cfg *Config, torrents *LibtorrentClient, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry) bool {
+func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry) bool {
 	if retry, ok := storageMoveRetries[strings.ToLower(torrent.Hash)]; ok && retry.postSeed {
 		return true
 	}
@@ -970,7 +970,7 @@ func tev_postSeedRelocate(cfg *Config, torrents *LibtorrentClient, torrent *mode
 
 // tev_ramdiskRelocation implements `ramdisk_relocation`. It returns the reason and
 // destination when a torrent currently on the RAM disk should move to disk.
-func tev_ramdiskRelocation(cfg *Config, torrents *LibtorrentClient, hash, savePath string) (string, string, bool) {
+func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath string) (string, string, bool) {
 	if !cfg.RamdiskEnabled() {
 		return "", "", false
 	}
@@ -1025,7 +1025,7 @@ func tev_ramdiskRelocation(cfg *Config, torrents *LibtorrentClient, hash, savePa
 }
 
 // tev_enforceRamdiskCapacity implements `enforce_ramdisk_capacity`.
-func tev_enforceRamdiskCapacity(cfg *Config, torrents *LibtorrentClient, event *models.TorrentEvent) {
+func tev_enforceRamdiskCapacity(cfg *Config, torrents TorrentSession, event *models.TorrentEvent) {
 	reason, destination, ok := tev_ramdiskRelocation(cfg, torrents, event.Hash, event.SavePath)
 	if !ok {
 		return
@@ -1127,7 +1127,7 @@ func ramdiskOrphanIsStale(modTime, now time.Time) bool {
 // file name) is not loaded yet, and it only removes entries that have been idle
 // for a while. Without these guards a restart could wipe valid in-progress
 // downloads from the tmpfs and force a full re-download.
-func tev_cleanupOrphanedRamdisk(ramdisk string, torrents *LibtorrentClient) {
+func tev_cleanupOrphanedRamdisk(ramdisk string, torrents TorrentSession) {
 	resolved, err := canonicalizePath(ramdisk)
 	if err != nil {
 		logging.Debug("RAM disk orphan sweep skipped", "path", ramdisk, "error", err.Error())
@@ -1197,7 +1197,7 @@ func tev_cleanupOrphanedRamdisk(ramdisk string, torrents *LibtorrentClient) {
 }
 
 // ReconcileRamdisk implements `reconcile_ramdisk`.
-func ReconcileRamdisk(cfg *Config, torrents *LibtorrentClient, attempts map[string]time.Time) {
+func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]time.Time) {
 	ramdisk := cfg.RamdiskDir()
 	if ramdisk == nil {
 		clear(attempts)
@@ -1247,7 +1247,7 @@ func ReconcileRamdisk(cfg *Config, torrents *LibtorrentClient, attempts map[stri
 // ---------------------------------------------------------------------------
 
 // EnforceSeedPolicy implements `enforce_seed_policy`.
-func EnforceSeedPolicy(cfg *Config, torrents *LibtorrentClient, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time) {
+func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time) {
 	ratioLimit := 0.0
 	ratioLimitSet := false
 	if cfg.Libtorrent.StopAtRatio && cfg.Libtorrent.SeedRatio > 0.0 {
@@ -1388,7 +1388,7 @@ func tev_writeRejectionMarker(source, reason string) {
 }
 
 // tev_discardCompletedSource implements `discard_completed_source`.
-func tev_discardCompletedSource(cfg *Config, db *Database, torrents *LibtorrentClient, event *models.TorrentEvent, reason string) {
+func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, reason string) {
 	source := CompletionPath(event)
 	removed, err := torrents.Remove(event.Hash, false)
 	if err != nil {
@@ -1453,7 +1453,7 @@ func normalizeReleaseSeries(cfg *Config, release *models.Release) {
 	}
 }
 
-func tev_completeTorrent(cfg *Config, db *Database, torrents *LibtorrentClient, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient) (bool, error) {
+func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
 	guard := AcquireArchiveImport(release.Series)
@@ -1674,7 +1674,7 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents *LibtorrentClient, 
 // ---------------------------------------------------------------------------
 
 // HandleTorrentEvent implements `handle_torrent_event`.
-func HandleTorrentEvent(cfg *Config, torrents *LibtorrentClient, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, event models.TorrentEvent, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
+func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, event models.TorrentEvent, tmdb *TmdbClient, notifier *Notifier) (bool, error) {
 	logging.Debug("torrent completion processing started",
 		"hash", event.Hash, "kind", event.Kind, "name", event.Name, "save_path", event.SavePath)
 	// libtorrent error alerts are handled before the metadata lookup: some of

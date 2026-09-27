@@ -646,7 +646,7 @@ func SetTorrentTrackers(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		trackers = append(trackers, TrackerEntry{Tier: tracker.Tier, URL: strings.TrimSpace(tracker.Url)})
 	}
-	ok, err := s.torrents.SetTrackers(hash, trackers)
+	ok, err := s.activeEngine().SetTrackers(hash, trackers)
 	if err != nil {
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -703,7 +703,7 @@ func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{
 		"ok":            true,
 		"health":        health,
-		"torrent_stats": s.torrents.Stats(),
+		"torrent_stats": s.activeEngine().Stats(),
 		"last_cycle":    s.last_cycle.Snapshot(),
 	})
 }
@@ -711,7 +711,7 @@ func SystemStats(w http.ResponseWriter, r *http.Request, s *AppState) {
 // TorrentFiles is `torrent_files`.
 func TorrentFiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	files, ok, err := s.torrents.Files(hash)
+	files, ok, err := s.activeEngine().Files(hash)
 	if err != nil {
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -725,7 +725,7 @@ func TorrentFiles(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // Torrents is `torrents`.
 func Torrents(w http.ResponseWriter, r *http.Request, s *AppState) {
-	live := s.torrents.List()
+	live := s.activeEngine().List()
 	if len(live) == 0 && s.cfg.DryRun {
 		jsonResponse(w, gh3DecorateTorrents(s, gh3DryRunSessionPreview(s)))
 		return
@@ -779,7 +779,7 @@ func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if requested := strings.TrimSpace(r.URL.Query().Get("save_path")); requested != "" {
 		savePath = requested
 	}
-	hash, err := s.torrents.AddTorrentFileEx(path, savePath, AddOptions{Preallocate: cfg.LibtorrentPreallocate()})
+	hash, err := s.activeEngine().AddTorrentFileEx(path, savePath, AddOptions{Preallocate: cfg.LibtorrentPreallocate()})
 	if err != nil {
 		_ = os.Remove(path)
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
@@ -1124,7 +1124,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	go func() {
-		added, err := s.torrents.Add(source, s.cfg)
+		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:
 			logging.Error("manual torrent add failed", "title", title, "error", err.Error())
@@ -1167,7 +1167,7 @@ func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string,
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
-	hash, err := s.torrents.AddTorrentFileWithOptions(path, s.cfg, nil, options)
+	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
 	_ = os.Remove(path)
 	if err != nil {
 		return nil, err

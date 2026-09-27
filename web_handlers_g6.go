@@ -216,7 +216,7 @@ func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
 	return baseDownload, baseUpload
 }
 
-func gh6_applySpeedPolicy(cfg *Config, torrents *LibtorrentClient) {
+func gh6_applySpeedPolicy(cfg *Config, torrents TorrentEngine) {
 	download, upload := gh6_currentSpeedLimits(cfg)
 	if _, err := torrents.SetGlobalSpeedLimits(download, upload); err != nil {
 		logging.Debug("speed policy apply failed", "error", err)
@@ -831,7 +831,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 	}
 	removed := []string{}
 	skipped := 0
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		completed := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
 		if !completed {
 			continue
@@ -865,7 +865,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			continue
 		}
 		deleteFiles := input.DeleteFiles || gh6_torrentFilesAreDisposable(s.db, torrent.Hash)
-		ok, err := s.torrents.Remove(torrent.Hash, deleteFiles)
+		ok, err := s.activeEngine().Remove(torrent.Hash, deleteFiles)
 		if err != nil {
 			logging.Warn("completed torrent removal failed", "hash", torrent.Hash, "name", torrent.Name, "error", err)
 			continue
@@ -1194,7 +1194,7 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	cfg := latestConfig(s)
-	gh6_applySpeedPolicy(cfg, s.torrents)
+	gh6_applySpeedPolicy(cfg, s.activeEngine())
 	jsonResponse(w, map[string]any{
 		"ok":           true,
 		"until":        until,
@@ -1295,7 +1295,7 @@ func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 // TorrentPeers implements `torrent_peers`.
 func TorrentPeers(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	peers, found, err := s.torrents.Peers(hash)
+	peers, found, err := s.activeEngine().Peers(hash)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

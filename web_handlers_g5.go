@@ -465,6 +465,10 @@ func gh5_applyWatchlistImport(cfg *Config, entries []gh5_watchlistEntry) map[str
 
 // ApplyLibtorrentSettings implements `apply_libtorrent_settings`.
 func ApplyLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("apply_settings"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	cfg := latestConfig(s)
 	result, err := s.torrents.ApplySettings(cfg)
 	gh5_torrentAction(w, result, err)
@@ -796,7 +800,7 @@ func RemoveComic(w http.ResponseWriter, r *http.Request, s *AppState) {
 // RestartTorrent implements `restart_torrent`.
 func RestartTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	result, err := s.torrents.Restart(hash)
+	result, err := s.activeEngine().Restart(hash)
 	gh5_torrentAction(w, result, err)
 }
 
@@ -1100,6 +1104,10 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetSuperSeeding implements `set_super_seeding`.
 func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("super_seeding"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	var input struct {
 		Enabled bool `json:"enabled"`

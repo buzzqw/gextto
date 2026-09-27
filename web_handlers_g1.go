@@ -69,7 +69,7 @@ func gh1_torrentAction(ok bool, err error) (int, any) {
 }
 
 // gh1_torrentDisplayName mirrors the web module `torrent_display_name`.
-func gh1_torrentDisplayName(torrents *LibtorrentClient, hash string) string {
+func gh1_torrentDisplayName(torrents TorrentSession, hash string) string {
 	for _, torrent := range torrents.List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			if strings.TrimSpace(torrent.Name) != "" {
@@ -98,7 +98,7 @@ func gh1_torrentFilesAreDisposable(db *Database, hash string) bool {
 }
 
 // gh1_mismatchedPackRelease mirrors the web module `mismatched_pack_release`.
-func gh1_mismatchedPackRelease(torrents *LibtorrentClient, db *Database, hash string) *models.Release {
+func gh1_mismatchedPackRelease(torrents TorrentSession, db *Database, hash string) *models.Release {
 	meta, err := db.TorrentMeta(hash)
 	if err != nil || meta == nil {
 		return nil
@@ -124,7 +124,7 @@ func gh1_mismatchedPackRelease(torrents *LibtorrentClient, db *Database, hash st
 }
 
 // gh1_blocklistMismatchedPack mirrors the web module `blocklist_mismatched_pack`.
-func gh1_blocklistMismatchedPack(torrents *LibtorrentClient, db *Database, hash string) bool {
+func gh1_blocklistMismatchedPack(torrents TorrentSession, db *Database, hash string) bool {
 	release := gh1_mismatchedPackRelease(torrents, db, hash)
 	if release == nil {
 		return false
@@ -605,21 +605,21 @@ func MovieHistoryHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func PauseTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	status, value := gh1_torrentAction(s.torrents.Pause(hash))
+	status, value := gh1_torrentAction(s.activeEngine().Pause(hash))
 	jsonStatus(w, status, value)
 }
 
 func RecheckTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	name := hash
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		if strings.EqualFold(torrent.Hash, hash) {
 			name = torrent.Name
 			break
 		}
 	}
 	logging.Info("manual torrent integrity check requested", "hash", hash, "name", name)
-	ok, err := s.torrents.ForceRecheck(hash)
+	ok, err := s.activeEngine().ForceRecheck(hash)
 	switch {
 	case err != nil:
 		logging.Error("manual torrent integrity check failed to start", "hash", hash, "name", name, "error", err.Error())
@@ -646,7 +646,7 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 		}
 	}
 	deleteFiles := input.DeleteFiles || gh1_torrentFilesAreDisposable(s.db, hash)
-	removed, removeErr := s.torrents.Remove(hash, deleteFiles)
+	removed, removeErr := s.activeEngine().Remove(hash, deleteFiles)
 	if removeErr == nil && removed {
 		_ = s.db.MarkTorrentRemoved(hash)
 		_ = s.db.ForgetRemovedTorrent(hash)
@@ -700,7 +700,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 			s.archive,
 			s.comics,
 			notifier,
-			s.torrents,
+			s.activeEngine(),
 			taskDomain,
 		)
 		if runErr != nil {
@@ -973,7 +973,7 @@ func TorrentDetails(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
 		magnet = meta.Release.Magnet
 	}
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		if !strings.EqualFold(torrent.Hash, hash) {
 			continue
 		}
@@ -1026,7 +1026,7 @@ func TraktScrobble(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func UnpinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
-	ok, err := s.torrents.SetPin("", false)
+	ok, err := s.activeEngine().SetPin("", false)
 	if err == nil {
 		_ = SaveSetting(s.cfg.DataDir, "libtorrent_pinned_hash", "")
 	}

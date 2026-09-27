@@ -23,6 +23,15 @@ type fakeQbit struct {
 	lastLocation  url.Values
 	lastPause     url.Values
 	torrents      []Torrent
+
+	lastFilePath    url.Values
+	lastAddTracker  url.Values
+	lastShareLimits url.Values
+	lastForceStart  url.Values
+	lastCategory    url.Values
+	lastPrefs       url.Values
+	lastEdit        url.Values
+	lastTags        url.Values
 }
 
 func (f *fakeQbit) serveHTTP(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +88,51 @@ func (f *fakeQbit) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = r.ParseForm()
 		f.lastLocation = r.PostForm
 		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/filePrio":
+		_ = r.ParseForm()
+		f.lastFilePath = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/addTrackers":
+		_ = r.ParseForm()
+		f.lastAddTracker = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/setShareLimits":
+		_ = r.ParseForm()
+		f.lastShareLimits = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/setForceStart":
+		_ = r.ParseForm()
+		f.lastForceStart = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/setCategory", "/api/v2/torrents/createCategory":
+		_ = r.ParseForm()
+		f.lastCategory = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/editTracker":
+		_ = r.ParseForm()
+		f.lastEdit = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/addTags", "/api/v2/torrents/removeTags":
+		_ = r.ParseForm()
+		f.lastTags = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/setAutoManagement", "/api/v2/torrents/setSuperSeeding":
+		_ = r.ParseForm()
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/torrents/toggleSequentialDownload":
+		_ = r.ParseForm()
+		f.lastPause = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/app/defaultSavePath":
+		_, _ = w.Write([]byte("/data/downloads"))
+	case "/api/v2/app/preferences":
+		_, _ = w.Write([]byte(`{"save_path":"/data/downloads","max_connec":200}`))
+	case "/api/v2/app/setPreferences":
+		_ = r.ParseForm()
+		f.lastPrefs = r.PostForm
+		w.WriteHeader(http.StatusOK)
+	case "/api/v2/transfer/downloadLimit", "/api/v2/transfer/uploadLimit":
+		_, _ = w.Write([]byte("1024"))
 	case "/api/v2/torrents/files":
 		_ = json.NewEncoder(w).Encode([]File{{Name: "movie.mkv", Size: 100, Progress: 0.5, Priority: 1}})
 	case "/api/v2/torrents/trackers":
@@ -260,5 +314,82 @@ func TestMagnetHash(t *testing.T) {
 	}
 	if got := magnetHash("http://example/x.torrent"); got != "" {
 		t.Fatalf("magnetHash(non-magnet) = %q", got)
+	}
+}
+
+func TestFilePrioritiesAndTrackers(t *testing.T) {
+	fake, client := newFakeServer(t)
+	ctx := context.Background()
+	if err := client.SetFilePriorities(ctx, "ABC", []int{0, 2, 5}, FilePriorityMaximal); err != nil {
+		t.Fatalf("SetFilePriorities: %v", err)
+	}
+	if fake.lastFilePath.Get("hash") != "abc" || fake.lastFilePath.Get("id") != "0|2|5" || fake.lastFilePath.Get("priority") != "7" {
+		t.Fatalf("filePrio form = %v", fake.lastFilePath)
+	}
+	if err := client.AddTrackers(ctx, "abc", []string{"udp://a", "udp://b"}); err != nil {
+		t.Fatalf("AddTrackers: %v", err)
+	}
+	if fake.lastAddTracker.Get("urls") != "udp://a\nudp://b" {
+		t.Fatalf("addTrackers urls = %q", fake.lastAddTracker.Get("urls"))
+	}
+	if err := client.EditTracker(ctx, "abc", "udp://old", "udp://new"); err != nil {
+		t.Fatalf("EditTracker: %v", err)
+	}
+	if fake.lastEdit.Get("origUrl") != "udp://old" || fake.lastEdit.Get("newUrl") != "udp://new" {
+		t.Fatalf("editTracker form = %v", fake.lastEdit)
+	}
+}
+
+func TestShareLimitsForceStartAndPreferences(t *testing.T) {
+	fake, client := newFakeServer(t)
+	ctx := context.Background()
+	if err := client.SetShareLimits(ctx, 1.5, 1440, "abc"); err != nil {
+		t.Fatalf("SetShareLimits: %v", err)
+	}
+	if fake.lastShareLimits.Get("ratioLimit") != "1.5" || fake.lastShareLimits.Get("seedingTimeLimit") != "1440" {
+		t.Fatalf("share limits form = %v", fake.lastShareLimits)
+	}
+	if err := client.SetForceStart(ctx, true, "abc"); err != nil {
+		t.Fatalf("SetForceStart: %v", err)
+	}
+	if fake.lastForceStart.Get("value") != "true" {
+		t.Fatalf("force start form = %v", fake.lastForceStart)
+	}
+	if err := client.SetAutoManagement(ctx, false, "abc"); err != nil {
+		t.Fatalf("SetAutoManagement: %v", err)
+	}
+	if err := client.CreateCategory(ctx, "gextto", "/data"); err != nil {
+		t.Fatalf("CreateCategory: %v", err)
+	}
+	if fake.lastCategory.Get("category") != "gextto" || fake.lastCategory.Get("savePath") != "/data" {
+		t.Fatalf("category form = %v", fake.lastCategory)
+	}
+	if err := client.SetPreferences(ctx, map[string]any{"max_connec": 200}); err != nil {
+		t.Fatalf("SetPreferences: %v", err)
+	}
+	if !strings.Contains(fake.lastPrefs.Get("json"), "max_connec") {
+		t.Fatalf("prefs form = %v", fake.lastPrefs)
+	}
+	if limit, err := client.GlobalDownloadLimit(ctx); err != nil || limit != 1024 {
+		t.Fatalf("GlobalDownloadLimit = %d, %v", limit, err)
+	}
+	if path, err := client.DefaultSavePath(ctx); err != nil || path != "/data/downloads" {
+		t.Fatalf("DefaultSavePath = %q, %v", path, err)
+	}
+}
+
+func TestSetSequentialDownloadOnlyTogglesDifferences(t *testing.T) {
+	fake, client := newFakeServer(t)
+	ctx := context.Background()
+	fake.torrents = []Torrent{
+		{Hash: "aaa", Sequential: true},
+		{Hash: "bbb", Sequential: false},
+	}
+	if err := client.SetSequentialDownload(ctx, true, "aaa", "bbb"); err != nil {
+		t.Fatalf("SetSequentialDownload: %v", err)
+	}
+	// Only bbb differs and must be toggled.
+	if fake.lastPause.Get("hashes") != "bbb" {
+		t.Fatalf("toggled hashes = %q, want bbb", fake.lastPause.Get("hashes"))
 	}
 }

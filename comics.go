@@ -1436,7 +1436,7 @@ func firstComicString(values []string) string {
 
 // RunComicsCycle implements `comics::run_cycle` (renamed to avoid the
 // collision with the orchestrator's own run cycle).
-func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, defaultRoot string, torrents *LibtorrentClient, mainDB *Database, cfg *Config) (int, error) {
+func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, defaultRoot string, torrents TorrentEngine, mainDB *Database, cfg *Config) (int, error) {
 	monitored, err := db.ListMonitored(true)
 	if err != nil {
 		return 0, err
@@ -1748,7 +1748,7 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 
 // sendWeeklyPack sends a weekly pack (direct file, magnet or `.torrent`) to the
 // client. It returns true when it was accepted and marked as sent.
-func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents *LibtorrentClient, notifier *Notifier, defaultRoot string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL string) (bool, error) {
+func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, defaultRoot string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL string) (bool, error) {
 	target := comicDownloadDir(cfg)
 	if target == nil {
 		value := defaultRoot

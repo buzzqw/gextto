@@ -24,6 +24,10 @@ type TorrentFlagInput struct {
 
 // SetTorrentUploadMode implements POST /api/torrents/{hash}/upload-mode.
 func SetTorrentUploadMode(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("upload_mode"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	var input TorrentToggleInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -44,6 +48,10 @@ func SetTorrentUploadMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetTorrentShareMode implements POST /api/torrents/{hash}/share-mode.
 func SetTorrentShareMode(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("share_mode"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	var input TorrentToggleInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -64,6 +72,10 @@ func SetTorrentShareMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetTorrentFlag implements POST /api/torrents/{hash}/flags.
 func SetTorrentFlag(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("torrent_flags"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	var input TorrentFlagInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -90,6 +102,10 @@ func SetTorrentFlag(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // ScrapeTorrent implements POST /api/torrents/{hash}/scrape.
 func ScrapeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("scrape"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	ok, err := s.torrents.ScrapeTracker(hash)
 	if err != nil {
@@ -105,6 +121,10 @@ func ScrapeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // TorrentDhtAnnounce implements POST /api/torrents/{hash}/dht-announce.
 func TorrentDhtAnnounce(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("dht_announce"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	hash := pathParam(r, "hash")
 	ok, err := s.torrents.ForceDhtAnnounce(hash)
 	if err != nil {
@@ -123,7 +143,7 @@ func TorrentDhtAnnounce(w http.ResponseWriter, r *http.Request, s *AppState) {
 // extreme cases such as a swarm with no seeders explicit.
 func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
-	for _, torrent := range s.torrents.List() {
+	for _, torrent := range s.activeEngine().List() {
 		if !strings.EqualFold(torrent.Hash, hash) {
 			continue
 		}
@@ -142,6 +162,10 @@ func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // LibtorrentSessionStats implements GET /api/libtorrent/session-stats.
 func LibtorrentSessionStats(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if _, err := s.requireEmbedded("session_stats"); err != nil {
+		jsonError(w, http.StatusConflict, err.Error())
+		return
+	}
 	values, err := s.torrents.SessionStats()
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())

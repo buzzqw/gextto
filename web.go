@@ -478,14 +478,17 @@ func (g *ArchiveImportGuard) Release() {
 // AppState is shared by every web handler. Field names intentionally mirror the
 // struct so the port reads the same.
 type AppState struct {
-	cfg             *Config // startup snapshot
-	config_path     string
-	i18n            *I18nDb
-	db              *Database
-	archive         *Archive
-	comics          *ComicsDb
-	engine          *Engine
-	torrents        *LibtorrentClient
+	cfg         *Config // startup snapshot
+	config_path string
+	i18n        *I18nDb
+	db          *Database
+	archive     *Archive
+	comics      *ComicsDb
+	engine      *Engine
+	torrents    *LibtorrentClient
+	// torrent_engine is the active transfer engine. When nil the daemon uses
+	// the embedded libtorrent adapter (see activeEngine in torrent_engine.go).
+	torrent_engine  TorrentEngine
 	torrent_events  *EventLog
 	notifier        *Notifier
 	tmdb            *TmdbClient

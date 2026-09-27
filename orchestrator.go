@@ -45,7 +45,7 @@ func RunCycle(
 	archive *Archive,
 	comics *ComicsDb,
 	notifier *Notifier,
-	torrents *LibtorrentClient,
+	torrents TorrentEngine,
 ) (*models.CycleStats, error) {
 	return RunCycleDomain(ctx, cfg, engine, db, archive, comics, notifier, torrents, nil)
 }
@@ -60,7 +60,7 @@ func RunCycleDomain(
 	archive *Archive,
 	comics *ComicsDb,
 	notifier *Notifier,
-	torrents *LibtorrentClient,
+	torrents TorrentEngine,
 	domain *string,
 ) (*models.CycleStats, error) {
 	startedAt := time.Now().UTC()

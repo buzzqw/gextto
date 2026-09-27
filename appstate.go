@@ -1,6 +1,10 @@
 package gextto
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/buzzqw/gextto/internal/logging"
+)
 
 // NewAppState builds the shared daemon state. It exists so `cmd/gexttod` (a
 // different package) can construct the state whose fields stay unexported for
@@ -17,7 +21,7 @@ func NewAppState(
 	notifier *Notifier,
 	tmdb *TmdbClient,
 ) *AppState {
-	return &AppState{
+	state := &AppState{
 		cfg:             cfg,
 		config_path:     configPath,
 		i18n:            i18n,
@@ -34,4 +38,13 @@ func NewAppState(
 		rename_progress: &RenameProgress{},
 		config_cache:    &ConfigCache{},
 	}
+	// Install the configured transfer backend. A refused activation (invalid
+	// path mappings, an unavailable build tag) falls back to the embedded
+	// libtorrent engine instead of aborting the daemon: improving without
+	// breaking.
+	if err := ConfigureTorrentEngine(state, cfg); err != nil {
+		logging.Warn("torrent backend activation refused; using embedded libtorrent", "error", err)
+		state.setActiveEngine(nil)
+	}
+	return state
 }

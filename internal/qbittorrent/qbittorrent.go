@@ -93,28 +93,54 @@ type AddOptions struct {
 	FirstLast  bool
 }
 
-// Torrent is the subset of /torrents/info this client consumes.
+// Torrent is the subset of /torrents/info this client consumes. It is wider
+// than strictly needed so the backend adapter can build a faithful
+// models.TorrentView without a second round trip.
 type Torrent struct {
-	Hash         string  `json:"hash"`
-	Name         string  `json:"name"`
-	State        string  `json:"state"`
-	Progress     float64 `json:"progress"`
-	Size         int64   `json:"size"`
-	Downloaded   int64   `json:"downloaded"`
-	Uploaded     int64   `json:"uploaded"`
-	DownloadRate int64   `json:"dlspeed"`
-	UploadRate   int64   `json:"upspeed"`
-	NumSeeds     int     `json:"num_seeds"`
-	NumLeechs    int     `json:"num_leechs"`
-	SavePath     string  `json:"save_path"`
-	Category     string  `json:"category"`
-	Tags         string  `json:"tags"`
-	Ratio        float64 `json:"ratio"`
-	ETASeconds   int64   `json:"eta"`
-	SeedingTime  int64   `json:"seeding_time"`
-	AddedOn      int64   `json:"added_on"`
-	CompletedOn  int64   `json:"completion_on"`
-	Error        string  `json:"-"`
+	Hash           string  `json:"hash"`
+	Name           string  `json:"name"`
+	State          string  `json:"state"`
+	Progress       float64 `json:"progress"`
+	Size           int64   `json:"size"`
+	TotalSize      int64   `json:"total_size"`
+	Downloaded     int64   `json:"downloaded"`
+	AmountLeft     int64   `json:"amount_left"`
+	Uploaded       int64   `json:"uploaded"`
+	DownloadRate   int64   `json:"dlspeed"`
+	UploadRate     int64   `json:"upspeed"`
+	NumSeeds       int     `json:"num_seeds"`
+	NumLeechs      int     `json:"num_leechs"`
+	Seeds          int     `json:"seeds"`
+	Peers          int     `json:"peers"`
+	SeedsTotal     int     `json:"num_complete"`
+	PeersTotal     int     `json:"num_incomplete"`
+	SavePath       string  `json:"save_path"`
+	ContentPath    string  `json:"content_path"`
+	Category       string  `json:"category"`
+	Tags           string  `json:"tags"`
+	Ratio          float64 `json:"ratio"`
+	ETASeconds     int64   `json:"eta"`
+	SeedingTime    int64   `json:"seeding_time"`
+	ActiveTime     int64   `json:"time_active"`
+	AddedOn        int64   `json:"added_on"`
+	CompletedOn    int64   `json:"completion_on"`
+	LastActivity   int64   `json:"last_activity"`
+	Priority       int     `json:"priority"`
+	ForceStart     bool    `json:"force_start"`
+	Sequential     bool    `json:"seq_dl"`
+	AutoManaged    bool    `json:"auto_tmm"`
+	SuperSeeding   bool    `json:"super_seeding"`
+	DownloadLimit  int64   `json:"dl_limit"`
+	UploadLimit    int64   `json:"up_limit"`
+	MaxRatio       float64 `json:"max_ratio"`
+	MaxSeedingTime int64   `json:"max_seeding_time"`
+	RatioLimit     float64 `json:"ratio_limit"`
+	SeedingLimit   int64   `json:"seeding_time_limit"`
+	Magnet         string  `json:"magnet_uri"`
+	Tracker        string  `json:"tracker"`
+	InfohashV1     string  `json:"infohash_v1"`
+	InfohashV2     string  `json:"infohash_v2"`
+	Error          string  `json:"-"`
 }
 
 // Completeness reports whether the torrent finished downloading.
@@ -480,6 +506,18 @@ func (c *Client) SetTorrentUploadLimit(ctx context.Context, limit int64, hashes 
 	return c.postForm(ctx, "/api/v2/torrents/setUploadLimit", form)
 }
 
+// SetShareLimits sets per-torrent share ratio and seeding time limits.
+// ratio: -2 = use global, -1 = infinite, >=0 explicit. minutes follows the same
+// convention (-2 global, -1 infinite, >=0 minutes).
+func (c *Client) SetShareLimits(ctx context.Context, ratio float64, minutes int64, hashes ...string) error {
+	form := url.Values{
+		"hashes":           {joinHashes(hashes)},
+		"ratioLimit":       {strconv.FormatFloat(ratio, 'f', -1, 64)},
+		"seedingTimeLimit": {strconv.FormatInt(minutes, 10)},
+	}
+	return c.postForm(ctx, "/api/v2/torrents/setShareLimits", form)
+}
+
 // SetGlobalDownloadLimit sets the session download limit (bytes/s).
 func (c *Client) SetGlobalDownloadLimit(ctx context.Context, limit int64) error {
 	return c.postForm(ctx, "/api/v2/transfer/setDownloadLimit", url.Values{"limit": {strconv.FormatInt(limit, 10)}})
@@ -578,6 +616,190 @@ func (c *Client) Sync(ctx context.Context, rid int64) (MainData, error) {
 		return MainData{}, err
 	}
 	return data, nil
+}
+
+// FilePrioritySkip/normal/high/maximal mirror the qBittorrent priority scale.
+const (
+	FilePrioritySkip    = 0
+	FilePriorityNormal  = 1
+	FilePriorityHigh    = 6
+	FilePriorityMaximal = 7
+)
+
+// SetFilePriorities applies one priority to a list of file indices.
+func (c *Client) SetFilePriorities(ctx context.Context, hash string, ids []int, priority int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, strconv.Itoa(id))
+	}
+	form := url.Values{
+		"hash":     {strings.ToLower(hash)},
+		"id":       {strings.Join(parts, "|")},
+		"priority": {strconv.Itoa(priority)},
+	}
+	return c.postForm(ctx, "/api/v2/torrents/filePrio", form)
+}
+
+// AddTrackers appends trackers (one URL per line).
+func (c *Client) AddTrackers(ctx context.Context, hash string, urls []string) error {
+	form := url.Values{"hash": {strings.ToLower(hash)}, "urls": {strings.Join(urls, "\n")}}
+	return c.postForm(ctx, "/api/v2/torrents/addTrackers", form)
+}
+
+// RemoveTrackers removes trackers (pipe-separated URLs).
+func (c *Client) RemoveTrackers(ctx context.Context, hash string, urls []string) error {
+	form := url.Values{"hash": {strings.ToLower(hash)}, "urls": {strings.Join(urls, "|")}}
+	return c.postForm(ctx, "/api/v2/torrents/removeTrackers", form)
+}
+
+// EditTracker replaces one tracker URL.
+func (c *Client) EditTracker(ctx context.Context, hash, original, replacement string) error {
+	form := url.Values{
+		"hash":    {strings.ToLower(hash)},
+		"origUrl": {original},
+		"newUrl":  {replacement},
+	}
+	return c.postForm(ctx, "/api/v2/torrents/editTracker", form)
+}
+
+// SetCategory assigns torrents to a category.
+func (c *Client) SetCategory(ctx context.Context, category string, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "category": {category}}
+	return c.postForm(ctx, "/api/v2/torrents/setCategory", form)
+}
+
+// CreateCategory creates a category with an optional save path.
+func (c *Client) CreateCategory(ctx context.Context, name, savePath string) error {
+	form := url.Values{"category": {name}}
+	if savePath != "" {
+		form.Set("savePath", savePath)
+	}
+	return c.postForm(ctx, "/api/v2/torrents/createCategory", form)
+}
+
+// AddTags attaches comma-separated tags.
+func (c *Client) AddTags(ctx context.Context, tags string, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "tags": {tags}}
+	return c.postForm(ctx, "/api/v2/torrents/addTags", form)
+}
+
+// RemoveTags detaches comma-separated tags.
+func (c *Client) RemoveTags(ctx context.Context, tags string, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "tags": {tags}}
+	return c.postForm(ctx, "/api/v2/torrents/removeTags", form)
+}
+
+// ToggleSequentialDownload flips the sequential-download flag.
+func (c *Client) ToggleSequentialDownload(ctx context.Context, hashes ...string) error {
+	return c.postForm(ctx, "/api/v2/torrents/toggleSequentialDownload", url.Values{"hashes": {joinHashes(hashes)}})
+}
+
+// SetSequentialDownload sets (or clears) sequential download for torrents. The
+// Web API only exposes a toggle, so the current value is read first and only
+// the torrents that differ are toggled (idempotent behavior).
+func (c *Client) SetSequentialDownload(ctx context.Context, enabled bool, hashes ...string) error {
+	current, err := c.Torrents(ctx)
+	if err != nil {
+		return err
+	}
+	wanted := map[string]struct{}{}
+	for _, hash := range hashes {
+		hash = strings.ToLower(strings.TrimSpace(hash))
+		if hash != "" {
+			wanted[hash] = struct{}{}
+		}
+	}
+	toToggle := make([]string, 0, len(hashes))
+	for _, torrent := range current {
+		key := strings.ToLower(torrent.Hash)
+		if _, ok := wanted[key]; !ok {
+			continue
+		}
+		if torrent.Sequential == enabled {
+			continue
+		}
+		toToggle = append(toToggle, key)
+	}
+	if len(toToggle) == 0 {
+		return nil
+	}
+	return c.ToggleSequentialDownload(ctx, toToggle...)
+}
+
+// SetForceStart enables/disables force start.
+func (c *Client) SetForceStart(ctx context.Context, enabled bool, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "value": {strconv.FormatBool(enabled)}}
+	return c.postForm(ctx, "/api/v2/torrents/setForceStart", form)
+}
+
+// SetAutoManagement enables/disables automatic torrent management.
+func (c *Client) SetAutoManagement(ctx context.Context, enabled bool, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "enable": {strconv.FormatBool(enabled)}}
+	return c.postForm(ctx, "/api/v2/torrents/setAutoManagement", form)
+}
+
+// SetSuperSeeding enables/disables super seeding for torrents.
+func (c *Client) SetSuperSeeding(ctx context.Context, enabled bool, hashes ...string) error {
+	form := url.Values{"hashes": {joinHashes(hashes)}, "value": {strconv.FormatBool(enabled)}}
+	return c.postForm(ctx, "/api/v2/torrents/setSuperSeeding", form)
+}
+
+// GlobalDownloadLimit returns the session download limit in bytes/s.
+func (c *Client) GlobalDownloadLimit(ctx context.Context) (int64, error) {
+	raw, err := c.getText(ctx, "/api/v2/transfer/downloadLimit")
+	if err != nil {
+		return 0, err
+	}
+	return parseLimit(raw)
+}
+
+// GlobalUploadLimit returns the session upload limit in bytes/s.
+func (c *Client) GlobalUploadLimit(ctx context.Context) (int64, error) {
+	raw, err := c.getText(ctx, "/api/v2/transfer/uploadLimit")
+	if err != nil {
+		return 0, err
+	}
+	return parseLimit(raw)
+}
+
+// DefaultSavePath returns the qBittorrent default save path (as the backend
+// process sees it).
+func (c *Client) DefaultSavePath(ctx context.Context) (string, error) {
+	raw, err := c.getText(ctx, "/api/v2/app/defaultSavePath")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
+}
+
+// Preferences returns the full application preferences document.
+func (c *Client) Preferences(ctx context.Context) (map[string]any, error) {
+	var prefs map[string]any
+	if err := c.getJSON(ctx, "/api/v2/app/preferences", &prefs); err != nil {
+		return nil, err
+	}
+	return prefs, nil
+}
+
+// SetPreferences writes a partial preferences document.
+func (c *Client) SetPreferences(ctx context.Context, prefs map[string]any) error {
+	encoded, err := json.Marshal(prefs)
+	if err != nil {
+		return err
+	}
+	form := url.Values{"json": {string(encoded)}}
+	return c.postForm(ctx, "/api/v2/app/setPreferences", form)
+}
+
+func parseLimit(raw string) (int64, error) {
+	value, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("qbittorrent: parse limit %q: %w", strings.TrimSpace(raw), err)
+	}
+	return value, nil
 }
 
 func joinHashes(hashes []string) string {

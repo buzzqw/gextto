@@ -27,7 +27,7 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 		state.archive,
 		state.comics,
 		state.notifier,
-		state.torrents,
+		state.activeEngine(),
 	)
 	if err != nil {
 		t.Fatalf("RunCycle: %v", err)
@@ -61,7 +61,7 @@ func TestCycleDomainNoSourcesIsNoOp(t *testing.T) {
 				state.archive,
 				state.comics,
 				state.notifier,
-				state.torrents,
+				state.activeEngine(),
 				&current,
 			)
 			if err != nil {
