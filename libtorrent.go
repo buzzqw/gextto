@@ -393,13 +393,25 @@ func preferredDownloadPath(cfg *Config) string {
 	return cfg.LibtorrentDir
 }
 
+// pathIsDir and fileExists resolve the path inside an os.Root so a crafted
+// value cannot escape its directory through path separators.
 func pathIsDir(path string) bool {
-	info, err := os.Stat(filepath.Clean(path))
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return false
+	}
+	defer root.Close()
+	info, err := root.Stat(filepath.Base(path))
 	return err == nil && info.IsDir()
 }
 
 func fileExists(path string) bool {
-	info, err := os.Stat(filepath.Clean(path))
+	root, err := os.OpenRoot(filepath.Dir(path))
+	if err != nil {
+		return false
+	}
+	defer root.Close()
+	info, err := root.Stat(filepath.Base(path))
 	return err == nil && info.Mode().IsRegular()
 }
 

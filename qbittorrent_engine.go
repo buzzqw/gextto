@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -383,14 +384,14 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 		return
 	}
 	// Bound the configured value before narrowing it to int: the source is a
-	// settings string parsed as int64, so the conversion needs an upper bound.
+	// settings string parsed as int64, so the conversion needs an upper bound
+	// expressed with math.MaxInt for the target type.
 	limit64 := cfg.Libtorrent.ActiveDownloads
+	if limit64 > math.MaxInt {
+		limit64 = math.MaxInt
+	}
 	if limit64 < 1 {
 		limit64 = 1
-	}
-	const maxActiveDownloads = 10000
-	if limit64 > maxActiveDownloads {
-		limit64 = maxActiveDownloads
 	}
 	limit := int(limit64)
 	if limit < 1 {

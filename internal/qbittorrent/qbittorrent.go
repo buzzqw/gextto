@@ -432,7 +432,7 @@ func (c *Client) add(ctx context.Context, magnet, torrentPath string, opts AddOp
 			writeErr = fmt.Errorf("qbittorrent: torrent path must be absolute: %s", torrentPath)
 		} else {
 			var file *os.File
-			file, writeErr = os.Open(clean)
+			file, writeErr = os.OpenInRoot(filepath.Dir(clean), filepath.Base(clean))
 			if writeErr == nil {
 				defer file.Close()
 				var part io.Writer

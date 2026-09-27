@@ -627,7 +627,15 @@ func copyFileAtomically(source, target string) error {
 		fmt.Sprintf(".%s.gextto-copy-%s", name, randomToken()),
 	)
 	result := func() error {
-		input, err := os.Open(source)
+		// Open the source through an os.Root so its name cannot escape the
+		// directory it lives in, even if it carries path separators.
+		sourceRoot, err := os.OpenRoot(filepath.Dir(source))
+		if err != nil {
+			return err
+		}
+		defer sourceRoot.Close()
+		sourceName := filepath.Base(source)
+		input, err := sourceRoot.Open(sourceName)
 		if err != nil {
 			return err
 		}
@@ -648,7 +656,7 @@ func copyFileAtomically(source, target string) error {
 		if err := output.Close(); err != nil {
 			return err
 		}
-		sourceInfo, err := os.Stat(source)
+		sourceInfo, err := sourceRoot.Stat(sourceName)
 		if err != nil {
 			return err
 		}
