@@ -235,6 +235,7 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/torrents/{hash}/trackers` |
 | POST | `/api/torrents/{hash}/upload-mode` |
 | POST | `/api/torrents/{hash}/web-seeds` |
+| GET | `/api/torrents/{hash}/why` |
 | POST | `/api/trakt/auth/poll` |
 | POST | `/api/trakt/auth/refresh` |
 | POST | `/api/trakt/auth/revoke` |
@@ -259,4 +260,4 @@ Generated route table of the web/API surface served by the daemon.
 | GET | `/magnet` |
 | GET | `/pkg/ui_bg.wasm` |
 
-Total routes: 254
+Total routes: 255

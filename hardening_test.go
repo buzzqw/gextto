@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -136,6 +137,43 @@ func TestLibtorrentPreallocateDefaultsToTrue(t *testing.T) {
 	cfg.Settings["libtorrent_preallocate"] = "yes"
 	if !cfg.LibtorrentPreallocate() {
 		t.Fatal("explicit yes must enable preallocation")
+	}
+}
+
+func TestDiagnoseTorrentExtremeCases(t *testing.T) {
+	cases := []struct {
+		name string
+		in   models.TorrentView
+		want string
+	}{
+		{"complete", models.TorrentView{Progress: 100}, "seeding"},
+		{"no metadata", models.TorrentView{Progress: 42}, "metadata"},
+		{"dead swarm connected", models.TorrentView{Progress: 42, HasMetadata: true, NumPeers: 3, DownloadRate: 0}, "dead_swarm"},
+		{"dead swarm stalled", models.TorrentView{Progress: 42, HasMetadata: true, Stalled: true, NumSeeds: 0, NumComplete: 0}, "dead_swarm"},
+		{"seeders not connected", models.TorrentView{Progress: 42, HasMetadata: true, Stalled: true, NumSeeds: 0, NumComplete: 3}, "no_connected_seed"},
+		{"error", models.TorrentView{Progress: 42, HasMetadata: true, Error: "boom"}, "error"},
+		{"no peers", models.TorrentView{Progress: 42, HasMetadata: true, NumPeers: 0, NumConnections: 0}, "no_peers"},
+		{"downloading", models.TorrentView{Progress: 42, HasMetadata: true, NumPeers: 3, DownloadRate: 1000}, "downloading"},
+	}
+	for _, test := range cases {
+		code, reason, _ := DiagnoseTorrent(&test.in)
+		if code != test.want {
+			t.Errorf("%s: DiagnoseTorrent = %q, want %q", test.name, code, test.want)
+		}
+		if reason == "" {
+			t.Errorf("%s: empty reason", test.name)
+		}
+	}
+}
+
+func TestTorrentWhyEndpointUnknownHash(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/api/torrents/"+strings.Repeat("a", 40)+"/why")
+	if code != http.StatusNotFound {
+		t.Fatalf("unknown hash -> %d: %s", code, body)
 	}
 }
 

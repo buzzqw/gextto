@@ -243,6 +243,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /feed.xml", MagnetFeed)
 	handle(s, mux, "GET /api/feed.xml", MagnetFeed)
 	handle(s, mux, "GET /api/torrents/{hash}/peers", TorrentPeers)
+	handle(s, mux, "GET /api/torrents/{hash}/why", TorrentWhy)
 	handle(s, mux, "GET /api/torrents/{hash}/trackers", TorrentTrackers)
 	handle(s, mux, "POST /api/torrents/{hash}/trackers", SetTorrentTrackers)
 	handle(s, mux, "GET /api/torrents/{hash}/files", TorrentFiles)

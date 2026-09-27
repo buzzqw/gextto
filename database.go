@@ -3463,6 +3463,19 @@ func (d *Database) MarkTorrentCompleted(hash, path string, sizeBytes int64) erro
 	return err
 }
 
+// MarkTorrentCompletedUnarchived marks a torrent that finished but has no
+// registered release metadata (manually added or foreign). It is completed but
+// not archived, so `processed_path` is left untouched and the downloaded files
+// are never treated as a disposable archived copy.
+func (d *Database) MarkTorrentCompletedUnarchived(hash string) error {
+	now := nowSQLite()
+	_, err := d.db.Exec(
+		"UPDATE torrent_meta SET status='completed',completed_at=COALESCE(completed_at,?1),error='',updated_at=?1 WHERE hash=?2",
+		now, strings.ToLower(hash),
+	)
+	return err
+}
+
 // MarkReleaseCompleted marks a torrent as completed, updating every episode
 // covered by the release.
 func (d *Database) MarkReleaseCompleted(release *models.Release, path string, sizeBytes int64) error {

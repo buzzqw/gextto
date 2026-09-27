@@ -1216,7 +1216,7 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 		if totalDone < 0 {
 			totalDone = 0
 		}
-		result = append(result, models.TorrentView{
+		view := models.TorrentView{
 			Hash:              hash,
 			Name:              status.Name,
 			SavePath:          status.SavePath,
@@ -1257,9 +1257,42 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 			UploadMode:        status.UploadMode != 0,
 			ShareMode:         status.ShareMode != 0,
 			DistributedCopies: float64(status.DistributedCopies),
-		})
+		}
+		view.Diagnosis, _, _ = DiagnoseTorrent(&view)
+		result = append(result, view)
 	}
 	return result
+}
+
+// DiagnoseTorrent explains a torrent's situation as a short machine code plus a
+// human reason and hint. It makes extreme cases explicit (no seeders, a
+// leechers-only swarm, missing metadata, dead trackers) in the logs and in the
+// GET /api/torrents/{hash}/why endpoint.
+func DiagnoseTorrent(torrent *models.TorrentView) (code, reason, hint string) {
+	switch {
+	case torrent.Progress >= 100.0 || torrent.IsSeeding:
+		return "seeding", "Download completo.", "Il torrent sta condividendo secondo la policy di seed."
+	case !torrent.HasMetadata:
+		return "metadata", "In attesa dei metadati.", "Nessun peer ha ancora fornito l'elenco dei file: serve almeno un peer (anche leecher) o un web seed."
+	case strings.TrimSpace(torrent.Error) != "":
+		return "error", "libtorrent ha riportato un errore.", torrent.Error
+	// A stalled torrent is paused, so it has no peers: check the stall reasons
+	// before the "no peers" case.
+	case torrent.Stalled && torrent.NumSeeds == 0 && torrent.NumComplete <= 0:
+		return "dead_swarm", "Nessun seeder nello swarm.", "I peer connessi sono leecher: attendi un seeder o scegli un'altra release. Il torrent resta in retry senza essere rimosso."
+	case torrent.Stalled && torrent.NumSeeds == 0:
+		return "no_connected_seed", "Seeder presenti nello swarm ma non connessi.", "Controlla tracker, porta in ascolto e firewall/NAT."
+	case torrent.Stalled:
+		return "stalled", "Nessun progresso nonostante i peer.", "Verrà ritentato automaticamente."
+	case torrent.NumConnections == 0 && torrent.NumPeers == 0:
+		return "no_peers", "Nessun peer connesso.", "In attesa che tracker/DHT trovino peer."
+	case torrent.NumSeeds == 0 && torrent.NumComplete <= 0 && torrent.DownloadRate == 0:
+		// Peers are connected but nobody can serve the missing pieces: no
+		// connected seeder and no known swarm seeder.
+		return "dead_swarm", "Nessun seeder nello swarm.", "I peer connessi sono leecher: attendi un seeder o scegli un'altra release. Il torrent resta in retry senza essere rimosso."
+	default:
+		return "downloading", "Download in corso.", ""
+	}
 }
 
 // PollEvents drains the pending lifecycle events.

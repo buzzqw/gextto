@@ -6,7 +6,10 @@ package gextto
 //
 // Kept in a dedicated file so the rest of the web groups stay unchanged.
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // TorrentToggleInput is the body of the boolean per-torrent toggles.
 type TorrentToggleInput struct {
@@ -113,6 +116,28 @@ func TorrentDhtAnnounce(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// TorrentWhy implements GET /api/torrents/{hash}/why: it explains the current
+// situation of one torrent (why it is or is not downloading), which makes
+// extreme cases such as a swarm with no seeders explicit.
+func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
+	hash := pathParam(r, "hash")
+	for _, torrent := range s.torrents.List() {
+		if !strings.EqualFold(torrent.Hash, hash) {
+			continue
+		}
+		code, reason, hint := DiagnoseTorrent(&torrent)
+		jsonResponse(w, map[string]any{
+			"ok":      true,
+			"code":    code,
+			"reason":  reason,
+			"hint":    hint,
+			"torrent": torrent,
+		})
+		return
+	}
+	jsonError(w, http.StatusNotFound, "torrent not found")
 }
 
 // LibtorrentSessionStats implements GET /api/libtorrent/session-stats.

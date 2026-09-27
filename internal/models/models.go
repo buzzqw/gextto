@@ -413,6 +413,10 @@ type TorrentView struct {
 	UploadMode        bool    `json:"upload_mode"`
 	ShareMode         bool    `json:"share_mode"`
 	DistributedCopies float64 `json:"distributed_copies"`
+	// Diagnosis is a short machine code explaining the torrent's situation
+	// (downloading, metadata, dead_swarm, no_connected_seed, stalled, no_peers,
+	// seeding, error). See GET /api/torrents/{hash}/why for the human reason.
+	Diagnosis string `json:"diagnosis"`
 }
 
 // ProviderStatus is the escalating backoff state of one source.

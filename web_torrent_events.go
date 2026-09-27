@@ -568,12 +568,18 @@ func MonitorStalled(cfg *Config, torrents *LibtorrentClient, db *Database, notif
 			continue
 		}
 		if firstStall {
+			code, reason, hint := DiagnoseTorrent(&torrent)
 			logging.Warn("⏸️ DOWNLOAD STALLED — excluded from active slots; retaining for periodic retry",
 				"hash", torrent.Hash,
 				"name", torrent.Name,
 				"progress", torrent.Progress,
 				"num_peers", torrent.NumPeers,
 				"num_seeds", torrent.NumSeeds,
+				"swarm_seeds", torrent.NumComplete,
+				"swarm_peers", torrent.NumIncomplete,
+				"reason", code,
+				"detail", reason,
+				"hint", hint,
 				"stall_after_minutes", stallAfterMinutes,
 			)
 			entry.nextRetryAt = now.Add(retryTimeout)
@@ -1699,7 +1705,16 @@ func HandleTorrentEvent(cfg *Config, torrents *LibtorrentClient, db *Database, m
 		return false, err
 	}
 	if metadata == nil {
-		// Expected for manually added or foreign torrents: not an error.
+		// Expected for manually added or foreign torrents: not an error. Still
+		// mark the row completed so it does not stay "downloading" forever, but
+		// without an archive path (the files are not moved).
+		if event.Kind == "torrent_finished" {
+			if err := db.MarkTorrentCompletedUnarchived(event.Hash); err != nil {
+				logging.Debug("cannot mark foreign torrent completed",
+					"hash", event.Hash, "error", err.Error())
+			}
+			logging.Info(fmt.Sprintf("torrent completed (no release metadata, kept in place) — «%s»", event.Name))
+		}
 		logging.Debug("torrent alert has no registered release metadata",
 			"hash", event.Hash, "kind", event.Kind, "name", event.Name)
 		return false, nil
