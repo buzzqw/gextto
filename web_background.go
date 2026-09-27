@@ -1495,7 +1495,7 @@ func cycleWorker(state *AppState) {
 			// configured interval.
 			if cfg.Active {
 				if lastAt, ok := state.db.LastCycleAt(); ok {
-					due := lastAt.Add(time.Duration(refresh) * time.Second)
+					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
 						logging.Info("scheduled cycle deferred to respect the configured interval",
 							"remaining_secs", int64(remaining.Seconds()))
@@ -1548,7 +1548,7 @@ func cycleWorker(state *AppState) {
 					renameHours = parsed
 				}
 			}
-			if renameHours > 0 && time.Since(lastRenameCheck) >= time.Duration(renameHours)*time.Hour {
+			if renameHours > 0 && time.Since(lastRenameCheck) >= durationFromHours(renameHours) {
 				lastRenameCheck = time.Now()
 				if cfg.RenameEpisodes {
 					// The archive lives on a (possibly slow) NFS mount, so run the
@@ -1599,6 +1599,6 @@ func cycleWorker(state *AppState) {
 			stamp := time.Now()
 			lastInactiveLog = &stamp
 		}
-		time.Sleep(time.Duration(refresh) * time.Second)
+		time.Sleep(durationFromSeconds(refresh))
 	}
 }

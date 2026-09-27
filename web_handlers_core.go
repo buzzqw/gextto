@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +24,26 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+// durationFromSeconds converts a non-negative seconds count to a time.Duration,
+// saturating at the maximum representable duration instead of overflowing when
+// the source is a large uint64 (CodeQL go/incorrect-integer-conversion).
+func durationFromSeconds(seconds uint64) time.Duration {
+	const maxSeconds = uint64(math.MaxInt64) / uint64(time.Second)
+	if seconds > maxSeconds {
+		seconds = maxSeconds
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+// durationFromHours is durationFromSeconds expressed in hours.
+func durationFromHours(hours uint64) time.Duration {
+	const maxHours = uint64(math.MaxInt64) / uint64(time.Hour)
+	if hours > maxHours {
+		hours = maxHours
+	}
+	return time.Duration(hours) * time.Hour
+}
 
 // ---------------------------------------------------------------------------
 // Middlewares
@@ -496,7 +517,7 @@ func Status(w http.ResponseWriter, r *http.Request, s *AppState) {
 			start, ok = *snapshot.LastStartedAt, true
 		}
 		if ok {
-			nextCycleAt = start.Add(time.Duration(cfg.RefreshSecs) * time.Second).UTC().Format(time.RFC3339)
+			nextCycleAt = start.Add(durationFromSeconds(cfg.RefreshSecs)).UTC().Format(time.RFC3339)
 		}
 	}
 	jsonResponse(w, map[string]any{
