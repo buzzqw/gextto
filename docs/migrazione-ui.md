@@ -802,3 +802,32 @@ dipendere da Rust/WASM e senza perdere funzionalità:
 La UI classica Leptos resta su `/` e può essere rimossa quando si vuole, senza
 migrazione dati. Le azioni riusano le stesse API JSON, quindi il contratto
 pubblico e i client esterni non cambiano.
+
+
+---
+
+## 19. Cutover eseguito
+
+La nuova UI è ora la **root `/`**; la SPA classica Leptos resta su **`/legacy`** e
+serve solo come rete di sicurezza finché non si migrano gli ultimi dettagli.
+
+Completato dopo il §18:
+- **Flussi OAuth/PIN** Trakt e Simkl nella pagina Integrazioni (avvio, conferma
+  codice, refresh, revoca) più test/refresh dei media server.
+- **Configurazione**: scheda **"Altro"** con tutte le impostazioni persistite non
+  presenti nell'indice generato (306 campi totali) + editor **libreria/sorgenti**
+  (feed RSS, indexer, serie, film) via `/api/config/library`.
+- **Editor JSON generici** per filtri per sorgente, regole tag→cartella, event
+  hook e cartelle osservate.
+
+### Ultime voci ancora nella UI classica (`/legacy`)
+
+Per non perdere nulla, queste restano accessibili da `/legacy` e sono le uniche
+da migrare prima di rimuovere Rust:
+1. **Dettaglio serie** (elenco episodi con ignora/forza/riscarica/cerca) e
+   **dettaglio film**.
+2. **Gestione fumetti** (link, download, tag, weekly).
+3. **Editor traduzioni i18n**.
+
+La rimozione di Rust/WASM/cargo-leptos va fatta solo dopo aver migrato questi tre
+punti, altrimenti si perderebbero funzioni.
