@@ -7,6 +7,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/ui/app/src/lib.rs"
 [[ -f "$SRC" ]] || { echo "ui source not found: $SRC" >&2; exit 1; }
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
 
 python3 - "$SRC" <<'PY'
 import re, sys

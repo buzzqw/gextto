@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test vet fmt tidy package clean run
+.PHONY: all build fast test test-real vet fmt ui check-ui tidy package clean run
 
 all: build
 

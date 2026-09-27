@@ -6,14 +6,15 @@
 # binary from this checkout, writes ~/.config/systemd/user/gextto.service and
 # enables/restarts it.
 #
-# Overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_ACTIVE,
-# GEXTTO_DRY_RUN, GEXTTO_LOG, GEXTTO_BINARY.
+# Overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_LISTEN, GEXTTO_ENGINE_PORT,
+# GEXTTO_ACTIVE, GEXTTO_DRY_RUN, GEXTTO_LOG, GEXTTO_BINARY, GEXTTO_API_TOKEN.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BINARY="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
 DATA_DIR="${GEXTTO_DATA_DIR:-$HOME/gextto-data}"
 PORT="${GEXTTO_PORT:-5000}"
+LISTEN="${GEXTTO_LISTEN:-0.0.0.0:$PORT}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
 ACTIVE="${GEXTTO_ACTIVE:-1}"
 DRY_RUN="${GEXTTO_DRY_RUN:-0}"
@@ -33,8 +34,11 @@ if [[ -z "$API_TOKEN" && "${GEXTTO_GENERATE_TOKEN:-0}" == "1" ]]; then
 fi
 TOKEN_ENV=""
 [[ -n "$API_TOKEN" ]] && TOKEN_ENV="Environment=GEXTTO_API_TOKEN=$API_TOKEN"
-if [[ -z "$API_TOKEN" && "$PORT" != "127.0.0.1:"* ]]; then
-    log "warning: listening on $PORT without GEXTTO_API_TOKEN; the API is reachable without authentication"
+if [[ -z "$API_TOKEN" ]]; then
+    case "$LISTEN" in
+        127.0.0.1:* | localhost:* | "[::1]:"*) ;;
+        *) log "warning: listening on $LISTEN without GEXTTO_API_TOKEN; the API is reachable without authentication" ;;
+    esac
 fi
 
 mkdir -p "$UNIT_DIR" "$DATA_DIR"
@@ -50,7 +54,7 @@ Type=simple
 WorkingDirectory=$ROOT
 ExecStart=$BINARY
 Environment=GEXTTO_DATA_DIR=$DATA_DIR
-Environment=GEXTTO_LISTEN=0.0.0.0:$PORT
+Environment=GEXTTO_LISTEN=$LISTEN
 Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT
 Environment=GEXTTO_ACTIVE=$ACTIVE
 Environment=GEXTTO_DRY_RUN=$DRY_RUN

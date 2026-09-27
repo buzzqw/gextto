@@ -20,6 +20,8 @@ RELEASE="${GEXTTO_RELEASE:-continuous}"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+# Escape \, # and & so paths interpolate safely into the sed replacements below.
+sed_escape() { printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'; }
 
 install_packages() {
   [[ "${GEXTTO_SKIP_PACKAGES:-0}" == "1" ]] && { log "skipping system packages"; return; }
@@ -74,7 +76,10 @@ main() {
   trap 'rm -rf "$work"' EXIT
   download_payload "$work"
 
-  id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+  if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
+    local nologin; nologin="$(command -v nologin || echo /usr/sbin/nologin)"
+    useradd --system --home "$DATA_DIR" --shell "$nologin" "$SERVICE_USER"
+  fi
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
   install -d "$INSTALL_DIR"
   install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
@@ -85,14 +90,21 @@ main() {
   # default, so an unauthenticated API would be exposed to the whole network.
   # The token is stored in a root-readable EnvironmentFile, not in the world
   # readable unit.
+  # Reuse the token from a previous install so an upgrade does not invalidate
+  # existing clients; generate a fresh one only when none is available.
   API_TOKEN="${GEXTTO_API_TOKEN:-}"
+  if [[ -z "$API_TOKEN" && -r /etc/gextto/gextto.env ]]; then
+    API_TOKEN="$(sed -n 's/^GEXTTO_API_TOKEN=//p' /etc/gextto/gextto.env | head -n1)"
+  fi
   if [[ -z "$API_TOKEN" ]]; then
     if command -v openssl >/dev/null; then
       API_TOKEN="$(openssl rand -hex 24)"
     else
       API_TOKEN="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
     fi
+    log "generated a new API token"
   fi
+  [[ "$API_TOKEN" != *$'\n'* ]] || die "GEXTTO_API_TOKEN must not contain newlines"
   install -d -m 0750 /etc/gextto
   printf 'GEXTTO_API_TOKEN=%s\n' "$API_TOKEN" > /etc/gextto/gextto.env
   chmod 0640 /etc/gextto/gextto.env
@@ -103,13 +115,13 @@ main() {
   cp -a "$work/lib/." "$INSTALL_DIR/lib/"
 
   install -d /etc/systemd/system
-  sed -e "s#GEXTTO_DATA_DIR=.*#GEXTTO_DATA_DIR=$DATA_DIR#" \
-      -e "s#GEXTTO_LISTEN=.*#GEXTTO_LISTEN=0.0.0.0:$PORT#" \
-      -e "s#GEXTTO_ENGINE_LISTEN=.*#GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT#" \
-      -e "s#User=.*#User=$SERVICE_USER#" \
-      -e "s#Group=.*#Group=$SERVICE_USER#" \
-      -e "s#WorkingDirectory=.*#WorkingDirectory=$DATA_DIR#" \
-      -e "s#ExecStart=.*#ExecStart=$INSTALL_DIR/gexttod#" \
+  sed -e "s#GEXTTO_DATA_DIR=.*#GEXTTO_DATA_DIR=$(sed_escape "$DATA_DIR")#" \
+      -e "s#GEXTTO_LISTEN=.*#GEXTTO_LISTEN=0.0.0.0:$(sed_escape "$PORT")#" \
+      -e "s#GEXTTO_ENGINE_LISTEN=.*#GEXTTO_ENGINE_LISTEN=127.0.0.1:$(sed_escape "$ENGINE_PORT")#" \
+      -e "s#User=.*#User=$(sed_escape "$SERVICE_USER")#" \
+      -e "s#Group=.*#Group=$(sed_escape "$SERVICE_USER")#" \
+      -e "s#WorkingDirectory=.*#WorkingDirectory=$(sed_escape "$DATA_DIR")#" \
+      -e "s#ExecStart=.*#ExecStart=$(sed_escape "$INSTALL_DIR")/gexttod#" \
       "$(dirname "$0")/systemd/gextto.service" > /etc/systemd/system/gextto.service 2>/dev/null || \
   cat > /etc/systemd/system/gextto.service <<UNIT
 [Unit]

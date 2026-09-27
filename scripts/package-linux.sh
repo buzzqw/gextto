@@ -43,14 +43,18 @@ mkdir -p "$STAGE/lib"
 # Bundle the libtorrent shared libraries next to the executable: the daemon is
 # linked with an $ORIGIN/lib rpath, so it runs straight from the archive.
 LIBDIR="$(pkg-config --variable=libdir libtorrent-rasterbar 2>/dev/null || echo /usr/lib)"
-for lib in libtorrent-rasterbar.so; do
-  for candidate in "$LIBDIR/$lib" /usr/lib/$lib /usr/lib/x86_64-linux-gnu/$lib /usr/local/lib/$lib; do
-    if [[ -e "$candidate" ]]; then
-      cp -a "$candidate"* "$STAGE/lib/" 2>/dev/null || true
-      break
-    fi
-  done
+LIBTORRENT="libtorrent-rasterbar.so"
+BUNDLED_LIB=0
+for candidate in "$LIBDIR/$LIBTORRENT" "/usr/lib/$LIBTORRENT" "/usr/lib/x86_64-linux-gnu/$LIBTORRENT" "/usr/local/lib/$LIBTORRENT"; do
+  if [[ -e "$candidate" ]]; then
+    cp -a "$candidate"* "$STAGE/lib/" 2>/dev/null || true
+    BUNDLED_LIB=1
+    break
+  fi
 done
+if [[ "$BUNDLED_LIB" == "0" ]]; then
+  echo "warning: $LIBTORRENT not found; the archive only runs where libtorrent is installed system-wide" >&2
+fi
 
 cat > "$STAGE/run.sh" <<'RUN'
 #!/usr/bin/env bash
@@ -74,7 +78,7 @@ if [[ -n "${GEXTTO_UI_DIR:-}" && -d "${GEXTTO_UI_DIR}" ]]; then
   cp -a "${GEXTTO_UI_DIR}" "$STAGE/ui"
 fi
 
-tar -C "$STAGE" -czf "$OUTPUT" .
+tar --numeric-owner -C "$STAGE" -czf "$OUTPUT" .
 ( cd "$(dirname "$OUTPUT")" && sha256sum "$(basename "$OUTPUT")" > "$(basename "$OUTPUT").sha256" )
 
 echo "archive: $OUTPUT"

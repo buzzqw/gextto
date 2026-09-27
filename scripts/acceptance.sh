@@ -11,8 +11,13 @@ DATA="$(mktemp -d)"
 PORT="${GEXTTO_PORT:-5055}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8899}"
 LOG="$DATA/daemon.out"
+PID=""
 
-cleanup() { [[ -n "${PID:-}" ]] && kill "$PID" 2>/dev/null || true; rm -rf "$DATA"; }
+# shellcheck disable=SC2317  # cleanup is invoked indirectly by the EXIT trap
+cleanup() {
+  if [[ -n "$PID" ]]; then kill "$PID" 2>/dev/null || true; fi
+  rm -rf "$DATA"
+}
 trap cleanup EXIT
 
 GEXTTO_DATA_DIR="$DATA" GEXTTO_LISTEN="127.0.0.1:$PORT" \
@@ -20,10 +25,17 @@ GEXTTO_DATA_DIR="$DATA" GEXTTO_LISTEN="127.0.0.1:$PORT" \
   GEXTTO_DRY_RUN=1 GEXTTO_ACTIVE=0 "$BINARY" > "$LOG" 2>&1 &
 PID=$!
 
+started=0
 for _ in $(seq 1 40); do
-  if curl -sf -m 2 "http://127.0.0.1:$PORT/api/status" >/dev/null; then break; fi
+  if curl -sf -m 2 "http://127.0.0.1:$PORT/api/status" >/dev/null; then started=1; break; fi
   sleep 0.5
 done
+if [[ "$started" != "1" ]]; then
+  echo "FAIL: daemon did not become ready on port $PORT" >&2
+  echo "--- $LOG ---" >&2
+  cat "$LOG" >&2 || true
+  exit 1
+fi
 
 fail=0
 for path in /api/status /api/health /api/config /api/series /api/movies /api/torrents /api/comics; do
@@ -32,6 +44,6 @@ for path in /api/status /api/health /api/config /api/series /api/movies /api/tor
 done
 
 code="$(curl -s -o /dev/null -w '%{http_code}' -m 5 "http://127.0.0.1:$PORT/")"
-[[ "$code" == "200" ]] && echo "ok   /" || { echo "FAIL / -> $code"; fail=1; }
+if [[ "$code" == "200" ]]; then echo "ok   /"; else echo "FAIL / -> $code"; fail=1; fi
 
 exit "$fail"

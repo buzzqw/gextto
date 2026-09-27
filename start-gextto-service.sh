@@ -13,6 +13,9 @@ BIN="$ROOT/bin/gexttod"
 DATA_DIR="${GEXTTO_DATA_DIR:-$ROOT/data}"
 UNIT_SOURCE="$ROOT/systemd/$UNIT_NAME"
 
+# Escape \, # and & so paths interpolate safely into the sed replacements below.
+sed_escape() { printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'; }
+
 LEGACY_SERVICE="${GEXTTO_LEGACY_SERVICE:-}"
 if [[ -n "$LEGACY_SERVICE" ]] && systemctl is-active --quiet "$LEGACY_SERVICE"; then
     echo "The legacy service '$LEGACY_SERVICE' is active and uses the same ports. Stop it first: sudo systemctl stop $LEGACY_SERVICE" >&2
@@ -30,11 +33,11 @@ fi
 
 GENERATED_UNIT="$(mktemp)"
 sed \
-    -e "s#^User=.*#User=$(id -un)#" \
-    -e "s#^Group=.*#Group=$(id -gn)#" \
-    -e "s#^WorkingDirectory=.*#WorkingDirectory=$DATA_DIR#" \
-    -e "s#^ExecStart=.*#ExecStart=$BIN#" \
-    -e "s#^Environment=GEXTTO_DATA_DIR=.*#Environment=GEXTTO_DATA_DIR=$DATA_DIR#" \
+    -e "s#^User=.*#User=$(sed_escape "$(id -un)")#" \
+    -e "s#^Group=.*#Group=$(sed_escape "$(id -gn)")#" \
+    -e "s#^WorkingDirectory=.*#WorkingDirectory=$(sed_escape "$DATA_DIR")#" \
+    -e "s#^ExecStart=.*#ExecStart=$(sed_escape "$BIN")#" \
+    -e "s#^Environment=GEXTTO_DATA_DIR=.*#Environment=GEXTTO_DATA_DIR=$(sed_escape "$DATA_DIR")#" \
     "$UNIT_SOURCE" > "$GENERATED_UNIT"
 
 sudo install -d -o "$(id -un)" -g "$(id -gn)" "$DATA_DIR"

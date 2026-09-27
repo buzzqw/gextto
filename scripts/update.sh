@@ -41,6 +41,7 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
         --channel | --repo | --install-dir | --archive)
+            [[ $# -ge 2 ]] || { echo "$1 requires a value" >&2; exit 2; }
             MODE="release"
             UPDATE_ARGS+=("$1" "$2")
             shift
@@ -53,11 +54,12 @@ while [[ $# -gt 0 ]]; do
             RESTART=0
             ;;
         -h | --help)
-            sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+            # Print the leading comment block (after the shebang) verbatim.
+            awk 'NR==1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
             exit 0
             ;;
         *)
-            echo "opzione sconosciuta: $1" >&2
+            echo "unknown option: $1" >&2
             exit 2
             ;;
     esac
@@ -68,9 +70,9 @@ if [[ "$MODE" == "build" ]]; then
     echo "==> building from $ROOT"
     ( cd "$ROOT" && make build )
 else
-    [[ -x "$BINARY" ]] || { echo "gexttod non trovato in $BINARY" >&2; exit 1; }
+    [[ -x "$BINARY" ]] || { echo "gexttod not found at $BINARY" >&2; exit 1; }
     echo "==> installing published payload"
-    "$BINARY" --update --no-restart "${UPDATE_ARGS[@]}"
+    "$BINARY" --update --no-restart ${UPDATE_ARGS[@]+"${UPDATE_ARGS[@]}"}
 fi
 
 if [[ "$RESTART" == "1" ]]; then

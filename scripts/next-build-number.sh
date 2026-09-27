@@ -7,6 +7,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FILE="$ROOT/build_number"
 
+# Serialize concurrent builds so two releases never get the same number.
+if command -v flock >/dev/null; then
+  exec 9<>"$FILE"
+  flock 9
+fi
+
 current="$(tr -dc '0-9' < "$FILE" 2>/dev/null || true)"
 [[ -n "$current" ]] || current=1000
 next=$((current + 1))
