@@ -60,7 +60,10 @@ func durationFromHours(hours uint64) time.Duration {
 func ApiAuth(s *AppState, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if !strings.HasPrefix(path, "/api/") ||
+		protected := strings.HasPrefix(path, "/api/") ||
+			strings.HasPrefix(path, "/ui/partial/") ||
+			strings.HasPrefix(path, "/ui/action/")
+		if !protected ||
 			path == "/api/auth" || path == "/api/health" || path == "/api/status" {
 			next.ServeHTTP(w, r)
 			return
@@ -126,7 +129,7 @@ func (w *noCacheWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func UiNoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path != "/" && !strings.HasPrefix(path, "/pkg/") {
+		if path != "/" && !strings.HasPrefix(path, "/pkg/") && !strings.HasPrefix(path, "/ui") {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -274,6 +274,15 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
+	// New server-rendered UI (see uiweb.go). It is additive: the Leptos SPA
+	// keeps serving "/". The shell is public like the legacy one, while every
+	// data partial and action is guarded by ApiAuth (see web_handlers_core.go).
+	mux.Handle("GET /ui/static/", UiNoCache(http.StripPrefix("/ui/static/", http.FileServer(http.FS(uiwebStaticFS())))))
+	handle(s, mux, "GET /ui", UiPage)
+	handle(s, mux, "GET /ui/", UiPage)
+	handle(s, mux, "GET /ui/partial/dashboard", UiPartialDashboard)
+	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
+	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
 	// Static UI bundle: mirrors `.nest_service("/pkg", ServeDir::new(ui_pkg_dir()))`.
 	// `UiNoCache` is applied by hand because this route bypasses `handle`.
 	mux.Handle("/pkg/", UiNoCache(uiPackageHandler()))

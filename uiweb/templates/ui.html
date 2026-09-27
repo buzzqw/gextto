@@ -1,0 +1,134 @@
+{{define "shell"}}<!doctype html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Gextto · {{.Title}}</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/pkg/ui.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">G</span><span>Gextto</span></div>
+    <nav class="nav">
+      {{range .Groups}}
+      <div class="nav-group{{if .Open}} open{{end}}">
+        <div class="nav-group-label">{{.Label}}</div>
+        {{range .Items}}
+        <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}">{{.Label}}</a>
+        {{end}}
+      </div>
+      {{end}}
+    </nav>
+    <div class="sidebar-foot">
+      <a class="nav-item" href="/" title="Torna alla UI classica (Leptos)">UI classica</a>
+    </div>
+  </aside>
+  <div class="content">
+    <main id="ui-page" data-view="{{.Page}}">
+      <div class="loading">Caricamento…</div>
+    </main>
+  </div>
+</div>
+<script src="/ui/static/gextto-ui.js" defer></script>
+</body>
+</html>{{end}}
+
+{{define "unavailable"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head"><h3>{{.Title}}</h3></div>
+    <div class="panel-body">
+      <p class="muted">Questa sezione non è ancora disponibile nella nuova interfaccia.</p>
+      <p><a class="btn" href="/">Apri la UI classica</a></p>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "dashboard"}}
+<div class="view">
+  <div class="grid-4">
+    <div class="metric"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
+    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
+    <div class="metric"><span class="metric-sub">Torrent</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
+    <div class="metric"><span class="metric-sub">Velocità</span><strong>{{humanRate .DownloadRate}}</strong><small class="muted">↓ · {{humanRate .UploadRate}} ↑</small></div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3>Sessione</h3><small class="muted">{{.UpdatedAt}}</small></div>
+      <div class="panel-body">
+        <div class="row"><span>In scarico</span><strong>{{.Downloading}}</strong></div>
+        <div class="row"><span>In seed</span><strong>{{.Seeding}}</strong></div>
+        <div class="row"><span>In pausa</span><strong>{{.Paused}}</strong></div>
+        <div class="row"><span>In errore</span><strong>{{.Errors}}</strong></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Ultimo ciclo</h3></div>
+      <div class="panel-body">
+        <div class="row"><span>Release analizzate</span><strong>{{.CycleScraped}}</strong></div>
+        <div class="row"><span>Candidate</span><strong>{{.CycleCandidates}}</strong></div>
+        <div class="row"><span>Download avviati</span><strong>{{.CycleStarted}}</strong></div>
+        <div class="row"><span>Gap riempiti</span><strong>{{.CycleGaps}}</strong></div>
+        <div class="row"><span>Errori</span><strong>{{.CycleErrors}}</strong></div>
+      </div>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="btn" data-action="run-cycle" title="Avvia subito un ciclo di ricerca e download">Avvia ciclo ora</button>
+    <button class="btn" data-action="refresh" title="Ricarica i dati mostrati">Aggiorna</button>
+  </div>
+</div>
+{{end}}
+
+{{define "torrents"}}
+<div class="view">
+  <div class="panel">
+    <div class="panel-head">
+      <h3>Scarico</h3>
+      <small class="muted">{{.Count}} torrent · aggiornato {{.UpdatedAt}}</small>
+    </div>
+    <div class="panel-body">
+      {{if .Rows}}
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>Nome</th><th>Stato</th><th>Progresso</th><th>↓</th><th>↑</th><th>Peer / Seed</th><th>Ratio</th><th>Azioni</th>
+          </tr></thead>
+          <tbody>
+            {{range .Rows}}
+            <tr data-hash="{{.Hash}}">
+              <td class="truncate" title="{{.Name}}">{{.Name}}</td>
+              <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
+              <td style="min-width:140px">
+                <div class="progress" title="{{printf "%.1f" .Progress}}%"><span style="width:{{.ProgressPct}}%"></span></div>
+                <small class="muted">{{printf "%.1f" .Progress}}% · {{humanBytes .TotalDone}} / {{humanBytes .TotalSize}}</small>
+              </td>
+              <td class="numeric">{{humanRate .DownloadRate}}</td>
+              <td class="numeric">{{humanRate .UploadRate}}</td>
+              <td class="numeric">{{.NumPeers}} / {{.NumSeeds}}</td>
+              <td class="numeric">{{printf "%.2f" .Ratio}}</td>
+              <td class="row-actions">
+                {{if eq .Paused true}}
+                <button class="btn sm" data-action="resume" data-hash="{{.Hash}}" title="Riprendi il torrent">Riprendi</button>
+                {{else}}
+                <button class="btn sm" data-action="pause" data-hash="{{.Hash}}" title="Metti in pausa il torrent">Pausa</button>
+                {{end}}
+                <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Recheck</button>
+                <button class="btn sm danger" data-action="remove" data-hash="{{.Hash}}" title="Rimuovi il torrent (i file restano)">Rimuovi</button>
+              </td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+      {{else}}
+      <p class="muted">Nessun torrent nella sessione.</p>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
