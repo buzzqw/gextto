@@ -93,22 +93,21 @@ o disco locale).
 ### Installa su un server Linux
 
 L'installer ufficiale supporta Debian, Ubuntu, Fedora, openSUSE e Arch Linux.
-Installa le dipendenze di build (Go, toolchain C++ e header di sviluppo
-`libtorrent-rasterbar`), compila il demone Go dal checkout corrente (o dal
-sorgente GitHub quando eseguito da solo) e include la libreria libtorrent accanto
-all'eseguibile. Crea anche l'utente di servizio, il servizio systemd, le
-directory runtime e i database vuoti al primo avvio. Non importa dati legacy.
+A ogni push su `main`, GitHub Actions pubblica un artefatto Linux `continuous`
+testato. L'installer lo scarica, verifica il checksum SHA-256 e installa demone
+e libtorrent inclusa senza compilare sul server. Crea anche l'utente di servizio,
+il servizio systemd, le directory runtime e i database vuoti al primo avvio.
+Non importa dati legacy.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | bash
 ```
 
-L'installer compila sempre il sorgente corrente. Per portare un demone già
-installato a una release con tag usa il suo self-updater (vedi *Aggiornamento di
-Gextto*).
+L'installer usa per default l'ultimo artefatto `continuous`. Puoi scegliere un
+repository o una release diversi con `GEXTTO_REPO` e `GEXTTO_RELEASE`.
 
-Esegui lo stesso comando una seconda volta per cercare aggiornamenti e riavviare
-Gextto con la nuova versione, oppure lascia che sia il demone installato ad
+Esegui lo stesso comando una seconda volta per installare l'ultimo artefatto e
+riavviare Gextto, oppure lascia che sia il demone installato ad
 aggiornarsi (vedi *Aggiornamento di Gextto*). Database, configurazione, download,
 archivi e log restano in `/var/lib/gextto`; programma e UI sono in `/opt/gextto`.
 
@@ -116,7 +115,7 @@ Variabili opzionali:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | \
-  GEXTTO_DATA_DIR=/srv/gextto GEXTTO_PORT=5000 bash
+  GEXTTO_DATA_DIR=/srv/gextto GEXTTO_PORT=5000 GEXTTO_RELEASE=continuous bash
 ```
 
 Il servizio si chiama `gextto.service`:
@@ -138,7 +137,7 @@ all'aggiornamento.
 
 | Metodo | Comando | Note |
 |---|---|---|
-| Installer | riesegui il comando `install.sh` qui sopra | aggiorna anche dipendenze e unità systemd |
+| Installer | riesegui il comando `install.sh` qui sopra | installa l'ultimo artefatto e aggiorna l'unità systemd |
 | Demone | `sudo gexttod --update` | aggiorna solo il payload: `gexttod`, `lib/`, `run.sh` |
 
 Il programma installato vive in `/opt/gextto`:
@@ -201,9 +200,9 @@ serve alcuna libtorrent di sistema. L'archivio è prodotto da
 [`scripts/package-linux.sh`](scripts/package-linux.sh) ed è quello che
 `gexttod --update` installa. Richiede un Linux 64 bit recente (glibc, libstdc++,
 OpenSSL 3, zlib, libzstd); `ffprobe` è opzionale. Gli asset precompilati sono
-pubblicati **solo per x86_64**: su `aarch64` l'installer ripiega sulla
-compilazione da sorgente e `gexttod --update` segnala che non esiste un asset.
-Per un'installazione gestita come servizio usa l'installer descritto sopra.
+attualmente pubblicati **solo per x86_64**; su `aarch64` installer e
+`gexttod --update` segnalano che non esiste un asset. Per un'installazione
+gestita come servizio usa l'installer descritto sopra.
 
 ### Compila da un checkout (sviluppo)
 
@@ -419,7 +418,9 @@ schermata. Indice rapido:
 | `GEXTTO_ENGINE_LISTEN` | Canale interno del motore (default `127.0.0.1:8889`) |
 | `GEXTTO_UI_DIR` | Directory della UI web compilata (installazioni pacchettizzate) |
 | `GEXTTO_INSTALL_DIR` | Directory di installazione usata da `--update` |
-| `GEXTTO_REPO` | Repository GitHub usato da `--update` (default `buzzqw/gextto`) |
+| `GEXTTO_REPO` | Repository GitHub usato da installer e `--update` (default `buzzqw/gextto`) |
+| `GEXTTO_RELEASE` | Artefatto installer (`continuous` per default o un tag) |
+| `GEXTTO_ARCH` | Override dell'architettura dell'artefatto (`x86_64` o `aarch64`) |
 | `GEXTTO_ACTIVE` | `1` abilita i cicli di acquisizione |
 | `GEXTTO_DRY_RUN` | `1` disabilita i download reali |
 | `GEXTTO_API_TOKEN` | Token bearer opzionale per API/UI |
@@ -428,8 +429,6 @@ schermata. Indice rapido:
 | `GEXTTO_PORT` / `GEXTTO_ENGINE_PORT` | Installer: porta UI/API (default `5000`) e porta motore (default `8889`) |
 | `GEXTTO_USER` | Installer: utente di servizio da creare/usare (default `gextto`) |
 | `GEXTTO_SKIP_PACKAGES` | Installer: `1` salta l'installazione dei pacchetti di sistema |
-| `GEXTTO_SKIP_LIBTORRENT_BUILD` | Installer: accettato per compatibilità; libtorrent arriva dal pacchetto di sistema |
-| `GEXTTO_SOURCE_URL` | Installer (fallback): tarball sorgente da compilare |
 
 ## Affidabilità
 

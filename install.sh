@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# gextto installer: installs build dependencies, builds the Go daemon and the
-# embedded web UI, then installs it as a systemd service. Supports Debian,
-# Ubuntu, Fedora, openSUSE and Arch Linux.
+# gextto installer: downloads the latest published continuous payload and
+# installs it as a systemd service. Supports Debian, Ubuntu, Fedora, openSUSE
+# and Arch Linux.
 #
 #   curl -fsSL .../install.sh | bash
 #
 # Overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_USER,
-# GEXTTO_INSTALL_DIR, GEXTTO_PORT, GEXTTO_SKIP_PACKAGES,
-# GEXTTO_SKIP_LIBTORRENT_BUILD.
+# GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
+# GEXTTO_SKIP_PACKAGES.
 set -euo pipefail
 
 INSTALL_DIR="${GEXTTO_INSTALL_DIR:-/opt/gextto}"
@@ -15,7 +15,8 @@ DATA_DIR="${GEXTTO_DATA_DIR:-/var/lib/gextto}"
 PORT="${GEXTTO_PORT:-5000}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
 SERVICE_USER="${GEXTTO_USER:-gextto}"
-GO_MIN="1.26"
+REPO="${GEXTTO_REPO:-buzzqw/gextto}"
+RELEASE="${GEXTTO_RELEASE:-continuous}"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -24,68 +25,60 @@ install_packages() {
   [[ "${GEXTTO_SKIP_PACKAGES:-0}" == "1" ]] && { log "skipping system packages"; return; }
   if command -v apt-get >/dev/null; then
     apt-get update -y
-    apt-get install -y build-essential pkg-config libssl-dev zlib1g-dev libbz2-dev \
-      libboost-dev libboost-system-dev libboost-python-dev libtorrent-rasterbar-dev curl tar
+    apt-get install -y ca-certificates curl tar coreutils openssl libstdc++6 libssl3 zlib1g zstd
   elif command -v dnf >/dev/null; then
-    dnf install -y gcc-c++ make pkgconfig openssl-devel zlib-devel bzip2-devel \
-      boost-devel libtorrent-rasterbar-devel curl tar
+    dnf install -y ca-certificates curl tar coreutils openssl openssl-libs libstdc++ zlib zstd
   elif command -v zypper >/dev/null; then
-    zypper --non-interactive install gcc-c++ make pkg-config libopenssl-devel \
-      zlib-devel libbz2-devel boost-devel libtorrent-rasterbar-devel curl tar
+    zypper --non-interactive install ca-certificates curl tar coreutils openssl libstdc++6 zlib zstd
   elif command -v pacman >/dev/null; then
-    pacman -Sy --noconfirm base-devel pkgconf openssl zlib bzip2 boost libtorrent-rasterbar curl tar
+    pacman -Sy --noconfirm ca-certificates curl tar coreutils openssl zlib zstd
   else
-    log "unknown distribution: install a C++ toolchain, libtorrent-rasterbar and Go manually"
+    log "unknown distribution: install curl, tar, sha256sum, OpenSSL and the runtime C++/zlib libraries manually"
   fi
 }
 
-ensure_go() {
-  if command -v go >/dev/null; then
-    local have
-    have="$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
-    if [[ -n "$have" ]] && printf '%s\n%s\n' "$GO_MIN" "$have" | sort -V -C; then
-      log "Go $have found (>= $GO_MIN)"
-      return
-    fi
-    log "Go ${have:-unknown} is older than $GO_MIN; installing a newer toolchain"
-  else
-    log "installing Go"
-  fi
-  local arch; arch="$(uname -m)"
+download_payload() {
+  local work="$1"
+  local arch="${GEXTTO_ARCH:-$(uname -m)}"
   case "$arch" in
-    x86_64) arch=amd64 ;;
-    aarch64) arch=arm64 ;;
+    x86_64|amd64) arch=x86_64 ;;
+    aarch64|arm64) arch=aarch64 ;;
+    *) die "unsupported architecture: $arch (available assets: x86_64, aarch64)" ;;
   esac
-  local version="1.26.0"
-  curl -fsSL "https://go.dev/dl/go${version}.linux-${arch}.tar.gz" -o /tmp/go.tar.gz
-  rm -rf /usr/local/go
-  tar -C /usr/local -xzf /tmp/go.tar.gz
-  ln -sf /usr/local/go/bin/go /usr/local/bin/go
+
+  local asset="gextto-linux-${arch}.tar.gz"
+  local base
+  case "$RELEASE" in
+    latest|stable) base="https://github.com/${REPO}/releases/latest/download" ;;
+    *) base="https://github.com/${REPO}/releases/download/${RELEASE}" ;;
+  esac
+
+  log "downloading ${REPO} ${RELEASE} (${arch})"
+  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}" -o "$work/$asset" \
+    || die "unable to download ${asset} from ${base}"
+  curl -fL --retry 3 --retry-delay 2 "${base}/${asset}.sha256" -o "$work/${asset}.sha256" \
+    || die "unable to download checksum for ${asset}"
+  (cd "$work" && sha256sum -c "${asset}.sha256") \
+    || die "checksum verification failed for ${asset}"
+  tar -xzf "$work/$asset" -C "$work"
+  [[ -x "$work/gexttod" ]] || die "published payload does not contain an executable gexttod"
 }
 
 main() {
   [[ "$(id -u)" == "0" ]] || die "run as root"
   install_packages
-  ensure_go
 
-  log "building gextto"
+  log "installing published gextto payload"
   local work; work="$(mktemp -d)"
   trap 'rm -rf "$work"' EXIT
-  # Build from the current checkout when run in-tree, otherwise fetch the source.
-  if [[ -f "$(dirname "$0")/go.mod" ]]; then
-    cp -a "$(dirname "$0")" "$work/src"
-  else
-    curl -fsSL "${GEXTTO_SOURCE_URL:-https://github.com/buzzqw/gextto/archive/refs/heads/main.tar.gz}" \
-      | tar -xz -C "$work" --strip-components=1
-  fi
-  chmod +x "$work/src/scripts/build-daemon.sh" "$work/src/scripts/next-build-number.sh" 2>/dev/null || true
-  GEXTTO_BINARY="$work/gexttod" GEXTTO_BUMP_BUILD=1 "$work/src/scripts/build-daemon.sh"
+  download_payload "$work"
 
   id -u "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
   install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
   install -d "$INSTALL_DIR"
   install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
-  echo "source-main" > "$INSTALL_DIR/VERSION"
+  install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
+  install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
 
   # Generate an API token on a fresh install: the daemon binds 0.0.0.0 by
   # default, so an unauthenticated API would be exposed to the whole network.
@@ -104,12 +97,9 @@ main() {
   chmod 0640 /etc/gextto/gextto.env
   chown "root:$SERVICE_USER" /etc/gextto/gextto.env 2>/dev/null || true
 
-  # Bundle libtorrent next to the binary ($ORIGIN/lib rpath).
+  # Install the bundled libtorrent next to the binary ($ORIGIN/lib rpath).
   install -d "$INSTALL_DIR/lib"
-  local libdir; libdir="$(pkg-config --variable=libdir libtorrent-rasterbar 2>/dev/null || echo /usr/lib)"
-  for candidate in "$libdir"/libtorrent-rasterbar.so* /usr/lib/libtorrent-rasterbar.so* /usr/lib/x86_64-linux-gnu/libtorrent-rasterbar.so*; do
-    [[ -e "$candidate" ]] && cp -a "$candidate" "$INSTALL_DIR/lib/" && break
-  done
+  cp -a "$work/lib/." "$INSTALL_DIR/lib/"
 
   install -d /etc/systemd/system
   sed -e "s#GEXTTO_DATA_DIR=.*#GEXTTO_DATA_DIR=$DATA_DIR#" \
