@@ -721,3 +721,76 @@ func TestTitlesDefaultToAllowingUpgrades(t *testing.T) {
 		t.Fatal("upgrades_allowed should be false when disabled")
 	}
 }
+
+// TestConfigUnmarshalKeepsDefaultsForAbsentKeys locks in the fix for a partial
+// gextto.json: unmarshalling `{}` (or a file with only some keys) must not wipe
+// data_dir, listen and the other DefaultConfig values.
+func TestConfigUnmarshalKeepsDefaultsForAbsentKeys(t *testing.T) {
+	cfg := DefaultConfig()
+	if err := json.Unmarshal([]byte("{}"), &cfg); err != nil {
+		t.Fatalf("unmarshal empty object: %v", err)
+	}
+	if cfg.DataDir == "" {
+		t.Fatal("data_dir default was wiped by an empty JSON")
+	}
+	if cfg.Listen == "" {
+		t.Fatal("listen default was wiped by an empty JSON")
+	}
+	if cfg.EngineListen == "" {
+		t.Fatal("engine_listen default was wiped by an empty JSON")
+	}
+	if cfg.RefreshSecs == 0 {
+		t.Fatal("refresh_secs default was wiped by an empty JSON")
+	}
+	if cfg.LibtorrentTempDir == nil {
+		t.Fatal("libtorrent temp dir default was wiped by an empty JSON")
+	}
+
+	// A single key only overrides that key.
+	cfg2 := DefaultConfig()
+	if err := json.Unmarshal([]byte(`{"data_dir":"/srv/gextto","refresh_secs":42}`), &cfg2); err != nil {
+		t.Fatalf("unmarshal partial: %v", err)
+	}
+	if cfg2.DataDir != "/srv/gextto" {
+		t.Fatalf("data_dir = %q, want /srv/gextto", cfg2.DataDir)
+	}
+	if cfg2.RefreshSecs != 42 {
+		t.Fatalf("refresh_secs = %d, want 42", cfg2.RefreshSecs)
+	}
+	if cfg2.Listen == "" {
+		t.Fatal("listen default was wiped by a partial JSON")
+	}
+}
+
+// TestLoadConfigPartialFileKeepsDefaults exercises the real loader: a
+// gextto.json containing only `{}` must behave like the defaults.
+func TestLoadConfigPartialFileKeepsDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "gextto.json")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.DataDir == "" || cfg.Listen == "" || cfg.EngineListen == "" || cfg.RefreshSecs == 0 {
+		t.Fatalf("partial config lost defaults: data_dir=%q listen=%q engine_listen=%q refresh=%d",
+			cfg.DataDir, cfg.Listen, cfg.EngineListen, cfg.RefreshSecs)
+	}
+
+	customDir := filepath.Join(dir, "custom")
+	if err := os.WriteFile(path, []byte(`{"data_dir":"`+customDir+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = LoadConfig(path)
+	if err != nil {
+		t.Fatalf("LoadConfig custom: %v", err)
+	}
+	if cfg.DataDir != customDir {
+		t.Fatalf("data_dir = %q, want %q", cfg.DataDir, customDir)
+	}
+	if cfg.Listen == "" {
+		t.Fatal("listen default was wiped by a partial JSON file")
+	}
+}

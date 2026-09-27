@@ -827,7 +827,10 @@ func DefaultConfig() Config {
 // fall back to their defaults when the key is absent.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	type configAlias Config
-	var decoded configAlias
+	// Start from the current value (the caller pre-fills DefaultConfig) so a
+	// partial JSON file only overrides the keys it actually contains instead of
+	// zeroing data_dir/listen/refresh_secs and the other defaults.
+	decoded := configAlias(*c)
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		return err
 	}
@@ -2223,7 +2226,10 @@ func (c *Config) FromEnv() {
 // LoadConfig reads the JSON configuration file, overlays the settings stored in
 // `gextto_config.db` and finally applies the environment overrides.
 func LoadConfig(path string) (Config, error) {
-	var cfg Config
+	// Start from the defaults so a partial gextto.json (or a missing one) never
+	// leaves data_dir/listen/refresh_secs empty: the JSON only overrides the
+	// keys it actually contains.
+	cfg := DefaultConfig()
 	if info, err := os.Stat(path); err == nil {
 		if info.IsDir() {
 			return Config{}, fmt.Errorf("read %s: is a directory", path)
@@ -2235,8 +2241,6 @@ func LoadConfig(path string) (Config, error) {
 		if err := json.Unmarshal(data, &cfg); err != nil {
 			return Config{}, fmt.Errorf("parse %s: %w", path, err)
 		}
-	} else {
-		cfg = DefaultConfig()
 	}
 	roots := []string{filepath.Dir(path), cfg.DataDir, cfg.ImportSourceDir}
 	if _, err := MigrateLegacyFiles(cfg.DataDir, roots); err != nil {

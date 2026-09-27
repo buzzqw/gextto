@@ -144,7 +144,12 @@ func RunCycleDomain(
 	// season). This also removes stale conflicting rows from the archive. The
 	// blocklist does not change during candidate selection, so keep one
 	// snapshot for all feed/archive/pending lookups.
-	blocklistedHashes, _ := db.BlocklistedHashes()
+	// Fail closed: if the blocklist cannot be read we must not start downloads,
+	// or a DB error would silently disable the blocklist.
+	blocklistedHashes, err := db.BlocklistedHashes()
+	if err != nil {
+		return nil, fmt.Errorf("load blocklist: %w", err)
+	}
 	blockedHashes := map[string]struct{}{}
 	for i := range releases {
 		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {

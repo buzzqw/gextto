@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -316,4 +317,108 @@ func backupZipFiles(t *testing.T, dir string) map[string]struct{} {
 		files[entry.Name()] = struct{}{}
 	}
 	return files
+}
+
+// TestBackupSnapshotsInSameSecondGetDistinctNames covers the collision bug: two
+// backups started in the same wall-clock second must not write the same file.
+func TestBackupSnapshotsInSameSecondGetDistinctNames(t *testing.T) {
+	dataDir := t.TempDir()
+	backupRoot := filepath.Join(t.TempDir(), "backups")
+	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
+
+	first, err := CreateSnapshot(dataDir, backupRoot, 10)
+	if err != nil {
+		t.Fatalf("first snapshot: %v", err)
+	}
+	second, err := CreateSnapshot(dataDir, backupRoot, 10)
+	if err != nil {
+		t.Fatalf("second snapshot: %v", err)
+	}
+	if first == second {
+		t.Fatalf("two snapshots used the same name %q", first)
+	}
+	// Both archives must be present and valid.
+	if _, err := os.Stat(first); err != nil {
+		t.Fatalf("first archive missing: %v", err)
+	}
+	if _, err := os.Stat(second); err != nil {
+		t.Fatalf("second archive missing: %v", err)
+	}
+	readBackupZip(t, first)
+	readBackupZip(t, second)
+
+	// No published .tmp leftovers.
+	entries, err := os.ReadDir(backupRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".tmp") {
+			t.Fatalf("leftover temporary archive: %s", entry.Name())
+		}
+	}
+}
+
+// TestBackupLeavesNoTempDirectoryOnSuccess ensures the scratch folder is always
+// removed (it used to be removed only on the happy path, at the very end).
+func TestBackupLeavesNoTempDirectoryOnSuccess(t *testing.T) {
+	dataDir := t.TempDir()
+	backupRoot := filepath.Join(t.TempDir(), "backups")
+	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
+	if _, err := CreateSnapshot(dataDir, backupRoot, 5); err != nil {
+		t.Fatalf("CreateSnapshot: %v", err)
+	}
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".gextto-backup-") {
+			t.Fatalf("leftover scratch folder: %s", entry.Name())
+		}
+	}
+}
+
+// TestBackupConcurrentSnapshotsAreSafe runs two snapshots at once: both must
+// publish only complete archives and leave no scratch folder behind.
+func TestBackupConcurrentSnapshotsAreSafe(t *testing.T) {
+	dataDir := t.TempDir()
+	backupRoot := filepath.Join(t.TempDir(), "backups")
+	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
+
+	var wg sync.WaitGroup
+	results := make([]string, 2)
+	errs := make([]error, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = CreateSnapshot(dataDir, backupRoot, 10)
+		}(i)
+	}
+	wg.Wait()
+
+	successes := 0
+	for i := 0; i < 2; i++ {
+		if errs[i] == nil {
+			successes++
+			readBackupZip(t, results[i])
+			continue
+		}
+		if !strings.Contains(errs[i].Error(), "in corso") {
+			t.Fatalf("unexpected concurrent error: %v", errs[i])
+		}
+	}
+	if successes == 0 {
+		t.Fatal("no snapshot succeeded")
+	}
+	entries, err := os.ReadDir(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".gextto-backup-") {
+			t.Fatalf("leftover scratch folder: %s", entry.Name())
+		}
+	}
 }

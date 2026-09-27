@@ -10,12 +10,17 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jlaffaye/ftp"
 
 	"github.com/buzzqw/gextto/internal/logging"
 )
+
+// backupMu serializes in-process backups so a manual and a scheduled backup
+// starting together cannot write the same archive.
+var backupMu sync.Mutex
 
 // databases are the SQLite databases that get a transaction-consistent
 // snapshot.
@@ -74,6 +79,16 @@ func snapshotDatabase(source, destination string) error {
 	return nil
 }
 
+// verifyZipArchive opens the archive and reads its central directory, so a
+// truncated or corrupt file is rejected before it is published.
+func verifyZipArchive(path string) error {
+	reader, err := zip.OpenReader(path)
+	if err != nil {
+		return err
+	}
+	return reader.Close()
+}
+
 // addZipFile adds a file to the zip with standard deflate compression.
 func addZipFile(writer *zip.Writer, name, path string) error {
 	source, err := os.Open(path)
@@ -93,12 +108,27 @@ func addZipFile(writer *zip.Writer, name, path string) error {
 // transaction-consistent snapshots of the live databases, then prunes the
 // existing archives keeping the newest `retain` ones.
 func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
+	// Serialize in-process backups: a manual and a scheduled backup starting
+	// together must not write the same archive.
+	if !backupMu.TryLock() {
+		return "", fmt.Errorf("backup già in corso")
+	}
+	defer backupMu.Unlock()
+
 	if err := os.MkdirAll(backupRoot, 0o755); err != nil {
 		return "", err
 	}
-	// Readable, chronologically sortable name (server local time).
+	// Readable, chronologically sortable name (server local time) plus a short
+	// random suffix so two backups in the same second never collide.
 	stamp := time.Now().Format("2006-01-02_15-04-05")
-	destination := filepath.Join(backupRoot, "gextto-backup-"+stamp+".zip")
+	suffix := strings.ReplaceAll(backupUUID(), "-", "")
+	if len(suffix) > 8 {
+		suffix = suffix[:8]
+	}
+	destination := filepath.Join(backupRoot, "gextto-backup-"+stamp+"-"+suffix+".zip")
+	// Write to a sibling temporary file on the same filesystem, then rename:
+	// the published archive is always complete or absent, never truncated.
+	tmpZip := destination + ".tmp"
 
 	// Unique temporary folder so two backups starting together (e.g. a manual
 	// and a scheduled one) do not collide.
@@ -109,6 +139,8 @@ func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
 	if err := os.MkdirAll(temp, 0o755); err != nil {
 		return "", err
 	}
+	// Always clean the scratch folder, including on every early return.
+	defer func() { _ = os.RemoveAll(temp) }()
 	type dbSnapshot struct {
 		name string
 		path string
@@ -128,35 +160,49 @@ func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
 	}
 
 	// 2) Zip the non-DB files plus the consistent DB snapshots.
-	file, err := os.Create(destination)
+	file, err := os.Create(tmpZip)
 	if err != nil {
 		return "", err
 	}
 	archive := zip.NewWriter(file)
-	if err := addDirectory(archive, dataDir, dataDir, backupRoot, temp); err != nil {
+	fail := func(err error) (string, error) {
 		_ = archive.Close()
 		_ = file.Close()
+		_ = os.Remove(tmpZip)
 		return "", err
+	}
+	if err := addDirectory(archive, dataDir, dataDir, backupRoot, temp); err != nil {
+		return fail(err)
 	}
 	for _, snapshot := range snapshots {
 		if err := addZipFile(archive, snapshot.name, snapshot.path); err != nil {
-			_ = archive.Close()
-			_ = file.Close()
-			return "", err
+			return fail(err)
 		}
 	}
 	if err := archive.Close(); err != nil {
 		_ = file.Close()
+		_ = os.Remove(tmpZip)
 		return "", err
 	}
 	if err := file.Sync(); err != nil {
 		_ = file.Close()
+		_ = os.Remove(tmpZip)
 		return "", err
 	}
 	if err := file.Close(); err != nil {
+		_ = os.Remove(tmpZip)
 		return "", err
 	}
-	_ = os.RemoveAll(temp)
+
+	// Verify the archive is readable before publishing it.
+	if err := verifyZipArchive(tmpZip); err != nil {
+		_ = os.Remove(tmpZip)
+		return "", fmt.Errorf("verifica archivio fallita: %w", err)
+	}
+	if err := os.Rename(tmpZip, destination); err != nil {
+		_ = os.Remove(tmpZip)
+		return "", err
+	}
 
 	entries, err := os.ReadDir(backupRoot)
 	if err != nil {

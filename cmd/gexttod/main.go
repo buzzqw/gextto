@@ -73,7 +73,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if err := cfg.PrepareDirs(); err != nil {
 		return err
 	}
-	_ = gextto.CleanupMovieRequirements(cfg.DataDir)
+	if err := gextto.CleanupMovieRequirements(cfg.DataDir); err != nil {
+		logging.Warn("movie requirements cleanup failed", "error", err)
+	}
 
 	cache.Init(cfg.DataDir)
 
@@ -118,10 +120,10 @@ func runDaemon(dryRun bool, configOption *string) error {
 
 	// Reclaim an oversized WAL and verify integrity, as the daemon does at
 	// startup.
-	_ = db.Checkpoint()
-	_ = archive.Checkpoint()
-	_ = comics.Checkpoint()
-	_ = i18n.Checkpoint()
+	logCheckpoint("series", db.Checkpoint)
+	logCheckpoint("archive", archive.Checkpoint)
+	logCheckpoint("comics", comics.Checkpoint)
+	logCheckpoint("config", i18n.Checkpoint)
 
 	for _, check := range []struct {
 		name string
@@ -164,15 +166,24 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if shutdownErr := torrents.Shutdown(&cfg); shutdownErr != nil {
 		logging.Error("libtorrent shutdown did not save all fastresume data", "error", shutdownErr)
 	}
-	_ = db.Checkpoint()
-	_ = archive.Checkpoint()
-	_ = comics.Checkpoint()
-	_ = i18n.Checkpoint()
+	logCheckpoint("series", db.Checkpoint)
+	logCheckpoint("archive", archive.Checkpoint)
+	logCheckpoint("comics", comics.Checkpoint)
+	logCheckpoint("config", i18n.Checkpoint)
 	if serveErr != nil {
 		logging.Error("web server stopped with error", "error", serveErr)
 	}
 	closeLog()
 	return serveErr
+}
+
+// logCheckpoint runs a SQLite checkpoint and logs a warning on failure instead
+// of silently ignoring it: a failed checkpoint (disk full, read-only database)
+// is worth surfacing but must not prevent a clean shutdown.
+func logCheckpoint(database string, checkpoint func() error) {
+	if err := checkpoint(); err != nil {
+		logging.Warn("SQLite checkpoint failed", "database", database, "error", err)
+	}
 }
 
 func joinRows(rows []string) string {
