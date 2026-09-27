@@ -2,3 +2,18 @@ Copyright (c) 2026 buzzqw and Gextto contributors.
 
 Gextto is licensed under the European Union Public Licence v. 1.2.
 See LICENSE for the complete licence text.
+
+Third-party components
+----------------------
+Gextto depends on third-party libraries under their own licences. Two are worth
+calling out explicitly:
+
+- libtorrent (BSD-3-Clause): the default embedded BitTorrent engine, linked
+  through CGo (native/libtorrent_bridge.cpp).
+- github.com/anacrolix/torrent (Mozilla Public License 2.0): the optional native
+  Go torrent backend. It is only compiled when the daemon is built with the
+  `anacrolix` build tag (see docs/aggiunta-anacrolix.md, `make build-anacrolix`).
+  The default build does not include it.
+
+The full licence texts of the vendored/module dependencies are available from
+the Go module cache and the upstream projects.

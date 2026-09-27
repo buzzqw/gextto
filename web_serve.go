@@ -39,7 +39,7 @@ func (l nodelayListener) Accept() (net.Conn, error) {
 // . They are implemented by the handler-group files.
 func startBackgroundWorkers(state *AppState) {
 	safeGo("torrent_event_worker", func() {
-		torrentEventWorker(state.config_path, state.cfg, state.activeEngine(), state.db, state.comics, state.torrent_events)
+		torrentEventWorker(state.config_path, state.cfg, state, state.db, state.comics, state.torrent_events)
 	})
 	safeGo("cycle_worker", func() { cycleWorker(state) })
 	safeGo("backup_worker", func() { backupWorker(state) })

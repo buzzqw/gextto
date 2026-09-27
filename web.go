@@ -488,6 +488,9 @@ type AppState struct {
 	torrents    *LibtorrentClient
 	// torrent_engine is the active transfer engine. When nil the daemon uses
 	// the embedded libtorrent adapter (see activeEngine in torrent_engine.go).
+	// engine_mu guards it because the backend can be switched at runtime while
+	// the background worker reads it.
+	engine_mu       sync.RWMutex
 	torrent_engine  TorrentEngine
 	torrent_events  *EventLog
 	notifier        *Notifier

@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-real vet fmt ui check-ui tidy package clean run
+.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt ui check-ui tidy package clean run
 
 all: build
 
@@ -18,6 +18,14 @@ test:
 
 test-real:
 	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
+
+# Optional native-Go backend (see docs/aggiunta-anacrolix.md). The default
+# build and `make test` do not compile it; MPL-2.0 review gate still applies.
+test-anacrolix:
+	CGO_ENABLED=1 go test -tags anacrolix -timeout 600s ./...
+
+build-anacrolix:
+	GEXTTO_TAGS=anacrolix GEXTTO_BUMP_BUILD=1 scripts/build-daemon.sh
 
 vet:
 	CGO_ENABLED=1 go vet ./...

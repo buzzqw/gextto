@@ -209,8 +209,14 @@ func CapabilityParity() map[string]map[string]string {
 // alternative engine was installed at startup (or after a settings change), the
 // embedded libtorrent adapter is returned, preserving the historic behavior.
 func (s *AppState) activeEngine() TorrentEngine {
-	if s != nil && s.torrent_engine != nil {
-		return s.torrent_engine
+	if s == nil {
+		return embeddedEngine{nil}
+	}
+	s.engine_mu.RLock()
+	engine := s.torrent_engine
+	s.engine_mu.RUnlock()
+	if engine != nil {
+		return engine
 	}
 	return embeddedEngine{s.torrents}
 }
@@ -220,7 +226,11 @@ func (s *AppState) activeSession() TorrentSession { return s.activeEngine() }
 
 // setActiveEngine installs an alternative engine. A nil engine restores the
 // embedded libtorrent backend.
-func (s *AppState) setActiveEngine(engine TorrentEngine) { s.torrent_engine = engine }
+func (s *AppState) setActiveEngine(engine TorrentEngine) {
+	s.engine_mu.Lock()
+	s.torrent_engine = engine
+	s.engine_mu.Unlock()
+}
 
 // ---------------------------------------------------------------------------
 // path mapping (Gextto paths <-> backend paths)

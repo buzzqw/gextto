@@ -938,3 +938,93 @@ Gextto            = proprietario di stato, automazioni e UI
 3. Storage file + completion store persistente con test di crash; nessuna cache RAM custom all'inizio.
 4. Solo dopo parità su add/list/pause/remove/move/recheck, introdurre le funzioni nuove (diagnostica pezzi, download selettivo).
 5. Migrazione per ultima, con manifest e rollback, come per qBittorrent.
+
+---
+
+## 22. Implementazione 2026-09 — backend nativo dietro build tag
+
+### 22.1 Cosa è stato implementato
+
+`AnacrolixBackend` esiste ed è selezionabile, ma **solo nei build compilati con
+il tag `anacrolix`**: il build predefinito e la CI non compilano la dipendenza,
+quindi il percorso libtorrent resta invariato.
+
+| Componente | File | Ruolo |
+|---|---|---|
+| Backend | `anacrolix_engine.go` (`//go:build anacrolix`) | client unico, storage file, completion store persistente, manifest, eventi |
+| Selezione | `torrent_engine_select.go` | `newAnacrolixEngine` registrato via `init()`; errore esplicito senza tag |
+| Build | `Makefile`, `scripts/build-daemon.sh` | `make build-anacrolix`, `make test-anacrolix`, `GEXTTO_TAGS` |
+| Licenza | `NOTICE` | anacrolix/torrent = MPL-2.0, solo nel build opzionale |
+
+Cosa funziona realmente (verificato da test dietro tag):
+- un `*torrent.Client` per processo, listener/DHT/PEX/uTP mappati da
+  `cfg.Libtorrent`, storage file per-torrent con `storage.NewFileWithCompletion`;
+- **completion store persistente** (`storage.NewDefaultPieceCompletionForDir`,
+  SQLite/bolt a seconda del build) e warning se non persistente;
+- add magnet e `.torrent` con path per-torrent (senza sovrascrivere
+  infohash/metainfo dello spec);
+- **resume dopo riavvio** tramite manifest JSON + copie `.torrent` possedute da
+  Gextto; i pezzi verificati vengono riletti dal completion store;
+- eventi normalizzati (`metadata_received`, `torrent_finished`, `torrent_error`)
+  per diff di snapshot; pause/resume idempotenti via
+  `Allow/DisallowDataDownload/Upload`; recheck via `VerifyData`; remove con o
+  senza file.
+
+### 22.2 Capability dichiarate (nessun falso successo)
+
+Rispetto alla tabella ottimistica del piano, queste operazioni **restituiscono
+`ErrCapabilityUnavailable`** perché anacrolix non le applica a runtime come
+libtorrent:
+
+- `MoveStorage` (lo storage base è legato all'aggiunta del torrent: farlo
+  mentre i file sono aperti rischia la corruzione; è una fase dedicata);
+- limiti per-torrent (`SetLimits`) e limiti globali a runtime;
+- flag sequenziale e first/last piece;
+- pin e upload mode.
+
+La capability matrix in `torrent_engine.go` riflette questa realtà
+(`move: none`, `limits: partial`, `sequential/first_last: none`,
+`ip_filter: none`) ed è verificata dai test.
+
+### 22.3 Valutazione pro/contro aggiornata
+
+**Pro confermati**
+- Nessun CGo aggiuntivo, nessun daemon esterno: deployment a singolo binario
+  quando il tag è attivo.
+- Il completion store persistente rende il resume verificabile e testabile in
+  locale senza rete.
+- La narrow interface `TorrentSession` ha reso l'automazione riusabile: lo
+  stesso `MonitorStalled`/`EnforceSeedPolicy` gira sopra anacrolix.
+- Isolamento totale dietro build tag: `go test ./...` e il binario ufficiale non
+  pagano né dipendenze né rischio.
+
+**Contro confermati / nuovi**
+- La dipendenza è molto pesante (albero ampio, `go.mod`/`go.sum` estesi) e ha
+  portato l'upgrade di `golang.org/x/net` e `golang.org/x/crypto`: va rivisto in
+  CI come ogni bump.
+- MPL-2.0: obblighi di distribuzione se il binario con tag viene distribuito
+  (il tag è opt-in, il default no).
+- Storage/resume diversi dal fastresume libtorrent: il completion store è codice
+  critico; il move resta un rischio alto, per questo è esplicitamente assente.
+- Le feature "nuove" del piano (piece diagnostics esposti in UI, download
+  selettivo, verifica programmata, streaming) **non** sono ancora esposte come
+  endpoint: la libreria le supporta, Gextto no.
+
+### 22.4 Gap residui e prossimi passi
+
+1. **Storage move** con macchina a stati (quiesce → copy/rename → re-add →
+   validate), come da piano.
+2. **Diagnostica pezzi** (`/pieces`, `/pieces/runs`) e **download selettivo**
+   con profili film/serie/pack/fumetti.
+3. **IP blocklist**, bootstrap DHT e proxy non mappati.
+4. **Migrazione** embedded ↔ anacrolix, per ultima, con manifest e rollback.
+5. Esposizione della scelta backend in UI (oggi impostazioni/API).
+
+### 22.5 Test
+
+`anacrolix_engine_test.go` (tag `anacrolix`):
+- conversioni priorità; capability non supportate;
+- verifica dati locali fino al 100%, pause/resume, remove con conservazione file;
+- **restart**: il torrent viene ricostruito dal manifest e resta completo senza
+  riscaricare;
+- diff eventi metadata/completamento.

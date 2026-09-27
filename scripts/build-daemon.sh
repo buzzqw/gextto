@@ -5,6 +5,7 @@
 #   GEXTTO_BUMP_BUILD=1 scripts/...      # increment the build number first
 #   GEXTTO_BUILD=1234 scripts/...        # force a specific number (CI)
 #   GEXTTO_BINARY=/path/gexttod scripts/...
+#   GEXTTO_TAGS=anacrolix scripts/...    # optional build tags (anacrolix backend)
 #
 # The build number is what `gexttod --version` prints and identifies the exact
 # binary.
@@ -28,7 +29,9 @@ fi
 mkdir -p "$(dirname "$OUT")"
 (
     cd "$ROOT"
-    CGO_ENABLED=1 go build -trimpath \
+    TAGS=()
+    [[ -n "${GEXTTO_TAGS:-}" ]] && TAGS=(-tags "$GEXTTO_TAGS")
+    CGO_ENABLED=1 go build -trimpath "${TAGS[@]}" \
         -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
         -o "$OUT" ./cmd/gexttod
 )

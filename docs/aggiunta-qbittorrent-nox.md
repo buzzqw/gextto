@@ -985,3 +985,96 @@ Il primo passo del piano è stato realizzato **senza toccare il percorso di tras
 3. Coda/stalled/retry in Gextto sopra `sync/maindata` (polling come verità, script esterni solo come acceleratori).
 4. Completamento + post-processing una sola volta, con recupero all'avvio.
 5. Solo per ultima, la **migrazione** tra backend (manifest + macchina a stati), che è la parte a rischio più alto.
+
+---
+
+## 26. Implementazione 2026-09 — motore qBittorrent selezionabile (stato reale)
+
+### 26.1 Cosa è stato implementato
+
+Il piano è stato portato avanti oltre la sola connettività: `torrent_backend=qbittorrent`
+ora **installa davvero un motore** per il piano di trasferimento, mentre Gextto
+mantiene coda, automatismi e post-processing. Il default resta `embedded`.
+
+| Componente | File | Ruolo |
+|---|---|---|
+| Contratto motore | `torrent_engine.go` | `TorrentEngine`/`TorrentSession`, adapter `embeddedEngine`, matrice capability, path mapping |
+| Adapter qBittorrent | `qbittorrent_engine.go` | polling come verità, eventi normalizzati, comandi idempotenti, traduzione path, capability esplicite |
+| Selezione + preflight | `torrent_engine_select.go` | attivazione da `torrent_backend`, preflight bloccante sui path |
+| Client Web API | `internal/qbittorrent/qbittorrent.go` | login/sessione, add, file priority, tracker, share limits, categorie/tag, preferenze, limiti |
+| Endpoint | `web_handlers_torrent_backend.go`, `web_router.go` | stato, matrice, test, preflight, attivazione |
+
+Cambiamenti non-breaking:
+- `embeddedEngine` **incorpora** `*LibtorrentClient`: nessun metodo è stato riscritto, il comportamento è identico per metodo promosso.
+- Gli automatismi (`MonitorStalled`, `MonitorMetadata`, `RetryStorageMoves`,
+  `ReconcileRamdisk`, `EnforceSeedPolicy`, `RemoveSeededCompleted`,
+  `HandleTorrentEvent`, detach) ora accettano la **narrow interface**
+  `TorrentSession`: il motore è sostituibile senza duplicare la logica.
+- Il worker usa `state.activeEngine()`; gli hook libtorrent-only
+  (`PromoteMetadata`, `EnsureAutoManaged`, `AdjustQueue`, `EnforceDeferredOptions`,
+  `recentlyRechecked`) sono dietro un'interfaccia opzionale e vengono saltati dagli
+  altri backend.
+- Gli handler HTTP generici (lista, add, pause/resume, remove, recheck, move,
+  files/peers/trackers, limiti, priorità, pin, sequential) passano dal motore
+  attivo. Gli endpoint libtorrent-only (`apply_settings`, `optimize_settings`,
+  `upload-mode`, `share-mode`, `flags`, `scrape`, `dht-announce`, `ipfilter`,
+  session-stats, `super-seeding`) rispondono **409 capability unavailable**
+  quando il backend non è embedded.
+
+### 26.2 Matrice di capability (fonte unica in `torrent_engine.go`)
+
+| Capability | embedded | qbittorrent | anacrolix |
+|---|---|---|---|
+| add/list/pause/resume/remove/recheck | full | full | full |
+| files/peers/trackers/events/stats | full | full | full |
+| move | full | full | none |
+| limits | full | full | partial |
+| sequential / first_last | full | full | none |
+| seed_policy | full | partial | full |
+| sync incrementale | none | full | none |
+| ramdisk / fastresume | full | none | none |
+| piece diagnostics | partial | none | full |
+| ip_filter / session_stats | full | partial | none |
+
+La matrice è verificata da `TestCapabilityParityIsComplete` ed esposta in
+`GET /api/torrent-backend`.
+
+### 26.3 Migliorie rispetto al documento originale
+
+1. La **matrice di capability** è ora un artefatto verificabile, non implicita.
+2. Il **preflight path mapping è bloccante**: con mapping espliciti ogni path
+   richiesto deve essere coperto; senza mapping i path sono assunti condivisi ma
+   devono esistere.
+3. Le operazioni non equivalenti **non vengono simulate**: errore esplicito
+   `ErrCapabilityUnavailable`.
+4. Il fallback è automatico e sicuro: attivazione rifiutata ⇒ si resta su
+   libtorrent con un warning; qBittorrent non raggiungibile ⇒ cache stale, mai
+   cancellazioni.
+5. `pause/resume` e `stop/start` convivono tra versioni con fallback intenzionale.
+6. Aggiunta l'etichettatura UI `moving` (`ui/app/src/lib.rs`).
+
+### 26.4 Gap residui e prossimi passi (non ancora fatti)
+
+- **Arbitraggio coda Gextto sopra qBittorrent**: `AdjustQueue` resta
+  libtorrent-only; con qBittorrent la coda attiva è gestita dalle preferenze del
+  demone. Va portato lo scheduler Gextto sopra `sync/maindata`.
+- **Migrazione (Fase 6)**: manifest persistente + macchina a stati
+  export/import/rollback non implementati. Oggi lo switch è un cambio di
+  impostazione con preflight, non una migrazione dei torrent attivi.
+- **Profilo Ottimizza per qBittorrent**: l'endpoint resta embedded-only; va
+  mappato su `app/setPreferences`.
+- **Persistenza `.torrent` per magnet aggiunti via qBittorrent**: da copiare in
+  `StateDir` appena i metadati sono disponibili.
+- **Selettore backend in UI**: oggi disponibile via impostazioni/API.
+
+### 26.5 Test
+
+- `internal/qbittorrent`: file priority, tracker, share limits, force-start,
+  preferenze, limiti, toggle sequenziale idempotente.
+- `qbittorrent_engine_test.go`: mapping/stati, pause/resume idempotenti, move +
+  evento `storage_moved`, eventi metadata/completamento, offline con cache
+  conservata, capability non supportate, files/peers/trackers, add con path
+  tradotto e categorie, scoperta hash su `.torrent`.
+- `torrent_engine_test.go`: parsing/validazione/traduzione path, preflight,
+  matrice, selezione backend, e un test handler end-to-end con motore finto
+  installato in `AppState`.

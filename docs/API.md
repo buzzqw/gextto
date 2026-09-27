@@ -188,6 +188,10 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/tmdb/add` |
 | POST | `/api/tmdb/discover` |
 | POST | `/api/tmdb/search` |
+| GET | `/api/torrent-backend` |
+| POST | `/api/torrent-backend` |
+| POST | `/api/torrent-backend/preflight` |
+| POST | `/api/torrent-backend/test` |
 | GET | `/api/torrent-events` |
 | GET | `/api/torrent-no-rename` |
 | GET | `/api/torrent-tags` |

@@ -519,7 +519,8 @@ func bg_i64PtrValue(value int64) *int64 {
 // torrent session policy (config reload, metadata promotion, queue/speed
 // policy, pin/sequential flags), processes lifecycle events and then applies the
 // seed/cleanup policy once per tick.
-func torrentEventWorker(configPath string, fallback *Config, torrents TorrentEngine, db *Database, comics *ComicsDb, eventLog *EventLog) {
+func torrentEventWorker(configPath string, fallback *Config, state *AppState, db *Database, comics *ComicsDb, eventLog *EventLog) {
+	torrents := state.activeEngine()
 	// Optional libtorrent-only hooks: nil for any other backend.
 	extras, _ := torrents.(torrentEngineEmbeddedExtras)
 	moveRequests := map[string]struct{}{}
@@ -594,6 +595,14 @@ func torrentEventWorker(configPath string, fallback *Config, torrents TorrentEng
 	for {
 		time.Sleep(750 * time.Millisecond)
 		now := time.Now()
+		// The backend can be switched at runtime from the settings/API: pick
+		// up the new engine on the next tick so handlers and automation never
+		// diverge on which transfer plane they drive.
+		if active := state.activeEngine(); active != torrents {
+			torrents = active
+			extras, _ = torrents.(torrentEngineEmbeddedExtras)
+			logging.Info("torrent event worker switched backend", "backend", torrents.Name())
+		}
 		// Surface the progress of a long re-check so the UI is not silent for
 		// minutes while a large pack is verified on the NAS.
 		for _, torrent := range torrents.List() {
