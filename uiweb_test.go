@@ -190,6 +190,36 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 	}
 }
 
+// TestUiShellServesOwnStylesheet verifies the new UI ships its own stylesheet
+// (the compiled classic theme) and no longer depends on the Leptos /pkg bundle.
+func TestUiShellServesOwnStylesheet(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/")
+	if code != http.StatusOK {
+		t.Fatalf("GET / -> %d", code)
+	}
+	html := string(body)
+	if !strings.Contains(html, "/ui/static/gextto-ui.css") {
+		t.Fatal("shell does not load the new UI stylesheet")
+	}
+	if strings.Contains(html, "/pkg/ui.css") {
+		t.Fatal("shell still depends on the legacy stylesheet")
+	}
+	// The classic shell structure must be present (top bar + main frame).
+	for _, marker := range []string{`class="main-shell"`, `class="topbar"`, `class="top-actions"`, `class="sidebar"`, `class="brand"`, `data-metric="cpu"`, `data-theme-toggle`} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("shell missing %q", marker)
+		}
+	}
+	cssCode, _, css := webGet(t, server, "/ui/static/gextto-ui.css")
+	if cssCode != http.StatusOK || len(css) < 10_000 {
+		t.Fatalf("GET /ui/static/gextto-ui.css -> %d (%d bytes)", cssCode, len(css))
+	}
+}
+
 func TestUiStateLabelParity(t *testing.T) {
 	cases := map[string]string{
 		"downloading":          "In scarico",

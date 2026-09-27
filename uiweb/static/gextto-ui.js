@@ -469,6 +469,122 @@
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-search-post]"), renderSearch);
 
+  // ---- shell: navigation, theme, font scale, language, live metrics --------
+  document.addEventListener("click", function (event) {
+    var nav = event.target.closest("[data-nav]");
+    if (nav) {
+      location.href = "/?view=" + encodeURIComponent(nav.getAttribute("data-nav"));
+      return;
+    }
+    var navMore = event.target.closest("[data-nav-more]");
+    if (navMore) {
+      var group = navMore.closest(".nav-group");
+      if (group) {
+        group.classList.toggle("open");
+        var icon = navMore.querySelector("[data-nav-more-icon]");
+        if (icon) icon.textContent = group.classList.contains("open") ? "▲" : "▾";
+      }
+      return;
+    }
+    var navSearch = event.target.closest("[data-nav-search]");
+    if (navSearch) {
+      location.href = "/?view=settings";
+      return;
+    }
+    var font = event.target.closest("[data-font]");
+    if (font) {
+      setFontScale(readFontScale() + parseInt(font.getAttribute("data-font"), 10));
+      return;
+    }
+    var theme = event.target.closest("[data-theme-toggle]");
+    if (theme) {
+      setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+      return;
+    }
+  });
+
+  function storageGet(key) {
+    try { return localStorage.getItem(key); } catch (error) { return null; }
+  }
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (error) { /* ignore */ }
+  }
+  function readFontScale() {
+    var value = parseInt(storageGet("gextto_font_scale") || "100", 10);
+    if (!isFinite(value)) value = 100;
+    return Math.min(140, Math.max(85, value));
+  }
+  function setFontScale(percent) {
+    percent = Math.min(140, Math.max(85, percent));
+    document.documentElement.style.fontSize = (16 * percent / 100) + "px";
+    var label = document.querySelector("[data-font-label]");
+    if (label) label.textContent = "Testo " + percent + "%";
+    storageSet("gextto_font_scale", String(percent));
+  }
+  function setTheme(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    var button = document.querySelector("[data-theme-toggle]");
+    if (button) button.textContent = mode === "light" ? "Tema scuro" : "Tema chiaro";
+    storageSet("gextto_theme", mode);
+  }
+  setFontScale(readFontScale());
+  setTheme(storageGet("gextto_theme") === "light" ? "light" : "dark");
+  var langSelect = document.querySelector("[data-lang]");
+  if (langSelect) langSelect.addEventListener("change", function () {
+    api("/api/i18n/active", "POST", { lang: langSelect.value })
+      .then(function () { location.reload(); })
+      .catch(function (error) { alert("Cambio lingua non riuscito: " + error.message); });
+  });
+
+  function humanRate(value) {
+    var n = Number(value);
+    if (!isFinite(n) || n <= 0) return "0 B/s";
+    return humanBytes(n) + "/s";
+  }
+  function humanDuration(seconds) {
+    var total = Math.max(0, Math.floor(Number(seconds) || 0));
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var secs = total % 60;
+    if (hours > 0) return hours + "h " + minutes + "m";
+    if (minutes > 0) return minutes + "m " + secs + "s";
+    return secs + "s";
+  }
+  function setMetric(name, value) {
+    var node = document.querySelector('[data-metric="' + name + '"]');
+    if (node) node.textContent = value;
+  }
+  function refreshShellMetrics() {
+    api("/api/process-metrics", "GET").then(function (data) {
+      var cpu = data && data.process_cpu_percent;
+      setMetric("cpu", cpu == null ? "—" : Number(cpu).toFixed(1) + "%");
+      if (data && data.resident_bytes != null) setMetric("ram", humanBytes(data.resident_bytes));
+    }).catch(function () { /* keep the previous value */ });
+    api("/api/torrents", "GET").then(function (items) {
+      var list = Array.isArray(items) ? items : [];
+      var dl = 0, ul = 0, peers = 0, seeds = 0;
+      list.forEach(function (item) {
+        dl += Number(item.download_rate) || 0;
+        ul += Number(item.upload_rate) || 0;
+        peers += Number(item.num_peers) || 0;
+        seeds += Number(item.num_seeds) || 0;
+      });
+      setMetric("dl", humanRate(dl));
+      setMetric("ul", humanRate(ul));
+      setMetric("count", String(list.length));
+      setMetric("peers", peers + "/" + seeds);
+    }).catch(function () { /* keep the previous value */ });
+    api("/api/status", "GET").then(function (data) {
+      if (!data || !data.next_cycle_at) { setMetric("cycle", "—"); return; }
+      var remaining = (Date.parse(data.next_cycle_at) - Date.now()) / 1000;
+      setMetric("cycle", humanDuration(remaining));
+    }).catch(function () { /* keep the previous value */ });
+  }
+  refreshShellMetrics();
+  setInterval(function () {
+    if (document.visibilityState === "visible") refreshShellMetrics();
+  }, 4000);
+
   // ---- library editor (feeds + indexers + series/movies) ------------------
   // Feeds live in the `url` setting, indexers in the `indexers` setting (the
   // classic UI saves them the same way via /api/config/settings); series and

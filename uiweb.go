@@ -51,12 +51,14 @@ type uiNavItem struct {
 	Active       bool
 	Optional     bool
 	MobileHidden bool
+	Count        int
 }
 
 type uiNavGroup struct {
-	Label string
-	Items []uiNavItem
-	Open  bool
+	Label  string
+	Items  []uiNavItem
+	Open   bool
+	System bool
 }
 
 // uiShellData renders the application frame.
@@ -65,6 +67,7 @@ type uiShellData struct {
 	Page    string
 	Groups  []uiNavGroup
 	Content any
+	Chrome  uiShellChrome
 }
 
 // uiDashboardData is the view-model of the dashboard partial.
@@ -201,7 +204,7 @@ func uiIsSystemPage(view string) bool {
 	return false
 }
 
-func uiNavigation(view string) []uiNavGroup {
+func uiNavigation(view string, counts map[string]int) []uiNavGroup {
 	groups := make([]uiNavGroup, 0, len(uiNavGroups))
 	for index, group := range uiNavGroups {
 		out := uiNavGroup{Label: group.Label}
@@ -213,10 +216,12 @@ func uiNavigation(view string) []uiNavGroup {
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,
+				Count:        counts[item.ID],
 			})
 		}
 		if index == len(uiNavGroups)-1 {
 			out.Open = uiIsSystemPage(view)
+			out.System = true
 		}
 		groups = append(groups, out)
 	}
@@ -251,11 +256,13 @@ func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case uiMovieDetail:
 		renderPage = "movie-detail"
 	}
+	cfg := latestConfig(s)
 	uiRender(w, http.StatusOK, "shell", uiShellData{
 		Title:   uiPageLabel(view),
 		Page:    renderPage,
-		Groups:  uiNavigation(view),
+		Groups:  uiNavigation(view, uiNavCounts(s, cfg)),
 		Content: content,
+		Chrome:  uiShellChromeFrom(s),
 	})
 }
 

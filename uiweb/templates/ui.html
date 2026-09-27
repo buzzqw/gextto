@@ -6,28 +6,61 @@
 <meta name="color-scheme" content="dark light">
 <title>Gextto · {{.Title}}</title>
 <link rel="icon" href="/favicon.ico">
-<link rel="stylesheet" href="/pkg/ui.css">
+<link rel="stylesheet" href="/ui/static/gextto-ui.css">
 </head>
 <body>
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="brand"><span class="brand-mark">G</span><span>Gextto</span></div>
-    <nav class="nav">
+    <div class="brand">
+      <span class="brand-mark">R</span>
+      <div><strong>Gextto</strong><small title="Versione applicazione">Media daemon · v{{.Chrome.Version}}</small></div>
+    </div>
+    <nav>
+      <button type="button" class="nav-item nav-search" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
+        <span class="nav-search-icon">🔍</span><span>Cerca impostazioni</span>
+      </button>
       {{range .Groups}}
-      <div class="nav-group{{if .Open}} open{{end}}">
-        <div class="nav-group-label">{{.Label}}</div>
+      <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
+        {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
         {{range .Items}}
-        <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}"{{if .Active}} aria-current="page"{{end}}>{{.Label}}</a>
+        <button class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" title="{{.Label}}" data-nav="{{.ID}}"><span>{{.Label}}</span>{{if .Count}}<span class="nav-count">{{.Count}}</span>{{end}}</button>
         {{end}}
       </div>
       {{end}}
     </nav>
     <div class="sidebar-foot">
-      <a class="nav-item" href="/legacy" title="Torna alla UI classica (Leptos)">UI classica</a>
+      <span class="pulse"></span>
+      <span>{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}}</span>
     </div>
   </aside>
-  <div class="content">
-    <main id="ui-page" data-view="{{.Page}}">
+  <main class="main-shell">
+    <header class="topbar">
+      <div class="topbar-title">
+        <div class="crumb">GEXTTO</div>
+        <h1>{{.Title}}</h1>
+      </div>
+      <div class="topbar-message"></div>
+      <div class="top-actions">
+        <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU</span><strong data-metric="cpu">{{.Chrome.CPU}}</strong></div>
+        <div class="top-metric top-metric-ram" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong data-metric="ram">{{.Chrome.RAM}}</strong></div>
+        <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong data-metric="dl">{{.Chrome.Download}}</strong></div>
+        <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong data-metric="ul">{{.Chrome.Upload}}</strong></div>
+        <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong data-metric="count">{{.Chrome.Torrents}}</strong></div>
+        <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong data-metric="peers">{{.Chrome.Peers}}/{{.Chrome.Seeds}}</strong></div>
+        <div class="top-metric top-metric-cycle" title="Tempo stimato al prossimo ciclo automatico"><span class="top-metric-label">Prossimo ciclo</span><strong data-metric="cycle">{{.Chrome.NextCycle}}</strong></div>
+        <button class="btn" title="Testo più piccolo" data-font="-5">A−</button>
+        <button class="btn" title="Dimensione testo predefinita (100%)" data-font="100"><span data-font-label>Testo 100%</span></button>
+        <button class="btn" title="Testo più grande" data-font="+5">A+</button>
+        <select class="lang-select" title="Lingua dell'interfaccia" data-lang>
+          <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
+          <option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>English</option>
+        </select>
+        <button class="btn" title="Cambia tra tema chiaro e scuro" data-theme-toggle>Tema chiaro</button>
+        <button class="btn" title="Ricarica i dati mostrati" data-action="refresh">Aggiorna</button>
+        <span class="system-pill" title="Stato del servizio: il processo Gextto e la sua API rispondono."><span class="pulse"></span>{{.Chrome.Status}}</span>
+      </div>
+    </header>
+    <div class="content" id="ui-page" data-view="{{.Page}}">
       {{if eq .Page "dashboard"}}{{template "dashboard" .Content}}
       {{else if eq .Page "downloads"}}{{template "torrents" .Content}}
       {{else if eq .Page "health"}}{{template "health" .Content}}
@@ -42,8 +75,8 @@
       {{else if eq .Page "integrations"}}{{template "integrations" .Content}}
       {{else if eq .Page "settings"}}{{template "settings" .Content}}
       {{else}}{{template "unavailable" .Content}}{{end}}
-    </main>
-  </div>
+    </div>
+  </main>
 </div>
 <script src="/ui/static/gextto-ui.js" defer></script>
 </body>
