@@ -1452,7 +1452,7 @@ pub fn App() -> impl IntoView {
                             view! {
                                 <div class="nav-group" class:system-group=is_system class:open=move || nav_more.get()>
                                     {is_system.then(|| view! {
-                                        <button class="nav-more" on:click=move |_| nav_more.update(|open| *open = !*open)>
+                                        <button class="nav-more" title=ctx_tr("Mostra o nascondi le voci di sistema") on:click=move |_| nav_more.update(|open| *open = !*open)>
                                             <span>{ctx_tr("Sistema")}</span>
                                             <span>{move || if nav_more.get() { "▲" } else { "▾" }}</span>
                                         </button>
@@ -1464,7 +1464,7 @@ pub fn App() -> impl IntoView {
                                         let mobile_hidden = is_mobile_hidden_nav(id);
                                         let mobile_primary = is_mobile_primary_nav(id);
                                         view! {
-                                            <button class="nav-item" class:nav-optional=optional class:nav-mobile-hidden=mobile_hidden class:nav-mobile-primary=mobile_primary class:active=move || page.get() == id on:click=move |_| page.set(id.to_string())>
+                                            <button class="nav-item" title=ctx_tr(item_label) class:nav-optional=optional class:nav-mobile-hidden=mobile_hidden class:nav-mobile-primary=mobile_primary class:active=move || page.get() == id on:click=move |_| page.set(id.to_string())>
                                                 <span>{move || tr(data, item_label)}</span>
                                                 <SidebarCount page=page id=id data />
                                             </button>
@@ -3686,14 +3686,14 @@ fn Downloads(data: RwSignal<Data>) -> impl IntoView {
                                     }
                                 });
                             } /></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("name")>{ctx_tr("Nome")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per nome") on:click=move |_| set_sort("name")>{ctx_tr("Nome")}</button></th>
                             <th>{ctx_tr("Stato")}</th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("progress")>{ctx_tr("Progresso")}</button></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("dl")>{ctx_tr("↓")}</button></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("ul")>{ctx_tr("↑")}</button></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("eta")>{ctx_tr("ETA")}</button></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("peers")>{ctx_tr("Peer / Seed")}</button></th>
-                            <th><button type="button" class="th-sort" on:click=move |_| set_sort("ratio")>{ctx_tr("Ratio")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per progresso") on:click=move |_| set_sort("progress")>{ctx_tr("Progresso")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di download") on:click=move |_| set_sort("dl")>{ctx_tr("↓")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per velocità di upload") on:click=move |_| set_sort("ul")>{ctx_tr("↑")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per tempo stimato (ETA)") on:click=move |_| set_sort("eta")>{ctx_tr("ETA")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per numero di peer e seeder") on:click=move |_| set_sort("peers")>{ctx_tr("Peer / Seed")}</button></th>
+                            <th><button type="button" class="th-sort" title=ctx_tr("Ordina per ratio di condivisione") on:click=move |_| set_sort("ratio")>{ctx_tr("Ratio")}</button></th>
                             <th>{ctx_tr("Azioni")}</th>
                         </tr></thead>
                         <tbody>
@@ -9152,7 +9152,7 @@ fn SourceFilterEditor(data: RwSignal<Data>) -> impl IntoView {
                     view! {
                         <span class="badge" style="margin-right:6px" title=words_title>
                             {name.clone()} " · " {words}
-                            <button class="btn sm" style="margin-left:6px" on:click=move |_| {
+                            <button class="btn sm" style="margin-left:6px" title=ctx_tr("Rimuovi questo filtro") on:click=move |_| {
                                 let mut list = array(&data.get().config, "source_filters");
                                 list.retain(|entry| text(entry, "source", "") != remove_name);
                                 run_post(data, "/api/config/source-filters", Some(json!({"filters": list})), "Filtro sorgente rimosso");
