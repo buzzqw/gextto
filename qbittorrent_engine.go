@@ -383,17 +383,13 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 	if cfg == nil {
 		return
 	}
-	// Bound the configured value before narrowing it to int: the source is a
-	// settings string parsed as int64, so the conversion needs an upper bound
-	// expressed with math.MaxInt for the target type.
-	limit64 := cfg.Libtorrent.ActiveDownloads
-	if limit64 > math.MaxInt {
-		limit64 = math.MaxInt
+	// The configured value comes from an int64 setting: only narrow it to int
+	// inside an explicit range guard, which is what go/incorrect-integer-
+	// conversion recognizes (a plain clamp is not accepted).
+	limit := 1
+	if value := cfg.Libtorrent.ActiveDownloads; value >= 1 && value <= math.MaxInt {
+		limit = int(value)
 	}
-	if limit64 < 1 {
-		limit64 = 1
-	}
-	limit := int(limit64)
 	if limit < 1 {
 		limit = 1
 	}
