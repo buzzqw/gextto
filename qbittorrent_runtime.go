@@ -144,7 +144,17 @@ func managedQbittorrentConfig(cfg *Config) (*Config, error) {
 	return prepared, nil
 }
 
+// qbittorrentManagedDir keeps the managed runtime (binary + profile) next to
+// the daemon, in the application directory, so it never clutters the data dir
+// nor the media/download folders.
 func qbittorrentManagedDir(cfg *Config) string {
+	if exe, err := os.Executable(); err == nil && strings.TrimSpace(exe) != "" {
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil && strings.TrimSpace(resolved) != "" {
+			exe = resolved
+		}
+		return filepath.Join(filepath.Dir(exe), "qbittorrent")
+	}
+	// Fallback when the executable path is unavailable.
 	if cfg == nil || strings.TrimSpace(cfg.DataDir) == "" {
 		return ""
 	}
