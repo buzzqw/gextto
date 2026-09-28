@@ -588,8 +588,11 @@ func ManualArchiveSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		seen[hash] = struct{}{}
 		kept = append(kept, release)
 	}
+	for index := range kept {
+		kept[index].Score = cfg.ReleaseScore(&kept[index])
+	}
 	sort.SliceStable(kept, func(i, j int) bool {
-		return cfg.ReleaseScore(&kept[i]) > cfg.ReleaseScore(&kept[j])
+		return kept[i].Score > kept[j].Score
 	})
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "query": query, "results": kept})
 }

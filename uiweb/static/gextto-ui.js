@@ -149,10 +149,13 @@
         return;
       }
       var bulkAction = bulkButton.getAttribute("data-download-bulk");
-      if (bulkAction === "remove" && !confirm("Rimuovere i torrent selezionati dalla sessione? I file restano su disco.")) return;
+      if (bulkAction === "remove") {
+        openRemoveTorrent(selected, selected.length + " torrent selezionati");
+        return;
+      }
       var pathFor = function (hash) { return "/api/torrents/" + encodeURIComponent(hash) + "/" + bulkAction; };
       bulkButton.disabled = true;
-      Promise.all(selected.map(function (hash) { return api(pathFor(hash), "POST", bulkAction === "remove" ? { delete_files: false } : {}); }))
+      Promise.all(selected.map(function (hash) { return api(pathFor(hash), "POST", {}); }))
         .then(function () { load(); notify(selected.length + " torrent aggiornati", "ok"); })
         .catch(function (error) { notify("Azione bulk non riuscita: " + error.message, "err"); })
         .then(function () { bulkButton.disabled = false; });
@@ -474,8 +477,56 @@
 
   function torrentDetailPanel() { return page.querySelector("[data-torrent-detail-panel]"); }
 
-  function openTorrentDetail(hash) {
-    if (!hash) return;
+  // ---- torrent removal with the four rextto levels ------------------------
+  function openRemoveTorrent(hashes, name) {
+    var panel = page.querySelector("[data-torrent-remove-panel]");
+    if (!panel || !hashes || !hashes.length) return;
+    panel._hashes = hashes.slice();
+    var label = panel.querySelector("[data-torrent-remove-name]");
+    if (label) label.textContent = name || "";
+    var message = panel.querySelector("[data-torrent-remove-message]");
+    if (message) message.textContent = "";
+    panel.hidden = false;
+  }
+
+  document.addEventListener("click", function (event) {
+    var backdrop = event.target.matches && event.target.matches("[data-torrent-remove-panel]");
+    if (backdrop) { event.target.hidden = true; return; }
+    var rowRemove = event.target.closest("[data-torrent-remove]");
+    if (rowRemove) {
+      openRemoveTorrent([rowRemove.getAttribute("data-hash") || ""].filter(Boolean), rowRemove.getAttribute("data-name") || "");
+      return;
+    }
+    if (event.target.closest("[data-torrent-remove-close]")) {
+      var closePanel = page.querySelector("[data-torrent-remove-panel]");
+      if (closePanel) closePanel.hidden = true;
+      return;
+    }
+    var modeButton = event.target.closest("[data-remove-mode]");
+    if (!modeButton) return;
+    var panel = modeButton.closest("[data-torrent-remove-panel]");
+    if (!panel) return;
+    var hashes = panel._hashes || [];
+    if (!hashes.length) return;
+    var mode = modeButton.getAttribute("data-remove-mode");
+    var deleteFiles = mode === "files" || mode === "files_blocklist";
+    var blocklist = mode === "blocklist" || mode === "files_blocklist";
+    if (deleteFiles && !confirm("Eliminare anche i file scaricati?")) return;
+    var message = panel.querySelector("[data-torrent-remove-message]");
+    modeButton.disabled = true;
+    Promise.all(hashes.map(function (hash) {
+      return api("/api/torrents/" + encodeURIComponent(hash) + "/remove", "POST", { delete_files: deleteFiles, blocklist: blocklist });
+    })).then(function () {
+      panel.hidden = true;
+      notify(hashes.length === 1 ? "Torrent rimosso" : hashes.length + " torrent rimossi", "ok");
+      if (partials[view]) { load(); } else { location.reload(); }
+    }).catch(function (error) {
+      if (message) message.textContent = error.message;
+      notify("Rimozione non riuscita: " + error.message, "err");
+    }).then(function () { modeButton.disabled = false; });
+  });
+
+  function openTorrentDetail(hash) {    if (!hash) return;
     activeTorrentHash = hash;
     var panel = torrentDetailPanel();
     if (!panel) return;
@@ -1530,7 +1581,7 @@
     var addPath = form.getAttribute("data-add");
     var searchToken = 0;
     var archiveEndpoint = form.getAttribute("data-archive") || "/api/search/archive";
-    thead.innerHTML = "<tr><th>Release</th><th>Sorgente</th><th>Risoluzione</th><th>Azioni</th></tr>";
+    thead.innerHTML = "<tr><th class=\"th-sort\" data-release-sort=\"title\" title=\"Nome del file — clicca per ordinare\">Release</th><th title=\"Sorgente/indexer\">Sorgente</th><th class=\"th-sort\" data-release-sort=\"score\" title=\"Punteggio di qualità — clicca per ordinare\">Punteggio</th><th title=\"Azioni\">Azioni</th></tr>";
     var table = thead.closest("table");
     if (table) table.classList.add("release-table");
     if (filterInput) {
@@ -2384,8 +2435,10 @@
     }
     tbody.innerHTML = "";
     visible.forEach(function (release) {
-      var quality = release.quality || {};
       var row = document.createElement("tr");
+      row.setAttribute("data-release-row", "1");
+      row.setAttribute("data-title", String(release.title || ""));
+      row.setAttribute("data-score", String(Number(release.score) || 0));
 
       var titleCell = document.createElement("td");
       titleCell.className = "release-title";
@@ -2395,20 +2448,24 @@
       var sourceCell = document.createElement("td");
       sourceCell.className = "release-source";
       sourceCell.textContent = String(release.source || "—");
+      sourceCell.title = String(release.source || "");
 
-      var resolutionCell = document.createElement("td");
-      resolutionCell.className = "release-resolution";
-      resolutionCell.textContent = String(quality.resolution || "—");
+      var scoreCell = document.createElement("td");
+      scoreCell.className = "release-score numeric";
+      scoreCell.textContent = String(Number(release.score) || 0);
+      scoreCell.title = "Punteggio di qualità della release";
 
       var actionsCell = document.createElement("td");
       actionsCell.className = "row-actions";
       var explain = document.createElement("button");
       explain.className = "btn sm";
       explain.textContent = "Perché non questo?";
+      explain.title = "Mostra perché questa release viene accettata o scartata";
       explain.addEventListener("click", function () { showExplain(release); });
       var add = document.createElement("button");
       add.className = "btn sm primary";
       add.textContent = "Accoda";
+      add.title = "Aggiungi questa release ai download";
       add.addEventListener("click", function () {
         add.disabled = true;
         api(opts.addPath || "/api/search/add", "POST", { release: release })
@@ -2420,17 +2477,51 @@
 
       row.appendChild(titleCell);
       row.appendChild(sourceCell);
-      row.appendChild(resolutionCell);
+      row.appendChild(scoreCell);
       row.appendChild(actionsCell);
       tbody.appendChild(row);
     });
+    if (tbody._releaseSort && tbody._releaseSort.key) sortReleaseRows(tbody, tbody._releaseSort);
   }
+
+  function sortReleaseRows(tbody, state) {
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr[data-release-row]"));
+    rows.sort(function (left, right) {
+      if (state.key === "score") {
+        return ((Number(left.getAttribute("data-score")) || 0) - (Number(right.getAttribute("data-score")) || 0)) * state.dir;
+      }
+      return String(left.getAttribute("data-title") || "").localeCompare(String(right.getAttribute("data-title") || "")) * state.dir;
+    });
+    rows.forEach(function (row) { tbody.appendChild(row); });
+  }
+
+  document.addEventListener("click", function (event) {
+    var head = event.target.closest("[data-release-sort]");
+    if (!head) return;
+    var table = head.closest("table");
+    var tbody = table && table.querySelector("tbody");
+    if (!tbody) return;
+    var key = head.getAttribute("data-release-sort");
+    var state = tbody._releaseSort || { key: "", dir: 1 };
+    if (state.key === key) {
+      state.dir = -state.dir;
+    } else {
+      state.key = key;
+      state.dir = 1;
+    }
+    tbody._releaseSort = state;
+    sortReleaseRows(tbody, state);
+    Array.prototype.forEach.call(table.querySelectorAll("[data-release-sort]"), function (other) {
+      if (other === head) other.setAttribute("data-sort-dir", state.dir === 1 ? "asc" : "desc");
+      else other.removeAttribute("data-sort-dir");
+    });
+  });
 
   function renderReleaseResults(container, items) {
     container.innerHTML = "";
     var table = document.createElement("table");
     table.className = "data-table release-table";
-    table.innerHTML = "<thead><tr><th>Release</th><th>Sorgente</th><th>Risoluzione</th><th>Azioni</th></tr></thead>";
+    table.innerHTML = "<thead><tr><th class=\"th-sort\" data-release-sort=\"title\" title=\"Nome del file — clicca per ordinare\">Release</th><th>Sorgente</th><th class=\"th-sort\" data-release-sort=\"score\" title=\"Punteggio di qualità — clicca per ordinare\">Punteggio</th><th>Azioni</th></tr></thead>";
     var tbody = document.createElement("tbody");
     table.appendChild(tbody);
     container.appendChild(table);
@@ -2624,11 +2715,13 @@
     });
   });
 
-  // Close the torrent detail overlay with Escape.
+  // Close the torrent overlays with Escape.
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     var panel = page.querySelector("[data-torrent-detail-panel]");
     if (panel && !panel.hidden) panel.hidden = true;
+    var removePanel = page.querySelector("[data-torrent-remove-panel]");
+    if (removePanel && !removePanel.hidden) removePanel.hidden = true;
   });
 
   // ---- progress polling ---------------------------------------------------

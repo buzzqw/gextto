@@ -695,11 +695,10 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .tmdb-card small { color: var(--muted); font-size: 0.76rem; }
 .tmdb-card .btn { align-self: flex-start; margin-top: auto; }
 .cell-truncate { display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.release-table { table-layout: fixed; }
-.release-table td.release-title { white-space: normal; word-break: break-word; }
-.release-table th:nth-child(2), .release-table td.release-source { width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.release-table th:nth-child(3), .release-table td.release-resolution { width: 110px; white-space: nowrap; }
-.release-table th:nth-child(4) { width: 220px; white-space: nowrap; }
+.release-table { width: 100%; }
+.release-table td.release-title { white-space: normal; word-break: break-word; max-width: 0; width: 100%; }
+.release-table td.release-source, .release-table td.release-score { white-space: nowrap; }
+.release-table td.row-actions { white-space: nowrap; width: 1%; }
 
 /* modal / overlay (decision explanation, details) */
 .overlay {
@@ -711,7 +710,7 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 }
 .overlay[hidden] { display: none; }
 .modal {
-  width: min(880px, 100%);
+  width: min(1120px, 96vw);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -722,6 +721,11 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .modal-head h3 { font-size: 1rem; margin: 0; }
 .modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .modal-body h4 { margin: 0; }
+/* The torrent detail keeps a stable size so switching tab does not resize it. */
+.torrent-modal { width: min(1120px, 96vw); height: min(85vh, 900px); display: flex; flex-direction: column; }
+.torrent-modal .modal-body { flex: 1; min-height: 0; overflow-y: auto; }
+.remove-options { display: flex; flex-direction: column; gap: 8px; }
+.remove-options .btn { justify-content: flex-start; text-align: left; }
 
 @media (max-width: 860px) {
   .setting-row { grid-template-columns: 1fr; align-items: stretch; }

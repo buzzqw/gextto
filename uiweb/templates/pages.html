@@ -271,6 +271,7 @@
   <div data-torrents-slot>{{template "torrents_table" .Torrents}}</div>
 
   {{template "torrent_detail" .}}
+  {{template "torrent_remove" .}}
 
   {{range .Panels}}{{template "section" .}}{{end}}
 </div>
@@ -496,8 +497,8 @@
 {{define "settings_field"}}
 <form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
   <div class="setting-info">
-    <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
-    <code class="setting-key">{{.Key}}</code>
+    <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</label>
+    <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
   </div>
   <div class="setting-control">
     {{if eq .Kind "structured"}}

@@ -611,11 +611,6 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 			}),
 			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
 		}),
-		sectionActions(uiActionSection{Label: "Motore torrent", Hint: "Applica o ottimizza le impostazioni libtorrent.", Buttons: []uiActionButton{
-			{Label: "Applica impostazioni", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}"},
-			{Label: "Ottimizza", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}"},
-			{Label: "Aggiorna IP filter", Method: "POST", Path: "/api/torrents/ipfilter_update", Body: "{}"},
-		}}),
 	}
 	return page
 }

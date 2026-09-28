@@ -89,6 +89,8 @@ type uiSettingField struct {
 	Label string
 	Value string
 	Kind  string // text|bool|area|secret|tags
+	// Hint is the descriptive tooltip shown on the label (ported from rextto).
+	Hint string
 	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
 	// keep the original spelling (yes/no, 1/0, on/off, true/false) so saving the
 	// select never turns a "yes" into a "true" that strict readers would reject.
@@ -448,7 +450,7 @@ func uiSettingGroupTitle(tab, key string) string {
 }
 
 func uiSettingFieldFor(key, label, value string) uiSettingField {
-	field := uiSettingField{Key: key, Label: label, Value: value, Kind: uiSettingKind(key, value)}
+	field := uiSettingField{Key: key, Label: label, Value: value, Kind: uiSettingKind(key, value), Hint: uiSettingTooltip(key)}
 	if items, ok := uiJSONScalarList(value); ok {
 		field.Kind = "tags"
 		field.TagJSON = true

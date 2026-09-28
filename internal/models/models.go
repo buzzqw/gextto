@@ -343,6 +343,9 @@ type Release struct {
 	SizeBytes    int64     `json:"size_bytes"`
 	Seeders      int64     `json:"seeders"`
 	Peers        int64     `json:"peers"`
+	// Score is the release score computed by the current configuration, filled
+	// by the search endpoints so the UI can show and sort by it.
+	Score int64 `json:"score,omitempty"`
 }
 
 // TorrentMeta stores the release associated with a torrent hash.

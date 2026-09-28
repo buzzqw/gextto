@@ -544,8 +544,11 @@ func ManualSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		deduped = append(deduped, release)
 	}
 	results = deduped
+	for index := range results {
+		results[index].Score = cfg.ReleaseScore(&results[index])
+	}
 	sort.SliceStable(results, func(i, j int) bool {
-		return cfg.ReleaseScore(&results[i]) > cfg.ReleaseScore(&results[j])
+		return results[i].Score > results[j].Score
 	})
 	jsonResponse(w, map[string]any{"ok": true, "query": query, "results": results})
 }

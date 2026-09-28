@@ -243,15 +243,15 @@
         <table class="data-table torrent-table">
           <thead><tr>
             <th><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th>
-            <th class="th-sort" data-sort="name">Nome</th>
-            <th>Stato</th>
-            <th class="th-sort" data-sort="progress">Progresso</th>
-            <th class="th-sort" data-sort="dl">↓</th>
-            <th class="th-sort" data-sort="ul">↑</th>
-            <th class="th-sort" data-sort="eta">ETA</th>
-            <th class="th-sort" data-sort="peers">Peer / Seed</th>
-            <th class="th-sort" data-sort="ratio">Ratio</th>
-            <th>Azioni</th>
+            <th class="th-sort" data-sort="name" title="Nome del torrent — clicca per ordinare">Nome</th>
+            <th title="Stato del torrent nel client">Stato</th>
+            <th class="th-sort" data-sort="progress" title="Percentuale completata — clicca per ordinare">Progresso</th>
+            <th class="th-sort" data-sort="dl" title="Velocità di download — clicca per ordinare">↓</th>
+            <th class="th-sort" data-sort="ul" title="Velocità di upload — clicca per ordinare">↑</th>
+            <th class="th-sort" data-sort="eta" title="Tempo stimato al completamento — clicca per ordinare">ETA</th>
+            <th class="th-sort" data-sort="peers" title="Peer connessi / seed disponibili — clicca per ordinare">Peer / Seed</th>
+            <th class="th-sort" data-sort="ratio" title="Rapporto upload/download — clicca per ordinare">Ratio</th>
+            <th title="Azioni disponibili per il torrent">Azioni</th>
           </tr></thead>
           <tbody>
             {{range .Rows}}
@@ -284,7 +284,7 @@
                 {{end}}
                 <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Check</button>
                 <button class="btn sm" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent">Dettagli</button>
-                <button class="btn sm danger" data-action="remove" data-hash="{{.Hash}}" title="Rimuovi il torrent (i file restano)">Rimuovi</button>
+                <button class="btn sm danger" data-torrent-remove data-hash="{{.Hash}}" data-name="{{.Name}}" title="Rimuovi il torrent: scegli se mantenere o eliminare i file">Rimuovi</button>
               </td>
             </tr>
             {{end}}
@@ -300,7 +300,7 @@
 
 {{define "torrent_detail"}}
 <div class="overlay" data-torrent-detail-panel hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Dettagli torrent">
+  <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-label="Dettagli torrent">
     <div class="modal-head">
       <h3 data-torrent-detail-name>Dettagli torrent</h3>
       <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
@@ -318,6 +318,27 @@
       </div>
       <div class="output" data-torrent-detail-output></div>
       <div data-torrent-subdetail-output hidden></div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "torrent_remove"}}
+<div class="overlay" data-torrent-remove-panel hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Rimuovi torrent">
+    <div class="modal-head">
+      <h3>Rimuovi torrent</h3>
+      <button class="btn sm" type="button" data-torrent-remove-close>Chiudi</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" data-torrent-remove-name></p>
+      <div class="remove-options">
+        <button class="btn" type="button" data-remove-mode="session">Solo torrent <small class="muted">— mantieni i file</small></button>
+        <button class="btn danger" type="button" data-remove-mode="files">Torrent + dati <small class="muted">— elimina i file</small></button>
+        <button class="btn" type="button" data-remove-mode="blocklist">Torrent + blocklist <small class="muted">— mantieni i file</small></button>
+        <button class="btn danger" type="button" data-remove-mode="files_blocklist">Torrent + file + blocklist</button>
+      </div>
+      <small class="muted" data-torrent-remove-message aria-live="polite"></small>
     </div>
   </div>
 </div>
