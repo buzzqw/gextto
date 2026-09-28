@@ -382,6 +382,16 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 			t.Fatalf("GET %s -> %d, missing %q", check.path, code, check.marker)
 		}
 	}
+	code, _, settingsBody := webGet(t, server, "/ui?view=settings&tab=libtorrent")
+	if code != http.StatusOK {
+		t.Fatalf("GET settings -> %d", code)
+	}
+	if strings.Contains(string(settingsBody), "chip-count") {
+		t.Fatal("settings tab count badges should not be rendered")
+	}
+	if strings.Contains(string(settingsBody), `data-nav="archive" title="Archivio" data-nav-count`) {
+		t.Fatal("archive count badge should not be rendered")
+	}
 }
 
 // TestUiShellServesOwnStylesheet verifies the new UI ships its own stylesheet

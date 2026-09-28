@@ -1,9 +1,10 @@
 {{define "shell"}}<!doctype html>
-<html lang="it" data-theme="dark">
+<html lang="{{.Chrome.Lang}}" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark light">
+<meta name="application-name" content="Gextto EXpert Torrent Transfer Orchestrator">
 <title>Gextto · {{.Title}}</title>
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="/ui/static/gextto-ui.css">
@@ -12,7 +13,7 @@
 <a class="skip-link" href="#ui-page">Vai al contenuto</a>
 <div class="app-shell">
   <aside class="sidebar" id="app-sidebar">
-    <div class="brand">
+     <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
        <span class="brand-mark" aria-hidden="true">G</span>
       <div><strong>Gextto</strong><small title="Versione applicazione">Media daemon · v{{.Chrome.Version}}</small></div>
     </div>
@@ -24,7 +25,7 @@
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
           {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
          {{range .Items}}
-          <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span><span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span></a>
+           <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
       </div>
       {{end}}

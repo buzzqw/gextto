@@ -1,9 +1,10 @@
-# Gextto
+# Gextto EXpert Torrent Transfer Orchestrator
 
 Copyright (c) 2026 buzzqw e collaboratori di Gextto.
 
-**Gextto** è un demone self-hosted per l'acquisizione e l'archiviazione automatica
-di serie TV, film e fumetti.
+**Gextto EXpert Torrent Transfer Orchestrator** (mostrato come **Gextto Media
+Daemon** nelle interfacce compatte) è un demone self-hosted per l'acquisizione e
+l'archiviazione automatica di serie TV, film e fumetti.
 
 Un solo binario Go racchiude tutto: motore di scraping, archivio SQLite, web
 UI/API (inclusa con `//go:embed`), TUI terminale e una sessione **libtorrent**

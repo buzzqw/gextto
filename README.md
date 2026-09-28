@@ -1,9 +1,10 @@
-# Gextto
+# Gextto EXpert Torrent Transfer Orchestrator
 
 Copyright (c) 2026 buzzqw and Gextto contributors.
 
-**Gextto** is a self-hosted daemon for the automatic acquisition and archiving of
-TV series, movies and comics.
+**Gextto EXpert Torrent Transfer Orchestrator** (shown as **Gextto Media Daemon**
+in compact interfaces) is a self-hosted daemon for the automatic acquisition and
+archiving of TV series, movies and comics.
 
 A single Go binary bundles everything: the scraping engine, the SQLite archive,
 the web UI/API (embedded with `//go:embed`), the terminal TUI and an embedded

@@ -892,11 +892,11 @@
     <label class="settings-tab-select-wrap">
       <span>Sezione</span>
       <select class="input settings-tab-select" data-settings-tab-select aria-label="Sezione configurazione">
-        {{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{.Label}}{{if .Count}} ({{.Count}}){{end}}</option>{{end}}
+        {{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{.Label}}</option>{{end}}
       </select>
     </label>
     <div class="chip-row">
-      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}">{{.Label}}{{if .Count}}<span class="chip-count">{{.Count}}</span>{{end}}</a>{{end}}
+      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}">{{.Label}}</a>{{end}}
     </div>
     <div class="settings-savebar" data-settings-savebar hidden>
       <span class="settings-savebar-text" data-settings-dirty-count>Nessuna modifica</span>

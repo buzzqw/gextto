@@ -1380,7 +1380,7 @@ pub fn App() -> impl IntoView {
         <Title text="Gextto" />
         <div class="app-shell">
                 <aside class="sidebar">
-                    <div class="brand">
+                    <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
                         <span class="brand-mark">R</span>
                         <div><strong>Gextto</strong><small title=ctx_tr("Versione applicazione")>{move || data.with(|current| format!("Media daemon · v{}", text(&current.status, "version", "?")))}</small></div>
                     </div>

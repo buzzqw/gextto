@@ -45,6 +45,228 @@
     });
   }
 
+  // The server-rendered shell predates the bilingual UI and contains plain
+  // Italian labels. Reuse the persisted translation catalog here so the new
+  // UI follows the language selected in the top bar, including labels added by
+  // partials and client-side dialogs.
+  var uiTranslations = {};
+  var uiEnglishFallbacks = {
+    "Cerca impostazioni": "Search settings",
+    "Configurazione": "Configuration",
+    "Controllo libreria e download": "Library and download control",
+    "Monitora il servizio, avvia una ricerca o raggiungi subito la sezione che ti serve.": "Monitor the service, start a search, or jump to the section you need.",
+    "Torrent e download HTTP fumetti nella stessa lista di lavoro": "Torrents and comic HTTP downloads in the same work list",
+    "Download session": "Download session",
+    "In scarico": "Downloading",
+    "Nessun download nella sessione.": "No downloads in the session.",
+    "Dettagli download HTTP": "HTTP download details",
+    "Rimuovere questo download?": "Remove this download?",
+    "Storico da conservare": "History to keep",
+    "Numero massimo di elementi da conservare sia nello Storico fumetti sia nello Storico Weekly Pack (1–500).": "Maximum number of items to keep in both Comic history and Weekly Pack history (1–500).",
+    "Weekly attivo": "Weekly enabled",
+    "Avvia ciclo fumetti": "Start comic cycle",
+    "Pianificazione settimanale": "Weekly scheduling",
+    "Storico fumetti": "Comic history",
+    "Storico Weekly Pack": "Weekly Pack history",
+    "Motore torrent": "Torrent engine",
+    "Ciclo fumetti": "Comic cycle",
+    "Scarica weekly pack a partire dal": "Download Weekly Packs starting from",
+    "Cerca un Weekly Pack": "Search for a Weekly Pack",
+    "Cerca weekly": "Search weekly",
+    "Download diretto": "Direct download",
+    "File diretti": "Direct files",
+    "Ricerca in corso…": "Searching…",
+    "Nessun link trovato.": "No links found.",
+    "Cerca il post del Weekly Pack su GetComics per la data scelta ed estrae i magnet/.torrent disponibili. Non avvia il download.": "Find the GetComics Weekly Pack post for the selected date and extract the available magnet/.torrent links. Does not start the download.",
+    "Cerca il titolo, poi scarica con Download Now o aggiungi il fumetto alla libreria.": "Search for the title, then download with Download Now or add the comic to the library.",
+    "Scarica da GetComics": "Download from GetComics",
+    "Salva weekly": "Save weekly",
+    "Avvia ciclo fumetti": "Start comic cycle",
+    "Applica motore": "Apply engine",
+    "Stato qBittorrent-nox": "qBittorrent-nox status",
+    "Aggiungi riga": "Add row",
+    "Regole tag → cartella": "Tag → folder rules",
+    "Cartella": "Folder",
+    "Cartella finale": "Final folder",
+    "Cartella dati del motore anacrolix (stato e resume).": "anacrolix engine data folder (state and resume).",
+    "Intervallo in millisecondi tra due letture dello stato dei torrent.": "Interval in milliseconds between torrent status polls.",
+    "Mappatura dei percorsi tra Gextto e il motore anacrolix (locale=remoto).": "Path mapping between Gextto and the anacrolix engine (local=remote).",
+    "Motore torrent attivo (libtorrent, qBittorrent-nox o anacrolix).": "Active torrent engine (libtorrent, qBittorrent-nox, or anacrolix).",
+    "Porta di ascolto del motore anacrolix.": "anacrolix engine listening port.",
+    "Scegli il motore dalla tendina «Motore torrent». Il binario gestito è scaricato e aggiornato da Gextto.": "Choose the engine from the “Torrent engine” list. The managed binary is downloaded and updated by Gextto.",
+    "anacrolix — cartella dati": "anacrolix — data folder",
+    "Dimensione massima di un singolo torrent ammesso sul RAM disk (GB).": "Maximum size of a single torrent allowed on the RAM disk (GB).",
+    "I torrent che non trasferiscono dati non consumano uno slot attivo.": "Torrents that do not transfer data do not consume an active slot.",
+    "Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore.": "Advanced libtorrent settings, one key=value entry per line.",
+    "Limite di seeding in minuti, usato solo se Seed massimo (giorni) è 0.": "Seeding limit in minutes, used only when Maximum seed time (days) is 0.",
+    "Permette più connessioni dallo stesso indirizzo IP.": "Allows multiple connections from the same IP address.",
+    "Più connessioni per IP": "Multiple connections per IP",
+    "Programmazione velocità attiva": "Speed scheduling enabled",
+    "Scarica in RAM i torrent che rientrano nella soglia; i più grandi vanno su disco.": "Download torrents within the threshold to RAM; larger torrents go to disk.",
+    "Secondi di inattività dopo cui un blocco esce dalla cache.": "Idle seconds before a block leaves the cache.",
+    "Spazio libero da lasciare sul RAM disk una volta completato il download (GB).": "Free space to leave on the RAM disk after the download completes (GB).",
+    "Applica motore": "Apply engine",
+    "Scegli una destinazione temporanea tmpfs/ramfs scrivibile: premi \"Usa questo percorso\" e Gextto la configura (creando la cartella se serve) con soglia e margine consigliati. /dev/shm viene perso al riavvio.": "Choose a writable temporary tmpfs/ramfs destination: click “Use this path” and Gextto will configure it (creating the folder if needed) with recommended threshold and margin. /dev/shm is lost on reboot.",
+    "Salva Simkl": "Save Simkl",
+    "Salva Trakt": "Save Trakt",
+    "Jackett, Prowlarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).": "Jackett, Prowlarr, or other Torznab indexers. The URL is the base (Gextto adds the Torznab path).",
+    "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.": "Download scripts to open magnet links and .torrent files directly in Gextto.",
+    "Verifica indexer e sorgenti": "Check indexers and sources",
+    "Associa un tag del torrent a una cartella temporanea e finale.": "Map a torrent tag to a temporary and final folder.",
+    "Numero minimo di release recenti da conservare sempre in archivio.": "Minimum number of recent releases to always keep in the archive.",
+    "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download.": "Minimum free space (GB) in the download folder: below this threshold the cycle does not start downloads.",
+    "Sposta gli episodi e i season pack nella cartella archivio invece di copiarli.": "Move episodes and season packs to the archive folder instead of copying them.",
+    "La verifica parte solo quando la richiedi e può richiedere fino a ~1 minuto.": "The check starts only when requested and can take up to ~1 minute.",
+    "Diagnostica sorgenti": "Source diagnostics",
+    "Stato provider": "Provider status",
+    "Salva backup": "Save backup",
+    "Cartella cloud": "Cloud folder",
+    "VACUUM compatta i file; ANALYZE aggiorna le statistiche SQLite.": "VACUUM compacts the files; ANALYZE updates SQLite statistics.",
+    "Premi Aggiorna per verificare tutte le sorgenti; usa la ricerca per provare una query su feed, indexer e motori web.": "Click Refresh to check all sources; use the search to test a query on feeds, indexers, and web engines.",
+    "Aggiungi una serie": "Add a series",
+    "Aggiungi un film": "Add a movie",
+    "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.": "Enter the title and search TMDB, or use “Add manually” to fill in the requirements.",
+    "ATTIVO": "ACTIVE",
+    "Rinomina anche i file già corretti": "Also rename files already in the correct format",
+    "Perché non questo?": "Why not this?",
+    "Chiudi": "Close",
+    "Elimina tutti": "Delete all",
+    "Nessun database.": "No database.",
+    "Nessun download recente.": "No recent downloads.",
+    "Nessun duplicato inferiore trovato.": "No lower-quality duplicates found.",
+    "Nessun risultato su GetComics.": "No results on GetComics.",
+    "Nessun risultato su TMDB.": "No results on TMDB.",
+    "Nessun tmpfs/ramfs scrivibile trovato.": "No writable tmpfs/ramfs found.",
+    "Nessun file (metadati non ancora disponibili).": "No files (metadata not available yet).",
+    "Nessun peer connesso.": "No connected peers.",
+    "Nessun tracker.": "No trackers.",
+    "Nessuna rinomina necessaria: i file sono già nel formato corretto.": "No rename needed: files already use the correct format.",
+    "Nessun risultato con questo filtro.": "No results with this filter.",
+    "Seleziona almeno un torrent": "Select at least one torrent",
+    "Aggiungi questa release ai download": "Add this release to downloads",
+    "Tag aggiornato": "Tag updated",
+    "Punteggio di qualità della release": "Release quality score",
+    "Risolvi i link del post e avvia Download Now": "Resolve the post links and start Download Now",
+    "Download Now non trovato per questo post": "Download Now was not found for this post",
+    "Torrent non aggiunto: ": "Torrent not added: ",
+    "Operazione completata": "Operation completed",
+    "Azione non riuscita: ": "Action failed: ",
+    "Salvataggio non riuscito: ": "Save failed: ",
+    "Cambio lingua non riuscito: ": "Language change failed: ",
+    "Tag assegnato a ": "Tag assigned to ",
+    "Tag rimosso da ": "Tag removed from ",
+    "Seleziona tutti i torrent": "Select all torrents",
+    "Tag da assegnare ai torrent selezionati": "Tag to assign to selected torrents",
+    "Nuovo tag": "New tag",
+    "Assegna tag": "Assign tag",
+    "Rimuovi tag": "Remove tag",
+    "Recheck": "Recheck",
+    "Rimuovere questo torrent?": "Remove this torrent?",
+    "Nessun elemento.": "No items.",
+    "Caricamento…": "Loading…",
+    "Nessun risultato.": "No results.",
+    "Inserisci una ricerca.": "Enter a search.",
+    "Salva": "Save",
+    "Salva tutte": "Save all",
+    "Nessuna modifica": "No changes",
+    "Sì": "Yes",
+    "No": "No",
+    "Traduzioni": "Translations"
+  };
+
+  function uiEnglishText(value) {
+    if (!value) return value;
+    var match = String(value).match(/^(\s*)([\s\S]*?)(\s*)$/);
+    var core = match ? match[2] : String(value);
+    var translated = uiTranslations[core] || uiEnglishFallbacks[core];
+    var matchDownloads = core.match(/^(\d+) torrent · (\d+) HTTP fumetti · aggiornato (.+)$/);
+    if (!translated && matchDownloads) translated = matchDownloads[1] + " torrents · " + matchDownloads[2] + " comic HTTP downloads · updated " + matchDownloads[3];
+    var matchSelected = core.match(/^(\d+) selezionati$/);
+    if (!translated && matchSelected) translated = matchSelected[1] + " selected";
+    var matchSettings = core.match(/^(\d+) impostazioni$/);
+    if (!translated && matchSettings) translated = matchSettings[1] + " settings";
+    var matchOrigin = core.match(/^Perché: (.+) · Fonte: (.+)$/);
+    if (!translated && matchOrigin) translated = "Reason: " + matchOrigin[1] + " · Source: " + matchOrigin[2];
+    var matchDashboard = core.match(/^(\d+) in scarico · (\d+) in seed$/);
+    if (!translated && matchDashboard) translated = matchDashboard[1] + " downloading · " + matchDashboard[2] + " seeding";
+    var matchEngineHint = core.match(/^Scegli il motore dalla tendina «Motore torrent»\. Il binario gestito è scaricato e aggiornato da Gextto\. Binario: (.+)\.$/);
+    if (!translated && matchEngineHint) translated = "Choose the engine from the “Torrent engine” list. The managed binary is downloaded and updated by Gextto. Binary: " + matchEngineHint[1] + ".";
+    if (!translated) return value;
+    return (match ? match[1] : "") + translated + (match ? match[3] : "");
+  }
+
+  function translateUIValue(value) {
+    if (document.documentElement.getAttribute("lang") !== "en") return value;
+    return uiEnglishText(value);
+  }
+
+  function translateUIJSONAttribute(node, attribute) {
+    var raw = node.getAttribute(attribute);
+    if (!raw) return;
+    try {
+      var parsed = JSON.parse(raw);
+      var changed = false;
+      function visit(value) {
+        if (Array.isArray(value)) return value.map(visit);
+        if (!value || typeof value !== "object") {
+          var translated = translateUIValue(value);
+          if (translated !== value) changed = true;
+          return translated;
+        }
+        Object.keys(value).forEach(function (key) { value[key] = visit(value[key]); });
+        return value;
+      }
+      var translatedJSON = visit(parsed);
+      if (changed) node.setAttribute(attribute, JSON.stringify(translatedJSON));
+    } catch (_) { /* leave malformed or non-JSON attributes untouched */ }
+  }
+
+  function translateUINode(node) {
+    if (!node) return;
+    if (node.nodeType === 3) {
+      node.nodeValue = translateUIValue(node.nodeValue);
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    var tag = node.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "TEXTAREA") return;
+    ["title", "placeholder", "aria-label", "data-empty", "data-confirm", "data-action-label"].forEach(function (attribute) {
+      if (node.hasAttribute(attribute)) node.setAttribute(attribute, translateUIValue(node.getAttribute(attribute)));
+    });
+    ["data-columns", "data-actions"].forEach(function (attribute) { translateUIJSONAttribute(node, attribute); });
+    Array.prototype.forEach.call(node.childNodes, translateUINode);
+  }
+
+  function translateUI() {
+    if (document.documentElement.getAttribute("lang") === "en") {
+      translateUINode(document.body);
+      document.title = uiEnglishText(document.title.replace(/^Gextto · /, "")) === document.title.replace(/^Gextto · /, "")
+        ? document.title
+        : "Gextto · " + uiEnglishText(document.title.replace(/^Gextto · /, ""));
+    }
+  }
+
+  function loadUITranslations() {
+    if (document.documentElement.getAttribute("lang") !== "en") return;
+    api("/api/i18n?lang=en", "GET").then(function (data) {
+      (data && data.items || []).forEach(function (item) {
+        if (item && item.key && item.value) uiTranslations[item.key] = item.value;
+      });
+      translateUI();
+      if (window.MutationObserver) {
+        var observer = new MutationObserver(function (mutations) {
+          mutations.forEach(function (mutation) {
+            Array.prototype.forEach.call(mutation.addedNodes, translateUINode);
+            if (mutation.type === "characterData") translateUINode(mutation.target);
+          });
+        });
+        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+      }
+    }).catch(function () { translateUI(); });
+  }
+
+  loadUITranslations();
+
   var partials = {
     downloads: "/ui/partial/torrents"
   };
