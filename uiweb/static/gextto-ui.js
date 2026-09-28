@@ -8,7 +8,7 @@
   if (!page) return;
   var view = page.getAttribute("data-view") || "dashboard";
 
-  function request(path, method, body) {
+  function request(path, method, body, signal) {
     var requestMethod = (method || "GET").toUpperCase();
     var headers = { "Content-Type": "application/json" };
     // Browsers reject a body on GET/HEAD requests. Some generic action
@@ -22,7 +22,8 @@
       method: requestMethod,
       headers: headers,
       body: requestBody,
-      credentials: "same-origin"
+      credentials: "same-origin",
+      signal: signal
     });
   }
 
@@ -39,9 +40,28 @@
     return isJSON ? response.json() : response.text();
   }
 
-  function api(path, method, body) {
-    return request(path, method, body).then(function (response) {
+  function api(path, method, body, signal) {
+    return request(path, method, body, signal).then(function (response) {
       return handleResponse(response);
+    });
+  }
+
+  // Keep polling bounded. If the daemon is busy, overlapping fetches would
+  // retain their Promise/DOM closures until every request eventually finishes.
+  // Action requests continue to use api() directly and are not shortened.
+  var pollTimeoutMs = 10000;
+  function pollRequest(path) {
+    var controller = window.AbortController ? new window.AbortController() : null;
+    var timeout = window.setTimeout(function () {
+      if (controller) controller.abort();
+    }, pollTimeoutMs);
+    var signal = controller ? controller.signal : undefined;
+    return api(path, "GET", undefined, signal).then(function (value) {
+      window.clearTimeout(timeout);
+      return value;
+    }, function (error) {
+      window.clearTimeout(timeout);
+      throw error;
     });
   }
 
@@ -271,10 +291,12 @@
     downloads: "/ui/partial/torrents"
   };
 
+  var loadPromise = null;
   function load() {
+    if (loadPromise) return loadPromise;
     var url = partials[view];
     if (!url) return Promise.resolve();
-    return api(url, "GET")
+    loadPromise = pollRequest(url)
       .then(function (html) {
         if (view === "downloads") {
           var currentSlot = page.querySelector("[data-torrents-slot]");
@@ -296,7 +318,12 @@
       .catch(function (error) {
         page.innerHTML = '<div class="view"><div class="alert">Impossibile caricare i dati: ' +
           esc(error.message) + "</div></div>";
+      })
+      .then(function (value) {
+        loadPromise = null;
+        return value;
       });
+    return loadPromise;
   }
 
   // Inline feedback keeps the page context visible; browser alerts were easy
@@ -1322,12 +1349,15 @@
     var actions = JSON.parse(container.getAttribute("data-actions") || "[]");
     var empty = container.getAttribute("data-empty") || "Nessun elemento.";
     var searchParam = container.getAttribute("data-search") || "";
+    var fetching = false;
     function fetchAndRender() {
+      if (fetching) return;
+      fetching = true;
       var url = endpoint;
       if (searchParam && searchInput && searchInput.value) {
         url += (url.indexOf("?") >= 0 ? "&" : "?") + searchParam + "=" + encodeURIComponent(searchInput.value);
       }
-      api(url, "GET").then(function (data) {
+      pollRequest(url).then(function (data) {
         var items = (itemsKey && data[itemsKey]) || (Array.isArray(data) ? data : []);
         if (!columns.length && items.length) {
           columns = Object.keys(items[0]).filter(function (key) {
@@ -1494,6 +1524,8 @@
         applyTableFilter(panel);
       }).catch(function (error) {
         tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
+      }).then(function () {
+        fetching = false;
       });
     }
     container._refetch = fetchAndRender;
@@ -2315,13 +2347,16 @@
     node.textContent = String(count);
     node.hidden = count <= 0;
   }
+  var shellMetricsInFlight = false;
   function refreshShellMetrics() {
-    api("/api/process-metrics", "GET").then(function (data) {
+    if (shellMetricsInFlight) return;
+    shellMetricsInFlight = true;
+    pollRequest("/api/process-metrics").then(function (data) {
       var cpu = data && data.process_cpu_percent;
       setMetric("cpu", cpu == null ? "—" : Number(cpu).toFixed(1) + "%");
       if (data && data.resident_bytes != null) setMetric("ram", humanBytes(data.resident_bytes));
     }).catch(function () { /* keep the previous value */ });
-    api("/api/torrents", "GET").then(function (items) {
+    pollRequest("/api/torrents").then(function (items) {
       var list = Array.isArray(items) ? items : [];
       var dl = 0, ul = 0, peers = 0, seeds = 0;
       list.forEach(function (item) {
@@ -2335,7 +2370,7 @@
       setMetric("ul", humanRate(ul));
       setMetric("count", String(list.length));
       setMetric("peers", peers + "/" + seeds);
-      api("/api/comics/downloads", "GET").then(function (downloads) {
+      pollRequest("/api/comics/downloads").then(function (downloads) {
         var items = Array.isArray(downloads) ? downloads : [];
         shellHTTPDownload = items.reduce(function (total, item) {
           return total + (Number(item.speed_bytes) || 0);
@@ -2345,11 +2380,13 @@
         refreshShellDownloadMetric();
       }).catch(function () { refreshShellDownloadMetric(); });
     }).catch(function () { /* keep the previous value */ });
-    api("/api/status", "GET").then(function (data) {
+    pollRequest("/api/status").then(function (data) {
       if (!data || !data.next_cycle_at) { setMetric("cycle", "—"); return; }
       var remaining = (Date.parse(data.next_cycle_at) - Date.now()) / 1000;
       setMetric("cycle", humanDuration(remaining));
-    }).catch(function () { /* keep the previous value */ });
+    }).catch(function () { /* keep the previous value */ }).then(function () {
+      shellMetricsInFlight = false;
+    });
   }
   refreshShellMetrics();
   setInterval(function () {
@@ -2900,6 +2937,7 @@
     var logsCache = [];
     var logsFollow = true;
     var logsTimer = null;
+    var logsRefreshInFlight = false;
 
     var highlightLogLine = function (line) {
       return esc(line)
@@ -2924,11 +2962,15 @@
     };
 
     var refreshLogs = function () {
+      if (logsRefreshInFlight) return;
+      logsRefreshInFlight = true;
       var limit = logsLines ? logsLines.value : "500";
-      api("/api/logs?limit=" + encodeURIComponent(limit), "GET").then(function (data) {
+      pollRequest("/api/logs?limit=" + encodeURIComponent(limit)).then(function (data) {
         logsCache = Array.isArray(data.items) ? data.items : [];
         renderLogs();
-      }).catch(function () { /* keep the previous view on a transient error */ });
+      }).catch(function () { /* keep the previous view on a transient error */ }).then(function () {
+        logsRefreshInFlight = false;
+      });
     };
 
     var scheduleLogs = function () {
@@ -3370,8 +3412,11 @@
     var panel = node.closest(".panel");
     var bar = panel.querySelector("[data-progress-bar]");
     var text = panel.querySelector("[data-progress-text]");
+    var inFlight = false;
     function poll() {
-      api(endpoint, "GET").then(function (data) {
+      if (inFlight) return;
+      inFlight = true;
+      pollRequest(endpoint).then(function (data) {
         var progress = data && data.progress ? data.progress : data;
         if (!progress) return;
         var total = Number(progress.total) || 0;
@@ -3384,7 +3429,9 @@
             (progress.errors ? " · errori " + progress.errors : "") +
             (progress.message ? " · " + progress.message : "");
         }
-      }).catch(function () { /* keep the previous value */ });
+      }).catch(function () { /* keep the previous value */ }).then(function () {
+        inFlight = false;
+      });
     }
     poll();
     setInterval(poll, 3000);
