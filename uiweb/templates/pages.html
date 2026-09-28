@@ -56,9 +56,10 @@
     <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-wrap="{{.Wrap}}" data-render="{{.Render}}">
       {{range .Fields}}
       {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
-      {{else}}<label class="field"><span>{{.Label}}</span>
+      {{else}}<label class="field"{{if .Hint}} title="{{.Hint}}"{{end}}><span>{{.Label}}</span>
         {{if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" placeholder="{{.Placeholder}}" rows="3">{{.Value}}</textarea>
         {{else if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
+        {{else if .Browse}}<span class="field-row"><input class="input" name="{{.Name}}" type="text" value="{{.Value}}" placeholder="{{.Placeholder}}" /><button class="btn sm" type="button" data-browse-for="{{.Name}}" title="Sfoglia le cartelle e crea una nuova se serve">Sfoglia</button></span>
         {{else}}<input class="input" name="{{.Name}}" type="{{if .Kind}}{{.Kind}}{{else}}text{{end}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
         {{end}}
       </label>
@@ -66,6 +67,7 @@
       {{end}}
       <div class="form-actions">
         <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>
+        {{if .ManualAdd}}<button class="btn" type="button" data-open-add="{{.ManualAdd}}" title="Compila i requisiti e aggiungi manualmente">Aggiungi manualmente</button>{{end}}
         <small class="muted" data-form-message></small>
       </div>
       <div class="output" data-form-output hidden></div>
@@ -418,6 +420,7 @@
   <div class="panel" data-series-hero data-series-name="{{.PathName}}"
        data-name="{{.Name}}" data-quality="{{.Quality}}" data-language="{{.Language}}"
        data-archive="{{.ArchivePath}}" data-seasons="{{.Seasons}}" data-gaps="{{.Gaps}}"
+       data-downloaded="{{.DownloadedCount}}" data-total="{{.EpisodeCount}}"
        data-ignored-seasons="{{json .IgnoredSeasons}}"
        data-enabled="{{if .Enabled}}true{{else}}false{{end}}">
     <div class="panel-body series-hero">
@@ -501,7 +504,9 @@
         <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" /></label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
-        <label class="field"><span>Percorso archivio</span><input class="input" name="archive_path" value="{{.ArchivePath}}" /></label>
+        <label class="field span-full"><span>Percorso archivio (NAS)</span>
+          <span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" /><button class="btn sm" type="button" data-browse-for="archive_path" title="Sfoglia le cartelle e crea una nuova se serve">Sfoglia</button></span>
+        </label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message></small></div>
       </form>

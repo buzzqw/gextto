@@ -1127,6 +1127,21 @@
                 if (tag) html += (html ? " " : "") + '<span class="badge">' + esc(tag) + "</span>";
                 return "<td" + sortAttr + ">" + (html || '<span class="muted">—</span>') + "</td>";
               }
+              if (column.format === "series_status") {
+                var totalEpisodes = Number(row.episodes_total) || 0;
+                var doneEpisodes2 = Number(row.episodes_downloaded) || 0;
+                var complete = totalEpisodes > 0 && doneEpisodes2 >= totalEpisodes;
+                var rawStatus = String(row.tmdb_status || "").toLowerCase();
+                var ended = rawStatus === "ended" || rawStatus === "canceled" || rawStatus === "cancelled";
+                var enabled2 = row.enabled !== false;
+                var statusHTML;
+                if (ended && complete) statusHTML = '<span class="badge ok" title="Serie terminata e completa: tutti gli episodi disponibili sono archiviati">🏁 ✓✓</span>';
+                else if (ended) statusHTML = '<span class="badge" title="Serie terminata: mancano ancora episodi">🏁 terminata</span>';
+                else if (complete) statusHTML = '<span class="badge" title="Al passo: tutti gli episodi pubblicati finora sono archiviati, ma la serie non è terminata">✓ in pari</span>';
+                else statusHTML = '<span class="badge ' + (enabled2 ? "ok" : "") + '">' + (enabled2 ? "attiva" : "in pausa") + "</span>";
+                if ((ended || complete) && !enabled2) statusHTML += ' <span class="badge" title="Serie in pausa">in pausa</span>';
+                return "<td" + sortAttr + ">" + statusHTML + "</td>";
+              }
               if (column.format === "status_badge") {
                 var good = row.ok !== false;
                 return "<td" + sortAttr + '><span class="badge ' + (good ? "ok" : "err") + '">' + (good ? "ok" : "errore") + "</span></td>";
@@ -2859,6 +2874,16 @@
       metaSlot.innerHTML = badges.map(function (badge) {
         return '<span class="badge">' + esc(badge) + "</span>";
       }).join(" ");
+      var heroTotal = Number(hero.getAttribute("data-total")) || 0;
+      var heroDone = Number(hero.getAttribute("data-downloaded")) || 0;
+      var heroComplete = heroTotal > 0 && heroDone >= heroTotal;
+      var heroStatus = String(info.status || "").toLowerCase();
+      var heroEnded = heroStatus.indexOf("ended") === 0 || heroStatus.indexOf("cancel") === 0;
+      var flag = "";
+      if (heroEnded && heroComplete) flag = '<span class="badge ok" title="Serie terminata e completa: tutti gli episodi disponibili sono archiviati">🏁 ✓✓</span>';
+      else if (heroEnded) flag = '<span class="badge" title="Serie terminata: mancano ancora episodi">🏁 terminata</span>';
+      else if (heroComplete) flag = '<span class="badge" title="Al passo: tutti gli episodi pubblicati finora sono archiviati, ma la serie non è terminata">✓ in pari</span>';
+      if (flag) metaSlot.innerHTML = flag + (metaSlot.innerHTML ? " " + metaSlot.innerHTML : "");
     }
     var overviewSlot = hero.querySelector("[data-hero-overview]");
     if (overviewSlot && info.overview) overviewSlot.textContent = String(info.overview);
@@ -2944,9 +2969,10 @@
     language: [["", "Predefinita (ita)"], ["ita", "Italiano"], ["eng", "Inglese"], ["ita,eng", "Italiano + Inglese"], ["multi", "Multi"], ["any", "Qualsiasi"]]
   };
 
-  function addModalField(label, name, value, options) {
+  function addModalField(label, name, value, options, hint, browse) {
     var wrap = document.createElement("label");
     wrap.className = "field";
+    if (hint) wrap.setAttribute("title", hint);
     var span = document.createElement("span");
     span.textContent = label;
     var control;
@@ -2967,7 +2993,21 @@
     }
     control.setAttribute("name", name);
     wrap.appendChild(span);
-    wrap.appendChild(control);
+    if (browse && !options) {
+      var row = document.createElement("span");
+      row.className = "field-row";
+      row.appendChild(control);
+      var browseButton = document.createElement("button");
+      browseButton.className = "btn sm";
+      browseButton.type = "button";
+      browseButton.textContent = "Sfoglia";
+      browseButton.title = "Sfoglia le cartelle e crea una nuova se serve";
+      browseButton.addEventListener("click", function () { openBrowseModal(control); });
+      row.appendChild(browseButton);
+      wrap.appendChild(row);
+    } else {
+      wrap.appendChild(control);
+    }
     return wrap;
   }
 
@@ -3005,19 +3045,19 @@
     body.className = "modal-body";
     var form = document.createElement("div");
     form.className = "form-grid";
-    form.appendChild(addModalField("Titolo", "name", prefill.name || ""));
-    form.appendChild(addModalField("Anno", "year", prefill.year || ""));
-    form.appendChild(addModalField("TMDB ID", "tmdb_id", prefill.tmdb_id || ""));
-    form.appendChild(addModalField("TVDB ID", "tvdb_id", prefill.tvdb_id || ""));
-    form.appendChild(addModalField("Qualità richiesta", "quality", "", addModalOptions.quality));
-    form.appendChild(addModalField("Lingue", "language", "", addModalOptions.language));
-    form.appendChild(addModalField("Sottotitoli", "subtitle", ""));
+    form.appendChild(addModalField("Titolo", "name", prefill.name || "", null, "Titolo come deve comparire nella libreria."));
+    form.appendChild(addModalField("Anno", "year", prefill.year || "", null, "Anno di uscita/messa in onda (usato anche per i metadati)."));
+    form.appendChild(addModalField("TMDB ID", "tmdb_id", prefill.tmdb_id || "", null, "ID TMDB: permette di recuperare poster e metadati."));
+    form.appendChild(addModalField("TVDB ID", "tvdb_id", prefill.tvdb_id || "", null, "ID TVDB alternativo (opzionale)."));
+    form.appendChild(addModalField("Qualità richiesta", "quality", "", addModalOptions.quality, "Risoluzione minima accettata. 720p accetta 720p e superiori; 1080p da Full HD in su; 2160p+ 4K+ solo 4K. Il '+' non cambia la soglia (come in rextto)."));
+    form.appendChild(addModalField("Lingue", "language", "", addModalOptions.language, "Lingua audio richiesta. Per più lingue scegli Italiano + Inglese (ita,eng)."));
+    form.appendChild(addModalField("Sottotitoli", "subtitle", "", null, "Sottotitoli richiesti (es. ita,eng); vuoto = nessun requisito."));
     if (kind !== "movie") {
-      form.appendChild(addModalField("Stagioni", "seasons", "1+"));
-      form.appendChild(addModalField("Alias", "aliases", ""));
-      form.appendChild(addModalField("Percorso NAS", "archive_path", ""));
+      form.appendChild(addModalField("Stagioni", "seasons", "1+", null, "Stagioni da monitorare: es. 1-5, 3+ oppure * per tutte."));
+      form.appendChild(addModalField("Alias", "aliases", "", null, "Altri nomi con cui possono apparire le release, separati da virgola."));
+      form.appendChild(addModalField("Percorso NAS", "archive_path", "", null, "Cartella di destinazione sul NAS dove archiviare i file.", true));
     }
-    form.appendChild(addModalField("Esclusioni", "exclude", ""));
+    form.appendChild(addModalField("Esclusioni", "exclude", "", null, "Parole che escludono una release (es. cam, ts)."));
 
     var actions = document.createElement("div");
     actions.className = "form-actions";
@@ -3051,6 +3091,107 @@
     var first = form.querySelector("[name=name]");
     if (first) first.focus();
   }
+
+  // ---- folder browser (NAS path picker with mkdir) ------------------------
+  function openBrowseModal(input) {
+    var overlay = document.getElementById("browse-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "browse-overlay";
+      overlay.className = "overlay";
+      overlay.innerHTML =
+        '<div class="modal" role="dialog" aria-modal="true" aria-label="Sfoglia cartelle">' +
+        '<div class="modal-head"><h3>Scegli una cartella</h3><button class="btn sm" type="button" data-browse-close>Chiudi</button></div>' +
+        '<div class="modal-body">' +
+        '<div class="toolbar"><button class="btn sm" type="button" data-browse-up title="Vai alla cartella superiore">↑ Su</button><code class="browse-path" data-browse-path-label></code></div>' +
+        '<div class="toolbar"><input class="input" data-browse-new placeholder="nome nuova cartella" /><button class="btn sm" type="button" data-browse-create title="Crea la cartella nella posizione corrente">Crea cartella</button></div>' +
+        '<div class="browse-list" data-browse-list></div>' +
+        '<div class="form-actions"><button class="btn primary" type="button" data-browse-select>Seleziona questa cartella</button><small class="muted" data-browse-message aria-live="polite"></small></div>' +
+        "</div></div>";
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", function (event) {
+        if (event.target === overlay || event.target.closest("[data-browse-close]")) overlay.hidden = true;
+      });
+    }
+    overlay.hidden = false;
+    overlay._target = input;
+    overlay._current = String(input && input.value || "").trim();
+    loadBrowseModal(overlay);
+  }
+
+  function loadBrowseModal(overlay) {
+    var list = overlay.querySelector("[data-browse-list]");
+    var label = overlay.querySelector("[data-browse-path-label]");
+    var message = overlay.querySelector("[data-browse-message]");
+    if (message) message.textContent = "";
+    list.innerHTML = '<p class="muted">Caricamento…</p>';
+    api("/api/browse_dir?path=" + encodeURIComponent(overlay._current || ""), "GET").then(function (data) {
+      overlay._current = String(data.path || overlay._current || "");
+      overlay._parent = data.parent || "";
+      if (label) label.textContent = overlay._current;
+      var dirs = data.dirs || [];
+      list.innerHTML = "";
+      if (!dirs.length) list.innerHTML = '<p class="muted">Nessuna sottocartella.</p>';
+      dirs.forEach(function (dir) {
+        var button = document.createElement("button");
+        button.className = "browse-item";
+        button.type = "button";
+        button.textContent = folderLabel(dir);
+        button.title = dir;
+        button.addEventListener("click", function () { overlay._current = dir; loadBrowseModal(overlay); });
+        list.appendChild(button);
+      });
+    }).catch(function (error) {
+      list.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var browseButton = event.target.closest("[data-browse-for]");
+    if (browseButton) {
+      var scope = browseButton.closest("form") || browseButton.closest(".form-grid");
+      var input = scope ? scope.querySelector('[name="' + browseButton.getAttribute("data-browse-for") + '"]') : null;
+      if (input) openBrowseModal(input);
+      return;
+    }
+    var overlay = document.getElementById("browse-overlay");
+    if (!overlay || overlay.hidden) return;
+    var message = overlay.querySelector("[data-browse-message]");
+    if (event.target.closest("[data-browse-up]")) {
+      overlay._current = overlay._parent || overlay._current;
+      loadBrowseModal(overlay);
+      return;
+    }
+    if (event.target.closest("[data-browse-select]")) {
+      if (overlay._target) overlay._target.value = overlay._current;
+      overlay.hidden = true;
+      return;
+    }
+    if (event.target.closest("[data-browse-create]")) {
+      var nameInput = overlay.querySelector("[data-browse-new]");
+      var name = (nameInput && nameInput.value.trim()) || "";
+      if (!name) { if (message) message.textContent = "Inserisci il nome della cartella"; return; }
+      var target = (overlay._current || "/").replace(/\/+$/, "") + "/" + name;
+      api("/api/mkdir", "POST", { path: target }).then(function () {
+        overlay._current = target;
+        if (nameInput) nameInput.value = "";
+        if (message) message.textContent = "Cartella creata";
+        loadBrowseModal(overlay);
+      }).catch(function (error) { if (message) message.textContent = error.message; });
+      return;
+    }
+  });
+
+  // Open the completion modal from the "Aggiungi manualmente" button, prefilling
+  // the title with whatever is typed in the search box.
+  document.addEventListener("click", function (event) {
+    var manual = event.target.closest("[data-open-add]");
+    if (!manual) return;
+    var scope = manual.closest("form") || manual.closest(".panel");
+    var queryInput = scope ? scope.querySelector('input[name="query"]') : null;
+    var name = queryInput ? queryInput.value.trim() : "";
+    openAddModal(manual.getAttribute("data-open-add") || "series", { name: name });
+  });
 
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {

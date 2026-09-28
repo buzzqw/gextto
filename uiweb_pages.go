@@ -556,7 +556,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "", Label: "Ep.", Format: "episodes"},
 				{Key: "", Label: "Complet.", Format: "completion"},
 				{Key: "last_downloaded_at", Label: "Ultimo"},
-				{Key: "enabled", Label: "Stato", Format: "enabled"},
+				{Key: "", Label: "Stato", Format: "series_status"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
 				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`, Confirm: ""},

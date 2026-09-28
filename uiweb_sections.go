@@ -135,8 +135,10 @@ type uiFormField struct {
 	Label       string
 	Placeholder string
 	Value       string
-	Kind        string // text | number | area | select
+	Kind        string // text | number | area | select | hidden
 	Options     []uiFormOption
+	Hint        string
+	Browse      bool
 }
 
 type uiFormSection struct {
@@ -147,7 +149,10 @@ type uiFormSection struct {
 	Wrap   string // optional JSON object key around submitted fields
 	Submit string
 	Render string // optional result renderer: tmdb | releases
-	Fields []uiFormField
+	// ManualAdd, when set, adds a secondary "Aggiungi manualmente" button that
+	// opens the requirements completion modal for that kind.
+	ManualAdd string
+	Fields    []uiFormField
 }
 
 type uiProgressSection struct {
@@ -239,31 +244,13 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		spec, _ := uiTableSpecFor("series")
 		return uiPanelsPage{Sections: []uiPageSection{
 			sectionForm(uiFormSection{
-				Title: "Cerca una serie (TMDB)",
-				Hint:  "Cerca il titolo: i risultati si aggiungono con il pulsante nella scheda.",
+				Title: "Aggiungi una serie",
+				Hint:  "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.",
 				Path:  "/api/tmdb/search", Submit: "Cerca su TMDB", Render: "tmdb",
+				ManualAdd: "series",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "hidden", Value: "series"},
-					{Name: "query", Label: "Titolo", Placeholder: "Nome serie"},
-				},
-			}),
-			sectionForm(uiFormSection{
-				Title: "Aggiungi serie manualmente",
-				Hint:  "Le lingue multiple si separano con una virgola (es. ita,eng).",
-				Path:  "/api/tmdb/add", Submit: "Aggiungi serie",
-				Fields: []uiFormField{
-					{Name: "kind", Kind: "hidden", Value: "series"},
-					{Name: "name", Label: "Titolo", Placeholder: "Nome serie"},
-					{Name: "year", Label: "Anno", Placeholder: "es. 2024"},
-					{Name: "tmdb_id", Label: "TMDB ID", Placeholder: "es. 1399"},
-					{Name: "tvdb_id", Label: "TVDB ID", Placeholder: "opzionale"},
-					{Name: "quality", Label: "Qualità richiesta", Kind: "select", Options: uiQualityOptions},
-					{Name: "language", Label: "Lingue", Kind: "select", Options: uiLanguageOptions},
-					{Name: "subtitle", Label: "Sottotitoli", Placeholder: "es. ita,eng (vuoto = nessuno)"},
-					{Name: "seasons", Label: "Stagioni", Placeholder: "es. 1-5 oppure *"},
-					{Name: "aliases", Label: "Alias", Placeholder: "nomi alternativi separati da virgola"},
-					{Name: "archive_path", Label: "Percorso di salvataggio (NAS)", Placeholder: "es. /mnt/nas/Serie"},
-					{Name: "exclude", Label: "Esclusioni", Placeholder: "parole da escludere"},
+					{Name: "query", Label: "Titolo", Placeholder: "Nome serie", Hint: "Titolo della serie da cercare su TMDB."},
 				},
 			}),
 			sectionTable(spec),
@@ -272,28 +259,13 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		spec, _ := uiTableSpecFor("movies")
 		return uiPanelsPage{Sections: []uiPageSection{
 			sectionForm(uiFormSection{
-				Title: "Cerca un film (TMDB)",
-				Hint:  "Cerca il titolo: i risultati si aggiungono con il pulsante nella scheda.",
+				Title: "Aggiungi un film",
+				Hint:  "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.",
 				Path:  "/api/tmdb/search", Submit: "Cerca su TMDB", Render: "tmdb",
+				ManualAdd: "movie",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "hidden", Value: "movie"},
-					{Name: "query", Label: "Titolo", Placeholder: "Titolo film"},
-				},
-			}),
-			sectionForm(uiFormSection{
-				Title: "Aggiungi film manualmente",
-				Hint:  "Le lingue multiple si separano con una virgola (es. ita,eng).",
-				Path:  "/api/tmdb/add", Submit: "Aggiungi film",
-				Fields: []uiFormField{
-					{Name: "kind", Kind: "hidden", Value: "movie"},
-					{Name: "name", Label: "Titolo", Placeholder: "Titolo film"},
-					{Name: "year", Label: "Anno", Placeholder: "es. 2024"},
-					{Name: "tmdb_id", Label: "TMDB ID", Placeholder: "es. 603"},
-					{Name: "tvdb_id", Label: "TVDB ID", Placeholder: "opzionale"},
-					{Name: "quality", Label: "Qualità richiesta", Kind: "select", Options: uiQualityOptions},
-					{Name: "language", Label: "Lingue", Kind: "select", Options: uiLanguageOptions},
-					{Name: "subtitle", Label: "Sottotitoli", Placeholder: "es. ita,eng (vuoto = nessuno)"},
-					{Name: "exclude", Label: "Esclusioni", Placeholder: "parole da escludere"},
+					{Name: "query", Label: "Titolo", Placeholder: "Titolo film", Hint: "Titolo del film da cercare su TMDB."},
 				},
 			}),
 			sectionTable(spec),
