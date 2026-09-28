@@ -1290,6 +1290,9 @@ func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	for index := range items {
+		items[index].InLibrary = gh_tmdbItemInLibrary(cfg, kind, items[index])
+	}
 	jsonResponse(w, map[string]any{"ok": true, "kind": kind, "items": items})
 }
 

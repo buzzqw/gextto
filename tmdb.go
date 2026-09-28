@@ -50,6 +50,58 @@ type TmdbItem struct {
 	FirstAirDate *string  `json:"first_air_date"`
 	ReleaseDate  *string  `json:"release_date"`
 	VoteAverage  *float64 `json:"vote_average"`
+	// InLibrary marks a discovery/search result already present in the local
+	// library so the UI can show a "Già in lista" badge instead of offering a
+	// duplicate insert.
+	InLibrary bool `json:"in_library,omitempty"`
+}
+
+// gh_tmdbItemInLibrary reports whether a TMDB discovery/search result already
+// exists in the monitored library. It matches first by external id, then by
+// name (with the year for movies) so a card never offers a duplicate insert.
+func gh_tmdbItemInLibrary(cfg *Config, kind string, item TmdbItem) bool {
+	if cfg == nil {
+		return false
+	}
+	name := ""
+	if item.Name != nil {
+		name = strings.TrimSpace(*item.Name)
+	}
+	if name == "" && item.Title != nil {
+		name = strings.TrimSpace(*item.Title)
+	}
+	id := ""
+	if item.ID > 0 {
+		id = strconv.FormatInt(item.ID, 10)
+	}
+	if strings.EqualFold(strings.TrimSpace(kind), "movie") {
+		year := ""
+		if item.ReleaseDate != nil {
+			year = strings.TrimSpace(*item.ReleaseDate)
+			if len(year) > 4 {
+				year = year[:4]
+			}
+		}
+		for _, movie := range cfg.Movies {
+			if id != "" && strings.TrimSpace(movie.TmdbID) == id {
+				return true
+			}
+			if name != "" && strings.EqualFold(strings.TrimSpace(movie.Name), name) &&
+				(year == "" || movie.Year == "" || strings.HasPrefix(movie.Year, year)) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, series := range cfg.Series {
+		if id != "" && strings.TrimSpace(series.TmdbID) == id {
+			return true
+		}
+		if name != "" && strings.EqualFold(strings.TrimSpace(series.Name), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // TmdbMovieDetails mirrors the `TmdbMovieDetails`: editorial movie data

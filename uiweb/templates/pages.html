@@ -16,7 +16,7 @@
   <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
 </div>
 <div class="table-wrap">
-  <table class="data-table">
+  <table class="data-table {{.Class}}">
     <thead data-ui-head></thead>
     <tbody data-ui-body>
       <tr><td class="muted">Caricamento…</td></tr>
@@ -703,10 +703,11 @@
         {{range .Matches}}
         <tr>
           <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-          <td>{{.Source}}</td>
-          <td class="row-actions">
-            <button class="btn sm primary" data-api="/api/archive/batch-download" data-method="POST" data-body="{{.Body}}" title="Aggiungi questa release ai download">Scarica</button>
-            {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
+           <td title="{{.Source}}">{{sourceLabel .Source}}</td>
+           <td class="row-actions">
+             <button class="btn sm primary" data-api="/api/archive/batch-download" data-method="POST" data-body="{{.Body}}" title="Aggiungi questa release ai download">Scarica</button>
+             <button class="btn sm" data-release-explain="{{.ExplainBody}}" title="Mostra perché questa release viene accettata o scartata">Perché non questo?</button>
+             {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
           </td>
         </tr>
         {{end}}

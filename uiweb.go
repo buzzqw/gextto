@@ -36,7 +36,10 @@ var uiwebFS embed.FS
 var uiLicenseText string
 
 //go:embed docs/MANUAL.it.md
-var uiManualText string
+var uiManualTextIT string
+
+//go:embed docs/MANUAL.en.md
+var uiManualTextEN string
 
 var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
 	"humanBytes":  logging.HumanBytesI64,
@@ -48,7 +51,8 @@ var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
 		}
 		return *value
 	},
-	"json": uiJSON,
+	"json":        uiJSON,
+	"sourceLabel": uiSourceLabel,
 }).ParseFS(uiwebFS, "uiweb/templates/*.html"))
 
 // uiNavItem is one navigation entry of the new shell.
@@ -351,7 +355,7 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 	case "logs":
 		return uiLogsDataFrom(s)
 	case "manual":
-		return uiManualDataFrom()
+		return uiManualDataFrom(s)
 	case "license":
 		return uiLicenseData{Text: uiLicenseText}
 	case "settings":
@@ -600,10 +604,17 @@ func uiLogsDataFrom(s *AppState) uiLogsData {
 	return uiLogsData{Lines: lines, Count: len(lines)}
 }
 
-// uiManualDataFrom renders the bundled Italian manual with a minimal, escaped
-// Markdown pass (headings and paragraphs only; lists and code stay readable).
-func uiManualDataFrom() uiManualData {
-	return uiManualData{Lines: uiManualLines(uiManualText)}
+// uiManualDataFrom renders the bundled manual in the language selected by the
+// interface, with a minimal, escaped Markdown pass (headings and paragraphs
+// only; lists and code stay readable).
+func uiManualDataFrom(s *AppState) uiManualData {
+	text := uiManualTextIT
+	if s != nil {
+		if lang, err := s.i18n.Language(); err == nil && strings.EqualFold(strings.TrimSpace(lang), "en") {
+			text = uiManualTextEN
+		}
+	}
+	return uiManualData{Lines: uiManualLines(text)}
 }
 
 func uiManualLines(text string) []uiMdLine {

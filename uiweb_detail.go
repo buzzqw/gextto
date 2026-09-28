@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // uiweb_detail.go builds the series and movie detail pages server-side, reusing
@@ -85,10 +86,41 @@ func uiSeriesStatusLabel(total, downloaded int, ignoredSeasons []int64) string {
 }
 
 type uiMovieMatch struct {
-	Title  string
-	Magnet template.URL
-	Source string
-	Body   string
+	Title       string
+	Magnet      template.URL
+	Source      string
+	Body        string
+	ExplainBody string
+}
+
+// uiSourceLabel turns long feed URLs into a compact provider label while the
+// raw value remains available in the title/JSON action payload.
+func uiSourceLabel(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	candidate := value
+	parseValue := value
+	if !strings.Contains(parseValue, "://") && strings.Contains(parseValue, ".") {
+		parseValue = "https://" + parseValue
+	}
+	if parsed, err := url.Parse(parseValue); err == nil && parsed.Hostname() != "" {
+		labels := strings.Split(strings.TrimPrefix(strings.ToLower(parsed.Hostname()), "www."), ".")
+		if len(labels) >= 2 {
+			index := len(labels) - 2
+			if len(labels) >= 3 {
+				suffix := labels[len(labels)-2] + "." + labels[len(labels)-1]
+				if suffix == "co.uk" || suffix == "com.au" || suffix == "co.nz" || suffix == "com.br" || suffix == "co.jp" || suffix == "co.za" {
+					index = len(labels) - 3
+				}
+			}
+			if index >= 0 {
+				candidate = labels[index]
+			}
+		}
+	}
+	return strings.TrimSpace(strings.NewReplacer("-", " ", "_", " ").Replace(candidate))
 }
 
 type uiMovieDetail struct {
@@ -298,7 +330,12 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 					"source": entry[2],
 				}},
 			})
-			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2], Body: string(body)})
+			release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
+			if release == nil {
+				release = &models.Release{Title: entry[0], Magnet: entry[1], Source: entry[2]}
+			}
+			explainBody, _ := json.Marshal(release)
+			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2], Body: string(body), ExplainBody: string(explainBody)})
 		}
 	}
 	return detail, true

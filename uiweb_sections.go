@@ -337,6 +337,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		spec, _ := uiTableSpecFor("archive")
 		spec.ActionsJSON = uiJSON([]uiAction{
 			{Label: "Scarica", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`},
+			{Label: "Perché non questo?", Kind: "release-explain", Method: "POST", Path: ""},
 			{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/archive/delete", Body: `{"magnet":"{magnet}"}`, Confirm: "Eliminare questa voce dall'archivio?"},
 		})
 		return uiPanelsPage{Sections: []uiPageSection{
@@ -378,9 +379,6 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 				Title: "Esplora GetComics", Hint: "Cerca il titolo, poi scarica con Download Now o aggiungi il fumetto alla libreria.", Path: "/api/comics/explore", Submit: "Trova", Render: "comics",
 				Fields: []uiFormField{{Name: "query", Label: "Titolo", Placeholder: "es. Poison Ivy #41"}},
 			})),
-			group("Aggiungi fumetto", sectionActions(uiActionSection{Label: "Ciclo fumetti", Buttons: []uiActionButton{
-				{Label: "Avvia ciclo fumetti", Class: "primary", Method: "POST", Path: "/api/comics/cycle", Body: "{}"},
-			}})),
 			sectionTable(spec),
 			group("Weekly pack", sectionForm(uiFormSection{
 				Title: "Pianificazione settimanale", Hint: "Attiva il controllo automatico dei Weekly Pack. La data limita i pack da scaricare; non avvia il download di quelli precedenti.", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",

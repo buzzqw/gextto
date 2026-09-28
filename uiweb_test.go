@@ -784,6 +784,123 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 	}
 }
 
+// TestUiSourceLabel keeps long feed/indexer URLs compact in the Archivio table
+// while the raw value stays available in the tooltip.
+func TestUiSourceLabel(t *testing.T) {
+	cases := map[string]string{
+		"https://rss24h.torrentleech.org/a4ae63ba": "torrentleech",
+		"https://www.example.com:8080/torznab":     "example",
+		"http://sub.tracker.co.uk/feed":            "tracker",
+		"jackett":                                  "jackett",
+		"":                                         "",
+	}
+	for raw, want := range cases {
+		if got := uiSourceLabel(raw); got != want {
+			t.Fatalf("uiSourceLabel(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// TestTmdbItemInLibrary proves the "Già in lista" badge matches by external id
+// and by name, so the discovery wall never offers a duplicate insert.
+func TestTmdbItemInLibrary(t *testing.T) {
+	name := "Existing Show"
+	cfg := &Config{
+		Series: []SeriesConfig{{Name: "Existing Show", TmdbID: "111"}},
+		Movies: []MovieConfig{{Name: "Existing Movie", Year: "2024", TmdbID: "222"}},
+	}
+	if !gh_tmdbItemInLibrary(cfg, "series", TmdbItem{ID: 111}) {
+		t.Fatal("series id match not detected")
+	}
+	if !gh_tmdbItemInLibrary(cfg, "series", TmdbItem{Name: &name, ID: 999}) {
+		t.Fatal("name match not detected")
+	}
+	if gh_tmdbItemInLibrary(cfg, "series", TmdbItem{Name: stringPtr("Brand New"), ID: 999}) {
+		t.Fatal("unknown series must not be in library")
+	}
+	if !gh_tmdbItemInLibrary(cfg, "movie", TmdbItem{ID: 222}) {
+		t.Fatal("movie id match not detected")
+	}
+	if gh_tmdbItemInLibrary(cfg, "movie", TmdbItem{ID: 0, Title: stringPtr("Brand New Movie")}) {
+		t.Fatal("unknown movie must not be in library")
+	}
+}
+
+// TestUiArchiveAndComicsActions checks the Archivio explain action and that the
+// comic cycle button lives only in the dashboard, not on the Fumetti page.
+func TestUiArchiveAndComicsActions(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, archive := webGet(t, server, "/ui?view=archive")
+	if code != http.StatusOK {
+		t.Fatalf("GET archive -> %d", code)
+	}
+	if !strings.Contains(string(archive), "Perché non questo?") {
+		t.Fatal("archive table is missing the explain action")
+	}
+	if !strings.Contains(string(archive), "release-explain") {
+		t.Fatal("archive table is missing the release-explain action kind")
+	}
+
+	code, _, comics := webGet(t, server, "/ui?view=comics")
+	if code != http.StatusOK {
+		t.Fatalf("GET comics -> %d", code)
+	}
+	if strings.Contains(string(comics), "/api/comics/cycle") {
+		t.Fatal("Fumetti page must not offer the comic cycle button (dashboard only)")
+	}
+}
+
+// TestUiDashboardOrdering keeps the quick actions and the next-search panel at
+// the top of the dashboard, above the "Controllo libreria e download" intro.
+func TestUiDashboardOrdering(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=dashboard")
+	if code != http.StatusOK {
+		t.Fatalf("GET dashboard -> %d", code)
+	}
+	html := string(body)
+	intro := strings.Index(html, "Controllo libreria e download")
+	actions := strings.Index(html, "Azioni rapide")
+	next := strings.Index(html, "Prossima ricerca automatica")
+	if intro < 0 || actions < 0 || next < 0 {
+		t.Fatalf("dashboard markers missing: intro=%d actions=%d next=%d", intro, actions, next)
+	}
+	if actions > intro {
+		t.Fatal("quick actions must appear above the intro")
+	}
+	if next > intro {
+		t.Fatal("next automatic search must appear above the intro")
+	}
+}
+
+// TestUiManualFollowsLanguage verifies the bundled manual switches with the
+// active interface language.
+func TestUiManualFollowsLanguage(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	if err := state.i18n.SetLanguage("it"); err != nil {
+		t.Fatalf("set it: %v", err)
+	}
+	code, _, body := webGet(t, server, "/ui?view=manual")
+	if code != http.StatusOK || !strings.Contains(string(body), "Manuale utente") {
+		t.Fatalf("italian manual not served (%d)", code)
+	}
+	if err := state.i18n.SetLanguage("en"); err != nil {
+		t.Fatalf("set en: %v", err)
+	}
+	code, _, body = webGet(t, server, "/ui?view=manual")
+	if code != http.StatusOK || !strings.Contains(string(body), "User Manual") {
+		t.Fatalf("english manual not served (%d)", code)
+	}
+}
+
 func decodeActions(t *testing.T, raw string) []uiAction {
 	t.Helper()
 	if raw == "" {

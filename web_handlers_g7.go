@@ -1388,6 +1388,7 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !tmdbFailed && len(items) > 0 {
 		values := make([]any, 0, len(items))
 		for _, item := range items {
+			item.InLibrary = gh_tmdbItemInLibrary(cfg, input.Kind, item)
 			encoded, _ := json.Marshal(item)
 			var mapped map[string]any
 			_ = json.Unmarshal(encoded, &mapped)

@@ -35,6 +35,7 @@ type uiAction struct {
 
 type uiTableSpec struct {
 	Title       string
+	Class       string
 	Endpoint    string
 	ItemsKey    string
 	ColumnsJSON string
@@ -963,11 +964,12 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 	case "archive":
 		return uiTableSpec{
 			Title:    "Archivio",
+			Class:    "archive-table",
 			Endpoint: "/api/archive",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
 				{Key: "title", Label: "Titolo", Format: "truncate"},
-				{Key: "source", Label: "Sorgente"},
+				{Key: "source", Label: "Sorgente", Format: "source"},
 				{Key: "quality_score", Label: "Punteggio", Format: "number"},
 				{Key: "added_at", Label: "Aggiunto"},
 			}),

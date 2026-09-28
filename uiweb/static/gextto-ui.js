@@ -1328,12 +1328,28 @@
     }
     return last;
   }
+  function sourceLabel(value) {
+    var raw = String(value === null || value === undefined ? "" : value).trim();
+    if (!raw) return "";
+    var candidate = raw;
+    try {
+      var parsed = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : "https://" + raw);
+      if (parsed.hostname) {
+        var labels = parsed.hostname.toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
+        var compoundSuffix = labels.length >= 3 && /^(co|com|net|org)\.[a-z]{2}$/.test(labels.slice(-2).join("."));
+        var providerIndex = labels.length - (compoundSuffix ? 3 : 2);
+        if (providerIndex >= 0) candidate = labels[providerIndex];
+      }
+    } catch (_) { /* keep a non-URL source as-is */ }
+    return candidate.replace(/[-_]+/g, " ").trim();
+  }
   function fmt(value, format) {    if (value === null || value === undefined || value === "") return "";
     switch (format) {
       case "bool": return value ? "Sì" : "No";
       case "bytes": return humanBytes(value);
       case "rate": return humanBytes(value) + "/s";
       case "percent": return Number(value).toFixed(1) + "%";
+      case "source": return sourceLabel(value);
     }
     if (typeof value === "object") {
       return value.name || value.title || value.label || value.path || "—";
@@ -1442,6 +1458,9 @@
                 else if (row.results !== undefined && row.results !== null) detail = String(row.results) + " risultati";
                 return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(detail) + '">' + esc(detail || "—") + "</span></td>";
               }
+              if (column.format === "source") {
+                return "<td" + sortAttr + '><span class="source-label" title="' + esc(String(rawValue || "")) + '">' + esc(value || "—") + "</span></td>";
+              }
               if (column.format === "truncate") {
                 return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(value) + '">' + esc(value) + "</span></td>";
               }
@@ -1479,6 +1498,15 @@
                     ' data-comic-from-date="' + esc(row.from_date || "") + '"' +
                     ' data-comic-save-path="' + esc(row.save_path || "") + '">' +
                     esc(action.label || "Modifica") + "</button>";
+                }
+                if (action.kind === "release-explain") {
+                  var explainRelease = row.release && typeof row.release === "object" ? row.release : {
+                    title: row.title || "",
+                    magnet: row.magnet || "",
+                    source: row.source || ""
+                  };
+                  return '<button class="btn sm" data-release-explain="' + esc(JSON.stringify(explainRelease)) +
+                    '" title="Mostra perché questa release viene accettata o scartata">' + esc(action.label || "Perché non questo?") + "</button>";
                 }
                 if (action.kind === "comic-weekly-force") {
                   var weeklyMagnet = String(row.magnet || "").trim();
@@ -2790,6 +2818,14 @@
         (item.vote_average ? " · ★ " + item.vote_average : "");
       body.appendChild(meta);
 
+      if (item.in_library) {
+        var already = document.createElement("span");
+        already.className = "badge ok tmdb-in-library";
+        already.textContent = "Già in lista";
+        already.title = "Questo titolo è già presente nella libreria";
+        body.appendChild(already);
+      }
+
       if (item.overview) {
         var overview = String(item.overview);
         var text = document.createElement("p");
@@ -2800,7 +2836,8 @@
 
       var add = document.createElement("button");
       add.className = "btn sm primary";
-      add.textContent = "Aggiungi alla libreria";
+      add.textContent = item.in_library ? "Già in lista" : "Aggiungi alla libreria";
+      if (item.in_library) add.disabled = true;
       add.addEventListener("click", function () {
         openAddModal(kind, {
           name: title,
@@ -3208,6 +3245,15 @@
   }
 
   document.addEventListener("click", function (event) {
+    var explainButton = event.target.closest("[data-release-explain]");
+    if (explainButton) {
+      try {
+        showExplain(JSON.parse(explainButton.getAttribute("data-release-explain") || "{}"));
+      } catch (_) {
+        notify("Impossibile leggere la release", "err");
+      }
+      return;
+    }
     var head = event.target.closest("[data-release-sort]");
     if (!head) return;
     var table = head.closest("table");
