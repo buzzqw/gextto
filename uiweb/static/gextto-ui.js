@@ -83,7 +83,12 @@
             var holder = document.createElement("div");
             holder.innerHTML = html;
             var incomingSlot = holder.querySelector("[data-torrents-slot]");
-            if (incomingSlot) currentSlot.replaceWith(incomingSlot);
+            if (incomingSlot) {
+              currentSlot.replaceWith(incomingSlot);
+              updateDownloadSelection();
+              applyTorrentSort();
+              applyTorrentFilter();
+            }
             return;
           }
         }
@@ -155,18 +160,48 @@
     }
     var assignTag = event.target.closest("[data-download-assign-tag]");
     if (assignTag) {
-      var tagInput = page.querySelector("[data-download-tag]");
-      var tag = tagInput ? tagInput.value.trim() : "";
-      var hashes = Array.prototype.map.call(page.querySelectorAll("[data-download-select]:checked"), function (node) {
-        return node.getAttribute("data-hash") || "";
-      }).filter(Boolean);
+      var tag = readAssignTag();
+      var hashes = selectedHashes();
       if (!hashes.length) { notify("Seleziona almeno un torrent", "err"); return; }
-      if (!tag) { notify("Inserisci un tag", "err"); return; }
+      if (!tag) { notify("Scegli o inserisci un tag", "err"); return; }
       assignTag.disabled = true;
-      Promise.all(hashes.map(function (hash) { return api("/api/torrent-tags", "POST", { hash: hash, tag: tag }); }))
-        .then(function () { if (tagInput) tagInput.value = ""; load(); notify("Tag assegnato", "ok"); })
+      registerDownloadTag(tag)
+        .then(function () {
+          return Promise.all(hashes.map(function (hash) {
+            return api("/api/torrent-tags", "POST", { hash: hash, tag: tag });
+          }));
+        })
+        .then(function () { load(); notify("Tag assegnato a " + hashes.length + " torrent", "ok"); })
         .catch(function (error) { notify("Tag non assegnato: " + error.message, "err"); })
         .then(function () { assignTag.disabled = false; });
+      return;
+    }
+    var removeTag = event.target.closest("[data-download-remove-tag]");
+    if (removeTag) {
+      var hashesNoTag = selectedHashes();
+      if (!hashesNoTag.length) { notify("Seleziona almeno un torrent", "err"); return; }
+      removeTag.disabled = true;
+      Promise.all(hashesNoTag.map(function (hash) {
+        return api("/api/torrent-tags", "POST", { hash: hash, tag: "" });
+      }))
+        .then(function () { load(); notify("Tag rimosso da " + hashesNoTag.length + " torrent", "ok"); })
+        .catch(function (error) { notify("Tag non rimosso: " + error.message, "err"); })
+        .then(function () { removeTag.disabled = false; });
+      return;
+    }
+    var tempApply = event.target.closest("[data-temp-apply]");
+    if (tempApply) {
+      applyTempLimits(tempApply, false);
+      return;
+    }
+    var tempClear = event.target.closest("[data-temp-clear]");
+    if (tempClear) {
+      applyTempLimits(tempClear, true);
+      return;
+    }
+    var sortHead = event.target.closest("[data-sort]");
+    if (sortHead) {
+      toggleTorrentSort(sortHead.getAttribute("data-sort") || "name");
       return;
     }
     if (event.target.closest("[data-download-select-all]")) {
@@ -175,42 +210,21 @@
       updateDownloadSelection();
       return;
     }
+    var exportButton = event.target.closest("[data-torrent-export]");
+    if (exportButton && exportButton.getAttribute("data-torrent-export") === "magnet") {
+      event.preventDefault();
+      var magnetValue = exportButton.getAttribute("data-magnet") || "";
+      if (magnetValue) { copyText(magnetValue).then(function () { notify("Magnet copiato", "ok"); }); }
+      return;
+    }
     var detailButton = event.target.closest("[data-torrent-detail]");
     if (detailButton) {
-      var detailPanel = page.querySelector("[data-torrent-detail-panel]");
-      var detailOutput = detailPanel && detailPanel.querySelector("[data-torrent-detail-output]");
-      if (!detailPanel || !detailOutput) return;
-      detailButton.disabled = true;
-      api("/api/torrents/" + encodeURIComponent(detailButton.getAttribute("data-hash") || ""), "GET")
-        .then(function (data) {
-          renderReadable(detailOutput, data);
-          var detailHash = detailButton.getAttribute("data-hash") || "";
-          Array.prototype.forEach.call(detailPanel.querySelectorAll("[data-torrent-export]"), function (link) {
-            link.href = "/api/torrents/" + encodeURIComponent(detailHash) + "/" + link.getAttribute("data-torrent-export");
-          });
-          detailPanel.hidden = false;
-          detailPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        })
-        .catch(function (error) { notify("Dettagli non disponibili: " + error.message, "err"); })
-        .then(function () { detailButton.disabled = false; });
+      openTorrentDetail(detailButton.getAttribute("data-hash") || "");
       return;
     }
     var subdetailButton = event.target.closest("[data-torrent-subdetail]");
     if (subdetailButton) {
-      var subdetailPanel = page.querySelector("[data-torrent-detail-panel]");
-      var subdetailOutput = subdetailPanel && subdetailPanel.querySelector("[data-torrent-subdetail-output]");
-      var activeDetail = subdetailPanel && subdetailPanel.querySelector("[data-torrent-export]");
-      var activeHref = activeDetail && activeDetail.getAttribute("href") || "";
-      var match = activeHref.match(/\/api\/torrents\/([^/]+)\//);
-      if (!subdetailPanel || !subdetailOutput || !match) return;
-      subdetailButton.disabled = true;
-      api("/api/torrents/" + match[1] + "/" + subdetailButton.getAttribute("data-torrent-subdetail"), "GET")
-        .then(function (data) {
-          subdetailOutput.hidden = false;
-          renderReadable(subdetailOutput, data);
-        })
-        .catch(function (error) { notify("Dati non disponibili: " + error.message, "err"); })
-        .then(function () { subdetailButton.disabled = false; });
+      loadTorrentTab(subdetailButton.getAttribute("data-torrent-subdetail") || "general", subdetailButton);
       return;
     }
     if (event.target.closest("[data-torrent-detail-close]")) {
@@ -265,7 +279,568 @@
   }
   document.addEventListener("change", function (event) {
     if (event.target.closest("[data-download-select]")) updateDownloadSelection();
+    var tagSelect = event.target.closest("[data-download-tag-select]");
+    if (tagSelect) {
+      var newTagInput = page.querySelector("[data-download-new-tag]");
+      if (newTagInput) {
+        newTagInput.hidden = tagSelect.value !== "__new__";
+        if (tagSelect.value === "__new__") newTagInput.focus();
+      }
+      return;
+    }
+    if (event.target.closest("[data-download-tag-filter]")) {
+      applyTorrentFilter();
+      return;
+    }
+    var autoRemove = event.target.closest("[data-auto-remove-completed]");
+    if (autoRemove) {
+      api("/api/config/settings", "POST", { key: "auto_remove_completed", value: autoRemove.checked ? "true" : "false" })
+        .then(function () { notify("Preferenza salvata", "ok"); })
+        .catch(function (error) { notify("Preferenza non salvata: " + error.message, "err"); });
+    }
   });
+
+  function selectedHashes() {
+    return Array.prototype.map.call(page.querySelectorAll("[data-download-select]:checked"), function (node) {
+      return node.getAttribute("data-hash") || "";
+    }).filter(Boolean);
+  }
+
+  function readAssignTag() {
+    var select = page.querySelector("[data-download-tag-select]");
+    if (!select) return "";
+    if (select.value === "__new__") {
+      var input = page.querySelector("[data-download-new-tag]");
+      return input ? input.value.trim() : "";
+    }
+    return select.value.trim();
+  }
+
+  // registerDownloadTag records a new tag in the shared catalog so it also
+  // appears in the filter; a failure is not fatal for the assignment itself.
+  function registerDownloadTag(tag) {
+    if (!tag) return Promise.resolve();
+    return api("/api/download-tags", "POST", { tag: tag }).catch(function () { return null; });
+  }
+
+  function applyTempLimits(button, clear) {
+    var dl = page.querySelector("[data-temp-dl]");
+    var ul = page.querySelector("[data-temp-ul]");
+    var minutes = page.querySelector("[data-temp-minutes]");
+    var message = page.querySelector("[data-temp-message]");
+    var toInt = function (node) {
+      var parsed = parseInt(node && node.value ? node.value : "0", 10);
+      return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    };
+    var body = clear ? { clear: true } : {
+      download_kib: toInt(dl),
+      upload_kib: toInt(ul),
+      minutes: toInt(minutes)
+    };
+    button.disabled = true;
+    api("/api/torrents/temp-limits", "POST", body)
+      .then(function () {
+        if (message) message.textContent = clear ? "Limite temporaneo rimosso" : "Limite temporaneo applicato";
+        notify(clear ? "Limite temporaneo rimosso" : "Limite temporaneo applicato", "ok");
+        load();
+      })
+      .catch(function (error) {
+        if (message) message.textContent = error.message;
+        notify("Limite non applicato: " + error.message, "err");
+      })
+      .then(function () { button.disabled = false; });
+  }
+
+  // ---- torrent table sorting and tag filter -------------------------------
+  var torrentSort = { key: "", direction: 1 };
+
+  function toggleTorrentSort(key) {
+    if (torrentSort.key === key) {
+      torrentSort.direction = -torrentSort.direction;
+    } else {
+      torrentSort.key = key;
+      torrentSort.direction = 1;
+    }
+    applyTorrentSort();
+  }
+
+  function rowSortValue(row, key) {
+    if (key === "name") return (row.getAttribute("data-name") || "").toLowerCase();
+    var raw = row.getAttribute("data-" + key) || "0";
+    var number = parseFloat(raw);
+    return isNaN(number) ? 0 : number;
+  }
+
+  function applyTorrentSort() {
+    var body = page.querySelector(".torrent-table tbody");
+    if (!body) return;
+    var key = torrentSort.key;
+    if (key) {
+      var rows = Array.prototype.slice.call(body.querySelectorAll("tr[data-hash]"));
+      rows.sort(function (left, right) {
+        var a = rowSortValue(left, key);
+        var b = rowSortValue(right, key);
+        if (a < b) return -1 * torrentSort.direction;
+        if (a > b) return 1 * torrentSort.direction;
+        return 0;
+      });
+      rows.forEach(function (row) { body.appendChild(row); });
+    }
+    Array.prototype.forEach.call(page.querySelectorAll("[data-sort]"), function (head) {
+      if (head.getAttribute("data-sort") === key) {
+        head.setAttribute("data-sort-dir", torrentSort.direction === 1 ? "asc" : "desc");
+      } else {
+        head.removeAttribute("data-sort-dir");
+      }
+    });
+  }
+
+  function applyTorrentFilter() {
+    var filter = page.querySelector("[data-download-tag-filter]");
+    if (!filter) return;
+    var value = filter.value;
+    var wanted = value.toLowerCase();
+    Array.prototype.forEach.call(page.querySelectorAll(".torrent-table tbody tr[data-hash]"), function (row) {
+      var tags = (row.getAttribute("data-tags") || "").toLowerCase();
+      var show = true;
+      if (value === "__none__") {
+        show = tags.trim() === "";
+      } else if (wanted) {
+        show = tags.split(",").map(function (part) { return part.trim(); }).indexOf(wanted) >= 0;
+      }
+      row.hidden = !show;
+    });
+  }
+
+  function copyText(value) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(value).catch(function () { /* ignore */ });
+    }
+    var area = document.createElement("textarea");
+    area.value = value;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand("copy"); } catch (error) { /* ignore */ }
+    area.remove();
+    return Promise.resolve();
+  }
+
+  // ---- torrent detail modal ----------------------------------------------
+  var activeTorrentHash = "";
+
+  function torrentDetailPanel() { return page.querySelector("[data-torrent-detail-panel]"); }
+
+  function openTorrentDetail(hash) {
+    if (!hash) return;
+    activeTorrentHash = hash;
+    var panel = torrentDetailPanel();
+    if (!panel) return;
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    loadTorrentTab("general");
+  }
+
+  function loadTorrentTab(tab, button) {
+    var hash = activeTorrentHash;
+    if (!hash) return;
+    var panel = torrentDetailPanel();
+    if (!panel) return;
+    var output = panel.querySelector("[data-torrent-subdetail-output]");
+    if (!output) return;
+    if (button) button.disabled = true;
+    output.hidden = false;
+    output.innerHTML = '<p class="muted">Caricamento…</p>';
+    var endpoint = "/api/torrents/" + encodeURIComponent(hash);
+    if (tab === "trackers") endpoint += "/trackers";
+    else if (tab === "files") endpoint += "/files";
+    else if (tab === "peers") endpoint += "/peers";
+    api(endpoint, "GET")
+      .then(function (data) { renderTorrentTab(output, tab, hash, data); })
+      .catch(function (error) { output.innerHTML = '<p class="alert">' + esc(error.message) + "</p>"; })
+      .then(function () { if (button) button.disabled = false; });
+  }
+
+  function statGrid(pairs) {
+    var wrap = document.createElement("div");
+    wrap.className = "stat-grid";
+    pairs.forEach(function (pair) {
+      if (pair === null || pair === undefined || pair === "") return;
+      var row = document.createElement("div");
+      row.className = "row";
+      var label = document.createElement("span");
+      label.textContent = pair[0];
+      var value = document.createElement("strong");
+      value.textContent = pair[1];
+      row.appendChild(label);
+      row.appendChild(value);
+      wrap.appendChild(row);
+    });
+    return wrap;
+  }
+
+  function renderTorrentTab(output, tab, hash, data) {
+    output.innerHTML = "";
+    if (tab === "trackers") {
+      var trackers = (data && data.trackers) || [];
+      var table = document.createElement("table");
+      table.className = "data-table";
+      table.innerHTML = "<thead><tr><th>Tracker</th><th>Tier</th><th>Esito</th></tr></thead>";
+      var tbody = document.createElement("tbody");
+      trackers.forEach(function (tracker) {
+        var tr = document.createElement("tr");
+        var url = document.createElement("td");
+        url.className = "truncate";
+        url.textContent = String(tracker.url || "");
+        var tier = document.createElement("td");
+        tier.className = "numeric";
+        tier.textContent = String(tracker.tier === undefined ? "—" : tracker.tier);
+        var state = document.createElement("td");
+        state.textContent = tracker.verified ? "verificato" : "non verificato";
+        tr.appendChild(url); tr.appendChild(tier); tr.appendChild(state);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      output.appendChild(table);
+      if (!trackers.length) output.appendChild(muted("Nessun tracker."));
+      var form = document.createElement("div");
+      form.className = "field span-full";
+      var label = document.createElement("span");
+      label.textContent = "Modifica tracker (tier|url per riga)";
+      var textarea = document.createElement("textarea");
+      textarea.className = "input";
+      textarea.setAttribute("data-trackers-text", "");
+      textarea.rows = 4;
+      textarea.value = trackers.map(function (tracker) {
+        return (tracker.tier === undefined ? "0" : tracker.tier) + "|" + (tracker.url || "");
+      }).join("\n");
+      var save = document.createElement("button");
+      save.className = "btn sm primary";
+      save.textContent = "Salva tracker";
+      save.addEventListener("click", function () {
+        var lines = textarea.value.split("\n").map(function (line) { return line.trim(); }).filter(Boolean);
+        var items = lines.map(function (line) {
+          var parts = line.split("|");
+          return { url: (parts.length > 1 ? parts[1] : parts[0]).trim(), tier: parseInt(parts[0], 10) || 0 };
+        });
+        save.disabled = true;
+        api("/api/torrents/" + encodeURIComponent(hash) + "/trackers", "POST", { trackers: items })
+          .then(function () { notify("Tracker salvati", "ok"); loadTorrentTab("trackers"); })
+          .catch(function (error) { notify("Tracker non salvati: " + error.message, "err"); })
+          .then(function () { save.disabled = false; });
+      });
+      form.appendChild(label); form.appendChild(textarea); form.appendChild(save);
+      output.appendChild(form);
+      return;
+    }
+    if (tab === "files") {
+      var files = (data && data.files) || [];
+      var fileTable = document.createElement("table");
+      fileTable.className = "data-table";
+      fileTable.innerHTML = "<thead><tr><th>File</th><th>Dimensione</th><th>Scaricato</th><th>Priorità</th></tr></thead>";
+      var fileBody = document.createElement("tbody");
+      var priorities = files.map(function (file) { return Number(file.priority) || 0; });
+      files.forEach(function (file, index) {
+        priorities[index] = Number(file.priority) || 0;
+        var tr = document.createElement("tr");
+        var path = document.createElement("td");
+        path.className = "truncate";
+        path.title = String(file.path || "");
+        path.textContent = String(file.path || "");
+        var size = document.createElement("td");
+        size.className = "numeric";
+        size.textContent = humanBytes(file.size || 0);
+        var done = document.createElement("td");
+        done.className = "numeric";
+        done.textContent = humanBytes(file.downloaded || 0);
+        var priority = document.createElement("td");
+        var select = document.createElement("select");
+        select.className = "input";
+        [["0", "Salta"], ["1", "Normale"], ["4", "Predefinita"], ["6", "Alta"], ["7", "Massima"]].forEach(function (option) {
+          var node = document.createElement("option");
+          node.value = option[0];
+          node.textContent = option[1];
+          if (Number(file.priority) === Number(option[0])) node.selected = true;
+          select.appendChild(node);
+        });
+        select.addEventListener("change", function () {
+          priorities[index] = parseInt(select.value, 10) || 0;
+          api("/api/torrents/" + encodeURIComponent(hash) + "/files/priority", "POST", { priorities: priorities })
+            .then(function () { notify("Priorità salvata", "ok"); })
+            .catch(function (error) { notify("Priorità non salvata: " + error.message, "err"); });
+        });
+        priority.appendChild(select);
+        tr.appendChild(path); tr.appendChild(size); tr.appendChild(done); tr.appendChild(priority);
+        fileBody.appendChild(tr);
+      });
+      fileTable.appendChild(fileBody);
+      output.appendChild(fileTable);
+      if (!files.length) output.appendChild(muted("Nessun file (metadati non ancora disponibili)."));
+      return;
+    }
+    if (tab === "peers") {
+      var peers = (data && data.peers) || [];
+      var peerTable = document.createElement("table");
+      peerTable.className = "data-table";
+      peerTable.innerHTML = "<thead><tr><th>Indirizzo</th><th>Client</th><th>↓</th><th>↑</th><th>Seed</th></tr></thead>";
+      var peerBody = document.createElement("tbody");
+      peers.forEach(function (peer) {
+        var tr = document.createElement("tr");
+        var address = document.createElement("td");
+        address.textContent = String(peer.address || "");
+        var client = document.createElement("td");
+        client.textContent = String(peer.client || "—");
+        var down = document.createElement("td");
+        down.className = "numeric";
+        down.textContent = humanRate(peer.download_rate || 0);
+        var up = document.createElement("td");
+        up.className = "numeric";
+        up.textContent = humanRate(peer.upload_rate || 0);
+        var seed = document.createElement("td");
+        seed.textContent = peer.seed ? "sì" : "no";
+        tr.appendChild(address); tr.appendChild(client); tr.appendChild(down); tr.appendChild(up); tr.appendChild(seed);
+        peerBody.appendChild(tr);
+      });
+      peerTable.appendChild(peerBody);
+      output.appendChild(peerTable);
+      if (!peers.length) output.appendChild(muted("Nessun peer connesso."));
+      return;
+    }
+    if (tab === "limits") {
+      var torrent = (data && data.torrent) || {};
+      var limitForm = document.createElement("div");
+      limitForm.className = "form-grid";
+      limitForm.appendChild(numberField("data-limit-dl", "Download (KiB/s)", torrent.download_limit));
+      limitForm.appendChild(numberField("data-limit-ul", "Upload (KiB/s)", torrent.upload_limit));
+      limitForm.appendChild(numberField("data-limit-ratio", "Ratio seed", torrent.seed_ratio));
+      limitForm.appendChild(numberField("data-limit-days", "Giorni seed", torrent.seed_days));
+      var actions = document.createElement("div");
+      actions.className = "form-actions";
+      var saveLimits = document.createElement("button");
+      saveLimits.className = "btn sm primary";
+      saveLimits.textContent = "Salva limiti";
+      saveLimits.addEventListener("click", function () {
+        var value = function (name, multiplier) {
+          var node = limitForm.querySelector("[" + name + "]");
+          var parsed = parseFloat(node && node.value);
+          if (isNaN(parsed)) parsed = -1;
+          return Math.round(parsed * (multiplier || 1));
+        };
+        saveLimits.disabled = true;
+        api("/api/torrents/" + encodeURIComponent(hash) + "/limits", "POST", {
+          download_limit: value("data-limit-dl", 1024),
+          upload_limit: value("data-limit-ul", 1024),
+          seed_ratio: value("data-limit-ratio"),
+          seed_days: value("data-limit-days")
+        })
+          .then(function () { notify("Limiti salvati", "ok"); })
+          .catch(function (error) { notify("Limiti non salvati: " + error.message, "err"); })
+          .then(function () { saveLimits.disabled = false; });
+      });
+      actions.appendChild(saveLimits);
+      limitForm.appendChild(actions);
+      output.appendChild(limitForm);
+      return;
+    }
+    if (tab === "storage") {
+      var storageForm = document.createElement("div");
+      storageForm.className = "form-grid";
+      storageForm.appendChild(textField("data-storage-path", "Nuovo percorso di storage", torrent_save_path(data)));
+      var storageActions = document.createElement("div");
+      storageActions.className = "form-actions";
+      var moveButton = document.createElement("button");
+      moveButton.className = "btn sm primary";
+      moveButton.textContent = "Sposta storage";
+      moveButton.addEventListener("click", function () {
+        var node = storageForm.querySelector("[data-storage-path]");
+        var path = node ? node.value.trim() : "";
+        if (!path) { notify("Inserisci un percorso", "err"); return; }
+        moveButton.disabled = true;
+        api("/api/torrents/" + encodeURIComponent(hash) + "/storage", "POST", { path: path })
+          .then(function () { notify("Spostamento avviato", "ok"); })
+          .catch(function (error) { notify("Spostamento non riuscito: " + error.message, "err"); })
+          .then(function () { moveButton.disabled = false; });
+      });
+      storageActions.appendChild(moveButton);
+      storageForm.appendChild(storageActions);
+      output.appendChild(storageForm);
+      return;
+    }
+    renderTorrentGeneral(output, hash, data);
+  }
+
+  function muted(text) {
+    var node = document.createElement("p");
+    node.className = "muted";
+    node.textContent = text;
+    return node;
+  }
+
+  function numberField(attr, label, value) {
+    var wrap = document.createElement("label");
+    wrap.className = "field";
+    var span = document.createElement("span");
+    span.textContent = label;
+    var input = document.createElement("input");
+    input.className = "input";
+    input.type = "number";
+    input.setAttribute(attr, "");
+    if (value !== undefined && value !== null && value !== "") input.value = String(value);
+    wrap.appendChild(span); wrap.appendChild(input);
+    return wrap;
+  }
+
+  function textField(attr, label, value) {
+    var wrap = document.createElement("label");
+    wrap.className = "field span-full";
+    var span = document.createElement("span");
+    span.textContent = label;
+    var input = document.createElement("input");
+    input.className = "input";
+    input.setAttribute(attr, "");
+    input.value = value || "";
+    wrap.appendChild(span); wrap.appendChild(input);
+    return wrap;
+  }
+
+  function torrent_save_path(data) {
+    var torrent = (data && data.torrent) || {};
+    return String(torrent.save_path || "");
+  }
+
+  function renderTorrentGeneral(output, hash, data) {
+    var torrent = (data && data.torrent) || {};
+    var magnet = (data && data.magnet) || "";
+    var nameNode = torrentDetailPanel() && torrentDetailPanel().querySelector("[data-torrent-detail-name]");
+    if (nameNode) nameNode.textContent = torrent.name || "Dettagli torrent";
+    var exportMagnet = torrentDetailPanel() && torrentDetailPanel().querySelector('[data-torrent-export="magnet"]');
+    if (exportMagnet) exportMagnet.setAttribute("data-magnet", magnet);
+    var exportTorrent = torrentDetailPanel() && torrentDetailPanel().querySelector('[data-torrent-export="export.torrent"]');
+    if (exportTorrent) exportTorrent.href = "/api/torrents/" + encodeURIComponent(hash) + "/export.torrent";
+
+    output.appendChild(statGrid([
+      ["Stato", String(torrent.state || "—")],
+      ["Progresso", (Number(torrent.progress) || 0).toFixed(1) + "%"],
+      ["Dimensione", humanBytes(torrent.total_size || 0)],
+      ["Scaricato", humanBytes(torrent.total_done || 0)],
+      ["↓ / ↑", humanRate(torrent.download_rate || 0) + " / " + humanRate(torrent.upload_rate || 0)],
+      ["Peer / Seed", String(torrent.num_peers || 0) + " / " + String(torrent.num_seeds || 0)],
+      ["Posizione coda", String(torrent.queue_position === undefined ? "—" : torrent.queue_position)],
+      ["Metadata", torrent.has_metadata ? "presenti" : "in attesa"],
+      ["Versione torrent", String(torrent.torrent_version || "—")],
+      ["Auto-managed", torrent.auto_managed ? "sì" : "no"],
+      ["Percorso", String(torrent.save_path || "—")]
+    ]));
+
+    var toolbar = document.createElement("div");
+    toolbar.className = "toolbar";
+    var toggle = function (label, endpoint, body, confirmText) {
+      var button = document.createElement("button");
+      button.className = "btn sm";
+      button.textContent = label;
+      button.addEventListener("click", function () {
+        if (confirmText && !confirm(confirmText)) return;
+        button.disabled = true;
+        api(endpoint, "POST", body)
+          .then(function () { notify(label + ": fatto", "ok"); loadTorrentTab("general"); })
+          .catch(function (error) { notify(label + " non riuscito: " + error.message, "err"); })
+          .then(function () { button.disabled = false; });
+      });
+      return button;
+    };
+    toolbar.appendChild(toggle(torrent.no_rename ? "Rinomina abilitata" : "Non rinominare", "/api/torrents/" + encodeURIComponent(hash) + "/no_rename", { value: !torrent.no_rename }));
+    toolbar.appendChild(toggle("Annuncia", "/api/torrents/" + encodeURIComponent(hash) + "/reannounce", {}));
+    toolbar.appendChild(toggle("Riavvia torrent", "/api/torrents/" + encodeURIComponent(hash) + "/restart", {}));
+    toolbar.appendChild(toggle(torrent.super_seeding ? "Disattiva super seeding" : "Super seeding", "/api/torrents/" + encodeURIComponent(hash) + "/super-seeding", { enabled: !torrent.super_seeding }));
+    toolbar.appendChild(toggle("Pin", "/api/torrents/pin", { hash: hash }));
+    toolbar.appendChild(toggle("Segna come fallito", "/api/torrents/" + encodeURIComponent(hash) + "/mark_failed", {}, "Segnare questo torrent come fallito?"));
+    var tagButton = document.createElement("button");
+    tagButton.className = "btn sm";
+    tagButton.textContent = "Tag";
+    tagButton.addEventListener("click", function () {
+      var entered = window.prompt("Tag del torrent (separati da virgola):", "");
+      if (entered === null) return;
+      api("/api/torrent-tags", "POST", { hash: hash, tag: entered.trim() })
+        .then(function () { notify("Tag aggiornato", "ok"); load(); loadTorrentTab("general"); })
+        .catch(function (error) { notify("Tag non aggiornato: " + error.message, "err"); });
+    });
+    toolbar.appendChild(tagButton);
+    output.appendChild(toolbar);
+
+    // Removal levels.
+    var removeForm = document.createElement("div");
+    removeForm.className = "form-grid";
+    var removeWrap = document.createElement("label");
+    removeWrap.className = "field";
+    var removeLabel = document.createElement("span");
+    removeLabel.textContent = "Rimozione";
+    var removeSelect = document.createElement("select");
+    removeSelect.className = "input";
+    removeSelect.setAttribute("data-remove-mode", "");
+    [["session", "Solo sessione"], ["files", "Sessione + file"], ["blocklist", "Sessione + blocklist"], ["files_blocklist", "File + blocklist"]].forEach(function (option) {
+      var node = document.createElement("option");
+      node.value = option[0];
+      node.textContent = option[1];
+      removeSelect.appendChild(node);
+    });
+    removeWrap.appendChild(removeLabel); removeWrap.appendChild(removeSelect);
+    var removeActions = document.createElement("div");
+    removeActions.className = "form-actions";
+    var removeButton = document.createElement("button");
+    removeButton.className = "btn sm danger";
+    removeButton.textContent = "Rimuovi";
+    removeButton.addEventListener("click", function () {
+      var mode = removeSelect.value;
+      var deleteFiles = mode === "files" || mode === "files_blocklist";
+      var blocklist = mode === "blocklist" || mode === "files_blocklist";
+      if (deleteFiles && !confirm("Eliminare anche i file scaricati?")) return;
+      removeButton.disabled = true;
+      api("/api/torrents/" + encodeURIComponent(hash) + "/remove", "POST", { delete_files: deleteFiles, blocklist: blocklist })
+        .then(function () { notify("Torrent rimosso", "ok"); var panel = torrentDetailPanel(); if (panel) panel.hidden = true; load(); })
+        .catch(function (error) { notify("Rimozione non riuscita: " + error.message, "err"); })
+        .then(function () { removeButton.disabled = false; });
+    });
+    removeActions.appendChild(removeButton);
+    removeForm.appendChild(removeWrap); removeForm.appendChild(removeActions);
+    output.appendChild(removeForm);
+
+    // Web seeds.
+    var webForm = document.createElement("div");
+    webForm.className = "form-grid";
+    webForm.appendChild(textField("data-web-seeds", "Web seed (URL separati da spazio)", ""));
+    var webActions = document.createElement("div");
+    webActions.className = "form-actions";
+    var addSeed = document.createElement("button");
+    addSeed.className = "btn sm";
+    addSeed.textContent = "Aggiungi";
+    addSeed.addEventListener("click", function () {
+      var node = webForm.querySelector("[data-web-seeds]");
+      var urls = (node && node.value.trim()) || "";
+      if (!urls) { notify("Inserisci almeno un URL", "err"); return; }
+      addSeed.disabled = true;
+      api("/api/torrents/" + encodeURIComponent(hash) + "/web-seeds", "POST", { urls: urls, remove: false })
+        .then(function () { notify("Web seed aggiunto", "ok"); })
+        .catch(function (error) { notify("Web seed non aggiunto: " + error.message, "err"); })
+        .then(function () { addSeed.disabled = false; });
+    });
+    var removeSeed = document.createElement("button");
+    removeSeed.className = "btn sm danger";
+    removeSeed.textContent = "Rimuovi";
+    removeSeed.addEventListener("click", function () {
+      var node = webForm.querySelector("[data-web-seeds]");
+      var urls = (node && node.value.trim()) || "";
+      if (!urls) { notify("Inserisci almeno un URL", "err"); return; }
+      removeSeed.disabled = true;
+      api("/api/torrents/" + encodeURIComponent(hash) + "/web-seeds", "POST", { urls: urls, remove: true })
+        .then(function () { notify("Web seed rimosso", "ok"); })
+        .catch(function (error) { notify("Web seed non rimosso: " + error.message, "err"); })
+        .then(function () { removeSeed.disabled = false; });
+    });
+    webActions.appendChild(addSeed); webActions.appendChild(removeSeed);
+    webForm.appendChild(webActions);
+    output.appendChild(webForm);
+  }
 
   document.addEventListener("visibilitychange", schedule);
   schedule();

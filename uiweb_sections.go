@@ -4,6 +4,14 @@ package gextto
 // progress, comics link finder) and builds them for every menu, so the new UI
 // exposes the same data and actions as the classic one.
 
+import (
+	"encoding/json"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+)
+
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
 	Kind     string // table | actions | form | progress | comics_links | links | oauth
@@ -77,6 +85,15 @@ type uiPanelsPage struct {
 type uiDownloadsPage struct {
 	Torrents uiTorrentsData
 	Panels   []uiPageSection
+	// Temporary speed limits, prefilled from the persisted settings so the
+	// toolbar shows the values currently in force.
+	TempDL      int64
+	TempUL      int64
+	TempActive  bool
+	TempMinutes int64
+	// Tag catalog and selection used by the toolbar filters.
+	TagOptions          []string
+	AutoRemoveCompleted bool
 }
 
 func sectionTable(spec uiTableSpec) uiPageSection {
@@ -483,61 +500,102 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 // uiDownloadsPageFor builds the download page with the torrent table plus the
 // tag and temporary-limit panels of the classic interface.
 func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
-	return uiDownloadsPage{
-		Torrents: uiTorrentsDataFrom(s),
-		Panels: []uiPageSection{
-			sectionActions(uiActionSection{Label: "Limiti temporanei", Hint: "Applica un limite globale per un periodo, poi torna ai valori configurati.", Buttons: []uiActionButton{
-				{Label: "1 ora", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"download_kib":0,"upload_kib":0,"minutes":60}`},
-				{Label: "24 ore", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"download_kib":0,"upload_kib":0,"minutes":1440}`},
-				{Label: "Disattiva", Class: "danger", Method: "POST", Path: "/api/torrents/temp-limits", Body: `{"clear":true}`},
-				{Label: "Applica impostazioni", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}"},
-				{Label: "Ottimizza", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}"},
-			}}),
-			sectionForm(uiFormSection{
-				Title: "Limiti temporanei personalizzati", Path: "/api/torrents/temp-limits", Submit: "Applica",
-				Fields: []uiFormField{
-					{Name: "download_kib", Label: "Download (KiB/s, 0 = illimitato)", Kind: "number", Value: "0"},
-					{Name: "upload_kib", Label: "Upload (KiB/s, 0 = illimitato)", Kind: "number", Value: "0"},
-					{Name: "minutes", Label: "Durata (minuti)", Kind: "number", Value: "60"},
-				},
-			}),
-			sectionTable(uiTableSpec{
-				Title:       "Tag dei download (HTTP/fumetti)",
-				Endpoint:    "/api/download-tags",
-				ItemsKey:    "items",
-				ColumnsJSON: uiJSON([]uiColumn{{Key: "", Label: "Tag"}}),
-				Empty:       "Nessun tag.",
-			}),
-			sectionForm(uiFormSection{
-				Title: "Aggiungi tag ai download", Path: "/api/download-tags", Submit: "Aggiungi",
-				Fields: []uiFormField{{Name: "tag", Label: "Nuovo tag"}},
-			}),
-			sectionTable(uiTableSpec{
-				Title:       "Tag dei torrent",
-				Endpoint:    "/api/torrent-tags",
-				ItemsKey:    "items",
-				ColumnsJSON: uiJSON([]uiColumn{{Key: "hash", Label: "Hash"}, {Key: "tag", Label: "Tag"}}),
-				Empty:       "Nessun tag.",
-			}),
-			sectionForm(uiFormSection{
-				Title: "Assegna un tag a un torrent", Path: "/api/torrent-tags", Submit: "Assegna",
-				Fields: []uiFormField{
-					{Name: "hash", Label: "Hash"},
-					{Name: "tag", Label: "Tag"},
-				},
-			}),
-			sectionTable(uiTableSpec{
-				Title:    "Storico download",
-				Endpoint: "/api/torrents/history",
-				ItemsKey: "items",
-				ColumnsJSON: uiJSON([]uiColumn{
-					{Key: "name", Label: "Nome"}, {Key: "kind", Label: "Tipo"},
-					{Key: "status", Label: "Stato"}, {Key: "tag", Label: "Tag"},
-					{Key: "quality_score", Label: "Punteggio", Format: "number"},
-					{Key: "processed_path", Label: "Archivio"}, {Key: "completed_at", Label: "Concluso"},
-				}),
-				Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
-			}),
-		},
+	cfg := latestConfig(s)
+	page := uiDownloadsPage{
+		Torrents:            uiTorrentsDataFrom(s),
+		TempDL:              uiSettingInt(cfg, "libtorrent_temp_dl_limit"),
+		TempUL:              uiSettingInt(cfg, "libtorrent_temp_ul_limit"),
+		AutoRemoveCompleted: settingsBool(cfg, "auto_remove_completed", false),
+		TagOptions:          uiDownloadTagOptions(s, cfg),
 	}
+	if uiSettingString(cfg, "libtorrent_temp_limit_enabled") == "1" {
+		until := uiSettingInt(cfg, "libtorrent_temp_limit_until")
+		if remaining := until - time.Now().Unix(); remaining > 0 {
+			page.TempActive = true
+			page.TempMinutes = (remaining + 59) / 60
+		}
+	}
+	page.Panels = []uiPageSection{
+		sectionTable(uiTableSpec{
+			Title:    "Storico download",
+			Endpoint: "/api/torrents/history",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "Nome"}, {Key: "kind", Label: "Tipo"},
+				{Key: "tag", Label: "Tag NAS"}, {Key: "quality_score", Label: "Punteggio", Format: "number"},
+				{Key: "status", Label: "Stato"},
+				{Key: "processed_path", Label: "Cartella libreria / NAS"}, {Key: "completed_at", Label: "Concluso"},
+			}),
+			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
+		}),
+		sectionActions(uiActionSection{Label: "Motore torrent", Hint: "Applica o ottimizza le impostazioni libtorrent.", Buttons: []uiActionButton{
+			{Label: "Applica impostazioni", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}"},
+			{Label: "Ottimizza", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}"},
+			{Label: "Aggiorna IP filter", Method: "POST", Path: "/api/torrents/ipfilter_update", Body: "{}"},
+		}}),
+	}
+	return page
+}
+
+// uiSettingString returns a setting value or the empty string.
+func uiSettingString(cfg *Config, key string) string {
+	if cfg == nil {
+		return ""
+	}
+	return cfg.Settings[key]
+}
+
+// uiSettingInt parses an integer setting, returning 0 when unset or invalid.
+func uiSettingInt(cfg *Config, key string) int64 {
+	value := strings.TrimSpace(uiSettingString(cfg, key))
+	if value == "" {
+		return 0
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+// uiDownloadTagOptions merges the registered download tags with the tags in use
+// by the current torrents, so the toolbar filter and the assign list are the
+// same catalog the classic UI builds.
+func uiDownloadTagOptions(s *AppState, cfg *Config) []string {
+	seen := map[string]string{}
+	add := func(tag string) {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			return
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; !ok {
+			seen[key] = trimmed
+		}
+	}
+	if cfg != nil {
+		if raw := strings.TrimSpace(cfg.Settings["download_tags"]); raw != "" {
+			var items []string
+			if err := json.Unmarshal([]byte(raw), &items); err == nil {
+				for _, item := range items {
+					add(item)
+				}
+			}
+		}
+	}
+	if s != nil && s.db != nil {
+		if pairs, err := s.db.TorrentTags(); err == nil {
+			for _, pair := range pairs {
+				for _, part := range strings.Split(pair[1], ",") {
+					add(part)
+				}
+			}
+		}
+	}
+	options := make([]string, 0, len(seen))
+	for _, value := range seen {
+		options = append(options, value)
+	}
+	sort.Slice(options, func(i, j int) bool { return strings.ToLower(options[i]) < strings.ToLower(options[j]) })
+	return options
 }

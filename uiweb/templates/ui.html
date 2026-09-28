@@ -211,45 +211,52 @@
 {{end}}
 
 {{define "torrents"}}
-<div class="view" data-torrents-slot>{{template "torrents_body" .}}</div>
+<div class="view" data-torrents-slot>{{template "torrents_table" .}}</div>
 {{end}}
 
-{{define "torrents_body"}}
+{{define "torrents_table"}}
   <div class="panel">
     <div class="panel-head">
       <h3>Scarico</h3>
       <small class="muted">{{.Count}} torrent · aggiornato {{.UpdatedAt}}</small>
     </div>
     <div class="panel-body">
-      <div class="toolbar download-bulk-toolbar">
-        <span class="muted" data-download-selected-count>0 selezionati</span>
-        <button class="btn sm" type="button" data-download-bulk="pause">Pausa selezionati</button>
-        <button class="btn sm" type="button" data-download-bulk="resume">Riprendi selezionati</button>
-        <button class="btn sm" type="button" data-download-bulk="recheck">Recheck selezionati</button>
-        <button class="btn sm danger" type="button" data-download-bulk="remove">Rimuovi selezionati</button>
-        <input class="input compact" data-download-tag placeholder="Tag per selezionati" aria-label="Tag per torrent selezionati" />
-        <button class="btn sm" type="button" data-download-assign-tag>Assegna tag</button>
-        <button class="btn sm" type="button" data-api="/api/torrents/remove_completed" data-method="POST" data-body='{"delete_files":false}' title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
-      </div>
       {{if .Rows}}
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table torrent-table">
           <thead><tr>
-            <th><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th><th>Nome</th><th>Tag</th><th>Stato</th><th>Progresso</th><th>↓</th><th>↑</th><th>Peer / Seed</th><th>Ratio</th><th>Azioni</th>
+            <th><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th>
+            <th class="th-sort" data-sort="name">Nome</th>
+            <th>Stato</th>
+            <th class="th-sort" data-sort="progress">Progresso</th>
+            <th class="th-sort" data-sort="dl">↓</th>
+            <th class="th-sort" data-sort="ul">↑</th>
+            <th class="th-sort" data-sort="eta">ETA</th>
+            <th class="th-sort" data-sort="peers">Peer / Seed</th>
+            <th class="th-sort" data-sort="ratio">Ratio</th>
+            <th>Azioni</th>
           </tr></thead>
           <tbody>
             {{range .Rows}}
-            <tr data-hash="{{.Hash}}">
+            <tr data-hash="{{.Hash}}" data-name="{{.Name}}" data-tags="{{range .Tags}}{{.}},{{end}}"
+                data-progress="{{.ProgressPct}}" data-dl="{{.DownloadRate}}" data-ul="{{.UploadRate}}"
+                data-eta="{{.ETASeconds}}" data-peers="{{.NumPeers}}" data-ratio="{{printf "%.4f" .Ratio}}">
               <td><input type="checkbox" data-download-select data-hash="{{.Hash}}" aria-label="Seleziona {{.Name}}" /></td>
-              <td class="truncate" title="{{.Name}}">{{.Name}}</td>
-              <td>{{if .Tag}}<span class="badge">{{.Tag}}</span>{{else}}<span class="muted">—</span>{{end}}</td>
+              <td class="torrent-name">
+                <span class="truncate" title="{{.Name}}">{{.Name}}</span>
+                {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
+                {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti di ratio o tempo">seed ∞</span>{{end}}
+                {{if or .Reason .Source}}<small class="origin muted">Perché: {{if .Reason}}{{.Reason}}{{else}}—{{end}} · Fonte: {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
+                {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
+              </td>
               <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
-              <td style="min-width:140px">
-                <div class="progress" title="{{printf "%.1f" .Progress}}%"><span style="width:{{.ProgressPct}}%"></span></div>
+              <td style="min-width:150px">
+                <div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div>
                 <small class="muted">{{printf "%.1f" .Progress}}% · {{humanBytes .TotalDone}} / {{humanBytes .TotalSize}}</small>
               </td>
               <td class="numeric">{{humanRate .DownloadRate}}</td>
               <td class="numeric">{{humanRate .UploadRate}}</td>
+              <td class="numeric">{{.ETA}}</td>
               <td class="numeric">{{.NumPeers}} / {{.NumSeeds}}</td>
               <td class="numeric">{{printf "%.2f" .Ratio}}</td>
               <td class="row-actions">
@@ -258,7 +265,7 @@
                 {{else}}
                 <button class="btn sm" data-action="pause" data-hash="{{.Hash}}" title="Metti in pausa il torrent">Pausa</button>
                 {{end}}
-                <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Recheck</button>
+                <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Check</button>
                 <button class="btn sm" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent">Dettagli</button>
                 <button class="btn sm danger" data-action="remove" data-hash="{{.Hash}}" title="Rimuovi il torrent (i file restano)">Rimuovi</button>
               </td>
@@ -268,24 +275,33 @@
         </table>
       </div>
       {{else}}
-      <p class="muted">Nessun torrent nella sessione.</p>
+      <p class="muted">Nessun download nella sessione.</p>
       {{end}}
     </div>
   </div>
-  <div class="panel torrent-detail-panel" data-torrent-detail-panel hidden>
-    <div class="panel-head"><h3>Dettagli torrent</h3><button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button></div>
-    <div class="panel-body">
-      <div class="toolbar torrent-detail-tabs">
-        <button class="btn sm" type="button" data-torrent-subdetail="peers">Peer</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="files">File</button>
-        <a class="btn sm" data-torrent-export="magnet" target="_blank" rel="noopener">Magnet</a>
-        <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
-      </div>
-      <div class="output" data-torrent-detail-output></div>
-      <div class="output" data-torrent-subdetail-output hidden></div>
-    </div>
+{{end}}
+
+{{define "torrent_detail"}}
+<div class="panel torrent-modal" data-torrent-detail-panel hidden>
+  <div class="panel-head">
+    <h3 data-torrent-detail-name>Dettagli torrent</h3>
+    <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
   </div>
+  <div class="panel-body">
+    <div class="toolbar torrent-detail-tabs">
+      <button class="btn sm" type="button" data-torrent-subdetail="general">Generale</button>
+      <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
+      <button class="btn sm" type="button" data-torrent-subdetail="files">Contenuto</button>
+      <button class="btn sm" type="button" data-torrent-subdetail="peers">Peers</button>
+      <button class="btn sm" type="button" data-torrent-subdetail="limits">Limiti</button>
+      <button class="btn sm" type="button" data-torrent-subdetail="storage">Storage</button>
+      <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
+      <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
+    </div>
+    <div class="output" data-torrent-detail-output></div>
+    <div data-torrent-subdetail-output hidden></div>
+  </div>
+</div>
 {{end}}
 {{define "health"}}
 <div class="view">

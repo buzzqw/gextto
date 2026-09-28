@@ -165,7 +165,58 @@
       </form>
     </div>
   </div>
-  <div data-torrents-slot>{{template "torrents_body" .Torrents}}</div>
+
+  <div class="panel download-session" data-download-session>
+    <div class="panel-head">
+      <h3>Download session</h3>
+      <small class="muted">Torrent e download HTTP fumetti nella stessa lista di lavoro</small>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar download-global-toolbar">
+        <button class="btn sm" type="button" data-api="/api/torrents/remove_completed" data-method="POST" data-body='{"delete_files":false}' title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+        <label class="check"><input type="checkbox" data-auto-remove-completed {{if .AutoRemoveCompleted}}checked{{end}} /> <span>Elimina i completati dopo il seed</span></label>
+        <label class="field inline-field"><span>Tag</span>
+          <select class="input" data-download-tag-filter aria-label="Filtra per tag">
+            <option value="">Tutti i tag</option>
+            <option value="__none__">Senza tag</option>
+            {{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}
+          </select>
+        </label>
+      </div>
+      <div class="toolbar download-temp-toolbar">
+        <span class="muted" data-temp-limit-label>{{if .TempActive}}Limite temporaneo attivo{{else}}Limite temporaneo disattivo{{end}}</span>
+        <label class="field inline-field"><span>DL KiB/s</span><input class="input compact" type="number" min="0" data-temp-dl value="{{.TempDL}}" /></label>
+        <label class="field inline-field"><span>UL KiB/s</span><input class="input compact" type="number" min="0" data-temp-ul value="{{.TempUL}}" /></label>
+        <label class="field inline-field"><span>minuti</span><input class="input compact" type="number" min="0" data-temp-minutes value="{{.TempMinutes}}" /></label>
+        <button class="btn sm primary" type="button" data-temp-apply>Applica</button>
+        <button class="btn sm danger" type="button" data-temp-clear>Rimuovi</button>
+        <small class="muted" data-temp-message aria-live="polite"></small>
+      </div>
+      <div class="toolbar download-bulk-toolbar">
+        <span class="muted" data-download-selected-count>0 selezionati</span>
+        <label class="field inline-field"><span>Tag</span>
+          <select class="input" data-download-tag-select aria-label="Tag da assegnare ai torrent selezionati">
+            <option value="">— rimuovi il tag —</option>
+            {{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}
+            <option value="__new__">➕ Nuovo tag…</option>
+          </select>
+        </label>
+        <input class="input compact" data-download-new-tag placeholder="Nuovo tag" hidden />
+        <button class="btn sm" type="button" data-download-assign-tag>Assegna tag</button>
+        <button class="btn sm" type="button" data-download-remove-tag>Rimuovi tag</button>
+        <button class="btn sm" type="button" data-download-bulk="pause">Pausa</button>
+        <button class="btn sm" type="button" data-download-bulk="resume">Riprendi</button>
+        <button class="btn sm" type="button" data-download-bulk="recheck">Recheck</button>
+        <button class="btn sm" type="button" data-api="/api/torrents/unpin" data-method="POST" data-body="{}" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
+        <button class="btn sm danger" type="button" data-download-bulk="remove">Rimuovi</button>
+      </div>
+    </div>
+  </div>
+
+  <div data-torrents-slot>{{template "torrents_table" .Torrents}}</div>
+
+  {{template "torrent_detail" .}}
+
   {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}

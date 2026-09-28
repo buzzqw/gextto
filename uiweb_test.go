@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
@@ -86,6 +88,76 @@ func TestUiPartialTorrentsEscapesTorrentName(t *testing.T) {
 	}
 	if !strings.Contains(html, "In scarico") {
 		t.Fatalf("state label missing: %s", html)
+	}
+}
+
+func TestUiDownloadsToolbarParity(t *testing.T) {
+	state := newTestAppState(t)
+	fake := newFakeQB()
+	server := httptest.NewServer(http.HandlerFunc(fake.serveHTTP))
+	t.Cleanup(server.Close)
+	fake.setTorrents([]qbittorrent.Torrent{{
+		Hash:     "abcd",
+		Name:     "Example.Release.1080p",
+		State:    "downloading",
+		Progress: 0.25,
+		Size:     4096,
+	}})
+	cfg := state.cfg
+	cfg.Settings["torrent_backend"] = BackendQbittorrent
+	cfg.Settings["qbittorrent_url"] = server.URL
+	for key, value := range map[string]string{
+		"libtorrent_temp_dl_limit":      "512",
+		"libtorrent_temp_ul_limit":      "128",
+		"libtorrent_temp_limit_enabled": "1",
+		"libtorrent_temp_limit_until":   strconv.FormatInt(time.Now().Unix()+1800, 10),
+		"download_tags":                 `["Comic","Serie"]`,
+		"auto_remove_completed":         "yes",
+	} {
+		if err := SaveSetting(state.cfg.DataDir, key, value); err != nil {
+			t.Fatalf("SaveSetting %s: %v", key, err)
+		}
+	}
+	engine, err := newQbittorrentEngine(cfg)
+	if err != nil {
+		t.Fatalf("newQbittorrentEngine: %v", err)
+	}
+	state.setActiveEngine(engine)
+	if err := state.db.SetTorrentTag("abcd", "Comic"); err != nil {
+		t.Fatalf("SetTorrentTag: %v", err)
+	}
+
+	api := httptest.NewServer(Router(state))
+	t.Cleanup(api.Close)
+	code, _, body := webGet(t, api, "/ui?view=downloads")
+	if code != http.StatusOK {
+		t.Fatalf("downloads -> %d", code)
+	}
+	html := string(body)
+	for _, marker := range []string{
+		"Download session",
+		"data-temp-dl",
+		`value="512"`,
+		`value="128"`,
+		"data-download-tag-filter",
+		"data-download-tag-select",
+		"data-download-remove-tag",
+		"data-auto-remove-completed",
+		`data-sort="eta"`,
+		"data-torrent-detail-panel",
+		`data-torrent-subdetail="general"`,
+		`data-torrent-subdetail="limits"`,
+		`data-torrent-subdetail="storage"`,
+		"tag-chip",
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("downloads page missing %q", marker)
+		}
+	}
+	// The configured temporary limits are prefilled and the tag catalog is
+	// offered in the toolbar.
+	if !strings.Contains(html, "<option value=\"Comic\">Comic</option>") {
+		t.Fatalf("tag catalog missing from toolbar")
 	}
 }
 

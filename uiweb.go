@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 //go:embed uiweb/templates/*.html uiweb/static/*
@@ -135,21 +136,34 @@ type uiUpcoming struct {
 
 // uiTorrentRow is one row of the Scarico table.
 type uiTorrentRow struct {
-	Hash         string
-	Name         string
-	Tag          string
-	State        string
-	StateClass   string
-	Progress     float64
-	ProgressPct  string
-	DownloadRate uint64
-	UploadRate   uint64
-	NumPeers     int
-	NumSeeds     int
-	Ratio        float64
-	TotalSize    int64
-	TotalDone    int64
-	Paused       bool
+	Hash        string
+	Name        string
+	Tag         string
+	Tags        []string
+	State       string
+	StateClass  string
+	Progress    float64
+	ProgressPct string
+	// ProgressClass drives the progress bar colour (active|seed|paused).
+	ProgressClass string
+	DownloadRate  uint64
+	UploadRate    uint64
+	ETA           string
+	ETASeconds    int64
+	NumPeers      int
+	NumSeeds      int
+	Ratio         float64
+	TotalSize     int64
+	TotalDone     int64
+	Paused        bool
+	// Archived/reason/source mirror the "origin" line of the classic UI; they
+	// come from torrent_meta and never change the session data.
+	Archived bool
+	Reason   string
+	Source   string
+	// SeedInfinite marks a seeding torrent configured to seed without a ratio
+	// or time limit, rendered as the "seed ∞" badge.
+	SeedInfinite bool
 }
 
 type uiTorrentsData struct {
@@ -593,6 +607,11 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			tags[strings.ToLower(pair[0])] = pair[1]
 		}
 	}
+	hashes := make([]string, 0, len(views))
+	for _, view := range views {
+		hashes = append(hashes, view.Hash)
+	}
+	aux, _ := s.db.TorrentAuxBulk(hashes)
 	rows := make([]uiTorrentRow, 0, len(views))
 	for _, view := range views {
 		progress := view.Progress
@@ -606,25 +625,64 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		if view.AllTimeDownload > 0 {
 			ratio = float64(view.AllTimeUpload) / float64(view.AllTimeDownload)
 		}
-		rows = append(rows, uiTorrentRow{
-			Hash:         view.Hash,
-			Name:         view.Name,
-			Tag:          tags[strings.ToLower(view.Hash)],
-			State:        uiStateLabel(view.State),
-			StateClass:   uiStateClass(view.State),
-			Progress:     progress,
-			ProgressPct:  strconv.FormatFloat(progress, 'f', 1, 64),
-			DownloadRate: view.DownloadRate,
-			UploadRate:   view.UploadRate,
-			NumPeers:     view.NumPeers,
-			NumSeeds:     view.NumSeeds,
-			Ratio:        ratio,
-			TotalSize:    view.TotalSize,
-			TotalDone:    view.TotalDone,
-			Paused:       view.State == "paused",
-		})
+		tag := tags[strings.ToLower(view.Hash)]
+		row := uiTorrentRow{
+			Hash:          view.Hash,
+			Name:          view.Name,
+			Tag:           tag,
+			State:         uiStateLabel(view.State),
+			StateClass:    uiStateClass(view.State),
+			Progress:      progress,
+			ProgressPct:   strconv.FormatFloat(progress, 'f', 1, 64),
+			ProgressClass: uiProgressClass(view.State),
+			DownloadRate:  view.DownloadRate,
+			UploadRate:    view.UploadRate,
+			NumPeers:      view.NumPeers,
+			NumSeeds:      view.NumSeeds,
+			Ratio:         ratio,
+			TotalSize:     view.TotalSize,
+			TotalDone:     view.TotalDone,
+			Paused:        view.State == "paused",
+		}
+		row.ETA, row.ETASeconds = uiTorrentETA(view)
+		row.Tags = uiSplitTags(tag)
+		if values, ok := aux[strings.ToLower(view.Hash)]; ok {
+			row.Archived = strings.TrimSpace(values[0]) != ""
+			row.Source = values[1]
+			row.Reason = values[2]
+		}
+		if view.State == "seeding" || view.State == "finished" {
+			row.SeedInfinite = view.SeedRatio == 0 || view.SeedDays == 0
+		}
+		rows = append(rows, row)
 	}
 	return rows
+}
+
+// uiSplitTags splits a comma separated torrent tag into clean chips.
+func uiSplitTags(tag string) []string {
+	out := []string{}
+	for _, part := range strings.Split(tag, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+// uiTorrentETA renders the estimated time to completion like the classic UI:
+// an em dash when the torrent is not actively downloading. The numeric value is
+// returned too so the table column can be sorted.
+func uiTorrentETA(view models.TorrentView) (string, int64) {
+	if view.DownloadRate == 0 || view.TotalSize <= view.TotalDone {
+		return "—", 0
+	}
+	remaining := view.TotalSize - view.TotalDone
+	seconds := remaining / int64(view.DownloadRate)
+	if seconds <= 0 {
+		return "—", 0
+	}
+	return logging.HumanDuration(seconds), seconds
 }
 
 // uiStateLabel mirrors torrent_state_label of the legacy UI so users see the
@@ -659,6 +717,17 @@ func uiStateLabel(state string) string {
 	default:
 		return "Sconosciuto"
 	}
+}
+
+// uiProgressClass selects the progress bar colour, mirroring the classic UI.
+func uiProgressClass(state string) string {
+	switch state {
+	case "seeding", "finished":
+		return "seed"
+	case "paused", "queued", "stalled", "checking_files", "checking_resume_data":
+		return "paused"
+	}
+	return "active"
 }
 
 func uiStateClass(state string) string {
