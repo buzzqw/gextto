@@ -3092,7 +3092,7 @@
     if (first) first.focus();
   }
 
-  // ---- folder browser (NAS path picker with mkdir) ------------------------
+  // ---- folder browser (NAS path picker with mkdir, rextto-style) ----------
   function openBrowseModal(input) {
     var overlay = document.getElementById("browse-overlay");
     if (!overlay) {
@@ -3100,17 +3100,32 @@
       overlay.id = "browse-overlay";
       overlay.className = "overlay";
       overlay.innerHTML =
-        '<div class="modal" role="dialog" aria-modal="true" aria-label="Sfoglia cartelle">' +
-        '<div class="modal-head"><h3>Scegli una cartella</h3><button class="btn sm" type="button" data-browse-close>Chiudi</button></div>' +
+        '<div class="modal path-modal" role="dialog" aria-modal="true" aria-label="Sfoglia cartelle">' +
+        '<div class="modal-head"><h3>Sfoglia cartelle</h3><button class="btn sm" type="button" data-browse-close>Chiudi</button></div>' +
         '<div class="modal-body">' +
-        '<div class="toolbar"><button class="btn sm" type="button" data-browse-up title="Vai alla cartella superiore">↑ Su</button><code class="browse-path" data-browse-path-label></code></div>' +
-        '<div class="toolbar"><input class="input" data-browse-new placeholder="nome nuova cartella" /><button class="btn sm" type="button" data-browse-create title="Crea la cartella nella posizione corrente">Crea cartella</button></div>' +
-        '<div class="browse-list" data-browse-list></div>' +
-        '<div class="form-actions"><button class="btn primary" type="button" data-browse-select>Seleziona questa cartella</button><small class="muted" data-browse-message aria-live="polite"></small></div>' +
+        '<div class="toolbar" style="margin-bottom:10px">' +
+        '<button class="btn sm" type="button" data-browse-up title="Vai alla cartella superiore">↑ Su</button>' +
+        '<input class="input mono" type="text" data-browse-path-input title="Percorso corrente: modificalo e premi Invio per navigare" />' +
+        '<button class="btn sm primary" type="button" data-browse-select title="Usa questa cartella">Seleziona</button>' +
+        '<button class="btn sm" type="button" data-browse-create-prompt title="Crea una nuova cartella dentro quella corrente">Crea cartella</button>' +
+        "</div>" +
+        '<div class="path-list" data-browse-list></div>' +
+        '<div class="toolbar" style="margin-top:10px">' +
+        '<input class="input" data-browse-new placeholder="Nuova cartella" title="Nome della nuova cartella da creare nella cartella corrente" />' +
+        '<button class="btn sm primary" type="button" data-browse-create title="Crea la cartella e selezionala">Crea e usa</button>' +
+        "</div>" +
+        '<small class="muted" data-browse-message aria-live="polite"></small>' +
         "</div></div>";
       document.body.appendChild(overlay);
       overlay.addEventListener("click", function (event) {
         if (event.target === overlay || event.target.closest("[data-browse-close]")) overlay.hidden = true;
+      });
+      overlay.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && event.target.matches("[data-browse-path-input]")) {
+          event.preventDefault();
+          overlay._current = String(event.target.value || "").trim();
+          loadBrowseModal(overlay);
+        }
       });
     }
     overlay.hidden = false;
@@ -3121,29 +3136,50 @@
 
   function loadBrowseModal(overlay) {
     var list = overlay.querySelector("[data-browse-list]");
-    var label = overlay.querySelector("[data-browse-path-label]");
+    var pathInput = overlay.querySelector("[data-browse-path-input]");
     var message = overlay.querySelector("[data-browse-message]");
     if (message) message.textContent = "";
     list.innerHTML = '<p class="muted">Caricamento…</p>';
     api("/api/browse_dir?path=" + encodeURIComponent(overlay._current || ""), "GET").then(function (data) {
       overlay._current = String(data.path || overlay._current || "");
       overlay._parent = data.parent || "";
-      if (label) label.textContent = overlay._current;
+      if (pathInput) pathInput.value = overlay._current;
       var dirs = data.dirs || [];
       list.innerHTML = "";
-      if (!dirs.length) list.innerHTML = '<p class="muted">Nessuna sottocartella.</p>';
+      if (!dirs.length) {
+        list.innerHTML = '<p class="muted">Nessuna sottocartella.</p>';
+        return;
+      }
       dirs.forEach(function (dir) {
         var button = document.createElement("button");
-        button.className = "browse-item";
+        button.className = "path-item";
         button.type = "button";
-        button.textContent = folderLabel(dir);
         button.title = dir;
+        var span = document.createElement("span");
+        span.className = "mono truncate";
+        span.textContent = dir;
+        button.appendChild(span);
         button.addEventListener("click", function () { overlay._current = dir; loadBrowseModal(overlay); });
         list.appendChild(button);
       });
     }).catch(function (error) {
       list.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
     });
+  }
+
+  function browseCreate(overlay, name) {
+    name = String(name || "").trim();
+    var message = overlay.querySelector("[data-browse-message]");
+    if (!name) {
+      if (message) message.textContent = "Inserisci il nome della cartella";
+      return;
+    }
+    var target = (overlay._current || "/").replace(/\/+$/, "") + "/" + name;
+    api("/api/mkdir", "POST", { path: target }).then(function () {
+      if (overlay._target) overlay._target.value = target;
+      overlay.hidden = true;
+      notify("Cartella creata: " + target, "ok");
+    }).catch(function (error) { if (message) message.textContent = error.message; });
   }
 
   document.addEventListener("click", function (event) {
@@ -3156,7 +3192,6 @@
     }
     var overlay = document.getElementById("browse-overlay");
     if (!overlay || overlay.hidden) return;
-    var message = overlay.querySelector("[data-browse-message]");
     if (event.target.closest("[data-browse-up]")) {
       overlay._current = overlay._parent || overlay._current;
       loadBrowseModal(overlay);
@@ -3167,17 +3202,15 @@
       overlay.hidden = true;
       return;
     }
+    if (event.target.closest("[data-browse-create-prompt]")) {
+      var entered = window.prompt("Nome nuova cartella:", "");
+      if (entered === null) return;
+      browseCreate(overlay, entered);
+      return;
+    }
     if (event.target.closest("[data-browse-create]")) {
       var nameInput = overlay.querySelector("[data-browse-new]");
-      var name = (nameInput && nameInput.value.trim()) || "";
-      if (!name) { if (message) message.textContent = "Inserisci il nome della cartella"; return; }
-      var target = (overlay._current || "/").replace(/\/+$/, "") + "/" + name;
-      api("/api/mkdir", "POST", { path: target }).then(function () {
-        overlay._current = target;
-        if (nameInput) nameInput.value = "";
-        if (message) message.textContent = "Cartella creata";
-        loadBrowseModal(overlay);
-      }).catch(function (error) { if (message) message.textContent = error.message; });
+      browseCreate(overlay, nameInput ? nameInput.value : "");
       return;
     }
   });
