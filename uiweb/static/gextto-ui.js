@@ -1875,6 +1875,14 @@
           item.language = form.querySelector("[name=language]").value;
           item.archive_path = form.querySelector("[name=archive_path]").value;
           item.exclude = form.querySelector("[name=exclude]").value;
+          var subtitle = form.querySelector("[name=subtitle]");
+          if (subtitle) item.subtitle = subtitle.value;
+          var tvdb = form.querySelector("[name=tvdb_id]");
+          if (tvdb) item.tvdb_id = tvdb.value;
+          var aliases = form.querySelector("[name=aliases]");
+          if (aliases) {
+            item.aliases = aliases.value.split(",").map(function (part) { return part.trim(); }).filter(Boolean);
+          }
           return item;
         });
         if (!found) { notify("Serie non trovata", "err"); return; }

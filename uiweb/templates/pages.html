@@ -496,8 +496,11 @@
       <form class="form-grid" data-series-edit data-series-name="{{.Name}}">
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
-        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" /></label>
-        <label class="field"><span>Lingua</span><input class="input" name="language" value="{{.Language}}" /></label>
+        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 720p-1080p" /></label>
+        <label class="field"><span>Lingue</span><input class="input" name="language" value="{{.Language}}" placeholder="es. ita,eng" /></label>
+        <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" /></label>
+        <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
+        <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
         <label class="field"><span>Percorso archivio</span><input class="input" name="archive_path" value="{{.ArchivePath}}" /></label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message></small></div>

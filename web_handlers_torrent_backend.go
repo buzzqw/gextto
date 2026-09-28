@@ -130,6 +130,10 @@ func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState
 			})
 			return
 		}
+		if err := validateAnacrolixConfig(cfg); err != nil {
+			jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
 		jsonResponse(w, map[string]any{"ok": true, "backend": BackendAnacrolix})
 		return
 	}
@@ -176,6 +180,10 @@ func TorrentBackendActivate(w http.ResponseWriter, r *http.Request, s *AppState)
 				jsonStatus(w, http.StatusConflict, map[string]any{
 					"ok": false, "error": "torrent_backend=anacrolix requires a build with the `anacrolix` tag",
 				})
+				return
+			}
+			if err := validateAnacrolixConfig(cfg); err != nil {
+				jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
 				return
 			}
 		}

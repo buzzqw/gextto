@@ -49,6 +49,9 @@ type uiSeriesDetail struct {
 	Language        string
 	ArchivePath     string
 	Exclude         string
+	Subtitle        string
+	TvdbID          string
+	Aliases         string
 	Enabled         bool
 	Episodes        []uiEpisodeRow
 	SeasonGroups    []uiSeasonGroup
@@ -222,6 +225,9 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		Language:        series.Language,
 		ArchivePath:     series.ArchivePath,
 		Exclude:         series.Exclude,
+		Subtitle:        series.Subtitle,
+		TvdbID:          series.TvdbID,
+		Aliases:         strings.Join(series.Aliases, ", "),
 		Enabled:         series.Enabled,
 		Episodes:        rows,
 		SeasonGroups:    seasonGroups,

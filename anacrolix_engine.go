@@ -132,6 +132,14 @@ type anacrolixTorrent struct {
 	uploadOnly bool
 }
 
+// anacrolixManifestEntry is deliberately separate from the live torrent
+// handle. The manifest is the durable contract used to restore a session.
+type anacrolixManifestEntry struct {
+	SavePath   string `json:"save_path"`
+	Paused     bool   `json:"paused,omitempty"`
+	UploadOnly bool   `json:"upload_only,omitempty"`
+}
+
 type anacrolixSample struct {
 	done int64
 	at   time.Time
@@ -147,7 +155,7 @@ type anacrolixEngine struct {
 	state        map[string]*anacrolixTorrent
 	previous     map[string]models.TorrentView
 	events       []models.TorrentEvent
-	manifest     map[string]string
+	manifest     map[string]anacrolixManifestEntry
 	samples      map[string]anacrolixSample
 	policyPaused map[string]struct{}
 	lastErr      string
@@ -157,6 +165,9 @@ type anacrolixEngine struct {
 var _ TorrentEngine = (*anacrolixEngine)(nil)
 
 func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
+	if err := validateAnacrolixConfig(cfg); err != nil {
+		return nil, err
+	}
 	settings := anacrolixSettingsFromConfig(cfg)
 	if err := os.MkdirAll(settings.MetadataDir, 0o755); err != nil {
 		return nil, fmt.Errorf("anacrolix: create metadata dir: %w", err)
@@ -219,7 +230,7 @@ func newAnacrolixEngineImpl(cfg *Config) (TorrentEngine, error) {
 		completion:   completion,
 		state:        map[string]*anacrolixTorrent{},
 		previous:     map[string]models.TorrentView{},
-		manifest:     map[string]string{},
+		manifest:     map[string]anacrolixManifestEntry{},
 		samples:      map[string]anacrolixSample{},
 		policyPaused: map[string]struct{}{},
 	}
@@ -244,7 +255,24 @@ func (e *anacrolixEngine) loadManifest() {
 	if err != nil {
 		return
 	}
-	_ = json.Unmarshal(raw, &e.manifest)
+	// Older builds wrote {"hash":"/path"}. Accept that format forever so a
+	// backend upgrade never strands active downloads.
+	var values map[string]json.RawMessage
+	if json.Unmarshal(raw, &values) != nil {
+		return
+	}
+	for hash, value := range values {
+		var entry anacrolixManifestEntry
+		if len(value) > 0 && value[0] == '"' {
+			if json.Unmarshal(value, &entry.SavePath) == nil {
+				e.manifest[hash] = entry
+			}
+			continue
+		}
+		if json.Unmarshal(value, &entry) == nil && strings.TrimSpace(entry.SavePath) != "" {
+			e.manifest[hash] = entry
+		}
+	}
 }
 
 func (e *anacrolixEngine) saveManifest() {
@@ -263,12 +291,13 @@ func (e *anacrolixEngine) saveManifest() {
 // restore re-adds the torrents known from a previous run. The piece completion
 // store supplies the verified pieces, so a restart does not re-download data.
 func (e *anacrolixEngine) restore() {
-	for hash, savePath := range e.manifest {
+	for hash, manifest := range e.manifest {
 		path := filepath.Join(e.settings.MetadataDir, hash+".torrent")
 		if !fileExists(path) {
 			continue
 		}
-		if _, err := e.addTorrentFileInternal(path, savePath, AddOptions{}, nil); err != nil {
+		options := AddOptions{Paused: manifest.Paused, SeedMode: manifest.UploadOnly}
+		if _, err := e.addTorrentFileInternal(path, manifest.SavePath, options, nil); err != nil {
 			logging.Warn("anacrolix restore failed", "hash", hash, "error", err.Error())
 		}
 	}
@@ -343,7 +372,11 @@ func (e *anacrolixEngine) register(handle *torrent.Torrent, savePath string, opt
 	}
 	e.mu.Lock()
 	e.state[hash] = entry
-	e.manifest[hash] = savePath
+	e.manifest[hash] = anacrolixManifestEntry{
+		SavePath:   savePath,
+		Paused:     options.Paused,
+		UploadOnly: options.SeedMode,
+	}
 	e.mu.Unlock()
 	e.saveManifest()
 	return entry
@@ -793,6 +826,7 @@ func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
 	// the state map (under lock) keeps a concurrent List/sync from dereferencing
 	// a dropped handle.
 	wasPaused := entry.paused
+	wasUploadOnly := entry.uploadOnly
 	entry.handle.DisallowDataDownload()
 	entry.handle.DisallowDataUpload()
 	e.mu.Lock()
@@ -802,7 +836,7 @@ func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
 	entry.handle.Drop()
 
 	readd := func(path string) {
-		if _, addErr := e.addTorrentFileInternal(torrentFile, path, AddOptions{Paused: wasPaused}, nil); addErr != nil {
+		if _, addErr := e.addTorrentFileInternal(torrentFile, path, AddOptions{Paused: wasPaused, SeedMode: wasUploadOnly}, nil); addErr != nil {
 			logging.Error("anacrolix move: re-add failed", "hash", hash, "path", path, "error", addErr.Error())
 		}
 	}
@@ -811,7 +845,7 @@ func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
 		readd(entry.savePath)
 		return false, err
 	}
-	if _, err := e.addTorrentFileInternal(torrentFile, destination, AddOptions{Paused: wasPaused}, nil); err != nil {
+	if _, err := e.addTorrentFileInternal(torrentFile, destination, AddOptions{Paused: wasPaused, SeedMode: wasUploadOnly}, nil); err != nil {
 		// Try to restore the previous location rather than leaving it detached.
 		if moveErr := anacrolixMoveTree(target, source); moveErr == nil {
 			readd(entry.savePath)

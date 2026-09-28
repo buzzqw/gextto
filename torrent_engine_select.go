@@ -36,7 +36,7 @@ func alternativeBackendActive(cfg *Config) bool {
 		}
 		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
 	case BackendAnacrolix:
-		return newAnacrolixEngine != nil
+		return newAnacrolixEngine != nil && validateAnacrolixConfig(cfg) == nil
 	default:
 		return false
 	}
@@ -76,6 +76,9 @@ func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
 	case BackendAnacrolix:
 		if newAnacrolixEngine == nil {
 			return nil, "", fmt.Errorf("torrent_backend=anacrolix requires a build with the `anacrolix` tag")
+		}
+		if err := validateAnacrolixConfig(cfg); err != nil {
+			return nil, "", err
 		}
 		engine, err := newAnacrolixEngine(cfg)
 		if err != nil {
