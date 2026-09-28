@@ -1017,4 +1017,7 @@ pre.log-view { margin: 0; }
   /* Primary form actions become full-width, thumb-friendly buttons. */
   .form-actions { flex-direction: column; align-items: stretch; }
   .form-actions .btn { width: 100%; }
+
+  /* Truncated cells stop hogging the row: the next column stays in sight. */
+  .cell-truncate { max-width: 62vw; }
 }
