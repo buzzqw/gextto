@@ -244,7 +244,12 @@
   function translateUINode(node) {
     if (!node) return;
     if (node.nodeType === 3) {
-      node.nodeValue = translateUIValue(node.nodeValue);
+      var originalText = node.nodeValue;
+      var translatedText = translateUIValue(originalText);
+      // MutationObserver watches characterData. Do not write the same value
+      // back: browsers report even a no-op nodeValue assignment as a new
+      // mutation, which would create an observer -> write -> observer loop.
+      if (translatedText !== originalText) node.nodeValue = translatedText;
       return;
     }
     if (node.nodeType !== 1) return;
