@@ -658,6 +658,21 @@ type managedQbittorrentProcess struct {
 	logFile *os.File
 	mu      sync.Mutex
 	closed  bool
+	// done receives the exit error once the process terminates, so the
+	// supervisor can wait without racing the Wait goroutine.
+	done chan error
+}
+
+// wait blocks until the managed process exits and returns its exit error.
+func (p *managedQbittorrentProcess) wait() error {
+	if p == nil || p.done == nil {
+		return nil
+	}
+	err, ok := <-p.done
+	if !ok {
+		return nil
+	}
+	return err
 }
 
 func startManagedQbittorrent(cfg *Config, settings qbittorrentSettings) (*managedQbittorrentProcess, error) {
@@ -709,10 +724,12 @@ func startManagedQbittorrent(cfg *Config, settings qbittorrentSettings) (*manage
 		logFile.Close()
 		return nil, fmt.Errorf("avvio qBittorrent gestito: %w", err)
 	}
-	process := &managedQbittorrentProcess{cmd: command, logFile: logFile}
+	process := &managedQbittorrentProcess{cmd: command, logFile: logFile, done: make(chan error, 1)}
 	go func() {
-		_ = command.Wait()
+		err := command.Wait()
 		_ = logFile.Close()
+		process.done <- err
+		close(process.done)
 	}()
 	return process, nil
 }

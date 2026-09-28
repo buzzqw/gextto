@@ -105,7 +105,16 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 type qbittorrentEngine struct {
 	settings qbittorrentSettings
 	client   *qbittorrent.Client
-	process  *managedQbittorrentProcess
+	// cfg is the startup snapshot, kept so the watchdog can restart the
+	// managed process without an AppState.
+	cfg *Config
+
+	// processMu guards the managed process handle and the closed flag, which
+	// the watchdog goroutine and Close() both touch.
+	processMu      sync.Mutex
+	process        *managedQbittorrentProcess
+	supervisorStop chan struct{}
+	closed         bool
 
 	categoryReady bool
 	queueMu       sync.Mutex
@@ -144,16 +153,100 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &qbittorrentEngine{
-		settings:     settings,
-		client:       client,
-		process:      process,
-		cache:        map[string]models.TorrentView{},
-		previous:     map[string]models.TorrentView{},
-		stalled:      map[string]struct{}{},
-		policyPaused: map[string]struct{}{},
-		pendingMoves: map[string]string{},
-	}, nil
+	engine := &qbittorrentEngine{
+		settings:       settings,
+		client:         client,
+		cfg:            cfg,
+		process:        process,
+		supervisorStop: make(chan struct{}),
+		cache:          map[string]models.TorrentView{},
+		previous:       map[string]models.TorrentView{},
+		stalled:        map[string]struct{}{},
+		policyPaused:   map[string]struct{}{},
+		pendingMoves:   map[string]string{},
+	}
+	if process != nil {
+		go engine.superviseManagedProcess()
+	}
+	return engine, nil
+}
+
+// superviseManagedProcess keeps the managed qBittorrent-nox alive: every
+// unexpected exit is logged and the process is restarted. After too many
+// crashes in a short window Gextto gives up, switches back to the embedded
+// libtorrent engine and restarts the service to apply it.
+func (e *qbittorrentEngine) superviseManagedProcess() {
+	const (
+		crashWindow  = 10 * time.Minute
+		maxCrashes   = 3
+		restartPause = 5 * time.Second
+	)
+	var crashes []time.Time
+	for {
+		e.processMu.Lock()
+		process := e.process
+		closed := e.closed
+		e.processMu.Unlock()
+		if closed || process == nil {
+			return
+		}
+
+		err := process.wait()
+
+		e.processMu.Lock()
+		closed = e.closed
+		e.processMu.Unlock()
+		if closed {
+			return // intentional stop
+		}
+
+		exit := "uscita inattesa"
+		if err != nil {
+			exit = err.Error()
+		}
+		now := time.Now()
+		logging.Error("qBittorrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", len(crashes)+1)
+
+		crashes = append(crashes, now)
+		kept := crashes[:0]
+		for _, at := range crashes {
+			if now.Sub(at) <= crashWindow {
+				kept = append(kept, at)
+			}
+		}
+		crashes = kept
+
+		if len(crashes) >= maxCrashes {
+			logging.Error("qBittorrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
+				"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
+			if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
+				logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
+			}
+			requestServiceActionLater("restart")
+			return
+		}
+
+		select {
+		case <-e.supervisorStop:
+			return
+		case <-time.After(restartPause):
+		}
+
+		restarted, startErr := startManagedQbittorrent(e.cfg, e.settings)
+		if startErr != nil {
+			logging.Error("riavvio di qBittorrent gestito non riuscito", "error", startErr)
+			continue
+		}
+		e.processMu.Lock()
+		e.process = restarted
+		closed = e.closed
+		e.processMu.Unlock()
+		if closed {
+			_ = restarted.Close()
+			return
+		}
+		logging.Info("qBittorrent gestito riavviato dopo un'uscita inattesa", "restart", len(crashes))
+	}
 }
 
 func (e *qbittorrentEngine) Name() string { return BackendQbittorrent }
@@ -329,11 +422,16 @@ func (e *qbittorrentEngine) sync() error {
 
 	e.mu.Lock()
 	if err != nil {
+		wasConnected := e.connected
 		e.connected = false
 		e.lastErr = err.Error()
 		e.mu.Unlock()
+		if wasConnected {
+			logging.Warn("qBittorrent non raggiungibile", "url", e.settings.Client.BaseURL, "error", err)
+		}
 		return err
 	}
+	reconnected := !e.connected
 	e.connected = true
 	e.lastErr = ""
 	e.lastSync = now
@@ -394,6 +492,9 @@ func (e *qbittorrentEngine) sync() error {
 		}
 	}
 	e.mu.Unlock()
+	if reconnected {
+		logging.Info("qBittorrent connesso", "url", e.settings.Client.BaseURL)
+	}
 	for _, hash := range export {
 		e.ensureTorrentFile(hash)
 	}
@@ -634,6 +735,18 @@ func (e *qbittorrentEngine) SyncStats() map[string]any {
 // disabled it. Gextto owns scheduling while running, but must not leave a
 // user's external qBittorrent configuration altered after shutdown.
 func (e *qbittorrentEngine) Close() error {
+	// Stop the watchdog first so it never restarts the process we are about to
+	// stop on purpose.
+	e.processMu.Lock()
+	if !e.closed {
+		e.closed = true
+		if e.supervisorStop != nil {
+			close(e.supervisorStop)
+		}
+	}
+	process := e.process
+	e.processMu.Unlock()
+
 	e.queueMu.Lock()
 	restoreQueue := e.queueManaged && e.queueChanged
 	original := e.queueOriginal
@@ -644,8 +757,8 @@ func (e *qbittorrentEngine) Close() error {
 		err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": original})
 		cancel()
 		if err != nil {
-			if e.process != nil {
-				_ = e.process.Close()
+			if process != nil {
+				_ = process.Close()
 			}
 			return err
 		}
@@ -653,8 +766,8 @@ func (e *qbittorrentEngine) Close() error {
 		e.queueChanged = false
 		e.queueMu.Unlock()
 	}
-	if e.process != nil {
-		return e.process.Close()
+	if process != nil {
+		return process.Close()
 	}
 	return nil
 }
