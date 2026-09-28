@@ -2864,6 +2864,61 @@
     hero.innerHTML = '<div class="panel-body series-hero">' + html + "</div>";
   }
 
+  // ---- movie detail hero --------------------------------------------------
+  var movieHero = document.querySelector("[data-movie-hero]");
+  if (movieHero) {
+    var movieID = movieHero.getAttribute("data-movie-id") || "";
+    if (movieID) {
+      api("/api/movies/" + encodeURIComponent(movieID), "GET").then(function (data) {
+        renderMovieHero(movieHero, data || {});
+      }).catch(function (error) {
+        movieHero.innerHTML = '<div class="panel-body"><p class="alert">' + esc(error.message) + "</p></div>";
+      });
+    }
+  }
+
+  function renderMovieHero(hero, data) {
+    var movie = data.movie || {};
+    var meta = data.metadata || {};
+    var name = String(meta.title || movie.name || hero.getAttribute("data-name") || "");
+    var year = String(movie.year || "");
+    var posterPath = String(meta.poster_path || movie.poster_path || "");
+    var poster = posterPath && posterPath.indexOf("http") === 0
+      ? posterPath
+      : (posterPath ? "https://image.tmdb.org/t/p/w300" + posterPath : "");
+    var overview = String(meta.overview || movie.overview || "");
+    var releaseDate = String(meta.release_date || "");
+
+    var html = '<div class="series-hero-main">';
+    if (poster && safeHref(poster)) {
+      html += '<img class="series-poster" loading="lazy" alt="' + esc(name) + '" src="' + esc(safeHref(poster)) + '" />';
+    } else {
+      html += '<div class="series-poster placeholder">N/D</div>';
+    }
+    html += '<div class="series-hero-body">';
+    html += "<h2>" + esc(name) + (year ? ' <small class="muted">' + esc(year) + "</small>" : "") + "</h2>";
+    var badges = [];
+    if (releaseDate) badges.push("uscita " + releaseDate);
+    if (movie.quality) badges.push("Qualità " + String(movie.quality));
+    if (movie.language) badges.push("Lingua " + String(movie.language));
+    badges.push(movie.enabled === false ? "in pausa" : "attivo");
+    html += '<div class="series-badges">' + badges.map(function (badge) {
+      return '<span class="badge">' + esc(badge) + "</span>";
+    }).join(" ") + "</div>";
+    if (overview) html += '<p class="series-overview">' + esc(overview) + "</p>";
+    if (Array.isArray(data.cast) && data.cast.length) {
+      html += '<p class="muted"><small>Cast: ' + esc(data.cast.slice(0, 10).map(function (person) {
+        return String(person.name || "") + (person.character ? " (" + person.character + ")" : "");
+      }).join(", ")) + "</small></p>";
+    }
+    var links = "";
+    if (movie.tmdb_id) links += '<a class="btn sm" href="https://www.themoviedb.org/movie/' + encodeURIComponent(String(movie.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
+    if (movie.tvdb_id) links += ' <a class="btn sm" href="https://thetvdb.com/dereferrer/movie/' + encodeURIComponent(String(movie.tvdb_id)) + '" target="_blank" rel="noopener">TVDB</a>';
+    if (links) html += '<div class="series-links">' + links + "</div>";
+    html += "</div></div>";
+    hero.innerHTML = '<div class="panel-body series-hero">' + html + "</div>";
+  }
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";

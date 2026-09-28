@@ -469,7 +469,10 @@
 
 {{define "movie_detail"}}
 <div class="view">
-  <div class="toolbar"><a class="btn sm" href="/?view=movies">← Film</a></div>
+  <div class="toolbar"><a class="btn sm" href="/?view=movies" title="Torna all'elenco dei film">← Film</a></div>
+  <div class="panel" data-movie-hero data-movie-id="{{.ID}}" data-name="{{.Name}}" data-year="{{.Year}}">
+    <div class="panel-body series-hero"><p class="muted">Caricamento metadati…</p></div>
+  </div>
   <div class="panel">
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
