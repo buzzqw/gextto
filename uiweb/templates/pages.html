@@ -4,30 +4,32 @@
     <h3>{{.Title}}</h3>
     <small class="muted" data-ui-count></small>
   </div>
-  <div class="panel-body">
-    {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-    <div class="toolbar" style="margin-bottom:10px">
-      {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
-      {{if .Filter}}<input type="search" class="input" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
-      <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead data-ui-head></thead>
-        <tbody data-ui-body>
-          <tr><td class="muted">Caricamento…</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div data-ui-table
-         data-endpoint="{{.Endpoint}}"
-         data-items="{{.ItemsKey}}"
-         data-columns="{{.ColumnsJSON}}"
-         data-actions="{{.ActionsJSON}}"
-         data-empty="{{.Empty}}"
-         data-search="{{.SearchParam}}"></div>
-  </div>
+  <div class="panel-body">{{template "table_panel_body" .}}</div>
 </div>
+{{end}}
+
+{{define "table_panel_body"}}
+{{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+<div class="toolbar" style="margin-bottom:10px">
+  {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+  {{if .Filter}}<input type="search" class="input" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
+  <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
+</div>
+<div class="table-wrap">
+  <table class="data-table">
+    <thead data-ui-head></thead>
+    <tbody data-ui-body>
+      <tr><td class="muted">Caricamento…</td></tr>
+    </tbody>
+  </table>
+</div>
+<div data-ui-table
+     data-endpoint="{{.Endpoint}}"
+     data-items="{{.ItemsKey}}"
+     data-columns="{{.ColumnsJSON}}"
+     data-actions="{{.ActionsJSON}}"
+     data-empty="{{.Empty}}"
+     data-search="{{.SearchParam}}"></div>
 {{end}}
 
 {{define "table"}}
@@ -37,13 +39,43 @@
 {{define "action_section"}}
 <div class="panel">
   <div class="panel-head"><h3>{{.Label}}</h3></div>
-  <div class="panel-body">
+  <div class="panel-body">{{template "action_section_body" .}}</div>
+</div>
+{{end}}
+
+{{define "action_section_body"}}
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <div class="toolbar">
       {{range .Buttons}}
       <button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>
       {{end}}
     </div>
+{{end}}
+
+{{define "section_body_title"}}{{if eq .Kind "table"}}{{.Table.Title}}{{else if eq .Kind "form"}}{{.Form.Title}}{{else if eq .Kind "oauth"}}{{.OAuth.Name}}{{else if eq .Kind "settings"}}{{.Settings.Title}}{{else if eq .Kind "actions"}}{{.Action.Label}}{{end}}{{end}}
+
+{{define "section_body"}}
+{{if eq .Kind "table"}}{{template "table_panel_body" .Table}}
+{{else if eq .Kind "form"}}{{template "form_section_body" .Form}}
+{{else if eq .Kind "oauth"}}{{template "oauth_section_body" .OAuth}}
+{{else if eq .Kind "settings"}}{{template "settings_section_body" .Settings}}
+{{else if eq .Kind "actions"}}{{template "action_section_body" .Action}}
+{{else}}{{template "section" .}}{{end}}
+{{end}}
+
+{{define "integration_card"}}
+<div class="panel integration-card">
+  <div class="panel-head">
+    <h3>{{.Title}}</h3>
+    {{if .Status}}<span class="badge {{.StatusClass}}">{{.Status}}</span>{{end}}
+  </div>
+  <div class="panel-body integration-body">
+    {{range .Children}}
+    <section class="integration-block">
+      <h4 class="integration-subtitle">{{template "section_body_title" .}}</h4>
+      {{template "section_body" .}}
+    </section>
+    {{end}}
   </div>
 </div>
 {{end}}
@@ -51,7 +83,11 @@
 {{define "form_section"}}
 <div class="panel">
   <div class="panel-head"><h3>{{.Title}}</h3></div>
-  <div class="panel-body">
+  <div class="panel-body">{{template "form_section_body" .}}</div>
+</div>
+{{end}}
+
+{{define "form_section_body"}}
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-wrap="{{.Wrap}}" data-render="{{.Render}}">
       {{range .Fields}}
@@ -72,8 +108,6 @@
       </div>
       <div class="output" data-form-output hidden></div>
     </form>
-  </div>
-</div>
 {{end}}
 
 {{define "section"}}
@@ -87,6 +121,7 @@
 {{else if eq .Kind "duplicates"}}{{template "duplicates_panel" .}}
 {{else if eq .Kind "ramdisk"}}{{template "ramdisk_control" .}}
 {{else if eq .Kind "settings"}}{{template "settings_section" .Settings}}
+{{else if eq .Kind "integration"}}{{template "integration_card" .Integration}}
 {{else if eq .Kind "list_editor"}}{{template "list_editor" .Editor}}
 {{else if eq .Kind "sources_check"}}{{template "sources_check" .}}
 {{else if eq .Kind "db_optimize"}}{{template "db_optimize" .}}
@@ -155,12 +190,14 @@
 {{define "settings_section"}}
 <div class="panel">
   <div class="panel-head"><h3>{{.Title}}</h3></div>
-  <div class="panel-body">
+  <div class="panel-body">{{template "settings_section_body" .}}</div>
+</div>
+{{end}}
+
+{{define "settings_section_body"}}
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <div class="settings-rows">{{range .Fields}}{{template "settings_field" .}}{{end}}</div>
     {{if .Buttons}}<div class="toolbar" style="margin-top:12px">{{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>{{end}}</div>{{end}}
-  </div>
-</div>
 {{end}}
 
 {{define "duplicates_panel"}}
@@ -194,16 +231,18 @@
 {{define "oauth_section"}}
 <div class="panel">
   <div class="panel-head"><h3>{{.Name}}</h3></div>
-  <div class="panel-body">
+  <div class="panel-body">{{template "oauth_section_body" .}}</div>
+</div>
+{{end}}
+
+{{define "oauth_section_body"}}
     <div class="toolbar">
-      <button class="btn sm primary" data-oauth-start="{{.StartPath}}">Avvia accesso</button>
-      <input class="input" data-oauth-code placeholder="codice" />
-      <button class="btn sm" data-oauth-poll="{{.PollPath}}">Conferma</button>
-      {{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}">{{.Label}}</button>{{end}}
+      <button class="btn sm primary" data-oauth-start="{{.StartPath}}" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
+      <input class="input" data-oauth-code placeholder="codice" title="Codice/PIN mostrato dal provider" />
+      <button class="btn sm" data-oauth-poll="{{.PollPath}}" title="Conferma il codice/PIN inserito">Conferma</button>
+      {{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>{{end}}
     </div>
     <div class="output" data-oauth-output></div>
-  </div>
-</div>
 {{end}}
 
 {{define "links_section"}}

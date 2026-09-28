@@ -24,6 +24,33 @@ type uiPageSection struct {
 	OAuth    uiOAuthSection
 	Settings uiSettingsSection
 	Editor   uiListEditor
+	// Integration groups several sections in one provider tile (Trakt, Simkl).
+	Integration uiIntegrationCardSection
+}
+
+// uiIntegrationCardSection renders a provider as a single tile: a header with
+// the connection status and the child sections (OAuth, settings, watchlist,
+// calendar) stacked inside the same panel.
+type uiIntegrationCardSection struct {
+	Title       string
+	Status      string
+	StatusClass string // ok | warn | ""
+	Children    []uiPageSection
+}
+
+func sectionIntegration(card uiIntegrationCardSection) uiPageSection {
+	return uiPageSection{Kind: "integration", Integration: card}
+}
+
+// integrationStatus returns the status label and badge class of a provider.
+func integrationStatus(cfg *Config, prefix string) (string, string) {
+	if settingsNonEmpty(cfg, prefix+"_access_token") {
+		return "autenticato", "ok"
+	}
+	if settingsNonEmpty(cfg, prefix+"_client_id") {
+		return "configurato, da autenticare", "warn"
+	}
+	return "non configurato", ""
 }
 
 // uiSettingsSection renders a group of individual setting rows, reusing the
@@ -226,6 +253,13 @@ func boolField(name, label string, value bool) uiFormField {
 		{Value: "true", Label: "Sì", Selected: value},
 		{Value: "false", Label: "No", Selected: !value},
 	}}
+}
+
+// boolFieldHint is boolField with the tooltip shown on the label.
+func boolFieldHint(name, label, hint string, value bool) uiFormField {
+	field := boolField(name, label, value)
+	field.Hint = hint
+	return field
 }
 
 // uiQualityOptions are the quality presets used by the library add forms.
@@ -448,79 +482,91 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
+	traktStatus, traktStatusClass := integrationStatus(cfg, "trakt")
+	simklStatus, simklStatusClass := integrationStatus(cfg, "simkl")
 	group := func(name string, section uiPageSection) uiPageSection {
 		section.Group = name
 		return section
 	}
 	return []uiPageSection{
-		group("Trakt", sectionOAuth(uiOAuthSection{Name: "Trakt", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
-			{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}"},
-			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}"},
-			{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}"},
-		}})),
-		group("Trakt", sectionForm(uiFormSection{
-			Title: "Trakt — impostazioni", Hint: "Crea un'app API su trakt.tv e incolla client ID e secret.", Path: "/api/trakt/settings", Submit: "Salva Trakt",
-			Wrap: "values",
-			Fields: []uiFormField{
-				{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", "")},
-				{Name: "trakt_client_secret", Label: "Client secret", Kind: "text"},
-				{Name: "trakt_calendar_days", Label: "Giorni calendario", Value: traktCalendarDays},
-				boolField("trakt_watchlist_sync", "Sincronizza watchlist", settingsBool(cfg, "trakt_watchlist_sync", false)),
-				boolField("trakt_scrobble_enabled", "Scrobble", settingsBool(cfg, "trakt_scrobble_enabled", false)),
+		sectionIntegration(uiIntegrationCardSection{
+			Title: "Trakt", Status: traktStatus, StatusClass: traktStatusClass,
+			Children: []uiPageSection{
+				sectionOAuth(uiOAuthSection{Name: "Accesso", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
+					{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}", Hint: "Rinnova il token di accesso Trakt."},
+					{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}", Hint: "Revoca l'accesso e rimuove il token salvato."},
+					{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}", Hint: "Importa le serie della watchlist Trakt nella libreria."},
+				}}),
+				sectionForm(uiFormSection{
+					Title: "Impostazioni", Hint: "Crea un'app API su trakt.tv e incolla client ID e secret.", Path: "/api/trakt/settings", Submit: "Salva Trakt",
+					Wrap: "values",
+					Fields: []uiFormField{
+						{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", ""), Hint: "Client ID dell'app creata su trakt.tv."},
+						{Name: "trakt_client_secret", Label: "Client secret", Kind: "text", Hint: "Client secret dell'app creata su trakt.tv (non visualizzato)."},
+						{Name: "trakt_calendar_days", Label: "Giorni calendario", Value: traktCalendarDays, Hint: "Quanti giorni avanti mostrare nel calendario Trakt."},
+						boolFieldHint("trakt_watchlist_sync", "Sincronizza watchlist", "Sincronizza automaticamente la watchlist Trakt ad ogni ciclo.", settingsBool(cfg, "trakt_watchlist_sync", false)),
+						boolFieldHint("trakt_scrobble_enabled", "Scrobble", "Invia a Trakt gli episodi visti (scrobble).", settingsBool(cfg, "trakt_scrobble_enabled", false)),
+					},
+				}),
+				sectionTable(uiTableSpec{
+					Title:    "Watchlist Trakt",
+					Endpoint: "/api/trakt/watchlist",
+					ItemsKey: "",
+					ColumnsJSON: uiJSON([]uiColumn{
+						{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
+					}),
+					Empty: "Watchlist vuota o Trakt non configurato.",
+				}),
+				sectionTable(uiTableSpec{
+					Title:    "Calendario Trakt",
+					Endpoint: "/api/trakt/calendar",
+					ItemsKey: "",
+					ColumnsJSON: uiJSON([]uiColumn{
+						{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
+					}),
+					Empty: "Nessuna uscita o Trakt non configurato.",
+				}),
 			},
-		})),
-		group("Trakt", sectionTable(uiTableSpec{
-			Title:    "Watchlist Trakt",
-			Endpoint: "/api/trakt/watchlist",
-			ItemsKey: "",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
-			}),
-			Empty: "Watchlist vuota o Trakt non configurato.",
-		})),
-		group("Trakt", sectionTable(uiTableSpec{
-			Title:    "Calendario Trakt",
-			Endpoint: "/api/trakt/calendar",
-			ItemsKey: "",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
-			}),
-			Empty: "Nessuna uscita o Trakt non configurato.",
-		})),
-		group("Simkl", sectionOAuth(uiOAuthSection{Name: "Simkl", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
-			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}"},
-			{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}"},
-		}})),
-		group("Simkl", sectionForm(uiFormSection{
-			Title: "Simkl — impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
-			Wrap: "values",
-			Fields: []uiFormField{
-				{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", "")},
-				{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays},
-				{Name: "simkl_watchlist_status", Label: "Stato watchlist", Kind: "select", Options: []uiFormOption{
-					{Value: "plantowatch", Label: "Da guardare", Selected: settingsOr(cfg, "simkl_watchlist_status", "plantowatch") == "plantowatch"},
-					{Value: "watching", Label: "In visione", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "watching"},
-					{Value: "completed", Label: "Completato", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "completed"},
-				}},
-				boolField("simkl_mark_watched", "Segna come visto", settingsBool(cfg, "simkl_mark_watched", false)),
+		}),
+		sectionIntegration(uiIntegrationCardSection{
+			Title: "Simkl", Status: simklStatus, StatusClass: simklStatusClass,
+			Children: []uiPageSection{
+				sectionOAuth(uiOAuthSection{Name: "Accesso", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
+					{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}", Hint: "Revoca l'accesso e rimuove il token salvato."},
+					{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}", Hint: "Importa le serie della watchlist Simkl nella libreria."},
+				}}),
+				sectionForm(uiFormSection{
+					Title: "Impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
+					Wrap: "values",
+					Fields: []uiFormField{
+						{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", ""), Hint: "Client ID dell'app Simkl."},
+						{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays, Hint: "Quanti giorni avanti mostrare nel calendario Simkl."},
+						{Name: "simkl_watchlist_status", Label: "Stato watchlist", Kind: "select", Hint: "Stato assegnato alle serie importate nella watchlist Simkl.", Options: []uiFormOption{
+							{Value: "plantowatch", Label: "Da guardare", Selected: settingsOr(cfg, "simkl_watchlist_status", "plantowatch") == "plantowatch"},
+							{Value: "watching", Label: "In visione", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "watching"},
+							{Value: "completed", Label: "Completato", Selected: settingsOr(cfg, "simkl_watchlist_status", "") == "completed"},
+						}},
+						boolFieldHint("simkl_mark_watched", "Segna come visto", "Segna come visti su Simkl gli episodi scaricati.", settingsBool(cfg, "simkl_mark_watched", false)),
+					},
+				}),
+				sectionTable(uiTableSpec{
+					Title:       "Watchlist Simkl",
+					Endpoint:    "/api/simkl/watchlist",
+					ItemsKey:    "shows",
+					ColumnsJSON: uiJSON([]uiColumn{{Key: "show", Label: "Serie"}}),
+					Empty:       "Watchlist vuota o Simkl non configurato.",
+				}),
+				sectionTable(uiTableSpec{
+					Title:    "Calendario Simkl",
+					Endpoint: "/api/simkl/calendar",
+					ItemsKey: "",
+					ColumnsJSON: uiJSON([]uiColumn{
+						{Key: "date", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
+					}),
+					Empty: "Nessuna uscita o Simkl non configurato.",
+				}),
 			},
-		})),
-		group("Simkl", sectionTable(uiTableSpec{
-			Title:       "Watchlist Simkl",
-			Endpoint:    "/api/simkl/watchlist",
-			ItemsKey:    "shows",
-			ColumnsJSON: uiJSON([]uiColumn{{Key: "show", Label: "Serie"}}),
-			Empty:       "Watchlist vuota o Simkl non configurato.",
-		})),
-		group("Simkl", sectionTable(uiTableSpec{
-			Title:    "Calendario Simkl",
-			Endpoint: "/api/simkl/calendar",
-			ItemsKey: "",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "date", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
-			}),
-			Empty: "Nessuna uscita o Simkl non configurato.",
-		})),
+		}),
 		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}", Hint: "Verifica che Jellyfin risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}", Hint: "Chiede a Jellyfin di aggiornare la libreria."},

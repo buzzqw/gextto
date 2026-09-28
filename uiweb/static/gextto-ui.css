@@ -721,6 +721,13 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 }
 .section-group .grid-2 { align-items: start; }
 
+/* Provider tile (Trakt, Simkl): one panel with stacked sub-sections. */
+.integration-body { display: flex; flex-direction: column; gap: 14px; }
+.integration-block { display: flex; flex-direction: column; gap: 8px; }
+.integration-block + .integration-block { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.integration-subtitle { margin: 0; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.integration-subtitle:empty { display: none; }
+
 .tmdb-results { margin-top: 12px; }
 .tmdb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .tmdb-card {
