@@ -357,6 +357,16 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		return uiPanelsPage{Sections: []uiPageSection{sectionTable(spec)}}, true
 	case "comics":
 		spec, _ := uiTableSpecFor("comics")
+		weeklyEnabled := false
+		weeklyFromDate := ""
+		if s.comics != nil {
+			if value, err := s.comics.Setting("weekly_enabled", "no"); err == nil {
+				weeklyEnabled = value == "yes" || value == "true" || value == "1"
+			}
+			if value, err := s.comics.Setting("weekly_from_date", ""); err == nil {
+				weeklyFromDate = strings.TrimSpace(value)
+			}
+		}
 		group := func(name string, section uiPageSection) uiPageSection {
 			section.Group = name
 			return section
@@ -371,15 +381,15 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 			}})),
 			sectionTable(spec),
 			group("Weekly pack", sectionForm(uiFormSection{
-				Title: "Pianificazione settimanale", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",
+				Title: "Pianificazione settimanale", Hint: "Attiva il controllo automatico dei Weekly Pack. La data limita i pack da scaricare; non avvia il download di quelli precedenti.", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",
 				Fields: []uiFormField{
-					boolField("enabled", "Weekly attivo", false),
-					{Name: "from_date", Label: "Dal (YYYY.MM.DD)"},
+					boolField("enabled", "Weekly attivo", weeklyEnabled),
+					{Name: "from_date", Label: "Scarica weekly pack a partire dal", Kind: "date", Value: weeklyFromDate, Hint: "Non cercare o scaricare Weekly Pack con data precedente a questa."},
 				},
 			})),
 			group("Weekly pack", sectionForm(uiFormSection{
-				Title: "Link del weekly", Path: "/api/comics/weekly/links", Submit: "Trova link",
-				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto (YYYY.MM.DD)"}},
+				Title: "Cerca un Weekly Pack", Hint: "Cerca il post del Weekly Pack su GetComics per la data scelta ed estrae i magnet/.torrent disponibili. Non avvia il download.", Path: "/api/comics/weekly/links", Submit: "Cerca weekly",
+				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto", Kind: "date", Hint: "Data del Weekly Pack da cercare."}},
 			})),
 			group("Download", sectionTable(uiTableSpec{
 				Title:    "Download in corso",
@@ -410,6 +420,19 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/comics/history/delete", Body: `{"url":"{post_url}"}`, Confirm: "Eliminare questa voce dallo storico?"},
 				}),
 				Empty: "Storico vuoto.",
+			})),
+			group("Weekly pack", sectionTable(uiTableSpec{
+				Title:    "Storico Weekly Pack",
+				Endpoint: "/api/comics/weekly",
+				ItemsKey: "items",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "pack_date", Label: "Data"},
+					{Key: "sent_at", Label: "Stato", Format: "weekly_status"},
+				}),
+				ActionsJSON: uiJSON([]uiAction{
+					{Label: "Forza", Kind: "comic-weekly-force", Method: "POST", Path: "/api/comics/download", Body: "{}"},
+				}),
+				Empty: "Nessun Weekly Pack registrato.",
 			})),
 			sectionComicsLinks(),
 		}}, true
@@ -580,12 +603,6 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr risponda."},
 		}),
 		sectionSourcesCheck(),
-		sectionSettingsActions("Notifiche", "Telegram, webhook ed email: i valori si salvano per campo.", uiSettingFields(cfg,
-			"notify_telegram", "telegram_bot_token", "telegram_chat_id",
-			"notify_webhook_url", "notify_webhook_secret",
-			"notify_email", "email_smtp", "email_from", "email_to", "email_password"), []uiActionButton{
-			{Label: "Invia notifica di test", Method: "POST", Path: "/api/test-notification", Body: `{"message":"Gextto: test notifica"}`, Hint: "Invia una notifica di prova con la configurazione corrente."},
-		}),
 		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",

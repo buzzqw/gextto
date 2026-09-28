@@ -648,6 +648,17 @@ func TestUiBoolValuesPreserveSpelling(t *testing.T) {
 	}
 }
 
+func TestUiCleanupActionIsSelect(t *testing.T) {
+	move := uiSettingFieldFor("cleanup_action", "Azione cleanup", "move")
+	if move.Kind != "select" || len(move.Options) != 2 || !move.Options[0].Selected || move.Options[1].Selected {
+		t.Fatalf("unexpected move cleanup field: %+v", move)
+	}
+	delete := uiSettingFieldFor("cleanup_action", "Azione cleanup", "delete")
+	if delete.Kind != "select" || len(delete.Options) != 2 || delete.Options[0].Selected || !delete.Options[1].Selected {
+		t.Fatalf("unexpected delete cleanup field: %+v", delete)
+	}
+}
+
 // TestUiActionPathsAreRegistered is the formal check that every endpoint the new
 // UI links or posts to is actually served by the router. A typo or a removed
 // route would otherwise only surface as a broken button at runtime.

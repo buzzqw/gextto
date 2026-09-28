@@ -1113,6 +1113,12 @@
                 var good = row.ok !== false;
                 return "<td" + sortAttr + '><span class="badge ' + (good ? "ok" : "err") + '">' + (good ? "ok" : "errore") + "</span></td>";
               }
+              if (column.format === "weekly_status") {
+                var sent = String(row.sent_at || "").trim() !== "";
+                var hasLink = String(row.magnet || row.torrent_url || "").trim() !== "";
+                var weeklyLabel = sent ? "inviato" : (hasLink ? "trovato" : "in attesa del link");
+                return "<td" + sortAttr + '><span class="badge ' + (sent ? "ok" : (hasLink ? "" : "warn")) + '">' + esc(weeklyLabel) + "</span></td>";
+              }
               if (column.format === "source_detail") {
                 var detail = "";
                 if (row.error) detail = String(row.error);
@@ -1149,6 +1155,31 @@
             var actionsHtml = "";
             if (actions.length) {
               actionsHtml = '<td class="row-actions">' + actions.map(function (action) {
+                if (action.kind === "comic-edit") {
+                  return '<button class="btn sm" data-comic-edit' +
+                    ' data-comic-title="' + esc(row.title || "") + '"' +
+                    ' data-comic-tag-url="' + esc(row.tag_url || "") + '"' +
+                    ' data-comic-post-url="' + esc(row.post_url || "") + '"' +
+                    ' data-comic-from-date="' + esc(row.from_date || "") + '"' +
+                    ' data-comic-save-path="' + esc(row.save_path || "") + '">' +
+                    esc(action.label || "Modifica") + "</button>";
+                }
+                if (action.kind === "comic-weekly-force") {
+                  var weeklyMagnet = String(row.magnet || "").trim();
+                  var weeklyTorrent = String(row.torrent_url || "").trim();
+                  var weeklyURL = weeklyMagnet || weeklyTorrent;
+                  var weeklyMethod = weeklyMagnet ? "magnet" : "torrent";
+                  var weeklyBody = JSON.stringify({
+                    url: weeklyURL,
+                    method: weeklyMethod,
+                    title: "Weekly Pack " + String(row.pack_date || ""),
+                    post_url: "",
+                    save_path: ""
+                  });
+                  return '<button class="btn sm" data-api="/api/comics/download" data-method="POST" data-body="' +
+                    esc(weeklyBody) + '"' + (weeklyURL ? "" : " disabled") +
+                    ' title="Scarica di nuovo questo Weekly Pack">' + esc(action.label || "Forza") + "</button>";
+                }
                 if (action.kind === "gap-search") {
                   return '<button class="btn sm ' + (action.class || "") + '" data-gap-search data-series="' + esc(row.series) +
                     '" data-season="' + esc(row.season) + '" data-episode="' + esc(row.episode) + '">' + esc(action.label) + "</button>";
@@ -1395,6 +1426,55 @@
       }).then(function () { comicsLinks.disabled = false; });
     });
   }
+
+  // ---- monitored comic editor ---------------------------------------------
+  function openComicEditor(button) {
+    var overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Modifica fumetto monitorato">' +
+      '<div class="modal-head"><h3>Modifica fumetto monitorato</h3><button class="btn sm" type="button" data-comic-edit-close>Chiudi</button></div>' +
+      '<div class="modal-body"><form class="form-grid" data-comic-edit-form>' +
+      '<label class="field"><span>Titolo</span><input class="input" name="title" readonly /></label>' +
+      '<label class="field"><span>Data inizio</span><input class="input" type="date" name="from_date" /></label>' +
+      '<label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita" /></label>' +
+      '<div class="form-actions"><button class="btn primary" type="submit">Salva</button><small class="muted" data-comic-edit-message></small></div>' +
+      '</form></div></div>';
+    document.body.appendChild(overlay);
+    var form = overlay.querySelector("[data-comic-edit-form]");
+    form.elements.title.value = button.getAttribute("data-comic-title") || "";
+    form.elements.from_date.value = button.getAttribute("data-comic-from-date") || "";
+    form.elements.save_path.value = button.getAttribute("data-comic-save-path") || "";
+    function close() { overlay.remove(); }
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay || event.target.closest("[data-comic-edit-close]")) close();
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var submit = form.querySelector("button[type=submit]");
+      var message = form.querySelector("[data-comic-edit-message]");
+      submit.disabled = true;
+      api("/api/comics", "POST", {
+        title: form.elements.title.value,
+        tag_url: button.getAttribute("data-comic-tag-url") || "",
+        post_url: button.getAttribute("data-comic-post-url") || "",
+        from_date: form.elements.from_date.value,
+        save_path: form.elements.save_path.value
+      }).then(function () {
+        close();
+        notify("Fumetto aggiornato", "ok");
+        var container = button.closest(".panel") && button.closest(".panel").querySelector("[data-ui-table]");
+        if (container && container._refetch) container._refetch();
+      }).catch(function (error) {
+        message.textContent = error.message;
+        submit.disabled = false;
+      });
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-comic-edit]");
+    if (button) openComicEditor(button);
+  });
 
   // ---- generic actions ----------------------------------------------------
   document.addEventListener("click", function (event) {

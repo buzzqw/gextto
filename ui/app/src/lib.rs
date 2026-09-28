@@ -7003,7 +7003,7 @@ fn ComicsView(data: RwSignal<Data>) -> impl IntoView {
                             }
                         });
                     }>
-                        <label class="field span-full" title=ctx_tr("Cerca i link di un weekly pack di una data specifica")><span>{ctx_tr("Cerca un weekly pack specifico (data YYYY-MM-DD)")}</span><input prop:value=weekly_date on:input=move |event| weekly_date.set(event_target_value(&event)) placeholder=ctx_tr("YYYY-MM-DD") /></label>
+                        <label class="field span-full" title=ctx_tr("Cerca il post del Weekly Pack su GetComics per la data scelta ed estrae magnet o torrent; non avvia il download")><span>{ctx_tr("Cerca un weekly pack specifico")}</span><input type="date" prop:value=weekly_date on:input=move |event| weekly_date.set(event_target_value(&event)) /></label>
                         <div class="form-actions"><button class="btn">{ctx_tr("Cerca weekly")}</button></div>
                     </form>
                 </Panel>

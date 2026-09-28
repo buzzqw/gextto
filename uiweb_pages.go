@@ -330,9 +330,10 @@ type uiSearchEntry struct {
 	Tab   string `json:"tab"`
 }
 
-// uiSettingsPageFrom builds one settings tab from the generated index and the
-// live values, so every key the classic UI exposes stays editable. Only the
-// active tab is rendered, which keeps the page small and usable on mobile.
+// uiSettingsPageFrom builds one settings tab from the curated settings index
+// and the live values. Legacy or dedicated-page-only keys are intentionally not
+// copied into a catch-all tab. Only the active tab is rendered, which keeps the
+// page small and usable on mobile.
 func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	cfg := latestConfig(s)
 
@@ -385,15 +386,15 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		target := "altro"
+		// Unknown settings are normally legacy keys or values edited by a
+		// dedicated page (backup, integrations, runtime controls, ...). Do not
+		// expose them in a catch-all "Altro" tab: that made obsolete settings
+		// such as aMule and aria2 look supported and duplicated current controls.
+		// Quality score overrides are the one intentional exception; they are
+		// grouped in the Punteggi tab and edited by ScoreEditor.
 		if strings.HasPrefix(strings.ToLower(key), "score") {
-			target = "scores"
+			fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
 		}
-		fieldsByTab[target] = append(fieldsByTab[target], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
-	}
-	if len(fieldsByTab["altro"]) > 0 {
-		labels["altro"] = "Altro"
-		order = append(order, "altro")
 	}
 
 	special := map[string]bool{"sources": true, "advanced": true, "i18n": true}
@@ -507,11 +508,9 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab})
 	}
 	for _, key := range keys {
-		tab := "altro"
 		if strings.HasPrefix(strings.ToLower(key), "score") {
-			tab = "scores"
+			entries = append(entries, uiSearchEntry{Key: key, Label: uiSettingAutoLabel(key), Tab: "scores"})
 		}
-		entries = append(entries, uiSearchEntry{Key: key, Label: uiSettingAutoLabel(key), Tab: tab})
 	}
 	// Special editors have no single setting key: point the search at their tab.
 	for _, entry := range []uiSearchEntry{
@@ -676,8 +675,6 @@ func uiSettingGroupTitle(tab, key string) string {
 		default:
 			return "Punteggi qualità"
 		}
-	case "altro":
-		return "Altre impostazioni"
 	case "libtorrent":
 		switch {
 		case strings.Contains(lowered, "ramdisk") || strings.Contains(lowered, "port"):
@@ -791,6 +788,17 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 		Placeholder: placeholder,
 		Kind:        uiSettingKind(key, value),
 		Hint:        uiSettingTooltip(key),
+	}
+	if key == "cleanup_action" {
+		selected := strings.TrimSpace(value)
+		if selected != "delete" {
+			selected = "move"
+		}
+		field.Kind = "select"
+		field.Options = []uiFormOption{
+			{Value: "move", Label: "Sposta nel trash", Selected: selected == "move"},
+			{Value: "delete", Label: "Elimina definitivamente", Selected: selected == "delete"},
+		}
 	}
 	if items, ok := uiJSONScalarList(value); ok {
 		field.Kind = "tags"
@@ -997,6 +1005,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "tag_url", Label: "Sorgente", Format: "getcomics"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Modifica", Kind: "comic-edit", Method: "POST", Path: "/api/comics", Body: "{}"},
 				{Label: "Attiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":true}`},
 				{Label: "Disattiva", Method: "POST", Path: "/api/comics/{id}/enabled", Body: `{"enabled":false}`},
 				{Label: "Elimina", Class: "danger", Method: "DELETE", Path: "/api/comics/{id}", Body: "{}", Confirm: "Eliminare questo fumetto monitorizzato?"},
