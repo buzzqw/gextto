@@ -135,11 +135,19 @@ type uiSettingsPage struct {
 	Tabs            []uiSettingsTabRef
 	ActiveID        string
 	Fields          []uiSettingField
+	Groups          []uiSettingGroup
 	ShowSources     bool
 	ShowEditors     bool
 	ShowI18n        bool
 	ListEditors     []uiListEditor
 	SearchIndexJSON string
+}
+
+// uiSettingGroup is one titled block of settings rows. rextto groups the fields
+// of a tab into labelled panels instead of a grid of cards.
+type uiSettingGroup struct {
+	Title  string
+	Fields []uiSettingField
 }
 
 // uiListField describes one column of a structured list editor.
@@ -330,6 +338,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
 	}
+	page.Groups = uiSettingsGroups(active, page.Fields)
 	page.ShowSources = active == "sources"
 	page.ShowEditors = active == "advanced"
 	page.ShowI18n = active == "i18n"
@@ -365,6 +374,77 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	}
 	page.SearchIndexJSON = uiJSON(entries)
 	return page
+}
+
+// uiSettingsGroups splits the fields of a tab into the titled panels rextto
+// uses, keeping the original order both of the groups and of the fields.
+func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
+	if len(fields) == 0 {
+		return nil
+	}
+	order := []string{}
+	grouped := map[string][]uiSettingField{}
+	for _, field := range fields {
+		title := uiSettingGroupTitle(tab, field.Key)
+		if _, ok := grouped[title]; !ok {
+			order = append(order, title)
+		}
+		grouped[title] = append(grouped[title], field)
+	}
+	groups := make([]uiSettingGroup, 0, len(order))
+	for _, title := range order {
+		groups = append(groups, uiSettingGroup{Title: title, Fields: grouped[title]})
+	}
+	return groups
+}
+
+// uiSettingGroupTitle assigns a setting to a labelled group. The libtorrent tab
+// is the only one large enough to need sub-groups; the others render a single
+// panel with the tab name.
+func uiSettingGroupTitle(tab, key string) string {
+	lowered := strings.ToLower(key)
+	switch tab {
+	case "daemon":
+		return "Daemon"
+	case "advanced":
+		return "Avanzate"
+	case "acquisition":
+		return "Acquisizione automatica"
+	case "notify":
+		return "Notifiche"
+	case "paths":
+		return "Percorsi runtime"
+	case "rename":
+		return "Rinomina e pulizia"
+	case "scores":
+		return "Punteggi qualità"
+	case "altro":
+		return "Altre impostazioni"
+	case "libtorrent":
+		switch {
+		case strings.Contains(lowered, "ramdisk") || strings.Contains(lowered, "port"):
+			return "RAM disk e porte"
+		case strings.Contains(lowered, "dl_limit") || strings.Contains(lowered, "ul_limit") || strings.Contains(lowered, "sched"):
+			return "Velocità e programmazione"
+		case strings.Contains(lowered, "extra_settings"):
+			return "Impostazioni avanzate"
+		case strings.Contains(lowered, "connections") || strings.Contains(lowered, "cache") ||
+			strings.Contains(lowered, "aio") || strings.Contains(lowered, "alert") ||
+			strings.Contains(lowered, "half_open") || strings.Contains(lowered, "upload_slots") ||
+			strings.Contains(lowered, "max_"):
+			return "Connessioni e prestazioni"
+		case strings.Contains(lowered, "dht") || strings.Contains(lowered, "pex") ||
+			strings.Contains(lowered, "lsd") || strings.Contains(lowered, "upnp") ||
+			strings.Contains(lowered, "natpmp") || strings.Contains(lowered, "utp") ||
+			strings.Contains(lowered, "encryption") || strings.Contains(lowered, "proxy") ||
+			strings.Contains(lowered, "ipfilter") || strings.Contains(lowered, "interface") ||
+			strings.Contains(lowered, "tracker") || strings.Contains(lowered, "announce"):
+			return "Protocolli e rete"
+		default:
+			return "Generale"
+		}
+	}
+	return "Impostazioni"
 }
 
 func uiSettingFieldFor(key, label, value string) uiSettingField {

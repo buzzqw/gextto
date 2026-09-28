@@ -433,7 +433,7 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("settings -> %d", code)
 	}
-	for _, marker := range []string{`data-settings-index=`, `data-settings-search`, `data-settings-tab-select`, `class="chip`, `data-setting-key="`, `data-setting-status`, `settings-grid`} {
+	for _, marker := range []string{`data-settings-index=`, `data-settings-search`, `data-settings-tab-select`, `class="chip`, `data-setting-key="`, `data-setting-status`, `settings-rows`, `data-settings-savebar`} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("settings page missing %q", marker)
 		}
@@ -451,7 +451,7 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 	}
 	// An unknown tab falls back to the first available tab, never a blank page.
 	code, _, body = webGet(t, server, "/ui?view=settings&tab=does-not-exist")
-	if code != http.StatusOK || !strings.Contains(string(body), "settings-grid") {
+	if code != http.StatusOK || !strings.Contains(string(body), "settings-rows") {
 		t.Fatalf("unknown tab should fall back, got %d", code)
 	}
 }

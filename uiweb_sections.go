@@ -15,12 +15,40 @@ import (
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
 	Kind     string // table | actions | form | progress | comics_links | links | oauth
+	Group    string // optional grouping label: consecutive same-group blocks render side by side
 	Table    uiTableSpec
 	Action   uiActionSection
 	Form     uiFormSection
 	Progress uiProgressSection
 	Links    uiLinksSection
 	OAuth    uiOAuthSection
+}
+
+// uiPageGroup is a set of sections that belong together. A group with more than
+// one section is rendered as a two-column grid, like rextto's panels.
+type uiPageGroup struct {
+	Title    string
+	Sections []uiPageSection
+}
+
+// uiGroupSections collects the sections that share a Group label, preserving
+// first-seen order. Ungrouped sections stay full width.
+func uiGroupSections(sections []uiPageSection) []uiPageGroup {
+	groups := make([]uiPageGroup, 0, len(sections))
+	positions := map[string]int{}
+	for _, section := range sections {
+		if section.Group == "" {
+			groups = append(groups, uiPageGroup{Sections: []uiPageSection{section}})
+			continue
+		}
+		if position, ok := positions[section.Group]; ok {
+			groups[position].Sections = append(groups[position].Sections, section)
+			continue
+		}
+		positions[section.Group] = len(groups)
+		groups = append(groups, uiPageGroup{Title: section.Group, Sections: []uiPageSection{section}})
+	}
+	return groups
 }
 
 type uiLinkItem struct {
@@ -80,6 +108,7 @@ type uiProgressSection struct {
 // uiPanelsPage is a page made of reusable sections.
 type uiPanelsPage struct {
 	Sections []uiPageSection
+	Groups   []uiPageGroup
 }
 
 type uiDownloadsPage struct {
@@ -290,37 +319,100 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 }
 
 func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
+	group := func(name string, section uiPageSection) uiPageSection {
+		section.Group = name
+		return section
+	}
 	return []uiPageSection{
-		sectionActions(uiActionSection{Label: "Database", Hint: "Operazioni sui database applicativi.", Buttons: []uiActionButton{
+		group("Database", sectionActions(uiActionSection{Label: "Database", Hint: "Operazioni sui database applicativi.", Buttons: []uiActionButton{
 			{Label: "Ricalcola punteggi", Class: "primary", Method: "POST", Path: "/api/database/rescore", Body: "{}"},
 			{Label: "Pulizia duplicati", Method: "POST", Path: "/api/maintenance/clean-duplicates", Body: "{}"},
 			{Label: "Pota database", Method: "POST", Path: "/api/db/prune", Body: "{}"},
 			{Label: "VACUUM", Method: "POST", Path: "/api/db/action", Body: `{"action":"vacuum"}`},
-		}}),
-		sectionActions(uiActionSection{Label: "Archivio, rinomina e pulizie", Buttons: []uiActionButton{
+			{Label: "ANALYZE", Method: "POST", Path: "/api/db/action", Body: `{"action":"analyze"}`},
+		}})),
+		group("Database", sectionTable(uiTableSpec{
+			Title:    "Database",
+			Endpoint: "/api/db/info",
+			ItemsKey: "files",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "File"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
+				{Key: "exists", Label: "Presente", Format: "bool"},
+			}),
+			Empty: "Nessun database.",
+		})),
+		group("Archivio e rinomina", sectionActions(uiActionSection{Label: "Archivio e rinomina", Buttons: []uiActionButton{
 			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
 			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
 			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
 			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
 			{Label: "Backfill MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
-			{Label: "Crea backup", Method: "POST", Path: "/api/backup", Body: "{}"},
-		}}),
-		sectionActions(uiActionSection{Label: "Servizio e installazione", Hint: "Operazioni sensibili eseguite dal daemon.", Buttons: []uiActionButton{
+		}})),
+		group("Archivio e rinomina", sectionProgress("Progresso rinomina", "/api/rename-progress")),
+		group("Servizio e installazione", sectionActions(uiActionSection{Label: "Servizio e installazione", Hint: "Operazioni sensibili eseguite dal daemon.", Buttons: []uiActionButton{
 			{Label: "Controlla porte", Method: "GET", Path: "/api/config/check-ports", Body: ""},
 			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?"},
 			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?"},
-		}}),
-		sectionProgress("Progresso rinomina", "/api/rename-progress"),
-		sectionTable(uiTableSpec{
-			Title:    "Stato sorgenti",
-			Endpoint: "/api/sources/health",
+		}})),
+		group("Servizio e installazione", sectionTable(uiTableSpec{
+			Title:    "Porte",
+			Endpoint: "/api/config/check-ports",
+			ItemsKey: "ports",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "port", Label: "Porta"}, {Key: "available", Label: "Libera", Format: "bool"},
+				{Key: "tcp_available", Label: "TCP", Format: "bool"}, {Key: "udp_available", Label: "UDP", Format: "bool"},
+			}),
+			Empty: "Nessuna porta da verificare.",
+		})),
+		group("RAM disk", sectionTable(uiTableSpec{
+			Title:    "RAM disk",
+			Endpoint: "/api/ramdisk",
+			ItemsKey: "paths",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "path", Label: "Percorso"}, {Key: "filesystem", Label: "Filesystem"},
+				{Key: "exists", Label: "Presente", Format: "bool"},
+				{Key: "free_bytes", Label: "Liberi", Format: "bytes"},
+				{Key: "total_bytes", Label: "Totali", Format: "bytes"},
+			}),
+			Empty: "Nessun RAM disk configurato.",
+		})),
+		group("RAM disk", sectionForm(uiFormSection{
+			Title: "Seleziona RAM disk",
+			Hint:  "Inserisci un percorso tmpfs/ramfs già esistente e scrivibile.",
+			Path:  "/api/ramdisk/select", Submit: "Seleziona",
+			Fields: []uiFormField{{Name: "path", Label: "Percorso", Placeholder: "/dev/shm/gextto"}},
+		})),
+		group("RAM disk", sectionActions(uiActionSection{Label: "RAM disk automatico", Hint: "Crea /dev/shm/gextto e lo configura come destinazione temporanea.", Buttons: []uiActionButton{
+			{Label: "Crea RAM disk", Class: "primary", Method: "POST", Path: "/api/ramdisk/create", Body: `{"path":"/dev/shm/gextto"}`},
+		}})),
+		group("Backup", sectionTable(uiTableSpec{
+			Title:    "Backup disponibili",
+			Endpoint: "/api/backup/list",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
-				{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
+				{Key: "label", Label: "Etichetta"}, {Key: "name", Label: "Nome"},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
 			}),
-			Empty: "Nessuna sorgente da verificare.",
-		}),
+			Empty: "Nessun backup creato.",
+		})),
+		group("Backup", sectionForm(uiFormSection{
+			Title: "Impostazioni backup",
+			Hint:  "I valori vengono salvati nel formato usato dal daemon; lascia vuota la password per non modificarla.",
+			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup",
+			Fields: []uiFormField{
+				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5")},
+				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0")},
+				{Name: "backup_schedule_at", Label: "Orario (HH:MM)", Value: settingsOr(cfg, "backup_schedule_at", "")},
+				{Name: "backup_ftp_host", Label: "FTP host", Value: settingsOr(cfg, "backup_ftp_host", "")},
+				{Name: "backup_ftp_user", Label: "FTP utente", Value: settingsOr(cfg, "backup_ftp_user", "")},
+				{Name: "backup_ftp_path", Label: "FTP percorso", Value: settingsOr(cfg, "backup_ftp_path", "")},
+				{Name: "backup_cloud_dir", Label: "Cartella cloud", Value: settingsOr(cfg, "backup_cloud_dir", "")},
+				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
+			},
+		})),
+		sectionActions(uiActionSection{Label: "Cestino", Hint: "Il cestino conserva i file sostituiti o scartati.", Buttons: []uiActionButton{
+			{Label: "Pulisci cestino", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
+		}}),
 		sectionTable(uiTableSpec{
 			Title:    "Cestino",
 			Endpoint: "/api/trash",
@@ -335,70 +427,14 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			Empty: "Cestino vuoto.",
 		}),
 		sectionTable(uiTableSpec{
-			Title:    "Database",
-			Endpoint: "/api/db/info",
-			ItemsKey: "files",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "File"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
-				{Key: "exists", Label: "Presente", Format: "bool"},
-			}),
-			Empty: "Nessun database.",
-		}),
-		sectionTable(uiTableSpec{
-			Title:    "Porte",
-			Endpoint: "/api/config/check-ports",
-			ItemsKey: "ports",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "port", Label: "Porta"}, {Key: "available", Label: "Libera", Format: "bool"},
-				{Key: "tcp_available", Label: "TCP", Format: "bool"}, {Key: "udp_available", Label: "UDP", Format: "bool"},
-			}),
-			Empty: "Nessuna porta da verificare.",
-		}),
-		sectionTable(uiTableSpec{
-			Title:    "RAM disk",
-			Endpoint: "/api/ramdisk",
-			ItemsKey: "paths",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "path", Label: "Percorso"}, {Key: "filesystem", Label: "Filesystem"},
-				{Key: "exists", Label: "Presente", Format: "bool"},
-				{Key: "free_bytes", Label: "Liberi", Format: "bytes"},
-				{Key: "total_bytes", Label: "Totali", Format: "bytes"},
-			}),
-			Empty: "Nessun RAM disk configurato.",
-		}),
-		sectionForm(uiFormSection{
-			Title: "Seleziona RAM disk",
-			Hint:  "Inserisci un percorso tmpfs/ramfs già esistente e scrivibile.",
-			Path:  "/api/ramdisk/select", Submit: "Seleziona",
-			Fields: []uiFormField{{Name: "path", Label: "Percorso", Placeholder: "/dev/shm/gextto"}},
-		}),
-		sectionActions(uiActionSection{Label: "RAM disk automatico", Hint: "Crea /dev/shm/gextto e lo configura come destinazione temporanea.", Buttons: []uiActionButton{
-			{Label: "Crea RAM disk", Class: "primary", Method: "POST", Path: "/api/ramdisk/create", Body: `{"path":"/dev/shm/gextto"}`},
-		}}),
-		sectionTable(uiTableSpec{
-			Title:    "Backup disponibili",
-			Endpoint: "/api/backup/list",
+			Title:    "Stato sorgenti",
+			Endpoint: "/api/sources/health",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "label", Label: "Etichetta"}, {Key: "name", Label: "Nome"},
-				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
+				{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
+				{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
 			}),
-			Empty: "Nessun backup creato.",
-		}),
-		sectionForm(uiFormSection{
-			Title: "Impostazioni backup",
-			Hint:  "I valori vengono salvati nel formato usato dal daemon; lascia vuota la password per non modificarla.",
-			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup",
-			Fields: []uiFormField{
-				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5")},
-				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0")},
-				{Name: "backup_schedule_at", Label: "Orario (HH:MM)", Value: settingsOr(cfg, "backup_schedule_at", "")},
-				{Name: "backup_ftp_host", Label: "FTP host", Value: settingsOr(cfg, "backup_ftp_host", "")},
-				{Name: "backup_ftp_user", Label: "FTP utente", Value: settingsOr(cfg, "backup_ftp_user", "")},
-				{Name: "backup_ftp_path", Label: "FTP percorso", Value: settingsOr(cfg, "backup_ftp_path", "")},
-				{Name: "backup_cloud_dir", Label: "Cartella cloud", Value: settingsOr(cfg, "backup_cloud_dir", "")},
-				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
-			},
+			Empty: "Nessuna sorgente da verificare.",
 		}),
 	}
 }
@@ -406,7 +442,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
-	return []uiPageSection{
+	sections := []uiPageSection{
 		sectionOAuth(uiOAuthSection{Name: "Trakt", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
 			{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}"},
 			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}"},
@@ -495,6 +531,17 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
 		}}),
 	}
+	// Group each integration's panels together so the page renders them side by
+	// side (Trakt / Simkl), like the classic layout.
+	for index := range sections {
+		switch index {
+		case 0, 1, 4, 5:
+			sections[index].Group = "Trakt"
+		case 2, 3, 6, 7:
+			sections[index].Group = "Simkl"
+		}
+	}
+	return sections
 }
 
 // uiDownloadsPageFor builds the download page with the torrent table plus the

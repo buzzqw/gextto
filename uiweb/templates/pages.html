@@ -136,7 +136,18 @@
 {{end}}
 
 {{define "pages_panels"}}
-<div class="view">{{range .Sections}}{{template "section" .}}{{end}}</div>
+<div class="view">
+  {{range .Groups}}
+  {{if gt (len .Sections) 1}}
+  <div class="section-group">
+    {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+    <div class="grid-2">{{range .Sections}}{{template "section" .}}{{end}}</div>
+  </div>
+  {{else}}
+  {{range .Sections}}{{template "section" .}}{{end}}
+  {{end}}
+  {{end}}
+</div>
 {{end}}
 
 {{define "downloads"}}
@@ -412,33 +423,33 @@
 {{end}}
 
 {{define "settings_field"}}
-<form class="card setting" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
-  <div class="setting-heading">
+<form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
+  <div class="setting-info">
     <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
     <code class="setting-key">{{.Key}}</code>
   </div>
-  {{if eq .Kind "structured"}}
-  <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
-  {{else}}
-  {{if eq .Kind "bool"}}
-  <select class="input" data-setting-input id="input-{{.Key}}">
-    <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
-    <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
-  </select>
-  {{else if eq .Kind "tags"}}
-  <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="un valore per riga">{{.Value}}</textarea>
-  {{else if eq .Kind "area"}}
-  <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3">{{.Value}}</textarea>
-  {{else if eq .Kind "secret"}}
-  <input class="input" type="password" data-setting-input id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
-  {{else}}
-  <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" />
-  {{end}}
-  <div class="setting-foot">
-    <small class="setting-status muted" data-setting-status aria-live="polite"></small>
-    <button class="btn sm primary" type="submit">Salva</button>
+  <div class="setting-control">
+    {{if eq .Kind "structured"}}
+    <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
+    {{else if eq .Kind "bool"}}
+    <select class="input" data-setting-input id="input-{{.Key}}">
+      <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
+      <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
+    </select>
+    {{else if eq .Kind "tags"}}
+    <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="un valore per riga">{{.Value}}</textarea>
+    {{else if eq .Kind "area"}}
+    <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3">{{.Value}}</textarea>
+    {{else if eq .Kind "secret"}}
+    <input class="input" type="password" data-setting-input id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
+    {{else}}
+    <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" />
+    {{end}}
   </div>
-  {{end}}
+  <div class="setting-actions">
+    <small class="setting-status muted" data-setting-status aria-live="polite"></small>
+    {{if ne .Kind "structured"}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
+  </div>
 </form>
 {{end}}
 
@@ -494,13 +505,21 @@
     <div class="chip-row">
       {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}">{{.Label}}{{if .Count}}<span class="chip-count">{{.Count}}</span>{{end}}</a>{{end}}
     </div>
+    <div class="settings-savebar" data-settings-savebar hidden>
+      <span class="settings-savebar-text" data-settings-dirty-count>Nessuna modifica</span>
+      <button class="btn sm primary" type="button" data-settings-save-all>Salva tutte</button>
+      <button class="btn sm" type="button" data-settings-discard>Ignora</button>
+    </div>
     <div class="card settings-results" data-settings-results hidden role="listbox"></div>
   </div>
 
   <div class="settings-body" data-settings-body>
-    {{if .Fields}}
-    <div class="settings-grid">
-      {{range .Fields}}{{template "settings_field" .}}{{end}}
+    {{range .Groups}}
+    <div class="panel settings-panel">
+      <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
+      <div class="panel-body settings-rows">
+        {{range .Fields}}{{template "settings_field" .}}{{end}}
+      </div>
     </div>
     {{end}}
     {{if and (not .Fields) (not .ListEditors) (not (or .ShowSources .ShowEditors .ShowI18n))}}

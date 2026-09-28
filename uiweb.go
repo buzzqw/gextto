@@ -363,6 +363,7 @@ func uiPageContent(s *AppState, r *http.Request, view string) any {
 		}
 	}
 	if page, ok := uiPanelsPageFor(view, s); ok {
+		page.Groups = uiGroupSections(page.Sections)
 		return page
 	}
 	if spec, ok := uiTableSpecFor(view); ok {

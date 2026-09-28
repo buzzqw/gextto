@@ -1324,48 +1324,135 @@
   });
 
   // ---- settings forms -----------------------------------------------------
+  var dirtySettings = {};
+
+  function settingValueOf(input) {
+    if (!input) return "";
+    if (input.getAttribute("data-tag-json") !== null) {
+      var items = (input.value || "").split("\n").map(function (line) { return line.trim(); })
+        .filter(function (line) { return line !== ""; });
+      return input.getAttribute("data-tag-json") === "true" ? JSON.stringify(items) : items.join(", ");
+    }
+    return input.value;
+  }
+
+  function updateSettingsSavebar() {
+    var bar = document.querySelector("[data-settings-savebar]");
+    if (!bar) return;
+    var keys = Object.keys(dirtySettings);
+    if (!keys.length) { bar.hidden = true; return; }
+    bar.hidden = false;
+    var label = bar.querySelector("[data-settings-dirty-count]");
+    if (label) label.textContent = keys.length === 1 ? "1 modifica non salvata" : keys.length + " modifiche non salvate";
+  }
+
+  function markSettingDirty(form, input) {
+    var key = form.getAttribute("data-setting-key");
+    if (!key) return;
+    var original = form.getAttribute("data-original-value");
+    if (original === null) {
+      form.setAttribute("data-original-value", input.value);
+      original = input.value;
+    }
+    var secret = input.type === "password";
+    var current = input.value;
+    if (secret && current === "") {
+      delete dirtySettings[key];
+    } else if (!secret && current === original) {
+      delete dirtySettings[key];
+    } else {
+      dirtySettings[key] = { form: form, input: input };
+    }
+    updateSettingsSavebar();
+  }
+
+  document.addEventListener("input", function (event) {
+    var input = event.target.closest("[data-setting-input]");
+    if (!input) return;
+    var form = input.closest("[data-setting-key]");
+    if (form) markSettingDirty(form, input);
+  });
+  document.addEventListener("change", function (event) {
+    var input = event.target.closest("[data-setting-input]");
+    if (!input) return;
+    var form = input.closest("[data-setting-key]");
+    if (form) markSettingDirty(form, input);
+  });
+
+  function saveSettingForm(form, input) {
+    var key = form.getAttribute("data-setting-key");
+    var status = form.querySelector("[data-setting-status]");
+    var secret = input.type === "password";
+    var value = settingValueOf(input);
+    if (secret && value === "") {
+      if (status) status.textContent = "Inserisci un valore";
+      return Promise.reject(new Error("inserisci un valore"));
+    }
+    return api("/api/config/settings", "POST", { key: key, value: value }).then(function () {
+      if (status) status.textContent = "Salvato";
+      if (secret) {
+        input.value = "";
+      } else {
+        form.setAttribute("data-original-value", input.value);
+      }
+      delete dirtySettings[key];
+      updateSettingsSavebar();
+    });
+  }
+
   Array.prototype.forEach.call(document.querySelectorAll("[data-setting-key]"), function (form) {
+    var input = form.querySelector("[data-setting-input]");
+    if (input) form.setAttribute("data-original-value", input.value);
     form.addEventListener("submit", function (event) {
       event.preventDefault();
-      var key = form.getAttribute("data-setting-key");
-      var input = form.querySelector("[data-setting-input]");
-      if (!input) return; // structured value, edited from its dedicated section
-      var button = form.querySelector("button");
-      var status = form.querySelector("[data-setting-status]");
-      var secret = input.type === "password";
-      var value = input.value;
-      var tagJSON = input.getAttribute("data-tag-json");
-      if (tagJSON !== null) {
-        var items = value.split("\n").map(function (line) { return line.trim(); })
-          .filter(function (line) { return line !== ""; });
-        value = tagJSON === "true" ? JSON.stringify(items) : items.join(", ");
-      }
-      if (secret && value === "") {
-        if (button) {
-          button.textContent = "Inserisci un valore";
-          setTimeout(function () { button.textContent = "Salva"; }, 1500);
-        }
-        if (status) status.textContent = "Inserisci un valore";
-        return;
-      }
+      var currentInput = form.querySelector("[data-setting-input]");
+      if (!currentInput) return; // structured value, edited from its dedicated section
+      var button = form.querySelector("button[type=submit]");
       if (button) button.disabled = true;
-      api("/api/config/settings", "POST", { key: key, value: value })
-        .then(function () {
-          if (status) status.textContent = "Salvato";
-          if (!button) return;
-          button.textContent = "Salvato";
-          setTimeout(function () {
-            button.textContent = "Salva";
-            button.disabled = false;
-            if (status) status.textContent = "";
-          }, 1500);
-        })
-        .catch(function (error) {
+      saveSettingForm(form, currentInput).then(function () {
+        if (!button) return;
+        button.textContent = "Salvato";
+        setTimeout(function () { button.textContent = "Salva"; button.disabled = false; }, 1200);
+      }).catch(function (error) {
+        if (button) button.disabled = false;
+        var status = form.querySelector("[data-setting-status]");
+        if (status) status.textContent = "Errore";
+        if (error && error.message && error.message !== "inserisci un valore") {
           notify("Salvataggio non riuscito: " + error.message, "err");
-          if (status) status.textContent = "Errore";
-          if (button) button.disabled = false;
-        });
+        }
+      });
     });
+  });
+
+  document.addEventListener("click", function (event) {
+    var saveAll = event.target.closest("[data-settings-save-all]");
+    if (saveAll) {
+      var keys = Object.keys(dirtySettings);
+      if (!keys.length) { updateSettingsSavebar(); return; }
+      saveAll.disabled = true;
+      Promise.all(keys.map(function (key) {
+        var entry = dirtySettings[key];
+        if (!entry) return Promise.resolve();
+        return saveSettingForm(entry.form, entry.input);
+      })).then(function () {
+        notify("Impostazioni salvate", "ok");
+      }).catch(function (error) {
+        notify("Salvataggio non riuscito: " + error.message, "err");
+      }).then(function () { saveAll.disabled = false; });
+      return;
+    }
+    if (event.target.closest("[data-settings-discard]")) {
+      Object.keys(dirtySettings).forEach(function (key) {
+        var entry = dirtySettings[key];
+        if (!entry) return;
+        var original = entry.form.getAttribute("data-original-value");
+        entry.input.value = original === null ? "" : original;
+        var status = entry.form.querySelector("[data-setting-status]");
+        if (status) status.textContent = "";
+      });
+      dirtySettings = {};
+      updateSettingsSavebar();
+    }
   });
 
   // ---- explore (search) ---------------------------------------------------
