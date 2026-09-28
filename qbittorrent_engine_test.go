@@ -159,7 +159,6 @@ func newFakeQBEngine(t *testing.T) (*fakeQB, *qbittorrentEngine, string) {
 	cfg.Settings["qbittorrent_url"] = server.URL
 	cfg.Settings["qbittorrent_username"] = "admin"
 	cfg.Settings["qbittorrent_password"] = "secret"
-	cfg.Settings["qbittorrent_category"] = "gextto"
 
 	engine, err := newQbittorrentEngine(&cfg)
 	if err != nil {
@@ -317,6 +316,7 @@ func TestQbittorrentEngineInspection(t *testing.T) {
 func TestQbittorrentEngineAddAndLimits(t *testing.T) {
 	fake, engine, downloads := newFakeQBEngine(t)
 	engine.settings.dataDir = downloads
+	engine.settings.Category = "gextto"
 	magnet := "magnet:?xt=urn:btih:ABCDEF0123456789ABCDEF0123456789ABCDEF01&dn=x"
 	if ok, err := engine.Add(magnet, nil); err != nil || !ok {
 		t.Fatalf("Add = %v, %v", ok, err)

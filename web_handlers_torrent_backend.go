@@ -72,6 +72,67 @@ func TorrentBackendStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, payload)
 }
 
+// QbittorrentRuntimeUpdate reports the latest v2 static release and, on POST,
+// downloads it into Gextto's private DATA_DIR/qbittorrent directory. It never
+// touches a system qBittorrent installation.
+func QbittorrentRuntimeUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	if cfg == nil || strings.TrimSpace(cfg.DataDir) == "" {
+		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "directory dati Gextto non configurata"})
+		return
+	}
+	ctx := r.Context()
+	if r.Method == http.MethodPost {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+		prepared, err := managedQbittorrentConfig(cfg)
+		if err != nil {
+			jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		settings, err := qbittorrentSettingsFromConfig(prepared)
+		if err != nil {
+			jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		// Prepare the private profile before replacing the binary. A malformed or
+		// unwritable profile must never leave an existing executable half-updated.
+		if err := writeManagedQbittorrentConfig(prepared, settings); err != nil {
+			jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		status, err := installQbittorrentRuntime(ctx, prepared)
+		if err != nil {
+			jsonStatus(w, http.StatusBadGateway, map[string]any{
+				"ok": false, "error": err.Error(), "source": qbittorrentGitHubRepo,
+			})
+			return
+		}
+		// Downloading the managed binary is an explicit opt-in to the private
+		// runtime. The backend itself still changes only after a restart.
+		for _, key := range []string{"qbittorrent_url", "qbittorrent_username", "qbittorrent_password", "qbittorrent_managed"} {
+			if err := SaveSetting(cfg.DataDir, key, prepared.Settings[key]); err != nil {
+				jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+				return
+			}
+		}
+		status.Managed = true
+		status.RestartRequired = true
+		jsonResponse(w, map[string]any{"ok": true, "status": status, "message": "qBittorrent v2 installato nella cartella privata di Gextto; riavvia il servizio per usarlo."})
+		return
+	}
+	status, err := getQbittorrentRuntimeStatus(ctx, cfg)
+	if err != nil {
+		// The settings page remains usable when GitHub is temporarily rate
+		// limited/offline. The error is visible in the response and the next
+		// refresh retries after the short cache expires.
+		jsonResponse(w, map[string]any{"ok": false, "status": status, "error": err.Error(), "source": qbittorrentGitHubRepo})
+		return
+	}
+	jsonResponse(w, map[string]any{"ok": true, "status": status, "source": qbittorrentGitHubRepo})
+}
+
 // TorrentBackendTest implements `torrent_backend_test`: it logs into the
 // configured qBittorrent-nox and reports its versions and torrent count without
 // changing anything.

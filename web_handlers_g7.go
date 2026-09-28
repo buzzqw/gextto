@@ -683,7 +683,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
 		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
 		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
-		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "anacrolix_path_mappings",
+		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "qbittorrent_managed", "anacrolix_path_mappings",
 		"anacrolix_data_dir", "anacrolix_listen_port", "anacrolix_tcp", "anacrolix_utp",
 		"anacrolix_dht", "anacrolix_pex", "anacrolix_trackers", "anacrolix_upnp",
 		"anacrolix_dht_bootstrap_nodes", "anacrolix_max_conns_per_torrent",
@@ -1037,6 +1037,10 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if len(value) > 4096 {
 		jsonError(w, http.StatusBadRequest, "setting is too large")
+		return
+	}
+	if err := validateBackendSetting(input.Key, value); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := saveConfigSetting(s.cfg.DataDir, input.Key, value); err != nil {

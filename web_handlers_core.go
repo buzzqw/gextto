@@ -1068,6 +1068,8 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"qbittorrent_request_timeout_secs":    settingsOr(cfg, "qbittorrent_request_timeout_secs", "15"),
 		"qbittorrent_poll_interval_ms":        settingsOr(cfg, "qbittorrent_poll_interval_ms", "1500"),
 		"qbittorrent_path_mappings":           settingsOr(cfg, "qbittorrent_path_mappings", ""),
+		"qbittorrent_managed":                 settingsBoolString(cfg, "qbittorrent_managed", false),
+		"qbittorrent_managed_binary":          qbittorrentManagedBinary(cfg),
 		"qbittorrent_password_configured":     settingsNonEmpty(cfg, "qbittorrent_password"),
 		"anacrolix_path_mappings":             settingsOr(cfg, "anacrolix_path_mappings", ""),
 		"anacrolix_built":                     newAnacrolixEngine != nil,

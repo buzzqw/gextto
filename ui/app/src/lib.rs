@@ -206,6 +206,7 @@ const SETTINGS_INDEX: &[(&str, &str, &str)] = &[
     ("qBittorrent — timeout richieste (secondi)", "backend", "qbittorrent_request_timeout_secs"),
     ("qBittorrent — intervallo polling (ms)", "backend", "qbittorrent_poll_interval_ms"),
     ("qBittorrent — mappatura percorsi", "backend", "qbittorrent_path_mappings"),
+    ("qBittorrent — binario gestito da Gextto", "backend", "qbittorrent_managed"),
     ("anacrolix — mappatura percorsi", "backend", "anacrolix_path_mappings"),
     ("anacrolix — cartella dati", "backend", "anacrolix_data_dir"),
     ("anacrolix — porta in ascolto", "backend", "anacrolix_listen_port"),
@@ -2739,7 +2740,8 @@ fn setting_tooltip(key: &str) -> &'static str {
         "qbittorrent_tag" => "Tag assegnato da Gextto ai torrent gestiti.",
         "qbittorrent_request_timeout_secs" => "Timeout di ogni richiesta HTTP alla Web API di qBittorrent.",
         "qbittorrent_poll_interval_ms" => "Ogni quanti millisecondi Gextto legge lo stato da qBittorrent.",
-        "qbittorrent_path_mappings" => "Una riga per cartella, formato percorso Gextto = percorso visto da qBittorrent. Serve se i due processi non condividono il filesystem.",
+         "qbittorrent_path_mappings" => "Una riga per cartella, formato percorso Gextto = percorso visto da qBittorrent. Serve se i due processi non condividono il filesystem.",
+         "qbittorrent_managed" => "Usa il binario qBittorrent scaricato da Gextto sotto DATA_DIR/qbittorrent; non modifica mai un'installazione di sistema.",
         "anacrolix_data_dir" => "Cartella dati di anacrolix. Vuoto = usa libtorrent_dir.",
         "anacrolix_listen_port" => "Porta in ascolto di anacrolix. Vuoto = usa la porta minima di libtorrent.",
         "anacrolix_tcp" => "Abilita il trasporto TCP in anacrolix.",
@@ -7684,6 +7686,7 @@ fn capability_level_label(level: &str) -> &'static str {
 #[component]
 fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
     let status = RwSignal::new(Value::Null);
+    let runtime_status = RwSignal::new(Value::Null);
     let reload = RwSignal::new(0u32);
     let message = RwSignal::new(String::new());
     let show_capabilities = RwSignal::new(false);
@@ -7697,6 +7700,10 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
             match get("/api/torrent-backend").await {
                 Ok(value) => status.set(value),
                 Err(error) => message.set(error),
+            }
+            match get("/api/torrent-backend/qbittorrent/update").await {
+                Ok(value) => runtime_status.set(value),
+                Err(error) => message.set(tr_format(data, "Aggiornamento qBittorrent: {error}", &[("{error}", tr(data, &error))])),
             }
         });
     });
@@ -7728,6 +7735,10 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
             .and_then(Value::as_bool)
             .unwrap_or(false)
     });
+    let qbit_update_available = Signal::derive(move || runtime_status.get().get("status").and_then(|value| value.get("update_available")).and_then(Value::as_bool).unwrap_or(false));
+    let qbit_installed = Signal::derive(move || runtime_status.get().get("status").and_then(|value| value.get("installed")).and_then(Value::as_bool).unwrap_or(false));
+    let qbit_installed_tag = Signal::derive(move || runtime_status.get().get("status").and_then(|value| value.get("installed_tag")).and_then(Value::as_str).unwrap_or("").to_string());
+    let qbit_latest_tag = Signal::derive(move || runtime_status.get().get("status").and_then(|value| value.get("latest_tag")).and_then(Value::as_str).unwrap_or("").to_string());
 
     let select = move |value: &'static str| {
         selected.set(value.to_string());
@@ -7760,9 +7771,9 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                 <div class="live-card">
                     <div class="live-head">
                         <span class="muted">{ctx_tr("Motore attivo")}</span>
-                        <span class="badge ok">{move || backend_label(&active.get())}</span>
+                        <span class="badge ok">{move || tr(data, backend_label(&active.get()))}</span>
                     </div>
-                    <small class="muted">{move || format!("identificativo: {}", active.get())}</small>
+                    <small class="muted">{move || tr_format(data, "identificativo: {backend}", &[("{backend}", active.get())])}</small>
                 </div>
                 <div class="live-card">
                     <div class="live-head">
@@ -7771,7 +7782,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                             {move || if configured.get() == active.get() { ctx_tr("in uso").get() } else { ctx_tr("da applicare").get() }}
                         </span>
                     </div>
-                    <small class="muted">{move || backend_label(&configured.get())}</small>
+                    <small class="muted">{move || tr(data, backend_label(&configured.get()))}</small>
                 </div>
                 <div class="live-card">
                     <div class="live-head">
@@ -7782,7 +7793,7 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                     </div>
                     <small class="muted">{move || {
                         if has_sync.get() && !last_sync.get().is_empty() {
-                            format!("ultima sincronizzazione: {}", last_sync.get())
+                            tr_format(data, "ultima sincronizzazione: {time}", &[("{time}", last_sync.get())])
                         } else {
                             ctx_tr("nessuna sincronizzazione esterna").get()
                         }
@@ -7793,10 +7804,10 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
             <Show when=move || configured.get() != active.get()>
                 <div class="mode-banner" style="margin-top:12px">
                     <strong>{ctx_tr("Riavvio necessario")}</strong>
-                    <span>{move || format!(
-                        "Il motore configurato ({}) si applica solo al riavvio di Gextto; nel frattempo resta attivo {}.",
-                        backend_label(&configured.get()),
-                        backend_label(&active.get()),
+                    <span>{move || tr_format(
+                        data,
+                        "Il motore configurato ({configured}) si applica solo al riavvio di Gextto; nel frattempo resta attivo {active}.",
+                        &[("{configured}", tr(data, backend_label(&configured.get()))), ("{active}", tr(data, backend_label(&active.get())))],
                     )}</span>
                 </div>
             </Show>
@@ -7817,12 +7828,12 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                     <button class="btn sm" title=ctx_tr("Esegue il login a qBittorrent e mostra versione e numero di torrent.") on:click=move |_| {
                         spawn_local(async move {
                             match send("POST", "/api/torrent-backend/test", None).await {
-                                Ok(value) => message.set(format!(
-                                    "qBittorrent {} · {} torrent",
-                                    text(&value, "app_version", "?"),
-                                    value.get("torrents").and_then(Value::as_i64).unwrap_or(0),
+                                Ok(value) => message.set(tr_format(
+                                    data,
+                                    "qBittorrent {version} · {count} torrent",
+                                    &[("{version}", text(&value, "app_version", "?")), ("{count}", value.get("torrents").and_then(Value::as_i64).unwrap_or(0).to_string())],
                                 )),
-                                Err(error) => message.set(error),
+                                Err(error) => message.set(tr(data, &error)),
                             }
                         });
                     }>{ctx_tr("Test connessione")}</button>
@@ -7833,9 +7844,9 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                             Ok(value) => {
                                 let restart = value.get("restart_required").and_then(Value::as_bool).unwrap_or(false);
                                 let text = if restart {
-                                    text(&value, "message", "Riavvia Gextto per applicare il nuovo motore.")
+                                    tr(data, &text(&value, "message", "Riavvia Gextto per applicare il nuovo motore."))
                                 } else {
-                                    "La configurazione è già attiva.".to_string()
+                                    tr(data, "La configurazione è già attiva.")
                                 };
                                 flash_text(data, "ok", text);
                                 reload.update(|value| *value += 1);
@@ -7924,7 +7935,13 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                 </div>
                 <div class="live-card"
                     style=move || if selected.get() == "anacrolix" { "border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; cursor: pointer;" } else { "cursor: pointer;" }
-                    on:click=move |_| select("anacrolix")>
+                    on:click=move |_| {
+                        if anacrolix_built.get() {
+                            select("anacrolix");
+                        } else {
+                            message.set(tr(data, "Questo binario non include anacrolix: usa il target make build-anacrolix."));
+                        }
+                    }>
                     <div class="live-head">
                         <strong>"anacrolix"</strong>
                         {move || {
@@ -7961,17 +7978,46 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                         <SecretSetting label="Password" setting_key="qbittorrent_password" />
                         <TextSetting label="Timeout richieste (secondi)" setting_key="qbittorrent_request_timeout_secs" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_request_timeout_secs", "15")) placeholder="15" />
                         <TextSetting label="Intervallo polling (ms)" setting_key="qbittorrent_poll_interval_ms" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_poll_interval_ms", "1500")) placeholder="1500" />
+                        <p class="hint">{ctx_tr("Il polling è limitato a 250–60000 ms e viene usato anche per il retry quando qBittorrent non risponde. Premi Test connessione prima di applicare il motore.")}</p>
+                        <div class="mode-banner" style="margin-top:10px">
+                            <strong>{move || if qbit_update_available.get() { tr(data, "Aggiornamento disponibile") } else if qbit_installed.get() { tr(data, "Runtime qBittorrent gestito") } else { tr(data, "Runtime qBittorrent non installato") }}</strong>
+                            <span>{move || {
+                                let installed = qbit_installed_tag.get();
+                                let latest = qbit_latest_tag.get();
+                                if !latest.is_empty() && !installed.is_empty() {
+                                    tr_format(data, "libtorrent 2.x · installato: {installed} · ultima versione: {latest}", &[("{installed}", installed), ("{latest}", latest)])
+                                } else if !latest.is_empty() {
+                                    tr_format(data, "libtorrent 2.x · ultima versione: {latest}", &[("{latest}", latest)])
+                                } else {
+                                    tr(data, "Binario privato in DATA_DIR/qbittorrent; mai modifica qBittorrent di sistema.")
+                                }
+                            }}</span>
+                            <button class="btn sm" title=ctx_tr("Scarica o aggiorna l'ultima build statica qBittorrent con libtorrent 2.x nella cartella privata di Gextto.") on:click=move |_| {
+                                spawn_local(async move {
+                                    match send("POST", "/api/torrent-backend/qbittorrent/update", None).await {
+                                        Ok(value) => {
+                                            message.set(tr(data, &text(&value, "message", "qBittorrent aggiornato; riavvia Gextto per usarlo.")));
+                                            runtime_status.set(value);
+                                            trigger_refresh();
+                                        }
+                                        Err(error) => message.set(tr(data, &error)),
+                                    }
+                                });
+                            }>{move || if qbit_update_available.get() { tr(data, "Aggiorna qBittorrent v2") } else { tr(data, "Scarica qBittorrent v2") }}</button>
+                        </div>
+                        <BooleanSetting label="Usa il binario qBittorrent privato di Gextto" setting_key="qbittorrent_managed" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_managed", "false")) />
                     </SettingGroup>
                     <SettingGroup title="Organizzazione">
                         <TextSetting label="Categoria" setting_key="qbittorrent_category" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_category", "")) placeholder="gextto" />
                         <TextSetting label="Tag" setting_key="qbittorrent_tag" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_tag", "")) placeholder="gextto" />
-                        <p class="hint">{ctx_tr("Categoria e tag marcano i torrent gestiti da Gextto: i torrent senza marcatura restano non gestiti.")}</p>
+                            <p class="hint">{ctx_tr("Categoria e tag vengono applicati ai nuovi torrent; se compilati filtrano anche la sincronizzazione dei torrent già presenti. Lascia entrambi vuoti per gestire tutti i torrent.")}</p>
                     </SettingGroup>
                     <div class="setting-group" style="grid-column: 1 / -1;">
                         <h4>"Percorsi condivisi"</h4>
                         <div class="setting-group-body">
                             <AreaSetting label="Mappatura percorsi (Gextto=backend)" setting_key="qbittorrent_path_mappings" value=Signal::derive(move || raw(&data.get().config, "qbittorrent_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
-                            <p class="hint">{ctx_tr("Una riga per cartella, nel formato percorso Gextto = percorso visto da qBittorrent. Obbligatoria se i due processi non condividono lo stesso filesystem.")}</p>
+                            <p class="hint">{ctx_tr("Una riga per cartella, nel formato percorso Gextto = percorso visto da qBittorrent. Obbligatoria se i due processi non condividono lo stesso filesystem. Le directory non devono sovrapporsi.")}</p>
+                            <p class="hint">{ctx_tr("Se Categoria o Tag sono compilati, Gextto sincronizza solo i torrent che li rispettano; lascia entrambi vuoti per gestire tutti i torrent già presenti.")}</p>
                         </div>
                     </div>
                 </div>
@@ -7989,7 +8035,8 @@ fn TorrentBackendSettings(data: RwSignal<Data>) -> impl IntoView {
                 <div class="grid-2" style="margin-top:14px">
                     <SettingGroup title="Storage">
                         <TextSetting label="Cartella dati (vuoto = libtorrent)" setting_key="anacrolix_data_dir" value=Signal::derive(move || raw(&data.get().config, "anacrolix_data_dir", "")) placeholder="vuoto = libtorrent_dir" />
-                        <AreaSetting label="Mappatura percorsi" setting_key="anacrolix_path_mappings" value=Signal::derive(move || raw(&data.get().config, "anacrolix_path_mappings", "")) placeholder="/var/lib/gextto/downloads=/data/downloads" rows=3 />
+                            <AreaSetting label="Mappatura percorsi (normalmente vuota)" setting_key="anacrolix_path_mappings" value=Signal::derive(move || raw(&data.get().config, "anacrolix_path_mappings", "")) placeholder="lascia vuoto per il motore integrato" rows=3 />
+                            <p class="hint">{ctx_tr("anacrolix gira nello stesso processo di Gextto e normalmente non richiede mapping. Il campo è mantenuto per compatibilità e viene validato, ma non crea una namespace separata.")}</p>
                     </SettingGroup>
                     <SettingGroup title="Rete">
                         <TextSetting label="Porta in ascolto (vuoto = libtorrent)" setting_key="anacrolix_listen_port" value=Signal::derive(move || raw(&data.get().config, "anacrolix_listen_port", "")) placeholder="vuoto = porta minima libtorrent" />

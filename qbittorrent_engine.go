@@ -39,6 +39,7 @@ type qbittorrentSettings struct {
 	Client       qbittorrent.Config
 	Category     string
 	Tag          string
+	Managed      bool
 	Mappings     []PathMapping
 	PollInterval time.Duration
 	stateDir     string
@@ -52,16 +53,29 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 	}
 	timeout := 15 * time.Second
 	if value, ok := cfg.Settings["qbittorrent_request_timeout_secs"]; ok {
-		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		raw := strings.TrimSpace(value)
+		parsed, err := strconv.Atoi(raw)
+		if raw == "" {
+			parsed = 15
+			err = nil
+		}
 		if err != nil || parsed < 1 || parsed > 300 {
 			return qbittorrentSettings{}, fmt.Errorf("qbittorrent_request_timeout_secs must be between 1 and 300")
 		}
 		timeout = time.Duration(parsed) * time.Second
 	}
-	poll := 1500 * time.Millisecond
+	// An unset value preserves the historical eager refresh behavior. Once the
+	// user saves a value from the UI, the adapter throttles reads to that
+	// interval (including outage retries).
+	poll := time.Duration(0)
 	if value, ok := cfg.Settings["qbittorrent_poll_interval_ms"]; ok {
-		parsed, err := strconv.Atoi(strings.TrimSpace(value))
-		if err != nil || parsed < 250 || parsed > 60000 {
+		raw := strings.TrimSpace(value)
+		parsed, err := strconv.Atoi(raw)
+		if raw == "" {
+			parsed = 0
+			err = nil
+		}
+		if err != nil || (parsed != 0 && (parsed < 250 || parsed > 60000)) {
 			return qbittorrentSettings{}, fmt.Errorf("qbittorrent_poll_interval_ms must be between 250 and 60000")
 		}
 		poll = time.Duration(parsed) * time.Millisecond
@@ -79,6 +93,7 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 		},
 		Category:     strings.TrimSpace(cfg.Settings["qbittorrent_category"]),
 		Tag:          strings.TrimSpace(cfg.Settings["qbittorrent_tag"]),
+		Managed:      settingsBool(cfg, "qbittorrent_managed", false),
 		Mappings:     mappings,
 		PollInterval: poll,
 		stateDir:     cfg.StateDir,
@@ -90,6 +105,7 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 type qbittorrentEngine struct {
 	settings qbittorrentSettings
 	client   *qbittorrent.Client
+	process  *managedQbittorrentProcess
 
 	categoryReady bool
 	queueMu       sync.Mutex
@@ -124,9 +140,14 @@ func newQbittorrentEngine(cfg *Config) (*qbittorrentEngine, error) {
 	if err != nil {
 		return nil, err
 	}
+	process, err := startManagedQbittorrent(cfg, settings)
+	if err != nil {
+		return nil, err
+	}
 	return &qbittorrentEngine{
 		settings:     settings,
 		client:       client,
+		process:      process,
 		cache:        map[string]models.TorrentView{},
 		previous:     map[string]models.TorrentView{},
 		stalled:      map[string]struct{}{},
@@ -288,14 +309,14 @@ func (e *qbittorrentEngine) sync() error {
 
 	now := time.Now()
 	e.mu.Lock()
-	if !e.lastSync.IsZero() && now.Sub(e.lastSync) < e.settings.PollInterval {
+	if e.settings.PollInterval > 0 && !e.lastSync.IsZero() && now.Sub(e.lastSync) < e.settings.PollInterval {
 		e.mu.Unlock()
 		return nil
 	}
 	// Failed requests are throttled too. Without this guard every UI refresh,
 	// queue decision and status page would create a request storm while the
 	// external daemon is down.
-	if !e.lastAttempt.IsZero() && !e.connected && now.Sub(e.lastAttempt) < e.settings.PollInterval {
+	if e.settings.PollInterval > 0 && !e.lastAttempt.IsZero() && !e.connected && now.Sub(e.lastAttempt) < e.settings.PollInterval {
 		e.mu.Unlock()
 		return nil
 	}
@@ -379,24 +400,21 @@ func (e *qbittorrentEngine) sync() error {
 	return nil
 }
 
-// managedTorrent applies the optional category/tag ownership boundary. If no
-// marker is configured, the adapter keeps the backwards-compatible behavior of
-// managing every torrent visible to qBittorrent.
+// managedTorrent applies the optional ownership boundary. Category and tag
+// filters are deliberately opt-in: with both fields empty, the configured
+// qBittorrent instance is treated as dedicated to Gextto and all visible
+// torrents are synchronized.
 func (e *qbittorrentEngine) managedTorrent(t qbittorrent.Torrent) bool {
 	if category := e.settings.Category; category != "" && strings.TrimSpace(t.Category) != category {
 		return false
 	}
 	if wanted := e.settings.Tag; wanted != "" {
-		found := false
 		for _, tag := range strings.Split(t.Tags, ",") {
 			if strings.TrimSpace(tag) == wanted {
-				found = true
-				break
+				return true
 			}
 		}
-		if !found {
-			return false
-		}
+		return false
 	}
 	return true
 }
@@ -617,21 +635,27 @@ func (e *qbittorrentEngine) SyncStats() map[string]any {
 // user's external qBittorrent configuration altered after shutdown.
 func (e *qbittorrentEngine) Close() error {
 	e.queueMu.Lock()
-	if !e.queueManaged || !e.queueChanged {
-		e.queueMu.Unlock()
-		return nil
-	}
+	restoreQueue := e.queueManaged && e.queueChanged
 	original := e.queueOriginal
 	e.queueMu.Unlock()
 
-	ctx, cancel := e.requestContext()
-	defer cancel()
-	if err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": original}); err != nil {
-		return err
+	if restoreQueue {
+		ctx, cancel := e.requestContext()
+		err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": original})
+		cancel()
+		if err != nil {
+			if e.process != nil {
+				_ = e.process.Close()
+			}
+			return err
+		}
+		e.queueMu.Lock()
+		e.queueChanged = false
+		e.queueMu.Unlock()
 	}
-	e.queueMu.Lock()
-	e.queueChanged = false
-	e.queueMu.Unlock()
+	if e.process != nil {
+		return e.process.Close()
+	}
 	return nil
 }
 

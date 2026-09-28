@@ -197,6 +197,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/torrent-no-rename", TorrentNoRenameList)
 	handle(s, mux, "POST /api/torrents", AddTorrentHandler)
 	handle(s, mux, "GET /api/torrent-backend", TorrentBackendStatus)
+	handle(s, mux, "GET /api/torrent-backend/qbittorrent/update", QbittorrentRuntimeUpdate)
+	handle(s, mux, "POST /api/torrent-backend/qbittorrent/update", QbittorrentRuntimeUpdate)
 	handle(s, mux, "POST /api/torrent-backend", TorrentBackendActivate)
 	handle(s, mux, "POST /api/torrent-backend/test", TorrentBackendTest)
 	handle(s, mux, "POST /api/torrent-backend/preflight", TorrentBackendPreflight)
