@@ -499,6 +499,13 @@ type AppState struct {
 	cycle_lock      *sync.Mutex
 	rename_progress *RenameProgress
 	config_cache    *ConfigCache
+	// Background-worker lifecycle. bgStop is closed when the daemon starts
+	// shutting down and bgWG tracks every worker, so Serve waits for them before
+	// returning and the torrent session is destroyed only when no worker can
+	// call into it anymore.
+	bgStop     chan struct{}
+	bgStopOnce sync.Once
+	bgWG       sync.WaitGroup
 }
 
 // ---------------------------------------------------------------------------

@@ -196,9 +196,14 @@ type LibtorrentClient struct {
 	stopAtMetadataMu sync.RWMutex
 	stopAtMetadata   map[string]struct{}
 
-	session  unsafe.Pointer
-	configDB string
-	stateDir string
+	// sessionMu serialises the native session handle between the hot read path
+	// (List) and Shutdown: destroy must wait for the readers, and readers must
+	// not call into a handle that was already destroyed (boost aborts the
+	// process with "invalid session handle used").
+	sessionMu sync.RWMutex
+	session   unsafe.Pointer
+	configDB  string
+	stateDir  string
 
 	// listCache memoises the torrent snapshot for a very short TTL so several
 	// reads in the same worker tick (and concurrent UI polls) share one
@@ -491,8 +496,11 @@ func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
 	}
 	if session != nil {
 		runtime.SetFinalizer(client, func(c *LibtorrentClient) {
+			c.sessionMu.Lock()
+			defer c.sessionMu.Unlock()
 			if c.session != nil {
 				cgoLtDestroy(c.session)
+				c.session = nil
 			}
 		})
 	}
@@ -1216,7 +1224,10 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 
 // listUncached builds a fresh torrent snapshot.
 func (c *LibtorrentClient) listUncached() []models.TorrentView {
-	if c.session == nil {
+	c.sessionMu.RLock()
+	session := c.session
+	if session == nil {
+		c.sessionMu.RUnlock()
 		c.torrentsMu.RLock()
 		result := make([]models.TorrentView, 0, len(c.torrents))
 		for _, torrent := range c.torrents {
@@ -1226,7 +1237,8 @@ func (c *LibtorrentClient) listUncached() []models.TorrentView {
 		sort.Slice(result, func(i, j int) bool { return result[i].Hash < result[j].Hash })
 		return result
 	}
-	statuses := cgoLtStatuses(c.session)
+	statuses := cgoLtStatuses(session)
+	c.sessionMu.RUnlock()
 	limits, err := c.seedLimits()
 	if err != nil {
 		logging.Warn("cannot read per-torrent seed limits", "error", err)
@@ -2196,6 +2208,10 @@ func (c *LibtorrentClient) SessionStats() (map[string]int64, error) {
 }
 
 func (c *LibtorrentClient) Shutdown(cfg *Config) error {
+	// Wait for every in-flight List() to finish before destroying the handle:
+	// a late cgo call on a destroyed session aborts the process.
+	c.sessionMu.Lock()
+	defer c.sessionMu.Unlock()
 	if c.session == nil {
 		return nil
 	}

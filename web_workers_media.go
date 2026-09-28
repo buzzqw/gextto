@@ -25,7 +25,9 @@ func backupWorker(state *AppState) {
 		cfg, err := LoadConfig(state.config_path)
 		if err != nil {
 			logging.Warn("backup scheduler config reload failed", "error", err)
-			time.Sleep(60 * time.Second)
+			if !state.SleepBackground(60 * time.Second) {
+				return
+			}
 			continue
 		}
 		if cfg.Active && bwm_backupDue(&cfg, last) {
@@ -38,7 +40,9 @@ func backupWorker(state *AppState) {
 				bwm_saveLastBackup(cfg.DataDir, now)
 			}
 		}
-		time.Sleep(60 * time.Second)
+		if !state.SleepBackground(60 * time.Second) {
+			return
+		}
 	}
 }
 
@@ -46,7 +50,9 @@ func backupWorker(state *AppState) {
 // (the web module:8495): a few archived files per run, only those without stored
 // MediaInfo.
 func mediaInfoBackfillWorker(state *AppState) {
-	time.Sleep(300 * time.Second)
+	if !state.SleepBackground(300 * time.Second) {
+		return
+	}
 	warnedUnavailable := false
 	for {
 		cfg := latestConfig(state)
@@ -96,7 +102,9 @@ func mediaInfoBackfillWorker(state *AppState) {
 				logging.Warn("ffprobe is not available: MediaInfo backfill paused until it is installed")
 			}
 		}
-		time.Sleep(time.Duration(intervalMinutes) * 60 * time.Second)
+		if !state.SleepBackground(time.Duration(intervalMinutes) * 60 * time.Second) {
+			return
+		}
 	}
 }
 
@@ -104,7 +112,9 @@ func mediaInfoBackfillWorker(state *AppState) {
 // precomputes the calendar at startup and refreshes it when the cache expires,
 // so the endpoint answers immediately.
 func calendarWarmupWorker(state *AppState) {
-	time.Sleep(3 * time.Second)
+	if !state.SleepBackground(3 * time.Second) {
+		return
+	}
 	for {
 		cfg := latestConfig(state)
 		if cfg.TmdbAPIKey != nil {
@@ -113,7 +123,9 @@ func calendarWarmupWorker(state *AppState) {
 				cachePut("calendar", response)
 			}
 		}
-		time.Sleep(60 * time.Second)
+		if !state.SleepBackground(60 * time.Second) {
+			return
+		}
 	}
 }
 

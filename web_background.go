@@ -593,7 +593,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		startupHashes[strings.ToLower(torrent.Hash)] = struct{}{}
 	}
 	for {
-		time.Sleep(750 * time.Millisecond)
+		if !state.SleepBackground(750 * time.Millisecond) {
+			return
+		}
 		now := time.Now()
 		// The backend can be switched at runtime from the settings/API: pick
 		// up the new engine on the next tick so handlers and automation never
@@ -1177,7 +1179,9 @@ func bg_applyLibtorrentOptimization(s *AppState) (bool, uint64, error) {
 func optimizeWorker(state *AppState) {
 	const optimizePeriod = 15 * time.Minute
 	for {
-		time.Sleep(optimizePeriod)
+		if !state.SleepBackground(optimizePeriod) {
+			return
+		}
 		enabled := false
 		if cfg, err := LoadConfig(state.config_path); err == nil {
 			if value, ok := cfg.Settings["libtorrent_auto_optimize"]; ok {
@@ -1208,7 +1212,9 @@ func optimizeWorker(state *AppState) {
 // multi-hundred-MB `-wal` file between restarts.
 func dbCheckpointWorker(state *AppState) {
 	for {
-		time.Sleep(15 * time.Minute)
+		if !state.SleepBackground(15 * time.Minute) {
+			return
+		}
 		// Periodic housekeeping also returns any freed heap to the OS.
 		TrimMemory()
 		db := state.db
@@ -1315,7 +1321,9 @@ func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 func tempCleanupWorker(state *AppState) {
 	const cleanupPeriod = 30 * time.Minute
 	for {
-		time.Sleep(cleanupPeriod)
+		if !state.SleepBackground(cleanupPeriod) {
+			return
+		}
 		cfg := latestConfig(state)
 		bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
 	}
@@ -1330,7 +1338,9 @@ func tempCleanupWorker(state *AppState) {
 // configurable (`housekeeping_interval_hours`, 0/disabled via
 // `housekeeping_enabled`).
 func housekeepingWorker(state *AppState) {
-	time.Sleep(10 * time.Minute)
+	if !state.SleepBackground(10 * time.Minute) {
+		return
+	}
 	for {
 		cfg := latestConfig(state)
 		enabled := true
@@ -1360,7 +1370,9 @@ func housekeepingWorker(state *AppState) {
 		if hours > 24*30 {
 			hours = 24 * 30
 		}
-		time.Sleep(time.Duration(hours) * time.Hour)
+		if !state.SleepBackground(time.Duration(hours) * time.Hour) {
+			return
+		}
 	}
 }
 
@@ -1395,7 +1407,9 @@ func watchedFoldersWorker(state *AppState) {
 	observed := map[string]bg_watchedSignature{}
 	failures := map[string]bg_watchedFailure{}
 	for {
-		time.Sleep(period)
+		if !state.SleepBackground(period) {
+			return
+		}
 		now := time.Now()
 		cfg := latestConfig(state)
 		if cfg.DryRun {
@@ -1517,7 +1531,9 @@ func cycleWorker(state *AppState) {
 		loaded, err := LoadConfig(state.config_path)
 		if err != nil {
 			logging.Error("scheduled config reload failed", "error", err)
-			time.Sleep(60 * time.Second)
+			if !state.SleepBackground(60 * time.Second) {
+				return
+			}
 			continue
 		}
 		cfg := loaded
@@ -1548,7 +1564,9 @@ func cycleWorker(state *AppState) {
 							if remaining < chunk {
 								chunk = remaining
 							}
-							time.Sleep(chunk)
+							if !state.SleepBackground(chunk) {
+								return
+							}
 							if reloaded, err := LoadConfig(state.config_path); err == nil && !reloaded.Active {
 								break
 							}
@@ -1557,7 +1575,7 @@ func cycleWorker(state *AppState) {
 				}
 			}
 		}
-		if cfg.Active {
+		if cfg.Active && !state.stopping() {
 			state.cycle_lock.Lock()
 			// Publish the start time immediately (see the manual path).
 			startedAt := time.Now().UTC()
@@ -1639,6 +1657,8 @@ func cycleWorker(state *AppState) {
 			stamp := time.Now()
 			lastInactiveLog = &stamp
 		}
-		time.Sleep(durationFromSeconds(refresh))
+		if !state.SleepBackground(durationFromSeconds(refresh)) {
+			return
+		}
 	}
 }

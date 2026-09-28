@@ -36,20 +36,78 @@ func (l nodelayListener) Accept() (net.Conn, error) {
 }
 
 // startBackgroundWorkers launches the long-lived workers that `serve` starts in
-// . They are implemented by the handler-group files.
+// . They are implemented by the handler-group files. Every worker is tracked in
+// state.bgWG so stopBackgroundWorkers can wait for them before the torrent
+// session is torn down.
 func startBackgroundWorkers(state *AppState) {
-	safeGo("torrent_event_worker", func() {
+	register := func(name string, run func()) {
+		state.bgWG.Add(1)
+		safeGo(name, func() {
+			defer state.bgWG.Done()
+			run()
+		})
+	}
+	register("torrent_event_worker", func() {
 		torrentEventWorker(state.config_path, state.cfg, state, state.db, state.comics, state.torrent_events)
 	})
-	safeGo("cycle_worker", func() { cycleWorker(state) })
-	safeGo("backup_worker", func() { backupWorker(state) })
-	safeGo("optimize_worker", func() { optimizeWorker(state) })
-	safeGo("temp_cleanup_worker", func() { tempCleanupWorker(state) })
-	safeGo("watched_folders_worker", func() { watchedFoldersWorker(state) })
-	safeGo("housekeeping_worker", func() { housekeepingWorker(state) })
-	safeGo("media_info_backfill_worker", func() { mediaInfoBackfillWorker(state) })
-	safeGo("calendar_warmup_worker", func() { calendarWarmupWorker(state) })
-	safeGo("db_checkpoint_worker", func() { dbCheckpointWorker(state) })
+	register("cycle_worker", func() { cycleWorker(state) })
+	register("backup_worker", func() { backupWorker(state) })
+	register("optimize_worker", func() { optimizeWorker(state) })
+	register("temp_cleanup_worker", func() { tempCleanupWorker(state) })
+	register("watched_folders_worker", func() { watchedFoldersWorker(state) })
+	register("housekeeping_worker", func() { housekeepingWorker(state) })
+	register("media_info_backfill_worker", func() { mediaInfoBackfillWorker(state) })
+	register("calendar_warmup_worker", func() { calendarWarmupWorker(state) })
+	register("db_checkpoint_worker", func() { dbCheckpointWorker(state) })
+}
+
+// BackgroundStop is closed as soon as the daemon begins shutting down. Workers
+// select on it so they return before the torrent session is destroyed.
+func (s *AppState) BackgroundStop() <-chan struct{} { return s.bgStop }
+
+// stopping reports whether a shutdown has been requested.
+func (s *AppState) stopping() bool {
+	select {
+	case <-s.bgStop:
+		return true
+	default:
+		return false
+	}
+}
+
+// SleepBackground sleeps for d and returns false when a shutdown was requested
+// meanwhile. Workers use it instead of time.Sleep so they can exit promptly.
+func (s *AppState) SleepBackground(d time.Duration) bool {
+	if d <= 0 {
+		d = time.Millisecond
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-s.bgStop:
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+// stopBackgroundWorkers signals every worker to stop and waits for them, so the
+// libtorrent session can be destroyed without a late List()/Add() hitting a
+// closed session handle (which aborts the process through boost).
+func stopBackgroundWorkers(state *AppState) {
+	state.bgStopOnce.Do(func() { close(state.bgStop) })
+	done := make(chan struct{})
+	go func() {
+		state.bgWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		// A long cycle may still be running; systemd's stop timeout is the hard
+		// limit. The session lock still protects the hot List path.
+		logging.Warn("background workers did not stop in time; continuing shutdown")
+	}
 }
 
 func shutdownServers(servers ...*http.Server) {
@@ -122,6 +180,13 @@ func Serve(state *AppState) error {
 
 	startBackgroundWorkers(state)
 
+	// Cancel request contexts before closing the native torrent session. This is
+	// important for long-lived SSE connections: http.Server.Shutdown waits for
+	// active handlers, but an SSE handler may otherwise remain open until the
+	// shutdown timeout and race with libtorrent teardown.
+	requestCtx, cancelRequests := context.WithCancel(context.Background())
+	defer cancelRequests()
+
 	app := Router(state)
 	// Timeouts defend against slowloris and idle-connection exhaustion. Write is
 	// intentionally unlimited: the log/notification SSE streams and long
@@ -129,6 +194,7 @@ func Serve(state *AppState) error {
 	newServer := func() *http.Server {
 		return &http.Server{
 			Handler:           app,
+			BaseContext:       func(net.Listener) context.Context { return requestCtx },
 			ReadHeaderTimeout: 15 * time.Second,
 			ReadTimeout:       5 * time.Minute,
 			IdleTimeout:       120 * time.Second,
@@ -155,10 +221,14 @@ func Serve(state *AppState) error {
 
 	select {
 	case err := <-errCh:
+		cancelRequests()
 		shutdownServers(webServer, engineServer)
+		stopBackgroundWorkers(state)
 		return err
 	case <-ctx.Done():
+		cancelRequests()
 		shutdownServers(webServer, engineServer)
+		stopBackgroundWorkers(state)
 		return nil
 	}
 }

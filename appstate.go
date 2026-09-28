@@ -37,6 +37,7 @@ func NewAppState(
 		cycle_lock:      &sync.Mutex{},
 		rename_progress: &RenameProgress{},
 		config_cache:    &ConfigCache{},
+		bgStop:          make(chan struct{}),
 	}
 	// Install the configured transfer backend. A refused activation (invalid
 	// path mappings, an unavailable build tag, a port conflict) falls back to
