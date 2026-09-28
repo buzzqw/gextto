@@ -6,6 +6,28 @@ automaticamente serie TV, film e fumetti. La gestione avviene dalla UI web.
 > English: [`README.md`](README.md) · Manuale completo:
 > [`docs/MANUAL.it.md`](docs/MANUAL.it.md)
 
+## Cos'è Gextto
+
+Gextto automatizza il ciclo completo della libreria: cerca le release, sceglie
+quella migliore, scarica, controlla il file, lo rinomina e lo archivia nel
+percorso configurato.
+
+## Perché scegliere Gextto
+
+- **Un solo servizio**: UI, database, ricerca, coda torrent e archiviazione
+  lavorano insieme, senza un orchestratore esterno.
+- **Torrent integrati**: libtorrent è incluso e non richiede un servizio
+  aggiuntivo; sono disponibili anche qBittorrent-nox e anacrolix.
+- **Scelte basate sulla qualità**: risoluzione, sorgente, codec, audio, HDR,
+  lingue e dimensione vengono valutati prima del download e degli upgrade.
+- **Controllo reale dei file**: `ffprobe`/MediaInfo verificano codec, audio,
+  HDR e lingue del file effettivo, non solo il nome della release.
+- **Serie, film e fumetti**: metadati TMDB/TVDB, episodi mancanti, calendario,
+  ricerca manuale, rinomina e percorsi NAS.
+- **Gestione semplice**: interfaccia web responsive in italiano e inglese,
+  backup, log, salute del servizio e integrazioni con Trakt, Simkl, Jellyfin e
+  Plex.
+
 ## Installazione
 
 ### Installazione ufficiale su Linux

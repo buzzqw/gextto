@@ -6,6 +6,27 @@ archiving TV series, movies and comics. It is managed through the web UI.
 > Italiano: [`README.it.md`](README.it.md) · Full manual:
 > [`docs/MANUAL.en.md`](docs/MANUAL.en.md)
 
+## What Gextto is
+
+Gextto automates the complete library workflow: it searches for releases,
+selects the best one, downloads it, checks the file, renames it and archives it
+in the configured location.
+
+## Why choose Gextto
+
+- **One service**: UI, database, search, torrent queue and archiving work
+  together without an external orchestrator.
+- **Embedded torrents**: libtorrent is included and needs no extra service;
+  qBittorrent-nox and anacrolix are also supported.
+- **Quality-based decisions**: resolution, source, codec, audio, HDR, languages
+  and size are evaluated before downloads and upgrades.
+- **Real file inspection**: `ffprobe`/MediaInfo check the actual file's codec,
+  audio, HDR and languages instead of trusting only its release name.
+- **TV, movies and comics**: TMDB/TVDB metadata, missing episodes, calendar,
+  manual search, renaming and NAS paths.
+- **Simple management**: responsive web UI in Italian and English, backups,
+  logs, health checks and Trakt, Simkl, Jellyfin and Plex integrations.
+
 ## Installation
 
 ### Official Linux installation
