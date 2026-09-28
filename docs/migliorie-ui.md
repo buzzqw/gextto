@@ -20,7 +20,7 @@ L’ordine numerico è quello di arrivo degli appunti.
 | 13 | completato | Rifare completamente il menu Esplora, verificandolo e riallineandolo a `rextto`. | Aggiunti tab Di tendenza TMDB (Serie TV/Film, settimana/oggi/popolari/votati/programmazione/uscite), Calendario TMDB, ricerca TMDB e ricerca release. |
 | 14 | completato | In Archivio, mantenere su una sola riga le righe con l’elenco dei file. | Titolo troncato con ellissi e tooltip; azioni non-wrappabili; tabella scorrevole. |
 | 15 | completato | Rivedere la sezione Fumetti confrontandola con l’organizzazione di `rextto`. | Ordine: Aggiungi fumetto, Monitorati, grid-2 Weekly pack, grid-2 Download/Storico, Link trovati; rimossa la nota obsoleta sul legacy. |
-| 16 | in coda | Ricontrollare tutta l’interfaccia e riallinearla completamente a come era in `rextto`, non limitandosi a correzioni isolate. | Obiettivo generale della revisione completa. |
+| 16 | in lavorazione | Ricontrollare tutta l’interfaccia e riallinearla completamente a come era in `rextto`, non limitandosi a correzioni isolate. | Passaggio completo: Configurazione a righe raggruppate con salva-tutte, Integrazioni e Manutenzione in pannelli grid-2, Esplora con tendenze+calendario, dashboard con feed-sorgenti, log con filtro/follow, Scarico con dettaglio a schede. Verifica strutturale 16/16 pagine OK. Restano ritocchi cosmetici (sparkline di rete, download HTTP fusi nella tabella Scarico, pannello servizi in Salute). |
 
 La coda operativa completa resta mantenuta anche in
 [`ui-feedback-queue.md`](ui-feedback-queue.md).
