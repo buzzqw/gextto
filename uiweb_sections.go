@@ -359,6 +359,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		spec, _ := uiTableSpecFor("comics")
 		weeklyEnabled := false
 		weeklyFromDate := ""
+		historyLimit := int64(100)
 		if s.comics != nil {
 			if value, err := s.comics.Setting("weekly_enabled", "no"); err == nil {
 				weeklyEnabled = value == "yes" || value == "true" || value == "1"
@@ -366,6 +367,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 			if value, err := s.comics.Setting("weekly_from_date", ""); err == nil {
 				weeklyFromDate = strings.TrimSpace(value)
 			}
+			historyLimit = s.comics.HistoryLimit()
 		}
 		group := func(name string, section uiPageSection) uiPageSection {
 			section.Group = name
@@ -385,28 +387,12 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 				Fields: []uiFormField{
 					boolField("enabled", "Weekly attivo", weeklyEnabled),
 					{Name: "from_date", Label: "Scarica weekly pack a partire dal", Kind: "date", Value: weeklyFromDate, Hint: "Non cercare o scaricare Weekly Pack con data precedente a questa."},
+					{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10), Hint: "Numero massimo di elementi da conservare sia nello Storico fumetti sia nello Storico Weekly Pack (1–500)."},
 				},
 			})),
 			group("Weekly pack", sectionForm(uiFormSection{
 				Title: "Cerca un Weekly Pack", Hint: "Cerca il post del Weekly Pack su GetComics per la data scelta ed estrae i magnet/.torrent disponibili. Non avvia il download.", Path: "/api/comics/weekly/links", Submit: "Cerca weekly",
 				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto", Kind: "date", Hint: "Data del Weekly Pack da cercare."}},
-			})),
-			group("Download", sectionTable(uiTableSpec{
-				Title:    "Download in corso",
-				Endpoint: "/api/comics/downloads",
-				ItemsKey: "",
-				ColumnsJSON: uiJSON([]uiColumn{
-					{Key: "title", Label: "Titolo"}, {Key: "method", Label: "Metodo"}, {Key: "status", Label: "Stato"},
-					{Key: "progress", Label: "Avanzamento", Format: "percent"},
-					{Key: "downloaded_bytes", Label: "Scaricato", Format: "bytes"},
-					{Key: "speed_bytes", Label: "Velocità", Format: "rate"}, {Key: "tag", Label: "Tag"},
-				}),
-				ActionsJSON: uiJSON([]uiAction{
-					{Label: "Pausa", Method: "POST", Path: "/api/comics/downloads/{id}/pause", Body: "{}"},
-					{Label: "Riprendi", Method: "POST", Path: "/api/comics/downloads/{id}/resume", Body: "{}"},
-					{Label: "Rimuovi", Class: "danger", Method: "POST", Path: "/api/comics/downloads/{id}/remove", Body: "{}", Confirm: "Rimuovere questo download?"},
-				}),
-				Empty: "Nessun download in corso.",
 			})),
 			group("Download", sectionTable(uiTableSpec{
 				Title:    "Storico fumetti",

@@ -151,7 +151,7 @@ func ComicDownloadResume(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // ComicsHistory is `comics_history`.
 func ComicsHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
-	value, err := s.comics.History(100)
+	value, err := s.comics.History(s.comics.HistoryLimit())
 	if err != nil {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return

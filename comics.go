@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -127,6 +128,48 @@ type ComicsImportReport struct {
 // ComicsDb wraps the SQLite connection of the comics database.
 type ComicsDb struct {
 	db *sql.DB
+}
+
+const defaultComicsHistoryLimit int64 = 100
+
+// HistoryLimit is the shared retention limit for comics and Weekly Pack
+// history. It is stored with the comics settings so it is independent from
+// the torrent seed/removal settings.
+func (d *ComicsDb) HistoryLimit() int64 {
+	value, err := d.Setting("comics_history_limit", strconv.FormatInt(defaultComicsHistoryLimit, 10))
+	if err != nil {
+		return defaultComicsHistoryLimit
+	}
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return defaultComicsHistoryLimit
+	}
+	return clampInt64(parsed, 1, 500)
+}
+
+// PruneHistory keeps the newest rows in both comic history tables. Weekly
+// rows are retained by pack date/id, so deleting old rows cannot affect the
+// current pending-pack state.
+func (d *ComicsDb) PruneHistory(limit int64) error {
+	limit = clampInt64(limit, 1, 500)
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec("DELETE FROM comics_history WHERE id NOT IN (SELECT id FROM comics_history ORDER BY id DESC LIMIT ?1)", limit); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if _, err = tx.Exec("DELETE FROM comics_weekly WHERE id NOT IN (SELECT id FROM comics_weekly ORDER BY pack_date DESC, id DESC LIMIT ?1)", limit); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+// PruneConfiguredHistory applies the current shared retention setting.
+func (d *ComicsDb) PruneConfiguredHistory() error {
+	return d.PruneHistory(d.HistoryLimit())
 }
 
 // comicsSchema is `ensure_schema` (copied verbatim ).
@@ -356,7 +399,13 @@ func (d *ComicsDb) AddHistory(monitoredID int64, postURL, title, magnet, torrent
 	if err != nil {
 		return false, err
 	}
-	return affected > 0, nil
+	if affected == 0 {
+		return false, nil
+	}
+	if err := d.PruneConfiguredHistory(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // AddTorrent registers a torrent queued by the comics module.
@@ -430,7 +479,7 @@ func (d *ComicsDb) RemoveHistory(postURL string) (bool, error) {
 
 // Weekly returns the most recent weekly pack rows.
 func (d *ComicsDb) Weekly(limit int64) ([]map[string]any, error) {
-	rows, err := d.db.Query("SELECT pack_date,magnet,torrent_url,sent_at,found_at,size_bytes FROM comics_weekly ORDER BY pack_date DESC LIMIT ?1", clampInt64(limit, 1, 200))
+	rows, err := d.db.Query("SELECT pack_date,magnet,torrent_url,sent_at,found_at,size_bytes FROM comics_weekly ORDER BY pack_date DESC LIMIT ?1", clampInt64(limit, 1, 500))
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +534,13 @@ func (d *ComicsDb) AddWeekly(packDate, magnet, torrentURL string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	return affected > 0, nil
+	if affected == 0 {
+		return false, nil
+	}
+	if err := d.PruneConfiguredHistory(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // MarkWeeklySent marks a weekly pack as sent.
@@ -566,6 +621,7 @@ type httpControl struct {
 	title          string
 	targetDir      string
 	client         *http.Client
+	onComplete     func(string)
 	pathsMu        sync.Mutex
 	temporary      *string
 	destination    *string
@@ -883,11 +939,17 @@ func (c *GetComicsClient) DownloadDirect(rawURL, targetDir, title string) (strin
 // StartDirectDownload resolves a GetComics redirect and starts the HTTP download
 // in the background, returning the id used by the comics download list.
 func (c *GetComicsClient) StartDirectDownload(rawURL, targetDir, title string) (string, error) {
+	return c.StartDirectDownloadWithCompletion(rawURL, targetDir, title, nil)
+}
+
+// StartDirectDownloadWithCompletion starts a direct download and invokes
+// onComplete only after the final file has been written successfully.
+func (c *GetComicsClient) StartDirectDownloadWithCompletion(rawURL, targetDir, title string, onComplete func(string)) (string, error) {
 	resolved, err := c.resolveDirectURL(rawURL)
 	if err != nil {
 		return "", err
 	}
-	return startHTTPDownload(c.client, resolved, targetDir, title), nil
+	return startHTTPDownloadWithCompletion(c.client, resolved, targetDir, title, onComplete), nil
 }
 
 // DownloadTorrent downloads a `.torrent` file.
@@ -1061,8 +1123,13 @@ func DownloadHTTP(client *http.Client, rawURL, targetDir, title string) (string,
 }
 
 func startHTTPDownload(client *http.Client, rawURL, targetDir, title string) string {
+	return startHTTPDownloadWithCompletion(client, rawURL, targetDir, title, nil)
+}
+
+func startHTTPDownloadWithCompletion(client *http.Client, rawURL, targetDir, title string, onComplete func(string)) string {
 	id := registerHTTPDownload(title, "http", rawURL)
-	installHTTPControl(id, client, rawURL, targetDir, title)
+	control := installHTTPControl(id, client, rawURL, targetDir, title)
+	control.onComplete = onComplete
 	logging.Info("comic HTTP download started", "title", title, "download_id", id)
 	go runHTTPDownload(id)
 	return id
@@ -1100,6 +1167,9 @@ func handleHTTPOutcome(id string, control *httpControl, outcome comicHTTPOutcome
 			download.SpeedBytes = 0
 			download.ETASeconds = nil
 		})
+		if control.onComplete != nil {
+			control.onComplete(path)
+		}
 		logging.Info("comic HTTP download completed", "title", control.title, "download_id", id, "path", path)
 		return path, nil
 	case outcome == comicHTTPPaused:
@@ -1437,6 +1507,9 @@ func firstComicString(values []string) string {
 // RunComicsCycle implements `comics::run_cycle` (renamed to avoid the
 // collision with the orchestrator's own run cycle).
 func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, defaultRoot string, torrents TorrentEngine, mainDB *Database, cfg *Config) (int, error) {
+	if err := db.PruneConfiguredHistory(); err != nil {
+		return 0, err
+	}
 	monitored, err := db.ListMonitored(true)
 	if err != nil {
 		return 0, err
@@ -1742,6 +1815,9 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 		logging.Info("comics: weekly check done", "checked", weeklyChecked)
 	} else if weeklyEnabled != "yes" {
 		logging.Info("comics: weekly packs disabled")
+	}
+	if err := db.PruneConfiguredHistory(); err != nil {
+		return downloaded, err
 	}
 	return downloaded, nil
 }

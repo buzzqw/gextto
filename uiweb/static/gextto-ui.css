@@ -395,9 +395,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.logs-toolbar { flex-wrap: nowrap; }
+.logs-toolbar [data-logs-filter] { flex: 1 1 auto; min-width: 120px; }
+.logs-toolbar [data-logs-lines] { flex: 0 0 76px; width: 76px; min-width: 76px; }
 .form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-items: end; }
 .form-grid .span-full, .form-grid .form-actions { grid-column: 1 / -1; }
+.form-grid .output { grid-column: 1 / -1; width: 100%; }
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 .field-row { display: flex; align-items: center; gap: 8px; }
 .field-row .input { flex: 1; min-width: 0; }
@@ -812,6 +816,8 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .editor-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .editor-card h3 { font-size: 1rem; }
 .editor-card .field { gap: 6px; }
+.comics-results { width: 100%; overflow-x: auto; }
+.comics-results .data-table { min-width: 760px; }
 
 /* keep the old utility classes used by a few pages */
 .grid-4 > *, .grid-2 > * { min-width: 0; }

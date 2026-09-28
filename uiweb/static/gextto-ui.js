@@ -240,6 +240,11 @@
       openTorrentDetail(detailButton.getAttribute("data-hash") || "");
       return;
     }
+    var httpDetailButton = event.target.closest("[data-http-detail]");
+    if (httpDetailButton) {
+      openHTTPDetail(httpDetailButton);
+      return;
+    }
     var subdetailButton = event.target.closest("[data-torrent-subdetail]");
     if (subdetailButton) {
       loadTorrentTab(subdetailButton.getAttribute("data-torrent-subdetail") || "general", subdetailButton);
@@ -447,6 +452,60 @@
     try { document.execCommand("copy"); } catch (error) { /* ignore */ }
     area.remove();
     return Promise.resolve();
+  }
+
+  function openHTTPDetail(button) {
+    var row = button.closest("[data-http-download]");
+    if (!row) return;
+    var value = function (name, fallback) {
+      var result = row.getAttribute(name) || "";
+      return result || fallback || "—";
+    };
+    var status = value("data-http-status");
+    var progress = Number(row.getAttribute("data-http-progress"));
+    var downloaded = Number(row.getAttribute("data-http-downloaded")) || 0;
+    var total = Number(row.getAttribute("data-http-total")) || 0;
+    var speed = Number(row.getAttribute("data-http-speed")) || 0;
+    var overlay = document.createElement("div");
+    overlay.className = "overlay";
+    var modal = document.createElement("div");
+    modal.className = "modal torrent-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Dettagli download HTTP");
+    var head = document.createElement("div");
+    head.className = "modal-head";
+    var title = document.createElement("h3");
+    title.textContent = value("data-name", "Download HTTP");
+    var close = document.createElement("button");
+    close.className = "btn sm";
+    close.type = "button";
+    close.textContent = "Chiudi";
+    head.appendChild(title);
+    head.appendChild(close);
+    var body = document.createElement("div");
+    body.className = "modal-body";
+    body.appendChild(statGrid([
+      ["Stato", status === "downloading" ? "In scarico" : status],
+      ["Metodo", "HTTP"],
+      ["Progresso", isFinite(progress) && progress >= 0 ? progress.toFixed(1) + "%" : "—"],
+      ["Scaricato", humanBytes(downloaded) + (total > 0 ? " / " + humanBytes(total) : "")],
+      ["Velocità", humanRate(speed)],
+      ["URL", value("data-http-url")],
+      ["File finale", value("data-http-destination")],
+      ["File temporaneo", value("data-http-temporary")],
+      ["Aggiornato", value("data-http-updated")],
+      ["Errore", value("data-http-error", "")]
+    ]));
+    modal.appendChild(head);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    function dismiss() { overlay.remove(); }
+    close.addEventListener("click", dismiss);
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay) dismiss();
+    });
   }
 
   // ---- torrent detail modal ----------------------------------------------
@@ -1223,8 +1282,25 @@
     });
     if (filterInput) filterInput.addEventListener("input", function () { applyTableFilter(panel); });
     fetchAndRender();
+    if (endpoint === "/api/comics/downloads") {
+      var pollTimer = window.setInterval(function () {
+        // The page content can be replaced by navigation. Stop polling a
+        // detached table so each visit does not add another timer.
+        if (!document.body.contains(container)) {
+          window.clearInterval(pollTimer);
+          return;
+        }
+        fetchAndRender();
+      }, 3000);
+    }
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-table]"), renderTable);
+
+  function refreshComicsDownloadTables() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ui-table][data-endpoint="/api/comics/downloads"]'), function (table) {
+      if (table._refetch) table._refetch();
+    });
+  }
 
   function applyTableFilter(panel) {
     var input = panel.querySelector("[data-ui-filter]");
@@ -1487,6 +1563,7 @@
     element.disabled = true;
     api(element.getAttribute("data-api"), element.getAttribute("data-method") || "POST", body)
       .then(function (data) {
+        refreshComicsDownloadTables();
         var container = element.closest(".panel") &&
           element.closest(".panel").querySelector("[data-ui-table]");
         if (container && container._refetch) { container._refetch(); return; }
@@ -2005,6 +2082,17 @@
     var node = document.querySelector('[data-metric="' + name + '"]');
     if (node) node.textContent = value;
   }
+  var shellTorrentDownload = 0;
+  var shellHTTPDownload = 0;
+  function refreshShellDownloadMetric() {
+    setMetric("dl", humanRate(shellTorrentDownload + shellHTTPDownload));
+  }
+  function setNavDownloadCount(count) {
+    var node = document.querySelector('[data-nav="downloads"] [data-nav-count]');
+    if (!node) return;
+    node.textContent = String(count);
+    node.hidden = count <= 0;
+  }
   function refreshShellMetrics() {
     api("/api/process-metrics", "GET").then(function (data) {
       var cpu = data && data.process_cpu_percent;
@@ -2020,10 +2108,20 @@
         peers += Number(item.num_peers) || 0;
         seeds += Number(item.num_seeds) || 0;
       });
-      setMetric("dl", humanRate(dl));
+      shellTorrentDownload = dl;
+      refreshShellDownloadMetric();
       setMetric("ul", humanRate(ul));
       setMetric("count", String(list.length));
       setMetric("peers", peers + "/" + seeds);
+      api("/api/comics/downloads", "GET").then(function (downloads) {
+        var items = Array.isArray(downloads) ? downloads : [];
+        shellHTTPDownload = items.reduce(function (total, item) {
+          return total + (Number(item.speed_bytes) || 0);
+        }, 0);
+        var activeHTTP = items.filter(function (item) { return item.status === "downloading"; }).length;
+        setNavDownloadCount(list.length + activeHTTP);
+        refreshShellDownloadMetric();
+      }).catch(function () { refreshShellDownloadMetric(); });
     }).catch(function () { /* keep the previous value */ });
     api("/api/status", "GET").then(function (data) {
       if (!data || !data.next_cycle_at) { setMetric("cycle", "—"); return; }
@@ -4009,6 +4107,7 @@
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";
+    container.classList.add("comics-results");
     if (!items.length) { container.innerHTML = '<p class="muted">Nessun risultato su GetComics.</p>'; return; }
     var table = document.createElement("table");
     table.className = "data-table";
@@ -4052,6 +4151,7 @@
         }).then(function () {
           download.textContent = "Avviato";
           notify("Download avviato", "ok");
+          refreshComicsDownloadTables();
         }).catch(function (error) {
           notify("Download non avviato: " + error.message, "err");
           download.disabled = false;

@@ -872,7 +872,18 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var runErr error
 	switch method {
 	case "download_now", "direct", "http":
-		id, err := client.StartDirectDownload(strings.TrimSpace(input.Url), target, strings.TrimSpace(input.Title))
+		historyURL := strings.TrimSpace(input.PostUrl)
+		if historyURL == "" {
+			historyURL = strings.TrimSpace(input.Url)
+		}
+		id, err := client.StartDirectDownloadWithCompletion(strings.TrimSpace(input.Url), target, strings.TrimSpace(input.Title), func(path string) {
+			if s.comics == nil || historyURL == "" {
+				return
+			}
+			if _, historyErr := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); historyErr != nil {
+				logging.Warn("comic manual download history record failed", "title", input.Title, "error", historyErr)
+			}
+		})
 		if err != nil {
 			runErr = err
 		} else {
@@ -933,6 +944,17 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if runErr != nil {
 		jsonError(w, http.StatusBadGateway, runErr.Error())
 		return
+	}
+	if method != "download_now" && method != "direct" && method != "http" && s.comics != nil {
+		historyURL := strings.TrimSpace(input.PostUrl)
+		if historyURL == "" {
+			historyURL = strings.TrimSpace(input.Url)
+		}
+		if historyURL != "" {
+			if _, err := s.comics.AddHistory(0, historyURL, strings.TrimSpace(input.Title), "", ""); err != nil {
+				logging.Warn("comic manual download history record failed", "title", input.Title, "error", err)
+			}
+		}
 	}
 	jsonStatus(w, http.StatusAccepted, map[string]any{"ok": true, "result": result})
 }

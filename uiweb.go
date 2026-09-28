@@ -42,7 +42,13 @@ var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
 	"humanBytes":  logging.HumanBytesI64,
 	"humanBytesU": func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
 	"humanRate":   func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
-	"json":        uiJSON,
+	"derefUint64": func(value *uint64) uint64 {
+		if value == nil {
+			return 0
+		}
+		return *value
+	},
+	"json": uiJSON,
 }).ParseFS(uiwebFS, "uiweb/templates/*.html"))
 
 // uiNavItem is one navigation entry of the new shell.
@@ -168,9 +174,10 @@ type uiTorrentRow struct {
 }
 
 type uiTorrentsData struct {
-	Rows      []uiTorrentRow
-	Count     int
-	UpdatedAt string
+	Rows          []uiTorrentRow
+	HTTPDownloads []ComicDownload
+	Count         int
+	UpdatedAt     string
 }
 
 // uiHealthData is the view-model of the Salute page.
@@ -627,9 +634,10 @@ func uiManualLines(text string) []uiMdLine {
 func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 	rows := uiTorrentRows(s)
 	return uiTorrentsData{
-		Rows:      rows,
-		Count:     len(rows),
-		UpdatedAt: uiNowClock(),
+		Rows:          rows,
+		HTTPDownloads: HTTPDownloads(),
+		Count:         len(rows),
+		UpdatedAt:     uiNowClock(),
 	}
 }
 

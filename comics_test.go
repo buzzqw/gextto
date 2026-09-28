@@ -453,6 +453,35 @@ func TestMonitoredHistoryAndWeeklyRecordsAreIdempotent(t *testing.T) {
 	}
 }
 
+func TestComicsHistoryLimitPrunesBothHistories(t *testing.T) {
+	db := openTestComicsDb(t)
+	if err := db.SetSetting("comics_history_limit", "2"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 3; i++ {
+		if _, err := db.AddHistory(0, fmt.Sprintf("https://example/post/%d", i), fmt.Sprintf("Comic %d", i), "", ""); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.AddWeekly(fmt.Sprintf("2026-09-%02d", i), "", fmt.Sprintf("https://example/weekly/%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	history, err := db.History(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 2 || history[0]["title"] != "Comic 3" {
+		t.Fatalf("comic history = %#v, want newest two rows", history)
+	}
+	weekly, err := db.Weekly(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(weekly) != 2 || weekly[0]["pack_date"] != "2026-09-03" {
+		t.Fatalf("weekly history = %#v, want newest two rows", weekly)
+	}
+}
+
 func TestParsesPostsAndClassifiesDownloadLinks(t *testing.T) {
 	html := `<article class='post'><h2 class='post-title'><a href='/post/example'>Example</a></h2><time datetime='2026-09-19T10:00:00'></time><img src='/cover.jpg'></article><a href='magnet:?xt=urn:btih:0123456789012345678901234567890123456789'>torrent</a><a href='/dlds/1'>MEGA</a><a href='/file.torrent'>torrent file</a><a href='/download/file'>Download now</a>`
 	posts := parseComicArticles(html, "2026-01-01", "https://getcomics.org/tag/example/")

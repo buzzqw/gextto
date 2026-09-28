@@ -877,13 +877,14 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			skipped++
 		}
 	}
-	httpRemoved := ClearFinishedHTTPDownloads()
 	jsonResponse(w, map[string]any{
-		"ok":           true,
-		"success":      true,
-		"removed":      len(removed),
-		"skipped":      skipped,
-		"http_removed": httpRemoved,
+		"ok":      true,
+		"success": true,
+		"removed": len(removed),
+		"skipped": skipped,
+		// HTTP comic downloads are not torrents and must remain visible until
+		// the user removes them explicitly from the unified Scarico page.
+		"http_removed": 0,
 		"items":        removed,
 	})
 }

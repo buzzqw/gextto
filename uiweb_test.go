@@ -373,7 +373,8 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 		{"/ui?view=movies", `movie_link`},
 		{"/ui?view=comics", `/api/comics/{id}/enabled`},
 		{"/ui?view=comics", `data-comics-download`},
-		{"/ui?view=comics", `/api/comics/downloads/{id}/pause`},
+		{"/ui?view=downloads", "HTTP fumetti nella stessa lista di lavoro"},
+		{"/ui?view=logs", `data-logs-lines`},
 	}
 	for _, check := range checks {
 		code, _, body := webGet(t, server, check.path)

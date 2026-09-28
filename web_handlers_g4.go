@@ -812,7 +812,7 @@ func ComicsWeekly(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if lastCheckTs < 0 {
 		lastCheckTs = 0
 	}
-	items, err := s.comics.Weekly(100)
+	items, err := s.comics.Weekly(s.comics.HistoryLimit())
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -824,6 +824,7 @@ func ComicsWeekly(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"items":               items,
 		"check_interval_secs": checkIntervalSecs,
 		"last_check_ts":       lastCheckTs,
+		"history_limit":       s.comics.HistoryLimit(),
 	})
 }
 
@@ -1313,16 +1314,92 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if page < 1 {
 		page = 1
 	}
-	offset := (page - 1) * limit
 	query := queryParam(r, "q")
-	items, total, err := s.db.CompletedTorrents(int(offset), int(limit), query)
+	// Fetch both sources before paginating: otherwise comic rows would be
+	// prepended to every torrent page and the reported total would not match
+	// the visible rows.
+	_, torrentTotal, err := s.db.CompletedTorrents(0, 1, query)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	torrentLimit := int(torrentTotal)
+	if torrentLimit < 1 {
+		torrentLimit = 1
+	}
+	if torrentLimit > 2000 {
+		torrentLimit = 2000
+	}
+	torrents, _, err := s.db.CompletedTorrents(0, torrentLimit, query)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	type historyItem struct {
+		value any
+		at    string
+	}
+	combined := make([]historyItem, 0, len(torrents))
+	for _, torrent := range torrents {
+		at := torrent.CompletedAt
+		if at == "" {
+			at = torrent.UpdatedAt
+		}
+		combined = append(combined, historyItem{value: torrent, at: at})
+	}
+	// Comic HTTP downloads are not libtorrent rows, but users expect every
+	// completed download in the same Storico download view. Keep their source
+	// record in comics_history and expose it with the common history shape.
+	if s.comics != nil {
+		if history, historyErr := s.comics.History(s.comics.HistoryLimit()); historyErr == nil {
+			needle := strings.ToLower(strings.TrimSpace(query))
+			for _, item := range history {
+				name := fmt.Sprint(item["title"])
+				postURL := fmt.Sprint(item["post_url"])
+				if needle != "" && !strings.Contains(strings.ToLower(name), needle) && !strings.Contains(strings.ToLower(postURL), needle) {
+					continue
+				}
+				comic := map[string]any{
+					"name":           name,
+					"kind":           "comic",
+					"tag":            "Comic",
+					"quality_score":  0,
+					"status":         "completed",
+					"processed_path": "",
+					"completed_at":   item["sent_at"],
+					"source":         postURL,
+				}
+				combined = append(combined, historyItem{value: comic, at: fmt.Sprint(item["sent_at"])})
+			}
+		}
+	}
+	sort.SliceStable(combined, func(i, j int) bool {
+		return combined[i].at > combined[j].at
+	})
+	total := int64(len(combined))
+	if torrentTotal > int64(len(torrents)) {
+		// Keep pagination honest if the database contains more rows than the
+		// defensive fetch cap; the visible page is still correctly ordered for
+		// the rows we loaded.
+		total = torrentTotal + int64(len(combined)-len(torrents))
+	}
 	pages := (total + limit - 1) / limit
 	if pages < 1 {
 		pages = 1
+	}
+	offset := (page - 1) * limit
+	start := int(offset)
+	if start > len(combined) {
+		start = len(combined)
+	}
+	end := start + int(limit)
+	if end > len(combined) {
+		end = len(combined)
+	}
+	items := make([]any, 0, end-start)
+	for _, item := range combined[start:end] {
+		items = append(items, item.value)
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":    true,

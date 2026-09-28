@@ -34,8 +34,9 @@ import (
 // ---------------------------------------------------------------------------
 
 type gh1_ComicWeeklySettings struct {
-	Enabled  bool    `json:"enabled"`
-	FromDate *string `json:"from_date"`
+	Enabled      bool    `json:"enabled"`
+	FromDate     *string `json:"from_date"`
+	HistoryLimit *int64  `json:"history_limit"`
 }
 
 // gh1_decodeOptionalJSON decodes an optional JSON body: an empty body leaves
@@ -434,10 +435,23 @@ func ComicWeeklySettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if input.HistoryLimit != nil {
+		limit := clampInt64(*input.HistoryLimit, 1, 500)
+		if err := s.comics.SetSetting("comics_history_limit", strconv.FormatInt(limit, 10)); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := s.comics.PruneHistory(limit); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	historyLimit := s.comics.HistoryLimit()
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":               true,
 		"weekly_enabled":   input.Enabled,
 		"weekly_from_date": fromDate,
+		"history_limit":    historyLimit,
 	})
 }
 

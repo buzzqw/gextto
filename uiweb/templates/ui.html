@@ -24,7 +24,7 @@
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
           {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
          {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="nav-count">{{.Count}}</span>{{end}}</a>
+          <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span><span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span></a>
          {{end}}
       </div>
       {{end}}
@@ -235,10 +235,10 @@
   <div class="panel">
     <div class="panel-head">
       <h3>Scarico</h3>
-      <small class="muted">{{.Count}} torrent · aggiornato {{.UpdatedAt}}</small>
+      <small class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP fumetti · aggiornato {{.UpdatedAt}}</small>
     </div>
     <div class="panel-body">
-      {{if .Rows}}
+      {{if or .Rows .HTTPDownloads}}
       <div class="table-wrap">
         <table class="data-table torrent-table">
           <thead><tr>
@@ -285,6 +285,36 @@
                 <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Check</button>
                 <button class="btn sm" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent">Dettagli</button>
                 <button class="btn sm danger" data-torrent-remove data-hash="{{.Hash}}" data-name="{{.Name}}" title="Rimuovi il torrent: scegli se mantenere o eliminare i file">Rimuovi</button>
+              </td>
+            </tr>
+            {{end}}
+            {{range .HTTPDownloads}}
+            <tr data-http-download="{{.ID}}" data-name="{{.Title}}"
+                data-http-status="{{.Status}}" data-http-progress="{{printf "%.1f" .Progress}}"
+                data-http-downloaded="{{.DownloadedBytes}}" data-http-total="{{if .TotalBytes}}{{derefUint64 .TotalBytes}}{{else}}0{{end}}"
+                data-http-speed="{{.SpeedBytes}}" data-http-url="{{.URL}}" data-http-destination="{{.Destination}}"
+                data-http-temporary="{{.Temporary}}" data-http-updated="{{.UpdatedAt}}" data-http-error="{{if .Error}}{{.Error}}{{end}}">
+              <td></td>
+              <td class="torrent-name">
+                <span class="truncate" title="{{.Title}}">{{.Title}}</span>
+                <span class="badge">HTTP</span>
+                {{if .Tag}}<span class="tag-chips"><span class="tag-chip">{{.Tag}}</span></span>{{end}}
+                {{if .Error}}<small class="origin muted">{{.Error}}</small>{{end}}
+              </td>
+              <td><span class="badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span></td>
+              <td style="min-width:150px">
+                {{if ge .Progress 0.0}}<div class="progress {{if eq .Status "completed"}}seed{{else if eq .Status "paused"}}paused{{else}}active{{end}}"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{humanBytesU .DownloadedBytes}}{{if .TotalBytes}} / {{humanBytesU (derefUint64 .TotalBytes)}}{{end}}</small>{{else}}<small class="muted">{{humanBytesU .DownloadedBytes}}</small>{{end}}
+              </td>
+              <td class="numeric">{{humanRate .SpeedBytes}}</td>
+              <td class="numeric">—</td>
+              <td class="numeric">—</td>
+              <td class="numeric">—</td>
+              <td class="numeric">—</td>
+              <td class="row-actions">
+                {{if eq .Status "downloading"}}<button class="btn sm" data-api="/api/comics/downloads/{{.ID}}/pause" data-method="POST" data-body="{}">Pausa</button>{{end}}
+                {{if eq .Status "paused"}}<button class="btn sm" data-api="/api/comics/downloads/{{.ID}}/resume" data-method="POST" data-body="{}">Riprendi</button>{{end}}
+                <button class="btn sm" type="button" data-http-detail>Dettagli</button>
+                <button class="btn sm danger" data-api="/api/comics/downloads/{{.ID}}/remove" data-method="POST" data-body='{"delete_files":false}' data-confirm="Rimuovere questo download?">Rimuovi</button>
               </td>
             </tr>
             {{end}}
@@ -386,9 +416,9 @@
   <div class="panel" data-logs>
     <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span data-logs-count>{{.Count}}</span> righe</small></div>
     <div class="panel-body">
-      <div class="toolbar">
+      <div class="toolbar logs-toolbar">
         <input class="input" type="search" data-logs-filter placeholder="Filtra le righe…" />
-        <select class="input" data-logs-lines aria-label="Numero di righe">
+        <select class="input compact" data-logs-lines aria-label="Numero di righe">
           <option value="200">200</option>
           <option value="500" selected>500</option>
           <option value="1000">1000</option>
