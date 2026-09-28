@@ -96,13 +96,15 @@ func Run(ctx context.Context, opts Options) error {
 	// Refreshes run in a goroutine so a slow or unreachable daemon never blocks
 	// the keyboard: the interface always reacts to q / Ctrl-C.
 	refreshCh := make(chan refreshResult, 4)
+	actionCh := make(chan actionResult, 4)
 	var fetching int32
+	var acting int32
 	requestRefresh := func() {
 		if !atomic.CompareAndSwapInt32(&fetching, 0, 1) {
 			return
 		}
 		go func() {
-			result := fetchModel(ctx, client)
+			result := fetchModel(ctx, client, !model.LogStreamConnected, model.Tab, model.ArchiveFilter)
 			atomic.StoreInt32(&fetching, 0)
 			select {
 			case refreshCh <- result:
@@ -113,46 +115,76 @@ func Run(ctx context.Context, opts Options) error {
 
 	parser := &KeyParser{}
 	requestRefresh()
+	startAction := func(action Action) bool {
+		return startActionAsync(ctx, client, model, action, requestRefresh, actionCh, &acting)
+	}
 
 	ticker := time.NewTicker(refresh)
 	defer ticker.Stop()
-	flush := time.NewTicker(50 * time.Millisecond)
-	defer flush.Stop()
+	// KeyParser needs a short timeout to distinguish an incomplete escape
+	// sequence from a standalone key. It must not also drive screen redraws:
+	// doing so made the log flash continuously even while it was idle.
+	keyFlush := time.NewTicker(50 * time.Millisecond)
+	defer keyFlush.Stop()
+	// Coalesce bursts of SSE log events into at most ten frames per second.
+	frame := time.NewTicker(100 * time.Millisecond)
+	defer frame.Stop()
+	// The next-cycle countdown is the only time-based content on screen.
+	clock := time.NewTicker(time.Second)
+	defer clock.Stop()
 
 	quit := false
+	dirty := true
+	width, height := term.size()
+	renderANSIConvert(out, model.Render(width, height))
+	dirty = false
 	for !quit {
-		width, height := term.size()
-		renderANSIConvert(out, model.Render(width, height))
-
 		select {
 		case <-signalCtx.Done():
 			quit = true
 		case data := <-inputCh:
 			for _, key := range parser.Feed(data, false) {
-				if execute(ctx, client, model, model.Update(key), requestRefresh) {
+				dirty = true
+				if startAction(model.Update(key)) {
 					quit = true
 					break
 				}
 			}
-		case <-flush.C:
+		case <-keyFlush.C:
 			for _, key := range parser.Feed(nil, true) {
-				if execute(ctx, client, model, model.Update(key), requestRefresh) {
+				dirty = true
+				if startAction(model.Update(key)) {
 					quit = true
 					break
 				}
 			}
 		case result := <-refreshCh:
 			model.applyRefresh(result)
+			dirty = true
+		case result := <-actionCh:
+			atomic.StoreInt32(&acting, 0)
+			applyActionResult(model, result, requestRefresh)
+			dirty = true
 		case event := <-streamCh:
 			applyStream(model, event)
+			dirty = true
 		case <-ticker.C:
 			requestRefresh()
+		case <-clock.C:
+			dirty = true
+		case <-frame.C:
+			if dirty {
+				width, height := term.size()
+				renderANSIConvert(out, model.Render(width, height))
+				dirty = false
+			}
 		}
 		// Drain pending stream events without blocking the next render.
 		for draining := true; draining; {
 			select {
 			case event := <-streamCh:
 				applyStream(model, event)
+				dirty = true
 			default:
 				draining = false
 			}
@@ -201,7 +233,7 @@ func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
 
 func readStream(ctx context.Context, client *Client, ch chan<- streamEvent) {
 	for ctx.Err() == nil {
-		ch <- streamEvent{connected: true}
+		sendStream(ctx, ch, streamEvent{connected: true})
 		err := client.StreamLogs(ctx,
 			func(lines []string) { sendStream(ctx, ch, streamEvent{snapshot: lines}) },
 			func(line string) { sendStream(ctx, ch, streamEvent{line: line}) },
@@ -237,19 +269,27 @@ func applyStream(model *Model, event streamEvent) {
 
 // refreshResult carries one background poll of the daemon.
 type refreshResult struct {
-	status      *Status
-	statusErr   string
-	torrents    []Torrent
-	hasTorrents bool
-	logs        []string
-	hasLogs     bool
-	health      *Health
-	healthErr   string
+	status       *Status
+	statusErr    string
+	torrents     []Torrent
+	hasTorrents  bool
+	logs         []string
+	hasLogs      bool
+	archive      []ArchiveEntry
+	hasArchive   bool
+	archiveTotal int
+	archivePages int
+	missing      []Gap
+	hasMissing   bool
+	blocklist    []BlocklistEntry
+	hasBlocklist bool
+	health       *Health
+	healthErr    string
 }
 
 // fetchModel polls the daemon with a short timeout. It is safe to call from a
 // goroutine because it never touches the model.
-func fetchModel(ctx context.Context, client *Client) refreshResult {
+func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, archiveQuery string) refreshResult {
 	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
@@ -263,9 +303,30 @@ func fetchModel(ctx context.Context, client *Client) refreshResult {
 		result.torrents = torrents
 		result.hasTorrents = true
 	}
-	if logs, err := client.Logs(callCtx, 200); err == nil {
-		result.logs = logs
-		result.hasLogs = true
+	if includeLogs {
+		if logs, err := client.Logs(callCtx, 200); err == nil {
+			result.logs = logs
+			result.hasLogs = true
+		}
+	}
+	switch tab {
+	case TabArchive:
+		if items, total, pages, err := client.Archive(callCtx, archiveQuery); err == nil {
+			result.archive = items
+			result.archiveTotal = total
+			result.archivePages = pages
+			result.hasArchive = true
+		}
+	case TabMissing:
+		if items, err := client.Gaps(callCtx); err == nil {
+			result.missing = items
+			result.hasMissing = true
+		}
+	case TabBlocklist:
+		if items, err := client.Blocklist(callCtx); err == nil {
+			result.blocklist = items
+			result.hasBlocklist = true
+		}
 	}
 	if health, err := client.Health(callCtx); err == nil {
 		result.health = &health
@@ -289,6 +350,20 @@ func (m *Model) applyRefresh(result refreshResult) {
 	if result.hasLogs && !m.LogStreamConnected {
 		m.SetLogs(result.logs)
 	}
+	if result.hasArchive {
+		m.Archive = result.archive
+		m.ArchiveTotal = result.archiveTotal
+		m.ArchivePages = result.archivePages
+		m.ArchiveSelected = min(m.ArchiveSelected, max(0, len(m.Archive)-1))
+	}
+	if result.hasMissing {
+		m.Missing = result.missing
+		m.MissingSelected = min(m.MissingSelected, max(0, len(m.Missing)-1))
+	}
+	if result.hasBlocklist {
+		m.Blocklist = result.blocklist
+		m.BlocklistSelected = min(m.BlocklistSelected, max(0, len(m.Blocklist)-1))
+	}
 	if result.health != nil {
 		m.SetHealth(*result.health)
 	} else if result.healthErr != "" {
@@ -297,191 +372,258 @@ func (m *Model) applyRefresh(result refreshResult) {
 	m.Loading = false
 }
 
-func execute(ctx context.Context, client *Client, model *Model, action Action, refresh func()) (quit bool) {
+type actionResult struct {
+	message      string
+	apply        func(*Model)
+	refresh      bool
+	clearMessage bool
+}
+
+func startActionAsync(ctx context.Context, client *Client, model *Model, action Action, refresh func(), results chan<- actionResult, acting *int32) bool {
 	if action.Kind == ActionNone {
 		return false
 	}
-	callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
 	tr := model.Tr
-
 	switch action.Kind {
 	case ActionQuit:
 		return true
 	case ActionRefresh:
+		model.Loading = true
 		refresh()
 		model.SetMessage(tr.T("msg.refreshed"))
-	case ActionRunCycle:
-		result, err := client.RunCycle(callCtx, action.Domain)
-		if err != nil {
-			model.SetMessage(tr.Format("msg.cyclefailed", err))
-			break
+		return false
+	}
+	if !atomic.CompareAndSwapInt32(acting, 0, 1) {
+		model.SetMessage(tr.T("msg.busy"))
+		return false
+	}
+	model.Loading = true
+	go func() {
+		result := performAction(ctx, client, tr, action)
+		select {
+		case results <- result:
+		case <-ctx.Done():
 		}
-		queued, _ := result["queued"].(bool)
+	}()
+	return false
+}
+
+func performAction(ctx context.Context, client *Client, tr *Translator, action Action) actionResult {
+	callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	result := actionResult{}
+	fail := func(message string, args ...any) actionResult {
+		result.message = tr.Format(message, args...)
+		return result
+	}
+
+	switch action.Kind {
+	case ActionRunCycle:
+		response, err := client.RunCycle(callCtx, action.Domain)
+		if err != nil {
+			return fail("msg.cyclefailed", err)
+		}
+		queued, _ := response["queued"].(bool)
 		switch {
 		case queued:
-			model.SetMessage(tr.Format("msg.cyclequeued", action.Domain))
+			result.message = tr.Format("msg.cyclequeued", action.Domain)
 		case action.Domain == "" || action.Domain == "full":
-			model.SetMessage(tr.T("msg.cyclefull"))
+			result.message = tr.T("msg.cyclefull")
 		default:
-			model.SetMessage(tr.Format("msg.cyclestarted", action.Domain))
+			result.message = tr.Format("msg.cyclestarted", action.Domain)
 		}
+		result.refresh = true
 	case ActionSearch:
-		results, err := client.Search(callCtx, action.Text)
+		items, err := client.Search(callCtx, action.Text)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.searchfailed", err))
-			break
+			return fail("msg.searchfailed", err)
 		}
-		model.SetSearchResults(action.Text, results)
-		model.SetMessage(tr.Format("msg.search", len(results)))
+		result.apply = func(m *Model) { m.SetSearchResults(action.Text, items) }
+		result.message = tr.Format("msg.search", len(items))
 	case ActionAddMagnet:
 		if err := client.AddMagnet(callCtx, action.Text); err != nil {
-			model.SetMessage(tr.Format("msg.addfailed", err))
-			break
+			return fail("msg.addfailed", err)
 		}
-		model.SetMessage(tr.T("msg.magneton"))
+		result.message = tr.T("msg.magneton")
+		result.refresh = true
 	case ActionAddFile:
 		if err := client.AddTorrentFile(callCtx, action.Text); err != nil {
-			model.SetMessage(tr.Format("msg.addfailed", err))
-			break
+			return fail("msg.addfailed", err)
 		}
-		model.SetMessage(tr.T("msg.torrentadded"))
+		result.message = tr.T("msg.torrentadded")
+		result.refresh = true
 	case ActionPauseToggle:
-		paused := false
-		if detail, err := client.TorrentDetail(callCtx, action.Hash); err == nil {
-			paused = detail.Torrent.State == "paused"
+		detail, err := client.TorrentDetail(callCtx, action.Hash)
+		if err != nil {
+			return fail("msg.actionfailed", tr.T("tab.torrents"), err)
 		}
-		var err error
+		paused := detail.Torrent.State == "paused"
 		if paused {
 			err = client.Resume(callCtx, action.Hash)
 		} else {
 			err = client.Pause(callCtx, action.Hash)
 		}
 		if err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", tr.T("tab.torrents"), err))
-			break
+			return fail("msg.actionfailed", tr.T("tab.torrents"), err)
 		}
 		if paused {
-			model.SetMessage(tr.T("msg.resumed"))
+			result.message = tr.T("msg.resumed")
 		} else {
-			model.SetMessage(tr.T("msg.paused"))
+			result.message = tr.T("msg.paused")
 		}
-		refresh()
+		result.refresh = true
 	case ActionRestart:
-		model.SetMessage(tr.T("msg.restarted"))
 		if err := client.Restart(callCtx, action.Hash); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "restart", err))
+			return fail("msg.actionfailed", "restart", err)
 		}
-		refresh()
+		result.message = tr.T("msg.restarted")
+		result.refresh = true
 	case ActionRemove:
 		if err := client.Remove(callCtx, action.Hash, action.DeleteFiles, false); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "remove", err))
-			break
+			return fail("msg.actionfailed", "remove", err)
 		}
 		if action.DeleteFiles {
-			model.SetMessage(tr.T("msg.removedfiles"))
+			result.message = tr.T("msg.removedfiles")
 		} else {
-			model.SetMessage(tr.T("msg.removed"))
+			result.message = tr.T("msg.removed")
 		}
-		refresh()
+		result.refresh = true
 	case ActionRecheck:
 		if err := client.Recheck(callCtx, action.Hash); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "recheck", err))
-			break
+			return fail("msg.actionfailed", "recheck", err)
 		}
-		model.SetMessage(tr.T("msg.rechecked"))
+		result.message = tr.T("msg.rechecked")
 	case ActionReannounce:
 		if err := client.Reannounce(callCtx, action.Hash); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "reannounce", err))
-			break
+			return fail("msg.actionfailed", "reannounce", err)
 		}
-		model.SetMessage(tr.T("msg.reannounced"))
+		result.message = tr.T("msg.reannounced")
 	case ActionNoRenameToggle:
-		current := false
-		if detail, err := client.TorrentDetail(callCtx, action.Hash); err == nil {
-			current = detail.NoRename
+		detail, err := client.TorrentDetail(callCtx, action.Hash)
+		if err != nil {
+			return fail("msg.actionfailed", "no-rename", err)
 		}
-		if err := client.SetNoRename(callCtx, action.Hash, !current); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "no-rename", err))
-			break
+		if err := client.SetNoRename(callCtx, action.Hash, !detail.NoRename); err != nil {
+			return fail("msg.actionfailed", "no-rename", err)
 		}
-		if !current {
-			model.SetMessage(tr.T("msg.norenameon"))
+		if detail.NoRename {
+			result.message = tr.T("msg.norenameoff")
 		} else {
-			model.SetMessage(tr.T("msg.norenameoff"))
+			result.message = tr.T("msg.norenameon")
 		}
 	case ActionPin:
 		if err := client.Pin(callCtx, action.Hash); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "pin", err))
-			break
+			return fail("msg.actionfailed", "pin", err)
 		}
-		model.SetMessage(tr.T("msg.pinned"))
+		result.message = tr.T("msg.pinned")
 	case ActionUnpin:
 		if err := client.Unpin(callCtx); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "unpin", err))
-			break
+			return fail("msg.actionfailed", "unpin", err)
 		}
-		model.SetMessage(tr.T("msg.unpinned"))
+		result.message = tr.T("msg.unpinned")
 	case ActionCleanCompleted:
-		result, err := client.RemoveCompleted(callCtx, false)
+		response, err := client.RemoveCompleted(callCtx, false)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "clean", err))
-			break
+			return fail("msg.actionfailed", "clean", err)
 		}
-		removed := int(numberValue(result["removed"]))
-		skipped := int(numberValue(result["skipped"]))
-		model.SetMessage(tr.Format("msg.removedone", removed, skipped))
-		refresh()
+		result.message = tr.Format("msg.removedone", int(numberValue(response["removed"])), int(numberValue(response["skipped"])))
+		result.refresh = true
 	case ActionSetLimits:
 		if err := client.SetSpeedLimits(callCtx, action.DL, action.UL); err != nil {
-			model.SetMessage(tr.Format("msg.actionfailed", "limits", err))
-			break
+			return fail("msg.actionfailed", "limits", err)
 		}
-		model.SetMessage(tr.Format("msg.limits", action.DL, action.UL))
+		result.message = tr.Format("msg.limits", action.DL, action.UL)
 	case ActionCleanTrash:
-		result, err := client.CleanTrash(callCtx)
+		response, err := client.CleanTrash(callCtx)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.trashfailed", err))
-			break
+			return fail("msg.trashfailed", err)
 		}
-		if files, ok := result["files"]; ok {
-			model.SetMessage(tr.Format("msg.trashcleaned", int(numberValue(files))))
+		if files, ok := response["files"]; ok {
+			result.message = tr.Format("msg.trashcleaned", int(numberValue(files)))
 		} else {
-			model.SetMessage(tr.T("msg.trashcleanedna"))
+			result.message = tr.T("msg.trashcleanedna")
 		}
-		refresh()
+		result.refresh = true
 	case ActionQueueRelease:
 		if err := client.AddRelease(callCtx, action.Release); err != nil {
-			model.SetMessage(tr.Format("msg.queuefailed", err))
-			break
+			return fail("msg.queuefailed", err)
 		}
-		model.Overlay = OverlayNone
-		model.SetMessage(tr.T("msg.queued"))
-		refresh()
+		result.apply = func(m *Model) { m.Overlay = OverlayNone }
+		result.message = tr.T("msg.queued")
+		result.refresh = true
 	case ActionOpenDetails:
 		detail, err := client.TorrentDetail(callCtx, action.Hash)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.detailsfailed", err))
-			break
+			return fail("msg.detailsfailed", err)
 		}
-		model.SetDetail(detail)
-		model.SetMessage("")
+		result.apply = func(m *Model) { m.SetDetail(detail) }
+		result.clearMessage = true
 	case ActionLoadDetail:
 		items, err := client.TorrentCollection(callCtx, action.Hash, action.DetailKind)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.detailfailed", action.DetailKind, err))
-			break
+			return fail("msg.detailfailed", err)
 		}
-		model.SetDetailItems(items)
+		result.apply = func(m *Model) { m.SetDetailItems(items) }
 	case ActionLoadEvents:
 		events, err := client.Events(callCtx)
 		if err != nil {
-			model.SetMessage(tr.Format("msg.eventsfailed", err))
-			break
+			return fail("msg.eventsfailed", err)
 		}
-		model.SetEvents(events)
-		model.Overlay = OverlayEvents
-		model.SetMessage(tr.Format("msg.events", len(events)))
+		result.apply = func(m *Model) {
+			m.SetEvents(events)
+			m.Overlay = OverlayEvents
+		}
+		result.message = tr.Format("msg.events", len(events))
+	case ActionLoadArchive:
+		items, total, pages, err := client.Archive(callCtx, action.Text)
+		if err != nil {
+			return fail("msg.archivefailed", err)
+		}
+		result.apply = func(m *Model) {
+			m.Archive = items
+			m.ArchiveTotal = total
+			m.ArchivePages = pages
+			m.ArchiveSelected = min(m.ArchiveSelected, max(0, len(items)-1))
+		}
+	case ActionLoadMissing:
+		items, err := client.Gaps(callCtx)
+		if err != nil {
+			return fail("msg.missingfailed", err)
+		}
+		result.apply = func(m *Model) {
+			m.Missing = items
+			m.MissingSelected = min(m.MissingSelected, max(0, len(items)-1))
+		}
+	case ActionLoadBlocklist:
+		items, err := client.Blocklist(callCtx)
+		if err != nil {
+			return fail("msg.blocklistfailed", err)
+		}
+		result.apply = func(m *Model) {
+			m.Blocklist = items
+			m.BlocklistSelected = min(m.BlocklistSelected, max(0, len(items)-1))
+		}
+	case ActionRemoveBlocklist:
+		if err := client.RemoveBlocklist(callCtx, action.Hash); err != nil {
+			return fail("msg.blocklistremovefailed", err)
+		}
+		result.message = tr.T("msg.blocklistremoved")
+		result.refresh = true
 	}
-	return false
+	return result
+}
+
+func applyActionResult(model *Model, result actionResult, refresh func()) {
+	if result.apply != nil {
+		result.apply(model)
+	}
+	if result.clearMessage {
+		model.SetMessage("")
+	} else if result.message != "" {
+		model.SetMessage(result.message)
+	}
+	model.Loading = false
+	if result.refresh {
+		refresh()
+	}
 }

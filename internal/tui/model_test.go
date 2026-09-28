@@ -44,6 +44,9 @@ func TestTabsAndGlobalKeys(t *testing.T) {
 	if action := m.Update(runeKey('r')); action.Kind != ActionRefresh {
 		t.Fatalf("r should refresh, got %+v", action)
 	}
+	if action := m.Update(runeKey('5')); action.Kind != ActionLoadArchive || m.Tab != TabArchive {
+		t.Fatalf("5 should open archive and load it, tab=%v action=%+v", m.Tab, action)
+	}
 }
 
 func TestHelpOverlay(t *testing.T) {
@@ -224,6 +227,23 @@ func TestMagnetPromptValidation(t *testing.T) {
 	}
 }
 
+func TestPromptEditing(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Update(runeKey('s'))
+	typeText(m, "abcd")
+	m.Update(kindKey(KeyLeft))
+	m.Update(kindKey(KeyLeft))
+	m.Update(runeKey('X'))
+	if got := m.Prompt.Buffer; got != "abXcd" {
+		t.Fatalf("middle insertion = %q", got)
+	}
+	m.Update(kindKey(KeyEnd))
+	m.Update(kindKey(KeyCtrlW))
+	if got := m.Prompt.Buffer; got != "" {
+		t.Fatalf("Ctrl-W should remove the previous word, got %q", got)
+	}
+}
+
 func TestSearchOverlay(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	m.Update(runeKey('s'))
@@ -297,6 +317,55 @@ func TestLogsFilterAndFollow(t *testing.T) {
 	}
 }
 
+func TestLogsWithoutFollowKeepTheirViewport(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabLogs
+	m.SetLogs([]string{"one", "two", "three", "four", "five"})
+	m.LogFollow = false
+	m.LogScroll = 2
+	m.AppendLog("six")
+	if m.LogScroll != 3 {
+		t.Fatalf("new log line should not move a paused viewport: scroll=%d", m.LogScroll)
+	}
+}
+
+func TestLogSnapshotKeepsPausedViewportAcrossRollingBuffer(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.LogFollow = false
+	m.Logs = []string{"two", "three", "four"}
+	m.LogScroll = 2
+	m.SetLogs([]string{"three", "four", "five"})
+	if m.LogScroll != 3 {
+		t.Fatalf("rolling snapshot should advance paused scroll, got %d", m.LogScroll)
+	}
+}
+
+func TestSetTorrentsKeepsSelectedHash(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetTorrents(sampleTorrents())
+	m.Update(kindKey(KeyDown)) // Bravo after name sorting.
+	m.SetTorrents([]Torrent{
+		{Hash: "cccc", Name: "Charlie"},
+		{Hash: "aaaa", Name: "Alfa"},
+		{Hash: "bbbb", Name: "Bravo", Progress: 20},
+	})
+	if selected := m.SelectedTorrent(); selected == nil || selected.Hash != "bbbb" {
+		t.Fatalf("refresh should preserve selected torrent, got %+v", selected)
+	}
+}
+
+func TestRenderErrorKeepsTheCurrentView(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetTorrents(sampleTorrents())
+	m.SetError("connection refused")
+	screen := m.Render(100, 30)
+	if !lineContains(screen, "Bravo") || !lineContains(screen, "connection refused") {
+		t.Fatalf("transport error should not hide current data: %+v", firstLines(screen, 8))
+	}
+}
+
 func TestHealthCleanTrashConfirm(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	m.Update(runeKey('4'))
@@ -309,6 +378,33 @@ func TestHealthCleanTrashConfirm(t *testing.T) {
 	}
 	if action := m.Update(runeKey('y')); action.Kind != ActionCleanTrash {
 		t.Fatalf("y should clean trash, got %+v", action)
+	}
+}
+
+func TestArchiveFilterAndQueue(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabArchive
+	m.Archive = []ArchiveEntry{{Title: "Example", Magnet: "magnet:?xt=urn:btih:x", Source: "archive"}}
+	m.Update(runeKey('/'))
+	typeText(m, "Example")
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionLoadArchive || action.Text != "Example" {
+		t.Fatalf("archive filter action = %+v", action)
+	}
+	m.Prompt = nil
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionAddMagnet || action.Text == "" {
+		t.Fatalf("archive Enter should queue the selected magnet, got %+v", action)
+	}
+}
+
+func TestBlocklistRemoveConfirmation(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabBlocklist
+	m.Blocklist = []BlocklistEntry{{Hash: "abc", Title: "Blocked release"}}
+	if action := m.Update(runeKey('d')); action.Kind != ActionNone || m.Confirm == nil {
+		t.Fatalf("blocklist d should ask for confirmation: action=%+v confirm=%+v", action, m.Confirm)
+	}
+	if action := m.Update(runeKey('s')); action.Kind != ActionRemoveBlocklist || action.Hash != "abc" {
+		t.Fatalf("confirmation should remove selected entry, got %+v", action)
 	}
 }
 

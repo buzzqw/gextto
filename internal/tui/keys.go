@@ -21,7 +21,13 @@ const (
 	KeyPgDn
 	KeyHome
 	KeyEnd
+	KeyDelete
 	KeyCtrlC
+	KeyCtrlA
+	KeyCtrlE
+	KeyCtrlK
+	KeyCtrlU
+	KeyCtrlW
 )
 
 // Key is one decoded key.
@@ -109,6 +115,8 @@ func (p *KeyParser) parseOne(flush bool) (Key, int, bool) {
 						return Key{Kind: KeyPgUp}, consumed, true
 					case "6":
 						return Key{Kind: KeyPgDn}, consumed, true
+					case "3":
+						return Key{Kind: KeyDelete}, consumed, true
 					}
 					return Key{}, consumed, true // unknown, drop
 				}
@@ -128,6 +136,16 @@ func (p *KeyParser) parseOne(flush bool) (Key, int, bool) {
 		return Key{Kind: KeyTab}, 1, true
 	case 0x03:
 		return Key{Kind: KeyCtrlC}, 1, true
+	case 0x01:
+		return Key{Kind: KeyCtrlA}, 1, true
+	case 0x05:
+		return Key{Kind: KeyCtrlE}, 1, true
+	case 0x0b:
+		return Key{Kind: KeyCtrlK}, 1, true
+	case 0x15:
+		return Key{Kind: KeyCtrlU}, 1, true
+	case 0x17:
+		return Key{Kind: KeyCtrlW}, 1, true
 	}
 	if b[0] < 0x20 {
 		return Key{}, 1, true // other control chars: ignore

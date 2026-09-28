@@ -127,6 +127,34 @@ func TestClientReadsEndpoints(t *testing.T) {
 	}
 }
 
+func TestClientReadsCatalogViews(t *testing.T) {
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		switch r.URL.Path {
+		case "/api/archive":
+			writeJSON(t, w, map[string]any{"items": []map[string]any{{"title": "Archived", "magnet": "magnet:x"}}, "total": 1, "pages": 1})
+		case "/api/gaps":
+			writeJSON(t, w, map[string]any{"items": []map[string]any{{"series": "Example", "season": 1, "episode": 2}}})
+		case "/api/blocklist":
+			writeJSON(t, w, map[string]any{"items": []map[string]any{{"hash": "abc", "title": "Blocked"}}})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	ctx := context.Background()
+	archive, total, pages, err := client.Archive(ctx, "Example")
+	if err != nil || len(archive) != 1 || total != 1 || pages != 1 {
+		t.Fatalf("Archive: %v %+v %d %d", err, archive, total, pages)
+	}
+	gaps, err := client.Gaps(ctx)
+	if err != nil || len(gaps) != 1 || gaps[0].Episode != 2 {
+		t.Fatalf("Gaps: %v %+v", err, gaps)
+	}
+	blocklist, err := client.Blocklist(ctx)
+	if err != nil || len(blocklist) != 1 || blocklist[0].Hash != "abc" {
+		t.Fatalf("Blocklist: %v %+v", err, blocklist)
+	}
+}
+
 func TestClientWritesEndpoints(t *testing.T) {
 	client, recorded := newTestClient(t, func(w http.ResponseWriter, r *http.Request, body string) {
 		if r.Method == http.MethodPost {

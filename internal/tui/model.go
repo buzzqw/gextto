@@ -13,6 +13,9 @@ const (
 	TabTorrents
 	TabLogs
 	TabHealth
+	TabArchive
+	TabMissing
+	TabBlocklist
 )
 
 // SortMode selects the torrent list ordering.
@@ -58,6 +61,7 @@ const (
 	PromptLimits
 	PromptLogFilter
 	PromptTorrentFilter
+	PromptArchiveFilter
 )
 
 // ActionKind identifies a side effect the runner must perform.
@@ -86,6 +90,10 @@ const (
 	ActionOpenDetails
 	ActionLoadDetail
 	ActionLoadEvents
+	ActionLoadArchive
+	ActionLoadMissing
+	ActionLoadBlocklist
+	ActionRemoveBlocklist
 )
 
 // Action is a request emitted by Update and executed against the daemon.
@@ -104,6 +112,11 @@ type Action struct {
 type prompt struct {
 	Kind   PromptKind
 	Buffer string
+	Cursor int
+}
+
+func newPrompt(kind PromptKind, buffer string) *prompt {
+	return &prompt{Kind: kind, Buffer: buffer, Cursor: len([]rune(buffer))}
 }
 
 // confirm holds a pending yes/no question.
@@ -148,17 +161,30 @@ type modelEvent = Event
 type Model struct {
 	Tr *Translator
 
-	Tab      Tab
-	Selected int
-	Filter   string
-	Sort     SortMode
-	SortDesc bool
+	Tab               Tab
+	Selected          int
+	Filter            string
+	Sort              SortMode
+	SortDesc          bool
+	TorrentScroll     int
+	ArchiveFilter     string
+	ArchiveSelected   int
+	ArchiveScroll     int
+	MissingSelected   int
+	MissingScroll     int
+	BlocklistSelected int
+	BlocklistScroll   int
 
 	Status    *Status
 	Health    *Health
 	HealthErr string
 
-	Torrents []Torrent
+	Torrents     []Torrent
+	Archive      []ArchiveEntry
+	ArchiveTotal int
+	ArchivePages int
+	Missing      []Gap
+	Blocklist    []BlocklistEntry
 
 	Logs               []string
 	LogFilter          string
@@ -171,12 +197,14 @@ type Model struct {
 	DetailItems  []map[string]any
 	DetailScroll int
 
-	Overlay Overlay
-	Events  []Event
+	Overlay     Overlay
+	Events      []Event
+	EventScroll int
 
 	SearchResults  []map[string]any
 	SearchQuery    string
 	SearchSelected int
+	SearchScroll   int
 
 	Message string
 	Err     string
@@ -205,9 +233,22 @@ func (m *Model) SetStatus(status Status) { m.Status = &status }
 
 // SetTorrents replaces the torrent list.
 func (m *Model) SetTorrents(torrents []Torrent) {
+	selectedHash := ""
+	if selected := m.SelectedTorrent(); selected != nil {
+		selectedHash = selected.Hash
+	}
 	m.Torrents = torrents
-	if m.Selected >= len(m.visibleTorrents()) {
-		m.Selected = max(0, len(m.visibleTorrents())-1)
+	visible := m.visibleTorrents()
+	if selectedHash != "" {
+		for index, torrent := range visible {
+			if torrent.Hash == selectedHash {
+				m.Selected = index
+				return
+			}
+		}
+	}
+	if m.Selected >= len(visible) {
+		m.Selected = max(0, len(visible)-1)
 	}
 }
 
@@ -218,11 +259,56 @@ func (m *Model) SetHealth(health Health) { m.Health = &health; m.HealthErr = "" 
 func (m *Model) SetHealthError(message string) { m.HealthErr = message }
 
 // SetLogs replaces the whole log buffer (SSE snapshot fallback).
-func (m *Model) SetLogs(lines []string) { m.Logs = append([]string(nil), lines...) }
+func (m *Model) SetLogs(lines []string) {
+	previous := m.Logs
+	m.Logs = append([]string(nil), lines...)
+	if !m.LogFollow {
+		m.LogScroll += logAppendDelta(previous, m.Logs)
+	}
+}
+
+// logAppendDelta estimates how many new entries a polling/SSE snapshot added.
+// It handles both an ordinary append and the rolling 500-line buffer.
+func logAppendDelta(previous, current []string) int {
+	if len(previous) == 0 {
+		return len(current)
+	}
+	if len(current) >= len(previous) {
+		matches := true
+		for index := range previous {
+			if previous[index] != current[index] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return len(current) - len(previous)
+		}
+	}
+	maxOverlap := min(len(previous), len(current))
+	for overlap := maxOverlap; overlap > 0; overlap-- {
+		matches := true
+		for index := 0; index < overlap; index++ {
+			if previous[len(previous)-overlap+index] != current[index] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return len(current) - overlap
+		}
+	}
+	return 0
+}
 
 // AppendLog appends a single log line, keeping the last 500.
 func (m *Model) AppendLog(line string) {
 	m.Logs = append(m.Logs, line)
+	if !m.LogFollow {
+		// LogScroll is measured from the bottom. Keep the currently visible
+		// rows fixed while new entries arrive in the background.
+		m.LogScroll++
+	}
 	if len(m.Logs) > 500 {
 		m.Logs = m.Logs[len(m.Logs)-500:]
 	}
@@ -246,13 +332,17 @@ func (m *Model) SetDetailItems(items []map[string]any) {
 }
 
 // SetEvents stores the recent torrent events.
-func (m *Model) SetEvents(events []Event) { m.Events = events }
+func (m *Model) SetEvents(events []Event) {
+	m.Events = events
+	m.EventScroll = 0
+}
 
 // SetSearchResults opens the search overlay with results.
 func (m *Model) SetSearchResults(query string, results []map[string]any) {
 	m.SearchQuery = query
 	m.SearchResults = results
 	m.SearchSelected = 0
+	m.SearchScroll = 0
 	m.Overlay = OverlaySearch
 }
 

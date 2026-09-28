@@ -116,7 +116,7 @@ func Serve(state *AppState) error {
 			switch host {
 			case "127.0.0.1", "::1", "localhost":
 			default:
-				logging.Warn("web UI/API is reachable without an API token; set GEXTTO_API_TOKEN or bind to 127.0.0.1",
+				logging.Debug("web UI/API is reachable without an API token; set GEXTTO_API_TOKEN or bind to 127.0.0.1",
 					"listen", webAddr)
 			}
 		}

@@ -146,6 +146,38 @@ type Event struct {
 	Message  string `json:"message"`
 }
 
+// ArchiveEntry mirrors one row of /api/archive.
+type ArchiveEntry struct {
+	ID           int64  `json:"id"`
+	Title        string `json:"title"`
+	Magnet       string `json:"magnet"`
+	Source       string `json:"source"`
+	QualityScore int64  `json:"quality_score"`
+	AddedAt      string `json:"added_at"`
+}
+
+// Gap mirrors one missing episode from /api/gaps.
+type Gap struct {
+	Series  string `json:"series"`
+	Season  int64  `json:"season"`
+	Episode int64  `json:"episode"`
+	AirDate string `json:"air_date"`
+}
+
+// BlocklistEntry mirrors one row of /api/blocklist.
+type BlocklistEntry struct {
+	Hash       string `json:"hash"`
+	Title      string `json:"title"`
+	Reason     string `json:"reason"`
+	CreatedAt  string `json:"created_at"`
+	Kind       string `json:"kind"`
+	SeriesName string `json:"series_name"`
+	Season     *int64 `json:"season"`
+	Episode    *int64 `json:"episode"`
+	MovieName  string `json:"movie_name"`
+	MovieYear  *int64 `json:"movie_year"`
+}
+
 // APIError carries the HTTP status of a failed request.
 type APIError struct {
 	Status int
@@ -289,6 +321,53 @@ func (c *Client) Events(ctx context.Context) ([]Event, error) {
 		events = []Event{}
 	}
 	return events, err
+}
+
+// Archive fetches a page of archived releases.
+func (c *Client) Archive(ctx context.Context, query string) ([]ArchiveEntry, int, int, error) {
+	var response struct {
+		Items []ArchiveEntry `json:"items"`
+		Total int            `json:"total"`
+		Pages int            `json:"pages"`
+	}
+	path := "/api/archive?limit=200"
+	if strings.TrimSpace(query) != "" {
+		path += "&q=" + url.QueryEscape(query)
+	}
+	err := c.get(ctx, path, &response)
+	if response.Items == nil {
+		response.Items = []ArchiveEntry{}
+	}
+	return response.Items, response.Total, response.Pages, err
+}
+
+// Gaps fetches the currently missing monitored episodes.
+func (c *Client) Gaps(ctx context.Context) ([]Gap, error) {
+	var response struct {
+		Items []Gap `json:"items"`
+	}
+	err := c.get(ctx, "/api/gaps", &response)
+	if response.Items == nil {
+		response.Items = []Gap{}
+	}
+	return response.Items, err
+}
+
+// Blocklist fetches the recent blocklist entries.
+func (c *Client) Blocklist(ctx context.Context) ([]BlocklistEntry, error) {
+	var response struct {
+		Items []BlocklistEntry `json:"items"`
+	}
+	err := c.get(ctx, "/api/blocklist", &response)
+	if response.Items == nil {
+		response.Items = []BlocklistEntry{}
+	}
+	return response.Items, err
+}
+
+// RemoveBlocklist removes one blocklist entry by magnet hash.
+func (c *Client) RemoveBlocklist(ctx context.Context, hash string) error {
+	return c.postJSON(ctx, "/api/blocklist/"+url.PathEscape(hash)+"/remove", map[string]any{}, nil)
 }
 
 // RunCycle starts a cycle (full, series, movies or comics).
@@ -435,7 +514,11 @@ func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines
 		request.Header.Set("X-Gextto-Token", c.token)
 	}
 	request.Header.Set("Accept", "text/event-stream")
-	response, err := c.http.Do(request)
+	// A stream must not inherit Client's 30-second request timeout. The
+	// context supplied by the TUI owns its lifetime and reconnects on errors.
+	streamHTTP := *c.http
+	streamHTTP.Timeout = 0
+	response, err := streamHTTP.Do(request)
 	if err != nil {
 		return err
 	}

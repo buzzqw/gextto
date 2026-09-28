@@ -33,6 +33,18 @@ func (m *Model) Update(k Key) Action {
 			m.Overlay = OverlayNone
 		case k.Kind == KeyRune && k.Rune == 'r':
 			return Action{Kind: ActionLoadEvents}
+		case k.Kind == KeyUp:
+			m.EventScroll = max(0, m.EventScroll-1)
+		case k.Kind == KeyDown:
+			m.EventScroll = min(max(0, len(m.Events)-1), m.EventScroll+1)
+		case k.Kind == KeyPgUp:
+			m.EventScroll = max(0, m.EventScroll-10)
+		case k.Kind == KeyPgDn:
+			m.EventScroll = min(max(0, len(m.Events)-1), m.EventScroll+10)
+		case k.Kind == KeyHome:
+			m.EventScroll = 0
+		case k.Kind == KeyEnd:
+			m.EventScroll = max(0, len(m.Events)-1)
 		}
 		return Action{}
 	}
@@ -56,28 +68,28 @@ func (m *Model) Update(k Key) Action {
 		m.Loading = true
 		return Action{Kind: ActionRefresh}
 	case k.Kind == KeyRune && k.Rune == 'a':
-		m.Prompt = &prompt{Kind: PromptMagnet}
+		m.Prompt = newPrompt(PromptMagnet, "")
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 't':
-		m.Prompt = &prompt{Kind: PromptFile}
+		m.Prompt = newPrompt(PromptFile, "")
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'c':
-		m.Prompt = &prompt{Kind: PromptCycle}
+		m.Prompt = newPrompt(PromptCycle, "")
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 's':
-		m.Prompt = &prompt{Kind: PromptSearch}
+		m.Prompt = newPrompt(PromptSearch, "")
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'e':
 		return Action{Kind: ActionLoadEvents}
 	case k.Kind == KeyTab:
-		m.Tab = Tab((int(m.Tab) + 1) % 4)
-		return Action{}
+		m.Tab = Tab((int(m.Tab) + 1) % tabCount)
+		return m.loadTabAction()
 	case k.Kind == KeyBackTab:
-		m.Tab = Tab((int(m.Tab) + 3) % 4)
-		return Action{}
-	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '4':
+		m.Tab = Tab((int(m.Tab) + tabCount - 1) % tabCount)
+		return m.loadTabAction()
+	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '7':
 		m.Tab = Tab(k.Rune - '1')
-		return Action{}
+		return m.loadTabAction()
 	}
 
 	switch m.Tab {
@@ -89,26 +101,69 @@ func (m *Model) Update(k Key) Action {
 		if k.Kind == KeyRune && k.Rune == 'x' {
 			m.Confirm = &confirm{MessageKey: "prompt.cleantrash", Action: Action{Kind: ActionCleanTrash}}
 		}
+	case TabArchive:
+		return m.updateArchive(k)
+	case TabMissing:
+		return m.updateMissing(k)
+	case TabBlocklist:
+		return m.updateBlocklist(k)
 	}
 	return Action{}
 }
 
 func (m *Model) updatePrompt(k Key) Action {
+	buffer := []rune(m.Prompt.Buffer)
+	if m.Prompt.Cursor < 0 || m.Prompt.Cursor > len(buffer) {
+		m.Prompt.Cursor = len(buffer)
+	}
 	switch k.Kind {
 	case KeyEsc:
 		m.Prompt = nil
 		m.Message = m.Tr.T("msg.cancelled")
+		return Action{}
 	case KeyEnter:
 		return m.submitPrompt()
 	case KeyBackspace:
-		if len(m.Prompt.Buffer) > 0 {
-			m.Prompt.Buffer = m.Prompt.Buffer[:len(m.Prompt.Buffer)-1]
+		if m.Prompt.Cursor > 0 {
+			buffer = append(buffer[:m.Prompt.Cursor-1], buffer[m.Prompt.Cursor:]...)
+			m.Prompt.Cursor--
 		}
+	case KeyDelete:
+		if m.Prompt.Cursor < len(buffer) {
+			buffer = append(buffer[:m.Prompt.Cursor], buffer[m.Prompt.Cursor+1:]...)
+		}
+	case KeyLeft:
+		m.Prompt.Cursor = max(0, m.Prompt.Cursor-1)
+	case KeyRight:
+		m.Prompt.Cursor = min(len(buffer), m.Prompt.Cursor+1)
+	case KeyHome, KeyCtrlA:
+		m.Prompt.Cursor = 0
+	case KeyEnd, KeyCtrlE:
+		m.Prompt.Cursor = len(buffer)
+	case KeyCtrlK:
+		buffer = buffer[:m.Prompt.Cursor]
+	case KeyCtrlU:
+		buffer = nil
+		m.Prompt.Cursor = 0
+	case KeyCtrlW:
+		end := m.Prompt.Cursor
+		for end > 0 && buffer[end-1] == ' ' {
+			end--
+		}
+		for end > 0 && buffer[end-1] != ' ' {
+			end--
+		}
+		buffer = append(buffer[:end], buffer[m.Prompt.Cursor:]...)
+		m.Prompt.Cursor = end
 	case KeyRune:
 		if k.Rune >= 32 {
-			m.Prompt.Buffer += string(k.Rune)
+			buffer = append(buffer, 0)
+			copy(buffer[m.Prompt.Cursor+1:], buffer[m.Prompt.Cursor:])
+			buffer[m.Prompt.Cursor] = k.Rune
+			m.Prompt.Cursor++
 		}
 	}
+	m.Prompt.Buffer = string(buffer)
 	return Action{}
 }
 
@@ -166,6 +221,12 @@ func (m *Model) submitPrompt() Action {
 	case PromptTorrentFilter:
 		m.Filter = value
 		m.Selected = 0
+		m.TorrentScroll = 0
+	case PromptArchiveFilter:
+		m.ArchiveFilter = value
+		m.ArchiveSelected = 0
+		m.ArchiveScroll = 0
+		return Action{Kind: ActionLoadArchive, Text: value}
 	}
 	return Action{}
 }
@@ -322,13 +383,13 @@ func (m *Model) updateTorrents(k Key) Action {
 		case 'X':
 			m.Confirm = &confirm{MessageKey: "prompt.cleancomp", Action: Action{Kind: ActionCleanCompleted}}
 		case 'L':
-			m.Prompt = &prompt{Kind: PromptLimits}
+			m.Prompt = newPrompt(PromptLimits, "")
 		case 'o':
 			m.Sort = SortMode((int(m.Sort) + 1) % 5)
 		case 'O':
 			m.SortDesc = !m.SortDesc
 		case 'F':
-			m.Prompt = &prompt{Kind: PromptTorrentFilter, Buffer: m.Filter}
+			m.Prompt = newPrompt(PromptTorrentFilter, m.Filter)
 		}
 	}
 	return Action{}
@@ -356,12 +417,81 @@ func (m *Model) updateLogs(k Key) Action {
 	case KeyRune:
 		switch k.Rune {
 		case '/':
-			m.Prompt = &prompt{Kind: PromptLogFilter, Buffer: m.LogFilter}
+			m.Prompt = newPrompt(PromptLogFilter, m.LogFilter)
 		case 'f':
 			m.LogFollow = !m.LogFollow
 			if m.LogFollow {
 				m.LogScroll = 0
 			}
+		}
+	}
+	return Action{}
+}
+
+func (m *Model) loadTabAction() Action {
+	switch m.Tab {
+	case TabArchive:
+		return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter}
+	case TabMissing:
+		return Action{Kind: ActionLoadMissing}
+	case TabBlocklist:
+		return Action{Kind: ActionLoadBlocklist}
+	default:
+		return Action{}
+	}
+}
+
+func moveSelection(selected, length int, k KeyKind) int {
+	if length == 0 {
+		return 0
+	}
+	switch k {
+	case KeyUp:
+		return max(0, selected-1)
+	case KeyDown:
+		return min(length-1, selected+1)
+	case KeyPgUp:
+		return max(0, selected-10)
+	case KeyPgDn:
+		return min(length-1, selected+10)
+	case KeyHome:
+		return 0
+	case KeyEnd:
+		return length - 1
+	default:
+		return selected
+	}
+}
+
+func (m *Model) updateArchive(k Key) Action {
+	switch {
+	case k.Kind == KeyRune && k.Rune == '/':
+		m.Prompt = newPrompt(PromptArchiveFilter, m.ArchiveFilter)
+	case k.Kind == KeyEnter:
+		if m.ArchiveSelected >= 0 && m.ArchiveSelected < len(m.Archive) && m.Archive[m.ArchiveSelected].Magnet != "" {
+			return Action{Kind: ActionAddMagnet, Text: m.Archive[m.ArchiveSelected].Magnet}
+		}
+	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
+		m.ArchiveSelected = moveSelection(m.ArchiveSelected, len(m.Archive), k.Kind)
+	}
+	return Action{}
+}
+
+func (m *Model) updateMissing(k Key) Action {
+	if k.Kind == KeyUp || k.Kind == KeyDown || k.Kind == KeyPgUp || k.Kind == KeyPgDn || k.Kind == KeyHome || k.Kind == KeyEnd {
+		m.MissingSelected = moveSelection(m.MissingSelected, len(m.Missing), k.Kind)
+	}
+	return Action{}
+}
+
+func (m *Model) updateBlocklist(k Key) Action {
+	switch {
+	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
+		m.BlocklistSelected = moveSelection(m.BlocklistSelected, len(m.Blocklist), k.Kind)
+	case k.Kind == KeyRune && k.Rune == 'd':
+		if m.BlocklistSelected >= 0 && m.BlocklistSelected < len(m.Blocklist) {
+			entry := m.Blocklist[m.BlocklistSelected]
+			m.Confirm = &confirm{MessageKey: "prompt.blocklistremove", Args: []any{Shorten(entry.Title, 45)}, Action: Action{Kind: ActionRemoveBlocklist, Hash: entry.Hash}}
 		}
 	}
 	return Action{}
@@ -387,6 +517,8 @@ func (m *Model) PromptLabel() string {
 		return m.Tr.T("prompt.logfilter")
 	case PromptTorrentFilter:
 		return m.Tr.T("prompt.torrentfilter")
+	case PromptArchiveFilter:
+		return m.Tr.T("prompt.archivefilter")
 	}
 	return ""
 }

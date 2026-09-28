@@ -24,17 +24,23 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
    filtro (`F`), ordinamento (`o`/`O`), dettagli (`Invio`).
 3. **Log** — ultime righe, filtro (`/`), segui (`f`), stream SSE live.
 4. **Salute** — CPU/RAM/disco, percorsi, dischi, RAM disk, ultimi errori.
+5. **Archivio** — archivio delle release, filtro e accodamento diretto.
+6. **Mancanti** — episodi mancanti della libreria monitorata.
+7. **Blocklist** — release bloccate, con rimozione interattiva.
 
 ## Tasti
 
 | Ambito | Tasti |
 | --- | --- |
-| Globali | `1`-`4`/`Tab` schede · `r` aggiorna · `?` aiuto · `q` esci |
+| Globali | `1`-`7`/`Tab` schede · `r` aggiorna · `?` aiuto · `q` esci |
 | Aggiunta | `a` magnet/URL · `t` file `.torrent` · `c` ciclo · `s` cerca · `e` eventi |
 | Torrent | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli · `p` pausa/riprendi · `b` riavvia · `d`/`D` rimuovi (con o senza file) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti · `o`/`O` ordina · `F` filtro |
 | Dettagli | `1` generale · `2` tracker · `3` file · `4` peer · `↑↓` scorri · `Esc`/`Invio` indietro |
-| Log | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filtro · `f` segui |
+| Log | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filtro · `f` segui/ferma |
 | Salute | `x` svuota cestino (con conferma) |
+| Archivio | `↑↓` seleziona · `Invio` accoda · `/` filtro |
+| Mancanti | `↑↓` seleziona · `r` aggiorna |
+| Blocklist | `↑↓` seleziona · `d` rimuovi |
 
 ## Architettura
 
@@ -50,6 +56,10 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 - `run.go` — ciclo principale: polling, stream SSE, esecuzione azioni.
 
 La TUI parla **solo** con l'API HTTP del daemon e non tocca mai i database.
+
+Nei prompt di testo sono disponibili anche `←→`, `Home`/`End`, `Delete`,
+`Ctrl-A`/`Ctrl-E` (inizio/fine), `Ctrl-U` (svuota), `Ctrl-K` (cancella fino
+alla fine) e `Ctrl-W` (cancella la parola precedente).
 
 ## Test
 

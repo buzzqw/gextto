@@ -26,12 +26,18 @@ func TestKeyParserArrowsAndSpecial(t *testing.T) {
 		{"\x1b[F", KeyEnd},
 		{"\x1b[1~", KeyHome},
 		{"\x1b[4~", KeyEnd},
+		{"\x1b[3~", KeyDelete},
 		{"\x1b[Z", KeyBackTab},
 		{"\r", KeyEnter},
 		{"\n", KeyEnter},
 		{"\x7f", KeyBackspace},
 		{"\t", KeyTab},
 		{"\x03", KeyCtrlC},
+		{"\x01", KeyCtrlA},
+		{"\x05", KeyCtrlE},
+		{"\x0b", KeyCtrlK},
+		{"\x15", KeyCtrlU},
+		{"\x17", KeyCtrlW},
 	}
 	for _, tc := range cases {
 		parser := &KeyParser{}

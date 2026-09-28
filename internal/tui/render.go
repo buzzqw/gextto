@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const tabCount = 4
+const tabCount = 7
 
 // Render produces a frame for the given terminal size. It is pure: the same
 // state always renders the same lines, which makes the layout testable.
@@ -25,22 +25,26 @@ func (m *Model) Render(width, height int) Screen {
 	}
 	var content []Line
 	switch {
-	case m.Err != "":
-		content = m.renderError()
 	case m.Overlay == OverlayHelp:
 		content = m.renderHelp(width)
 	case m.Overlay == OverlaySearch:
-		content = m.renderSearch(width)
+		content = m.renderSearch(width, contentHeight)
 	case m.Overlay == OverlayEvents:
-		content = m.renderEvents(width)
+		content = m.renderEvents(width, contentHeight)
 	case m.Detail != nil:
 		content = m.renderDetail(width)
 	case m.Tab == TabStatus:
 		content = m.renderStatus()
 	case m.Tab == TabTorrents:
-		content = m.renderTorrents(width)
+		content = m.renderTorrents(width, contentHeight)
 	case m.Tab == TabLogs:
 		content = m.renderLogs(width, contentHeight)
+	case m.Tab == TabArchive:
+		content = m.renderArchive(width, contentHeight)
+	case m.Tab == TabMissing:
+		content = m.renderMissing(width, contentHeight)
+	case m.Tab == TabBlocklist:
+		content = m.renderBlocklist(width, contentHeight)
 	default:
 		content = m.renderHealth(width)
 	}
@@ -61,13 +65,21 @@ func (m *Model) Render(width, height int) Screen {
 		screen.CursorVisible = true
 	} else {
 		message := m.Message
+		footerStyle := StyleOK
+		if m.Err != "" {
+			if message != "" {
+				message += " · "
+			}
+			message += m.Tr.Format("msg.offline", m.Err)
+			footerStyle = StyleErr
+		}
 		if m.Loading {
 			if message != "" {
 				message += " · "
 			}
 			message += m.Tr.T("msg.loading")
 		}
-		lines = append(lines, Line{Text: m.truncate(message, width), Style: StyleOK})
+		lines = append(lines, Line{Text: m.truncate(message, width), Style: footerStyle})
 	}
 	for len(lines) > height {
 		lines = lines[:height]
@@ -78,7 +90,7 @@ func (m *Model) Render(width, height int) Screen {
 	screen.Lines = lines
 	if screen.CursorVisible {
 		screen.CursorRow = len(lines) - 1
-		screen.CursorCol = len([]rune(m.PromptLabel() + m.Prompt.Buffer))
+		screen.CursorCol = len([]rune(m.PromptLabel())) + m.Prompt.Cursor
 		if screen.CursorCol >= width {
 			screen.CursorCol = width - 1
 		}
@@ -125,7 +137,7 @@ func nextCycleSeconds(value string) int64 {
 }
 
 func (m *Model) tabsLine() string {
-	labels := []string{m.Tr.T("tab.status"), m.Tr.T("tab.torrents"), m.Tr.T("tab.logs"), m.Tr.T("tab.health")}
+	labels := []string{m.Tr.T("tab.status"), m.Tr.T("tab.torrents"), m.Tr.T("tab.logs"), m.Tr.T("tab.health"), m.Tr.T("tab.archive"), m.Tr.T("tab.missing"), m.Tr.T("tab.blocklist")}
 	parts := make([]string, 0, tabCount)
 	for index, label := range labels {
 		if Tab(index) == m.Tab {
@@ -148,6 +160,12 @@ func (m *Model) hints() string {
 		hints += " · " + m.Tr.T("hint.logs")
 	case m.Tab == TabHealth:
 		hints += " · " + m.Tr.T("hint.health")
+	case m.Tab == TabArchive:
+		hints += " · " + m.Tr.T("hint.archive")
+	case m.Tab == TabMissing:
+		hints += " · " + m.Tr.T("hint.missing")
+	case m.Tab == TabBlocklist:
+		hints += " · " + m.Tr.T("hint.blocklist")
 	}
 	return hints
 }
@@ -177,6 +195,7 @@ func (m *Model) renderStatus() []Line {
 			status.TorrentStats.Count, status.TorrentStats.Downloading, m.Tr.T("label.downloading"),
 			status.TorrentStats.Queued, m.Tr.T("label.queued"),
 			status.TorrentStats.Seeding, m.Tr.T("label.seeding")), Style: StyleNormal},
+		{Text: fmt.Sprintf("%s: %d", m.Tr.T("label.stalled"), status.TorrentStats.Stalled), Style: StyleMuted},
 	}
 	if status.NextCycleAt != nil {
 		if remaining := nextCycleSeconds(*status.NextCycleAt); remaining >= 0 {
@@ -201,7 +220,7 @@ func (m *Model) renderStatus() []Line {
 	return lines
 }
 
-func (m *Model) renderTorrents(width int) []Line {
+func (m *Model) renderTorrents(width, contentHeight int) []Line {
 	items := m.VisibleTorrents()
 	sortName := []string{m.Tr.T("sort.name"), m.Tr.T("sort.progress"), m.Tr.T("sort.state"), m.Tr.T("sort.rate"), m.Tr.T("sort.size")}[m.Sort]
 	direction := "↑"
@@ -222,13 +241,25 @@ func (m *Model) renderTorrents(width int) []Line {
 		return lines
 	}
 	if width < 74 {
-		for index, torrent := range items {
-			style := StyleNormal
-			if index == m.Selected {
+		visibleItems := max(1, (contentHeight-1)/2)
+		maxScroll := max(0, len(items)-visibleItems)
+		start := min(max(m.TorrentScroll, 0), maxScroll)
+		if m.Selected < start {
+			start = m.Selected
+		}
+		if m.Selected >= start+visibleItems {
+			start = m.Selected - visibleItems + 1
+		}
+		m.TorrentScroll = min(max(start, 0), maxScroll)
+		end := min(len(items), m.TorrentScroll+visibleItems)
+		selected := m.Selected - m.TorrentScroll
+		for index, torrent := range items[m.TorrentScroll:end] {
+			style := torrentStyle(torrent.State)
+			if index == selected {
 				style = StyleSelected
 			}
 			marker := " "
-			if index == m.Selected {
+			if index == selected {
 				marker = ">"
 			}
 			lines = append(lines, Line{Text: fmt.Sprintf("%s %s %.1f%% %s", marker, m.Tr.StateLabel(torrent.State), torrent.Progress, torrent.Name), Style: style})
@@ -245,8 +276,20 @@ func (m *Model) renderTorrents(width int) []Line {
 		PadLeft(m.Tr.T("label.progress"), 6), PadLeft(m.Tr.T("label.done"), 10),
 		PadLeft(m.Tr.T("label.down"), 11), PadLeft(m.Tr.T("label.up"), 11), m.Tr.T("label.name"))
 	lines = append(lines, Line{Text: header, Style: StyleHeader})
-	for index, torrent := range items {
-		style := StyleNormal
+	visibleItems := max(1, contentHeight-len(lines))
+	maxScroll := max(0, len(items)-visibleItems)
+	start := min(max(m.TorrentScroll, 0), maxScroll)
+	if m.Selected < start {
+		start = m.Selected
+	}
+	if m.Selected >= start+visibleItems {
+		start = m.Selected - visibleItems + 1
+	}
+	m.TorrentScroll = min(max(start, 0), maxScroll)
+	end := min(len(items), m.TorrentScroll+visibleItems)
+	for index, torrent := range items[m.TorrentScroll:end] {
+		index += m.TorrentScroll
+		style := torrentStyle(torrent.State)
 		marker := " "
 		if index == m.Selected {
 			style = StyleSelected
@@ -260,6 +303,21 @@ func (m *Model) renderTorrents(width int) []Line {
 		lines = append(lines, Line{Text: row, Style: style})
 	}
 	return lines
+}
+
+func torrentStyle(state string) Style {
+	switch strings.ToLower(strings.TrimSpace(state)) {
+	case "error":
+		return StyleErr
+	case "stalled", "checking_files", "checking_resume_data":
+		return StyleWarn
+	case "seeding", "finished":
+		return StyleOK
+	case "paused":
+		return StyleMuted
+	default:
+		return StyleNormal
+	}
 }
 
 func (m *Model) renderLogs(width, contentHeight int) []Line {
@@ -292,6 +350,86 @@ func (m *Model) renderLogs(width, contentHeight int) []Line {
 		out = append(out, Line{Text: line, Style: style})
 	}
 	return out
+}
+
+func catalogWindow(selected, scroll, length, visible int) (int, int) {
+	visible = max(1, visible)
+	maxScroll := max(0, length-visible)
+	start := min(max(scroll, 0), maxScroll)
+	if selected < start {
+		start = selected
+	}
+	if selected >= start+visible {
+		start = selected - visible + 1
+	}
+	start = min(max(start, 0), maxScroll)
+	return start, min(length, start+visible)
+}
+
+func (m *Model) renderArchive(width, contentHeight int) []Line {
+	title := fmt.Sprintf("%s: %d", m.Tr.T("tab.archive"), m.ArchiveTotal)
+	if m.ArchiveFilter != "" {
+		title += fmt.Sprintf(" · %s '%s'", m.Tr.T("label.filter"), m.ArchiveFilter)
+	}
+	lines := []Line{{Text: title, Style: StyleHeader}}
+	if len(m.Archive) == 0 {
+		return append(lines, Line{Text: m.Tr.T("msg.emptyarchive"), Style: StyleMuted})
+	}
+	start, end := catalogWindow(m.ArchiveSelected, m.ArchiveScroll, len(m.Archive), contentHeight-1)
+	m.ArchiveScroll = start
+	for index, entry := range m.Archive[start:end] {
+		index += start
+		style := StyleNormal
+		marker := " "
+		if index == m.ArchiveSelected {
+			style = StyleSelected
+			marker = ">"
+		}
+		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · %s · %s", marker, entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-")), Style: style})
+	}
+	return lines
+}
+
+func (m *Model) renderMissing(width, contentHeight int) []Line {
+	lines := []Line{{Text: fmt.Sprintf("%s: %d", m.Tr.T("tab.missing"), len(m.Missing)), Style: StyleHeader}}
+	if len(m.Missing) == 0 {
+		return append(lines, Line{Text: m.Tr.T("msg.emptymissing"), Style: StyleMuted})
+	}
+	start, end := catalogWindow(m.MissingSelected, m.MissingScroll, len(m.Missing), contentHeight-1)
+	m.MissingScroll = start
+	for index, gap := range m.Missing[start:end] {
+		index += start
+		style := StyleNormal
+		marker := " "
+		if index == m.MissingSelected {
+			style = StyleSelected
+			marker = ">"
+		}
+		airDate := firstNonEmpty(gap.AirDate, "-")
+		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · S%02dE%02d · %s", marker, gap.Series, gap.Season, gap.Episode, airDate), Style: style})
+	}
+	return lines
+}
+
+func (m *Model) renderBlocklist(width, contentHeight int) []Line {
+	lines := []Line{{Text: fmt.Sprintf("%s: %d", m.Tr.T("tab.blocklist"), len(m.Blocklist)), Style: StyleHeader}}
+	if len(m.Blocklist) == 0 {
+		return append(lines, Line{Text: m.Tr.T("msg.emptyblocklist"), Style: StyleMuted})
+	}
+	start, end := catalogWindow(m.BlocklistSelected, m.BlocklistScroll, len(m.Blocklist), contentHeight-1)
+	m.BlocklistScroll = start
+	for index, entry := range m.Blocklist[start:end] {
+		index += start
+		style := StyleNormal
+		marker := " "
+		if index == m.BlocklistSelected {
+			style = StyleSelected
+			marker = ">"
+		}
+		reason := firstNonEmpty(entry.Reason, "-")
+		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · %s · %s", marker, entry.Title, reason, entry.CreatedAt), Style: style})
+	}
+	return lines
 }
 
 func (m *Model) renderHealth(width int) []Line {
@@ -446,7 +584,7 @@ func (m *Model) renderDetail(width int) []Line {
 func (m *Model) renderHelp(width int) []Line {
 	keys := []string{
 		"help.title", "", "help.global", "help.global2", "help.torrents", "help.torrents2",
-		"help.torrents3", "help.torrents4", "help.details", "help.logs", "help.health", "",
+		"help.torrents3", "help.torrents4", "help.details", "help.logs", "help.health", "help.archive", "help.missing", "help.blocklist", "",
 		"help.close",
 	}
 	lines := make([]Line, 0, len(keys))
@@ -466,13 +604,25 @@ func (m *Model) renderHelp(width int) []Line {
 	return lines
 }
 
-func (m *Model) renderSearch(width int) []Line {
+func (m *Model) renderSearch(width, contentHeight int) []Line {
 	lines := []Line{{Text: m.Tr.Format("msg.search", len(m.SearchResults)) + fmt.Sprintf("  '%s'", m.SearchQuery), Style: StyleHeader}}
 	if len(m.SearchResults) == 0 {
 		lines = append(lines, Line{Text: m.Tr.T("msg.nosearch"), Style: StyleMuted})
 		return lines
 	}
-	for index, result := range m.SearchResults {
+	visible := max(1, contentHeight-1)
+	maxScroll := max(0, len(m.SearchResults)-visible)
+	start := min(max(m.SearchScroll, 0), maxScroll)
+	if m.SearchSelected < start {
+		start = m.SearchSelected
+	}
+	if m.SearchSelected >= start+visible {
+		start = m.SearchSelected - visible + 1
+	}
+	m.SearchScroll = min(max(start, 0), maxScroll)
+	end := min(len(m.SearchResults), m.SearchScroll+visible)
+	for index, result := range m.SearchResults[m.SearchScroll:end] {
+		index += m.SearchScroll
 		style := StyleNormal
 		marker := " "
 		if index == m.SearchSelected {
@@ -488,12 +638,16 @@ func (m *Model) renderSearch(width int) []Line {
 	return lines
 }
 
-func (m *Model) renderEvents(width int) []Line {
+func (m *Model) renderEvents(width, contentHeight int) []Line {
 	lines := []Line{{Text: m.Tr.Format("msg.events", len(m.Events)), Style: StyleHeader}}
 	if len(m.Events) == 0 {
 		return lines
 	}
-	for _, event := range m.Events {
+	visible := max(1, contentHeight-1)
+	maxScroll := max(0, len(m.Events)-visible)
+	m.EventScroll = min(max(m.EventScroll, 0), maxScroll)
+	end := min(len(m.Events), m.EventScroll+visible)
+	for _, event := range m.Events[m.EventScroll:end] {
 		line := fmt.Sprintf("%s %s", PadRight(event.Kind, 22), firstNonEmpty(event.Name, event.Hash))
 		if event.SavePath != "" {
 			line += " · " + event.SavePath
