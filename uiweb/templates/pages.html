@@ -425,9 +425,9 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
-    <button class="btn sm primary" data-api="/api/series/{{.PathName}}/search-missing" data-method="POST" data-body="{}" title="Cerca le release per gli episodi mancanti">Cerca mancanti</button>
-    <button class="btn sm" data-api="/api/series/{{.PathName}}/scan-archive" data-method="POST" data-body="{}" title="Scansiona l'archivio per questa serie">Scansiona archivio</button>
-    <button class="btn sm" data-api="/api/series/{{.PathName}}/metadata" data-method="POST" data-body="{}" title="Aggiorna i metadati TMDB">Aggiorna da TMDB</button>
+    <button class="btn sm primary" data-series-action="/api/series/{{.PathName}}/search-missing" data-action-label="Cerca mancanti" title="Cerca le release per gli episodi mancanti">Cerca mancanti</button>
+    <button class="btn sm" data-series-action="/api/series/{{.PathName}}/scan-archive" data-action-label="Scansiona archivio" title="Scansiona l'archivio per questa serie">Scansiona archivio</button>
+    <button class="btn sm" data-series-action="/api/series/{{.PathName}}/metadata" data-action-label="Aggiorna da TMDB" title="Aggiorna i metadati TMDB e le date degli episodi">Aggiorna da TMDB</button>
     <button class="btn sm" data-rename-preview="/api/series/{{.PathName}}/rename-preview" data-rename-execute="/api/series/{{.PathName}}/rename-execute" title="Anteprima rinomina TMDB">Anteprima rinomina</button>
   </div>
 
@@ -511,9 +511,9 @@
     <div class="panel-head"><h3>Modifica serie</h3></div>
     <div class="panel-body">
       <form class="form-grid" data-series-edit data-series-name="{{.Name}}">
-        <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" readonly /></label>
-        <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
-        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 720p-1080p" /></label>
+        <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" readonly title="Titolo della serie (non modificabile qui)" /></label>
+        <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" title="Stagioni da monitorare: es. 1-5, 3+ oppure * per tutte" /></label>
+        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 720p-1080p" title="Risoluzione minima accettata (es. 720p-1080p)" /></label>
         <label class="field"><span>Lingue</span>
           <span class="field-row">
             <select class="input" data-preset-for="language" title="Preset rapidi: aggiorna la casella a destra">{{template "lang_preset_options"}}</select>
@@ -526,12 +526,12 @@
             <input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" title="Sottotitoli richiesti, separati da virgola" />
           </span>
         </label>
-        <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
-        <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
+        <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" title="ID TVDB alternativo (opzionale)" /></label>
+        <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" title="Altri nomi con cui possono apparire le release, separati da virgola" /></label>
         <label class="field span-full"><span>Percorso archivio (NAS)</span>
-          <span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" /><button class="btn sm" type="button" data-browse-for="archive_path" title="Sfoglia le cartelle e crea una nuova se serve">Sfoglia</button></span>
+          <span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" title="Cartella di destinazione sul NAS dove archiviare la serie" /><button class="btn sm" type="button" data-browse-for="archive_path" title="Sfoglia le cartelle e crea una nuova se serve">Sfoglia</button></span>
         </label>
-        <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
+        <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" title="Parole che escludono una release (es. cam, ts)" /></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message></small></div>
       </form>
     </div>
@@ -568,9 +568,9 @@
     <div class="panel-body">
       {{if .Overview}}<p>{{.Overview}}</p>{{end}}
       <form class="form-grid" data-movie-id="{{.ID}}">
-        <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" /></label>
-        <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" /></label>
-        <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" /></label>
+        <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" title="Titolo del film come compare nella libreria" /></label>
+        <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" title="Anno di uscita" /></label>
+        <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" title="Risoluzione minima accettata (es. 1080p+)" /></label>
         <label class="field"><span>Lingua</span>
           <span class="field-row">
             <select class="input" data-preset-for="language" title="Preset rapidi">{{template "lang_preset_options"}}</select>

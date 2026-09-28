@@ -3508,6 +3508,25 @@
     }).then(function () { button.disabled = false; });
   });
 
+  // Series header actions: Cerca mancanti / Scansiona archivio / Aggiorna da TMDB.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-series-action]");
+    if (!button) return;
+    var label = button.getAttribute("data-action-label") || "Operazione";
+    button.disabled = true;
+    api(button.getAttribute("data-series-action"), "POST", {}).then(function (data) {
+      var extra = "";
+      if (data && data.updated !== undefined) extra = " · " + data.updated + " file aggiornati";
+      else if (data && data.air_dates_updated !== undefined) extra = " · " + data.air_dates_updated + " date aggiornate";
+      else if (data && Array.isArray(data.results)) extra = " · " + data.results.length + " risultati";
+      notify(label + ": completato" + extra, "ok");
+      window.setTimeout(function () { location.reload(); }, 700);
+    }).catch(function (error) {
+      notify(label + " non riuscito: " + error.message, "err");
+      button.disabled = false;
+    });
+  });
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";
