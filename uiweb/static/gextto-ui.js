@@ -1069,6 +1069,103 @@
     container.appendChild(makeNode(value));
   }
 
+  function renderCalendarList(container, items) {
+    container.innerHTML = "";
+    if (!items.length) {
+      container.innerHTML = '<p class="muted">Nessuna uscita in programma.</p>';
+      return;
+    }
+    items.slice(0, 6).forEach(function (item) {
+      var episode = item && item.episode || {};
+      var row = document.createElement("div");
+      row.className = "list-item";
+      var poster = document.createElement("div");
+      poster.className = "list-poster placeholder";
+      poster.textContent = "N/D";
+      var posterURL = item && typeof item.poster === "string" ? item.poster : "";
+      if (/^https?:\/\//i.test(posterURL)) {
+        var image = document.createElement("img");
+        image.className = "list-poster";
+        image.src = posterURL;
+        image.alt = String(item.series || "Serie");
+        image.loading = "lazy";
+        poster = image;
+      }
+      var text = document.createElement("div");
+      var title = document.createElement("strong");
+      title.textContent = String(item.series || "Serie");
+      var detail = document.createElement("small");
+      detail.textContent = "S" + String(episode.season_number || "—") +
+        "E" + String(episode.episode_number || "—") + " · " + String(episode.air_date || "—");
+      text.appendChild(title);
+      text.appendChild(detail);
+      row.appendChild(poster);
+      row.appendChild(text);
+      container.appendChild(row);
+    });
+  }
+
+  var calendarList = document.querySelector("[data-dashboard-calendar-list]");
+  if (calendarList) {
+    api("/api/calendar", "GET").then(function (data) {
+      renderCalendarList(calendarList, data && Array.isArray(data.items) ? data.items : []);
+    }).catch(function (error) {
+      calendarList.innerHTML = '<p class="muted">' + esc(error.message) + "</p>";
+    });
+  }
+
+  function renderRecentList(container, items) {
+    container.innerHTML = "";
+    if (!items.length) {
+      container.innerHTML = '<p class="muted">Nessun download recente.</p>';
+      return;
+    }
+    items.slice(0, 6).forEach(function (item) {
+      var isSeries = item && item.kind === "series";
+      var name = String(item && item.name || "—");
+      var label = isSeries
+        ? name + " S" + String(item.season || "—") + "E" + String(item.episode || "—")
+        : name;
+      var detail = isSeries
+        ? "S" + String(item.season || "—") + "E" + String(item.episode || "—") + " · "
+        : "";
+      detail += String(item && item.downloaded_at || "—") + " · " + humanBytes(item && item.size_bytes);
+      var row = document.createElement("div");
+      row.className = "list-item";
+      var poster = document.createElement("div");
+      poster.className = "list-poster placeholder";
+      poster.textContent = "N/D";
+      var posterURL = item && typeof item.poster === "string" ? item.poster : "";
+      if (/^https?:\/\//i.test(posterURL)) {
+        var image = document.createElement("img");
+        image.className = "list-poster";
+        image.src = posterURL;
+        image.alt = name;
+        image.loading = "lazy";
+        poster = image;
+      }
+      var text = document.createElement("div");
+      var title = document.createElement("strong");
+      title.textContent = label;
+      var small = document.createElement("small");
+      small.textContent = detail;
+      text.appendChild(title);
+      text.appendChild(small);
+      row.appendChild(poster);
+      row.appendChild(text);
+      container.appendChild(row);
+    });
+  }
+
+  var recentList = document.querySelector("[data-dashboard-recent-list]");
+  if (recentList) {
+    api("/api/recent-downloads", "GET").then(function (data) {
+      renderRecentList(recentList, data && Array.isArray(data.items) ? data.items : []);
+    }).catch(function (error) {
+      recentList.innerHTML = '<p class="muted">' + esc(error.message) + "</p>";
+    });
+  }
+
   function renderReleaseResults(container, items) {
     container.innerHTML = "";
     var table = document.createElement("table");

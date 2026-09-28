@@ -32,10 +32,8 @@ func TestUiShellRendersNavigationParity(t *testing.T) {
 			t.Fatalf("navigation missing %q", label)
 		}
 	}
-	for _, group := range []string{"Panoramica", "Download", "Libreria", "Scoperta", "Sistema"} {
-		if !strings.Contains(html, `class="nav-group-label">`+group+"<") {
-			t.Fatalf("navigation group missing %q", group)
-		}
+	if strings.Contains(html, `class="nav-group-label"`) {
+		t.Fatal("navigation should not render visual group separators")
 	}
 	if !strings.Contains(html, "/ui/static/gextto-ui.js") {
 		t.Fatal("shell does not load the new UI script")
@@ -47,7 +45,7 @@ func TestUiPartialDashboardRenders(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 	code, _, body := webGet(t, server, "/ui/partial/dashboard")
-	if code != http.StatusOK || !strings.Contains(string(body), "Stato daemon") {
+	if code != http.StatusOK || !strings.Contains(string(body), `data-dashboard-recent-list`) {
 		t.Fatalf("dashboard partial -> %d: %s", code, body)
 	}
 }
@@ -114,7 +112,7 @@ func TestUiServerRenderedPages(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cases := map[string]string{
-		"dashboard": "Stato daemon",
+		"dashboard": "Ultimi download",
 		"downloads": "Scarico",
 		"health":    "Percorsi",
 		"logs":      "Log",

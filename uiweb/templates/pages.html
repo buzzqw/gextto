@@ -143,13 +143,16 @@
   <div class="panel">
     <div class="panel-head"><h3>Aggiungi torrent</h3></div>
     <div class="panel-body">
-      <form class="form-grid" data-torrent-add>
-        <label class="field span-full"><span>Magnet o URL .torrent</span>
+      <form class="torrent-add-form" data-torrent-add>
+        <div class="torrent-add-main">
+        <label class="field"><span>Magnet o URL .torrent</span>
           <input class="input" name="magnet" data-torrent-magnet placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" />
         </label>
         <label class="field"><span>Percorso (opzionale)</span><input class="input" name="save_path" data-torrent-save-path placeholder="cartella predefinita" /></label>
         <label class="field"><span>File .torrent</span><input class="input" type="file" accept=".torrent,application/x-bittorrent" data-torrent-upload /></label>
-        <div class="toolbar span-full">
+        <div class="torrent-add-action"><button class="btn primary" type="submit">Aggiungi</button><small class="muted" data-torrent-message aria-live="polite"></small></div>
+        </div>
+        <div class="toolbar torrent-options">
           <label class="check"><input type="checkbox" data-torrent-option="start" checked /> <span>Scarica subito</span></label>
           <label class="check"><input type="checkbox" data-torrent-option="no_rename" /> <span>Non rinominare</span></label>
           <label class="check"><input type="checkbox" data-torrent-option="sequential" /> <span>Sequenziale</span></label>
@@ -159,7 +162,6 @@
           <label class="check"><input type="checkbox" data-torrent-option="metadata_only" /> <span>Solo metadati</span></label>
           <label class="check"><input type="checkbox" data-torrent-option="preallocate" checked /> <span>Prealloca spazio</span></label>
         </div>
-        <div class="form-actions span-full"><button class="btn primary" type="submit">Aggiungi</button><small class="muted" data-torrent-message aria-live="polite"></small></div>
       </form>
     </div>
   </div>

@@ -22,8 +22,7 @@
        </a>
        {{range .Groups}}
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-         <div class="nav-group-label">{{.Label}}</div>
-         {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
+          {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
          {{range .Items}}
          <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="nav-count">{{.Count}}</span>{{end}}</a>
          {{end}}
@@ -113,7 +112,6 @@
     <div class="metric amber"><span class="metric-sub">Cestino</span><strong>{{humanBytesU .TrashBytes}}</strong></div>
     <div class="metric mint"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
     <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
-    <div class="metric{{if .DryRun}} amber{{end}}"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
   </div>
 
   <div class="panel">
@@ -169,6 +167,17 @@
     </div>
   </div>
 
+  <div class="dashboard-collection-grid">
+    <div class="panel dashboard-list-panel" data-dashboard-calendar>
+      <div class="panel-head"><h3>Prossime uscite</h3><small class="muted">Serie TV</small></div>
+      <div class="panel-body"><div class="dashboard-list" data-dashboard-calendar-list><p class="muted">Caricamento…</p></div></div>
+    </div>
+    <div class="panel dashboard-list-panel" data-dashboard-recent>
+      <div class="panel-head"><h3>Ultimi download</h3><small class="muted">Libreria</small></div>
+      <div class="panel-body"><div class="dashboard-list" data-dashboard-recent-list><p class="muted">Caricamento…</p></div></div>
+    </div>
+  </div>
+
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3>Prossima ricerca automatica</h3></div>
@@ -198,30 +207,6 @@
     </div>
   </div>
 
-  {{if .Recent}}
-  <div class="panel">
-    <div class="panel-head"><h3>Ultimi download</h3></div>
-    <div class="panel-body">
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Titolo</th><th>Tipo</th><th>Qualità</th><th>Dimensione</th><th>Quando</th></tr></thead>
-          <tbody>
-            {{range .Recent}}
-            <tr>
-              <td class="truncate" title="{{.Name}}">{{.Name}}</td>
-              <td>{{.Kind}}{{if .Season}} S{{.Season}}E{{.Episode}}{{end}}</td>
-              <td class="numeric">{{.QualityScore}}</td>
-              <td class="numeric">{{humanBytes .SizeBytes}}</td>
-              <td class="muted">{{.DownloadedAt}}</td>
-            </tr>
-            {{end}}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-  {{end}}
-  {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}
 
