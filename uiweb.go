@@ -20,6 +20,7 @@ import (
 	"math"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -689,6 +690,16 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		}
 		rows = append(rows, row)
 	}
+	// Default order in Scarico: alphabetical by name (case-insensitive), with
+	// the hash as a stable tie-breaker. The client can still re-sort by any
+	// column header.
+	sort.SliceStable(rows, func(i, j int) bool {
+		left, right := strings.ToLower(rows[i].Name), strings.ToLower(rows[j].Name)
+		if left == right {
+			return rows[i].Hash < rows[j].Hash
+		}
+		return left < right
+	})
 	return rows
 }
 
