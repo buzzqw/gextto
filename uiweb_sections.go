@@ -27,15 +27,21 @@ type uiPageSection struct {
 }
 
 // uiSettingsSection renders a group of individual setting rows, reusing the
-// settings save machinery (one POST /api/config/settings per field).
+// settings save machinery (one POST /api/config/settings per field). Buttons
+// are optional actions rendered at the bottom of the same panel.
 type uiSettingsSection struct {
-	Title  string
-	Hint   string
-	Fields []uiSettingField
+	Title   string
+	Hint    string
+	Fields  []uiSettingField
+	Buttons []uiActionButton
 }
 
 func sectionSettings(title, hint string, fields []uiSettingField) uiPageSection {
 	return uiPageSection{Kind: "settings", Settings: uiSettingsSection{Title: title, Hint: hint, Fields: fields}}
+}
+
+func sectionSettingsActions(title, hint string, fields []uiSettingField, buttons []uiActionButton) uiPageSection {
+	return uiPageSection{Kind: "settings", Settings: uiSettingsSection{Title: title, Hint: hint, Fields: fields, Buttons: buttons}}
 }
 
 func sectionEditor(editor uiListEditor) uiPageSection {
@@ -384,53 +390,26 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 	}
 	return []uiPageSection{
 		sectionActions(uiActionSection{Label: "Azioni", Hint: "Operazioni di manutenzione del daemon e della libreria.", Buttons: []uiActionButton{
-			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}"},
-			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
-			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}"},
-			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
-			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
-			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
-			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
-			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?"},
-			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?"},
+			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Hint: "Crea subito uno snapshot di backup dei database."},
+			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}", Hint: "Elimina definitivamente gli elementi nel cestino."},
+			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}", Hint: "Ricalcola lo score delle release archiviate con i pesi attuali."},
+			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}", Hint: "Rilegge le cartelle archivio e aggiorna la libreria."},
+			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}", Hint: "Analizza con ffprobe i file archiviati senza MediaInfo."},
+			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}", Hint: "Rinomina tutti i file archiviati secondo il formato configurato."},
+			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}", Hint: "Pulizia dati tecnici e storico, senza toccare la libreria."},
+			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?", Hint: "Importa un setup esistente (extto)."},
+			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?", Hint: "Riavvia il daemon Gextto."},
 		}}),
 		sectionProgress("Progresso rinomina", "/api/rename-progress"),
 		group("Libreria", uiPageSection{Kind: "duplicates"}),
-		group("Libreria", sectionActions(uiActionSection{Label: "Database", Hint: "VACUUM compatta i file, ANALYZE aggiorna le statistiche.", Buttons: []uiActionButton{
-			{Label: "VACUUM", Method: "POST", Path: "/api/db/action", Body: `{"action":"vacuum"}`},
-			{Label: "ANALYZE", Method: "POST", Path: "/api/db/action", Body: `{"action":"analyze"}`},
-		}})),
-		group("Libreria", sectionTable(uiTableSpec{
-			Title:    "File database",
-			Endpoint: "/api/db/info",
-			ItemsKey: "files",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "File"},
-				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
-				{Key: "exists", Label: "Presente", Format: "bool"},
-			}),
-			Empty: "Nessun database.",
-		})),
+		group("Libreria", uiPageSection{Kind: "db_optimize"}),
 		uiPageSection{Kind: "ramdisk"},
-		group("Pulizie", sectionTable(uiTableSpec{
-			Title:    "Cestino",
-			Endpoint: "/api/trash",
-			ItemsKey: "items",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "Nome", Format: "truncate"},
-				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
-				{Key: "is_dir", Label: "Cartella", Format: "bool"},
-			}),
-			ActionsJSON: uiJSON([]uiAction{
-				{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/trash/delete", Body: `{"names":["{name}"]}`, Confirm: "Eliminare definitivamente questo file?"},
-			}),
-			Empty: "Cestino vuoto.",
-		})),
+		group("Pulizie", uiPageSection{Kind: "trash_panel"}),
 		group("Pulizie", sectionForm(uiFormSection{
 			Title: "Pulizia database", Hint: "Applica la retention a ciclo storico e log errori.", Path: "/api/db/prune", Submit: "Pulisci",
 			Fields: []uiFormField{
-				{Name: "retain_cycles", Label: "Cicli da conservare", Kind: "number", Value: "50"},
-				{Name: "error_age_days", Label: "Giorni errori", Kind: "number", Value: "7"},
+				{Name: "retain_cycles", Label: "Cicli da conservare", Kind: "number", Value: "50", Hint: "Numero di statistiche dei cicli da conservare."},
+				{Name: "error_age_days", Label: "Giorni errori", Kind: "number", Value: "7", Hint: "Elimina i log di errore più vecchi di N giorni."},
 			},
 		})),
 		group("Backup", sectionTable(uiTableSpec{
@@ -458,22 +437,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
 		})),
-		sectionTable(uiTableSpec{
-			Title:    "Diagnostica sorgenti",
-			Endpoint: "/api/sources/health",
-			ItemsKey: "items",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "kind", Label: "Tipo"},
-				{Key: "name", Label: "Nome", Format: "truncate"},
-				{Key: "results", Label: "Risultati", Format: "number"},
-				{Key: "ok", Label: "Esito", Format: "status_badge"},
-				{Key: "", Label: "Dettaglio", Format: "source_detail"},
-			}),
-			Empty:       "Nessuna sorgente da verificare.",
-			Search:      true,
-			SearchParam: "q",
-			Note:        "Premi Aggiorna per verificare le sorgenti; usa la ricerca per provare una query.",
-		}),
+		uiPageSection{Kind: "sources_probe"},
 	}
 }
 
@@ -553,26 +517,25 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			}),
 			Empty: "Nessuna uscita o Simkl non configurato.",
 		})),
-		group("Jellyfin", sectionSettings("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key"))),
-		group("Jellyfin", sectionActions(uiActionSection{Label: "Jellyfin", Hint: "Verifica la connessione o aggiorna la libreria.", Buttons: []uiActionButton{
-			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
-			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
-		}})),
-		group("Plex", sectionSettings("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token"))),
-		group("Plex", sectionActions(uiActionSection{Label: "Plex", Hint: "Verifica la connessione o aggiorna la libreria.", Buttons: []uiActionButton{
-			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}"},
-			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}"},
-		}})),
-		group("Sorgenti", sectionEditor(uiIndexerEditor)),
-		group("Sorgenti", sectionSettings("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"))),
-		group("Sorgenti", sectionSourcesCheck()),
-		group("Notifiche", sectionSettings("Notifiche", "Telegram, webhook ed email: i valori si salvano per campo.", uiSettingFields(cfg,
+		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key"), []uiActionButton{
+			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}", Hint: "Verifica che Jellyfin risponda."},
+			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}", Hint: "Chiede a Jellyfin di aggiornare la libreria."},
+		})),
+		group("Media server", sectionSettingsActions("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token"), []uiActionButton{
+			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}", Hint: "Verifica che Plex risponda."},
+			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}", Hint: "Chiede a Plex di aggiornare la libreria."},
+		})),
+		sectionEditor(uiIndexerEditor),
+		sectionSettingsActions("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"), []uiActionButton{
+			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr risponda."},
+		}),
+		sectionSourcesCheck(),
+		sectionSettingsActions("Notifiche", "Telegram, webhook ed email: i valori si salvano per campo.", uiSettingFields(cfg,
 			"notify_telegram", "telegram_bot_token", "telegram_chat_id",
 			"notify_webhook_url", "notify_webhook_secret",
-			"notify_email", "email_smtp", "email_from", "email_to", "email_password"))),
-		group("Notifiche", sectionActions(uiActionSection{Label: "Notifiche", Hint: "Invia una notifica di prova con la configurazione corrente.", Buttons: []uiActionButton{
-			{Label: "Invia notifica di test", Method: "POST", Path: "/api/test-notification", Body: `{"message":"Gextto: test notifica"}`},
-		}})),
+			"notify_email", "email_smtp", "email_from", "email_to", "email_password"), []uiActionButton{
+			{Label: "Invia notifica di test", Method: "POST", Path: "/api/test-notification", Body: `{"message":"Gextto: test notifica"}`, Hint: "Invia una notifica di prova con la configurazione corrente."},
+		}),
 		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",

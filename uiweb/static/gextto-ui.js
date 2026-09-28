@@ -3527,6 +3527,220 @@
     });
   });
 
+  // ---- maintenance: database optimization --------------------------------
+  var dbPanel = document.querySelector("[data-db-optimize]");
+  if (dbPanel) {
+    var dbFiles = dbPanel.querySelector("[data-db-files]");
+    var dbResult = dbPanel.querySelector("[data-db-result]");
+    var dbStatus = dbPanel.querySelector("[data-db-status]");
+    var loadDB = function () {
+      api("/api/db/info", "GET").then(function (data) {
+        var files = (data && data.files) || [];
+        dbFiles.innerHTML = "";
+        if (!files.length) { dbFiles.innerHTML = '<p class="muted">Nessun database.</p>'; return; }
+        files.forEach(function (file) {
+          var row = document.createElement("div");
+          row.className = "list-item";
+          var name = document.createElement("span");
+          name.className = "mono truncate";
+          name.textContent = String(file.name || "");
+          name.title = String(file.path || file.name || "");
+          var size = document.createElement("strong");
+          size.textContent = humanBytes(file.size_bytes || 0);
+          row.appendChild(name);
+          row.appendChild(size);
+          dbFiles.appendChild(row);
+        });
+      }).catch(function (error) { dbFiles.innerHTML = '<p class="alert">' + esc(error.message) + "</p>"; });
+    };
+    var runDB = function (action, button) {
+      button.disabled = true;
+      if (dbStatus) dbStatus.textContent = action.toUpperCase() + " in corso…";
+      api("/api/db/action", "POST", { action: action }).then(function (data) {
+        if (dbStatus) dbStatus.textContent = "";
+        var before = (data && data.before) || {};
+        var after = (data && data.after) || {};
+        dbResult.hidden = false;
+        dbResult.innerHTML = "";
+        [["Operazione", String((data && data.action) || action)],
+         ["Dimensione prima", humanBytes(before.size_bytes || 0)],
+         ["Dimensione dopo", humanBytes(after.size_bytes || 0)],
+         ["Spazio liberato", humanBytes(Math.max(0, (before.size_bytes || 0) - (after.size_bytes || 0)))],
+         ["Righe prima", String(before.rows || 0)],
+         ["Righe dopo", String(after.rows || 0)]].forEach(function (pair) {
+          var row = document.createElement("div");
+          row.className = "row";
+          var label = document.createElement("span");
+          label.textContent = pair[0];
+          var value = document.createElement("strong");
+          value.textContent = pair[1];
+          row.appendChild(label);
+          row.appendChild(value);
+          dbResult.appendChild(row);
+        });
+        notify(action.toUpperCase() + ": fatto", "ok");
+        loadDB();
+      }).catch(function (error) {
+        if (dbStatus) dbStatus.textContent = error.message;
+        notify(action.toUpperCase() + " non riuscito: " + error.message, "err");
+      }).then(function () { button.disabled = false; });
+    };
+    Array.prototype.forEach.call(dbPanel.querySelectorAll("[data-db-action]"), function (button) {
+      button.addEventListener("click", function () { runDB(button.getAttribute("data-db-action"), button); });
+    });
+    var dbRefresh = dbPanel.querySelector("[data-db-refresh]");
+    if (dbRefresh) dbRefresh.addEventListener("click", loadDB);
+    loadDB();
+  }
+
+  // ---- maintenance: trash (button opens a modal with the list) ------------
+  var trashPanel = document.querySelector("[data-trash]");
+  if (trashPanel) {
+    var trashStatus = trashPanel.querySelector("[data-trash-status]");
+    var loadTrash = function () {
+      api("/api/trash", "GET").then(function (data) {
+        if (trashStatus) trashStatus.textContent = (Number(data && data.count) || 0) + " elementi · " + humanBytes((data && data.total_bytes) || 0);
+      }).catch(function (error) { if (trashStatus) trashStatus.textContent = error.message; });
+    };
+    var renderTrashModal = function (overlay) {
+      var body = overlay.querySelector("[data-trash-body]");
+      var count = overlay.querySelector("[data-trash-count]");
+      var message = overlay.querySelector("[data-trash-message]");
+      api("/api/trash", "GET").then(function (data) {
+        var items = (data && data.items) || [];
+        if (count) count.textContent = items.length + " elementi · " + humanBytes((data && data.total_bytes) || 0);
+        body.innerHTML = "";
+        if (!items.length) { body.innerHTML = '<tr><td class="muted" colspan="3">Cestino vuoto.</td></tr>'; return; }
+        items.forEach(function (item) {
+          var tr = document.createElement("tr");
+          var nameCell = document.createElement("td");
+          nameCell.className = "truncate";
+          nameCell.title = String(item.path || item.name || "");
+          nameCell.textContent = String(item.name || "");
+          var sizeCell = document.createElement("td");
+          sizeCell.className = "numeric";
+          sizeCell.textContent = humanBytes(item.size_bytes || 0);
+          var actionCell = document.createElement("td");
+          actionCell.className = "row-actions";
+          var del = document.createElement("button");
+          del.className = "btn sm danger";
+          del.textContent = "Elimina";
+          del.title = "Elimina definitivamente questo elemento";
+          del.addEventListener("click", function () {
+            if (!confirm("Eliminare definitivamente " + item.name + "?")) return;
+            del.disabled = true;
+            api("/api/trash/delete", "POST", { names: [item.name] })
+              .then(function () { renderTrashModal(overlay); loadTrash(); })
+              .catch(function (error) { if (message) message.textContent = error.message; del.disabled = false; });
+          });
+          actionCell.appendChild(del);
+          tr.appendChild(nameCell);
+          tr.appendChild(sizeCell);
+          tr.appendChild(actionCell);
+          body.appendChild(tr);
+        });
+      }).catch(function (error) { body.innerHTML = '<tr><td class="alert" colspan="3">' + esc(error.message) + "</td></tr>"; });
+    };
+    var openTrash = function () {
+      var overlay = document.getElementById("trash-overlay");
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "trash-overlay";
+        overlay.className = "overlay";
+        document.body.appendChild(overlay);
+        overlay.addEventListener("click", function (event) {
+          if (event.target === overlay || event.target.closest("[data-trash-close]")) overlay.hidden = true;
+        });
+      }
+      overlay.hidden = false;
+      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Cestino">' +
+        '<div class="modal-head"><h3>Cestino</h3><button class="btn sm" type="button" data-trash-close>Chiudi</button></div>' +
+        '<div class="modal-body">' +
+        '<div class="toolbar"><span class="muted" data-trash-count></span><button class="btn sm danger" type="button" data-trash-all title="Elimina tutti gli elementi">Elimina tutti</button><button class="btn sm" type="button" data-trash-reload title="Ricarica">Aggiorna</button><small class="muted" data-trash-message aria-live="polite"></small></div>' +
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Nome</th><th>Dimensione</th><th></th></tr></thead><tbody data-trash-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>' +
+        '</div></div>';
+      renderTrashModal(overlay);
+    };
+    var trashOpenButton = trashPanel.querySelector("[data-trash-open]");
+    if (trashOpenButton) trashOpenButton.addEventListener("click", openTrash);
+    var trashEmptyButton = trashPanel.querySelector("[data-trash-empty]");
+    if (trashEmptyButton) trashEmptyButton.addEventListener("click", function () {
+      if (!confirm("Eliminare tutti gli elementi del cestino?")) return;
+      trashEmptyButton.disabled = true;
+      api("/api/maintenance/clean-trash", "POST", {})
+        .then(function () { notify("Cestino svuotato", "ok"); loadTrash(); })
+        .catch(function (error) { notify("Pulizia cestino non riuscita: " + error.message, "err"); })
+        .then(function () { trashEmptyButton.disabled = false; });
+    });
+    var trashRefreshButton = trashPanel.querySelector("[data-trash-refresh]");
+    if (trashRefreshButton) trashRefreshButton.addEventListener("click", loadTrash);
+    document.addEventListener("click", function (event) {
+      var overlay = document.getElementById("trash-overlay");
+      if (!overlay || overlay.hidden) return;
+      if (event.target.closest("[data-trash-reload]")) { renderTrashModal(overlay); return; }
+      if (event.target.closest("[data-trash-all]")) {
+        if (!confirm("Eliminare tutti gli elementi del cestino?")) return;
+        api("/api/trash", "GET").then(function (data) {
+          var names = ((data && data.items) || []).map(function (item) { return item.name; });
+          if (!names.length) { notify("Cestino già vuoto", "info"); return null; }
+          return api("/api/trash/delete", "POST", { names: names });
+        }).then(function (result) {
+          if (result === null) return;
+          renderTrashModal(overlay);
+          loadTrash();
+          notify("Elementi eliminati", "ok");
+        }).catch(function (error) { notify("Eliminazione non riuscita: " + error.message, "err"); });
+        return;
+      }
+    });
+    loadTrash();
+  }
+
+  // ---- maintenance: on-demand sources check ------------------------------
+  var sourcesProbe = document.querySelector("[data-sources-probe]");
+  if (sourcesProbe) {
+    var probeOutput = sourcesProbe.querySelector("[data-sources-output]");
+    var probeStatus = sourcesProbe.querySelector("[data-sources-status]");
+    var probeButton = sourcesProbe.querySelector("[data-sources-run]");
+    var probeQuery = sourcesProbe.querySelector("[data-sources-query]");
+    if (probeButton) probeButton.addEventListener("click", function () {
+      var term = probeQuery ? probeQuery.value.trim() : "";
+      probeButton.disabled = true;
+      if (probeStatus) probeStatus.textContent = "Verifica in corso…";
+      probeOutput.innerHTML = '<p class="muted">Attendere…</p>';
+      var url = "/api/sources/health" + (term ? "?q=" + encodeURIComponent(term) : "");
+      api(url, "GET").then(function (data) {
+        if (probeStatus) probeStatus.textContent = "";
+        renderSourcesTable(probeOutput, (data && data.items) || []);
+      }).catch(function (error) {
+        if (probeStatus) probeStatus.textContent = error.message;
+        probeOutput.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+      }).then(function () { probeButton.disabled = false; });
+    });
+  }
+
+  function renderSourcesTable(container, items) {
+    container.innerHTML = "";
+    if (!items.length) { container.innerHTML = '<p class="muted">Nessuna sorgente da verificare.</p>'; return; }
+    var table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
+    var tbody = document.createElement("tbody");
+    items.forEach(function (item) {
+      var ok = item.ok !== false;
+      var detail = item.error ? String(item.error) : (item.results !== undefined && item.results !== null ? String(item.results) + " risultati" : "");
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + esc(String(item.kind || "")) + "</td>" +
+        "<td class='truncate'>" + esc(String(item.name || "")) + "</td>" +
+        "<td><span class='badge " + (ok ? "ok" : "err") + "'>" + (ok ? "ok" : "errore") + "</span></td>" +
+        "<td class='numeric'>" + esc(String(item.results === undefined || item.results === null ? "—" : item.results)) + "</td>" +
+        "<td class='muted truncate'>" + esc(detail) + "</td>";
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";

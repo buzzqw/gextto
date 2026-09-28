@@ -89,7 +89,54 @@
 {{else if eq .Kind "settings"}}{{template "settings_section" .Settings}}
 {{else if eq .Kind "list_editor"}}{{template "list_editor" .Editor}}
 {{else if eq .Kind "sources_check"}}{{template "sources_check" .}}
+{{else if eq .Kind "db_optimize"}}{{template "db_optimize" .}}
+{{else if eq .Kind "trash_panel"}}{{template "trash_panel" .}}
+{{else if eq .Kind "sources_probe"}}{{template "sources_probe" .}}
 {{end}}
+{{end}}
+
+{{define "db_optimize"}}
+<div class="panel" data-db-optimize>
+  <div class="panel-head"><h3>Ottimizzazione database</h3><small class="muted" data-db-status></small></div>
+  <div class="panel-body">
+    <p class="hint">VACUUM compatta i file; ANALYZE aggiorna le statistiche SQLite.</p>
+    <div class="list" data-db-files><p class="muted">Caricamento…</p></div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn sm" type="button" data-db-action="vacuum" title="Compatta i database (VACUUM) e libera spazio">VACUUM</button>
+      <button class="btn sm" type="button" data-db-action="analyze" title="Aggiorna le statistiche del query planner (ANALYZE)">ANALYZE</button>
+      <button class="btn sm" type="button" data-db-refresh title="Aggiorna le dimensioni dei file">Aggiorna dimensioni</button>
+    </div>
+    <div class="stat-grid" data-db-result hidden></div>
+  </div>
+</div>
+{{end}}
+
+{{define "trash_panel"}}
+<div class="panel" data-trash>
+  <div class="panel-head"><h3>Cestino</h3><small class="muted" data-trash-status></small></div>
+  <div class="panel-body">
+    <p class="hint">Gli elementi nel cestino non occupano la libreria; aprili per eliminarli singolarmente o svuota tutto.</p>
+    <div class="toolbar">
+      <button class="btn sm primary" type="button" data-trash-open title="Mostra l'elenco degli elementi nel cestino">Apri cestino</button>
+      <button class="btn sm danger" type="button" data-trash-empty title="Elimina tutti gli elementi del cestino">Svuota cestino</button>
+      <button class="btn sm" type="button" data-trash-refresh title="Aggiorna conteggio e dimensione">Aggiorna</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "sources_probe"}}
+<div class="panel" data-sources-probe>
+  <div class="panel-head"><h3>Diagnostica sorgenti</h3><small class="muted" data-sources-status aria-live="polite"></small></div>
+  <div class="panel-body">
+    <p class="hint">La verifica parte solo quando la richiedi e può richiedere fino a ~1 minuto.</p>
+    <div class="toolbar">
+      <input class="input" data-sources-query placeholder="Termine di prova (opzionale, es. ita 1080p)" title="Se vuoto controlla solo la raggiungibilità delle sorgenti" />
+      <button class="btn sm primary" type="button" data-sources-run title="Avvia la verifica di feed, indexer e motori web">Testa sorgenti</button>
+    </div>
+    <div data-sources-output></div>
+  </div>
+</div>
 {{end}}
 
 {{define "sources_check"}}
@@ -111,6 +158,7 @@
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <div class="settings-rows">{{range .Fields}}{{template "settings_field" .}}{{end}}</div>
+    {{if .Buttons}}<div class="toolbar" style="margin-top:12px">{{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>{{end}}</div>{{end}}
   </div>
 </div>
 {{end}}
@@ -589,7 +637,7 @@
             <div class="lang-row"><select class="input" data-lang-select title="Lingua richiesta">{{template "lang_single_options"}}</select><label class="check" title="La release deve contenere questa lingua"><input type="checkbox" data-lang-required /> <span>obbligatoria</span></label></div>
             <div class="lang-row"><select class="input" data-lang-select title="Lingua richiesta">{{template "lang_single_options"}}</select><label class="check" title="La release deve contenere questa lingua"><input type="checkbox" data-lang-required /> <span>obbligatoria</span></label></div>
           </div>
-          <input type="hidden" name="language_requirements" data-lang-hidden value="{{.LanguageRequirements}}" />
+          <input type="hidden" name="language_requirements" value="{{.LanguageRequirements}}" data-lang-hidden />
         </div>
         <label class="field span-full"><span>Requisiti sottotitoli (obbligatori)</span>
           <input name="subtitle_requirements" value="{{.SubtitleRequirements}}" placeholder="es. ita,eng" title="Lingue di sottotitoli obbligatorie" />
