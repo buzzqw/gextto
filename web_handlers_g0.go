@@ -1329,6 +1329,7 @@ func gh0_runMediaInfoBackfill(s *AppState, limit int) (map[string]any, error) {
 		"ok":           true,
 		"candidates":   len(targets),
 		"probed":       probed,
+		"analyzed":     probed,
 		"failed":       failed,
 		"skipped":      skipped,
 		"failed_items": failedItems,

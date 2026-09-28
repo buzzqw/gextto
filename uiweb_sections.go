@@ -14,7 +14,7 @@ import (
 
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
-	Kind     string // table | actions | form | progress | comics_links | links | oauth | settings | list_editor | duplicates | ramdisk
+	Kind     string // table | actions | form | progress | comics_links | links | oauth | settings | list_editor | duplicates | ramdisk | folder_rename
 	Group    string // optional grouping label: consecutive same-group blocks render side by side
 	Table    uiTableSpec
 	Action   uiActionSection
@@ -420,6 +420,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?", Hint: "Importa un setup esistente (extto)."},
 			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?", Hint: "Riavvia il daemon Gextto."},
 		}}),
+		uiPageSection{Kind: "folder_rename"},
 		sectionProgress("Progresso rinomina", "/api/rename-progress"),
 		group("Libreria", uiPageSection{Kind: "duplicates"}),
 		group("Libreria", uiPageSection{Kind: "db_optimize"}),

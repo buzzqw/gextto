@@ -104,6 +104,8 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/maintenance/clean-trash` |
 | POST | `/api/maintenance/housekeeping` |
 | POST | `/api/maintenance/restore-source` |
+| POST | `/api/maintenance/rename-folder/scan` |
+| POST | `/api/maintenance/rename-folder/apply` |
 | GET | `/api/manual-search` |
 | GET | `/api/media-info` |
 | POST | `/api/media-info/probe` |

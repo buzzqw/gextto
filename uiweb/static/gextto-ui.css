@@ -419,6 +419,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 .field-row { display: flex; align-items: center; gap: 8px; }
 .field-row .input { flex: 1; min-width: 0; }
+.folder-rename-toolbar { align-items: flex-end; }
+.folder-rename-toolbar .inline-field { flex: 1 1 420px; min-width: min(100%, 320px); }
+.folder-rename-actions { margin-top: 14px; }
 .lang-rows { display: flex; flex-direction: column; gap: 6px; }
 .lang-row { display: flex; align-items: center; gap: 10px; }
 .lang-row select { flex: 0 0 180px; }

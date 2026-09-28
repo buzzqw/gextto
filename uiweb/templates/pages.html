@@ -127,6 +127,7 @@
 {{else if eq .Kind "db_optimize"}}{{template "db_optimize" .}}
 {{else if eq .Kind "trash_panel"}}{{template "trash_panel" .}}
 {{else if eq .Kind "sources_probe"}}{{template "sources_probe" .}}
+{{else if eq .Kind "folder_rename"}}{{template "folder_rename" .}}
 {{end}}
 {{end}}
 
@@ -210,6 +211,25 @@
       <button class="btn sm danger" type="button" data-duplicates-clean>Pulisci duplicati</button>
     </div>
     <div data-duplicates-results></div>
+  </div>
+</div>
+{{end}}
+
+{{define "folder_rename"}}
+<div class="panel" data-folder-rename>
+  <div class="panel-head"><h3>Rinomina contenuto cartella</h3><small class="muted" data-folder-rename-status aria-live="polite"></small></div>
+  <div class="panel-body">
+    <p class="hint">Scansiona una cartella di serie o film: Gextto confronta i nomi con TMDB/TVDB e propone le rinomine. La scansione non modifica nulla; vengono applicate solo le righe accettate.</p>
+    <div class="toolbar folder-rename-toolbar">
+      <label class="field inline-field"><span>Cartella</span><span class="field-row"><input class="input" type="text" data-folder-rename-path placeholder="/percorso/alla/cartella" autocomplete="off" /><button class="btn sm" type="button" data-folder-rename-browse title="Sfoglia le cartelle">Sfoglia</button></span></label>
+      <button class="btn sm primary" type="button" data-folder-rename-scan>Scansiona e proponi</button>
+    </div>
+    <div class="toolbar folder-rename-actions" data-folder-rename-actions hidden>
+      <button class="btn sm" type="button" data-folder-rename-accept-all>Accetta tutte le proposte</button>
+      <button class="btn sm primary" type="button" data-folder-rename-apply>Applica selezionate</button>
+      <small class="muted" data-folder-rename-count>0 proposte</small>
+    </div>
+    <div class="table-wrap" data-folder-rename-results hidden></div>
   </div>
 </div>
 {{end}}

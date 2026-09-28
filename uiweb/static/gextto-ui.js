@@ -3114,6 +3114,198 @@
     if (dupClean) dupClean.addEventListener("click", function () { runDuplicates(true); });
   }
 
+  // ---- maintenance: review-based folder rename ----------------------------
+  var folderRenamePanel = document.querySelector("[data-folder-rename]");
+  if (folderRenamePanel) {
+    var folderRenamePath = folderRenamePanel.querySelector("[data-folder-rename-path]");
+    var folderRenameScan = folderRenamePanel.querySelector("[data-folder-rename-scan]");
+    var folderRenameBrowse = folderRenamePanel.querySelector("[data-folder-rename-browse]");
+    var folderRenameActions = folderRenamePanel.querySelector("[data-folder-rename-actions]");
+    var folderRenameResults = folderRenamePanel.querySelector("[data-folder-rename-results]");
+    var folderRenameStatus = folderRenamePanel.querySelector("[data-folder-rename-status]");
+    var folderRenameCount = folderRenamePanel.querySelector("[data-folder-rename-count]");
+    var folderRenameState = { path: "", items: [] };
+
+    var folderRenameStatusLabel = function (item) {
+      if (item._applied) return "Rinominato";
+      if (item._rejected) return "Rifiutato";
+      if (item.conflict) return "Conflitto";
+      if (item.status === "unmatched") return "Non identificato";
+      if (item.status === "proposta") return "Proposta forte";
+      return "Da verificare";
+    };
+
+    var folderRenameUpdateCount = function () {
+      var selected = folderRenamePanel.querySelectorAll("[data-folder-rename-check]:checked").length;
+      var available = folderRenamePanel.querySelectorAll("[data-folder-rename-check]:not(:disabled)").length;
+      if (folderRenameCount) folderRenameCount.textContent = selected + " selezionate · " + available + " proposte";
+    };
+
+    var folderRenameRender = function () {
+      folderRenameResults.innerHTML = "";
+      if (!folderRenameState.items.length) {
+        folderRenameResults.hidden = true;
+        folderRenameActions.hidden = true;
+        return;
+      }
+      var table = document.createElement("table");
+      table.className = "data-table folder-rename-table";
+      var head = document.createElement("thead");
+      head.innerHTML = "<tr><th>Accetta</th><th>File</th><th>Tipo</th><th>Rilevato</th><th>Confronto TMDB/TVDB</th><th>Nuovo nome</th><th>Stato</th><th>Azioni</th></tr>";
+      table.appendChild(head);
+      var body = document.createElement("tbody");
+      folderRenameState.items.forEach(function (item, index) {
+        var row = document.createElement("tr");
+        row.setAttribute("data-folder-rename-row", String(index));
+
+        var selectCell = document.createElement("td");
+        var check = document.createElement("input");
+        check.type = "checkbox";
+        check.setAttribute("data-folder-rename-check", "");
+        check.checked = !item._rejected && !!item.target && !item.conflict;
+        check.disabled = !item.target || item.status === "unmatched" || !!item.conflict || !!item._applied;
+        check.addEventListener("change", function () {
+          item._rejected = !check.checked;
+          folderRenameUpdateCount();
+        });
+        selectCell.appendChild(check);
+        row.appendChild(selectCell);
+
+        var fileCell = document.createElement("td");
+        var file = document.createElement("span");
+        file.className = "cell-truncate";
+        file.title = String(item.source || "");
+        file.textContent = String(item.relative || item.source || "");
+        fileCell.appendChild(file);
+        row.appendChild(fileCell);
+
+        var kind = document.createElement("td");
+        kind.textContent = item.kind === "series" ? "Serie" : item.kind === "movie" ? "Film" : "—";
+        row.appendChild(kind);
+        var detected = document.createElement("td");
+        detected.textContent = String(item.detected || "—") + (item.season ? " · S" + String(item.season).padStart(2, "0") + "E" + String(item.episode).padStart(2, "0") : "");
+        row.appendChild(detected);
+
+        var match = document.createElement("td");
+        if (item.candidates && item.candidates.length) {
+          var candidateSelect = document.createElement("select");
+          candidateSelect.className = "input compact";
+          candidateSelect.setAttribute("data-folder-rename-candidate", "");
+          item.candidates.forEach(function (candidate, candidateIndex) {
+            var option = document.createElement("option");
+            option.value = String(candidateIndex);
+            option.textContent = String(candidate.provider || "") .toUpperCase() + " · " + String(candidate.title || "") + (candidate.year ? " (" + candidate.year + ")" : "");
+            candidateSelect.appendChild(option);
+          });
+          candidateSelect.addEventListener("change", function () {
+            var candidate = item.candidates[Number(candidateSelect.value)];
+            if (!candidate) return;
+            item.target = candidate.target || "";
+            target.textContent = item.target || "—";
+            item._rejected = false;
+            check.disabled = !item.target || !!item.conflict;
+            check.checked = !check.disabled;
+            folderRenameUpdateCount();
+          });
+          match.appendChild(candidateSelect);
+        } else {
+          match.textContent = item.reason || "Nessuna proposta";
+        }
+        row.appendChild(match);
+
+        var targetCell = document.createElement("td");
+        var target = document.createElement("span");
+        target.className = "cell-truncate";
+        target.title = String(item.target || "");
+        target.textContent = item.target || "—";
+        targetCell.appendChild(target);
+        row.appendChild(targetCell);
+
+        var stateCell = document.createElement("td");
+        stateCell.textContent = folderRenameStatusLabel(item) + (item.reason && item.status !== "unmatched" ? " · " + item.reason : "");
+        row.appendChild(stateCell);
+
+        var actions = document.createElement("td");
+        actions.className = "row-actions";
+        var accept = document.createElement("button");
+        accept.className = "btn sm";
+        accept.type = "button";
+        accept.textContent = "Accetta";
+        accept.disabled = check.disabled;
+        accept.addEventListener("click", function () { check.checked = true; item._rejected = false; folderRenameUpdateCount(); });
+        actions.appendChild(accept);
+        var reject = document.createElement("button");
+        reject.className = "btn sm";
+        reject.type = "button";
+        reject.textContent = "Rifiuta";
+        reject.addEventListener("click", function () { check.checked = false; item._rejected = true; folderRenameUpdateCount(); });
+        actions.appendChild(reject);
+        row.appendChild(actions);
+        body.appendChild(row);
+      });
+      table.appendChild(body);
+      folderRenameResults.appendChild(table);
+      folderRenameResults.hidden = false;
+      folderRenameActions.hidden = false;
+      folderRenameUpdateCount();
+    };
+
+    var folderRenameApply = function () {
+      var selected = [];
+      Array.prototype.forEach.call(folderRenamePanel.querySelectorAll("[data-folder-rename-check]:checked"), function (check) {
+        var row = check.closest("[data-folder-rename-row]");
+        var index = row ? Number(row.getAttribute("data-folder-rename-row")) : -1;
+        if (index >= 0 && folderRenameState.items[index]) selected.push(folderRenameState.items[index]);
+      });
+      if (!selected.length) { notify("Seleziona almeno una proposta", "err"); return; }
+      var applyButton = folderRenamePanel.querySelector("[data-folder-rename-apply]");
+      if (applyButton) applyButton.disabled = true;
+      if (folderRenameStatus) folderRenameStatus.textContent = "Rinomina in corso…";
+      api("/api/maintenance/rename-folder/apply", "POST", {
+        path: folderRenameState.path,
+        items: selected.map(function (item) { return { source: item.source, target: item.target }; })
+      }).then(function (data) {
+        var successful = {};
+        (data.items || []).forEach(function (result) {
+          if (result.ok) successful[result.source] = true;
+        });
+        folderRenameState.items = folderRenameState.items.filter(function (item) { return !successful[item.source]; });
+        if (folderRenameStatus) folderRenameStatus.textContent = "";
+        folderRenameRender();
+        notify("Rinominati " + String(data.renamed || 0) + " file", "ok");
+      }).catch(function (error) {
+        if (folderRenameStatus) folderRenameStatus.textContent = "";
+        notify("Rinomina cartella non riuscita: " + error.message, "err");
+      }).then(function () { if (applyButton) applyButton.disabled = false; });
+    };
+
+    folderRenameScan.addEventListener("click", function () {
+      var path = String(folderRenamePath.value || "").trim();
+      if (!path) { notify("Inserisci il percorso di una cartella", "err"); return; }
+      folderRenameState = { path: path, items: [] };
+      folderRenameScan.disabled = true;
+      if (folderRenameStatus) folderRenameStatus.textContent = "Scansione e confronto con TMDB/TVDB…";
+      api("/api/maintenance/rename-folder/scan", "POST", { path: path }).then(function (data) {
+        folderRenameState.path = data.path || path;
+        folderRenameState.items = (data.items || []).map(function (item) { item._rejected = false; return item; });
+        if (folderRenameStatus) folderRenameStatus.textContent = folderRenameState.items.length + " file analizzati";
+        folderRenameRender();
+      }).catch(function (error) {
+        if (folderRenameStatus) folderRenameStatus.textContent = "";
+        folderRenameResults.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+        folderRenameResults.hidden = false;
+      }).then(function () { folderRenameScan.disabled = false; });
+    });
+    if (folderRenameBrowse) folderRenameBrowse.addEventListener("click", function () {
+      openBrowseModal(folderRenamePath);
+    });
+    folderRenamePanel.querySelector("[data-folder-rename-accept-all]").addEventListener("click", function () {
+      folderRenameState.items.forEach(function (item) { if (item.target && !item.conflict) item._rejected = false; });
+      folderRenameRender();
+    });
+    folderRenamePanel.querySelector("[data-folder-rename-apply]").addEventListener("click", folderRenameApply);
+  }
+
   // ---- maintenance: RAM disk control --------------------------------------
   var ramdiskPanel = document.querySelector("[data-ramdisk]");
   if (ramdiskPanel) {

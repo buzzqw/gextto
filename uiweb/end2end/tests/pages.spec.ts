@@ -74,6 +74,14 @@ test("manuale utente raggiungibile e renderizzato", async ({ page }) => {
   expect(anchors).toBeGreaterThan(0);
 });
 
+test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {
+  await page.goto("/");
+  await nav(page, "Manutenzione").click();
+  await expect(page.locator("h3").filter({ hasText: "Rinomina contenuto cartella" })).toBeVisible();
+  await expect(page.locator("[data-folder-rename-path]")).toBeVisible();
+  await expect(page.locator("[data-folder-rename-browse]")).toHaveText("Sfoglia");
+});
+
 test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Cerca impostazioni" })).toBeVisible();

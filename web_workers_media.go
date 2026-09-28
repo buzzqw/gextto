@@ -90,10 +90,11 @@ func mediaInfoBackfillWorker(state *AppState) {
 					candidates := bwm_reportCount(report, "candidates")
 					if candidates > 0 {
 						logging.Info(
-							"🔬 MediaInfo backfill: analyzed archived files",
+							"🔬 MediaInfo backfill: esito analisi file archiviati",
 							"candidates", candidates,
-							"probed", bwm_reportCount(report, "probed"),
+							"analyzed", bwm_reportCount(report, "probed"),
 							"failed", bwm_reportCount(report, "failed"),
+							"skipped_missing", bwm_reportCount(report, "skipped"),
 						)
 					}
 				}

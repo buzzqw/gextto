@@ -108,6 +108,8 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/missing/search", SearchMissing)
 	handle(s, mux, "GET /api/calendar", Calendar)
 	handle(s, mux, "POST /api/scan-all-archives", ScanAllArchives)
+	handle(s, mux, "POST /api/maintenance/rename-folder/scan", MaintenanceRenameFolderScan)
+	handle(s, mux, "POST /api/maintenance/rename-folder/apply", MaintenanceRenameFolderApply)
 	handle(s, mux, "POST /api/database/rescore", RescoreDatabase)
 	handle(s, mux, "POST /api/score/preview", ScorePreview)
 	handle(s, mux, "POST /api/search/explain", ExplainRelease)
