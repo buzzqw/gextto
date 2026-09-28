@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -87,6 +88,7 @@ type uiMovieMatch struct {
 	Title  string
 	Magnet template.URL
 	Source string
+	Body   string
 }
 
 type uiMovieDetail struct {
@@ -289,7 +291,14 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 			if index >= 20 {
 				break
 			}
-			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2]})
+			body, _ := json.Marshal(map[string]any{
+				"items": []map[string]string{{
+					"title":  entry[0],
+					"magnet": entry[1],
+					"source": entry[2],
+				}},
+			})
+			detail.Matches = append(detail.Matches, uiMovieMatch{Title: entry[0], Magnet: uiMagnetURL(entry[1]), Source: entry[2], Body: string(body)})
 		}
 	}
 	return detail, true

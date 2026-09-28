@@ -543,7 +543,7 @@
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
       {{if .Overview}}<p>{{.Overview}}</p>{{end}}
-      <form data-movie-id="{{.ID}}">
+      <form class="form-grid" data-movie-id="{{.ID}}">
         <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" /></label>
         <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" /></label>
@@ -563,7 +563,21 @@
         <button class="btn sm danger" data-api="/api/movies/{{.ID}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questo film?">Elimina</button>
       </div>
       {{if .Matches}}<div class="field span-full" style="margin-top:12px"><span>Corrispondenze archivio</span></div>
-      <ul class="hint">{{range .Matches}}<li>{{if .Magnet}}<a href="{{.Magnet}}" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}} <span class="muted">{{.Source}}</span></li>{{end}}</ul>{{end}}
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Titolo</th><th>Sorgente</th><th>Azioni</th></tr></thead>
+        <tbody>
+        {{range .Matches}}
+        <tr>
+          <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+          <td>{{.Source}}</td>
+          <td class="row-actions">
+            <button class="btn sm primary" data-api="/api/archive/batch-download" data-method="POST" data-body="{{.Body}}" title="Aggiungi questa release ai download">Scarica</button>
+            {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
+          </td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table></div>{{end}}
       {{if .History}}<div class="field span-full" style="margin-top:12px"><span>Storico</span></div>
       <div class="table-wrap"><table class="data-table"><thead><tr><th>Titolo</th><th>Qualità</th><th>Dimensione</th></tr></thead><tbody>
       {{range .History}}<tr><td class="truncate">{{.Title}}</td><td class="numeric">{{.QualityScore}}</td><td class="numeric">{{humanBytes .SizeBytes}}</td></tr>{{end}}

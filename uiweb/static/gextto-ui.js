@@ -2947,7 +2947,14 @@
     var season = parseInt(toggle.getAttribute("data-season-toggle"), 10);
     toggle.disabled = true;
     api("/api/series/" + (hero.getAttribute("data-series-name") || "") + "/toggle-season", "POST", { season: season, enabled: ignored })
-      .then(function () { location.reload(); })
+      .then(function () {
+        var nowIgnored = !ignored;
+        toggle.setAttribute("data-season-ignored", nowIgnored ? "true" : "false");
+        toggle.classList.toggle("warn", nowIgnored);
+        toggle.classList.toggle("primary", !nowIgnored);
+        notify(nowIgnored ? ("Stagione " + season + " disattivata") : ("Stagione " + season + " attivata"), "ok");
+        toggle.disabled = false;
+      })
       .catch(function (error) { notify("Stagione non aggiornata: " + error.message, "err"); toggle.disabled = false; });
   });
 
