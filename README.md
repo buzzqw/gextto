@@ -31,7 +31,8 @@ in the configured location.
 
 ### Official Linux installation
 
-On a 64-bit Linux server with systemd:
+On a 64-bit Linux server with systemd, run the installer as **root** (through
+`sudo` or from a root shell):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash

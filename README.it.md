@@ -32,7 +32,8 @@ percorso configurato.
 
 ### Installazione ufficiale su Linux
 
-Su un server Linux 64 bit con systemd:
+Su un server Linux 64 bit con systemd, esegui l'installer come **root** (tramite
+`sudo` oppure da una shell root):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
