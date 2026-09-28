@@ -412,16 +412,6 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "error_age_days", Label: "Giorni errori", Kind: "number", Value: "7", Hint: "Elimina i log di errore più vecchi di N giorni."},
 			},
 		})),
-		group("Backup", sectionTable(uiTableSpec{
-			Title:    "Backup disponibili",
-			Endpoint: "/api/backup/list",
-			ItemsKey: "items",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "label", Label: "Etichetta"}, {Key: "name", Label: "Nome"},
-				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
-			}),
-			Empty: "Nessun backup creato.",
-		})),
 		group("Backup", sectionForm(uiFormSection{
 			Title: "Impostazioni backup",
 			Hint:  "I valori vengono salvati nel formato usato dal daemon; lascia vuota la password per non modificarla.",
@@ -436,6 +426,16 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_cloud_dir", Label: "Cartella cloud", Value: settingsOr(cfg, "backup_cloud_dir", "")},
 				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
+		})),
+		group("Backup", sectionTable(uiTableSpec{
+			Title:    "Backup disponibili",
+			Endpoint: "/api/backup/list",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "label", Label: "Etichetta"}, {Key: "name", Label: "Nome"},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
+			}),
+			Empty: "Nessun backup creato.",
 		})),
 		uiPageSection{Kind: "sources_probe"},
 	}

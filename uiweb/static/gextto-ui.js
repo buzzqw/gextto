@@ -2448,11 +2448,18 @@
             use.textContent = "Usa questo percorso";
             use.addEventListener("click", function () {
               use.disabled = true;
-              api("/api/ramdisk/select", "POST", { path: item.path }).then(function (res) {
+              // /dev/shm is a shared tmpfs: create a dedicated subfolder there
+              // silently, then select it. Other paths are selected as-is.
+              var isDevShm = String(item.path) === "/dev/shm";
+              var endpoint = isDevShm ? "/api/ramdisk/create" : "/api/ramdisk/select";
+              var body = isDevShm ? { path: "/dev/shm/gextto" } : { path: item.path };
+              api(endpoint, "POST", body).then(function (res) {
                 var recommended = (res && res.recommended) || {};
+                var chosen = isDevShm ? "/dev/shm/gextto" : item.path;
                 if (ramdiskMessage) {
-                  ramdiskMessage.textContent = "Selezionato " + item.path +
-                    (recommended.threshold_gb ? " · soglia " + recommended.threshold_gb + " GB, margine " + recommended.margin_gb + " GB" : "");
+                  ramdiskMessage.textContent = "Selezionato " + chosen +
+                    (recommended.threshold_gb ? " · soglia " + recommended.threshold_gb + " GB, margine " + recommended.margin_gb + " GB" : "") +
+                    (isDevShm ? " (cartella creata se assente)" : "");
                 }
                 notify("RAM disk selezionato", "ok");
                 loadRamdisk();
@@ -2473,16 +2480,6 @@
     };
     var ramdiskRefresh = ramdiskPanel.querySelector("[data-ramdisk-refresh]");
     if (ramdiskRefresh) ramdiskRefresh.addEventListener("click", loadRamdisk);
-    var ramdiskCreate = ramdiskPanel.querySelector("[data-ramdisk-create]");
-    if (ramdiskCreate) ramdiskCreate.addEventListener("click", function () {
-      ramdiskCreate.disabled = true;
-      api("/api/ramdisk/create", "POST", { path: "/dev/shm/gextto" }).then(function () {
-        if (ramdiskMessage) ramdiskMessage.textContent = "Creato /dev/shm/gextto e selezionato";
-        notify("RAM disk creato", "ok");
-        loadRamdisk();
-      }).catch(function (error) { notify("Creazione non riuscita: " + error.message, "err"); })
-        .then(function () { ramdiskCreate.disabled = false; });
-    });
     loadRamdisk();
   }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -98,6 +99,12 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 	}
 	if !strings.HasPrefix(filepath.Base(archive), "gextto-backup-") || filepath.Ext(archive) != ".zip" {
 		t.Fatalf("unexpected archive name %q", archive)
+	}
+	// The name is the readable timestamp only (a numeric suffix appears just on
+	// a same-second collision), no random hash suffix.
+	validName := regexp.MustCompile(`^gextto-backup-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(-\d+)?\.zip$`)
+	if !validName.MatchString(filepath.Base(archive)) {
+		t.Fatalf("archive name not readable/simple: %q", filepath.Base(archive))
 	}
 	if _, err := os.Stat(archive); err != nil {
 		t.Fatalf("archive not created: %v", err)

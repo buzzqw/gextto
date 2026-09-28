@@ -181,10 +181,9 @@
 <div class="panel" data-ramdisk>
   <div class="panel-head"><h3>RAM disk</h3><small class="muted" data-ramdisk-status></small></div>
   <div class="panel-body">
-    <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile per i download; Gextto calcola soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
+    <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile: premi "Usa questo percorso" e Gextto la configura (creando la cartella se serve) con soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
     <div class="toolbar">
-      <button class="btn sm" type="button" data-ramdisk-refresh>Aggiorna</button>
-      <button class="btn sm primary" type="button" data-ramdisk-create>Crea in /dev/shm</button>
+      <button class="btn sm" type="button" data-ramdisk-refresh title="Rileggi i percorsi disponibili">Aggiorna</button>
       <small class="muted" data-ramdisk-message aria-live="polite"></small>
     </div>
     <div data-ramdisk-paths></div>

@@ -247,8 +247,8 @@ func TestUiMaintenanceParity(t *testing.T) {
 	html := string(body)
 	for _, marker := range []string{
 		"data-duplicates", "data-duplicates-preview", "data-duplicates-clean",
-		"data-ramdisk", "data-ramdisk-create", "data-ramdisk-paths",
-		"Diagnostica sorgenti", `data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
+		"data-ramdisk", "data-ramdisk-paths", "data-db-optimize", "data-trash-open",
+		"Diagnostica sorgenti", "data-sources-run", `data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
 	} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("maintenance page missing %q", marker)

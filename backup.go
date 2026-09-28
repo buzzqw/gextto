@@ -118,14 +118,17 @@ func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
 	if err := os.MkdirAll(backupRoot, 0o755); err != nil {
 		return "", err
 	}
-	// Readable, chronologically sortable name (server local time) plus a short
-	// random suffix so two backups in the same second never collide.
+	// Readable, chronologically sortable name (server local time). A numeric
+	// suffix is added only on the rare same-second collision so two backups in
+	// the same second never overwrite each other.
 	stamp := time.Now().Format("2006-01-02_15-04-05")
-	suffix := strings.ReplaceAll(backupUUID(), "-", "")
-	if len(suffix) > 8 {
-		suffix = suffix[:8]
+	destination := filepath.Join(backupRoot, "gextto-backup-"+stamp+".zip")
+	for counter := 2; ; counter++ {
+		if _, err := os.Stat(destination); os.IsNotExist(err) {
+			break
+		}
+		destination = filepath.Join(backupRoot, fmt.Sprintf("gextto-backup-%s-%d.zip", stamp, counter))
 	}
-	destination := filepath.Join(backupRoot, "gextto-backup-"+stamp+"-"+suffix+".zip")
 	// Write to a sibling temporary file on the same filesystem, then rename:
 	// the published archive is always complete or absent, never truncated.
 	tmpZip := destination + ".tmp"
