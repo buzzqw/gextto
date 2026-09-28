@@ -2800,67 +2800,92 @@
     });
   }
 
+  function heroPersonLink(person) {
+    var label = esc(String(person && person.name || ""));
+    if (!label) return "";
+    var url = person && (person.url || person.profile_url);
+    if (url && safeHref(url)) {
+      return '<a href="' + esc(safeHref(url)) + '" target="_blank" rel="noopener">' + label + "</a>";
+    }
+    return '<a href="https://www.themoviedb.org/search?query=' + encodeURIComponent(String(person.name || "")) + '" target="_blank" rel="noopener">' + label + "</a>";
+  }
+
+  function heroCastHTML(cast) {
+    if (!Array.isArray(cast) || !cast.length) return "";
+    return "<small>Cast: " + cast.slice(0, 12).map(function (person) {
+      var link = heroPersonLink(person);
+      return person && person.character ? link + " (" + esc(String(person.character)) + ")" : link;
+    }).join(", ") + "</small>";
+  }
+
+  function setHeroPoster(hero, url, name) {
+    var slot = hero.querySelector("[data-hero-poster]");
+    if (!slot || !url || !safeHref(url)) return;
+    var image = document.createElement("img");
+    image.className = "series-poster";
+    image.loading = "lazy";
+    image.alt = String(name || "");
+    image.src = safeHref(url);
+    slot.replaceWith(image);
+  }
+
   function renderSeriesHero(hero, info) {
     var name = String(info.name || hero.getAttribute("data-name") || "");
-    var poster = String(info.poster || "");
-    var html = '<div class="series-hero-main">';
-    if (poster && safeHref(poster)) {
-      html += '<img class="series-poster" loading="lazy" alt="' + esc(name) + '" src="' + esc(safeHref(poster)) + '" />';
-    } else {
-      html += '<div class="series-poster placeholder">N/D</div>';
-    }
-    html += '<div class="series-hero-body">';
-    html += "<h2>" + esc(name) + (info.year ? ' <small class="muted">' + esc(String(info.year)) + "</small>" : "") + "</h2>";
-    var badges = [];
-    if (info.network) badges.push(String(info.network));
-    if (info.country) badges.push(String(info.country));
-    if (info.vote) badges.push("★ " + String(info.vote));
-    if (info.seasons) badges.push(String(info.seasons) + " stagioni");
-    if (info.last_air_date) badges.push("ultima " + String(info.last_air_date));
-    if (info.status) badges.push(String(info.status));
-    if (badges.length) {
-      html += '<div class="series-badges">' + badges.map(function (badge) {
+    setHeroPoster(hero, String(info.poster || ""), name);
+    var nameSlot = hero.querySelector("[data-hero-name]");
+    if (nameSlot && info.name) nameSlot.textContent = String(info.name);
+    var yearSlot = hero.querySelector("[data-hero-year]");
+    if (yearSlot && info.year) yearSlot.textContent = String(info.year);
+    var metaSlot = hero.querySelector("[data-hero-meta]");
+    if (metaSlot) {
+      var badges = [];
+      if (info.network) badges.push(String(info.network));
+      if (info.country) badges.push(String(info.country));
+      if (info.vote) badges.push("★ " + String(info.vote));
+      if (info.seasons) badges.push(String(info.seasons) + " stagioni");
+      if (info.last_air_date) badges.push("ultima " + String(info.last_air_date));
+      if (info.status) badges.push(String(info.status));
+      var next = info.next_episode;
+      if (next && next.name) {
+        badges.push("Prossima: S" + String(next.season_number || "—") + "E" +
+          String(next.episode_number || "—") + " · " + String(next.air_date || "—"));
+      }
+      metaSlot.innerHTML = badges.map(function (badge) {
         return '<span class="badge">' + esc(badge) + "</span>";
-      }).join(" ") + "</div>";
+      }).join(" ");
     }
-    var meta = [];
-    var quality = hero.getAttribute("data-quality") || "";
-    var language = hero.getAttribute("data-language") || "";
-    var archive = hero.getAttribute("data-archive") || "";
-    var enabled = hero.getAttribute("data-enabled") === "true";
-    if (quality) meta.push("Qualità: " + quality);
-    if (language) meta.push("Lingua: " + language);
-    if (archive) meta.push("Archivio: " + archive);
-    meta.push(enabled ? "attiva" : "in pausa");
-    html += '<p class="muted">' + esc(meta.join(" · ")) + "</p>";
-    if (info.overview) html += '<p class="series-overview">' + esc(String(info.overview)) + "</p>";
-    if (Array.isArray(info.genres) && info.genres.length) {
-      html += '<div class="series-genres">' + info.genres.map(function (genre) {
+    var overviewSlot = hero.querySelector("[data-hero-overview]");
+    if (overviewSlot && info.overview) overviewSlot.textContent = String(info.overview);
+    var genresSlot = hero.querySelector("[data-hero-genres]");
+    if (genresSlot && Array.isArray(info.genres) && info.genres.length) {
+      genresSlot.innerHTML = info.genres.map(function (genre) {
         return '<span class="badge">' + esc(String(genre)) + "</span>";
-      }).join(" ") + "</div>";
+      }).join(" ");
     }
-    if (Array.isArray(info.cast) && info.cast.length) {
-      html += '<p class="muted"><small>Cast: ' + esc(info.cast.slice(0, 10).map(function (person) {
-        return String(person.name || "");
-      }).join(", ")) + "</small></p>";
+    var castSlot = hero.querySelector("[data-hero-cast]");
+    if (castSlot) castSlot.innerHTML = heroCastHTML(info.cast);
+    var linksSlot = hero.querySelector("[data-hero-links]");
+    if (linksSlot) {
+      var links = "";
+      if (info.tmdb_id) links += '<a class="btn sm" href="https://www.themoviedb.org/tv/' + encodeURIComponent(String(info.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
+      if (info.tvdb_url && safeHref(info.tvdb_url)) links += '<a class="btn sm" href="' + esc(safeHref(info.tvdb_url)) + '" target="_blank" rel="noopener">TVDB</a>';
+      linksSlot.innerHTML = links;
     }
-    var next = info.next_episode;
-    if (next && next.name) {
-      html += '<p class="muted"><small>Prossima: S' + esc(String(next.season_number || "—")) +
-        "E" + esc(String(next.episode_number || "—")) + " · " + esc(String(next.name)) +
-        " · " + esc(String(next.air_date || "")) + "</small></p>";
-    }
-    var links = "";
-    if (info.tvdb_url && safeHref(info.tvdb_url)) {
-      links += '<a class="btn sm" href="' + esc(safeHref(info.tvdb_url)) + '" target="_blank" rel="noopener">TVDB</a>';
-    }
-    if (info.tmdb_id) {
-      links += ' <a class="btn sm" href="https://www.themoviedb.org/tv/' + encodeURIComponent(String(info.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
-    }
-    if (links) html += '<div class="series-links">' + links + "</div>";
-    html += "</div></div>";
-    hero.innerHTML = '<div class="panel-body series-hero">' + html + "</div>";
   }
+
+  // Series season enable/disable toggles.
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest("[data-season-toggle]");
+    if (!toggle) return;
+    var hero = toggle.closest("[data-series-hero]");
+    if (!hero) return;
+    var ignored = toggle.getAttribute("data-season-ignored") === "true";
+    var season = parseInt(toggle.getAttribute("data-season-toggle"), 10);
+    toggle.disabled = true;
+    api("/api/series/" + (hero.getAttribute("data-series-name") || "") + "/toggle-season", "POST", { season: season, enabled: ignored })
+      .then(function () { location.reload(); })
+      .catch(function (error) { notify("Stagione non aggiornata: " + error.message, "err"); toggle.disabled = false; });
+  });
 
   // ---- movie detail hero --------------------------------------------------
   var movieHero = document.querySelector("[data-movie-hero]");
@@ -2877,42 +2902,34 @@
     var movie = data.movie || {};
     var meta = data.metadata || {};
     var name = String(meta.title || movie.name || hero.getAttribute("data-name") || "");
-    var year = String(movie.year || "");
     var posterPath = String(meta.poster_path || movie.poster_path || "");
     var poster = posterPath && posterPath.indexOf("http") === 0
       ? posterPath
       : (posterPath ? "https://image.tmdb.org/t/p/w300" + posterPath : "");
-    var overview = String(meta.overview || movie.overview || "");
-    var releaseDate = String(meta.release_date || "");
-
-    var html = '<div class="series-hero-main">';
-    if (poster && safeHref(poster)) {
-      html += '<img class="series-poster" loading="lazy" alt="' + esc(name) + '" src="' + esc(safeHref(poster)) + '" />';
-    } else {
-      html += '<div class="series-poster placeholder">N/D</div>';
+    setHeroPoster(hero, poster, name);
+    var nameSlot = hero.querySelector("[data-hero-name]");
+    if (nameSlot && name) nameSlot.textContent = name;
+    var yearSlot = hero.querySelector("[data-hero-year]");
+    if (yearSlot && movie.year) yearSlot.textContent = String(movie.year);
+    var metaSlot = hero.querySelector("[data-hero-meta]");
+    if (metaSlot) {
+      var badges = [];
+      if (meta.release_date) badges.push("uscita " + String(meta.release_date));
+      metaSlot.innerHTML = badges.map(function (badge) {
+        return '<span class="badge">' + esc(badge) + "</span>";
+      }).join(" ");
     }
-    html += '<div class="series-hero-body">';
-    html += "<h2>" + esc(name) + (year ? ' <small class="muted">' + esc(year) + "</small>" : "") + "</h2>";
-    var badges = [];
-    if (releaseDate) badges.push("uscita " + releaseDate);
-    if (movie.quality) badges.push("Qualità " + String(movie.quality));
-    if (movie.language) badges.push("Lingua " + String(movie.language));
-    badges.push(movie.enabled === false ? "in pausa" : "attivo");
-    html += '<div class="series-badges">' + badges.map(function (badge) {
-      return '<span class="badge">' + esc(badge) + "</span>";
-    }).join(" ") + "</div>";
-    if (overview) html += '<p class="series-overview">' + esc(overview) + "</p>";
-    if (Array.isArray(data.cast) && data.cast.length) {
-      html += '<p class="muted"><small>Cast: ' + esc(data.cast.slice(0, 10).map(function (person) {
-        return String(person.name || "") + (person.character ? " (" + person.character + ")" : "");
-      }).join(", ")) + "</small></p>";
+    var overviewSlot = hero.querySelector("[data-hero-overview]");
+    if (overviewSlot && (meta.overview || movie.overview)) overviewSlot.textContent = String(meta.overview || movie.overview);
+    var castSlot = hero.querySelector("[data-hero-cast]");
+    if (castSlot) castSlot.innerHTML = heroCastHTML(data.cast);
+    var linksSlot = hero.querySelector("[data-hero-links]");
+    if (linksSlot) {
+      var links = "";
+      if (movie.tmdb_id) links += '<a class="btn sm" href="https://www.themoviedb.org/movie/' + encodeURIComponent(String(movie.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
+      if (movie.tvdb_id) links += '<a class="btn sm" href="https://thetvdb.com/dereferrer/movie/' + encodeURIComponent(String(movie.tvdb_id)) + '" target="_blank" rel="noopener">TVDB</a>';
+      linksSlot.innerHTML = links;
     }
-    var links = "";
-    if (movie.tmdb_id) links += '<a class="btn sm" href="https://www.themoviedb.org/movie/' + encodeURIComponent(String(movie.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
-    if (movie.tvdb_id) links += ' <a class="btn sm" href="https://thetvdb.com/dereferrer/movie/' + encodeURIComponent(String(movie.tvdb_id)) + '" target="_blank" rel="noopener">TVDB</a>';
-    if (links) html += '<div class="series-links">' + links + "</div>";
-    html += "</div></div>";
-    hero.innerHTML = '<div class="panel-body series-hero">' + html + "</div>";
   }
 
   // ---- comics explore results (Download Now / Seleziona) ------------------

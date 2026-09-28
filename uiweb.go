@@ -42,6 +42,7 @@ var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
 	"humanBytes":  logging.HumanBytesI64,
 	"humanBytesU": func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
 	"humanRate":   func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
+	"json":        uiJSON,
 }).ParseFS(uiwebFS, "uiweb/templates/*.html"))
 
 // uiNavItem is one navigation entry of the new shell.

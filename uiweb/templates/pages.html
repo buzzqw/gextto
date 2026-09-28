@@ -416,12 +416,16 @@
   <div class="panel" data-series-hero data-series-name="{{.PathName}}"
        data-name="{{.Name}}" data-quality="{{.Quality}}" data-language="{{.Language}}"
        data-archive="{{.ArchivePath}}" data-seasons="{{.Seasons}}" data-gaps="{{.Gaps}}"
+       data-ignored-seasons="{{json .IgnoredSeasons}}"
        data-enabled="{{if .Enabled}}true{{else}}false{{end}}">
     <div class="panel-body series-hero">
       <div class="series-hero-main">
-        <div class="series-poster placeholder">N/D</div>
+        <div class="series-poster placeholder" data-hero-poster>N/D</div>
         <div class="series-hero-body">
-          <h2>{{.Name}}</h2>
+          <div class="series-hero-top">
+            <h2><span data-hero-name>{{.Name}}</span> <small class="muted" data-hero-year></small></h2>
+            <div class="series-links" data-hero-links></div>
+          </div>
           <div class="series-badges">
             {{if .Quality}}<span class="badge">Qualità {{.Quality}}</span>{{end}}
             {{if .Language}}<span class="badge">Lingua {{.Language}}</span>{{end}}
@@ -430,40 +434,56 @@
             {{if .Gaps}}<span class="badge warn">{{.Gaps}} mancanti</span>{{end}}
             <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
             <span class="badge">{{.StatusLabel}}</span>
+            <span data-hero-meta></span>
           </div>
           {{if .ArchivePath}}<p class="muted"><small>Archivio: <code title="{{.ArchivePath}}">{{.ArchivePath}}</code></small></p>{{end}}
-          {{if .IgnoredSeasons}}<p class="muted"><small>Stagioni disattivate: {{range $index, $season := .IgnoredSeasons}}{{if $index}}, {{end}}{{$season}}{{end}}</small></p>{{end}}
+          <p class="series-overview" data-hero-overview></p>
+          <div class="series-genres" data-hero-genres></div>
+          <p class="muted" data-hero-cast></p>
+          {{if .SeasonButtons}}
+          <div class="season-toggles">
+            <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
+            {{range .SeasonButtons}}<button class="btn sm {{if .Ignored}}warn{{else}}primary{{end}}" data-season-toggle="{{.Season}}" data-season-ignored="{{if .Ignored}}true{{else}}false{{end}}" title="Attiva o disattiva la stagione {{.Season}}">S{{.Season}}</button>{{end}}
+          </div>
+          {{end}}
         </div>
       </div>
     </div>
   </div>
 
   <div class="panel">
-    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.Gaps}} mancanti</small></div>
+    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.DownloadedCount}}/{{.EpisodeCount}} · {{.Gaps}} mancanti</small></div>
     <div class="panel-body">
       <div class="toolbar"><input class="input" type="search" data-series-filter placeholder="Filtra episodi (numero, titolo, stato)…" title="Filtra le righe già caricate" /></div>
-      {{if .Episodes}}
-      <div class="table-wrap"><table class="data-table series-episodes">
-        <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th title="Punteggio di qualità del file archiviato">Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
-        <tbody>
-        {{range .Episodes}}
-        <tr>
-          <td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td>
-          <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-          <td>{{.Status}}{{if .Ignored}} <span class="badge warn">ignorato</span>{{end}}</td>
-          <td class="numeric">{{.QualityScore}}</td>
-          <td class="numeric">{{humanBytes .SizeBytes}}</td>
-          <td class="row-actions">
-            <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca manualmente questa puntata">Cerca</button>
-            <button class="btn sm" data-api="{{.ForcePath}}" data-method="POST" data-body="{}" title="Forza il download ignorando i controlli di qualità">Forza</button>
-            <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita questa puntata">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
-            <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile questa puntata">Riscarica</button>
-            <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina questa puntata">Elimina</button>
-          </td>
-        </tr>
+      {{if .SeasonGroups}}
+      <div class="season-list">
+        {{range .SeasonGroups}}
+        <details class="season-block" open>
+          <summary><strong>Stagione {{.Season}}</strong> <small class="muted">{{.Owned}}/{{.Total}} archiviati</small></summary>
+          <div class="table-wrap"><table class="data-table series-episodes">
+            <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th title="Punteggio di qualità del file archiviato">Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
+            <tbody>
+            {{range .Rows}}
+            <tr>
+              <td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td>
+              <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+              <td>{{.Status}}{{if .Ignored}} <span class="badge warn">ignorato</span>{{end}}</td>
+              <td class="numeric">{{.QualityScore}}</td>
+              <td class="numeric">{{humanBytes .SizeBytes}}</td>
+              <td class="row-actions">
+                <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca manualmente questa puntata">Cerca</button>
+                <button class="btn sm" data-api="{{.ForcePath}}" data-method="POST" data-body="{}" title="Forza il download ignorando i controlli di qualità">Forza</button>
+                <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita questa puntata">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
+                <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile questa puntata">Riscarica</button>
+                <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina questa puntata">Elimina</button>
+              </td>
+            </tr>
+            {{end}}
+            </tbody>
+          </table></div>
+        </details>
         {{end}}
-        </tbody>
-      </table></div>
+      </div>
       {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
     </div>
   </div>
@@ -491,15 +511,20 @@
   <div class="panel" data-movie-hero data-movie-id="{{.ID}}" data-name="{{.Name}}" data-year="{{.Year}}">
     <div class="panel-body series-hero">
       <div class="series-hero-main">
-        <div class="series-poster placeholder">N/D</div>
+        <div class="series-poster placeholder" data-hero-poster>N/D</div>
         <div class="series-hero-body">
-          <h2>{{.Name}} {{if .Year}}<small class="muted">{{.Year}}</small>{{end}}</h2>
+          <div class="series-hero-top">
+            <h2><span data-hero-name>{{.Name}}</span> <small class="muted" data-hero-year>{{.Year}}</small></h2>
+            <div class="series-links" data-hero-links></div>
+          </div>
           <div class="series-badges">
             {{if .Quality}}<span class="badge">Qualità {{.Quality}}</span>{{end}}
             {{if .Language}}<span class="badge">Lingua {{.Language}}</span>{{end}}
             <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attivo{{else}}in pausa{{end}}</span>
+            <span data-hero-meta></span>
           </div>
-          {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
+          <p class="series-overview" data-hero-overview>{{.Overview}}</p>
+          <p class="muted" data-hero-cast></p>
         </div>
       </div>
     </div>

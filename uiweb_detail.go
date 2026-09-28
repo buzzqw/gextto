@@ -21,6 +21,7 @@ type uiEpisodeRow struct {
 	Status       string
 	AirDate      string
 	Ignored      bool
+	Archived     bool
 	QualityScore int64
 	SizeBytes    int64
 	IgnorePath   string
@@ -29,6 +30,15 @@ type uiEpisodeRow struct {
 	Redownload   string
 	SearchPath   string
 	DeletePath   string
+}
+
+// uiSeasonGroup groups the episode rows of one season for the collapsible
+// per-season blocks of the series detail.
+type uiSeasonGroup struct {
+	Season int64
+	Rows   []uiEpisodeRow
+	Owned  int
+	Total  int
 }
 
 type uiSeriesDetail struct {
@@ -41,11 +51,19 @@ type uiSeriesDetail struct {
 	Exclude         string
 	Enabled         bool
 	Episodes        []uiEpisodeRow
+	SeasonGroups    []uiSeasonGroup
 	Gaps            int
 	EpisodeCount    int
 	DownloadedCount int
 	IgnoredSeasons  []int64
+	SeasonButtons   []uiSeasonButton
 	StatusLabel     string
+}
+
+// uiSeasonButton is one season toggle in the series header.
+type uiSeasonButton struct {
+	Season  int64
+	Ignored bool
 }
 
 // uiSeriesStatusLabel mirrors rextto's series status wording.
@@ -147,6 +165,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			Status:       episode.Status,
 			AirDate:      episode.AirDate,
 			Ignored:      episode.Ignored,
+			Archived:     episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "",
 			QualityScore: episode.QualityScore,
 			SizeBytes:    episode.SizeBytes,
 			IgnorePath:   base + "/ignore",
@@ -167,6 +186,34 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			gaps++
 		}
 	}
+	seasonGroups := make([]uiSeasonGroup, 0)
+	groupIndex := map[int64]int{}
+	maxSeason := int64(0)
+	for _, row := range rows {
+		position, ok := groupIndex[row.Season]
+		if !ok {
+			position = len(seasonGroups)
+			groupIndex[row.Season] = position
+			seasonGroups = append(seasonGroups, uiSeasonGroup{Season: row.Season})
+		}
+		seasonGroups[position].Rows = append(seasonGroups[position].Rows, row)
+		seasonGroups[position].Total++
+		if row.Archived {
+			seasonGroups[position].Owned++
+		}
+		if row.Season > maxSeason {
+			maxSeason = row.Season
+		}
+	}
+	for _, season := range ignoredSeasons {
+		if season > maxSeason {
+			maxSeason = season
+		}
+	}
+	seasonButtons := make([]uiSeasonButton, 0, maxSeason)
+	for season := int64(1); season <= maxSeason; season++ {
+		seasonButtons = append(seasonButtons, uiSeasonButton{Season: season, Ignored: containsInt64(ignoredSeasons, season)})
+	}
 	return uiSeriesDetail{
 		Name:            series.Name,
 		PathName:        escaped,
@@ -177,10 +224,12 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		Exclude:         series.Exclude,
 		Enabled:         series.Enabled,
 		Episodes:        rows,
+		SeasonGroups:    seasonGroups,
 		Gaps:            gaps,
 		EpisodeCount:    len(rows),
 		DownloadedCount: downloadedCount,
 		IgnoredSeasons:  ignoredSeasons,
+		SeasonButtons:   seasonButtons,
 		StatusLabel:     uiSeriesStatusLabel(len(rows), downloadedCount, ignoredSeasons),
 	}, true
 }
