@@ -2671,11 +2671,9 @@
       var button = document.createElement("button");
       button.className = "btn sm primary";
       button.textContent = "Aggiungi";
+      button.title = "Completa i requisiti e aggiungi alla libreria";
       button.addEventListener("click", function () {
-        button.disabled = true;
-        api("/api/tmdb/add", "POST", { kind: kind, name: title, year: year, tmdb_id: String(id) })
-          .then(function () { button.textContent = "Aggiunto"; })
-          .catch(function (error) { notify("Aggiunta non riuscita: " + error.message, "err"); button.disabled = false; });
+        openAddModal(kind, { name: title, year: year, tmdb_id: String(id), tvdb_id: String(item.tvdb_id || "") });
       });
       cell.appendChild(button);
       row.appendChild(cell);
@@ -2938,6 +2936,120 @@
       if (movie.tvdb_id) links += '<a class="btn sm" href="https://thetvdb.com/dereferrer/movie/' + encodeURIComponent(String(movie.tvdb_id)) + '" target="_blank" rel="noopener">TVDB</a>';
       linksSlot.innerHTML = links;
     }
+  }
+
+  // ---- add-to-library completion modal (rextto-style) ---------------------
+  var addModalOptions = {
+    quality: [["", "Qualsiasi"], ["720p", "720p"], ["720p+", "720p+"], ["1080p", "1080p"], ["1080p+", "1080p+"], ["2160p", "2160p 4K"], ["2160p+", "2160p+ 4K+"]],
+    language: [["", "Predefinita (ita)"], ["ita", "Italiano"], ["eng", "Inglese"], ["ita,eng", "Italiano + Inglese"], ["multi", "Multi"], ["any", "Qualsiasi"]]
+  };
+
+  function addModalField(label, name, value, options) {
+    var wrap = document.createElement("label");
+    wrap.className = "field";
+    var span = document.createElement("span");
+    span.textContent = label;
+    var control;
+    if (options) {
+      control = document.createElement("select");
+      control.className = "input";
+      options.forEach(function (option) {
+        var node = document.createElement("option");
+        node.value = option[0];
+        node.textContent = option[1];
+        if (option[0] === value) node.selected = true;
+        control.appendChild(node);
+      });
+    } else {
+      control = document.createElement("input");
+      control.className = "input";
+      control.value = value || "";
+    }
+    control.setAttribute("name", name);
+    wrap.appendChild(span);
+    wrap.appendChild(control);
+    return wrap;
+  }
+
+  function openAddModal(kind, prefill) {
+    prefill = prefill || {};
+    var overlay = document.getElementById("add-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "add-overlay";
+      overlay.className = "overlay";
+      document.body.appendChild(overlay);
+    }
+    overlay.hidden = false;
+    overlay.innerHTML = "";
+    overlay.onclick = function (event) { if (event.target === overlay) overlay.hidden = true; };
+
+    var modal = document.createElement("div");
+    modal.className = "modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    var head = document.createElement("div");
+    head.className = "modal-head";
+    var title = document.createElement("h3");
+    title.textContent = kind === "movie" ? "Aggiungi film" : "Aggiungi serie";
+    var close = document.createElement("button");
+    close.className = "btn sm";
+    close.type = "button";
+    close.textContent = "Chiudi";
+    close.addEventListener("click", function () { overlay.hidden = true; });
+    head.appendChild(title);
+    head.appendChild(close);
+    modal.appendChild(head);
+
+    var body = document.createElement("div");
+    body.className = "modal-body";
+    var form = document.createElement("div");
+    form.className = "form-grid";
+    form.appendChild(addModalField("Titolo", "name", prefill.name || ""));
+    form.appendChild(addModalField("Anno", "year", prefill.year || ""));
+    form.appendChild(addModalField("TMDB ID", "tmdb_id", prefill.tmdb_id || ""));
+    form.appendChild(addModalField("TVDB ID", "tvdb_id", prefill.tvdb_id || ""));
+    form.appendChild(addModalField("Qualità richiesta", "quality", "", addModalOptions.quality));
+    form.appendChild(addModalField("Lingue", "language", "", addModalOptions.language));
+    form.appendChild(addModalField("Sottotitoli", "subtitle", ""));
+    if (kind !== "movie") {
+      form.appendChild(addModalField("Stagioni", "seasons", "1+"));
+      form.appendChild(addModalField("Alias", "aliases", ""));
+      form.appendChild(addModalField("Percorso NAS", "archive_path", ""));
+    }
+    form.appendChild(addModalField("Esclusioni", "exclude", ""));
+
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var confirm = document.createElement("button");
+    confirm.className = "btn primary";
+    confirm.type = "button";
+    confirm.textContent = "Conferma";
+    var message = document.createElement("small");
+    message.className = "muted";
+    confirm.addEventListener("click", function () {
+      var payload = { kind: kind };
+      Array.prototype.forEach.call(form.querySelectorAll("[name]"), function (field) {
+        payload[field.getAttribute("name")] = field.value;
+      });
+      if (!String(payload.name || "").trim()) { message.textContent = "Inserisci il titolo"; return; }
+      confirm.disabled = true;
+      api("/api/tmdb/add", "POST", payload).then(function () {
+        overlay.hidden = true;
+        notify("Aggiunto alla libreria", "ok");
+        if (partials[view]) { load(); return; }
+        var container = page.querySelector("[data-ui-table]");
+        if (container && container._refetch) container._refetch();
+      }).catch(function (error) { message.textContent = error.message; confirm.disabled = false; });
+    });
+    actions.appendChild(confirm);
+    actions.appendChild(message);
+    form.appendChild(actions);
+    body.appendChild(form);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    var first = form.querySelector("[name=name]");
+    if (first) first.focus();
   }
 
   // ---- comics explore results (Download Now / Seleziona) ------------------
