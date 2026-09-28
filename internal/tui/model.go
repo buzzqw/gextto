@@ -192,7 +192,6 @@ type Screen struct {
 }
 
 // Event is one torrent event (alias kept for readability in the model).
-type modelEvent = Event
 
 // Model is the pure TUI state. It has no terminal or network dependencies, so
 // every transition can be tested deterministically.

@@ -158,7 +158,6 @@ type anacrolixEngine struct {
 	manifest     map[string]anacrolixManifestEntry
 	samples      map[string]anacrolixSample
 	policyPaused map[string]struct{}
-	lastErr      string
 	closed       bool
 }
 

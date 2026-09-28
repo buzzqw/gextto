@@ -568,22 +568,6 @@ func jsonError(w http.ResponseWriter, status int, message string) {
 	jsonStatus(w, status, map[string]any{"ok": false, "error": message})
 }
 
-// jsonOK writes a 200 response, guaranteeing `"ok":true`.
-func jsonOK(w http.ResponseWriter, value any) {
-	if value == nil {
-		jsonResponse(w, map[string]any{"ok": true})
-		return
-	}
-	if object, ok := value.(map[string]any); ok {
-		if _, exists := object["ok"]; !exists {
-			object["ok"] = true
-		}
-		jsonResponse(w, object)
-		return
-	}
-	jsonResponse(w, value)
-}
-
 // pathParam returns the `{key}` path wildcard, or "" when absent.
 func pathParam(r *http.Request, key string) string { return r.PathValue(key) }
 

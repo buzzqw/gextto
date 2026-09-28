@@ -242,9 +242,6 @@ func (s *AppState) activeEngine() TorrentEngine {
 	return embeddedEngine{s.torrents}
 }
 
-// activeSession is the automation-facing view of activeEngine.
-func (s *AppState) activeSession() TorrentSession { return s.activeEngine() }
-
 // setActiveEngine installs an alternative engine. A nil engine restores the
 // embedded libtorrent backend.
 func (s *AppState) setActiveEngine(engine TorrentEngine) {

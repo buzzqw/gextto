@@ -46,8 +46,7 @@ func (l Level) String() string {
 var (
 	logMu     sync.Mutex
 	logWriter io.Writer = os.Stdout
-	rotating  *RotatingWriter
-	minLevel  = LevelInfo
+	minLevel            = LevelInfo
 	filePath  string
 )
 
@@ -55,7 +54,6 @@ var (
 func Init(dir, base string, maxBytes int64, maxFiles int) func() {
 	rw := NewRotatingWriter(dir, base, maxBytes, maxFiles)
 	logMu.Lock()
-	rotating = rw
 	filePath = filepath.Join(dir, base)
 	logWriter = rw
 	logMu.Unlock()

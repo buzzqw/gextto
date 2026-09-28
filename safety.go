@@ -9,19 +9,6 @@ import (
 	"github.com/buzzqw/gextto/internal/logging"
 )
 
-// recoverPanic logs a recovered panic with its stack. It is the single place
-// that formats crash diagnostics, so a defective component degrades gracefully
-// instead of taking the whole daemon down.
-func recoverPanic(component string, detail ...any) {
-	recovered := recover()
-	if recovered == nil {
-		return
-	}
-	fields := []any{"component", component, "panic", fmt.Sprint(recovered), "stack", string(debug.Stack())}
-	fields = append(fields, detail...)
-	logging.Error("recovered panic", fields...)
-}
-
 // workerRestartDelay is the pause before a panicked worker is restarted. It is a
 // variable so tests can shorten it.
 var workerRestartDelay = 5 * time.Second

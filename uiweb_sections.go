@@ -63,10 +63,6 @@ type uiSettingsSection struct {
 	Buttons []uiActionButton
 }
 
-func sectionSettings(title, hint string, fields []uiSettingField) uiPageSection {
-	return uiPageSection{Kind: "settings", Settings: uiSettingsSection{Title: title, Hint: hint, Fields: fields}}
-}
-
 func sectionSettingsActions(title, hint string, fields []uiSettingField, buttons []uiActionButton) uiPageSection {
 	return uiPageSection{Kind: "settings", Settings: uiSettingsSection{Title: title, Hint: hint, Fields: fields, Buttons: buttons}}
 }
@@ -260,27 +256,6 @@ func boolFieldHint(name, label, hint string, value bool) uiFormField {
 	field := boolField(name, label, value)
 	field.Hint = hint
 	return field
-}
-
-// uiQualityOptions are the quality presets used by the library add forms.
-var uiQualityOptions = []uiFormOption{
-	{Value: "", Label: "Qualsiasi", Selected: true},
-	{Value: "720p", Label: "720p"},
-	{Value: "720p+", Label: "720p+"},
-	{Value: "1080p", Label: "1080p"},
-	{Value: "1080p+", Label: "1080p+"},
-	{Value: "2160p", Label: "2160p 4K"},
-	{Value: "2160p+", Label: "2160p+ 4K+"},
-}
-
-// uiLanguageOptions are the language presets (multiple languages use "ita,eng").
-var uiLanguageOptions = []uiFormOption{
-	{Value: "", Label: "Predefinita (ita)", Selected: true},
-	{Value: "ita", Label: "Italiano"},
-	{Value: "eng", Label: "Inglese"},
-	{Value: "ita,eng", Label: "Italiano + Inglese"},
-	{Value: "multi", Label: "Multi"},
-	{Value: "any", Label: "Qualsiasi"},
 }
 
 // uiPanelsPageFor builds the section list of the pages that need more than one

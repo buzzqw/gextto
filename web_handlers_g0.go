@@ -33,8 +33,7 @@ import (
 )
 
 var (
-	gh0_weeklyDatePattern     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-	gh0_archiveEpisodePattern = regexp.MustCompile(`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`)
+	gh0_weeklyDatePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 )
 
 // The input structs below live outside the `web.go` core range (they are
@@ -60,10 +59,6 @@ type gh0_backfillMediaInfoInput struct {
 // ---------------------------------------------------------------------------
 // small generic helpers
 // ---------------------------------------------------------------------------
-
-func gh0_strPtr(value string) *string { return &value }
-
-func gh0_i64Ptr(value int64) *int64 { return &value }
 
 func gh0_derefStr(value *string) string {
 	if value == nil {

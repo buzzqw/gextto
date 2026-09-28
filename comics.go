@@ -1122,10 +1122,6 @@ func DownloadHTTP(client *http.Client, rawURL, targetDir, title string) (string,
 	return handleHTTPOutcome(id, control, outcome, path, err)
 }
 
-func startHTTPDownload(client *http.Client, rawURL, targetDir, title string) string {
-	return startHTTPDownloadWithCompletion(client, rawURL, targetDir, title, nil)
-}
-
 func startHTTPDownloadWithCompletion(client *http.Client, rawURL, targetDir, title string, onComplete func(string)) string {
 	id := registerHTTPDownload(title, "http", rawURL)
 	control := installHTTPControl(id, client, rawURL, targetDir, title)

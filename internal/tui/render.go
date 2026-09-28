@@ -220,13 +220,6 @@ func (m *Model) hints() string {
 	return hints
 }
 
-func (m *Model) renderError() []Line {
-	return []Line{
-		{Text: m.Tr.Format("msg.offline", m.Err), Style: StyleErr},
-		{Text: m.Tr.T("msg.sethint"), Style: StyleMuted},
-	}
-}
-
 func (m *Model) renderStatus(width, contentHeight int) []Line {
 	if m.Status == nil {
 		return []Line{{Text: m.Tr.T("msg.loading"), Style: StyleMuted}}
