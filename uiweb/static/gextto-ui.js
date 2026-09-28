@@ -3403,6 +3403,60 @@
     showRenamePreview(preview.getAttribute("data-rename-preview"), preview.getAttribute("data-rename-execute"));
   });
 
+  // ---- language / subtitle helpers ---------------------------------------
+  document.addEventListener("change", function (event) {
+    var preset = event.target.closest("[data-preset-for]");
+    if (!preset || !preset.value) return;
+    var scope = preset.closest("form") || preset.closest(".form-grid") || preset.closest(".panel");
+    var input = scope ? scope.querySelector('[name="' + preset.getAttribute("data-preset-for") + '"]') : null;
+    if (input) input.value = preset.value;
+  });
+
+  (function initLanguageRequirements() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-lang-requirements]"), function (box) {
+      var rows = Array.prototype.slice.call(box.querySelectorAll(".lang-row"));
+      var hidden = box.parentNode ? box.parentNode.querySelector("[data-lang-hidden]") : null;
+      var value = String(box.getAttribute("data-value") || "").trim();
+      var entries = [];
+      if (value.charAt(0) === "[") {
+        try {
+          JSON.parse(value).forEach(function (entry) {
+            if (entry && entry.language) entries.push({ language: String(entry.language), required: entry.required !== false });
+          });
+        } catch (error) { entries = []; }
+      } else if (value) {
+        value.split(/[,\+]/).forEach(function (part) {
+          if (part.trim()) entries.push({ language: part.trim().toLowerCase(), required: true });
+        });
+      }
+      var sync = function () {
+        var out = [];
+        rows.forEach(function (row) {
+          var select = row.querySelector("[data-lang-select]");
+          var check = row.querySelector("[data-lang-required]");
+          if (check) {
+            check.disabled = !(select && select.value);
+            if (!select || !select.value) check.checked = false;
+          }
+          if (select && select.value) out.push({ language: select.value, required: check ? check.checked : true });
+        });
+        if (hidden) hidden.value = out.length ? JSON.stringify(out) : "";
+      };
+      rows.forEach(function (row, index) {
+        var select = row.querySelector("[data-lang-select]");
+        var check = row.querySelector("[data-lang-required]");
+        var entry = entries[index];
+        if (entry) {
+          if (select) select.value = entry.language;
+          if (check) check.checked = entry.required;
+        }
+        if (select) select.addEventListener("change", sync);
+        if (check) check.addEventListener("change", sync);
+      });
+      sync();
+    });
+  })();
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";

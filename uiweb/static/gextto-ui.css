@@ -395,6 +395,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 .field-row { display: flex; align-items: center; gap: 8px; }
 .field-row .input { flex: 1; min-width: 0; }
+.lang-rows { display: flex; flex-direction: column; gap: 6px; }
+.lang-row { display: flex; align-items: center; gap: 10px; }
+.lang-row select { flex: 0 0 180px; }
+.lang-row .check { margin: 0; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .path-modal { width: min(760px, 96vw); }
 .path-list { display: flex; flex-direction: column; gap: 2px; max-height: 45vh; overflow-y: auto; }

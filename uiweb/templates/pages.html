@@ -500,8 +500,18 @@
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
         <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 720p-1080p" /></label>
-        <label class="field"><span>Lingue</span><input class="input" name="language" value="{{.Language}}" placeholder="es. ita,eng" /></label>
-        <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" /></label>
+        <label class="field"><span>Lingue</span>
+          <span class="field-row">
+            <select class="input" data-preset-for="language" title="Preset rapidi: aggiorna la casella a destra">{{template "lang_preset_options"}}</select>
+            <input class="input" name="language" value="{{.Language}}" placeholder="es. ita,eng" title="Lingue audio richieste, separate da virgola" />
+          </span>
+        </label>
+        <label class="field"><span>Sottotitoli</span>
+          <span class="field-row">
+            <select class="input" data-preset-for="subtitle" title="Preset rapidi: aggiorna la casella a destra">{{template "lang_preset_options"}}</select>
+            <input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" title="Sottotitoli richiesti, separati da virgola" />
+          </span>
+        </label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
         <label class="field span-full"><span>Percorso archivio (NAS)</span>
@@ -547,13 +557,32 @@
         <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" /></label>
         <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" /></label>
-        <label class="field"><span>Lingua</span><input name="language" value="{{.Language}}" /></label>
-        <label class="field"><span>Sottotitoli</span><input name="subtitle" value="{{.Subtitle}}" /></label>
+        <label class="field"><span>Lingua</span>
+          <span class="field-row">
+            <select class="input" data-preset-for="language" title="Preset rapidi">{{template "lang_preset_options"}}</select>
+            <input name="language" value="{{.Language}}" placeholder="es. ita,eng" title="Lingua audio richiesta" />
+          </span>
+        </label>
+        <label class="field"><span>Sottotitoli (facoltativi)</span>
+          <span class="field-row">
+            <select class="input" data-preset-for="subtitle" title="Preset rapidi">{{template "lang_preset_options"}}</select>
+            <input name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" title="Sottotitoli preferiti" />
+          </span>
+        </label>
+        <div class="field span-full"><span>Lingue richieste (fino a 3)</span>
+          <div class="lang-rows" data-lang-requirements data-value="{{.LanguageRequirements}}">
+            <div class="lang-row"><select class="input" data-lang-select title="Lingua richiesta">{{template "lang_single_options"}}</select><label class="check" title="La release deve contenere questa lingua"><input type="checkbox" data-lang-required /> <span>obbligatoria</span></label></div>
+            <div class="lang-row"><select class="input" data-lang-select title="Lingua richiesta">{{template "lang_single_options"}}</select><label class="check" title="La release deve contenere questa lingua"><input type="checkbox" data-lang-required /> <span>obbligatoria</span></label></div>
+            <div class="lang-row"><select class="input" data-lang-select title="Lingua richiesta">{{template "lang_single_options"}}</select><label class="check" title="La release deve contenere questa lingua"><input type="checkbox" data-lang-required /> <span>obbligatoria</span></label></div>
+          </div>
+          <input type="hidden" name="language_requirements" data-lang-hidden value="{{.LanguageRequirements}}" />
+        </div>
+        <label class="field span-full"><span>Requisiti sottotitoli (obbligatori)</span>
+          <input name="subtitle_requirements" value="{{.SubtitleRequirements}}" placeholder="es. ita,eng" title="Lingue di sottotitoli obbligatorie" />
+        </label>
         <label class="field"><span>Escludi</span><input name="exclude" value="{{.Exclude}}" title="Parole da escludere nella ricerca di questo film" /></label>
         <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
         <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
-        <input type="hidden" name="language_requirements" value="{{.LanguageRequirements}}" />
-        <input type="hidden" name="subtitle_requirements" value="{{.SubtitleRequirements}}" />
         <div class="form-actions"><button class="btn sm primary" type="submit">Salva</button><small class="muted"></small></div>
       </form>
       <div class="toolbar" style="margin-top:10px">
@@ -586,6 +615,10 @@
   </div>
 </div>
 {{end}}
+
+{{define "lang_preset_options"}}<option value="">Preset…</option><option value="ita">Italiano</option><option value="eng">Inglese</option><option value="ita,eng">Italiano + Inglese</option><option value="multi">Multi</option><option value="any">Qualsiasi</option>{{end}}
+
+{{define "lang_single_options"}}<option value="">—</option><option value="ita">Italiano</option><option value="eng">Inglese</option><option value="spa">Spagnolo</option><option value="fra">Francese</option><option value="deu">Tedesco</option>{{end}}
 
 {{define "settings_field"}}
 <form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
