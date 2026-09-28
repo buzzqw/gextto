@@ -369,10 +369,16 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 	}
 	trimmed := strings.TrimSpace(value)
 	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
-		// A structured object (or array of objects) is never shown as raw JSON;
-		// it is edited through its dedicated editor.
-		field.Kind = "structured"
-		return field
+		var parsed any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+			switch parsed.(type) {
+			case map[string]any, []any:
+				// A structured object (or array of objects) is never shown as
+				// raw JSON; it is edited through its dedicated editor.
+				field.Kind = "structured"
+				return field
+			}
+		}
 	}
 	if field.Kind == "bool" {
 		field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(value)
