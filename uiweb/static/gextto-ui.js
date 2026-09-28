@@ -306,10 +306,19 @@
         if (view === "downloads") {
           var currentSlot = page.querySelector("[data-torrents-slot]");
           if (currentSlot) {
+            // The download partial is replaced on every poll. Preserve the
+            // user's selection across that DOM replacement; otherwise the
+            // checkboxes appear to clear themselves after a few seconds.
+            var selectedBeforeRefresh = selectedHashes();
             var holder = document.createElement("div");
             holder.innerHTML = html;
             var incomingSlot = holder.querySelector("[data-torrents-slot]");
             if (incomingSlot) {
+              var selectedSet = Object.create(null);
+              selectedBeforeRefresh.forEach(function (hash) { selectedSet[hash] = true; });
+              Array.prototype.forEach.call(incomingSlot.querySelectorAll("[data-download-select]"), function (node) {
+                node.checked = !!selectedSet[node.getAttribute("data-hash") || ""];
+              });
               currentSlot.replaceWith(incomingSlot);
               updateDownloadSelection();
               applyTorrentSort();

@@ -38,6 +38,23 @@ test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) 
   await expect(page.locator("label.check").filter({ hasText: "Scarica subito" })).toBeVisible();
 });
 
+test("selezione torrent mantenuta durante il polling", async ({ page }) => {
+  await page.route("**/ui/partial/torrents", async (route) => {
+    await route.fulfill({
+      contentType: "text/html; charset=utf-8",
+      body: `<div class="view" data-torrents-slot>
+        <input type="checkbox" data-download-select data-hash="selection-test" />
+      </div>`,
+    });
+  });
+  await page.goto("/?view=downloads");
+  const checkbox = page.locator("[data-download-select]").first();
+  await expect(checkbox).toBeVisible();
+  await checkbox.check();
+  await page.waitForTimeout(3500);
+  await expect(checkbox).toBeChecked();
+});
+
 test("selettore lingua presente e selezionabile", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".lang-select")).toBeVisible();
