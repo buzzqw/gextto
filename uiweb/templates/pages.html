@@ -414,7 +414,7 @@
     <button class="btn sm primary" data-api="/api/series/{{.PathName}}/search-missing" data-method="POST" data-body="{}" title="Cerca le release per gli episodi mancanti">Cerca mancanti</button>
     <button class="btn sm" data-api="/api/series/{{.PathName}}/scan-archive" data-method="POST" data-body="{}" title="Scansiona l'archivio per questa serie">Scansiona archivio</button>
     <button class="btn sm" data-api="/api/series/{{.PathName}}/metadata" data-method="POST" data-body="{}" title="Aggiorna i metadati TMDB">Aggiorna da TMDB</button>
-    <button class="btn sm" data-api="/api/series/{{.PathName}}/rename-preview" data-method="POST" data-body="{}" title="Anteprima rinomina TMDB">Anteprima rinomina</button>
+    <button class="btn sm" data-rename-preview="/api/series/{{.PathName}}/rename-preview" data-rename-execute="/api/series/{{.PathName}}/rename-execute" title="Anteprima rinomina TMDB">Anteprima rinomina</button>
   </div>
 
   <div class="panel" data-series-hero data-series-name="{{.PathName}}"

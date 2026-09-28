@@ -3266,6 +3266,143 @@
     openAddModal(manual.getAttribute("data-open-add") || "series", { name: name });
   });
 
+  // ---- rename preview modal (series) --------------------------------------
+  function renameFileName(path) {
+    var parts = String(path || "").split(/[\\/]/);
+    return parts[parts.length - 1] || path || "";
+  }
+
+  function showRenamePreview(previewURL, executeURL) {
+    var overlay = document.getElementById("rename-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "rename-overlay";
+      overlay.className = "overlay";
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", function (event) {
+        if (event.target === overlay || event.target.closest("[data-rename-close]")) overlay.hidden = true;
+      });
+    }
+    overlay.hidden = false;
+    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Anteprima rinomina">' +
+      '<div class="modal-head"><h3>Anteprima rinomina</h3><button class="btn sm" type="button" data-rename-close>Chiudi</button></div>' +
+      '<div class="modal-body" data-rename-body><p class="muted">Analisi in corso…</p></div></div>';
+    var body = overlay.querySelector("[data-rename-body]");
+    api(previewURL, "POST", {}).then(function (data) {
+      renderRenamePreview(body, data || {}, executeURL, overlay);
+    }).catch(function (error) {
+      body.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+    });
+  }
+
+  function renderRenamePreview(body, data, executeURL, overlay) {
+    body.innerHTML = "";
+    var items = Array.isArray(data.items) ? data.items : [];
+
+    var summary = document.createElement("div");
+    summary.className = "series-badges";
+    [
+      ["Da rinominare", items.length],
+      ["Già corretti", Number(data.already_ok_count) || 0],
+      ["File presenti", (Number(data.with_path) || 0) + "/" + (Number(data.episodes) || 0)],
+      ["Scartati", Number(data.discarded_count) || 0],
+      ["Errori", Number(data.error_count) || 0],
+    ].forEach(function (pair) {
+      var badge = document.createElement("span");
+      badge.className = "badge" + (pair[0] === "Errori" && pair[1] > 0 ? " err" : "");
+      badge.textContent = pair[0] + ": " + pair[1];
+      summary.appendChild(badge);
+    });
+    body.appendChild(summary);
+
+    if (!items.length) {
+      var none = document.createElement("p");
+      none.className = "muted";
+      none.textContent = "Nessuna rinomina necessaria: i file sono già nel formato corretto.";
+      body.appendChild(none);
+    } else {
+      var table = document.createElement("table");
+      table.className = "data-table";
+      table.innerHTML = "<thead><tr><th>Ep.</th><th>Vecchio nome</th><th>Nuovo nome / esito</th></tr></thead>";
+      var tbody = document.createElement("tbody");
+      items.forEach(function (item) {
+        var row = document.createElement("tr");
+        var ep = document.createElement("td");
+        ep.className = "numeric";
+        ep.textContent = "S" + String(item.season || "—") + "E" + String(item.episode || "—");
+        var fromCell = document.createElement("td");
+        fromCell.className = "truncate";
+        fromCell.title = String(item.from || "");
+        fromCell.textContent = renameFileName(item.from);
+        var toCell = document.createElement("td");
+        if (item.error) {
+          toCell.innerHTML = '<span class="badge err">errore</span> ' + esc(String(item.error));
+        } else if (item.discarded) {
+          toCell.innerHTML = '<span class="badge warn">scartato</span>';
+        } else {
+          toCell.className = "truncate";
+          toCell.title = String(item.to || "");
+          toCell.textContent = renameFileName(item.to);
+        }
+        row.appendChild(ep);
+        row.appendChild(fromCell);
+        row.appendChild(toCell);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      var wrap = document.createElement("div");
+      wrap.className = "table-wrap";
+      wrap.appendChild(table);
+      body.appendChild(wrap);
+    }
+
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var execute = document.createElement("button");
+    execute.className = "btn sm primary";
+    execute.textContent = "Esegui rinomina";
+    execute.disabled = items.length === 0;
+    var force = document.createElement("button");
+    force.className = "btn sm danger";
+    force.textContent = "Forza rinomina";
+    force.title = "Rinomina anche i file già corretti";
+    var message = document.createElement("small");
+    message.className = "muted";
+
+    var runRename = function (forceFlag) {
+      execute.disabled = true;
+      force.disabled = true;
+      message.textContent = "Rinomina in corso…";
+      api(executeURL, "POST", { force: forceFlag }).then(function (result) {
+        var renamed = Number(result && result.renamed_count) || 0;
+        var discarded = Number(result && result.discarded_count) || 0;
+        message.textContent = "Fatto: " + renamed + " rinominati, " + discarded + " scartati";
+        notify("Rinomina: " + renamed + " file aggiornati", "ok");
+      }).catch(function (error) {
+        message.textContent = error.message;
+        notify("Rinomina non riuscita: " + error.message, "err");
+      }).then(function () {
+        execute.disabled = false;
+        force.disabled = false;
+      });
+    };
+    execute.addEventListener("click", function () { runRename(false); });
+    force.addEventListener("click", function () {
+      if (!confirm("Forzare la rinomina? Verranno toccati anche i file già corretti.")) return;
+      runRename(true);
+    });
+    actions.appendChild(execute);
+    actions.appendChild(force);
+    actions.appendChild(message);
+    body.appendChild(actions);
+  }
+
+  document.addEventListener("click", function (event) {
+    var preview = event.target.closest("[data-rename-preview]");
+    if (!preview) return;
+    showRenamePreview(preview.getAttribute("data-rename-preview"), preview.getAttribute("data-rename-execute"));
+  });
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";
