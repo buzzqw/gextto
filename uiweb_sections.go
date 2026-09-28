@@ -58,6 +58,7 @@ type uiFormSection struct {
 	Hint   string
 	Path   string
 	Method string
+	Wrap   string // optional JSON object key around submitted fields
 	Submit string
 	Render string // optional result renderer: tmdb | releases
 	Fields []uiFormField
@@ -122,8 +123,17 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		return uiPanelsPage{Sections: []uiPageSection{
 			sectionTable(spec),
 			sectionForm(uiFormSection{
-				Title: "Aggiungi o cerca una serie (TMDB/TVDB)",
-				Hint:  "Cerca su TMDB/TVDB e aggiungi con i dati già compilati, oppure inserisci l'ID manualmente.",
+				Title: "Cerca una serie (TMDB)",
+				Hint:  "Cerca il titolo e aggiungi direttamente il risultato trovato.",
+				Path:  "/api/tmdb/search", Submit: "Cerca", Render: "tmdb",
+				Fields: []uiFormField{
+					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "series", Label: "Serie TV", Selected: true}}},
+					{Name: "query", Label: "Titolo", Placeholder: "Nome serie"},
+				},
+			}),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi serie manualmente",
+				Hint:  "Usa questa scheda se hai già un ID TMDB/TVDB o vuoi compilare i valori a mano.",
 				Path:  "/api/tmdb/add", Submit: "Aggiungi serie",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "series", Label: "Serie TV", Selected: true}, {Value: "movie", Label: "Film"}}},
@@ -142,7 +152,16 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		return uiPanelsPage{Sections: []uiPageSection{
 			sectionTable(spec),
 			sectionForm(uiFormSection{
-				Title: "Aggiungi un film (TMDB/TVDB)",
+				Title: "Cerca un film (TMDB)",
+				Hint:  "Cerca il titolo e aggiungi direttamente il risultato trovato.",
+				Path:  "/api/tmdb/search", Submit: "Cerca", Render: "tmdb",
+				Fields: []uiFormField{
+					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "movie", Label: "Film", Selected: true}}},
+					{Name: "query", Label: "Titolo", Placeholder: "Titolo film"},
+				},
+			}),
+			sectionForm(uiFormSection{
+				Title: "Aggiungi film manualmente",
 				Path:  "/api/tmdb/add", Submit: "Aggiungi film",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "movie", Label: "Film", Selected: true}, {Value: "series", Label: "Serie TV"}}},
@@ -330,6 +349,40 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			}),
 			Empty: "Nessun RAM disk configurato.",
 		}),
+		sectionForm(uiFormSection{
+			Title: "Seleziona RAM disk",
+			Hint:  "Inserisci un percorso tmpfs/ramfs già esistente e scrivibile.",
+			Path:  "/api/ramdisk/select", Submit: "Seleziona",
+			Fields: []uiFormField{{Name: "path", Label: "Percorso", Placeholder: "/dev/shm/gextto"}},
+		}),
+		sectionActions(uiActionSection{Label: "RAM disk automatico", Hint: "Crea /dev/shm/gextto e lo configura come destinazione temporanea.", Buttons: []uiActionButton{
+			{Label: "Crea RAM disk", Class: "primary", Method: "POST", Path: "/api/ramdisk/create", Body: `{"path":"/dev/shm/gextto"}`},
+		}}),
+		sectionTable(uiTableSpec{
+			Title:    "Backup disponibili",
+			Endpoint: "/api/backup/list",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "label", Label: "Etichetta"}, {Key: "name", Label: "Nome"},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
+			}),
+			Empty: "Nessun backup creato.",
+		}),
+		sectionForm(uiFormSection{
+			Title: "Impostazioni backup",
+			Hint:  "I valori vengono salvati nel formato usato dal daemon; lascia vuota la password per non modificarla.",
+			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup",
+			Fields: []uiFormField{
+				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5")},
+				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0")},
+				{Name: "backup_schedule_at", Label: "Orario (HH:MM)", Value: settingsOr(cfg, "backup_schedule_at", "")},
+				{Name: "backup_ftp_host", Label: "FTP host", Value: settingsOr(cfg, "backup_ftp_host", "")},
+				{Name: "backup_ftp_user", Label: "FTP utente", Value: settingsOr(cfg, "backup_ftp_user", "")},
+				{Name: "backup_ftp_path", Label: "FTP percorso", Value: settingsOr(cfg, "backup_ftp_path", "")},
+				{Name: "backup_cloud_dir", Label: "Cartella cloud", Value: settingsOr(cfg, "backup_cloud_dir", "")},
+				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
+			},
+		}),
 	}
 }
 
@@ -344,6 +397,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		}}),
 		sectionForm(uiFormSection{
 			Title: "Trakt — impostazioni", Path: "/api/trakt/settings", Submit: "Salva Trakt",
+			Wrap: "values",
 			Fields: []uiFormField{
 				{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", "")},
 				{Name: "trakt_client_secret", Label: "Client secret", Kind: "text"},
@@ -358,6 +412,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		}}),
 		sectionForm(uiFormSection{
 			Title: "Simkl — impostazioni", Path: "/api/simkl/settings", Submit: "Salva Simkl",
+			Wrap: "values",
 			Fields: []uiFormField{
 				{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", "")},
 				{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays},
@@ -393,6 +448,15 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			ItemsKey:    "shows",
 			ColumnsJSON: uiJSON([]uiColumn{{Key: "show", Label: "Serie"}}),
 			Empty:       "Watchlist vuota o Simkl non configurato.",
+		}),
+		sectionTable(uiTableSpec{
+			Title:    "Calendario Simkl",
+			Endpoint: "/api/simkl/calendar",
+			ItemsKey: "",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "date", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
+			}),
+			Empty: "Nessuna uscita o Simkl non configurato.",
 		}),
 		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
@@ -461,6 +525,18 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 					{Name: "hash", Label: "Hash"},
 					{Name: "tag", Label: "Tag"},
 				},
+			}),
+			sectionTable(uiTableSpec{
+				Title:    "Storico download",
+				Endpoint: "/api/torrents/history",
+				ItemsKey: "items",
+				ColumnsJSON: uiJSON([]uiColumn{
+					{Key: "name", Label: "Nome"}, {Key: "kind", Label: "Tipo"},
+					{Key: "status", Label: "Stato"}, {Key: "tag", Label: "Tag"},
+					{Key: "quality_score", Label: "Punteggio", Format: "number"},
+					{Key: "processed_path", Label: "Archivio"}, {Key: "completed_at", Label: "Concluso"},
+				}),
+				Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
 			}),
 		},
 	}

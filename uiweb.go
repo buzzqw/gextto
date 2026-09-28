@@ -94,6 +94,7 @@ type uiDashboardData struct {
 	MoviesConfigured int
 	ArchiveTotal     int64
 	FreeSpace        uint64
+	TrashBytes       uint64
 	SeenGroups       int64
 	TrashCount       int64
 	NextCycle        string
@@ -136,6 +137,7 @@ type uiUpcoming struct {
 type uiTorrentRow struct {
 	Hash         string
 	Name         string
+	Tag          string
 	State        string
 	StateClass   string
 	Progress     float64
@@ -456,6 +458,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 		RamdiskPath:  ramdisk,
 	})
 	data.FreeSpace = health.DiskFreeBytes
+	data.TrashBytes = health.TrashBytes
 	if cfg.RefreshSecs > 0 {
 		start, ok := s.db.LastCycleAt()
 		if snapshot := s.last_cycle.Snapshot(); snapshot.LastStartedAt != nil && (!ok || snapshot.LastStartedAt.After(start)) {
@@ -584,6 +587,12 @@ func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 
 func uiTorrentRows(s *AppState) []uiTorrentRow {
 	views := s.activeEngine().List()
+	tags := make(map[string]string)
+	if pairs, err := s.db.TorrentTags(); err == nil {
+		for _, pair := range pairs {
+			tags[strings.ToLower(pair[0])] = pair[1]
+		}
+	}
 	rows := make([]uiTorrentRow, 0, len(views))
 	for _, view := range views {
 		progress := view.Progress
@@ -600,6 +609,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		rows = append(rows, uiTorrentRow{
 			Hash:         view.Hash,
 			Name:         view.Name,
+			Tag:          tags[strings.ToLower(view.Hash)],
 			State:        uiStateLabel(view.State),
 			StateClass:   uiStateClass(view.State),
 			Progress:     progress,

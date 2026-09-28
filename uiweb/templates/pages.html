@@ -52,7 +52,7 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-render="{{.Render}}">
+    <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-wrap="{{.Wrap}}" data-render="{{.Render}}">
       {{range .Fields}}
       <label class="field"><span>{{.Label}}</span>
         {{if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" placeholder="{{.Placeholder}}" rows="3">{{.Value}}</textarea>
@@ -140,7 +140,30 @@
 
 {{define "downloads"}}
 <div class="view">
-  {{template "torrents_body" .Torrents}}
+  <div class="panel">
+    <div class="panel-head"><h3>Aggiungi torrent</h3></div>
+    <div class="panel-body">
+      <form class="form-grid" data-torrent-add>
+        <label class="field span-full"><span>Magnet o URL .torrent</span>
+          <input class="input" name="magnet" data-torrent-magnet placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" />
+        </label>
+        <label class="field"><span>Percorso (opzionale)</span><input class="input" name="save_path" data-torrent-save-path placeholder="cartella predefinita" /></label>
+        <label class="field"><span>File .torrent</span><input class="input" type="file" accept=".torrent,application/x-bittorrent" data-torrent-upload /></label>
+        <div class="toolbar span-full">
+          <label class="check"><input type="checkbox" data-torrent-option="start" checked /> <span>Scarica subito</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="no_rename" /> <span>Non rinominare</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="sequential" /> <span>Sequenziale</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="seed_mode" /> <span>Salta verifica</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="queue_top" /> <span>In cima alla coda</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="first_last" /> <span>Primo/ultimo pezzo</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="metadata_only" /> <span>Solo metadati</span></label>
+          <label class="check"><input type="checkbox" data-torrent-option="preallocate" checked /> <span>Prealloca spazio</span></label>
+        </div>
+        <div class="form-actions span-full"><button class="btn primary" type="submit">Aggiungi</button><small class="muted" data-torrent-message aria-live="polite"></small></div>
+      </form>
+    </div>
+  </div>
+  <div data-torrents-slot>{{template "torrents_body" .Torrents}}</div>
   {{range .Panels}}{{template "section" .}}{{end}}
 </div>
 {{end}}
@@ -330,7 +353,10 @@
 
 {{define "settings_field"}}
 <form class="card setting" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
-  <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
+  <div class="setting-heading">
+    <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
+    <code class="setting-key">{{.Key}}</code>
+  </div>
   {{if eq .Kind "structured"}}
   <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
   {{else}}
@@ -349,7 +375,7 @@
   <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" />
   {{end}}
   <div class="setting-foot">
-    <code class="setting-key">{{.Key}}</code>
+    <small class="setting-status muted" data-setting-status aria-live="polite"></small>
     <button class="btn sm primary" type="submit">Salva</button>
   </div>
   {{end}}
@@ -387,11 +413,28 @@
 {{define "settings"}}
 <div class="view settings-view" data-settings-index="{{.SearchIndexJSON}}">
   <div class="settings-head">
-    <input type="search" class="input settings-search" data-settings-search placeholder="Cerca tra le impostazioni…" autocomplete="off" />
+    <div class="settings-title-row">
+      <div>
+        <span class="eyebrow">Configurazione</span>
+        {{range .Tabs}}{{if .Active}}<h2>{{.Label}}</h2>{{end}}{{end}}
+      </div>
+      <span class="settings-save-hint">Le modifiche si salvano per campo</span>
+    </div>
+    <label class="settings-search-wrap">
+      <span class="settings-search-icon" aria-hidden="true">⌕</span>
+      <span class="sr-only">Cerca impostazioni</span>
+      <input type="search" class="input settings-search" data-settings-search placeholder="Cerca per nome o chiave…" autocomplete="off" />
+    </label>
+    <label class="settings-tab-select-wrap">
+      <span>Sezione</span>
+      <select class="input settings-tab-select" data-settings-tab-select aria-label="Sezione configurazione">
+        {{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{.Label}}{{if .Count}} ({{.Count}}){{end}}</option>{{end}}
+      </select>
+    </label>
     <div class="chip-row">
       {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}">{{.Label}}{{if .Count}}<span class="chip-count">{{.Count}}</span>{{end}}</a>{{end}}
     </div>
-    <div class="card settings-results" data-settings-results hidden></div>
+    <div class="card settings-results" data-settings-results hidden role="listbox"></div>
   </div>
 
   <div class="settings-body" data-settings-body>

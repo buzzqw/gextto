@@ -19,13 +19,21 @@
   var tokenPrompted = false;
 
   function request(path, method, body) {
+    var requestMethod = (method || "GET").toUpperCase();
     var headers = { "Content-Type": "application/json" };
     var value = token();
     if (value) headers["X-Gextto-Token"] = value;
+    // Browsers reject a body on GET/HEAD requests. Some generic action
+    // buttons intentionally use GET (for example the port check) and carry
+    // an empty data-body attribute, so only encode payloads for methods that
+    // can transport one.
+    var requestBody = requestMethod === "GET" || requestMethod === "HEAD"
+      ? undefined
+      : (body === undefined || body === null ? undefined : JSON.stringify(body));
     return fetch(path, {
-      method: method || "GET",
+      method: requestMethod,
       headers: headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: requestBody,
       credentials: "same-origin"
     });
   }
@@ -69,12 +77,49 @@
     if (!url) return Promise.resolve();
     return api(url, "GET")
       .then(function (html) {
+        if (view === "downloads") {
+          var currentSlot = page.querySelector("[data-torrents-slot]");
+          if (currentSlot) {
+            var holder = document.createElement("div");
+            holder.innerHTML = html;
+            var incomingSlot = holder.querySelector("[data-torrents-slot]");
+            if (incomingSlot) currentSlot.replaceWith(incomingSlot);
+            return;
+          }
+        }
         page.innerHTML = html;
       })
       .catch(function (error) {
         page.innerHTML = '<div class="view"><div class="alert">Impossibile caricare i dati: ' +
           esc(error.message) + "</div></div>";
       });
+  }
+
+  // Inline feedback keeps the page context visible; browser alerts were easy
+  // to miss on mobile and blocked the rest of the interface.
+  var toastHost = null;
+  function notify(message, kind) {
+    if (!toastHost) {
+      toastHost = document.createElement("div");
+      toastHost.className = "toast-host";
+      toastHost.setAttribute("aria-live", "polite");
+      document.body.appendChild(toastHost);
+    }
+    var toast = document.createElement("div");
+    toast.className = "toast " + (kind || "info");
+    toast.setAttribute("role", kind === "err" ? "alert" : "status");
+    var text = document.createElement("span");
+    text.textContent = String(message || "");
+    var close = document.createElement("button");
+    close.className = "toast-close";
+    close.type = "button";
+    close.setAttribute("aria-label", "Chiudi messaggio");
+    close.textContent = "×";
+    close.addEventListener("click", function () { toast.remove(); });
+    toast.appendChild(text);
+    toast.appendChild(close);
+    toastHost.appendChild(toast);
+    window.setTimeout(function () { if (toast.parentNode) toast.remove(); }, kind === "err" ? 7000 : 3500);
   }
 
   var timer = null;
@@ -89,6 +134,90 @@
   }
 
   document.addEventListener("click", function (event) {
+    var bulkButton = event.target.closest("[data-download-bulk]");
+    if (bulkButton) {
+      var selected = Array.prototype.map.call(page.querySelectorAll("[data-download-select]:checked"), function (node) {
+        return node.getAttribute("data-hash") || "";
+      }).filter(Boolean);
+      if (!selected.length) {
+        notify("Seleziona almeno un torrent", "err");
+        return;
+      }
+      var bulkAction = bulkButton.getAttribute("data-download-bulk");
+      if (bulkAction === "remove" && !confirm("Rimuovere i torrent selezionati dalla sessione? I file restano su disco.")) return;
+      var pathFor = function (hash) { return "/api/torrents/" + encodeURIComponent(hash) + "/" + bulkAction; };
+      bulkButton.disabled = true;
+      Promise.all(selected.map(function (hash) { return api(pathFor(hash), "POST", bulkAction === "remove" ? { delete_files: false } : {}); }))
+        .then(function () { load(); notify(selected.length + " torrent aggiornati", "ok"); })
+        .catch(function (error) { notify("Azione bulk non riuscita: " + error.message, "err"); })
+        .then(function () { bulkButton.disabled = false; });
+      return;
+    }
+    var assignTag = event.target.closest("[data-download-assign-tag]");
+    if (assignTag) {
+      var tagInput = page.querySelector("[data-download-tag]");
+      var tag = tagInput ? tagInput.value.trim() : "";
+      var hashes = Array.prototype.map.call(page.querySelectorAll("[data-download-select]:checked"), function (node) {
+        return node.getAttribute("data-hash") || "";
+      }).filter(Boolean);
+      if (!hashes.length) { notify("Seleziona almeno un torrent", "err"); return; }
+      if (!tag) { notify("Inserisci un tag", "err"); return; }
+      assignTag.disabled = true;
+      Promise.all(hashes.map(function (hash) { return api("/api/torrent-tags", "POST", { hash: hash, tag: tag }); }))
+        .then(function () { if (tagInput) tagInput.value = ""; load(); notify("Tag assegnato", "ok"); })
+        .catch(function (error) { notify("Tag non assegnato: " + error.message, "err"); })
+        .then(function () { assignTag.disabled = false; });
+      return;
+    }
+    if (event.target.closest("[data-download-select-all]")) {
+      var selectAll = event.target.closest("[data-download-select-all]");
+      Array.prototype.forEach.call(page.querySelectorAll("[data-download-select]"), function (node) { node.checked = selectAll.checked; });
+      updateDownloadSelection();
+      return;
+    }
+    var detailButton = event.target.closest("[data-torrent-detail]");
+    if (detailButton) {
+      var detailPanel = page.querySelector("[data-torrent-detail-panel]");
+      var detailOutput = detailPanel && detailPanel.querySelector("[data-torrent-detail-output]");
+      if (!detailPanel || !detailOutput) return;
+      detailButton.disabled = true;
+      api("/api/torrents/" + encodeURIComponent(detailButton.getAttribute("data-hash") || ""), "GET")
+        .then(function (data) {
+          renderReadable(detailOutput, data);
+          var detailHash = detailButton.getAttribute("data-hash") || "";
+          Array.prototype.forEach.call(detailPanel.querySelectorAll("[data-torrent-export]"), function (link) {
+            link.href = "/api/torrents/" + encodeURIComponent(detailHash) + "/" + link.getAttribute("data-torrent-export");
+          });
+          detailPanel.hidden = false;
+          detailPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        })
+        .catch(function (error) { notify("Dettagli non disponibili: " + error.message, "err"); })
+        .then(function () { detailButton.disabled = false; });
+      return;
+    }
+    var subdetailButton = event.target.closest("[data-torrent-subdetail]");
+    if (subdetailButton) {
+      var subdetailPanel = page.querySelector("[data-torrent-detail-panel]");
+      var subdetailOutput = subdetailPanel && subdetailPanel.querySelector("[data-torrent-subdetail-output]");
+      var activeDetail = subdetailPanel && subdetailPanel.querySelector("[data-torrent-export]");
+      var activeHref = activeDetail && activeDetail.getAttribute("href") || "";
+      var match = activeHref.match(/\/api\/torrents\/([^/]+)\//);
+      if (!subdetailPanel || !subdetailOutput || !match) return;
+      subdetailButton.disabled = true;
+      api("/api/torrents/" + match[1] + "/" + subdetailButton.getAttribute("data-torrent-subdetail"), "GET")
+        .then(function (data) {
+          subdetailOutput.hidden = false;
+          renderReadable(subdetailOutput, data);
+        })
+        .catch(function (error) { notify("Dati non disponibili: " + error.message, "err"); })
+        .then(function () { subdetailButton.disabled = false; });
+      return;
+    }
+    if (event.target.closest("[data-torrent-detail-close]")) {
+      var panel = page.querySelector("[data-torrent-detail-panel]");
+      if (panel) panel.hidden = true;
+      return;
+    }
     var element = event.target.closest("[data-action]");
     if (!element) return;
     var action = element.getAttribute("data-action");
@@ -102,7 +231,7 @@
       element.disabled = true;
       api("/api/run_now", "POST", {})
         .then(function () { if (partials[view]) { load(); } else { location.reload(); } })
-        .catch(function (error) { alert("Ciclo non avviato: " + error.message); })
+        .catch(function (error) { notify("Ciclo non avviato: " + error.message, "err"); })
         .then(function () { element.disabled = false; });
       return;
     }
@@ -112,22 +241,112 @@
       return;
     }
     var actions = {
-      pause: ["/api/torrents/" + hash + "/pause", "POST", {}],
-      resume: ["/api/torrents/" + hash + "/resume", "POST", {}],
-      recheck: ["/api/torrents/" + hash + "/recheck", "POST", {}],
-      remove: ["/api/torrents/" + hash + "/remove", "POST", { delete_files: false }]
+      pause: ["/api/torrents/" + encodeURIComponent(hash) + "/pause", "POST", {}],
+      resume: ["/api/torrents/" + encodeURIComponent(hash) + "/resume", "POST", {}],
+      recheck: ["/api/torrents/" + encodeURIComponent(hash) + "/recheck", "POST", {}],
+      remove: ["/api/torrents/" + encodeURIComponent(hash) + "/remove", "POST", { delete_files: false }]
     };
     var entry = actions[action];
     if (!entry) return;
     element.disabled = true;
     api(entry[0], entry[1], entry[2])
       .then(load)
-      .catch(function (error) { alert("Azione non riuscita: " + error.message); })
+      .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })
       .then(function () { element.disabled = false; });
+  });
+
+  function updateDownloadSelection() {
+    var count = page.querySelectorAll("[data-download-select]:checked").length;
+    var label = page.querySelector("[data-download-selected-count]");
+    if (label) label.textContent = count + " selezionati";
+    var selectAll = page.querySelector("[data-download-select-all]");
+    var all = page.querySelectorAll("[data-download-select]");
+    if (selectAll) selectAll.checked = all.length > 0 && count === all.length;
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.closest("[data-download-select]")) updateDownloadSelection();
   });
 
   document.addEventListener("visibilitychange", schedule);
   schedule();
+
+  // ---- add/upload torrent --------------------------------------------------
+  function uploadTorrent(file, form) {
+    var headers = { "Content-Type": "application/octet-stream" };
+    var value = token();
+    if (value) headers["X-Gextto-Token"] = value;
+    var uploadURL = "/api/upload-torrent";
+    var savePath = form && form.querySelector("[data-torrent-save-path]");
+    if (savePath && savePath.value.trim()) uploadURL += "?save_path=" + encodeURIComponent(savePath.value.trim());
+    return file.arrayBuffer().then(function (buffer) {
+      return fetch(uploadURL, {
+        method: "POST", headers: headers, body: buffer, credentials: "same-origin"
+      });
+    }).then(function (response) {
+      if (response.status === 401 && !tokenPrompted) {
+        tokenPrompted = true;
+        var entered = window.prompt("Token API Gextto (vuoto per annullare):");
+        if (entered) {
+          try { localStorage.setItem("gextto_api_token", entered); } catch (error) { /* ignore */ }
+          return uploadTorrent(file, form);
+        }
+      }
+      return handleResponse(response);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("[data-torrent-add]"), function (form) {
+    var message = form.querySelector("[data-torrent-message]");
+    var upload = form.querySelector("[data-torrent-upload]");
+    if (upload) upload.addEventListener("change", function () {
+      var file = upload.files && upload.files[0];
+      if (!file) return;
+      if (message) message.textContent = "Caricamento…";
+      upload.disabled = true;
+      uploadTorrent(file, form).then(function () {
+        if (message) message.textContent = "Torrent caricato";
+        if (partials[view]) load();
+      }).catch(function (error) {
+        if (message) message.textContent = error.message;
+        notify("Upload non riuscito: " + error.message, "err");
+      }).then(function () { upload.disabled = false; });
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var magnet = form.querySelector("[data-torrent-magnet]");
+      var value = magnet ? magnet.value.trim() : "";
+      if (!value) {
+        if (message) message.textContent = "Inserisci un magnet o un URL";
+        return;
+      }
+      var option = function (name) {
+        var node = form.querySelector('[data-torrent-option="' + name + '"]');
+        return !!(node && node.checked);
+      };
+      var savePath = form.querySelector("[data-torrent-save-path]");
+      var body = {
+        magnet: value,
+        save_path: savePath ? savePath.value.trim() : "",
+        start_paused: !option("start"),
+        no_rename: option("no_rename"),
+        sequential: option("sequential"),
+        seed_mode: option("seed_mode"),
+        queue_top: option("queue_top"),
+        first_last: option("first_last"),
+        stop_at_metadata: option("metadata_only"),
+        preallocate: option("preallocate")
+      };
+      var button = form.querySelector("button[type=submit]");
+      if (button) button.disabled = true;
+      api("/api/send-magnet", "POST", body).then(function () {
+        if (message) message.textContent = "Torrent accodato";
+        if (magnet) magnet.value = "";
+        if (partials[view]) load();
+      }).catch(function (error) {
+        if (message) message.textContent = error.message;
+        notify("Torrent non aggiunto: " + error.message, "err");
+      }).then(function () { if (button) button.disabled = false; });
+    });
+  });
 
   // ---- generic list pages -------------------------------------------------
   function esc(value) {
@@ -198,7 +417,10 @@
         } else {
           tbody.innerHTML = items.map(function (row) {
             var cells = columns.map(function (column) {
-              var value = fmt(row[column.key], column.format);
+              // Some APIs return scalar arrays (for example download tags)
+              // rather than objects. An empty column key means "the item".
+              var rawValue = column.key === "" ? row : row[column.key];
+              var value = fmt(rawValue, column.format);
               if (column.format === "series_link") {
                 return '<td><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
               }
@@ -264,7 +486,7 @@
       api("/api/movies/" + encodeURIComponent(id), "POST", body).then(function () {
         if (message) message.textContent = "Salvato";
       }).catch(function (error) {
-        alert("Salvataggio non riuscito: " + error.message);
+        notify("Salvataggio non riuscito: " + error.message, "err");
       });
     });
   });
@@ -297,7 +519,7 @@
     }).catch(function () { loadI18n(); });
     langSelect.addEventListener("change", function () {
       api("/api/i18n/language", "POST", { lang: langSelect.value }).then(function () { loadI18n(); })
-        .catch(function (error) { alert("Cambio lingua non riuscito: " + error.message); });
+        .catch(function (error) { notify("Cambio lingua non riuscito: " + error.message, "err"); });
     });
     i18nBody.addEventListener("click", function (event) {
       var button = event.target.closest("[data-i18n-save]");
@@ -307,7 +529,7 @@
       button.disabled = true;
       api("/api/i18n", "POST", { lang: langSelect.value, key: key, value: input ? input.value : "" })
         .then(function () { if (i18nMessage) i18nMessage.textContent = "Salvato"; })
-        .catch(function (error) { alert("Salvataggio non riuscito: " + error.message); })
+        .catch(function (error) { notify("Salvataggio non riuscito: " + error.message, "err"); })
         .then(function () { button.disabled = false; });
     });
     var i18nImport = i18nEditor.querySelector("[data-i18n-import]");
@@ -316,14 +538,14 @@
       i18nImport.disabled = true;
       api("/api/i18n/import/" + encodeURIComponent(langSelect.value), "POST", { yaml: area ? area.value : "" })
         .then(function () { if (i18nMessage) i18nMessage.textContent = "Importato"; loadI18n(); })
-        .catch(function (error) { alert("Import non riuscito: " + error.message); })
+        .catch(function (error) { notify("Import non riuscito: " + error.message, "err"); })
         .then(function () { i18nImport.disabled = false; });
     });
     var i18nDelete = i18nEditor.querySelector("[data-i18n-delete]");
     if (i18nDelete) i18nDelete.addEventListener("click", function () {
       if (!confirm("Eliminare tutte le traduzioni della lingua " + langSelect.value + "?")) return;
       api("/api/i18n/" + encodeURIComponent(langSelect.value), "DELETE", {}).then(function () { loadI18n(); })
-        .catch(function (error) { alert("Eliminazione non riuscita: " + error.message); });
+        .catch(function (error) { notify("Eliminazione non riuscita: " + error.message, "err"); });
     });
   }
 
@@ -343,7 +565,7 @@
     ];
     comicsLinks.addEventListener("click", function () {
       var postURL = comicsInput.value.trim();
-      if (!postURL) { alert("Inserisci l'URL del post GetComics"); return; }
+      if (!postURL) { notify("Inserisci l'URL del post GetComics", "err"); return; }
       comicsLinks.disabled = true;
       if (comicsMessage) comicsMessage.textContent = "Ricerca in corso…";
       api("/api/comics/links", "POST", { url: postURL }).then(function (data) {
@@ -382,7 +604,7 @@
         if (partials[view]) { load(); return; }
         location.reload();
       })
-      .catch(function (error) { alert("Azione non riuscita: " + error.message); })
+      .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })
       .then(function () { element.disabled = false; });
   });
 
@@ -394,6 +616,7 @@
       var input = form.querySelector("[data-setting-input]");
       if (!input) return; // structured value, edited from its dedicated section
       var button = form.querySelector("button");
+      var status = form.querySelector("[data-setting-status]");
       var secret = input.type === "password";
       var value = input.value;
       var tagJSON = input.getAttribute("data-tag-json");
@@ -407,17 +630,24 @@
           button.textContent = "Inserisci un valore";
           setTimeout(function () { button.textContent = "Salva"; }, 1500);
         }
+        if (status) status.textContent = "Inserisci un valore";
         return;
       }
       if (button) button.disabled = true;
       api("/api/config/settings", "POST", { key: key, value: value })
         .then(function () {
+          if (status) status.textContent = "Salvato";
           if (!button) return;
           button.textContent = "Salvato";
-          setTimeout(function () { button.textContent = "Salva"; button.disabled = false; }, 1500);
+          setTimeout(function () {
+            button.textContent = "Salva";
+            button.disabled = false;
+            if (status) status.textContent = "";
+          }, 1500);
         })
         .catch(function (error) {
-          alert("Salvataggio non riuscito: " + error.message);
+          notify("Salvataggio non riuscito: " + error.message, "err");
+          if (status) status.textContent = "Errore";
           if (button) button.disabled = false;
         });
     });
@@ -471,7 +701,7 @@
       api(addPath, "POST", { release: row }).then(function () {
         button.textContent = "Accodata";
       }).catch(function (error) {
-        alert("Non accodata: " + error.message);
+        notify("Non accodata: " + error.message, "err");
         button.disabled = false;
       });
     });
@@ -522,7 +752,7 @@
     api(path, "POST", {}).then(function () {
       button.textContent = "Avviato";
     }).catch(function (error) {
-      alert("Ciclo non avviato: " + error.message);
+      notify("Ciclo non avviato: " + error.message, "err");
     }).then(function () { button.disabled = false; });
   });
 
@@ -556,7 +786,7 @@
   if (langSelect) langSelect.addEventListener("change", function () {
     api("/api/i18n/active", "POST", { lang: langSelect.value })
       .then(function () { location.reload(); })
-      .catch(function (error) { alert("Cambio lingua non riuscito: " + error.message); });
+      .catch(function (error) { notify("Cambio lingua non riuscito: " + error.message, "err"); });
   });
 
   function humanRate(value) {
@@ -627,7 +857,7 @@
       api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }).then(function () {
         if (sourcesMessage) sourcesMessage.textContent = "Feed salvati";
       }).catch(function (error) {
-        alert("Salvataggio non riuscito: " + error.message);
+        notify("Salvataggio non riuscito: " + error.message, "err");
       }).then(function () { saveSources.disabled = false; });
     });
   }
@@ -708,7 +938,7 @@
       request.then(function () {
         if (message) message.textContent = "Salvato";
       }).catch(function (error) {
-        alert("Salvataggio non riuscito: " + error.message);
+        notify("Salvataggio non riuscito: " + error.message, "err");
       }).then(function () { saveButton.disabled = false; });
     });
   });
@@ -732,12 +962,12 @@
           item.exclude = form.querySelector("[name=exclude]").value;
           return item;
         });
-        if (!found) { alert("Serie non trovata"); return; }
+        if (!found) { notify("Serie non trovata", "err"); return; }
         return api("/api/config/series", "POST", series).then(function () {
           if (message) message.textContent = "Salvata";
         });
       }).catch(function (error) {
-        alert("Salvataggio non riuscito: " + error.message);
+        notify("Salvataggio non riuscito: " + error.message, "err");
       });
     });
   });
@@ -749,8 +979,12 @@
     try { settingsIndex = JSON.parse(settingsView.getAttribute("data-settings-index") || "[]"); }
     catch (error) { settingsIndex = []; }
     var searchInput = settingsView.querySelector("[data-settings-search]");
+    var tabSelect = settingsView.querySelector("[data-settings-tab-select]");
     var resultsBox = settingsView.querySelector("[data-settings-results]");
     var settingsBody = settingsView.querySelector("[data-settings-body]");
+    if (tabSelect) tabSelect.addEventListener("change", function () {
+      location.href = "/?view=settings&tab=" + encodeURIComponent(tabSelect.value);
+    });
     if (searchInput) searchInput.addEventListener("input", function () {
       var query = (searchInput.value || "").trim().toLowerCase();
       var cards = settingsBody ? settingsBody.querySelectorAll("[data-setting-key]") : [];
@@ -854,7 +1088,7 @@
         api("/api/search/add", "POST", { release: release }).then(function () {
           button.textContent = "Accodata";
         }).catch(function (error) {
-          alert("Non accodata: " + error.message);
+          notify("Non accodata: " + error.message, "err");
           button.disabled = false;
         });
       });
@@ -888,7 +1122,7 @@
         button.disabled = true;
         api("/api/tmdb/add", "POST", { kind: kind, name: title, year: year, tmdb_id: String(id) })
           .then(function () { button.textContent = "Aggiunto"; })
-          .catch(function (error) { alert("Aggiunta non riuscita: " + error.message); button.disabled = false; });
+          .catch(function (error) { notify("Aggiunta non riuscita: " + error.message, "err"); button.disabled = false; });
       });
       cell.appendChild(button);
       row.appendChild(cell);
@@ -906,13 +1140,19 @@
       Array.prototype.forEach.call(form.querySelectorAll("[name]"), function (field) {
         var value = field.value;
         if (field.type === "number") value = Number(value);
+        // boolField renders a select for APIs whose JSON contract uses real
+        // booleans (weekly/comics and provider settings), not string values.
+        if (value === "true") value = true;
+        if (value === "false") value = false;
         body[field.name] = value;
       });
       var button = form.querySelector("button[type=submit]");
       var message = form.querySelector("[data-form-message]");
       var output = form.querySelector("[data-form-output]");
       if (button) button.disabled = true;
-      api(form.getAttribute("data-endpoint"), form.getAttribute("data-method") || "POST", body).then(function (data) {
+      var wrap = form.getAttribute("data-wrap");
+      var payload = wrap ? (function () { var value = {}; value[wrap] = body; return value; }()) : body;
+      api(form.getAttribute("data-endpoint"), form.getAttribute("data-method") || "POST", payload).then(function (data) {
         if (message) message.textContent = "Fatto";
         if (output && data !== undefined && data !== null && data !== "") {
           output.hidden = false;
@@ -925,7 +1165,7 @@
           }
         }
       }).catch(function (error) {
-        alert("Operazione non riuscita: " + error.message);
+        notify("Operazione non riuscita: " + error.message, "err");
       }).then(function () { if (button) button.disabled = false; });
     });
   });
@@ -975,7 +1215,7 @@
       var output2 = panel2.querySelector("[data-oauth-output]");
       var input = panel2.querySelector("[data-oauth-code]");
       var code = input ? input.value.trim() : "";
-      if (!code) { alert("Inserisci il codice di accesso"); return; }
+      if (!code) { notify("Inserisci il codice di accesso", "err"); return; }
       poll.disabled = true;
       api(poll.getAttribute("data-oauth-poll"), "POST", { code: code })
         .then(function (data) { if (output2) renderReadable(output2, data); })

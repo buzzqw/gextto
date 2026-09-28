@@ -829,7 +829,11 @@ func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, cfg, &cfg.LibtorrentDir, options)
+	preferredPath := cfg.LibtorrentDir
+	if input.SavePath != nil && strings.TrimSpace(*input.SavePath) != "" {
+		preferredPath = strings.TrimSpace(*input.SavePath)
+	}
+	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, cfg, &preferredPath, options)
 	if err != nil {
 		_ = os.Remove(path)
 		jsonError(w, http.StatusBadRequest, err.Error())

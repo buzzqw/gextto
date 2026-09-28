@@ -972,3 +972,10 @@ Su richiesta: la UI non mostra e non fa usare JSON. Tutto è a campi leggibili.
   risposte OAuth/PIN sono tabelle/link o blocchi chiave-valore leggibili; i
   valori annidati mostrano un'etichetta, mai il JSON.
 - Le chiavi interne (`_*`) e quelle con editor dedicato non vengono ripetute.
+
+## 25. Audit successivo
+
+Le sezioni 18–24 descrivono lo stato della migrazione al momento della loro
+stesura. La verifica completa più recente distingue la copertura delle viste
+dalla parità dei flussi browser e documenta i gap ancora aperti in
+[`docs/audit-ui-2026-09-28.md`](audit-ui-2026-09-28.md).

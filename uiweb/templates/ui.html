@@ -9,22 +9,24 @@
 <link rel="stylesheet" href="/ui/static/gextto-ui.css">
 </head>
 <body>
+<a class="skip-link" href="#ui-page">Vai al contenuto</a>
 <div class="app-shell">
   <aside class="sidebar" id="app-sidebar">
     <div class="brand">
-      <span class="brand-mark">R</span>
+       <span class="brand-mark" aria-hidden="true">G</span>
       <div><strong>Gextto</strong><small title="Versione applicazione">Media daemon · v{{.Chrome.Version}}</small></div>
     </div>
     <nav>
-      <button type="button" class="nav-item nav-search" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
-        <span class="nav-search-icon">🔍</span><span>Cerca impostazioni</span>
-      </button>
-      {{range .Groups}}
-      <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-        {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
-        {{range .Items}}
-        <button class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" title="{{.Label}}" data-nav="{{.ID}}"><span>{{.Label}}</span>{{if .Count}}<span class="nav-count">{{.Count}}</span>{{end}}</button>
-        {{end}}
+       <a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
+         <span class="nav-search-icon">🔍</span><span>Cerca impostazioni</span>
+       </a>
+       {{range .Groups}}
+       <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
+         <div class="nav-group-label">{{.Label}}</div>
+         {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
+         {{range .Items}}
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="nav-count">{{.Count}}</span>{{end}}</a>
+         {{end}}
       </div>
       {{end}}
     </nav>
@@ -94,15 +96,24 @@
 
 {{define "dashboard"}}
 <div class="view">
+  <div class="dashboard-intro">
+    <div>
+      <span class="eyebrow">Panoramica</span>
+      <h2>Controllo libreria e download</h2>
+      <p class="muted">Monitora il servizio, avvia una ricerca o raggiungi subito la sezione che ti serve.</p>
+    </div>
+    <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}" title="{{if .DryRun}}Nessun download reale: Gextto analizza i candidati ma non scarica.{{else}}Gextto può scaricare e archiviare i contenuti.{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
+  </div>
   <div class="grid-4">
-    <div class="metric"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
-    <div class="metric"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
-    <div class="metric"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
-    <div class="metric"><span class="metric-sub">Spazio libero</span><strong>{{humanBytesU .FreeSpace}}</strong></div>
+    <div class="metric mint"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
+    <div class="metric blue"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
+    <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
+    <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{humanBytesU .FreeSpace}}</strong></div>
     <div class="metric"><span class="metric-sub">Visti nei feed</span><strong>{{.SeenGroups}}</strong></div>
-    <div class="metric"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
+    <div class="metric amber"><span class="metric-sub">Cestino</span><strong>{{humanBytesU .TrashBytes}}</strong></div>
+    <div class="metric mint"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
     <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
-    <div class="metric"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
+    <div class="metric{{if .DryRun}} amber{{end}}"><span class="metric-sub">Stato daemon</span><strong>{{if .Active}}Attivo{{else}}In pausa{{end}}</strong>{{if .DryRun}}<span class="badge warn">dry-run</span>{{end}}</div>
   </div>
 
   <div class="panel">
@@ -117,6 +128,20 @@
           <thead data-ui-head></thead>
           <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel dashboard-explore-panel">
+    <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <a class="btn" href="/?view=series">📺 Serie TV</a>
+        <a class="btn" href="/?view=movies">🎬 Film</a>
+        <a class="btn" href="/?view=search">🔎 Esplora release</a>
+        <a class="btn" href="/?view=comics">📚 Fumetti</a>
+        <a class="btn" href="/?view=archive">📦 Archivio</a>
+        <a class="btn" href="/?view=maintenance">🛠 Manutenzione</a>
       </div>
     </div>
   </div>
@@ -201,7 +226,7 @@
 {{end}}
 
 {{define "torrents"}}
-<div class="view">{{template "torrents_body" .}}</div>
+<div class="view" data-torrents-slot>{{template "torrents_body" .}}</div>
 {{end}}
 
 {{define "torrents_body"}}
@@ -211,16 +236,28 @@
       <small class="muted">{{.Count}} torrent · aggiornato {{.UpdatedAt}}</small>
     </div>
     <div class="panel-body">
+      <div class="toolbar download-bulk-toolbar">
+        <span class="muted" data-download-selected-count>0 selezionati</span>
+        <button class="btn sm" type="button" data-download-bulk="pause">Pausa selezionati</button>
+        <button class="btn sm" type="button" data-download-bulk="resume">Riprendi selezionati</button>
+        <button class="btn sm" type="button" data-download-bulk="recheck">Recheck selezionati</button>
+        <button class="btn sm danger" type="button" data-download-bulk="remove">Rimuovi selezionati</button>
+        <input class="input compact" data-download-tag placeholder="Tag per selezionati" aria-label="Tag per torrent selezionati" />
+        <button class="btn sm" type="button" data-download-assign-tag>Assegna tag</button>
+        <button class="btn sm" type="button" data-api="/api/torrents/remove_completed" data-method="POST" data-body='{"delete_files":false}' title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+      </div>
       {{if .Rows}}
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr>
-            <th>Nome</th><th>Stato</th><th>Progresso</th><th>↓</th><th>↑</th><th>Peer / Seed</th><th>Ratio</th><th>Azioni</th>
+            <th><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th><th>Nome</th><th>Tag</th><th>Stato</th><th>Progresso</th><th>↓</th><th>↑</th><th>Peer / Seed</th><th>Ratio</th><th>Azioni</th>
           </tr></thead>
           <tbody>
             {{range .Rows}}
             <tr data-hash="{{.Hash}}">
+              <td><input type="checkbox" data-download-select data-hash="{{.Hash}}" aria-label="Seleziona {{.Name}}" /></td>
               <td class="truncate" title="{{.Name}}">{{.Name}}</td>
+              <td>{{if .Tag}}<span class="badge">{{.Tag}}</span>{{else}}<span class="muted">—</span>{{end}}</td>
               <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
               <td style="min-width:140px">
                 <div class="progress" title="{{printf "%.1f" .Progress}}%"><span style="width:{{.ProgressPct}}%"></span></div>
@@ -237,6 +274,7 @@
                 <button class="btn sm" data-action="pause" data-hash="{{.Hash}}" title="Metti in pausa il torrent">Pausa</button>
                 {{end}}
                 <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Recheck</button>
+                <button class="btn sm" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent">Dettagli</button>
                 <button class="btn sm danger" data-action="remove" data-hash="{{.Hash}}" title="Rimuovi il torrent (i file restano)">Rimuovi</button>
               </td>
             </tr>
@@ -249,7 +287,20 @@
       {{end}}
     </div>
   </div>
-</div>
+  <div class="panel torrent-detail-panel" data-torrent-detail-panel hidden>
+    <div class="panel-head"><h3>Dettagli torrent</h3><button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button></div>
+    <div class="panel-body">
+      <div class="toolbar torrent-detail-tabs">
+        <button class="btn sm" type="button" data-torrent-subdetail="peers">Peer</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="files">File</button>
+        <a class="btn sm" data-torrent-export="magnet" target="_blank" rel="noopener">Magnet</a>
+        <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
+      </div>
+      <div class="output" data-torrent-detail-output></div>
+      <div class="output" data-torrent-subdetail-output hidden></div>
+    </div>
+  </div>
 {{end}}
 {{define "health"}}
 <div class="view">

@@ -3,6 +3,7 @@ package gextto
 import (
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -29,6 +30,11 @@ func TestUiShellRendersNavigationParity(t *testing.T) {
 	for _, label := range []string{"Dashboard", "Scarico", "Serie TV", "Film", "Mancanti", "Esplora", "Archivio", "Fumetti", "Configurazione", "Integrazioni", "Manutenzione", "Salute", "Log", "Blocklist", "Manuale", "Licenza"} {
 		if !strings.Contains(html, ">"+label+"<") {
 			t.Fatalf("navigation missing %q", label)
+		}
+	}
+	for _, group := range []string{"Panoramica", "Download", "Libreria", "Scoperta", "Sistema"} {
+		if !strings.Contains(html, `class="nav-group-label">`+group+"<") {
+			t.Fatalf("navigation group missing %q", group)
 		}
 	}
 	if !strings.Contains(html, "/ui/static/gextto-ui.js") {
@@ -120,6 +126,14 @@ func TestUiServerRenderedPages(t *testing.T) {
 		if code != http.StatusOK || !strings.Contains(string(body), marker) {
 			t.Fatalf("GET /ui?view=%s -> %d, missing %q", view, code, marker)
 		}
+	}
+	code, _, body := webGet(t, server, "/ui?view=downloads")
+	if code != http.StatusOK || !strings.Contains(string(body), `data-torrent-add`) || !strings.Contains(string(body), `data-torrents-slot`) || !strings.Contains(string(body), `data-download-bulk`) || !strings.Contains(string(body), `data-torrent-subdetail`) {
+		t.Fatalf("downloads missing add form or refresh slot")
+	}
+	code, _, body = webGet(t, server, "/ui/partial/torrents")
+	if code != http.StatusOK || !strings.Contains(string(body), `data-torrents-slot`) {
+		t.Fatalf("torrent partial missing refresh slot")
 	}
 }
 
@@ -220,6 +234,21 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 	if cssCode != http.StatusOK || len(css) < 10_000 {
 		t.Fatalf("GET /ui/static/gextto-ui.css -> %d (%d bytes)", cssCode, len(css))
 	}
+	for _, marker := range []string{".app-shell { flex-direction: row; }", "@media (max-width: 900px)", ".settings-tab-select-wrap"} {
+		if !strings.Contains(string(css), marker) {
+			t.Fatalf("stylesheet missing responsive marker %q", marker)
+		}
+	}
+}
+
+func TestUiReadActionsDoNotSendJSONBodies(t *testing.T) {
+	code, err := fs.ReadFile(uiwebFS, "uiweb/static/gextto-ui.js")
+	if err != nil {
+		t.Fatalf("read embedded UI client: %v", err)
+	}
+	if !strings.Contains(string(code), `requestMethod === "GET" || requestMethod === "HEAD"`) {
+		t.Fatal("UI client must omit bodies for GET/HEAD requests")
+	}
 }
 
 func TestUiStateLabelParity(t *testing.T) {
@@ -307,6 +336,7 @@ func TestUiDashboardParity(t *testing.T) {
 	}
 	html := string(body)
 	for _, marker := range []string{
+		"Controllo libreria e download", "dashboard-explore-panel", "DRY-RUN",
 		"Serie TV configurate", "Film configurati", "Magnet in archivio", "Spazio libero",
 		"Visti nei feed", "Torrent in sessione", "Prossima ricerca automatica",
 		"Consumo banda", "Azioni rapide", "Ultimo ciclo", "Sessione",
@@ -333,7 +363,7 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("settings -> %d", code)
 	}
-	for _, marker := range []string{`data-settings-index=`, `data-settings-search`, `class="chip`, `data-setting-key="`, `settings-grid`} {
+	for _, marker := range []string{`data-settings-index=`, `data-settings-search`, `data-settings-tab-select`, `class="chip`, `data-setting-key="`, `data-setting-status`, `settings-grid`} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("settings page missing %q", marker)
 		}
