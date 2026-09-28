@@ -5,13 +5,12 @@ package gextto
 //
 // It is purely additive: the Leptos SPA keeps serving `/`, while the new UI
 // lives under `/ui`. The shell is a plain HTML document; the dynamic regions are
-// fetched from authenticated `/ui/partial/...` endpoints and the actions reuse
+// fetched from `/ui/partial/...` endpoints and the actions reuse
 // the existing JSON APIs, so the API contract and all current behaviour are
 // untouched.
 //
-// Security model (unchanged): the document is public like the legacy shell, and
-// every data/action request carries the API token in `X-Gextto-Token`, which the
-// small client script reads from `localStorage["gextto_api_token"]`.
+// The document and its JSON calls are served without an authentication layer;
+// the daemon is meant to listen on a trusted interface (default 127.0.0.1).
 
 import (
 	"bytes"

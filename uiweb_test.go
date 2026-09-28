@@ -163,11 +163,6 @@ func TestUiDownloadsToolbarParity(t *testing.T) {
 
 func TestUiPagesArePublicOnLan(t *testing.T) {
 	state := newTestAppState(t)
-	// A token may be configured, but the new UI is meant for a trusted LAN and
-	// does not gate its pages or partials.
-	if err := SaveSetting(state.cfg.DataDir, "api_token", "lan-token"); err != nil {
-		t.Fatalf("save token: %v", err)
-	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
@@ -706,22 +701,6 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 			add(action.Method, action.Path)
 		}
 	}
-	// Action pages.
-	for _, view := range []string{"maintenance"} {
-		page, ok := uiActionsPageFor(view)
-		if !ok {
-			t.Fatalf("missing actions page %s", view)
-		}
-		for _, section := range page.Sections {
-			for _, button := range section.Buttons {
-				add(button.Method, button.Path)
-			}
-		}
-	}
-	// Integrations (OAuth + media servers).
-	for _, button := range uiActionsPageButtons(uiIntegrationsPageFrom(newTestAppState(t)).Sections) {
-		add(button.Method, button.Path)
-	}
 	// Panels pages: library, archive, comics, maintenance, integrations and the
 	// download page. Every section table/action/form must map to a real route.
 	for _, view := range []string{"series", "movies", "gaps", "archive", "blocklist", "comics", "maintenance", "integrations"} {
@@ -757,6 +736,7 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 		"GET /api/i18n/active", "GET /api/i18n/export/{lang}", "POST /api/i18n/import/{lang}", "DELETE /api/i18n/{lang}",
 		"POST /api/comics/links", "POST /api/comics/download",
 		"GET /api/comics/downloads",
+		"POST /api/maintenance/clean-duplicates", "POST /api/db/action",
 		"POST /api/run_now",
 		"POST /api/torrents/{hash}/pause", "POST /api/torrents/{hash}/resume",
 		"POST /api/torrents/{hash}/recheck", "POST /api/torrents/{hash}/remove",
@@ -779,14 +759,6 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 			t.Errorf("new UI references an unregistered route: %s", check)
 		}
 	}
-}
-
-func uiActionsPageButtons(sections []uiActionSection) []uiActionButton {
-	var buttons []uiActionButton
-	for _, section := range sections {
-		buttons = append(buttons, section.Buttons...)
-	}
-	return buttons
 }
 
 func decodeActions(t *testing.T, raw string) []uiAction {

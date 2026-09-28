@@ -170,6 +170,10 @@ type uiProgressSection struct {
 type uiPanelsPage struct {
 	Sections []uiPageSection
 	Groups   []uiPageGroup
+	// Stack renders every group as a full-width column instead of rextto's
+	// two-column grid. Integrations, Manutenzione and Fumetti opt in so their
+	// panels keep the same single-column rhythm as the Configurazione page.
+	Stack bool
 }
 
 type uiDownloadsPage struct {
@@ -323,7 +327,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 			section.Group = name
 			return section
 		}
-		return uiPanelsPage{Sections: []uiPageSection{
+		return uiPanelsPage{Stack: true, Sections: []uiPageSection{
 			group("Aggiungi fumetto", sectionForm(uiFormSection{
 				Title: "Esplora GetComics", Hint: "Cerca il titolo, poi scarica con Download Now o aggiungi il fumetto alla libreria.", Path: "/api/comics/explore", Submit: "Trova", Render: "comics",
 				Fields: []uiFormField{{Name: "query", Label: "Titolo", Placeholder: "es. Poison Ivy #41"}},
@@ -376,9 +380,9 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 			sectionComicsLinks(),
 		}}, true
 	case "maintenance":
-		return uiPanelsPage{Sections: uiMaintenanceSections(s, cfg)}, true
+		return uiPanelsPage{Sections: uiMaintenanceSections(s, cfg), Stack: true}, true
 	case "integrations":
-		return uiPanelsPage{Sections: uiIntegrationSections(s, cfg)}, true
+		return uiPanelsPage{Sections: uiIntegrationSections(s, cfg), Stack: true}, true
 	}
 	return uiPanelsPage{}, false
 }

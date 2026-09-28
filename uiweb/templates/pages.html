@@ -246,10 +246,15 @@
 {{define "pages_panels"}}
 <div class="view">
   {{range .Groups}}
-  {{if gt (len .Sections) 1}}
+  {{if and (gt (len .Sections) 1) (not $.Stack)}}
   <div class="section-group">
     {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
     <div class="grid-2">{{range .Sections}}{{template "section" .}}{{end}}</div>
+  </div>
+  {{else if .Title}}
+  <div class="section-group">
+    <div class="section-group-label">{{.Title}}</div>
+    {{range .Sections}}{{template "section" .}}{{end}}
   </div>
   {{else}}
   {{range .Sections}}{{template "section" .}}{{end}}
@@ -684,7 +689,8 @@
 {{define "settings_field"}}
 <form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
   <div class="setting-info">
-    <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</label>
+    <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
+    {{if .Hint}}<small class="setting-hint" title="{{.Hint}}">{{.Hint}}</small>{{end}}
     <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
   </div>
   <div class="setting-control">
@@ -696,13 +702,13 @@
       <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
     </select>
     {{else if eq .Kind "tags"}}
-    <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="un valore per riga">{{.Value}}</textarea>
+    <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}">{{.Value}}</textarea>
     {{else if eq .Kind "area"}}
-    <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3">{{.Value}}</textarea>
+    <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
     {{else if eq .Kind "secret"}}
     <input class="input" type="password" data-setting-input id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
     {{else}}
-    <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" />
+    <input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
     {{end}}
   </div>
   <div class="setting-actions">
@@ -740,6 +746,27 @@
 </div>
 {{end}}
 
+{{define "settings_editors"}}
+{{if .ShowSources}}
+<div class="card editor-card" data-sources-editor>
+  <h3>Feed RSS</h3>
+  <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
+  <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message></small></div>
+</div>
+{{end}}
+{{range .ListEditors}}{{template "list_editor" .}}{{end}}
+{{if .Extras}}
+<div class="panel settings-panel">
+  <div class="panel-head"><h3>{{.ExtrasTitle}}</h3></div>
+  <div class="panel-body">
+    {{if .ExtrasHint}}<p class="hint">{{.ExtrasHint}}</p>{{end}}
+    <div class="settings-rows">{{range .Extras}}{{template "settings_field" .}}{{end}}</div>
+    {{if .ExtrasActions}}<div class="toolbar" style="margin-top:10px">{{range .ExtrasActions}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>{{end}}</div>{{end}}
+  </div>
+</div>
+{{end}}
+{{end}}
+
 {{define "settings"}}
 <div class="view settings-view" data-settings-index="{{.SearchIndexJSON}}">
   <div class="settings-head">
@@ -773,6 +800,8 @@
   </div>
 
   <div class="settings-body" data-settings-body>
+    {{if .Actions}}{{template "action_section" .Actions}}{{end}}
+    {{if .EditorsFirst}}{{template "settings_editors" .}}{{end}}
     {{range .Groups}}
     <div class="panel settings-panel">
       <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
@@ -785,15 +814,7 @@
     <p class="muted">Nessuna impostazione in questa sezione.</p>
     {{end}}
 
-    {{if .ShowSources}}
-    <div class="card editor-card" data-sources-editor>
-      <h3>Feed RSS</h3>
-      <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
-      <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message></small></div>
-    </div>
-    {{end}}
-
-    {{range .ListEditors}}{{template "list_editor" .}}{{end}}
+    {{if not .EditorsFirst}}{{template "settings_editors" .}}{{end}}
 
     {{if .ShowI18n}}
     <div class="card editor-card" data-i18n-editor>

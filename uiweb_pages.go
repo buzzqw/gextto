@@ -78,17 +78,15 @@ type uiActionSection struct {
 	Buttons []uiActionButton
 }
 
-type uiActionsPage struct {
-	Title    string
-	Sections []uiActionSection
-}
-
 // uiSettingField is one editable setting in the new settings page.
 type uiSettingField struct {
 	Key   string
 	Label string
 	Value string
 	Kind  string // text|bool|area|secret|tags
+	// Placeholder is the default value shown greyed out when the setting is
+	// still unset, so the form mirrors rextto/extto instead of looking empty.
+	Placeholder string
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
 	Hint string
 	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
@@ -143,6 +141,18 @@ type uiSettingsPage struct {
 	ShowI18n        bool
 	ListEditors     []uiListEditor
 	SearchIndexJSON string
+	// Actions is an optional toolbar of API buttons shown at the top of the
+	// tab (e.g. Ottimizza / Applica ora in Libtorrent).
+	Actions *uiActionSection
+	// Extras is an optional panel rendered right after the list editors, used
+	// to keep FlareSolverr under the indexer editor like rextto/extto.
+	Extras        []uiSettingField
+	ExtrasTitle   string
+	ExtrasHint    string
+	ExtrasActions []uiActionButton
+	// EditorsFirst renders the structured editors (feed, indexer, FlareSolverr)
+	// before the plain fields, the order extto/rextto use on the Sorgenti tab.
+	EditorsFirst bool
 }
 
 // uiSettingGroup is one titled block of settings rows. rextto groups the fields
@@ -346,9 +356,27 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	page.ShowI18n = active == "i18n"
 	switch active {
 	case "sources":
+		page.EditorsFirst = true
 		page.ListEditors = []uiListEditor{uiIndexerEditor}
+		// FlareSolverr belongs to the indexers, not to the generic fields: it is
+		// rendered as its own panel right below the Indexer Torznab editor.
+		page.ExtrasTitle = "FlareSolverr"
+		page.ExtrasHint = "Serve per superare Cloudflare su alcuni siti/indexer."
+		page.Extras = []uiSettingField{uiSettingFieldFor("flaresolverr_url", "URL FlareSolverr", cfg.Settings["flaresolverr_url"])}
+		page.ExtrasActions = []uiActionButton{
+			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr sia raggiungibile."},
+		}
 	case "advanced":
 		page.ListEditors = uiAdvancedEditors
+	case "libtorrent":
+		page.Actions = &uiActionSection{
+			Label: "Ottimizzazione",
+			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento.",
+			Buttons: []uiActionButton{
+				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
+				{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."},
+			},
+		}
 	}
 
 	entries := make([]uiSearchEntry, 0, len(cfg.Settings))
@@ -366,6 +394,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	for _, entry := range []uiSearchEntry{
 		{Key: "", Label: "Feed RSS", Tab: "sources"},
 		{Key: "", Label: "Indexer Torznab (Jackett / Prowlarr)", Tab: "sources"},
+		{Key: "", Label: "FlareSolverr", Tab: "sources"},
 		{Key: "", Label: "Filtri per sorgente", Tab: "advanced"},
 		{Key: "", Label: "Regole tag → cartella", Tab: "advanced"},
 		{Key: "", Label: "Event hook", Tab: "advanced"},
@@ -408,6 +437,8 @@ func uiSettingGroupTitle(tab, key string) string {
 	switch tab {
 	case "daemon":
 		return "Daemon"
+	case "sources":
+		return "Motori web e filtri"
 	case "advanced":
 		return "Avanzate"
 	case "acquisition":
@@ -450,7 +481,26 @@ func uiSettingGroupTitle(tab, key string) string {
 }
 
 func uiSettingFieldFor(key, label, value string) uiSettingField {
-	field := uiSettingField{Key: key, Label: label, Value: value, Kind: uiSettingKind(key, value), Hint: uiSettingTooltip(key)}
+	// Mirror rextto/extto: when the key was never saved, show the documented
+	// default instead of an empty control. Secrets and list-like values keep the
+	// default only as a placeholder so they are never written by accident.
+	placeholder := ""
+	if strings.TrimSpace(value) == "" {
+		if def := uiSettingDefault(key); def != "" {
+			placeholder = def
+			if !uiSettingIsSecret(key) && !uiSettingNoPrefill[key] {
+				value = def
+			}
+		}
+	}
+	field := uiSettingField{
+		Key:         key,
+		Label:       label,
+		Value:       value,
+		Placeholder: placeholder,
+		Kind:        uiSettingKind(key, value),
+		Hint:        uiSettingTooltip(key),
+	}
 	if items, ok := uiJSONScalarList(value); ok {
 		field.Kind = "tags"
 		field.TagJSON = true
@@ -503,12 +553,22 @@ func uiJSONScalarList(value string) ([]string, bool) {
 	return out, true
 }
 
-func uiSettingKind(key, value string) string {
+// uiSettingIsSecret reports whether a setting key must never be rendered in
+// clear nor prefilled with a default.
+func uiSettingIsSecret(key string) bool {
 	lowered := strings.ToLower(key)
 	for _, secret := range []string{"password", "token", "api_key", "secret"} {
 		if strings.Contains(lowered, secret) {
-			return "secret"
+			return true
 		}
+	}
+	return false
+}
+
+func uiSettingKind(key, value string) string {
+	lowered := strings.ToLower(key)
+	if uiSettingIsSecret(key) {
+		return "secret"
 	}
 	// A structured value (e.g. the `indexers` JSON) can embed credentials even
 	// when its key does not: never render those in clear.
@@ -685,62 +745,6 @@ func uiSearchPageFor(view string) (uiSearchPage, bool) {
 	}, true
 }
 
-// uiActionsPages are pages made of buttons that call existing endpoints.
-func uiActionsPageFor(view string) (uiActionsPage, bool) {
-	switch view {
-	case "maintenance":
-		return uiActionsPage{Title: "Manutenzione", Sections: []uiActionSection{
-			{Label: "Database", Hint: "Operazioni sui database applicativi.", Buttons: []uiActionButton{
-				{Label: "Ricalcola punteggi", Class: "primary", Method: "POST", Path: "/api/database/rescore", Body: "{}", Hint: "Ricalcola lo score delle release archiviate."},
-				{Label: "Pulizia duplicati", Method: "POST", Path: "/api/maintenance/clean-duplicates", Body: "{}", Hint: "Rimuove le voci duplicate."},
-				{Label: "Pota database", Method: "POST", Path: "/api/db/prune", Body: "{}", Hint: "Applica la retention configurata."},
-				{Label: "VACUUM", Method: "POST", Path: "/api/db/action", Body: `{"action":"vacuum"}`, Hint: "Compatta i database."},
-			}},
-			{Label: "Archivio e rinomina", Buttons: []uiActionButton{
-				{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
-				{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
-			}},
-			{Label: "Pulizie", Buttons: []uiActionButton{
-				{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
-				{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
-				{Label: "Backfill MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
-			}},
-			{Label: "Backup", Buttons: []uiActionButton{
-				{Label: "Crea backup", Method: "POST", Path: "/api/backup", Body: "{}"},
-			}},
-		}}, true
-	default:
-		return uiActionsPage{}, false
-	}
-}
-
-// uiIntegrationsPage carries the OAuth/PIN state and the media-server actions.
-type uiIntegrationsPage struct {
-	TraktConfigured    bool
-	TraktAuthenticated bool
-	SimklConfigured    bool
-	SimklAuthenticated bool
-	Sections           []uiActionSection
-}
-
-func uiIntegrationsPageFrom(s *AppState) uiIntegrationsPage {
-	cfg := latestConfig(s)
-	return uiIntegrationsPage{
-		TraktConfigured:    settingsNonEmpty(cfg, "trakt_client_id"),
-		TraktAuthenticated: settingsNonEmpty(cfg, "trakt_access_token"),
-		SimklConfigured:    settingsNonEmpty(cfg, "simkl_client_id"),
-		SimklAuthenticated: settingsNonEmpty(cfg, "simkl_access_token"),
-		Sections: []uiActionSection{
-			{Label: "Media server", Hint: "Verifica o aggiorna le librerie collegate.", Buttons: []uiActionButton{
-				{Label: "Test Jellyfin", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
-				{Label: "Aggiorna Jellyfin", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
-				{Label: "Test Plex", Method: "POST", Path: "/api/plex/test", Body: "{}"},
-				{Label: "Aggiorna Plex", Method: "POST", Path: "/api/plex/refresh", Body: "{}"},
-			}},
-			{Label: "Servizi", Buttons: []uiActionButton{
-				{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
-				{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
-			}},
-		},
-	}
-}
+// Maintenance and Integrations are rendered as panels pages
+// (uiMaintenanceSections / uiIntegrationSections); the old action-page builders
+// were superseded and removed.
