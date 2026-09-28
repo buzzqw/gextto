@@ -13,7 +13,7 @@ build:
 fast:
 	scripts/build-daemon.sh
 
-test:
+test: check-ui
 	CGO_ENABLED=1 go test ./...
 
 test-real:
