@@ -390,13 +390,13 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 	}
 	return []uiPageSection{
 		sectionActions(uiActionSection{Label: "Azioni", Hint: "Operazioni di manutenzione del daemon e della libreria.", Buttons: []uiActionButton{
-			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Hint: "Crea subito uno snapshot di backup dei database."},
-			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}", Hint: "Elimina definitivamente gli elementi nel cestino."},
-			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}", Hint: "Ricalcola lo score delle release archiviate con i pesi attuali."},
-			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}", Hint: "Rilegge le cartelle archivio e aggiorna la libreria."},
-			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}", Hint: "Analizza con ffprobe i file archiviati senza MediaInfo."},
-			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}", Hint: "Rinomina tutti i file archiviati secondo il formato configurato."},
-			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}", Hint: "Pulizia dati tecnici e storico, senza toccare la libreria."},
+			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database."},
+			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}", Confirm: "Eliminare definitivamente gli elementi nel cestino?", Hint: "Elimina definitivamente gli elementi nel cestino."},
+			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}", Confirm: "Ricalcolare i punteggi delle release archiviate con i pesi attuali?", Hint: "Ricalcola lo score delle release archiviate con i pesi attuali."},
+			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}", Confirm: "Rileggere le cartelle archivio e aggiornare la libreria?", Hint: "Rilegge le cartelle archivio e aggiorna la libreria."},
+			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}", Confirm: "Analizzare con ffprobe i file archiviati senza MediaInfo?", Hint: "Analizza con ffprobe i file archiviati senza MediaInfo."},
+			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}", Confirm: "Rinominare tutti i file archiviati secondo il formato configurato?", Hint: "Rinomina tutti i file archiviati secondo il formato configurato."},
+			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}", Confirm: "Eseguire l'housekeeping (pulizia dati tecnici e storico)?", Hint: "Pulizia dati tecnici e storico, senza toccare la libreria."},
 			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?", Hint: "Importa un setup esistente (extto)."},
 			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?", Hint: "Riavvia il daemon Gextto."},
 		}}),

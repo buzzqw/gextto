@@ -1439,12 +1439,15 @@
     try { body = JSON.parse(element.getAttribute("data-body") || "{}"); } catch (error) { body = {}; }
     element.disabled = true;
     api(element.getAttribute("data-api"), element.getAttribute("data-method") || "POST", body)
-      .then(function () {
+      .then(function (data) {
         var container = element.closest(".panel") &&
           element.closest(".panel").querySelector("[data-ui-table]");
         if (container && container._refetch) { container._refetch(); return; }
         if (partials[view]) { load(); return; }
-        location.reload();
+        var message = "Operazione completata";
+        if (data && typeof data === "object" && data.message) message = String(data.message);
+        notify(message, "ok");
+        window.setTimeout(function () { location.reload(); }, 700);
       })
       .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })
       .then(function () { element.disabled = false; });
