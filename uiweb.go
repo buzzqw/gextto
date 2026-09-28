@@ -3,11 +3,9 @@ package gextto
 // uiweb.go is the first concrete slice of the UI migration to Go + server-side
 // rendering for the server-side UI migration.
 //
-// It is purely additive: the Leptos SPA keeps serving `/`, while the new UI
-// lives under `/ui`. The shell is a plain HTML document; the dynamic regions are
-// fetched from `/ui/partial/...` endpoints and the actions reuse
-// the existing JSON APIs, so the API contract and all current behaviour are
-// untouched.
+// The shell is a plain HTML document served at `/` and `/ui`. Dynamic regions
+// are fetched from `/ui/partial/...` endpoints and actions reuse the existing
+// JSON APIs, so the API contract and all current behaviour are untouched.
 //
 // The document and its JSON calls are served without an authentication layer;
 // the daemon is meant to listen on a trusted interface (default 127.0.0.1).
@@ -342,8 +340,8 @@ func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // uiPageContent builds the view-model of the requested page. Pages that are not
-// migrated yet get the placeholder model, which links back to the legacy UI so
-// no functionality is ever missing.
+// migrated yet get the placeholder model, which links back to the dashboard so
+// the user is never left at a dead end.
 func uiPageContent(s *AppState, r *http.Request, view string) any {
 	switch view {
 	case "dashboard":
@@ -402,7 +400,7 @@ func UiPartialTorrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // UiPartialUnavailable is the honest placeholder for pages not migrated yet:
-// it never pretends the feature is gone, it points to the legacy UI.
+// it never pretends the feature is gone and points back to the dashboard.
 func UiPartialUnavailable(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := strings.TrimSpace(r.URL.Query().Get("view"))
 	uiRender(w, http.StatusOK, "unavailable", map[string]any{"Title": uiPageLabel(view)})
@@ -748,7 +746,7 @@ func uiTorrentETA(view models.TorrentView) (string, int64) {
 	return logging.HumanDuration(seconds), seconds
 }
 
-// uiStateLabel mirrors torrent_state_label of the legacy UI so users see the
+// uiStateLabel mirrors torrent_state_label so users see the
 // same words in both interfaces.
 func uiStateLabel(state string) string {
 	switch state {

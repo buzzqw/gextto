@@ -2,15 +2,15 @@ package gextto
 
 import (
 	"bytes"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
-// TestBrandingHasNoLegacyName guards the rebranding: neither the served shell
-// nor the embedded interface bundle may carry the previous product name. The
-// legacy tokens are assembled at runtime so the guard itself does not embed the
-// previous name anywhere in the source tree.
+// TestBrandingHasNoLegacyName guards the rebranding of the server-rendered
+// shell. The legacy tokens are assembled at runtime so the guard itself does
+// not embed the previous name anywhere in the source tree.
 func TestBrandingHasNoLegacyName(t *testing.T) {
 	legacyTokens := [][]byte{
 		[]byte("Rex" + "tto"),
@@ -18,8 +18,9 @@ func TestBrandingHasNoLegacyName(t *testing.T) {
 		[]byte("REX" + "TTO"),
 	}
 
+	state := newTestAppState(t)
 	recorder := httptest.NewRecorder()
-	Index(recorder, httptest.NewRequest(http.MethodGet, "/", nil), &AppState{})
+	UiPage(recorder, httptest.NewRequest(http.MethodGet, "/", nil), state)
 	body := recorder.Body.Bytes()
 	if !bytes.Contains(body, []byte("Gextto")) {
 		t.Fatal("index does not mention Gextto")
@@ -30,16 +31,16 @@ func TestBrandingHasNoLegacyName(t *testing.T) {
 		}
 	}
 
-	wasm, ok := uiAsset("pkg/ui.wasm")
-	if !ok {
-		t.Fatal("embedded wasm missing")
+	css, err := fs.ReadFile(uiwebStaticFS(), "gextto-ui.css")
+	if err != nil {
+		t.Fatal("embedded server UI stylesheet missing")
 	}
 	for _, legacy := range legacyTokens {
-		if bytes.Contains(wasm, legacy) {
-			t.Fatal("embedded UI still contains the previous product name")
+		if bytes.Contains(css, legacy) {
+			t.Fatal("embedded server UI still contains the previous product name")
 		}
 	}
-	if !bytes.Contains(wasm, []byte("Gextto")) {
-		t.Fatal("embedded UI has no Gextto branding")
+	if !bytes.Contains(css, []byte("Gextto")) {
+		t.Fatal("embedded server UI has no Gextto branding")
 	}
 }

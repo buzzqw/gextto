@@ -26,11 +26,6 @@ if [[ ! -x "$BIN" ]] || find "$ROOT"/*.go "$ROOT"/internal "$ROOT"/cmd "$ROOT/go
     ( cd "$ROOT" && make build )
 fi
 
-# The embedded UI needs no bundle; an on-disk override is optional.
-if [[ ! -f "$ROOT/webui/pkg/ui.js" ]]; then
-    echo "warning: webui/pkg/ui.js is missing from the checkout" >&2
-fi
-
 GENERATED_UNIT="$(mktemp)"
 sed \
     -e "s#^User=.*#User=$(sed_escape "$(id -un)")#" \

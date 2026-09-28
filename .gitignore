@@ -47,7 +47,7 @@ gextto.json
 .direnv/
 .envrc
 
-# UI build output
-ui/target/
-ui/end2end/node_modules/
-ui/end2end/test-results/
+# Browser test output
+uiweb/end2end/node_modules/
+uiweb/end2end/test-results/
+uiweb/end2end/playwright-report/

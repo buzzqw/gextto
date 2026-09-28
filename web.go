@@ -261,23 +261,6 @@ func SetupMarker(cfg *Config) string {
 	return filepath.Join(cfg.DataDir, ".gextto-setup.json")
 }
 
-// UiSiteDir returns the directory containing the built static UI.
-func UiSiteDir() string {
-	if dir, ok := os.LookupEnv("GEXTTO_UI_DIR"); ok {
-		return dir
-	}
-	if executable, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(executable), "ui")
-		if info, err := os.Stat(filepath.Join(candidate, "pkg")); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-	return filepath.Join("ui", "target", "site")
-}
-
-// UiPkgDir implements `ui_pkg_dir`.
-func UiPkgDir() string { return filepath.Join(UiSiteDir(), "pkg") }
-
 // SetupComplete reports whether the setup marker exists.
 func SetupComplete(cfg *Config) bool {
 	info, err := os.Stat(SetupMarker(cfg))

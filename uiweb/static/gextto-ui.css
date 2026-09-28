@@ -266,7 +266,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 
 .content {
   flex: 1; width: 100%; max-width: none; margin: 0;
-  padding: 14px calc(14px + env(safe-area-inset-left)) 40px calc(14px + env(safe-area-inset-right));
+  padding: 14px calc(14px + env(safe-area-inset-right)) 40px calc(14px + env(safe-area-inset-left));
 }
 
 @media (min-width: 901px) {
@@ -960,7 +960,7 @@ pre.log-view { margin: 0; }
   .topbar-title { flex: none; }
   .topbar-title h1 { font-size: 1.125rem; }
   .top-actions { flex: none; flex-wrap: wrap; overflow-x: auto; }
-  .content { padding: 14px calc(14px + env(safe-area-inset-left)) 40px calc(14px + env(safe-area-inset-right)); }
+  .content { padding: 14px calc(14px + env(safe-area-inset-right)) 40px calc(14px + env(safe-area-inset-left)); }
   .settings-head { position: static; top: auto; }
   .nav-mobile-hidden { display: none; }
 }
@@ -973,6 +973,8 @@ pre.log-view { margin: 0; }
 /* Phone-first refinements layered on the compact shell: comfortable touch
    targets, snap-scrolling navigation, a two-column dashboard, dialogs that fit
    the screen and respect the device safe areas. */
+.table-scroll-hint { display: none; }
+
 @media (max-width: 899px) {
   /* Touch targets: 44px minimum on navigation and icon buttons. */
   .nav-item, .nav-more { min-height: 44px; }
@@ -1020,4 +1022,96 @@ pre.log-view { margin: 0; }
 
   /* Truncated cells stop hogging the row: the next column stays in sight. */
   .cell-truncate { max-width: 62vw; }
+}
+
+/* ------------------------------------------------------- phone refinements */
+/* Keep every primary destination reachable. The compact navigation can scroll
+   horizontally, so hiding whole sections on a phone saves no real space and
+   makes pages such as Mancanti/Esplora unnecessarily hard to discover. */
+@media (max-width: 899px) {
+  .nav-mobile-hidden { display: inline-flex !important; }
+
+  .table-scroll-hint {
+    display: block;
+    margin: -2px 0 8px;
+    color: var(--muted);
+    font-size: 0.76rem;
+  }
+}
+
+@media (max-width: 560px) {
+  /* A bottom navigation is easier to reach with one hand and remains
+     available while inspecting a long list. */
+  .sidebar {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+    padding-top: 7px;
+    padding-bottom: calc(7px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+    box-shadow: 0 -10px 28px rgba(2, 8, 23, 0.24);
+  }
+  .sidebar nav { min-width: max-content; }
+  .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+  /* Keep the download controls readable instead of producing a long row of
+     tiny buttons. Selection actions are grouped into two thumb-sized columns. */
+  .download-global-toolbar,
+  .download-temp-toolbar,
+  .download-bulk-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .download-global-toolbar > :first-child,
+  .download-global-toolbar > .check,
+  .download-temp-toolbar > :first-child,
+  .download-temp-toolbar > small,
+  .download-bulk-toolbar > [data-download-selected-count],
+  .download-bulk-toolbar > .field { grid-column: 1 / -1; }
+  .download-global-toolbar .btn,
+  .download-temp-toolbar .btn,
+  .download-bulk-toolbar .btn { width: 100%; min-width: 0; }
+  .download-global-toolbar .field,
+  .download-temp-toolbar .field,
+  .download-bulk-toolbar .field { min-width: 0; }
+  .download-temp-toolbar .input,
+  .download-bulk-toolbar .input { min-width: 0; }
+  .download-bulk-toolbar .compact { width: 100%; }
+
+  /* The full desktop torrent table contains secondary peer/rate columns. Keep
+     the useful mobile summary in view and leave the remaining details to the
+     torrent detail dialog. */
+  .data-table.torrent-table {
+    min-width: 720px;
+    table-layout: fixed;
+  }
+  .data-table.torrent-table th:nth-child(5),
+  .data-table.torrent-table td:nth-child(5),
+  .data-table.torrent-table th:nth-child(6),
+  .data-table.torrent-table td:nth-child(6),
+  .data-table.torrent-table th:nth-child(8),
+  .data-table.torrent-table td:nth-child(8),
+  .data-table.torrent-table th:nth-child(9),
+  .data-table.torrent-table td:nth-child(9) { display: none; }
+  .data-table.torrent-table th:nth-child(1),
+  .data-table.torrent-table td:nth-child(1) { width: 42px; }
+  .data-table.torrent-table th:nth-child(2),
+  .data-table.torrent-table td:nth-child(2) { width: 30%; }
+  .data-table.torrent-table th:nth-child(4),
+  .data-table.torrent-table td:nth-child(4) { width: 24%; }
+  .data-table.torrent-table th:nth-child(10),
+  .data-table.torrent-table td:nth-child(10) { width: 28%; }
+  .data-table.torrent-table .torrent-name { min-width: 0; max-width: none; }
+  .data-table.torrent-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; }
+  .data-table.torrent-table .row-actions .btn { min-height: 40px; }
+
+  /* Episode actions also wrap instead of forcing a very wide table. */
+  .data-table.series-episodes { min-width: 620px; }
+  .data-table.series-episodes th:nth-child(5),
+  .data-table.series-episodes td:nth-child(5),
+  .data-table.series-episodes th:nth-child(6),
+  .data-table.series-episodes td:nth-child(6) { display: none; }
+  .data-table.series-episodes .row-actions { flex-wrap: wrap; white-space: normal; }
 }

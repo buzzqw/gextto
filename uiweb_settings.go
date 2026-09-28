@@ -1,8 +1,7 @@
 package gextto
 
-// uiweb_settings.go is generated from SETTINGS_INDEX/SETTINGS_TABS in
-// ui/app/src/lib.rs so the new settings page exposes every key with the same
-// label and tab as the classic UI (parity).
+// uiweb_settings.go contains the curated search index and tabs used by the
+// server-rendered settings page.
 
 type uiSettingDef struct{ Key, Label, Tab string }
 

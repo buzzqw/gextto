@@ -862,6 +862,17 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
 	}
+	// A newly added series may not have season counts yet. Populate them before
+	// calculating gaps so the first manual search does not misleadingly report
+	// zero episodes just because the background refresh has not run.
+	if cfg.TmdbAPIKey != nil {
+		stale, err := s.db.SeriesMetadataStale(series.Name, 24)
+		if err != nil || stale {
+			if err := refreshSeriesMetadataForSearch(r.Context(), cfg, s.db, series); err != nil {
+				logging.Debug("manual missing search: metadata refresh unavailable", "series", series.Name, "error", err)
+			}
+		}
+	}
 	allGaps, err := s.db.UnarchivedEpisodesForSeries(series.Name, series.IgnoredSeasons)
 	if err != nil {
 		allGaps = nil
@@ -926,12 +937,14 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	for _, gap := range gaps {
 		episodes = append(episodes, map[string]any{"season": gap[0], "episode": gap[1]})
 	}
+	seasonMetadata, _ := s.db.SeriesSeasonCounts(series.Name)
 	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":       true,
-		"series":   series.Name,
-		"searched": len(gaps),
-		"episodes": episodes,
-		"results":  results,
+		"ok":                 true,
+		"series":             series.Name,
+		"searched":           len(gaps),
+		"episodes":           episodes,
+		"results":            results,
+		"metadata_available": len(seasonMetadata) > 0 || len(allGaps) > 0,
 	})
 }
 

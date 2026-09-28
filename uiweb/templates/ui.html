@@ -17,13 +17,13 @@
        <span class="brand-mark" aria-hidden="true">G</span>
       <div><strong>Gextto</strong><small title="Versione applicazione">Media daemon · v{{.Chrome.Version}}</small></div>
     </div>
-    <nav>
+    <nav aria-label="Navigazione principale">
        <a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
          <span class="nav-search-icon">🔍</span><span>Cerca impostazioni</span>
        </a>
        {{range .Groups}}
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-          {{if .System}}<button class="nav-more" title="Mostra o nascondi le voci di sistema" data-nav-more><span>Sistema</span><span data-nav-more-icon>{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
+          {{if .System}}<button class="nav-more" type="button" title="Mostra o nascondi le voci di sistema" aria-expanded="{{if .Open}}true{{else}}false{{end}}" data-nav-more><span>Sistema</span><span data-nav-more-icon aria-hidden="true">{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
          {{range .Items}}
            <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
@@ -88,7 +88,7 @@
     <div class="panel-head"><h3>{{.Title}}</h3></div>
     <div class="panel-body">
       <p class="muted">Questa sezione non è ancora disponibile nella nuova interfaccia.</p>
-      <p><a class="btn" href="/legacy">Apri la UI classica</a></p>
+     <p><a class="btn" href="/?view=dashboard">Torna alla dashboard</a></p>
     </div>
   </div>
 </div>
@@ -240,6 +240,7 @@
     </div>
     <div class="panel-body">
       {{if or .Rows .HTTPDownloads}}
+      <p class="table-scroll-hint">Scorri lateralmente per vedere tutte le colonne</p>
       <div class="table-wrap">
         <table class="data-table torrent-table">
           <thead><tr>

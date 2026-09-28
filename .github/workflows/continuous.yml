@@ -34,17 +34,6 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Install Rust for the web UI
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install cargo-leptos
-        run: cargo install cargo-leptos --locked
-
-      - name: Build web UI
-        run: scripts/build-ui.sh
-
       - name: Build and package
         env:
           GEXTTO_BUILD: ${{ github.run_number }}

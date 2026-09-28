@@ -94,23 +94,6 @@ func TestDecodeJSON(t *testing.T) {
 	}
 }
 
-func TestIndexAndEmbeddedUI(t *testing.T) {
-	if !uiBundleAvailable() {
-		t.Fatal("embedded UI bundle is not available")
-	}
-	recorder := httptest.NewRecorder()
-	Index(recorder, httptest.NewRequest(http.MethodGet, "/", nil), &AppState{})
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("index status = %d", recorder.Code)
-	}
-	if recorder.Body.Len() == 0 {
-		t.Fatal("empty index")
-	}
-	if data, ok := uiAsset("pkg/ui.js"); !ok || len(data) == 0 {
-		t.Fatal("embedded pkg/ui.js missing")
-	}
-}
-
 func TestNewAppStateWiresCollaborators(t *testing.T) {
 	state := NewAppState(&Config{}, "gextto.json", nil, nil, nil, nil, nil, nil, nil, nil)
 	if state == nil {

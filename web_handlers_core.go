@@ -5,10 +5,10 @@ package gextto
 // the Go implementation of the matching handlers .
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"net/http"
 	"os"
@@ -87,11 +87,11 @@ func (w *noCacheWriter) Flush() {
 func (w *noCacheWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 // UiNoCache disables browser caching for the UI shell (`/`) and its assets
-// (`/pkg/*`), mirroring `ui_no_cache`.
+// (`/ui/*`), mirroring `ui_no_cache`.
 func UiNoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path != "/" && path != "/legacy" && !strings.HasPrefix(path, "/pkg/") && !strings.HasPrefix(path, "/ui") {
+		if path != "/" && !strings.HasPrefix(path, "/ui") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -102,64 +102,6 @@ func UiNoCache(next http.Handler) http.Handler {
 // ---------------------------------------------------------------------------
 // Static pages
 // ---------------------------------------------------------------------------
-
-// Index serves the single-page UI shell. The compiled bundle is embedded in the
-// binary and served from `/pkg`; a disk directory still overrides it.
-func Index(w http.ResponseWriter, r *http.Request, s *AppState) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if uiBundleAvailable() {
-		_, _ = io.WriteString(w, indexBundleHTML)
-		return
-	}
-	_, _ = io.WriteString(w, indexMissingHTML)
-}
-
-const indexMissingHTML = `<!doctype html>
-<html lang="it">
-<head><meta charset="utf-8"><title>Gextto</title></head>
-<body style="font-family:system-ui;background:#0b1120;color:#e6edf7;display:grid;place-items:center;height:100vh;margin:0">
-<main style="max-width:520px;padding:24px;text-align:center">
-<h1>Gextto</h1>
-<p>La web interface non è inclusa in questo binario.</p>
-<p>Compila con <code>make build</code> oppure imposta <code>GEXTTO_UI_DIR</code>.</p>
-</main></body></html>`
-
-const indexBundleHTML = `<!doctype html>
-<html lang="it" data-theme="dark">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark light">
-  <title>Gextto</title>
-  <link rel="icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/pkg/ui.css">
-  <style>
-    html,body{margin:0;height:100%;background:#0b1120;color:#e6edf7;font-family:Inter,system-ui,sans-serif}
-    #gextto-boot{display:grid;place-items:center;height:100vh;gap:14px;text-align:center}
-    #gextto-boot .logo{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#3b82f6,#22d3ee);display:grid;place-items:center;font-weight:800;font-size:30px;color:#04121f}
-    #gextto-boot .spinner{width:26px;height:26px;border:3px solid #1f2f47;border-top-color:#3b82f6;border-radius:50%;animation:gspin 1s linear infinite}
-    @keyframes gspin{to{transform:rotate(360deg)}}
-    #gextto-boot.hidden{display:none}
-  </style>
-</head>
-<body>
-  <div id="gextto-boot">
-    <div class="logo">g</div>
-    <div class="spinner"></div>
-    <div>Avvio di Gextto…</div>
-  </div>
-  <script type="module">
-    import init, { hydrate } from "/pkg/ui.js";
-    init().then(() => {
-      const boot = document.getElementById("gextto-boot");
-      if (boot) boot.classList.add("hidden");
-      hydrate();
-    }).catch((error) => {
-      document.body.innerHTML = '<pre style="padding:24px;color:#ff9fb0">Errore di avvio UI: ' + error + '</pre>';
-    });
-  </script>
-</body>
-</html>`
 
 // MagnetHandler is the landing page for `magnet:` links.
 func MagnetHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -216,21 +158,10 @@ const magnetPage = `<!doctype html>
 </body>
 </html>`
 
-// WasmAlias serves the WASM binary under its stable alias.
-func WasmAlias(w http.ResponseWriter, r *http.Request, s *AppState) {
-	data, ok := uiAsset("pkg/ui.wasm")
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/wasm")
-	_, _ = w.Write(data)
-}
-
 // Favicon serves the site favicon.
 func Favicon(w http.ResponseWriter, r *http.Request, s *AppState) {
-	data, ok := uiAsset("favicon.ico")
-	if !ok {
+	data, err := fs.ReadFile(uiwebStaticFS(), "favicon.ico")
+	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}

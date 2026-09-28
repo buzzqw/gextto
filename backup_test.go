@@ -85,7 +85,7 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 
 	// Configuration and content/caches.
 	writeBackupFile(t, filepath.Join(dataDir, "gextto.json"), "{}\n")
-	writeBackupFile(t, filepath.Join(dataDir, "webui", "index.html"), "<html></html>\n")
+	writeBackupFile(t, filepath.Join(dataDir, "custom", "extra.txt"), "extra\n")
 	writeBackupFile(t, filepath.Join(dataDir, "gextto_torrents_state", "abc.fastresume"), "state")
 	writeBackupFile(t, filepath.Join(dataDir, "ipfilter.dat"), "blocklist")
 	writeBackupFile(t, filepath.Join(dataDir, "gextto_magnet_cache.json"), "{}")
@@ -111,7 +111,7 @@ func TestBackupCreateSnapshotIncludesDatabasesAndExcludesContent(t *testing.T) {
 	}
 
 	files := readBackupZip(t, archive)
-	for _, required := range []string{"gextto_series.db", "gextto_config.db", "gextto_comics.db", "gextto.json", "webui/index.html"} {
+	for _, required := range []string{"gextto_series.db", "gextto_config.db", "gextto_comics.db", "gextto.json", "custom/extra.txt"} {
 		if _, ok := files[required]; !ok {
 			t.Errorf("archive is missing %q; entries: %v", required, backupZipNames(files))
 		}

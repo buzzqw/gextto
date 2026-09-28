@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -262,12 +263,57 @@ func TestWebApiIndexAndUIAsset(t *testing.T) {
 		t.Fatalf("GET /: body does not contain <html: %s", body)
 	}
 
-	status, _, asset := webGet(t, server, "/pkg/ui.js")
+	status, _, asset := webGet(t, server, "/ui/static/gextto-ui.js")
 	if status != http.StatusOK {
-		t.Fatalf("GET /pkg/ui.js: status = %d", status)
+		t.Fatalf("GET /ui/static/gextto-ui.js: status = %d", status)
 	}
 	if len(asset) == 0 {
-		t.Fatal("GET /pkg/ui.js: empty body")
+		t.Fatal("GET /ui/static/gextto-ui.js: empty body")
+	}
+
+	for _, path := range []string{"/legacy", "/pkg/ui.js", "/pkg/ui_bg.wasm"} {
+		status, _, _ := webGet(t, server, path)
+		if status != http.StatusNotFound {
+			t.Fatalf("GET %s: status = %d, want %d", path, status, http.StatusNotFound)
+		}
+	}
+}
+
+func TestSeriesSearchMissingRefreshesNewSeriesMetadata(t *testing.T) {
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/tv/1399" {
+			t.Fatalf("TMDB path = %q, want /tv/1399", r.URL.Path)
+		}
+		tmdbWriteJSON(t, w, `{"seasons":[{"season_number":1,"episode_count":3}]}`)
+	})
+
+	state := newTestAppState(t)
+	key := "test-key"
+	cfg := *state.cfg
+	cfg.TmdbAPIKey = &key
+	cfg.Series = []SeriesConfig{{Name: "Star Wars: The Clone Wars", Seasons: "1+", TmdbID: "1399", Enabled: true}}
+	state.config_cache = &ConfigCache{
+		generation: ConfigGeneration(),
+		cfg:        &cfg,
+		valid:      true,
+	}
+
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	path := "/api/series/" + url.PathEscape("Star Wars: The Clone Wars") + "/search-missing"
+	status, body := webPostJSON(t, server, path, `{}`)
+	if status != http.StatusOK {
+		t.Fatalf("POST %s: status = %d, body = %s", path, status, body)
+	}
+	decoded := map[string]any{}
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatalf("decode response: %v (%s)", err, body)
+	}
+	if decoded["searched"] != float64(3) {
+		t.Fatalf("searched = %v, want 3", decoded["searched"])
+	}
+	if decoded["metadata_available"] != true {
+		t.Fatalf("metadata_available = %v, want true", decoded["metadata_available"])
 	}
 }
 

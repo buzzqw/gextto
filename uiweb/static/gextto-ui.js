@@ -2283,7 +2283,9 @@
       if (group) {
         group.classList.toggle("open");
         var icon = navMore.querySelector("[data-nav-more-icon]");
-        if (icon) icon.textContent = group.classList.contains("open") ? "▲" : "▾";
+        var open = group.classList.contains("open");
+        if (icon) icon.textContent = open ? "▲" : "▾";
+        navMore.setAttribute("aria-expanded", open ? "true" : "false");
       }
       return;
     }
@@ -2303,6 +2305,17 @@
       return;
     }
   });
+
+  // On a phone the navigation is a horizontal scroller (and on very small
+  // screens it is docked at the bottom). Keep the current destination visible
+  // after a page navigation instead of making the user hunt for it.
+  (function revealActiveNavigation() {
+    var active = document.querySelector(".sidebar .nav-item.active");
+    if (!active || !window.matchMedia || window.matchMedia("(min-width: 900px)").matches) return;
+    window.requestAnimationFrame(function () {
+      active.scrollIntoView({ block: "nearest", inline: "center" });
+    });
+  }());
 
   // Cycle buttons with a domain (Dashboard quick actions).
   document.addEventListener("click", function (event) {
@@ -4201,8 +4214,14 @@
     var label = button.getAttribute("data-action-label") || "Operazione";
     button.disabled = true;
     api(button.getAttribute("data-series-action"), "POST", {}).then(function (data) {
+      if (data && data.metadata_available === false) {
+        notify(label + ": metadati episodi non disponibili. Premi prima “Aggiorna da TMDB”.", "err");
+        button.disabled = false;
+        return;
+      }
       var extra = "";
-      if (data && data.updated !== undefined) extra = " · " + data.updated + " file aggiornati";
+      if (data && data.searched !== undefined) extra = " · " + data.searched + " episodi verificati";
+      else if (data && data.updated !== undefined) extra = " · " + data.updated + " file aggiornati";
       else if (data && data.air_dates_updated !== undefined) extra = " · " + data.air_dates_updated + " date aggiornate";
       else if (data && Array.isArray(data.results)) extra = " · " + data.results.length + " risultati";
       notify(label + ": completato" + extra, "ok");

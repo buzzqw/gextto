@@ -1087,6 +1087,40 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
+// refreshSeriesMetadataForSearch loads the season episode counts needed by the
+// manual missing search. It is deliberately limited to counts: the explicit
+// metadata action below additionally refreshes status and air dates.
+func refreshSeriesMetadataForSearch(ctx context.Context, cfg *Config, db *Database, series *SeriesConfig) error {
+	if cfg == nil || cfg.TmdbAPIKey == nil {
+		return fmt.Errorf("TMDB API key is not configured")
+	}
+	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	resolved := strings.TrimSpace(series.TmdbID)
+	if resolved == "" {
+		id, err := tmdb.ResolveSeriesID(ctx, series.Name)
+		if err != nil {
+			return err
+		}
+		if id == nil {
+			return fmt.Errorf("series not found on TMDB")
+		}
+		resolved = *id
+	}
+	counts, err := tmdb.SeasonCounts(ctx, resolved)
+	if err != nil {
+		return err
+	}
+	values := make([][2]int64, 0, len(counts))
+	for season, count := range counts {
+		values = append(values, [2]int64{season, count})
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i][0] < values[j][0] })
+	if len(values) == 0 {
+		return fmt.Errorf("TMDB returned no season metadata")
+	}
+	return db.SaveSeriesMetadata(series.Name, values)
+}
+
 // SeriesMetadataRefresh handles POST /api/series/{name}/metadata.
 func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := pathParam(r, "name")

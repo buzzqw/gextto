@@ -71,7 +71,7 @@ func TestFindReleaseRootHandlesNestedArchives(t *testing.T) {
 	}
 }
 
-func TestUpdateValidateReleaseAcceptsEmbeddedUI(t *testing.T) {
+func TestUpdateValidateRelease(t *testing.T) {
 	// A payload with only the executable is valid: the web UI is embedded.
 	embedded := t.TempDir()
 	if err := os.WriteFile(filepath.Join(embedded, "gexttod"), []byte("binary"), 0o755); err != nil {
@@ -86,23 +86,6 @@ func TestUpdateValidateReleaseAcceptsEmbeddedUI(t *testing.T) {
 		t.Fatal("payload without the executable was accepted")
 	}
 
-	// A shipped on-disk UI override must be complete.
-	partial := t.TempDir()
-	if err := os.WriteFile(filepath.Join(partial, "gexttod"), []byte("binary"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(partial, "ui", "pkg"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := updateValidateRelease(partial); err == nil {
-		t.Fatal("incomplete on-disk UI was accepted")
-	}
-	if err := os.WriteFile(filepath.Join(partial, "ui", "pkg", "ui.js"), []byte("js"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := updateValidateRelease(partial); err != nil {
-		t.Fatalf("complete on-disk UI rejected: %v", err)
-	}
 }
 
 func TestSha256FileMatchesTheKnownDigest(t *testing.T) {

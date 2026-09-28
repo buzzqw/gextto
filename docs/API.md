@@ -267,6 +267,5 @@ Generated route table of the web/API surface served by the daemon.
 | GET | `/favicon.ico` |
 | GET | `/feed.xml` |
 | GET | `/magnet` |
-| GET | `/pkg/ui_bg.wasm` |
 
 Total routes: 255

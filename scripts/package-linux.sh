@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the standalone Linux archive consumed by the installer and by
-# `gexttod --update`. The Go binary embeds the compiled web UI, so the archive
+# `gexttod --update`. The Go binary embeds the server-rendered web UI, so the archive
 # ships the daemon, the bundled libtorrent shared libraries, a launcher and a
 # short README. Layout:
 #   gexttod  run.sh  lib/  README.md  VERSION
@@ -62,21 +62,12 @@ cat > "$STAGE/run.sh" <<'RUN'
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-if [[ -d "$DIR/ui" ]]; then
-  export GEXTTO_UI_DIR="$DIR/ui"
-fi
 exec "$DIR/gexttod" "$@"
 RUN
 chmod +x "$STAGE/run.sh"
 
 cp "${ROOT}/README.md" "$STAGE/README.md" 2>/dev/null || true
 echo "$LABEL" > "$STAGE/VERSION"
-
-# Go binaries embed the UI; no ui/ directory is required. Keep one if the caller
-# provided an override (GEXTTO_UI_DIR points at a source tree).
-if [[ -n "${GEXTTO_UI_DIR:-}" && -d "${GEXTTO_UI_DIR}" ]]; then
-  cp -a "${GEXTTO_UI_DIR}" "$STAGE/ui"
-fi
 
 tar --numeric-owner -C "$STAGE" -czf "$OUTPUT" .
 ( cd "$(dirname "$OUTPUT")" && sha256sum "$(basename "$OUTPUT")" > "$(basename "$OUTPUT").sha256" )

@@ -10,10 +10,8 @@ import "net/http"
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
 	handle(s, mux, "GET /{$}", UiPage)
-	handle(s, mux, "GET /legacy", Index)
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)
-	handle(s, mux, "GET /pkg/ui_bg.wasm", WasmAlias)
 	handle(s, mux, "GET /api/i18n", I18nList)
 	handle(s, mux, "POST /api/i18n", I18nSet)
 	handle(s, mux, "POST /api/i18n/language", I18nLanguage)
@@ -276,17 +274,13 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
-	// New server-rendered UI (see uiweb.go). It is additive: the Leptos SPA
-	// keeps serving "/". The shell is public like the legacy one, while every
-	// data partial and action routes use the same shared middleware.
+	// Server-rendered UI (see uiweb.go). The shell is public, while every data
+	// partial and action route uses the same shared middleware.
 	mux.Handle("GET /ui/static/", UiNoCache(http.StripPrefix("/ui/static/", http.FileServer(http.FS(uiwebStaticFS())))))
 	handle(s, mux, "GET /ui", UiPage)
 	handle(s, mux, "GET /ui/", UiPage)
 	handle(s, mux, "GET /ui/partial/dashboard", UiPartialDashboard)
 	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
 	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
-	// Static UI bundle: mirrors `.nest_service("/pkg", ServeDir::new(ui_pkg_dir()))`.
-	// `UiNoCache` is applied by hand because this route bypasses `handle`.
-	mux.Handle("/pkg/", UiNoCache(uiPackageHandler()))
 	return mux
 }

@@ -257,11 +257,9 @@ Compilalo (o i suoi test) con `make build-anacrolix` / `make test-anacrolix`, ch
 aggiungono il build tag `anacrolix`; la build predefinita mantiene libtorrent e
 rifiuta `torrent_backend=anacrolix`.
 
-La UI web è inclusa nel binario con `//go:embed` da `webui/pkg`, quindi una build
-normale non richiede passi UI. Il sorgente Leptos è in `ui/`; dopo averlo
-modificato, rigenera il bundle con `make ui` (servono `cargo leptos` e il target
-`wasm32-unknown-unknown`), che aggiorna `webui/pkg`. Un bundle su disco in
-`GEXTTO_UI_DIR` (o `<exe>/ui`) ha comunque la precedenza per lo sviluppo.
+La UI web server-rendered è inclusa direttamente nel binario Go da
+`uiweb/templates` e `uiweb/static`: una build normale non richiede toolchain
+frontend né un bundle UI separato.
 
 Per una prova locale in modalità dry-run, senza download reali:
 
@@ -515,7 +513,6 @@ schermata. Indice rapido:
 | `GEXTTO_DATA_DIR` | Data directory (database, log, download) |
 | `GEXTTO_LISTEN` | Indirizzo UI/API (default `127.0.0.1:5000`; il servizio installato usa `0.0.0.0:5000` per default) |
 | `GEXTTO_ENGINE_LISTEN` | Canale interno del motore (default `127.0.0.1:8889`) |
-| `GEXTTO_UI_DIR` | Directory della UI web compilata (installazioni pacchettizzate) |
 | `GEXTTO_INSTALL_DIR` | Directory di installazione usata da `--update` |
 | `GEXTTO_REPO` | Repository GitHub usato da installer e `--update` (default `buzzqw/gextto`) |
 | `GEXTTO_RELEASE` | Artefatto installer (`continuous` per default o un tag) |
@@ -640,7 +637,7 @@ bin/gexttod --update --archive /tmp/gextto-linux-x86_64.tar.gz \
 | Componente / risorsa | Ruolo | Funzioni che abilita |
 |---|---|---|
 | Go + `net/http` (`web.go`, `web_router.go`) | runtime del demone e server HTTP | cicli, API REST, stream SSE dei log, UI statica |
-| UI web inclusa (`webui/`, `//go:embed`) | front-end single-page | dashboard, schermate libreria, impostazioni, UI bilingue |
+| UI web inclusa (`uiweb/`) | interfaccia server-rendered e asset statici | dashboard, schermate libreria, impostazioni, UI bilingue |
 | SQLite (`modernc.org/sqlite`, Go puro) | persistenza locale | serie/episodi, film, archivio, fumetti, config, statistiche cicli, metadati torrent |
 | libtorrent (`libtorrent_bridge.cpp`, `libtorrent_cgo.go`, `libtorrent.go`) | motore BitTorrent integrato | coda e limiti, politica di seeding, tracker, file, peer, fastresume, killswitch VPN |
 | `torrent_engine.go`, `torrent_engine_select.go`, `qbittorrent_engine.go`, `qbittorrent_runtime.go`, `internal/qbittorrent`, `anacrolix_engine.go` | backend torrent sostituibili | selezione motore, qBittorrent-nox gestito, anacrolix nativo, preflight mappatura percorsi |

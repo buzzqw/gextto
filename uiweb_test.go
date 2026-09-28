@@ -395,7 +395,8 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 }
 
 // TestUiShellServesOwnStylesheet verifies the new UI ships its own stylesheet
-// (the compiled classic theme) and no longer depends on the Leptos /pkg bundle.
+// (the compiled server-rendered theme) and no longer depends on a frontend
+// bundle under /pkg.
 func TestUiShellServesOwnStylesheet(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

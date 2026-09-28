@@ -371,14 +371,6 @@ func updateValidateRelease(root string) error {
 	if !updateIsFile(binary) {
 		return fmt.Errorf("release is missing the %s executable", binary)
 	}
-	// The web UI is embedded in the executable with //go:embed, so a payload
-	// does not need a separate `ui/` directory. When one *is* shipped (an
-	// on-disk override), it must be complete.
-	if uiDir := filepath.Join(root, "ui"); updateIsDir(uiDir) {
-		if ui := filepath.Join(uiDir, "pkg", "ui.js"); !updateIsFile(ui) {
-			return fmt.Errorf("release ships an incomplete web UI (%s)", ui)
-		}
-	}
 	return nil
 }
 

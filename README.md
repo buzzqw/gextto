@@ -255,11 +255,9 @@ it (or its tests) with `make build-anacrolix` / `make test-anacrolix`, which add
 the `anacrolix` build tag; the default build keeps libtorrent and rejects
 `torrent_backend=anacrolix`.
 
-The web UI is embedded in the binary with `//go:embed` from `webui/pkg`, so a
-normal build needs no UI step. The Leptos source lives in `ui/`; after editing
-it, regenerate the bundle with `make ui` (needs `cargo leptos` and the
-`wasm32-unknown-unknown` target), which refreshes `webui/pkg`. An on-disk bundle
-in `GEXTTO_UI_DIR` (or `<exe>/ui`) still takes precedence for development.
+The server-rendered web UI is embedded directly in the Go binary from
+`uiweb/templates` and `uiweb/static`, so a normal build needs no separate
+frontend toolchain or UI bundle step.
 
 To run locally in dry-run mode, without real downloads:
 
@@ -509,7 +507,6 @@ every screen. Quick index:
 | `GEXTTO_DATA_DIR` | Data directory (databases, logs, downloads) |
 | `GEXTTO_LISTEN` | Web UI/API address (default `127.0.0.1:5000`; the installed service defaults to `0.0.0.0:5000`) |
 | `GEXTTO_ENGINE_LISTEN` | Internal engine channel (default `127.0.0.1:8889`) |
-| `GEXTTO_UI_DIR` | Directory of the compiled web UI (packaged installs) |
 | `GEXTTO_INSTALL_DIR` | Installation directory used by `--update` |
 | `GEXTTO_REPO` | GitHub repository used by installer and `--update` (default `buzzqw/gextto`) |
 | `GEXTTO_RELEASE` | Installer payload (`continuous` by default, or a release tag) |
@@ -628,7 +625,7 @@ bin/gexttod --update --archive /tmp/gextto-linux-x86_64.tar.gz \
 | Component / resource | Role | Functions it powers |
 |---|---|---|
 | Go + `net/http` (`web.go`, `web_router.go`) | daemon runtime and HTTP server | cycles, REST API, SSE log stream, static UI |
-| Embedded web UI (`webui/`, `//go:embed`) | single-page front-end | dashboard, library screens, settings, bilingual UI |
+| Embedded web UI (`uiweb/`) | server-rendered interface and static assets | dashboard, library screens, settings, bilingual UI |
 | SQLite (`modernc.org/sqlite`, pure Go) | local persistence | series/episodes, movies, archive, comics, config, cycle stats, torrent metadata |
 | libtorrent (`libtorrent_bridge.cpp`, `libtorrent_cgo.go`, `libtorrent.go`) | embedded BitTorrent engine | queue and limits, seeding policy, trackers, files, peers, fastresume, VPN killswitch |
 | `torrent_engine.go`, `torrent_engine_select.go`, `qbittorrent_engine.go`, `qbittorrent_runtime.go`, `internal/qbittorrent`, `anacrolix_engine.go` | pluggable torrent backends | engine selection, managed qBittorrent-nox, native anacrolix, path-mapping preflight |

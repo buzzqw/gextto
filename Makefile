@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt ui check-ui tidy package clean run
+.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt check-ui tidy package clean run
 
 all: build
 
@@ -33,11 +33,7 @@ vet:
 fmt:
 	gofmt -w .
 
-# Regenerate the embedded web UI from ui/ (needs cargo-leptos + wasm target).
-ui:
-	scripts/build-ui.sh
-
-# Fail when a UI setting is missing from the "Cerca impostazioni" index.
+# Validate the server-rendered UI settings index.
 check-ui:
 	scripts/check-ui-settings-index.sh
 
