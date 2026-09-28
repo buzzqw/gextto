@@ -647,6 +647,10 @@ arguments if the command may be recorded in system logs.
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**
   (probes archived files without data via `ffprobe` and stores it) and restart
   the service.
+- **Rename folder contents** — enter a folder and press **Browse** to select it
+  on the server. Gextto recursively scans video files, detects series and movies
+  from their names, compares titles with TMDB/TVDB and shows a rename proposal
+  with alternative matches when available.
 - **Trash cleanup** from the **Maintenance** toolbar is forced: it removes the
   selected trash content immediately. Cleanup started from the **Trash** panel
   respects the configured retention period.
@@ -672,11 +676,24 @@ arguments if the command may be recorded in system logs.
    Seen-from-feed cleanup removes only historical feed rows, not files or
    downloads; it also applies the standard cleanup of the last 50 cycles and
    torrent errors older than 7 days.
- - **Backups**: retention, schedule (manual, every N hours or a fixed daily
+- **Backups**: retention, schedule (manual, every N hours or a fixed daily
    HH:MM), FTP host/user/path + **Test FTP** (checks connection, path and a probe
    upload), cloud/sync folder copy, Telegram delivery, list of available backups.
-   A snapshot contains the databases and configuration; media files and torrent
-   session state are not included.
+  A snapshot contains the databases and configuration; media files and torrent
+  session state are not included.
+
+### Manually renaming a folder
+
+Scanning is a preview and does not modify files. For each row you can:
+
+- choose another TMDB/TVDB result;
+- accept or reject the proposal individually;
+- use **Accept all proposals** and then **Apply selected**.
+
+Only selected files that really exist and have a valid destination in the same
+subfolder are renamed. Conflicts, unrecognised titles and existing destinations
+are left untouched. Associated sidecars (subtitles, images, NFO files and
+similar) follow the new name when possible.
 
 ### Backups: what they protect and what they do not
 

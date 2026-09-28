@@ -44,7 +44,7 @@ L'installer configura il servizio e conserva dati e configurazione in
 
 ### Installazione da codice sorgente
 
-Questa modalità è descritta in [Sviluppo e installazioni locali](docs/DEVELOPMENT.md).
+Questa modalità è descritta nel [manuale per sviluppatori](docs/DEVELOPERS.md).
 
 ## Aggiornamento
 
@@ -100,7 +100,8 @@ Per la configurazione dettagliata consulta il
 - [Migrazione da un'installazione esistente](docs/MIGRATION.md)
 - [Sicurezza](docs/SECURITY.md)
 - [TUI da terminale](docs/tui.md)
-- [Sviluppo e installazioni locali](docs/DEVELOPMENT.md)
+- [Manuale utenti avanzati](docs/ADVANCED.it.md)
+- [Manuale sviluppatori](docs/DEVELOPERS.md)
 
 ## Licenza
 

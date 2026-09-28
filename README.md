@@ -43,7 +43,7 @@ The installer configures the service and keeps data and configuration in
 
 ### Source installation
 
-See [Development and local installations](docs/DEVELOPMENT.md).
+See the [developer manual](docs/DEVELOPERS.md).
 
 ## Updating
 
@@ -99,7 +99,8 @@ For detailed configuration, see the
 - [Migration from an existing installation](docs/MIGRATION.md)
 - [Security policy](docs/SECURITY.md)
 - [Terminal TUI](docs/tui.md)
-- [Development and local installations](docs/DEVELOPMENT.md)
+- [Advanced user manual](docs/ADVANCED.en.md)
+- [Developer manual](docs/DEVELOPERS.md)
 
 ## License
 

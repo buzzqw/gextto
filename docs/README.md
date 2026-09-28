@@ -8,4 +8,6 @@ Documenti destinati agli utenti e ai contributor:
 - [Migrazione da un'installazione esistente](MIGRATION.md)
 - [Sicurezza](SECURITY.md)
 - [TUI](tui.md)
-- [Sviluppo e installazioni locali](DEVELOPMENT.md)
+- [Manuale utenti avanzati italiano](ADVANCED.it.md)
+- [Advanced user manual](ADVANCED.en.md)
+- [Manuale sviluppatori](DEVELOPERS.md)

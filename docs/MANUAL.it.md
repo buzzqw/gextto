@@ -664,6 +664,10 @@ token o password negli argomenti se il comando finisce nei log del sistema.
 - Backup immediato, pulisci cestino, ricalcola scoring, scansiona archivi,
   **Aggiorna MediaInfo** (analizza con `ffprobe` i file archiviati senza dati e
   li salva) e riavvia il servizio.
+- **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
+  sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
+  serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
+  di rinomina con eventuali alternative.
 - **Pulizia cestino** dalla toolbar **Manutenzione** — è forzata e rimuove subito
   il contenuto selezionato. La pulizia avviata dal pannello **Trash** rispetta
   invece il periodo di retention configurato.
@@ -691,11 +695,25 @@ token o password negli argomenti se il comando finisce nei log del sistema.
    La pulizia dei "visti" rimuove solo righe storiche dei feed, non file o
    download; applica anche la pulizia standard degli ultimi 50 cicli e degli
    errori torrent più vecchi di 7 giorni.
- - **Backup**: retention, schedulazione (manuale, ogni N ore o a un orario fisso
+- **Backup**: retention, schedulazione (manuale, ogni N ore o a un orario fisso
    giornaliero HH:MM), FTP (host/utente/percorso) con **Test FTP** (verifica
    connessione, percorso e upload di prova), copia su cartella cloud/sync, invio
    Telegram, elenco backup. Lo snapshot contiene database e configurazione, non
-   i media né lo stato della sessione torrent.
+  i media né lo stato della sessione torrent.
+
+### Rinomina manuale di una cartella
+
+La scansione è solo un'anteprima e non modifica i file. Per ogni riga puoi:
+
+- scegliere un risultato TMDB/TVDB alternativo;
+- accettare o rifiutare singolarmente la proposta;
+- usare **Accetta tutte le proposte** e poi **Applica selezionate**.
+
+Vengono rinominati solo i file selezionati, realmente presenti e con una
+destinazione valida nella stessa sottocartella. I conflitti, i titoli non
+riconosciuti e le destinazioni già esistenti restano invariati. I sidecar
+associati (sottotitoli, immagini, NFO e simili) seguono il nuovo nome quando
+possibile.
 
 ### Backup: cosa protegge e cosa no
 
