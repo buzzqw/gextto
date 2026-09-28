@@ -2100,38 +2100,95 @@
     runDiscover();
   }
 
-  function renderDiscoverResults(container, items, kind) {
+  function tmdbPosterURL(item) {
+    if (item.poster && /^https?:\/\//i.test(item.poster)) return item.poster;
+    if (item.poster_path) return "https://image.tmdb.org/t/p/w200" + item.poster_path;
+    return "";
+  }
+
+  // Shared rextto-style TMDB cards: poster, title, id/year/vote, overview and
+  // an "Aggiungi alla libreria" button that opens the completion modal.
+  function renderTmdbCards(container, items, kind) {
     container.innerHTML = "";
-    if (!items.length) { container.innerHTML = '<p class="muted">Nessun risultato.</p>'; return; }
+    if (!items.length) {
+      container.innerHTML = '<p class="muted">Nessun risultato su TMDB.</p>';
+      return;
+    }
     var grid = document.createElement("div");
     grid.className = "tmdb-grid";
     items.forEach(function (item) {
+      var isTVDB = String(item.external || "tmdb") === "tvdb";
+      var title = String(item.name || item.title || "—");
+      var year = String(item.first_air_date || item.release_date || "").slice(0, 4);
+      var id = isTVDB ? String(item.tvdb_id || "") : String(item.id || item.tmdb_id || "");
+      var poster = tmdbPosterURL(item);
+
       var card = document.createElement("div");
       card.className = "tmdb-card";
-      var title = document.createElement("strong");
-      title.textContent = String(item.name || item.title || "—");
+
+      var posterBox = document.createElement("div");
+      posterBox.className = "tmdb-poster";
+      if (poster && safeHref(poster)) {
+        var image = document.createElement("img");
+        image.src = safeHref(poster);
+        image.alt = title;
+        image.loading = "lazy";
+        posterBox.appendChild(image);
+      } else {
+        posterBox.className = "tmdb-poster placeholder";
+        posterBox.textContent = "N/D";
+      }
+      card.appendChild(posterBox);
+
+      var body = document.createElement("div");
+      body.className = "tmdb-card-body";
+      var strong = document.createElement("strong");
+      if (!isTVDB && id) {
+        var link = document.createElement("a");
+        link.href = "https://www.themoviedb.org/" + (kind === "movie" ? "movie/" : "tv/") + encodeURIComponent(id);
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = title;
+        strong.appendChild(link);
+      } else {
+        strong.textContent = title;
+      }
+      body.appendChild(strong);
+
       var meta = document.createElement("small");
-      var date = String(item.first_air_date || item.release_date || "").slice(0, 4);
-      meta.textContent = "TMDB " + String(item.id || item.tmdb_id || "") + (date ? " · " + date : "");
-      var button = document.createElement("button");
-      button.className = "btn sm primary";
-      button.textContent = "Aggiungi";
-      button.addEventListener("click", function () {
-        button.disabled = true;
-        api("/api/tmdb/add", "POST", {
-          kind: kind,
-          name: String(item.name || item.title || ""),
-          year: date,
-          tmdb_id: String(item.id || item.tmdb_id || "")
-        }).then(function () { button.textContent = "Aggiunto"; })
-          .catch(function (error) { notify("Aggiunta non riuscita: " + error.message, "err"); button.disabled = false; });
+      meta.textContent = (isTVDB ? "TVDB " : "TMDB ") + (id || "—") + (year ? " · " + year : "") +
+        (item.vote_average ? " · ★ " + item.vote_average : "");
+      body.appendChild(meta);
+
+      if (item.overview) {
+        var overview = String(item.overview);
+        var text = document.createElement("p");
+        text.className = "tmdb-overview";
+        text.textContent = overview.length > 180 ? overview.slice(0, 180) + "…" : overview;
+        body.appendChild(text);
+      }
+
+      var add = document.createElement("button");
+      add.className = "btn sm primary";
+      add.textContent = "Aggiungi alla libreria";
+      add.addEventListener("click", function () {
+        openAddModal(kind, {
+          name: title,
+          year: year,
+          tmdb_id: isTVDB ? "" : id,
+          tvdb_id: isTVDB ? id : ""
+        });
       });
-      card.appendChild(title);
-      card.appendChild(meta);
-      card.appendChild(button);
+      body.appendChild(add);
+
+      card.appendChild(body);
       grid.appendChild(card);
     });
     container.appendChild(grid);
+  }
+
+  function renderDiscoverResults(container, items, kind) {
+    renderTmdbCards(container, items, kind);
   }
 
   function renderRecentList(container, items) {
@@ -2669,33 +2726,9 @@
   }
 
   function renderTmdbResults(container, items, form) {
-    container.innerHTML = "";
     var kindField = form ? form.querySelector("[name=kind]") : null;
     var kind = kindField ? kindField.value : "series";
-    var table = document.createElement("table");
-    table.className = "data-table";
-    table.innerHTML = "<thead><tr><th>Titolo</th><th>Anno</th><th>ID</th><th></th></tr></thead>";
-    var tbody = document.createElement("tbody");
-    items.forEach(function (item) {
-      var title = item.name || item.title || "—";
-      var year = String(item.first_air_date || item.release_date || "").slice(0, 4);
-      var id = item.id || item.tmdb_id || item.tvdb_id || "";
-      var row = document.createElement("tr");
-      row.innerHTML = "<td>" + esc(title) + "</td><td>" + esc(year) + "</td><td>" + esc(String(id)) + "</td>";
-      var cell = document.createElement("td");
-      var button = document.createElement("button");
-      button.className = "btn sm primary";
-      button.textContent = "Aggiungi";
-      button.title = "Completa i requisiti e aggiungi alla libreria";
-      button.addEventListener("click", function () {
-        openAddModal(kind, { name: title, year: year, tmdb_id: String(id), tvdb_id: String(item.tvdb_id || "") });
-      });
-      cell.appendChild(button);
-      row.appendChild(cell);
-      tbody.appendChild(row);
-    });
-    table.appendChild(tbody);
-    container.appendChild(table);
+    renderTmdbCards(container, items, kind);
   }
 
   // ---- generic JSON forms (section forms) ---------------------------------

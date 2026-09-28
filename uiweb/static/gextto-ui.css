@@ -696,14 +696,31 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .section-group .grid-2 { align-items: start; }
 
 .tmdb-results { margin-top: 12px; }
-.tmdb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.tmdb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .tmdb-card {
-  display: flex; flex-direction: column; gap: 6px; padding: 12px;
+  display: flex; gap: 10px; padding: 10px;
   border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
 }
-.tmdb-card strong { font-size: 0.9rem; }
-.tmdb-card small { color: var(--muted); font-size: 0.76rem; }
-.tmdb-card .btn { align-self: flex-start; margin-top: auto; }
+.tmdb-poster { width: 74px; height: 111px; flex: none; border-radius: 6px; overflow: hidden; background: var(--surface-3); }
+.tmdb-poster img { width: 100%; height: 100%; object-fit: cover; }
+.tmdb-poster.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 0.7rem; }
+.tmdb-card-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tmdb-card-body strong { font-size: 0.92rem; }
+.tmdb-card-body small { color: var(--muted); font-size: 0.75rem; }
+.tmdb-overview { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+.tmdb-card-body .btn { align-self: flex-start; margin-top: auto; }
+
+/* TMDB calendar: four columns on wide screens */
+.calendar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.calendar-grid .list-item {
+  display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+}
+.calendar-grid .list-item strong, .calendar-grid .list-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-grid .list-item small { color: var(--muted); margin-top: 2px; }
+@media (max-width: 1200px) { .calendar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .calendar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .calendar-grid { grid-template-columns: 1fr; } }
 .cell-truncate { display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .release-table { width: 100%; }
 .release-table td.release-title { white-space: normal; word-break: break-word; max-width: 0; width: 100%; }
