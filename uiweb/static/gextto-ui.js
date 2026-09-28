@@ -3457,6 +3457,57 @@
     });
   })();
 
+  // ---- integrations: sources / FlareSolverr check -------------------------
+  document.addEventListener("click", function (event) {
+    var check = event.target.closest("[data-sources-check]");
+    var flare = event.target.closest("[data-flaresolverr-test]");
+    if (!check && !flare) return;
+    var button = check || flare;
+    var panel = button.closest(".panel");
+    var output = panel.querySelector("[data-sources-output]");
+    var message = panel.querySelector("[data-sources-message]");
+    button.disabled = true;
+    if (message) message.textContent = "Verifica in corso…";
+    output.innerHTML = '<p class="muted">Attendere…</p>';
+    var promise = check ? api("/api/sources/health", "GET") : api("/api/flaresolverr/test", "POST", {});
+    promise.then(function (data) {
+      if (message) message.textContent = "";
+      output.innerHTML = "";
+      if (check) {
+        var items = (data && data.items) || [];
+        if (!items.length) {
+          output.innerHTML = '<p class="muted">Nessuna sorgente da verificare.</p>';
+          return;
+        }
+        var table = document.createElement("table");
+        table.className = "data-table";
+        table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
+        var tbody = document.createElement("tbody");
+        items.forEach(function (item) {
+          var tr = document.createElement("tr");
+          var ok = item.ok !== false;
+          var detail = item.error ? String(item.error) : (item.results !== undefined && item.results !== null ? String(item.results) + " risultati" : "");
+          tr.innerHTML = "<td>" + esc(String(item.kind || "")) + "</td>" +
+            "<td class='truncate'>" + esc(String(item.name || "")) + "</td>" +
+            "<td><span class='badge " + (ok ? "ok" : "err") + "'>" + (ok ? "ok" : "errore") + "</span></td>" +
+            "<td class='numeric'>" + esc(String(item.results === undefined || item.results === null ? "—" : item.results)) + "</td>" +
+            "<td class='muted truncate'>" + esc(detail) + "</td>";
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        output.appendChild(table);
+      } else {
+        var box = document.createElement("div");
+        box.className = "output";
+        renderReadable(box, data || {});
+        output.appendChild(box);
+      }
+    }).catch(function (error) {
+      if (message) message.textContent = error.message;
+      output.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+    }).then(function () { button.disabled = false; });
+  });
+
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";

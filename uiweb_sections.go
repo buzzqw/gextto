@@ -203,6 +203,10 @@ func sectionComicsLinks() uiPageSection {
 	return uiPageSection{Kind: "comics_links"}
 }
 
+func sectionSourcesCheck() uiPageSection {
+	return uiPageSection{Kind: "sources_check"}
+}
+
 func sectionLinks(section uiLinksSection) uiPageSection {
 	return uiPageSection{Kind: "links", Links: section}
 }
@@ -561,12 +565,14 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		}})),
 		group("Sorgenti", sectionEditor(uiIndexerEditor)),
 		group("Sorgenti", sectionSettings("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"))),
-		group("Sorgenti", sectionActions(uiActionSection{Label: "Sorgenti", Hint: "Verifica FlareSolverr; l'esito degli indexer è in Salute e Manutenzione.", Buttons: []uiActionButton{
-			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
+		group("Sorgenti", sectionSourcesCheck()),
+		group("Notifiche", sectionSettings("Notifiche", "Telegram, webhook ed email: i valori si salvano per campo.", uiSettingFields(cfg,
+			"notify_telegram", "telegram_bot_token", "telegram_chat_id",
+			"notify_webhook_url", "notify_webhook_secret",
+			"notify_email", "email_smtp", "email_from", "email_to", "email_password"))),
+		group("Notifiche", sectionActions(uiActionSection{Label: "Notifiche", Hint: "Invia una notifica di prova con la configurazione corrente.", Buttons: []uiActionButton{
+			{Label: "Invia notifica di test", Method: "POST", Path: "/api/test-notification", Body: `{"message":"Gextto: test notifica"}`},
 		}})),
-		sectionActions(uiActionSection{Label: "Notifiche", Hint: "Invia una notifica di prova con la configurazione corrente.", Buttons: []uiActionButton{
-			{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
-		}}),
 		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",

@@ -88,7 +88,21 @@
 {{else if eq .Kind "ramdisk"}}{{template "ramdisk_control" .}}
 {{else if eq .Kind "settings"}}{{template "settings_section" .Settings}}
 {{else if eq .Kind "list_editor"}}{{template "list_editor" .Editor}}
+{{else if eq .Kind "sources_check"}}{{template "sources_check" .}}
 {{end}}
+{{end}}
+
+{{define "sources_check"}}
+<div class="panel">
+  <div class="panel-head"><h3>Verifica sorgenti</h3><small class="muted" data-sources-message aria-live="polite"></small></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <button class="btn sm primary" type="button" data-sources-check title="Verifica feed RSS, indexer Torznab e motori web">Verifica indexer e sorgenti</button>
+      <button class="btn sm" type="button" data-flaresolverr-test title="Verifica che FlareSolverr risponda">Test FlareSolverr</button>
+    </div>
+    <div data-sources-output></div>
+  </div>
+</div>
 {{end}}
 
 {{define "settings_section"}}
