@@ -735,12 +735,18 @@
     </div>
   </div>
   <div class="setting-control">
-    {{if eq .Kind "structured"}}
+    {{if .Managed}}
+    <input class="input" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
+    {{else if eq .Kind "structured"}}
     <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
     {{else if eq .Kind "bool"}}
     <select class="input" data-setting-input id="input-{{.Key}}">
       <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
       <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
+    </select>
+    {{else if eq .Kind "select"}}
+    <select class="input" data-setting-input id="input-{{.Key}}">
+      {{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}
     </select>
     {{else if eq .Kind "tags"}}
     <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}">{{.Value}}</textarea>
@@ -754,7 +760,7 @@
   </div>
   <div class="setting-actions">
     <small class="setting-status muted" data-setting-status aria-live="polite"></small>
-    {{if ne .Kind "structured"}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
+    {{if and (ne .Kind "structured") (not .Managed)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
   </div>
 </form>
 {{end}}
@@ -788,7 +794,7 @@
 {{end}}
 
 {{define "settings_checkbox_group"}}
-<div class="panel settings-panel" data-checkbox-group data-key="{{.Key}}">
+<div class="panel settings-panel" data-checkbox-group data-key="{{.Key}}"{{if .TestKind}} data-test-kind="{{.TestKind}}"{{end}}>
   <div class="panel-head"><h3>{{.Title}}</h3><small class="muted" data-checkbox-status aria-live="polite"></small></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
@@ -802,6 +808,14 @@
       <input class="input" data-checkbox-custom placeholder="{{.CustomPlaceholder}}" />
       <button class="btn sm" type="button" data-checkbox-add>Aggiungi</button>
     </div>
+    {{end}}
+    {{if .TestQuery}}
+    <div class="toolbar" style="margin-top:10px">
+      <input class="input" data-checkbox-query value="{{.TestQuery}}" placeholder="Termine di prova" title="Termine usato per la ricerca di prova" />
+      <button class="btn sm" type="button" data-checkbox-test title="Interroga le voci selezionate e mostra quali rispondono">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button>
+      <small class="muted" data-checkbox-test-status aria-live="polite"></small>
+    </div>
+    <div class="output" data-checkbox-test-output hidden></div>
     {{end}}
   </div>
 </div>

@@ -87,6 +87,11 @@ type uiSettingField struct {
 	// Placeholder is the default value shown greyed out when the setting is
 	// still unset, so the form mirrors rextto/extto instead of looking empty.
 	Placeholder string
+	// Managed marks a field the automatic optimization controls: it renders
+	// read-only with the value "Auto" (like rextto) instead of an editable box.
+	Managed bool
+	// Options is set for Kind=="select": a fixed list to choose from.
+	Options []uiFormOption
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
 	Hint string
 	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
@@ -177,6 +182,12 @@ type uiCheckboxGroup struct {
 	Options           []uiCheckboxOption
 	Custom            bool
 	CustomPlaceholder string
+	// TestQuery, when set, shows a "test the selected values" toolbar: the
+	// button queries /api/sources/health with this default term and reports
+	// which sources responded. TestKind filters the health items by `kind`.
+	TestQuery string
+	TestKind  string
+	TestLabel string
 }
 
 // uiWebsearchEngines are the web search engines rextto exposes for gap filling.
@@ -397,6 +408,25 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
 	}
+	// With the continuous optimization on, the queue/cache fields are handled
+	// by Rextto/Gextto: show them as "Auto" (read-only), like rextto does.
+	if active == "libtorrent" && settingsBool(cfg, "libtorrent_auto_optimize", false) {
+		for index := range page.Fields {
+			if uiManagedSetting[page.Fields[index].Key] {
+				page.Fields[index].Managed = true
+			}
+		}
+	}
+	// The transfer backend is a fixed choice: render it as a select instead of
+	// a free-text box.
+	if active == "backend" {
+		for index := range page.Fields {
+			if page.Fields[index].Key == "torrent_backend" {
+				page.Fields[index].Kind = "select"
+				page.Fields[index].Options = uiTorrentBackendOptions(page.Fields[index].Value)
+			}
+		}
+	}
 	page.Groups = uiSettingsGroups(active, page.Fields)
 	page.ShowSources = active == "sources"
 	page.ShowEditors = active == "advanced"
@@ -413,7 +443,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	case "libtorrent":
 		page.Actions = &uiActionSection{
 			Label: "Ottimizzazione",
-			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento.",
+			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento. Con l'ottimizzazione continua attiva i campi Download attivi, Seed attivi, Limite torrent attivi e Cache disco sono gestiti automaticamente (Auto).",
 			Buttons: []uiActionButton{
 				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
 				{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."},
@@ -475,9 +505,12 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 // (Motori web, Filtri contenuto) from the stored JSON arrays.
 func uiSourcesCheckboxGroups(cfg *Config) []uiCheckboxGroup {
 	engines := uiCheckboxGroup{
-		Key:   "websearch_engines",
-		Title: "Motori web",
-		Hint:  "Spunta i motori di ricerca da usare per i gap.",
+		Key:       "websearch_engines",
+		Title:     "Motori web",
+		Hint:      "Spunta i motori di ricerca da usare per i gap.",
+		TestQuery: "1080p",
+		TestKind:  "engine",
+		TestLabel: "Testa motori",
 	}
 	for _, option := range uiWebsearchEngines {
 		option.Selected = settingListContains(cfg, "websearch_engines", option.Value)
@@ -540,6 +573,16 @@ func uiSettingGroupTitle(tab, key string) string {
 		return "Daemon"
 	case "sources":
 		return "Blacklist"
+	case "backend":
+		// One panel per transfer engine, so the settings are clearly separated.
+		switch {
+		case strings.HasPrefix(lowered, "qbittorrent_"):
+			return "qBittorrent"
+		case strings.HasPrefix(lowered, "anacrolix_"):
+			return "anacrolix"
+		default:
+			return "Motore torrent"
+		}
 	case "advanced":
 		return "Avanzate"
 	case "acquisition":
@@ -579,6 +622,35 @@ func uiSettingGroupTitle(tab, key string) string {
 		}
 	}
 	return "Impostazioni"
+}
+
+// uiManagedSetting lists the settings the continuous optimization drives: with
+// `libtorrent_auto_optimize` on they render as "Auto" and cannot be edited.
+var uiManagedSetting = map[string]bool{
+	"libtorrent_active_downloads": true,
+	"libtorrent_active_seeds":     true,
+	"libtorrent_active_limit":     true,
+	"libtorrent_cache_size":       true,
+}
+
+// uiTorrentBackendOptions is the combo list of the transfer engines.
+func uiTorrentBackendOptions(value string) []uiFormOption {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = BackendEmbedded
+	}
+	options := []uiFormOption{
+		{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded},
+		{Value: BackendQbittorrent, Label: "qBittorrent", Selected: value == BackendQbittorrent},
+		{Value: BackendAnacrolix, Label: "anacrolix", Selected: value == BackendAnacrolix},
+	}
+	if value != BackendEmbedded && value != BackendQbittorrent && value != BackendAnacrolix {
+		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
+		for index := 1; index < len(options); index++ {
+			options[index].Selected = false
+		}
+	}
+	return options
 }
 
 func uiSettingFieldFor(key, label, value string) uiSettingField {

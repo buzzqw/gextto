@@ -94,7 +94,7 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_extra_settings":                    "Una per riga: chiave=valore\nmax_peerlist_size=4000\nmax_queued_disk_bytes=104857600\nactive_downloads=6\nsmooth_connects=true\nrequest_timeout=10",
 
 	// --- Motore torrent (backend) ------------------------------------------
-	"torrent_backend":           "libtorrent",
+	"torrent_backend":           "embedded",
 	"qbittorrent_managed":       "false",
 	"anacrolix_tcp":             "true",
 	"anacrolix_utp":             "true",

@@ -101,7 +101,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "qbittorrent_request_timeout_secs", Label: "qBittorrent — timeout richieste (secondi)", Tab: "backend"},
 	{Key: "qbittorrent_poll_interval_ms", Label: "qBittorrent — intervallo polling (ms)", Tab: "backend"},
 	{Key: "qbittorrent_path_mappings", Label: "qBittorrent — mappatura percorsi", Tab: "backend"},
-	{Key: "qbittorrent_managed", Label: "qBittorrent — binario gestito da Gextto", Tab: "backend"},
+	{Key: "qbittorrent_managed", Label: "qBittorrent — scaricato e aggiornato da Gextto", Tab: "backend"},
 	{Key: "anacrolix_path_mappings", Label: "anacrolix — mappatura percorsi", Tab: "backend"},
 	{Key: "anacrolix_data_dir", Label: "anacrolix — cartella dati", Tab: "backend"},
 	{Key: "anacrolix_listen_port", Label: "anacrolix — porta in ascolto", Tab: "backend"},

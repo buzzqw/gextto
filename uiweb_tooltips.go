@@ -146,7 +146,7 @@ var uiSettingTooltipText = map[string]string{
 	"qbittorrent_request_timeout_secs":             "Timeout in secondi delle richieste HTTP verso qBittorrent.",
 	"qbittorrent_poll_interval_ms":                 "Intervallo in millisecondi tra due letture dello stato dei torrent.",
 	"qbittorrent_path_mappings":                    "Mappatura dei percorsi tra Gextto e qBittorrent, una per riga (locale=remoto).",
-	"qbittorrent_managed":                          "Avvia e ferma qBittorrent insieme a Gextto (richiede il binario installato).",
+	"qbittorrent_managed":                          "Gextto scarica da sé l'ultima release di qBittorrent, la installa nella sua cartella dati, la avvia e la ferma con il servizio e la aggiorna (con backup e rollback). Il motore in uso però si sceglie dalla voce «Motore torrent»: questa opzione non lo cambia.",
 	"anacrolix_path_mappings":                      "Mappatura dei percorsi tra Gextto e il motore anacrolix (locale=remoto).",
 	"anacrolix_data_dir":                           "Cartella dati del motore anacrolix (stato e resume).",
 	"anacrolix_listen_port":                        "Porta di ascolto del motore anacrolix.",

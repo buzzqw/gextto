@@ -1507,6 +1507,11 @@
       var button = form.querySelector("button[type=submit]");
       if (button) button.disabled = true;
       saveSettingForm(form, currentInput).then(function () {
+        if (form.getAttribute("data-setting-key") === "libtorrent_auto_optimize") {
+          // Re-render the tab so the managed queue/cache fields switch to Auto.
+          location.reload();
+          return;
+        }
         if (!button) return;
         button.textContent = "Salvato";
         setTimeout(function () { button.textContent = "Salva"; button.disabled = false; }, 1200);
@@ -1526,6 +1531,7 @@
     if (saveAll) {
       var keys = Object.keys(dirtySettings);
       if (!keys.length) { updateSettingsSavebar(); return; }
+      var reloadAfter = keys.indexOf("libtorrent_auto_optimize") !== -1;
       saveAll.disabled = true;
       Promise.all(keys.map(function (key) {
         var entry = dirtySettings[key];
@@ -1535,7 +1541,10 @@
         notify("Impostazioni salvate", "ok");
       }).catch(function (error) {
         notify("Salvataggio non riuscito: " + error.message, "err");
-      }).then(function () { saveAll.disabled = false; });
+      }).then(function () {
+        saveAll.disabled = false;
+        if (reloadAfter) location.reload();
+      });
       return;
     }
     if (event.target.closest("[data-settings-discard]")) {
@@ -1601,6 +1610,44 @@
         }
         custom.value = "";
         save("Filtro aggiunto");
+      });
+    }
+
+    var testButton = group.querySelector("[data-checkbox-test]");
+    if (testButton) {
+      var queryInput = group.querySelector("[data-checkbox-query]");
+      var testStatus = group.querySelector("[data-checkbox-test-status]");
+      var testOutput = group.querySelector("[data-checkbox-test-output]");
+      var testKind = group.getAttribute("data-test-kind") || "";
+      var labelFor = {};
+      Array.prototype.forEach.call(group.querySelectorAll("[data-checkbox-option]"), function (box) {
+        var span = box.parentNode ? box.parentNode.querySelector("span") : null;
+        if (span) labelFor[box.value] = span.textContent;
+      });
+      testButton.addEventListener("click", function () {
+        var term = (queryInput && queryInput.value || "").trim();
+        if (!term) { if (testStatus) testStatus.textContent = "Inserisci un termine"; return; }
+        testButton.disabled = true;
+        if (testStatus) testStatus.textContent = "Verifica in corso…";
+        if (testOutput) testOutput.hidden = true;
+        api("/api/sources/health?q=" + encodeURIComponent(term), "GET").then(function (data) {
+          var items = (data && data.items) || [];
+          if (testKind) items = items.filter(function (item) { return item.kind === testKind; });
+          var ok = items.filter(function (item) { return item.ok; });
+          var ko = items.filter(function (item) { return !item.ok; });
+          var name = function (item) { return labelFor[item.name] || item.name; };
+          var parts = [ok.length + "/" + items.length + " ok"];
+          if (ok.length) parts.push(ok.map(name).join(", "));
+          if (testStatus) testStatus.textContent = parts.join(": ");
+          if (testOutput && ko.length) {
+            testOutput.hidden = false;
+            testOutput.textContent = ko.map(function (item) {
+              return name(item) + ": " + (item.error || "nessun risultato");
+            }).join("\n");
+          }
+        }).catch(function (error) {
+          if (testStatus) testStatus.textContent = "Errore: " + error.message;
+        }).then(function () { testButton.disabled = false; });
       });
     }
   });
