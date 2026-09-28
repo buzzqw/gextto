@@ -12,7 +12,7 @@ calling out explicitly:
   through CGo (native/libtorrent_bridge.cpp).
 - github.com/anacrolix/torrent (Mozilla Public License 2.0): the optional native
   Go torrent backend. It is only compiled when the daemon is built with the
-  `anacrolix` build tag (see docs/aggiunta-anacrolix.md, `make build-anacrolix`).
+  `anacrolix` build tag (see `make build-anacrolix`).
   The default build does not include it.
 
 The full licence texts of the vendored/module dependencies are available from

@@ -149,7 +149,7 @@ func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState
 // the configured engine and reports whether a restart is needed. A running
 // daemon never installs a second engine: switching the transfer plane changes
 // who owns the files, so it is applied at startup after a clean shutdown
-// (see docs/aggiunta-qbittorrent-nox.md §26.4).
+// (see the backend-specific implementation notes).
 func TorrentBackendActivate(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	active := ActiveTorrentBackend(s).Name()

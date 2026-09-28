@@ -4,7 +4,7 @@ package gextto
 // to the TorrentEngine contract. Gextto keeps the queue and the automation;
 // this adapter only moves bytes and reports state.
 //
-// Design decisions (see docs/aggiunta-qbittorrent-nox.md):
+// Design decisions for the optional qBittorrent backend:
 //   - polling is the source of truth: every List() refreshes from
 //     /torrents/info and diffs the previous snapshot to emit lifecycle events,
 //     so a lost qBittorrent script or a restart cannot silently drop a

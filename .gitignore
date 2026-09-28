@@ -7,12 +7,19 @@ gextto-data/
 bin/
 *.tar.gz
 *.tar.gz.sha256
+dist/
+release/
 __pycache__/
 coverage.out
+coverage.html
+coverage.xml
 *.coverprofile
 *.prof
 *.tmp
 *.pid
+
+# Local-only project notes and superseded planning documents
+docs/internal/
 
 # The monotonic build number is generated per build, never committed.
 build_number
@@ -30,10 +37,15 @@ gextto.json
 # Editor / OS noise
 .DS_Store
 *.swp
+*.swo
+*.orig
+*.rej
 .idea/
 .vscode/
 .opencode/
 .claude/
+.direnv/
+.envrc
 
 # UI build output
 ui/target/

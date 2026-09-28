@@ -19,8 +19,8 @@ test:
 test-real:
 	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
 
-# Optional native-Go backend (see docs/aggiunta-anacrolix.md). The default
-# build and `make test` do not compile it; MPL-2.0 review gate still applies.
+# Optional native-Go backend. The default build and `make test` do not compile
+# it; the MPL-2.0 review gate still applies.
 test-anacrolix:
 	CGO_ENABLED=1 go test -tags anacrolix -timeout 600s ./...
 

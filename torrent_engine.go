@@ -13,7 +13,7 @@ package gextto
 // existing *LibtorrentClient, so every promoted method behaves exactly as
 // before. The abstraction exists to let the daemon select a different engine
 // without changing the HTTP contract or the automation policy (see
-// docs/aggiunta-qbittorrent-nox.md and docs/aggiunta-anacrolix.md).
+// the backend-specific implementation notes).
 
 import (
 	"errors"

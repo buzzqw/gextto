@@ -1,8 +1,7 @@
 package gextto
 
 // torrent_migration.go implements the migration *preparation* described in
-// docs/aggiunta-qbittorrent-nox.md §14 (Fase 6) and
-// docs/aggiunta-anacrolix.md §12. It never moves files or starts a second
+// the backend migration design. It never moves files or starts a second
 // engine: it exports a persistent manifest of the managed torrents and
 // validates, in dry-run, that a switch to the target backend is feasible.
 //

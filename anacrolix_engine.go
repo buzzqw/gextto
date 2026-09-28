@@ -6,7 +6,7 @@ package gextto
 // behind the `anacrolix` build tag. The default build never compiles this file,
 // so the official libtorrent path and its dependency tree are untouched.
 //
-// See docs/aggiunta-anacrolix.md. Scope of this first implementation:
+// Scope of this optional backend implementation:
 //   - one `*torrent.Client` per process, file storage plus a persistent piece
 //     completion store;
 //   - magnet and `.torrent` add with per-torrent storage directories;

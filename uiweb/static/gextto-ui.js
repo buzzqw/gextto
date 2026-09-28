@@ -2787,9 +2787,7 @@
     if (heroSeriesName) {
       api("/api/series/" + heroSeriesName + "/info", "GET").then(function (data) {
         renderSeriesHero(seriesHero, (data && data.info) || {});
-      }).catch(function (error) {
-        seriesHero.innerHTML = '<div class="panel-body"><p class="alert">' + esc(error.message) + "</p></div>";
-      });
+      }).catch(function () { /* keep the server-rendered header */ });
     }
   }
   var seriesFilter = document.querySelector("[data-series-filter]");
@@ -2871,9 +2869,7 @@
     if (movieID) {
       api("/api/movies/" + encodeURIComponent(movieID), "GET").then(function (data) {
         renderMovieHero(movieHero, data || {});
-      }).catch(function (error) {
-        movieHero.innerHTML = '<div class="panel-body"><p class="alert">' + esc(error.message) + "</p></div>";
-      });
+      }).catch(function () { /* keep the server-rendered header */ });
     }
   }
 

@@ -1,7 +1,7 @@
 package gextto
 
 // uiweb.go is the first concrete slice of the UI migration to Go + server-side
-// rendering (see docs/migrazione-ui.md and docs/migrazione-ui-inventario.md).
+// rendering for the server-side UI migration.
 //
 // It is purely additive: the Leptos SPA keeps serving `/`, while the new UI
 // lives under `/ui`. The shell is a plain HTML document; the dynamic regions are

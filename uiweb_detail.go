@@ -32,16 +32,34 @@ type uiEpisodeRow struct {
 }
 
 type uiSeriesDetail struct {
-	Name        string
-	PathName    string
-	Seasons     string
-	Quality     string
-	Language    string
-	ArchivePath string
-	Exclude     string
-	Enabled     bool
-	Episodes    []uiEpisodeRow
-	Gaps        int
+	Name            string
+	PathName        string
+	Seasons         string
+	Quality         string
+	Language        string
+	ArchivePath     string
+	Exclude         string
+	Enabled         bool
+	Episodes        []uiEpisodeRow
+	Gaps            int
+	EpisodeCount    int
+	DownloadedCount int
+	IgnoredSeasons  []int64
+	StatusLabel     string
+}
+
+// uiSeriesStatusLabel mirrors rextto's series status wording.
+func uiSeriesStatusLabel(total, downloaded int, ignoredSeasons []int64) string {
+	if total == 0 {
+		return "Nessun episodio"
+	}
+	if downloaded >= total {
+		return "Completa"
+	}
+	if downloaded == 0 {
+		return "Da scaricare"
+	}
+	return "In corso"
 }
 
 type uiMovieMatch struct {
@@ -107,7 +125,11 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	}
 	escaped := url.PathEscape(series.Name)
 	rows := make([]uiEpisodeRow, 0, len(episodes))
+	downloadedCount := 0
 	for _, episode := range episodes {
+		if episode.ArchivePath != nil && strings.TrimSpace(*episode.ArchivePath) != "" {
+			downloadedCount++
+		}
 		title := episode.RenamedTitle
 		if title == "" {
 			title = episode.Title
@@ -146,16 +168,20 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		}
 	}
 	return uiSeriesDetail{
-		Name:        series.Name,
-		PathName:    escaped,
-		Seasons:     series.Seasons,
-		Quality:     series.Quality,
-		Language:    series.Language,
-		ArchivePath: series.ArchivePath,
-		Exclude:     series.Exclude,
-		Enabled:     series.Enabled,
-		Episodes:    rows,
-		Gaps:        gaps,
+		Name:            series.Name,
+		PathName:        escaped,
+		Seasons:         series.Seasons,
+		Quality:         series.Quality,
+		Language:        series.Language,
+		ArchivePath:     series.ArchivePath,
+		Exclude:         series.Exclude,
+		Enabled:         series.Enabled,
+		Episodes:        rows,
+		Gaps:            gaps,
+		EpisodeCount:    len(rows),
+		DownloadedCount: downloadedCount,
+		IgnoredSeasons:  ignoredSeasons,
+		StatusLabel:     uiSeriesStatusLabel(len(rows), downloadedCount, ignoredSeasons),
 	}, true
 }
 
