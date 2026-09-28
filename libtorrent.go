@@ -2012,15 +2012,54 @@ func (c *LibtorrentClient) restore(stateDir string) error {
 
 // Shutdown saves resume data for the running session.
 // tevArchivedCopyPresent reports whether the DB points at an existing archived
-// regular file for this torrent. A "completed" row whose file is gone (or was
-// never placed) must not suppress post-processing again.
+// copy for this torrent. A "completed" row whose copy is gone (or was never
+// placed) must not suppress post-processing again.
+//
+// Single releases are archived to a regular file, but a season pack is copied
+// into a destination *directory* (usually the series folder). Treating a
+// directory as a missing copy made the completion guard fail on every storage
+// move, so the same season pack was re-processed and re-archived in a loop.
+// A directory is therefore considered present when it still contains at least
+// one regular file.
 func tevArchivedCopyPresent(db *Database, hash string) bool {
 	processed, err := db.TorrentProcessed(hash)
 	if err != nil || processed == nil || strings.TrimSpace(*processed) == "" {
 		return false
 	}
 	info, err := os.Stat(*processed)
-	return err == nil && !info.IsDir()
+	if err != nil {
+		return false
+	}
+	if !info.IsDir() {
+		return true
+	}
+	return tevDirectoryHasRegularFile(*processed)
+}
+
+// tevDirectoryHasRegularFile reports whether the directory contains a regular
+// file, descending at most two levels so a season subfolder is covered without
+// walking a whole library.
+func tevDirectoryHasRegularFile(dir string) bool {
+	return tevDirHasFile(dir, 2)
+}
+
+func tevDirHasFile(dir string, depth int) bool {
+	if depth < 0 {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Type().IsRegular() {
+			return true
+		}
+		if entry.IsDir() && tevDirHasFile(filepath.Join(dir, entry.Name()), depth-1) {
+			return true
+		}
+	}
+	return false
 }
 
 // tevIgnoreRepeatedCompletion mirrors the "already completed" guard but only
