@@ -207,6 +207,42 @@ func TestUiServerRenderedPages(t *testing.T) {
 	}
 }
 
+func TestUiLogsAndFeedParity(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=logs")
+	if code != http.StatusOK {
+		t.Fatalf("logs -> %d", code)
+	}
+	for _, marker := range []string{"data-logs-view", "data-logs-filter", "data-logs-lines", "data-logs-follow"} {
+		if !strings.Contains(string(body), marker) {
+			t.Fatalf("logs page missing %q", marker)
+		}
+	}
+
+	code, _, body = webGet(t, server, "/ui?view=dashboard")
+	if code != http.StatusOK {
+		t.Fatalf("dashboard -> %d", code)
+	}
+	for _, marker := range []string{"data-dashboard-feed", "data-dashboard-feed-body", "Ultimi trovati nelle sorgenti"} {
+		if !strings.Contains(string(body), marker) {
+			t.Fatalf("dashboard missing %q", marker)
+		}
+	}
+
+	code, _, body = webGet(t, server, "/ui?view=search")
+	if code != http.StatusOK {
+		t.Fatalf("search -> %d", code)
+	}
+	for _, marker := range []string{"data-discover", "data-discover-results", "data-discover-calendar", `data-discover-kind="series"`, `data-discover-mode="popular"`} {
+		if !strings.Contains(string(body), marker) {
+			t.Fatalf("explore page missing %q", marker)
+		}
+	}
+}
+
 func TestUiListAndActionPages(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

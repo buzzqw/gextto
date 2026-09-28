@@ -2073,6 +2073,129 @@
     });
   }
 
+  // Dashboard "Ultimi trovati nelle sorgenti": flattens the feed matches so a
+  // release can be queued straight from the dashboard, like the classic UI.
+  var feedPanel = document.querySelector("[data-dashboard-feed]");
+  if (feedPanel) {
+    var feedBody = feedPanel.querySelector("[data-dashboard-feed-body]");
+    var feedStatus = feedPanel.querySelector("[data-dashboard-feed-status]");
+    var loadFeed = function () {
+      feedBody.innerHTML = '<tr><td class="muted" colspan="5">Caricamento…</td></tr>';
+      api("/api/feed/status", "GET").then(function (data) {
+        var rows = [];
+        (data.items || []).forEach(function (item) {
+          (item.matches || []).forEach(function (match) {
+            rows.push({ name: item.name, kind: item.kind, title: match.title, source: match.source, magnet: match.magnet });
+          });
+        });
+        if (feedStatus) feedStatus.textContent = rows.length + " release";
+        if (!rows.length) {
+          feedBody.innerHTML = '<tr><td class="muted" colspan="5">Nessuna release trovata.</td></tr>';
+          return;
+        }
+        feedBody.innerHTML = "";
+        rows.slice(0, 40).forEach(function (row) {
+          var tr = document.createElement("tr");
+          var nameCell = document.createElement("td");
+          nameCell.textContent = String(row.name || "—");
+          var kindCell = document.createElement("td");
+          kindCell.textContent = row.kind === "movie" ? "Film" : "Serie TV";
+          var releaseCell = document.createElement("td");
+          var release = document.createElement("span");
+          release.className = "cell-truncate";
+          release.title = String(row.title || "");
+          release.textContent = String(row.title || "");
+          releaseCell.appendChild(release);
+          var sourceCell = document.createElement("td");
+          sourceCell.textContent = String(row.source || "—");
+          var actionCell = document.createElement("td");
+          var add = document.createElement("button");
+          add.className = "btn sm primary";
+          add.textContent = "Accoda";
+          add.addEventListener("click", function () {
+            add.disabled = true;
+            api("/api/archive/add", "POST", { title: row.title, magnet: row.magnet, source: row.source })
+              .then(function () { add.textContent = "Accodato"; })
+              .catch(function (error) { notify("Accoda non riuscito: " + error.message, "err"); add.disabled = false; });
+          });
+          actionCell.appendChild(add);
+          tr.appendChild(nameCell); tr.appendChild(kindCell); tr.appendChild(releaseCell);
+          tr.appendChild(sourceCell); tr.appendChild(actionCell);
+          feedBody.appendChild(tr);
+        });
+      }).catch(function (error) {
+        feedBody.innerHTML = '<tr><td class="alert" colspan="5">' + esc(error.message) + "</td></tr>";
+      });
+    };
+    var feedButton = feedPanel.querySelector("[data-dashboard-feed-load]");
+    if (feedButton) feedButton.addEventListener("click", loadFeed);
+  }
+
+  // ---- logs: filter, level highlighting, follow ---------------------------
+  var logsView = document.querySelector("[data-logs-view]");
+  if (logsView) {
+    var logsPanel = logsView.closest("[data-logs]");
+    var logsFilter = logsPanel.querySelector("[data-logs-filter]");
+    var logsLines = logsPanel.querySelector("[data-logs-lines]");
+    var logsCount = logsPanel.querySelector("[data-logs-count]");
+    var logsFollowButton = logsPanel.querySelector("[data-logs-follow]");
+    var logsCache = [];
+    var logsFollow = true;
+    var logsTimer = null;
+
+    var highlightLogLine = function (line) {
+      return esc(line)
+        .replace(/\bERROR\b/g, '<span class="hl-err">ERROR</span>')
+        .replace(/\b(WARN|WARNING)\b/g, '<span class="hl-warn">$1</span>')
+        .replace(/\b(completed|completato|archived|archiviato|moved|approved|approvato)\b/gi, '<span class="hl-ok">$1</span>')
+        .replace(/\b(indexer|feed|source|sorgente|scraping|engine)\b/gi, '<span class="hl-src">$1</span>')
+        .replace(/\b(upgrade|score|punteggio)\b/gi, '<span class="hl-score">$1</span>')
+        .replace(/\b(filter|filtered|rejected|scartato|skipped|blocklist|stalled)\b/gi, '<span class="hl-filter">$1</span>');
+    };
+
+    var renderLogs = function () {
+      var query = (logsFilter && logsFilter.value || "").trim().toLowerCase();
+      var lines = logsCache.filter(function (line) {
+        return !query || line.toLowerCase().indexOf(query) >= 0;
+      });
+      logsView.innerHTML = lines.map(function (line) {
+        return '<span class="log-line">' + highlightLogLine(line) + "</span>";
+      }).join("");
+      if (logsCount) logsCount.textContent = String(lines.length);
+      if (logsFollow) logsView.scrollTop = logsView.scrollHeight;
+    };
+
+    var refreshLogs = function () {
+      var limit = logsLines ? logsLines.value : "500";
+      api("/api/logs?limit=" + encodeURIComponent(limit), "GET").then(function (data) {
+        logsCache = Array.isArray(data.items) ? data.items : [];
+        renderLogs();
+      }).catch(function () { /* keep the previous view on a transient error */ });
+    };
+
+    var scheduleLogs = function () {
+      if (logsTimer) clearInterval(logsTimer);
+      if (!logsFollow) return;
+      logsTimer = setInterval(function () {
+        if (document.visibilityState === "visible") refreshLogs();
+      }, 5000);
+    };
+
+    if (logsFilter) logsFilter.addEventListener("input", renderLogs);
+    if (logsLines) logsLines.addEventListener("change", refreshLogs);
+    var logsRefreshButton = logsPanel.querySelector("[data-logs-refresh]");
+    if (logsRefreshButton) logsRefreshButton.addEventListener("click", refreshLogs);
+    if (logsFollowButton) logsFollowButton.addEventListener("click", function () {
+      logsFollow = !logsFollow;
+      logsFollowButton.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Riprendi";
+      scheduleLogs();
+      if (logsFollow) renderLogs();
+    });
+    document.addEventListener("visibilitychange", scheduleLogs);
+    refreshLogs();
+    scheduleLogs();
+  }
+
   function renderReleaseResults(container, items) {
     container.innerHTML = "";
     var table = document.createElement("table");
