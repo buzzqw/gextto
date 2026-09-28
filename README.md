@@ -8,7 +8,10 @@ archiving of TV series, movies and comics.
 
 A single Go binary bundles everything: the scraping engine, the SQLite archive,
 the web UI/API (embedded with `//go:embed`), the terminal TUI and an embedded
-**libtorrent** session. No runtime and no external services required.
+**libtorrent** session. No runtime and no external services required. The torrent
+transfer plane is pluggable: on top of the embedded engine, Gextto can drive a
+managed **qBittorrent-nox** or the native **anacrolix** backend (see
+[Torrent backends](#torrent-backends)).
 
 It watches what you configure, searches RSS/HTML sources, Torznab indexers
 (Jackett/Prowlarr) and public search engines, scores every release by quality,
@@ -41,9 +44,10 @@ disk).
   score threshold.
 - **Series & movies** — TMDB metadata, posters, per-season monitoring, missing
   episode search, calendar, manual search.
-- **Torrents** — embedded libtorrent: queue, limits, tags, peers, trackers,
-  files, storage moves, seed policy, fastresume, VPN killswitch and restart
-  recovery. **Stalled torrents are really paused and excluded from active slots**,
+- **Torrents** — three selectable backends: embedded **libtorrent** (default),
+  managed **qBittorrent-nox** or native **anacrolix**. Whichever is active, Gextto
+  owns the queue, limits, tags, storage moves, seed policy and restart recovery.
+  **Stalled torrents are really paused and excluded from active slots**,
   then resumed/reannounced automatically. New downloads are **preallocated on
   disk** by default (toggle in the settings and per add). Add options include
   pause, sequential, skip-check, queue-top, first/last piece, metadata-only and
@@ -246,6 +250,11 @@ make build            # -> bin/gexttod
 CGO_ENABLED=1 go build -o bin/gexttod ./cmd/gexttod
 ```
 
+The optional native-Go torrent backend is not part of the default build. Build
+it (or its tests) with `make build-anacrolix` / `make test-anacrolix`, which add
+the `anacrolix` build tag; the default build keeps libtorrent and rejects
+`torrent_backend=anacrolix`.
+
 The web UI is embedded in the binary with `//go:embed` from `webui/pkg`, so a
 normal build needs no UI step. The Leptos source lives in `ui/`; after editing
 it, regenerate the bundle with `make ui` (needs `cargo leptos` and the
@@ -295,6 +304,41 @@ with the API key. Gextto queries the Torznab endpoint and uses `t=caps` for the
 health check, so it also validates the key and configured indexers. Torznab
 errors are detected even when Jackett returns HTTP 200, and results may identify
 the source as `jackett:TrackerName`.
+
+### Torrent backends
+
+Gextto always owns the database, the queue, scoring, post-processing, renaming,
+archiving and the **Downloads** UI. Only the transfer plane is pluggable, chosen
+in *Configuration → Torrent engine* (`torrent_backend`). A torrent is owned by
+exactly one backend at a time, so switching is a controlled migration rather than
+two engines working on the same data.
+
+- **Embedded libtorrent** (`embedded`, default) — the bundled in-process
+  libtorrent session. No external service; every `libtorrent_*` setting applies.
+- **qBittorrent-nox** (`qbittorrent`) — Gextto drives an existing qBittorrent-nox
+  through its Web API (`qbittorrent_url`, user/password, category, tag, poll
+  interval, request timeout). Configure `qbittorrent_path_mappings` (`local=remote`,
+  one per line) whenever the two processes see different paths; with no mappings
+  Gextto checks that the required paths exist locally. If a path cannot be
+  translated, activation is **refused** so a move can never target the wrong
+  folder. **Managed mode** (`qbittorrent_managed=true`) lets Gextto download the
+  latest qBittorrent-nox static release, install it next to `gexttod` inside the
+  application directory (`qbittorrent/`), start and stop it with the service and
+  update it with backup and rollback; a watchdog restarts it after an unexpected
+  exit and, after repeated crashes in a short window, switches back to the
+  embedded libtorrent engine and restarts the service. When qBittorrent is
+  unreachable at startup the adapter stays installed and keeps retrying instead
+  of failing hard.
+- **anacrolix** (`anacrolix`) — `github.com/anacrolix/torrent`, a native Go
+  BitTorrent engine that runs in-process (no Web API, no CGo). It is compiled only
+  with the `anacrolix` build tag (`make build-anacrolix`); the default build keeps
+  libtorrent and refuses `torrent_backend=anacrolix`. It is configured through the
+  `anacrolix_*` keys: listen port, TCP/uTP/DHT/PEX/trackers/UPnP, connection and
+  bandwidth limits, piece hashers, unverified buffer, IP filter, proxy, path
+  mappings and data folder.
+
+The configuration tile shows the active engine and its status and offers a
+reachability/path test, so you can validate a backend before switching.
 
 ### Add series and movies
 
@@ -584,6 +628,7 @@ bin/gexttod --update --archive /tmp/gextto-linux-x86_64.tar.gz \
 | Embedded web UI (`webui/`, `//go:embed`) | single-page front-end | dashboard, library screens, settings, bilingual UI |
 | SQLite (`modernc.org/sqlite`, pure Go) | local persistence | series/episodes, movies, archive, comics, config, cycle stats, torrent metadata |
 | libtorrent (`libtorrent_bridge.cpp`, `libtorrent_cgo.go`, `libtorrent.go`) | embedded BitTorrent engine | queue and limits, seeding policy, trackers, files, peers, fastresume, VPN killswitch |
+| `torrent_engine.go`, `torrent_engine_select.go`, `qbittorrent_engine.go`, `qbittorrent_runtime.go`, `internal/qbittorrent`, `anacrolix_engine.go` | pluggable torrent backends | engine selection, managed qBittorrent-nox, native anacrolix, path-mapping preflight |
 | `rss.go`, `websearch.go`, `httpx.go` | source acquisition | RSS/HTML listings, Torznab indexers, web engines, FlareSolverr fallback |
 | `tmdb.go`, `tvdb.go` | metadata providers | posters, seasons, episode dates, discovery |
 | `mediainfo.go` | real media inspection | codec/HDR/audio/language data that feeds upgrade comparisons |

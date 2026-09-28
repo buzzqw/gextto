@@ -8,7 +8,10 @@ l'archiviazione automatica di serie TV, film e fumetti.
 
 Un solo binario Go racchiude tutto: motore di scraping, archivio SQLite, web
 UI/API (inclusa con `//go:embed`), TUI terminale e una sessione **libtorrent**
-integrata. Non servono runtime né servizi esterni.
+integrata. Non servono runtime né servizi esterni. Il piano di trasferimento dei
+torrent è sostituibile: oltre al motore integrato, Gextto può pilotare un
+**qBittorrent-nox** gestito o il backend nativo **anacrolix** (vedi
+[Motori torrent](#motori-torrent)).
 
 Monitora ciò che configuri, cerca su feed RSS/HTML, indexer Torznab
 (Jackett/Prowlarr) e motori di ricerca pubblici, assegna un punteggio di qualità a
@@ -41,9 +44,10 @@ o disco locale).
   soglia di punteggio configurabile.
 - **Serie e film** — metadati TMDB, locandine, monitoraggio per stagione, ricerca
   episodi mancanti, calendario, ricerca manuale.
-- **Torrent** — libtorrent embedded: coda, limiti, tag, peer, tracker, file,
-  spostamento storage, politica di seeding, fastresume, killswitch VPN e recupero
-  dopo riavvio. I torrent **stalled** vengono messi realmente in pausa e fuori
+- **Torrent** — tre backend selezionabili: **libtorrent** integrato (default),
+  **qBittorrent-nox** gestito o **anacrolix** nativo. Quale che sia quello attivo,
+  Gextto possiede coda, limiti, tag, spostamento storage, politica di seeding e
+  recupero dopo riavvio. I torrent **stalled** vengono messi realmente in pausa e fuori
   dagli slot attivi, poi riprovati automaticamente. I nuovi download sono
   **preallocati su disco** di default (interruttore nelle impostazioni e per
   singolo torrent). In aggiunta: pausa, sequenziale, salta-verifica, cima-coda,
@@ -248,6 +252,11 @@ make build            # -> bin/gexttod
 CGO_ENABLED=1 go build -o bin/gexttod ./cmd/gexttod
 ```
 
+Il backend torrent nativo Go opzionale non fa parte della build predefinita.
+Compilalo (o i suoi test) con `make build-anacrolix` / `make test-anacrolix`, che
+aggiungono il build tag `anacrolix`; la build predefinita mantiene libtorrent e
+rifiuta `torrent_backend=anacrolix`.
+
 La UI web è inclusa nel binario con `//go:embed` da `webui/pkg`, quindi una build
 normale non richiede passi UI. Il sorgente Leptos è in `ui/`; dopo averlo
 modificato, rigenera il bundle con `make ui` (servono `cargo leptos` e il target
@@ -299,6 +308,42 @@ alla sua API key. Gextto interroga l'endpoint Torznab e usa `t=caps` nel control
 salute, così verifica anche la chiave e la disponibilità degli indexer configurati.
 Gli errori Torznab vengono riconosciuti anche con risposta HTTP 200; nei risultati
 la sorgente può essere indicata come `jackett:NomeTracker`.
+
+### Motori torrent
+
+Gextto possiede sempre database, coda, punteggi, post-processing, rinomina,
+archiviazione e la UI **Scarico**. È sostituibile solo il piano di trasferimento,
+scelto in *Configurazione → Motore torrent* (`torrent_backend`). Un torrent è
+posseduto da un solo backend alla volta, quindi il passaggio è una migrazione
+controllata e non due motori che lavorano sugli stessi dati.
+
+- **libtorrent integrato** (`embedded`, default) — la sessione libtorrent inclusa,
+  nello stesso processo. Nessun servizio esterno; valgono tutte le voci
+  `libtorrent_*`.
+- **qBittorrent-nox** (`qbittorrent`) — Gextto pilota un qBittorrent-nox esistente
+  tramite la sua Web API (`qbittorrent_url`, utente/password, categoria, tag,
+  intervallo di polling, timeout). Configura `qbittorrent_path_mappings`
+  (`locale=remoto`, una per riga) quando i due processi vedono percorsi diversi;
+  senza mappature Gextto verifica che i percorsi necessari esistano in locale. Se
+  un percorso non è traducibile, l'attivazione viene **rifiutata**, così uno
+  spostamento non può finire nella cartella sbagliata. La **modalità gestita**
+  (`qbittorrent_managed=true`) fa scaricare a Gextto l'ultima release statica di
+  qBittorrent-nox, la installa accanto a `gexttod` nella cartella dell'applicazione
+  (`qbittorrent/`), la avvia e la ferma con il servizio e la aggiorna con backup e
+  rollback; un watchdog la riavvia dopo un'uscita inattesa e, dopo ripetuti crash
+  in breve tempo, torna al motore libtorrent integrato e riavvia il servizio. Se
+  qBittorrent non è raggiungibile all'avvio, l'adattatore resta installato e
+  continua a riprovare invece di fallire.
+- **anacrolix** (`anacrolix`) — `github.com/anacrolix/torrent`, motore BitTorrent
+  nativo Go che gira nello stesso processo (senza Web API e senza CGo). Viene
+  compilato solo con il build tag `anacrolix` (`make build-anacrolix`); la build
+  predefinita mantiene libtorrent e rifiuta `torrent_backend=anacrolix`. Si
+  configura con le voci `anacrolix_*`: porta di ascolto, TCP/uTP/DHT/PEX/tracker/
+  UPnP, limiti di connessioni e banda, piece hasher, buffer non verificato, filtro
+  IP, proxy, mappature percorsi e cartella dati.
+
+Il riquadro di configurazione mostra il motore attivo e il suo stato e offre un
+test di raggiungibilità/percorsi, così puoi validare un backend prima di passare.
 
 ### Aggiungi serie e film
 
@@ -595,6 +640,7 @@ bin/gexttod --update --archive /tmp/gextto-linux-x86_64.tar.gz \
 | UI web inclusa (`webui/`, `//go:embed`) | front-end single-page | dashboard, schermate libreria, impostazioni, UI bilingue |
 | SQLite (`modernc.org/sqlite`, Go puro) | persistenza locale | serie/episodi, film, archivio, fumetti, config, statistiche cicli, metadati torrent |
 | libtorrent (`libtorrent_bridge.cpp`, `libtorrent_cgo.go`, `libtorrent.go`) | motore BitTorrent integrato | coda e limiti, politica di seeding, tracker, file, peer, fastresume, killswitch VPN |
+| `torrent_engine.go`, `torrent_engine_select.go`, `qbittorrent_engine.go`, `qbittorrent_runtime.go`, `internal/qbittorrent`, `anacrolix_engine.go` | backend torrent sostituibili | selezione motore, qBittorrent-nox gestito, anacrolix nativo, preflight mappatura percorsi |
 | `rss.go`, `websearch.go`, `httpx.go` | acquisizione sorgenti | feed RSS/HTML, indexer Torznab, motori web, fallback FlareSolverr |
 | `tmdb.go`, `tvdb.go` | provider metadati | locandine, stagioni, date episodi, scoperta |
 | `mediainfo.go` | ispezione reale dei file | dati codec/HDR/audio/lingue usati nei confronti di upgrade |
