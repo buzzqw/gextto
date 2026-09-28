@@ -258,16 +258,31 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		return uiPanelsPage{Sections: []uiPageSection{sectionTable(spec)}}, true
 	case "comics":
 		spec, _ := uiTableSpecFor("comics")
+		group := func(name string, section uiPageSection) uiPageSection {
+			section.Group = name
+			return section
+		}
 		return uiPanelsPage{Sections: []uiPageSection{
-			sectionTable(spec),
-			sectionActions(uiActionSection{Label: "Ciclo fumetti", Buttons: []uiActionButton{
+			group("Aggiungi fumetto", sectionForm(uiFormSection{
+				Title: "Esplora GetComics", Hint: "Cerca il titolo, poi aggiungi il risultato trovato alla libreria dei fumetti.", Path: "/api/comics/explore", Submit: "Trova",
+				Fields: []uiFormField{{Name: "query", Label: "Titolo", Placeholder: "es. Poison Ivy #41"}},
+			})),
+			group("Aggiungi fumetto", sectionActions(uiActionSection{Label: "Ciclo fumetti", Buttons: []uiActionButton{
 				{Label: "Avvia ciclo fumetti", Class: "primary", Method: "POST", Path: "/api/comics/cycle", Body: "{}"},
-			}}),
-			sectionForm(uiFormSection{
-				Title: "Esplora GetComics", Path: "/api/comics/explore", Submit: "Cerca",
-				Fields: []uiFormField{{Name: "query", Label: "Titolo fumetto", Placeholder: "es. Poison Ivy #41"}},
-			}),
-			sectionTable(uiTableSpec{
+			}})),
+			sectionTable(spec),
+			group("Weekly pack", sectionForm(uiFormSection{
+				Title: "Pianificazione settimanale", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",
+				Fields: []uiFormField{
+					boolField("enabled", "Weekly attivo", false),
+					{Name: "from_date", Label: "Dal (YYYY.MM.DD)"},
+				},
+			})),
+			group("Weekly pack", sectionForm(uiFormSection{
+				Title: "Link del weekly", Path: "/api/comics/weekly/links", Submit: "Trova link",
+				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto (YYYY.MM.DD)"}},
+			})),
+			group("Download", sectionTable(uiTableSpec{
 				Title:    "Download in corso",
 				Endpoint: "/api/comics/downloads",
 				ItemsKey: "",
@@ -283,8 +298,8 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Label: "Rimuovi", Class: "danger", Method: "POST", Path: "/api/comics/downloads/{id}/remove", Body: "{}", Confirm: "Rimuovere questo download?"},
 				}),
 				Empty: "Nessun download in corso.",
-			}),
-			sectionTable(uiTableSpec{
+			})),
+			group("Download", sectionTable(uiTableSpec{
 				Title:    "Storico fumetti",
 				Endpoint: "/api/comics/history",
 				ItemsKey: "items",
@@ -296,18 +311,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/comics/history/delete", Body: `{"url":"{post_url}"}`, Confirm: "Eliminare questa voce dallo storico?"},
 				}),
 				Empty: "Storico vuoto.",
-			}),
-			sectionForm(uiFormSection{
-				Title: "Pianificazione settimanale", Path: "/api/comics/weekly/settings", Submit: "Salva weekly",
-				Fields: []uiFormField{
-					boolField("enabled", "Weekly attivo", false),
-					{Name: "from_date", Label: "Dal (YYYY.MM.DD)"},
-				},
-			}),
-			sectionForm(uiFormSection{
-				Title: "Link del weekly", Path: "/api/comics/weekly/links", Submit: "Trova link",
-				Fields: []uiFormField{{Name: "date", Label: "Data pacchetto (YYYY.MM.DD)"}},
-			}),
+			})),
 			sectionComicsLinks(),
 		}}, true
 	case "maintenance":

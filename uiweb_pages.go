@@ -593,6 +593,10 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "episode", Label: "Episodio", Format: "number"},
 				{Key: "air_date", Label: "Data"},
 			}),
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Cerca", Kind: "gap-search", Class: "primary", Method: "POST", Path: "", Body: "{}"},
+				{Label: "Ignora", Method: "POST", Path: "/api/episodes/{series}/{season}/{episode}/ignore", Body: `{"ignored":true,"reason":"ui"}`, Confirm: "Ignorare questo episodio mancante?"},
+			}),
 			Empty: "Nessun episodio mancante.",
 		}, true
 	case "archive":
@@ -601,7 +605,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Endpoint: "/api/archive",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "title", Label: "Titolo"},
+				{Key: "title", Label: "Titolo", Format: "truncate"},
 				{Key: "source", Label: "Sorgente"},
 				{Key: "quality_score", Label: "Punteggio", Format: "number"},
 				{Key: "added_at", Label: "Aggiunto"},
@@ -645,7 +649,6 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Label: "Elimina", Class: "danger", Method: "DELETE", Path: "/api/comics/{id}", Body: "{}", Confirm: "Eliminare questo fumetto monitorizzato?"},
 			}),
 			Empty:  "Nessun fumetto monitorizzato.",
-			Note:   "Tag dei download e pianificazione settimanale restano nella UI classica (/legacy).",
 			Comics: true,
 			DownloadsColumnsJSON: uiJSON([]uiColumn{
 				{Key: "title", Label: "Titolo"},

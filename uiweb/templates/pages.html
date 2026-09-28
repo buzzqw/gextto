@@ -255,8 +255,44 @@
 
 {{define "search"}}
 <div class="view">
+  <div class="panel" data-discover>
+    <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted" data-discover-status></small></div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <button class="btn sm primary" type="button" data-discover-kind="series">Serie TV</button>
+        <button class="btn sm" type="button" data-discover-kind="movie">Film</button>
+      </div>
+      <div class="toolbar" style="margin-top:8px">
+        <button class="btn sm" type="button" data-discover-mode="trending" data-discover-window="week">Tendenza settimana</button>
+        <button class="btn sm" type="button" data-discover-mode="trending" data-discover-window="day">Tendenza oggi</button>
+        <button class="btn sm" type="button" data-discover-mode="popular">Popolari</button>
+        <button class="btn sm" type="button" data-discover-mode="top_rated">Più votati</button>
+        <button class="btn sm" type="button" data-discover-mode="now_playing">In programmazione</button>
+        <button class="btn sm" type="button" data-discover-mode="upcoming">Prossime uscite</button>
+      </div>
+      <div class="tmdb-results" data-discover-results><p class="muted">Scegli un elenco per iniziare.</p></div>
+    </div>
+  </div>
+
   <div class="panel">
-    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted" data-ui-count></small></div>
+    <div class="panel-head"><h3>Calendario TMDB</h3><small class="muted">Prossime uscite</small></div>
+    <div class="panel-body"><div class="dashboard-list" data-discover-calendar><p class="muted">Caricamento…</p></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Esplora TMDB (ricerca)</h3></div>
+    <div class="panel-body">
+      <form class="form-grid" data-json-form data-render="tmdb" data-endpoint="/api/tmdb/search">
+        <label class="field"><span>Tipo</span><select class="input" name="kind"><option value="series" selected>Serie TV</option><option value="movie">Film</option></select></label>
+        <label class="field span-full"><span>Titolo da cercare su TMDB</span><input class="input" name="query" placeholder="es. Il Signore degli Anelli" /></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message></small></div>
+        <div class="output" data-form-output hidden></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Ricerca release</h3><small class="muted" data-ui-count></small></div>
     <div class="panel-body">
       <form class="search-row" data-ui-search-post data-endpoint="{{.Endpoint}}" data-results="{{.ResultsKey}}" data-add="{{.AddPath}}">
         <input type="search" placeholder="Cerca una release…" />
@@ -269,18 +305,6 @@
         </table>
       </div>
       <p class="hint">Ricerca su feed, indexer e motori web (fino a 90 s).</p>
-    </div>
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h3>Aggiungi da TMDB/TVDB</h3></div>
-    <div class="panel-body">
-      <form class="form-grid" data-json-form data-render="tmdb" data-endpoint="/api/tmdb/search">
-        <label class="field"><span>Tipo</span><select class="input" name="kind"><option value="series" selected>Serie TV</option><option value="movie">Film</option></select></label>
-        <label class="field"><span>Titolo</span><input class="input" name="query" placeholder="es. Il Signore degli Anelli" /></label>
-        <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message></small></div>
-        <div class="output" data-form-output hidden></div>
-      </form>
-      <p class="hint">Usa l'ID TMDB restituito in "Aggiungi serie/film" nelle pagine Serie TV / Film.</p>
     </div>
   </div>
 </div>

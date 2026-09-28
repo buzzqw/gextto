@@ -677,6 +677,17 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 }
 .section-group .grid-2 { align-items: start; }
 
+.tmdb-results { margin-top: 12px; }
+.tmdb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.tmdb-card {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface);
+}
+.tmdb-card strong { font-size: 0.9rem; }
+.tmdb-card small { color: var(--muted); font-size: 0.76rem; }
+.tmdb-card .btn { align-self: flex-start; margin-top: auto; }
+.cell-truncate { display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
 @media (max-width: 860px) {
   .setting-row { grid-template-columns: 1fr; align-items: stretch; }
   .setting-actions { justify-content: space-between; }

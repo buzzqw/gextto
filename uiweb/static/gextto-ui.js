@@ -209,6 +209,22 @@
       }
       return;
     }
+    var gapSearch = event.target.closest("[data-gap-search]");
+    if (gapSearch) {
+      var gapForm = page.querySelector('[data-json-form][data-render="releases"]');
+      if (!gapForm) { notify("Modulo di ricerca non disponibile", "err"); return; }
+      var setField = function (name, value) {
+        var field = gapForm.querySelector('[name="' + name + '"]');
+        if (field) field.value = value || "";
+      };
+      setField("series", gapSearch.getAttribute("data-series"));
+      setField("season", gapSearch.getAttribute("data-season"));
+      setField("episode", gapSearch.getAttribute("data-episode"));
+      if (gapForm.requestSubmit) gapForm.requestSubmit();
+      else gapForm.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      gapForm.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     var libraryToggleButton = event.target.closest("[data-library-toggle]");
     if (libraryToggleButton) {
       libraryToggleButton.disabled = true;
@@ -1038,6 +1054,9 @@
                 sortValue = value;
               }
               var sortAttr = column.sortable ? ' data-value="' + esc(sortValue) + '"' : "";
+              if (column.format === "truncate") {
+                return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(value) + '">' + esc(value) + "</span></td>";
+              }
               if (column.format === "series_link") {
                 return "<td" + sortAttr + '><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
               }
@@ -1059,6 +1078,10 @@
             var actionsHtml = "";
             if (actions.length) {
               actionsHtml = '<td class="row-actions">' + actions.map(function (action) {
+                if (action.kind === "gap-search") {
+                  return '<button class="btn sm ' + (action.class || "") + '" data-gap-search data-series="' + esc(row.series) +
+                    '" data-season="' + esc(row.season) + '" data-episode="' + esc(row.episode) + '">' + esc(action.label) + "</button>";
+                }
                 if (action.kind === "library-toggle" || action.kind === "library-remove") {
                   var isRemove = action.kind === "library-remove";
                   var scope = itemsKey === "series" ? "series" : "movies";
@@ -1871,13 +1894,14 @@
     container.appendChild(makeNode(value));
   }
 
-  function renderCalendarList(container, items) {
+  function renderCalendarList(container, items, limit) {
+    var max = typeof limit === "number" ? limit : 6;
     container.innerHTML = "";
     if (!items.length) {
       container.innerHTML = '<p class="muted">Nessuna uscita in programma.</p>';
       return;
     }
-    items.slice(0, 6).forEach(function (item) {
+    items.slice(0, max).forEach(function (item) {
       var episode = item && item.episode || {};
       var row = document.createElement("div");
       row.className = "list-item";
@@ -1914,6 +1938,87 @@
     }).catch(function (error) {
       calendarList.innerHTML = '<p class="muted">' + esc(error.message) + "</p>";
     });
+  }
+
+  var discoverCalendar = document.querySelector("[data-discover-calendar]");
+  if (discoverCalendar) {
+    api("/api/calendar", "GET").then(function (data) {
+      renderCalendarList(discoverCalendar, data && Array.isArray(data.items) ? data.items : [], 24);
+    }).catch(function (error) {
+      discoverCalendar.innerHTML = '<p class="muted">' + esc(error.message) + "</p>";
+    });
+  }
+
+  // Esplora: TMDB discovery with a kind toggle and the trending/category modes.
+  var discoverPanel = document.querySelector("[data-discover]");
+  if (discoverPanel) {
+    var discoverState = { kind: "series", mode: "trending", window: "week" };
+    var discoverResults = discoverPanel.querySelector("[data-discover-results]");
+    var discoverStatus = discoverPanel.querySelector("[data-discover-status]");
+    var runDiscover = function () {
+      discoverResults.innerHTML = '<p class="muted">Caricamento…</p>';
+      if (discoverStatus) discoverStatus.textContent = "";
+      api("/api/tmdb/discover", "POST", { kind: discoverState.kind, mode: discoverState.mode, window: discoverState.window })
+        .then(function (data) {
+          var items = data.items || [];
+          if (discoverStatus) discoverStatus.textContent = items.length + " risultati";
+          renderDiscoverResults(discoverResults, items, discoverState.kind);
+        })
+        .catch(function (error) {
+          discoverResults.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+        });
+    };
+    Array.prototype.forEach.call(discoverPanel.querySelectorAll("[data-discover-kind]"), function (button) {
+      button.addEventListener("click", function () {
+        discoverState.kind = button.getAttribute("data-discover-kind");
+        Array.prototype.forEach.call(discoverPanel.querySelectorAll("[data-discover-kind]"), function (other) {
+          other.classList.toggle("primary", other === button);
+        });
+        runDiscover();
+      });
+    });
+    Array.prototype.forEach.call(discoverPanel.querySelectorAll("[data-discover-mode]"), function (button) {
+      button.addEventListener("click", function () {
+        discoverState.mode = button.getAttribute("data-discover-mode");
+        discoverState.window = button.getAttribute("data-discover-window") || "week";
+        runDiscover();
+      });
+    });
+    runDiscover();
+  }
+
+  function renderDiscoverResults(container, items, kind) {
+    container.innerHTML = "";
+    if (!items.length) { container.innerHTML = '<p class="muted">Nessun risultato.</p>'; return; }
+    var grid = document.createElement("div");
+    grid.className = "tmdb-grid";
+    items.forEach(function (item) {
+      var card = document.createElement("div");
+      card.className = "tmdb-card";
+      var title = document.createElement("strong");
+      title.textContent = String(item.name || item.title || "—");
+      var meta = document.createElement("small");
+      var date = String(item.first_air_date || item.release_date || "").slice(0, 4);
+      meta.textContent = "TMDB " + String(item.id || item.tmdb_id || "") + (date ? " · " + date : "");
+      var button = document.createElement("button");
+      button.className = "btn sm primary";
+      button.textContent = "Aggiungi";
+      button.addEventListener("click", function () {
+        button.disabled = true;
+        api("/api/tmdb/add", "POST", {
+          kind: kind,
+          name: String(item.name || item.title || ""),
+          year: date,
+          tmdb_id: String(item.id || item.tmdb_id || "")
+        }).then(function () { button.textContent = "Aggiunto"; })
+          .catch(function (error) { notify("Aggiunta non riuscita: " + error.message, "err"); button.disabled = false; });
+      });
+      card.appendChild(title);
+      card.appendChild(meta);
+      card.appendChild(button);
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
   }
 
   function renderRecentList(container, items) {
