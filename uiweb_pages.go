@@ -181,7 +181,11 @@ type uiRenameToken struct {
 // of a tab into labelled panels instead of a grid of cards.
 type uiSettingGroup struct {
 	Title  string
+	Hint   string
 	Fields []uiSettingField
+	// Buttons are optional API actions rendered inside the group panel (the
+	// qBittorrent-nox tile, for example).
+	Buttons []uiActionButton
 }
 
 // uiCheckboxOption is one checkbox of a uiCheckboxGroup.
@@ -457,6 +461,24 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		page.Rename = uiRenameEditorFrom(cfg)
 	}
 	page.Groups = uiSettingsGroups(active, page.Fields)
+	if active == "backend" {
+		hint := "Scegli il motore dalla tendina «Motore torrent». Il binario gestito è scaricato e aggiornato da Gextto."
+		if binary := qbittorrentManagedBinary(cfg); binary != "" {
+			hint += " Binario: " + binary + "."
+		}
+		buttons := []uiActionButton{
+			{Label: "Installa / Ottimizza qBittorrent-nox", Class: "primary", Method: "POST", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Scarica o aggiorna qBittorrent-nox nella cartella dell'app e imposta le opzioni ottimali (URL locale, utente admin, gestione automatica)."},
+			{Label: "Stato qBittorrent-nox", Method: "GET", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Mostra dove è installato qBittorrent-nox e se c'è un aggiornamento."},
+			{Label: "Applica motore", Method: "POST", Path: "/api/torrent-backend", Body: "{}", Hint: "Verifica il motore configurato e indica se serve un riavvio."},
+			{Label: "Test connessione", Method: "POST", Path: "/api/torrent-backend/test", Body: "{}", Hint: "Verifica la connessione al qBittorrent-nox configurato."},
+		}
+		for index := range page.Groups {
+			if strings.HasPrefix(page.Groups[index].Title, "qBittorrent") {
+				page.Groups[index].Hint = hint
+				page.Groups[index].Buttons = buttons
+			}
+		}
+	}
 	page.ShowSources = active == "sources"
 	page.ShowEditors = active == "advanced"
 	page.ShowI18n = active == "i18n"
@@ -469,21 +491,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
 	case "advanced":
 		page.ListEditors = uiAdvancedEditors
-	case "backend":
-		backendHint := "Scegli il motore dalla tendina «Motore torrent». Selezionando qBittorrent, Gextto scarica/aggiorna il binario gestito in una cartella sua e imposta le opzioni ottimali."
-		if binary := qbittorrentManagedBinary(cfg); binary != "" {
-			backendHint += " Binario gestito: " + binary + "."
-		}
-		page.Actions = &uiActionSection{
-			Label: "Motore torrent",
-			Hint:  backendHint,
-			Buttons: []uiActionButton{
-				{Label: "Installa / Ottimizza qBittorrent", Class: "primary", Method: "POST", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Scarica o aggiorna qBittorrent nella cartella di Gextto e imposta le opzioni ottimali (URL locale, utente admin, gestione automatica)."},
-				{Label: "Stato qBittorrent", Method: "GET", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Mostra dove è installato qBittorrent e se c'è un aggiornamento."},
-				{Label: "Applica motore", Method: "POST", Path: "/api/torrent-backend", Body: "{}", Hint: "Verifica il motore configurato e indica se serve un riavvio."},
-				{Label: "Test connessione", Method: "POST", Path: "/api/torrent-backend/test", Body: "{}", Hint: "Verifica la connessione al qBittorrent configurato."},
-			},
-		}
 	case "libtorrent":
 		page.Actions = &uiActionSection{
 			Label: "Ottimizzazione",
@@ -636,7 +643,7 @@ func uiSettingGroupTitle(tab, key string) string {
 		// One panel per transfer engine, so the settings are clearly separated.
 		switch {
 		case strings.HasPrefix(lowered, "qbittorrent_"):
-			return "qBittorrent"
+			return "qBittorrent-nox"
 		case strings.HasPrefix(lowered, "anacrolix_"):
 			return "anacrolix"
 		default:
@@ -752,7 +759,7 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 	}
 	options := []uiFormOption{
 		{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded},
-		{Value: BackendQbittorrent, Label: "qBittorrent", Selected: value == BackendQbittorrent},
+		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
 		{Value: BackendAnacrolix, Label: "anacrolix", Selected: value == BackendAnacrolix},
 	}
 	if value != BackendEmbedded && value != BackendQbittorrent && value != BackendAnacrolix {

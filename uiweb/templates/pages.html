@@ -912,9 +912,13 @@
     {{range .Groups}}
     <div class="panel settings-panel">
       <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
-      <div class="panel-body{{if not $.FieldsGrid}} settings-rows{{end}}">
-        {{if $.FieldsGrid}}<div class="form-grid">{{range .Fields}}{{template "settings_field_grid" .}}{{end}}</div>
-        {{else}}{{range .Fields}}{{template "settings_field" .}}{{end}}{{end}}
+      <div class="panel-body">
+        {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+        <div class="{{if $.FieldsGrid}}form-grid{{else}}settings-rows{{end}}">
+          {{if $.FieldsGrid}}{{range .Fields}}{{template "settings_field_grid" .}}{{end}}
+          {{else}}{{range .Fields}}{{template "settings_field" .}}{{end}}{{end}}
+        </div>
+        {{if .Buttons}}<div class="toolbar" style="margin-top:12px">{{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>{{end}}</div>{{end}}
       </div>
     </div>
     {{end}}
