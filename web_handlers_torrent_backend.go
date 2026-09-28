@@ -12,6 +12,7 @@ package gextto
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -119,7 +120,9 @@ func QbittorrentRuntimeUpdate(w http.ResponseWriter, r *http.Request, s *AppStat
 		}
 		status.Managed = true
 		status.RestartRequired = true
-		jsonResponse(w, map[string]any{"ok": true, "status": status, "message": "qBittorrent v2 installato nella cartella privata di Gextto; riavvia il servizio per usarlo."})
+		jsonResponse(w, map[string]any{"ok": true, "status": status, "message": fmt.Sprintf(
+			"qBittorrent scaricato e installato in %s (%s); riavvia il servizio per usarlo.",
+			status.Binary, status.LatestName)})
 		return
 	}
 	status, err := getQbittorrentRuntimeStatus(ctx, cfg)
@@ -130,7 +133,20 @@ func QbittorrentRuntimeUpdate(w http.ResponseWriter, r *http.Request, s *AppStat
 		jsonResponse(w, map[string]any{"ok": false, "status": status, "error": err.Error(), "source": qbittorrentGitHubRepo})
 		return
 	}
-	jsonResponse(w, map[string]any{"ok": true, "status": status, "source": qbittorrentGitHubRepo})
+	jsonResponse(w, map[string]any{"ok": true, "status": status, "source": qbittorrentGitHubRepo, "message": qbittorrentRuntimeMessage(status)})
+}
+
+// qbittorrentRuntimeMessage describes the managed runtime and where it lives.
+func qbittorrentRuntimeMessage(status qbittorrentRuntimeStatus) string {
+	switch {
+	case status.Installed && status.UpdateAvailable:
+		return fmt.Sprintf("qBittorrent installato in %s (versione %s); aggiornamento disponibile: %s. Usa «Installa / Ottimizza qBittorrent» per aggiornarlo.",
+			status.Binary, status.InstalledTag, status.LatestName)
+	case status.Installed:
+		return fmt.Sprintf("qBittorrent installato in %s (versione %s), già aggiornato.", status.Binary, status.InstalledTag)
+	default:
+		return fmt.Sprintf("qBittorrent non ancora installato. Verrà scaricato in %s: premi «Installa / Ottimizza qBittorrent» (oppure seleziona qBittorrent dalla tendina).", status.Binary)
+	}
 }
 
 // TorrentBackendTest implements `torrent_backend_test`: it logs into the

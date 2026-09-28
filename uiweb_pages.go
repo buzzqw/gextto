@@ -441,11 +441,16 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	case "advanced":
 		page.ListEditors = uiAdvancedEditors
 	case "backend":
+		backendHint := "Scegli il motore dalla tendina «Motore torrent». Selezionando qBittorrent, Gextto scarica/aggiorna il binario gestito in una cartella sua e imposta le opzioni ottimali."
+		if binary := qbittorrentManagedBinary(cfg); binary != "" {
+			backendHint += " Binario gestito: " + binary + "."
+		}
 		page.Actions = &uiActionSection{
 			Label: "Motore torrent",
-			Hint:  "Scegli il motore dalla tendina «Motore torrent». Selezionando qBittorrent, Gextto scarica/aggiorna il binario gestito e imposta le opzioni ottimali.",
+			Hint:  backendHint,
 			Buttons: []uiActionButton{
 				{Label: "Installa / Ottimizza qBittorrent", Class: "primary", Method: "POST", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Scarica o aggiorna qBittorrent nella cartella di Gextto e imposta le opzioni ottimali (URL locale, utente admin, gestione automatica)."},
+				{Label: "Stato qBittorrent", Method: "GET", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Mostra dove è installato qBittorrent e se c'è un aggiornamento."},
 				{Label: "Applica motore", Method: "POST", Path: "/api/torrent-backend", Body: "{}", Hint: "Verifica il motore configurato e indica se serve un riavvio."},
 				{Label: "Test connessione", Method: "POST", Path: "/api/torrent-backend/test", Body: "{}", Hint: "Verifica la connessione al qBittorrent configurato."},
 			},

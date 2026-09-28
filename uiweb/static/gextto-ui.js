@@ -1414,7 +1414,7 @@
         var message = "Operazione completata";
         if (data && typeof data === "object" && data.message) message = String(data.message);
         notify(message, "ok");
-        window.setTimeout(function () { location.reload(); }, 700);
+        window.setTimeout(function () { location.reload(); }, 1400);
       })
       .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })
       .then(function () { element.disabled = false; });
@@ -1593,10 +1593,10 @@
         api("/api/config/settings", "POST", { key: "torrent_backend", value: "qbittorrent" })
           .then(function () { return api("/api/torrent-backend/qbittorrent/update", "POST", {}); })
           .then(function (data) {
-            var message = (data && data.message) || "qBittorrent ottimizzato";
+            var message = (data && data.message) || "qBittorrent scaricato e installato";
             if (status) status.textContent = message;
             notify(message, "ok");
-            window.setTimeout(function () { location.reload(); }, 900);
+            window.setTimeout(function () { location.reload(); }, 1500);
           })
           .catch(function (error) {
             if (status) status.textContent = "Errore";
