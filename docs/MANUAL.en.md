@@ -3,7 +3,8 @@
 This manual covers the everyday use of Gextto through its web interface and
 terminal TUI. The web UI is available in **English** and **Italian** (header
 language switch); this document describes the English labels, the Italian ones are in
-[`MANUAL.it.md`](MANUAL.it.md).
+[`MANUAL.it.md`](MANUAL.it.md). The **Manual** page inside the app shows this
+document in the language selected in the header.
 
 ## How to use this guide
 
@@ -345,8 +346,9 @@ fill several episodes, but archive comparison still happens episode by episode.
   language).
 - The editor supports quality, base language, subtitles, exclusions and up to
   **three required languages** with a per-row “required” flag.
-- **Movie detail**: poster, plot, cast, edit, re-download, **Search now** and a
-  “best matches” table from the sources.
+- **Movie detail**: poster, plot, cast, edit, re-download, **Search now**, a
+  “best matches” table from the sources and an **archive matches** table where
+  each row offers **Why not this one?**.
 
 ### Adding and selecting a movie
 
@@ -367,9 +369,13 @@ and score without automatically blocking the release.
 ## 6. Explore, Archive, Comics
 
 - **Explore** — TMDB trending/today/popular/top-rated/now playing/upcoming, TMDB
-  search, generic release search, add-to-library.
+  search, generic release search, add-to-library. Cards are shown in a five-column
+  wall; a title already in the library carries a **Già in lista** badge and its
+  add button is disabled, so you never create a duplicate by mistake.
 - **Archive** — full-text search of past releases with pagination, batch queue,
-  copy magnet, delete; **Series/Movies from feed** tabs.
+  copy magnet, delete; **Series/Movies from feed** tabs. The **Source** column
+  shows only the provider/domain (the full URL is in the tooltip), and every row
+  offers **Why not this one?** like the search table.
 - **Seen from feed** — every release seen in the sources, grouped by title
   (movies/series) with count, best resolution and score; expand a group to
   queue a single release. Populated by each cycle, even for unmonitored titles.
@@ -388,9 +394,9 @@ and score without automatically blocking the release.
 
 ## 7. Configuration
 
-Tabs: **Daemon, Sources, libtorrent, Scores, Rename, Advanced, Acquisition,
-Notifications, Paths, Translations**. Unsaved changes are highlighted with a
-“Save all” bar.
+Tabs: **Daemon, Sources, libtorrent, Torrent engine, Scores, Rename, Advanced,
+Acquisition, Notifications, Paths, Translations**. Unsaved changes are
+highlighted with a “Save all” bar.
 
 - **Sources** — RSS feed list, indexers (Jackett/Prowlarr) with a *Verify*
   button, FlareSolverr URL + test, web engines, content filters, blacklist.
@@ -464,10 +470,44 @@ Notifications, Paths, Translations**. Unsaved changes are highlighted with a
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
+### Torrent engine (embedded, qBittorrent-nox, anacrolix)
+
+Gextto always keeps its own database, queue, scoring, post-processing, renaming
+and archive; only the transfer plane is pluggable, chosen in
+*Configuration → Torrent engine*. A torrent is owned by a single engine at a
+time, so switching is a controlled migration, not two clients working on the
+same data.
+
+- **Embedded libtorrent** (default) — the bundled in-process session; every
+  *libtorrent* setting applies.
+- **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
+  API. Set the URL, user/password, category, tag and poll interval, and the
+  `local=remote` **path mappings** whenever the two processes see different
+  paths; with no mappings Gextto checks that the required paths exist locally. If
+  a path cannot be translated, activation is refused so a move can never target
+  the wrong folder. **Managed mode** downloads the latest qBittorrent-nox static
+  release, installs it in the application folder (next to `gexttod`), starts and
+  stops it with the service and updates it with backup and rollback; a watchdog
+  restarts it after an unexpected exit and, after repeated crashes, falls back to
+  the embedded engine. If qBittorrent is down at startup, Gextto keeps retrying
+  instead of failing.
+- **anacrolix** — a native Go BitTorrent engine that runs in-process (no Web API,
+  no CGo). It requires a build with the `anacrolix` tag; the default build keeps
+  libtorrent and refuses it. Its options cover listening port, TCP/uTP/DHT/PEX/
+  trackers/UPnP, connection and bandwidth limits, piece hashers, proxy, IP filter
+  and paths.
+
+The configuration tile shows the active engine, its status and a
+reachability/path test, so you can validate a backend before switching.
+Whichever engine is active, the **Downloads** screen and every automation stay
+the same.
+
 ### Performance: RAM and CPU
 
 The daemon's own logic is negligible; with libtorrent active almost all the cost
-is the engine while it has torrents in the session. To lower RAM and CPU:
+is the engine while it has torrents in the session. If you use an external engine
+(qBittorrent-nox), that cost lives in its own process instead. To lower RAM and
+CPU:
 
 - **RAM** — the values that matter are the **disk cache** (`cache_size`, 16 KiB
   blocks) and `max_queued_disk_bytes`. The **Optimise** button (or *continuous

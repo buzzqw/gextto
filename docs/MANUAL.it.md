@@ -4,7 +4,8 @@ Questo manuale descrive l'uso quotidiano di Gextto dalla sua interfaccia web e
 dalla TUI terminale. La UI web è disponibile in **italiano** e **inglese**
 (selettore lingua in alto); qui sono usate le etichette italiane, la versione
 inglese è in
-[`MANUAL.en.md`](MANUAL.en.md).
+[`MANUAL.en.md`](MANUAL.en.md). La pagina **Manuale** dentro l'app mostra questo
+documento nella lingua scelta in alto.
 
 ## Come usare questa guida
 
@@ -347,8 +348,9 @@ episodio per episodio.
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua).
 - L'editor gestisce qualità, lingua base, sottotitoli, esclusioni e fino a **tre
   lingue richieste** con flag “obbligatoria” per riga.
-- **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**
-  e tabella dei “migliori trovati” dalle sorgenti.
+- **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
+  tabella dei “migliori trovati” dalle sorgenti e tabella **corrispondenze
+  archivio** dove ogni riga offre **Perché non questa?**.
 
 ### Aggiungere e scegliere un film
 
@@ -371,9 +373,13 @@ blocco.
 
 - **Esplora** — TMDB: tendenze oggi/settimana, popolari, più votati, in
   programmazione, prossime uscite; ricerca TMDB; ricerca release generica;
-  aggiunta alla libreria.
+  aggiunta alla libreria. Le card sono mostrate in una griglia a cinque colonne;
+  un titolo già in libreria porta il badge **Già in lista** e il pulsante di
+  aggiunta è disattivato, così non crei duplicati per errore.
 - **Archivio** — ricerca full-text delle release passate con paginazione, accoda
-  in blocco, copia magnet, elimina; tab **Serie/Film dal feed**.
+  in blocco, copia magnet, elimina; tab **Serie/Film dal feed**. La colonna
+  **Sorgente** mostra solo il provider/dominio (l'URL completo è nel tooltip) e
+  ogni riga offre **Perché non questa?** come nella tabella dei risultati.
 - **Visti dai feed** — ogni release vista nelle sorgenti, raggruppata per titolo
   (film/serie) con numero, risoluzione e score migliori; espandi un gruppo per
   accodare una singola release. Popolata ad ogni ciclo, anche per titoli non
@@ -395,9 +401,9 @@ blocco.
 
 ## 7. Configurazione
 
-Tab: **Daemon, Sorgenti, libtorrent, Punteggi, Rinomina, Avanzate, Acquisizione,
-Notifiche, Percorsi, Traduzioni**. Le modifiche non salvate sono evidenziate con
-la barra “Salva tutte”.
+Tab: **Daemon, Sorgenti, libtorrent, Motore torrent, Punteggi, Rinomina, Avanzate,
+Acquisizione, Notifiche, Percorsi, Traduzioni**. Le modifiche non salvate sono
+evidenziate con la barra “Salva tutte”.
 
 - **Sorgenti** — lista feed RSS, indexer (Jackett/Prowlarr) con pulsante
   *Verifica*, URL FlareSolverr + test, motori web, filtri contenuto, blacklist.
@@ -476,10 +482,43 @@ la barra “Salva tutte”.
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
+### Motore torrent (integrato, qBittorrent-nox, anacrolix)
+
+Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
+archivio; è sostituibile solo il piano di trasferimento, scelto in
+*Configurazione → Motore torrent*. Un torrent è di un solo motore alla volta,
+quindi il passaggio è una migrazione controllata, non due client sugli stessi
+dati.
+
+- **libtorrent integrato** (default) — la sessione inclusa, nello stesso processo;
+  valgono tutte le voci *libtorrent*.
+- **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
+  Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
+  le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi
+  diversi; senza mappature Gextto verifica che i percorsi necessari esistano in
+  locale. Se un percorso non è traducibile, l'attivazione viene rifiutata, così
+  uno spostamento non può finire nella cartella sbagliata. La **modalità gestita**
+  scarica l'ultima release statica di qBittorrent-nox, la installa nella cartella
+  dell'applicazione (accanto a `gexttod`), la avvia/ferma col servizio e la
+  aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa
+  e, dopo ripetuti crash, torna al motore integrato. Se qBittorrent è spento
+  all'avvio, Gextto continua a riprovare invece di fallire.
+- **anacrolix** — motore BitTorrent nativo Go, nello stesso processo (senza Web
+  API e senza CGo). Richiede una build con il tag `anacrolix`; la build
+  predefinita mantiene libtorrent e lo rifiuta. Le sue opzioni coprono porta di
+  ascolto, TCP/uTP/DHT/PEX/tracker/UPnP, limiti di connessioni e banda, piece
+  hasher, proxy, filtro IP e percorsi.
+
+Il riquadro di configurazione mostra il motore attivo, il suo stato e un test di
+raggiungibilità/percorsi, così puoi validare un backend prima di passare. Quale
+che sia il motore attivo, la schermata **Scarico** e tutte le automazioni restano
+identiche.
+
 ### Prestazioni: RAM e CPU
 
 La logica del daemon è trascurabile; con libtorrent attivo il costo è quasi tutto
-del motore finché ha torrent in sessione. Per ridurre RAM e CPU:
+del motore finché ha torrent in sessione. Se usi un motore esterno
+(qBittorrent-nox), quel costo vive nel suo processo. Per ridurre RAM e CPU:
 
 - **RAM** — i valori che contano sono la **cache disco** (`cache_size`, blocchi
   da 16 KiB) e `max_queued_disk_bytes`. Il pulsante **Ottimizza** (o
