@@ -7,8 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 // Options configures the terminal interface.
@@ -90,8 +93,26 @@ func Run(ctx context.Context, opts Options) error {
 	streamCh := make(chan streamEvent, 256)
 	go readStream(ctx, client, streamCh)
 
+	// Refreshes run in a goroutine so a slow or unreachable daemon never blocks
+	// the keyboard: the interface always reacts to q / Ctrl-C.
+	refreshCh := make(chan refreshResult, 4)
+	var fetching int32
+	requestRefresh := func() {
+		if !atomic.CompareAndSwapInt32(&fetching, 0, 1) {
+			return
+		}
+		go func() {
+			result := fetchModel(ctx, client)
+			atomic.StoreInt32(&fetching, 0)
+			select {
+			case refreshCh <- result:
+			case <-ctx.Done():
+			}
+		}()
+	}
+
 	parser := &KeyParser{}
-	refreshModel(ctx, client, model)
+	requestRefresh()
 
 	ticker := time.NewTicker(refresh)
 	defer ticker.Stop()
@@ -108,22 +129,24 @@ func Run(ctx context.Context, opts Options) error {
 			quit = true
 		case data := <-inputCh:
 			for _, key := range parser.Feed(data, false) {
-				if execute(ctx, client, model, model.Update(key)) {
+				if execute(ctx, client, model, model.Update(key), requestRefresh) {
 					quit = true
 					break
 				}
 			}
 		case <-flush.C:
 			for _, key := range parser.Feed(nil, true) {
-				if execute(ctx, client, model, model.Update(key)) {
+				if execute(ctx, client, model, model.Update(key), requestRefresh) {
 					quit = true
 					break
 				}
 			}
+		case result := <-refreshCh:
+			model.applyRefresh(result)
 		case event := <-streamCh:
 			applyStream(model, event)
 		case <-ticker.C:
-			refreshModel(ctx, client, model)
+			requestRefresh()
 		}
 		// Drain pending stream events without blocking the next render.
 		for draining := true; draining; {
@@ -139,9 +162,28 @@ func Run(ctx context.Context, opts Options) error {
 }
 
 func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
+	fd := int(in.Fd())
 	buffer := make([]byte, 256)
 	for {
-		count, err := in.Read(buffer)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		// Poll with a short timeout instead of trusting VMIN/VTIME: a blocking
+		// terminal read can hang forever (and ignore keys) on some setups.
+		pollFDs := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+		ready, err := unix.Poll(pollFDs, 100)
+		if err != nil {
+			if err == unix.EINTR {
+				continue
+			}
+			return
+		}
+		if ready == 0 {
+			continue
+		}
+		count, readErr := unix.Read(fd, buffer)
 		if count > 0 {
 			data := make([]byte, count)
 			copy(data, buffer[:count])
@@ -151,7 +193,7 @@ func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
 				return
 			}
 		}
-		if err != nil {
+		if readErr != nil && readErr != unix.EAGAIN && readErr != unix.EINTR {
 			return
 		}
 	}
@@ -193,33 +235,69 @@ func applyStream(model *Model, event streamEvent) {
 	}
 }
 
-func refreshModel(ctx context.Context, client *Client, model *Model) {
-	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	if status, err := client.Status(callCtx); err == nil {
-		model.SetStatus(status)
-		model.SetError("")
-	} else if ctx.Err() == nil {
-		model.SetError(err.Error())
-	}
-	if torrents, err := client.Torrents(callCtx); err == nil {
-		model.SetTorrents(torrents)
-	}
-	if !model.LogStreamConnected {
-		if logs, err := client.Logs(callCtx, 200); err == nil {
-			model.SetLogs(logs)
-		}
-	}
-	if health, err := client.Health(callCtx); err == nil {
-		model.SetHealth(health)
-	} else {
-		model.SetHealthError(err.Error())
-	}
-	model.Loading = false
+// refreshResult carries one background poll of the daemon.
+type refreshResult struct {
+	status      *Status
+	statusErr   string
+	torrents    []Torrent
+	hasTorrents bool
+	logs        []string
+	hasLogs     bool
+	health      *Health
+	healthErr   string
 }
 
-func execute(ctx context.Context, client *Client, model *Model, action Action) (quit bool) {
+// fetchModel polls the daemon with a short timeout. It is safe to call from a
+// goroutine because it never touches the model.
+func fetchModel(ctx context.Context, client *Client) refreshResult {
+	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	var result refreshResult
+	if status, err := client.Status(callCtx); err == nil {
+		result.status = &status
+	} else if ctx.Err() == nil {
+		result.statusErr = err.Error()
+	}
+	if torrents, err := client.Torrents(callCtx); err == nil {
+		result.torrents = torrents
+		result.hasTorrents = true
+	}
+	if logs, err := client.Logs(callCtx, 200); err == nil {
+		result.logs = logs
+		result.hasLogs = true
+	}
+	if health, err := client.Health(callCtx); err == nil {
+		result.health = &health
+	} else {
+		result.healthErr = err.Error()
+	}
+	return result
+}
+
+// applyRefresh merges a poll result into the model on the main goroutine.
+func (m *Model) applyRefresh(result refreshResult) {
+	if result.status != nil {
+		m.SetStatus(*result.status)
+		m.SetError("")
+	} else if result.statusErr != "" {
+		m.SetError(result.statusErr)
+	}
+	if result.hasTorrents {
+		m.SetTorrents(result.torrents)
+	}
+	if result.hasLogs && !m.LogStreamConnected {
+		m.SetLogs(result.logs)
+	}
+	if result.health != nil {
+		m.SetHealth(*result.health)
+	} else if result.healthErr != "" {
+		m.SetHealthError(result.healthErr)
+	}
+	m.Loading = false
+}
+
+func execute(ctx context.Context, client *Client, model *Model, action Action, refresh func()) (quit bool) {
 	if action.Kind == ActionNone {
 		return false
 	}
@@ -231,7 +309,7 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 	case ActionQuit:
 		return true
 	case ActionRefresh:
-		refreshModel(ctx, client, model)
+		refresh()
 		model.SetMessage(tr.T("msg.refreshed"))
 	case ActionRunCycle:
 		result, err := client.RunCycle(callCtx, action.Domain)
@@ -288,13 +366,13 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 		} else {
 			model.SetMessage(tr.T("msg.paused"))
 		}
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionRestart:
 		model.SetMessage(tr.T("msg.restarted"))
 		if err := client.Restart(callCtx, action.Hash); err != nil {
 			model.SetMessage(tr.Format("msg.actionfailed", "restart", err))
 		}
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionRemove:
 		if err := client.Remove(callCtx, action.Hash, action.DeleteFiles, false); err != nil {
 			model.SetMessage(tr.Format("msg.actionfailed", "remove", err))
@@ -305,7 +383,7 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 		} else {
 			model.SetMessage(tr.T("msg.removed"))
 		}
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionRecheck:
 		if err := client.Recheck(callCtx, action.Hash); err != nil {
 			model.SetMessage(tr.Format("msg.actionfailed", "recheck", err))
@@ -353,7 +431,7 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 		removed := int(numberValue(result["removed"]))
 		skipped := int(numberValue(result["skipped"]))
 		model.SetMessage(tr.Format("msg.removedone", removed, skipped))
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionSetLimits:
 		if err := client.SetSpeedLimits(callCtx, action.DL, action.UL); err != nil {
 			model.SetMessage(tr.Format("msg.actionfailed", "limits", err))
@@ -371,7 +449,7 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 		} else {
 			model.SetMessage(tr.T("msg.trashcleanedna"))
 		}
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionQueueRelease:
 		if err := client.AddRelease(callCtx, action.Release); err != nil {
 			model.SetMessage(tr.Format("msg.queuefailed", err))
@@ -379,7 +457,7 @@ func execute(ctx context.Context, client *Client, model *Model, action Action) (
 		}
 		model.Overlay = OverlayNone
 		model.SetMessage(tr.T("msg.queued"))
-		refreshModel(ctx, client, model)
+		refresh()
 	case ActionOpenDetails:
 		detail, err := client.TorrentDetail(callCtx, action.Hash)
 		if err != nil {
