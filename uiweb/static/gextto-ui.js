@@ -270,6 +270,10 @@
       if (panel) panel.hidden = true;
       return;
     }
+    if (event.target.matches && event.target.matches("[data-torrent-detail-panel]")) {
+      event.target.hidden = true;
+      return;
+    }
     var element = event.target.closest("[data-action]");
     if (!element) return;
     var action = element.getAttribute("data-action");
@@ -404,7 +408,7 @@
 
   function rowSortValue(row, key) {
     if (key === "name") return (row.getAttribute("data-name") || "").toLowerCase();
-    var raw = row.getAttribute("data-" + key) || "0";
+    var raw = row.getAttribute("data-sort-" + key) || "0";
     var number = parseFloat(raw);
     return isNaN(number) ? 0 : number;
   }
@@ -476,7 +480,6 @@
     var panel = torrentDetailPanel();
     if (!panel) return;
     panel.hidden = false;
-    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     loadTorrentTab("general");
   }
 
@@ -982,8 +985,19 @@
     while (n >= 1024 && index < units.length - 1) { n /= 1024; index++; }
     return (index === 0 ? n.toFixed(0) : n.toFixed(1)) + " " + units[index];
   }
-  function fmt(value, format) {
-    if (value === null || value === undefined || value === "") return "";
+  // folderLabel reduces an archived path to its destination folder: for a media
+  // file it shows the containing folder, for a directory the last segment.
+  function folderLabel(path) {
+    var value = String(path === null || path === undefined ? "" : path).replace(/[\\/]+$/, "");
+    if (!value) return "";
+    var parts = value.split(/[\\/]/);
+    var last = parts[parts.length - 1] || "";
+    if (/\.(mkv|mp4|avi|m4v|ts|mov|wmv|flv|srt|nfo|jpg|jpeg|png|webp)$/i.test(last)) {
+      return parts[parts.length - 2] || last;
+    }
+    return last;
+  }
+  function fmt(value, format) {    if (value === null || value === undefined || value === "") return "";
     switch (format) {
       case "bool": return value ? "Sì" : "No";
       case "bytes": return humanBytes(value);
@@ -1054,8 +1068,32 @@
                 sortValue = value;
               }
               var sortAttr = column.sortable ? ' data-value="' + esc(sortValue) + '"' : "";
+              if (column.format === "nas_tag") {
+                var hasNAS = row.processed_path && String(row.processed_path).trim() !== "";
+                var tag = String(row.tag || "").trim();
+                var html = "";
+                if (hasNAS) html += '<span class="badge ok">NAS</span>';
+                if (tag) html += (html ? " " : "") + '<span class="badge">' + esc(tag) + "</span>";
+                return "<td" + sortAttr + ">" + (html || '<span class="muted">—</span>') + "</td>";
+              }
+              if (column.format === "status_badge") {
+                var good = row.ok !== false;
+                return "<td" + sortAttr + '><span class="badge ' + (good ? "ok" : "err") + '">' + (good ? "ok" : "errore") + "</span></td>";
+              }
+              if (column.format === "source_detail") {
+                var detail = "";
+                if (row.error) detail = String(row.error);
+                else if (row.status !== undefined && row.status !== null) detail = "HTTP " + String(row.status);
+                else if (row.results !== undefined && row.results !== null) detail = String(row.results) + " risultati";
+                return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(detail) + '">' + esc(detail || "—") + "</span></td>";
+              }
               if (column.format === "truncate") {
                 return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(value) + '">' + esc(value) + "</span></td>";
+              }
+              if (column.format === "folder") {
+                var fullPath = String(rawValue || "");
+                if (!fullPath) return "<td" + sortAttr + "></td>";
+                return "<td" + sortAttr + '><span title="' + esc(fullPath) + '">' + esc(folderLabel(fullPath)) + "</span></td>";
               }
               if (column.format === "series_link") {
                 return "<td" + sortAttr + '><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
@@ -1484,50 +1522,51 @@
     var thead = panel.querySelector("[data-ui-head]");
     var tbody = panel.querySelector("[data-ui-body]");
     var count = panel.querySelector("[data-ui-count]");
+    var status = panel.querySelector("[data-release-status]");
+    var filterInput = panel.querySelector("[data-release-filter]");
     var input = form.querySelector("input");
     var endpoint = form.getAttribute("data-endpoint");
     var resultsKey = form.getAttribute("data-results") || "results";
     var addPath = form.getAttribute("data-add");
-    thead.innerHTML = "<tr><th>Titolo</th><th>Seed</th><th>Dimensione</th><th>Azioni</th></tr>";
+    var searchToken = 0;
+    var archiveEndpoint = form.getAttribute("data-archive") || "/api/search/archive";
+    thead.innerHTML = "<tr><th>Release</th><th>Sorgente</th><th>Risoluzione</th><th>Azioni</th></tr>";
+    var table = thead.closest("table");
+    if (table) table.classList.add("release-table");
+    if (filterInput) {
+      filterInput.addEventListener("input", function () {
+        renderReleaseTable({ container: tbody, filterInput: filterInput, countNode: count, items: form._items || [], addPath: addPath });
+      });
+    }
+    var renderItems = function (items) {
+      form._items = items;
+      renderReleaseTable({ container: tbody, filterInput: filterInput, countNode: count, items: items, addPath: addPath });
+    };
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       var query = (input.value || "").trim();
       if (!query) return;
-      tbody.innerHTML = '<tr><td class="muted">Ricerca in corso…</td></tr>';
+      var token = ++searchToken;
+      tbody.innerHTML = '<tr><td class="muted" colspan="4">Ricerca nell\'archivio…</td></tr>';
+      if (count) count.textContent = "…";
+      // Phase 1: the local archive answers immediately.
+      api(archiveEndpoint, "POST", { query: query }).then(function (data) {
+        if (token !== searchToken) return;
+        var archiveItems = (data && data.results) || [];
+        renderItems(archiveItems);
+        if (status) status.textContent = "Archivio: " + archiveItems.length + " · ricerca su indexer e motori web…";
+      }).catch(function () { /* the full search reports errors */ });
+      // Phase 2: indexer + web engines (may take up to 90 s); the archive
+      // results are already visible and are merged when the full set arrives.
       api(endpoint, "POST", { query: query }).then(function (data) {
-        var items = data[resultsKey] || [];
-        form._items = items;
-        if (count) count.textContent = items.length + " risultati";
-        if (!items.length) {
-          tbody.innerHTML = '<tr><td class="muted">Nessun risultato.</td></tr>';
-          return;
-        }
-        tbody.innerHTML = items.map(function (row, index) {
-          var magnet = safeHref(row.magnet || "");
-          var title = magnet ? '<a href="' + magnet + '">' + esc(row.title) + "</a>" : esc(row.title);
-          return '<tr><td class="truncate">' + title +
-            '</td><td class="numeric">' + esc(row.seeders || 0) +
-            '</td><td class="numeric">' + humanBytes(row.size_bytes) +
-            "</td><td>" + (addPath
-              ? '<button class="btn sm primary" data-ui-add data-index="' + index + '">Accoda</button>'
-              : "") + "</td></tr>";
-        }).join("");
+        if (token !== searchToken) return;
+        var items = (data && data[resultsKey]) || [];
+        renderItems(items);
+        if (status) status.textContent = "";
       }).catch(function (error) {
-        tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
-      });
-    });
-    form.addEventListener("click", function (event) {
-      var button = event.target.closest("[data-ui-add]");
-      if (!button) return;
-      var items = form._items || [];
-      var row = items[parseInt(button.getAttribute("data-index"), 10)];
-      if (!row) return;
-      button.disabled = true;
-      api(addPath, "POST", { release: row }).then(function () {
-        button.textContent = "Accodata";
-      }).catch(function (error) {
-        notify("Non accodata: " + error.message, "err");
-        button.disabled = false;
+        if (token !== searchToken) return;
+        tbody.innerHTML = '<tr><td class="alert" colspan="4">' + esc(error.message) + "</td></tr>";
+        if (status) status.textContent = "";
       });
     });
   }
@@ -2196,35 +2235,323 @@
     scheduleLogs();
   }
 
+  // ---- maintenance: duplicate cleanup -------------------------------------
+  var duplicatesPanel = document.querySelector("[data-duplicates]");
+  if (duplicatesPanel) {
+    var dupResults = duplicatesPanel.querySelector("[data-duplicates-results]");
+    var dupStatus = duplicatesPanel.querySelector("[data-duplicates-status]");
+    var renderDuplicates = function (items) {
+      dupResults.innerHTML = "";
+      if (!items.length) { dupResults.innerHTML = '<p class="muted">Nessun duplicato inferiore trovato.</p>'; return; }
+      var table = document.createElement("table");
+      table.className = "data-table";
+      table.innerHTML = "<thead><tr><th>Serie</th><th>Stagione</th><th>Episodio</th><th>File</th><th>Risoluzione</th></tr></thead>";
+      var tbody = document.createElement("tbody");
+      items.forEach(function (item) {
+        var tr = document.createElement("tr");
+        var series = document.createElement("td"); series.textContent = String(item.series || "");
+        var season = document.createElement("td"); season.className = "numeric"; season.textContent = String(item.season || 0);
+        var episode = document.createElement("td"); episode.className = "numeric"; episode.textContent = String(item.episode || 0);
+        var fileCell = document.createElement("td");
+        var file = document.createElement("span"); file.className = "cell-truncate"; file.title = String(item.path || ""); file.textContent = folderLabel(item.path || "");
+        fileCell.appendChild(file);
+        var resolution = document.createElement("td"); resolution.textContent = String(item.resolution_rank) + " (migliore " + String(item.best_rank) + ")";
+        tr.appendChild(series); tr.appendChild(season); tr.appendChild(episode); tr.appendChild(fileCell); tr.appendChild(resolution);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      dupResults.appendChild(table);
+    };
+    var runDuplicates = function (execute) {
+      if (execute && !confirm("Spostare nel cestino le copie inferiori?")) return;
+      if (dupStatus) dupStatus.textContent = "Analisi…";
+      api("/api/maintenance/clean-duplicates", "POST", { execute: execute }).then(function (data) {
+        if (execute) {
+          if (dupStatus) dupStatus.textContent = "";
+          dupResults.innerHTML = '<p class="muted">Rimossi ' + String(data.removed || 0) + ' file.</p>';
+          notify("Pulizia duplicati completata", "ok");
+          return;
+        }
+        var items = data.items || [];
+        if (dupStatus) dupStatus.textContent = items.length + " file inferiori";
+        renderDuplicates(items);
+      }).catch(function (error) {
+        if (dupStatus) dupStatus.textContent = "";
+        dupResults.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+      });
+    };
+    var dupPreview = duplicatesPanel.querySelector("[data-duplicates-preview]");
+    if (dupPreview) dupPreview.addEventListener("click", function () { runDuplicates(false); });
+    var dupClean = duplicatesPanel.querySelector("[data-duplicates-clean]");
+    if (dupClean) dupClean.addEventListener("click", function () { runDuplicates(true); });
+  }
+
+  // ---- maintenance: RAM disk control --------------------------------------
+  var ramdiskPanel = document.querySelector("[data-ramdisk]");
+  if (ramdiskPanel) {
+    var ramdiskPaths = ramdiskPanel.querySelector("[data-ramdisk-paths]");
+    var ramdiskStatus = ramdiskPanel.querySelector("[data-ramdisk-status]");
+    var ramdiskMessage = ramdiskPanel.querySelector("[data-ramdisk-message]");
+    var loadRamdisk = function () {
+      api("/api/ramdisk", "GET").then(function (data) {
+        if (ramdiskStatus) ramdiskStatus.textContent = data.configured ? "in uso: " + data.configured : "non configurato";
+        var paths = data.paths || [];
+        ramdiskPaths.innerHTML = "";
+        if (!paths.length) { ramdiskPaths.innerHTML = '<p class="muted">Nessun tmpfs/ramfs scrivibile trovato.</p>'; return; }
+        var table = document.createElement("table");
+        table.className = "data-table";
+        table.innerHTML = "<thead><tr><th>Percorso</th><th>Filesystem</th><th>Liberi</th><th>Totali</th><th></th></tr></thead>";
+        var tbody = document.createElement("tbody");
+        paths.forEach(function (item) {
+          var tr = document.createElement("tr");
+          var path = document.createElement("td"); path.textContent = String(item.path || "");
+          var filesystem = document.createElement("td"); filesystem.textContent = String(item.filesystem || "");
+          var free = document.createElement("td"); free.className = "numeric"; free.textContent = humanBytes(item.free_bytes || 0);
+          var total = document.createElement("td"); total.className = "numeric"; total.textContent = humanBytes(item.total_bytes || 0);
+          var action = document.createElement("td"); action.className = "row-actions";
+          if (item.configured) {
+            action.innerHTML = '<span class="badge ok">in uso</span>';
+          } else if (item.writable) {
+            var use = document.createElement("button");
+            use.className = "btn sm primary";
+            use.textContent = "Usa questo percorso";
+            use.addEventListener("click", function () {
+              use.disabled = true;
+              api("/api/ramdisk/select", "POST", { path: item.path }).then(function (res) {
+                var recommended = (res && res.recommended) || {};
+                if (ramdiskMessage) {
+                  ramdiskMessage.textContent = "Selezionato " + item.path +
+                    (recommended.threshold_gb ? " · soglia " + recommended.threshold_gb + " GB, margine " + recommended.margin_gb + " GB" : "");
+                }
+                notify("RAM disk selezionato", "ok");
+                loadRamdisk();
+              }).catch(function (error) { notify("Selezione non riuscita: " + error.message, "err"); use.disabled = false; });
+            });
+            action.appendChild(use);
+          } else {
+            action.innerHTML = '<span class="muted">non scrivibile</span>';
+          }
+          tr.appendChild(path); tr.appendChild(filesystem); tr.appendChild(free); tr.appendChild(total); tr.appendChild(action);
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        ramdiskPaths.appendChild(table);
+      }).catch(function (error) {
+        ramdiskPaths.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+      });
+    };
+    var ramdiskRefresh = ramdiskPanel.querySelector("[data-ramdisk-refresh]");
+    if (ramdiskRefresh) ramdiskRefresh.addEventListener("click", loadRamdisk);
+    var ramdiskCreate = ramdiskPanel.querySelector("[data-ramdisk-create]");
+    if (ramdiskCreate) ramdiskCreate.addEventListener("click", function () {
+      ramdiskCreate.disabled = true;
+      api("/api/ramdisk/create", "POST", { path: "/dev/shm/gextto" }).then(function () {
+        if (ramdiskMessage) ramdiskMessage.textContent = "Creato /dev/shm/gextto e selezionato";
+        notify("RAM disk creato", "ok");
+        loadRamdisk();
+      }).catch(function (error) { notify("Creazione non riuscita: " + error.message, "err"); })
+        .then(function () { ramdiskCreate.disabled = false; });
+    });
+    loadRamdisk();
+  }
+
+  // ---- release results (search, gaps, comic result panels) ----------------
+  // Shared renderer: Release | Sorgente | Risoluzione | Codec | Azioni, with a
+  // local text filter and the "Perché non questo?" decision explanation, like
+  // rextto. `filterInput`/`countNode` are optional.
+  function renderReleaseTable(opts) {
+    var tbody = opts.container;
+    if (!tbody) return;
+    var items = opts.items || [];
+    var filterInput = opts.filterInput;
+    var query = (filterInput && filterInput.value || "").trim().toLowerCase();
+    var terms = query ? query.split(/\s+/).filter(Boolean) : [];
+    var visible = terms.length ? items.filter(function (release) {
+      var quality = release.quality || {};
+      var text = (String(release.title || "") + " " + String(release.source || "") +
+        " " + String(quality.resolution || "") + " " + String(quality.codec || "")).toLowerCase();
+      return terms.every(function (term) {
+        if (term.charAt(0) === "-") return text.indexOf(term.slice(1)) < 0;
+        return text.indexOf(term) >= 0;
+      });
+    }) : items;
+    if (opts.countNode) {
+      opts.countNode.textContent = terms.length ? visible.length + "/" + items.length + " risultati" : items.length + " risultati";
+    }
+    if (!visible.length) {
+      tbody.innerHTML = '<tr><td class="muted" colspan="4">' + esc(terms.length ? "Nessun risultato con questo filtro." : "Nessun risultato.") + "</td></tr>";
+      return;
+    }
+    tbody.innerHTML = "";
+    visible.forEach(function (release) {
+      var quality = release.quality || {};
+      var row = document.createElement("tr");
+
+      var titleCell = document.createElement("td");
+      titleCell.className = "release-title";
+      titleCell.textContent = String(release.title || "—");
+      titleCell.title = String(release.title || "");
+
+      var sourceCell = document.createElement("td");
+      sourceCell.className = "release-source";
+      sourceCell.textContent = String(release.source || "—");
+
+      var resolutionCell = document.createElement("td");
+      resolutionCell.className = "release-resolution";
+      resolutionCell.textContent = String(quality.resolution || "—");
+
+      var actionsCell = document.createElement("td");
+      actionsCell.className = "row-actions";
+      var explain = document.createElement("button");
+      explain.className = "btn sm";
+      explain.textContent = "Perché non questo?";
+      explain.addEventListener("click", function () { showExplain(release); });
+      var add = document.createElement("button");
+      add.className = "btn sm primary";
+      add.textContent = "Accoda";
+      add.addEventListener("click", function () {
+        add.disabled = true;
+        api(opts.addPath || "/api/search/add", "POST", { release: release })
+          .then(function () { add.textContent = "Accodata"; })
+          .catch(function (error) { notify("Non accodata: " + error.message, "err"); add.disabled = false; });
+      });
+      actionsCell.appendChild(explain);
+      actionsCell.appendChild(add);
+
+      row.appendChild(titleCell);
+      row.appendChild(sourceCell);
+      row.appendChild(resolutionCell);
+      row.appendChild(actionsCell);
+      tbody.appendChild(row);
+    });
+  }
+
   function renderReleaseResults(container, items) {
     container.innerHTML = "";
     var table = document.createElement("table");
-    table.className = "data-table";
-    table.innerHTML = "<thead><tr><th>Titolo</th><th>Seed</th><th>Dimensione</th><th></th></tr></thead>";
+    table.className = "data-table release-table";
+    table.innerHTML = "<thead><tr><th>Release</th><th>Sorgente</th><th>Risoluzione</th><th>Azioni</th></tr></thead>";
     var tbody = document.createElement("tbody");
-    items.forEach(function (release) {
-      var row = document.createElement("tr");
-      row.innerHTML = '<td class="truncate">' + esc(release.title || "—") + '</td><td class="numeric">' +
-        esc(String(release.seeders || 0)) + '</td><td class="numeric">' + humanBytes(release.size_bytes) + "</td>";
-      var cell = document.createElement("td");
-      var button = document.createElement("button");
-      button.className = "btn sm primary";
-      button.textContent = "Accoda";
-      button.addEventListener("click", function () {
-        button.disabled = true;
-        api("/api/search/add", "POST", { release: release }).then(function () {
-          button.textContent = "Accodata";
-        }).catch(function (error) {
-          notify("Non accodata: " + error.message, "err");
-          button.disabled = false;
-        });
-      });
-      cell.appendChild(button);
-      row.appendChild(cell);
-      tbody.appendChild(row);
-    });
     table.appendChild(tbody);
     container.appendChild(table);
+    renderReleaseTable({ container: tbody, items: items, addPath: "/api/search/add" });
+  }
+
+  // ---- decision explanation overlay ("Perché non questo?") ----------------
+  function showExplain(release) {
+    var overlay = document.getElementById("explain-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "explain-overlay";
+      overlay.className = "overlay";
+      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Spiegazione della decisione">' +
+        '<div class="modal-head"><h3>Perché non questo?</h3><button class="btn sm" type="button" data-explain-close>Chiudi</button></div>' +
+        '<div class="modal-body" data-explain-body></div></div>';
+      overlay.addEventListener("click", function (event) {
+        if (event.target === overlay || event.target.closest("[data-explain-close]")) overlay.hidden = true;
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !overlay.hidden) overlay.hidden = true;
+      });
+      document.body.appendChild(overlay);
+    }
+    overlay.hidden = false;
+    var body = overlay.querySelector("[data-explain-body]");
+    body.innerHTML = '<p class="muted">Analisi della release…</p>';
+    api("/api/search/explain", "POST", { release: release }).then(function (data) {
+      renderDecisionTrace(body, data.trace || {});
+    }).catch(function (error) {
+      body.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+    });
+  }
+
+  function renderDecisionTrace(container, trace) {
+    container.innerHTML = "";
+    var verdict = String(trace.decision || "unknown").toLowerCase();
+    var banner = document.createElement("p");
+    banner.className = "badge " + (verdict === "approved" || verdict === "accept" ? "ok" : (verdict === "rejected" ? "err" : "warn"));
+    banner.textContent = verdict === "approved" || verdict === "accept" ? "Accettata" : (verdict === "rejected" ? "Rifiutata" : (trace.decision || "—"));
+    container.appendChild(banner);
+
+    var title = document.createElement("h4");
+    title.textContent = String(trace.candidate || "");
+    container.appendChild(title);
+    if (trace.reason) {
+      var reason = document.createElement("p");
+      reason.className = "muted";
+      reason.textContent = "Motivo: " + String(trace.reason);
+      container.appendChild(reason);
+    }
+
+    var summary = document.createElement("div");
+    summary.className = "stat-grid";
+    [["Punteggio", String(trace.score === undefined ? "—" : trace.score)],
+     ["Obiettivo", String(trace.target || "—")]].forEach(function (pair) {
+      var row = document.createElement("div");
+      row.className = "row";
+      var label = document.createElement("span");
+      label.textContent = pair[0];
+      var value = document.createElement("strong");
+      value.textContent = pair[1];
+      row.appendChild(label); row.appendChild(value);
+      summary.appendChild(row);
+    });
+    container.appendChild(summary);
+
+    var steps = trace.steps || [];
+    if (steps.length) {
+      var heading = document.createElement("div");
+      heading.className = "field span-full";
+      heading.innerHTML = "<span>Controlli</span>";
+      container.appendChild(heading);
+      var table = document.createElement("table");
+      table.className = "data-table";
+      table.innerHTML = "<thead><tr><th>Regola</th><th>Esito</th><th>Dettaglio</th></tr></thead>";
+      var tbody = document.createElement("tbody");
+      steps.forEach(function (step) {
+        var row = document.createElement("tr");
+        var rule = document.createElement("td"); rule.textContent = String(step.rule || "");
+        var result = document.createElement("td");
+        result.innerHTML = '<span class="badge ' + (step.result === "ok" ? "ok" : (step.result === "fail" ? "err" : "warn")) + '">' + esc(String(step.result || "")) + "</span>";
+        var detail = document.createElement("td"); detail.textContent = String(step.detail || "");
+        row.appendChild(rule); row.appendChild(result); row.appendChild(detail);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    var components = trace.score_components || [];
+    if (components.length) {
+      var compHeading = document.createElement("div");
+      compHeading.className = "field span-full";
+      compHeading.innerHTML = "<span>Punteggio</span>";
+      container.appendChild(compHeading);
+      var compTable = document.createElement("table");
+      compTable.className = "data-table";
+      compTable.innerHTML = "<thead><tr><th>Voce</th><th>Valore</th></tr></thead>";
+      var compBody = document.createElement("tbody");
+      components.forEach(function (component) {
+        var row = document.createElement("tr");
+        var label = document.createElement("td"); label.textContent = String(component.label || component.key || "");
+        var value = document.createElement("td"); value.className = "numeric"; value.textContent = String(component.value === undefined ? "" : component.value);
+        row.appendChild(label); row.appendChild(value);
+        compBody.appendChild(row);
+      });
+      compTable.appendChild(compBody);
+      container.appendChild(compTable);
+    }
+
+    if (trace.comparison && Object.keys(trace.comparison).length) {
+      var cmpHeading = document.createElement("div");
+      cmpHeading.className = "field span-full";
+      cmpHeading.innerHTML = "<span>Confronto con l'archivio</span>";
+      container.appendChild(cmpHeading);
+      var cmp = document.createElement("div");
+      cmp.className = "output";
+      renderReadable(cmp, trace.comparison);
+      container.appendChild(cmp);
+    }
   }
 
   function renderTmdbResults(container, items, form) {
@@ -2297,9 +2624,15 @@
     });
   });
 
+  // Close the torrent detail overlay with Escape.
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var panel = page.querySelector("[data-torrent-detail-panel]");
+    if (panel && !panel.hidden) panel.hidden = true;
+  });
+
   // ---- progress polling ---------------------------------------------------
-  Array.prototype.forEach.call(document.querySelectorAll("[data-progress]"), function (node) {
-    var endpoint = node.getAttribute("data-endpoint");
+  Array.prototype.forEach.call(document.querySelectorAll("[data-progress][data-endpoint]"), function (node) {    var endpoint = node.getAttribute("data-endpoint");
     var panel = node.closest(".panel");
     var bar = panel.querySelector("[data-progress-bar]");
     var text = panel.querySelector("[data-progress-text]");

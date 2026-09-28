@@ -695,6 +695,33 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .tmdb-card small { color: var(--muted); font-size: 0.76rem; }
 .tmdb-card .btn { align-self: flex-start; margin-top: auto; }
 .cell-truncate { display: inline-block; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.release-table { table-layout: fixed; }
+.release-table td.release-title { white-space: normal; word-break: break-word; }
+.release-table th:nth-child(2), .release-table td.release-source { width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.release-table th:nth-child(3), .release-table td.release-resolution { width: 110px; white-space: nowrap; }
+.release-table th:nth-child(4) { width: 220px; white-space: nowrap; }
+
+/* modal / overlay (decision explanation, details) */
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 4vh 16px;
+  background: color-mix(in srgb, #000 62%, transparent);
+  overflow-y: auto;
+}
+.overlay[hidden] { display: none; }
+.modal {
+  width: min(880px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
+.modal-head h3 { font-size: 1rem; margin: 0; }
+.modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.modal-body h4 { margin: 0; }
 
 @media (max-width: 860px) {
   .setting-row { grid-template-columns: 1fr; align-items: stretch; }

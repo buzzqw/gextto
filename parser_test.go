@@ -281,6 +281,32 @@ func TestDetectsItalianWithoutStreamingTagFalsePositives(t *testing.T) {
 	}
 }
 
+func TestWebRipSourceDetection(t *testing.T) {
+	cases := map[string]string{
+		"Movie.2024.1080p.WEBRip.x264-GRP": "webrip",
+		"Movie.2024.1080p.WEB-DL.x264-GRP": "webdl",
+		"Movie.2024.1080p.WEBDL.x264-GRP":  "webdl",
+		"Movie.2024.720p.WEBRip.AAC-iTA":   "webrip",
+		"Movie.2024.720p.WEB.DL.H264":      "webdl",
+		"Show.2024.S01.1080p.WEB.x264":     "webdl",
+	}
+	for title, want := range cases {
+		if got := ParseQuality(title).Source; got != want {
+			t.Errorf("ParseQuality(%q).Source = %q, want %q", title, got, want)
+		}
+	}
+	// A WEBRip must not be treated as an HDTV->WEB-DL source upgrade over an
+	// equal-resolution copy.
+	webrip := ParseQuality("Movie.2024.720p.WEBRip.x264-AAC")
+	hdtv := ParseQuality("Movie.2024.720p.HDTV.x264-AC3")
+	if webrip.Source != "webrip" {
+		t.Fatalf("webrip source = %q, want webrip", webrip.Source)
+	}
+	if reason := webrip.UpgradeReason(&hdtv, webrip.Score(), hdtv.Score(), 200); reason != "" {
+		t.Fatalf("equal-resolution WEBRip over HDTV should not upgrade, got %q", reason)
+	}
+}
+
 func TestDetectsExtendedResolutionSourceHdrAndWordReal(t *testing.T) {
 	if got := ParseQuality("Movie.2026.UHD.BluRay").Resolution; got != "2160p" {
 		t.Fatalf("UHD resolution = %q, want 2160p", got)

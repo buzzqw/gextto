@@ -121,6 +121,10 @@
         <input type="search" placeholder="Cerca in archivio, indexer e motori web…" />
         <button class="btn primary">Cerca</button>
       </form>
+      <div class="toolbar" style="margin-top:8px">
+        <input class="input" type="search" data-release-filter placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
+        <small class="muted" data-release-status aria-live="polite"></small>
+      </div>
       <div class="table-wrap" style="margin-top:10px">
         <table class="data-table">
           <thead data-ui-head></thead>
@@ -252,8 +256,8 @@
           <tbody>
             {{range .Rows}}
             <tr data-hash="{{.Hash}}" data-name="{{.Name}}" data-tags="{{range .Tags}}{{.}},{{end}}"
-                data-progress="{{.ProgressPct}}" data-dl="{{.DownloadRate}}" data-ul="{{.UploadRate}}"
-                data-eta="{{.ETASeconds}}" data-peers="{{.NumPeers}}" data-ratio="{{printf "%.4f" .Ratio}}">
+                data-sort-progress="{{.ProgressPct}}" data-sort-dl="{{.DownloadRate}}" data-sort-ul="{{.UploadRate}}"
+                data-sort-eta="{{.ETASeconds}}" data-sort-peers="{{.NumPeers}}" data-sort-ratio="{{printf "%.4f" .Ratio}}">
               <td><input type="checkbox" data-download-select data-hash="{{.Hash}}" aria-label="Seleziona {{.Name}}" /></td>
               <td class="torrent-name">
                 <span class="truncate" title="{{.Name}}">{{.Name}}</span>
@@ -295,34 +299,36 @@
 {{end}}
 
 {{define "torrent_detail"}}
-<div class="panel torrent-modal" data-torrent-detail-panel hidden>
-  <div class="panel-head">
-    <h3 data-torrent-detail-name>Dettagli torrent</h3>
-    <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
-  </div>
-  <div class="panel-body">
-    <div class="toolbar torrent-detail-tabs">
-      <button class="btn sm" type="button" data-torrent-subdetail="general">Generale</button>
-      <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
-      <button class="btn sm" type="button" data-torrent-subdetail="files">Contenuto</button>
-      <button class="btn sm" type="button" data-torrent-subdetail="peers">Peers</button>
-      <button class="btn sm" type="button" data-torrent-subdetail="limits">Limiti</button>
-      <button class="btn sm" type="button" data-torrent-subdetail="storage">Storage</button>
-      <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
-      <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
+<div class="overlay" data-torrent-detail-panel hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Dettagli torrent">
+    <div class="modal-head">
+      <h3 data-torrent-detail-name>Dettagli torrent</h3>
+      <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
     </div>
-    <div class="output" data-torrent-detail-output></div>
-    <div data-torrent-subdetail-output hidden></div>
+    <div class="modal-body">
+      <div class="toolbar torrent-detail-tabs">
+        <button class="btn sm" type="button" data-torrent-subdetail="general">Generale</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="files">Contenuto</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="peers">Peers</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="limits">Limiti</button>
+        <button class="btn sm" type="button" data-torrent-subdetail="storage">Storage</button>
+        <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
+        <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
+      </div>
+      <div class="output" data-torrent-detail-output></div>
+      <div data-torrent-subdetail-output hidden></div>
+    </div>
   </div>
 </div>
 {{end}}
 {{define "health"}}
 <div class="view">
   <div class="grid-4">
-    <div class="metric"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong></div>
+    <div class="metric{{if ne .Health.Status "ok"}} amber{{end}}"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
     <div class="metric"><span class="metric-sub">Memoria processo</span><strong>{{humanBytesU .Health.ResidentBytes}}</strong><small class="muted">su {{humanBytesU .Health.MemoryTotalBytes}}</small></div>
     <div class="metric"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{humanBytesU .Health.DiskFreeBytes}} liberi</small></div>
-    <div class="metric"><span class="metric-sub">Uptime</span><strong>{{.Uptime}}</strong><small class="muted">processo {{.ProcessUptime}}</small></div>
+    <div class="metric"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
   </div>
   <div class="grid-2">
     <div class="panel">

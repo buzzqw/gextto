@@ -80,7 +80,50 @@
 {{else if eq .Kind "links"}}{{template "links_section" .Links}}
 {{else if eq .Kind "oauth"}}{{template "oauth_section" .OAuth}}
 {{else if eq .Kind "comics_links"}}{{template "comics_links" .}}
+{{else if eq .Kind "duplicates"}}{{template "duplicates_panel" .}}
+{{else if eq .Kind "ramdisk"}}{{template "ramdisk_control" .}}
+{{else if eq .Kind "settings"}}{{template "settings_section" .Settings}}
+{{else if eq .Kind "list_editor"}}{{template "list_editor" .Editor}}
 {{end}}
+{{end}}
+
+{{define "settings_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="settings-rows">{{range .Fields}}{{template "settings_field" .}}{{end}}</div>
+  </div>
+</div>
+{{end}}
+
+{{define "duplicates_panel"}}
+<div class="panel" data-duplicates>
+  <div class="panel-head"><h3>Duplicati video in libreria</h3><small class="muted" data-duplicates-status></small></div>
+  <div class="panel-body">
+    <p class="hint">Confronta le risoluzioni archiviate: l'anteprima non elimina nulla, la pulizia sposta le copie inferiori nel cestino.</p>
+    <div class="toolbar">
+      <button class="btn sm" type="button" data-duplicates-preview>Anteprima duplicati</button>
+      <button class="btn sm danger" type="button" data-duplicates-clean>Pulisci duplicati</button>
+    </div>
+    <div data-duplicates-results></div>
+  </div>
+</div>
+{{end}}
+
+{{define "ramdisk_control"}}
+<div class="panel" data-ramdisk>
+  <div class="panel-head"><h3>RAM disk</h3><small class="muted" data-ramdisk-status></small></div>
+  <div class="panel-body">
+    <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile per i download; Gextto calcola soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
+    <div class="toolbar">
+      <button class="btn sm" type="button" data-ramdisk-refresh>Aggiorna</button>
+      <button class="btn sm primary" type="button" data-ramdisk-create>Crea in /dev/shm</button>
+      <small class="muted" data-ramdisk-message aria-live="polite"></small>
+    </div>
+    <div data-ramdisk-paths></div>
+  </div>
+</div>
 {{end}}
 
 {{define "oauth_section"}}
@@ -298,6 +341,10 @@
         <input type="search" placeholder="Cerca una release…" />
         <button class="btn primary">Cerca</button>
       </form>
+      <div class="toolbar" style="margin-top:8px">
+        <input class="input" type="search" data-release-filter placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
+        <small class="muted" data-release-status aria-live="polite"></small>
+      </div>
       <div class="table-wrap" style="margin-top:10px">
         <table class="data-table">
           <thead data-ui-head></thead>

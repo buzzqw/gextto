@@ -481,10 +481,16 @@ func ParseQuality(title string) models.Quality {
 	switch {
 	case strings.Contains(low, "bluray") || strings.Contains(low, "bdrip") || strings.Contains(low, "brrip"):
 		source = "bluray"
-	case strings.Contains(low, "web-dl") || strings.Contains(low, "webdl") || strings.Contains(low, "web"):
-		source = "webdl"
-	case strings.Contains(low, "webrip"):
+	// WEBRip must be checked before the generic "web" catch-all: otherwise
+	// every WEBRip title was classified as WEB-DL (and scored as one), which
+	// turned an equal-quality re-release into a false "source" upgrade.
+	case strings.Contains(tNormLang, "webrip") || strings.Contains(low, "web-rip"):
 		source = "webrip"
+	case strings.Contains(tNormLang, "web dl") || strings.Contains(low, "web-dl") ||
+		strings.Contains(low, "webdl") || strings.Contains(low, "web.dl"):
+		source = "webdl"
+	case strings.Contains(tNormLang, "web"):
+		source = "webdl"
 	case strings.Contains(low, "hdtv") || strings.Contains(low, "hdtvrip"):
 		source = "hdtv"
 	case strings.Contains(low, "dvdrip") || strings.Contains(low, "dvd"):

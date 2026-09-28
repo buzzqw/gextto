@@ -207,6 +207,60 @@ func TestUiServerRenderedPages(t *testing.T) {
 	}
 }
 
+// TestUiMaintenanceParity pins the rextto-style maintenance layout: grouped
+// actions, duplicates, a real RAM disk control, trash, backup and diagnostics,
+// without the useless ports panel.
+// TestUiIntegrationsParity pins the rextto-style integrations page: Trakt and
+// Simkl panels plus the Jellyfin/Plex and indexer configuration forms.
+func TestUiIntegrationsParity(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=integrations")
+	if code != http.StatusOK {
+		t.Fatalf("integrations -> %d", code)
+	}
+	html := string(body)
+	for _, marker := range []string{
+		"Trakt", "Simkl", "Jellyfin", "Plex", "FlareSolverr", "Indexer Torznab",
+		`data-setting-key="jellyfin_url"`, `data-setting-key="jellyfin_api_key"`,
+		`data-setting-key="plex_url"`, `data-setting-key="plex_token"`,
+		`data-setting-key="flaresolverr_url"`, `data-list-editor`,
+		`data-api="/api/jellyfin/refresh"`, `data-api="/api/plex/refresh"`,
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("integrations page missing %q", marker)
+		}
+	}
+}
+
+func TestUiMaintenanceParity(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=maintenance")
+	if code != http.StatusOK {
+		t.Fatalf("maintenance -> %d", code)
+	}
+	html := string(body)
+	for _, marker := range []string{
+		"data-duplicates", "data-duplicates-preview", "data-duplicates-clean",
+		"data-ramdisk", "data-ramdisk-create", "data-ramdisk-paths",
+		"Diagnostica sorgenti", `data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
+	} {
+		if !strings.Contains(html, marker) {
+			t.Fatalf("maintenance page missing %q", marker)
+		}
+	}
+	for _, forbidden := range []string{">Porte<", "/api/config/check-ports"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("maintenance page should not contain %q", forbidden)
+		}
+	}
+}
+
 func TestUiLogsAndFeedParity(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
@@ -226,7 +280,7 @@ func TestUiLogsAndFeedParity(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("dashboard -> %d", code)
 	}
-	for _, marker := range []string{"data-dashboard-feed", "data-dashboard-feed-body", "Ultimi trovati nelle sorgenti"} {
+	for _, marker := range []string{"data-dashboard-feed", "data-dashboard-feed-body", "Ultimi trovati nelle sorgenti", "data-release-filter", "data-release-status"} {
 		if !strings.Contains(string(body), marker) {
 			t.Fatalf("dashboard missing %q", marker)
 		}
@@ -236,10 +290,31 @@ func TestUiLogsAndFeedParity(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("search -> %d", code)
 	}
-	for _, marker := range []string{"data-discover", "data-discover-results", "data-discover-calendar", `data-discover-kind="series"`, `data-discover-mode="popular"`} {
+	for _, marker := range []string{"data-discover", "data-discover-results", "data-discover-calendar", `data-discover-kind="series"`, `data-discover-mode="popular"`, "data-release-filter"} {
 		if !strings.Contains(string(body), marker) {
 			t.Fatalf("explore page missing %q", marker)
 		}
+	}
+}
+
+// TestUiHistoryFolderColumn pins the "Cartella libreria / NAS" rendering: the
+// full absolute path is only a tooltip, the visible cell is the destination
+// folder.
+func TestUiHistoryFolderColumn(t *testing.T) {
+	state := newTestAppState(t)
+	page := uiDownloadsPageFor(state)
+	found := false
+	for _, section := range page.Panels {
+		if section.Kind != "table" || section.Table.Title != "Storico download" {
+			continue
+		}
+		if !strings.Contains(section.Table.ColumnsJSON, `"format":"folder"`) {
+			t.Fatalf("history columns missing folder format: %s", section.Table.ColumnsJSON)
+		}
+		found = true
+	}
+	if !found {
+		t.Fatal("history download table not found")
 	}
 }
 

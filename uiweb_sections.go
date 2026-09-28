@@ -14,7 +14,7 @@ import (
 
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
-	Kind     string // table | actions | form | progress | comics_links | links | oauth
+	Kind     string // table | actions | form | progress | comics_links | links | oauth | settings | list_editor | duplicates | ramdisk
 	Group    string // optional grouping label: consecutive same-group blocks render side by side
 	Table    uiTableSpec
 	Action   uiActionSection
@@ -22,6 +22,56 @@ type uiPageSection struct {
 	Progress uiProgressSection
 	Links    uiLinksSection
 	OAuth    uiOAuthSection
+	Settings uiSettingsSection
+	Editor   uiListEditor
+}
+
+// uiSettingsSection renders a group of individual setting rows, reusing the
+// settings save machinery (one POST /api/config/settings per field).
+type uiSettingsSection struct {
+	Title  string
+	Hint   string
+	Fields []uiSettingField
+}
+
+func sectionSettings(title, hint string, fields []uiSettingField) uiPageSection {
+	return uiPageSection{Kind: "settings", Settings: uiSettingsSection{Title: title, Hint: hint, Fields: fields}}
+}
+
+func sectionEditor(editor uiListEditor) uiPageSection {
+	return uiPageSection{Kind: "list_editor", Editor: editor}
+}
+
+// uiSettingFields builds settings rows for the given keys, using the label from
+// the generated settings index when available.
+func uiSettingFields(cfg *Config, keys ...string) []uiSettingField {
+	fields := make([]uiSettingField, 0, len(keys))
+	for _, key := range keys {
+		value := ""
+		if cfg != nil {
+			value = cfg.Settings[key]
+		}
+		fields = append(fields, uiSettingFieldFor(key, uiSettingLabel(key), value))
+	}
+	return fields
+}
+
+func uiSettingLabel(key string) string {
+	for _, def := range uiSettingsIndex {
+		if def.Key == key {
+			return def.Label
+		}
+	}
+	if label, ok := map[string]string{
+		"jellyfin_url":     "Jellyfin URL",
+		"jellyfin_api_key": "Jellyfin API key",
+		"plex_url":         "Plex URL",
+		"plex_token":       "Plex token",
+		"flaresolverr_url": "FlareSolverr URL",
+	}[key]; ok {
+		return label
+	}
+	return key
 }
 
 // uiPageGroup is a set of sections that belong together. A group with more than
@@ -328,67 +378,56 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 		return section
 	}
 	return []uiPageSection{
-		group("Database", sectionActions(uiActionSection{Label: "Database", Hint: "Operazioni sui database applicativi.", Buttons: []uiActionButton{
-			{Label: "Ricalcola punteggi", Class: "primary", Method: "POST", Path: "/api/database/rescore", Body: "{}"},
-			{Label: "Pulizia duplicati", Method: "POST", Path: "/api/maintenance/clean-duplicates", Body: "{}"},
-			{Label: "Pota database", Method: "POST", Path: "/api/db/prune", Body: "{}"},
+		sectionActions(uiActionSection{Label: "Azioni", Hint: "Operazioni di manutenzione del daemon e della libreria.", Buttons: []uiActionButton{
+			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}"},
+			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
+			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}"},
+			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
+			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
+			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
+			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
+			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?"},
+			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?"},
+		}}),
+		sectionProgress("Progresso rinomina", "/api/rename-progress"),
+		group("Libreria", uiPageSection{Kind: "duplicates"}),
+		group("Libreria", sectionActions(uiActionSection{Label: "Database", Hint: "VACUUM compatta i file, ANALYZE aggiorna le statistiche.", Buttons: []uiActionButton{
 			{Label: "VACUUM", Method: "POST", Path: "/api/db/action", Body: `{"action":"vacuum"}`},
 			{Label: "ANALYZE", Method: "POST", Path: "/api/db/action", Body: `{"action":"analyze"}`},
 		}})),
-		group("Database", sectionTable(uiTableSpec{
-			Title:    "Database",
+		group("Libreria", sectionTable(uiTableSpec{
+			Title:    "File database",
 			Endpoint: "/api/db/info",
 			ItemsKey: "files",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "File"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
+				{Key: "name", Label: "File"},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
 				{Key: "exists", Label: "Presente", Format: "bool"},
 			}),
 			Empty: "Nessun database.",
 		})),
-		group("Archivio e rinomina", sectionActions(uiActionSection{Label: "Archivio e rinomina", Buttons: []uiActionButton{
-			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}"},
-			{Label: "Rinomina tutto", Method: "POST", Path: "/api/rename-all", Body: "{}"},
-			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
-			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}"},
-			{Label: "Backfill MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}"},
-		}})),
-		group("Archivio e rinomina", sectionProgress("Progresso rinomina", "/api/rename-progress")),
-		group("Servizio e installazione", sectionActions(uiActionSection{Label: "Servizio e installazione", Hint: "Operazioni sensibili eseguite dal daemon.", Buttons: []uiActionButton{
-			{Label: "Controlla porte", Method: "GET", Path: "/api/config/check-ports", Body: ""},
-			{Label: "Importa setup", Method: "POST", Path: "/api/setup/import", Body: "{}", Confirm: "Importare la configurazione di setup?"},
-			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?"},
-		}})),
-		group("Servizio e installazione", sectionTable(uiTableSpec{
-			Title:    "Porte",
-			Endpoint: "/api/config/check-ports",
-			ItemsKey: "ports",
+		uiPageSection{Kind: "ramdisk"},
+		group("Pulizie", sectionTable(uiTableSpec{
+			Title:    "Cestino",
+			Endpoint: "/api/trash",
+			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "port", Label: "Porta"}, {Key: "available", Label: "Libera", Format: "bool"},
-				{Key: "tcp_available", Label: "TCP", Format: "bool"}, {Key: "udp_available", Label: "UDP", Format: "bool"},
+				{Key: "name", Label: "Nome", Format: "truncate"},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
+				{Key: "is_dir", Label: "Cartella", Format: "bool"},
 			}),
-			Empty: "Nessuna porta da verificare.",
-		})),
-		group("RAM disk", sectionTable(uiTableSpec{
-			Title:    "RAM disk",
-			Endpoint: "/api/ramdisk",
-			ItemsKey: "paths",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "path", Label: "Percorso"}, {Key: "filesystem", Label: "Filesystem"},
-				{Key: "exists", Label: "Presente", Format: "bool"},
-				{Key: "free_bytes", Label: "Liberi", Format: "bytes"},
-				{Key: "total_bytes", Label: "Totali", Format: "bytes"},
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/trash/delete", Body: `{"names":["{name}"]}`, Confirm: "Eliminare definitivamente questo file?"},
 			}),
-			Empty: "Nessun RAM disk configurato.",
+			Empty: "Cestino vuoto.",
 		})),
-		group("RAM disk", sectionForm(uiFormSection{
-			Title: "Seleziona RAM disk",
-			Hint:  "Inserisci un percorso tmpfs/ramfs già esistente e scrivibile.",
-			Path:  "/api/ramdisk/select", Submit: "Seleziona",
-			Fields: []uiFormField{{Name: "path", Label: "Percorso", Placeholder: "/dev/shm/gextto"}},
+		group("Pulizie", sectionForm(uiFormSection{
+			Title: "Pulizia database", Hint: "Applica la retention a ciclo storico e log errori.", Path: "/api/db/prune", Submit: "Pulisci",
+			Fields: []uiFormField{
+				{Name: "retain_cycles", Label: "Cicli da conservare", Kind: "number", Value: "50"},
+				{Name: "error_age_days", Label: "Giorni errori", Kind: "number", Value: "7"},
+			},
 		})),
-		group("RAM disk", sectionActions(uiActionSection{Label: "RAM disk automatico", Hint: "Crea /dev/shm/gextto e lo configura come destinazione temporanea.", Buttons: []uiActionButton{
-			{Label: "Crea RAM disk", Class: "primary", Method: "POST", Path: "/api/ramdisk/create", Body: `{"path":"/dev/shm/gextto"}`},
-		}})),
 		group("Backup", sectionTable(uiTableSpec{
 			Title:    "Backup disponibili",
 			Endpoint: "/api/backup/list",
@@ -414,31 +453,21 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
 		})),
-		sectionActions(uiActionSection{Label: "Cestino", Hint: "Il cestino conserva i file sostituiti o scartati.", Buttons: []uiActionButton{
-			{Label: "Pulisci cestino", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}"},
-		}}),
 		sectionTable(uiTableSpec{
-			Title:    "Cestino",
-			Endpoint: "/api/trash",
-			ItemsKey: "items",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "Nome"}, {Key: "size_bytes", Label: "Dimensione", Format: "bytes"},
-				{Key: "is_dir", Label: "Cartella", Format: "bool"},
-			}),
-			ActionsJSON: uiJSON([]uiAction{
-				{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/trash/delete", Body: `{"names":["{name}"]}`, Confirm: "Eliminare definitivamente questo file?"},
-			}),
-			Empty: "Cestino vuoto.",
-		}),
-		sectionTable(uiTableSpec{
-			Title:    "Stato sorgenti",
+			Title:    "Diagnostica sorgenti",
 			Endpoint: "/api/sources/health",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
-				{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
+				{Key: "kind", Label: "Tipo"},
+				{Key: "name", Label: "Nome", Format: "truncate"},
+				{Key: "results", Label: "Risultati", Format: "number"},
+				{Key: "ok", Label: "Esito", Format: "status_badge"},
+				{Key: "", Label: "Dettaglio", Format: "source_detail"},
 			}),
-			Empty: "Nessuna sorgente da verificare.",
+			Empty:       "Nessuna sorgente da verificare.",
+			Search:      true,
+			SearchParam: "q",
+			Note:        "Premi Aggiorna per verificare le sorgenti; usa la ricerca per provare una query.",
 		}),
 	}
 }
@@ -446,14 +475,18 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
-	sections := []uiPageSection{
-		sectionOAuth(uiOAuthSection{Name: "Trakt", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
+	group := func(name string, section uiPageSection) uiPageSection {
+		section.Group = name
+		return section
+	}
+	return []uiPageSection{
+		group("Trakt", sectionOAuth(uiOAuthSection{Name: "Trakt", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
 			{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}"},
 			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}"},
 			{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}"},
-		}}),
-		sectionForm(uiFormSection{
-			Title: "Trakt — impostazioni", Path: "/api/trakt/settings", Submit: "Salva Trakt",
+		}})),
+		group("Trakt", sectionForm(uiFormSection{
+			Title: "Trakt — impostazioni", Hint: "Crea un'app API su trakt.tv e incolla client ID e secret.", Path: "/api/trakt/settings", Submit: "Salva Trakt",
 			Wrap: "values",
 			Fields: []uiFormField{
 				{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", "")},
@@ -462,13 +495,31 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				boolField("trakt_watchlist_sync", "Sincronizza watchlist", settingsBool(cfg, "trakt_watchlist_sync", false)),
 				boolField("trakt_scrobble_enabled", "Scrobble", settingsBool(cfg, "trakt_scrobble_enabled", false)),
 			},
-		}),
-		sectionOAuth(uiOAuthSection{Name: "Simkl", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
+		})),
+		group("Trakt", sectionTable(uiTableSpec{
+			Title:    "Watchlist Trakt",
+			Endpoint: "/api/trakt/watchlist",
+			ItemsKey: "",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
+			}),
+			Empty: "Watchlist vuota o Trakt non configurato.",
+		})),
+		group("Trakt", sectionTable(uiTableSpec{
+			Title:    "Calendario Trakt",
+			Endpoint: "/api/trakt/calendar",
+			ItemsKey: "",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
+			}),
+			Empty: "Nessuna uscita o Trakt non configurato.",
+		})),
+		group("Simkl", sectionOAuth(uiOAuthSection{Name: "Simkl", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
 			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}"},
 			{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}"},
-		}}),
-		sectionForm(uiFormSection{
-			Title: "Simkl — impostazioni", Path: "/api/simkl/settings", Submit: "Salva Simkl",
+		}})),
+		group("Simkl", sectionForm(uiFormSection{
+			Title: "Simkl — impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
 			Wrap: "values",
 			Fields: []uiFormField{
 				{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", "")},
@@ -480,33 +531,15 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				}},
 				boolField("simkl_mark_watched", "Segna come visto", settingsBool(cfg, "simkl_mark_watched", false)),
 			},
-		}),
-		sectionTable(uiTableSpec{
-			Title:    "Watchlist Trakt",
-			Endpoint: "/api/trakt/watchlist",
-			ItemsKey: "",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
-			}),
-			Empty: "Watchlist vuota o Trakt non configurato.",
-		}),
-		sectionTable(uiTableSpec{
-			Title:    "Calendario Trakt",
-			Endpoint: "/api/trakt/calendar",
-			ItemsKey: "",
-			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
-			}),
-			Empty: "Nessuna uscita o Trakt non configurato.",
-		}),
-		sectionTable(uiTableSpec{
+		})),
+		group("Simkl", sectionTable(uiTableSpec{
 			Title:       "Watchlist Simkl",
 			Endpoint:    "/api/simkl/watchlist",
 			ItemsKey:    "shows",
 			ColumnsJSON: uiJSON([]uiColumn{{Key: "show", Label: "Serie"}}),
 			Empty:       "Watchlist vuota o Simkl non configurato.",
-		}),
-		sectionTable(uiTableSpec{
+		})),
+		group("Simkl", sectionTable(uiTableSpec{
 			Title:    "Calendario Simkl",
 			Endpoint: "/api/simkl/calendar",
 			ItemsKey: "",
@@ -514,7 +547,25 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				{Key: "date", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
 			}),
 			Empty: "Nessuna uscita o Simkl non configurato.",
-		}),
+		})),
+		group("Jellyfin", sectionSettings("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key"))),
+		group("Jellyfin", sectionActions(uiActionSection{Label: "Jellyfin", Hint: "Verifica la connessione o aggiorna la libreria.", Buttons: []uiActionButton{
+			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
+			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
+		}})),
+		group("Plex", sectionSettings("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token"))),
+		group("Plex", sectionActions(uiActionSection{Label: "Plex", Hint: "Verifica la connessione o aggiorna la libreria.", Buttons: []uiActionButton{
+			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}"},
+			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}"},
+		}})),
+		group("Sorgenti", sectionEditor(uiIndexerEditor)),
+		group("Sorgenti", sectionSettings("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"))),
+		group("Sorgenti", sectionActions(uiActionSection{Label: "Sorgenti", Hint: "Verifica FlareSolverr; l'esito degli indexer è in Salute e Manutenzione.", Buttons: []uiActionButton{
+			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
+		}})),
+		sectionActions(uiActionSection{Label: "Notifiche", Hint: "Invia una notifica di prova con la configurazione corrente.", Buttons: []uiActionButton{
+			{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
+		}}),
 		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
@@ -526,26 +577,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				{Label: "install.sh", Href: "/api/browser-handlers/download?file=install.sh"},
 			},
 		}),
-		sectionActions(uiActionSection{Label: "Browser e media server", Hint: "Installa gli handler magnet/.torrent nel browser o aggiorna le librerie.", Buttons: []uiActionButton{
-			{Label: "Test Jellyfin", Method: "POST", Path: "/api/jellyfin/test", Body: "{}"},
-			{Label: "Aggiorna Jellyfin", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}"},
-			{Label: "Test Plex", Method: "POST", Path: "/api/plex/test", Body: "{}"},
-			{Label: "Aggiorna Plex", Method: "POST", Path: "/api/plex/refresh", Body: "{}"},
-			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}"},
-			{Label: "Notifica di test", Method: "POST", Path: "/api/test-notification", Body: "{}"},
-		}}),
 	}
-	// Group each integration's panels together so the page renders them side by
-	// side (Trakt / Simkl), like the classic layout.
-	for index := range sections {
-		switch index {
-		case 0, 1, 4, 5:
-			sections[index].Group = "Trakt"
-		case 2, 3, 6, 7:
-			sections[index].Group = "Simkl"
-		}
-	}
-	return sections
 }
 
 // uiDownloadsPageFor builds the download page with the torrent table plus the
@@ -573,9 +605,9 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
 				{Key: "name", Label: "Nome"}, {Key: "kind", Label: "Tipo"},
-				{Key: "tag", Label: "Tag NAS"}, {Key: "quality_score", Label: "Punteggio", Format: "number"},
+				{Key: "tag", Label: "Tag NAS", Format: "nas_tag"}, {Key: "quality_score", Label: "Punteggio", Format: "number"},
 				{Key: "status", Label: "Stato"},
-				{Key: "processed_path", Label: "Cartella libreria / NAS"}, {Key: "completed_at", Label: "Concluso"},
+				{Key: "processed_path", Label: "Cartella libreria / NAS", Format: "folder"}, {Key: "completed_at", Label: "Concluso"},
 			}),
 			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
 		}),

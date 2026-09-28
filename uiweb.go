@@ -175,6 +175,7 @@ type uiTorrentsData struct {
 // uiHealthData is the view-model of the Salute page.
 type uiHealthData struct {
 	Health        Health
+	StatusReason  string
 	DiskUsedPct   string
 	Uptime        string
 	ProcessUptime string
@@ -526,6 +527,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	}
 	return uiHealthData{
 		Health:        health,
+		StatusReason:  healthStatusReason(health),
 		DiskUsedPct:   usedPct,
 		Uptime:        logging.HumanDuration(saturatingInt64(health.UptimeSeconds)),
 		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
@@ -535,23 +537,53 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 				Endpoint: "/api/sources/health",
 				ItemsKey: "items",
 				ColumnsJSON: uiJSON([]uiColumn{
-					{Key: "kind", Label: "Tipo"}, {Key: "name", Label: "Nome"},
-					{Key: "ok", Label: "Esito", Format: "bool"}, {Key: "detail", Label: "Dettaglio"},
+					{Key: "kind", Label: "Tipo"},
+					{Key: "name", Label: "Nome", Format: "truncate"},
+					{Key: "results", Label: "Risultati", Format: "number"},
+					{Key: "ok", Label: "Esito", Format: "status_badge"},
+					{Key: "", Label: "Dettaglio", Format: "source_detail"},
 				}),
-				Empty: "Nessuna sorgente da verificare.",
+				Empty:       "Nessuna sorgente da verificare.",
+				Search:      true,
+				SearchParam: "q",
+				Note:        "Premi Aggiorna per verificare tutte le sorgenti; usa la ricerca per provare una query su feed, indexer e motori web.",
 			}),
 			sectionTable(uiTableSpec{
 				Title:    "Stato provider",
 				Endpoint: "/api/providers/status",
 				ItemsKey: "items",
 				ColumnsJSON: uiJSON([]uiColumn{
-					{Key: "provider", Label: "Provider"}, {Key: "status", Label: "Stato"},
-					{Key: "message", Label: "Messaggio"}, {Key: "checked_at", Label: "Verificato"},
+					{Key: "provider", Label: "Provider"},
+					{Key: "kind", Label: "Tipo"},
+					{Key: "level", Label: "Livello", Format: "number"},
+					{Key: "disabled_till", Label: "Disabilitato fino a"},
+					{Key: "last_error", Label: "Ultimo errore", Format: "truncate"},
 				}),
-				Empty: "Nessun provider verificato.",
+				ActionsJSON: uiJSON([]uiAction{
+					{Label: "Azzera", Class: "primary", Method: "POST", Path: "/api/providers/status", Body: `{"provider":"{provider}"}`},
+				}),
+				Empty: "Nessun provider in backoff.",
+				Note:  "Backoff crescente sui provider che falliscono; Azzera li riabilita subito.",
 			}),
 		},
 	}
+}
+
+// healthStatusReason explains a non-ok health status (or lists the missing
+// paths) so the Salute page does not show a bare "degraded".
+func healthStatusReason(health Health) string {
+	problems := []string{}
+	if !health.DataDirWritable {
+		problems = append(problems, "cartella dati non scrivibile")
+	}
+	for _, path := range health.Paths {
+		if !path.Exists {
+			problems = append(problems, path.Label+" assente")
+		} else if !path.Writable {
+			problems = append(problems, path.Label+" non scrivibile")
+		}
+	}
+	return strings.Join(problems, "; ")
 }
 
 // uiLogsDataFrom reads the same log tail the JSON API exposes.
