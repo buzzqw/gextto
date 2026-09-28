@@ -41,7 +41,7 @@
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <div class="toolbar">
       {{range .Buttons}}
-      <button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>
+      <button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>
       {{end}}
     </div>
   </div>
