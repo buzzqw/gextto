@@ -2331,7 +2331,10 @@
   }
   function setFontScale(percent) {
     percent = Math.min(140, Math.max(85, percent));
-    document.documentElement.style.fontSize = (16 * percent / 100) + "px";
+    // The root font size drives every rem-based size. Base 17px (not 16) so
+    // the whole interface reads one step larger by default; the stored scale
+    // then multiplies it.
+    document.documentElement.style.fontSize = (17 * percent / 100) + "px";
     var label = document.querySelector("[data-font-label]");
     if (label) label.textContent = "Testo " + percent + "%";
     storageSet("gextto_font_scale", String(percent));
