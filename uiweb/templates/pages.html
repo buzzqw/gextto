@@ -690,8 +690,10 @@
 <form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
   <div class="setting-info">
     <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
-    {{if .Hint}}<small class="setting-hint" title="{{.Hint}}">{{.Hint}}</small>{{end}}
-    <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
+    <div class="setting-meta">
+      {{if .Hint}}<small class="setting-hint" title="{{.Hint}}">{{.Hint}}</small>{{end}}
+      <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
+    </div>
   </div>
   <div class="setting-control">
     {{if eq .Kind "structured"}}
@@ -728,11 +730,11 @@
   <template data-list-row>
     <div class="card list-row">
       {{range .Fields}}
-      {{if eq .Kind "bool"}}<label class="field"><span>{{.Label}}</span><select class="input" data-field="{{.Name}}" data-kind="bool"><option value="true">Sì</option><option value="false">No</option></select></label>
-      {{else if eq .Kind "number"}}<label class="field"><span>{{.Label}}</span><input class="input" type="number" data-field="{{.Name}}" data-kind="number" /></label>
-      {{else if eq .Kind "tags"}}<label class="field"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="tags" placeholder="{{.Placeholder}}" /></label>
-      {{else if eq .Kind "secret"}}<label class="field"><span>{{.Label}}</span><input class="input" type="password" data-field="{{.Name}}" data-kind="text" autocomplete="new-password" /></label>
-      {{else}}<label class="field"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="text" placeholder="{{.Placeholder}}" /></label>
+      {{if eq .Kind "bool"}}<label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span><select class="input" data-field="{{.Name}}" data-kind="bool"><option value="true">Sì</option><option value="false">No</option></select></label>
+      {{else if eq .Kind "number"}}<label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span><input class="input" type="number" data-field="{{.Name}}" data-kind="number" /></label>
+      {{else if eq .Kind "tags"}}<label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="tags" placeholder="{{.Placeholder}}" /></label>
+      {{else if eq .Kind "secret"}}<label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span><input class="input" type="password" data-field="{{.Name}}" data-kind="text" autocomplete="new-password" /></label>
+      {{else}}<label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="text" placeholder="{{.Placeholder}}" /></label>
       {{end}}
       {{end}}
       <div class="form-actions"><button class="btn sm danger" type="button" data-list-remove>Rimuovi</button></div>
@@ -746,25 +748,36 @@
 </div>
 {{end}}
 
+{{define "settings_checkbox_group"}}
+<div class="panel settings-panel" data-checkbox-group data-key="{{.Key}}">
+  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted" data-checkbox-status aria-live="polite"></small></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="toolbar checkbox-row">
+      {{range .Options}}
+      <label class="check" title="{{.Label}}"><input type="checkbox" data-checkbox-option value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>
+      {{end}}
+    </div>
+    {{if .Custom}}
+    <div class="toolbar" style="margin-top:10px">
+      <input class="input" data-checkbox-custom placeholder="{{.CustomPlaceholder}}" />
+      <button class="btn sm" type="button" data-checkbox-add>Aggiungi</button>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{define "settings_editors"}}
 {{if .ShowSources}}
 <div class="card editor-card" data-sources-editor>
   <h3>Feed RSS</h3>
-  <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
+  <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="9"></textarea></label>
   <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message></small></div>
 </div>
 {{end}}
+{{range .CheckboxGroups}}{{template "settings_checkbox_group" .}}{{end}}
 {{range .ListEditors}}{{template "list_editor" .}}{{end}}
-{{if .Extras}}
-<div class="panel settings-panel">
-  <div class="panel-head"><h3>{{.ExtrasTitle}}</h3></div>
-  <div class="panel-body">
-    {{if .ExtrasHint}}<p class="hint">{{.ExtrasHint}}</p>{{end}}
-    <div class="settings-rows">{{range .Extras}}{{template "settings_field" .}}{{end}}</div>
-    {{if .ExtrasActions}}<div class="toolbar" style="margin-top:10px">{{range .ExtrasActions}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>{{end}}</div>{{end}}
-  </div>
-</div>
-{{end}}
 {{end}}
 
 {{define "settings"}}

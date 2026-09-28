@@ -144,15 +144,12 @@ type uiSettingsPage struct {
 	// Actions is an optional toolbar of API buttons shown at the top of the
 	// tab (e.g. Ottimizza / Applica ora in Libtorrent).
 	Actions *uiActionSection
-	// Extras is an optional panel rendered right after the list editors, used
-	// to keep FlareSolverr under the indexer editor like rextto/extto.
-	Extras        []uiSettingField
-	ExtrasTitle   string
-	ExtrasHint    string
-	ExtrasActions []uiActionButton
-	// EditorsFirst renders the structured editors (feed, indexer, FlareSolverr)
-	// before the plain fields, the order extto/rextto use on the Sorgenti tab.
+	// EditorsFirst renders the structured editors (the feed editor) before the
+	// plain fields, the order extto/rextto use on the Sorgenti tab.
 	EditorsFirst bool
+	// CheckboxGroups edits JSON-array settings as checkbox lists (Motori web,
+	// Filtri contenuto) instead of textareas.
+	CheckboxGroups []uiCheckboxGroup
 }
 
 // uiSettingGroup is one titled block of settings rows. rextto groups the fields
@@ -162,12 +159,60 @@ type uiSettingGroup struct {
 	Fields []uiSettingField
 }
 
+// uiCheckboxOption is one checkbox of a uiCheckboxGroup.
+type uiCheckboxOption struct {
+	Value    string
+	Label    string
+	Selected bool
+}
+
+// uiCheckboxGroup edits a JSON-array setting as a list of checkboxes (Motori
+// web, Filtri contenuto) instead of a raw textarea, exactly like rextto. Every
+// change is saved immediately; when Custom is set the panel also offers an
+// input to add a custom value.
+type uiCheckboxGroup struct {
+	Key               string
+	Title             string
+	Hint              string
+	Options           []uiCheckboxOption
+	Custom            bool
+	CustomPlaceholder string
+}
+
+// uiWebsearchEngines are the web search engines rextto exposes for gap filling.
+var uiWebsearchEngines = []uiCheckboxOption{
+	{Value: "bitsearch", Label: "BitSearch"},
+	{Value: "tpb", Label: "The Pirate Bay"},
+	{Value: "1337x", Label: "1337x"},
+	{Value: "bt4g", Label: "BT4G"},
+	{Value: "knaben", Label: "Knaben"},
+	{Value: "nyaa", Label: "Nyaa"},
+	{Value: "eztv", Label: "EZTV"},
+	{Value: "btdig", Label: "BTDig"},
+	{Value: "limetorrents", Label: "LimeTorrents"},
+	{Value: "torrentz2", Label: "Torrentz2"},
+	{Value: "torrentscsv", Label: "TorrentsCSV"},
+}
+
+// uiContentFilterOptions are the script/keyword filters rextto offers.
+var uiContentFilterOptions = []uiCheckboxOption{
+	{Value: "[non-latino]", Label: "Non latino (cirillico, arabo, CJK…)"},
+	{Value: "[cjk]", Label: "CJK (cinese, giapponese, coreano)"},
+	{Value: "[cirillico]", Label: "Cirillico"},
+	{Value: "[arabo]", Label: "Arabo"},
+	{Value: "[ebraico]", Label: "Ebraico"},
+	{Value: "[thai]", Label: "Thai"},
+	{Value: "[porno]", Label: "Porno / contenuti per adulti"},
+}
+
 // uiListField describes one column of a structured list editor.
 type uiListField struct {
 	Name        string
 	Label       string
 	Kind        string // text | number | bool | tags | secret
 	Placeholder string
+	// Wide gives the field two grid tracks on wide screens (URLs, API keys).
+	Wide bool
 }
 
 // uiListEditor edits a list of structured records with real form rows, so the
@@ -195,8 +240,8 @@ var uiIndexerEditor = uiListEditor{
 	PostKey:  "indexers",
 	Fields: []uiListField{
 		{Name: "name", Label: "Nome", Kind: "text", Placeholder: "jackett / prowlarr"},
-		{Name: "url", Label: "URL base", Kind: "text", Placeholder: "http://127.0.0.1:9117"},
-		{Name: "api_key", Label: "API key", Kind: "secret"},
+		{Name: "url", Label: "URL base", Kind: "text", Placeholder: "http://127.0.0.1:9117", Wide: true},
+		{Name: "api_key", Label: "API key", Kind: "secret", Wide: true},
 		{Name: "enabled", Label: "Attivo", Kind: "bool"},
 	},
 }
@@ -280,6 +325,8 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	structured := map[string]struct{}{
 		"url": {}, "indexers": {}, "source_filters": {},
 		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {},
+		// Edited as checkbox groups (see uiSourcesCheckboxGroups).
+		"websearch_engines": {}, "content_filters": {},
 	}
 	indexed := map[string]struct{}{}
 	for _, def := range uiSettingsIndex {
@@ -356,16 +403,11 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	page.ShowI18n = active == "i18n"
 	switch active {
 	case "sources":
+		// The Indexer Torznab editor and FlareSolverr live only in Integrazioni
+		// (as in extto); here we keep the feed and the web-search/filter
+		// settings, so the same form is not shown twice.
 		page.EditorsFirst = true
-		page.ListEditors = []uiListEditor{uiIndexerEditor}
-		// FlareSolverr belongs to the indexers, not to the generic fields: it is
-		// rendered as its own panel right below the Indexer Torznab editor.
-		page.ExtrasTitle = "FlareSolverr"
-		page.ExtrasHint = "Serve per superare Cloudflare su alcuni siti/indexer."
-		page.Extras = []uiSettingField{uiSettingFieldFor("flaresolverr_url", "URL FlareSolverr", cfg.Settings["flaresolverr_url"])}
-		page.ExtrasActions = []uiActionButton{
-			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr sia raggiungibile."},
-		}
+		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
 	case "advanced":
 		page.ListEditors = uiAdvancedEditors
 	case "libtorrent":
@@ -393,8 +435,8 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	// Special editors have no single setting key: point the search at their tab.
 	for _, entry := range []uiSearchEntry{
 		{Key: "", Label: "Feed RSS", Tab: "sources"},
-		{Key: "", Label: "Indexer Torznab (Jackett / Prowlarr)", Tab: "sources"},
-		{Key: "", Label: "FlareSolverr", Tab: "sources"},
+		{Key: "", Label: "Motori web", Tab: "sources"},
+		{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},
 		{Key: "", Label: "Filtri per sorgente", Tab: "advanced"},
 		{Key: "", Label: "Regole tag → cartella", Tab: "advanced"},
 		{Key: "", Label: "Event hook", Tab: "advanced"},
@@ -429,6 +471,65 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 	return groups
 }
 
+// uiSourcesCheckboxGroups builds the two checkbox editors of the Sorgenti tab
+// (Motori web, Filtri contenuto) from the stored JSON arrays.
+func uiSourcesCheckboxGroups(cfg *Config) []uiCheckboxGroup {
+	engines := uiCheckboxGroup{
+		Key:   "websearch_engines",
+		Title: "Motori web",
+		Hint:  "Spunta i motori di ricerca da usare per i gap.",
+	}
+	for _, option := range uiWebsearchEngines {
+		option.Selected = settingListContains(cfg, "websearch_engines", option.Value)
+		engines.Options = append(engines.Options, option)
+	}
+
+	filters := uiCheckboxGroup{
+		Key:               "content_filters",
+		Title:             "Filtri contenuto esclusi",
+		Hint:              "Le release che contengono queste parole o script (es. [non-latino], [porno]) vengono escluse. Le modifiche si salvano subito.",
+		Custom:            true,
+		CustomPlaceholder: "Filtro personalizzato",
+	}
+	known := map[string]bool{}
+	for _, option := range uiContentFilterOptions {
+		option.Selected = settingListContains(cfg, "content_filters", option.Value)
+		known[strings.ToLower(option.Value)] = true
+		filters.Options = append(filters.Options, option)
+	}
+	// Custom filters already stored (not one of the presets) stay visible and
+	// removable like the preset ones.
+	for _, value := range settingList(cfg, "content_filters") {
+		if known[strings.ToLower(value)] {
+			continue
+		}
+		filters.Options = append(filters.Options, uiCheckboxOption{Value: value, Label: value, Selected: true})
+	}
+	return []uiCheckboxGroup{engines, filters}
+}
+
+// settingList parses a JSON-array setting into its string items.
+func settingList(cfg *Config, key string) []string {
+	if cfg == nil {
+		return nil
+	}
+	items, ok := uiJSONScalarList(cfg.Settings[key])
+	if !ok {
+		return nil
+	}
+	return items
+}
+
+// settingListContains reports whether a JSON-array setting contains a value.
+func settingListContains(cfg *Config, key, value string) bool {
+	for _, item := range settingList(cfg, key) {
+		if strings.EqualFold(strings.TrimSpace(item), value) {
+			return true
+		}
+	}
+	return false
+}
+
 // uiSettingGroupTitle assigns a setting to a labelled group. The libtorrent tab
 // is the only one large enough to need sub-groups; the others render a single
 // panel with the tab name.
@@ -438,7 +539,7 @@ func uiSettingGroupTitle(tab, key string) string {
 	case "daemon":
 		return "Daemon"
 	case "sources":
-		return "Motori web e filtri"
+		return "Blacklist"
 	case "advanced":
 		return "Avanzate"
 	case "acquisition":

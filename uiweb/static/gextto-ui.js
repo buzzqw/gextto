@@ -1552,6 +1552,59 @@
     }
   });
 
+  // ---- checkbox groups (Motori web, Filtri contenuto) ---------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-checkbox-group]"), function (group) {
+    var key = group.getAttribute("data-key");
+    var status = group.querySelector("[data-checkbox-status]");
+    var row = group.querySelector(".checkbox-row");
+    function selected() {
+      return Array.prototype.filter.call(group.querySelectorAll("[data-checkbox-option]"), function (box) {
+        return box.checked;
+      }).map(function (box) { return box.value; });
+    }
+    function save(message) {
+      return api("/api/config/settings", "POST", { key: key, value: JSON.stringify(selected()) }).then(function () {
+        if (status) status.textContent = message || "Salvato";
+      }).catch(function (error) {
+        if (status) status.textContent = "Errore";
+        notify("Salvataggio non riuscito: " + error.message, "err");
+      });
+    }
+    group.addEventListener("change", function (event) {
+      if (!event.target.closest("[data-checkbox-option]")) return;
+      save("Salvato");
+    });
+    var add = group.querySelector("[data-checkbox-add]");
+    var custom = group.querySelector("[data-checkbox-custom]");
+    if (add && custom) {
+      add.addEventListener("click", function () {
+        var value = (custom.value || "").trim();
+        if (!value) return;
+        var exists = Array.prototype.some.call(group.querySelectorAll("[data-checkbox-option]"), function (box) {
+          return box.value.toLowerCase() === value.toLowerCase();
+        });
+        if (!exists && row) {
+          var label = document.createElement("label");
+          label.className = "check";
+          label.title = value;
+          var input = document.createElement("input");
+          input.type = "checkbox";
+          input.setAttribute("data-checkbox-option", "");
+          input.value = value;
+          input.checked = true;
+          var span = document.createElement("span");
+          span.textContent = value;
+          label.appendChild(input);
+          label.appendChild(document.createTextNode(" "));
+          label.appendChild(span);
+          row.appendChild(label);
+        }
+        custom.value = "";
+        save("Filtro aggiunto");
+      });
+    }
+  });
+
   // ---- explore (search) ---------------------------------------------------
   function renderSearch(form) {
     var panel = form.closest(".panel");

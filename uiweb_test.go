@@ -367,7 +367,8 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 		{"/ui?view=settings&tab=i18n", `data-i18n-editor`},
 		{"/ui?view=settings&tab=advanced", `data-list-editor`},
 		{"/ui?view=settings&tab=sources", `data-sources-editor`},
-		{"/ui?view=settings&tab=sources", `data-list-editor`},
+		// The Indexer Torznab editor lives only in Integrazioni (no duplicate).
+		{"/ui?view=integrations", `data-list-editor`},
 		{"/ui?view=series", `series_link`},
 		{"/ui?view=movies", `movie_link`},
 		{"/ui?view=comics", `/api/comics/{id}/enabled`},
