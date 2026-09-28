@@ -13,6 +13,11 @@ Gextto è un demone unico: ricerca le sorgenti, valuta le release, gestisce
 libtorrent, rinomina i file e li archivia. Non è necessario avviare componenti
 separati per il funzionamento normale.
 
+L'interfaccia web funziona anche da telefono: sotto i 900 px il layout diventa
+compatto, con navigazione in alto scorrevole, metriche della dashboard su due
+colonne, finestre a tutta larghezza e tabelle che scorrono orizzontalmente
+dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
+
 Il percorso consigliato per una nuova installazione è:
 
 1. configurare percorsi e sorgenti;

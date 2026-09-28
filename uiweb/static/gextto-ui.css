@@ -116,7 +116,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   flex-direction: row;
   align-items: center;
   gap: 4px;
-  padding: 8px calc(8px + env(safe-area-inset-left)) 8px calc(8px + env(safe-area-inset-right));
+  padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
@@ -967,4 +967,54 @@ pre.log-view { margin: 0; }
 
 @media (min-width: 901px) {
   .nav-mobile-hidden { display: flex; }
+}
+
+/* ------------------------------------------------------- mobile usability */
+/* Phone-first refinements layered on the compact shell: comfortable touch
+   targets, snap-scrolling navigation, a two-column dashboard, dialogs that fit
+   the screen and respect the device safe areas. */
+@media (max-width: 899px) {
+  /* Touch targets: 44px minimum on navigation and icon buttons. */
+  .nav-item, .nav-more { min-height: 44px; }
+  .btn.sm { min-height: 40px; }
+  .icon-btn { width: 44px; height: 44px; }
+
+  /* Top navigation scrolls with snap alignment; the active pill is reachable
+     and a horizontal swipe does not trigger the browser back gesture. */
+  .sidebar { scroll-snap-type: x proximity; scroll-padding-inline: 8px; overscroll-behavior-x: contain; }
+  .nav-item, .nav-more { scroll-snap-align: start; }
+  .topbar {
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+
+  /* Keep the page clear of the phone home indicator and never wider than it. */
+  .content { padding-bottom: calc(40px + env(safe-area-inset-bottom)); overflow-x: clip; }
+
+  /* Tables stay inside their panel and scroll on their own. */
+  .panel-body, .table-wrap { min-width: 0; }
+  .table-wrap { max-width: 100%; }
+  .data-table { font-size: 0.9rem; }
+  .data-table th, .data-table td { padding: 8px 10px; }
+  .logs-toolbar { flex-wrap: wrap; }
+  .logs-toolbar [data-logs-lines] { flex: 0 0 auto; width: auto; }
+
+  /* Dashboard metrics use two columns as soon as there is room. */
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 380px) {
+  .grid-4 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  /* Dialogs take the full width and keep their own scroll. */
+  .overlay { padding: 2vh 8px calc(2vh + env(safe-area-inset-bottom)); }
+  .modal, .torrent-modal { width: 100%; max-width: none; border-radius: var(--radius-sm); }
+  .torrent-modal { height: calc(96dvh - env(safe-area-inset-bottom)); }
+  .modal-head, .modal-body { padding-left: 12px; padding-right: 12px; }
+
+  /* Primary form actions become full-width, thumb-friendly buttons. */
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .form-actions .btn { width: 100%; }
 }

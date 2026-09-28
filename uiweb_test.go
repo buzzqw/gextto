@@ -422,7 +422,17 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 	if cssCode != http.StatusOK || len(css) < 10_000 {
 		t.Fatalf("GET /ui/static/gextto-ui.css -> %d (%d bytes)", cssCode, len(css))
 	}
-	for _, marker := range []string{".app-shell { flex-direction: row; }", "@media (max-width: 900px)", ".settings-tab-select-wrap"} {
+	for _, marker := range []string{
+		".app-shell { flex-direction: row; }",
+		"@media (max-width: 900px)",
+		".settings-tab-select-wrap",
+		// Mobile usability markers: snap navigation, touch targets, two-column
+		// dashboard, safe-area aware dialogs and contained table scrolling.
+		"scroll-snap-type: x proximity",
+		"overscroll-behavior-x: contain",
+		"env(safe-area-inset-bottom)",
+		"@media (max-width: 380px)",
+	} {
 		if !strings.Contains(string(css), marker) {
 			t.Fatalf("stylesheet missing responsive marker %q", marker)
 		}

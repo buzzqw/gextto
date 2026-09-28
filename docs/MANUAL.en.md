@@ -12,6 +12,11 @@ Gextto is a single daemon: it searches sources, evaluates releases, manages
 libtorrent, renames files and archives them. Normal operation does not require
 separate orchestrator processes.
 
+The web interface works on a phone too: below 900 px the shell switches to a
+compact layout with a scrollable top navigation, the dashboard metrics in two
+columns, full-width dialogs and tables that scroll horizontally inside their
+panel. Every action stays reachable by touch.
+
 The recommended path for a new installation is:
 
 1. configure paths and sources;
