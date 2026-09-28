@@ -481,6 +481,7 @@ every screen. Quick index:
 | First run and modes | *First run* | [1. First start](docs/MANUAL.en.md#1-first-start) |
 | Dashboard, cycles, stats | *Cycles and downloads* | [2. Dashboard](docs/MANUAL.en.md#2-dashboard) |
 | Torrents, stalled, history | *Cycles and downloads* | [3. Downloads](docs/MANUAL.en.md#3-downloads) |
+| Torrent backends (libtorrent, qBittorrent-nox, anacrolix) | *Torrent backends* | [7. Configuration](docs/MANUAL.en.md#7-configuration) |
 | Series, episodes, gaps | *Add series and movies* | [4. Series](docs/MANUAL.en.md#4-series) |
 | Movies | *Add series and movies* | [5. Movies](docs/MANUAL.en.md#5-movies) |
 | Explore, Archive, Comics | *UI sections* | [6. Explore, Archive, Comics](docs/MANUAL.en.md#6-explore-archive-comics) |
@@ -527,7 +528,9 @@ every screen. Quick index:
   session-less instance sits at **0% CPU and ~30 MB RSS** (measured), and its Go
   heap stays in the low megabytes. With libtorrent active, CPU and RAM are spent
   almost entirely by the engine while it has torrents (DHT, tracker announces,
-  peers and the disk cache), not by the daemon's loops.
+  peers and the disk cache), not by the daemon's loops. With an external engine
+  (qBittorrent-nox), that cost lives in the engine's own process instead, and the
+  daemon stays in the tens of megabytes.
 - **RAM**: libtorrent's disk cache (`cache_size`, in 16 KiB blocks) and the
   queued-disk budget (`max_queued_disk_bytes`) are the main consumers. The
   daemon calls `malloc_trim` after completions, after every cycle and every 15

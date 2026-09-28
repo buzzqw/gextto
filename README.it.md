@@ -487,6 +487,7 @@ schermata. Indice rapido:
 | Primo avvio e modalità | *Primo avvio* | [1. Primo avvio](docs/MANUAL.it.md#1-primo-avvio) |
 | Dashboard, cicli, statistiche | *Cicli e download* | [2. Dashboard](docs/MANUAL.it.md#2-dashboard) |
 | Torrent, stalled, storico | *Cicli e download* | [3. Scarico](docs/MANUAL.it.md#3-scarico) |
+| Motori torrent (libtorrent, qBittorrent-nox, anacrolix) | *Motori torrent* | [7. Configurazione](docs/MANUAL.it.md#7-configurazione) |
 | Serie, episodi, gap | *Aggiungi serie e film* | [4. Serie TV](docs/MANUAL.it.md#4-serie-tv) |
 | Film | *Aggiungi serie e film* | [5. Film](docs/MANUAL.it.md#5-film) |
 | Esplora, Archivio, Fumetti | *Le sezioni della UI* | [6. Esplora, Archivio, Fumetti](docs/MANUAL.it.md#6-esplora-archivio-fumetti) |
@@ -533,7 +534,9 @@ schermata. Indice rapido:
   senza sessione sta a **0% CPU e ~30 MB RSS** (misurato) e l'heap Go resta
   nell'ordine di pochi MB. Con libtorrent attivo, CPU e RAM sono spese quasi
   interamente dal motore quando ha torrent (DHT, announce ai tracker, peer e
-  cache su disco), non dai loop del daemon.
+  cache su disco), non dai loop del daemon. Con un motore esterno
+  (qBittorrent-nox) quel costo vive nel suo processo, e il daemon resta
+  nell'ordine delle decine di MB.
 - **RAM**: i consumatori principali sono la cache disco di libtorrent
   (`cache_size`, in blocchi da 16 KiB) e il budget di scritture in coda
   (`max_queued_disk_bytes`). Il daemon chiama `malloc_trim` dopo i
