@@ -306,10 +306,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .list-poster.placeholder { display: grid; place-items: center; color: var(--muted); font-size: 0.68rem; }
 /* generic two-column list (used by the database optimization tool) */
 .list { display: flex; flex-direction: column; gap: 2px; }
-.list-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
-.list-item:last-child { border-bottom: 0; }
-.list-item > .truncate { flex: 1 1 auto; min-width: 0; }
-.list-item > strong { flex: 0 0 auto; white-space: nowrap; color: var(--text); }
+.list > .list-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+.list > .list-item:last-child { border-bottom: 0; }
+.list > .list-item > .truncate { flex: 1 1 auto; min-width: 0; }
+.list > .list-item > strong { flex: 0 0 auto; white-space: nowrap; color: var(--text); }
 
 .panel, .card {
   background: var(--surface);
