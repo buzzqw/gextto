@@ -155,6 +155,29 @@ func TestRejectsCodecAsNxEpisode(t *testing.T) {
 	}
 }
 
+// FuzzParseRelease feeds arbitrary release titles to the parser, the component
+// that sees the most untrusted input. It must never panic or allocate without
+// bound, whatever the upstream feed contains.
+func FuzzParseRelease(f *testing.F) {
+	for _, seed := range []string{
+		"The.Pitt.S01E01.Pilot.1080p.WEB-DL.DDP5.1.H.264-ABC",
+		"Movie.2024.2160p.UHD.BluRay.REMUX.DV.HDR10.ITA.ENG.DTS-HD.x265-GROUP",
+		"Show.S02E01-05.720p.HDTV.x264.ITA.SUB.ITA",
+		"Nightcrawler.2014.2160p.iT.WEB-DL.DV.HDR10+.MULTi.DTS-HD.MA.5.1.H265-BTM",
+		"Daily.Show.2026-09-21.WEB-DL.1080p.ITA",
+		"", "....", "S01E01", "1080p",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, title string) {
+		quality := ParseQuality(title)
+		_ = quality.Score()
+		if release := ParseRelease(title, testMagnet, "fuzz"); release != nil {
+			_ = release.Quality.Score()
+		}
+	})
+}
+
 func BenchmarkParseQuality(b *testing.B) {
 	titles := []string{
 		"The.Pitt.S01E01.Pilot.1080p.WEB-DL.DDP5.1.H.264-ABC",

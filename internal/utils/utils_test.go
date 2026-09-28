@@ -102,7 +102,8 @@ func TestRedactURLSecrets(t *testing.T) {
 }
 
 func TestStableIDAndCondensedKey(t *testing.T) {
-	if StableID("example") != StableID("example") || len(StableID("example")) != 40 {
+	id := StableID("example")
+	if StableID("example") != id || len(id) != 40 {
 		t.Fatal("stable id not deterministic hex40")
 	}
 	if StableID("a") == StableID("b") {
