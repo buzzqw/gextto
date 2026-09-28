@@ -11,12 +11,11 @@ import (
 )
 
 func TestHookEnvDoesNotLeakDaemonSecrets(t *testing.T) {
-	t.Setenv("GEXTTO_API_TOKEN", "top-secret-token")
 	t.Setenv("GEXTTO_NOTIFY_WEBHOOK_SECRET", "hush")
 
 	env := runHookEnv(map[string]string{"title": "Show"})
 	joined := strings.Join(env, "\n")
-	if strings.Contains(joined, "top-secret-token") || strings.Contains(joined, "hush") {
+	if strings.Contains(joined, "hush") {
 		t.Fatalf("hook environment leaked a daemon secret: %s", joined)
 	}
 	if !strings.Contains(joined, "GEXTTO_TITLE=Show") {

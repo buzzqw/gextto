@@ -5,12 +5,11 @@
 #
 # Uso:
 #   ./gextto_tui.sh                          # http://127.0.0.1:5000
-#   ./gextto_tui.sh --url http://host:5000 --token <token>
+#   ./gextto_tui.sh --url http://host:5000
 #   ./gextto_tui.sh --lang en
 #
-# Variabili d'ambiente (se non passi --url/--token):
+# Variabili d'ambiente (se non passi --url):
 #   GEXTTO_URL        URL del daemon (default http://127.0.0.1:5000)
-#   GEXTTO_API_TOKEN  token API, se il daemon è protetto
 #   GEXTTO_BINARY     percorso alternativo al binario gexttod
 #
 set -euo pipefail

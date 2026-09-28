@@ -20,23 +20,14 @@ delay before any public disclosure.
 
 ## Network exposure
 
-Gextto has **no built-in user management**: access is controlled by a single
-optional API token. Treat the web port as an administrative interface.
+Gextto has **no built-in user management or authentication**. Treat the web port
+as an administrative interface.
 
 - **Bind to loopback** (`127.0.0.1:5000`) and put a reverse proxy with
   authentication and TLS in front of it when the UI must be reachable remotely.
-- **Set `GEXTTO_API_TOKEN`** whenever the daemon listens on anything other than
-  loopback. The token is accepted as `x-gextto-token: <token>` or
-  `Authorization: Bearer <token>`. `/api/auth`, `/api/health` and `/api/status`
-  stay public for liveness checks; every other `/api/*` route requires the token
-  when one is configured.
-- The system installer generates a random token on a fresh install and stores it
-  in `/etc/gextto/gextto.env` (mode `0640`, loaded with `EnvironmentFile=`),
-  never in the world-readable unit file. The daemon logs a warning at startup if
-  it listens on a non-loopback address without a token.
-- Rotating or setting the token from the UI takes effect immediately, without a
-  restart. Common origins are **not** trusted cross-origin; the token is the
-  boundary.
+- **Restrict network access** with a firewall or reverse proxy when the UI must
+  be reachable from another machine. HTTPS and upstream authentication should be
+  provided by that proxy.
 
 ## What the daemon deliberately does
 
@@ -53,8 +44,6 @@ optional API token. Treat the web port as an administrative interface.
 - **Bounded requests.** The HTTP server has header/read/idle timeouts and a body
   size cap; the probe of a media file runs `ffprobe` with a timeout and a
   local-only protocol whitelist, and refuses paths that start with `-`.
-- **Optional API token compared in constant time**, read from the live
-  configuration so a runtime change is honoured at once.
 - **Atomic self-update.** `gexttod --update` downloads the release archive,
   verifies the published `.sha256` when present, stages the payload and swaps it
   with renames; a failure leaves the running installation untouched.

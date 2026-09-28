@@ -81,13 +81,13 @@ func TestParsesImportSubcommand(t *testing.T) {
 }
 
 func TestParsesTuiSubcommand(t *testing.T) {
-	got := Parse(strings.Fields("tui --url http://host:5000 --token abc --lang en"))
-	want := Command{Kind: CommandTUI, TUIURL: "http://host:5000", TUIToken: "abc", TUILang: "en"}
+	got := Parse(strings.Fields("tui --url http://host:5000 --lang en"))
+	want := Command{Kind: CommandTUI, TUIURL: "http://host:5000", TUILang: "en"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("tui = %#v, want %#v", got, want)
 	}
-	got = Parse(strings.Fields("tui --url=http://x --token=z --lang=it"))
-	want = Command{Kind: CommandTUI, TUIURL: "http://x", TUIToken: "z", TUILang: "it"}
+	got = Parse(strings.Fields("tui --url=http://x --lang=it"))
+	want = Command{Kind: CommandTUI, TUIURL: "http://x", TUILang: "it"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("tui inline = %#v, want %#v", got, want)
 	}
@@ -101,7 +101,7 @@ func TestUsageMentionsEverySwitchesAndDefaults(t *testing.T) {
 	for _, needle := range []string{
 		"gexttod 0.1.0 — Gextto (gextto): self-contained Go daemon for media acquisition and archiving",
 		"    gexttod [OPTIONS]",
-		"    gexttod tui [--url <url>] [--token <token>] [--lang it|en]",
+		"    gexttod tui [--url <url>] [--lang it|en]",
 		"    gexttod import --from-copy <dir> [--data-dir <dir>]",
 		"    gexttod --update [OPTIONS]",
 		"    -h, --help            Show this help and exit",
@@ -109,7 +109,6 @@ func TestUsageMentionsEverySwitchesAndDefaults(t *testing.T) {
 		"    --config <file>       Configuration file (default: gextto.json)",
 		"    --dry-run             Never start real downloads",
 		"    -u, --url <url>       Daemon URL (default: GEXTTO_URL or http://127.0.0.1:5000)",
-		"    --token <token>       API token (default: GEXTTO_API_TOKEN)",
 		"    -l, --lang <it|en>    Interface language (default: daemon language)",
 		"    --repo <owner/name>   GitHub repository (default: buzzqw/gextto)",
 		"    --release <tag>       Install a specific release tag",

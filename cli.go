@@ -68,9 +68,8 @@ type Command struct {
 	To   string
 
 	// TUI fields.
-	TUIURL   string
-	TUIToken string
-	TUILang  string
+	TUIURL  string
+	TUILang string
 
 	// Update fields.
 	Options UpdateOptions
@@ -192,11 +191,6 @@ func parseTUI(args []string) Command {
 			index++
 		case strings.HasPrefix(value, "--url="):
 			command.TUIURL = value[len("--url="):]
-		case value == "--token" && index+1 < len(args):
-			command.TUIToken = args[index+1]
-			index++
-		case strings.HasPrefix(value, "--token="):
-			command.TUIToken = value[len("--token="):]
 		case (value == "--lang" || value == "-l") && index+1 < len(args):
 			command.TUILang = args[index+1]
 			index++
@@ -266,7 +260,7 @@ func Usage() string {
 
 USAGE:
     %s [OPTIONS]
-    %s tui [--url <url>] [--token <token>] [--lang it|en]
+    %s tui [--url <url>] [--lang it|en]
     %s import --from-copy <dir> [--data-dir <dir>]
     %s migrate --from <dir> [--to <dir>]
     %s --update [OPTIONS]
@@ -279,7 +273,6 @@ OPTIONS:
 
 TUI OPTIONS:
     -u, --url <url>       Daemon URL (default: GEXTTO_URL or http://127.0.0.1:5000)
-    --token <token>       API token (default: GEXTTO_API_TOKEN)
     -l, --lang <it|en>    Interface language (default: daemon language)
 
 MIGRATE OPTIONS:

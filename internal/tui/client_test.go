@@ -16,7 +16,6 @@ type recordedRequest struct {
 	method string
 	path   string
 	body   string
-	token  string
 }
 
 func newTestClient(t *testing.T, handler func(w http.ResponseWriter, r *http.Request, body string)) (*Client, *[]recordedRequest) {
@@ -28,12 +27,11 @@ func newTestClient(t *testing.T, handler func(w http.ResponseWriter, r *http.Req
 			method: r.Method,
 			path:   r.URL.RequestURI(),
 			body:   string(data),
-			token:  r.Header.Get("X-Gextto-Token"),
 		})
 		handler(w, r, string(data))
 	}))
 	t.Cleanup(server.Close)
-	return NewClient(server.URL, "secret-token"), recorded
+	return NewClient(server.URL), recorded
 }
 
 func writeJSON(t *testing.T, w http.ResponseWriter, value any) {
@@ -119,10 +117,9 @@ func TestClientReadsEndpoints(t *testing.T) {
 	if err != nil || lang != "en" {
 		t.Fatalf("Language: %v %q", err, lang)
 	}
-	// Every read carried the token.
 	for _, request := range *recorded {
-		if request.token != "secret-token" {
-			t.Fatalf("missing token on %s %s", request.method, request.path)
+		if request.method == "" || request.path == "" {
+			t.Fatalf("invalid recorded request: %+v", request)
 		}
 	}
 }

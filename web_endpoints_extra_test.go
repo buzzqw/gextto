@@ -49,41 +49,27 @@ func TestEventHooksEndpointValidatesAndReloads(t *testing.T) {
 	}
 }
 
-func TestAPIAuthEnforced(t *testing.T) {
+func TestAPIRoutesArePublic(t *testing.T) {
 	state := newTestAppState(t)
-	token := "secret-token"
-	// The token is read from the live configuration; persist it instead of
-	// mutating the startup snapshot.
-	if err := SaveSetting(state.cfg.DataDir, "api_token", token); err != nil {
-		t.Fatalf("save token: %v", err)
-	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	// Public endpoints stay reachable.
-	if code, _, _ := webGet(t, server, "/api/status"); code != http.StatusOK {
-		t.Fatalf("status should not require the token: %d", code)
+	for _, path := range []string{"/api/status", "/api/series"} {
+		response, err := http.Get(server.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("%s -> %d, want 200", path, response.StatusCode)
+		}
 	}
-	// Protected endpoint without a token.
-	response, err := http.Get(server.URL + "/api/series")
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body.Close()
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("missing token -> %d, want 401", response.StatusCode)
-	}
-	// Protected endpoint with the token.
 	request, _ := http.NewRequest(http.MethodGet, server.URL+"/api/series", nil)
-	request.Header.Set("x-gextto-token", token)
-	authorized, err := http.DefaultClient.Do(request)
+	public, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
 	}
-	authorized.Body.Close()
-	if authorized.StatusCode != http.StatusOK {
-		t.Fatalf("with token -> %d, want 200", authorized.StatusCode)
-	}
+	public.Body.Close()
 }
 
 func TestLanguageEndpointSwitchesActive(t *testing.T) {

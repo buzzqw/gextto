@@ -7,13 +7,16 @@
 # enables/restarts it.
 #
 # Overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_LISTEN, GEXTTO_ENGINE_PORT,
-# GEXTTO_ACTIVE, GEXTTO_DRY_RUN, GEXTTO_LOG, GEXTTO_BINARY, GEXTTO_API_TOKEN.
+# GEXTTO_ACTIVE, GEXTTO_DRY_RUN, GEXTTO_LOG, GEXTTO_BINARY.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BINARY="${GEXTTO_BINARY:-$ROOT/bin/gexttod}"
 DATA_DIR="${GEXTTO_DATA_DIR:-$HOME/gextto-data}"
 PORT="${GEXTTO_PORT:-5000}"
+# Gextto is meant to be used over the LAN from the other PCs of the same owner,
+# so the service listens on every interface by default. Restrict access with a
+# firewall or reverse proxy when the network is not fully trusted.
 LISTEN="${GEXTTO_LISTEN:-0.0.0.0:$PORT}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
 ACTIVE="${GEXTTO_ACTIVE:-1}"
@@ -25,21 +28,6 @@ UNIT="$UNIT_DIR/gextto.service"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
 [[ -x "$BINARY" ]] || { log "building $BINARY"; ( cd "$ROOT" && make build ); }
-
-# Optional API token: use the provided one, or generate one when asked. Without
-# a token the API is unauthenticated, which is only safe on loopback.
-API_TOKEN="${GEXTTO_API_TOKEN:-}"
-if [[ -z "$API_TOKEN" && "${GEXTTO_GENERATE_TOKEN:-0}" == "1" ]]; then
-    API_TOKEN="$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-fi
-TOKEN_ENV=""
-[[ -n "$API_TOKEN" ]] && TOKEN_ENV="Environment=GEXTTO_API_TOKEN=$API_TOKEN"
-if [[ -z "$API_TOKEN" ]]; then
-    case "$LISTEN" in
-        127.0.0.1:* | localhost:* | "[::1]:"*) ;;
-        *) log "warning: listening on $LISTEN without GEXTTO_API_TOKEN; the API is reachable without authentication" ;;
-    esac
-fi
 
 mkdir -p "$UNIT_DIR" "$DATA_DIR"
 
@@ -60,7 +48,6 @@ Environment=GEXTTO_ACTIVE=$ACTIVE
 Environment=GEXTTO_DRY_RUN=$DRY_RUN
 Environment=GEXTTO_LIBTORRENT=1
 Environment=GEXTTO_LOG=$LOG
-$TOKEN_ENV
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
@@ -74,4 +61,4 @@ systemctl --user daemon-reload
 systemctl --user enable gextto.service
 systemctl --user restart gextto.service
 log "gextto user service installed: $UNIT"
-log "UI: http://127.0.0.1:$PORT   status: systemctl --user status gextto.service"
+log "UI bind: $LISTEN   status: systemctl --user status gextto.service"

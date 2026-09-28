@@ -7,8 +7,6 @@ Wants=network-online.target
 Type=simple
 User=gextto
 Group=gextto
-# Optional secrets (GEXTTO_API_TOKEN, ...) kept out of the world-readable unit.
-EnvironmentFile=-/etc/gextto/gextto.env
 Environment=GEXTTO_DATA_DIR=/var/lib/gextto
 Environment=GEXTTO_LISTEN=0.0.0.0:5000
 Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:8889

@@ -242,7 +242,6 @@ const SETTINGS_INDEX: &[(&str, &str, &str)] = &[
     ("Cleanup upgrade", "rename", "cleanup_upgrades"),
     ("Differenza minima score per cleanup", "rename", "cleanup_min_score_diff"),
     ("Differenza minima score per upgrade", "rename", "upgrade_min_score_diff"),
-    ("Token API Gextto", "rename", "api_token"),
     ("Formato rinomina", "rename", "rename-format"),
     ("Template rinomina", "rename", "rename-template"),
     ("TMDB API key", "rename", "tmdb_api_key"),
@@ -620,20 +619,6 @@ fn size(value: &Value, key: &str) -> String {
     format!("{amount:.1} {}", units[index])
 }
 
-fn token() -> Option<String> {
-    web_sys::window()
-        .and_then(|window| window.local_storage().ok().flatten())
-        .and_then(|storage| storage.get_item("gextto_api_token").ok().flatten())
-}
-
-fn save_token(value: &str) {
-    if let Some(storage) =
-        web_sys::window().and_then(|window| window.local_storage().ok().flatten())
-    {
-        let _ = storage.set_item("gextto_api_token", value);
-    }
-}
-
 fn format_remaining_seconds(remaining: i64) -> String {
     if remaining <= 0 {
         return "imminente".into();
@@ -650,9 +635,6 @@ fn format_remaining_seconds(remaining: i64) -> String {
 
 async fn json_response(response: Response) -> Result<Value, String> {
     let status = response.status();
-    if status == 401 {
-        return Err("AUTH".into());
-    }
     let value = response
         .json::<Value>()
         .await
@@ -663,95 +645,42 @@ async fn json_response(response: Response) -> Result<Value, String> {
     Ok(value)
 }
 
-async fn request_token() -> Option<String> {
-    let value = web_sys::window()
-        .and_then(|window| window.prompt_with_message("Token API Gextto").ok().flatten())?;
-    save_token(&value);
-    Some(value)
-}
-
 async fn get(path: &str) -> Result<Value, String> {
-    for _ in 0..2 {
-        let mut request = Request::get(path);
-        if let Some(value) = token() {
-            request = request.header("x-gextto-token", &value);
-        }
-        let result = json_response(request.send().await.map_err(|error| error.to_string())?).await;
-        match result {
-            Err(error) if error == "AUTH" => {
-                if request_token().await.is_none() {
-                    return Err("Autenticazione richiesta".into());
-                }
-            }
-            result => return result,
-        }
-    }
-    Err("Autenticazione richiesta".into())
+    let request = Request::get(path);
+    json_response(request.send().await.map_err(|error| error.to_string())?).await
 }
 
 async fn get_text(path: &str) -> Result<String, String> {
-    for _ in 0..2 {
-        let mut request = Request::get(path);
-        if let Some(value) = token() {
-            request = request.header("x-gextto-token", &value);
-        }
-        let response = request.send().await.map_err(|error| error.to_string())?;
-        if response.status() == 401 {
-            if request_token().await.is_none() {
-                return Err("Autenticazione richiesta".into());
-            }
-            continue;
-        }
-        let status = response.status();
-        let body = response.text().await.map_err(|error| error.to_string())?;
-        if !(200..300).contains(&status) {
-            return Err(body);
-        }
-        return Ok(body);
+    let response = Request::get(path)
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+    let status = response.status();
+    let body = response.text().await.map_err(|error| error.to_string())?;
+    if !(200..300).contains(&status) {
+        return Err(body);
     }
-    Err("Autenticazione richiesta".into())
+    Ok(body)
 }
 
 async fn send(method: &str, path: &str, body: Option<Value>) -> Result<Value, String> {
-    for _ in 0..2 {
-        let response = match (method, body.clone()) {
-            ("DELETE", _) => {
-                let mut request = Request::delete(path);
-                if let Some(value) = token() {
-                    request = request.header("x-gextto-token", &value);
-                }
-                request.send().await.map_err(|error| error.to_string())?
-            }
-            (_, Some(value)) => {
-                let mut request = Request::post(path);
-                if let Some(token) = token() {
-                    request = request.header("x-gextto-token", &token);
-                }
-                request
-                    .json(&value)
-                    .map_err(|error| error.to_string())?
-                    .send()
-                    .await
-                    .map_err(|error| error.to_string())?
-            }
-            (_, None) => {
-                let mut request = Request::post(path);
-                if let Some(token) = token() {
-                    request = request.header("x-gextto-token", &token);
-                }
-                request.send().await.map_err(|error| error.to_string())?
-            }
-        };
-        match json_response(response).await {
-            Err(error) if error == "AUTH" => {
-                if request_token().await.is_none() {
-                    return Err("Autenticazione richiesta".into());
-                }
-            }
-            result => return result,
-        }
-    }
-    Err("Autenticazione richiesta".into())
+    let response = match (method, body) {
+        ("DELETE", _) => Request::delete(path)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?,
+        (_, Some(value)) => Request::post(path)
+            .json(&value)
+            .map_err(|error| error.to_string())?
+            .send()
+            .await
+            .map_err(|error| error.to_string())?,
+        (_, None) => Request::post(path)
+            .send()
+            .await
+            .map_err(|error| error.to_string())?,
+    };
+    json_response(response).await
 }
 
 /// Variante di `send` con un tetto massimo di attesa: se il server non risponde
@@ -2703,7 +2632,6 @@ fn setting_tooltip(key: &str) -> &'static str {
         "rename_episodes" => "Rinomina i file scaricati usando i metadati TMDB.",
         "cleanup_upgrades" => "Sostituisce versioni inferiori già archiviate con upgrade migliori.",
         "cleanup_action" => "Cosa fare con i file sostituiti: sposta nel trash o elimina.",
-        "api_token" => "Token per proteggere le API e la UI (vuoto = nessuna autenticazione).",
         "tmdb_language" => "Lingua usata per i metadati TMDB (codice BCP-47, es. it-IT, en-US). Influisce su titoli episodi e descrizioni.",
         "default_language" => "Lingua preferita di default per serie e film (es. ita, eng).",
         "blacklist" => "Parole vietate separate da virgola: le release che le contengono vengono scartate (es. cam, ts, screener).",
@@ -3521,11 +3449,8 @@ fn Downloads(data: RwSignal<Data>) -> impl IntoView {
                     return;
                 }
             };
-            let mut builder = Request::post("/api/upload-torrent")
+            let builder = Request::post("/api/upload-torrent")
                 .header("content-type", "application/octet-stream");
-            if let Some(value) = token() {
-                builder = builder.header("x-gextto-token", &value);
-            }
             match builder.body(js_sys::Uint8Array::from(buffer.as_slice())) {
                 Ok(request) => match request.send().await {
                     Ok(response) if response.ok() => {
@@ -8330,7 +8255,6 @@ fn SettingsView(data: RwSignal<Data>) -> impl IntoView {
                      <BooleanSetting label="Cleanup upgrade" setting_key="cleanup_upgrades" value=Signal::derive(move || raw(&data.get().config, "cleanup_upgrades", "false")) />
                      <TextSetting label="Differenza minima score per cleanup" setting_key="cleanup_min_score_diff" value=Signal::derive(move || number(&data.get().config, "cleanup_min_score_diff")) placeholder="0" />
                     <TextSetting label="Differenza minima score per upgrade" setting_key="upgrade_min_score_diff" value=Signal::derive(move || number(&data.get().config, "upgrade_min_score_diff")) placeholder="200" />
-                    <SecretSetting label="Token API Gextto" setting_key="api_token" />
                 </Panel>
             </Show>
             <Show when=move || tab.get() == "notify">

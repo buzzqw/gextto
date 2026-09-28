@@ -109,19 +109,6 @@ func Serve(state *AppState) error {
 		return fmt.Errorf("bind engine listener %s: %w", engineAddr, err)
 	}
 
-	// Warn once when the API is exposed beyond loopback without a token: a
-	// default install that binds 0.0.0.0 must know it is unauthenticated.
-	if state.cfg.APIToken == nil || strings.TrimSpace(*state.cfg.APIToken) == "" {
-		if host, _, err := net.SplitHostPort(webAddr); err == nil {
-			switch host {
-			case "127.0.0.1", "::1", "localhost":
-			default:
-				logging.Debug("web UI/API is reachable without an API token; set GEXTTO_API_TOKEN or bind to 127.0.0.1",
-					"listen", webAddr)
-			}
-		}
-	}
-
 	mode := "stand-by (downloads paused)"
 	if state.cfg.DryRun {
 		mode = "dry-run (no real downloads)"

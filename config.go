@@ -328,7 +328,6 @@ type Config struct {
 	LibtorrentDir       string             `json:"libtorrent_dir"`
 	LibtorrentTempDir   *string            `json:"libtorrent_temp_dir"`
 	StateDir            string             `json:"state_dir"`
-	APIToken            *string            `json:"api_token"`
 }
 
 // LegacyMigrationReport summarises a legacy-file import run.
@@ -357,18 +356,6 @@ func defaultBlacklist() []string {
 		"workprint",
 		"sample",
 	}
-}
-
-// defaultAPIToken implements `default_api_token()`.
-func defaultAPIToken() *string {
-	value, ok := os.LookupEnv("GEXTTO_API_TOKEN")
-	if !ok {
-		return nil
-	}
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	return &value
 }
 
 // parseConfigList parses a JSON array of strings, falling back to a
@@ -818,12 +805,11 @@ func DefaultConfig() Config {
 		Libtorrent:          DefaultLibtorrentSettings(),
 		RenameFormat:        defaultRenameFormatValue,
 		RenameTemplate:      defaultRenameTemplateValue,
-		APIToken:            defaultAPIToken(),
 	}
 }
 
 // UnmarshalJSON reproduces the JSON JSON default attributes of
-// `Config`: `blacklist`, `rename_format`, `rename_template` and `api_token`
+// `Config`: `blacklist`, `rename_format` and `rename_template`
 // fall back to their defaults when the key is absent.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	type configAlias Config
@@ -847,9 +833,6 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	}
 	if _, ok := raw["rename_template"]; !ok {
 		c.RenameTemplate = defaultRenameTemplateValue
-	}
-	if _, ok := raw["api_token"]; !ok {
-		c.APIToken = defaultAPIToken()
 	}
 	if _, ok := raw["libtorrent"]; !ok {
 		c.Libtorrent = DefaultLibtorrentSettings()
@@ -1816,6 +1799,12 @@ func (c *Config) loadConfigDB() error {
 		return err
 	}
 	rows.Close()
+	if _, ok := c.Settings["api_token"]; ok {
+		delete(c.Settings, "api_token")
+		if _, err := conn.Exec("DELETE FROM settings WHERE key = ?1", "api_token"); err != nil {
+			return err
+		}
+	}
 	if value, ok := c.Settings["url"]; ok {
 		var feeds []string
 		if strings.HasPrefix(strings.TrimSpace(value), "[") {
@@ -2019,9 +2008,6 @@ func (c *Config) loadConfigDB() error {
 	}
 	if value, ok := c.Settings["rename_template"]; ok {
 		c.RenameTemplate = value
-	}
-	if value, ok := c.Settings["api_token"]; ok && strings.TrimSpace(value) != "" {
-		c.APIToken = &value
 	}
 	c.ArchiveRoot = configPathSetting(mapValue(c.Settings, "archive_root"))
 	if value := configPathSetting(mapValue(c.Settings, "trash_path")); value != nil {

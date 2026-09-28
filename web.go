@@ -509,9 +509,8 @@ type AppState struct {
 // `handle` instead of being a global.
 type HandlerFunc func(w http.ResponseWriter, r *http.Request, s *AppState)
 
-// handle registers fn on mux under pattern, installing the same auth and cache
-// control middleware that axum layered over the whole router (ui_no_cache wraps
-// api_auth, which is the outermost of the two).
+// handle registers fn on mux under pattern, installing cache-control middleware
+// and the request-body limit shared by all routes.
 // maxRequestBodyBytes caps every request body. It is generous enough for
 // torrent uploads and large JSON configuration saves, but prevents a client
 // from making the daemon allocate an unbounded amount of memory.
@@ -527,7 +526,7 @@ func handle(s *AppState, mux *http.ServeMux, pattern string, fn HandlerFunc) {
 		}
 		guardHandler(pattern, fn)(w, r, s)
 	})
-	mux.Handle(pattern, UiNoCache(ApiAuth(s, core)))
+	mux.Handle(pattern, UiNoCache(core))
 }
 
 // RegisteredRoutes returns every HTTP route pattern installed by Router. It is

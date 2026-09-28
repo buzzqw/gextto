@@ -9,7 +9,6 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/archive/add` |
 | POST | `/api/archive/batch-download` |
 | POST | `/api/archive/delete` |
-| GET | `/api/auth` |
 | GET | `/api/backup` |
 | POST | `/api/backup` |
 | GET | `/api/backup/list` |

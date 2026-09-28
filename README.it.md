@@ -6,8 +6,8 @@ Copyright (c) 2026 buzzqw e collaboratori di Gextto.
 di serie TV, film e fumetti.
 
 Un solo binario Go racchiude tutto: motore di scraping, archivio SQLite, web
-UI/API (inclusa con `//go:embed`) e una sessione **libtorrent** integrata. Non
-servono runtime né servizi esterni.
+UI/API (inclusa con `//go:embed`), TUI terminale e una sessione **libtorrent**
+integrata. Non servono runtime né servizi esterni.
 
 Monitora ciò che configuri, cerca su feed RSS/HTML, indexer Torznab
 (Jackett/Prowlarr) e motori di ricerca pubblici, assegna un punteggio di qualità a
@@ -59,6 +59,9 @@ o disco locale).
 - **UI web** — single-page responsive, tema chiaro/scuro, completamente in
   **italiano e inglese** (traduzione a runtime con import/export YAML), con log
   viewer, salute, grafici e manutenzione.
+- **TUI terminale** — interfaccia interattiva via SSH/terminale per stato, torrent,
+  log live, salute, archivio, mancanti e blocklist. Usa le stesse API del daemon
+  senza accedere direttamente ai database.
 - **Decisioni leggibili** — dai risultati di ricerca puoi vedere perché una
   release supera o non supera i controlli, con score, regole applicate e
   confronto read-only con l'archivio; la spiegazione non accoda né modifica dati.
@@ -98,6 +101,8 @@ o disco locale).
 ### Installa su un server Linux
 
 L'installer ufficiale supporta Debian, Ubuntu, Fedora, openSUSE e Arch Linux.
+Va eseguito come root (o tramite `sudo`), su un host Linux 64 bit supportato con
+systemd.
 A ogni push su `main`, GitHub Actions pubblica un artefatto Linux `continuous`
 testato. L'installer lo scarica, verifica il checksum SHA-256 e installa demone
 e libtorrent inclusa senza compilare sul server. Crea anche l'utente di servizio,
@@ -105,7 +110,7 @@ il servizio systemd, le directory runtime e i database vuoti al primo avvio.
 Non importa dati legacy.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
 L'installer usa per default l'ultimo artefatto `continuous`. Puoi scegliere un
@@ -120,7 +125,7 @@ Variabili opzionali:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | \
-  GEXTTO_DATA_DIR=/srv/gextto GEXTTO_PORT=5000 GEXTTO_RELEASE=continuous bash
+  sudo env GEXTTO_DATA_DIR=/srv/gextto GEXTTO_PORT=5000 GEXTTO_RELEASE=continuous bash
 ```
 
 Il servizio si chiama `gextto.service`:
@@ -128,10 +133,25 @@ Il servizio si chiama `gextto.service`:
 ```bash
 sudo systemctl status gextto.service
 sudo journalctl -u gextto.service -f
+curl -fsS http://127.0.0.1:5000/api/health
 ```
 
-Per un'installazione per utente senza root, [`scripts/install-user-service.sh`](scripts/install-user-service.sh)
-scrive e avvia un'unità `systemctl --user`.
+Per un'installazione per utente senza root, compila da un checkout ed esegui
+[`scripts/install-user-service.sh`](scripts/install-user-service.sh). Scrive e
+avvia un'unità `systemctl --user`; per default ascolta sulla porta 5000 su tutte
+le interfacce:
+
+```bash
+make build
+GEXTTO_DATA_DIR="$HOME/gextto-data" \
+  GEXTTO_LISTEN=127.0.0.1:5000 \
+  scripts/install-user-service.sh
+systemctl --user status gextto.service
+```
+
+Per mantenere il servizio attivo dopo il logout, abilita una volta il lingering
+con `loginctl enable-linger "$USER"`. Se deve essere raggiungibile da un'altra
+macchina, limita l'accesso con firewall o reverse proxy.
 
 ### Aggiornamento di Gextto
 
@@ -143,7 +163,7 @@ all'aggiornamento.
 | Metodo | Comando | Note |
 |---|---|---|
 | Installer | riesegui il comando `install.sh` qui sopra | installa l'ultimo artefatto e aggiorna l'unità systemd |
-| Demone | `sudo gexttod --update` | aggiorna solo il payload: `gexttod`, `lib/`, `run.sh` |
+| Demone | `sudo /opt/gextto/gexttod --update` | aggiorna solo il payload: `gexttod`, `lib/`, `run.sh` |
 
 Il programma installato vive in `/opt/gextto`:
 
@@ -154,7 +174,7 @@ run.sh      launcher (imposta LD_LIBRARY_PATH)
 VERSION     il marker di release mostrato da --version
 ```
 
-`gexttod --update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
+`/opt/gextto/gexttod --update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
 pubblicato quando la release lo fornisce e prepara il nuovo payload prima di
 toccare l'installazione corrente. Se il download, il checksum o l'estrazione
 falliscono, l'installazione in esecuzione resta invariata; se uno swap fallisce,
@@ -163,11 +183,17 @@ automaticamente quando il comando gira come root, altrimenti viene stampato il
 comando `systemctl` esatto.
 
 ```bash
-gexttod --version                       # versione, build number e libtorrent
-sudo gexttod --update                   # ultima build continua
-sudo gexttod --update --channel stable  # ultima release con tag
-sudo gexttod --update --release v0.2.0  # un tag specifico
+/opt/gextto/gexttod --version                         # versione e build
+sudo /opt/gextto/gexttod --update                    # ultima build continua
+sudo /opt/gextto/gexttod --update --channel stable   # ultima release con tag
+sudo /opt/gextto/gexttod --update --release v0.2.0   # un tag specifico
 ```
+
+Se hai installato in un'altra directory, sostituisci `/opt/gextto` con quella
+directory. L'updater riavvia automaticamente `gextto.service`; usa
+`--no-restart` per un'installazione ferma o gestita manualmente. Usa
+`--install-dir` solo quando il servizio o l'installazione di test risiede davvero
+in quella directory.
 
 Da un checkout sorgente, [`scripts/update.sh`](scripts/update.sh) ricompila il
 demone (`make build`) e riavvia il servizio; aggiungi `--release` per installare
@@ -204,10 +230,11 @@ Poiché l'archivio include libtorrent e il demone ha la UI web già inclusa, non
 serve alcuna libtorrent di sistema. L'archivio è prodotto da
 [`scripts/package-linux.sh`](scripts/package-linux.sh) ed è quello che
 `gexttod --update` installa. Richiede un Linux 64 bit recente (glibc, libstdc++,
-OpenSSL 3, zlib, libzstd); `ffprobe` è opzionale. Gli asset precompilati sono
-attualmente pubblicati **solo per x86_64**; su `aarch64` installer e
-`gexttod --update` segnalano che non esiste un asset. Per un'installazione
-gestita come servizio usa l'installer descritto sopra.
+OpenSSL 3, zlib, libzstd); `ffprobe` è opzionale. Il repository ufficiale
+pubblica attualmente asset precompilati **solo per x86_64**. `aarch64` è
+accettato come override per un repository che pubblichi l'asset corrispondente,
+ma non è ancora disponibile nelle release ufficiali continuous/taggate. Per
+un'installazione gestita come servizio usa l'installer descritto sopra.
 
 ### Compila da un checkout (sviluppo)
 
@@ -350,6 +377,7 @@ Il demone parte normalmente come servizio systemd. Eseguito direttamente,
 | `-V`, `--version` | mostra versione installata, build number e libtorrent inclusa |
 | `--config <file>` | usa un file di configurazione specifico (default `gextto.json`) |
 | `--dry-run` | avvia senza download reali |
+| `tui` | apre la TUI verso un daemon già avviato |
 | `--update` | scarica e installa l'ultimo payload (vedi *Aggiornamento di Gextto*) |
 
 Opzioni di `--update`:
@@ -367,13 +395,29 @@ Opzioni di `--update`:
 Esempi:
 
 ```bash
-gexttod --version                          # cosa è installato ora
-sudo gexttod --update                      # ultima build continua
-sudo gexttod --update --channel stable     # ultima release con tag
-sudo gexttod --update --release v0.2.0     # un tag specifico
-gexttod --update --install-dir /srv/gextto --no-restart
-gexttod --update --archive ./gextto-linux-x86_64.tar.gz   # offline
+/opt/gextto/gexttod --version                         # cosa è installato ora
+sudo /opt/gextto/gexttod --update                    # ultima build continua
+sudo /opt/gextto/gexttod --update --channel stable   # ultima release con tag
+sudo /opt/gextto/gexttod --update --release v0.2.0   # un tag specifico
+sudo /opt/gextto/gexttod --update --install-dir /srv/gextto --no-restart
+sudo /opt/gextto/gexttod --update --archive ./gextto-linux-x86_64.tar.gz   # offline
 ```
+
+### TUI da terminale
+
+La TUI è un sottocomando dello stesso binario, ma viene eseguita come processo
+separato dal daemon e comunica con esso via HTTP/SSE. Avvia prima il daemon, poi:
+
+```bash
+/opt/gextto/gexttod tui                                  # daemon locale
+/opt/gextto/gexttod tui --url http://host:5000 --lang it
+GEXTTO_URL=http://host:5000 /opt/gextto/gexttod tui
+```
+
+Sono disponibili `--url`/`-u` e `--lang`/`-l`; la variabile d'ambiente per l'URL è
+`GEXTTO_URL`. Le schede sono
+Stato, Torrent, Log, Salute, Archivio, Mancanti e Blocklist. I tasti rapidi e i
+prompt sono documentati in [`docs/tui.md`](docs/tui.md).
 
 Per provare un aggiornamento senza toccare un'installazione reale, combina
 `--install-dir` con una directory usa e getta e `--no-restart`; `--archive` evita
@@ -411,7 +455,8 @@ schermata. Indice rapido:
 
 - Data directory di default: `data/` (modificabile con `GEXTTO_DATA_DIR`).
 - Log in `data/gextto.log`, con rotazione a 5 MB (file attivo + 3 backup),
-  consultabili in streaming dalla UI. Il viewer permette filtro e follow/pause.
+  consultabili in streaming dalla UI web e dalla TUI. I viewer permettono filtro
+  e follow/pause.
 - Database: `gextto_series.db`, `gextto_archive.db`, `gextto_config.db`,
   `gextto_comics.db`.
 - Stato della sessione torrent in `data/gextto_torrents_state/` (fastresume).
@@ -421,16 +466,15 @@ schermata. Indice rapido:
 | Variabile | Scopo |
 |---|---|
 | `GEXTTO_DATA_DIR` | Data directory (database, log, download) |
-| `GEXTTO_LISTEN` | Indirizzo UI/API (default `0.0.0.0:5000`) |
+| `GEXTTO_LISTEN` | Indirizzo UI/API (default `127.0.0.1:5000`; il servizio installato usa `0.0.0.0:5000` per default) |
 | `GEXTTO_ENGINE_LISTEN` | Canale interno del motore (default `127.0.0.1:8889`) |
 | `GEXTTO_UI_DIR` | Directory della UI web compilata (installazioni pacchettizzate) |
 | `GEXTTO_INSTALL_DIR` | Directory di installazione usata da `--update` |
 | `GEXTTO_REPO` | Repository GitHub usato da installer e `--update` (default `buzzqw/gextto`) |
 | `GEXTTO_RELEASE` | Artefatto installer (`continuous` per default o un tag) |
-| `GEXTTO_ARCH` | Override dell'architettura dell'artefatto (`x86_64` o `aarch64`) |
+| `GEXTTO_ARCH` | Override architettura asset (`x86_64`; `aarch64` solo se il repository lo pubblica) |
 | `GEXTTO_ACTIVE` | `1` abilita i cicli di acquisizione |
 | `GEXTTO_DRY_RUN` | `1` disabilita i download reali |
-| `GEXTTO_API_TOKEN` | Token bearer opzionale per API/UI |
 | `GEXTTO_LOG` | Filtro log (`info`, oppure `debug` quando il debug è attivo) |
 | `GEXTTO_CHANNEL` / `GEXTTO_VERSION` | Canale dell'updater (`continuous`, `stable`) o un tag di release specifico |
 | `GEXTTO_PORT` / `GEXTTO_ENGINE_PORT` | Installer: porta UI/API (default `5000`) e porta motore (default `8889`) |
@@ -570,12 +614,11 @@ Le build di sviluppo restano piccole e non crescono all'infinito:
 
 ## Sicurezza
 
-La porta web è un'interfaccia amministrativa. Legala al loopback oppure imposta
-`GEXTTO_API_TOKEN` prima di esporla in rete; l'installer genera un token casuale
-a una nuova installazione e lo salva in `/etc/gextto/gextto.env`. Vedi
-[SECURITY.md](SECURITY.md) per il modello di rete, le garanzie del daemon
-(nessuna shell, SQL parametrizzato, richieste limitate, aggiornamenti atomici) e
-come segnalare una vulnerabilità.
+La porta web è un'interfaccia amministrativa senza autenticazione. Legala al
+loopback oppure limita l'accesso con firewall/reverse proxy prima di esporla in
+rete. Vedi [SECURITY.md](SECURITY.md) per il modello di rete, le garanzie del
+daemon (nessuna shell, SQL parametrizzato, richieste limitate, aggiornamenti
+atomici) e come segnalare una vulnerabilità.
 
 ## ❤️ Sostieni il progetto
 

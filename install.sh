@@ -45,7 +45,7 @@ download_payload() {
   case "$arch" in
     x86_64|amd64) arch=x86_64 ;;
     aarch64|arm64) arch=aarch64 ;;
-    *) die "unsupported architecture: $arch (available assets: x86_64, aarch64)" ;;
+    *) die "unsupported architecture: $arch (accepted values: x86_64, aarch64; the official repository currently publishes x86_64)" ;;
   esac
 
   local asset="gextto-linux-${arch}.tar.gz"
@@ -86,29 +86,11 @@ main() {
   install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
   install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
 
-  # Generate an API token on a fresh install: the daemon binds 0.0.0.0 by
-  # default, so an unauthenticated API would be exposed to the whole network.
-  # The token is stored in a root-readable EnvironmentFile, not in the world
-  # readable unit.
-  # Reuse the token from a previous install so an upgrade does not invalidate
-  # existing clients; generate a fresh one only when none is available.
-  API_TOKEN="${GEXTTO_API_TOKEN:-}"
-  if [[ -z "$API_TOKEN" && -r /etc/gextto/gextto.env ]]; then
-    API_TOKEN="$(sed -n 's/^GEXTTO_API_TOKEN=//p' /etc/gextto/gextto.env | head -n1)"
+  # Remove the legacy daemon API token from previous installations. Other
+  # variables in the file, if an operator added any, are left untouched.
+  if [[ -f /etc/gextto/gextto.env ]]; then
+    sed -i '/^GEXTTO_API_TOKEN=/d' /etc/gextto/gextto.env
   fi
-  if [[ -z "$API_TOKEN" ]]; then
-    if command -v openssl >/dev/null; then
-      API_TOKEN="$(openssl rand -hex 24)"
-    else
-      API_TOKEN="$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-    fi
-    log "generated a new API token"
-  fi
-  [[ "$API_TOKEN" != *$'\n'* ]] || die "GEXTTO_API_TOKEN must not contain newlines"
-  install -d -m 0750 /etc/gextto
-  printf 'GEXTTO_API_TOKEN=%s\n' "$API_TOKEN" > /etc/gextto/gextto.env
-  chmod 0640 /etc/gextto/gextto.env
-  chown "root:$SERVICE_USER" /etc/gextto/gextto.env 2>/dev/null || true
 
   # Install the bundled libtorrent next to the binary ($ORIGIN/lib rpath).
   install -d "$INSTALL_DIR/lib"
@@ -153,7 +135,6 @@ UNIT
   systemctl enable --now gextto.service
   log "gextto installed and started"
   log "UI: http://127.0.0.1:$PORT   status: systemctl status gextto.service"
-  log "API token saved in /etc/gextto/gextto.env (enter it in the UI when prompted)"
 }
 
 main "$@"

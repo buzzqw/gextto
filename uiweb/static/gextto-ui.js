@@ -8,21 +8,9 @@
   if (!page) return;
   var view = page.getAttribute("data-view") || "dashboard";
 
-  function token() {
-    try {
-      return localStorage.getItem("gextto_api_token") || "";
-    } catch (error) {
-      return "";
-    }
-  }
-
-  var tokenPrompted = false;
-
   function request(path, method, body) {
     var requestMethod = (method || "GET").toUpperCase();
     var headers = { "Content-Type": "application/json" };
-    var value = token();
-    if (value) headers["X-Gextto-Token"] = value;
     // Browsers reject a body on GET/HEAD requests. Some generic action
     // buttons intentionally use GET (for example the port check) and carry
     // an empty data-body attribute, so only encode payloads for methods that
@@ -45,7 +33,6 @@
       return (isJSON ? response.json().catch(function () { return null; }) : Promise.resolve(null))
         .then(function (data) {
           var message = data && data.error ? String(data.error) : "HTTP " + response.status;
-          if (response.status === 401) message = "token API mancante o non valido";
           throw new Error(message);
         });
     }
@@ -54,16 +41,6 @@
 
   function api(path, method, body) {
     return request(path, method, body).then(function (response) {
-      // The API can be protected by an optional token; the new UI has no form
-      // for it, so ask once and retry (the token is shared with the classic UI).
-      if (response.status === 401 && !tokenPrompted) {
-        tokenPrompted = true;
-        var entered = window.prompt("Token API Gextto (vuoto per annullare):");
-        if (entered) {
-          try { localStorage.setItem("gextto_api_token", entered); } catch (error) { /* ignore */ }
-        }
-        return request(path, method, body).then(handleResponse);
-      }
       return handleResponse(response);
     });
   }
@@ -940,8 +917,6 @@
   // ---- add/upload torrent --------------------------------------------------
   function uploadTorrent(file, form) {
     var headers = { "Content-Type": "application/octet-stream" };
-    var value = token();
-    if (value) headers["X-Gextto-Token"] = value;
     var uploadURL = "/api/upload-torrent";
     var savePath = form && form.querySelector("[data-torrent-save-path]");
     if (savePath && savePath.value.trim()) uploadURL += "?save_path=" + encodeURIComponent(savePath.value.trim());
@@ -950,14 +925,6 @@
         method: "POST", headers: headers, body: buffer, credentials: "same-origin"
       });
     }).then(function (response) {
-      if (response.status === 401 && !tokenPrompted) {
-        tokenPrompted = true;
-        var entered = window.prompt("Token API Gextto (vuoto per annullare):");
-        if (entered) {
-          try { localStorage.setItem("gextto_api_token", entered); } catch (error) { /* ignore */ }
-          return uploadTorrent(file, form);
-        }
-      }
       return handleResponse(response);
     });
   }

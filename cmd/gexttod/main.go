@@ -52,9 +52,8 @@ func main() {
 		return
 	case gextto.CommandTUI:
 		err := tui.Run(context.Background(), tui.Options{
-			URL:   command.TUIURL,
-			Token: command.TUIToken,
-			Lang:  command.TUILang,
+			URL:  command.TUIURL,
+			Lang: command.TUILang,
 		})
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "tui:", err)

@@ -168,7 +168,7 @@ var catalog = map[string][2]string{
 	"msg.detailfailed":          {"%s non disponibili: %s", "%s failed: %s"},
 	"msg.actionfailed":          {"%s non riuscito: %s", "%s failed: %s"},
 	"msg.offline":               {"impossibile raggiungere il daemon: %s", "cannot reach the daemon: %s"},
-	"msg.sethint":               {"imposta GEXTTO_URL / GEXTTO_API_TOKEN", "set GEXTTO_URL / GEXTTO_API_TOKEN"},
+	"msg.sethint":               {"imposta GEXTTO_URL", "set GEXTTO_URL"},
 	"msg.loading":               {"caricamento…", "loading…"},
 	"msg.emptylogs":             {"nessun log da mostrare", "no logs to show"},
 	"msg.emptytorrents":         {"nessun torrent nella sessione", "no torrents in the session"},

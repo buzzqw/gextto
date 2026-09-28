@@ -18,8 +18,6 @@ import (
 type Options struct {
 	// URL is the daemon base URL. Defaults to GEXTTO_URL or 127.0.0.1:5000.
 	URL string
-	// Token is the optional API token. Defaults to GEXTTO_API_TOKEN.
-	Token string
 	// Lang forces the interface language ("it" or "en"). Empty auto-detects.
 	Lang string
 	// Refresh is the polling interval (default 2s).
@@ -62,11 +60,7 @@ func Run(ctx context.Context, opts Options) error {
 	if base == "" {
 		base = DefaultURL()
 	}
-	token := strings.TrimSpace(opts.Token)
-	if token == "" {
-		token = os.Getenv("GEXTTO_API_TOKEN")
-	}
-	client := NewClient(base, token)
+	client := NewClient(base)
 
 	daemonLang := ""
 	probeCtx, cancelProbe := context.WithTimeout(ctx, 3*time.Second)

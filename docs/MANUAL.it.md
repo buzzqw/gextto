@@ -1,8 +1,9 @@
 # Gextto — Manuale utente
 
-Questo manuale descrive l'uso quotidiano di Gextto dalla sua interfaccia web.
-La UI è disponibile in **italiano** e **inglese** (selettore lingua in alto); qui
-sono usate le etichette italiane, la versione inglese è in
+Questo manuale descrive l'uso quotidiano di Gextto dalla sua interfaccia web e
+dalla TUI terminale. La UI web è disponibile in **italiano** e **inglese**
+(selettore lingua in alto); qui sono usate le etichette italiane, la versione
+inglese è in
 [`MANUAL.en.md`](MANUAL.en.md).
 
 ## Come usare questa guida
@@ -43,10 +44,10 @@ Se usi un NAS, prova prima a creare un file nella destinazione con lo stesso
 utente che esegue `gextto.service`. Un percorso visibile dalla shell dell'utente
 personale può non essere visibile al servizio systemd.
 
-**Sicurezza.** La porta web è un'interfaccia amministrativa. Tienila sul loopback
-oppure imposta `GEXTTO_API_TOKEN` prima di esporla in rete: l'installer genera un
-token casuale a una nuova installazione e lo salva in `/etc/gextto/gextto.env`.
-`gexttod --version` indica quale build è in esecuzione. Vedi
+**Sicurezza.** La porta web è un'interfaccia amministrativa senza autenticazione.
+Lasciala sul loopback oppure limita l'accesso con firewall/reverse proxy prima di
+esporla in rete. Nell'installazione standard, `/opt/gextto/gexttod --version`
+indica quale build è in esecuzione. Vedi
 [`SECURITY.md`](../SECURITY.md) per il modello di rete completo.
 
 - [1. Primo avvio](#1-primo-avvio)
@@ -117,16 +118,51 @@ comprende:
 - `gexttod --config <file>` e `gexttod --dry-run` — usati dal servizio e per le
   prove locali.
 
+#### TUI terminale
+
+La TUI si avvia con `/opt/gextto/gexttod tui` dopo aver avviato il daemon
+(sostituisci la directory se l'installazione è personalizzata). È un processo
+separato che usa esclusivamente le API HTTP e lo stream SSE del daemon: non
+legge direttamente i database e può quindi essere usata anche da una shell SSH.
+
+```bash
+/opt/gextto/gexttod tui
+/opt/gextto/gexttod tui --url http://host:5000 --lang it
+GEXTTO_URL=http://host:5000 /opt/gextto/gexttod tui
+```
+
+Le opzioni sono `--url`/`-u` e `--lang`/`-l`; la variabile d'ambiente per l'URL è
+`GEXTTO_URL`. Le sette schede sono Stato,
+Torrent, Log, Salute, Archivio, Mancanti e Blocklist. La guida completa dei tasti,
+dei prompt e delle azioni è in [`docs/tui.md`](tui.md).
+
 **Installazione e aggiornamento.** A ogni push su `main` viene pubblicato un
 payload Linux `continuous` testato. L'installer ufficiale lo scarica, verifica il
 checksum SHA-256 e lo installa senza compilare Go o C++ sul server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-Usa `GEXTTO_REPO` e `GEXTTO_RELEASE` per scegliere un repository o una release
-diversi. Installer e `gexttod --update` installano lo stesso payload.
+L'installer deve essere eseguito come root e richiede systemd. Usa `GEXTTO_REPO`
+e `GEXTTO_RELEASE` per scegliere un repository o una release diversi. Salva i
+dati del servizio in `/var/lib/gextto`, il programma in `/opt/gextto` e il token
+API generato in `/etc/gextto/gextto.env`. Installer e `gexttod --update`
+installano lo stesso payload.
+
+Per un'installazione senza root da un checkout sorgente:
+
+```bash
+make build
+GEXTTO_DATA_DIR="$HOME/gextto-data" \
+  GEXTTO_LISTEN=127.0.0.1:5000 \
+  scripts/install-user-service.sh
+systemctl --user status gextto.service
+```
+
+Il servizio per-utente ascolta per default sulla porta 5000 su tutte le
+interfacce. Limita l'accesso con firewall o reverse proxy; usa
+`loginctl enable-linger "$USER"` se deve rimanere attivo dopo il logout.
 `--update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
 pubblicato quando presente, prepara i file e poi sostituisce l'eseguibile (con la
 UI web inclusa), la `lib/` e `run.sh` con rename atomici. Dati e configurazione in
@@ -135,13 +171,18 @@ download, un checksum o un'estrazione falliti lasciano l'installazione in
 esecuzione invariata, e uno swap fallito viene ripristinato. Il marker `VERSION`
 accanto all'eseguibile viene aggiornato ed è mostrato da `--version`.
 
+Il repository ufficiale pubblica attualmente asset Linux per `x86_64`. Un asset
+`aarch64` funziona se fornito da un repository personalizzato tramite
+`GEXTTO_REPO`.
+
 - `--channel stable` / `--release <tag>` — scelgono la release da installare;
 - `--install-dir <dir>` — installa altrove (default: la directory del binario);
 - `--archive <file>` — installa da un archivio locale (offline);
 - `--force` — reinstalla anche se la versione è invariata;
 - `--no-restart` — non riavviare `gextto.service`.
 
-Eseguito come root riavvia `gextto.service` automaticamente; altrimenti stampa il
+Esegui `/opt/gextto/gexttod --update` come root per riavviare automaticamente
+`gextto.service`; altrimenti stampa il
 comando `systemctl` esatto. L'unità systemd non viene sovrascritta, così le
 personalizzazioni locali (utente, porte, percorsi) restano. Lo stesso payload è
 il pacchetto Linux autonomo descritto nel README (*Pacchetto Linux autonomo*).
@@ -392,8 +433,8 @@ la barra “Salva tutte”.
   effettivo è unico per acquisizione, ricerche, upgrade, post-processing,
   archivio e rescore; comprende anche bonus dimensione e, per i film, sottotitoli
   preferiti. Usa **Manutenzione → Ricalcola scoring** dopo aver cambiato i pesi.
-- **Rinomina** — abilita rinomina, editor del template con token e anteprima,
-  chiavi TMDB/TVDB, lingua, soglie di upgrade, token API. La verifica recupera il
+  - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
+  chiavi TMDB/TVDB, lingua e soglie di upgrade. La verifica recupera il
   token sorgente dal titolo originale della release nel database ed elimina i
   blocchi placeholder vuoti (`[]`), così un `[WEB-DL]` perso viene ripristinato
   invece di restare `unknown`.
@@ -649,7 +690,7 @@ la pulizia degli altri.
   ultimi errori, dischi. Per Jackett il controllo usa l'endpoint Torznab `caps`;
   un problema di API key o di configurazione degli indexer viene quindi distinto
   dalla semplice raggiungibilità della macchina.
-- **Log** — stream SSE live con filtro testuale, numero righe e segui/pausa.
+- **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
   Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO [componente]
   messaggio · campo: valore`, con parole chiave evidenziate (NAS, download,
   sorgenti, filtri, errori). Ogni ciclo stampa un **SOURCE REPORT** con l'esito
@@ -660,6 +701,14 @@ la pulizia degli altri.
 - **Grafici** — sparkline CPU/RAM/download/upload/disco/RAM disk e consumo
   giornaliero.
 - **Attività** — eventi torrent recenti e download.
+
+### TUI: uso rapido
+
+Nella TUI `1`-`7` o `Tab` cambiano scheda, `r` aggiorna e `?` apre l'aiuto.
+Nella scheda **Log**, `/` filtra le righe e `f` attiva o ferma il follow; quando
+il follow è fermo la posizione resta congelata anche se arrivano nuovi log.
+Archivio, Mancanti e Blocklist dispongono di selezione e scrolling con le frecce
+e i tasti pagina. Per l'elenco completo dei comandi vedi [`docs/tui.md`](tui.md).
 
 ### Salute: interpretare lo stato delle sorgenti
 

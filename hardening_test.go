@@ -74,43 +74,6 @@ func normalizeJSONScalar(value any) string {
 	}
 }
 
-// A token set at runtime must be enforced immediately, without a restart.
-func TestApiTokenSetAtRuntimeIsEnforced(t *testing.T) {
-	state := newTestAppState(t)
-	server := httptest.NewServer(Router(state))
-	t.Cleanup(server.Close)
-
-	payload, _ := json.Marshal(map[string]string{"key": "api_token", "value": "s3cret-token"})
-	if status, body := webPostJSON(t, server, "/api/config/settings", string(payload)); status != http.StatusOK {
-		t.Fatalf("save token -> %d: %s", status, body)
-	}
-
-	response, err := http.Get(server.URL + "/api/series")
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body.Close()
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("protected route without token -> %d, want 401", response.StatusCode)
-	}
-
-	request, _ := http.NewRequest(http.MethodGet, server.URL+"/api/series", nil)
-	request.Header.Set("x-gextto-token", "s3cret-token")
-	authorized, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authorized.Body.Close()
-	if authorized.StatusCode != http.StatusOK {
-		t.Fatalf("protected route with token -> %d, want 200", authorized.StatusCode)
-	}
-
-	// Public liveness endpoints stay reachable.
-	if code, _, _ := webGet(t, server, "/api/health"); code != http.StatusOK {
-		t.Fatalf("health should stay public: %d", code)
-	}
-}
-
 func TestAddOptionsPreallocationAndStopFlags(t *testing.T) {
 	opts := AddOptions{Preallocate: true, StopWhenReady: true}
 	flags := opts.Flags()

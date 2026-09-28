@@ -5,8 +5,8 @@ import "net/http"
 // Router builds the HTTP mux for the web UI and API.
 //
 // It implements the `router()` : every route from the
-// contract table is registered through `handle`, which installs the same
-// auth and cache-control middleware that axum layered over the whole router.
+// contract table is registered through `handle`, which installs shared
+// cache-control middleware.
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
 	handle(s, mux, "GET /{$}", UiPage)
@@ -14,7 +14,6 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)
 	handle(s, mux, "GET /pkg/ui_bg.wasm", WasmAlias)
-	handle(s, mux, "GET /api/auth", AuthStatus)
 	handle(s, mux, "GET /api/i18n", I18nList)
 	handle(s, mux, "POST /api/i18n", I18nSet)
 	handle(s, mux, "POST /api/i18n/language", I18nLanguage)
@@ -279,7 +278,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/run-now", RunNow)
 	// New server-rendered UI (see uiweb.go). It is additive: the Leptos SPA
 	// keeps serving "/". The shell is public like the legacy one, while every
-	// data partial and action is guarded by ApiAuth (see web_handlers_core.go).
+	// data partial and action routes use the same shared middleware.
 	mux.Handle("GET /ui/static/", UiNoCache(http.StripPrefix("/ui/static/", http.FileServer(http.FS(uiwebStaticFS())))))
 	handle(s, mux, "GET /ui", UiPage)
 	handle(s, mux, "GET /ui/", UiPage)

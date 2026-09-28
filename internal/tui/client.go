@@ -193,24 +193,19 @@ func (e *APIError) Error() string {
 
 // Client talks to a running gextto daemon over HTTP.
 type Client struct {
-	base  string
-	token string
-	http  *http.Client
+	base string
+	http *http.Client
 }
 
 // NewClient builds a client for base (e.g. http://127.0.0.1:5000).
-func NewClient(base, token string) *Client {
+func NewClient(base string) *Client {
 	return &Client{
-		base:  strings.TrimRight(strings.TrimSpace(base), "/"),
-		token: strings.TrimSpace(token),
-		http:  &http.Client{Timeout: 30 * time.Second},
+		base: strings.TrimRight(strings.TrimSpace(base), "/"),
+		http: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
 func (c *Client) do(request *http.Request) (*http.Response, error) {
-	if c.token != "" {
-		request.Header.Set("X-Gextto-Token", c.token)
-	}
 	request.Header.Set("Accept", "application/json")
 	return c.http.Do(request)
 }
@@ -509,9 +504,6 @@ func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/logs/stream?limit=500", nil)
 	if err != nil {
 		return err
-	}
-	if c.token != "" {
-		request.Header.Set("X-Gextto-Token", c.token)
 	}
 	request.Header.Set("Accept", "text/event-stream")
 	// A stream must not inherit Client's 30-second request timeout. The

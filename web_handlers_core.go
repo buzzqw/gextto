@@ -5,7 +5,6 @@ package gextto
 // the Go implementation of the matching handlers .
 
 import (
-	"crypto/subtle"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -54,40 +53,6 @@ func durationFromHours(hours uint64) time.Duration {
 // ---------------------------------------------------------------------------
 // Middlewares
 // ---------------------------------------------------------------------------
-
-// ApiAuth enforces the optional API token, mirroring `api_auth`. Public
-// endpoints and non-API paths are passed through untouched.
-func ApiAuth(s *AppState, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if !strings.HasPrefix(path, "/api/") ||
-			path == "/api/auth" || path == "/api/health" || path == "/api/status" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		// Read the token from the live configuration, not the startup
-		// snapshot: setting `api_token` at runtime must take effect (both
-		// enabling and rotating) without restarting the daemon.
-		token := LatestConfig(s).APIToken
-		if token == nil || *token == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		supplied := r.Header.Get("x-gextto-token")
-		if supplied == "" {
-			if authorization := r.Header.Get("authorization"); strings.HasPrefix(authorization, "Bearer ") {
-				supplied = strings.TrimPrefix(authorization, "Bearer ")
-			}
-		}
-		// Constant-time comparison: a plain `==` short-circuits on the first
-		// differing byte and leaks the shared prefix to a timing observer.
-		if subtle.ConstantTimeCompare([]byte(supplied), []byte(*token)) == 1 {
-			next.ServeHTTP(w, r)
-			return
-		}
-		jsonError(w, http.StatusUnauthorized, "API token required")
-	})
-}
 
 // noCacheWriter injects the Cache-Control header before the first write so it
 // is present even when the wrapped handler writes the header itself ( can
@@ -274,14 +239,8 @@ func Favicon(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // ---------------------------------------------------------------------------
-// Auth / i18n
+// I18n
 // ---------------------------------------------------------------------------
-
-// AuthStatus reports whether an API token is configured.
-func AuthStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
-	token := LatestConfig(s).APIToken
-	jsonResponse(w, map[string]any{"required": token != nil && *token != ""})
-}
 
 // I18nList returns the translations for a language.
 func I18nList(w http.ResponseWriter, r *http.Request, s *AppState) {

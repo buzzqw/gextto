@@ -191,7 +191,6 @@ func transferTestConfig(t *testing.T, dataDir string, port uint16) Config {
 	cfg.DryRun = false
 	cfg.Active = false
 	cfg.LibtorrentEnabled = true
-	cfg.APIToken = nil
 	cfg.Libtorrent.PortMin = port
 	cfg.Libtorrent.PortMax = port
 	cfg.Libtorrent.Dht = false

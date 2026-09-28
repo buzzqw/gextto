@@ -8,10 +8,13 @@ nessuna dipendenza oltre a `golang.org/x/sys`.
 ## Avvio
 
 ```bash
-gexttod tui                        # daemon su http://127.0.0.1:5000
-gexttod tui --url http://host:5000 --token <token> --lang en
-GEXTTO_URL=http://host:5000 GEXTTO_API_TOKEN=<token> GEXTTO_LANG=it gexttod tui
+/opt/gextto/gexttod tui                    # installazione standard
+/opt/gextto/gexttod tui --url http://host:5000 --lang en
+GEXTTO_URL=http://host:5000 GEXTTO_LANG=it /opt/gextto/gexttod tui
 ```
+
+Con un'installazione diversa da quella standard, sostituisci `/opt/gextto` con
+la directory che contiene `gexttod`.
 
 La lingua viene scelta in quest'ordine: `--lang`, `GEXTTO_LANG`, la lingua
 attiva del daemon (`/api/i18n/active`), altrimenti italiano.

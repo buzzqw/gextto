@@ -61,10 +61,6 @@ func newTestAppState(t *testing.T) *AppState {
 	cfg.TrashPath = &trash
 	cfg.DryRun = true
 	cfg.Active = false
-	// Never require an API token: the default reads GEXTTO_API_TOKEN from the
-	// environment, which would make every /api/ request 401.
-	cfg.APIToken = nil
-
 	// Write a minimal configuration file pointing at the temporary directory so
 	// LatestConfig reloads from an isolated config database instead of falling
 	// back to `./data` (which would make the tests depend on the environment).

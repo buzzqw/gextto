@@ -674,7 +674,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"content_filters", "max_release_age_days", "gap_fill_max_per_series", "gap_fill_max_per_cycle",
 		"gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle", "flaresolverr_url",
 		"tmdb_api_key", "tmdb_language", "default_language", "rename_episodes", "rename_format",
-		"rename_template", "api_token", "archive_root", "trash_path", "libtorrent_dir",
+		"rename_template", "archive_root", "trash_path", "libtorrent_dir",
 		"libtorrent_temp_dir", "libtorrent_ramdisk_dir", "libtorrent_extra_settings",
 		"cleanup_upgrades", "cleanup_min_score_diff", "upgrade_min_score_diff", "cleanup_action",
 		"min_free_space_gb", "trash_retention_days", "archive_retention_days", "archive_cleanup_enabled",
