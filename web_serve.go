@@ -65,6 +65,24 @@ func startBackgroundWorkers(state *AppState) {
 // select on it so they return before the torrent session is destroyed.
 func (s *AppState) BackgroundStop() <-chan struct{} { return s.bgStop }
 
+// BackgroundContext returns a context that is cancelled when the daemon starts
+// shutting down. Long operations that touch the torrent engine (the acquisition
+// cycle, manual cycles) take it so they abort before the session is destroyed.
+func (s *AppState) BackgroundContext() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	if s.bgStop == nil {
+		return ctx, cancel
+	}
+	go func() {
+		select {
+		case <-s.bgStop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
+
 // stopping reports whether a shutdown has been requested.
 func (s *AppState) stopping() bool {
 	select {

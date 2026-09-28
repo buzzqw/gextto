@@ -1522,6 +1522,10 @@ func watchedFoldersWorker(state *AppState) {
 // cycleWorker runs the scheduled scrape/cycle loop and, every
 // `rename_verify_interval` hours, performs the archive rename repair.
 func cycleWorker(state *AppState) {
+	// Cancelled on shutdown so a cycle in progress releases the torrent engine
+	// before ShutdownEmbedded destroys the native session.
+	ctx, cancel := state.BackgroundContext()
+	defer cancel()
 	lastRenameCheck := time.Now().Add(-6 * time.Hour)
 	// Guards against overlapping archive repairs (they can be slow on NFS).
 	var renameRepairRunning atomic.Bool
@@ -1582,7 +1586,7 @@ func cycleWorker(state *AppState) {
 			state.last_cycle.Set(models.CycleStats{LastStartedAt: &startedAt})
 			notifier := FromConfig(&cfg)
 			stats, runErr := RunCycle(
-				context.Background(),
+				ctx,
 				&cfg,
 				state.engine,
 				state.db,

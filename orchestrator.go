@@ -71,6 +71,9 @@ func RunCycleDomain(
 	}
 	logging.Info(cycleDivider)
 	logging.Info(fmt.Sprintf("🔄 CYCLE STARTED (mode: %s)", mode))
+	if cycleCancelled(ctx) {
+		return stats, nil
+	}
 
 	comicsIntervalValue, err := comics.Setting("comics_check_interval", "604800")
 	if err != nil {
@@ -96,6 +99,9 @@ func RunCycleDomain(
 	// waiting for the automatic interval; otherwise the Comics button appears
 	// to do nothing when the next scheduled check is not due yet.
 	comicsRequested := domain != nil && *domain == "comics"
+	if cycleCancelled(ctx) {
+		return stats, nil
+	}
 	if !domainIs(domain, "series") && !domainIs(domain, "movies") &&
 		(comicsRequested || comicsInterval == 0 || saturatingSub(nowTs, lastComicsCheck) >= comicsInterval) {
 		downloaded, runErr := RunComicsCycle(comics, NewGetComicsClient(), notifier, cfg.LibtorrentDir, torrents, db, cfg)
@@ -130,6 +136,9 @@ func RunCycleDomain(
 
 	releases, err := engine.ScrapeAll(ctx, cfg)
 	if err != nil {
+		if cycleCancelled(ctx) {
+			return stats, nil
+		}
 		return nil, err
 	}
 	if domainIs(domain, "series") {
@@ -703,7 +712,15 @@ func RunCycleDomain(
 	upgrades := 0
 	newItems := 0
 	var startedDetails []string
+	if cycleCancelled(ctx) {
+		return stats, nil
+	}
 	for i := range best {
+		// Stop before starting another download when the daemon is shutting
+		// down: the native session is destroyed right after the workers stop.
+		if cycleCancelled(ctx) {
+			return stats, nil
+		}
 		release := best[i]
 		// Feeds that expose only a `.torrent` link (for example TorrentLeech)
 		// have no magnet: download the file, derive its infohash, and retain the
@@ -996,6 +1013,17 @@ func RunCycleDomain(
 }
 
 // domainIs reports whether the optional domain equals value.
+// cycleCancelled reports whether the daemon is shutting down and the cycle must
+// stop before it touches the torrent engine again. It logs once per call site so
+// an aborted cycle is visible in the log.
+func cycleCancelled(ctx context.Context) bool {
+	if ctx == nil || ctx.Err() == nil {
+		return false
+	}
+	logging.Info("cycle interrupted: daemon is shutting down")
+	return true
+}
+
 func domainIs(domain *string, value string) bool {
 	return domain != nil && *domain == value
 }
@@ -1236,6 +1264,9 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	knownStatuses, _ := db.SeriesStatuses()
 	for i := range cfg.Series {
+		if ctx != nil && ctx.Err() != nil {
+			return
+		}
 		series := &cfg.Series[i]
 		if !series.Enabled {
 			continue

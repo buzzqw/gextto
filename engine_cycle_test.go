@@ -3,6 +3,7 @@ package gextto
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // newCycleState returns the shared fixture used by the cycle tests. It is the
@@ -40,6 +41,52 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 	}
 	if stats.DownloadsStarted != 0 {
 		t.Fatalf("DownloadsStarted = %d, want 0", stats.DownloadsStarted)
+	}
+}
+
+// TestCycleCancelledContextAborts verifies that a cycle with an already
+// cancelled context (daemon shutting down) returns cleanly without doing work,
+// so the torrent session can be destroyed without a late engine call.
+func TestCycleCancelledContextAborts(t *testing.T) {
+	state := newCycleState(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	stats, err := RunCycle(
+		ctx,
+		state.cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		state.activeEngine(),
+	)
+	if err != nil {
+		t.Fatalf("RunCycle with cancelled context: %v", err)
+	}
+	if stats == nil {
+		t.Fatal("RunCycle returned nil stats")
+	}
+	if stats.DownloadsStarted != 0 || stats.Scraped != 0 {
+		t.Fatalf("cancelled cycle did work: scraped=%d started=%d", stats.Scraped, stats.DownloadsStarted)
+	}
+}
+
+// TestBackgroundContextCancelledOnStop verifies that BackgroundContext is
+// cancelled when the daemon shutdown is signalled, which is what makes the
+// cycle abort before the session is destroyed.
+func TestBackgroundContextCancelledOnStop(t *testing.T) {
+	state := newTestAppState(t)
+	ctx, cancel := state.BackgroundContext()
+	defer cancel()
+
+	stopBackgroundWorkers(state)
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+		t.Fatal("BackgroundContext was not cancelled on shutdown")
 	}
 }
 

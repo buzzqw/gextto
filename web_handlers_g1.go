@@ -9,7 +9,6 @@ package gextto
 // private helpers/types are declared here and prefixed `gh1_`.
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -688,7 +687,11 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	logging.Info("manual cycle requested", "domain", gh1_domainLabel(domain), "queued", running)
 	taskDomain := domain
+	// Cancelled on shutdown so a manual cycle releases the torrent engine
+	// before the native session is destroyed.
+	cycleCtx, cancelCycle := s.BackgroundContext()
 	go func() {
+		defer cancelCycle()
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
 		logging.Info("manual cycle started", "domain", gh1_domainLabel(taskDomain))
@@ -696,7 +699,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		s.last_cycle.Set(models.CycleStats{LastStartedAt: &now, ErrorDetails: map[string]int{}})
 		notifier := FromConfig(&cfg)
 		stats, runErr := RunCycleDomain(
-			context.Background(),
+			cycleCtx,
 			&cfg,
 			s.engine,
 			s.db,
