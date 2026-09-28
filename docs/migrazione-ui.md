@@ -953,3 +953,22 @@ tutti i menu; ogni sezione è coperta dal test `TestUiActionPathsAreRegistered`.
 Dettagli minori non bloccanti: i risultati grezzi di "Esplora fumetti" e
 "Ricerca mancanti" sono mostrati come JSON; i grafici sparkline della Dashboard
 classica non sono replicati (i dati numerici sì).
+
+
+---
+
+## 24. Nessun JSON in interfaccia
+
+Su richiesta: la UI non mostra e non fa usare JSON. Tutto è a campi leggibili.
+
+- Gli editor JSON sono diventati **editor a righe** (indexer, filtri per
+  sorgente, regole tag→cartella, event hook, cartelle osservate): aggiungi/
+  rimuovi riga, input tipizzati, liste di parole una per riga.
+- Rimosse le textarea JSON di serie/film: la serie si modifica dal suo dettaglio,
+  il film ha il suo form.
+- Le impostazioni che erano array JSON (blacklist, filtri contenuto, wanted list,
+  …) sono aree "un valore per riga" e vengono salvate nel formato originale.
+- I risultati (TMDB, episodi mancanti, esplora fumetti, link weekly) e le
+  risposte OAuth/PIN sono tabelle/link o blocchi chiave-valore leggibili; i
+  valori annidati mostrano un'etichetta, mai il JSON.
+- Le chiavi interne (`_*`) e quelle con editor dedicato non vengono ripetute.
