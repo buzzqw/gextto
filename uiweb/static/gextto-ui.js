@@ -1561,6 +1561,68 @@
     }
   });
 
+  // Selecting the qBittorrent engine installs/refreshes the managed binary and
+  // fills the optimal qBittorrent options, then reloads the tab.
+  var backendSelect = document.querySelector("#input-torrent_backend");
+  if (backendSelect) {
+    // Sane starting values for the anacrolix engine (which has no managed
+    // binary): applied automatically when it is selected.
+    var ANACROLIX_SANE = {
+      anacrolix_listen_port: "6881",
+      anacrolix_tcp: "true",
+      anacrolix_utp: "true",
+      anacrolix_dht: "true",
+      anacrolix_pex: "true",
+      anacrolix_trackers: "true",
+      anacrolix_upnp: "true",
+      anacrolix_apply_ip_filter: "true",
+      anacrolix_max_conns_per_torrent: "50",
+      anacrolix_download_limit_kib: "0",
+      anacrolix_upload_limit_kib: "0",
+      anacrolix_piece_hashers: "2",
+      anacrolix_max_unverified_mb: "64",
+      anacrolix_proxy_type: "0",
+      anacrolix_proxy_port: "0"
+    };
+    backendSelect.addEventListener("change", function () {
+      var form = backendSelect.closest("[data-setting-key]");
+      var status = form ? form.querySelector("[data-setting-status]") : null;
+      if (backendSelect.value === "qbittorrent") {
+        if (status) status.textContent = "Ottimizzazione qBittorrent…";
+        notify("Ottimizzazione qBittorrent in corso… (download del binario gestito)", "info");
+        api("/api/config/settings", "POST", { key: "torrent_backend", value: "qbittorrent" })
+          .then(function () { return api("/api/torrent-backend/qbittorrent/update", "POST", {}); })
+          .then(function (data) {
+            var message = (data && data.message) || "qBittorrent ottimizzato";
+            if (status) status.textContent = message;
+            notify(message, "ok");
+            window.setTimeout(function () { location.reload(); }, 900);
+          })
+          .catch(function (error) {
+            if (status) status.textContent = "Errore";
+            notify("Ottimizzazione qBittorrent non riuscita: " + error.message, "err");
+          });
+        return;
+      }
+      if (backendSelect.value === "anacrolix") {
+        if (status) status.textContent = "Applico valori sani anacrolix…";
+        notify("Applico valori sani ad anacrolix…", "info");
+        var saves = [api("/api/config/settings", "POST", { key: "torrent_backend", value: "anacrolix" })];
+        Object.keys(ANACROLIX_SANE).forEach(function (key) {
+          saves.push(api("/api/config/settings", "POST", { key: key, value: ANACROLIX_SANE[key] }));
+        });
+        Promise.all(saves).then(function () {
+          if (status) status.textContent = "Valori sani applicati";
+          notify("anacrolix impostato con valori sani; riavvia per applicarlo", "ok");
+          window.setTimeout(function () { location.reload(); }, 900);
+        }).catch(function (error) {
+          if (status) status.textContent = "Errore";
+          notify("Configurazione anacrolix non riuscita: " + error.message, "err");
+        });
+      }
+    });
+  }
+
   // ---- checkbox groups (Motori web, Filtri contenuto) ---------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-checkbox-group]"), function (group) {
     var key = group.getAttribute("data-key");
