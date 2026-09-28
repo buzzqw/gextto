@@ -1370,16 +1370,18 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else {
 		items, err = tmdb.SearchSeries(ctx, query)
 	}
-	if ctx.Err() == context.DeadlineExceeded {
-		jsonError(w, http.StatusGatewayTimeout,
-			fmt.Sprintf("TMDB non ha risposto entro %ds", int(gh7_external_search_timeout.Seconds())))
-		return
-	}
-	if err != nil {
+	tmdbTimedOut := ctx.Err() == context.DeadlineExceeded
+	tmdbFailed := tmdbTimedOut || err != nil
+	if tmdbFailed && isMovie {
+		if tmdbTimedOut {
+			jsonError(w, http.StatusGatewayTimeout,
+				fmt.Sprintf("TMDB non ha risposto entro %ds", int(gh7_external_search_timeout.Seconds())))
+			return
+		}
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	if len(items) > 0 {
+	if !tmdbFailed && len(items) > 0 {
 		values := make([]any, 0, len(items))
 		for _, item := range items {
 			encoded, _ := json.Marshal(item)
@@ -1391,12 +1393,14 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonResponse(w, map[string]any{"ok": true, "kind": input.Kind, "items": values, "source": "tmdb"})
 		return
 	}
-	if isMovie {
+	if !tmdbFailed && isMovie {
 		jsonResponse(w, map[string]any{"ok": true, "kind": input.Kind, "items": []any{}, "source": "tmdb"})
 		return
 	}
 
-	// Fallback TVDB (series only) when TMDB has no results.
+	// Fallback TVDB (series only): when TMDB returns no results OR fails
+	// (error/timeout). If TVDB also yields nothing and TMDB had failed, the
+	// original TMDB error is reported.
 	tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
 	tvdbItems := []any{}
 	tctx, tcancel := context.WithTimeout(r.Context(), gh7_external_search_timeout)
@@ -1423,9 +1427,19 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			})
 		}
 	}
+	if len(tvdbItems) == 0 && tmdbFailed {
+		if tmdbTimedOut {
+			jsonError(w, http.StatusGatewayTimeout,
+				fmt.Sprintf("TMDB non ha risposto entro %ds e nessun risultato da TVDB", int(gh7_external_search_timeout.Seconds())))
+			return
+		}
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
 	source := "tmdb"
 	if len(tvdbItems) > 0 {
 		source = "tvdb"
+		logging.Info("TMDB senza risultati o non raggiungibile: uso il fallback TVDB", "query", query)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "kind": "series", "items": tvdbItems, "source": source})
 }
