@@ -6,12 +6,13 @@ package gextto
 
 // uiPageSection is one block of a panel page.
 type uiPageSection struct {
-	Kind     string // table | actions | form | progress | comics_links | links
+	Kind     string // table | actions | form | progress | comics_links | links | oauth
 	Table    uiTableSpec
 	Action   uiActionSection
 	Form     uiFormSection
 	Progress uiProgressSection
 	Links    uiLinksSection
+	OAuth    uiOAuthSection
 }
 
 type uiLinkItem struct {
@@ -24,6 +25,17 @@ type uiLinksSection struct {
 	Title string
 	Hint  string
 	Links []uiLinkItem
+}
+
+type uiOAuthSection struct {
+	Name      string
+	StartPath string
+	PollPath  string
+	Buttons   []uiActionButton
+}
+
+func sectionOAuth(section uiOAuthSection) uiPageSection {
+	return uiPageSection{Kind: "oauth", OAuth: section}
 }
 
 type uiFormOption struct {
@@ -47,6 +59,7 @@ type uiFormSection struct {
 	Path   string
 	Method string
 	Submit string
+	Render string // optional result renderer: tmdb | releases
 	Fields []uiFormField
 }
 
@@ -148,7 +161,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 			sectionForm(uiFormSection{
 				Title: "Cerca un episodio mancante",
 				Hint:  "Cerca una release specifica per serie/stagione/episodio e accodala dai risultati.",
-				Path:  "/api/missing/search", Submit: "Cerca",
+				Path:  "/api/missing/search", Submit: "Cerca", Render: "releases",
 				Fields: []uiFormField{
 					{Name: "series", Label: "Serie"},
 					{Name: "season", Label: "Stagione", Kind: "number"},
@@ -324,8 +337,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
 	return []uiPageSection{
-		sectionActions(uiActionSection{Label: "Trakt", Hint: "Avvia il flusso di accesso e poi conferma il codice.", Buttons: []uiActionButton{
-			{Label: "Avvia accesso", Class: "primary", Method: "POST", Path: "/api/trakt/auth/start", Body: "{}"},
+		sectionOAuth(uiOAuthSection{Name: "Trakt", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
 			{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}"},
 			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}"},
 			{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}"},
@@ -340,8 +352,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				boolField("trakt_scrobble_enabled", "Scrobble", settingsBool(cfg, "trakt_scrobble_enabled", false)),
 			},
 		}),
-		sectionActions(uiActionSection{Label: "Simkl", Buttons: []uiActionButton{
-			{Label: "Avvia PIN", Class: "primary", Method: "POST", Path: "/api/simkl/auth/start", Body: "{}"},
+		sectionOAuth(uiOAuthSection{Name: "Simkl", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
 			{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/simkl/auth/revoke", Body: "{}"},
 			{Label: "Importa watchlist", Method: "POST", Path: "/api/simkl/watchlist/import", Body: "{}"},
 		}}),

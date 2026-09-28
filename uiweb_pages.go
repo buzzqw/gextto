@@ -3,6 +3,7 @@ package gextto
 import (
 	"encoding/json"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -79,13 +80,16 @@ type uiSettingField struct {
 	Key   string
 	Label string
 	Value string
-	Kind  string // text|bool|area|secret
+	Kind  string // text|bool|area|secret|tags
 	// BoolValue, TrueValue and FalseValue are set only for Kind=="bool": they
 	// keep the original spelling (yes/no, 1/0, on/off, true/false) so saving the
 	// select never turns a "yes" into a "true" that strict readers would reject.
 	BoolValue  bool
 	TrueValue  string
 	FalseValue string
+	// TagJSON is set for Kind=="tags": the value was a JSON array of scalars and
+	// must be saved back as a JSON array (otherwise comma separated).
+	TagJSON bool
 }
 
 // uiBoolPairs maps the boolean spellings accepted by the backend to their pair,
@@ -124,32 +128,92 @@ type uiSettingsPage struct {
 	ActiveID        string
 	Fields          []uiSettingField
 	ShowSources     bool
-	ShowLibrary     bool
 	ShowEditors     bool
 	ShowI18n        bool
-	Editors         []uiJSONEditor
+	ListEditors     []uiListEditor
 	SearchIndexJSON string
 }
 
-// uiJSONEditor is a generic JSON editor for a structured configuration
-// endpoint: GET to load, POST to save. Some endpoints return a wrapper object
-// ({"items":[...]}) but expect a bare array on POST, or expect a wrapped object;
-// Unwrap extracts the payload from the GET response and Wrap rewraps it before
-// POST so the round-trip is lossless.
-type uiJSONEditor struct {
-	Label    string
-	GetPath  string
-	PostPath string
-	Hint     string
-	Unwrap   string
-	Wrap     string
+// uiListField describes one column of a structured list editor.
+type uiListField struct {
+	Name        string
+	Label       string
+	Kind        string // text | number | bool | tags | secret
+	Placeholder string
 }
 
-var uiJSONEditors = []uiJSONEditor{
-	{Label: "Filtri per sorgente", GetPath: "/api/config/source-filters", PostPath: "/api/config/source-filters", Unwrap: "filters", Wrap: "filters"},
-	{Label: "Regole tag → cartella", GetPath: "/api/tag-dir-rules", PostPath: "/api/tag-dir-rules", Unwrap: "items"},
-	{Label: "Event hook", GetPath: "/api/event-hooks", PostPath: "/api/event-hooks", Unwrap: "items"},
-	{Label: "Cartelle osservate", GetPath: "/api/watched-folders", PostPath: "/api/watched-folders", Unwrap: "items"},
+// uiListEditor edits a list of structured records with real form rows, so the
+// interface never shows raw JSON. GetPath/Unwrap load the list; PostPath plus
+// Wrap (or PostKey for a setting) save it back.
+type uiListEditor struct {
+	Title    string
+	Hint     string
+	GetPath  string
+	PostPath string
+	Unwrap   string
+	Wrap     string
+	// PostKey, when set, saves the list as the JSON value of that setting
+	// through /api/config/settings (used for the indexers).
+	PostKey string
+	Fields  []uiListField
+}
+
+var uiIndexerEditor = uiListEditor{
+	Title:    "Indexer Torznab",
+	Hint:     "Jackett, Prowlarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).",
+	GetPath:  "/api/config",
+	Unwrap:   "indexers",
+	PostPath: "/api/config/settings",
+	PostKey:  "indexers",
+	Fields: []uiListField{
+		{Name: "name", Label: "Nome", Kind: "text", Placeholder: "jackett / prowlarr"},
+		{Name: "url", Label: "URL base", Kind: "text", Placeholder: "http://127.0.0.1:9117"},
+		{Name: "api_key", Label: "API key", Kind: "secret"},
+		{Name: "enabled", Label: "Attivo", Kind: "bool"},
+	},
+}
+
+var uiAdvancedEditors = []uiListEditor{
+	{
+		Title: "Filtri per sorgente", Hint: "Parole chiave da accettare o scartare per una sorgente.",
+		GetPath: "/api/config/source-filters", Unwrap: "filters", PostPath: "/api/config/source-filters", Wrap: "filters",
+		Fields: []uiListField{
+			{Name: "source", Label: "Sorgente", Kind: "text"},
+			{Name: "keywords", Label: "Parole chiave", Kind: "tags", Placeholder: "separate da virgola"},
+			{Name: "enabled", Label: "Attivo", Kind: "bool"},
+		},
+	},
+	{
+		Title: "Regole tag → cartella", Hint: "Associa un tag del torrent a una cartella temporanea e finale.",
+		GetPath: "/api/tag-dir-rules", Unwrap: "items", PostPath: "/api/tag-dir-rules",
+		Fields: []uiListField{
+			{Name: "tag", Label: "Tag", Kind: "text"},
+			{Name: "temp_dir", Label: "Cartella temporanea", Kind: "text"},
+			{Name: "final_dir", Label: "Cartella finale", Kind: "text"},
+		},
+	},
+	{
+		Title: "Event hook", Hint: "Esegue un programma su determinati eventi.",
+		GetPath: "/api/event-hooks", Unwrap: "items", PostPath: "/api/event-hooks",
+		Fields: []uiListField{
+			{Name: "name", Label: "Nome", Kind: "text"},
+			{Name: "enabled", Label: "Attivo", Kind: "bool"},
+			{Name: "events", Label: "Eventi", Kind: "tags", Placeholder: "vuoto = tutti"},
+			{Name: "program", Label: "Programma", Kind: "text"},
+			{Name: "args", Label: "Argomenti", Kind: "text"},
+			{Name: "timeout_secs", Label: "Timeout (s)", Kind: "number"},
+		},
+	},
+	{
+		Title: "Cartelle osservate", Hint: "Aggiunge automaticamente i .torrent trovati in queste cartelle.",
+		GetPath: "/api/watched-folders", Unwrap: "items", PostPath: "/api/watched-folders",
+		Fields: []uiListField{
+			{Name: "path", Label: "Cartella", Kind: "text"},
+			{Name: "enabled", Label: "Attiva", Kind: "bool"},
+			{Name: "recursive", Label: "Ricorsiva", Kind: "bool"},
+			{Name: "delete_after", Label: "Elimina dopo", Kind: "bool"},
+		},
+	},
 }
 
 type uiSearchEntry struct {
@@ -182,8 +246,13 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], uiSettingFieldFor(def.Key, def.Label, value))
 	}
 
-	// Any persisted setting not covered by the generated index (score groups,
-	// backup, integrations, ...) is still editable, grouped under "Altro".
+	// Structured settings are edited with real forms (feed lines, indexer rows,
+	// JSON editors turned into list editors); they are never repeated as raw
+	// values.
+	structured := map[string]struct{}{
+		"url": {}, "indexers": {}, "source_filters": {},
+		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {},
+	}
 	indexed := map[string]struct{}{}
 	for _, def := range uiSettingsIndex {
 		indexed[def.Key] = struct{}{}
@@ -191,6 +260,13 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	keys := make([]string, 0, len(cfg.Settings))
 	for key := range cfg.Settings {
 		if _, ok := indexed[key]; ok {
+			continue
+		}
+		if _, ok := structured[key]; ok {
+			continue
+		}
+		// Internal markers and settings with a dedicated editor are not repeated.
+		if strings.HasPrefix(key, "_") || key == "download_tags" {
 			continue
 		}
 		keys = append(keys, key)
@@ -207,10 +283,8 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		labels["altro"] = "Altro"
 		order = append(order, "altro")
 	}
-	labels["libreria"] = "Libreria"
-	order = append(order, "libreria")
 
-	special := map[string]bool{"sources": true, "advanced": true, "libreria": true, "i18n": true}
+	special := map[string]bool{"sources": true, "advanced": true, "i18n": true}
 	tabs := make([]uiSettingsTabRef, 0, len(order))
 	for _, id := range order {
 		if len(fieldsByTab[id]) == 0 && !special[id] {
@@ -247,12 +321,16 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		Tabs:     tabs,
 		ActiveID: active,
 		Fields:   fieldsByTab[active],
-		Editors:  uiJSONEditors,
 	}
 	page.ShowSources = active == "sources"
-	page.ShowLibrary = active == "libreria"
 	page.ShowEditors = active == "advanced"
 	page.ShowI18n = active == "i18n"
+	switch active {
+	case "sources":
+		page.ListEditors = []uiListEditor{uiIndexerEditor}
+	case "advanced":
+		page.ListEditors = uiAdvancedEditors
+	}
 
 	entries := make([]uiSearchEntry, 0, len(cfg.Settings))
 	for _, def := range uiSettingsIndex {
@@ -273,7 +351,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		{Key: "", Label: "Regole tag → cartella", Tab: "advanced"},
 		{Key: "", Label: "Event hook", Tab: "advanced"},
 		{Key: "", Label: "Cartelle osservate", Tab: "advanced"},
-		{Key: "", Label: "Libreria (serie e film)", Tab: "libreria"},
 		{Key: "", Label: "Traduzioni", Tab: "i18n"},
 	} {
 		entries = append(entries, entry)
@@ -284,10 +361,50 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 
 func uiSettingFieldFor(key, label, value string) uiSettingField {
 	field := uiSettingField{Key: key, Label: label, Value: value, Kind: uiSettingKind(key, value)}
+	if items, ok := uiJSONScalarList(value); ok {
+		field.Kind = "tags"
+		field.TagJSON = true
+		field.Value = strings.Join(items, "\n")
+		return field
+	}
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[") {
+		// A structured object (or array of objects) is never shown as raw JSON;
+		// it is edited through its dedicated editor.
+		field.Kind = "structured"
+		return field
+	}
 	if field.Kind == "bool" {
 		field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(value)
 	}
 	return field
+}
+
+// uiJSONScalarList reports whether value is a JSON array of scalars and returns
+// its items as strings.
+func uiJSONScalarList(value string) ([]string, bool) {
+	trimmed := strings.TrimSpace(value)
+	if !strings.HasPrefix(trimmed, "[") {
+		return nil, false
+	}
+	var items []any
+	if err := json.Unmarshal([]byte(trimmed), &items); err != nil {
+		return nil, false
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		switch typed := item.(type) {
+		case string:
+			out = append(out, typed)
+		case float64:
+			out = append(out, strconv.FormatFloat(typed, 'f', -1, 64))
+		case bool:
+			out = append(out, strconv.FormatBool(typed))
+		default:
+			return nil, false
+		}
+	}
+	return out, true
 }
 
 func uiSettingKind(key, value string) string {

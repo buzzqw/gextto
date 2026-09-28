@@ -37,6 +37,7 @@ type uiSeriesDetail struct {
 	Quality     string
 	Language    string
 	ArchivePath string
+	Exclude     string
 	Enabled     bool
 	Episodes    []uiEpisodeRow
 	Gaps        int
@@ -149,6 +150,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		Quality:     series.Quality,
 		Language:    series.Language,
 		ArchivePath: series.ArchivePath,
+		Exclude:     series.Exclude,
 		Enabled:     series.Enabled,
 		Episodes:    rows,
 		Gaps:        gaps,

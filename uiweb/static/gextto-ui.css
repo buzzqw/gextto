@@ -418,6 +418,14 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
   white-space: pre-wrap;
   word-break: break-word;
 }
+.output:empty { display: none; }
+.kv { margin: 0; display: grid; grid-template-columns: minmax(110px, 28%) 1fr; gap: 4px 12px; }
+.kv dt { color: var(--muted); font-size: 0.82rem; }
+.kv dd { margin: 0; word-break: break-word; }
+.kv-list { margin: 0; padding-left: 18px; }
+.kv-list li { margin: 2px 0; }
+.list-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; padding: 12px; margin-top: 10px; align-items: end; }
+.list-row .form-actions { grid-column: 1 / -1; }
 .manual-body h1, .manual-body h2, .manual-body h3, .manual-body h4 { margin: 16px 0 6px; }
 .manual-body p { margin: 6px 0; color: var(--text); }
 

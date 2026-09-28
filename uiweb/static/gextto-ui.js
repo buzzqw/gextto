@@ -159,7 +159,7 @@
       case "percent": return Number(value).toFixed(1) + "%";
     }
     if (typeof value === "object") {
-      return value.name || value.title || value.label || JSON.stringify(value);
+      return value.name || value.title || value.label || value.path || "—";
     }
     return String(value);
   }
@@ -392,9 +392,16 @@
       event.preventDefault();
       var key = form.getAttribute("data-setting-key");
       var input = form.querySelector("[data-setting-input]");
+      if (!input) return; // structured value, edited from its dedicated section
       var button = form.querySelector("button");
-      var secret = input && input.type === "password";
-      var value = input ? input.value : "";
+      var secret = input.type === "password";
+      var value = input.value;
+      var tagJSON = input.getAttribute("data-tag-json");
+      if (tagJSON !== null) {
+        var items = value.split("\n").map(function (line) { return line.trim(); })
+          .filter(function (line) { return line !== ""; });
+        value = tagJSON === "true" ? JSON.stringify(items) : items.join(", ");
+      }
       if (secret && value === "") {
         if (button) {
           button.textContent = "Inserisci un valore";
@@ -601,94 +608,137 @@
     if (document.visibilityState === "visible") refreshShellMetrics();
   }, 4000);
 
-  // ---- sources editor (feeds + indexers) ----------------------------------
-  // Feeds live in the `url` setting, indexers in the `indexers` setting (the
-  // classic UI saves them the same way via /api/config/settings).
+  // ---- sources editor (feeds) ---------------------------------------------
+  // Feeds live in the `url` setting and are edited as one URL per line.
   var sourcesEditor = document.querySelector("[data-sources-editor]");
   if (sourcesEditor) {
     var feedsInput = sourcesEditor.querySelector("[data-sources-feeds]");
-    var indexersInput = sourcesEditor.querySelector("[data-sources-indexers]");
     var sourcesMessage = sourcesEditor.querySelector("[data-sources-message]");
     api("/api/config", "GET").then(function (config) {
       config = config || {};
       if (feedsInput) feedsInput.value = (config.feed_urls || []).join("\n");
-      if (indexersInput) indexersInput.value = JSON.stringify(config.indexers || [], null, 2);
     }).catch(function (error) { if (sourcesMessage) sourcesMessage.textContent = error.message; });
     var saveSources = sourcesEditor.querySelector("[data-sources-save]");
     if (saveSources) saveSources.addEventListener("click", function () {
       var feeds = ((feedsInput && feedsInput.value) || "").split("\n").map(function (line) {
         return line.trim();
       }).filter(function (line) { return line !== ""; });
-      var indexers;
-      try { indexers = JSON.parse((indexersInput && indexersInput.value) || "[]"); }
-      catch (error) { alert("Indexer JSON non valido: " + error.message); return; }
       saveSources.disabled = true;
-      Promise.all([
-        api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }),
-        api("/api/config/settings", "POST", { key: "indexers", value: JSON.stringify(indexers) })
-      ]).then(function () {
-        if (sourcesMessage) sourcesMessage.textContent = "Sorgenti salvate";
+      api("/api/config/settings", "POST", { key: "url", value: JSON.stringify(feeds) }).then(function () {
+        if (sourcesMessage) sourcesMessage.textContent = "Feed salvati";
       }).catch(function (error) {
         alert("Salvataggio non riuscito: " + error.message);
       }).then(function () { saveSources.disabled = false; });
     });
   }
 
-  // ---- library editor (series + movies) -----------------------------------
-  var libraryEditor = document.querySelector("[data-library-editor]");
-  if (libraryEditor) {
-    var library = null;
-    var seriesInput = libraryEditor.querySelector("[data-library-series]");
-    var moviesInput = libraryEditor.querySelector("[data-library-movies]");
-    var libraryMessage = libraryEditor.querySelector("[data-library-message]");
-    api("/api/config/library", "GET").then(function (data) {
-      library = data || {};
-      if (seriesInput) seriesInput.value = JSON.stringify(library.series || [], null, 2);
-      if (moviesInput) moviesInput.value = JSON.stringify(library.movies || [], null, 2);
-    }).catch(function (error) {
-      if (libraryMessage) libraryMessage.textContent = error.message;
-    });
-    var saveLibrary = libraryEditor.querySelector("[data-library-save]");
-    if (saveLibrary) saveLibrary.addEventListener("click", function () {
-      if (!library) return;
-      var series, movies;
-      try { series = JSON.parse((seriesInput && seriesInput.value) || "[]"); }
-      catch (error) { alert("Serie JSON non valido: " + error.message); return; }
-      try { movies = JSON.parse((moviesInput && moviesInput.value) || "[]"); }
-      catch (error) { alert("Film JSON non valido: " + error.message); return; }
-      saveLibrary.disabled = true;
-      api("/api/config/library", "POST", { series: series, movies: movies }).then(function () {
-        if (libraryMessage) libraryMessage.textContent = "Libreria salvata";
-      }).catch(function (error) {
-        alert("Salvataggio non riuscito: " + error.message);
-      }).then(function () { saveLibrary.disabled = false; });
+  // ---- structured list editors --------------------------------------------
+  // Real form rows, never raw JSON: indexers, tag-to-folder rules, event hooks,
+  // watched folders and source filters.
+  function listFieldValue(field) {
+    var kind = field.getAttribute("data-kind");
+    if (kind === "bool") return field.value === "true";
+    if (kind === "number") return Number(field.value || 0);
+    if (kind === "tags") {
+      return (field.value || "").split(",").map(function (part) { return part.trim(); })
+        .filter(function (part) { return part !== ""; });
+    }
+    return field.value;
+  }
+  function fillListRow(row, item) {
+    Array.prototype.forEach.call(row.querySelectorAll("[data-field]"), function (field) {
+      var name = field.getAttribute("data-field");
+      var value = item ? item[name] : undefined;
+      if (field.getAttribute("data-kind") === "bool") {
+        field.value = (value === false || value === "false") ? "false" : "true";
+      } else if (field.getAttribute("data-kind") === "tags") {
+        field.value = Array.isArray(value) ? value.join(", ") : (value || "");
+      } else {
+        field.value = (value === undefined || value === null) ? "" : value;
+      }
     });
   }
-
-  // ---- generic JSON editors ----------------------------------------------
-  Array.prototype.forEach.call(document.querySelectorAll("[data-json-editor]"), function (editor) {
-    var textarea = editor.querySelector("[data-json-text]");
-    var message = editor.querySelector("[data-json-message]");
-    var button = editor.querySelector("[data-json-save]");
+  Array.prototype.forEach.call(document.querySelectorAll("[data-list-editor]"), function (editor) {
+    var rowsBox = editor.querySelector("[data-list-rows]");
+    var template = editor.querySelector("[data-list-row]");
+    var message = editor.querySelector("[data-list-message]");
     var unwrap = editor.getAttribute("data-unwrap") || "";
     var wrap = editor.getAttribute("data-wrap") || "";
+    var postKey = editor.getAttribute("data-post-key") || "";
+    function addRow(item) {
+      var clone = template.content.firstElementChild.cloneNode(true);
+      fillListRow(clone, item || {});
+      var remove = clone.querySelector("[data-list-remove]");
+      if (remove) remove.addEventListener("click", function () { clone.remove(); });
+      rowsBox.appendChild(clone);
+      return clone;
+    }
     api(editor.getAttribute("data-get"), "GET").then(function (data) {
       var payload = (unwrap && data && data[unwrap] !== undefined) ? data[unwrap] : data;
-      if (textarea) textarea.value = JSON.stringify(payload, null, 2);
-    }).catch(function (error) { if (message) message.textContent = error.message; });
-    if (!button) return;
-    button.addEventListener("click", function () {
-      var parsed;
-      try { parsed = JSON.parse((textarea && textarea.value) || "null"); }
-      catch (error) { alert("JSON non valido: " + error.message); return; }
-      var body = parsed;
-      if (wrap) { body = {}; body[wrap] = parsed; }
-      button.disabled = true;
-      api(editor.getAttribute("data-post"), "POST", body).then(function () {
+      var items = Array.isArray(payload) ? payload : [];
+      if (!items.length) { addRow({}); return; }
+      items.forEach(function (item) { addRow(item); });
+    }).catch(function (error) {
+      if (message) message.textContent = error.message;
+      addRow({});
+    });
+    var addButton = editor.querySelector("[data-list-add]");
+    if (addButton) addButton.addEventListener("click", function () { addRow({}); });
+    var saveButton = editor.querySelector("[data-list-save]");
+    if (saveButton) saveButton.addEventListener("click", function () {
+      var items = Array.prototype.map.call(rowsBox.children, function (row) {
+        var item = {};
+        Array.prototype.forEach.call(row.querySelectorAll("[data-field]"), function (field) {
+          item[field.getAttribute("data-field")] = listFieldValue(field);
+        });
+        return item;
+      });
+      var encoded = JSON.stringify(items);
+      var request;
+      if (postKey) {
+        request = api(editor.getAttribute("data-post"), "POST", { key: postKey, value: encoded });
+      } else if (wrap) {
+        var body = {};
+        body[wrap] = items;
+        request = api(editor.getAttribute("data-post"), "POST", body);
+      } else {
+        request = api(editor.getAttribute("data-post"), "POST", items);
+      }
+      saveButton.disabled = true;
+      request.then(function () {
         if (message) message.textContent = "Salvato";
       }).catch(function (error) {
         alert("Salvataggio non riuscito: " + error.message);
-      }).then(function () { button.disabled = false; });
+      }).then(function () { saveButton.disabled = false; });
+    });
+  });
+
+  // ---- series edit form (structured fields, no JSON) ----------------------
+  Array.prototype.forEach.call(document.querySelectorAll("[data-series-edit]"), function (form) {
+    var name = form.getAttribute("data-series-name");
+    var message = form.querySelector("[data-form-message]");
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      api("/api/config/library", "GET").then(function (library) {
+        var series = (library && library.series) || [];
+        var found = false;
+        series = series.map(function (item) {
+          if (item.name !== name) return item;
+          found = true;
+          item.seasons = form.querySelector("[name=seasons]").value;
+          item.quality = form.querySelector("[name=quality]").value;
+          item.language = form.querySelector("[name=language]").value;
+          item.archive_path = form.querySelector("[name=archive_path]").value;
+          item.exclude = form.querySelector("[name=exclude]").value;
+          return item;
+        });
+        if (!found) { alert("Serie non trovata"); return; }
+        return api("/api/config/series", "POST", series).then(function () {
+          if (message) message.textContent = "Salvata";
+        });
+      }).catch(function (error) {
+        alert("Salvataggio non riuscito: " + error.message);
+      });
     });
   });
 
@@ -742,6 +792,112 @@
     }
   }
 
+  // ---- readable rendering (never JSON) ------------------------------------
+  function renderReadable(container, value) {
+    container.innerHTML = "";
+    function makeNode(item) {
+      if (item === null || item === undefined) return document.createTextNode("—");
+      if (typeof item === "boolean") return document.createTextNode(item ? "Sì" : "No");
+      if (typeof item === "number") return document.createTextNode(String(item));
+      if (typeof item === "string") {
+        if (/^https?:\/\//i.test(item)) {
+          var link = document.createElement("a");
+          link.href = item;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = item;
+          return link;
+        }
+        return document.createTextNode(item);
+      }
+      if (Array.isArray(item)) {
+        var list = document.createElement("ul");
+        list.className = "kv-list";
+        item.forEach(function (entry) {
+          var li = document.createElement("li");
+          li.appendChild(makeNode(entry));
+          list.appendChild(li);
+        });
+        return list;
+      }
+      var dl = document.createElement("dl");
+      dl.className = "kv";
+      Object.keys(item).forEach(function (key) {
+        var dt = document.createElement("dt");
+        dt.textContent = key;
+        var dd = document.createElement("dd");
+        dd.appendChild(makeNode(item[key]));
+        dl.appendChild(dt);
+        dl.appendChild(dd);
+      });
+      return dl;
+    }
+    container.appendChild(makeNode(value));
+  }
+
+  function renderReleaseResults(container, items) {
+    container.innerHTML = "";
+    var table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = "<thead><tr><th>Titolo</th><th>Seed</th><th>Dimensione</th><th></th></tr></thead>";
+    var tbody = document.createElement("tbody");
+    items.forEach(function (release) {
+      var row = document.createElement("tr");
+      row.innerHTML = '<td class="truncate">' + esc(release.title || "—") + '</td><td class="numeric">' +
+        esc(String(release.seeders || 0)) + '</td><td class="numeric">' + humanBytes(release.size_bytes) + "</td>";
+      var cell = document.createElement("td");
+      var button = document.createElement("button");
+      button.className = "btn sm primary";
+      button.textContent = "Accoda";
+      button.addEventListener("click", function () {
+        button.disabled = true;
+        api("/api/search/add", "POST", { release: release }).then(function () {
+          button.textContent = "Accodata";
+        }).catch(function (error) {
+          alert("Non accodata: " + error.message);
+          button.disabled = false;
+        });
+      });
+      cell.appendChild(button);
+      row.appendChild(cell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  function renderTmdbResults(container, items, form) {
+    container.innerHTML = "";
+    var kindField = form ? form.querySelector("[name=kind]") : null;
+    var kind = kindField ? kindField.value : "series";
+    var table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = "<thead><tr><th>Titolo</th><th>Anno</th><th>ID</th><th></th></tr></thead>";
+    var tbody = document.createElement("tbody");
+    items.forEach(function (item) {
+      var title = item.name || item.title || "—";
+      var year = String(item.first_air_date || item.release_date || "").slice(0, 4);
+      var id = item.id || item.tmdb_id || item.tvdb_id || "";
+      var row = document.createElement("tr");
+      row.innerHTML = "<td>" + esc(title) + "</td><td>" + esc(year) + "</td><td>" + esc(String(id)) + "</td>";
+      var cell = document.createElement("td");
+      var button = document.createElement("button");
+      button.className = "btn sm primary";
+      button.textContent = "Aggiungi";
+      button.addEventListener("click", function () {
+        button.disabled = true;
+        api("/api/tmdb/add", "POST", { kind: kind, name: title, year: year, tmdb_id: String(id) })
+          .then(function () { button.textContent = "Aggiunto"; })
+          .catch(function (error) { alert("Aggiunta non riuscita: " + error.message); button.disabled = false; });
+      });
+      cell.appendChild(button);
+      row.appendChild(cell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
   // ---- generic JSON forms (section forms) ---------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-json-form]"), function (form) {
     form.addEventListener("submit", function (event) {
@@ -760,7 +916,13 @@
         if (message) message.textContent = "Fatto";
         if (output && data !== undefined && data !== null && data !== "") {
           output.hidden = false;
-          output.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+          if (form.getAttribute("data-render") === "tmdb" && data && Array.isArray(data.items)) {
+            renderTmdbResults(output, data.items, form);
+          } else if (form.getAttribute("data-render") === "releases" && data && Array.isArray(data.results)) {
+            renderReleaseResults(output, data.results);
+          } else {
+            renderReadable(output, data);
+          }
         }
       }).catch(function (error) {
         alert("Operazione non riuscita: " + error.message);
@@ -802,7 +964,7 @@
       var output = panel.querySelector("[data-oauth-output]");
       start.disabled = true;
       api(start.getAttribute("data-oauth-start"), "POST", {})
-        .then(function (data) { if (output) output.textContent = JSON.stringify(data, null, 2); })
+        .then(function (data) { if (output) renderReadable(output, data); })
         .catch(function (error) { if (output) output.textContent = error.message; })
         .then(function () { start.disabled = false; });
       return;
@@ -816,7 +978,7 @@
       if (!code) { alert("Inserisci il codice di accesso"); return; }
       poll.disabled = true;
       api(poll.getAttribute("data-oauth-poll"), "POST", { code: code })
-        .then(function (data) { if (output2) output2.textContent = JSON.stringify(data, null, 2); })
+        .then(function (data) { if (output2) renderReadable(output2, data); })
         .catch(function (error) { if (output2) output2.textContent = error.message; })
         .then(function () { poll.disabled = false; });
       return;

@@ -175,9 +175,9 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 		marker string
 	}{
 		{"/ui?view=settings&tab=i18n", `data-i18n-editor`},
-		{"/ui?view=settings&tab=advanced", `data-json-editor`},
+		{"/ui?view=settings&tab=advanced", `data-list-editor`},
 		{"/ui?view=settings&tab=sources", `data-sources-editor`},
-		{"/ui?view=settings&tab=libreria", `data-library-editor`},
+		{"/ui?view=settings&tab=sources", `data-list-editor`},
 		{"/ui?view=series", `series_link`},
 		{"/ui?view=movies", `movie_link`},
 		{"/ui?view=comics", `/api/comics/{id}/enabled`},
@@ -341,9 +341,8 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 	// Each tab query selects exactly one section.
 	for path, marker := range map[string]string{
 		"/ui?view=settings&tab=i18n":     "data-i18n-editor",
-		"/ui?view=settings&tab=advanced": "data-json-editor",
+		"/ui?view=settings&tab=advanced": "data-list-editor",
 		"/ui?view=settings&tab=sources":  "data-sources-editor",
-		"/ui?view=settings&tab=libreria": "data-library-editor",
 	} {
 		code, _, body := webGet(t, server, path)
 		if code != http.StatusOK || !strings.Contains(string(body), marker) {
@@ -377,28 +376,36 @@ func TestUiSettingKindMasksStructuredSecrets(t *testing.T) {
 	}
 }
 
-// TestUiJSONEditorRoundTripShape pins the unwrap/wrap of each structured editor:
-// the GET response and the POST body have different shapes, and a mismatch would
-// make "Salva" fail with HTTP 400.
-func TestUiJSONEditorRoundTripShape(t *testing.T) {
-	want := map[string]struct{ unwrap, wrap string }{
-		"/api/config/source-filters": {"filters", "filters"},
-		"/api/tag-dir-rules":         {"items", ""},
-		"/api/event-hooks":           {"items", ""},
-		"/api/watched-folders":       {"items", ""},
+// TestUiListEditorShape pins the load/save shape of each structured list editor
+// (the GET response and the POST body differ, and a mismatch would make "Salva"
+// fail with HTTP 400).
+func TestUiListEditorShape(t *testing.T) {
+	byTitle := map[string]uiListEditor{}
+	for _, editor := range append([]uiListEditor{uiIndexerEditor}, uiAdvancedEditors...) {
+		byTitle[editor.Title] = editor
 	}
-	if len(uiJSONEditors) != len(want) {
-		t.Fatalf("got %d editors, want %d", len(uiJSONEditors), len(want))
+	checks := map[string]struct {
+		get, unwrap, wrap, postKey string
+	}{
+		"Indexer Torznab":       {"/api/config", "indexers", "", "indexers"},
+		"Filtri per sorgente":   {"/api/config/source-filters", "filters", "filters", ""},
+		"Regole tag → cartella": {"/api/tag-dir-rules", "items", "", ""},
+		"Event hook":            {"/api/event-hooks", "items", "", ""},
+		"Cartelle osservate":    {"/api/watched-folders", "items", "", ""},
 	}
-	for _, editor := range uiJSONEditors {
-		expected, ok := want[editor.GetPath]
+	for title, want := range checks {
+		editor, ok := byTitle[title]
 		if !ok {
-			t.Errorf("unexpected editor %q", editor.GetPath)
+			t.Errorf("missing list editor %q", title)
 			continue
 		}
-		if editor.Unwrap != expected.unwrap || editor.Wrap != expected.wrap {
-			t.Errorf("%s: unwrap/wrap = %q/%q, want %q/%q",
-				editor.GetPath, editor.Unwrap, editor.Wrap, expected.unwrap, expected.wrap)
+		if editor.GetPath != want.get || editor.Unwrap != want.unwrap || editor.Wrap != want.wrap || editor.PostKey != want.postKey {
+			t.Errorf("%s: get/unwrap/wrap/postKey = %q/%q/%q/%q, want %q/%q/%q/%q",
+				title, editor.GetPath, editor.Unwrap, editor.Wrap, editor.PostKey,
+				want.get, want.unwrap, want.wrap, want.postKey)
+		}
+		if len(editor.Fields) == 0 {
+			t.Errorf("%s: no fields", title)
 		}
 	}
 }
@@ -522,7 +529,7 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 	add("POST", "/api/backup")
 	add("POST", "/api/search")
 	add("POST", "/api/search/add")
-	for _, editor := range uiJSONEditors {
+	for _, editor := range append([]uiListEditor{uiIndexerEditor}, uiAdvancedEditors...) {
 		add("GET", editor.GetPath)
 		add("POST", editor.PostPath)
 	}

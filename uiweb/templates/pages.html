@@ -52,7 +52,7 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}">
+    <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-render="{{.Render}}">
       {{range .Fields}}
       <label class="field"><span>{{.Label}}</span>
         {{if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" placeholder="{{.Placeholder}}" rows="3">{{.Value}}</textarea>
@@ -65,7 +65,7 @@
         <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>
         <small class="muted" data-form-message></small>
       </div>
-      <pre class="output" data-form-output hidden></pre>
+      <div class="output" data-form-output hidden></div>
     </form>
   </div>
 </div>
@@ -77,8 +77,24 @@
 {{else if eq .Kind "form"}}{{template "form_section" .Form}}
 {{else if eq .Kind "progress"}}{{template "progress_section" .Progress}}
 {{else if eq .Kind "links"}}{{template "links_section" .Links}}
+{{else if eq .Kind "oauth"}}{{template "oauth_section" .OAuth}}
 {{else if eq .Kind "comics_links"}}{{template "comics_links" .}}
 {{end}}
+{{end}}
+
+{{define "oauth_section"}}
+<div class="panel">
+  <div class="panel-head"><h3>{{.Name}}</h3></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <button class="btn sm primary" data-oauth-start="{{.StartPath}}">Avvia accesso</button>
+      <input class="input" data-oauth-code placeholder="codice" />
+      <button class="btn sm" data-oauth-poll="{{.PollPath}}">Conferma</button>
+      {{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}">{{.Label}}</button>{{end}}
+    </div>
+    <div class="output" data-oauth-output></div>
+  </div>
+</div>
 {{end}}
 
 {{define "links_section"}}
@@ -170,11 +186,11 @@
   <div class="panel">
     <div class="panel-head"><h3>Aggiungi da TMDB/TVDB</h3></div>
     <div class="panel-body">
-      <form class="form-grid" data-json-form data-endpoint="/api/tmdb/search">
+      <form class="form-grid" data-json-form data-render="tmdb" data-endpoint="/api/tmdb/search">
         <label class="field"><span>Tipo</span><select class="input" name="kind"><option value="series" selected>Serie TV</option><option value="movie">Film</option></select></label>
         <label class="field"><span>Titolo</span><input class="input" name="query" placeholder="es. Il Signore degli Anelli" /></label>
         <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message></small></div>
-        <pre class="output" data-form-output hidden></pre>
+        <div class="output" data-form-output hidden></div>
       </form>
       <p class="hint">Usa l'ID TMDB restituito in "Aggiungi serie/film" nelle pagine Serie TV / Film.</p>
     </div>
@@ -195,7 +211,7 @@
         <button class="btn sm" data-api="/api/trakt/auth/refresh" data-method="POST" data-body="{}" title="Rinnova il token">Refresh</button>
         <button class="btn sm danger" data-api="/api/trakt/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
       </div>
-      <pre class="output" data-oauth-output></pre>
+      <div class="output" data-oauth-output></div>
     </div>
   </div>
   <div class="panel">
@@ -208,7 +224,7 @@
         <button class="btn sm" data-oauth-poll="/api/simkl/auth/poll" title="Conferma il PIN">Conferma</button>
         <button class="btn sm danger" data-api="/api/simkl/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
       </div>
-      <pre class="output" data-oauth-output></pre>
+      <div class="output" data-oauth-output></div>
     </div>
   </div>
   <div class="panel">
@@ -258,6 +274,20 @@
       {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
     </div>
   </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Modifica serie</h3></div>
+    <div class="panel-body">
+      <form class="form-grid" data-series-edit data-series-name="{{.Name}}">
+        <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" readonly /></label>
+        <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
+        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" /></label>
+        <label class="field"><span>Lingua</span><input class="input" name="language" value="{{.Language}}" /></label>
+        <label class="field"><span>Percorso archivio</span><input class="input" name="archive_path" value="{{.ArchivePath}}" /></label>
+        <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message></small></div>
+      </form>
+    </div>
+  </div>
 </div>
 {{end}}
 
@@ -301,11 +331,16 @@
 {{define "settings_field"}}
 <form class="card setting" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
   <label class="setting-label" for="input-{{.Key}}">{{.Label}}</label>
+  {{if eq .Kind "structured"}}
+  <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
+  {{else}}
   {{if eq .Kind "bool"}}
   <select class="input" data-setting-input id="input-{{.Key}}">
     <option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option>
     <option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option>
   </select>
+  {{else if eq .Kind "tags"}}
+  <textarea class="input" data-setting-input data-tag-json="{{if .TagJSON}}true{{else}}false{{end}}" id="input-{{.Key}}" rows="3" placeholder="un valore per riga">{{.Value}}</textarea>
   {{else if eq .Kind "area"}}
   <textarea class="input" data-setting-input id="input-{{.Key}}" rows="3">{{.Value}}</textarea>
   {{else if eq .Kind "secret"}}
@@ -317,7 +352,36 @@
     <code class="setting-key">{{.Key}}</code>
     <button class="btn sm primary" type="submit">Salva</button>
   </div>
+  {{end}}
 </form>
+{{end}}
+
+{{define "list_editor"}}
+<div class="card editor-card" data-list-editor
+     data-get="{{.GetPath}}" data-post="{{.PostPath}}"
+     data-unwrap="{{.Unwrap}}" data-wrap="{{.Wrap}}" data-post-key="{{.PostKey}}">
+  <h3>{{.Title}}</h3>
+  {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+  <div data-list-rows></div>
+  <template data-list-row>
+    <div class="card list-row">
+      {{range .Fields}}
+      {{if eq .Kind "bool"}}<label class="field"><span>{{.Label}}</span><select class="input" data-field="{{.Name}}" data-kind="bool"><option value="true">Sì</option><option value="false">No</option></select></label>
+      {{else if eq .Kind "number"}}<label class="field"><span>{{.Label}}</span><input class="input" type="number" data-field="{{.Name}}" data-kind="number" /></label>
+      {{else if eq .Kind "tags"}}<label class="field"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="tags" placeholder="{{.Placeholder}}" /></label>
+      {{else if eq .Kind "secret"}}<label class="field"><span>{{.Label}}</span><input class="input" type="password" data-field="{{.Name}}" data-kind="text" autocomplete="new-password" /></label>
+      {{else}}<label class="field"><span>{{.Label}}</span><input class="input" data-field="{{.Name}}" data-kind="text" placeholder="{{.Placeholder}}" /></label>
+      {{end}}
+      {{end}}
+      <div class="form-actions"><button class="btn sm danger" type="button" data-list-remove>Rimuovi</button></div>
+    </div>
+  </template>
+  <div class="form-actions">
+    <button class="btn sm" type="button" data-list-add>Aggiungi riga</button>
+    <button class="btn sm primary" type="button" data-list-save>Salva</button>
+    <small class="muted" data-list-message></small>
+  </div>
+</div>
 {{end}}
 
 {{define "settings"}}
@@ -336,37 +400,19 @@
       {{range .Fields}}{{template "settings_field" .}}{{end}}
     </div>
     {{end}}
-    {{if and (not .Fields) (not (or .ShowSources .ShowLibrary .ShowEditors .ShowI18n))}}
+    {{if and (not .Fields) (not .ListEditors) (not (or .ShowSources .ShowEditors .ShowI18n))}}
     <p class="muted">Nessuna impostazione in questa sezione.</p>
     {{end}}
 
     {{if .ShowSources}}
     <div class="card editor-card" data-sources-editor>
-      <h3>Feed e indexer</h3>
-      <label class="field"><span>Feed RSS (un URL per riga)</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
-      <label class="field"><span>Indexer Torznab (JSON)</span><textarea class="input" data-sources-indexers rows="6"></textarea></label>
-      <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva sorgenti</button><small class="muted" data-sources-message></small></div>
+      <h3>Feed RSS</h3>
+      <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="4"></textarea></label>
+      <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message></small></div>
     </div>
     {{end}}
 
-    {{if .ShowEditors}}
-    {{range .Editors}}
-    <div class="card editor-card" data-json-editor data-get="{{.GetPath}}" data-post="{{.PostPath}}" data-unwrap="{{.Unwrap}}" data-wrap="{{.Wrap}}">
-      <h3>{{.Label}}</h3>
-      <textarea class="input" data-json-text rows="5"></textarea>
-      <div class="form-actions"><button class="btn sm primary" data-json-save>Salva</button><small class="muted" data-json-message></small></div>
-    </div>
-    {{end}}
-    {{end}}
-
-    {{if .ShowLibrary}}
-    <div class="card editor-card" data-library-editor>
-      <h3>Libreria</h3>
-      <label class="field"><span>Serie monitorizzate (JSON)</span><textarea class="input" data-library-series rows="6"></textarea></label>
-      <label class="field"><span>Film monitorizzati (JSON)</span><textarea class="input" data-library-movies rows="6"></textarea></label>
-      <div class="form-actions"><button class="btn sm primary" data-library-save>Salva libreria</button><small class="muted" data-library-message></small></div>
-    </div>
-    {{end}}
+    {{range .ListEditors}}{{template "list_editor" .}}{{end}}
 
     {{if .ShowI18n}}
     <div class="card editor-card" data-i18n-editor>
