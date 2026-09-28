@@ -55,12 +55,14 @@
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <form class="form-grid" data-json-form data-endpoint="{{.Path}}" data-method="{{.Method}}" data-wrap="{{.Wrap}}" data-render="{{.Render}}">
       {{range .Fields}}
-      <label class="field"><span>{{.Label}}</span>
+      {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
+      {{else}}<label class="field"><span>{{.Label}}</span>
         {{if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" placeholder="{{.Placeholder}}" rows="3">{{.Value}}</textarea>
         {{else if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
         {{else}}<input class="input" name="{{.Name}}" type="{{if .Kind}}{{.Kind}}{{else}}text{{end}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
         {{end}}
       </label>
+      {{end}}
       {{end}}
       <div class="form-actions">
         <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>

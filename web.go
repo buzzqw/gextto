@@ -918,6 +918,8 @@ type TmdbAddInput struct {
 	Seasons     string `json:"seasons"`
 	ArchivePath string `json:"archive_path"`
 	Exclude     string `json:"exclude"`
+	Subtitle    string `json:"subtitle"`
+	Aliases     string `json:"aliases"`
 }
 
 // DiscoverInput is the input of `tmdb_discover`.

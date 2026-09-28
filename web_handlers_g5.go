@@ -1186,7 +1186,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Quality:              strings.TrimSpace(input.Quality),
 			Language:             language,
 			Enabled:              true,
-			Subtitle:             "",
+			Subtitle:             strings.TrimSpace(input.Subtitle),
 			Exclude:              strings.TrimSpace(input.Exclude),
 			LanguageRequirements: "",
 			SubtitleRequirements: "",
@@ -1214,10 +1214,10 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Language:         language,
 			ArchivePath:      strings.TrimSpace(input.ArchivePath),
 			Timeframe:        0,
-			Aliases:          nil,
+			Aliases:          splitAliases(input.Aliases),
 			TmdbID:           strings.TrimSpace(input.TmdbId),
 			TvdbID:           strings.TrimSpace(input.TvdbId),
-			Subtitle:         "",
+			Subtitle:         strings.TrimSpace(input.Subtitle),
 			Exclude:          strings.TrimSpace(input.Exclude),
 			Enabled:          true,
 			IgnoredSeasons:   nil,
@@ -1234,6 +1234,20 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"name":             input.Name,
 		"restart_required": true,
 	})
+}
+
+// splitAliases parses a comma separated alias list into a clean slice.
+func splitAliases(raw string) []string {
+	aliases := []string{}
+	for _, part := range strings.Split(raw, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			aliases = append(aliases, trimmed)
+		}
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	return aliases
 }
 
 // TorrentNoRenameList implements `torrent_no_rename_list`.

@@ -47,17 +47,24 @@ type qbittorrentSettings struct {
 
 // qbittorrentSettingsFromConfig reads the qBittorrent settings from a Config.
 func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
+	if cfg == nil {
+		return qbittorrentSettings{}, fmt.Errorf("qBittorrent configuration is unavailable")
+	}
 	timeout := 15 * time.Second
 	if value, ok := cfg.Settings["qbittorrent_request_timeout_secs"]; ok {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
-			timeout = time.Duration(parsed) * time.Second
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || parsed < 1 || parsed > 300 {
+			return qbittorrentSettings{}, fmt.Errorf("qbittorrent_request_timeout_secs must be between 1 and 300")
 		}
+		timeout = time.Duration(parsed) * time.Second
 	}
 	poll := 1500 * time.Millisecond
 	if value, ok := cfg.Settings["qbittorrent_poll_interval_ms"]; ok {
-		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && parsed > 0 {
-			poll = time.Duration(parsed) * time.Millisecond
+		parsed, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil || parsed < 250 || parsed > 60000 {
+			return qbittorrentSettings{}, fmt.Errorf("qbittorrent_poll_interval_ms must be between 250 and 60000")
 		}
+		poll = time.Duration(parsed) * time.Millisecond
 	}
 	mappings, err := ParsePathMappings(cfg.Settings["qbittorrent_path_mappings"])
 	if err != nil {
@@ -85,9 +92,13 @@ type qbittorrentEngine struct {
 	client   *qbittorrent.Client
 
 	categoryReady bool
+	queueMu       sync.Mutex
 	queueManaged  bool
+	queueChanged  bool
+	queueOriginal bool
 
 	mu           sync.Mutex
+	syncMu       sync.Mutex
 	cache        map[string]models.TorrentView
 	previous     map[string]models.TorrentView
 	events       []models.TorrentEvent
@@ -95,6 +106,7 @@ type qbittorrentEngine struct {
 	policyPaused map[string]struct{}
 	pendingMoves map[string]string
 	lastSync     time.Time
+	lastAttempt  time.Time
 	lastErr      string
 	connected    bool
 }
@@ -271,16 +283,34 @@ func (e *qbittorrentEngine) toView(t qbittorrent.Torrent) models.TorrentView {
 // cache is kept (stale) and the error is recorded: no destructive action may
 // follow a backend outage.
 func (e *qbittorrentEngine) sync() error {
+	e.syncMu.Lock()
+	defer e.syncMu.Unlock()
+
+	now := time.Now()
+	e.mu.Lock()
+	if !e.lastSync.IsZero() && now.Sub(e.lastSync) < e.settings.PollInterval {
+		e.mu.Unlock()
+		return nil
+	}
+	// Failed requests are throttled too. Without this guard every UI refresh,
+	// queue decision and status page would create a request storm while the
+	// external daemon is down.
+	if !e.lastAttempt.IsZero() && !e.connected && now.Sub(e.lastAttempt) < e.settings.PollInterval {
+		e.mu.Unlock()
+		return nil
+	}
+	e.lastAttempt = now
+	e.mu.Unlock()
+
 	ctx, cancel := e.requestContext()
 	defer cancel()
 	torrents, err := e.client.Torrents(ctx)
-	now := time.Now()
 
 	e.mu.Lock()
-	defer e.mu.Unlock()
 	if err != nil {
 		e.connected = false
 		e.lastErr = err.Error()
+		e.mu.Unlock()
 		return err
 	}
 	e.connected = true
@@ -289,6 +319,9 @@ func (e *qbittorrentEngine) sync() error {
 
 	next := make(map[string]models.TorrentView, len(torrents))
 	for _, t := range torrents {
+		if !e.managedTorrent(t) {
+			continue
+		}
 		view := e.toView(t)
 		if view.Hash == "" {
 			continue
@@ -327,18 +360,50 @@ func (e *qbittorrentEngine) sync() error {
 	e.previous = next
 	e.cache = next
 	// Keep a Gextto-owned .torrent for every torrent whose metadata is known, so
-	// export and backend migration do not depend on qBittorrent retention.
+	// export and backend migration do not depend on qBittorrent retention. Do
+	// not perform the HTTP export while holding e.mu: an old qBittorrent can take
+	// seconds to answer and would block every read/control operation.
+	var export []string
 	for hash, view := range next {
 		if view.HasMetadata {
-			e.ensureTorrentFileLocked(hash)
+			target := filepath.Join(e.settings.stateDir, hash+".torrent")
+			if e.settings.stateDir != "" && !fileExists(target) {
+				export = append(export, hash)
+			}
 		}
+	}
+	e.mu.Unlock()
+	for _, hash := range export {
+		e.ensureTorrentFile(hash)
 	}
 	return nil
 }
 
-// ensureTorrentFileLocked downloads and stores the .torrent once. Called with
-// e.mu held; failures are non-fatal (older qBittorrent has no export endpoint).
-func (e *qbittorrentEngine) ensureTorrentFileLocked(hash string) {
+// managedTorrent applies the optional category/tag ownership boundary. If no
+// marker is configured, the adapter keeps the backwards-compatible behavior of
+// managing every torrent visible to qBittorrent.
+func (e *qbittorrentEngine) managedTorrent(t qbittorrent.Torrent) bool {
+	if category := e.settings.Category; category != "" && strings.TrimSpace(t.Category) != category {
+		return false
+	}
+	if wanted := e.settings.Tag; wanted != "" {
+		found := false
+		for _, tag := range strings.Split(t.Tags, ",") {
+			if strings.TrimSpace(tag) == wanted {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// ensureTorrentFile downloads and stores the .torrent once. Failures are
+// non-fatal (older qBittorrent has no export endpoint).
+func (e *qbittorrentEngine) ensureTorrentFile(hash string) {
 	if e.settings.stateDir == "" {
 		return
 	}
@@ -365,15 +430,36 @@ func (e *qbittorrentEngine) ensureTorrentFileLocked(hash string) {
 // ensureQueueingLocked disables qBittorrent's own queue once: Gextto owns the
 // active-download decision, so the backend must not independently queue.
 func (e *qbittorrentEngine) ensureQueueingLocked() {
+	e.queueMu.Lock()
 	if e.queueManaged {
+		e.queueMu.Unlock()
 		return
 	}
-	e.queueManaged = true
+	e.queueMu.Unlock()
+
 	ctx, cancel := e.requestContext()
 	defer cancel()
-	if err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": false}); err != nil {
-		logging.Debug("qbittorrent queueing disable skipped", "error", err.Error())
+	prefs, err := e.client.Preferences(ctx)
+	if err != nil {
+		logging.Debug("qbittorrent queueing preference unavailable", "error", err.Error())
+		return
 	}
+	original, ok := prefs["queueing_enabled"].(bool)
+	if !ok {
+		logging.Debug("qbittorrent queueing preference has no boolean value")
+		return
+	}
+	if original {
+		if err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": false}); err != nil {
+			logging.Debug("qbittorrent queueing disable skipped", "error", err.Error())
+			return
+		}
+	}
+	e.queueMu.Lock()
+	e.queueManaged = true
+	e.queueOriginal = original
+	e.queueChanged = original
+	e.queueMu.Unlock()
 }
 
 // AdjustQueue enforces Gextto's active-download slots above qBittorrent. It
@@ -394,9 +480,9 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 		limit = 1
 	}
 	views := e.List()
+	e.ensureQueueingLocked()
 
 	e.mu.Lock()
-	e.ensureQueueingLocked()
 	type candidate struct {
 		hash string
 		pos  int
@@ -524,6 +610,29 @@ func (e *qbittorrentEngine) SyncStats() map[string]any {
 		stats["last_error"] = e.lastErr
 	}
 	return stats
+}
+
+// Close restores qBittorrent's queueing preference when Gextto temporarily
+// disabled it. Gextto owns scheduling while running, but must not leave a
+// user's external qBittorrent configuration altered after shutdown.
+func (e *qbittorrentEngine) Close() error {
+	e.queueMu.Lock()
+	if !e.queueManaged || !e.queueChanged {
+		e.queueMu.Unlock()
+		return nil
+	}
+	original := e.queueOriginal
+	e.queueMu.Unlock()
+
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetPreferences(ctx, map[string]any{"queueing_enabled": original}); err != nil {
+		return err
+	}
+	e.queueMu.Lock()
+	e.queueChanged = false
+	e.queueMu.Unlock()
+	return nil
 }
 
 // Stats returns the global transfer statistics in Gextto's shape.

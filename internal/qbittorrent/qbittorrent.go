@@ -52,6 +52,7 @@ type Client struct {
 	http *http.Client
 
 	mu       sync.Mutex
+	loginMu  sync.Mutex
 	loggedIn bool
 	appVer   string
 	apiVer   string
@@ -64,8 +65,12 @@ func New(cfg Config) (*Client, error) {
 	if base == "" {
 		return nil, fmt.Errorf("qbittorrent: empty base url")
 	}
-	if _, err := url.Parse(base); err != nil {
+	parsed, err := url.Parse(base)
+	if err != nil {
 		return nil, fmt.Errorf("qbittorrent: invalid base url: %w", err)
+	}
+	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return nil, fmt.Errorf("qbittorrent: base url must be an http(s) URL with a host")
 	}
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -308,6 +313,18 @@ func (c *Client) ensureLogin(ctx context.Context) error {
 
 // Login authenticates and stores the SID cookie in the jar.
 func (c *Client) Login(ctx context.Context) error {
+	// Several workers can notice an expired SID at the same time. Serialize the
+	// refresh and re-check the flag after waiting, otherwise qBittorrent sees a
+	// burst of needless logins (and may rate-limit the account).
+	c.loginMu.Lock()
+	defer c.loginMu.Unlock()
+	c.mu.Lock()
+	if c.loggedIn {
+		c.mu.Unlock()
+		return nil
+	}
+	c.mu.Unlock()
+
 	form := url.Values{"username": {c.user}, "password": {c.pass}}
 	status, payload, err := c.attempt(ctx, http.MethodPost, loginPath, formBody(form))
 	if err != nil {
