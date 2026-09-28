@@ -1401,8 +1401,8 @@
           var values = links[group.key] || [];
           if (!values.length) return "";
           return '<div class="field span-full" style="margin-top:10px"><span>' + esc(group.label) + "</span></div>" +
-            '<div class="toolbar">' + values.map(function (value) {
-              var body = JSON.stringify({ url: value, method: group.method, title: "", post_url: postURL });
+            '<div class="toolbar">' + values.map(function (value, index) {
+              var body = JSON.stringify({ url: value, method: group.method, title: "Comic " + group.label + " " + (index + 1), post_url: postURL });
               return '<button class="btn sm" data-api="/api/comics/download" data-method="POST" data-body="' + esc(body) + '" title="' + esc(value) + '">Scarica</button>';
             }).join(" ") + "</div>";
         }).join("");
@@ -2705,6 +2705,8 @@
             renderTmdbResults(output, data.items, form);
           } else if (form.getAttribute("data-render") === "releases" && data && Array.isArray(data.results)) {
             renderReleaseResults(output, data.results);
+          } else if (form.getAttribute("data-render") === "comics" && data && Array.isArray(data.items)) {
+            renderComicsResults(output, data.items);
           } else {
             renderReadable(output, data);
           }
@@ -2777,4 +2779,207 @@
       return;
     }
   });
+
+  // ---- series detail hero + episode filter --------------------------------
+  var seriesHero = document.querySelector("[data-series-hero]");
+  if (seriesHero) {
+    var heroSeriesName = seriesHero.getAttribute("data-series-name") || "";
+    if (heroSeriesName) {
+      api("/api/series/" + heroSeriesName + "/info", "GET").then(function (data) {
+        renderSeriesHero(seriesHero, (data && data.info) || {});
+      }).catch(function (error) {
+        seriesHero.innerHTML = '<div class="panel-body"><p class="alert">' + esc(error.message) + "</p></div>";
+      });
+    }
+  }
+  var seriesFilter = document.querySelector("[data-series-filter]");
+  if (seriesFilter) {
+    seriesFilter.addEventListener("input", function () {
+      var query = (seriesFilter.value || "").trim().toLowerCase();
+      Array.prototype.forEach.call(document.querySelectorAll(".series-episodes tbody tr"), function (row) {
+        row.hidden = query !== "" && (row.textContent || "").toLowerCase().indexOf(query) < 0;
+      });
+    });
+  }
+
+  function renderSeriesHero(hero, info) {
+    var name = String(info.name || hero.getAttribute("data-name") || "");
+    var poster = String(info.poster || "");
+    var html = '<div class="series-hero-main">';
+    if (poster && safeHref(poster)) {
+      html += '<img class="series-poster" loading="lazy" alt="' + esc(name) + '" src="' + esc(safeHref(poster)) + '" />';
+    } else {
+      html += '<div class="series-poster placeholder">N/D</div>';
+    }
+    html += '<div class="series-hero-body">';
+    html += "<h2>" + esc(name) + (info.year ? ' <small class="muted">' + esc(String(info.year)) + "</small>" : "") + "</h2>";
+    var badges = [];
+    if (info.network) badges.push(String(info.network));
+    if (info.country) badges.push(String(info.country));
+    if (info.vote) badges.push("★ " + String(info.vote));
+    if (info.seasons) badges.push(String(info.seasons) + " stagioni");
+    if (info.last_air_date) badges.push("ultima " + String(info.last_air_date));
+    if (info.status) badges.push(String(info.status));
+    if (badges.length) {
+      html += '<div class="series-badges">' + badges.map(function (badge) {
+        return '<span class="badge">' + esc(badge) + "</span>";
+      }).join(" ") + "</div>";
+    }
+    var meta = [];
+    var quality = hero.getAttribute("data-quality") || "";
+    var language = hero.getAttribute("data-language") || "";
+    var archive = hero.getAttribute("data-archive") || "";
+    var enabled = hero.getAttribute("data-enabled") === "true";
+    if (quality) meta.push("Qualità: " + quality);
+    if (language) meta.push("Lingua: " + language);
+    if (archive) meta.push("Archivio: " + archive);
+    meta.push(enabled ? "attiva" : "in pausa");
+    html += '<p class="muted">' + esc(meta.join(" · ")) + "</p>";
+    if (info.overview) html += '<p class="series-overview">' + esc(String(info.overview)) + "</p>";
+    if (Array.isArray(info.genres) && info.genres.length) {
+      html += '<div class="series-genres">' + info.genres.map(function (genre) {
+        return '<span class="badge">' + esc(String(genre)) + "</span>";
+      }).join(" ") + "</div>";
+    }
+    if (Array.isArray(info.cast) && info.cast.length) {
+      html += '<p class="muted"><small>Cast: ' + esc(info.cast.slice(0, 10).map(function (person) {
+        return String(person.name || "");
+      }).join(", ")) + "</small></p>";
+    }
+    var next = info.next_episode;
+    if (next && next.name) {
+      html += '<p class="muted"><small>Prossima: S' + esc(String(next.season_number || "—")) +
+        "E" + esc(String(next.episode_number || "—")) + " · " + esc(String(next.name)) +
+        " · " + esc(String(next.air_date || "")) + "</small></p>";
+    }
+    var links = "";
+    if (info.tvdb_url && safeHref(info.tvdb_url)) {
+      links += '<a class="btn sm" href="' + esc(safeHref(info.tvdb_url)) + '" target="_blank" rel="noopener">TVDB</a>';
+    }
+    if (info.tmdb_id) {
+      links += ' <a class="btn sm" href="https://www.themoviedb.org/tv/' + encodeURIComponent(String(info.tmdb_id)) + '" target="_blank" rel="noopener">TMDB</a>';
+    }
+    if (links) html += '<div class="series-links">' + links + "</div>";
+    html += "</div></div>";
+    hero.innerHTML = '<div class="panel-body series-hero">' + html + "</div>";
+  }
+
+  // ---- comics explore results (Download Now / Seleziona) ------------------
+  function renderComicsResults(container, items) {
+    container.innerHTML = "";
+    if (!items.length) { container.innerHTML = '<p class="muted">Nessun risultato su GetComics.</p>'; return; }
+    var table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = "<thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead>";
+    var tbody = document.createElement("tbody");
+    items.forEach(function (item) {
+      var row = document.createElement("tr");
+      var titleCell = document.createElement("td");
+      if (item.url) {
+        var link = document.createElement("a");
+        link.href = safeHref(item.url);
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = String(item.title || item.url);
+        titleCell.appendChild(link);
+      } else {
+        titleCell.textContent = String(item.title || "—");
+      }
+      var dateCell = document.createElement("td");
+      dateCell.textContent = String(item.date || "—");
+      var actionsCell = document.createElement("td");
+      actionsCell.className = "row-actions";
+      var download = document.createElement("button");
+      download.className = "btn sm primary";
+      download.textContent = "Scarica";
+      download.title = "Risolvi i link del post e avvia Download Now";
+      download.addEventListener("click", function () {
+        if (!item.url) { notify("Post senza URL", "err"); return; }
+        download.disabled = true;
+        api("/api/comics/links", "POST", { url: item.url }).then(function (data) {
+          var links = (data && data.links) || {};
+          var url = (links.download_now || [])[0] || (links.direct || [])[0];
+          if (!url) throw new Error("Download Now non trovato per questo post");
+          return api("/api/comics/download", "POST", {
+            url: url,
+            method: "direct",
+            title: "Comic " + String(item.title || "download"),
+            post_url: item.url,
+            save_path: ""
+          });
+        }).then(function () {
+          download.textContent = "Avviato";
+          notify("Download avviato", "ok");
+        }).catch(function (error) {
+          notify("Download non avviato: " + error.message, "err");
+          download.disabled = false;
+        });
+      });
+      var select = document.createElement("button");
+      select.className = "btn sm";
+      select.textContent = "Seleziona";
+      select.title = "Aggiungi questo fumetto alla libreria monitorata";
+      select.addEventListener("click", function () { renderComicSelect(container, item); });
+      actionsCell.appendChild(download);
+      actionsCell.appendChild(select);
+      row.appendChild(titleCell);
+      row.appendChild(dateCell);
+      row.appendChild(actionsCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  function renderComicSelect(container, item) {
+    var box = document.createElement("div");
+    box.className = "card editor-card";
+    var heading = document.createElement("h3");
+    heading.textContent = "Fumetto selezionato";
+    box.appendChild(heading);
+    var name = document.createElement("p");
+    name.className = "muted";
+    name.textContent = String(item.title || "");
+    box.appendChild(name);
+    var pathField = document.createElement("label");
+    pathField.className = "field";
+    var pathLabel = document.createElement("span");
+    pathLabel.textContent = "Percorso archivio (opzionale)";
+    var pathInput = document.createElement("input");
+    pathInput.className = "input";
+    pathInput.placeholder = "cartella fumetti predefinita";
+    pathField.appendChild(pathLabel);
+    pathField.appendChild(pathInput);
+    box.appendChild(pathField);
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var add = document.createElement("button");
+    add.className = "btn sm primary";
+    add.textContent = "Aggiungi fumetto selezionato";
+    add.addEventListener("click", function () {
+      add.disabled = true;
+      api("/api/comics", "POST", {
+        title: String(item.title || ""),
+        tag_url: String(item.tag_url || item.url || ""),
+        post_url: String(item.url || ""),
+        cover_url: String(item.cover_url || ""),
+        publisher: String(item.publisher || ""),
+        description: String(item.description || ""),
+        from_date: String(item.date || ""),
+        save_path: pathInput.value.trim()
+      }).then(function () {
+        notify("Fumetto aggiunto", "ok");
+        box.remove();
+      }).catch(function (error) { notify("Aggiunta non riuscita: " + error.message, "err"); add.disabled = false; });
+    });
+    var cancel = document.createElement("button");
+    cancel.className = "btn sm";
+    cancel.textContent = "Annulla";
+    cancel.addEventListener("click", function () { box.remove(); });
+    actions.appendChild(add);
+    actions.appendChild(cancel);
+    box.appendChild(actions);
+    container.appendChild(box);
+    pathInput.focus();
+  }
 })();

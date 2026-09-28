@@ -406,19 +406,27 @@
 {{define "series_detail"}}
 <div class="view">
   <div class="toolbar">
-    <a class="btn sm" href="/?view=series">← Serie TV</a>
+    <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
     <button class="btn sm primary" data-api="/api/series/{{.PathName}}/search-missing" data-method="POST" data-body="{}" title="Cerca le release per gli episodi mancanti">Cerca mancanti</button>
     <button class="btn sm" data-api="/api/series/{{.PathName}}/scan-archive" data-method="POST" data-body="{}" title="Scansiona l'archivio per questa serie">Scansiona archivio</button>
     <button class="btn sm" data-api="/api/series/{{.PathName}}/metadata" data-method="POST" data-body="{}" title="Aggiorna i metadati TMDB">Aggiorna da TMDB</button>
     <button class="btn sm" data-api="/api/series/{{.PathName}}/rename-preview" data-method="POST" data-body="{}" title="Anteprima rinomina TMDB">Anteprima rinomina</button>
   </div>
+
+  <div class="panel" data-series-hero data-series-name="{{.PathName}}"
+       data-name="{{.Name}}" data-quality="{{.Quality}}" data-language="{{.Language}}"
+       data-archive="{{.ArchivePath}}" data-seasons="{{.Seasons}}" data-gaps="{{.Gaps}}"
+       data-enabled="{{if .Enabled}}true{{else}}false{{end}}">
+    <div class="panel-body series-hero"><p class="muted">Caricamento metadati…</p></div>
+  </div>
+
   <div class="panel">
-    <div class="panel-head"><h3>{{.Name}}</h3><small class="muted">{{.Quality}} · {{.Language}} · stagioni {{.Seasons}} · {{.Gaps}} mancanti</small></div>
+    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.Gaps}} mancanti</small></div>
     <div class="panel-body">
-      <p class="muted">Percorso archivio: {{.ArchivePath}}</p>
+      <div class="toolbar"><input class="input" type="search" data-series-filter placeholder="Filtra episodi (numero, titolo, stato)…" title="Filtra le righe già caricate" /></div>
       {{if .Episodes}}
-      <div class="table-wrap"><table class="data-table">
-        <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th>Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
+      <div class="table-wrap"><table class="data-table series-episodes">
+        <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th title="Punteggio di qualità del file archiviato">Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
         <tbody>
         {{range .Episodes}}
         <tr>
@@ -428,10 +436,11 @@
           <td class="numeric">{{.QualityScore}}</td>
           <td class="numeric">{{humanBytes .SizeBytes}}</td>
           <td class="row-actions">
-            <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca questa puntata">Cerca</button>
-            <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
-            <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile">Riscarica</button>
-            <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina">Elimina</button>
+            <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca manualmente questa puntata">Cerca</button>
+            <button class="btn sm" data-api="{{.ForcePath}}" data-method="POST" data-body="{}" title="Forza il download ignorando i controlli di qualità">Forza</button>
+            <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita questa puntata">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
+            <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile questa puntata">Riscarica</button>
+            <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina questa puntata">Elimina</button>
           </td>
         </tr>
         {{end}}
@@ -440,6 +449,7 @@
       {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
     </div>
   </div>
+
   <div class="panel">
     <div class="panel-head"><h3>Modifica serie</h3></div>
     <div class="panel-body">

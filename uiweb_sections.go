@@ -314,7 +314,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		}
 		return uiPanelsPage{Sections: []uiPageSection{
 			group("Aggiungi fumetto", sectionForm(uiFormSection{
-				Title: "Esplora GetComics", Hint: "Cerca il titolo, poi aggiungi il risultato trovato alla libreria dei fumetti.", Path: "/api/comics/explore", Submit: "Trova",
+				Title: "Esplora GetComics", Hint: "Cerca il titolo, poi scarica con Download Now o aggiungi il fumetto alla libreria.", Path: "/api/comics/explore", Submit: "Trova", Render: "comics",
 				Fields: []uiFormField{{Name: "query", Label: "Titolo", Placeholder: "es. Poison Ivy #41"}},
 			})),
 			group("Aggiungi fumetto", sectionActions(uiActionSection{Label: "Ciclo fumetti", Buttons: []uiActionButton{
