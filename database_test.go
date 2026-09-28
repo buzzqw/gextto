@@ -3,6 +3,7 @@ package gextto
 import (
 	"database/sql"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -177,6 +178,10 @@ func upper(value string) string {
 
 func TestPurgeSeriesRemovesEveryTrace(t *testing.T) {
 	db := newTestDB(t)
+	archivePath := filepath.Join(t.TempDir(), "e1.mkv")
+	if err := os.WriteFile(archivePath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Gone')"); err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +189,7 @@ func TestPurgeSeriesRemovesEveryTrace(t *testing.T) {
 	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Gone'").Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Gone.S01E01','/nas/gone/e1.mkv')", id); err != nil {
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Gone.S01E01',?2)", id, archivePath); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.db.Exec("INSERT INTO pending_downloads(series_id,season,episode,status) VALUES (?1,1,1,'pending')", id); err != nil {
@@ -1309,6 +1314,10 @@ func TestRescoreUsesStoredMediaInfo(t *testing.T) {
 
 func TestMediaInfoBackfillTargetsSkipAlreadyProbedRows(t *testing.T) {
 	db := newTestDB(t)
+	archivePath := filepath.Join(t.TempDir(), "e1.mkv")
+	if err := os.WriteFile(archivePath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
 		t.Fatal(err)
 	}
@@ -1316,7 +1325,7 @@ func TestMediaInfoBackfillTargetsSkipAlreadyProbedRows(t *testing.T) {
 	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show.S01E01','/nas/e1.mkv')", seriesID); err != nil {
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show.S01E01',?2)", seriesID, archivePath); err != nil {
 		t.Fatal(err)
 	}
 	targets, err := db.MediaInfoBackfillTargets(10)
@@ -1325,7 +1334,7 @@ func TestMediaInfoBackfillTargetsSkipAlreadyProbedRows(t *testing.T) {
 	}
 	assertEqual(t, len(targets), 1)
 	assertEqual(t, targets[0].Kind, "series")
-	assertEqual(t, targets[0].Path, "/nas/e1.mkv")
+	assertEqual(t, targets[0].Path, archivePath)
 	if _, err := db.SetEpisodeMediaInfo("Show", 1, 1, "{}"); err != nil {
 		t.Fatal(err)
 	}
@@ -1334,6 +1343,30 @@ func TestMediaInfoBackfillTargetsSkipAlreadyProbedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertEqual(t, len(targets), 0)
+}
+
+func TestMediaInfoBackfillTargetsIgnoreMissingFiles(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	var seriesID int64
+	if err := db.db.QueryRow("SELECT id FROM series WHERE name='Show'").Scan(&seriesID); err != nil {
+		t.Fatal(err)
+	}
+	archivePath := filepath.Join(t.TempDir(), "existing.mkv")
+	if err := os.WriteFile(archivePath, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(series_id,season,episode,title,archive_path) VALUES (?1,1,1,'Show.S01E01','/missing/e1.mkv'),(?1,1,2,'Show.S01E02',?2)", seriesID, archivePath); err != nil {
+		t.Fatal(err)
+	}
+	targets, err := db.MediaInfoBackfillTargets(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(targets), 1)
+	assertEqual(t, targets[0].Path, archivePath)
 }
 
 func TestMediaInfoRoundtripsForEpisodesAndMovies(t *testing.T) {

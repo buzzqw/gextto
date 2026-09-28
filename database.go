@@ -1604,13 +1604,15 @@ func (d *Database) SetMovieMediaInfo(name string, year *int64, jsonValue string)
 	return int(affected), err
 }
 
-// MediaInfoBackfillTargets returns archived entries with a known path but no
-// stored probe yet.
+// MediaInfoBackfillTargets returns archived entries with a known path, an
+// existing regular file, and no stored probe yet. Files that only exist as
+// stale database references are deliberately ignored: ffprobe/MediaInfo must
+// never be invoked for paths that are not on disk.
 func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarget, error) {
 	limit = clampInt(limit, 1, 20_000)
 	limit64 := int64(limit)
 	targets := make([]MediaInfoBackfillTarget, 0)
-	rows, err := d.db.Query("SELECT s.name, e.season, e.episode, e.archive_path FROM episodes e JOIN series s ON s.id=e.series_id WHERE COALESCE(e.media_info_json,'')='' AND COALESCE(e.archive_path,'')<>'' ORDER BY e.id DESC LIMIT ?1", limit64)
+	rows, err := d.db.Query("SELECT s.name, e.season, e.episode, e.archive_path FROM episodes e JOIN series s ON s.id=e.series_id WHERE COALESCE(e.media_info_json,'')='' AND COALESCE(e.archive_path,'')<>'' ORDER BY e.id DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -1621,6 +1623,9 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 			rows.Close()
 			return nil, err
 		}
+		if !mediaInfoBackfillPathExists(path) {
+			continue
+		}
 		seasonValue := season
 		episodeValue := episode
 		targets = append(targets, MediaInfoBackfillTarget{
@@ -1630,6 +1635,9 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 			Episode: &episodeValue,
 			Path:    path,
 		})
+		if int64(len(targets)) >= limit64 {
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -1637,8 +1645,7 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 	}
 	rows.Close()
 	if len(targets) < limit {
-		remaining := limit64 - int64(len(targets))
-		movieRows, err := d.db.Query("SELECT m.name, m.year, t.processed_path FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE COALESCE(m.media_info_json,'')='' AND COALESCE(t.processed_path,'')<>'' AND m.removed_at IS NULL ORDER BY m.id DESC LIMIT ?1", remaining)
+		movieRows, err := d.db.Query("SELECT m.name, m.year, t.processed_path FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE COALESCE(m.media_info_json,'')='' AND COALESCE(t.processed_path,'')<>'' AND m.removed_at IS NULL ORDER BY m.id DESC")
 		if err != nil {
 			return nil, err
 		}
@@ -1649,18 +1656,29 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 			if err := movieRows.Scan(&name, &year, &path); err != nil {
 				return nil, err
 			}
+			if !mediaInfoBackfillPathExists(path) {
+				continue
+			}
 			targets = append(targets, MediaInfoBackfillTarget{
 				Kind: "movie",
 				Name: name,
 				Year: nullInt64Ptr(year),
 				Path: path,
 			})
+			if int64(len(targets)) >= limit64 {
+				break
+			}
 		}
 		if err := movieRows.Err(); err != nil {
 			return nil, err
 		}
 	}
 	return targets, nil
+}
+
+func mediaInfoBackfillPathExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
 }
 
 func parseMediaInfoJSON(raw sql.NullString) map[string]any {

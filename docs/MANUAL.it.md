@@ -54,7 +54,7 @@ personale può non essere visibile al servizio systemd.
 Lasciala sul loopback oppure limita l'accesso con firewall/reverse proxy prima di
 esporla in rete. Nell'installazione standard, `/opt/gextto/gexttod --version`
 indica quale build è in esecuzione. Vedi
-[`SECURITY.md`](../SECURITY.md) per il modello di rete completo.
+[`SECURITY.md`](SECURITY.md) per il modello di rete completo.
 
 - [1. Primo avvio](#1-primo-avvio)
 - [2. Dashboard](#2-dashboard)

@@ -6,9 +6,6 @@ Documenti destinati agli utenti e ai contributor:
 - [English manual](MANUAL.en.md)
 - [API HTTP](API.md)
 - [Migrazione da un'installazione esistente](MIGRATION.md)
-- [Checklist di release](ACCEPTANCE.md)
+- [Sicurezza](SECURITY.md)
 - [TUI](tui.md)
-
-Le note di lavoro, i piani superati e le checklist interne possono essere
-conservati localmente sotto `docs/internal/`, ma quella directory è esclusa
-dal versionamento tramite `.gitignore`.
+- [Sviluppo e installazioni locali](DEVELOPMENT.md)

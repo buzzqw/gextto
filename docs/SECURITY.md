@@ -26,8 +26,8 @@ as an administrative interface.
 - **Bind to loopback** (`127.0.0.1:5000`) and put a reverse proxy with
   authentication and TLS in front of it when the UI must be reachable remotely.
 - **Restrict network access** with a firewall or reverse proxy when the UI must
-  be reachable from another machine. HTTPS and upstream authentication should be
-  provided by that proxy.
+  be reachable from another machine. HTTPS and upstream authentication should
+  be provided by that proxy.
 
 ## What the daemon deliberately does
 

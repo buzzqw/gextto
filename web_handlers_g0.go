@@ -1287,9 +1287,26 @@ func gh0_runMediaInfoBackfill(s *AppState, limit int) (map[string]any, error) {
 	failed := 0
 	skipped := 0
 	failedItems := []any{}
+	missingItems := []any{}
+	missingFiles := []string{}
 	for _, target := range targets {
 		if _, err := os.Stat(target.Path); err != nil {
 			skipped++
+			reason := "file non esistente"
+			if !os.IsNotExist(err) {
+				reason = "errore di accesso: " + err.Error()
+			}
+			missingFiles = append(missingFiles, target.Path+" ("+reason+")")
+			missingItems = append(missingItems, map[string]any{
+				"path":    target.Path,
+				"kind":    target.Kind,
+				"series":  target.Series,
+				"season":  target.Season,
+				"episode": target.Episode,
+				"name":    target.Name,
+				"year":    target.Year,
+				"reason":  reason,
+			})
 			logging.Debug("media info backfill: file assente, salto",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "path", target.Path)
@@ -1326,13 +1343,15 @@ func gh0_runMediaInfoBackfill(s *AppState, limit int) (map[string]any, error) {
 		}
 	}
 	return map[string]any{
-		"ok":           true,
-		"candidates":   len(targets),
-		"probed":       probed,
-		"analyzed":     probed,
-		"failed":       failed,
-		"skipped":      skipped,
-		"failed_items": failedItems,
+		"ok":            true,
+		"candidates":    len(targets),
+		"probed":        probed,
+		"analyzed":      probed,
+		"failed":        failed,
+		"skipped":       skipped,
+		"failed_items":  failedItems,
+		"missing_items": missingItems,
+		"missing_files": missingFiles,
 	}, nil
 }
 

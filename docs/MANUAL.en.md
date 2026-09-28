@@ -53,7 +53,7 @@ to the systemd service user.
 it on loopback, or restrict it with a firewall/reverse proxy before exposing it
 to a network. In the standard install, `/opt/gextto/gexttod --version` tells you
 which build is running.
-See [`SECURITY.md`](../SECURITY.md) for the full network model.
+See [`SECURITY.md`](SECURITY.md) for the full network model.
 
 - [1. First start](#1-first-start)
 - [2. Dashboard](#2-dashboard)
