@@ -1714,6 +1714,62 @@
     }
   });
 
+  // ---- rename composition -------------------------------------------------
+  var renameEditor = document.querySelector("[data-rename-editor]");
+  if (renameEditor) {
+    var renameFormat = renameEditor.querySelector("[data-rename-format]");
+    var renameTemplate = renameEditor.querySelector("[data-rename-template]");
+    var renamePreview = renameEditor.querySelector("[data-rename-preview]");
+    var renameStatus = renameEditor.querySelector("[data-rename-status]");
+    var renameSave = renameEditor.querySelector("[data-rename-save]");
+    var renameSample = { series: "Nome Serie", title: "Titolo Episodio", res: "1080p", codec: "x265", audio: "DDP5.1", hdr: "HDR10", lang: "ita", channels: "5.1", source: "WEB-DL", group: "GRP" };
+    var renameRender = function () {
+      var format = renameFormat ? renameFormat.value : "base";
+      var tpl = renameTemplate ? renameTemplate.value : "";
+      var s = renameSample;
+      var stem;
+      if (format === "standard") {
+        stem = s.series + " - S01E02 - " + s.title + " [" + s.res + "][" + s.codec + "]";
+      } else if (format === "full" || format === "completo") {
+        stem = s.series + " - S01E02 - " + s.title + " [" + s.res + "][" + s.audio + "][" + s.hdr + "][" + s.codec + "][" + s.lang + "]";
+      } else if (format === "custom") {
+        stem = tpl
+          .split("{Serie}").join(s.series).split("{Stagione}").join("S01").split("{Episodio}").join("E02")
+          .split("{Titolo}").join(s.title).split("{Source}").join(s.source).split("{Sorgente}").join(s.source)
+          .split("{Gruppo}").join(s.group).split("{Risoluzione}").join(s.res).split("{VideoCodec}").join(s.codec)
+          .split("{AudioCodec}").join(s.audio).split("{Audio}").join(s.audio).split("{Canali}").join(s.channels)
+          .split("{HDR}").join(s.hdr).split("{Lingue}").join(s.lang);
+      } else {
+        stem = s.series + " - S01E02 - " + s.title;
+      }
+      if (renamePreview) renamePreview.textContent = stem + ".mkv";
+    };
+    if (renameFormat) renameFormat.addEventListener("change", renameRender);
+    if (renameTemplate) renameTemplate.addEventListener("input", renameRender);
+    Array.prototype.forEach.call(renameEditor.querySelectorAll("[data-rename-token]"), function (button) {
+      button.addEventListener("click", function () {
+        if (!renameTemplate) return;
+        renameTemplate.value += button.getAttribute("data-rename-token");
+        renameRender();
+      });
+    });
+    if (renameSave) {
+      renameSave.addEventListener("click", function () {
+        renameSave.disabled = true;
+        if (renameStatus) renameStatus.textContent = "Salvataggio…";
+        api("/api/config/settings", "POST", { key: "rename_format", value: renameFormat ? renameFormat.value : "base" })
+          .then(function () { return api("/api/config/settings", "POST", { key: "rename_template", value: renameTemplate ? renameTemplate.value : "" }); })
+          .then(function () { if (renameStatus) renameStatus.textContent = "Rinomina salvata"; })
+          .catch(function (error) {
+            if (renameStatus) renameStatus.textContent = "Errore";
+            notify("Salvataggio rinomina non riuscito: " + error.message, "err");
+          })
+          .then(function () { renameSave.disabled = false; });
+      });
+    }
+    renameRender();
+  }
+
   // ---- explore (search) ---------------------------------------------------
   function renderSearch(form) {
     var panel = form.closest(".panel");

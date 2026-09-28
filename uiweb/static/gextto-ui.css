@@ -671,6 +671,7 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .settings-body { display: flex; flex-direction: column; gap: 14px; }
 .settings-panel { margin: 0; }
 .settings-rows { display: flex; flex-direction: column; }
+.rename-preview { display: block; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-3); color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 
 .setting-row {
   display: grid;

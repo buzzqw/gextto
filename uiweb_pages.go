@@ -155,6 +155,26 @@ type uiSettingsPage struct {
 	// CheckboxGroups edits JSON-array settings as checkbox lists (Motori web,
 	// Filtri contenuto) instead of textareas.
 	CheckboxGroups []uiCheckboxGroup
+	// FieldsGrid renders the group fields as a two-column grid of compact
+	// fields (Punteggi), like rextto's score editor.
+	FieldsGrid bool
+	// Rename is the rename-composition editor of the Rinomina tab.
+	Rename *uiRenameEditor
+}
+
+// uiRenameEditor composes the file-rename format: a preset, a custom template,
+// the placeholders and a live preview.
+type uiRenameEditor struct {
+	Format   string
+	Template string
+	Formats  []uiFormOption
+	Tokens   []uiRenameToken
+}
+
+// uiRenameToken is one placeholder button of the rename editor.
+type uiRenameToken struct {
+	Token string
+	Label string
 }
 
 // uiSettingGroup is one titled block of settings rows. rextto groups the fields
@@ -338,6 +358,8 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		"tag_dir_rules": {}, "event_hooks": {}, "watched_folders": {},
 		// Edited as checkbox groups (see uiSourcesCheckboxGroups).
 		"websearch_engines": {}, "content_filters": {},
+		// Edited by the rename-composition editor (see uiRenameEditor).
+		"rename_format": {}, "rename_template": {},
 	}
 	indexed := map[string]struct{}{}
 	for _, def := range uiSettingsIndex {
@@ -363,7 +385,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		if strings.HasPrefix(strings.ToLower(key), "score") {
 			target = "scores"
 		}
-		fieldsByTab[target] = append(fieldsByTab[target], uiSettingFieldFor(key, key, cfg.Settings[key]))
+		fieldsByTab[target] = append(fieldsByTab[target], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
 	}
 	if len(fieldsByTab["altro"]) > 0 {
 		labels["altro"] = "Altro"
@@ -427,6 +449,13 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			}
 		}
 	}
+	if active == "scores" {
+		// The score weights read best as a compact two-column grid.
+		page.FieldsGrid = true
+	}
+	if active == "rename" {
+		page.Rename = uiRenameEditorFrom(cfg)
+	}
 	page.Groups = uiSettingsGroups(active, page.Fields)
 	page.ShowSources = active == "sources"
 	page.ShowEditors = active == "advanced"
@@ -475,7 +504,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		if strings.HasPrefix(strings.ToLower(key), "score") {
 			tab = "scores"
 		}
-		entries = append(entries, uiSearchEntry{Key: key, Label: key, Tab: tab})
+		entries = append(entries, uiSearchEntry{Key: key, Label: uiSettingAutoLabel(key), Tab: tab})
 	}
 	// Special editors have no single setting key: point the search at their tab.
 	for _, entry := range []uiSearchEntry{
@@ -578,6 +607,21 @@ func settingListContains(cfg *Config, key, value string) bool {
 	return false
 }
 
+// uiSettingAutoLabel prettifies the label of a setting that is not in the
+// curated index (score weights, internal keys) so a raw key is never shown as
+// the field name.
+func uiSettingAutoLabel(key string) string {
+	for _, prefix := range []string{"score_res_", "score_source_", "score_codec_", "score_audio_", "score_bonus_"} {
+		if strings.HasPrefix(key, prefix) {
+			return strings.TrimPrefix(key, prefix)
+		}
+	}
+	if strings.HasPrefix(key, "score_group_") {
+		return "Gruppo " + strings.TrimPrefix(key, "score_group_")
+	}
+	return key
+}
+
 // uiSettingGroupTitle assigns a setting to a labelled group. The libtorrent tab
 // is the only one large enough to need sub-groups; the others render a single
 // panel with the tab name.
@@ -609,7 +653,22 @@ func uiSettingGroupTitle(tab, key string) string {
 	case "rename":
 		return "Rinomina e pulizia"
 	case "scores":
-		return "Punteggi qualità"
+		switch {
+		case strings.HasPrefix(lowered, "score_res_"):
+			return "Risoluzione"
+		case strings.HasPrefix(lowered, "score_source_"):
+			return "Sorgente"
+		case strings.HasPrefix(lowered, "score_codec_"):
+			return "Codec"
+		case strings.HasPrefix(lowered, "score_audio_"):
+			return "Audio"
+		case strings.HasPrefix(lowered, "score_bonus_"):
+			return "Bonus"
+		case strings.HasPrefix(lowered, "score_group_"):
+			return "Gruppi custom"
+		default:
+			return "Punteggi qualità"
+		}
 	case "altro":
 		return "Altre impostazioni"
 	case "libtorrent":
@@ -646,6 +705,43 @@ var uiManagedSetting = map[string]bool{
 	"libtorrent_active_seeds":     true,
 	"libtorrent_active_limit":     true,
 	"libtorrent_cache_size":       true,
+}
+
+// uiRenameEditorFrom builds the rename-composition editor of the Rinomina tab.
+func uiRenameEditorFrom(cfg *Config) *uiRenameEditor {
+	format := strings.TrimSpace(cfg.RenameFormat)
+	if format == "" {
+		format = defaultRenameFormatValue
+	}
+	template := cfg.RenameTemplate
+	if strings.TrimSpace(template) == "" {
+		template = defaultRenameTemplateValue
+	}
+	return &uiRenameEditor{
+		Format:   format,
+		Template: template,
+		Formats: []uiFormOption{
+			{Value: "base", Label: "Base", Selected: format == "base"},
+			{Value: "standard", Label: "Standard", Selected: format == "standard"},
+			{Value: "full", Label: "Completo", Selected: format == "full" || format == "completo"},
+			{Value: "custom", Label: "Personalizzato", Selected: format == "custom"},
+		},
+		Tokens: []uiRenameToken{
+			{Token: "{Serie}", Label: "Serie"},
+			{Token: "{Stagione}", Label: "Stagione"},
+			{Token: "{Episodio}", Label: "Episodio"},
+			{Token: "{Titolo}", Label: "Titolo"},
+			{Token: "{Source}", Label: "Sorgente"},
+			{Token: "{Gruppo}", Label: "Gruppo"},
+			{Token: "{Risoluzione}", Label: "Risoluzione"},
+			{Token: "{VideoCodec}", Label: "Video codec"},
+			{Token: "{Audio}", Label: "Audio"},
+			{Token: "{AudioCodec}", Label: "Audio codec"},
+			{Token: "{Canali}", Label: "Canali"},
+			{Token: "{HDR}", Label: "HDR"},
+			{Token: "{Lingue}", Label: "Lingue"},
+		},
+	}
 }
 
 // uiTorrentBackendOptions is the combo list of the transfer engines.
