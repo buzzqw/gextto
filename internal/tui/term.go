@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -70,9 +71,13 @@ func renderANSIConvert(w io.Writer, screen Screen) {
 	builder.WriteString("\x1b[H")
 	for index, line := range screen.Lines {
 		builder.WriteString("\x1b[2K")
-		builder.WriteString(styleCode(line.Style))
+		if screen.ColorsEnabled {
+			builder.WriteString(styleCode(line.Style, screen.HighContrast))
+		}
 		builder.WriteString(line.Text)
-		builder.WriteString("\x1b[0m")
+		if screen.ColorsEnabled {
+			builder.WriteString("\x1b[0m")
+		}
 		if index < len(screen.Lines)-1 {
 			builder.WriteString("\r\n")
 		}
@@ -86,7 +91,23 @@ func renderANSIConvert(w io.Writer, screen Screen) {
 	_, _ = io.WriteString(w, builder.String())
 }
 
-func styleCode(style Style) string {
+func styleCode(style Style, highContrast bool) string {
+	if highContrast {
+		switch style {
+		case StyleMuted:
+			return "\x1b[1;37m"
+		case StyleHeader:
+			return "\x1b[1;97;44m"
+		case StyleOK:
+			return "\x1b[1;92m"
+		case StyleWarn:
+			return "\x1b[1;93m"
+		case StyleErr:
+			return "\x1b[1;91m"
+		case StyleSelected:
+			return "\x1b[1;7m"
+		}
+	}
 	switch style {
 	case StyleMuted:
 		return "\x1b[2m"
@@ -103,4 +124,13 @@ func styleCode(style Style) string {
 	default:
 		return ""
 	}
+}
+
+// writeOSC52 asks the terminal to copy value to its clipboard. Terminals that
+// do not support OSC52 simply ignore the sequence; the TUI still reports that
+// a copy was requested instead of invoking a desktop-specific utility.
+func writeOSC52(w io.Writer, value string) error {
+	encoded := base64.StdEncoding.EncodeToString([]byte(value))
+	_, err := io.WriteString(w, "\x1b]52;c;"+encoded+"\x07")
+	return err
 }

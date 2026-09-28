@@ -24,7 +24,7 @@ func sampleTorrents() []Torrent {
 
 func TestTabsAndGlobalKeys(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
-	if action := m.Update(runeKey('2')); action.Kind != ActionNone || m.Tab != TabTorrents {
+	if action := m.Update(runeKey('2')); action.Kind != ActionRefresh || m.Tab != TabTorrents {
 		t.Fatalf("digit 2 should switch to Torrents: tab=%v action=%+v", m.Tab, action)
 	}
 	m.Update(kindKey(KeyTab))
@@ -385,6 +385,11 @@ func TestArchiveFilterAndQueue(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	m.Tab = TabArchive
 	m.Archive = []ArchiveEntry{{Title: "Example", Magnet: "magnet:?xt=urn:btih:x", Source: "archive"}}
+	m.Update(runeKey('s'))
+	if m.Prompt == nil || m.Prompt.Kind != PromptArchiveFilter {
+		t.Fatalf("archive s should open the archive filter, got %+v", m.Prompt)
+	}
+	m.Prompt = nil
 	m.Update(runeKey('/'))
 	typeText(m, "Example")
 	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionLoadArchive || action.Text != "Example" {
@@ -393,6 +398,42 @@ func TestArchiveFilterAndQueue(t *testing.T) {
 	m.Prompt = nil
 	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionAddMagnet || action.Text == "" {
 		t.Fatalf("archive Enter should queue the selected magnet, got %+v", action)
+	}
+}
+
+func TestArchivePaginationSortingAndDetails(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabArchive
+	m.ArchivePage = 1
+	m.ArchivePages = 3
+	m.Archive = []ArchiveEntry{
+		{ID: 1, Title: "Zeta", Source: "b", QualityScore: 100, AddedAt: "2024-01-01", Magnet: "magnet:z"},
+		{ID: 2, Title: "Alfa", Source: "a", QualityScore: 900, AddedAt: "2025-01-01", Magnet: "magnet:a"},
+	}
+	if action := m.Update(kindKey(KeyPgDn)); action.Kind != ActionLoadArchive || action.Page != 2 {
+		t.Fatalf("PgDn should load archive page 2, got %+v", action)
+	}
+	m.ArchivePage = 2
+	if action := m.Update(kindKey(KeyPgUp)); action.Kind != ActionLoadArchive || action.Page != 1 {
+		t.Fatalf("PgUp should load archive page 1, got %+v", action)
+	}
+	m.ArchiveSort = ArchiveSortTitle
+	if got := m.VisibleArchive()[0].Title; got != "Alfa" {
+		t.Fatalf("title sort = %q, want Alfa", got)
+	}
+	m.ArchiveSort = ArchiveSortQuality
+	if got := m.VisibleArchive()[0].QualityScore; got != 100 {
+		t.Fatalf("quality sort = %d, want 100", got)
+	}
+	if action := m.Update(runeKey('d')); action.Kind != ActionNone || m.ArchiveDetail == nil {
+		t.Fatalf("d should open archive details: action=%+v detail=%+v", action, m.ArchiveDetail)
+	}
+	if action := m.Update(runeKey('a')); action.Kind != ActionAddMagnet || action.Text != "magnet:z" {
+		t.Fatalf("a should queue archive detail magnet, got %+v", action)
+	}
+	m.Update(kindKey(KeyEsc))
+	if m.ArchiveDetail != nil {
+		t.Fatal("Esc should close archive details")
 	}
 }
 
@@ -464,6 +505,85 @@ func TestRenderError(t *testing.T) {
 	screen := m.Render(100, 30)
 	if !lineContains(screen, "connection refused") {
 		t.Fatal("error should be rendered")
+	}
+}
+
+func TestDaemonStateAndStatusMetrics(t *testing.T) {
+	m := NewModel(NewTranslator("en"))
+	m.SetStatus(Status{Active: true, TorrentStats: TorrentStats{Count: 2, Downloading: 1, Seeding: 1}})
+	m.SetMetrics(DashboardStats{
+		TorrentStats: map[string]any{"dl_info_speed": float64(1024), "up_info_speed": float64(512), "active_peers": float64(3)},
+		Consumption:  &ConsumptionStats{TotalBytes: 4096, Last7DaysBytes: 2048, Last30DaysBytes: 3072},
+	})
+	m.SetMetrics(DashboardStats{
+		TorrentStats: map[string]any{"dl_info_speed": float64(2048), "up_info_speed": float64(1024), "active_peers": float64(4)},
+		Consumption:  &ConsumptionStats{TotalBytes: 8192, Last7DaysBytes: 4096, Last30DaysBytes: 6144, Daily7d: []DailyConsumption{{Bytes: 1}, {Bytes: 2}, {Bytes: 3}}},
+	})
+	m.SetDaemonState(true, "")
+	screen := m.Render(100, 20)
+	if !lineContains(screen, "ONLINE") || !lineContains(screen, "Transfer") || !lineContains(screen, "Consumption") || !lineContains(screen, "Trend") || !lineContains(screen, "2.0 KB/s") {
+		t.Fatalf("status metrics missing: %+v", firstLines(screen, 12))
+	}
+	m.SetDaemonState(false, "connection refused")
+	screen = m.Render(100, 20)
+	if !lineContains(screen, "OFFLINE") || screen.Lines[0].Style != StyleErr {
+		t.Fatalf("offline daemon state not visible: %+v", firstLines(screen, 3))
+	}
+}
+
+func TestSettingsCopyAndNotifications(t *testing.T) {
+	m := NewModel(NewTranslator("en"))
+	m.SetConfig(TUIConfig{DefaultLanguage: "en", RefreshSecs: 2, DryRun: false})
+	if action := m.Update(runeKey('g')); action.Kind != ActionNone || m.Overlay != OverlaySettings {
+		t.Fatalf("g should open settings, got action=%+v overlay=%v", action, m.Overlay)
+	}
+	m.SettingsSelected = 3
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionSaveSetting || action.Domain != "dry_run" || action.Text != "true" {
+		t.Fatalf("dry-run setting action = %+v", action)
+	}
+	m.Overlay = OverlayNone
+	m.Tab = TabTorrents
+	m.SetTorrents(sampleTorrents())
+	if action := m.Update(runeKey('y')); action.Kind != ActionCopy || action.Text != "aaaa" {
+		t.Fatalf("y should copy selected hash, got %+v", action)
+	}
+	m.SetDaemonState(true, "")
+	m.SetDaemonState(false, "connection refused")
+	if !strings.Contains(m.Notification, "offline") {
+		t.Fatalf("daemon notification = %q", m.Notification)
+	}
+	m.ObserveEvent(Event{Kind: "torrent_finished", Name: "Example"})
+	if !strings.Contains(m.Notification, "finished") {
+		t.Fatalf("event notification = %q", m.Notification)
+	}
+}
+
+func TestLogsFitTerminalHeight(t *testing.T) {
+	m := NewModel(NewTranslator("en"))
+	m.Tab = TabLogs
+	logs := make([]string, 100)
+	for index := range logs {
+		logs[index] = "line " + string(rune('A'+index%26))
+	}
+	m.SetLogs(logs)
+	screen := m.Render(80, 8)
+	if len(screen.Lines) != 8 {
+		t.Fatalf("expected terminal-sized screen, got %d lines", len(screen.Lines))
+	}
+	visible := 0
+	for _, line := range screen.Lines {
+		if strings.HasPrefix(line.Text, "line ") {
+			visible++
+		}
+	}
+	if visible != 3 {
+		t.Fatalf("expected 3 visible log rows, got %d", visible)
+	}
+	if got := logLimitForHeight(8); got != 40 {
+		t.Fatalf("small terminal log limit = %d, want 40", got)
+	}
+	if got := logLimitForHeight(200); got != 500 {
+		t.Fatalf("large terminal log limit = %d, want 500", got)
 	}
 }
 

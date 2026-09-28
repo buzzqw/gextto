@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const tabCount = 7
@@ -12,11 +13,15 @@ const tabCount = 7
 // state always renders the same lines, which makes the layout testable.
 func (m *Model) Render(width, height int) Screen {
 	if width < 12 || height < 6 {
-		return Screen{Lines: []Line{{Text: m.Tr.T("msg.termtoolsmall"), Style: StyleHeader}}}
+		return Screen{Lines: []Line{{Text: m.Tr.T("msg.termtoolsmall"), Style: StyleHeader}}, ColorsEnabled: m.ColorsEnabled, HighContrast: m.HighContrast}
 	}
 	lines := make([]Line, 0, height)
-	lines = append(lines, Line{Text: m.headerLine(width), Style: StyleNormal})
-	lines = append(lines, Line{Text: m.truncate(m.tabsLine(), width), Style: StyleNormal})
+	headerStyle := StyleHeader
+	if m.DaemonKnown && !m.DaemonConnected {
+		headerStyle = StyleErr
+	}
+	lines = append(lines, Line{Text: m.headerLine(width), Style: headerStyle})
+	lines = append(lines, Line{Text: m.truncate(m.tabsLine(width), width), Style: StyleNormal})
 	lines = append(lines, Line{Text: m.truncate(m.hints(), width), Style: StyleMuted})
 
 	contentHeight := height - 4
@@ -31,10 +36,14 @@ func (m *Model) Render(width, height int) Screen {
 		content = m.renderSearch(width, contentHeight)
 	case m.Overlay == OverlayEvents:
 		content = m.renderEvents(width, contentHeight)
+	case m.Overlay == OverlaySettings:
+		content = m.renderSettings(width, contentHeight)
 	case m.Detail != nil:
 		content = m.renderDetail(width)
+	case m.ArchiveDetail != nil:
+		content = m.renderArchiveDetail(width)
 	case m.Tab == TabStatus:
-		content = m.renderStatus()
+		content = m.renderStatus(width, contentHeight)
 	case m.Tab == TabTorrents:
 		content = m.renderTorrents(width, contentHeight)
 	case m.Tab == TabLogs:
@@ -56,7 +65,7 @@ func (m *Model) Render(width, height int) Screen {
 		}
 	}
 
-	screen := Screen{}
+	screen := Screen{ColorsEnabled: m.ColorsEnabled, HighContrast: m.HighContrast}
 	if m.Confirm != nil {
 		lines = append(lines, Line{Text: m.truncate(m.ConfirmMessage(), width), Style: StyleWarn})
 	} else if m.Prompt != nil {
@@ -66,6 +75,13 @@ func (m *Model) Render(width, height int) Screen {
 	} else {
 		message := m.Message
 		footerStyle := StyleOK
+		if m.Notification != "" && time.Now().Before(m.NotificationUntil) {
+			if message != "" {
+				message += " · "
+			}
+			message += m.Notification
+			footerStyle = StyleWarn
+		}
 		if m.Err != "" {
 			if message != "" {
 				message += " · "
@@ -122,6 +138,20 @@ func (m *Model) headerLine(width int) string {
 			next = " · " + m.Tr.T("label.nextcycle") + ": " + HumanDuration(float64(remaining))
 		}
 	}
+	connection := m.Tr.T("label.connecting")
+	if m.DaemonKnown {
+		connection = m.Tr.T("label.online")
+		if !m.DaemonConnected {
+			connection = m.Tr.T("label.offline")
+			if m.DaemonReconnects > 1 {
+				connection += fmt.Sprintf(" #%d", m.DaemonReconnects)
+			}
+		}
+	}
+	next = " · " + connection + next
+	if !m.LogStreamConnected && m.StreamReconnect > 0 {
+		next += fmt.Sprintf(" · %s #%d", m.Tr.T("label.reconnect"), m.StreamReconnect)
+	}
 	return m.truncate(fmt.Sprintf("%s  [%s]%s", name, mode, next), width)
 }
 
@@ -136,7 +166,7 @@ func nextCycleSeconds(value string) int64 {
 	return int64(time.Until(parsed).Seconds())
 }
 
-func (m *Model) tabsLine() string {
+func (m *Model) tabsLine(width int) string {
 	labels := []string{m.Tr.T("tab.status"), m.Tr.T("tab.torrents"), m.Tr.T("tab.logs"), m.Tr.T("tab.health"), m.Tr.T("tab.archive"), m.Tr.T("tab.missing"), m.Tr.T("tab.blocklist")}
 	parts := make([]string, 0, tabCount)
 	for index, label := range labels {
@@ -146,14 +176,34 @@ func (m *Model) tabsLine() string {
 			parts = append(parts, fmt.Sprintf(" %d:%s ", index+1, label))
 		}
 	}
-	return "  " + strings.Join(parts, " ") + "  (" + m.Tr.T("hint.tabs") + ")"
+	full := "  " + strings.Join(parts, " ") + "  (" + m.Tr.T("hint.tabs") + ")"
+	if utf8.RuneCountInString(full) <= width {
+		return full
+	}
+	compact := make([]string, 0, tabCount)
+	for index, label := range labels {
+		if Tab(index) == m.Tab {
+			compact = append(compact, fmt.Sprintf("[%d:%s]", index+1, label))
+		} else {
+			compact = append(compact, fmt.Sprintf("%d", index+1))
+		}
+	}
+	compactLine := " " + strings.Join(compact, " ")
+	if utf8.RuneCountInString(compactLine) <= width {
+		return compactLine
+	}
+	return fmt.Sprintf("[%d:%s]", int(m.Tab)+1, labels[m.Tab])
 }
 
 func (m *Model) hints() string {
 	hints := m.Tr.T("hint.global")
 	switch {
+	case m.Overlay == OverlaySettings:
+		hints += " · " + m.Tr.T("hint.settings")
 	case m.Detail != nil:
 		hints += " · " + m.Tr.T("hint.details")
+	case m.ArchiveDetail != nil:
+		hints += " · " + m.Tr.T("hint.archivedetail")
 	case m.Tab == TabTorrents:
 		hints += " · " + m.Tr.T("hint.torrents")
 	case m.Tab == TabLogs:
@@ -177,7 +227,7 @@ func (m *Model) renderError() []Line {
 	}
 }
 
-func (m *Model) renderStatus() []Line {
+func (m *Model) renderStatus(width, contentHeight int) []Line {
 	if m.Status == nil {
 		return []Line{{Text: m.Tr.T("msg.loading"), Style: StyleMuted}}
 	}
@@ -196,6 +246,9 @@ func (m *Model) renderStatus() []Line {
 			status.TorrentStats.Queued, m.Tr.T("label.queued"),
 			status.TorrentStats.Seeding, m.Tr.T("label.seeding")), Style: StyleNormal},
 		{Text: fmt.Sprintf("%s: %d", m.Tr.T("label.stalled"), status.TorrentStats.Stalled), Style: StyleMuted},
+	}
+	if m.Metrics != nil {
+		lines = append(lines, m.renderMetricLines(width)...)
 	}
 	if status.NextCycleAt != nil {
 		if remaining := nextCycleSeconds(*status.NextCycleAt); remaining >= 0 {
@@ -217,7 +270,116 @@ func (m *Model) renderStatus() []Line {
 			m.Tr.T("label.movies"), status.Seen.Movies,
 			m.Tr.T("label.series"), status.Seen.Series), Style: StyleMuted},
 	)
+	if contentHeight > 0 && len(lines) > contentHeight {
+		lines = lines[:contentHeight]
+	}
 	return lines
+}
+
+func (m *Model) renderMetricLines(width int) []Line {
+	metrics := m.Metrics.TorrentStats
+	download, hasDownload := metricNumber(metrics, "dl_info_speed", "download_rate", "download_speed")
+	upload, hasUpload := metricNumber(metrics, "up_info_speed", "upload_rate", "upload_speed")
+	peers, hasPeers := metricNumber(metrics, "active_peers", "num_connections", "num_incoming_connections")
+
+	transfer := make([]string, 0, 3)
+	if hasDownload {
+		transfer = append(transfer, m.Tr.T("label.down")+" "+HumanRate(download))
+	}
+	if hasUpload {
+		transfer = append(transfer, m.Tr.T("label.up")+" "+HumanRate(upload))
+	}
+	if hasPeers {
+		transfer = append(transfer, m.Tr.T("label.peers")+" "+fmt.Sprintf("%.0f", peers))
+	}
+	lines := make([]Line, 0, 2)
+	if len(transfer) > 0 {
+		if width < 72 {
+			for _, value := range transfer {
+				lines = append(lines, Line{Text: value, Style: StyleNormal})
+			}
+		} else {
+			lines = append(lines, Line{Text: m.Tr.T("label.transfer") + ": " + strings.Join(transfer, " · "), Style: StyleNormal})
+		}
+	}
+	if len(m.TransferHistory) > 1 {
+		graphWidth := 24
+		if width < 72 {
+			graphWidth = 12
+		}
+		downloads := make([]float64, 0, len(m.TransferHistory))
+		uploads := make([]float64, 0, len(m.TransferHistory))
+		for _, sample := range m.TransferHistory {
+			downloads = append(downloads, sample.Download)
+			uploads = append(uploads, sample.Upload)
+		}
+		lines = append(lines, Line{Text: fmt.Sprintf("%s: ↓%s ↑%s", m.Tr.T("label.trend"), sparkline(downloads, graphWidth), sparkline(uploads, graphWidth)), Style: StyleMuted})
+	}
+	if consumption := m.Metrics.Consumption; consumption != nil {
+		value := fmt.Sprintf("%s: 7d %s · 30d %s · %s %s",
+			m.Tr.T("label.consumption"),
+			HumanBytes(float64(consumption.Last7DaysBytes)),
+			HumanBytes(float64(consumption.Last30DaysBytes)),
+			m.Tr.T("label.total"), HumanBytes(float64(consumption.TotalBytes)))
+		lines = append(lines, Line{Text: value, Style: StyleMuted})
+		if len(consumption.Daily7d) > 1 {
+			daily := make([]float64, 0, len(consumption.Daily7d))
+			for _, item := range consumption.Daily7d {
+				daily = append(daily, float64(item.Bytes))
+			}
+			lines = append(lines, Line{Text: m.Tr.T("label.consumption7d") + ": " + sparkline(daily, min(24, max(8, width-28))), Style: StyleMuted})
+		}
+	}
+	return lines
+}
+
+func sparkline(values []float64, width int) string {
+	if width <= 0 || len(values) == 0 {
+		return ""
+	}
+	if len(values) > width {
+		values = values[len(values)-width:]
+	}
+	minValue, maxValue := values[0], values[0]
+	for _, value := range values[1:] {
+		minValue = minFloat(minValue, value)
+		maxValue = maxFloat(maxValue, value)
+	}
+	levels := []rune("▁▂▃▄▅▆▇█")
+	var builder strings.Builder
+	for _, value := range values {
+		level := 0
+		if maxValue > minValue {
+			level = int((value - minValue) / (maxValue - minValue) * float64(len(levels)-1))
+		}
+		builder.WriteRune(levels[min(max(level, 0), len(levels)-1)])
+	}
+	return builder.String()
+}
+
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func metricNumber(values map[string]any, keys ...string) (float64, bool) {
+	for _, key := range keys {
+		if value, ok := values[key]; ok {
+			if number, valid := toFloat(value); valid {
+				return number, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func (m *Model) renderTorrents(width, contentHeight int) []Line {
@@ -238,6 +400,30 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 	lines := []Line{{Text: title, Style: StyleHeader}}
 	if len(items) == 0 {
 		lines = append(lines, Line{Text: m.Tr.T("msg.emptytorrents"), Style: StyleMuted})
+		return lines
+	}
+	if width < 50 {
+		visibleItems := max(1, contentHeight-1)
+		maxScroll := max(0, len(items)-visibleItems)
+		start := min(max(m.TorrentScroll, 0), maxScroll)
+		if m.Selected < start {
+			start = m.Selected
+		}
+		if m.Selected >= start+visibleItems {
+			start = m.Selected - visibleItems + 1
+		}
+		m.TorrentScroll = min(max(start, 0), maxScroll)
+		end := min(len(items), m.TorrentScroll+visibleItems)
+		for index, torrent := range items[m.TorrentScroll:end] {
+			index += m.TorrentScroll
+			style := torrentStyle(torrent.State)
+			marker := " "
+			if index == m.Selected {
+				style = StyleSelected
+				marker = ">"
+			}
+			lines = append(lines, Line{Text: fmt.Sprintf("%s %s %.1f%% %s", marker, m.Tr.StateLabel(torrent.State), torrent.Progress, torrent.Name), Style: style})
+		}
 		return lines
 	}
 	if width < 74 {
@@ -367,17 +553,26 @@ func catalogWindow(selected, scroll, length, visible int) (int, int) {
 }
 
 func (m *Model) renderArchive(width, contentHeight int) []Line {
-	title := fmt.Sprintf("%s: %d", m.Tr.T("tab.archive"), m.ArchiveTotal)
+	sortNames := []string{m.Tr.T("sort.archive_title"), m.Tr.T("sort.archive_source"), m.Tr.T("sort.archive_quality"), m.Tr.T("sort.archive_added")}
+	direction := "↑"
+	if m.ArchiveSortDesc {
+		direction = "↓"
+	}
+	page := max(1, m.ArchivePage)
+	pages := max(1, m.ArchivePages)
+	title := fmt.Sprintf("%s: %d · %s %d/%d · %s %s%s", m.Tr.T("tab.archive"), m.ArchiveTotal,
+		m.Tr.T("label.page"), page, pages, m.Tr.T("label.sort"), sortNames[m.ArchiveSort], direction)
 	if m.ArchiveFilter != "" {
 		title += fmt.Sprintf(" · %s '%s'", m.Tr.T("label.filter"), m.ArchiveFilter)
 	}
 	lines := []Line{{Text: title, Style: StyleHeader}}
-	if len(m.Archive) == 0 {
+	items := m.VisibleArchive()
+	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptyarchive"), Style: StyleMuted})
 	}
-	start, end := catalogWindow(m.ArchiveSelected, m.ArchiveScroll, len(m.Archive), contentHeight-1)
+	start, end := catalogWindow(m.ArchiveSelected, m.ArchiveScroll, len(items), contentHeight-1)
 	m.ArchiveScroll = start
-	for index, entry := range m.Archive[start:end] {
+	for index, entry := range items[start:end] {
 		index += start
 		style := StyleNormal
 		marker := " "
@@ -386,6 +581,28 @@ func (m *Model) renderArchive(width, contentHeight int) []Line {
 			marker = ">"
 		}
 		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · %s · %s", marker, entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-")), Style: style})
+	}
+	return lines
+}
+
+func (m *Model) renderArchiveDetail(width int) []Line {
+	if m.ArchiveDetail == nil {
+		return nil
+	}
+	entry := m.ArchiveDetail
+	rows := [][2]string{
+		{m.Tr.T("label.archiveid"), fmt.Sprintf("%d", entry.ID)},
+		{m.Tr.T("label.name"), entry.Title},
+		{m.Tr.T("label.source"), firstNonEmpty(entry.Source, "-")},
+		{m.Tr.T("label.quality"), fmt.Sprintf("%d", entry.QualityScore)},
+		{m.Tr.T("label.added"), firstNonEmpty(entry.AddedAt, "-")},
+		{m.Tr.T("label.magnet"), firstNonEmpty(entry.Magnet, "-")},
+	}
+	lines := []Line{{Text: entry.Title, Style: StyleHeader}}
+	start := min(m.ArchiveDetailScroll, max(0, len(rows)-1))
+	valueWidth := max(1, width-23)
+	for _, row := range rows[start:] {
+		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + Shorten(row[1], valueWidth), Style: StyleNormal})
 	}
 	return lines
 }
@@ -584,7 +801,7 @@ func (m *Model) renderDetail(width int) []Line {
 func (m *Model) renderHelp(width int) []Line {
 	keys := []string{
 		"help.title", "", "help.global", "help.global2", "help.torrents", "help.torrents2",
-		"help.torrents3", "help.torrents4", "help.details", "help.logs", "help.health", "help.archive", "help.missing", "help.blocklist", "",
+		"help.torrents3", "help.torrents4", "help.details", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "",
 		"help.close",
 	}
 	lines := make([]Line, 0, len(keys))
@@ -655,6 +872,40 @@ func (m *Model) renderEvents(width, contentHeight int) []Line {
 		lines = append(lines, Line{Text: line, Style: StyleNormal})
 	}
 	return lines
+}
+
+func (m *Model) renderSettings(width, contentHeight int) []Line {
+	lines := []Line{{Text: m.Tr.T("settings.title"), Style: StyleHeader}}
+	if m.Config == nil {
+		return append(lines, Line{Text: m.Tr.T("msg.loading"), Style: StyleMuted})
+	}
+	config := m.Config
+	rows := []string{
+		fmt.Sprintf("%d  %s: %s", 1, m.Tr.T("settings.language"), firstNonEmpty(config.DefaultLanguage, "-")),
+		fmt.Sprintf("%d  %s: %ds", 2, m.Tr.T("settings.refresh"), config.RefreshSecs),
+		fmt.Sprintf("%d  %s: %d/%d KiB/s", 3, m.Tr.T("settings.limits"), config.DownloadLimitKib, config.UploadLimitKib),
+		fmt.Sprintf("%d  %s: %s", 4, m.Tr.T("settings.dryrun"), boolWord(m.Tr, config.DryRun)),
+		fmt.Sprintf("%d  %s: %s", 5, m.Tr.T("settings.colors"), boolWord(m.Tr, m.ColorsEnabled)),
+		fmt.Sprintf("%d  %s: %s", 6, m.Tr.T("settings.contrast"), boolWord(m.Tr, m.HighContrast)),
+	}
+	for index, row := range rows {
+		style := StyleNormal
+		if index == m.SettingsSelected {
+			style = StyleSelected
+		}
+		lines = append(lines, Line{Text: row, Style: style})
+	}
+	if contentHeight > len(lines) {
+		lines = append(lines, Line{Text: m.Tr.T("settings.hint"), Style: StyleMuted})
+	}
+	return lines
+}
+
+func boolWord(tr *Translator, value bool) string {
+	if value {
+		return tr.T("label.yes")
+	}
+	return tr.T("label.no")
 }
 
 func qualityLabel(value any) string {

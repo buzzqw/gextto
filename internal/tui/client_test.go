@@ -69,6 +69,16 @@ func TestClientReadsEndpoints(t *testing.T) {
 		case r.URL.Path == "/api/health":
 			writeJSON(t, w, map[string]any{"status": "ok", "process_id": 42, "resident_bytes": 1024,
 				"paths": []map[string]any{{"label": "dati", "path": "/data", "exists": true, "writable": true}}})
+		case r.URL.Path == "/api/stats":
+			writeJSON(t, w, map[string]any{
+				"torrent_stats": map[string]any{"dl_info_speed": 1024, "up_info_speed": 512, "active_peers": 3},
+				"consumption":   map[string]any{"total_bytes": 4096, "last_7_days_bytes": 2048, "last_30_days_bytes": 3072},
+			})
+		case r.URL.Path == "/api/config":
+			writeJSON(t, w, map[string]any{
+				"active": true, "dry_run": false, "refresh_secs": 5, "default_language": "en",
+				"libtorrent": map[string]any{"download_limit_kib": 100, "upload_limit_kib": 50},
+			})
 		case r.URL.Path == "/api/torrent-events":
 			writeJSON(t, w, []map[string]any{{"kind": "completed", "hash": "abc", "name": "Example"}})
 		case r.URL.Path == "/api/i18n/active":
@@ -109,6 +119,14 @@ func TestClientReadsEndpoints(t *testing.T) {
 	if err != nil || health.ProcessID != 42 || len(health.Paths) != 1 {
 		t.Fatalf("Health: %v %+v", err, health)
 	}
+	stats, err := client.Stats(ctx)
+	if err != nil || stats.TorrentStats["active_peers"] != float64(3) || stats.Consumption == nil || stats.Consumption.Last7DaysBytes != 2048 {
+		t.Fatalf("Stats: %v %+v", err, stats)
+	}
+	config, err := client.Config(ctx)
+	if err != nil || config.RefreshSecs != 5 || config.Libtorrent.DownloadLimitKib != 100 {
+		t.Fatalf("Config: %v %+v", err, config)
+	}
 	events, err := client.Events(ctx)
 	if err != nil || len(events) != 1 || events[0].Kind != "completed" {
 		t.Fatalf("Events: %v %+v", err, events)
@@ -138,7 +156,7 @@ func TestClientReadsCatalogViews(t *testing.T) {
 		}
 	})
 	ctx := context.Background()
-	archive, total, pages, err := client.Archive(ctx, "Example")
+	archive, total, pages, err := client.Archive(ctx, "Example", 2)
 	if err != nil || len(archive) != 1 || total != 1 || pages != 1 {
 		t.Fatalf("Archive: %v %+v %d %d", err, archive, total, pages)
 	}

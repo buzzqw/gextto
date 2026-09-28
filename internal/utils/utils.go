@@ -2,6 +2,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -120,6 +121,18 @@ var FlareSolverrLimiter = make(chan struct{}, 2)
 // AcquireFlareSolverr blocks until a FlareSolverr slot is free.
 func AcquireFlareSolverr() {
 	FlareSolverrLimiter <- struct{}{}
+}
+
+// AcquireFlareSolverrContext waits for a FlareSolverr slot while still
+// respecting request cancellation. This prevents a shutdown or an expired
+// request from remaining blocked behind other browser sessions.
+func AcquireFlareSolverrContext(ctx context.Context) error {
+	select {
+	case FlareSolverrLimiter <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // ReleaseFlareSolverr releases a FlareSolverr slot.

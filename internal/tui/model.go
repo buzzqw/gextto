@@ -3,6 +3,7 @@ package tui
 import (
 	"sort"
 	"strings"
+	"time"
 )
 
 // Tab identifies the active view.
@@ -29,6 +30,16 @@ const (
 	SortSize
 )
 
+// ArchiveSortMode selects the archive list ordering.
+type ArchiveSortMode int
+
+const (
+	ArchiveSortTitle ArchiveSortMode = iota
+	ArchiveSortSource
+	ArchiveSortQuality
+	ArchiveSortAdded
+)
+
 // DetailView is the sub-view of the torrent details overlay.
 type DetailView int
 
@@ -47,6 +58,7 @@ const (
 	OverlayHelp
 	OverlaySearch
 	OverlayEvents
+	OverlaySettings
 )
 
 // PromptKind identifies the active single-line input.
@@ -62,6 +74,8 @@ const (
 	PromptLogFilter
 	PromptTorrentFilter
 	PromptArchiveFilter
+	PromptLanguage
+	PromptRefresh
 )
 
 // ActionKind identifies a side effect the runner must perform.
@@ -94,6 +108,10 @@ const (
 	ActionLoadMissing
 	ActionLoadBlocklist
 	ActionRemoveBlocklist
+	ActionCopy
+	ActionLoadConfig
+	ActionSaveSetting
+	ActionSetLanguage
 )
 
 // Action is a request emitted by Update and executed against the daemon.
@@ -106,6 +124,24 @@ type Action struct {
 	DL, UL      int64
 	Release     map[string]any
 	DetailKind  string
+	Page        int
+}
+
+// TUIConfig contains the small set of daemon settings editable from the TUI.
+type TUIConfig struct {
+	Active           bool
+	DryRun           bool
+	RefreshSecs      uint64
+	DefaultLanguage  string
+	DownloadLimitKib int64
+	UploadLimitKib   int64
+}
+
+// TransferSample is one in-memory point used by the status sparkline.
+type TransferSample struct {
+	Download float64
+	Upload   float64
+	At       time.Time
 }
 
 // prompt holds the active input buffer.
@@ -151,6 +187,8 @@ type Screen struct {
 	CursorRow     int
 	CursorCol     int
 	CursorVisible bool
+	ColorsEnabled bool
+	HighContrast  bool
 }
 
 // Event is one torrent event (alias kept for readability in the model).
@@ -170,6 +208,9 @@ type Model struct {
 	ArchiveFilter     string
 	ArchiveSelected   int
 	ArchiveScroll     int
+	ArchivePage       int
+	ArchiveSort       ArchiveSortMode
+	ArchiveSortDesc   bool
 	MissingSelected   int
 	MissingScroll     int
 	BlocklistSelected int
@@ -178,6 +219,18 @@ type Model struct {
 	Status    *Status
 	Health    *Health
 	HealthErr string
+
+	Metrics           *DashboardStats
+	DaemonKnown       bool
+	DaemonConnected   bool
+	DaemonReconnects  int
+	Config            *TUIConfig
+	SettingsSelected  int
+	ColorsEnabled     bool
+	HighContrast      bool
+	TransferHistory   []TransferSample
+	Notification      string
+	NotificationUntil time.Time
 
 	Torrents     []Torrent
 	Archive      []ArchiveEntry
@@ -191,15 +244,20 @@ type Model struct {
 	LogFollow          bool
 	LogScroll          int
 	LogStreamConnected bool
+	StreamReconnect    int
 
 	Detail       *TorrentDetail
 	DetailView   DetailView
 	DetailItems  []map[string]any
 	DetailScroll int
 
-	Overlay     Overlay
-	Events      []Event
-	EventScroll int
+	ArchiveDetail       *ArchiveEntry
+	ArchiveDetailScroll int
+
+	Overlay          Overlay
+	Events           []Event
+	EventScroll      int
+	EventStreamReady bool
 
 	SearchResults  []map[string]any
 	SearchQuery    string
@@ -220,9 +278,11 @@ func NewModel(tr *Translator) *Model {
 		tr = NewTranslator(LangIT)
 	}
 	return &Model{
-		Tr:         tr,
-		LogFollow:  true,
-		DetailView: DetailGeneral,
+		Tr:            tr,
+		LogFollow:     true,
+		DetailView:    DetailGeneral,
+		ArchivePage:   1,
+		ColorsEnabled: true,
 	}
 }
 
@@ -257,6 +317,68 @@ func (m *Model) SetHealth(health Health) { m.Health = &health; m.HealthErr = "" 
 
 // SetHealthError records a health fetch failure.
 func (m *Model) SetHealthError(message string) { m.HealthErr = message }
+
+// SetMetrics replaces aggregate transfer and consumption statistics and keeps
+// a short in-memory history for the status sparkline.
+func (m *Model) SetMetrics(stats DashboardStats) {
+	m.Metrics = &stats
+	download, hasDownload := metricNumber(stats.TorrentStats, "dl_info_speed", "download_rate", "download_speed")
+	upload, hasUpload := metricNumber(stats.TorrentStats, "up_info_speed", "upload_rate", "upload_speed")
+	if !hasDownload && !hasUpload {
+		return
+	}
+	m.TransferHistory = append(m.TransferHistory, TransferSample{Download: download, Upload: upload, At: time.Now()})
+	if len(m.TransferHistory) > 60 {
+		m.TransferHistory = m.TransferHistory[len(m.TransferHistory)-60:]
+	}
+}
+
+// SetConfig replaces the daemon settings shown by the TUI settings panel.
+func (m *Model) SetConfig(config TUIConfig) { m.Config = &config }
+
+// SetNotification displays a transient, non-modal notification.
+func (m *Model) SetNotification(message string) {
+	if strings.TrimSpace(message) == "" {
+		return
+	}
+	m.Notification = message
+	m.NotificationUntil = time.Now().Add(8 * time.Second)
+}
+
+// ObserveEvent turns relevant torrent lifecycle events into notifications.
+func (m *Model) ObserveEvent(event Event) {
+	kind := strings.ToLower(strings.TrimSpace(event.Kind))
+	name := firstNonEmpty(event.Name, event.Hash, m.Tr.T("label.torrents"))
+	switch {
+	case strings.Contains(kind, "finished"):
+		m.SetNotification(m.Tr.Format("msg.notifyfinished", name))
+	case strings.Contains(kind, "error") || strings.Contains(kind, "failed"):
+		message := firstNonEmpty(event.Message, m.Tr.T("msg.unknownerror"))
+		m.SetNotification(m.Tr.Format("msg.notifyerror", name, message))
+	}
+}
+
+// SetDaemonState records reachability of the daemon API.
+func (m *Model) SetDaemonState(connected bool, message string) {
+	wasKnown, wasConnected := m.DaemonKnown, m.DaemonConnected
+	m.DaemonKnown = true
+	m.DaemonConnected = connected
+	if connected {
+		m.DaemonReconnects = 0
+		m.Err = ""
+		if wasKnown && !wasConnected {
+			m.SetNotification(m.Tr.T("msg.daemononline"))
+		}
+		return
+	}
+	m.DaemonReconnects++
+	if message != "" {
+		m.Err = message
+	}
+	if wasKnown && wasConnected {
+		m.SetNotification(m.Tr.T("msg.daemonoffline"))
+	}
+}
 
 // SetLogs replaces the whole log buffer (SSE snapshot fallback).
 func (m *Model) SetLogs(lines []string) {
@@ -317,6 +439,9 @@ func (m *Model) AppendLog(line string) {
 // SetStreamConnected records the SSE connection state.
 func (m *Model) SetStreamConnected(connected bool) { m.LogStreamConnected = connected }
 
+// SetStreamReconnect records the number of consecutive SSE reconnects.
+func (m *Model) SetStreamReconnect(attempt int) { m.StreamReconnect = max(0, attempt) }
+
 // SetDetail stores the open torrent details.
 func (m *Model) SetDetail(detail TorrentDetail) {
 	m.Detail = &detail
@@ -329,6 +454,13 @@ func (m *Model) SetDetail(detail TorrentDetail) {
 func (m *Model) SetDetailItems(items []map[string]any) {
 	m.DetailItems = items
 	m.DetailScroll = 0
+}
+
+// SetArchiveDetail opens the selected archive entry details.
+func (m *Model) SetArchiveDetail(entry ArchiveEntry) {
+	copy := entry
+	m.ArchiveDetail = &copy
+	m.ArchiveDetailScroll = 0
 }
 
 // SetEvents stores the recent torrent events.
@@ -391,6 +523,33 @@ func (m *Model) VisibleTorrents() []Torrent {
 		}
 	}
 	return sorted
+}
+
+// VisibleArchive returns the current archive page in the selected order.
+func (m *Model) VisibleArchive() []ArchiveEntry {
+	items := append([]ArchiveEntry(nil), m.Archive...)
+	sort.SliceStable(items, func(i, j int) bool {
+		cmp := 0
+		switch m.ArchiveSort {
+		case ArchiveSortSource:
+			cmp = strings.Compare(strings.ToLower(items[i].Source), strings.ToLower(items[j].Source))
+		case ArchiveSortQuality:
+			if items[i].QualityScore < items[j].QualityScore {
+				cmp = -1
+			} else if items[i].QualityScore > items[j].QualityScore {
+				cmp = 1
+			}
+		case ArchiveSortAdded:
+			cmp = strings.Compare(items[i].AddedAt, items[j].AddedAt)
+		default:
+			cmp = strings.Compare(strings.ToLower(items[i].Title), strings.ToLower(items[j].Title))
+		}
+		if m.ArchiveSortDesc {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+	return items
 }
 
 func (m *Model) visibleTorrents() []Torrent { return m.VisibleTorrents() }

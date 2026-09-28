@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -47,6 +48,8 @@ func (m *Model) Update(k Key) Action {
 			m.EventScroll = max(0, len(m.Events)-1)
 		}
 		return Action{}
+	case OverlaySettings:
+		return m.updateSettings(k)
 	}
 
 	switch {
@@ -62,6 +65,9 @@ func (m *Model) Update(k Key) Action {
 	if m.Detail != nil {
 		return m.updateDetail(k)
 	}
+	if m.ArchiveDetail != nil {
+		return m.updateArchiveDetail(k)
+	}
 
 	switch {
 	case k.Kind == KeyRune && k.Rune == 'r':
@@ -76,11 +82,22 @@ func (m *Model) Update(k Key) Action {
 	case k.Kind == KeyRune && k.Rune == 'c':
 		m.Prompt = newPrompt(PromptCycle, "")
 		return Action{}
-	case k.Kind == KeyRune && k.Rune == 's':
-		m.Prompt = newPrompt(PromptSearch, "")
+	case k.Kind == KeyRune && unicode.ToLower(k.Rune) == 's':
+		if m.Tab == TabArchive {
+			m.Prompt = newPrompt(PromptArchiveFilter, m.ArchiveFilter)
+		} else {
+			m.Prompt = newPrompt(PromptSearch, "")
+		}
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'e':
 		return Action{Kind: ActionLoadEvents}
+	case k.Kind == KeyRune && k.Rune == 'g':
+		m.Overlay = OverlaySettings
+		m.SettingsSelected = 0
+		if m.Config == nil {
+			return Action{Kind: ActionLoadConfig}
+		}
+		return Action{}
 	case k.Kind == KeyTab:
 		m.Tab = Tab((int(m.Tab) + 1) % tabCount)
 		return m.loadTabAction()
@@ -226,7 +243,21 @@ func (m *Model) submitPrompt() Action {
 		m.ArchiveFilter = value
 		m.ArchiveSelected = 0
 		m.ArchiveScroll = 0
-		return Action{Kind: ActionLoadArchive, Text: value}
+		m.ArchivePage = 1
+		return Action{Kind: ActionLoadArchive, Text: value, Page: 1}
+	case PromptLanguage:
+		if value != LangIT && value != LangEN {
+			m.Message = m.Tr.T("msg.languageinvalid")
+			return Action{}
+		}
+		return Action{Kind: ActionSetLanguage, Text: value}
+	case PromptRefresh:
+		seconds, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || seconds < 1 || seconds > 86400 {
+			m.Message = m.Tr.T("msg.refreshinvalid")
+			return Action{}
+		}
+		return Action{Kind: ActionSaveSetting, Domain: "refresh_interval", Text: strconv.FormatUint(seconds, 10)}
 	}
 	return Action{}
 }
@@ -262,7 +293,7 @@ func (m *Model) updateConfirm(k Key) Action {
 
 func (m *Model) updateSearchOverlay(k Key) Action {
 	switch {
-	case k.Kind == KeyEsc:
+	case k.Kind == KeyEsc || (k.Kind == KeyRune && k.Rune == 'q'):
 		m.Overlay = OverlayNone
 	case k.Kind == KeyRune && k.Rune == 'q':
 		m.Overlay = OverlayNone
@@ -276,6 +307,13 @@ func (m *Model) updateSearchOverlay(k Key) Action {
 			return Action{}
 		}
 		return Action{Kind: ActionQueueRelease, Release: m.SearchResults[m.SearchSelected]}
+	case k.Kind == KeyRune && k.Rune == 'y':
+		if len(m.SearchResults) > 0 && m.SearchSelected >= 0 && m.SearchSelected < len(m.SearchResults) {
+			magnet := stringValue(m.SearchResults[m.SearchSelected]["magnet"])
+			if magnet != "" {
+				return Action{Kind: ActionCopy, Text: magnet}
+			}
+		}
 	}
 	return Action{}
 }
@@ -306,6 +344,10 @@ func (m *Model) updateDetail(k Key) Action {
 		if torrent := m.SelectedTorrent(); torrent != nil {
 			kind := map[DetailView]string{DetailTrackers: "trackers", DetailFiles: "files", DetailPeers: "peers"}[view]
 			return Action{Kind: ActionLoadDetail, Hash: torrent.Hash, DetailKind: kind}
+		}
+	case k.Kind == KeyRune && k.Rune == 'y':
+		if m.Detail.Magnet != "" {
+			return Action{Kind: ActionCopy, Text: m.Detail.Magnet}
 		}
 	}
 	return Action{}
@@ -390,6 +432,10 @@ func (m *Model) updateTorrents(k Key) Action {
 			m.SortDesc = !m.SortDesc
 		case 'F':
 			m.Prompt = newPrompt(PromptTorrentFilter, m.Filter)
+		case 'y':
+			if torrent != nil && torrent.Hash != "" {
+				return Action{Kind: ActionCopy, Text: torrent.Hash}
+			}
 		}
 	}
 	return Action{}
@@ -428,16 +474,62 @@ func (m *Model) updateLogs(k Key) Action {
 	return Action{}
 }
 
+func (m *Model) updateSettings(k Key) Action {
+	const settingCount = 6
+	switch {
+	case k.Kind == KeyEsc || (k.Kind == KeyRune && k.Rune == 'q'):
+		m.Overlay = OverlayNone
+	case k.Kind == KeyUp:
+		m.SettingsSelected = (m.SettingsSelected + settingCount - 1) % settingCount
+	case k.Kind == KeyDown:
+		m.SettingsSelected = (m.SettingsSelected + 1) % settingCount
+	case k.Kind == KeyRune && k.Rune == 'c':
+		m.ColorsEnabled = !m.ColorsEnabled
+	case k.Kind == KeyRune && k.Rune == 'h':
+		m.HighContrast = !m.HighContrast
+	case k.Kind == KeyEnter:
+		switch m.SettingsSelected {
+		case 0:
+			language := ""
+			if m.Config != nil {
+				language = m.Config.DefaultLanguage
+			}
+			m.Prompt = newPrompt(PromptLanguage, language)
+		case 1:
+			seconds := "2"
+			if m.Config != nil && m.Config.RefreshSecs > 0 {
+				seconds = strconv.FormatUint(m.Config.RefreshSecs, 10)
+			}
+			m.Prompt = newPrompt(PromptRefresh, seconds)
+		case 2:
+			value := "0 0"
+			if m.Config != nil {
+				value = fmt.Sprintf("%d %d", m.Config.DownloadLimitKib, m.Config.UploadLimitKib)
+			}
+			m.Prompt = newPrompt(PromptLimits, value)
+		case 3:
+			if m.Config != nil {
+				value := "false"
+				if !m.Config.DryRun {
+					value = "true"
+				}
+				return Action{Kind: ActionSaveSetting, Domain: "dry_run", Text: value}
+			}
+		}
+	}
+	return Action{}
+}
+
 func (m *Model) loadTabAction() Action {
 	switch m.Tab {
 	case TabArchive:
-		return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter}
+		return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter, Page: m.ArchivePage}
 	case TabMissing:
 		return Action{Kind: ActionLoadMissing}
 	case TabBlocklist:
 		return Action{Kind: ActionLoadBlocklist}
 	default:
-		return Action{}
+		return Action{Kind: ActionRefresh}
 	}
 }
 
@@ -468,11 +560,68 @@ func (m *Model) updateArchive(k Key) Action {
 	case k.Kind == KeyRune && k.Rune == '/':
 		m.Prompt = newPrompt(PromptArchiveFilter, m.ArchiveFilter)
 	case k.Kind == KeyEnter:
-		if m.ArchiveSelected >= 0 && m.ArchiveSelected < len(m.Archive) && m.Archive[m.ArchiveSelected].Magnet != "" {
-			return Action{Kind: ActionAddMagnet, Text: m.Archive[m.ArchiveSelected].Magnet}
+		items := m.VisibleArchive()
+		if m.ArchiveSelected >= 0 && m.ArchiveSelected < len(items) && items[m.ArchiveSelected].Magnet != "" {
+			return Action{Kind: ActionAddMagnet, Text: items[m.ArchiveSelected].Magnet}
 		}
-	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
+	case k.Kind == KeyPgUp:
+		if m.ArchivePage > 1 {
+			m.ArchivePage--
+			m.ArchiveSelected = 0
+			m.ArchiveScroll = 0
+			return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter, Page: m.ArchivePage}
+		}
+	case k.Kind == KeyPgDn:
+		if m.ArchivePage < max(1, m.ArchivePages) {
+			m.ArchivePage++
+			m.ArchiveSelected = 0
+			m.ArchiveScroll = 0
+			return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter, Page: m.ArchivePage}
+		}
+	case k.Kind == KeyRune && (k.Rune == 'o' || k.Rune == 'O'):
+		if k.Rune == 'o' {
+			m.ArchiveSort = (m.ArchiveSort + 1) % 4
+		} else {
+			m.ArchiveSortDesc = !m.ArchiveSortDesc
+		}
+		m.ArchiveSelected = 0
+		m.ArchiveScroll = 0
+	case k.Kind == KeyRune && k.Rune == 'd':
+		items := m.VisibleArchive()
+		if m.ArchiveSelected >= 0 && m.ArchiveSelected < len(items) {
+			m.SetArchiveDetail(items[m.ArchiveSelected])
+		}
+	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyHome, k.Kind == KeyEnd:
 		m.ArchiveSelected = moveSelection(m.ArchiveSelected, len(m.Archive), k.Kind)
+	}
+	return Action{}
+}
+
+func (m *Model) updateArchiveDetail(k Key) Action {
+	switch {
+	case k.Kind == KeyEsc || k.Kind == KeyEnter:
+		m.ArchiveDetail = nil
+		m.ArchiveDetailScroll = 0
+	case k.Kind == KeyUp:
+		m.ArchiveDetailScroll = max(0, m.ArchiveDetailScroll-1)
+	case k.Kind == KeyDown:
+		m.ArchiveDetailScroll++
+	case k.Kind == KeyPgUp:
+		m.ArchiveDetailScroll = max(0, m.ArchiveDetailScroll-10)
+	case k.Kind == KeyPgDn:
+		m.ArchiveDetailScroll += 10
+	case k.Kind == KeyHome:
+		m.ArchiveDetailScroll = 0
+	case k.Kind == KeyEnd:
+		m.ArchiveDetailScroll = 1000000
+	case k.Kind == KeyRune && unicode.ToLower(k.Rune) == 'a':
+		if m.ArchiveDetail != nil && m.ArchiveDetail.Magnet != "" {
+			return Action{Kind: ActionAddMagnet, Text: m.ArchiveDetail.Magnet}
+		}
+	case k.Kind == KeyRune && k.Rune == 'y':
+		if m.ArchiveDetail != nil && m.ArchiveDetail.Magnet != "" {
+			return Action{Kind: ActionCopy, Text: m.ArchiveDetail.Magnet}
+		}
 	}
 	return Action{}
 }
@@ -519,6 +668,10 @@ func (m *Model) PromptLabel() string {
 		return m.Tr.T("prompt.torrentfilter")
 	case PromptArchiveFilter:
 		return m.Tr.T("prompt.archivefilter")
+	case PromptLanguage:
+		return m.Tr.T("prompt.language")
+	case PromptRefresh:
+		return m.Tr.T("prompt.refresh")
 	}
 	return ""
 }

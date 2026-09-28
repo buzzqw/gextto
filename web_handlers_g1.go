@@ -855,6 +855,7 @@ func SimklAuthStart(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
+	ConfigureCloudflareState(cfg.DataDir)
 	rawTerm := queryParam(r, "q")
 	var term *string
 	if strings.TrimSpace(rawTerm) != "" {
@@ -886,7 +887,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			indexer := indexer
 			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznab(ctx, indexer, *term)
+				items, err := FetchTorznabFlareSolverr(ctx, indexer, *term, nil, cfg.FlaresolverrURL)
 				if err != nil {
 					return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}
 				}
@@ -926,7 +927,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 			indexer := indexer
 			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznab(ctx, indexer, "ita")
+				items, err := FetchTorznabFlareSolverr(ctx, indexer, "ita", nil, cfg.FlaresolverrURL)
 				if err != nil {
 					return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}
 				}

@@ -1990,6 +1990,9 @@ func (c *Config) loadConfigDB() error {
 	if value, ok := c.Settings["active"]; ok {
 		c.Active = configBoolSetting(&value)
 	}
+	if value, ok := c.Settings["dry_run"]; ok {
+		c.DryRun = configBoolSetting(&value)
+	}
 	if value, ok := c.Settings["tmdb_api_key"]; ok && value != "" {
 		c.TmdbAPIKey = &value
 	} else {
@@ -2236,6 +2239,7 @@ func LoadConfig(path string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.FromEnv()
+	ConfigureCloudflareState(cfg.DataDir)
 	return cfg, nil
 }
 

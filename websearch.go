@@ -127,6 +127,7 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 	var engines []string
 	var flaresolverr *string
 	if cfg != nil {
+		ConfigureCloudflareState(cfg.DataDir)
 		engines = cfg.WebsearchEngines
 		if cfg.FlaresolverrURL != nil && strings.TrimSpace(*cfg.FlaresolverrURL) != "" {
 			flaresolverr = cfg.FlaresolverrURL
@@ -227,7 +228,7 @@ func runWebEngine(ctx context.Context, engine, query string, flaresolverr *strin
 	case "knaben":
 		return search_knaben(ctx, query)
 	case "nyaa":
-		return search_nyaa(ctx, query)
+		return search_nyaa(ctx, query, flaresolverr)
 	case "eztv":
 		return search_eztv(ctx, query)
 	case "btdig":
@@ -399,9 +400,9 @@ func search_knaben(ctx context.Context, query string) ([]webResult, error) {
 	return results, nil
 }
 
-func search_nyaa(ctx context.Context, query string) ([]webResult, error) {
+func search_nyaa(ctx context.Context, query string, flaresolverr *string) ([]webResult, error) {
 	rawURL := "https://nyaa.si/?page=rss&q=" + url.QueryEscape(query)
-	releases, err := FetchFeed(ctx, rawURL, nil, 3, 0, 0.8)
+	releases, err := FetchFeed(ctx, rawURL, flaresolverr, 3, 0, 0.8)
 	if err != nil {
 		return nil, err
 	}
@@ -500,67 +501,70 @@ func search_btdig(ctx context.Context, query string, flaresolverr *string) ([]we
 }
 
 func fetch_html(ctx context.Context, rawURL string, flaresolverr *string) (string, error) {
-	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	response, err := httpDo(requestCtx, defaultHTTPClient, http.MethodGet, rawURL, nil, nil, "")
-	if err == nil {
-		if response.StatusCode >= 200 && response.StatusCode < 300 {
-			payload, readErr := io.ReadAll(response.Body)
-			response.Body.Close()
-			if readErr != nil {
-				cancel()
-				return "", readErr
-			}
-			body := string(payload)
-			if len(body) > 1000 && !strings.Contains(strings.ToLower(body), "cloudflare") {
-				cancel()
+	useFlareSolverr := flaresolverr != nil && strings.TrimSpace(*flaresolverr) != ""
+	flareTried := false
+	if useFlareSolverr && cfDomainNeedsFlareSolverr(rawURL) {
+		_, hasSession := session_for(rawURL)
+		if !hasSession {
+			flareTried = true
+			if body, err := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); err == nil {
 				return body, nil
 			}
-		} else {
-			response.Body.Close()
 		}
-	} else if response != nil {
-		response.Body.Close()
 	}
+
+	requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	headers := map[string]string{}
+	if session, ok := session_for(rawURL); ok {
+		if session.userAgent != "" {
+			headers["User-Agent"] = session.userAgent
+		}
+		if session.cookie != "" {
+			headers["Cookie"] = session.cookie
+		}
+	}
+	response, err := httpDo(requestCtx, defaultHTTPClient, http.MethodGet, rawURL, headers, nil, "")
+	if err != nil {
+		cancel()
+		if useFlareSolverr && !flareTried {
+			flareTried = true
+			if body, flareErr := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+				return body, nil
+			}
+		}
+		return "", err
+	}
+
+	status := response.StatusCode
+	payload, readErr := io.ReadAll(response.Body)
+	response.Body.Close()
 	cancel()
-	if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
-		return "", fmt.Errorf("HTML engine unavailable and FlareSolverr is not configured")
+	if readErr != nil {
+		if useFlareSolverr && !flareTried {
+			flareTried = true
+			if body, flareErr := fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL); flareErr == nil {
+				return body, nil
+			}
+		}
+		return "", readErr
 	}
-	utils.AcquireFlareSolverr()
-	defer utils.ReleaseFlareSolverr()
-	endpoint := strings.TrimRight(*flaresolverr, "/") + "/v1"
-	payload, err := json.Marshal(map[string]any{
-		"cmd":        "request.get",
-		"url":        rawURL,
-		"maxTimeout": 20000,
-	})
-	if err != nil {
-		return "", err
+	body := string(payload)
+	if status >= 200 && status < 300 && !is_cloudflare_challenge(body) {
+		return body, nil
 	}
-	postCtx, postCancel := context.WithTimeout(ctx, 25*time.Second)
-	defer postCancel()
-	body, status, err := HTTPPostJSON(postCtx, endpoint, nil, payload)
-	if err != nil {
-		return "", err
+
+	directErr := fmt.Errorf("HTTP %d", status)
+	cloudflare := cloudflare_blocked(status) || is_cloudflare_challenge(body)
+	if !cloudflare {
+		return "", directErr
 	}
-	if status >= 400 {
-		return "", fmt.Errorf("HTTP %d", status)
+	if !useFlareSolverr || flareTried {
+		if is_cloudflare_challenge(body) && status >= 200 && status < 300 {
+			return "", fmt.Errorf("Cloudflare challenge")
+		}
+		return "", directErr
 	}
-	var value struct {
-		Status   string `json:"status"`
-		Solution struct {
-			Response string `json:"response"`
-		} `json:"solution"`
-	}
-	if err := json.Unmarshal(body, &value); err != nil {
-		return "", err
-	}
-	if value.Status != "" && value.Status != "ok" {
-		return "", fmt.Errorf("FlareSolverr returned status %q", value.Status)
-	}
-	if value.Solution.Response == "" {
-		return "", fmt.Errorf("FlareSolverr returned no HTML")
-	}
-	return value.Solution.Response, nil
+	return fetch_with_flaresolverr(ctx, defaultHTTPClient, *flaresolverr, rawURL)
 }
 
 func search_torrentscsv(ctx context.Context, query string) ([]webResult, error) {
@@ -704,14 +708,20 @@ func search_bt4g(ctx context.Context, query string, flaresolverr *string) ([]web
 	}
 	var selected string
 	var body string
+	var lastErr error
 	for _, candidate := range candidates {
 		if value, err := fetch_html(ctx, candidate, flaresolverr); err == nil {
 			selected = candidate
 			body = value
 			break
+		} else {
+			lastErr = err
 		}
 	}
 	if selected == "" {
+		if lastErr != nil {
+			return nil, fmt.Errorf("BT4G unavailable: %w", lastErr)
+		}
 		return nil, fmt.Errorf("invalid BT4G base URL")
 	}
 	if body == "" {

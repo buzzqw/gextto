@@ -10,6 +10,8 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -327,7 +329,12 @@ func is_cloudflare_challenge(body string) bool {
 	return strings.Contains(lower, "just a moment") ||
 		strings.Contains(lower, "cf-challenge") ||
 		strings.Contains(lower, "enable javascript and cookies") ||
-		strings.Contains(lower, "attention required! | cloudflare")
+		strings.Contains(lower, "attention required! | cloudflare") ||
+		strings.Contains(lower, "checking your browser") ||
+		strings.Contains(lower, "cf-browser-verification") ||
+		strings.Contains(lower, "cf_chl_opt") ||
+		strings.Contains(lower, "cdn-cgi/challenge-platform") ||
+		strings.Contains(lower, "ddos protection by cloudflare")
 }
 
 // cfSession is a Cloudflare cookie/User-Agent pair learned from FlareSolverr,
@@ -347,6 +354,97 @@ var (
 	cfSessionsMu sync.Mutex
 	cfSessions   = map[string]cfSession{}
 )
+
+const cfDomainTTL = 6 * time.Hour
+
+var (
+	cfDomainsMu      sync.Mutex
+	cfDomainsWriteMu sync.Mutex
+	cfDomains        = map[string]time.Time{}
+	cfDomainsPath    string
+)
+
+// ConfigureCloudflareState selects the data directory used for the small
+// persisted memory of domains that required FlareSolverr. Cookies and
+// User-Agents are deliberately kept in memory only.
+func ConfigureCloudflareState(dataDir string) {
+	dataDir = strings.TrimSpace(dataDir)
+	if dataDir == "" {
+		return
+	}
+	path := filepath.Join(dataDir, "gextto_cf_domains.json")
+	cfDomainsMu.Lock()
+	defer cfDomainsMu.Unlock()
+	if path == cfDomainsPath {
+		return
+	}
+	cfDomainsPath = path
+	cfDomains = map[string]time.Time{}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	var saved map[string]int64
+	if json.Unmarshal(payload, &saved) != nil {
+		return
+	}
+	now := time.Now()
+	for domain, unix := range saved {
+		stamp := time.Unix(unix, 0)
+		if now.Sub(stamp) < cfDomainTTL {
+			cfDomains[domain] = stamp
+		}
+	}
+}
+
+func cfDomainNeedsFlareSolverr(rawURL string) bool {
+	domain := domain_of(rawURL)
+	if domain == "" {
+		return false
+	}
+	cfDomainsMu.Lock()
+	defer cfDomainsMu.Unlock()
+	stamp, ok := cfDomains[domain]
+	if !ok {
+		return false
+	}
+	if time.Since(stamp) >= cfDomainTTL {
+		delete(cfDomains, domain)
+		return false
+	}
+	return true
+}
+
+func rememberCFDomain(rawURL string) {
+	domain := domain_of(rawURL)
+	if domain == "" {
+		return
+	}
+	now := time.Now()
+	cfDomainsMu.Lock()
+	cfDomains[domain] = now
+	path := cfDomainsPath
+	saved := make(map[string]int64, len(cfDomains))
+	for name, stamp := range cfDomains {
+		if now.Sub(stamp) < cfDomainTTL {
+			saved[name] = stamp.Unix()
+		}
+	}
+	cfDomainsMu.Unlock()
+	if path == "" {
+		return
+	}
+	payload, err := json.Marshal(saved)
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	cfDomainsWriteMu.Lock()
+	defer cfDomainsWriteMu.Unlock()
+	_ = utils.AtomicWrite(path, payload)
+}
 
 // Aggregate concurrency per host. A single feed keeps its own small limit, but
 // many feeds run at once and detail scraping can fan out to dozens of requests;
@@ -500,7 +598,9 @@ func httpDo(ctx context.Context, client *http.Client, method, rawURL string, hea
 }
 
 func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
-	utils.AcquireFlareSolverr()
+	if err := utils.AcquireFlareSolverrContext(ctx); err != nil {
+		return "", err
+	}
 	defer utils.ReleaseFlareSolverr()
 	endpoint := strings.TrimRight(flaresolverr, "/") + "/v1"
 	payload, err := json.Marshal(map[string]any{
@@ -526,6 +626,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 		return "", err
 	}
 	var value struct {
+		Status   string `json:"status"`
 		Solution struct {
 			UserAgent string             `json:"userAgent"`
 			Cookies   []cloudflareCookie `json:"cookies"`
@@ -535,10 +636,14 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 	if err := json.Unmarshal(body, &value); err != nil {
 		return "", err
 	}
+	if value.Status != "" && value.Status != "ok" {
+		return "", fmt.Errorf("FlareSolverr returned status %q", value.Status)
+	}
 	remember_session(rawURL, value.Solution.UserAgent, value.Solution.Cookies)
 	if value.Solution.Response == "" {
 		return "", fmt.Errorf("flaresolverr returned an empty response")
 	}
+	rememberCFDomain(rawURL)
 	return value.Solution.Response, nil
 }
 
@@ -683,6 +788,20 @@ func read_knaben_stream(response *http.Response) (string, error) {
 // Cloudflare is the last resort, after the direct retries, so it is not
 // hammered on every micro-error.
 func fetch_body(ctx context.Context, client *http.Client, rawURL string, flaresolverr *string) (string, error) {
+	flareTried := false
+	// Once a domain has required a browser challenge, prefer the browser when
+	// there is no usable in-memory session yet. A successful solution populates
+	// the session cache, so subsequent listing/detail requests can go direct.
+	if flaresolverr != nil && strings.TrimSpace(*flaresolverr) != "" &&
+		cfDomainNeedsFlareSolverr(rawURL) {
+		_, hasSession := session_for(rawURL)
+		if !hasSession {
+			flareTried = true
+			if body, err := flaresolverr_or(ctx, client, *flaresolverr, rawURL, "domain remembered as Cloudflare-protected"); err == nil {
+				return body, nil
+			}
+		}
+	}
 	lastTransient := ""
 	for attempt := 1; attempt <= FEED_FETCH_ATTEMPTS; attempt++ {
 		result := fetch_body_direct(ctx, client, rawURL, FEED_FETCH_TIMEOUT)
@@ -691,9 +810,13 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 			return result.value, nil
 		case fetchAttemptCloudflare:
 			// Non è un problema di rete transitorio: lascia fare a FlareSolverr.
-			if flaresolverr == nil {
+			if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 				return "", fmt.Errorf("%s", result.value)
 			}
+			if flareTried {
+				return "", fmt.Errorf("%s", result.value)
+			}
+			flareTried = true
 			return flaresolverr_or(ctx, client, *flaresolverr, rawURL, result.value)
 		case fetchAttemptFatal:
 			return "", fmt.Errorf("%s", result.value)
@@ -714,7 +837,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 		}
 	}
 	// Stream ostinato: ultima spiaggia FlareSolverr, se configurato.
-	if flaresolverr != nil {
+	if flaresolverr != nil && strings.TrimSpace(*flaresolverr) != "" && !flareTried {
 		return flaresolverr_or(ctx, client, *flaresolverr, rawURL, "direct attempts exhausted")
 	}
 	return "", fmt.Errorf("%s", lastTransient)
@@ -1347,7 +1470,16 @@ func FetchTorznabWith(ctx context.Context, indexer IndexerConfig, query string, 
 // fallback when the indexer blocks the request (Cloudflare / 403).
 func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query string, externalIDs [][2]string, flaresolverr *string) ([]models.Release, error) {
 	fullURL := torznabRequestURL(indexer, query, externalIDs)
-	response, transportErr := httpDo(ctx, defaultHTTPClient, http.MethodGet, fullURL, nil, nil, "")
+	headers := map[string]string{}
+	if session, ok := session_for(fullURL); ok {
+		if session.userAgent != "" {
+			headers["User-Agent"] = session.userAgent
+		}
+		if session.cookie != "" {
+			headers["Cookie"] = session.cookie
+		}
+	}
+	response, transportErr := httpDo(ctx, defaultHTTPClient, http.MethodGet, fullURL, headers, nil, "")
 	if response != nil {
 		defer response.Body.Close()
 	}
@@ -1365,6 +1497,9 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		body = fetched
 		contentType = torznabContentType(body)
 	case response.StatusCode >= 400:
+		if !cloudflare_blocked(response.StatusCode) {
+			return nil, fmt.Errorf("HTTP %d", response.StatusCode)
+		}
 		if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 			return nil, fmt.Errorf("HTTP %d", response.StatusCode)
 		}
@@ -1381,6 +1516,17 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 			return nil, readErr
 		}
 		body = string(payload)
+		if is_cloudflare_challenge(body) {
+			if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
+				return nil, fmt.Errorf("Cloudflare challenge")
+			}
+			fetched, fetchErr := torznabViaFlareSolverr(ctx, indexer, *flaresolverr, fullURL, "Cloudflare challenge body")
+			if fetchErr != nil {
+				return nil, fetchErr
+			}
+			body = fetched
+			contentType = torznabContentType(body)
+		}
 	}
 	if torznabError := TorznabError(body); torznabError != "" {
 		return nil, fmt.Errorf("%s", torznabError)

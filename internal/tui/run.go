@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -36,10 +37,11 @@ func DefaultURL() string {
 }
 
 type streamEvent struct {
-	snapshot  []string
-	line      string
-	connected bool
-	closed    bool
+	snapshot     []string
+	line         string
+	notification *Event
+	connected    bool
+	closed       bool
 }
 
 // Run starts the terminal interface and blocks until the user quits.
@@ -69,6 +71,8 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	cancelProbe()
 	model := NewModel(NewTranslator(ResolveLang(opts.Lang, os.Getenv("GEXTTO_LANG"), daemonLang)))
+	model.ColorsEnabled = os.Getenv("NO_COLOR") == ""
+	model.HighContrast = strings.EqualFold(strings.TrimSpace(os.Getenv("GEXTTO_TUI_THEME")), "high-contrast")
 
 	term := newTerminal(in, out)
 	if err := term.enter(); err != nil {
@@ -86,6 +90,7 @@ func Run(ctx context.Context, opts Options) error {
 
 	streamCh := make(chan streamEvent, 256)
 	go readStream(ctx, client, streamCh)
+	go readNotifications(ctx, client, streamCh)
 
 	// Refreshes run in a goroutine so a slow or unreachable daemon never blocks
 	// the keyboard: the interface always reacts to q / Ctrl-C.
@@ -98,7 +103,8 @@ func Run(ctx context.Context, opts Options) error {
 			return
 		}
 		go func() {
-			result := fetchModel(ctx, client, !model.LogStreamConnected, model.Tab, model.ArchiveFilter)
+			_, terminalHeight := term.size()
+			result := fetchModel(ctx, client, model.Tab == TabLogs && !model.LogStreamConnected, model.Tab, model.ArchiveFilter, model.ArchivePage, logLimitForHeight(terminalHeight))
 			atomic.StoreInt32(&fetching, 0)
 			select {
 			case refreshCh <- result:
@@ -110,6 +116,14 @@ func Run(ctx context.Context, opts Options) error {
 	parser := &KeyParser{}
 	requestRefresh()
 	startAction := func(action Action) bool {
+		if action.Kind == ActionCopy {
+			if err := writeOSC52(out, action.Text); err != nil {
+				model.SetMessage(model.Tr.Format("msg.copyfailed", err))
+			} else {
+				model.SetMessage(model.Tr.T("msg.copied"))
+			}
+			return false
+		}
 		return startActionAsync(ctx, client, model, action, requestRefresh, actionCh, &acting)
 	}
 
@@ -158,6 +172,9 @@ func Run(ctx context.Context, opts Options) error {
 		case result := <-actionCh:
 			atomic.StoreInt32(&acting, 0)
 			applyActionResult(model, result, requestRefresh)
+			if result.refreshInterval > 0 {
+				ticker.Reset(result.refreshInterval)
+			}
 			dirty = true
 		case event := <-streamCh:
 			applyStream(model, event)
@@ -226,16 +243,62 @@ func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
 }
 
 func readStream(ctx context.Context, client *Client, ch chan<- streamEvent) {
+	backoff := time.Second
 	for ctx.Err() == nil {
-		sendStream(ctx, ch, streamEvent{connected: true})
 		err := client.StreamLogs(ctx,
+			func() { sendStream(ctx, ch, streamEvent{connected: true}) },
 			func(lines []string) { sendStream(ctx, ch, streamEvent{snapshot: lines}) },
 			func(line string) { sendStream(ctx, ch, streamEvent{line: line}) },
 		)
 		sendStream(ctx, ch, streamEvent{connected: false, closed: err != nil})
+		if err == nil {
+			backoff = time.Second
+		} else if backoff < 10*time.Second {
+			backoff *= 2
+			if backoff > 10*time.Second {
+				backoff = 10 * time.Second
+			}
+		}
+		timer := time.NewTimer(backoff)
 		select {
-		case <-time.After(2 * time.Second):
+		case <-timer.C:
 		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return
+		}
+	}
+}
+
+func readNotifications(ctx context.Context, client *Client, ch chan<- streamEvent) {
+	backoff := time.Second
+	for ctx.Err() == nil {
+		err := client.StreamNotifications(ctx, func(event Event) {
+			copy := event
+			sendStream(ctx, ch, streamEvent{notification: &copy})
+		})
+		if err == nil {
+			backoff = time.Second
+		} else if backoff < 10*time.Second {
+			backoff *= 2
+			if backoff > 10*time.Second {
+				backoff = 10 * time.Second
+			}
+		}
+		timer := time.NewTimer(backoff)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 			return
 		}
 	}
@@ -250,14 +313,18 @@ func sendStream(ctx context.Context, ch chan<- streamEvent, event streamEvent) {
 
 func applyStream(model *Model, event streamEvent) {
 	switch {
+	case event.notification != nil:
+		model.ObserveEvent(*event.notification)
 	case event.snapshot != nil:
 		model.SetLogs(event.snapshot)
 	case event.line != "":
 		model.AppendLog(event.line)
 	case event.connected:
 		model.SetStreamConnected(true)
+		model.SetStreamReconnect(0)
 	case event.closed:
 		model.SetStreamConnected(false)
+		model.SetStreamReconnect(model.StreamReconnect + 1)
 	}
 }
 
@@ -265,6 +332,8 @@ func applyStream(model *Model, event streamEvent) {
 type refreshResult struct {
 	status       *Status
 	statusErr    string
+	metrics      *DashboardStats
+	hasMetrics   bool
 	torrents     []Torrent
 	hasTorrents  bool
 	logs         []string
@@ -273,6 +342,7 @@ type refreshResult struct {
 	hasArchive   bool
 	archiveTotal int
 	archivePages int
+	archivePage  int
 	missing      []Gap
 	hasMissing   bool
 	blocklist    []BlocklistEntry
@@ -283,7 +353,7 @@ type refreshResult struct {
 
 // fetchModel polls the daemon with a short timeout. It is safe to call from a
 // goroutine because it never touches the model.
-func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, archiveQuery string) refreshResult {
+func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, archiveQuery string, archivePage, logLimit int) refreshResult {
 	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
@@ -293,22 +363,31 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 	} else if ctx.Err() == nil {
 		result.statusErr = err.Error()
 	}
-	if torrents, err := client.Torrents(callCtx); err == nil {
-		result.torrents = torrents
-		result.hasTorrents = true
+	if tab == TabStatus {
+		if stats, err := client.Stats(callCtx); err == nil {
+			result.metrics = &stats
+			result.hasMetrics = true
+		}
 	}
-	if includeLogs {
-		if logs, err := client.Logs(callCtx, 200); err == nil {
+	if tab == TabTorrents {
+		if torrents, err := client.Torrents(callCtx); err == nil {
+			result.torrents = torrents
+			result.hasTorrents = true
+		}
+	}
+	if tab == TabLogs && includeLogs {
+		if logs, err := client.Logs(callCtx, logLimit); err == nil {
 			result.logs = logs
 			result.hasLogs = true
 		}
 	}
 	switch tab {
 	case TabArchive:
-		if items, total, pages, err := client.Archive(callCtx, archiveQuery); err == nil {
+		if items, total, pages, err := client.Archive(callCtx, archiveQuery, archivePage); err == nil {
 			result.archive = items
 			result.archiveTotal = total
 			result.archivePages = pages
+			result.archivePage = archivePage
 			result.hasArchive = true
 		}
 	case TabMissing:
@@ -322,21 +401,37 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 			result.hasBlocklist = true
 		}
 	}
-	if health, err := client.Health(callCtx); err == nil {
-		result.health = &health
-	} else {
-		result.healthErr = err.Error()
+	if tab == TabHealth {
+		if health, err := client.Health(callCtx); err == nil {
+			result.health = &health
+		} else {
+			result.healthErr = err.Error()
+		}
 	}
 	return result
+}
+
+func logLimitForHeight(height int) int {
+	limit := (height - 4) * 4
+	if limit < 40 {
+		limit = 40
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	return limit
 }
 
 // applyRefresh merges a poll result into the model on the main goroutine.
 func (m *Model) applyRefresh(result refreshResult) {
 	if result.status != nil {
 		m.SetStatus(*result.status)
-		m.SetError("")
+		m.SetDaemonState(true, "")
 	} else if result.statusErr != "" {
-		m.SetError(result.statusErr)
+		m.SetDaemonState(false, result.statusErr)
+	}
+	if result.hasMetrics && result.metrics != nil {
+		m.SetMetrics(*result.metrics)
 	}
 	if result.hasTorrents {
 		m.SetTorrents(result.torrents)
@@ -348,6 +443,7 @@ func (m *Model) applyRefresh(result refreshResult) {
 		m.Archive = result.archive
 		m.ArchiveTotal = result.archiveTotal
 		m.ArchivePages = result.archivePages
+		m.ArchivePage = max(1, result.archivePage)
 		m.ArchiveSelected = min(m.ArchiveSelected, max(0, len(m.Archive)-1))
 	}
 	if result.hasMissing {
@@ -367,10 +463,11 @@ func (m *Model) applyRefresh(result refreshResult) {
 }
 
 type actionResult struct {
-	message      string
-	apply        func(*Model)
-	refresh      bool
-	clearMessage bool
+	message         string
+	apply           func(*Model)
+	refresh         bool
+	clearMessage    bool
+	refreshInterval time.Duration
 }
 
 func startActionAsync(ctx context.Context, client *Client, model *Model, action Action, refresh func(), results chan<- actionResult, acting *int32) bool {
@@ -526,7 +623,68 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		if err := client.SetSpeedLimits(callCtx, action.DL, action.UL); err != nil {
 			return fail("msg.actionfailed", "limits", err)
 		}
+		result.apply = func(m *Model) {
+			if m.Config != nil {
+				m.Config.DownloadLimitKib = action.DL
+				m.Config.UploadLimitKib = action.UL
+			}
+		}
 		result.message = tr.Format("msg.limits", action.DL, action.UL)
+	case ActionLoadConfig:
+		config, err := client.Config(callCtx)
+		if err != nil {
+			return fail("msg.settingsfailed", err)
+		}
+		result.apply = func(m *Model) {
+			m.SetConfig(TUIConfig{
+				Active:           config.Active,
+				DryRun:           config.DryRun,
+				RefreshSecs:      config.RefreshSecs,
+				DefaultLanguage:  config.DefaultLanguage,
+				DownloadLimitKib: config.Libtorrent.DownloadLimitKib,
+				UploadLimitKib:   config.Libtorrent.UploadLimitKib,
+			})
+		}
+		result.clearMessage = true
+	case ActionSaveSetting:
+		if err := client.SaveSetting(callCtx, action.Domain, action.Text); err != nil {
+			return fail("msg.settingsfailed", err)
+		}
+		result.apply = func(m *Model) {
+			if m.Config == nil {
+				return
+			}
+			switch action.Domain {
+			case "refresh_interval":
+				if seconds, err := strconv.ParseUint(action.Text, 10, 64); err == nil {
+					m.Config.RefreshSecs = seconds
+				}
+			case "dry_run":
+				m.Config.DryRun = action.Text == "true"
+			}
+		}
+		if action.Domain == "refresh_interval" {
+			if seconds, err := strconv.ParseUint(action.Text, 10, 64); err == nil {
+				result.refreshInterval = time.Duration(seconds) * time.Second
+			}
+		}
+		result.message = tr.T("msg.settingssaved")
+		if action.Domain == "dry_run" {
+			result.message = tr.T("msg.settingsrestart")
+		}
+		result.refresh = true
+	case ActionSetLanguage:
+		if err := client.SetLanguage(callCtx, action.Text); err != nil {
+			return fail("msg.settingsfailed", err)
+		}
+		result.apply = func(m *Model) {
+			m.Tr = NewTranslator(action.Text)
+			if m.Config != nil {
+				m.Config.DefaultLanguage = action.Text
+			}
+		}
+		result.message = tr.T("msg.languagesaved")
+		result.refresh = true
 	case ActionCleanTrash:
 		response, err := client.CleanTrash(callCtx)
 		if err != nil {
@@ -569,7 +727,11 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		}
 		result.message = tr.Format("msg.events", len(events))
 	case ActionLoadArchive:
-		items, total, pages, err := client.Archive(callCtx, action.Text)
+		page := action.Page
+		if page < 1 {
+			page = 1
+		}
+		items, total, pages, err := client.Archive(callCtx, action.Text, page)
 		if err != nil {
 			return fail("msg.archivefailed", err)
 		}
@@ -577,6 +739,7 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 			m.Archive = items
 			m.ArchiveTotal = total
 			m.ArchivePages = pages
+			m.ArchivePage = page
 			m.ArchiveSelected = min(m.ArchiveSelected, max(0, len(items)-1))
 		}
 	case ActionLoadMissing:

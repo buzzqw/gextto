@@ -311,6 +311,9 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 // scrapeFeed runs one feed inside its backoff window and total time budget,
 // updating the provider backoff and the per-source stats.
 func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, maxPages int, maxAgeDays int64, oldRatio float64) []models.Release {
+	if cfg != nil {
+		ConfigureCloudflareState(cfg.DataDir)
+	}
 	feed := feedLabel(rawURL)
 	source := feedSourceName(rawURL)
 	// Skip sources inside their backoff window instead of hammering them once
@@ -394,6 +397,9 @@ func searchOneWithDB(
 	providerDB *Database,
 	includeRejected bool,
 ) []models.Release {
+	if cfg != nil {
+		ConfigureCloudflareState(cfg.DataDir)
+	}
 	var all []models.Release
 	// Load the disabled set once, then exclude those providers from the fan-out.
 	blockedProviders := map[[2]string]struct{}{}

@@ -91,6 +91,40 @@ type Status struct {
 	Seen         Seen         `json:"seen"`
 }
 
+// ConsumptionStats mirrors the aggregate transfer consumption in /api/stats.
+type ConsumptionStats struct {
+	TotalBytes      int64              `json:"total_bytes"`
+	Last30DaysBytes int64              `json:"last_30_days_bytes"`
+	Last7DaysBytes  int64              `json:"last_7_days_bytes"`
+	Daily7d         []DailyConsumption `json:"daily_7d"`
+}
+
+// DailyConsumption is one day of recorded download consumption.
+type DailyConsumption struct {
+	Date  string `json:"date"`
+	Bytes int64  `json:"bytes"`
+}
+
+// DashboardStats mirrors /api/stats. TorrentStats is intentionally dynamic
+// because the active backend exposes different metric names.
+type DashboardStats struct {
+	LastCycle    LastCycle         `json:"last_cycle"`
+	TorrentStats map[string]any    `json:"torrent_stats"`
+	Consumption  *ConsumptionStats `json:"consumption"`
+}
+
+// ConfigSnapshot mirrors the editable subset of GET /api/config.
+type ConfigSnapshot struct {
+	Active          bool   `json:"active"`
+	DryRun          bool   `json:"dry_run"`
+	RefreshSecs     uint64 `json:"refresh_secs"`
+	DefaultLanguage string `json:"default_language"`
+	Libtorrent      struct {
+		DownloadLimitKib int64 `json:"download_limit_kib"`
+		UploadLimitKib   int64 `json:"upload_limit_kib"`
+	} `json:"libtorrent"`
+}
+
 // PathCheck is one health path entry.
 type PathCheck struct {
 	Label    string `json:"label"`
@@ -259,6 +293,30 @@ func (c *Client) Status(ctx context.Context) (Status, error) {
 	return status, err
 }
 
+// Stats fetches aggregate transfer and consumption statistics.
+func (c *Client) Stats(ctx context.Context) (DashboardStats, error) {
+	var stats DashboardStats
+	err := c.get(ctx, "/api/stats", &stats)
+	return stats, err
+}
+
+// Config fetches the editable daemon settings.
+func (c *Client) Config(ctx context.Context) (ConfigSnapshot, error) {
+	var config ConfigSnapshot
+	err := c.get(ctx, "/api/config", &config)
+	return config, err
+}
+
+// SaveSetting persists one configuration setting.
+func (c *Client) SaveSetting(ctx context.Context, key, value string) error {
+	return c.postJSON(ctx, "/api/config/settings", map[string]string{"key": key, "value": value}, nil)
+}
+
+// SetLanguage changes the daemon's active UI language.
+func (c *Client) SetLanguage(ctx context.Context, language string) error {
+	return c.postJSON(ctx, "/api/i18n/active", map[string]string{"lang": language}, nil)
+}
+
 // Torrents fetches the session torrents (already sorted by name).
 func (c *Client) Torrents(ctx context.Context) ([]Torrent, error) {
 	var torrents []Torrent
@@ -319,13 +377,16 @@ func (c *Client) Events(ctx context.Context) ([]Event, error) {
 }
 
 // Archive fetches a page of archived releases.
-func (c *Client) Archive(ctx context.Context, query string) ([]ArchiveEntry, int, int, error) {
+func (c *Client) Archive(ctx context.Context, query string, page int) ([]ArchiveEntry, int, int, error) {
 	var response struct {
 		Items []ArchiveEntry `json:"items"`
 		Total int            `json:"total"`
 		Pages int            `json:"pages"`
 	}
-	path := "/api/archive?limit=200"
+	if page < 1 {
+		page = 1
+	}
+	path := fmt.Sprintf("/api/archive?limit=200&page=%d", page)
 	if strings.TrimSpace(query) != "" {
 		path += "&q=" + url.QueryEscape(query)
 	}
@@ -498,9 +559,10 @@ func (c *Client) Language(ctx context.Context) (string, error) {
 	return response.Lang, nil
 }
 
-// StreamLogs consumes the SSE log stream until ctx is cancelled. snapshots
-// replaces the buffer, lines appends single entries.
-func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines func(string)) error {
+// StreamLogs consumes the SSE log stream until ctx is cancelled. connected is
+// called after the HTTP stream is established; snapshots replaces the buffer,
+// lines appends single entries.
+func (c *Client) StreamLogs(ctx context.Context, connected func(), snapshots func([]string), lines func(string)) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/logs/stream?limit=500", nil)
 	if err != nil {
 		return err
@@ -517,6 +579,9 @@ func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines
 	defer response.Body.Close()
 	if response.StatusCode >= 400 {
 		return &APIError{Status: response.StatusCode}
+	}
+	if connected != nil {
+		connected()
 	}
 	reader := bufio.NewReader(response.Body)
 	var data []string
@@ -535,6 +600,50 @@ func (c *Client) StreamLogs(ctx context.Context, snapshots func([]string), lines
 		case line == "" && len(data) > 0:
 			c.emitEvent(strings.Join(data, "\n"), snapshots, lines)
 			data = nil
+		}
+	}
+}
+
+// StreamNotifications consumes torrent lifecycle events until ctx is cancelled.
+func (c *Client) StreamNotifications(ctx context.Context, events func(Event)) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/api/notifications/stream", nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Accept", "text/event-stream")
+	streamHTTP := *c.http
+	streamHTTP.Timeout = 0
+	response, err := streamHTTP.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		return &APIError{Status: response.StatusCode}
+	}
+	reader := bufio.NewReader(response.Body)
+	var data []string
+	eventName := ""
+	for {
+		raw, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		line := strings.TrimRight(raw, "\r\n")
+		switch {
+		case strings.HasPrefix(line, "event:"):
+			eventName = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+		case strings.HasPrefix(line, "data:"):
+			data = append(data, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+		case line == "" && len(data) > 0:
+			if eventName == "torrent" && events != nil {
+				var event Event
+				if json.Unmarshal([]byte(strings.Join(data, "\n")), &event) == nil {
+					events(event)
+				}
+			}
+			data = nil
+			eventName = ""
 		}
 	}
 }
