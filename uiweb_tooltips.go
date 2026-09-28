@@ -96,7 +96,7 @@ var uiSettingTooltipText = map[string]string{
 	"cleanup_action":                               "Cosa fare con i file sostituiti: sposta nel trash o elimina.",
 	"tmdb_language":                                "Lingua usata per i metadati TMDB (es. it-IT, en-US).",
 	"default_language":                             "Lingua preferita di default per serie e film (es. ita, eng).",
-	"blacklist":                                    "Parole vietate separate da virgola: le release che le contengono vengono scartate.",
+	"blacklist":                                    "Parole vietate, una per riga: le release che le contengono vengono scartate.",
 	"archive_root":                                 "Cartella di archivio predefinita per i contenuti senza percorso dedicato.",
 	"trash_path":                                   "Cartella dove vengono spostati i file sostituiti/duplicati.",
 	"libtorrent_dir":                               "Cartella di download predefinita di libtorrent.",

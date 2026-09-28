@@ -30,7 +30,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gap_deep_interval_hours", Label: "Intervallo deep search (ore)", Tab: "daemon"},
 	{Key: "gap_deep_max_per_cycle", Label: "Deep search massime per ciclo", Tab: "daemon"},
 	{Key: "active", Label: "Attivo", Tab: "daemon"},
-	{Key: "blacklist", Label: "Blacklist (parole separate da virgola)", Tab: "sources"},
+	{Key: "blacklist", Label: "Blacklist (una parola per riga)", Tab: "sources"},
 	{Key: "libtorrent_enabled", Label: "Client abilitato", Tab: "libtorrent"},
 	{Key: "libtorrent_dynamic_queue", Label: "Auto-gestione dinamica coda e risorse", Tab: "libtorrent"},
 	{Key: "libtorrent_auto_optimize", Label: "Ottimizzazione continua (periodica)", Tab: "libtorrent"},

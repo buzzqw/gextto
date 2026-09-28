@@ -26,7 +26,7 @@ var uiSettingDefaults = map[string]string{
 	"gap_deep_max_per_cycle":  "5",
 
 	// --- Sorgenti -----------------------------------------------------------
-	"blacklist":         "cam, ts, screener",
+	"blacklist":         "cam\nscreener\nts",
 	"websearch_engines": "",
 	"content_filters":   "",
 
