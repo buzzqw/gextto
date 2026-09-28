@@ -213,8 +213,8 @@ func TestUiListAndActionPages(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cases := map[string]string{
-		"series":       `data-endpoint="/api/series"`,
-		"movies":       `data-endpoint="/api/movies"`,
+		"series":       `data-endpoint="/api/config/library"`,
+		"movies":       `data-endpoint="/api/config/library"`,
 		"gaps":         `data-endpoint="/api/gaps"`,
 		"archive":      `data-endpoint="/api/archive"`,
 		"blocklist":    `/api/blocklist/{hash}/remove`,
@@ -560,6 +560,9 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 			if section.Kind == "table" && section.Table.Endpoint != "" {
 				add("GET", section.Table.Endpoint)
 				for _, action := range decodeActions(t, section.Table.ActionsJSON) {
+					if action.Kind != "" || action.Path == "" {
+						continue
+					}
 					add(action.Method, action.Path)
 				}
 			}
@@ -583,6 +586,9 @@ func TestUiActionPathsAreRegistered(t *testing.T) {
 		}
 		add("GET", spec.Endpoint)
 		for _, action := range decodeActions(t, spec.ActionsJSON) {
+			if action.Kind != "" || action.Path == "" {
+				continue
+			}
 			add(action.Method, action.Path)
 		}
 		for _, action := range decodeActions(t, spec.DownloadsActionsJSON) {

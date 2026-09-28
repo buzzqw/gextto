@@ -201,7 +201,29 @@
     }
     var sortHead = event.target.closest("[data-sort]");
     if (sortHead) {
-      toggleTorrentSort(sortHead.getAttribute("data-sort") || "name");
+      var sortTable = sortHead.closest("table");
+      if (sortTable && sortTable.classList.contains("torrent-table")) {
+        toggleTorrentSort(sortHead.getAttribute("data-sort") || "name");
+      } else {
+        toggleGenericSort(sortHead);
+      }
+      return;
+    }
+    var libraryToggleButton = event.target.closest("[data-library-toggle]");
+    if (libraryToggleButton) {
+      libraryToggleButton.disabled = true;
+      libraryToggle(libraryToggleButton.getAttribute("data-library-toggle") || "series",
+        libraryToggleButton.getAttribute("data-library-name") || "");
+      window.setTimeout(function () { libraryToggleButton.disabled = false; }, 1200);
+      return;
+    }
+    var libraryRemoveButton = event.target.closest("[data-library-remove]");
+    if (libraryRemoveButton) {
+      var removeConfirm = libraryRemoveButton.getAttribute("data-confirm");
+      if (removeConfirm && !confirm(removeConfirm)) return;
+      libraryRemoveButton.disabled = true;
+      libraryRemove(libraryRemoveButton.getAttribute("data-library-remove") || "series",
+        libraryRemoveButton.getAttribute("data-library-name") || "", libraryRemoveButton);
       return;
     }
     if (event.target.closest("[data-download-select-all]")) {
@@ -964,6 +986,7 @@
     var tbody = panel.querySelector("[data-ui-body]");
     var count = panel.querySelector("[data-ui-count]");
     var searchInput = panel.querySelector("[data-ui-search]");
+    var filterInput = panel.querySelector("[data-ui-filter]");
     var endpoint = container.getAttribute("data-endpoint");
     var itemsKey = container.getAttribute("data-items") || "items";
     var columns = JSON.parse(container.getAttribute("data-columns") || "[]");
@@ -985,7 +1008,8 @@
         }
         var colspan = columns.length + (actions.length ? 1 : 0);
         thead.innerHTML = "<tr>" + columns.map(function (column) {
-          return "<th>" + esc(column.label) + "</th>";
+          var headerAttrs = column.sortable ? ' class="th-sort" data-sort="' + esc(column.key) + '"' : "";
+          return "<th" + headerAttrs + ">" + esc(column.label) + "</th>";
         }).join("") + (actions.length ? "<th>Azioni</th>" : "") + "</tr>";
         if (!items.length) {
           tbody.innerHTML = '<tr><td class="muted" colspan="' + colspan + '">' + esc(empty) + "</td></tr>";
@@ -995,28 +1019,55 @@
               // Some APIs return scalar arrays (for example download tags)
               // rather than objects. An empty column key means "the item".
               var rawValue = column.key === "" ? row : row[column.key];
-              var value = fmt(rawValue, column.format);
+              var value;
+              var sortValue;
+              if (column.format === "episodes") {
+                value = String(row.episodes_downloaded || 0) + "/" + String(row.episodes_total || 0);
+                sortValue = String(Number(row.episodes_downloaded) || 0);
+              } else if (column.format === "completion") {
+                var totalEpisodes = Number(row.episodes_total) || 0;
+                var doneEpisodes = Number(row.episodes_downloaded) || 0;
+                var percent = totalEpisodes > 0 ? (doneEpisodes / totalEpisodes) * 100 : 0;
+                value = percent.toFixed(0) + "%";
+                sortValue = String(percent);
+              } else if (column.format === "enabled") {
+                value = row.enabled ? "attiva" : "in pausa";
+                sortValue = row.enabled ? "1" : "0";
+              } else {
+                value = fmt(rawValue, column.format);
+                sortValue = value;
+              }
+              var sortAttr = column.sortable ? ' data-value="' + esc(sortValue) + '"' : "";
               if (column.format === "series_link") {
-                return '<td><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
+                return "<td" + sortAttr + '><a href="/?view=series&amp;series=' + encodeURIComponent(row[column.key]) + '" title="Apri il dettaglio della serie">' + esc(value) + "</a></td>";
               }
               if (column.format === "movie_link") {
-                return '<td><a href="/?view=movies&amp;movie=' + encodeURIComponent(row.id) + '" title="Apri il dettaglio del film">' + esc(value) + "</a></td>";
+                return "<td" + sortAttr + '><a href="/?view=movies&amp;movie=' + encodeURIComponent(row.id) + '" title="Apri il dettaglio del film">' + esc(value) + "</a></td>";
               }
               if (column.format === "url" || column.format === "getcomics") {
-                if (!value) return "<td></td>";
+                if (!value) return "<td" + sortAttr + "></td>";
                 var href = String(value);
                 if (column.format === "getcomics" && href.charAt(0) === "/") {
                   href = "https://getcomics.org" + href;
                 }
                 href = safeHref(href);
-                if (!href) return "<td></td>";
-                return '<td><a href="' + href + '" target="_blank" rel="noopener">apri</a></td>';
+                if (!href) return "<td" + sortAttr + "></td>";
+                return "<td" + sortAttr + '><a href="' + href + '" target="_blank" rel="noopener">apri</a></td>';
               }
-              return "<td>" + esc(value) + "</td>";
+              return "<td" + sortAttr + ">" + esc(value) + "</td>";
             }).join("");
             var actionsHtml = "";
             if (actions.length) {
               actionsHtml = '<td class="row-actions">' + actions.map(function (action) {
+                if (action.kind === "library-toggle" || action.kind === "library-remove") {
+                  var isRemove = action.kind === "library-remove";
+                  var scope = itemsKey === "series" ? "series" : "movies";
+                  var buttonClass = action.class || (isRemove ? "danger" : "");
+                  var buttonLabel = isRemove ? action.label : (row.enabled ? "Pausa" : "Attiva");
+                  var confirmAttr = action.confirm ? ' data-confirm="' + esc(action.confirm) + '"' : "";
+                  return '<button class="btn sm ' + buttonClass + '" data-library-' + (isRemove ? "remove" : "toggle") +
+                    '="' + scope + '" data-library-name="' + esc(row.name) + '"' + confirmAttr + ">" + esc(buttonLabel) + "</button>";
+                }
                 var path = action.path.replace(/\{([a-z_]+)\}/g, function (_, key) {
                   return encodeURIComponent(row[key]);
                 });
@@ -1034,6 +1085,7 @@
           }).join("");
         }
         if (count) count.textContent = items.length + " voci";
+        applyTableFilter(panel);
       }).catch(function (error) {
         tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
       });
@@ -1044,9 +1096,97 @@
     if (searchInput) searchInput.addEventListener("keydown", function (event) {
       if (event.key === "Enter") { event.preventDefault(); fetchAndRender(); }
     });
+    if (filterInput) filterInput.addEventListener("input", function () { applyTableFilter(panel); });
     fetchAndRender();
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-table]"), renderTable);
+
+  function applyTableFilter(panel) {
+    var input = panel.querySelector("[data-ui-filter]");
+    if (!input) return;
+    var query = (input.value || "").trim().toLowerCase();
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-ui-body] tr"), function (row) {
+      if (!query) { row.hidden = false; return; }
+      row.hidden = (row.textContent || "").toLowerCase().indexOf(query) < 0;
+    });
+  }
+
+  // ---- library toggle/remove (read-modify-write of /api/config/library) ---
+  function libraryRead() {
+    return api("/api/config/library", "GET").then(function (data) {
+      return { series: data.series || [], movies: data.movies || [] };
+    });
+  }
+
+  function librarySave(library) {
+    return api("/api/config/library", "POST", { series: library.series, movies: library.movies });
+  }
+
+  function refetchTableFor(element) {
+    var panel = element.closest(".panel");
+    var container = panel && panel.querySelector("[data-ui-table]");
+    if (container && container._refetch) { container._refetch(); return; }
+    if (partials[view]) { load(); return; }
+    location.reload();
+  }
+
+  function libraryToggle(scope, name) {
+    libraryRead().then(function (library) {
+      var list = library[scope] || [];
+      var found = false;
+      list.forEach(function (item) {
+        if (item.name === name) { item.enabled = !item.enabled; found = true; }
+      });
+      if (!found) throw new Error("elemento non trovato");
+      library[scope] = list;
+      return librarySave(library);
+    }).then(function () { notify("Stato aggiornato", "ok"); })
+      .catch(function (error) { notify("Modifica non riuscita: " + error.message, "err"); });
+  }
+
+  function libraryRemove(scope, name, element) {
+    libraryRead().then(function (library) {
+      var list = (library[scope] || []).filter(function (item) { return item.name !== name; });
+      if (list.length === (library[scope] || []).length) throw new Error("elemento non trovato");
+      library[scope] = list;
+      return librarySave(library);
+    }).then(function () {
+      notify("Elemento eliminato", "ok");
+      if (element) refetchTableFor(element);
+    }).catch(function (error) { notify("Eliminazione non riuscita: " + error.message, "err"); });
+  }
+
+  function toggleGenericSort(head) {
+    var table = head.closest("table");
+    var body = table && table.querySelector("tbody");
+    if (!body) return;
+    var index = Array.prototype.indexOf.call(head.parentNode.children, head);
+    var key = head.getAttribute("data-sort") || String(index);
+    if (genericSort.table === table && genericSort.key === key) {
+      genericSort.direction = -genericSort.direction;
+    } else {
+      genericSort.table = table;
+      genericSort.key = key;
+      genericSort.direction = 1;
+    }
+    var rows = Array.prototype.slice.call(body.querySelectorAll("tr"));
+    rows.sort(function (left, right) {
+      var ca = left.children[index];
+      var cb = right.children[index];
+      var va = ca ? (ca.getAttribute("data-value") || ca.textContent || "") : "";
+      var vb = cb ? (cb.getAttribute("data-value") || cb.textContent || "") : "";
+      var na = parseFloat(va);
+      var nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) return (na - nb) * genericSort.direction;
+      return String(va).localeCompare(String(vb)) * genericSort.direction;
+    });
+    rows.forEach(function (row) { body.appendChild(row); });
+    Array.prototype.forEach.call(table.querySelectorAll("th[data-sort]"), function (th) {
+      if (th === head) th.setAttribute("data-sort-dir", genericSort.direction === 1 ? "asc" : "desc");
+      else th.removeAttribute("data-sort-dir");
+    });
+  }
+  var genericSort = { table: null, key: "", direction: 1 };
 
   // ---- movie detail edit form ---------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-movie-id]"), function (form) {

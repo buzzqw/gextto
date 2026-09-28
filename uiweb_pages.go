@@ -16,6 +16,8 @@ type uiColumn struct {
 	Key    string `json:"key"`
 	Label  string `json:"label"`
 	Format string `json:"format,omitempty"`
+	// Sortable renders a clickable header that sorts the client-side table.
+	Sortable bool `json:"sortable,omitempty"`
 }
 
 type uiAction struct {
@@ -25,6 +27,10 @@ type uiAction struct {
 	Path    string `json:"path"`
 	Body    string `json:"body,omitempty"`
 	Confirm string `json:"confirm,omitempty"`
+	// Kind selects a client-side action instead of a plain API call:
+	// "library-toggle" (enable/disable) or "library-remove" (delete), both
+	// implemented as a read-modify-write of /api/config/library.
+	Kind string `json:"kind,omitempty"`
 }
 
 type uiTableSpec struct {
@@ -38,6 +44,8 @@ type uiTableSpec struct {
 	Search      bool
 	SearchParam string
 	Query       string
+	// Filter adds a client-side text filter over the rendered rows.
+	Filter bool
 	// Comics enables the extra panels of the comics page (download queue and
 	// GetComics link finder) and the columns/actions of the queue table.
 	Comics               bool
@@ -455,36 +463,44 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 	switch view {
 	case "series":
 		return uiTableSpec{
-			Title:    "Serie TV",
-			Endpoint: "/api/series",
-			ItemsKey: "items",
+			Title:    "Serie monitorate",
+			Endpoint: "/api/config/library",
+			ItemsKey: "series",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "Nome", Format: "series_link"},
+				{Key: "name", Label: "Nome", Format: "series_link", Sortable: true},
 				{Key: "seasons", Label: "Stagioni"},
 				{Key: "quality", Label: "Qualità"},
 				{Key: "language", Label: "Lingua"},
-				{Key: "enabled", Label: "Attiva", Format: "bool"},
+				{Key: "", Label: "Ep.", Format: "episodes"},
+				{Key: "", Label: "Complet.", Format: "completion"},
+				{Key: "last_downloaded_at", Label: "Ultimo"},
+				{Key: "enabled", Label: "Stato", Format: "enabled"},
 			}),
 			ActionsJSON: uiJSON([]uiAction{
-				{Label: "Cerca mancanti", Class: "primary", Method: "POST", Path: "/api/series/{name}/search-missing", Body: "{}"},
-				{Label: "Scansiona", Method: "POST", Path: "/api/series/{name}/scan-archive", Body: "{}"},
-				{Label: "TMDB", Method: "POST", Path: "/api/series/{name}/metadata", Body: "{}"},
+				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`, Confirm: ""},
+				{Label: "Elimina", Class: "danger", Kind: "library-remove", Method: "POST", Path: "", Body: "{}", Confirm: "Eliminare questa serie dalla libreria?"},
 			}),
-			Empty: "Nessuna serie monitorizzata.",
+			Empty:  "Nessuna serie monitorata.",
+			Filter: true,
 		}, true
 	case "movies":
 		return uiTableSpec{
-			Title:    "Film",
-			Endpoint: "/api/movies",
-			ItemsKey: "items",
+			Title:    "Film monitorati",
+			Endpoint: "/api/config/library",
+			ItemsKey: "movies",
 			ColumnsJSON: uiJSON([]uiColumn{
-				{Key: "name", Label: "Nome", Format: "movie_link"},
-				{Key: "year", Label: "Anno"},
-				{Key: "quality", Label: "Qualità"},
-				{Key: "language", Label: "Lingua"},
-				{Key: "enabled", Label: "Attivo", Format: "bool"},
+				{Key: "name", Label: "Nome", Format: "movie_link", Sortable: true},
+				{Key: "year", Label: "Anno", Format: "number", Sortable: true},
+				{Key: "quality", Label: "Qualità", Sortable: true},
+				{Key: "language", Label: "Lingua", Sortable: true},
+				{Key: "enabled", Label: "Stato", Format: "enabled"},
 			}),
-			Empty: "Nessun film monitorizzato.",
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Pausa", Kind: "library-toggle", Method: "POST", Path: "", Body: `{"enabled":false}`},
+				{Label: "Elimina", Class: "danger", Kind: "library-remove", Method: "POST", Path: "", Body: "{}", Confirm: "Eliminare questo film dalla libreria?"},
+			}),
+			Empty:  "Nessun film monitorizzato.",
+			Filter: true,
 		}, true
 	case "gaps":
 		return uiTableSpec{

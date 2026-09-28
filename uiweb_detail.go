@@ -33,6 +33,7 @@ type uiEpisodeRow struct {
 
 type uiSeriesDetail struct {
 	Name        string
+	PathName    string
 	Seasons     string
 	Quality     string
 	Language    string
@@ -146,6 +147,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	}
 	return uiSeriesDetail{
 		Name:        series.Name,
+		PathName:    escaped,
 		Seasons:     series.Seasons,
 		Quality:     series.Quality,
 		Language:    series.Language,

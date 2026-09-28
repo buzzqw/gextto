@@ -8,6 +8,7 @@
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
     <div class="toolbar" style="margin-bottom:10px">
       {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+      {{if .Filter}}<input type="search" class="input" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
       <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
     </div>
     <div class="table-wrap">
@@ -321,7 +322,13 @@
 
 {{define "series_detail"}}
 <div class="view">
-  <div class="toolbar"><a class="btn sm" href="/?view=series">← Serie TV</a></div>
+  <div class="toolbar">
+    <a class="btn sm" href="/?view=series">← Serie TV</a>
+    <button class="btn sm primary" data-api="/api/series/{{.PathName}}/search-missing" data-method="POST" data-body="{}" title="Cerca le release per gli episodi mancanti">Cerca mancanti</button>
+    <button class="btn sm" data-api="/api/series/{{.PathName}}/scan-archive" data-method="POST" data-body="{}" title="Scansiona l'archivio per questa serie">Scansiona archivio</button>
+    <button class="btn sm" data-api="/api/series/{{.PathName}}/metadata" data-method="POST" data-body="{}" title="Aggiorna i metadati TMDB">Aggiorna da TMDB</button>
+    <button class="btn sm" data-api="/api/series/{{.PathName}}/rename-preview" data-method="POST" data-body="{}" title="Anteprima rinomina TMDB">Anteprima rinomina</button>
+  </div>
   <div class="panel">
     <div class="panel-head"><h3>{{.Name}}</h3><small class="muted">{{.Quality}} · {{.Language}} · stagioni {{.Seasons}} · {{.Gaps}} mancanti</small></div>
     <div class="panel-body">

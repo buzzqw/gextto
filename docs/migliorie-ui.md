@@ -11,11 +11,11 @@ L’ordine numerico è quello di arrivo degli appunti.
 | 4 | completato | In Scarico, mantenere i pulsanti della colonna Azioni su una sola riga. | Azioni non-wrappabili; la tabella può scorrere orizzontalmente. |
 | 5 | completato | Rifare il blocco “Aggiungi torrent” come in `rextto`, su una sola riga. | Magnet, file, percorso e pulsante sono sulla stessa riga desktop; opzioni sotto. |
 | 6 | completato | Verificare perché sono stati aggiunti alla lista torrent due elementi apparentemente duplicati: `I.Delitti.Del.BarLume.S07.ITA.720p.NOW.WEB-DL.x264-UBi`. | Causa: per un season pack `processed_path` è una cartella; la guardia di completamento la trattava come "copia archiviata assente" e ri-processava/ri-archiviava il pack a ogni spostamento di storage. `tevArchivedCopyPresent` ora accetta anche una cartella non vuota; test `TestTevArchivedCopyPresent`. |
-| 7 | in coda | Copiare da `rextto` la gestione dei limiti temporanei di download e upload. | — |
-| 8 | in coda | Rifare la schermata per taggare i file in Scarico, copiandola da `rextto`. | — |
-| 9 | in coda | Rivedere completamente la schermata di Scarico, attualmente percepita come una copia povera di `rextto`. | — |
-| 10 | in coda | Riorganizzare il menu Serie TV nello spirito della schermata equivalente di `rextto`. | — |
-| 11 | in coda | Riorganizzare il menu Film come in `rextto`, portando in alto le opzioni di aggiunta. | — |
+| 7 | completato | Copiare da `rextto` la gestione dei limiti temporanei di download e upload. | Barra "Limite temporaneo" nella sessione: DL/UL KiB/s, minuti, Applica e Rimuovi, con i valori correnti prefillati e messaggio inline. |
+| 8 | completato | Rifare la schermata per taggare i file in Scarico, copiandola da `rextto`. | Filtro per tag, selezione multipla, assegna/rimuovi tag con "Nuovo tag…", chip sotto il nome, tag per singolo torrent nel dettaglio. |
+| 9 | completato | Rivedere completamente la schermata di Scarico, attualmente percepita come una copia povera di `rextto`. | Tabella con colonne ordinabili, ETA, badge NAS/seed ∞, riga origine, barre colorate; modale dettaglio a schede Generale/Tracker/Contenuto/Peers/Limiti/Storage; pulisci completati e auto-remove. |
+| 10 | completato | Riorganizzare il menu Serie TV nello spirito della schermata equivalente di `rextto`. | Ricerca/aggiunta in alto, elenco da `/api/config/library` con filtro, colonne Ep./Complet./Ultimo/Stato, azioni Pausa/Attiva/Elimina; azioni serie spostate nel dettaglio. |
+| 11 | completato | Riorganizzare il menu Film come in `rextto`, portando in alto le opzioni di aggiunta. | Ricerca/aggiunta in alto, elenco con filtro, colonne ordinabili Nome/Anno/Qualità/Lingua e azioni Pausa/Attiva/Elimina. |
 | 12 | in coda | Verificare e ripristinare in Mancanti la possibilità di avviare una ricerca, presente in `rextto`. | — |
 | 13 | in coda | Rifare completamente il menu Esplora, verificandolo e riallineandolo a `rextto`. | — |
 | 14 | in coda | In Archivio, mantenere su una sola riga le righe con l’elenco dei file. | — |

@@ -138,11 +138,10 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 	case "series":
 		spec, _ := uiTableSpecFor("series")
 		return uiPanelsPage{Sections: []uiPageSection{
-			sectionTable(spec),
 			sectionForm(uiFormSection{
 				Title: "Cerca una serie (TMDB)",
 				Hint:  "Cerca il titolo e aggiungi direttamente il risultato trovato.",
-				Path:  "/api/tmdb/search", Submit: "Cerca", Render: "tmdb",
+				Path:  "/api/tmdb/search", Submit: "Cerca su TMDB", Render: "tmdb",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "series", Label: "Serie TV", Selected: true}}},
 					{Name: "query", Label: "Titolo", Placeholder: "Nome serie"},
@@ -163,15 +162,15 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Name: "exclude", Label: "Escludi", Placeholder: "parole da escludere"},
 				},
 			}),
+			sectionTable(spec),
 		}}, true
 	case "movies":
 		spec, _ := uiTableSpecFor("movies")
 		return uiPanelsPage{Sections: []uiPageSection{
-			sectionTable(spec),
 			sectionForm(uiFormSection{
 				Title: "Cerca un film (TMDB)",
 				Hint:  "Cerca il titolo e aggiungi direttamente il risultato trovato.",
-				Path:  "/api/tmdb/search", Submit: "Cerca", Render: "tmdb",
+				Path:  "/api/tmdb/search", Submit: "Cerca su TMDB", Render: "tmdb",
 				Fields: []uiFormField{
 					{Name: "kind", Kind: "select", Label: "Tipo", Options: []uiFormOption{{Value: "movie", Label: "Film", Selected: true}}},
 					{Name: "query", Label: "Titolo", Placeholder: "Titolo film"},
@@ -189,6 +188,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Name: "language", Label: "Lingua"},
 				},
 			}),
+			sectionTable(spec),
 		}}, true
 	case "gaps":
 		spec, _ := uiTableSpecFor("gaps")
