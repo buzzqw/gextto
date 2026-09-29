@@ -223,7 +223,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   border-bottom: 1px solid var(--line-soft);
 }
 .topbar-title { min-width: 0; }
-.topbar-title .crumb { color: var(--muted); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.14em; }
+.topbar-title .crumb { color: var(--muted); font-size: 0.64rem; font-weight: 800; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-title h1 { font-size: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-message { display: none; }
 .top-actions {

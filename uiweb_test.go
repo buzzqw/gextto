@@ -312,6 +312,9 @@ func TestUiHistoryFolderColumn(t *testing.T) {
 		if !strings.Contains(section.Table.ColumnsJSON, `"key":"completed_at","label":"Concluso","format":"datetime"`) {
 			t.Fatalf("history columns missing compact datetime format: %s", section.Table.ColumnsJSON)
 		}
+		if section.Table.PageSize != 10 {
+			t.Fatalf("history table page size = %d, want 10", section.Table.PageSize)
+		}
 		found = true
 	}
 	if !found {
@@ -440,7 +443,7 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 		t.Fatal("shell still depends on the legacy stylesheet")
 	}
 	// The classic shell structure must be present (top bar + main frame).
-	for _, marker := range []string{`class="main-shell"`, `class="topbar"`, `class="top-actions"`, `class="sidebar"`, `class="brand"`, `data-metric="cpu"`, `data-theme-toggle`} {
+	for _, marker := range []string{`class="main-shell"`, `class="topbar"`, `class="top-actions"`, `class="sidebar"`, `class="brand"`, `Gextto · EXpert Torrent Transfer Orchestrator`, `data-metric="cpu"`, `data-theme-toggle`} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("shell missing %q", marker)
 		}
