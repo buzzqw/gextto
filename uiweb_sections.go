@@ -619,7 +619,7 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 				{Key: "processed_path", Label: "Cartella libreria / NAS", Format: "folder"},
 				{Key: "source", Label: "Sorgente", Format: "source"}, {Key: "completed_at", Label: "Concluso", Format: "datetime"},
 			}),
-			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
+			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q", PageSize: 10,
 		}),
 	}
 	return page
