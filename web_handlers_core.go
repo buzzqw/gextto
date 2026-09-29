@@ -216,8 +216,8 @@ func I18nLanguage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if input.Lang != "it" && input.Lang != "en" && input.Lang != "de" && input.Lang != "fr" {
-		jsonError(w, http.StatusBadRequest, "language must be it, en, de or fr")
+	if input.Lang != "it" && input.Lang != "en" && input.Lang != "de" && input.Lang != "fr" && input.Lang != "es" && input.Lang != "pl" {
+		jsonError(w, http.StatusBadRequest, "language must be it, en, de, fr, es or pl")
 		return
 	}
 	if err := s.i18n.SetLanguage(input.Lang); err != nil {
@@ -238,6 +238,8 @@ func I18nLanguages(w http.ResponseWriter, r *http.Request, s *AppState) {
 			{"lang": "en", "name": "English"},
 			{"lang": "de", "name": "Deutsch"},
 			{"lang": "fr", "name": "Français"},
+			{"lang": "es", "name": "Español"},
+			{"lang": "pl", "name": "Polski"},
 		},
 	})
 }

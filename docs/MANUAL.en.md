@@ -1,11 +1,11 @@
 # Gextto User Manual
 
 This is the operational guide for Gextto's web UI and terminal TUI. The web
-interface is available in English, Italian, German and French; this document uses
+interface is available in English, Italian, German, French, Spanish and Polish; this document uses
 English labels. For Italian labels, read [MANUAL.it.md](MANUAL.it.md). The
-German and French UIs use their bundled catalogs and fall back to this English
-manual for long-form documentation. The in-app **Manual** page follows the
-language selected in its header.
+non-Italian UIs use their bundled catalogs and fall back to this English manual
+for long-form documentation. The in-app **Manual** page follows the language
+selected in its header.
 
 > [!IMPORTANT]
 > Start in **dry-run**. Verify paths, source access and one test title before

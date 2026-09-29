@@ -40,5 +40,13 @@ func TestPicksVariantByLanguage(t *testing.T) {
 	if Language() != "fr" || IsEnglish() {
 		t.Fatalf("French language = %q english=%v", Language(), IsEnglish())
 	}
+	SetLanguage("spa")
+	if got := Pick("ciao", "hello"); got != "hello" || Language() != "es" {
+		t.Fatalf("Spanish fallback = %q language=%q", got, Language())
+	}
+	SetLanguage("pol")
+	if got := Pick("ciao", "hello"); got != "hello" || Language() != "pl" {
+		t.Fatalf("Polish fallback = %q language=%q", got, Language())
+	}
 	SetLanguage("it")
 }

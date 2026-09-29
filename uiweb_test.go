@@ -1006,6 +1006,15 @@ func TestUiManualFollowsLanguage(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(string(body), "User Manual") {
 		t.Fatalf("French manual fallback not served (%d)", code)
 	}
+	for _, lang := range []string{"es", "pl"} {
+		if err := state.i18n.SetLanguage(lang); err != nil {
+			t.Fatalf("set %s: %v", lang, err)
+		}
+		code, _, body = webGet(t, server, "/ui?view=manual")
+		if code != http.StatusOK || !strings.Contains(string(body), "User Manual") {
+			t.Fatalf("%s manual fallback not served (%d)", lang, code)
+		}
+	}
 }
 
 func decodeActions(t *testing.T, raw string) []uiAction {

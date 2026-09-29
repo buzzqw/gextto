@@ -89,6 +89,8 @@ func TestI18nLanguageRoundTripsAliases(t *testing.T) {
 		{"fra", "fr", "fra"},
 		{"es", "es", "spa"},
 		{"spa", "es", "spa"},
+		{"pl", "pl", "pol"},
+		{"pol", "pl", "pol"},
 		// Unknown codes pass through unchanged in both directions.
 		{"pt", "pt", "pt"},
 	}
@@ -264,6 +266,24 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if value, ok := findFrench("Configurazione"); !ok || value != "Configuration" {
 		t.Errorf("French bundled translation = %q (present=%v), want Configuration", value, ok)
 	}
+	findLanguage := func(lang, key string) (string, bool) {
+		list, err := db.List(lang)
+		if err != nil {
+			t.Fatalf("List(%s): %v", lang, err)
+		}
+		for _, entry := range list {
+			if entry.Key == key {
+				return entry.Value, true
+			}
+		}
+		return "", false
+	}
+	if value, ok := findLanguage("es", "Configurazione"); !ok || value != "Configuración" {
+		t.Errorf("Spanish bundled translation = %q (present=%v), want Configuración", value, ok)
+	}
+	if value, ok := findLanguage("pl", "Configurazione"); !ok || value != "Konfiguracja" {
+		t.Errorf("Polish bundled translation = %q (present=%v), want Konfiguracja", value, ok)
+	}
 	deItems, err := db.List("de")
 	if err != nil {
 		t.Fatalf("List(de): %v", err)
@@ -272,7 +292,15 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if err != nil {
 		t.Fatalf("List(fr): %v", err)
 	}
-	localizedCount := len(deItems) + len(frItems)
+	esItems, err := db.List("es")
+	if err != nil {
+		t.Fatalf("List(es): %v", err)
+	}
+	plItems, err := db.List("pl")
+	if err != nil {
+		t.Fatalf("List(pl): %v", err)
+	}
+	localizedCount := len(deItems) + len(frItems) + len(esItems) + len(plItems)
 
 	second, err := db.SeedDefaultTranslations()
 	if err != nil {

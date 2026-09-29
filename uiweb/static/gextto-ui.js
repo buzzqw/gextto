@@ -263,18 +263,20 @@
     "Traduzioni": "Translations"
   };
 
-  // German and French have bundled catalogs; these fallback objects carry
+  // German, French, Spanish and Polish have bundled catalogs; these fallback objects carry
   // labels added by the redesigned UI before they reach the persisted catalog.
   var uiGermanFallbacks = {};
   var uiFrenchFallbacks = {};
-  var uiFallbacks = { en: uiEnglishFallbacks, de: uiGermanFallbacks, fr: uiFrenchFallbacks };
+  var uiSpanishFallbacks = {};
+  var uiPolishFallbacks = {};
+  var uiFallbacks = { en: uiEnglishFallbacks, de: uiGermanFallbacks, fr: uiFrenchFallbacks, es: uiSpanishFallbacks, pl: uiPolishFallbacks };
 
   function uiTranslatedText(value) {
     if (!value) return value;
     var match = String(value).match(/^(\s*)([\s\S]*?)(\s*)$/);
     var core = match ? match[2] : String(value);
     var translated = uiTranslations[core] || (uiFallbacks[uiLanguage] || {})[core];
-    if (!translated && (uiLanguage === "de" || uiLanguage === "fr")) translated = uiEnglishCatalog[core];
+    if (!translated && uiLanguage !== "en") translated = uiEnglishCatalog[core];
     var matchDownloads = core.match(/^(\d+) torrent · (\d+) HTTP fumetti · aggiornato (.+)$/);
     if (!translated && matchDownloads) translated = matchDownloads[1] + " torrents · " + matchDownloads[2] + " comic HTTP downloads · updated " + matchDownloads[3];
     var matchSelected = core.match(/^(\d+) selezionati$/);
@@ -292,7 +294,7 @@
   }
 
   function translateUIValue(value) {
-    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr") return value;
+    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr" && uiLanguage !== "es" && uiLanguage !== "pl") return value;
     return uiTranslatedText(value);
   }
 
@@ -339,7 +341,7 @@
   }
 
   function translateUI() {
-    if (uiLanguage === "en" || uiLanguage === "de" || uiLanguage === "fr") {
+    if (uiLanguage === "en" || uiLanguage === "de" || uiLanguage === "fr" || uiLanguage === "es" || uiLanguage === "pl") {
       translateUINode(document.body);
       document.title = uiTranslatedText(document.title.replace(/^Gextto · /, "")) === document.title.replace(/^Gextto · /, "")
         ? document.title
@@ -348,13 +350,13 @@
   }
 
   function loadUITranslations() {
-    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr") return;
+    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr" && uiLanguage !== "es" && uiLanguage !== "pl") return;
     api("/api/i18n?lang=" + encodeURIComponent(uiLanguage), "GET").then(function (data) {
       (data && data.items || []).forEach(function (item) {
         if (item && item.key && item.value) uiTranslations[item.key] = item.value;
       });
       var catalogReady = Promise.resolve();
-      if (uiLanguage === "de" || uiLanguage === "fr") {
+      if (uiLanguage !== "en") {
         catalogReady = api("/api/i18n?lang=en", "GET").then(function (english) {
           (english && english.items || []).forEach(function (item) {
             if (item && item.key && item.value) uiEnglishCatalog[item.key] = item.value;
