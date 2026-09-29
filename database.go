@@ -813,6 +813,13 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec("CREATE INDEX IF NOT EXISTS idx_torrent_meta_hash_lower ON torrent_meta(lower(hash)); CREATE INDEX IF NOT EXISTS idx_episodes_magnet_lower ON episodes(lower(magnet_hash)); CREATE INDEX IF NOT EXISTS idx_movies_magnet_lower ON movies(lower(magnet_hash));"); err != nil {
 		logging.Warn("schema migration: lower(hash) indexes failed", "error", err)
 	}
+	// Indici per i percorsi caldi dell'acquisizione: lookup dei film per
+	// (name, year), dei torrent attivi per (series_name, season, episode) e
+	// della coda pending per (series_id, season, episode). Senza questi indici
+	// ogni candidato esegue una scansione completa della tabella.
+	if _, err := d.db.Exec("CREATE INDEX IF NOT EXISTS idx_movies_name_year ON movies(name, year); CREATE INDEX IF NOT EXISTS idx_torrent_meta_series_lower ON torrent_meta(lower(series_name), season, episode); CREATE INDEX IF NOT EXISTS idx_pending_downloads_lookup ON pending_downloads(series_id, season, episode);"); err != nil {
+		logging.Warn("schema migration: hot-path indexes failed", "error", err)
+	}
 	return nil
 }
 
@@ -1868,31 +1875,63 @@ func (d *Database) RollbackRelease(release *models.Release) error {
 	if err != nil {
 		return err
 	}
-	if _, err := d.db.Exec("DELETE FROM episodes WHERE magnet_hash=?1 OR magnet_link=?2", hash, release.Magnet); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
 		return err
 	}
-	_, err = d.db.Exec("DELETE FROM movies WHERE magnet_hash=?1", hash)
-	return err
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_hash=?1 OR magnet_link=?2", hash, release.Magnet); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM movies WHERE magnet_hash=?1", hash); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // ForgetRemovedTorrent cleans up the database when a torrent is removed by the
 // user (or is abandoned).
 func (d *Database) ForgetRemovedTorrent(hash string) error {
 	normalized := strings.ToLower(hash)
-	if _, err := d.db.Exec("UPDATE episodes SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
 		return err
 	}
-	if _, err := d.db.Exec("UPDATE movies SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("UPDATE episodes SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
 		return err
 	}
-	if _, err := d.db.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", normalized); err != nil {
+	if _, err := tx.Exec("UPDATE movies SET magnet_hash=NULL WHERE lower(COALESCE(magnet_hash,''))=?1 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>'')", normalized); err != nil {
 		return err
 	}
-	if _, err := d.db.Exec("DELETE FROM movies WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL", normalized); err != nil {
+	if _, err := tx.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", normalized); err != nil {
 		return err
 	}
-	_, err := d.db.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized)
-	return err
+	if _, err := tx.Exec("DELETE FROM movies WHERE lower(COALESCE(magnet_hash,''))=?1 AND downloaded_at IS NULL", normalized); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // QueuePending holds a series release for `timeframe_hours` hours.
@@ -2753,16 +2792,32 @@ func (d *Database) SetEpisodeIgnored(seriesName string, season, episode int64, i
 
 // ResetEpisode resets the state of one episode.
 func (d *Database) ResetEpisode(seriesName string, season, episode int64, removeHistory bool) error {
-	if _, err := d.db.Exec("DELETE FROM pending_downloads WHERE series_id=(SELECT id FROM series WHERE name=?1) AND season=?2 AND episode=?3", seriesName, season, episode); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("DELETE FROM pending_downloads WHERE series_id=(SELECT id FROM series WHERE name=?1) AND season=?2 AND episode=?3", seriesName, season, episode); err != nil {
 		return err
 	}
 	if removeHistory {
-		if _, err := d.db.Exec("DELETE FROM episodes WHERE series_id=(SELECT id FROM series WHERE name=?1) AND season=?2 AND episode=?3", seriesName, season, episode); err != nil {
+		if _, err := tx.Exec("DELETE FROM episodes WHERE series_id=(SELECT id FROM series WHERE name=?1) AND season=?2 AND episode=?3", seriesName, season, episode); err != nil {
 			return err
 		}
 	}
-	_, err := d.db.Exec("DELETE FROM ignored_episodes WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode)
-	return err
+	if _, err := tx.Exec("DELETE FROM ignored_episodes WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // SeriesMetadataStale reports whether the series metadata is older than
@@ -3526,14 +3581,30 @@ func (d *Database) CompletedTorrents(offset, limit int, query string) ([]StoredT
 // MarkTorrentCompleted marks a torrent and its files as completed.
 func (d *Database) MarkTorrentCompleted(hash, path string, sizeBytes int64) error {
 	now := nowSQLite()
-	if _, err := d.db.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3 WHERE magnet_hash=?4", now, path, sizeBytes, hash); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
 		return err
 	}
-	if _, err := d.db.Exec("UPDATE movies SET downloaded_at=?1,size_bytes=?2 WHERE magnet_hash=?3", now, sizeBytes, hash); err != nil {
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=?3 WHERE magnet_hash=?4", now, path, sizeBytes, hash); err != nil {
 		return err
 	}
-	_, err := d.db.Exec("UPDATE torrent_meta SET status='completed',completed_at=?1,processed_path=?2,error='',updated_at=?1 WHERE hash=?3", now, path, strings.ToLower(hash))
-	return err
+	if _, err := tx.Exec("UPDATE movies SET downloaded_at=?1,size_bytes=?2 WHERE magnet_hash=?3", now, sizeBytes, hash); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("UPDATE torrent_meta SET status='completed',completed_at=?1,processed_path=?2,error='',updated_at=?1 WHERE hash=?3", now, path, strings.ToLower(hash)); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 // MarkTorrentCompletedUnarchived marks a torrent that finished but has no
@@ -3744,18 +3815,32 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	if err := json.Unmarshal([]byte(payload.String), &backup); err != nil {
 		return false, err
 	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
 	if backup.Kind == "series" {
-		if _, err := d.db.Exec("UPDATE episodes SET quality_score=?1,magnet_hash=?2,magnet_link=?3,downloaded_at=?4,archive_path=?5,size_bytes=?6,title=?7 WHERE id=?8", backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.ArchivePath, backup.SizeBytes, backup.Title, backup.RowID); err != nil {
+		if _, err := tx.Exec("UPDATE episodes SET quality_score=?1,magnet_hash=?2,magnet_link=?3,downloaded_at=?4,archive_path=?5,size_bytes=?6,title=?7 WHERE id=?8", backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.ArchivePath, backup.SizeBytes, backup.Title, backup.RowID); err != nil {
 			return false, err
 		}
 	} else {
-		if _, err := d.db.Exec("UPDATE movies SET name=?1,year=?2,title=?3,quality_score=?4,magnet_hash=?5,magnet_link=?6,downloaded_at=?7,size_bytes=?8,removed_at=NULL WHERE id=?9", backup.Name, backup.Year, backup.Title, backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.SizeBytes, backup.RowID); err != nil {
+		if _, err := tx.Exec("UPDATE movies SET name=?1,year=?2,title=?3,quality_score=?4,magnet_hash=?5,magnet_link=?6,downloaded_at=?7,size_bytes=?8,removed_at=NULL WHERE id=?9", backup.Name, backup.Year, backup.Title, backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.SizeBytes, backup.RowID); err != nil {
 			return false, err
 		}
 	}
-	if _, err := d.db.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized); err != nil {
+	if _, err := tx.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized); err != nil {
 		return false, err
 	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	committed = true
 	return true, nil
 }
 
@@ -4465,6 +4550,25 @@ func (d *Database) RecordSeenBatch(releases []models.Release, cfg *Config) error
 	if len(releases) == 0 {
 		return nil
 	}
+	// Chunk in transazioni più piccole come SaveBatch: un'unica transazione da
+	// migliaia di righe fa crescere il WAL e tiene occupata la connessione a
+	// lungo. Con chunk da 1000 righe e un checkpoint tra i chunk l'atomicità
+	// resta per chunk e un crash recupera meno lavoro.
+	const chunkSize = 1000
+	for start := 0; start < len(releases); start += chunkSize {
+		end := start + chunkSize
+		if end > len(releases) {
+			end = len(releases)
+		}
+		if err := d.recordSeenChunk(releases[start:end], cfg); err != nil {
+			return err
+		}
+		_ = d.Checkpoint()
+	}
+	return nil
+}
+
+func (d *Database) recordSeenChunk(releases []models.Release, cfg *Config) error {
 	tx, err := d.db.Begin()
 	if err != nil {
 		return err

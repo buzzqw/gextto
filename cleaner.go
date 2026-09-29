@@ -197,12 +197,15 @@ func duplicateTarget(trash, file string) string {
 		stem = "duplicate"
 	}
 	extension := cleanerFileExtension(file)
-	for index := 1; ; index++ {
+	for index := 1; index <= 10000; index++ {
 		candidate := filepath.Join(trash, fmt.Sprintf("%s__duplicate_%d%s", stem, index, extension))
 		if !cleanerExists(candidate) {
 			return candidate
 		}
 	}
+	// Pathological: thousands of duplicates already present. Fall back to a
+	// random suffix so the loop always terminates instead of spinning forever.
+	return filepath.Join(trash, fmt.Sprintf("%s__duplicate_%s%s", stem, randomToken(), extension))
 }
 
 // handleDuplicate removes a duplicate file according to the cleanup action.

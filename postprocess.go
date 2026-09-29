@@ -780,6 +780,7 @@ func StagePackFile(
 		)
 	}
 	if err := os.Rename(temporary, target); err != nil {
+		_ = os.Remove(temporary)
 		return "", false, err
 	}
 	return target, true, nil
@@ -1558,7 +1559,11 @@ type mediaTags struct {
 // readMediaTags runs the `mediainfo` binary and parses its JSON output (implementation of
 // `read_media_tags`). Any failure yields empty tags.
 func readMediaTags(path string) mediaTags {
-	output, err := exec.Command("mediainfo", "--Output=JSON", path).Output()
+	// Bounded timeout so a hung probe or a stuck file cannot pin a worker
+	// indefinitely (mirrors the ffprobe probe in mediainfo.go).
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "mediainfo", "--Output=JSON", path).Output()
 	if err != nil {
 		return mediaTags{}
 	}

@@ -883,7 +883,12 @@ func RunCycleDomain(
 				if rollbackErr := db.RollbackRelease(&release); rollbackErr != nil {
 					logging.Warn("release rollback failed", "error", rollbackErr)
 				}
-				return nil, err
+				// A single release refused by the engine must not abort the whole
+				// cycle: the placeholder is already rolled back, so record the
+				// failure and continue with the remaining candidates.
+				stats.Error("add_failed")
+				logging.Warn("release add failed; continuing the cycle", "target", releaseTarget(&release), "error", err)
+				continue
 			}
 			if !added {
 				if err := db.RollbackRelease(&release); err != nil {
