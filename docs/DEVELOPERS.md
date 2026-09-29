@@ -109,7 +109,12 @@ The end-to-end suite is under `uiweb/end2end` and requires a running daemon:
 ```bash
 cd uiweb/end2end
 npx playwright test
+npm run test:a11y
 ```
+
+`test:a11y` runs the axe-core checks and keyboard/reflow accessibility
+regressions. It should pass before changing UI templates, styles or client-side
+interaction code.
 
 ## Concurrency and safety
 

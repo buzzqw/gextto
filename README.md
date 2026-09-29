@@ -46,6 +46,25 @@ build is required. See the [developer manual](docs/DEVELOPERS.md).
 make build
 ```
 
+## Accessibility
+
+The web UI includes keyboard navigation, accessible names for controls, focus
+management in dialogs, semantic sortable tables, live announcements for dynamic
+updates, responsive reflow and improved light-theme contrast. Accessibility
+regressions are checked with axe-core and Playwright:
+
+```bash
+cd uiweb/end2end
+npm ci
+npm run test:a11y
+```
+
+The current automated suite covers the main UI sections and 11 accessibility
+checks. This is not, by itself, a legal accessibility certification: manual
+screen-reader, keyboard and assistive-technology testing is still required.
+See the [accessibility analysis](accessibilita-analisi.md) for scope and known
+limitations.
+
 ## First safe run
 
 1. Open `http://<server>:5000` and complete setup.

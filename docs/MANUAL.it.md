@@ -31,6 +31,36 @@ Il percorso consigliato per una nuova installazione è:
 5. controllare Salute e Log;
 6. abilitare la modalità attiva solo dopo aver verificato i risultati.
 
+## Accessibilità
+
+La UI web è stata migliorata per l'uso con tastiera e tecnologie assistive:
+
+- i controlli di ricerca, configurazione e lingua hanno nomi accessibili;
+- i dialoghi gestiscono ingresso del focus, `Tab`, `Esc` e ritorno al controllo
+  che li ha aperti;
+- le intestazioni ordinabili delle tabelle sono attivabili da tastiera e
+  comunicano l'ordinamento corrente;
+- aggiornamenti asincroni, errori, progressi e notifiche usano regioni live;
+- tabelle, progress bar, tab e landmark espongono semantica aggiuntiva;
+- il layout supporta viewport stretti, reflow e contrasto migliorato nel tema
+  chiaro.
+
+Le verifiche automatiche si eseguono dal checkout sorgente:
+
+```bash
+cd uiweb/end2end
+npm ci
+npm run test:a11y
+```
+
+La suite corrente esegue 11 controlli axe-core/Playwright sulle sezioni
+principali, compresi dialoghi, ordinamento da tastiera, polling e reflow a 320
+px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
+un'attestazione servono anche audit manuale con screen reader, tastiera,
+ingrandimento e tecnologie assistive, oltre alla valutazione dei requisiti
+applicabili. Per il dettaglio vedere
+[`accessibilita-analisi.md`](../accessibilita-analisi.md).
+
 Il manuale distingue sempre tra:
 
 - **ricerca manuale**: serve a ispezionare risultati e accodare una scelta;
@@ -60,6 +90,7 @@ esporla in rete. Nell'installazione standard, `/opt/gextto/gexttod --version`
 indica quale build è in esecuzione. Vedi
 [`SECURITY.md`](SECURITY.md) per il modello di rete completo.
 
+- [Accessibilità](#accessibilità)
 - [1. Primo avvio](#1-primo-avvio)
 - [2. Dashboard](#2-dashboard)
 - [3. Scarico](#3-scarico)

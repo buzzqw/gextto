@@ -31,6 +31,35 @@ The recommended path for a new installation is:
 5. inspect Health and Logs;
 6. enable active mode only after checking the results.
 
+## Accessibility
+
+The web UI has been improved for keyboard and assistive-technology use:
+
+- search, configuration and language controls have accessible names;
+- dialogs manage focus entry, `Tab`, `Escape` and focus restoration to the
+  control that opened them;
+- sortable table headers work from the keyboard and expose their current sort;
+- asynchronous updates, errors, progress and notifications use live regions;
+- tables, progress bars, tabs and landmarks expose additional semantics;
+- the layout supports narrow viewports, reflow and improved light-theme
+  contrast.
+
+Run the automated checks from a source checkout:
+
+```bash
+cd uiweb/end2end
+npm ci
+npm run test:a11y
+```
+
+The current suite runs 11 axe-core/Playwright checks on the main sections,
+including dialogs, keyboard sorting, polling and 320 px reflow. This result is
+not a WCAG or legal-compliance declaration: an attestation also requires manual
+screen-reader, keyboard, magnification and assistive-technology testing, plus
+an assessment of the applicable requirements. See
+[`accessibilita-analisi.md`](../accessibilita-analisi.md) for the detailed scope
+and known limitations.
+
 This manual distinguishes between:
 
 - **manual search**: inspect results and queue one choice;
@@ -60,6 +89,7 @@ to a network. In the standard install, `/opt/gextto/gexttod --version` tells you
 which build is running.
 See [`SECURITY.md`](SECURITY.md) for the full network model.
 
+- [Accessibility](#accessibility)
 - [1. First start](#1-first-start)
 - [2. Dashboard](#2-dashboard)
 - [3. Downloads](#3-downloads)
