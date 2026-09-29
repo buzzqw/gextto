@@ -775,6 +775,38 @@ func TestBestEpisodeFilePrefersHigherResolutionAndIgnoresPartials(t *testing.T) 
 	}
 }
 
+// TestBestEpisodeFileFromFilesMatchesBestEpisodeFile locks in the refactor that
+// made BestEpisodeFile delegate to the pre-enumerated variant: the pack flow now
+// walks the destination once and reuses the list, so the two functions must
+// agree on every result.
+func TestBestEpisodeFileFromFilesMatchesBestEpisodeFile(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{
+		"Show.S01E01.720p.WEB-DL.H264.mkv",
+		"Show.S01E01.1080p.WEB-DL.H265.mkv",
+		"Show.S01E02.2160p.WEB-DL.H265.mkv",
+		"Show.S01E03.1080p.WEB-DL.H264.mkv.gextto-part",
+	}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files, err := VideoFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, season := range []int64{1} {
+		for episode := int64(0); episode <= 4; episode++ {
+			want, wantOK := BestEpisodeFile(dir, season, episode)
+			got, gotOK := BestEpisodeFileFromFiles(files, season, episode)
+			if wantOK != gotOK || want != got {
+				t.Fatalf("S%02dE%02d: BestEpisodeFile=%q(%v), FromFiles=%q(%v)", season, episode, want, wantOK, got, gotOK)
+			}
+		}
+	}
+}
+
 // jsonString encodes a filesystem path as a JSON string literal.
 func postprocessJSONString(value string) string {
 	encoded, err := json.Marshal(value)
