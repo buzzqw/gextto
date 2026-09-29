@@ -24,6 +24,14 @@ func (a *Archive) Close() error {
 	return a.db.Close()
 }
 
+// RowCount returns the number of rows stored in the archive database.
+func (a *Archive) RowCount() int64 {
+	if a == nil {
+		return 0
+	}
+	return ConnectionRowCount(a.db)
+}
+
 // ArchiveEntry is one row of the archive with the parsed release attached.
 type ArchiveEntry struct {
 	ID           int64           `json:"id"`

@@ -593,6 +593,8 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .download-history-table th:nth-child(7), .download-history-table td:nth-child(7) { width: 100px; max-width: 120px; }
 .download-history-table th:last-child, .download-history-table td:last-child { width: 150px; white-space: nowrap; }
 .download-history-table .source-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backup-table { min-width: 760px; }
+.backup-table th:first-child, .backup-table td:first-child { min-width: 460px; white-space: nowrap; }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }
 .row-actions .btn { flex: none; }
 
@@ -856,6 +858,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .modal-head h3 { font-size: 1rem; margin: 0; }
 .modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .modal-body h4 { margin: 0; }
+.trash-modal { width: min(900px, 96vw); }
+.trash-modal .table-wrap { max-width: 100%; }
+.trash-table { min-width: 620px; }
+.trash-table th:last-child, .trash-table td:last-child { width: 1%; min-width: 100px; white-space: nowrap; }
+.trash-table td:last-child .btn { white-space: nowrap; }
 /* The torrent detail keeps a stable size so switching tab does not resize it. */
 .torrent-modal { width: min(1120px, 96vw); height: min(85vh, 900px); display: flex; flex-direction: column; }
 .torrent-modal .modal-body { flex: 1; min-height: 0; overflow-y: auto; }

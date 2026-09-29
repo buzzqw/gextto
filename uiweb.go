@@ -543,9 +543,11 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
 		Panels: []uiPageSection{
 			sectionTable(uiTableSpec{
-				Title:    "Stato sorgenti",
-				Endpoint: "/api/sources/health",
-				ItemsKey: "items",
+				Title:      "Stato sorgenti",
+				Endpoint:   "/api/sources/health",
+				ItemsKey:   "items",
+				ManualOnly: true,
+				Initial:    "Premi Aggiorna per verificare le sorgenti.",
 				ColumnsJSON: uiJSON([]uiColumn{
 					{Key: "kind", Label: "Tipo"},
 					{Key: "name", Label: "Nome", Format: "truncate"},

@@ -701,6 +701,9 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 			jsonError(w, http.StatusBadRequest, "invalid backup setting value")
 			return
 		}
+		if key == "backup_ftp_password" && value == "" {
+			continue
+		}
 		if len(value) > 4096 {
 			jsonError(w, http.StatusBadRequest, "backup setting too long")
 			return

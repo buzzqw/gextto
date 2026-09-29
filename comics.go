@@ -138,6 +138,14 @@ func (d *ComicsDb) Close() error {
 	return d.db.Close()
 }
 
+// RowCount returns the number of rows stored in the comics database.
+func (d *ComicsDb) RowCount() int64 {
+	if d == nil {
+		return 0
+	}
+	return ConnectionRowCount(d.db)
+}
+
 const defaultComicsHistoryLimit int64 = 100
 
 // HistoryLimit is the shared retention limit for comics and Weekly Pack

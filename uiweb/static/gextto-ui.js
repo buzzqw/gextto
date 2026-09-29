@@ -106,11 +106,13 @@
   // retain their Promise/DOM closures until every request eventually finishes.
   // Action requests continue to use api() directly and are not shortened.
   var pollTimeoutMs = 10000;
+  var sourceHealthTimeoutMs = 120000;
   function pollRequest(path) {
     var controller = window.AbortController ? new window.AbortController() : null;
+    var timeoutMs = path.indexOf("/api/sources/health") === 0 ? sourceHealthTimeoutMs : pollTimeoutMs;
     var timeout = window.setTimeout(function () {
       if (controller) controller.abort();
-    }, pollTimeoutMs);
+    }, timeoutMs);
     var signal = controller ? controller.signal : undefined;
     return api(path, "GET", undefined, signal).then(function (value) {
       window.clearTimeout(timeout);
@@ -1459,6 +1461,12 @@
     }
     return last;
   }
+  function pathBaseName(path) {
+    var value = String(path === null || path === undefined ? "" : path).replace(/[\\/]+$/, "");
+    if (!value) return "";
+    var parts = value.split(/[\\/]/);
+    return parts[parts.length - 1] || value;
+  }
   function sourceLabel(value) {
     var raw = String(value === null || value === undefined ? "" : value).trim();
     if (!raw) return "";
@@ -1519,6 +1527,8 @@
     var columns = JSON.parse(container.getAttribute("data-columns") || "[]");
     var actions = JSON.parse(container.getAttribute("data-actions") || "[]");
     var empty = container.getAttribute("data-empty") || "Nessun elemento.";
+    var initial = container.getAttribute("data-initial") || "";
+    var manualOnly = container.getAttribute("data-auto-load") === "false";
     var searchParam = container.getAttribute("data-search") || "";
     var pageSize = parseInt(container.getAttribute("data-page-size") || "0", 10) || 0;
     var page = 1;
@@ -1538,6 +1548,16 @@
       var next = pagination.querySelector("[data-page-next]");
       if (previous) previous.addEventListener("click", function () { page = Math.max(1, current - 1); fetchAndRender(); });
       if (next) next.addEventListener("click", function () { page = Math.min(pages, current + 1); fetchAndRender(); });
+    }
+    function renderTableHead() {
+      thead.innerHTML = "<tr>" + columns.map(function (column) {
+        var headerAttrs = column.sortable ? ' scope="col" class="th-sort" data-sort="' + esc(column.key) + '" aria-sort="none"' : ' scope="col"';
+        var headerContent = column.sortable
+          ? '<button class="table-sort-button" type="button">' + esc(column.label) + "</button>"
+          : esc(column.label);
+        return "<th" + headerAttrs + ">" + headerContent + "</th>";
+      }).join("") + (actions.length ? '<th scope="col">Azioni</th>' : "") + "</tr>";
+      accessibleDataTable(table, tableTitle);
     }
     function fetchAndRender() {
       if (fetching) {
@@ -1561,14 +1581,7 @@
           }).slice(0, 8).map(function (key) { return { key: key, label: key }; });
         }
         var colspan = columns.length + (actions.length ? 1 : 0);
-        thead.innerHTML = "<tr>" + columns.map(function (column) {
-          var headerAttrs = column.sortable ? ' scope="col" class="th-sort" data-sort="' + esc(column.key) + '" aria-sort="none"' : ' scope="col"';
-          var headerContent = column.sortable
-            ? '<button class="table-sort-button" type="button">' + esc(column.label) + "</button>"
-            : esc(column.label);
-          return "<th" + headerAttrs + ">" + headerContent + "</th>";
-        }).join("") + (actions.length ? '<th scope="col">Azioni</th>' : "") + "</tr>";
-        accessibleDataTable(table, tableTitle);
+        renderTableHead();
         if (!items.length) {
           tbody.innerHTML = '<tr><td class="muted" colspan="' + colspan + '">' + esc(empty) + "</td></tr>";
         } else {
@@ -1739,7 +1752,8 @@
         if (pageSize) renderPagination(Number(data.page) || page, Number(data.pages) || 1, total);
         applyTableFilter(panel);
       }).catch(function (error) {
-        tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
+        var message = error && error.name === "AbortError" ? "Verifica sorgenti scaduta: riprova con Aggiorna." : error.message;
+        tbody.innerHTML = '<tr><td class="alert">' + esc(message) + "</td></tr>";
       }).then(function () {
         fetching = false;
         if (refetchPending && document.body.contains(container)) {
@@ -1755,7 +1769,12 @@
       if (event.key === "Enter") { event.preventDefault(); page = 1; fetchAndRender(); }
     });
     if (filterInput) filterInput.addEventListener("input", function () { applyTableFilter(panel); });
-    fetchAndRender();
+    if (manualOnly) {
+      renderTableHead();
+      tbody.innerHTML = '<tr><td class="muted" colspan="' + (columns.length + (actions.length ? 1 : 0)) + '">' + esc(initial || "Premi Aggiorna per caricare i dati.") + "</td></tr>";
+    } else {
+      fetchAndRender();
+    }
     if (endpoint === "/api/comics/downloads") {
       var pollTimer = window.setInterval(function () {
         // The page content can be replaced by navigation. Stop polling a
@@ -3432,7 +3451,8 @@
             var candidate = item.candidates[Number(candidateSelect.value)];
             if (!candidate) return;
             item.target = candidate.target || "";
-            target.textContent = item.target || "—";
+            target.title = String(item.target || "");
+            target.textContent = pathBaseName(item.target) || "—";
             item._rejected = false;
             check.disabled = !item.target || !!item.conflict;
             check.checked = !check.disabled;
@@ -3448,7 +3468,7 @@
         var target = document.createElement("span");
         target.className = "cell-truncate";
         target.title = String(item.target || "");
-        target.textContent = item.target || "—";
+        target.textContent = pathBaseName(item.target) || "—";
         targetCell.appendChild(target);
         row.appendChild(targetCell);
 
@@ -4824,11 +4844,11 @@
           if (event.target === overlay || event.target.closest("[data-trash-close]")) closeAccessibleDialog(overlay);
         });
       }
-      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="trash-title">' +
+      overlay.innerHTML = '<div class="modal trash-modal" role="dialog" aria-modal="true" aria-labelledby="trash-title">' +
         '<div class="modal-head"><h3 id="trash-title">Cestino</h3><button class="btn sm" type="button" data-trash-close>Chiudi</button></div>' +
         '<div class="modal-body">' +
         '<div class="toolbar"><span class="muted" data-trash-count></span><button class="btn sm danger" type="button" data-trash-all title="Elimina tutti gli elementi">Elimina tutti</button><button class="btn sm" type="button" data-trash-reload title="Ricarica">Aggiorna</button><small class="muted" data-trash-message aria-live="polite"></small></div>' +
-        '<div class="table-wrap"><table class="data-table"><caption class="sr-only">Elementi nel cestino</caption><thead><tr><th scope="col">Nome</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead><tbody data-trash-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>' +
+        '<div class="table-wrap"><table class="data-table trash-table"><caption class="sr-only">Elementi nel cestino</caption><thead><tr><th scope="col">Nome</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead><tbody data-trash-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>' +
         '</div></div>';
       openAccessibleDialog(overlay, trashOpenButton);
       renderTrashModal(overlay);

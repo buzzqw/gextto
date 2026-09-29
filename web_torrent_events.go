@@ -1774,7 +1774,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				logging.Debug("cannot mark foreign torrent completed",
 					"hash", event.Hash, "error", err.Error())
 			}
-			logging.Info(fmt.Sprintf("torrent completed (no release metadata, kept in place) — «%s»", event.Name))
+			// A foreign torrent can emit this lifecycle alert again after a
+			// session refresh/restart. Completion is not an actionable change for
+			// the user; the INFO log is reserved for the later removal from the
+			// sharing session.
+			logging.Debug(fmt.Sprintf("torrent completed (no release metadata, kept in place) — «%s»", event.Name))
 		}
 		logging.Debug("torrent alert has no registered release metadata",
 			"hash", event.Hash, "kind", event.Kind, "name", event.Name)

@@ -141,20 +141,25 @@ func runDaemon(dryRun bool, configOption *string) error {
 	logCheckpoint("config", i18n.Checkpoint)
 
 	for _, check := range []struct {
-		name string
-		run  func() ([]string, error)
+		name     string
+		run      func() ([]string, error)
+		rowCount func() int64
 	}{
-		{constants.DefaultDBFile, db.QuickCheck},
-		{constants.DefaultArchiveFile, archive.QuickCheck},
-		{"gextto_comics.db", comics.QuickCheck},
-		{constants.DefaultConfigFile, i18n.QuickCheck},
+		{constants.DefaultDBFile, db.QuickCheck, db.RowCount},
+		{constants.DefaultArchiveFile, archive.QuickCheck, archive.RowCount},
+		{"gextto_comics.db", comics.QuickCheck, comics.RowCount},
+		{constants.DefaultConfigFile, i18n.QuickCheck, i18n.RowCount},
 	} {
 		rows, checkErr := check.run()
 		switch {
 		case checkErr != nil:
 			logging.Warn("integrity check not executed", "database", check.name, "error", checkErr)
 		case len(rows) == 1 && rows[0] == "ok":
-			logging.Info("integrity check: ok", "database", check.name)
+			size := int64(0)
+			if info, statErr := os.Stat(filepath.Join(cfg.DataDir, check.name)); statErr == nil {
+				size = info.Size()
+			}
+			logging.Info("integrity check: ok", "database", check.name, "rows", check.rowCount(), "size", logging.HumanBytesI64(size))
 		default:
 			logging.Error("integrity check: problems found", "database", check.name, "detail", joinRows(rows))
 		}

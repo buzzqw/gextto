@@ -41,6 +41,8 @@
      data-columns="{{.ColumnsJSON}}"
      data-actions="{{.ActionsJSON}}"
      data-empty="{{.Empty}}"
+     data-initial="{{.Initial}}"
+     data-auto-load="{{if .ManualOnly}}false{{else}}true{{end}}"
      data-search="{{.SearchParam}}"
      data-page-size="{{.PageSize}}"></div>
 {{end}}

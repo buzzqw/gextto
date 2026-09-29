@@ -196,6 +196,10 @@ func TestUiServerRenderedPages(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(string(body), `data-torrent-add`) || !strings.Contains(string(body), `data-torrents-slot`) || !strings.Contains(string(body), `data-download-bulk`) || !strings.Contains(string(body), `data-torrent-subdetail`) {
 		t.Fatalf("downloads missing add form or refresh slot")
 	}
+	code, _, body = webGet(t, server, "/ui?view=health")
+	if code != http.StatusOK || !strings.Contains(string(body), `data-auto-load="false"`) || !strings.Contains(string(body), "Premi Aggiorna per verificare le sorgenti.") {
+		t.Fatalf("health sources table should be manual-only")
+	}
 	code, _, body = webGet(t, server, "/ui/partial/torrents")
 	if code != http.StatusOK || !strings.Contains(string(body), `data-torrents-slot`) {
 		t.Fatalf("torrent partial missing refresh slot")
@@ -244,6 +248,7 @@ func TestUiMaintenanceParity(t *testing.T) {
 		"data-duplicates", "data-duplicates-preview", "data-duplicates-clean",
 		"data-ramdisk", "data-ramdisk-paths", "data-db-optimize", "data-trash-open",
 		"Diagnostica sorgenti", "data-sources-run", `data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
+		"Cartella cloud", "FTP password", "Percorso locale di una cartella già montata", `&#34;key&#34;:&#34;path&#34;,&#34;label&#34;:&#34;Nome&#34;`,
 	} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("maintenance page missing %q", marker)

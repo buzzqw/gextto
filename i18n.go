@@ -31,6 +31,14 @@ func (d *I18nDb) Close() error {
 	return d.db.Close()
 }
 
+// RowCount returns the number of rows stored in the translation database.
+func (d *I18nDb) RowCount() int64 {
+	if d == nil {
+		return 0
+	}
+	return ConnectionRowCount(d.db)
+}
+
 // Translation is one persisted key/value pair for a language.
 type Translation struct {
 	Lang  string `json:"lang"`

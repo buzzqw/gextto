@@ -46,6 +46,9 @@ type uiTableSpec struct {
 	SearchParam string
 	Query       string
 	PageSize    int
+	// ManualOnly leaves the table idle until the user presses Aggiorna.
+	ManualOnly bool
+	Initial    string
 	// Filter adds a client-side text filter over the rendered rows.
 	Filter bool
 	// Comics enables the extra panels of the comics page (download queue and

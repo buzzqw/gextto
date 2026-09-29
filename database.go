@@ -586,6 +586,44 @@ func ConnectionSizeBytes(db *sql.DB) int64 {
 	return pages * pageSize
 }
 
+// ConnectionRowCount returns the total number of rows in the user tables of a
+// SQLite connection. SQLite/FTS internal tables are excluded from the count.
+func ConnectionRowCount(db *sql.DB) int64 {
+	if db == nil {
+		return 0
+	}
+	rows, err := db.Query(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'`)
+	if err != nil {
+		return 0
+	}
+	tableNames := make([]string, 0)
+	for rows.Next() {
+		var tableName string
+		if err := rows.Scan(&tableName); err != nil {
+			_ = rows.Close()
+			return 0
+		}
+		tableNames = append(tableNames, tableName)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0
+	}
+	if err := rows.Close(); err != nil {
+		return 0
+	}
+	var total int64
+	for _, tableName := range tableNames {
+		quoted := `"` + strings.ReplaceAll(tableName, `"`, `""`) + `"`
+		var count int64
+		if err := db.QueryRow("SELECT COUNT(*) FROM " + quoted).Scan(&count); err != nil {
+			continue
+		}
+		total += count
+	}
+	return total
+}
+
 // databaseSchemaBase is the first `execute_batch` of `Database::migrate`
 // (copied verbatim ).
 const databaseSchemaBase = `CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL); CREATE TABLE IF NOT EXISTS series (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, seasons TEXT DEFAULT '1+', quality TEXT DEFAULT '', language TEXT DEFAULT 'ita', enabled INTEGER DEFAULT 1, archive_path TEXT DEFAULT '', tmdb_id TEXT DEFAULT '', aliases TEXT DEFAULT ''); CREATE TABLE IF NOT EXISTS episodes (id INTEGER PRIMARY KEY, series_id INTEGER NOT NULL, season INTEGER NOT NULL, episode INTEGER NOT NULL, title TEXT, quality_score INTEGER NOT NULL DEFAULT 0, is_repack INTEGER DEFAULT 0, magnet_hash TEXT UNIQUE, magnet_link TEXT, downloaded_at TEXT, archive_path TEXT, size_bytes INTEGER DEFAULT 0, original_title TEXT, rename_verified INTEGER DEFAULT 0, UNIQUE(series_id, season, episode)); CREATE TABLE IF NOT EXISTS movies (id INTEGER PRIMARY KEY, name TEXT, year INTEGER, title TEXT, quality_score INTEGER DEFAULT 0, magnet_hash TEXT UNIQUE, magnet_link TEXT, downloaded_at TEXT, size_bytes INTEGER DEFAULT 0, removed_at TEXT); CREATE TABLE IF NOT EXISTS pending_downloads (id INTEGER PRIMARY KEY, series_id INTEGER, season INTEGER, episode INTEGER, best_magnet TEXT, best_quality_score INTEGER, ready_at TEXT); CREATE TABLE IF NOT EXISTS cycle_history (id INTEGER PRIMARY KEY, at TEXT NOT NULL, payload_json TEXT NOT NULL); CREATE TABLE IF NOT EXISTS torrent_meta (hash TEXT PRIMARY KEY, tag TEXT DEFAULT '', source TEXT DEFAULT '', ui_state TEXT DEFAULT '', progress REAL DEFAULT 0, paused INTEGER DEFAULT 0, total_size INTEGER DEFAULT 0, downloaded INTEGER DEFAULT 0, name TEXT DEFAULT '', kind TEXT DEFAULT '', title TEXT DEFAULT '', series_name TEXT DEFAULT '', season INTEGER, episode INTEGER, year INTEGER, quality_score INTEGER DEFAULT 0, metadata_json TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'queued', completed_at TEXT, processed_path TEXT, error TEXT DEFAULT '', created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_episodes_lookup ON episodes(series_id, season, episode); CREATE INDEX IF NOT EXISTS idx_episodes_magnet ON episodes(magnet_hash); CREATE INDEX IF NOT EXISTS idx_episodes_downloaded ON episodes(downloaded_at); CREATE INDEX IF NOT EXISTS idx_movies_magnet ON movies(magnet_hash); CREATE INDEX IF NOT EXISTS idx_movies_removed ON movies(removed_at); CREATE INDEX IF NOT EXISTS idx_torrent_meta_status ON torrent_meta(status); INSERT INTO schema_meta(key,value,updated_at) VALUES ('schema_version','2',datetime('now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at;`
@@ -673,6 +711,14 @@ func (d *Database) Close() error {
 		return nil
 	}
 	return d.db.Close()
+}
+
+// RowCount returns the number of rows stored in the database's user tables.
+func (d *Database) RowCount() int64 {
+	if d == nil {
+		return 0
+	}
+	return ConnectionRowCount(d.db)
 }
 
 // OpenDatabase opens the database at path, applies the shared pragmas and runs
