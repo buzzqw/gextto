@@ -216,7 +216,13 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	}
 	active := TorrentBackendName(cfg)
 	if engine == nil {
-		active = BackendEmbedded
+		// The configured name `embedded` is an implementation detail. The
+		// actual engine is libtorrent, so expose the concrete backend and the
+		// linked library version in the startup log.
+		logging.Info("torrent backend selected",
+			"backend", "libtorrent",
+			"version", LibtorrentVersion())
+		return nil
 	}
 	logging.Info("torrent backend selected", "backend", active)
 	return nil
