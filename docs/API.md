@@ -107,6 +107,7 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | POST | `/api/i18n/language` |
 | GET | `/api/i18n/languages` |
 | DELETE | `/api/i18n/{lang}` |
+| POST | `/api/indexer/test` |
 | POST | `/api/jellyfin/refresh` |
 | POST | `/api/jellyfin/test` |
 | GET | `/api/last_cycle` |
@@ -292,4 +293,4 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | GET | `/feed.xml` |
 | GET | `/magnet` |
 
-Total routes: 267
+Total routes: 268

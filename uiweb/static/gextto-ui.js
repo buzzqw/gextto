@@ -2609,6 +2609,7 @@
     var kind = field.getAttribute("data-kind");
     if (kind === "bool") return field.value === "true";
     if (kind === "number") return Number(field.value || 0);
+    if (kind === "select") return field.value;
     if (kind === "tags") {
       return (field.value || "").split(",").map(function (part) { return part.trim(); })
         .filter(function (part) { return part !== ""; });
@@ -2619,9 +2620,12 @@
     Array.prototype.forEach.call(row.querySelectorAll("[data-field]"), function (field) {
       var name = field.getAttribute("data-field");
       var value = item ? item[name] : undefined;
-      if (field.getAttribute("data-kind") === "bool") {
+      var kind = field.getAttribute("data-kind");
+      if (kind === "bool") {
         field.value = (value === false || value === "false") ? "false" : "true";
-      } else if (field.getAttribute("data-kind") === "tags") {
+      } else if (kind === "select") {
+        field.value = (value === undefined || value === null) ? "" : String(value);
+      } else if (kind === "tags") {
         field.value = Array.isArray(value) ? value.join(", ") : (value || "");
       } else {
         field.value = (value === undefined || value === null) ? "" : value;
@@ -2635,11 +2639,36 @@
     var unwrap = editor.getAttribute("data-unwrap") || "";
     var wrap = editor.getAttribute("data-wrap") || "";
     var postKey = editor.getAttribute("data-post-key") || "";
+    var testEndpoint = editor.getAttribute("data-test-endpoint") || "";
+    function rowValues(row) {
+      var item = {};
+      Array.prototype.forEach.call(row.querySelectorAll("[data-field]"), function (field) {
+        item[field.getAttribute("data-field")] = listFieldValue(field);
+      });
+      return item;
+    }
     function addRow(item) {
       var clone = template.content.firstElementChild.cloneNode(true);
       fillListRow(clone, item || {});
       var remove = clone.querySelector("[data-list-remove]");
       if (remove) remove.addEventListener("click", function () { clone.remove(); });
+      var testButton = clone.querySelector("[data-list-test]");
+      if (testButton && testEndpoint) {
+        testButton.addEventListener("click", function () {
+          var result = clone.querySelector("[data-list-test-result]");
+          testButton.disabled = true;
+          if (result) result.textContent = "Test in corso…";
+          api(testEndpoint, "POST", rowValues(clone)).then(function (data) {
+            var ok = !!(data && data.ok === true);
+            var detail = ok ? "OK" : ("Errore: " + String((data && data.error) || "non riuscito"));
+            if (result) result.textContent = detail;
+            notify(ok ? "Indexer OK" : ("Test indexer: " + detail), ok ? "ok" : "err");
+          }).catch(function (error) {
+            if (result) result.textContent = "Errore: " + error.message;
+            notify("Test indexer: " + error.message, "err");
+          }).then(function () { testButton.disabled = false; });
+        });
+      }
       rowsBox.appendChild(clone);
       return clone;
     }

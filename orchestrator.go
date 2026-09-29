@@ -873,6 +873,13 @@ func RunCycleDomain(
 			var preferredPath *string
 			if downloadDir, ok := DownloadDirFor(&release, cfg); ok {
 				preferredPath = &downloadDir
+			} else if !ReleaseFitsRamdisk(&release, cfg) {
+				// The known size already exceeds the RAM disk threshold: download
+				// straight to disk instead of staging a multi-gigabyte season pack
+				// on the tmpfs and moving it out right after the metadata arrives.
+				if dir, ok := ramdiskOverflowDir(cfg); ok {
+					preferredPath = &dir
+				}
 			}
 			added := false
 			if torrentFile != nil {

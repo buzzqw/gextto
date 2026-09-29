@@ -20,6 +20,7 @@ coverage.xml
 
 # Local-only project notes and superseded planning documents
 docs/internal/
+docs/SONARR_RADARR_REPLACEMENT_PLAN.md
 
 # The monotonic build number is generated per build, never committed.
 build_number

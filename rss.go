@@ -598,54 +598,195 @@ func httpDo(ctx context.Context, client *http.Client, method, rawURL string, hea
 	return client.Do(request)
 }
 
+// fsSolution is the subset of a FlareSolverr /v1 reply Gextto uses.
+type fsSolution struct {
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Session string `json:"session"`
+	// Solution holds the origin response; its Status is the page's HTTP status.
+	Solution struct {
+		Status    int                `json:"status"`
+		UserAgent string             `json:"userAgent"`
+		Cookies   []cloudflareCookie `json:"cookies"`
+		Response  string             `json:"response"`
+	} `json:"solution"`
+}
+
+// fsAPI posts one command to FlareSolverr and decodes the reply.
+func fsAPI(ctx context.Context, client *http.Client, endpoint string, payload map[string]any, out *fsSolution) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	response, err := httpDo(requestCtx, client, http.MethodPost, endpoint, nil, encoded, "application/json")
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("HTTP %d", response.StatusCode)
+	}
+	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, out)
+}
+
+// Persistent FlareSolverr sessions. A stateless `request.get` launches a fresh
+// browser for every call, which is slow when a Cloudflare-protected site is
+// queried several times (listing plus detail pages). A session reuses the same
+// browser context instead. Sessions are created lazily per domain, reused for a
+// short TTL, and destroyed when stale. If the FlareSolverr instance does not
+// support sessions, Gextto falls back to the stateless mode.
+const fsSessionTTL = 5 * time.Minute
+
+type fsSessionEntry struct {
+	id       string
+	lastUsed time.Time
+}
+
+var (
+	fsSessionMu       sync.Mutex
+	fsSessionByDomain = map[string]fsSessionEntry{}
+	fsSessionDisabled = map[string]bool{}
+)
+
+// acquireFlareSolverrSession returns a reusable session id for the URL's domain,
+// or "" when sessions are unavailable (the caller then runs statelessly).
+func acquireFlareSolverrSession(ctx context.Context, client *http.Client, endpoint, rawURL string) string {
+	domain := domain_of(rawURL)
+	if domain == "" {
+		return ""
+	}
+	fsSessionMu.Lock()
+	if fsSessionDisabled[endpoint] {
+		fsSessionMu.Unlock()
+		return ""
+	}
+	entry, ok := fsSessionByDomain[domain]
+	if ok && entry.id != "" {
+		if time.Since(entry.lastUsed) < fsSessionTTL {
+			fsSessionMu.Unlock()
+			return entry.id
+		}
+		delete(fsSessionByDomain, domain)
+		fsSessionMu.Unlock()
+		_ = destroyFlareSolverrSession(ctx, client, endpoint, entry.id)
+	} else {
+		fsSessionMu.Unlock()
+	}
+	var out fsSolution
+	if err := fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.create"}, &out); err != nil {
+		fsSessionMu.Lock()
+		fsSessionDisabled[endpoint] = true
+		fsSessionMu.Unlock()
+		return ""
+	}
+	id := strings.TrimSpace(out.Session)
+	if (out.Status != "" && out.Status != "ok") || id == "" {
+		fsSessionMu.Lock()
+		fsSessionDisabled[endpoint] = true
+		fsSessionMu.Unlock()
+		return ""
+	}
+	fsSessionMu.Lock()
+	fsSessionByDomain[domain] = fsSessionEntry{id: id, lastUsed: time.Now()}
+	fsSessionMu.Unlock()
+	return id
+}
+
+// touchFlareSolverrSession refreshes the reuse window of a domain's session.
+func touchFlareSolverrSession(rawURL string) {
+	domain := domain_of(rawURL)
+	if domain == "" {
+		return
+	}
+	fsSessionMu.Lock()
+	if entry, ok := fsSessionByDomain[domain]; ok {
+		entry.lastUsed = time.Now()
+		fsSessionByDomain[domain] = entry
+	}
+	fsSessionMu.Unlock()
+}
+
+// forgetFlareSolverrSession removes and returns a domain's session id.
+func forgetFlareSolverrSession(rawURL string) string {
+	domain := domain_of(rawURL)
+	if domain == "" {
+		return ""
+	}
+	fsSessionMu.Lock()
+	defer fsSessionMu.Unlock()
+	entry, ok := fsSessionByDomain[domain]
+	if !ok {
+		return ""
+	}
+	delete(fsSessionByDomain, domain)
+	return entry.id
+}
+
+func destroyFlareSolverrSession(ctx context.Context, client *http.Client, endpoint, id string) error {
+	if strings.TrimSpace(id) == "" {
+		return nil
+	}
+	var out fsSolution
+	return fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.destroy", "session": id}, &out)
+}
+
 func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
 	if err := utils.AcquireFlareSolverrContext(ctx); err != nil {
 		return "", err
 	}
 	defer utils.ReleaseFlareSolverr()
 	endpoint := strings.TrimRight(flaresolverr, "/") + "/v1"
-	payload, err := json.Marshal(map[string]any{
-		"cmd":        "request.get",
-		"url":        rawURL,
-		"maxTimeout": 20000,
-	})
+	session := acquireFlareSolverrSession(ctx, client, endpoint, rawURL)
+
+	fetch := func(useSession string) (string, error) {
+		payload := map[string]any{
+			"cmd":        "request.get",
+			"url":        rawURL,
+			"maxTimeout": 20000,
+		}
+		if useSession != "" {
+			payload["session"] = useSession
+		}
+		var value fsSolution
+		if err := fsAPI(ctx, client, endpoint, payload, &value); err != nil {
+			return "", err
+		}
+		if value.Status != "" && value.Status != "ok" {
+			return "", fmt.Errorf("FlareSolverr returned status %q", value.Status)
+		}
+		remember_session(rawURL, value.Solution.UserAgent, value.Solution.Cookies)
+		if value.Solution.Response == "" {
+			return "", fmt.Errorf("flaresolverr returned an empty response")
+		}
+		// Treat the origin's own error status as a failure instead of parsing an
+		// error page as content.
+		if value.Solution.Status >= 400 {
+			return "", fmt.Errorf("FlareSolverr solved with HTTP %d", value.Solution.Status)
+		}
+		rememberCFDomain(rawURL)
+		return value.Solution.Response, nil
+	}
+
+	body, err := fetch(session)
+	if err != nil && session != "" {
+		// The session may have expired inside FlareSolverr; drop it and retry
+		// once stateless so a stale session never blocks a fetch.
+		if stale := forgetFlareSolverrSession(rawURL); stale != "" {
+			_ = destroyFlareSolverrSession(ctx, client, endpoint, stale)
+		}
+		body, err = fetch("")
+	}
 	if err != nil {
 		return "", err
 	}
-	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	response, err := httpDo(requestCtx, client, http.MethodPost, endpoint, nil, payload, "application/json")
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	if response.StatusCode >= 400 {
-		return "", fmt.Errorf("HTTP %d", response.StatusCode)
-	}
-	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
-	if err != nil {
-		return "", err
-	}
-	var value struct {
-		Status   string `json:"status"`
-		Solution struct {
-			UserAgent string             `json:"userAgent"`
-			Cookies   []cloudflareCookie `json:"cookies"`
-			Response  string             `json:"response"`
-		} `json:"solution"`
-	}
-	if err := json.Unmarshal(body, &value); err != nil {
-		return "", err
-	}
-	if value.Status != "" && value.Status != "ok" {
-		return "", fmt.Errorf("FlareSolverr returned status %q", value.Status)
-	}
-	remember_session(rawURL, value.Solution.UserAgent, value.Solution.Cookies)
-	if value.Solution.Response == "" {
-		return "", fmt.Errorf("flaresolverr returned an empty response")
-	}
-	rememberCFDomain(rawURL)
-	return value.Solution.Response, nil
+	touchFlareSolverrSession(rawURL)
+	return body, nil
 }
 
 // cloudflare_blocked reports HTTP statuses that mean "Cloudflare is in front of
@@ -1226,19 +1367,58 @@ func extract_magnet(body string) string {
 	return direct
 }
 
+// Manager identifiers for the supported indexer managers.
+const (
+	ManagerProwlarr = "prowlarr"
+	ManagerJackett  = "jackett"
+)
+
+// normalizeManagerKind maps user input to a known manager id, or "" otherwise.
+func normalizeManagerKind(kind string) string {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case ManagerProwlarr:
+		return ManagerProwlarr
+	case ManagerJackett:
+		return ManagerJackett
+	default:
+		return ""
+	}
+}
+
+// explicitManagerKind returns the manager an indexer declares, or "".
+func explicitManagerKind(indexer IndexerConfig) string {
+	return normalizeManagerKind(indexer.Manager)
+}
+
+// managerKind resolves the effective manager: the declared one when present,
+// otherwise the legacy URL/port/name heuristic (Prowlarr default 9696, Jackett
+// 9117), so an indexer renamed by the user still works.
+func managerKind(indexer IndexerConfig) string {
+	if kind := explicitManagerKind(indexer); kind != "" {
+		return kind
+	}
+	lowerURL := strings.ToLower(strings.TrimSpace(indexer.URL))
+	lowerName := strings.ToLower(strings.TrimSpace(indexer.Name))
+	if strings.Contains(lowerURL, "prowlarr") || strings.Contains(lowerURL, ":9696") ||
+		strings.Contains(lowerName, "prowlarr") {
+		return ManagerProwlarr
+	}
+	return ManagerJackett
+}
+
+// isManagerSource reports whether the indexer is a Jackett/Prowlarr aggregate.
+// Those managers handle Cloudflare themselves, so FlareSolverr must not be used
+// for them.
+func isManagerSource(indexer IndexerConfig) bool {
+	return managerKind(indexer) != ""
+}
+
 func torznab_endpoint(indexer IndexerConfig) string {
 	base := strings.TrimRight(strings.TrimSpace(indexer.URL), "/")
 	if strings.Contains(base, "/api") || strings.Contains(base, "torznab") {
 		return base
 	}
-	// legacy detects the kind from the URL/port (Prowlarr default 9696, Jackett
-	// 9117), not from the configured name: a renamed indexer must still work.
-	lowerURL := strings.ToLower(base)
-	lowerName := strings.ToLower(indexer.Name)
-	isProwlarr := strings.Contains(lowerURL, "prowlarr") ||
-		strings.Contains(lowerURL, ":9696") ||
-		strings.Contains(lowerName, "prowlarr")
-	if isProwlarr {
+	if managerKind(indexer) == ManagerProwlarr {
 		return base + "/api/v1/search"
 	}
 	return base + "/api/v2.0/indexers/all/results/torznab/api"
@@ -1478,6 +1658,12 @@ func FetchTorznabWith(ctx context.Context, indexer IndexerConfig, query string, 
 // FetchTorznabFlareSolverr runs a Torznab search with an optional FlareSolverr
 // fallback when the indexer blocks the request (Cloudflare / 403).
 func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query string, externalIDs [][2]string, flaresolverr *string) ([]models.Release, error) {
+	// Jackett and Prowlarr handle Cloudflare inside the manager: routing their
+	// (usually local) endpoint through FlareSolverr only wastes 20-30s and hides
+	// the real auth/network error.
+	if isManagerSource(indexer) {
+		flaresolverr = nil
+	}
 	fullURL := torznabRequestURL(indexer, query, externalIDs)
 	headers := map[string]string{}
 	if session, ok := session_for(fullURL); ok {

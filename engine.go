@@ -44,6 +44,12 @@ const (
 	manualSearchTimeout    = 15 * time.Second
 )
 
+// indexerRequestTimeout bounds a single indexer/manager request. It is shorter
+// than automaticSearchTimeout so that one slow source fails on its own while the
+// healthy sources still return their results, instead of consuming the whole
+// search budget.
+var indexerRequestTimeout = 60 * time.Second
+
 // NewEngine builds the default engine, mirroring `Engine::new`.
 func NewEngine() *Engine {
 	return &Engine{
@@ -470,7 +476,9 @@ func searchOneWithDB(
 					continue
 				}
 				logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
-				items, err := FetchTorznabFlareSolverr(ctx, indexer, query, externalIDs, cfg.FlaresolverrURL)
+				requestCtx, cancel := context.WithTimeout(ctx, indexerRequestTimeout)
+				items, err := FetchTorznabFlareSolverr(requestCtx, indexer, query, externalIDs, cfg.FlaresolverrURL)
+				cancel()
 				indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
 			}
 		}()
@@ -507,8 +515,10 @@ func searchOneWithDB(
 		} else {
 			// Cancellation belongs to the search/request lifecycle, not to the
 			// indexer. Do not mark the provider as failed or emit a warning when
-			// the caller has already stopped waiting for this search.
-			if errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded) {
+			// the caller has already stopped waiting for this search. A request
+			// timeout that fires while the search is still running (the parent
+			// context is alive) is a real per-source failure and is handled below.
+			if (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)) && ctx.Err() != nil {
 				logging.Debug("indexer search stopped with the search context",
 					"indexer", result.Name,
 					"query", result.Query,

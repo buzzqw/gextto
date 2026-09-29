@@ -754,12 +754,19 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	indexers := make([]map[string]any, 0, len(cfg.Indexers))
 	configuredKeys := 0
 	for _, indexer := range cfg.Indexers {
-		indexers = append(indexers, map[string]any{
+		entry := map[string]any{
 			"name":    indexer.Name,
 			"url":     indexer.URL,
 			"api_key": indexer.APIKey,
 			"enabled": indexer.Enabled,
-		})
+		}
+		// Manager metadata is only present for indexers declared as a Jackett or
+		// Prowlarr manager; keeping it in the response lets the editor round-trip
+		// it instead of dropping it on save.
+		if indexer.Manager != "" {
+			entry["manager"] = indexer.Manager
+		}
+		indexers = append(indexers, entry)
 		if strings.TrimSpace(indexer.APIKey) != "" {
 			configuredKeys++
 		}

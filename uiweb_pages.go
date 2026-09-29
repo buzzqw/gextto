@@ -242,11 +242,19 @@ var uiContentFilterOptions = []uiCheckboxOption{
 }
 
 // uiListField describes one column of a structured list editor.
+// uiListFieldOption is one choice of a select field.
+type uiListFieldOption struct {
+	Value string
+	Label string
+}
+
 type uiListField struct {
 	Name        string
 	Label       string
-	Kind        string // text | number | bool | tags | secret
+	Kind        string // text | number | bool | tags | secret | select
 	Placeholder string
+	// Options are the choices of a select field.
+	Options []uiListFieldOption
 	// Wide gives the field two grid tracks on wide screens (URLs, API keys).
 	Wide bool
 }
@@ -264,20 +272,29 @@ type uiListEditor struct {
 	// PostKey, when set, saves the list as the JSON value of that setting
 	// through /api/config/settings (used for the indexers).
 	PostKey string
-	Fields  []uiListField
+	// TestEndpoint, when set, renders a per-row "Testa" button that POSTs the
+	// row's fields to that endpoint.
+	TestEndpoint string
+	Fields       []uiListField
 }
 
 var uiIndexerEditor = uiListEditor{
-	Title:    "Indexer Torznab",
-	Hint:     "Jackett, Prowlarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).",
-	GetPath:  "/api/config",
-	Unwrap:   "indexers",
-	PostPath: "/api/config/settings",
-	PostKey:  "indexers",
+	Title:        "Indexer Torznab",
+	Hint:         "Jackett, Prowlarr o altri indexer Torznab. L'URL è la base (Gextto aggiunge il percorso Torznab).",
+	GetPath:      "/api/config",
+	Unwrap:       "indexers",
+	PostPath:     "/api/config/settings",
+	PostKey:      "indexers",
+	TestEndpoint: "/api/indexer/test",
 	Fields: []uiListField{
 		{Name: "name", Label: "Nome", Kind: "text", Placeholder: "jackett / prowlarr"},
 		{Name: "url", Label: "URL base", Kind: "text", Placeholder: "http://127.0.0.1:9117", Wide: true},
 		{Name: "api_key", Label: "API key", Kind: "secret", Wide: true},
+		{Name: "manager", Label: "Tipo", Kind: "select", Options: []uiListFieldOption{
+			{Value: "", Label: "Rilevato automaticamente"},
+			{Value: "prowlarr", Label: "Prowlarr"},
+			{Value: "jackett", Label: "Jackett"},
+		}},
 		{Name: "enabled", Label: "Attivo", Kind: "bool"},
 	},
 }

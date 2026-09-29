@@ -962,6 +962,28 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 
+	// Manager-side indexer health: one row per indexer configured in a Prowlarr
+	// instance, so a failing or disabled indexer is visible in the Sources table
+	// instead of showing up only as missing results.
+	for _, indexer := range cfg.Indexers {
+		if !indexer.Enabled || managerKind(indexer) != ManagerProwlarr {
+			continue
+		}
+		health, healthErr := ProwlarrIndexerHealth(ctx, indexer.URL, indexer.APIKey)
+		if healthErr != nil {
+			name := indexer.Name
+			message := healthErr.Error()
+			tasks = append(tasks, func() map[string]any {
+				return map[string]any{"kind": "prowlarr", "name": name, "ok": false, "results": nil, "error": message}
+			})
+			continue
+		}
+		for _, item := range health {
+			item := item
+			tasks = append(tasks, func() map[string]any { return item })
+		}
+	}
+
 	var mu sync.Mutex
 	items := []map[string]any{}
 	var wait sync.WaitGroup

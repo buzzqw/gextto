@@ -35,6 +35,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/config/series", SaveSeriesConfig)
 	handle(s, mux, "POST /api/config/movies", SaveMoviesConfig)
 	handle(s, mux, "POST /api/config/settings", SaveSettingHandler)
+	handle(s, mux, "POST /api/indexer/test", IndexerTest)
 	handle(s, mux, "DELETE /api/config/settings/{key}", DeleteSettingHandler)
 	handle(s, mux, "GET /api/ramdisk", RamdiskView)
 	handle(s, mux, "POST /api/ramdisk/select", SelectRamdisk)

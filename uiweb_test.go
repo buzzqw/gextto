@@ -369,6 +369,10 @@ func TestUiDetailAndEditorPages(t *testing.T) {
 		{"/ui?view=settings&tab=sources", `data-sources-editor`},
 		// The Indexer Torznab editor lives only in Integrazioni (no duplicate).
 		{"/ui?view=integrations", `data-list-editor`},
+		// The manager type picker is a dropdown, not free text.
+		{"/ui?view=integrations", `data-kind="select"`},
+		// Every indexer row offers a "Testa" action.
+		{"/ui?view=integrations", `data-list-test`},
 		{"/ui?view=series", `series_link`},
 		{"/ui?view=movies", `movie_link`},
 		{"/ui?view=comics", `/api/comics/{id}/enabled`},

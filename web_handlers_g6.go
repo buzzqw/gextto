@@ -355,6 +355,47 @@ func gh6_servicesProbe(rawURL string, timeout time.Duration) (int, bool, string)
 	return response.StatusCode, true, string(body)
 }
 
+// IndexerTest implements `indexer_test`: probe a single indexer as typed in the
+// editor (which may not be saved yet) and report reachability plus any Torznab
+// application error. It is the per-row "Testa" action of the Indexer editor.
+func IndexerTest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	var input IndexerConfig
+	if err := decodeJSON(r, &input); err != nil {
+		jsonError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	rawURL := strings.TrimSpace(input.URL)
+	if rawURL == "" || len(rawURL) > 2048 {
+		jsonError(w, http.StatusBadRequest, "a valid indexer url is required")
+		return
+	}
+	if len(input.APIKey) > 512 {
+		jsonError(w, http.StatusBadRequest, "api key is too long")
+		return
+	}
+	status, reachable, body := gh6_servicesProbe(HealthProbeURL(input), 10*time.Second)
+	torznabError := ""
+	if reachable {
+		torznabError = TorznabError(body)
+	}
+	ok := reachable && status >= 200 && status < 300 && torznabError == ""
+	message := ""
+	switch {
+	case !reachable:
+		message = "irraggiungibile"
+	case torznabError != "":
+		message = torznabError
+	case !ok:
+		message = fmt.Sprintf("HTTP %d", status)
+	}
+	jsonResponse(w, map[string]any{
+		"ok":        ok,
+		"reachable": reachable,
+		"status":    status,
+		"error":     message,
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------

@@ -94,11 +94,16 @@ type MovieConfig struct {
 func (m *MovieConfig) UpgradesAllowed() bool { return !m.DisableUpgrades }
 
 // IndexerConfig describes one configured indexer.
+//
+// `Manager` optionally declares that the indexer is a Jackett/Prowlarr manager
+// entry ("jackett" or "prowlarr"), so the endpoint is chosen explicitly instead
+// of being inferred from the URL/port/name.
 type IndexerConfig struct {
 	Name    string `json:"name"`
 	URL     string `json:"url"`
 	APIKey  string `json:"api_key"`
 	Enabled bool   `json:"enabled"`
+	Manager string `json:"manager,omitempty"`
 }
 
 // UnmarshalJSON applies the JSON default: `enabled` defaults to true when the
@@ -110,6 +115,7 @@ func (i *IndexerConfig) UnmarshalJSON(data []byte) error {
 		URL     string `json:"url"`
 		APIKey  string `json:"api_key"`
 		Enabled *bool  `json:"enabled"`
+		Manager string `json:"manager"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -121,6 +127,7 @@ func (i *IndexerConfig) UnmarshalJSON(data []byte) error {
 	if raw.Enabled != nil {
 		i.Enabled = *raw.Enabled
 	}
+	i.Manager = normalizeManagerKind(raw.Manager)
 	return nil
 }
 

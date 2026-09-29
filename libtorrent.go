@@ -398,6 +398,42 @@ func preferredDownloadPath(cfg *Config) string {
 	return cfg.LibtorrentDir
 }
 
+// ReleaseFitsRamdisk reports whether a release whose size is already known can
+// be admitted to the RAM disk. An unknown or non-positive size is treated as
+// fitting: the torrent is then placed on the RAM disk and relocated by the
+// `metadata_received` handler if the real size turns out to be too large.
+//
+// This lets an automatic acquisition that already knows it is a multi-gigabyte
+// season pack skip the tmpfs entirely instead of being moved out moments later.
+func ReleaseFitsRamdisk(release *models.Release, cfg *Config) bool {
+	if !cfg.RamdiskEnabled() {
+		return true
+	}
+	if release == nil || release.SizeBytes <= 0 {
+		return true
+	}
+	threshold := cfg.RamdiskThresholdBytes()
+	if threshold == 0 {
+		return true
+	}
+	return uint64(release.SizeBytes) <= threshold
+}
+
+// ramdiskOverflowDir is where an oversized acquisition should be downloaded
+// instead of the RAM disk: the temporary disk when it exists, the final
+// directory otherwise. The returned path always exists as a directory so that
+// `resolveSavePath` does not fall back to `preferredDownloadPath` (which would
+// pick the RAM disk again).
+func ramdiskOverflowDir(cfg *Config) (string, bool) {
+	if cfg.LibtorrentTempDir != nil && pathIsDir(*cfg.LibtorrentTempDir) {
+		return *cfg.LibtorrentTempDir, true
+	}
+	if pathIsDir(cfg.LibtorrentDir) {
+		return cfg.LibtorrentDir, true
+	}
+	return "", false
+}
+
 // pathIsDir and fileExists resolve the path inside an os.Root so a crafted
 // value cannot escape its directory through path separators.
 func pathIsDir(path string) bool {
