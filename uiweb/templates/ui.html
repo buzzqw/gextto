@@ -78,6 +78,30 @@
         <span class="system-pill" title="Stato del servizio: il processo Gextto e la sua API rispondono."><span class="pulse"></span>{{.Chrome.Status}}</span>
       </div>
     </header>
+    <section class="mobile-performance" aria-label="Connessioni e prestazioni">
+      <div class="mobile-performance-head">
+        <span class="eyebrow">Connessioni e prestazioni</span>
+        <small class="muted">Aggiornamento automatico</small>
+      </div>
+      <div class="mobile-performance-grid">
+        <div class="mobile-performance-tile">
+          <span class="top-metric-label">CPU</span>
+          <strong data-metric="cpu">{{.Chrome.CPU}}</strong>
+        </div>
+        <div class="mobile-performance-tile">
+          <span class="top-metric-label">RAM</span>
+          <strong data-metric="ram">{{.Chrome.RAM}}</strong>
+        </div>
+        <div class="mobile-performance-tile">
+          <span class="top-metric-label">Velocità di download</span>
+          <strong data-metric="dl">{{.Chrome.Download}}</strong>
+        </div>
+        <div class="mobile-performance-tile">
+          <span class="top-metric-label">Velocità di upload</span>
+          <strong data-metric="ul">{{.Chrome.Upload}}</strong>
+        </div>
+      </div>
+    </section>
     <div class="content" id="ui-page" data-view="{{.Page}}">
       {{if eq .Page "dashboard"}}{{template "dashboard" .Content}}
       {{else if eq .Page "downloads"}}{{template "downloads" .Content}}

@@ -107,4 +107,15 @@ test.describe("mobile", () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(2);
   });
+
+  test("prestazioni visibili in tile su mobile", async ({ page }) => {
+    await page.goto("/");
+    const performance = page.locator(".mobile-performance");
+    await expect(performance).toBeVisible();
+    await expect(performance.locator(".mobile-performance-tile")).toHaveCount(4);
+    await expect(performance.locator('[data-metric="cpu"]')).toBeVisible();
+    await expect(performance.locator('[data-metric="ram"]')).toBeVisible();
+    await expect(performance.locator('[data-metric="dl"]')).toBeVisible();
+    await expect(performance.locator('[data-metric="ul"]')).toBeVisible();
+  });
 });

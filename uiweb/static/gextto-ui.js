@@ -2647,8 +2647,8 @@
     return secs + "s";
   }
   function setMetric(name, value) {
-    var node = document.querySelector('[data-metric="' + name + '"]');
-    if (node) node.textContent = value;
+    var nodes = document.querySelectorAll('[data-metric="' + name + '"]');
+    Array.prototype.forEach.call(nodes, function (node) { node.textContent = value; });
   }
   var shellTorrentDownload = 0;
   var shellHTTPDownload = 0;
