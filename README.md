@@ -123,8 +123,6 @@ service and leaves the data directory and configuration untouched. Use
 | Accessibility scope and testing | [Accessibility analysis](accessibility-analysis.md) |
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
-Contributor-facing code reviews are collected in [gextto-terra](gextto-terra.md)
-and [pro-terra](pro-terra.md).
 
 ## License
 

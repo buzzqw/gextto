@@ -122,8 +122,6 @@ rilevato e lascia intatti dati e configurazione. Usa
 | Ambito e test accessibilità | [Analisi accessibilità](accessibility-analysis.md) |
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
-Le revisioni del codice rivolte ai contributor sono raccolte in
-[gextto-terra](gextto-terra.md) e [pro-terra](pro-terra.md).
 
 ## Licenza
 

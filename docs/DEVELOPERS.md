@@ -133,10 +133,6 @@ session, so a few invariants are load-bearing:
 - New endpoints must validate and bound every user input and restrict filesystem
   paths to the configured roots before use.
 
-Two technical reports — [`gextto-terra.md`](../gextto-terra.md) and
-[`pro-terra.md`](../pro-terra.md) — collect the known improvement backlog in
-this area.
-
 ## Packaging and releases
 
 Build the daemon and standalone Linux payload with:
