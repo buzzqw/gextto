@@ -2,10 +2,12 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -73,6 +75,26 @@ func TestHealthProbeURLValidatesProwlarrKey(t *testing.T) {
 	jackett := IndexerConfig{Name: "Jackett", URL: "http://host:9117", APIKey: "secret", Enabled: true}
 	if got := HealthProbeURL(jackett); !strings.Contains(got, "t=caps&apikey=secret") {
 		t.Fatalf("jackett probe = %q", got)
+	}
+}
+
+func TestCanceledTorznabRequestDoesNotInvokeFlareSolverr(t *testing.T) {
+	var fallbackCalls atomic.Int32
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fallbackCalls.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer fallback.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	indexer := IndexerConfig{Name: "Jackett", URL: fallback.URL, APIKey: "secret", Enabled: true}
+	_, err := FetchTorznabFlareSolverr(ctx, indexer, "test", nil, &fallback.URL)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+	if calls := fallbackCalls.Load(); calls != 0 {
+		t.Fatalf("FlareSolverr fallback called %d times after cancellation", calls)
 	}
 }
 

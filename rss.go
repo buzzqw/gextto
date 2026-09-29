@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -1495,6 +1496,16 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 	var body string
 	switch {
 	case transportErr != nil:
+		// Do not turn cancellation of the parent search into a FlareSolverr
+		// retry. The retry would use the same canceled context, produce a second
+		// misleading error and could make a normal search timeout look like an
+		// indexer/Cloudflare failure.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		if errors.Is(transportErr, context.Canceled) || errors.Is(transportErr, context.DeadlineExceeded) {
+			return nil, transportErr
+		}
 		if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 			return nil, transportErr
 		}
@@ -1551,6 +1562,9 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 // torznabViaFlareSolverr retries a blocked Torznab request through
 // FlareSolverr, logging the (redacted) original error.
 func torznabViaFlareSolverr(ctx context.Context, indexer IndexerConfig, flaresolverr, fullURL, errorText string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	logging.Info("torznab request failed; retrying via FlareSolverr",
 		"indexer", indexer.Name, "reason", errorText)
 	return fetch_with_flaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)

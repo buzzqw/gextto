@@ -505,6 +505,16 @@ func searchOneWithDB(
 				"query", result.Query)
 			all = append(all, result.Items...)
 		} else {
+			// Cancellation belongs to the search/request lifecycle, not to the
+			// indexer. Do not mark the provider as failed or emit a warning when
+			// the caller has already stopped waiting for this search.
+			if errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded) {
+				logging.Debug("indexer search stopped with the search context",
+					"indexer", result.Name,
+					"query", result.Query,
+					"reason", result.Err)
+				continue
+			}
 			message := utils.RedactURLSecrets(result.Err.Error())
 			logging.SourceFail("indexer", result.Name, message)
 			if providerDB != nil {
