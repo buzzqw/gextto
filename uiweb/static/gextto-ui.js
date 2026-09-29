@@ -362,8 +362,12 @@
   };
 
   var loadPromise = null;
+  var loadPending = false;
   function load() {
-    if (loadPromise) return loadPromise;
+    if (loadPromise) {
+      loadPending = true;
+      return loadPromise;
+    }
     var url = partials[view];
     if (!url) return Promise.resolve();
     loadPromise = pollRequest(url)
@@ -421,6 +425,10 @@
       })
       .then(function (value) {
         loadPromise = null;
+        if (loadPending && document.body.contains(page)) {
+          loadPending = false;
+          window.setTimeout(load, 0);
+        }
         return value;
       });
     return loadPromise;
@@ -456,7 +464,7 @@
   var timer = null;
   function schedule() {
     if (timer) clearInterval(timer);
-    var interval = view === "downloads" ? 3000 : 0;
+    var interval = view === "downloads" ? 1500 : 0;
     if (interval > 0) {
       timer = setInterval(function () {
         if (document.visibilityState === "visible") load();
@@ -1499,6 +1507,7 @@
     var pageSize = parseInt(container.getAttribute("data-page-size") || "0", 10) || 0;
     var page = 1;
     var fetching = false;
+    var refetchPending = false;
     function renderPagination(current, pages, total) {
       if (!pagination || !pageSize) return;
       pagination.hidden = pages <= 1;
@@ -1515,7 +1524,10 @@
       if (next) next.addEventListener("click", function () { page = Math.min(pages, current + 1); fetchAndRender(); });
     }
     function fetchAndRender() {
-      if (fetching) return;
+      if (fetching) {
+        refetchPending = true;
+        return;
+      }
       fetching = true;
       var url = endpoint;
       if (searchParam && searchInput && searchInput.value) {
@@ -1711,6 +1723,10 @@
         tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
       }).then(function () {
         fetching = false;
+        if (refetchPending && document.body.contains(container)) {
+          refetchPending = false;
+          window.setTimeout(fetchAndRender, 0);
+        }
       });
     }
     container._refetch = fetchAndRender;
@@ -1730,7 +1746,7 @@
           return;
         }
         fetchAndRender();
-      }, 3000);
+      }, 1500);
     }
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-table]"), renderTable);
