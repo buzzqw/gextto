@@ -197,7 +197,7 @@ func TestUiServerRenderedPages(t *testing.T) {
 		t.Fatalf("downloads missing add form or refresh slot")
 	}
 	code, _, body = webGet(t, server, "/ui?view=health")
-	if code != http.StatusOK || !strings.Contains(string(body), `data-auto-load="false"`) || !strings.Contains(string(body), "Premi Aggiorna per verificare le sorgenti.") {
+	if code != http.StatusOK || !strings.Contains(string(body), `data-auto-load="false"`) || !strings.Contains(string(body), "Premi Aggiorna per verificare le sorgenti.") || !strings.Contains(string(body), "Esegue ora il controllo delle sorgenti configurate") || !strings.Contains(string(body), "Inserisci una query (per esempio ita 1080p)") {
 		t.Fatalf("health sources table should be manual-only")
 	}
 	code, _, body = webGet(t, server, "/ui/partial/torrents")
@@ -207,8 +207,8 @@ func TestUiServerRenderedPages(t *testing.T) {
 }
 
 // TestUiMaintenanceParity pins the rextto-style maintenance layout: grouped
-// actions, duplicates, a real RAM disk control, trash, backup and diagnostics,
-// without the useless ports panel.
+// actions, duplicates, a real RAM disk control, trash and backup, without a
+// duplicate source check or the useless ports panel.
 // TestUiIntegrationsParity pins the rextto-style integrations page: Trakt and
 // Simkl panels plus the Jellyfin/Plex and indexer configuration forms.
 func TestUiIntegrationsParity(t *testing.T) {
@@ -247,12 +247,15 @@ func TestUiMaintenanceParity(t *testing.T) {
 	for _, marker := range []string{
 		"data-duplicates", "data-duplicates-preview", "data-duplicates-clean",
 		"data-ramdisk", "data-ramdisk-paths", "data-db-optimize", "data-trash-open",
-		"Diagnostica sorgenti", "data-sources-run", `data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
+		`data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
 		"Cartella cloud", "FTP password", "Percorso locale di una cartella già montata", `&#34;key&#34;:&#34;path&#34;,&#34;label&#34;:&#34;Nome&#34;`,
 	} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("maintenance page missing %q", marker)
 		}
+	}
+	if strings.Contains(html, "Diagnostica sorgenti") || strings.Contains(html, "data-sources-probe") {
+		t.Fatalf("maintenance page should not duplicate the source check")
 	}
 	for _, forbidden := range []string{">Porte<", "/api/config/check-ports"} {
 		if strings.Contains(html, forbidden) {

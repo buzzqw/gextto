@@ -543,11 +543,12 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
 		Panels: []uiPageSection{
 			sectionTable(uiTableSpec{
-				Title:      "Stato sorgenti",
-				Endpoint:   "/api/sources/health",
-				ItemsKey:   "items",
-				ManualOnly: true,
-				Initial:    "Premi Aggiorna per verificare le sorgenti.",
+				Title:       "Stato sorgenti",
+				Endpoint:    "/api/sources/health",
+				ItemsKey:    "items",
+				ManualOnly:  true,
+				Initial:     "Premi Aggiorna per verificare le sorgenti.",
+				RefreshHint: "Esegue ora il controllo delle sorgenti configurate. Senza una ricerca verifica la raggiungibilità; con una ricerca controlla anche i risultati. Non modifica la configurazione.",
 				ColumnsJSON: uiJSON([]uiColumn{
 					{Key: "kind", Label: "Tipo"},
 					{Key: "name", Label: "Nome", Format: "truncate"},
@@ -558,7 +559,8 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 				Empty:       "Nessuna sorgente da verificare.",
 				Search:      true,
 				SearchParam: "q",
-				Note:        "Premi Aggiorna per verificare tutte le sorgenti; usa la ricerca per provare una query su feed, indexer e motori web.",
+				SearchHint:  "Inserisci una query (per esempio ita 1080p) per controllare se le sorgenti restituiscono risultati; premi Invio per eseguire la verifica.",
+				Note:        "Questa è la verifica delle sorgenti. Premi Aggiorna per controllare feed, indexer e motori web; inserisci una ricerca per misurare anche i risultati. Il controllo è manuale e non cambia le impostazioni.",
 			}),
 			sectionTable(uiTableSpec{
 				Title:    "Stato provider",

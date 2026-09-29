@@ -11,9 +11,9 @@
 {{define "table_panel_body"}}
 {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
 <div class="toolbar" style="margin-bottom:10px">
-  {{if .Search}}<input type="search" aria-label="Cerca nell'elenco" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+  {{if .Search}}<input type="search" aria-label="Cerca nell'elenco" placeholder="Cerca…"{{if .SearchHint}} title="{{.SearchHint}}"{{end}} data-ui-search value="{{.Query}}" />{{end}}
   {{if .Filter}}<input type="search" class="input" aria-label="Filtra l'elenco" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
-  <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
+  <button class="btn sm" data-ui-refresh title="{{if .RefreshHint}}{{.RefreshHint}}{{else}}Ricarica i dati{{end}}">Aggiorna</button>
 </div>
 <div class="table-wrap">
   <table class="data-table {{.Class}}">
@@ -141,7 +141,6 @@
 {{else if eq .Kind "sources_check"}}{{template "sources_check" .}}
 {{else if eq .Kind "db_optimize"}}{{template "db_optimize" .}}
 {{else if eq .Kind "trash_panel"}}{{template "trash_panel" .}}
-{{else if eq .Kind "sources_probe"}}{{template "sources_probe" .}}
 {{else if eq .Kind "folder_rename"}}{{template "folder_rename" .}}
 {{end}}
 {{end}}
@@ -172,20 +171,6 @@
       <button class="btn sm danger" type="button" data-trash-empty title="Elimina tutti gli elementi del cestino">Svuota cestino</button>
       <button class="btn sm" type="button" data-trash-refresh title="Aggiorna conteggio e dimensione">Aggiorna</button>
     </div>
-  </div>
-</div>
-{{end}}
-
-{{define "sources_probe"}}
-<div class="panel" data-sources-probe>
-  <div class="panel-head"><h3>Diagnostica sorgenti</h3><small class="muted" data-sources-status aria-live="polite"></small></div>
-  <div class="panel-body">
-    <p class="hint">La verifica parte solo quando la richiedi e può richiedere fino a ~1 minuto.</p>
-    <div class="toolbar">
-       <input class="input" data-sources-query aria-label="Termine di prova per le sorgenti" placeholder="Termine di prova (opzionale, es. ita 1080p)" title="Se vuoto controlla solo la raggiungibilità delle sorgenti" />
-      <button class="btn sm primary" type="button" data-sources-run title="Avvia la verifica di feed, indexer e motori web">Testa sorgenti</button>
-    </div>
-    <div data-sources-output aria-live="polite"></div>
   </div>
 </div>
 {{end}}

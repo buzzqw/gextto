@@ -471,7 +471,6 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			}),
 			Empty: "Nessun backup creato.", Note: "Nome mostra il percorso completo del file ZIP. I backup locali vengono creati nella cartella backups della directory dati.",
 		})),
-		uiPageSection{Kind: "sources_probe"},
 	}
 }
 

@@ -44,8 +44,10 @@ type uiTableSpec struct {
 	Note        string
 	Search      bool
 	SearchParam string
+	SearchHint  string
 	Query       string
 	PageSize    int
+	RefreshHint string
 	// ManualOnly leaves the table idle until the user presses Aggiorna.
 	ManualOnly bool
 	Initial    string

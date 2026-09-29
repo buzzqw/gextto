@@ -4888,52 +4888,6 @@
     loadTrash();
   }
 
-  // ---- maintenance: on-demand sources check ------------------------------
-  var sourcesProbe = document.querySelector("[data-sources-probe]");
-  if (sourcesProbe) {
-    var probeOutput = sourcesProbe.querySelector("[data-sources-output]");
-    var probeStatus = sourcesProbe.querySelector("[data-sources-status]");
-    var probeButton = sourcesProbe.querySelector("[data-sources-run]");
-    var probeQuery = sourcesProbe.querySelector("[data-sources-query]");
-    if (probeButton) probeButton.addEventListener("click", function () {
-      var term = probeQuery ? probeQuery.value.trim() : "";
-      probeButton.disabled = true;
-      if (probeStatus) probeStatus.textContent = "Verifica in corso…";
-      probeOutput.innerHTML = '<p class="muted">Attendere…</p>';
-      var url = "/api/sources/health" + (term ? "?q=" + encodeURIComponent(term) : "");
-      api(url, "GET").then(function (data) {
-        if (probeStatus) probeStatus.textContent = "";
-        renderSourcesTable(probeOutput, (data && data.items) || []);
-      }).catch(function (error) {
-        if (probeStatus) probeStatus.textContent = error.message;
-        probeOutput.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
-      }).then(function () { probeButton.disabled = false; });
-    });
-  }
-
-  function renderSourcesTable(container, items) {
-    container.innerHTML = "";
-    if (!items.length) { container.innerHTML = '<p class="muted">Nessuna sorgente da verificare.</p>'; return; }
-    var table = document.createElement("table");
-    table.className = "data-table";
-    table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
-    accessibleDataTable(table, "Stato sorgenti");
-    var tbody = document.createElement("tbody");
-    items.forEach(function (item) {
-      var ok = item.ok !== false;
-      var detail = item.error ? String(item.error) : (item.results !== undefined && item.results !== null ? String(item.results) + " risultati" : "");
-      var tr = document.createElement("tr");
-      tr.innerHTML = "<td>" + esc(String(item.kind || "")) + "</td>" +
-        "<td class='truncate'>" + esc(String(item.name || "")) + "</td>" +
-        "<td><span class='badge " + (ok ? "ok" : "err") + "'>" + (ok ? "ok" : "errore") + "</span></td>" +
-        "<td class='numeric'>" + esc(String(item.results === undefined || item.results === null ? "—" : item.results)) + "</td>" +
-        "<td class='muted truncate'>" + esc(detail) + "</td>";
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    container.appendChild(table);
-  }
-
   // ---- comics explore results (Download Now / Seleziona) ------------------
   function renderComicsResults(container, items) {
     container.innerHTML = "";
