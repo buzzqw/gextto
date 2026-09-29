@@ -1192,19 +1192,35 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 	hashAvailable := !hashTaken
 	live := context.Live
 	archive := context.Archive
-	for _, episode := range targets {
-		active := false
-		if !manual {
-			var activeDB bool
-			if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND episode=?3 AND status NOT IN ('completed','error','removed'))", seriesName, season, episode).Scan(&activeDB); err != nil {
+	// Pre-load the active torrents for the whole season in one query instead of
+	// one EXISTS per episode (a full-season pack would otherwise run N queries
+	// inside the write transaction).
+	activeEpisodes := map[int64]bool{}
+	if !manual {
+		activeRows, err := tx.Query("SELECT DISTINCT episode FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND status NOT IN ('completed','error','removed')", seriesName, season)
+		if err != nil {
+			return false, "", err
+		}
+		for activeRows.Next() {
+			var activeEpisode int64
+			if err := activeRows.Scan(&activeEpisode); err != nil {
+				activeRows.Close()
 				return false, "", err
 			}
-			active = activeDB
-			if !active && live != nil {
-				key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
-				if _, ok := live.Episodes[key]; ok {
-					active = true
-				}
+			activeEpisodes[activeEpisode] = true
+		}
+		if err := activeRows.Err(); err != nil {
+			activeRows.Close()
+			return false, "", err
+		}
+		activeRows.Close()
+	}
+	for _, episode := range targets {
+		active := activeEpisodes[episode]
+		if !manual && !active && live != nil {
+			key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
+			if _, ok := live.Episodes[key]; ok {
+				active = true
 			}
 		}
 		if active {
