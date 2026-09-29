@@ -1474,6 +1474,21 @@
     } catch (_) { /* keep a non-URL source as-is */ }
     return candidate.replace(/[-_]+/g, " ").trim();
   }
+  function compactDateTime(value) {
+    var raw = String(value === null || value === undefined ? "" : value).trim();
+    if (!raw) return "";
+    // SQLite timestamps are UTC but have no timezone suffix. RFC3339 values
+    // may contain nanoseconds, which Date.parse does not consistently accept.
+    var normalized = raw.replace(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})/, "$1T$2");
+    normalized = normalized.replace(/\.(\d{3})\d+(?=(Z|[+-]\d{2}:?\d{2})$)/, ".$1");
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(normalized)) normalized += "Z";
+    var timestamp = Date.parse(normalized);
+    if (isNaN(timestamp)) return raw;
+    var date = new Date(timestamp);
+    function pad(number) { return String(number).padStart(2, "0"); }
+    return pad(date.getDate()) + "/" + pad(date.getMonth() + 1) + "/" + date.getFullYear() +
+      " " + pad(date.getHours()) + ":" + pad(date.getMinutes());
+  }
   function fmt(value, format) {    if (value === null || value === undefined || value === "") return "";
     switch (format) {
       case "bool": return value ? "Sì" : "No";
@@ -1481,6 +1496,7 @@
       case "rate": return humanBytes(value) + "/s";
       case "percent": return Number(value).toFixed(1) + "%";
       case "source": return sourceLabel(value);
+      case "datetime": return compactDateTime(value);
     }
     if (typeof value === "object") {
       return value.name || value.title || value.label || value.path || "—";
@@ -1622,6 +1638,9 @@
               }
               if (column.format === "source") {
                 return "<td" + sortAttr + '><span class="source-label" title="' + esc(String(rawValue || "")) + '">' + esc(value || "—") + "</span></td>";
+              }
+              if (column.format === "datetime") {
+                return "<td" + sortAttr + '><span title="' + esc(String(rawValue || "")) + '">' + esc(value) + "</span></td>";
               }
               if (column.format === "truncate") {
                 return "<td" + sortAttr + '><span class="cell-truncate" title="' + esc(value) + '">' + esc(value) + "</span></td>";

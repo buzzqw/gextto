@@ -617,7 +617,7 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 				{Key: "tag", Label: "Tag NAS", Format: "nas_tag"}, {Key: "quality_score", Label: "Punteggio", Format: "number"},
 				{Key: "status", Label: "Stato"},
 				{Key: "processed_path", Label: "Cartella libreria / NAS", Format: "folder"},
-				{Key: "source", Label: "Sorgente", Format: "source"}, {Key: "completed_at", Label: "Concluso"},
+				{Key: "source", Label: "Sorgente", Format: "source"}, {Key: "completed_at", Label: "Concluso", Format: "datetime"},
 			}),
 			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
 		}),

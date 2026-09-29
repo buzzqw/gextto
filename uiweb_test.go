@@ -309,6 +309,9 @@ func TestUiHistoryFolderColumn(t *testing.T) {
 		if !strings.Contains(section.Table.ColumnsJSON, `"key":"source"`) {
 			t.Fatalf("history columns missing source: %s", section.Table.ColumnsJSON)
 		}
+		if !strings.Contains(section.Table.ColumnsJSON, `"key":"completed_at","label":"Concluso","format":"datetime"`) {
+			t.Fatalf("history columns missing compact datetime format: %s", section.Table.ColumnsJSON)
+		}
 		found = true
 	}
 	if !found {
