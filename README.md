@@ -32,7 +32,7 @@ It installs the program in `/opt/gextto`, stores service data in
 
 > [!IMPORTANT]
 > The web UI is an unauthenticated administrative interface. Keep it on a
-> trusted network, or put authenticated HTTPS reverse proxy and firewall rules
+> trusted network, or put an authenticated HTTPS reverse proxy and firewall rules
 > in front of it. Read the [security policy](docs/SECURITY.md) before exposing
 > it remotely.
 
@@ -44,6 +44,15 @@ build is required. See the [developer manual](docs/DEVELOPERS.md).
 
 ```bash
 make build
+```
+
+`make build` increments the local build number and writes the versioned daemon
+to `bin/gexttod`. To rebuild without incrementing the number, use `make fast`.
+Verify the exact binary, product version, build number and linked libtorrent
+version with:
+
+```bash
+./bin/gexttod --version
 ```
 
 ## Accessibility
@@ -59,8 +68,8 @@ npm ci
 npm run test:a11y
 ```
 
-The current automated suite covers the main UI sections and 12 accessibility
-checks. This is not, by itself, a legal accessibility certification: manual
+The current automated suite covers the main UI sections with 12 accessibility
+tests. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
 See the [accessibility analysis](accessibility-analysis.md) for scope and known
 limitations.
@@ -96,6 +105,10 @@ git pull --ff-only
 curl -fsS http://127.0.0.1:5000/api/health
 ```
 
+The source update script runs the versioned build, restarts the detected
+service and leaves the data directory and configuration untouched. Use
+`./scripts/update.sh --no-restart` when the restart must be performed manually.
+
 ## Documentation
 
 | Need | Document |
@@ -107,6 +120,7 @@ curl -fsS http://127.0.0.1:5000/api/health
 | Terminal client | [TUI reference](docs/tui.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
+| Accessibility scope and testing | [Accessibility analysis](accessibility-analysis.md) |
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 Contributor-facing code reviews are collected in [gextto-terra](gextto-terra.md)

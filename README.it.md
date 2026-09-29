@@ -45,6 +45,15 @@ Consulta il [manuale sviluppatori](docs/DEVELOPERS.md).
 make build
 ```
 
+`make build` incrementa il numero della build locale e scrive il demone
+versionato in `bin/gexttod`. Per ricompilare senza incrementare il numero usa
+`make fast`. Verifica binario, versione del prodotto, numero di build e versione
+di libtorrent collegata con:
+
+```bash
+./bin/gexttod --version
+```
+
 ## Accessibilità
 
 La UI web include navigazione da tastiera, nomi accessibili per i controlli,
@@ -58,8 +67,8 @@ npm ci
 npm run test:a11y
 ```
 
-La suite automatica attuale copre le sezioni principali della UI con 12 controlli
-di accessibilità. Questo non costituisce da solo una certificazione normativa:
+La suite automatica attuale copre le sezioni principali della UI con 12 test di
+accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
 Consulta l'[analisi di accessibilità](accessibility-analysis.md) per ambito e
 limitazioni note.
@@ -95,6 +104,10 @@ git pull --ff-only
 curl -fsS http://127.0.0.1:5000/api/health
 ```
 
+Lo script di aggiornamento esegue la build versionata, riavvia il servizio
+rilevato e lascia intatti dati e configurazione. Usa
+`./scripts/update.sh --no-restart` se vuoi riavviare manualmente.
+
 ## Documentazione
 
 | Esigenza | Documento |
@@ -106,6 +119,7 @@ curl -fsS http://127.0.0.1:5000/api/health
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
+| Ambito e test accessibilità | [Analisi accessibilità](accessibility-analysis.md) |
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
 Le revisioni del codice rivolte ai contributor sono raccolte in
