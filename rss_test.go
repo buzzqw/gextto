@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -10,6 +11,15 @@ import (
 	"github.com/buzzqw/gextto/internal/cache"
 	"github.com/buzzqw/gextto/internal/models"
 )
+
+func TestFlareSolverrErrorMessageIsUserFriendly(t *testing.T) {
+	if got := flaresolverr_error_message(context.DeadlineExceeded); got != "FlareSolverr did not respond in time" {
+		t.Fatalf("timeout message = %q", got)
+	}
+	if got := flaresolverr_error_message(errors.New("context deadline exceeded")); got != "feed URL could not be retrieved via FlareSolverr" {
+		t.Fatalf("generic message = %q", got)
+	}
+}
 
 func TestBuildsTorznabEndpointsForJackettAndProwlarr(t *testing.T) {
 	jackett := IndexerConfig{Name: "jackett", URL: "http://host:9117", APIKey: "k", Enabled: true}

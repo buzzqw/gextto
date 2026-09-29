@@ -796,8 +796,18 @@ func cloudflare_blocked(status int) bool {
 	return status == 403 || status == 503 || (status >= 520 && status <= 530)
 }
 
+func flaresolverr_error_message(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "FlareSolverr did not respond in time"
+	}
+	return "feed URL could not be retrieved via FlareSolverr"
+}
+
 func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, rawURL, reason string, retryDirectOnFailure bool) (string, error) {
-	logging.Info("trying FlareSolverr to retrieve the feed; success will continue with feed parsing",
+	// This is an implementation detail of the fetch path. Keep it at debug
+	// level so a successful request produces only the useful summary below;
+	// failures are still reported at warning level.
+	logging.Debug("trying FlareSolverr to retrieve the feed; success will continue with feed parsing",
 		"feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason)
 	body, err := fetch_with_flaresolverr(ctx, client, flaresolverr, rawURL)
 	if err != nil {
@@ -806,7 +816,8 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 			nextStep = "direct HTTP attempts will continue"
 		}
 		logging.Warn("FlareSolverr failed; "+nextStep,
-			"feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
+			"feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason, "error", flaresolverr_error_message(err))
+		logging.Debug("FlareSolverr request failed", "feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
 		return "", err
 	}
 	logging.Info("FlareSolverr solved the challenge; parsing the retrieved feed",

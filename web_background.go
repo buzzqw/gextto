@@ -1601,12 +1601,6 @@ func cycleWorker(state *AppState) {
 				logging.Error("scheduled cycle failed", "error", runErr)
 			} else if stats != nil {
 				state.last_cycle.Set(*stats)
-				logging.Info("scheduled cycle completed: releases scraped and evaluated",
-					"scraped", stats.Scraped,
-					"candidates", stats.Candidates,
-					"downloads_started", stats.DownloadsStarted,
-					"gaps_filled", stats.GapsFilled,
-					"errors", stats.Errors)
 				// The scrape/evaluation peak can leave freed C++ arena and Go
 				// heap pages resident; return them before the long idle window.
 				TrimMemory()

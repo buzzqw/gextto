@@ -1022,9 +1022,6 @@ func RunCycleDomain(
 	if len(newDetails) == 0 && len(upgradeDetails) == 0 {
 		logging.Info("📦 CYCLE DOWNLOADS — no downloads started")
 	}
-	if stats.DownloadsStarted == 0 {
-		logging.Info("💤 No downloads in this cycle")
-	}
 	logging.Info(cycleDivider)
 	return stats, nil
 }
