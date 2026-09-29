@@ -20,6 +20,9 @@ var defaultTranslations string
 //go:embed internal_translations_de.yml
 var defaultGermanTranslations string
 
+//go:embed internal_translations_fr.yml
+var defaultFrenchTranslations string
+
 // I18nDb is the persisted interface-translation database. It shares the
 // `gextto_config.db` schema with the daemon.
 type I18nDb struct {
@@ -202,6 +205,7 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 	}{
 		{name: "default", raw: defaultTranslations},
 		{name: "German", raw: defaultGermanTranslations},
+		{name: "French", raw: defaultFrenchTranslations},
 	} {
 		var defaults map[string]map[string]string
 		if err := yaml.Unmarshal([]byte(catalog.raw), &defaults); err != nil {

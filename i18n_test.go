@@ -249,13 +249,30 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if value, ok := findGerman("Configurazione"); !ok || value != "Konfiguration" {
 		t.Errorf("German bundled translation = %q (present=%v), want Konfiguration", value, ok)
 	}
-	germanCount := len(func() []Translation {
-		items, err := db.List("de")
+	findFrench := func(key string) (string, bool) {
+		list, err := db.List("fr")
 		if err != nil {
-			t.Fatalf("List(de): %v", err)
+			t.Fatalf("List(fr): %v", err)
 		}
-		return items
-	}())
+		for _, entry := range list {
+			if entry.Key == key {
+				return entry.Value, true
+			}
+		}
+		return "", false
+	}
+	if value, ok := findFrench("Configurazione"); !ok || value != "Configuration" {
+		t.Errorf("French bundled translation = %q (present=%v), want Configuration", value, ok)
+	}
+	deItems, err := db.List("de")
+	if err != nil {
+		t.Fatalf("List(de): %v", err)
+	}
+	frItems, err := db.List("fr")
+	if err != nil {
+		t.Fatalf("List(fr): %v", err)
+	}
+	localizedCount := len(deItems) + len(frItems)
 
 	second, err := db.SeedDefaultTranslations()
 	if err != nil {
@@ -265,9 +282,9 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 		t.Errorf("second seed inserted %d rows, want 0 (idempotent)", second)
 	}
 
-	// After deleting English, the same English defaults can be reseeded. German
-	// is still present, so the third seed inserts the original English portion
-	// plus one row for the edited key.
+	// After deleting English, the same English defaults can be reseeded. The
+	// localized catalogs are still present, so the third seed inserts the
+	// original English portion plus one row for the edited key.
 	if _, err := db.DeleteLang("eng"); err != nil {
 		t.Fatalf("DeleteLang(eng): %v", err)
 	}
@@ -275,7 +292,7 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if err != nil {
 		t.Fatalf("third seed: %v", err)
 	}
-	wantThird := first - germanCount + 1
+	wantThird := first - localizedCount + 1
 	if third != wantThird {
 		t.Errorf("third seed inserted %d rows, want %d", third, wantThird)
 	}

@@ -999,6 +999,13 @@ func TestUiManualFollowsLanguage(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(string(body), "User Manual") {
 		t.Fatalf("German manual fallback not served (%d)", code)
 	}
+	if err := state.i18n.SetLanguage("fr"); err != nil {
+		t.Fatalf("set fr: %v", err)
+	}
+	code, _, body = webGet(t, server, "/ui?view=manual")
+	if code != http.StatusOK || !strings.Contains(string(body), "User Manual") {
+		t.Fatalf("French manual fallback not served (%d)", code)
+	}
 }
 
 func decodeActions(t *testing.T, raw string) []uiAction {

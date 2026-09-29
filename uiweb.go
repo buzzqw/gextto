@@ -614,9 +614,9 @@ func uiManualDataFrom(s *AppState) uiManualData {
 	if s != nil {
 		if lang, err := s.i18n.Language(); err == nil {
 			switch strings.ToLower(strings.TrimSpace(lang)) {
-			case "en", "de":
-				// German currently falls back to the English manual until its
-				// long-form documentation is translated separately.
+			case "en", "de", "fr":
+				// German and French currently fall back to the English manual
+				// until their long-form documentation is translated separately.
 				text = uiManualTextEN
 			}
 		}

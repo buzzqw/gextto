@@ -123,7 +123,7 @@
     });
   }
 
-  // The server-rendered shell predates the bilingual UI and contains plain
+  // The server-rendered shell predates the multilingual UI and contains plain
   // Italian labels. Reuse the persisted translation catalog here so the new
   // UI follows the language selected in the top bar, including labels added by
   // partials and client-side dialogs.
@@ -263,17 +263,18 @@
     "Traduzioni": "Translations"
   };
 
-  // German has a bundled catalog; this fallback object carries labels added by
-  // the redesigned UI before they reach the persisted catalog.
+  // German and French have bundled catalogs; these fallback objects carry
+  // labels added by the redesigned UI before they reach the persisted catalog.
   var uiGermanFallbacks = {};
-  var uiFallbacks = { en: uiEnglishFallbacks, de: uiGermanFallbacks };
+  var uiFrenchFallbacks = {};
+  var uiFallbacks = { en: uiEnglishFallbacks, de: uiGermanFallbacks, fr: uiFrenchFallbacks };
 
   function uiTranslatedText(value) {
     if (!value) return value;
     var match = String(value).match(/^(\s*)([\s\S]*?)(\s*)$/);
     var core = match ? match[2] : String(value);
     var translated = uiTranslations[core] || (uiFallbacks[uiLanguage] || {})[core];
-    if (!translated && uiLanguage === "de") translated = uiEnglishCatalog[core];
+    if (!translated && (uiLanguage === "de" || uiLanguage === "fr")) translated = uiEnglishCatalog[core];
     var matchDownloads = core.match(/^(\d+) torrent · (\d+) HTTP fumetti · aggiornato (.+)$/);
     if (!translated && matchDownloads) translated = matchDownloads[1] + " torrents · " + matchDownloads[2] + " comic HTTP downloads · updated " + matchDownloads[3];
     var matchSelected = core.match(/^(\d+) selezionati$/);
@@ -291,7 +292,7 @@
   }
 
   function translateUIValue(value) {
-    if (uiLanguage !== "en" && uiLanguage !== "de") return value;
+    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr") return value;
     return uiTranslatedText(value);
   }
 
@@ -338,7 +339,7 @@
   }
 
   function translateUI() {
-    if (uiLanguage === "en" || uiLanguage === "de") {
+    if (uiLanguage === "en" || uiLanguage === "de" || uiLanguage === "fr") {
       translateUINode(document.body);
       document.title = uiTranslatedText(document.title.replace(/^Gextto · /, "")) === document.title.replace(/^Gextto · /, "")
         ? document.title
@@ -347,13 +348,13 @@
   }
 
   function loadUITranslations() {
-    if (uiLanguage !== "en" && uiLanguage !== "de") return;
+    if (uiLanguage !== "en" && uiLanguage !== "de" && uiLanguage !== "fr") return;
     api("/api/i18n?lang=" + encodeURIComponent(uiLanguage), "GET").then(function (data) {
       (data && data.items || []).forEach(function (item) {
         if (item && item.key && item.value) uiTranslations[item.key] = item.value;
       });
       var catalogReady = Promise.resolve();
-      if (uiLanguage === "de") {
+      if (uiLanguage === "de" || uiLanguage === "fr") {
         catalogReady = api("/api/i18n?lang=en", "GET").then(function (english) {
           (english && english.items || []).forEach(function (item) {
             if (item && item.key && item.value) uiEnglishCatalog[item.key] = item.value;

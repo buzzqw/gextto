@@ -17,7 +17,7 @@ func TestPicksVariantByLanguage(t *testing.T) {
 	if Language() != "en" || !IsEnglish() {
 		t.Fatalf("language = %q english=%v", Language(), IsEnglish())
 	}
-	// Public codes alias to the two supported languages.
+	// Public codes alias to the supported languages.
 	SetLanguage("eng")
 	if !IsEnglish() {
 		t.Fatal("eng should map to english")
@@ -32,6 +32,13 @@ func TestPicksVariantByLanguage(t *testing.T) {
 	}
 	if Language() != "de" || IsEnglish() {
 		t.Fatalf("German language = %q english=%v", Language(), IsEnglish())
+	}
+	SetLanguage("fra")
+	if got := Pick("ciao", "hello"); got != "hello" {
+		t.Fatalf("French fallback = %q, want hello", got)
+	}
+	if Language() != "fr" || IsEnglish() {
+		t.Fatalf("French language = %q english=%v", Language(), IsEnglish())
 	}
 	SetLanguage("it")
 }
