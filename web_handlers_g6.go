@@ -388,6 +388,13 @@ func IndexerTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case !ok:
 		message = fmt.Sprintf("HTTP %d", status)
 	}
+	logging.Info("indexer test",
+		"kind", managerKind(input),
+		"name", strings.TrimSpace(input.Name),
+		"host", domain_of(rawURL),
+		"ok", ok,
+		"status", status,
+		"error", message)
 	jsonResponse(w, map[string]any{
 		"ok":        ok,
 		"reachable": reachable,

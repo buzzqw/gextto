@@ -473,15 +473,18 @@ func FlaresolverrTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	endpoint := strings.TrimRight(configured, "/") + "/v1"
+	host := domain_of(configured)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	body, _, err := HTTPPostJSON(ctx, endpoint, nil, []byte(`{"cmd": "sessions.list"}`))
 	if err != nil {
+		logging.Info("flaresolverr test", "host", host, "ok", false, "error", err.Error())
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	var value map[string]any
 	if err := json.Unmarshal(body, &value); err != nil {
+		logging.Info("flaresolverr test", "host", host, "ok", false, "error", "invalid response")
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -490,6 +493,7 @@ func FlaresolverrTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !ok {
 		sessions = []any{}
 	}
+	logging.Info("flaresolverr test", "host", host, "ok", status == "ok", "status", status)
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":       status == "ok",
 		"status":   value["status"],

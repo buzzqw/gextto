@@ -1050,6 +1050,7 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	response, err := get("/identity")
 	if err != nil {
+		logging.Info("plex test", "host", domain_of(base), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -1065,12 +1066,15 @@ func PlexTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 				server = gh4_derefString(gh4_xmlAttribute(string(body), "friendlyName"))
 			}
 		}
+		logging.Info("plex test", "host", domain_of(base), "ok", true, "status", response.StatusCode, "server", server)
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": "", "machine": machine})
 		return
 	}
+	mediaError := gh4_mediaTestError("Plex", response.StatusCode)
+	logging.Info("plex test", "host", domain_of(base), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
-		"error": gh4_mediaTestError("Plex", response.StatusCode),
+		"error": mediaError,
 	})
 }
 
@@ -1295,9 +1299,11 @@ func TestNotification(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	notifier := FromConfig(latestConfig(s))
 	if err := notifier.Notify(message); err != nil {
+		logging.Info("notification test", "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	logging.Info("notification test", "ok", true, "enabled", notifier.Enabled())
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "enabled": notifier.Enabled()})
 }
 

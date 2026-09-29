@@ -553,6 +553,7 @@ func JellyfinTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	request.Header.Set("X-Emby-Token", key)
 	response, err := client.Do(request)
 	if err != nil {
+		logging.Info("jellyfin test", "host", domain_of(url), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -562,12 +563,15 @@ func JellyfinTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_ = json.NewDecoder(response.Body).Decode(&info)
 		server, _ := info["ServerName"].(string)
 		version, _ := info["Version"].(string)
+		logging.Info("jellyfin test", "host", domain_of(url), "ok", true, "status", response.StatusCode, "server", server)
 		jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "server": server, "version": version})
 		return
 	}
+	mediaError := gh1_mediaTestError("Jellyfin", response.StatusCode)
+	logging.Info("jellyfin test", "host", domain_of(url), "ok", false, "status", response.StatusCode, "error", mediaError)
 	jsonStatus(w, http.StatusBadGateway, map[string]any{
 		"ok":    false,
-		"error": gh1_mediaTestError("Jellyfin", response.StatusCode),
+		"error": mediaError,
 	})
 }
 

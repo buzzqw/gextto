@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
 )
 
@@ -156,16 +157,19 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	settings, err := qbittorrentSettingsFromConfig(cfg)
 	if err != nil {
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
 	clientCfg := settings.Client
 	if clientCfg.BaseURL == "" {
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "ok", false, "error", "qbittorrent_url is not configured")
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "qbittorrent_url is not configured"})
 		return
 	}
 	client, err := qbittorrent.New(clientCfg)
 	if err != nil {
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -174,6 +178,7 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 	appVersion, err := client.AppVersion(ctx)
 	if err != nil {
+		logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", false, "error", err.Error())
 		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -186,6 +191,7 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if torrents, err := client.Torrents(ctx); err == nil {
 		result["torrents"] = len(torrents)
 	}
+	logging.Info("torrent backend test", "backend", TorrentBackendName(cfg), "host", domain_of(clientCfg.BaseURL), "ok", true, "app_version", appVersion)
 	jsonResponse(w, result)
 }
 
