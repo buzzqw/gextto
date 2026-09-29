@@ -1,8 +1,9 @@
-# Gextto
+# Gextto — EXpert Torrent Transfer Orchestrator
 
-Gextto is a self-hosted daemon that finds, selects, downloads, verifies, names
-and archives TV series, movies and comics. Its web interface is the control
-plane; the daemon keeps running as a service.
+**Gextto (EXpert Torrent Transfer Orchestrator)** is a self-hosted daemon that
+finds, selects, downloads, verifies, names and archives TV series, movies and
+comics. Its web interface is the control plane; the daemon keeps running as a
+service.
 
 > **Italiano:** [README.it.md](README.it.md) · **Complete guide:**
 > [English manual](docs/MANUAL.en.md)

@@ -1,8 +1,9 @@
-# Gextto
+# Gextto — EXpert Torrent Transfer Orchestrator
 
-Gextto è un demone self-hosted che cerca, seleziona, scarica, verifica, rinomina
-e archivia serie TV, film e fumetti. L'interfaccia web è il piano di controllo;
-il demone continua a funzionare come servizio.
+**Gextto (EXpert Torrent Transfer Orchestrator)** è un demone self-hosted che
+cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, film e
+fumetti. L'interfaccia web è il piano di controllo; il demone continua a
+funzionare come servizio.
 
 > **English:** [README.md](README.md) · **Guida completa:**
 > [manuale italiano](docs/MANUAL.it.md)
