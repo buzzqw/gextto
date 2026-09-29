@@ -60,6 +60,13 @@ func gh4_historyDisplayName(name, source string) string {
 		if label == "" || strings.EqualFold(label, "archive") || strings.EqualFold(label, "unknown") {
 			continue
 		}
+		bracketed := "[" + label + "]"
+		if len(name) > len(bracketed) && strings.EqualFold(name[len(name)-len(bracketed):], bracketed) {
+			trimmed := strings.TrimRight(strings.TrimSpace(name[:len(name)-len(bracketed)]), " -_.")
+			if trimmed != "" {
+				return trimmed
+			}
+		}
 		if len(name) <= len(label) || !strings.EqualFold(name[len(name)-len(label):], label) {
 			continue
 		}

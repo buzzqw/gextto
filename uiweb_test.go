@@ -322,6 +322,7 @@ func TestTorrentHistoryDisplayNameRemovesProviderSuffix(t *testing.T) {
 	}{
 		{name: "Movie.2026.1080p-ExtTo", source: "ExtTo", want: "Movie.2026.1080p"},
 		{name: "Show.S01E01-Knaben", source: "prowlarr:Knaben", want: "Show.S01E01"},
+		{name: "CIA.S01E10-12.1080p.WEB-DL.ITA.ENG.AAC2.0.H.265-G66 [ExtTo]", source: "ExtTo", want: "CIA.S01E10-12.1080p.WEB-DL.ITA.ENG.AAC2.0.H.265-G66"},
 		{name: "The Knaben", source: "Knaben", want: "The Knaben"},
 	}
 	for _, testCase := range cases {
