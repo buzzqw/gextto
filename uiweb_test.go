@@ -650,6 +650,23 @@ func TestUiSettingDefaultsMatchSafeRuntimeDefaults(t *testing.T) {
 	}
 }
 
+func TestAnacrolixSettingsHaveExplanatoryTooltips(t *testing.T) {
+	for _, key := range []string{
+		"anacrolix_path_mappings", "anacrolix_data_dir", "anacrolix_listen_port",
+		"anacrolix_tcp", "anacrolix_utp", "anacrolix_dht", "anacrolix_pex",
+		"anacrolix_trackers", "anacrolix_upnp", "anacrolix_dht_bootstrap_nodes",
+		"anacrolix_max_conns_per_torrent", "anacrolix_download_limit_kib",
+		"anacrolix_upload_limit_kib", "anacrolix_piece_hashers",
+		"anacrolix_max_unverified_mb", "anacrolix_ipfilter_path",
+		"anacrolix_apply_ip_filter", "anacrolix_proxy_type", "anacrolix_proxy_host",
+		"anacrolix_proxy_port", "anacrolix_proxy_user", "anacrolix_proxy_password",
+	} {
+		if strings.TrimSpace(uiSettingTooltip(key)) == "" {
+			t.Errorf("missing tooltip for %s", key)
+		}
+	}
+}
+
 // TestUiSettingKindMasksStructuredSecrets ensures a structured value that
 // embeds credentials (the `indexers` JSON) is never rendered in clear.
 func TestUiSettingKindMasksStructuredSecrets(t *testing.T) {
