@@ -53,13 +53,13 @@ npm ci
 npm run test:a11y
 ```
 
-La suite corrente esegue 11 controlli axe-core/Playwright sulle sezioni
+La suite corrente esegue 12 controlli axe-core/Playwright sulle sezioni
 principali, compresi dialoghi, ordinamento da tastiera, polling e reflow a 320
 px. Il risultato non è una dichiarazione di conformità WCAG o normativa: per
 un'attestazione servono anche audit manuale con screen reader, tastiera,
 ingrandimento e tecnologie assistive, oltre alla valutazione dei requisiti
 applicabili. Per il dettaglio vedere
-[`accessibilita-analisi.md`](../accessibilita-analisi.md).
+[`accessibility-analysis.md`](../accessibility-analysis.md).
 
 Il manuale distingue sempre tra:
 

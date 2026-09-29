@@ -52,12 +52,12 @@ npm ci
 npm run test:a11y
 ```
 
-The current suite runs 11 axe-core/Playwright checks on the main sections,
+The current suite runs 12 axe-core/Playwright checks on the main sections,
 including dialogs, keyboard sorting, polling and 320 px reflow. This result is
 not a WCAG or legal-compliance declaration: an attestation also requires manual
 screen-reader, keyboard, magnification and assistive-technology testing, plus
 an assessment of the applicable requirements. See
-[`accessibilita-analisi.md`](../accessibilita-analisi.md) for the detailed scope
+[`accessibility-analysis.md`](../accessibility-analysis.md) for the detailed scope
 and known limitations.
 
 This manual distinguishes between:

@@ -59,10 +59,10 @@ npm ci
 npm run test:a11y
 ```
 
-The current automated suite covers the main UI sections and 11 accessibility
+The current automated suite covers the main UI sections and 12 accessibility
 checks. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
-See the [accessibility analysis](accessibilita-analisi.md) for scope and known
+See the [accessibility analysis](accessibility-analysis.md) for scope and known
 limitations.
 
 ## First safe run

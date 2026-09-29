@@ -58,10 +58,10 @@ npm ci
 npm run test:a11y
 ```
 
-La suite automatica attuale copre le sezioni principali della UI con 11 controlli
+La suite automatica attuale copre le sezioni principali della UI con 12 controlli
 di accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
-Consulta l'[analisi di accessibilità](accessibilita-analisi.md) per ambito e
+Consulta l'[analisi di accessibilità](accessibility-analysis.md) per ambito e
 limitazioni note.
 
 ## Primo avvio sicuro
