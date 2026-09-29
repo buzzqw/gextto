@@ -297,6 +297,7 @@ restart_and_verify() {
   while (( waited < HEALTH_TIMEOUT )); do
     if systemctl is-active --quiet "$SERVICE_NAME"; then
       log "gextto is running"
+      rm -f "$INSTALL_DIR/gexttod.prev"
       return 0
     fi
     sleep 1
