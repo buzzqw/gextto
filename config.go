@@ -1905,6 +1905,9 @@ func (c *Config) loadConfigDB() error {
 	default:
 		movieQuery = "SELECT id,name,year,quality,language,enabled,subtitle,'','','','','','','','',0 FROM movies_config"
 	}
+	// Keep the library presentation stable when a newly added movie is saved:
+	// SQLite otherwise returns rows in insertion/rowid order.
+	movieQuery += " ORDER BY name COLLATE NOCASE, year COLLATE NOCASE, id"
 	rows, err = conn.Query(movieQuery)
 	if err != nil {
 		// A missing movies_config table is benign (no movies configured yet);

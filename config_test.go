@@ -137,6 +137,33 @@ func TestPreservesMovieIDsWhenClientSendsZero(t *testing.T) {
 	}
 }
 
+func TestLoadConfigOrdersMoviesAlphabetically(t *testing.T) {
+	dir := t.TempDir()
+	if err := SaveLibrary(dir, []SeriesConfig{}, []MovieConfig{
+		{Name: "Zulu", Year: "2024"},
+		{Name: "alpha", Year: "2025"},
+		{Name: "Beta", Year: "2023"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(dir, "gextto.json")
+	if err := os.WriteFile(configPath, []byte(`{"data_dir":"`+dir+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]string, 0, len(cfg.Movies))
+	for _, movie := range cfg.Movies {
+		got = append(got, movie.Name)
+	}
+	want := []string{"alpha", "Beta", "Zulu"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("movie order = %v, want %v", got, want)
+	}
+}
+
 func TestMatchesEnabledSeriesAliasAndRespectsIgnoredSeason(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Series = append(cfg.Series, SeriesConfig{
