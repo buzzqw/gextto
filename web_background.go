@@ -1557,8 +1557,10 @@ func cycleWorker(state *AppState) {
 				if lastAt, ok := state.db.LastCycleAt(); ok {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
-						logging.Info("scheduled cycle deferred to respect the configured interval",
-							"remaining_secs", int64(remaining.Seconds()))
+						logging.Info(fmt.Sprintf("scheduled cycle postponed after restart; next cycle will start in %s",
+							remaining.Round(time.Second)),
+							"next_cycle_at", due.Format(time.RFC3339),
+							"configured_interval", durationFromSeconds(refresh).String())
 						for {
 							remaining = time.Until(due)
 							if remaining <= 0 {

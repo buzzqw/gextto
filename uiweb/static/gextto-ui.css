@@ -419,6 +419,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
 .field-row { display: flex; align-items: center; gap: 8px; }
 .field-row .input { flex: 1; min-width: 0; }
+.movie-detail-form .field-row .movie-language-preset { flex: 0 1 230px; min-width: 190px; }
+.movie-detail-form .field-row input { flex: 1 1 260px; }
+@media (max-width: 560px) {
+  .movie-detail-form .field-row { flex-direction: column; align-items: stretch; }
+  .movie-detail-form .field-row .movie-language-preset,
+  .movie-detail-form .field-row input { width: 100%; min-width: 0; flex: 1 1 auto; }
+}
 .folder-rename-toolbar { align-items: flex-end; }
 .folder-rename-toolbar .inline-field { flex: 1 1 420px; min-width: min(100%, 320px); }
 .folder-rename-actions { margin-top: 14px; }
@@ -532,7 +539,9 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .input.compact { width: 96px; min-width: 76px; }
 .field.inline-field { flex-direction: row; align-items: center; gap: 6px; }
 .inline-field > span { white-space: nowrap; }
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px 18px; margin-bottom: 10px; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 18px; margin-bottom: 10px; }
+@media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; } }
 .torrent-modal .form-grid { margin-top: 10px; }
 
 /* tables */
@@ -617,6 +626,8 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .checkbox-row .check:hover { border-color: var(--accent-2); }
 .torrent-detail-panel { scroll-margin-top: 80px; }
 .torrent-detail-tabs { flex-wrap: wrap; margin-bottom: 12px; }
+.torrent-detail-tabs [role="tab"] { border-bottom-width: 2px; }
+.torrent-detail-tabs [role="tab"].tab-active { background: var(--accent); border-color: var(--accent); color: #04121f; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 .download-bulk-toolbar { flex-wrap: wrap; }
 .download-bulk-toolbar .compact { width: 150px; min-width: 120px; }
 .torrent-add-main {

@@ -678,19 +678,19 @@
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
       {{if .Overview}}<p>{{.Overview}}</p>{{end}}
-      <form class="form-grid" data-movie-id="{{.ID}}">
+      <form class="form-grid movie-detail-form" data-movie-id="{{.ID}}">
         <label class="field"><span>Nome</span><input name="name" value="{{.Name}}" title="Titolo del film come compare nella libreria" /></label>
         <label class="field"><span>Anno</span><input name="year" value="{{.Year}}" title="Anno di uscita" /></label>
         <label class="field"><span>Qualità</span><input name="quality" value="{{.Quality}}" title="Risoluzione minima accettata (es. 1080p+)" /></label>
         <label class="field"><span>Lingua</span>
           <span class="field-row">
-            <select class="input" data-preset-for="language" title="Preset rapidi">{{template "lang_preset_options"}}</select>
+            <select class="input movie-language-preset" data-preset-for="language" title="Preset rapidi">{{template "lang_preset_options"}}</select>
             <input name="language" value="{{.Language}}" placeholder="es. ita,eng" title="Lingua audio richiesta" />
           </span>
         </label>
         <label class="field"><span>Sottotitoli (facoltativi)</span>
           <span class="field-row">
-            <select class="input" data-preset-for="subtitle" title="Preset rapidi">{{template "lang_preset_options"}}</select>
+            <select class="input movie-language-preset" data-preset-for="subtitle" title="Preset rapidi">{{template "lang_preset_options"}}</select>
             <input name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" title="Sottotitoli preferiti" />
           </span>
         </label>

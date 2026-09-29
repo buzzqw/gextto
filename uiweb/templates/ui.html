@@ -350,18 +350,18 @@
       <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
     </div>
     <div class="modal-body">
-      <div class="toolbar torrent-detail-tabs">
-        <button class="btn sm" type="button" data-torrent-subdetail="general">Generale</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="trackers">Tracker</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="files">Contenuto</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="peers">Peers</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="limits">Limiti</button>
-        <button class="btn sm" type="button" data-torrent-subdetail="storage">Storage</button>
+      <div class="toolbar torrent-detail-tabs" role="tablist" aria-label="Sezioni dettagli torrent">
+        <button class="btn sm" type="button" role="tab" aria-selected="true" aria-controls="torrent-subdetail-output" data-torrent-subdetail="general">Generale</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="trackers">Tracker</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="files">Contenuto</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="peers">Peers</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="limits">Limiti</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="storage">Storage</button>
         <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
         <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
       </div>
       <div class="output" data-torrent-detail-output></div>
-      <div data-torrent-subdetail-output hidden></div>
+      <div id="torrent-subdetail-output" data-torrent-subdetail-output role="tabpanel" aria-live="polite" hidden></div>
     </div>
   </div>
 </div>

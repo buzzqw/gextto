@@ -849,6 +849,11 @@
     if (!panel) return;
     var output = panel.querySelector("[data-torrent-subdetail-output]");
     if (!output) return;
+    Array.prototype.forEach.call(panel.querySelectorAll("[data-torrent-subdetail]"), function (tabButton) {
+      var active = tabButton.getAttribute("data-torrent-subdetail") === tab;
+      tabButton.classList.toggle("tab-active", active);
+      tabButton.setAttribute("aria-selected", active ? "true" : "false");
+    });
     if (button) button.disabled = true;
     output.hidden = false;
     output.innerHTML = '<p class="muted">Caricamento…</p>';
