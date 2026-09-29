@@ -36,6 +36,23 @@ It installs the program in `/opt/gextto`, stores service data in
 > in front of it. Read the [security policy](docs/SECURITY.md) before exposing
 > it remotely.
 
+### Updating, uninstalling, dry-run
+
+Re-running the installer updates an existing installation: it replaces the
+binary, restarts the service and, if the new version fails to start, rolls back
+to the previous one.
+
+```bash
+sudo bash install.sh --help       # all options
+sudo bash install.sh --dry-run    # print what would happen, change nothing
+sudo bash install.sh --uninstall  # stop and remove the program (keeps data)
+sudo bash install.sh --uninstall --purge   # also remove the data directory
+```
+
+Environment overrides (`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, …) stay
+supported. `GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs from
+a local payload (offline or CI).
+
 ### Install from source
 
 Source builds require Go 1.26+, a C++17 compiler and libtorrent-rasterbar
