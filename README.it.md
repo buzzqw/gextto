@@ -120,7 +120,6 @@ rilevato e lascia intatti dati e configurazione. Usa
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
 | Ambito e test accessibilità | [Analisi accessibilità](accessibility-analysis.md) |
-| Sostituire Sonarr/Radarr | [Piano di sostituzione in inglese](docs/SONARR_RADARR_REPLACEMENT_PLAN.md) |
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
 
