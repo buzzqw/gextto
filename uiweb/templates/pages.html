@@ -11,12 +11,13 @@
 {{define "table_panel_body"}}
 {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
 <div class="toolbar" style="margin-bottom:10px">
-  {{if .Search}}<input type="search" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
-  {{if .Filter}}<input type="search" class="input" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
+  {{if .Search}}<input type="search" aria-label="Cerca nell'elenco" placeholder="Cerca…" data-ui-search value="{{.Query}}" />{{end}}
+  {{if .Filter}}<input type="search" class="input" aria-label="Filtra l'elenco" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
   <button class="btn sm" data-ui-refresh title="Ricarica i dati">Aggiorna</button>
 </div>
 <div class="table-wrap">
   <table class="data-table {{.Class}}">
+    <caption class="sr-only">{{.Title}}</caption>
     <thead data-ui-head></thead>
     <tbody data-ui-body>
       <tr><td class="muted">Caricamento…</td></tr>
@@ -104,9 +105,9 @@
       <div class="form-actions">
         <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>
         {{if .ManualAdd}}<button class="btn" type="button" data-open-add="{{.ManualAdd}}" title="Compila i requisiti e aggiungi manualmente">Aggiungi manualmente</button>{{end}}
-        <small class="muted" data-form-message></small>
+        <small class="muted" data-form-message role="status" aria-live="polite" aria-atomic="true"></small>
       </div>
-      <div class="output" data-form-output hidden></div>
+      <div class="output" data-form-output aria-live="polite" hidden></div>
     </form>
 {{end}}
 
@@ -133,7 +134,7 @@
 
 {{define "db_optimize"}}
 <div class="panel" data-db-optimize>
-  <div class="panel-head"><h3>Ottimizzazione database</h3><small class="muted" data-db-status></small></div>
+   <div class="panel-head"><h3>Ottimizzazione database</h3><small class="muted" data-db-status role="status" aria-live="polite" aria-atomic="true"></small></div>
   <div class="panel-body">
     <p class="hint">VACUUM compatta i file; ANALYZE aggiorna le statistiche SQLite.</p>
     <div class="list" data-db-files><p class="muted">Caricamento…</p></div>
@@ -149,7 +150,7 @@
 
 {{define "trash_panel"}}
 <div class="panel" data-trash>
-  <div class="panel-head"><h3>Cestino</h3><small class="muted" data-trash-status></small></div>
+   <div class="panel-head"><h3>Cestino</h3><small class="muted" data-trash-status role="status" aria-live="polite" aria-atomic="true"></small></div>
   <div class="panel-body">
     <p class="hint">Gli elementi nel cestino non occupano la libreria; aprili per eliminarli singolarmente o svuota tutto.</p>
     <div class="toolbar">
@@ -167,10 +168,10 @@
   <div class="panel-body">
     <p class="hint">La verifica parte solo quando la richiedi e può richiedere fino a ~1 minuto.</p>
     <div class="toolbar">
-      <input class="input" data-sources-query placeholder="Termine di prova (opzionale, es. ita 1080p)" title="Se vuoto controlla solo la raggiungibilità delle sorgenti" />
+       <input class="input" data-sources-query aria-label="Termine di prova per le sorgenti" placeholder="Termine di prova (opzionale, es. ita 1080p)" title="Se vuoto controlla solo la raggiungibilità delle sorgenti" />
       <button class="btn sm primary" type="button" data-sources-run title="Avvia la verifica di feed, indexer e motori web">Testa sorgenti</button>
     </div>
-    <div data-sources-output></div>
+    <div data-sources-output aria-live="polite"></div>
   </div>
 </div>
 {{end}}
@@ -183,7 +184,7 @@
       <button class="btn sm primary" type="button" data-sources-check title="Verifica feed RSS, indexer Torznab e motori web">Verifica indexer e sorgenti</button>
       <button class="btn sm" type="button" data-flaresolverr-test title="Verifica che FlareSolverr risponda">Test FlareSolverr</button>
     </div>
-    <div data-sources-output></div>
+    <div data-sources-output aria-live="polite"></div>
   </div>
 </div>
 {{end}}
@@ -203,14 +204,14 @@
 
 {{define "duplicates_panel"}}
 <div class="panel" data-duplicates>
-  <div class="panel-head"><h3>Duplicati video in libreria</h3><small class="muted" data-duplicates-status></small></div>
+  <div class="panel-head"><h3>Duplicati video in libreria</h3><small class="muted" data-duplicates-status role="status" aria-live="polite" aria-atomic="true"></small></div>
   <div class="panel-body">
     <p class="hint">Confronta le risoluzioni archiviate: l'anteprima non elimina nulla, la pulizia sposta le copie inferiori nel cestino.</p>
     <div class="toolbar">
       <button class="btn sm" type="button" data-duplicates-preview>Anteprima duplicati</button>
       <button class="btn sm danger" type="button" data-duplicates-clean>Pulisci duplicati</button>
     </div>
-    <div data-duplicates-results></div>
+    <div data-duplicates-results aria-live="polite"></div>
   </div>
 </div>
 {{end}}
@@ -229,14 +230,14 @@
       <button class="btn sm primary" type="button" data-folder-rename-apply>Applica selezionate</button>
       <small class="muted" data-folder-rename-count>0 proposte</small>
     </div>
-    <div class="table-wrap" data-folder-rename-results hidden></div>
+    <div class="table-wrap" data-folder-rename-results aria-live="polite" hidden></div>
   </div>
 </div>
 {{end}}
 
 {{define "ramdisk_control"}}
 <div class="panel" data-ramdisk>
-  <div class="panel-head"><h3>RAM disk</h3><small class="muted" data-ramdisk-status></small></div>
+  <div class="panel-head"><h3>RAM disk</h3><small class="muted" data-ramdisk-status role="status" aria-live="polite" aria-atomic="true"></small></div>
   <div class="panel-body">
     <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile: premi "Usa questo percorso" e Gextto la configura (creando la cartella se serve) con soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
     <div class="toolbar">
@@ -258,11 +259,11 @@
 {{define "oauth_section_body"}}
     <div class="toolbar">
       <button class="btn sm primary" data-oauth-start="{{.StartPath}}" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
-      <input class="input" data-oauth-code placeholder="codice" title="Codice/PIN mostrato dal provider" />
+      <input class="input" data-oauth-code aria-label="Codice o PIN di accesso" placeholder="codice" title="Codice/PIN mostrato dal provider" />
       <button class="btn sm" data-oauth-poll="{{.PollPath}}" title="Conferma il codice/PIN inserito">Conferma</button>
       {{range .Buttons}}<button class="btn sm {{.Class}}" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}" title="{{.Hint}}">{{.Label}}</button>{{end}}
     </div>
-    <div class="output" data-oauth-output></div>
+    <div class="output" data-oauth-output aria-live="polite"></div>
 {{end}}
 
 {{define "links_section"}}
@@ -281,7 +282,7 @@
 <div class="panel">
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
-    <div class="progress"><span data-progress-bar style="width:0%"></span></div>
+     <div class="progress" role="progressbar" aria-label="Avanzamento operazione" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span data-progress-bar style="width:0%"></span></div>
     <p class="muted" data-progress-text>in attesa…</p>
     <div data-progress data-endpoint="{{.Endpoint}}" hidden></div>
   </div>
@@ -293,11 +294,11 @@
   <div class="panel-head"><h3>Scarica da GetComics</h3></div>
   <div class="panel-body">
     <div class="toolbar">
-      <input class="input" data-comics-post placeholder="URL del post GetComics" />
+       <input class="input" data-comics-post aria-label="URL del post GetComics" placeholder="URL del post GetComics" />
       <button class="btn sm primary" data-comics-links>Trova link</button>
-      <small class="muted" data-comics-message></small>
+      <small class="muted" data-comics-message aria-live="polite"></small>
     </div>
-    <div data-comics-results></div>
+    <div data-comics-results aria-live="polite"></div>
   </div>
 </div>
 {{end}}
@@ -330,7 +331,7 @@
       <form class="torrent-add-form" data-torrent-add>
         <div class="torrent-add-main">
         <label class="field"><span>Magnet o URL .torrent</span>
-          <input class="input" name="magnet" data-torrent-magnet placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" />
+           <input class="input" name="magnet" data-torrent-magnet aria-label="Magnet o URL del file torrent" placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" />
         </label>
         <label class="field"><span>Percorso (opzionale)</span><input class="input" name="save_path" data-torrent-save-path placeholder="cartella predefinita" /></label>
         <label class="field"><span>File .torrent</span><input class="input" type="file" accept=".torrent,application/x-bittorrent" data-torrent-upload /></label>
@@ -385,7 +386,7 @@
             <option value="__new__">➕ Nuovo tag…</option>
           </select>
         </label>
-        <input class="input compact" data-download-new-tag placeholder="Nuovo tag" hidden />
+         <input class="input compact" data-download-new-tag aria-label="Nuovo tag" placeholder="Nuovo tag" hidden />
         <button class="btn sm" type="button" data-download-assign-tag>Assegna tag</button>
         <button class="btn sm" type="button" data-download-remove-tag>Rimuovi tag</button>
         <button class="btn sm" type="button" data-download-bulk="pause">Pausa</button>
@@ -429,7 +430,7 @@
 {{define "search"}}
 <div class="view">
   <div class="panel" data-discover>
-    <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted" data-discover-status></small></div>
+    <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted" data-discover-status aria-live="polite"></small></div>
     <div class="panel-body">
       <div class="toolbar">
         <button class="btn sm primary" type="button" data-discover-kind="series">Serie TV</button>
@@ -443,7 +444,7 @@
         <button class="btn sm" type="button" data-discover-mode="now_playing">In programmazione</button>
         <button class="btn sm" type="button" data-discover-mode="upcoming">Prossime uscite</button>
       </div>
-      <div class="tmdb-results" data-discover-results><p class="muted">Scegli un elenco per iniziare.</p></div>
+      <div class="tmdb-results" data-discover-results aria-live="polite"><p class="muted">Scegli un elenco per iniziare.</p></div>
     </div>
   </div>
 
@@ -458,7 +459,7 @@
       <form class="form-grid" data-json-form data-render="tmdb" data-endpoint="/api/tmdb/search">
         <label class="field"><span>Tipo</span><select class="input" name="kind"><option value="series" selected>Serie TV</option><option value="movie">Film</option></select></label>
         <label class="field span-full"><span>Titolo da cercare su TMDB</span><input class="input" name="query" placeholder="es. Il Signore degli Anelli" /></label>
-        <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message></small></div>
+        <div class="form-actions"><button class="btn primary" type="submit">Cerca su TMDB</button><small class="muted" data-form-message role="status" aria-live="polite" aria-atomic="true"></small></div>
         <div class="output" data-form-output hidden></div>
       </form>
     </div>
@@ -467,16 +468,17 @@
   <div class="panel">
     <div class="panel-head"><h3>Ricerca release</h3><small class="muted" data-ui-count></small></div>
     <div class="panel-body">
-      <form class="search-row" data-ui-search-post data-endpoint="{{.Endpoint}}" data-results="{{.ResultsKey}}" data-add="{{.AddPath}}">
-        <input type="search" placeholder="Cerca una release…" />
+       <form class="search-row" data-ui-search-post data-endpoint="{{.Endpoint}}" data-results="{{.ResultsKey}}" data-add="{{.AddPath}}">
+         <input type="search" aria-label="Cerca una release" placeholder="Cerca una release…" />
         <button class="btn primary">Cerca</button>
       </form>
       <div class="toolbar" style="margin-top:8px">
-        <input class="input" type="search" data-release-filter placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
+         <input class="input" type="search" data-release-filter aria-label="Filtra i risultati già caricati" placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
         <small class="muted" data-release-status aria-live="polite"></small>
       </div>
       <div class="table-wrap" style="margin-top:10px">
         <table class="data-table">
+          <caption class="sr-only">Risultati release</caption>
           <thead data-ui-head></thead>
           <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
         </table>
@@ -495,12 +497,12 @@
       <p class="muted">Stato: {{if .TraktAuthenticated}}autenticato{{else if .TraktConfigured}}configurato, non autenticato{{else}}non configurato{{end}}</p>
       <div class="toolbar">
         <button class="btn sm primary" data-oauth-start="/api/trakt/auth/start" title="Avvia il flusso di accesso Trakt">Avvia accesso</button>
-        <input data-oauth-code placeholder="codice" />
+         <input data-oauth-code aria-label="Codice di accesso Trakt" placeholder="codice" />
         <button class="btn sm" data-oauth-poll="/api/trakt/auth/poll" title="Conferma il codice di accesso">Conferma</button>
         <button class="btn sm" data-api="/api/trakt/auth/refresh" data-method="POST" data-body="{}" title="Rinnova il token">Refresh</button>
         <button class="btn sm danger" data-api="/api/trakt/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
       </div>
-      <div class="output" data-oauth-output></div>
+      <div class="output" data-oauth-output aria-live="polite"></div>
     </div>
   </div>
   <div class="panel">
@@ -509,11 +511,11 @@
       <p class="muted">Stato: {{if .SimklAuthenticated}}autenticato{{else if .SimklConfigured}}configurato, non autenticato{{else}}non configurato{{end}}</p>
       <div class="toolbar">
         <button class="btn sm primary" data-oauth-start="/api/simkl/auth/start" title="Avvia il flusso PIN Simkl">Avvia PIN</button>
-        <input data-oauth-code placeholder="codice" />
+         <input data-oauth-code aria-label="PIN di accesso Simkl" placeholder="codice" />
         <button class="btn sm" data-oauth-poll="/api/simkl/auth/poll" title="Conferma il PIN">Conferma</button>
         <button class="btn sm danger" data-api="/api/simkl/auth/revoke" data-method="POST" data-body="{}" title="Revoca l'accesso">Revoca</button>
       </div>
-      <div class="output" data-oauth-output></div>
+      <div class="output" data-oauth-output aria-live="polite"></div>
     </div>
   </div>
   <div class="panel">
@@ -584,14 +586,15 @@
   <div class="panel">
     <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.DownloadedCount}}/{{.EpisodeCount}} · {{.Gaps}} mancanti</small></div>
     <div class="panel-body">
-      <div class="toolbar"><input class="input" type="search" data-series-filter placeholder="Filtra episodi (numero, titolo, stato)…" title="Filtra le righe già caricate" /></div>
+       <div class="toolbar"><input class="input" type="search" data-series-filter aria-label="Filtra gli episodi" placeholder="Filtra episodi (numero, titolo, stato)…" title="Filtra le righe già caricate" /></div>
       {{if .SeasonGroups}}
       <div class="season-list">
         {{range .SeasonGroups}}
         <details class="season-block" open>
           <summary><strong>Stagione {{.Season}}</strong> <small class="muted">{{.Owned}}/{{.Total}} archiviati</small></summary>
           <div class="table-wrap"><table class="data-table series-episodes">
-            <thead><tr><th>S</th><th>E</th><th>Titolo</th><th>Stato</th><th title="Punteggio di qualità del file archiviato">Qualità</th><th>Dimensione</th><th>Azioni</th></tr></thead>
+            <caption class="sr-only">Episodi della stagione {{.Season}}</caption>
+            <thead><tr><th scope="col">S</th><th scope="col">E</th><th scope="col">Titolo</th><th scope="col">Stato</th><th scope="col" title="Punteggio di qualità del file archiviato">Qualità</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
             <tbody>
             {{range .Rows}}
             <tr>
@@ -643,7 +646,7 @@
           <span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" title="Cartella di destinazione sul NAS dove archiviare la serie" /><button class="btn sm" type="button" data-browse-for="archive_path" title="Sfoglia le cartelle e crea una nuova se serve">Sfoglia</button></span>
         </label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" title="Parole che escludono una release (es. cam, ts)" /></label>
-        <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message></small></div>
+        <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button><small class="muted" data-form-message role="status" aria-live="polite" aria-atomic="true"></small></div>
       </form>
     </div>
   </div>
@@ -718,7 +721,8 @@
       </div>
       {{if .Matches}}<div class="field span-full" style="margin-top:12px"><span>Corrispondenze archivio</span></div>
       <div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Titolo</th><th>Sorgente</th><th>Azioni</th></tr></thead>
+        <caption class="sr-only">Corrispondenze archivio</caption>
+        <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Azioni</th></tr></thead>
         <tbody>
         {{range .Matches}}
         <tr>
@@ -734,7 +738,7 @@
         </tbody>
       </table></div>{{end}}
       {{if .History}}<div class="field span-full" style="margin-top:12px"><span>Storico</span></div>
-      <div class="table-wrap"><table class="data-table"><thead><tr><th>Titolo</th><th>Qualità</th><th>Dimensione</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="data-table"><caption class="sr-only">Storico download</caption><thead><tr><th scope="col">Titolo</th><th scope="col">Qualità</th><th scope="col">Dimensione</th></tr></thead><tbody>
       {{range .History}}<tr><td class="truncate">{{.Title}}</td><td class="numeric">{{.QualityScore}}</td><td class="numeric">{{humanBytes .SizeBytes}}</td></tr>{{end}}
       </tbody></table></div>{{end}}
     </div>
@@ -757,7 +761,7 @@
   </div>
   <div class="setting-control">
     {{if .Managed}}
-    <input class="input" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
+    <input class="input" id="input-{{.Key}}" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
     {{else if eq .Kind "structured"}}
     <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
     {{else if eq .Kind "bool"}}
@@ -788,9 +792,9 @@
 
 {{define "settings_field_grid"}}
 <form class="field" data-setting-key="{{.Key}}" id="setting-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>
-  <span>{{.Label}}</span>
+  <label class="field-label" for="input-{{.Key}}">{{.Label}}</label>
   <div class="field-row">
-    {{if .Managed}}<input class="input" value="Auto" disabled />
+    {{if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled />
     {{else if eq .Kind "bool"}}<select class="input" data-setting-input id="input-{{.Key}}"><option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option><option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option></select>
     {{else if eq .Kind "select"}}<select class="input" data-setting-input id="input-{{.Key}}">{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
     {{else}}<input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
@@ -850,7 +854,7 @@
   <div class="form-actions">
     <button class="btn sm" type="button" data-list-add>Aggiungi riga</button>
     <button class="btn sm primary" type="button" data-list-save>Salva</button>
-    <small class="muted" data-list-message></small>
+    <small class="muted" data-list-message aria-live="polite"></small>
   </div>
 </div>
 {{end}}
@@ -888,7 +892,7 @@
 <div class="card editor-card" data-sources-editor>
   <h3>Feed RSS</h3>
   <label class="field"><span>Un URL per riga</span><textarea class="input" data-sources-feeds rows="9"></textarea></label>
-  <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message></small></div>
+  <div class="form-actions"><button class="btn sm primary" data-sources-save>Salva feed</button><small class="muted" data-sources-message aria-live="polite"></small></div>
 </div>
 {{end}}
 {{range .CheckboxGroups}}{{template "settings_checkbox_group" .}}{{end}}
@@ -908,7 +912,7 @@
     <label class="settings-search-wrap">
       <span class="settings-search-icon" aria-hidden="true">⌕</span>
       <span class="sr-only">Cerca impostazioni</span>
-      <input type="search" class="input settings-search" data-settings-search placeholder="Cerca per nome o chiave…" autocomplete="off" />
+      <input type="search" class="input settings-search" data-settings-search aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off" />
     </label>
     <label class="settings-tab-select-wrap">
       <span>Sezione</span>
@@ -924,7 +928,7 @@
       <button class="btn sm primary" type="button" data-settings-save-all>Salva tutte</button>
       <button class="btn sm" type="button" data-settings-discard>Ignora</button>
     </div>
-    <div class="card settings-results" data-settings-results hidden role="listbox"></div>
+      <div class="card settings-results" data-settings-results aria-live="polite" hidden></div>
   </div>
 
   <div class="settings-body" data-settings-body>
@@ -961,9 +965,9 @@
         <a class="btn sm" data-i18n-export target="_blank" rel="noopener" title="Scarica le traduzioni in YAML">Esporta YAML</a>
         <button class="btn sm danger" data-i18n-delete title="Elimina tutte le traduzioni della lingua">Elimina lingua</button>
       </div>
-      <div class="table-wrap"><table class="data-table"><thead><tr><th>Chiave</th><th>Valore</th><th></th></tr></thead><tbody data-i18n-body></tbody></table></div>
+      <div class="table-wrap"><table class="data-table"><caption class="sr-only">Traduzioni configurate</caption><thead><tr><th scope="col">Chiave</th><th scope="col">Valore</th><th scope="col">Azioni</th></tr></thead><tbody data-i18n-body></tbody></table></div>
       <label class="field"><span>Importa YAML</span><textarea class="input" data-i18n-yaml rows="4"></textarea></label>
-      <div class="form-actions"><button class="btn sm primary" data-i18n-import>Importa</button><small class="muted" data-i18n-message></small></div>
+      <div class="form-actions"><button class="btn sm primary" data-i18n-import>Importa</button><small class="muted" data-i18n-message aria-live="polite"></small></div>
     </div>
     {{end}}
   </div>

@@ -31,7 +31,7 @@
     </div>
     <nav aria-label="Navigazione principale">
        <a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
-         <span class="nav-search-icon">🔍</span><span>Cerca impostazioni</span>
+          <span class="nav-search-icon" aria-hidden="true">🔍</span><span>Cerca impostazioni</span>
        </a>
        {{range .Groups}}
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
@@ -65,7 +65,7 @@
         <button class="btn" title="Testo più piccolo" data-font="-5">A−</button>
         <button class="btn" title="Dimensione testo predefinita (100%)" data-font="100"><span data-font-label>Testo 100%</span></button>
         <button class="btn" title="Testo più grande" data-font="+5">A+</button>
-        <select class="lang-select" title="Lingua dell'interfaccia" data-lang>
+        <select class="lang-select" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" data-lang>
           <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
           <option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>English</option>
         </select>
@@ -151,15 +151,16 @@
     <div class="panel-head"><h3>Cerca</h3><small class="muted" data-ui-count></small></div>
     <div class="panel-body">
       <form class="search-row" data-ui-search-post data-endpoint="/api/search" data-results="results" data-add="/api/search/add">
-        <input type="search" placeholder="Cerca in archivio, indexer e motori web…" />
+         <input type="search" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
         <button class="btn primary">Cerca</button>
       </form>
       <div class="toolbar" style="margin-top:8px">
-        <input class="input" type="search" data-release-filter placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
+         <input class="input" type="search" data-release-filter aria-label="Filtra i risultati già caricati" placeholder="Filtra i risultati già caricati… ( -parola esclude )" />
         <small class="muted" data-release-status aria-live="polite"></small>
       </div>
       <div class="table-wrap" style="margin-top:10px">
         <table class="data-table">
+          <caption class="sr-only">Risultati ricerca</caption>
           <thead data-ui-head></thead>
           <tbody data-ui-body><tr><td class="muted">Inserisci una ricerca.</td></tr></tbody>
         </table>
@@ -216,12 +217,13 @@
   </div>
 
   <div class="panel" data-dashboard-feed>
-    <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted" data-dashboard-feed-status></small></div>
+    <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted" data-dashboard-feed-status aria-live="polite"></small></div>
     <div class="panel-body">
       <div class="toolbar"><button class="btn sm" type="button" data-dashboard-feed-load>Carica risultati</button></div>
       <div class="table-wrap" style="margin-top:10px">
         <table class="data-table">
-          <thead><tr><th>Monitorato</th><th>Tipo</th><th>Release</th><th>Fonte</th><th></th></tr></thead>
+          <caption class="sr-only">Ultime release trovate nelle sorgenti</caption>
+          <thead><tr><th scope="col">Monitorato</th><th scope="col">Tipo</th><th scope="col">Release</th><th scope="col">Fonte</th><th scope="col">Azioni</th></tr></thead>
           <tbody data-dashboard-feed-body><tr><td class="muted" colspan="5">Premi "Carica risultati" per leggere i feed.</td></tr></tbody>
         </table>
       </div>
@@ -255,17 +257,18 @@
       <p class="table-scroll-hint">Scorri lateralmente per vedere tutte le colonne</p>
       <div class="table-wrap">
         <table class="data-table torrent-table">
+          <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
           <thead><tr>
-            <th><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th>
-            <th class="th-sort" data-sort="name" title="Nome del torrent — clicca per ordinare">Nome</th>
-            <th title="Stato del torrent nel client">Stato</th>
-            <th class="th-sort" data-sort="progress" title="Percentuale completata — clicca per ordinare">Progresso</th>
-            <th class="th-sort" data-sort="dl" title="Velocità di download — clicca per ordinare">↓</th>
-            <th class="th-sort" data-sort="ul" title="Velocità di upload — clicca per ordinare">↑</th>
-            <th class="th-sort" data-sort="eta" title="Tempo stimato al completamento — clicca per ordinare">ETA</th>
-            <th class="th-sort" data-sort="peers" title="Peer connessi / seed disponibili — clicca per ordinare">Peer / Seed</th>
-            <th class="th-sort" data-sort="ratio" title="Rapporto upload/download — clicca per ordinare">Ratio</th>
-            <th title="Azioni disponibili per il torrent">Azioni</th>
+            <th scope="col"><input type="checkbox" data-download-select-all aria-label="Seleziona tutti i torrent" /></th>
+            <th scope="col" class="th-sort" data-sort="name" aria-sort="none" title="Nome del torrent — clicca per ordinare"><button class="table-sort-button" type="button">Nome</button></th>
+            <th scope="col" title="Stato del torrent nel client">Stato</th>
+            <th scope="col" class="th-sort" data-sort="progress" aria-sort="none" title="Percentuale completata — clicca per ordinare"><button class="table-sort-button" type="button">Progresso</button></th>
+            <th scope="col" class="th-sort" data-sort="dl" aria-sort="none" title="Velocità di download — clicca per ordinare"><button class="table-sort-button" type="button">↓ Download</button></th>
+            <th scope="col" class="th-sort" data-sort="ul" aria-sort="none" title="Velocità di upload — clicca per ordinare"><button class="table-sort-button" type="button">↑ Upload</button></th>
+            <th scope="col" class="th-sort" data-sort="eta" aria-sort="none" title="Tempo stimato al completamento — clicca per ordinare"><button class="table-sort-button" type="button">ETA</button></th>
+            <th scope="col" class="th-sort" data-sort="peers" aria-sort="none" title="Peer connessi / seed disponibili — clicca per ordinare"><button class="table-sort-button" type="button">Peer / Seed</button></th>
+            <th scope="col" class="th-sort" data-sort="ratio" aria-sort="none" title="Rapporto upload/download — clicca per ordinare"><button class="table-sort-button" type="button">Ratio</button></th>
+            <th scope="col" title="Azioni disponibili per il torrent">Azioni</th>
           </tr></thead>
           <tbody>
             {{range .Rows}}
@@ -344,9 +347,9 @@
 
 {{define "torrent_detail"}}
 <div class="overlay" data-torrent-detail-panel hidden>
-  <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-label="Dettagli torrent">
+  <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-labelledby="torrent-detail-title">
     <div class="modal-head">
-      <h3 data-torrent-detail-name>Dettagli torrent</h3>
+      <h3 id="torrent-detail-title" data-torrent-detail-name>Dettagli torrent</h3>
       <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
     </div>
     <div class="modal-body">
@@ -360,7 +363,7 @@
         <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
         <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
       </div>
-      <div class="output" data-torrent-detail-output></div>
+      <div class="output" data-torrent-detail-output aria-live="polite"></div>
       <div id="torrent-subdetail-output" data-torrent-subdetail-output role="tabpanel" aria-live="polite" hidden></div>
     </div>
   </div>
@@ -369,9 +372,9 @@
 
 {{define "torrent_remove"}}
 <div class="overlay" data-torrent-remove-panel hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Rimuovi torrent">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="torrent-remove-title">
     <div class="modal-head">
-      <h3>Rimuovi torrent</h3>
+      <h3 id="torrent-remove-title">Rimuovi torrent</h3>
       <button class="btn sm" type="button" data-torrent-remove-close>Chiudi</button>
     </div>
     <div class="modal-body">
@@ -431,7 +434,7 @@
     <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span data-logs-count>{{.Count}}</span> righe</small></div>
     <div class="panel-body">
       <div class="toolbar logs-toolbar">
-        <input class="input" type="search" data-logs-filter placeholder="Filtra le righe…" />
+        <input class="input" type="search" data-logs-filter aria-label="Filtra le righe del log" placeholder="Filtra le righe…" />
         <select class="input compact" data-logs-lines aria-label="Numero di righe">
           <option value="200">200</option>
           <option value="500" selected>500</option>

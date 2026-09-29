@@ -8,6 +8,62 @@
   if (!page) return;
   var view = page.getAttribute("data-view") || "dashboard";
 
+  // All dialogs use the same keyboard contract: focus enters the dialog,
+  // Tab stays inside it, Escape closes it, and focus returns to the opener.
+  // This is deliberately small and dependency-free because the UI is served
+  // without a component framework.
+  var activeDialog = null;
+  function dialogFocusable(dialog) {
+    return Array.prototype.filter.call(dialog.querySelectorAll(
+      'a[href], area[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ), function (node) {
+      return !node.hidden && !!(node.offsetWidth || node.offsetHeight || node.getClientRects().length);
+    });
+  }
+  function openAccessibleDialog(dialog, opener) {
+    if (!dialog) return;
+    dialog._previousDialog = activeDialog && activeDialog !== dialog ? activeDialog : null;
+    dialog._previousFocus = opener && typeof opener.focus === "function" ? opener : document.activeElement;
+    dialog.hidden = false;
+    activeDialog = dialog;
+    var target = dialogFocusable(dialog)[0] || dialog.querySelector('[role="dialog"]');
+    if (target) {
+      if (!target.matches("input, select, textarea, button, a, area") && !target.hasAttribute("tabindex")) target.tabIndex = -1;
+      window.setTimeout(function () { target.focus(); }, 0);
+    }
+  }
+  function closeAccessibleDialog(dialog, remove) {
+    if (!dialog) return;
+    dialog.hidden = true;
+    if (activeDialog === dialog) activeDialog = dialog._previousDialog || null;
+    if (remove || dialog._removeOnClose) dialog.remove();
+    var previous = dialog._previousFocus;
+    if (previous && document.contains(previous) && !previous.disabled) previous.focus();
+  }
+  document.addEventListener("keydown", function (event) {
+    if (!activeDialog || activeDialog.hidden) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAccessibleDialog(activeDialog);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    var focusable = dialogFocusable(activeDialog);
+    if (!focusable.length) {
+      event.preventDefault();
+      return;
+    }
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }, true);
+
   function request(path, method, body, signal) {
     var requestMethod = (method || "GET").toUpperCase();
     var headers = { "Content-Type": "application/json" };
@@ -319,6 +375,13 @@
             // user's selection across that DOM replacement; otherwise the
             // checkboxes appear to clear themselves after a few seconds.
             var selectedBeforeRefresh = selectedHashes();
+            var activeBeforeRefresh = document.activeElement;
+            var activeHash = activeBeforeRefresh && activeBeforeRefresh.getAttribute("data-hash");
+            var activeAction = activeBeforeRefresh && activeBeforeRefresh.getAttribute("data-action");
+            var activeDetail = activeBeforeRefresh && activeBeforeRefresh.hasAttribute("data-torrent-detail");
+            var activeSelect = activeBeforeRefresh && activeBeforeRefresh.hasAttribute("data-download-select");
+            var activeSort = activeBeforeRefresh && activeBeforeRefresh.closest("[data-sort]");
+            var activeSortKey = activeSort && activeSort.getAttribute("data-sort");
             var holder = document.createElement("div");
             holder.innerHTML = html;
             var incomingSlot = holder.querySelector("[data-torrents-slot]");
@@ -332,6 +395,20 @@
               updateDownloadSelection();
               applyTorrentSort();
               applyTorrentFilter();
+              var focusTarget = null;
+              if (activeHash) {
+                Array.prototype.some.call(incomingSlot.querySelectorAll("[data-hash]"), function (candidate) {
+                  if (candidate.getAttribute("data-hash") !== activeHash) return false;
+                  if (activeSelect && candidate.hasAttribute("data-download-select")) { focusTarget = candidate; return true; }
+                  if (activeDetail && candidate.hasAttribute("data-torrent-detail")) { focusTarget = candidate; return true; }
+                  if (activeAction && candidate.getAttribute("data-action") === activeAction) { focusTarget = candidate; return true; }
+                  return false;
+                });
+              } else if (activeSortKey) {
+                var refreshedHead = incomingSlot.querySelector('[data-sort="' + activeSortKey + '"]');
+                focusTarget = refreshedHead && refreshedHead.querySelector("button") || refreshedHead;
+              }
+              if (focusTarget) focusTarget.focus();
             }
             return;
           }
@@ -399,7 +476,7 @@
       }
       var bulkAction = bulkButton.getAttribute("data-download-bulk");
       if (bulkAction === "remove") {
-        openRemoveTorrent(selected, selected.length + " torrent selezionati");
+       openRemoveTorrent(selected, selected.length + " torrent selezionati", bulkButton);
         return;
       }
       var pathFor = function (hash) { return "/api/torrents/" + encodeURIComponent(hash) + "/" + bulkAction; };
@@ -509,7 +586,7 @@
     }
     var detailButton = event.target.closest("[data-torrent-detail]");
     if (detailButton) {
-      openTorrentDetail(detailButton.getAttribute("data-hash") || "");
+       openTorrentDetail(detailButton.getAttribute("data-hash") || "", detailButton);
       return;
     }
     var httpDetailButton = event.target.closest("[data-http-detail]");
@@ -524,11 +601,11 @@
     }
     if (event.target.closest("[data-torrent-detail-close]")) {
       var panel = page.querySelector("[data-torrent-detail-panel]");
-      if (panel) panel.hidden = true;
+       if (panel) closeAccessibleDialog(panel);
       return;
     }
     if (event.target.matches && event.target.matches("[data-torrent-detail-panel]")) {
-      event.target.hidden = true;
+       closeAccessibleDialog(event.target);
       return;
     }
     var element = event.target.closest("[data-action]");
@@ -688,8 +765,10 @@
     Array.prototype.forEach.call(page.querySelectorAll("[data-sort]"), function (head) {
       if (head.getAttribute("data-sort") === key) {
         head.setAttribute("data-sort-dir", torrentSort.direction === 1 ? "asc" : "desc");
+        head.setAttribute("aria-sort", torrentSort.direction === 1 ? "ascending" : "descending");
       } else {
         head.removeAttribute("data-sort-dir");
+        head.setAttribute("aria-sort", "none");
       }
     });
   }
@@ -740,14 +819,16 @@
     var speed = Number(row.getAttribute("data-http-speed")) || 0;
     var overlay = document.createElement("div");
     overlay.className = "overlay";
+    overlay._removeOnClose = true;
     var modal = document.createElement("div");
     modal.className = "modal torrent-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", "Dettagli download HTTP");
+    modal.setAttribute("aria-labelledby", "http-detail-title");
     var head = document.createElement("div");
     head.className = "modal-head";
     var title = document.createElement("h3");
+    title.id = "http-detail-title";
     title.textContent = value("data-name", "Download HTTP");
     var close = document.createElement("button");
     close.className = "btn sm";
@@ -773,7 +854,8 @@
     modal.appendChild(body);
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
-    function dismiss() { overlay.remove(); }
+    openAccessibleDialog(overlay, button);
+    function dismiss() { closeAccessibleDialog(overlay, true); }
     close.addEventListener("click", dismiss);
     overlay.addEventListener("click", function (event) {
       if (event.target === overlay) dismiss();
@@ -786,7 +868,7 @@
   function torrentDetailPanel() { return page.querySelector("[data-torrent-detail-panel]"); }
 
   // ---- torrent removal with the four rextto levels ------------------------
-  function openRemoveTorrent(hashes, name) {
+  function openRemoveTorrent(hashes, name, opener) {
     var panel = page.querySelector("[data-torrent-remove-panel]");
     if (!panel || !hashes || !hashes.length) return;
     panel._hashes = hashes.slice();
@@ -794,20 +876,20 @@
     if (label) label.textContent = name || "";
     var message = panel.querySelector("[data-torrent-remove-message]");
     if (message) message.textContent = "";
-    panel.hidden = false;
+    openAccessibleDialog(panel, opener);
   }
 
   document.addEventListener("click", function (event) {
     var backdrop = event.target.matches && event.target.matches("[data-torrent-remove-panel]");
-    if (backdrop) { event.target.hidden = true; return; }
+    if (backdrop) { closeAccessibleDialog(event.target); return; }
     var rowRemove = event.target.closest("[data-torrent-remove]");
     if (rowRemove) {
-      openRemoveTorrent([rowRemove.getAttribute("data-hash") || ""].filter(Boolean), rowRemove.getAttribute("data-name") || "");
+      openRemoveTorrent([rowRemove.getAttribute("data-hash") || ""].filter(Boolean), rowRemove.getAttribute("data-name") || "", rowRemove);
       return;
     }
     if (event.target.closest("[data-torrent-remove-close]")) {
       var closePanel = page.querySelector("[data-torrent-remove-panel]");
-      if (closePanel) closePanel.hidden = true;
+       if (closePanel) closeAccessibleDialog(closePanel);
       return;
     }
     var modeButton = event.target.closest("[data-remove-mode]");
@@ -825,7 +907,7 @@
     Promise.all(hashes.map(function (hash) {
       return api("/api/torrents/" + encodeURIComponent(hash) + "/remove", "POST", { delete_files: deleteFiles, blocklist: blocklist });
     })).then(function () {
-      panel.hidden = true;
+      closeAccessibleDialog(panel);
       notify(hashes.length === 1 ? "Torrent rimosso" : hashes.length + " torrent rimossi", "ok");
       if (partials[view]) { load(); } else { location.reload(); }
     }).catch(function (error) {
@@ -834,11 +916,11 @@
     }).then(function () { modeButton.disabled = false; });
   });
 
-  function openTorrentDetail(hash) {    if (!hash) return;
+  function openTorrentDetail(hash, opener) {    if (!hash) return;
     activeTorrentHash = hash;
     var panel = torrentDetailPanel();
     if (!panel) return;
-    panel.hidden = false;
+    openAccessibleDialog(panel, opener);
     loadTorrentTab("general");
   }
 
@@ -885,6 +967,19 @@
     return wrap;
   }
 
+  function accessibleDataTable(table, captionText) {
+    if (!table) return;
+    if (captionText && !table.querySelector("caption")) {
+      var caption = document.createElement("caption");
+      caption.className = "sr-only";
+      caption.textContent = captionText;
+      table.insertBefore(caption, table.firstChild);
+    }
+    Array.prototype.forEach.call(table.querySelectorAll("thead th"), function (th) {
+      if (!th.hasAttribute("scope")) th.setAttribute("scope", "col");
+    });
+  }
+
   function renderTorrentTab(output, tab, hash, data) {
     output.innerHTML = "";
     if (tab === "trackers") {
@@ -892,6 +987,7 @@
       var table = document.createElement("table");
       table.className = "data-table";
       table.innerHTML = "<thead><tr><th>Tracker</th><th>Tier</th><th>Esito</th></tr></thead>";
+      accessibleDataTable(table, "Tracker del torrent");
       var tbody = document.createElement("tbody");
       trackers.forEach(function (tracker) {
         var tr = document.createElement("tr");
@@ -916,6 +1012,7 @@
       var textarea = document.createElement("textarea");
       textarea.className = "input";
       textarea.setAttribute("data-trackers-text", "");
+      textarea.setAttribute("aria-label", "Modifica tracker, un tier e URL per riga");
       textarea.rows = 4;
       textarea.value = trackers.map(function (tracker) {
         return (tracker.tier === undefined ? "0" : tracker.tier) + "|" + (tracker.url || "");
@@ -944,6 +1041,7 @@
       var fileTable = document.createElement("table");
       fileTable.className = "data-table";
       fileTable.innerHTML = "<thead><tr><th>File</th><th>Dimensione</th><th>Scaricato</th><th>Priorità</th></tr></thead>";
+      accessibleDataTable(fileTable, "File del torrent");
       var fileBody = document.createElement("tbody");
       var priorities = files.map(function (file) { return Number(file.priority) || 0; });
       files.forEach(function (file, index) {
@@ -962,6 +1060,7 @@
         var priority = document.createElement("td");
         var select = document.createElement("select");
         select.className = "input";
+        select.setAttribute("aria-label", "Priorità del file " + String(file.path || index + 1));
         [["0", "Salta"], ["1", "Normale"], ["4", "Predefinita"], ["6", "Alta"], ["7", "Massima"]].forEach(function (option) {
           var node = document.createElement("option");
           node.value = option[0];
@@ -989,6 +1088,7 @@
       var peerTable = document.createElement("table");
       peerTable.className = "data-table";
       peerTable.innerHTML = "<thead><tr><th>Indirizzo</th><th>Client</th><th>↓</th><th>↑</th><th>Seed</th></tr></thead>";
+      accessibleDataTable(peerTable, "Peer del torrent");
       var peerBody = document.createElement("tbody");
       peers.forEach(function (peer) {
         var tr = document.createElement("tr");
@@ -1202,7 +1302,7 @@
       if (deleteFiles && !confirm("Eliminare anche i file scaricati?")) return;
       removeButton.disabled = true;
       api("/api/torrents/" + encodeURIComponent(hash) + "/remove", "POST", { delete_files: deleteFiles, blocklist: blocklist })
-        .then(function () { notify("Torrent rimosso", "ok"); var panel = torrentDetailPanel(); if (panel) panel.hidden = true; load(); })
+        .then(function () { notify("Torrent rimosso", "ok"); var panel = torrentDetailPanel(); if (panel) closeAccessibleDialog(panel); load(); })
         .catch(function (error) { notify("Rimozione non riuscita: " + error.message, "err"); })
         .then(function () { removeButton.disabled = false; });
     });
@@ -1381,6 +1481,8 @@
   }
   function renderTable(container) {
     var panel = container.closest(".panel");
+    var tableTitleNode = panel && panel.querySelector(".panel-head h3");
+    var tableTitle = tableTitleNode ? tableTitleNode.textContent : "Elenco";
     var table = panel.querySelector("table");
     var thead = panel.querySelector("[data-ui-head]");
     var tbody = panel.querySelector("[data-ui-body]");
@@ -1411,9 +1513,13 @@
         }
         var colspan = columns.length + (actions.length ? 1 : 0);
         thead.innerHTML = "<tr>" + columns.map(function (column) {
-          var headerAttrs = column.sortable ? ' class="th-sort" data-sort="' + esc(column.key) + '"' : "";
-          return "<th" + headerAttrs + ">" + esc(column.label) + "</th>";
-        }).join("") + (actions.length ? "<th>Azioni</th>" : "") + "</tr>";
+          var headerAttrs = column.sortable ? ' scope="col" class="th-sort" data-sort="' + esc(column.key) + '" aria-sort="none"' : ' scope="col"';
+          var headerContent = column.sortable
+            ? '<button class="table-sort-button" type="button">' + esc(column.label) + "</button>"
+            : esc(column.label);
+          return "<th" + headerAttrs + ">" + headerContent + "</th>";
+        }).join("") + (actions.length ? '<th scope="col">Azioni</th>' : "") + "</tr>";
+        accessibleDataTable(table, tableTitle);
         if (!items.length) {
           tbody.innerHTML = '<tr><td class="muted" colspan="' + colspan + '">' + esc(empty) + "</td></tr>";
         } else {
@@ -1693,8 +1799,13 @@
     });
     rows.forEach(function (row) { body.appendChild(row); });
     Array.prototype.forEach.call(table.querySelectorAll("th[data-sort]"), function (th) {
-      if (th === head) th.setAttribute("data-sort-dir", genericSort.direction === 1 ? "asc" : "desc");
-      else th.removeAttribute("data-sort-dir");
+      if (th === head) {
+        th.setAttribute("data-sort-dir", genericSort.direction === 1 ? "asc" : "desc");
+        th.setAttribute("aria-sort", genericSort.direction === 1 ? "ascending" : "descending");
+      } else {
+        th.removeAttribute("data-sort-dir");
+        th.setAttribute("aria-sort", "none");
+      }
     });
   }
   var genericSort = { table: null, key: "", direction: 1 };
@@ -1817,20 +1928,22 @@
   function openComicEditor(button) {
     var overlay = document.createElement("div");
     overlay.className = "overlay";
-    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Modifica fumetto monitorato">' +
-      '<div class="modal-head"><h3>Modifica fumetto monitorato</h3><button class="btn sm" type="button" data-comic-edit-close>Chiudi</button></div>' +
+    overlay._removeOnClose = true;
+    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="comic-edit-title">' +
+      '<div class="modal-head"><h3 id="comic-edit-title">Modifica fumetto monitorato</h3><button class="btn sm" type="button" data-comic-edit-close>Chiudi</button></div>' +
       '<div class="modal-body"><form class="form-grid" data-comic-edit-form>' +
       '<label class="field"><span>Titolo</span><input class="input" name="title" readonly /></label>' +
       '<label class="field"><span>Data inizio</span><input class="input" type="date" name="from_date" /></label>' +
-      '<label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita" /></label>' +
-      '<div class="form-actions"><button class="btn primary" type="submit">Salva</button><small class="muted" data-comic-edit-message></small></div>' +
+      '<label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" aria-label="Percorso archivio" placeholder="cartella fumetti predefinita" /></label>' +
+      '<div class="form-actions"><button class="btn primary" type="submit">Salva</button><small class="muted" data-comic-edit-message role="status" aria-live="polite" aria-atomic="true"></small></div>' +
       '</form></div></div>';
     document.body.appendChild(overlay);
     var form = overlay.querySelector("[data-comic-edit-form]");
     form.elements.title.value = button.getAttribute("data-comic-title") || "";
     form.elements.from_date.value = button.getAttribute("data-comic-from-date") || "";
     form.elements.save_path.value = button.getAttribute("data-comic-save-path") || "";
-    function close() { overlay.remove(); }
+    openAccessibleDialog(overlay, button);
+    function close() { closeAccessibleDialog(overlay, true); }
     overlay.addEventListener("click", function (event) {
       if (event.target === overlay || event.target.closest("[data-comic-edit-close]")) close();
     });
@@ -2251,7 +2364,7 @@
     var addPath = form.getAttribute("data-add");
     var searchToken = 0;
     var archiveEndpoint = form.getAttribute("data-archive") || "/api/search/archive";
-    thead.innerHTML = "<tr><th class=\"th-sort\" data-release-sort=\"title\" title=\"Nome del file — clicca per ordinare\">Release</th><th title=\"Sorgente/indexer\">Sorgente</th><th class=\"th-sort\" data-release-sort=\"score\" title=\"Punteggio di qualità — clicca per ordinare\">Punteggio</th><th title=\"Azioni\">Azioni</th></tr>";
+    thead.innerHTML = "<tr><th scope=\"col\" class=\"th-sort\" data-release-sort=\"title\" aria-sort=\"none\" title=\"Nome del file — clicca per ordinare\"><button class=\"table-sort-button\" type=\"button\">Release</button></th><th scope=\"col\" title=\"Sorgente/indexer\">Sorgente</th><th scope=\"col\" class=\"th-sort\" data-release-sort=\"score\" aria-sort=\"none\" title=\"Punteggio di qualità — clicca per ordinare\"><button class=\"table-sort-button\" type=\"button\">Punteggio</button></th><th scope=\"col\" title=\"Azioni\">Azioni</th></tr>";
     var table = thead.closest("table");
     if (table) table.classList.add("release-table");
     if (filterInput) {
@@ -2617,6 +2730,12 @@
     var tabSelect = settingsView.querySelector("[data-settings-tab-select]");
     var resultsBox = settingsView.querySelector("[data-settings-results]");
     var settingsBody = settingsView.querySelector("[data-settings-body]");
+    function settingsMatches(entry, query) {
+      var text = [entry && entry.key, entry && entry.label].filter(Boolean).join(" ").toLowerCase();
+      return query.split(/\s+/).filter(Boolean).every(function (part) {
+        return text.indexOf(part) >= 0;
+      });
+    }
     if (tabSelect) tabSelect.addEventListener("change", function () {
       location.href = "/?view=settings&tab=" + encodeURIComponent(tabSelect.value);
     });
@@ -2627,7 +2746,7 @@
         var key = (card.getAttribute("data-setting-key") || "").toLowerCase();
         var labelNode = card.querySelector(".setting-label");
         var label = (labelNode && labelNode.textContent || "").toLowerCase();
-        var match = query === "" || key.indexOf(query) >= 0 || label.indexOf(query) >= 0;
+        var match = query === "" || settingsMatches({ key: key, label: label }, query);
         card.style.display = match ? "" : "none";
       });
       if (!resultsBox) return;
@@ -2637,8 +2756,7 @@
         return;
       }
       var matches = settingsIndex.filter(function (entry) {
-        return (entry.label || "").toLowerCase().indexOf(query) >= 0 ||
-          (entry.key || "").toLowerCase().indexOf(query) >= 0;
+        return settingsMatches(entry, query);
       }).slice(0, 30);
       resultsBox.hidden = false;
       if (!matches.length) {
@@ -3088,6 +3206,7 @@
       var table = document.createElement("table");
       table.className = "data-table";
       table.innerHTML = "<thead><tr><th>Serie</th><th>Stagione</th><th>Episodio</th><th>File</th><th>Risoluzione</th></tr></thead>";
+      accessibleDataTable(table, "Duplicati video");
       var tbody = document.createElement("tbody");
       items.forEach(function (item) {
         var tr = document.createElement("tr");
@@ -3167,6 +3286,7 @@
       var head = document.createElement("thead");
       head.innerHTML = "<tr><th>Accetta</th><th>File</th><th>Tipo</th><th>Rilevato</th><th>Confronto TMDB/TVDB</th><th>Nuovo nome</th><th>Stato</th><th>Azioni</th></tr>";
       table.appendChild(head);
+      accessibleDataTable(table, "Anteprima rinomina file");
       var body = document.createElement("tbody");
       folderRenameState.items.forEach(function (item, index) {
         var row = document.createElement("tr");
@@ -3335,6 +3455,7 @@
         var table = document.createElement("table");
         table.className = "data-table";
         table.innerHTML = "<thead><tr><th>Percorso</th><th>Filesystem</th><th>Liberi</th><th>Totali</th><th></th></tr></thead>";
+        accessibleDataTable(table, "Percorsi RAM disk");
         var tbody = document.createElement("tbody");
         paths.forEach(function (item) {
           var tr = document.createElement("tr");
@@ -3441,7 +3562,7 @@
       explain.className = "btn sm";
       explain.textContent = "Perché non questo?";
       explain.title = "Mostra perché questa release viene accettata o scartata";
-      explain.addEventListener("click", function () { showExplain(release); });
+       explain.addEventListener("click", function () { showExplain(release, explain); });
       var add = document.createElement("button");
       add.className = "btn sm primary";
       add.textContent = "Accoda";
@@ -3479,7 +3600,7 @@
     var explainButton = event.target.closest("[data-release-explain]");
     if (explainButton) {
       try {
-        showExplain(JSON.parse(explainButton.getAttribute("data-release-explain") || "{}"));
+        showExplain(JSON.parse(explainButton.getAttribute("data-release-explain") || "{}"), explainButton);
       } catch (_) {
         notify("Impossibile leggere la release", "err");
       }
@@ -3501,8 +3622,13 @@
     tbody._releaseSort = state;
     sortReleaseRows(tbody, state);
     Array.prototype.forEach.call(table.querySelectorAll("[data-release-sort]"), function (other) {
-      if (other === head) other.setAttribute("data-sort-dir", state.dir === 1 ? "asc" : "desc");
-      else other.removeAttribute("data-sort-dir");
+      if (other === head) {
+        other.setAttribute("data-sort-dir", state.dir === 1 ? "asc" : "desc");
+        other.setAttribute("aria-sort", state.dir === 1 ? "ascending" : "descending");
+      } else {
+        other.removeAttribute("data-sort-dir");
+        other.setAttribute("aria-sort", "none");
+      }
     });
   });
 
@@ -3510,7 +3636,8 @@
     container.innerHTML = "";
     var table = document.createElement("table");
     table.className = "data-table release-table";
-    table.innerHTML = "<thead><tr><th class=\"th-sort\" data-release-sort=\"title\" title=\"Nome del file — clicca per ordinare\">Release</th><th>Sorgente</th><th class=\"th-sort\" data-release-sort=\"score\" title=\"Punteggio di qualità — clicca per ordinare\">Punteggio</th><th>Azioni</th></tr></thead>";
+    table.innerHTML = "<thead><tr><th scope=\"col\" class=\"th-sort\" data-release-sort=\"title\" aria-sort=\"none\" title=\"Nome del file — clicca per ordinare\"><button class=\"table-sort-button\" type=\"button\">Release</button></th><th scope=\"col\">Sorgente</th><th scope=\"col\" class=\"th-sort\" data-release-sort=\"score\" aria-sort=\"none\" title=\"Punteggio di qualità — clicca per ordinare\"><button class=\"table-sort-button\" type=\"button\">Punteggio</button></th><th scope=\"col\">Azioni</th></tr></thead>";
+    accessibleDataTable(table, "Risultati release");
     var tbody = document.createElement("tbody");
     table.appendChild(tbody);
     container.appendChild(table);
@@ -3518,24 +3645,24 @@
   }
 
   // ---- decision explanation overlay ("Perché non questo?") ----------------
-  function showExplain(release) {
+  function showExplain(release, opener) {
     var overlay = document.getElementById("explain-overlay");
     if (!overlay) {
       overlay = document.createElement("div");
       overlay.id = "explain-overlay";
       overlay.className = "overlay";
-      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Spiegazione della decisione">' +
-        '<div class="modal-head"><h3>Perché non questo?</h3><button class="btn sm" type="button" data-explain-close>Chiudi</button></div>' +
+      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="explain-title">' +
+        '<div class="modal-head"><h3 id="explain-title">Perché non questo?</h3><button class="btn sm" type="button" data-explain-close>Chiudi</button></div>' +
         '<div class="modal-body" data-explain-body></div></div>';
       overlay.addEventListener("click", function (event) {
-        if (event.target === overlay || event.target.closest("[data-explain-close]")) overlay.hidden = true;
+        if (event.target === overlay || event.target.closest("[data-explain-close]")) closeAccessibleDialog(overlay);
       });
       document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && !overlay.hidden) overlay.hidden = true;
+        if (event.key === "Escape" && !overlay.hidden) closeAccessibleDialog(overlay);
       });
       document.body.appendChild(overlay);
     }
-    overlay.hidden = false;
+    openAccessibleDialog(overlay, opener);
     var body = overlay.querySelector("[data-explain-body]");
     body.innerHTML = '<p class="muted">Analisi della release…</p>';
     api("/api/search/explain", "POST", { release: release }).then(function (data) {
@@ -3587,6 +3714,7 @@
       var table = document.createElement("table");
       table.className = "data-table";
       table.innerHTML = "<thead><tr><th>Regola</th><th>Esito</th><th>Dettaglio</th></tr></thead>";
+      accessibleDataTable(table, "Controlli punteggio");
       var tbody = document.createElement("tbody");
       steps.forEach(function (step) {
         var row = document.createElement("tr");
@@ -3684,9 +3812,9 @@
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     var panel = page.querySelector("[data-torrent-detail-panel]");
-    if (panel && !panel.hidden) panel.hidden = true;
+    if (panel && !panel.hidden) closeAccessibleDialog(panel);
     var removePanel = page.querySelector("[data-torrent-remove-panel]");
-    if (removePanel && !removePanel.hidden) removePanel.hidden = true;
+    if (removePanel && !removePanel.hidden) closeAccessibleDialog(removePanel);
   });
 
   // ---- progress polling ---------------------------------------------------
@@ -3702,9 +3830,16 @@
         var progress = data && data.progress ? data.progress : data;
         if (!progress) return;
         var total = Number(progress.total) || 0;
-        var current = Number(progress.current) || 0;
-        var pct = total > 0 ? Math.min(100, Math.round(current / total * 100)) : (progress.running ? 0 : 100);
-        if (bar) bar.style.width = pct + "%";
+         var current = Number(progress.current) || 0;
+         var pct = total > 0 ? Math.min(100, Math.round(current / total * 100)) : (progress.running ? 0 : 100);
+         if (bar) {
+           bar.style.width = pct + "%";
+           var progressBar = bar.closest('[role="progressbar"]') || bar;
+           progressBar.setAttribute("aria-valuenow", String(pct));
+           progressBar.setAttribute("aria-valuetext", pct + "%");
+           progressBar.setAttribute("aria-busy", progress.running ? "true" : "false");
+         }
+         if (node) node.setAttribute("aria-busy", progress.running ? "true" : "false");
         if (text) {
           text.textContent = (progress.running ? "in corso" : "inattivo") +
             (progress.series ? " · " + progress.series : "") + " · " + current + "/" + total +
@@ -3967,6 +4102,7 @@
 
   function openAddModal(kind, prefill) {
     prefill = prefill || {};
+    var opener = document.activeElement;
     var overlay = document.getElementById("add-overlay");
     if (!overlay) {
       overlay = document.createElement("div");
@@ -3974,23 +4110,24 @@
       overlay.className = "overlay";
       document.body.appendChild(overlay);
     }
-    overlay.hidden = false;
     overlay.innerHTML = "";
-    overlay.onclick = function (event) { if (event.target === overlay) overlay.hidden = true; };
+    overlay.onclick = function (event) { if (event.target === overlay) closeAccessibleDialog(overlay); };
 
     var modal = document.createElement("div");
     modal.className = "modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "add-modal-title");
     var head = document.createElement("div");
     head.className = "modal-head";
     var title = document.createElement("h3");
+    title.id = "add-modal-title";
     title.textContent = kind === "movie" ? "Aggiungi film" : "Aggiungi serie";
     var close = document.createElement("button");
     close.className = "btn sm";
     close.type = "button";
     close.textContent = "Chiudi";
-    close.addEventListener("click", function () { overlay.hidden = true; });
+    close.addEventListener("click", function () { closeAccessibleDialog(overlay); });
     head.appendChild(title);
     head.appendChild(close);
     modal.appendChild(head);
@@ -4021,15 +4158,30 @@
     confirm.textContent = "Conferma";
     var message = document.createElement("small");
     message.className = "muted";
+    message.id = "add-modal-message";
+    message.setAttribute("role", "alert");
+    message.setAttribute("aria-live", "assertive");
+    var titleField = form.querySelector('[name="name"]');
+    if (titleField) titleField.setAttribute("aria-describedby", message.id);
     confirm.addEventListener("click", function () {
       var payload = { kind: kind };
       Array.prototype.forEach.call(form.querySelectorAll("[name]"), function (field) {
         payload[field.getAttribute("name")] = field.value;
       });
-      if (!String(payload.name || "").trim()) { message.textContent = "Inserisci il titolo"; return; }
+      if (!String(payload.name || "").trim()) {
+        var nameField = form.querySelector('[name="name"]');
+        if (nameField) {
+          nameField.setAttribute("aria-invalid", "true");
+          nameField.focus();
+        }
+        message.textContent = "Inserisci il titolo";
+        return;
+      }
+      var validName = form.querySelector('[name="name"]');
+      if (validName) validName.removeAttribute("aria-invalid");
       confirm.disabled = true;
       api("/api/tmdb/add", "POST", payload).then(function () {
-        overlay.hidden = true;
+        closeAccessibleDialog(overlay);
         notify("Aggiunto alla libreria", "ok");
         if (partials[view]) { load(); return; }
         var container = page.querySelector("[data-ui-table]");
@@ -4042,6 +4194,7 @@
     body.appendChild(form);
     modal.appendChild(body);
     overlay.appendChild(modal);
+    openAccessibleDialog(overlay, opener);
     var first = form.querySelector("[name=name]");
     if (first) first.focus();
   }
@@ -4054,25 +4207,25 @@
       overlay.id = "browse-overlay";
       overlay.className = "overlay";
       overlay.innerHTML =
-        '<div class="modal path-modal" role="dialog" aria-modal="true" aria-label="Sfoglia cartelle">' +
-        '<div class="modal-head"><h3>Sfoglia cartelle</h3><button class="btn sm" type="button" data-browse-close>Chiudi</button></div>' +
+        '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="browse-title">' +
+        '<div class="modal-head"><h3 id="browse-title">Sfoglia cartelle</h3><button class="btn sm" type="button" data-browse-close>Chiudi</button></div>' +
         '<div class="modal-body">' +
         '<div class="toolbar" style="margin-bottom:10px">' +
         '<button class="btn sm" type="button" data-browse-up title="Vai alla cartella superiore">↑ Su</button>' +
-        '<input class="input mono" type="text" data-browse-path-input title="Percorso corrente: modificalo e premi Invio per navigare" />' +
+        '<input class="input mono" type="text" data-browse-path-input aria-label="Percorso corrente" title="Percorso corrente: modificalo e premi Invio per navigare" />' +
         '<button class="btn sm primary" type="button" data-browse-select title="Usa questa cartella">Seleziona</button>' +
         '<button class="btn sm" type="button" data-browse-create-prompt title="Crea una nuova cartella dentro quella corrente">Crea cartella</button>' +
         "</div>" +
         '<div class="path-list" data-browse-list></div>' +
         '<div class="toolbar" style="margin-top:10px">' +
-        '<input class="input" data-browse-new placeholder="Nuova cartella" title="Nome della nuova cartella da creare nella cartella corrente" />' +
+        '<input class="input" data-browse-new aria-label="Nome nuova cartella" placeholder="Nuova cartella" title="Nome della nuova cartella da creare nella cartella corrente" />' +
         '<button class="btn sm primary" type="button" data-browse-create title="Crea la cartella e selezionala">Crea e usa</button>' +
         "</div>" +
         '<small class="muted" data-browse-message aria-live="polite"></small>' +
         "</div></div>";
       document.body.appendChild(overlay);
       overlay.addEventListener("click", function (event) {
-        if (event.target === overlay || event.target.closest("[data-browse-close]")) overlay.hidden = true;
+        if (event.target === overlay || event.target.closest("[data-browse-close]")) closeAccessibleDialog(overlay);
       });
       overlay.addEventListener("keydown", function (event) {
         if (event.key === "Enter" && event.target.matches("[data-browse-path-input]")) {
@@ -4082,7 +4235,7 @@
         }
       });
     }
-    overlay.hidden = false;
+    openAccessibleDialog(overlay, input);
     overlay._target = input;
     overlay._current = String(input && input.value || "").trim();
     loadBrowseModal(overlay);
@@ -4131,7 +4284,7 @@
     var target = (overlay._current || "/").replace(/\/+$/, "") + "/" + name;
     api("/api/mkdir", "POST", { path: target }).then(function () {
       if (overlay._target) overlay._target.value = target;
-      overlay.hidden = true;
+      closeAccessibleDialog(overlay);
       notify("Cartella creata: " + target, "ok");
     }).catch(function (error) { if (message) message.textContent = error.message; });
   }
@@ -4153,7 +4306,7 @@
     }
     if (event.target.closest("[data-browse-select]")) {
       if (overlay._target) overlay._target.value = overlay._current;
-      overlay.hidden = true;
+      closeAccessibleDialog(overlay);
       return;
     }
     if (event.target.closest("[data-browse-create-prompt]")) {
@@ -4194,13 +4347,13 @@
       overlay.className = "overlay";
       document.body.appendChild(overlay);
       overlay.addEventListener("click", function (event) {
-        if (event.target === overlay || event.target.closest("[data-rename-close]")) overlay.hidden = true;
+        if (event.target === overlay || event.target.closest("[data-rename-close]")) closeAccessibleDialog(overlay);
       });
     }
-    overlay.hidden = false;
-    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Anteprima rinomina">' +
-      '<div class="modal-head"><h3>Anteprima rinomina</h3><button class="btn sm" type="button" data-rename-close>Chiudi</button></div>' +
+    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="rename-title">' +
+      '<div class="modal-head"><h3 id="rename-title">Anteprima rinomina</h3><button class="btn sm" type="button" data-rename-close>Chiudi</button></div>' +
       '<div class="modal-body" data-rename-body><p class="muted">Analisi in corso…</p></div></div>';
+    openAccessibleDialog(overlay, document.activeElement);
     var body = overlay.querySelector("[data-rename-body]");
     api(previewURL, "POST", {}).then(function (data) {
       renderRenamePreview(body, data || {}, executeURL, overlay);
@@ -4238,6 +4391,7 @@
       var table = document.createElement("table");
       table.className = "data-table";
       table.innerHTML = "<thead><tr><th>Ep.</th><th>Vecchio nome</th><th>Nuovo nome / esito</th></tr></thead>";
+      accessibleDataTable(table, "Anteprima rinomina");
       var tbody = document.createElement("tbody");
       items.forEach(function (item) {
         var row = document.createElement("tr");
@@ -4396,6 +4550,7 @@
         var table = document.createElement("table");
         table.className = "data-table";
         table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
+        accessibleDataTable(table, "Stato sorgenti");
         var tbody = document.createElement("tbody");
         items.forEach(function (item) {
           var tr = document.createElement("tr");
@@ -4569,16 +4724,16 @@
         overlay.className = "overlay";
         document.body.appendChild(overlay);
         overlay.addEventListener("click", function (event) {
-          if (event.target === overlay || event.target.closest("[data-trash-close]")) overlay.hidden = true;
+          if (event.target === overlay || event.target.closest("[data-trash-close]")) closeAccessibleDialog(overlay);
         });
       }
-      overlay.hidden = false;
-      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Cestino">' +
-        '<div class="modal-head"><h3>Cestino</h3><button class="btn sm" type="button" data-trash-close>Chiudi</button></div>' +
+      overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="trash-title">' +
+        '<div class="modal-head"><h3 id="trash-title">Cestino</h3><button class="btn sm" type="button" data-trash-close>Chiudi</button></div>' +
         '<div class="modal-body">' +
         '<div class="toolbar"><span class="muted" data-trash-count></span><button class="btn sm danger" type="button" data-trash-all title="Elimina tutti gli elementi">Elimina tutti</button><button class="btn sm" type="button" data-trash-reload title="Ricarica">Aggiorna</button><small class="muted" data-trash-message aria-live="polite"></small></div>' +
-        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Nome</th><th>Dimensione</th><th></th></tr></thead><tbody data-trash-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>' +
+        '<div class="table-wrap"><table class="data-table"><caption class="sr-only">Elementi nel cestino</caption><thead><tr><th scope="col">Nome</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead><tbody data-trash-body><tr><td class="muted">Caricamento…</td></tr></tbody></table></div>' +
         '</div></div>';
+      openAccessibleDialog(overlay, trashOpenButton);
       renderTrashModal(overlay);
     };
     var trashOpenButton = trashPanel.querySelector("[data-trash-open]");
@@ -4645,6 +4800,7 @@
     var table = document.createElement("table");
     table.className = "data-table";
     table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
+    accessibleDataTable(table, "Stato sorgenti");
     var tbody = document.createElement("tbody");
     items.forEach(function (item) {
       var ok = item.ok !== false;
@@ -4669,6 +4825,7 @@
     var table = document.createElement("table");
     table.className = "data-table";
     table.innerHTML = "<thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead>";
+    accessibleDataTable(table, "Risultati GetComics");
     var tbody = document.createElement("tbody");
     items.forEach(function (item) {
       var row = document.createElement("tr");

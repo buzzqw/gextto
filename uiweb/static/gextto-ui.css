@@ -18,6 +18,7 @@
   --ok: #4fd6a1;
   --warn: #f2c14e;
   --err: #ff7b93;
+  --accent-action: #4fd6a1;
   --btn: #1c2b45;
   --btn-text: #dbe7fb;
   --btn-line: #2b3f61;
@@ -40,11 +41,14 @@
   --line-soft: #cfd9e6;
   --text: #2a3444;
   --muted: #566480;
-  --accent: #12a97a;
-  --accent-2: #2b7fd4;
-  --ok: #12a97a;
-  --warn: #b7791f;
-  --err: #d6336c;
+  /* Text/status variants are dark enough for normal text on light surfaces.
+     --accent-action remains brighter because it is used as a button fill. */
+  --accent: #08704f;
+  --accent-2: #125ea8;
+  --ok: #08704f;
+  --warn: #8a5a00;
+  --err: #b4235a;
+  --accent-action: #12a97a;
   --btn: #dfe7f2;
   --btn-text: #26324a;
   --btn-line: #bac8dc;
@@ -157,7 +161,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.nav-item:hover, .nav-item:focus-visible { background: var(--surface-3); color: var(--text); outline: none; text-decoration: none; }
+.nav-item:hover, .nav-item:focus-visible { background: var(--surface-3); color: var(--text); text-decoration: none; }
 .nav-item.active {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--text);
@@ -464,7 +468,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .btn.sm { min-height: 36px; padding: 6px 11px; font-size: 0.86rem; }
 .btn.sm.icon-action { width: 2.25rem; min-width: 2.25rem; padding: 6px 0; font-size: 1rem; }
 .icon-action span { line-height: 1; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+.btn.primary { background: var(--accent-action); border-color: var(--accent-action); color: #04121f; }
 .btn.danger { background: color-mix(in srgb, var(--err) 22%, var(--surface)); border-color: color-mix(in srgb, var(--err) 45%, transparent); color: var(--text); }
 
 /* inputs */
@@ -490,7 +494,7 @@ label.field, .field {
   flex-direction: column;
   gap: 6px;
 }
-label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
+label.field > span, .field > span, .field-label { color: var(--muted); font-size: 0.85rem; }
 .field.span-full { grid-column: 1 / -1; }
 
 /* badges + progress */
@@ -550,6 +554,27 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); }
 .data-table thead th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .data-table tbody tr:hover { background: var(--surface-2); }
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.table-sort-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-2) 75%, transparent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.th-sort { cursor: default; }
 /* The archive rows are short: keep the table content-sized instead of
    stretching the title column, so the source sits right next to the title
    with no dead space in between. */
