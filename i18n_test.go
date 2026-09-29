@@ -34,6 +34,34 @@ func TestI18nQuickCheckAndCheckpoint(t *testing.T) {
 	}
 }
 
+func TestSeedDefaultTranslationsRemovesObsoleteEd2kEntries(t *testing.T) {
+	db := openTestI18nDb(t)
+	if err := db.SetBulk("it", map[string]string{
+		"Gap Filling — Fallback eD2k (cerca su eD2k se Jackett non trova nulla)": "legacy",
+		"aMule / ed2k": "legacy",
+		"current.key":  "keep",
+	}); err != nil {
+		t.Fatalf("seed legacy translations: %v", err)
+	}
+	if _, err := db.SeedDefaultTranslations(); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+	var count int
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM translations WHERE lower(key) LIKE '%ed2k%' OR lower(value) LIKE '%ed2k%' OR lower(key) LIKE '%amule%' OR lower(value) LIKE '%amule%'").Scan(&count); err != nil {
+		t.Fatalf("count obsolete translations: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("obsolete translation rows remaining: %d", count)
+	}
+	var value string
+	if err := db.db.QueryRow("SELECT value FROM translations WHERE lang='ita' AND key='current.key'").Scan(&value); err != nil {
+		t.Fatalf("read current translation: %v", err)
+	}
+	if value != "keep" {
+		t.Fatalf("current translation = %q, want keep", value)
+	}
+}
+
 func TestI18nLanguageRoundTripsAliases(t *testing.T) {
 	db := openTestI18nDb(t)
 

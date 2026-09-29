@@ -182,6 +182,16 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 // database without overwriting existing entries. It returns how many rows were
 // added.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
+	// Older installations may still contain translations for the removed
+	// aMule/eD2k integration. They are not part of the current UI and would
+	// otherwise keep obsolete options visible in the translation editor.
+	if _, err := i.db.Exec(`DELETE FROM translations
+		WHERE lower(key) LIKE '%ed2k%'
+		   OR lower(value) LIKE '%ed2k%'
+		   OR lower(key) LIKE '%amule%'
+		   OR lower(value) LIKE '%amule%'`); err != nil {
+		return 0, fmt.Errorf("remove obsolete aMule/eD2k translations: %w", err)
+	}
 	var defaults map[string]map[string]string
 	if err := yaml.Unmarshal([]byte(defaultTranslations), &defaults); err != nil {
 		return 0, fmt.Errorf("parse default translations: %w", err)
