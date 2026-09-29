@@ -53,6 +53,8 @@ type uiTableSpec struct {
 	Comics               bool
 	DownloadsColumnsJSON string
 	DownloadsActionsJSON string
+	FooterForm           *uiFormSection
+	FooterActions        []uiActionButton
 }
 
 // uiSearchPage drives the Esplora page: a query form, a generic result table and

@@ -377,7 +377,8 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 				ActionsJSON: uiJSON([]uiAction{
 					{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/comics/history/delete", Body: `{"url":"{post_url}"}`, Confirm: "Eliminare questa voce dallo storico?"},
 				}),
-				Empty: "Storico vuoto.",
+				FooterActions: []uiActionButton{{Label: "Svuota storico fumetti", Class: "danger", Method: "POST", Path: "/api/comics/history/clear", Body: "{}", Confirm: "Eliminare tutto lo storico degli scarichi dei fumetti?", Hint: "Elimina tutte le voci dello storico fumetti, senza toccare i Weekly Pack."}},
+				Empty:         "Storico vuoto.",
 			})),
 			group("Weekly pack", sectionTable(uiTableSpec{
 				Title:    "Storico Weekly Pack",
@@ -390,11 +391,12 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 				ActionsJSON: uiJSON([]uiAction{
 					{Label: "Forza", Kind: "comic-weekly-force", Method: "POST", Path: "/api/comics/download", Body: "{}"},
 				}),
+				FooterForm: &uiFormSection{
+					Hint: "Numero massimo di elementi da conservare nello Storico fumetti e nello Storico Weekly Pack (1–500).",
+					Path: "/api/comics/weekly/settings", Submit: "Salva storico",
+					Fields: []uiFormField{{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10)}},
+				},
 				Empty: "Nessun Weekly Pack registrato.",
-			})),
-			group("Weekly pack", sectionForm(uiFormSection{
-				Title: "Storico Weekly Pack", Hint: "Numero massimo di elementi da conservare nello Storico fumetti e nello Storico Weekly Pack (1–500).", Path: "/api/comics/weekly/settings", Submit: "Salva storico",
-				Fields: []uiFormField{{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10)}},
 			})),
 			sectionComicsLinks(),
 		}}, true

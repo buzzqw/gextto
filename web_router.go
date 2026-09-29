@@ -135,6 +135,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "DELETE /api/comics/{id}", RemoveComic)
 	handle(s, mux, "GET /api/comics/history", ComicsHistory)
 	handle(s, mux, "POST /api/comics/history/delete", DeleteComicsHistory)
+	handle(s, mux, "POST /api/comics/history/clear", ClearComicsHistory)
 	handle(s, mux, "GET /api/comics/weekly", ComicsWeekly)
 	handle(s, mux, "GET /api/browse_dir", BrowseDir)
 	handle(s, mux, "POST /api/mkdir", MakeDirectory)

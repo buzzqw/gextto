@@ -25,6 +25,16 @@
   </table>
 </div>
 {{if .PageSize}}<div class="table-pagination" data-ui-pagination hidden></div>{{end}}
+{{if or .FooterForm .FooterActions}}
+<div class="table-panel-footer">
+  {{if .FooterForm}}{{template "form_section_body" .FooterForm}}{{end}}
+  {{if .FooterActions}}
+  <div class="form-actions">
+    {{range .FooterActions}}<button class="btn sm {{.Class}}" type="button" data-api="{{.Path}}" data-method="{{.Method}}" data-body="{{.Body}}"{{if .Confirm}} data-confirm="{{.Confirm}}"{{end}} title="{{.Hint}}">{{.Label}}</button>{{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}
 <div data-ui-table
      data-endpoint="{{.Endpoint}}"
      data-items="{{.ItemsKey}}"

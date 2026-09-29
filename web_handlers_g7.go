@@ -818,6 +818,16 @@ func DeleteComicsHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true, "deleted": deleted})
 }
 
+// ClearComicsHistory handles POST /api/comics/history/clear.
+func ClearComicsHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
+	deleted, err := s.comics.ClearHistory()
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonResponse(w, map[string]any{"ok": true, "deleted": deleted})
+}
+
 // ExportMagnet handles GET /api/torrents/{hash}/magnet.
 func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")

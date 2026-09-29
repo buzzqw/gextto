@@ -54,6 +54,7 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | POST | `/api/comics/explore` |
 | GET | `/api/comics/history` |
 | POST | `/api/comics/history/delete` |
+| POST | `/api/comics/history/clear` |
 | POST | `/api/comics/links` |
 | GET | `/api/comics/weekly` |
 | POST | `/api/comics/weekly/links` |
