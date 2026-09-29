@@ -609,13 +609,15 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	page.Panels = []uiPageSection{
 		sectionTable(uiTableSpec{
 			Title:    "Storico download",
+			Class:    "download-history-table",
 			Endpoint: "/api/torrents/history",
 			ItemsKey: "items",
 			ColumnsJSON: uiJSON([]uiColumn{
 				{Key: "name", Label: "Nome"}, {Key: "kind", Label: "Tipo"},
 				{Key: "tag", Label: "Tag NAS", Format: "nas_tag"}, {Key: "quality_score", Label: "Punteggio", Format: "number"},
 				{Key: "status", Label: "Stato"},
-				{Key: "processed_path", Label: "Cartella libreria / NAS", Format: "folder"}, {Key: "completed_at", Label: "Concluso"},
+				{Key: "processed_path", Label: "Cartella libreria / NAS", Format: "folder"},
+				{Key: "source", Label: "Sorgente", Format: "source"}, {Key: "completed_at", Label: "Concluso"},
 			}),
 			Empty: "Nessun download nello storico.", Search: true, SearchParam: "q",
 		}),

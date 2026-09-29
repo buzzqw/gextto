@@ -40,6 +40,41 @@ type gh4_KeywordPruneInput struct {
 	Preview  bool     `json:"preview"`
 }
 
+// gh4_historyDisplayName keeps provider suffixes out of the history title when
+// the same provider is already exposed in the dedicated source column.
+func gh4_historyDisplayName(name, source string) string {
+	name = strings.TrimSpace(name)
+	source = strings.TrimSpace(source)
+	if name == "" || source == "" {
+		return name
+	}
+	labels := []string{source}
+	if parts := strings.Split(source, ":"); len(parts) > 1 {
+		labels = append(labels, parts[len(parts)-1])
+	}
+	for _, part := range strings.Split(source, " - ") {
+		labels = append(labels, part)
+	}
+	for _, label := range labels {
+		label = strings.TrimSpace(label)
+		if label == "" || strings.EqualFold(label, "archive") || strings.EqualFold(label, "unknown") {
+			continue
+		}
+		if len(name) <= len(label) || !strings.EqualFold(name[len(name)-len(label):], label) {
+			continue
+		}
+		start := len(name) - len(label)
+		if !strings.ContainsRune("-_.", rune(name[start-1])) {
+			continue
+		}
+		trimmed := strings.TrimRight(name[:start], " -_.")
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return name
+}
+
 type gh4_WebSeedsInput struct {
 	Urls   []string `json:"urls"`
 	Remove bool     `json:"remove"`
@@ -1348,6 +1383,7 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	combined := make([]historyItem, 0, len(torrents))
 	for _, torrent := range torrents {
+		torrent.Name = gh4_historyDisplayName(torrent.Name, torrent.Source)
 		at := torrent.CompletedAt
 		if at == "" {
 			at = torrent.UpdatedAt

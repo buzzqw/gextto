@@ -306,10 +306,28 @@ func TestUiHistoryFolderColumn(t *testing.T) {
 		if !strings.Contains(section.Table.ColumnsJSON, `"format":"folder"`) {
 			t.Fatalf("history columns missing folder format: %s", section.Table.ColumnsJSON)
 		}
+		if !strings.Contains(section.Table.ColumnsJSON, `"key":"source"`) {
+			t.Fatalf("history columns missing source: %s", section.Table.ColumnsJSON)
+		}
 		found = true
 	}
 	if !found {
 		t.Fatal("history download table not found")
+	}
+}
+
+func TestTorrentHistoryDisplayNameRemovesProviderSuffix(t *testing.T) {
+	cases := []struct {
+		name, source, want string
+	}{
+		{name: "Movie.2026.1080p-ExtTo", source: "ExtTo", want: "Movie.2026.1080p"},
+		{name: "Show.S01E01-Knaben", source: "prowlarr:Knaben", want: "Show.S01E01"},
+		{name: "The Knaben", source: "Knaben", want: "The Knaben"},
+	}
+	for _, testCase := range cases {
+		if got := gh4_historyDisplayName(testCase.name, testCase.source); got != testCase.want {
+			t.Errorf("gh4_historyDisplayName(%q, %q) = %q, want %q", testCase.name, testCase.source, got, testCase.want)
+		}
 	}
 }
 
