@@ -292,13 +292,13 @@
               <td class="numeric">{{printf "%.2f" .Ratio}}</td>
               <td class="row-actions">
                 {{if eq .Paused true}}
-                <button class="btn sm" data-action="resume" data-hash="{{.Hash}}" title="Riprendi il torrent">Riprendi</button>
+                <button class="btn sm icon-action" data-action="resume" data-hash="{{.Hash}}" title="Riprendi il torrent" aria-label="Riprendi il torrent"><span aria-hidden="true">▶</span></button>
                 {{else}}
-                <button class="btn sm" data-action="pause" data-hash="{{.Hash}}" title="Metti in pausa il torrent">Pausa</button>
+                <button class="btn sm icon-action" data-action="pause" data-hash="{{.Hash}}" title="Metti in pausa il torrent" aria-label="Metti in pausa il torrent"><span aria-hidden="true">⏸</span></button>
                 {{end}}
-                <button class="btn sm" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati">Check</button>
-                <button class="btn sm" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent">Dettagli</button>
-                <button class="btn sm danger" data-torrent-remove data-hash="{{.Hash}}" data-name="{{.Name}}" title="Rimuovi il torrent: scegli se mantenere o eliminare i file">Rimuovi</button>
+                <button class="btn sm icon-action" data-action="recheck" data-hash="{{.Hash}}" title="Forza la verifica dei dati" aria-label="Forza la verifica dei dati"><span aria-hidden="true">⟳</span></button>
+                <button class="btn sm icon-action" data-torrent-detail data-hash="{{.Hash}}" title="Mostra i dettagli del torrent" aria-label="Mostra i dettagli del torrent"><span aria-hidden="true">ⓘ</span></button>
+                <button class="btn sm icon-action danger" data-torrent-remove data-hash="{{.Hash}}" data-name="{{.Name}}" title="Rimuovi il torrent: scegli se mantenere o eliminare i file" aria-label="Rimuovi il torrent: scegli se mantenere o eliminare i file"><span aria-hidden="true">🗑️</span></button>
               </td>
             </tr>
             {{end}}
@@ -325,10 +325,10 @@
               <td class="numeric">—</td>
               <td class="numeric">—</td>
               <td class="row-actions">
-                {{if eq .Status "downloading"}}<button class="btn sm" data-api="/api/comics/downloads/{{.ID}}/pause" data-method="POST" data-body="{}">Pausa</button>{{end}}
-                {{if eq .Status "paused"}}<button class="btn sm" data-api="/api/comics/downloads/{{.ID}}/resume" data-method="POST" data-body="{}">Riprendi</button>{{end}}
-                <button class="btn sm" type="button" data-http-detail>Dettagli</button>
-                <button class="btn sm danger" data-api="/api/comics/downloads/{{.ID}}/remove" data-method="POST" data-body='{"delete_files":false}' data-confirm="Rimuovere questo download?">Rimuovi</button>
+                 {{if eq .Status "downloading"}}<button class="btn sm icon-action" data-api="/api/comics/downloads/{{.ID}}/pause" data-method="POST" data-body="{}" title="Metti in pausa il download HTTP" aria-label="Metti in pausa il download HTTP"><span aria-hidden="true">⏸</span></button>{{end}}
+                 {{if eq .Status "paused"}}<button class="btn sm icon-action" data-api="/api/comics/downloads/{{.ID}}/resume" data-method="POST" data-body="{}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
+                 <button class="btn sm icon-action" type="button" data-http-detail title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
+                 <button class="btn sm icon-action danger" data-api="/api/comics/downloads/{{.ID}}/remove" data-method="POST" data-body='{"delete_files":false}' data-confirm="Rimuovere questo download?" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
               </td>
             </tr>
             {{end}}

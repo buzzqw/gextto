@@ -455,6 +455,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; cursor: default; }
 .btn.sm { min-height: 36px; padding: 6px 11px; font-size: 0.86rem; }
+.btn.sm.icon-action { width: 2.25rem; min-width: 2.25rem; padding: 6px 0; font-size: 1rem; }
+.icon-action span { line-height: 1; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
 .btn.danger { background: color-mix(in srgb, var(--err) 22%, var(--surface)); border-color: color-mix(in srgb, var(--err) 45%, transparent); color: var(--text); }
 
