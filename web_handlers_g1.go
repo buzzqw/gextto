@@ -34,7 +34,7 @@ import (
 // ---------------------------------------------------------------------------
 
 type gh1_ComicWeeklySettings struct {
-	Enabled      bool    `json:"enabled"`
+	Enabled      *bool   `json:"enabled"`
 	FromDate     *string `json:"from_date"`
 	HistoryLimit *int64  `json:"history_limit"`
 }
@@ -415,25 +415,26 @@ func ComicWeeklySettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	fromDate := ""
 	if input.FromDate != nil {
-		fromDate = strings.TrimSpace(*input.FromDate)
+		fromDate := strings.TrimSpace(*input.FromDate)
+		if fromDate != "" && !gh1_validDate(fromDate) {
+			jsonError(w, http.StatusBadRequest, "data weekly non valida: usare YYYY-MM-DD")
+			return
+		}
+		if err := s.comics.SetSetting("weekly_from_date", fromDate); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
-	if fromDate != "" && !gh1_validDate(fromDate) {
-		jsonError(w, http.StatusBadRequest, "data weekly non valida: usare YYYY-MM-DD")
-		return
-	}
-	enabled := "no"
-	if input.Enabled {
-		enabled = "yes"
-	}
-	if err := s.comics.SetSetting("weekly_enabled", enabled); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := s.comics.SetSetting("weekly_from_date", fromDate); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
+	if input.Enabled != nil {
+		enabled := "no"
+		if *input.Enabled {
+			enabled = "yes"
+		}
+		if err := s.comics.SetSetting("weekly_enabled", enabled); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	if input.HistoryLimit != nil {
 		limit := clampInt64(*input.HistoryLimit, 1, 500)
@@ -446,10 +447,12 @@ func ComicWeeklySettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		}
 	}
+	enabledValue, _ := s.comics.Setting("weekly_enabled", "no")
+	fromDate, _ := s.comics.Setting("weekly_from_date", "")
 	historyLimit := s.comics.HistoryLimit()
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":               true,
-		"weekly_enabled":   input.Enabled,
+		"weekly_enabled":   enabledValue == "yes" || enabledValue == "true" || enabledValue == "1",
 		"weekly_from_date": fromDate,
 		"history_limit":    historyLimit,
 	})

@@ -360,7 +360,6 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 				Fields: []uiFormField{
 					boolField("enabled", "Weekly attivo", weeklyEnabled),
 					{Name: "from_date", Label: "Scarica weekly pack a partire dal", Kind: "date", Value: weeklyFromDate, Hint: "Non cercare o scaricare Weekly Pack con data precedente a questa."},
-					{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10), Hint: "Numero massimo di elementi da conservare sia nello Storico fumetti sia nello Storico Weekly Pack (1–500)."},
 				},
 			})),
 			group("Weekly pack", sectionForm(uiFormSection{
@@ -392,6 +391,10 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Label: "Forza", Kind: "comic-weekly-force", Method: "POST", Path: "/api/comics/download", Body: "{}"},
 				}),
 				Empty: "Nessun Weekly Pack registrato.",
+			})),
+			group("Weekly pack", sectionForm(uiFormSection{
+				Title: "Storico Weekly Pack", Hint: "Numero massimo di elementi da conservare nello Storico fumetti e nello Storico Weekly Pack (1–500).", Path: "/api/comics/weekly/settings", Submit: "Salva storico",
+				Fields: []uiFormField{{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10)}},
 			})),
 			sectionComicsLinks(),
 		}}, true
