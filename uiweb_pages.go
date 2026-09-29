@@ -45,6 +45,7 @@ type uiTableSpec struct {
 	Search      bool
 	SearchParam string
 	Query       string
+	PageSize    int
 	// Filter adds a client-side text filter over the rendered rows.
 	Filter bool
 	// Comics enables the extra panels of the comics page (download queue and
@@ -209,7 +210,8 @@ type uiCheckboxGroup struct {
 	CustomPlaceholder string
 	// TestQuery, when set, shows a "test the selected values" toolbar: the
 	// button queries /api/sources/health with this default term and reports
-	// which sources responded. TestKind filters the health items by `kind`.
+	// which sources responded. TestKind filters the health request and results
+	// by `kind`.
 	TestQuery string
 	TestKind  string
 	TestLabel string
@@ -994,6 +996,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Empty:       "Archivio vuoto.",
 			Search:      true,
 			SearchParam: "q",
+			PageSize:    100,
 		}, true
 	case "blocklist":
 		return uiTableSpec{

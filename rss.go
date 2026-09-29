@@ -815,8 +815,17 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 		if retryDirectOnFailure {
 			nextStep = "direct HTTP attempts will continue"
 		}
-		logging.Warn("FlareSolverr failed; "+nextStep,
-			"feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason, "error", flaresolverr_error_message(err))
+		logMessage := "FlareSolverr failed; " + nextStep
+		logFields := []any{
+			"feed_url", rawURL, "flaresolverr", flaresolverr,
+			"reason", reason, "error", flaresolverr_error_message(err),
+		}
+		if retryDirectOnFailure {
+			// This is not yet a failed feed: the direct fallback is still running.
+			logging.Debug(logMessage, logFields...)
+		} else {
+			logging.Warn(logMessage, logFields...)
+		}
 		logging.Debug("FlareSolverr request failed", "feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
 		return "", err
 	}

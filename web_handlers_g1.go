@@ -877,6 +877,10 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	ConfigureCloudflareState(cfg.DataDir)
 	rawTerm := queryParam(r, "q")
+	kindFilter := strings.ToLower(strings.TrimSpace(queryParam(r, "kind")))
+	includeKind := func(kind string) bool {
+		return kindFilter == "" || kindFilter == kind
+	}
 	var term *string
 	if strings.TrimSpace(rawTerm) != "" {
 		value := rawTerm
@@ -891,117 +895,146 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		feedMaxPages := cfg.FeedMaxPages()
 		maxAgeDays := cfg.MaxReleaseAgeDays
 		oldRatio := cfg.StopOnOldPageRatio()
-		for _, feed := range cfg.FeedURLs {
-			feed := feed
-			tasks = append(tasks, func() map[string]any {
-				items, err := FetchFeed(ctx, feed, cfg.FlaresolverrURL, feedMaxPages, maxAgeDays, oldRatio)
-				if err != nil {
-					return map[string]any{"kind": "feed", "name": feed, "ok": false, "results": int64(0), "error": err.Error()}
-				}
-				return map[string]any{"kind": "feed", "name": feed, "ok": true, "results": int64(len(items)), "error": nil}
-			})
-		}
-		for _, indexer := range cfg.Indexers {
-			if !indexer.Enabled {
-				continue
+		if includeKind("feed") {
+			for _, feed := range cfg.FeedURLs {
+				feed := feed
+				tasks = append(tasks, func() map[string]any {
+					items, err := FetchFeed(ctx, feed, cfg.FlaresolverrURL, feedMaxPages, maxAgeDays, oldRatio)
+					if err != nil {
+						return map[string]any{"kind": "feed", "name": feed, "ok": false, "results": int64(0), "error": err.Error()}
+					}
+					return map[string]any{"kind": "feed", "name": feed, "ok": true, "results": int64(len(items)), "error": nil}
+				})
 			}
-			indexer := indexer
-			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznabFlareSolverr(ctx, indexer, *term, nil, cfg.FlaresolverrURL)
-				if err != nil {
-					return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}
-				}
-				return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": true, "results": int64(len(items)), "error": nil}
-			})
 		}
-		for _, engine := range cfg.WebsearchEngines {
-			engine := engine
-			tasks = append(tasks, func() map[string]any {
-				items, err := runWebEngine(ctx, engine, *term, cfg.FlaresolverrURL)
-				if err != nil {
-					return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+		if includeKind("indexer") {
+			for _, indexer := range cfg.Indexers {
+				if !indexer.Enabled {
+					continue
 				}
-				return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
-			})
+				indexer := indexer
+				tasks = append(tasks, func() map[string]any {
+					items, err := FetchTorznabFlareSolverr(ctx, indexer, *term, nil, cfg.FlaresolverrURL)
+					if err != nil {
+						return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": false, "results": int64(0), "error": err.Error()}
+					}
+					return map[string]any{"kind": "indexer", "name": indexer.Name, "ok": true, "results": int64(len(items)), "error": nil}
+				})
+			}
+		}
+		if includeKind("engine") {
+			for _, engine := range cfg.WebsearchEngines {
+				engine := engine
+				tasks = append(tasks, func() map[string]any {
+					items, err := runWebEngine(ctx, engine, *term, cfg.FlaresolverrURL)
+					if err != nil {
+						return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+					}
+					return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
+				})
+			}
 		}
 	} else {
-		for _, feed := range cfg.FeedURLs {
-			feed := feed
-			tasks = append(tasks, func() map[string]any {
-				request, err := http.NewRequestWithContext(ctx, http.MethodGet, feed, nil)
-				if err != nil {
-					return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
-				}
-				response, err := client.Do(request)
-				if err != nil {
-					return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
-				}
-				_ = response.Body.Close()
-				ok := response.StatusCode >= 200 && response.StatusCode < 300
-				return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": ok, "status": int64(response.StatusCode), "error": nil}
-			})
-		}
-		for _, indexer := range cfg.Indexers {
-			if !indexer.Enabled {
-				continue
+		if includeKind("feed") {
+			for _, feed := range cfg.FeedURLs {
+				feed := feed
+				tasks = append(tasks, func() map[string]any {
+					request, err := http.NewRequestWithContext(ctx, http.MethodGet, feed, nil)
+					if err != nil {
+						return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
+					}
+					response, err := client.Do(request)
+					if err != nil {
+						return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": false, "status": int64(0), "error": err.Error()}
+					}
+					_ = response.Body.Close()
+					ok := response.StatusCode >= 200 && response.StatusCode < 300
+					return map[string]any{"kind": "feed", "name": feed, "url": feed, "ok": ok, "status": int64(response.StatusCode), "error": nil}
+				})
 			}
-			indexer := indexer
-			tasks = append(tasks, func() map[string]any {
-				items, err := FetchTorznabFlareSolverr(ctx, indexer, "ita", nil, cfg.FlaresolverrURL)
-				if err != nil {
-					return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}
-				}
-				return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": true, "results": int64(len(items)), "error": nil}
-			})
 		}
-		for _, engine := range cfg.WebsearchEngines {
-			engine := engine
-			tasks = append(tasks, func() map[string]any {
-				items, err := runWebEngine(ctx, engine, "ita", cfg.FlaresolverrURL)
-				if err != nil {
-					return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+		if includeKind("indexer") {
+			for _, indexer := range cfg.Indexers {
+				if !indexer.Enabled {
+					continue
 				}
-				return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
-			})
+				indexer := indexer
+				tasks = append(tasks, func() map[string]any {
+					items, err := FetchTorznabFlareSolverr(ctx, indexer, "ita", nil, cfg.FlaresolverrURL)
+					if err != nil {
+						return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": false, "results": int64(0), "error": err.Error()}
+					}
+					return map[string]any{"kind": "indexer", "name": indexer.Name, "url": indexer.URL, "ok": true, "results": int64(len(items)), "error": nil}
+				})
+			}
+		}
+		if includeKind("engine") {
+			for _, engine := range cfg.WebsearchEngines {
+				engine := engine
+				tasks = append(tasks, func() map[string]any {
+					items, err := runWebEngine(ctx, engine, "ita", cfg.FlaresolverrURL)
+					if err != nil {
+						return map[string]any{"kind": "engine", "name": engine, "ok": false, "results": int64(0), "error": err.Error()}
+					}
+					return map[string]any{"kind": "engine", "name": engine, "ok": true, "results": int64(len(items)), "error": nil}
+				})
+			}
 		}
 	}
 
 	// Manager-side indexer health: one row per indexer configured in a Prowlarr
 	// instance, so a failing or disabled indexer is visible in the Sources table
 	// instead of showing up only as missing results.
-	for _, indexer := range cfg.Indexers {
-		if !indexer.Enabled || managerKind(indexer) != ManagerProwlarr {
-			continue
-		}
-		health, healthErr := ProwlarrIndexerHealth(ctx, indexer.URL, indexer.APIKey)
-		if healthErr != nil {
-			name := indexer.Name
-			message := healthErr.Error()
-			tasks = append(tasks, func() map[string]any {
-				return map[string]any{"kind": "prowlarr", "name": name, "ok": false, "results": nil, "error": message}
-			})
-			continue
-		}
-		for _, item := range health {
-			item := item
-			tasks = append(tasks, func() map[string]any { return item })
+	if kindFilter == "" || kindFilter == "prowlarr" {
+		for _, indexer := range cfg.Indexers {
+			if !indexer.Enabled || managerKind(indexer) != ManagerProwlarr {
+				continue
+			}
+			health, healthErr := ProwlarrIndexerHealth(ctx, indexer.URL, indexer.APIKey)
+			if healthErr != nil {
+				name := indexer.Name
+				message := healthErr.Error()
+				tasks = append(tasks, func() map[string]any {
+					return map[string]any{"kind": "prowlarr", "name": name, "ok": false, "results": nil, "error": message}
+				})
+				continue
+			}
+			for _, item := range health {
+				item := item
+				tasks = append(tasks, func() map[string]any { return item })
+			}
 		}
 	}
 
-	var mu sync.Mutex
-	items := []map[string]any{}
-	var wait sync.WaitGroup
-	for _, task := range tasks {
-		wait.Add(1)
-		go func(task func() map[string]any) {
-			defer wait.Done()
-			item := task()
-			mu.Lock()
-			items = append(items, item)
-			mu.Unlock()
-		}(task)
+	// Keep health probes bounded: each task may need one or more browser
+	// sessions, and FlareSolverr has its own shared two-slot queue. Running one
+	// worker per configured source would only create a large pile-up behind it.
+	workerCount := 2
+	if len(tasks) < workerCount {
+		workerCount = len(tasks)
 	}
+	jobs := make(chan func() map[string]any, len(tasks))
+	results := make(chan map[string]any, len(tasks))
+	var wait sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			for task := range jobs {
+				results <- task()
+			}
+		}()
+	}
+	for _, task := range tasks {
+		jobs <- task
+	}
+	close(jobs)
 	wait.Wait()
+	close(results)
+	items := make([]map[string]any, 0, len(tasks))
+	for item := range results {
+		items = append(items, item)
+	}
 
 	var query any
 	if term != nil {

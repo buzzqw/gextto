@@ -704,7 +704,7 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		term = queryParam(r, "query")
 	}
 	page := int(queryInt(r, "page", 1))
-	limit := int(queryInt(r, "limit", 200))
+	limit := int(queryInt(r, "limit", 100))
 	result, err := s.archive.BrowsePage(term, page, limit)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

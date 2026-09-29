@@ -24,13 +24,15 @@
     </tbody>
   </table>
 </div>
+{{if .PageSize}}<div class="table-pagination" data-ui-pagination hidden></div>{{end}}
 <div data-ui-table
      data-endpoint="{{.Endpoint}}"
      data-items="{{.ItemsKey}}"
      data-columns="{{.ColumnsJSON}}"
      data-actions="{{.ActionsJSON}}"
      data-empty="{{.Empty}}"
-     data-search="{{.SearchParam}}"></div>
+     data-search="{{.SearchParam}}"
+     data-page-size="{{.PageSize}}"></div>
 {{end}}
 
 {{define "table"}}

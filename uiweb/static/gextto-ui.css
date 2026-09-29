@@ -575,12 +575,16 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   border-radius: 3px;
 }
 .th-sort { cursor: default; }
-/* The archive rows are short: keep the table content-sized instead of
-   stretching the title column, so the source sits right next to the title
-   with no dead space in between. */
-.archive-table { width: auto; min-width: 0; }
+/* Let the archive title use the available panel width, while keeping the
+   action buttons compact instead of leaving dead space after them. */
+.archive-table { width: 100%; min-width: 0; table-layout: auto; }
+.archive-table th:first-child, .archive-table td:first-child { width: 100%; }
+.archive-table th:last-child, .archive-table td:last-child { width: 1%; }
+.archive-table td:first-child .cell-truncate { display: block; max-width: none; }
 .archive-table th, .archive-table td { padding: 8px 10px; }
 .archive-table td { white-space: nowrap; }
+.table-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
+.table-pagination .page-label { color: var(--muted); font-size: 0.85rem; }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }
 .row-actions .btn { flex: none; }
 

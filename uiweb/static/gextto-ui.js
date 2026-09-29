@@ -1489,19 +1489,40 @@
     var count = panel.querySelector("[data-ui-count]");
     var searchInput = panel.querySelector("[data-ui-search]");
     var filterInput = panel.querySelector("[data-ui-filter]");
+    var pagination = panel.querySelector("[data-ui-pagination]");
     var endpoint = container.getAttribute("data-endpoint");
     var itemsKey = container.getAttribute("data-items") || "items";
     var columns = JSON.parse(container.getAttribute("data-columns") || "[]");
     var actions = JSON.parse(container.getAttribute("data-actions") || "[]");
     var empty = container.getAttribute("data-empty") || "Nessun elemento.";
     var searchParam = container.getAttribute("data-search") || "";
+    var pageSize = parseInt(container.getAttribute("data-page-size") || "0", 10) || 0;
+    var page = 1;
     var fetching = false;
+    function renderPagination(current, pages, total) {
+      if (!pagination || !pageSize) return;
+      pagination.hidden = pages <= 1;
+      if (pages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+      pagination.innerHTML = '<button class="btn sm" type="button" data-page-prev' + (current <= 1 ? " disabled" : "") + '>‹ Precedente</button>' +
+        '<span class="page-label">Pagina ' + current + " di " + pages + " · " + total + " voci</span>" +
+        '<button class="btn sm" type="button" data-page-next' + (current >= pages ? " disabled" : "") + '>Successiva ›</button>';
+      var previous = pagination.querySelector("[data-page-prev]");
+      var next = pagination.querySelector("[data-page-next]");
+      if (previous) previous.addEventListener("click", function () { page = Math.max(1, current - 1); fetchAndRender(); });
+      if (next) next.addEventListener("click", function () { page = Math.min(pages, current + 1); fetchAndRender(); });
+    }
     function fetchAndRender() {
       if (fetching) return;
       fetching = true;
       var url = endpoint;
       if (searchParam && searchInput && searchInput.value) {
         url += (url.indexOf("?") >= 0 ? "&" : "?") + searchParam + "=" + encodeURIComponent(searchInput.value);
+      }
+      if (pageSize) {
+        url += (url.indexOf("?") >= 0 ? "&" : "?") + "page=" + page + "&limit=" + pageSize;
       }
       pollRequest(url).then(function (data) {
         var items = (itemsKey && data[itemsKey]) || (Array.isArray(data) ? data : []);
@@ -1682,7 +1703,9 @@
             return "<tr>" + cells + actionsHtml + "</tr>";
           }).join("");
         }
-        if (count) count.textContent = items.length + " voci";
+        var total = pageSize && typeof data.total === "number" ? data.total : items.length;
+        if (count) count.textContent = total + " voci";
+        if (pageSize) renderPagination(Number(data.page) || page, Number(data.pages) || 1, total);
         applyTableFilter(panel);
       }).catch(function (error) {
         tbody.innerHTML = '<tr><td class="alert">' + esc(error.message) + "</td></tr>";
@@ -1694,7 +1717,7 @@
     var refresh = panel.querySelector("[data-ui-refresh]");
     if (refresh) refresh.addEventListener("click", fetchAndRender);
     if (searchInput) searchInput.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") { event.preventDefault(); fetchAndRender(); }
+      if (event.key === "Enter") { event.preventDefault(); page = 1; fetchAndRender(); }
     });
     if (filterInput) filterInput.addEventListener("input", function () { applyTableFilter(panel); });
     fetchAndRender();
@@ -2272,7 +2295,9 @@
         testButton.disabled = true;
         if (testStatus) testStatus.textContent = "Verifica in corso…";
         if (testOutput) testOutput.hidden = true;
-        api("/api/sources/health?q=" + encodeURIComponent(term), "GET").then(function (data) {
+        var healthUrl = "/api/sources/health?q=" + encodeURIComponent(term);
+        if (testKind) healthUrl += "&kind=" + encodeURIComponent(testKind);
+        api(healthUrl, "GET").then(function (data) {
           var items = (data && data.items) || [];
           if (testKind) items = items.filter(function (item) { return item.kind === testKind; });
           var ok = items.filter(function (item) { return item.ok; });
