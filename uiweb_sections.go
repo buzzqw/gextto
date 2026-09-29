@@ -171,13 +171,14 @@ type uiFormField struct {
 }
 
 type uiFormSection struct {
-	Title  string
-	Hint   string
-	Path   string
-	Method string
-	Wrap   string // optional JSON object key around submitted fields
-	Submit string
-	Render string // optional result renderer: tmdb | releases
+	Title   string
+	Hint    string
+	Path    string
+	Method  string
+	Wrap    string // optional JSON object key around submitted fields
+	Submit  string
+	Render  string // optional result renderer: tmdb | releases
+	TestFTP bool   // renders the backup FTP connection/transfer test action
 	// ManualAdd, when set, adds a secondary "Aggiungi manualmente" button that
 	// opens the requirements completion modal for that kind.
 	ManualAdd string
@@ -447,7 +448,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 		group("Backup", sectionForm(uiFormSection{
 			Title: "Impostazioni backup",
 			Hint:  "Il backup crea uno ZIP locale dei database. Puoi conservarne più copie, programmarlo a intervalli o a un orario preciso e inviarne una copia opzionale via FTP, in una cartella cloud locale sincronizzata o su Telegram. Lascia vuoti i collegamenti che non vuoi usare.",
-			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup",
+			Path:  "/api/backup/settings", Wrap: "values", Submit: "Salva backup", TestFTP: true,
 			Fields: []uiFormField{
 				{Name: "backup_retention", Label: "Backup da conservare", Kind: "number", Value: settingsOr(cfg, "backup_retention", "5"), Hint: "Numero di file ZIP locali da conservare nella cartella backups; i più vecchi vengono eliminati quando ne viene creato uno nuovo."},
 				{Name: "backup_schedule_hours", Label: "Intervallo (ore)", Kind: "number", Value: settingsOr(cfg, "backup_schedule_hours", "0"), Hint: "Intervallo del backup automatico in ore. 0 disattiva l'intervallo; se imposti Orario, l'orario giornaliero ha la precedenza."},

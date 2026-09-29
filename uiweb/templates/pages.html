@@ -118,6 +118,7 @@
       {{end}}
       <div class="form-actions">
         <button class="btn primary" type="submit">{{if .Submit}}{{.Submit}}{{else}}Invia{{end}}</button>
+        {{if .TestFTP}}<button class="btn" type="button" data-backup-test-ftp title="Verifica connessione, login, cartella remota, upload e cancellazione di un piccolo file di prova; non crea un backup reale">Test FTP</button><small class="muted" data-backup-ftp-status role="status" aria-live="polite" aria-atomic="true"></small>{{end}}
         {{if .ManualAdd}}<button class="btn" type="button" data-open-add="{{.ManualAdd}}" title="Compila i requisiti e aggiungi manualmente">Aggiungi manualmente</button>{{end}}
         <small class="muted" data-form-message role="status" aria-live="polite" aria-atomic="true"></small>
       </div>
@@ -181,7 +182,6 @@
   <div class="panel-body">
     <div class="toolbar">
       <button class="btn sm primary" type="button" data-sources-check title="Verifica feed RSS, indexer Torznab e motori web">Verifica indexer e sorgenti</button>
-      <button class="btn sm" type="button" data-flaresolverr-test title="Verifica che FlareSolverr risponda">Test FlareSolverr</button>
     </div>
     <div data-sources-output aria-live="polite"></div>
   </div>
@@ -222,12 +222,12 @@
     <p class="hint">Scansiona una cartella di serie o film: Gextto confronta i nomi con TMDB/TVDB e propone le rinomine. La scansione non modifica nulla; vengono applicate solo le righe accettate.</p>
     <div class="toolbar folder-rename-toolbar">
       <label class="field inline-field"><span>Cartella</span><span class="field-row"><input class="input" type="text" data-folder-rename-path placeholder="/percorso/alla/cartella" autocomplete="off" /><button class="btn sm" type="button" data-folder-rename-browse title="Sfoglia le cartelle">Sfoglia</button></span></label>
-      <button class="btn sm primary" type="button" data-folder-rename-scan>Scansiona e proponi</button>
-    </div>
-    <div class="toolbar folder-rename-actions" data-folder-rename-actions hidden>
-      <button class="btn sm" type="button" data-folder-rename-accept-all>Accetta tutte le proposte</button>
-      <button class="btn sm primary" type="button" data-folder-rename-apply>Applica selezionate</button>
-      <small class="muted" data-folder-rename-count>0 proposte</small>
+      <button class="btn sm primary" type="button" data-folder-rename-scan title="Analizza la cartella e prepara le proposte senza rinominare alcun file">Scansiona e proponi</button>
+      <span class="folder-rename-actions" data-folder-rename-actions hidden>
+        <button class="btn sm" type="button" data-folder-rename-accept-all title="Seleziona tutte le proposte compatibili; non applica ancora le rinomine">Accetta tutte le proposte</button>
+        <button class="btn sm primary" type="button" data-folder-rename-apply title="Applica le proposte selezionate e rinomina i file">Applica selezionate</button>
+        <small class="muted" data-folder-rename-count>0 proposte</small>
+      </span>
     </div>
     <div class="table-wrap" data-folder-rename-results aria-live="polite" hidden></div>
   </div>

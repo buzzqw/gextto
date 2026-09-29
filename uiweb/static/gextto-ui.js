@@ -2078,6 +2078,35 @@
   });
 
   // ---- settings forms -----------------------------------------------------
+  var backupFtpTest = document.querySelector("[data-backup-test-ftp]");
+  if (backupFtpTest) {
+    var backupFtpForm = backupFtpTest.closest("form");
+    var backupFtpStatus = backupFtpForm && backupFtpForm.querySelector("[data-backup-ftp-status]");
+    var backupFtpValue = function (name) {
+      var input = backupFtpForm && backupFtpForm.querySelector('[name="' + name + '"]');
+      return input ? String(input.value || "").trim() : "";
+    };
+    backupFtpTest.addEventListener("click", function () {
+      backupFtpTest.disabled = true;
+      if (backupFtpStatus) backupFtpStatus.textContent = "Test FTP in corso…";
+      api("/api/backup/test-ftp", "POST", {
+        host: backupFtpValue("backup_ftp_host"),
+        user: backupFtpValue("backup_ftp_user"),
+        password: backupFtpValue("backup_ftp_password"),
+        path: backupFtpValue("backup_ftp_path")
+      }).then(function (data) {
+        var message = data && data.ok
+          ? "FTP OK: connessione, login, trasferimento e rimozione completati"
+          : "FTP non riuscito: " + String((data && data.error) || "verifica fallita");
+        if (backupFtpStatus) backupFtpStatus.textContent = message;
+        notify(message, data && data.ok ? "ok" : "err");
+      }).catch(function (error) {
+        if (backupFtpStatus) backupFtpStatus.textContent = "Test FTP non riuscito: " + error.message;
+        notify("Test FTP non riuscito: " + error.message, "err");
+      }).then(function () { backupFtpTest.disabled = false; });
+    });
+  }
+
   var dirtySettings = {};
 
   function settingValueOf(input) {
@@ -4642,28 +4671,26 @@
     });
   })();
 
-  // ---- integrations: sources / FlareSolverr check -------------------------
+  // ---- integrations: sources check ----------------------------------------
   document.addEventListener("click", function (event) {
     var check = event.target.closest("[data-sources-check]");
-    var flare = event.target.closest("[data-flaresolverr-test]");
-    if (!check && !flare) return;
-    var button = check || flare;
+    if (!check) return;
+    var button = check;
     var panel = button.closest(".panel");
     var output = panel.querySelector("[data-sources-output]");
     var message = panel.querySelector("[data-sources-message]");
     button.disabled = true;
     if (message) message.textContent = "Verifica in corso…";
     output.innerHTML = '<p class="muted">Attendere…</p>';
-    var promise = check ? api("/api/sources/health", "GET") : api("/api/flaresolverr/test", "POST", {});
+    var promise = api("/api/sources/health", "GET");
     promise.then(function (data) {
       if (message) message.textContent = "";
       output.innerHTML = "";
-      if (check) {
-        var items = (data && data.items) || [];
-        if (!items.length) {
-          output.innerHTML = '<p class="muted">Nessuna sorgente da verificare.</p>';
-          return;
-        }
+      var items = (data && data.items) || [];
+      if (!items.length) {
+        output.innerHTML = '<p class="muted">Nessuna sorgente da verificare.</p>';
+        return;
+      }
         var table = document.createElement("table");
         table.className = "data-table";
         table.innerHTML = "<thead><tr><th>Tipo</th><th>Nome</th><th>Esito</th><th>Risultati</th><th>Dettaglio</th></tr></thead>";
@@ -4682,12 +4709,6 @@
         });
         table.appendChild(tbody);
         output.appendChild(table);
-      } else {
-        var box = document.createElement("div");
-        box.className = "output";
-        renderReadable(box, data || {});
-        output.appendChild(box);
-      }
     }).catch(function (error) {
       if (message) message.textContent = error.message;
       output.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";

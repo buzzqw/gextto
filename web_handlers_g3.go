@@ -69,6 +69,7 @@ func BackupTestFtp(w http.ResponseWriter, r *http.Request, s *AppState) {
 	password := pick(input.Password, "backup_ftp_password")
 	path := pick(input.Path, "backup_ftp_path")
 	if host == "" || user == "" || password == "" {
+		logging.Info("FTP test skipped: missing configuration", "host", host, "user", user, "path", path, "password_configured", password != "")
 		jsonError(w, http.StatusBadRequest, "host, utente e password FTP sono obbligatori")
 		return
 	}

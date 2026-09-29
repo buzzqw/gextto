@@ -432,7 +432,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 }
 .folder-rename-toolbar { align-items: flex-end; }
 .folder-rename-toolbar .inline-field { flex: 1 1 420px; min-width: min(100%, 320px); }
-.folder-rename-actions { margin-top: 14px; }
+.folder-rename-actions:not([hidden]) { display: inline-flex; align-items: center; gap: 8px; }
 .lang-rows { display: flex; flex-direction: column; gap: 6px; }
 .lang-row { display: flex; align-items: center; gap: 10px; }
 .lang-row select { flex: 0 0 180px; }

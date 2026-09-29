@@ -248,7 +248,7 @@ func TestUiMaintenanceParity(t *testing.T) {
 		"data-duplicates", "data-duplicates-preview", "data-duplicates-clean",
 		"data-ramdisk", "data-ramdisk-paths", "data-db-optimize", "data-trash-open",
 		`data-endpoint="/api/db/prune"`, `data-api="/api/backup"`,
-		"Cartella cloud", "FTP password", "Percorso locale di una cartella già montata", `&#34;key&#34;:&#34;path&#34;,&#34;label&#34;:&#34;Nome&#34;`,
+		"Cartella cloud", "FTP password", "Percorso locale di una cartella già montata", "Test FTP", "Verifica connessione, login, cartella remota", `&#34;key&#34;:&#34;path&#34;,&#34;label&#34;:&#34;Nome&#34;`,
 	} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("maintenance page missing %q", marker)
@@ -256,6 +256,12 @@ func TestUiMaintenanceParity(t *testing.T) {
 	}
 	if strings.Contains(html, "Diagnostica sorgenti") || strings.Contains(html, "data-sources-probe") {
 		t.Fatalf("maintenance page should not duplicate the source check")
+	}
+	scanIndex := strings.Index(html, `data-folder-rename-scan`)
+	acceptIndex := strings.Index(html, `data-folder-rename-accept-all`)
+	applyIndex := strings.Index(html, `data-folder-rename-apply`)
+	if scanIndex < 0 || acceptIndex < 0 || applyIndex < 0 || !(scanIndex < acceptIndex && acceptIndex < applyIndex) {
+		t.Fatalf("folder rename actions should be ordered scan, accept all, apply")
 	}
 	for _, forbidden := range []string{">Porte<", "/api/config/check-ports"} {
 		if strings.Contains(html, forbidden) {
@@ -615,10 +621,32 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 			t.Fatalf("GET %s -> %d, missing %q", path, code, marker)
 		}
 	}
+	code, _, body = webGet(t, server, "/ui?view=settings&tab=libtorrent")
+	if code != http.StatusOK || !strings.Contains(string(body), `value="0.0.0.0:6881-6891"`) || !strings.Contains(string(body), "Il valore proposto va bene nella maggior parte dei casi") {
+		t.Fatalf("libtorrent settings should propose listen interfaces")
+	}
 	// An unknown tab falls back to the first available tab, never a blank page.
 	code, _, body = webGet(t, server, "/ui?view=settings&tab=does-not-exist")
 	if code != http.StatusOK || !strings.Contains(string(body), "settings-rows") {
 		t.Fatalf("unknown tab should fall back, got %d", code)
+	}
+}
+
+func TestUiSettingDefaultsMatchSafeRuntimeDefaults(t *testing.T) {
+	want := map[string]string{
+		"active":                       "false",
+		"libtorrent_proxy_port":        "0",
+		"libtorrent_listen_interfaces": "0.0.0.0:6881-6891",
+		"qbittorrent_poll_interval_ms": "1500",
+		"trash_retention_days":         "0",
+	}
+	for key, expected := range want {
+		if got := uiSettingDefaults[key]; got != expected {
+			t.Errorf("ui default %s = %q, want %q", key, got, expected)
+		}
+	}
+	if got, want := uiSettingDefaults["blacklist"], strings.Join(defaultBlacklist(), "\n"); got != want {
+		t.Errorf("ui default blacklist = %q, want %q", got, want)
 	}
 }
 

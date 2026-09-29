@@ -118,6 +118,38 @@ func webGet(t *testing.T, server *httptest.Server, path string) (int, http.Heade
 	return response.StatusCode, response.Header, body
 }
 
+func TestBrowserHandlerDownloadsUseGexttoEndpoints(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	tests := []struct {
+		file string
+		want []string
+	}{
+		{file: "gextto-magnet", want: []string{"Gextto", "/api/send-magnet"}},
+		{file: "gextto-torrent", want: []string{"Gextto", "/api/send-magnet", "/api/upload-torrent"}},
+		{file: "gextto-magnet.desktop", want: []string{"Name=Gextto Magnet Handler", "gextto-magnet"}},
+		{file: "gextto-torrent.desktop", want: []string{"Name=Gextto Torrent Handler", "gextto-torrent"}},
+		{file: "install.sh", want: []string{"Gextto - installazione handler", "/api/status", "gextto-magnet"}},
+	}
+	for _, test := range tests {
+		code, headers, body := webGet(t, server, "/api/browser-handlers/download?file="+url.QueryEscape(test.file))
+		if code != http.StatusOK {
+			t.Fatalf("download %s -> %d", test.file, code)
+		}
+		if got := headers.Get("Content-Disposition"); !strings.Contains(got, test.file) {
+			t.Fatalf("download %s content disposition = %q", test.file, got)
+		}
+		text := string(body)
+		for _, marker := range test.want {
+			if !strings.Contains(text, marker) {
+				t.Errorf("download %s missing %q", test.file, marker)
+			}
+		}
+	}
+}
+
 // webPostJSON performs a POST with a JSON body and returns status and body.
 func webPostJSON(t *testing.T, server *httptest.Server, path, payload string) (int, []byte) {
 	t.Helper()

@@ -133,7 +133,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "tmdb_api_key", Label: "TMDB API key", Tab: "rename"},
 	{Key: "tvdb_api_key", Label: "TVDB API key", Tab: "rename"},
 	{Key: "min_free_space_gb", Label: "Spazio libero minimo per scaricare (GB)", Tab: "advanced"},
-	{Key: "trash_retention_days", Label: "Trash — giorni di conservazione (0 = sempre tutto)", Tab: "advanced"},
+	{Key: "trash_retention_days", Label: "Trash — giorni di conservazione (0 = elimina tutto)", Tab: "advanced"},
 	{Key: "archive_retention_days", Label: "Archivio — giorni di conservazione (0 = illimitato)", Tab: "advanced"},
 	{Key: "archive_cleanup_enabled", Label: "Pulizia automatica archivio", Tab: "advanced"},
 	{Key: "archive_max_age_days", Label: "Archivio — età massima (giorni)", Tab: "advanced"},

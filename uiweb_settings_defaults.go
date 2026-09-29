@@ -16,7 +16,7 @@ package gextto
 // backend readers.
 var uiSettingDefaults = map[string]string{
 	// --- Daemon -------------------------------------------------------------
-	"active":                  "true",
+	"active":                  "false",
 	"refresh_interval":        "21600",
 	"max_release_age_days":    "0",
 	"gap_fill_max_per_series": "0",
@@ -26,7 +26,7 @@ var uiSettingDefaults = map[string]string{
 	"gap_deep_max_per_cycle":  "5",
 
 	// --- Sorgenti -----------------------------------------------------------
-	"blacklist":         "cam\nscreener\nts",
+	"blacklist":         "cam\ncamrip\nts\ntelesync\ntelecine\nscr\nscreener\nworkprint\nsample",
 	"websearch_engines": "",
 	"content_filters":   "",
 
@@ -76,7 +76,7 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_ipfilter_url":                      "",
 	"libtorrent_proxy_host":                        "",
 	"libtorrent_proxy_port":                        "0",
-	"libtorrent_listen_interfaces":                 "",
+	"libtorrent_listen_interfaces":                 "0.0.0.0:6881-6891",
 	"libtorrent_ramdisk_enabled":                   "false",
 	"libtorrent_ramdisk_threshold_gb":              "3.5",
 	"libtorrent_ramdisk_margin_gb":                 "0.5",
@@ -98,7 +98,7 @@ var uiSettingDefaults = map[string]string{
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
 	"qbittorrent_username":             "admin",
 	"qbittorrent_request_timeout_secs": "15",
-	"qbittorrent_poll_interval_ms":     "1000",
+	"qbittorrent_poll_interval_ms":     "1500",
 	"qbittorrent_managed":              "false",
 	"anacrolix_listen_port":            "6881",
 	"anacrolix_tcp":                    "true",
