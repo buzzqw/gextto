@@ -3457,7 +3457,7 @@ func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int
 			return reconciled, err
 		}
 		if release != nil {
-			if err := d.clearPlaceholders(release.Magnet); err != nil {
+			if err := d.clearPlaceholders(d.db, release.Magnet); err != nil {
 				return reconciled, err
 			}
 		}
@@ -3499,22 +3499,44 @@ func (d *Database) MarkTorrentRemoved(hash string) error {
 	if meta, err := d.TorrentMeta(hash); err == nil && meta != nil {
 		release = &meta.Release
 	}
-	if _, err := d.db.Exec("UPDATE torrent_meta SET status='removed', updated_at=?2 WHERE hash=?1 AND status NOT IN ('completed','error','removed')", strings.ToLower(hash), nowSQLite()); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
 		return err
 	}
-	if err := d.MarkTorrentRemovedAt(hash); err != nil {
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("UPDATE torrent_meta SET status='removed', updated_at=?2 WHERE hash=?1 AND status NOT IN ('completed','error','removed')", strings.ToLower(hash), nowSQLite()); err != nil {
+		return err
+	}
+	if err := d.markTorrentRemovedAt(tx, hash); err != nil {
 		return err
 	}
 	if release != nil {
-		return d.clearPlaceholders(release.Magnet)
+		if err := d.clearPlaceholders(tx, release.Magnet); err != nil {
+			return err
+		}
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return nil
 }
 
 // MarkTorrentRemovedAt records that a torrent has left the session (entering
 // the download history).
 func (d *Database) MarkTorrentRemovedAt(hash string) error {
-	_, err := d.db.Exec("UPDATE torrent_meta SET removed_at=?2, updated_at=?2 WHERE hash=?1 AND removed_at IS NULL", strings.ToLower(hash), nowSQLite())
+	return d.markTorrentRemovedAt(d.db, hash)
+}
+
+// markTorrentRemovedAt runs the removed_at update on the given executor so it
+// can participate in a caller's transaction.
+func (d *Database) markTorrentRemovedAt(exec sqlExecer, hash string) error {
+	_, err := exec.Exec("UPDATE torrent_meta SET removed_at=?2, updated_at=?2 WHERE hash=?1 AND removed_at IS NULL", strings.ToLower(hash), nowSQLite())
 	return err
 }
 
@@ -3823,16 +3845,16 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 }
 
 // clearPlaceholders deletes the not-yet-downloaded placeholders of a release.
-func (d *Database) clearPlaceholders(magnet string) error {
+func (d *Database) clearPlaceholders(exec sqlExecer, magnet string) error {
 	digest, ok := utils.MagnetHash(magnet)
 	if !ok {
 		// No usable magnet hash: match only by the exact magnet link so an
 		// empty digest cannot delete unrelated rows that legitimately have an
 		// empty magnet_hash.
-		_, err := d.db.Exec("DELETE FROM episodes WHERE magnet_link=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", magnet)
+		_, err := exec.Exec("DELETE FROM episodes WHERE magnet_link=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", magnet)
 		return err
 	}
-	_, err := d.db.Exec("DELETE FROM episodes WHERE (lower(magnet_hash)=lower(?1) OR magnet_link=?2) AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", digest, magnet)
+	_, err := exec.Exec("DELETE FROM episodes WHERE (lower(magnet_hash)=lower(?1) OR magnet_link=?2) AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", digest, magnet)
 	return err
 }
 
@@ -3842,12 +3864,28 @@ func (d *Database) MarkTorrentError(hash, failureError string) error {
 	if meta, err := d.TorrentMeta(hash); err == nil && meta != nil {
 		release = &meta.Release
 	}
-	if _, err := d.db.Exec("UPDATE torrent_meta SET status='error',error=?,updated_at=? WHERE hash=?", failureError, nowSQLite(), strings.ToLower(hash)); err != nil {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err := tx.Exec("UPDATE torrent_meta SET status='error',error=?,updated_at=? WHERE hash=?", failureError, nowSQLite(), strings.ToLower(hash)); err != nil {
 		return err
 	}
 	if release != nil {
-		return d.clearPlaceholders(release.Magnet)
+		if err := d.clearPlaceholders(tx, release.Magnet); err != nil {
+			return err
+		}
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return nil
 }
 
