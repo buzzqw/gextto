@@ -1215,6 +1215,34 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		}
 		activeRows.Close()
 	}
+	// Pre-load the existing episodes for the whole season in one query instead
+	// of one SELECT per episode (the same N+1 as the active check above).
+	type packEpisodeState struct {
+		ID          int64
+		Score       int64
+		Title       string
+		ArchivePath string
+		MediaInfo   string
+	}
+	existingEpisodes := map[int64]packEpisodeState{}
+	existingRows, err := tx.Query("SELECT episode, id, quality_score, COALESCE(title,''), COALESCE(archive_path,''), COALESCE(media_info_json,'') FROM episodes WHERE series_id=?1 AND season=?2", seriesID, season)
+	if err != nil {
+		return false, "", err
+	}
+	for existingRows.Next() {
+		var episode int64
+		var state packEpisodeState
+		if err := existingRows.Scan(&episode, &state.ID, &state.Score, &state.Title, &state.ArchivePath, &state.MediaInfo); err != nil {
+			existingRows.Close()
+			return false, "", err
+		}
+		existingEpisodes[episode] = state
+	}
+	if err := existingRows.Err(); err != nil {
+		existingRows.Close()
+		return false, "", err
+	}
+	existingRows.Close()
 	for _, episode := range targets {
 		active := activeEpisodes[episode]
 		if !manual && !active && live != nil {
@@ -1226,13 +1254,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		if active {
 			continue
 		}
-		var id, existingScore int64
-		var existingTitle, archivePath, existingMedia string
-		existingErr := tx.QueryRow("SELECT id,quality_score,COALESCE(title,''),COALESCE(archive_path,''),COALESCE(media_info_json,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", seriesID, season, episode).Scan(&id, &existingScore, &existingTitle, &archivePath, &existingMedia)
-		existing := existingErr == nil
-		if existingErr != nil && !errors.Is(existingErr, sql.ErrNoRows) {
-			return false, "", existingErr
-		}
+		state, existing := existingEpisodes[episode]
 		if !existing {
 			if archive != nil {
 				if disk, ok := archive.BestFor(season, episode); ok {
@@ -1259,23 +1281,23 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 					archivedOnDisk = true
 				}
 			}
-			if archivePath != "" || archivedOnDisk {
+			if state.ArchivePath != "" || archivedOnDisk {
 				continue
 			}
 		}
-		oldQuality := ParseQuality(existingTitle)
-		oldScore := existingScore
+		oldQuality := ParseQuality(state.Title)
+		oldScore := state.Score
 		if archive != nil {
 			if disk, ok := archive.BestFor(season, episode); ok {
-				oldQuality = MergeQuality(disk.Quality, ParseQuality(existingTitle))
+				oldQuality = MergeQuality(disk.Quality, ParseQuality(state.Title))
 				if disk.Score > oldScore {
 					oldScore = disk.Score
 				}
 			}
 		}
-		enrichQualityWithMediaInfo(existingMedia, &oldQuality)
+		enrichQualityWithMediaInfo(state.MediaInfo, &oldQuality)
 		if manual || (release.Quality.UpgradeReason(&oldQuality, score, oldScore, minScoreDiff) != "" && !context.ForbidUpgrade) {
-			previous, err := d.loadSeriesUpgradeBackup(tx, id, seriesName)
+			previous, err := d.loadSeriesUpgradeBackup(tx, state.ID, seriesName)
 			if err != nil {
 				return false, "", err
 			}
@@ -1287,7 +1309,7 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 				hashAvailable = false
 				episodeHash = hash
 			}
-			if _, err := tx.Exec("UPDATE episodes SET title=?1,quality_score=?2,magnet_hash=COALESCE(?3,magnet_hash),magnet_link=?4,downloaded_at=NULL,archive_path=NULL,media_info_json='' WHERE id=?5", release.Title, score, episodeHash, release.Magnet, id); err != nil {
+			if _, err := tx.Exec("UPDATE episodes SET title=?1,quality_score=?2,magnet_hash=COALESCE(?3,magnet_hash),magnet_link=?4,downloaded_at=NULL,archive_path=NULL,media_info_json='' WHERE id=?5", release.Title, score, episodeHash, release.Magnet, state.ID); err != nil {
 				return false, "", err
 			}
 			upgraded++
