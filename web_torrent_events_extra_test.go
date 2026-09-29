@@ -7,8 +7,8 @@ import (
 )
 
 func TestPackFileNames(t *testing.T) {
-	if got := tev_packFileNames(nil); got != "nessuno" {
-		t.Fatalf("empty = %q, want nessuno", got)
+	if got := tev_packFileNames(nil); got != "none" {
+		t.Fatalf("empty = %q, want none", got)
 	}
 	items := []PackFileResult{
 		{Path: "/nas/Show/S01E01.mkv"},
@@ -22,7 +22,7 @@ func TestPackFileNames(t *testing.T) {
 		many[index] = PackFileResult{Path: fmt.Sprintf("/nas/Show/S01E%02d.mkv", index+1)}
 	}
 	got := tev_packFileNames(many)
-	if !strings.Contains(got, "… e altri 2") {
-		t.Fatalf("truncated list = %q, want '… e altri 2'", got)
+	if !strings.Contains(got, "… and 2 more") {
+		t.Fatalf("truncated list = %q, want '… and 2 more'", got)
 	}
 }

@@ -654,13 +654,21 @@ func cloudflare_blocked(status int) bool {
 	return status == 403 || status == 503 || (status >= 520 && status <= 530)
 }
 
-func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, rawURL, reason string) (string, error) {
-	logging.Info("trying FlareSolverr", "feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason)
+func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, rawURL, reason string, retryDirectOnFailure bool) (string, error) {
+	logging.Info("trying FlareSolverr to retrieve the feed; success will continue with feed parsing",
+		"feed_url", rawURL, "flaresolverr", flaresolverr, "reason", reason)
 	body, err := fetch_with_flaresolverr(ctx, client, flaresolverr, rawURL)
 	if err != nil {
-		logging.Warn("FlareSolverr RSS fallback failed", "feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
+		nextStep := "the feed will be marked as failed"
+		if retryDirectOnFailure {
+			nextStep = "direct HTTP attempts will continue"
+		}
+		logging.Warn("FlareSolverr failed; "+nextStep,
+			"feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
 		return "", err
 	}
+	logging.Info("FlareSolverr solved the challenge; parsing the retrieved feed",
+		"feed_url", rawURL, "response_bytes", len(body))
 	return body, nil
 }
 
@@ -797,7 +805,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 		_, hasSession := session_for(rawURL)
 		if !hasSession {
 			flareTried = true
-			if body, err := flaresolverr_or(ctx, client, *flaresolverr, rawURL, "domain remembered as Cloudflare-protected"); err == nil {
+			if body, err := flaresolverr_or(ctx, client, *flaresolverr, rawURL, "domain remembered as Cloudflare-protected", true); err == nil {
 				return body, nil
 			}
 		}
@@ -817,7 +825,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 				return "", fmt.Errorf("%s", result.value)
 			}
 			flareTried = true
-			return flaresolverr_or(ctx, client, *flaresolverr, rawURL, result.value)
+			return flaresolverr_or(ctx, client, *flaresolverr, rawURL, result.value, false)
 		case fetchAttemptFatal:
 			return "", fmt.Errorf("%s", result.value)
 		case fetchAttemptTransient:
@@ -838,7 +846,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 	}
 	// Stream ostinato: ultima spiaggia FlareSolverr, se configurato.
 	if flaresolverr != nil && strings.TrimSpace(*flaresolverr) != "" && !flareTried {
-		return flaresolverr_or(ctx, client, *flaresolverr, rawURL, "direct attempts exhausted")
+		return flaresolverr_or(ctx, client, *flaresolverr, rawURL, "direct attempts exhausted", false)
 	}
 	return "", fmt.Errorf("%s", lastTransient)
 }
@@ -1492,7 +1500,8 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 		fetched, fetchErr := torznabViaFlareSolverr(ctx, indexer, *flaresolverr, fullURL, utils.RedactURLSecrets(transportErr.Error()))
 		if fetchErr != nil {
-			return nil, fetchErr
+			return nil, fmt.Errorf("direct Torznab request failed (%s); FlareSolverr fallback failed: %w",
+				utils.RedactURLSecrets(transportErr.Error()), fetchErr)
 		}
 		body = fetched
 		contentType = torznabContentType(body)
@@ -1542,7 +1551,8 @@ func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 // torznabViaFlareSolverr retries a blocked Torznab request through
 // FlareSolverr, logging the (redacted) original error.
 func torznabViaFlareSolverr(ctx context.Context, indexer IndexerConfig, flaresolverr, fullURL, errorText string) (string, error) {
-	logging.Info("torznab blocked, retrying via FlareSolverr", "indexer", indexer.Name, "error", errorText)
+	logging.Info("torznab request failed; retrying via FlareSolverr",
+		"indexer", indexer.Name, "reason", errorText)
 	return fetch_with_flaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)
 }
 

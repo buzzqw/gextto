@@ -970,7 +970,7 @@ func (c *LibtorrentClient) AddTorrentFileEx(torrentPath, savePath string, option
 	}
 	// A `.torrent` add already has metadata: persist it (and copy it to the
 	// configured folder) right away instead of waiting for an alert.
-	if err := c.saveTorrentMetadata(hash); err != nil {
+	if err := c.saveTorrentMetadata(hash, ""); err != nil {
 		logging.Debug("cannot persist added torrent metadata", "hash", hash, "error", err)
 	}
 	return &hash, nil
@@ -1412,7 +1412,7 @@ func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
 			kind = "session_error"
 		}
 		if kind == "metadata_received" {
-			if err := c.saveTorrentMetadata(hash); err != nil {
+			if err := c.saveTorrentMetadata(hash, name); err != nil {
 				logging.Warn("cannot persist torrent metadata", "hash", hash, "name", name, "error", err)
 			}
 		}
@@ -1427,7 +1427,7 @@ func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
 	return result
 }
 
-func (c *LibtorrentClient) saveTorrentMetadata(hash string) error {
+func (c *LibtorrentClient) saveTorrentMetadata(hash, displayName string) error {
 	if c.session == nil {
 		return nil
 	}
@@ -1440,7 +1440,7 @@ func (c *LibtorrentClient) saveTorrentMetadata(hash string) error {
 	if saved == 0 {
 		return fmt.Errorf("libtorrent metadata save failed: %s", errMessage)
 	}
-	c.copyTorrentFile(normalized, path)
+	c.copyTorrentFileNamed(normalized, path, displayName)
 	return nil
 }
 
@@ -1512,11 +1512,22 @@ func safeTorrentCopyName(name, hash string) string {
 // copyTorrentFile copies the saved `.torrent` of a started torrent into the
 // configured folder so external tools can reuse it.
 func (c *LibtorrentClient) copyTorrentFile(hash, source string) {
+	c.copyTorrentFileNamed(hash, source, "")
+}
+
+// copyTorrentFileNamed is the same operation with the display name captured
+// from the metadata event. That name is authoritative at the moment metadata
+// arrives; the cached/list snapshots can still contain the original magnet
+// name for a short time.
+func (c *LibtorrentClient) copyTorrentFileNamed(hash, source, displayName string) {
 	dir := c.torrentCopyDir()
 	if dir == "" {
 		return
 	}
-	name := strings.TrimSpace(c.torrentDisplayName(hash))
+	name := strings.TrimSpace(displayName)
+	if name == "" {
+		name = strings.TrimSpace(c.torrentDisplayName(hash))
+	}
 	if name == "" {
 		// The cache may not be populated yet right after an add: read the live
 		// name from the session so the copied file is recognisable.

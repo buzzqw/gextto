@@ -165,6 +165,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		Items []models.Release
 	}
 	results := make([]searchResult, len(targets))
+	timeoutQueries := make(chan string, len(targets))
 	var searchWG sync.WaitGroup
 	searchSem := make(chan struct{}, queryConcurrency)
 	for i, target := range targets {
@@ -179,9 +180,10 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			timedOut := errors.Is(searchCtx.Err(), context.DeadlineExceeded)
 			cancel()
 			if timedOut {
-				logging.Warn("scheduled title search timed out",
+				logging.Debug("scheduled title search timed out",
 					"query", query,
 					"timeout_secs", int(automaticSearchTimeout.Seconds()))
+				timeoutQueries <- query
 				items = nil
 			}
 			logging.Debug("scheduled title search completed",
@@ -192,6 +194,27 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		}(i, target.Query, target.IDs)
 	}
 	searchWG.Wait()
+	close(timeoutQueries)
+	var timedOutQueries []string
+	for query := range timeoutQueries {
+		timedOutQueries = append(timedOutQueries, query)
+	}
+	if len(timedOutQueries) > 0 {
+		indexerNames := make([]string, 0, len(cfg.Indexers))
+		for _, indexer := range cfg.Indexers {
+			if indexer.Enabled {
+				indexerNames = append(indexerNames, indexer.Name)
+			}
+		}
+		providers := strings.Join(indexerNames, ", ")
+		if providers == "" {
+			providers = "no indexers configured"
+		}
+		logging.Warn(fmt.Sprintf(
+			"scheduled title searches timed out: %d target(s) · indexers: %s · queries: %s",
+			len(timedOutQueries), providers, strings.Join(timedOutQueries, ", ")),
+			"timeout_secs", int(automaticSearchTimeout.Seconds()))
+	}
 
 	// "Compatible" count: a release is only useful when it passes the global
 	// filters and those of the searched series/movie (language, quality,
@@ -252,7 +275,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		all = append(all, result.Items...)
 	}
 	logging.Info(fmt.Sprintf(
-		"🔎 Step 2/2 complete: %d targets analyzed · %d with compatible releases · %d compatible releases",
+		"🔎 Step 2/2 complete: %d targets analyzed · %d targets returned compatible releases · %d compatible releases total",
 		targetsDone,
 		targetsWithHits,
 		step2Usable,

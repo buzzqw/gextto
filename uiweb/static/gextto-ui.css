@@ -497,6 +497,7 @@ label.field > span, .field > span { color: var(--muted); font-size: 0.85rem; }
 .badge.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .badge.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .badge.err { background: color-mix(in srgb, var(--err) 22%, transparent); color: var(--err); }
+.torrent-table td:nth-child(3) .badge { font-size: 0.68rem; white-space: nowrap; }
 
 .progress {
   height: 8px;

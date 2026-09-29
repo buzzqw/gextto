@@ -133,16 +133,35 @@ func tev_torrentDisplayName(torrents TorrentSession, hash string) string {
 // pack so the log names what was kept and what was discarded without flooding.
 func tev_packFileNames(items []PackFileResult) string {
 	if len(items) == 0 {
-		return "nessuno"
+		return "none"
 	}
 	const limit = 8
 	names := make([]string, 0, len(items))
 	for index, item := range items {
 		if index >= limit {
-			names = append(names, fmt.Sprintf("… e altri %d", len(items)-limit))
+			names = append(names, fmt.Sprintf("… and %d more", len(items)-limit))
 			break
 		}
 		names = append(names, filepath.Base(item.Path))
+	}
+	return strings.Join(names, ", ")
+}
+
+// tev_archivedFileNames renders the names currently present in an archived
+// season-pack destination. The list is deliberately bounded because a library
+// folder can contain more files than the pack being reported.
+func tev_archivedFileNames(paths []string) string {
+	if len(paths) == 0 {
+		return "none"
+	}
+	const limit = 8
+	names := make([]string, 0, len(paths))
+	for index, path := range paths {
+		if index >= limit {
+			names = append(names, fmt.Sprintf("… and %d more", len(paths)-limit))
+			break
+		}
+		names = append(names, filepath.Base(path))
 	}
 	return strings.Join(names, ", ")
 }
@@ -898,7 +917,18 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		}
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
 		if archivedPack {
-			logging.Info(fmt.Sprintf("🗑️ Season pack seeded — source removed, copy kept on NAS: «%s»", torrent.Name))
+			archivePath := "path unavailable"
+			archiveName := "name unavailable"
+			archiveFiles := "unavailable"
+			if processed, processedErr := db.TorrentProcessed(torrent.Hash); processedErr == nil && processed != nil && strings.TrimSpace(*processed) != "" {
+				archivePath = *processed
+				archiveName = filepath.Base(filepath.Clean(archivePath))
+				if files, filesErr := VideoFiles(archivePath); filesErr == nil {
+					archiveFiles = tev_archivedFileNames(files)
+				}
+			}
+			logging.Info(fmt.Sprintf("🗑️ Season pack seeded — source removed: «%s» · copy kept on NAS: %s · folder name: «%s» · files: %s",
+				torrent.Name, archivePath, archiveName, archiveFiles))
 		} else {
 			logging.Info(fmt.Sprintf("🗑️ Seeding done — removed from the session: «%s»", torrent.Name))
 		}
@@ -1783,7 +1813,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		for _, torrent := range torrents.List() {
 			if strings.EqualFold(torrent.Hash, event.Hash) {
-				logging.Info(fmt.Sprintf("📦 Download metadata received — «%s» · %s (torrent: %s)",
+				logging.Debug(fmt.Sprintf("📦 Download metadata received — «%s» · %s (torrent: %s)",
 					metadata.Release.Title, logging.HumanBytesI64(torrent.TotalSize), torrent.Name))
 				break
 			}
@@ -1902,7 +1932,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				if err := db.MarkTorrentError(event.Hash, "season pack inferior to existing files"); err != nil {
 					return false, err
 				}
-				logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · nessun episodio tenuto · scartati %d: %s",
+				logging.Warn(fmt.Sprintf("🗑️ Season pack rejected — «%s» · no episodes kept · discarded %d: %s",
 					release.Title, len(processed), tev_packFileNames(processed)))
 				// Esito definitivo: il pack è stato scartato per intero. Esce
 				// dalla sessione e la sorgente va nel cestino.
@@ -1943,15 +1973,26 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			// the counts, which made a rejected episode impossible to trace.
 			keptDetail := []PackFileResult{}
 			discardedDetail := []PackFileResult{}
+			upgradedDetail := []PackFileResult{}
+			trashCount := 0
 			for _, item := range processed {
 				if item.Discarded {
 					discardedDetail = append(discardedDetail, item)
 				} else {
 					keptDetail = append(keptDetail, item)
+					if item.Upgrade {
+						upgradedDetail = append(upgradedDetail, item)
+					}
+					trashCount += item.TrashCount
 				}
 			}
-			logging.Info(fmt.Sprintf("📦 Season pack detail — tenuti %d: %s · scartati %d: %s",
+			cleanupLabel := "moved to trash"
+			if cfg.CleanupAction == "delete" {
+				cleanupLabel = "deleted"
+			}
+			logging.Info(fmt.Sprintf("📦 Season pack detail — kept %d: %s · upgrades %d: %s · %s: %d file(s) · discarded %d: %s",
 				len(keptDetail), tev_packFileNames(keptDetail),
+				len(upgradedDetail), tev_packFileNames(upgradedDetail), cleanupLabel, trashCount,
 				len(discardedDetail), tev_packFileNames(discardedDetail)))
 			discardedCount := len(discardedDetail)
 			discardedList := []any{}

@@ -7,6 +7,18 @@
 <meta name="application-name" content="Gextto EXpert Torrent Transfer Orchestrator">
 <title>Gextto · {{.Title}}</title>
 <link rel="icon" href="/favicon.ico">
+<script>
+  // Apply the saved theme before the stylesheet is loaded, avoiding a dark
+  // flash while navigating between server-rendered pages.
+  (function () {
+    try {
+      var theme = localStorage.getItem("gextto_theme");
+      if (theme === "light" || theme === "dark") {
+        document.documentElement.setAttribute("data-theme", theme);
+      }
+    } catch (error) { /* storage may be unavailable */ }
+  }());
+</script>
 <link rel="stylesheet" href="/ui/static/gextto-ui.css">
 </head>
 <body>

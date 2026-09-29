@@ -711,7 +711,8 @@ func RunCycleDomain(
 
 	upgrades := 0
 	newItems := 0
-	var startedDetails []string
+	var newDetails []string
+	var upgradeDetails []string
 	if cycleCancelled(ctx) {
 		return stats, nil
 	}
@@ -897,18 +898,18 @@ func RunCycleDomain(
 				stats.Error("torrent_rejected")
 				continue
 			}
-			startedDetail := fmt.Sprintf("%s [%s]: %s", releaseTarget(&release), release.Source, release.Title)
+			startedDetail := fmt.Sprintf("%s [%s]: %s · qualità: %s · score: %d",
+				releaseTarget(&release), release.Source, release.Title,
+				releaseQualityLabel(&release), score)
 			if len(gapEpisodes) > 0 {
-				startedDetail = fmt.Sprintf("%s · episodi %s [%s]: %s",
-					releaseTarget(&release), episodesLabel(gapEpisodes), release.Source, release.Title)
+				startedDetail = fmt.Sprintf("%s · episodi %s · [%s]: %s · qualità: %s · score: %d",
+					releaseTarget(&release), episodesLabel(gapEpisodes), release.Source,
+					release.Title, releaseQualityLabel(&release), score)
 			}
-			startedDetails = append(startedDetails, startedDetail)
-			if len(gapEpisodes) == 0 {
-				logging.Info(fmt.Sprintf("📥 Download started [%s]: %s · %s · score %d",
-					release.Source, releaseTarget(&release), release.Kind, score))
+			if approvalReason == "upgrade" {
+				upgradeDetails = append(upgradeDetails, startedDetail)
 			} else {
-				logging.Info(fmt.Sprintf("✅ Gap filled: %s · episodes %s · downloading [%s]: %s",
-					releaseTarget(&release), episodesLabel(gapEpisodes), release.Source, release.Title))
+				newDetails = append(newDetails, startedDetail)
 			}
 			if err := db.RegisterTorrentScored(&release, score); err != nil {
 				return nil, err
@@ -1005,10 +1006,14 @@ func RunCycleDomain(
 		stats.GapsFilled,
 		stats.Errors,
 	))
-	if len(startedDetails) == 0 {
+	if len(newDetails) > 0 {
+		logging.Info("🆕 NEW DOWNLOADS — " + strings.Join(newDetails, " · "))
+	}
+	if len(upgradeDetails) > 0 {
+		logging.Info("⬆️ UPGRADES — " + strings.Join(upgradeDetails, " · "))
+	}
+	if len(newDetails) == 0 && len(upgradeDetails) == 0 {
 		logging.Info("📦 CYCLE DOWNLOADS — no downloads started")
-	} else {
-		logging.Info("📦 CYCLE DOWNLOADS — " + strings.Join(startedDetails, " · "))
 	}
 	if stats.DownloadsStarted == 0 {
 		logging.Info("💤 No downloads in this cycle")
@@ -1141,6 +1146,33 @@ func episodesLabel(episodes []int64) string {
 		parts[i] = strconv.FormatInt(episode, 10)
 	}
 	return strings.Join(parts, ",")
+}
+
+// releaseQualityLabel renders the quality attributes that made a release
+// useful to the selector. It keeps cycle download logs actionable instead of
+// reporting only the aggregate score.
+func releaseQualityLabel(release *models.Release) string {
+	quality := release.Quality
+	parts := make([]string, 0, 6)
+	for _, value := range []string{
+		quality.Resolution,
+		quality.Source,
+		quality.Codec,
+		quality.Audio,
+		quality.HDR,
+		quality.Language,
+	} {
+		if value = strings.TrimSpace(value); value != "" {
+			parts = append(parts, value)
+		}
+	}
+	if quality.IsDV {
+		parts = append(parts, "Dolby Vision")
+	}
+	if len(parts) == 0 {
+		return "unclassified"
+	}
+	return strings.Join(parts, "/")
 }
 
 // logCandidateRejected logs, at debug only, a monitored release that does not

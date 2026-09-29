@@ -567,6 +567,8 @@ type PackFileResult struct {
 	SizeBytes    int64
 	QualityScore int64
 	Discarded    bool
+	Upgrade      bool
+	TrashCount   int
 }
 
 // BestEpisodeFile returns the best-quality video file in dir matching the given
@@ -843,6 +845,7 @@ func ProcessPackFiles(
 		}
 		archive := filepath.Dir(finalPath)
 		score := cfg.ReleaseScore(&episodeRelease)
+		trashCount := 0
 		discarded, err := DiscardIfInferior(
 			cfg,
 			series,
@@ -856,7 +859,7 @@ func ProcessPackFiles(
 			return nil, err
 		}
 		if !discarded {
-			if _, err := CleanupOldEpisodeWithQuality(
+			removed, err := CleanupOldEpisodeWithQuality(
 				cfg,
 				series,
 				season,
@@ -865,9 +868,11 @@ func ProcessPackFiles(
 				finalPath,
 				archive,
 				episodeRelease.Quality,
-			); err != nil {
+			)
+			if err != nil {
 				return nil, err
 			}
+			trashCount = removed
 		}
 		qualityScore := cfg.FileScore(finalPath, "series", series)
 		if score > qualityScore {
@@ -880,6 +885,8 @@ func ProcessPackFiles(
 			SizeBytes:    size,
 			QualityScore: qualityScore,
 			Discarded:    discarded,
+			Upgrade:      !discarded && trashCount > 0,
+			TrashCount:   trashCount,
 		})
 	}
 	return results, nil
