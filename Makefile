@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt check-ui tidy package clean run
+.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt check-ui installer-test tidy package clean run
 
 all: build
 
@@ -13,7 +13,7 @@ build:
 fast:
 	scripts/build-daemon.sh
 
-test: check-ui
+test: check-ui installer-test
 	CGO_ENABLED=1 go test ./...
 
 test-real:
@@ -36,6 +36,10 @@ fmt:
 # Validate the server-rendered UI settings index.
 check-ui:
 	scripts/check-ui-settings-index.sh
+
+# Side-effect-free checks for the bash installers (also run by `make test`).
+installer-test:
+	scripts/installer-selftest.sh
 
 tidy:
 	go mod tidy

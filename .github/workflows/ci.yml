@@ -35,6 +35,9 @@ jobs:
       - name: UI settings index
         run: make check-ui
 
+      - name: Installer self-test
+        run: make installer-test
+
       - name: Vet
         run: make vet
 
