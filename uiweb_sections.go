@@ -378,7 +378,12 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					{Label: "Elimina", Class: "danger", Method: "POST", Path: "/api/comics/history/delete", Body: `{"url":"{post_url}"}`, Confirm: "Eliminare questa voce dallo storico?"},
 				}),
 				FooterActions: []uiActionButton{{Label: "Svuota storico fumetti", Class: "danger", Method: "POST", Path: "/api/comics/history/clear", Body: "{}", Confirm: "Eliminare tutto lo storico degli scarichi dei fumetti?", Hint: "Elimina tutte le voci dello storico fumetti, senza toccare i Weekly Pack."}},
-				Empty:         "Storico vuoto.",
+				FooterForm: &uiFormSection{
+					Hint: "Numero massimo di elementi da conservare nello Storico fumetti e nello Storico Weekly Pack (1–500).",
+					Path: "/api/comics/weekly/settings", Submit: "Salva storico",
+					Fields: []uiFormField{{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10)}},
+				},
+				Empty: "Storico vuoto.",
 			})),
 			group("Weekly pack", sectionTable(uiTableSpec{
 				Title:    "Storico Weekly Pack",
