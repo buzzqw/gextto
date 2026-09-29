@@ -121,6 +121,7 @@ service and leaves the data directory and configuration untouched. Use
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
 | Accessibility scope and testing | [Accessibility analysis](accessibility-analysis.md) |
+| Sonarr/Radarr replacement planning | [Replacement plan](docs/SONARR_RADARR_REPLACEMENT_PLAN.md) |
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 
