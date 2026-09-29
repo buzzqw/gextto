@@ -3972,28 +3972,57 @@ func (d *Database) Rescore(cfg *Config) (int, error) {
 		return 0, err
 	}
 	rows.Close()
+
+	// Pre-load the stored media info once per table instead of issuing two
+	// lookups per torrent row (an N+1 on a maintenance path that runs over the
+	// whole library). magnet_hash is UNIQUE in both tables, so a map keyed by
+	// the lowercased hash is exact.
+	episodeMediaMap := map[string]string{}
+	episodeMediaRows, err := d.db.Query("SELECT lower(magnet_hash), COALESCE(media_info_json,'') FROM episodes WHERE COALESCE(media_info_json,'')<>'' AND magnet_hash IS NOT NULL")
+	if err != nil {
+		return 0, err
+	}
+	for episodeMediaRows.Next() {
+		var hash, media string
+		if err := episodeMediaRows.Scan(&hash, &media); err != nil {
+			episodeMediaRows.Close()
+			return 0, err
+		}
+		episodeMediaMap[hash] = media
+	}
+	if err := episodeMediaRows.Err(); err != nil {
+		episodeMediaRows.Close()
+		return 0, err
+	}
+	episodeMediaRows.Close()
+	movieMediaMap := map[string]string{}
+	movieMediaRows, err := d.db.Query("SELECT lower(magnet_hash), COALESCE(media_info_json,'') FROM movies WHERE COALESCE(media_info_json,'')<>'' AND magnet_hash IS NOT NULL")
+	if err != nil {
+		return 0, err
+	}
+	for movieMediaRows.Next() {
+		var hash, media string
+		if err := movieMediaRows.Scan(&hash, &media); err != nil {
+			movieMediaRows.Close()
+			return 0, err
+		}
+		movieMediaMap[hash] = media
+	}
+	if err := movieMediaRows.Err(); err != nil {
+		movieMediaRows.Close()
+		return 0, err
+	}
+	movieMediaRows.Close()
+
 	changed := 0
 	for _, row := range metadataRows {
 		var meta models.TorrentMeta
 		if err := json.Unmarshal([]byte(row.JSON), &meta); err != nil {
 			continue
 		}
-		var mediaInfo string
-		var episodeMedia sql.NullString
-		episodeErr := d.db.QueryRow("SELECT COALESCE(media_info_json,'') FROM episodes WHERE lower(magnet_hash)=lower(?1) AND COALESCE(media_info_json,'')<>'' LIMIT 1", row.Hash).Scan(&episodeMedia)
-		if episodeErr == nil && episodeMedia.Valid && episodeMedia.String != "" {
-			mediaInfo = episodeMedia.String
-		} else if episodeErr != nil && !errors.Is(episodeErr, sql.ErrNoRows) {
-			return changed, episodeErr
-		}
+		mediaInfo := episodeMediaMap[strings.ToLower(row.Hash)]
 		if mediaInfo == "" {
-			var movieMedia sql.NullString
-			movieErr := d.db.QueryRow("SELECT COALESCE(media_info_json,'') FROM movies WHERE lower(magnet_hash)=lower(?1) AND COALESCE(media_info_json,'')<>'' LIMIT 1", row.Hash).Scan(&movieMedia)
-			if movieErr == nil && movieMedia.Valid && movieMedia.String != "" {
-				mediaInfo = movieMedia.String
-			} else if movieErr != nil && !errors.Is(movieErr, sql.ErrNoRows) {
-				return changed, movieErr
-			}
+			mediaInfo = movieMediaMap[strings.ToLower(row.Hash)]
 		}
 		enrichQualityWithMediaInfo(mediaInfo, &meta.Release.Quality)
 		score := cfg.ReleaseScore(&meta.Release)
