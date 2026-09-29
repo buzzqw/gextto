@@ -397,8 +397,11 @@ type torrentEngineEmbeddedExtras interface {
 // backend. When another engine is active it returns an explicit capability
 // error so libtorrent-only endpoints never act on the wrong session.
 func (s *AppState) requireEmbedded(capability string) (*LibtorrentClient, error) {
-	if s.torrent_engine != nil {
-		return nil, backendCapabilityError(s.torrent_engine.Name(), capability)
+	s.engine_mu.RLock()
+	engine := s.torrent_engine
+	s.engine_mu.RUnlock()
+	if engine != nil {
+		return nil, backendCapabilityError(engine.Name(), capability)
 	}
 	return s.torrents, nil
 }

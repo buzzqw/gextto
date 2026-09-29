@@ -110,6 +110,8 @@ func HTTPPostJSON(ctx context.Context, rawURL string, headers map[string]string,
 }
 
 // HTTPDownload streams a URL into a file writer, returning the byte count.
+// The stream is capped so a misconfigured or hostile source cannot fill the
+// target volume through an unbounded copy.
 func HTTPDownload(ctx context.Context, rawURL string, headers map[string]string, writer io.Writer) (int64, error) {
 	response, err := HTTPGet(ctx, rawURL, headers)
 	if err != nil {
@@ -119,5 +121,12 @@ func HTTPDownload(ctx context.Context, rawURL string, headers map[string]string,
 	if response.StatusCode >= 400 {
 		return 0, fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	return io.Copy(writer, response.Body)
+	written, err := io.Copy(writer, io.LimitReader(response.Body, maxDecompressedBytes+1))
+	if err != nil {
+		return 0, err
+	}
+	if written > maxDecompressedBytes {
+		return 0, fmt.Errorf("response body exceeds the %d byte limit", maxDecompressedBytes)
+	}
+	return written, nil
 }

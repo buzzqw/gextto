@@ -276,13 +276,20 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
-	// Server-rendered UI (see uiweb.go). The shell is public, while every data
-	// partial and action route uses the same shared middleware.
+	registerUIRoutes(s, mux)
+	return mux
+}
+
+// registerUIRoutes keeps server-rendered UI routes separate from the public API
+// registration above. Future route groups can follow the same pattern without
+// changing the router's external contract.
+func registerUIRoutes(s *AppState, mux *http.ServeMux) {
+	// The shell is public, while every data partial and action route uses the
+	// same shared middleware.
 	mux.Handle("GET /ui/static/", UiNoCache(http.StripPrefix("/ui/static/", http.FileServer(http.FS(uiwebStaticFS())))))
 	handle(s, mux, "GET /ui", UiPage)
 	handle(s, mux, "GET /ui/", UiPage)
 	handle(s, mux, "GET /ui/partial/dashboard", UiPartialDashboard)
 	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
 	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
-	return mux
 }

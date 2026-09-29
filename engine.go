@@ -38,6 +38,7 @@ type Engine struct {
 const (
 	queryConcurrency       = 2
 	feedConcurrency        = 4
+	indexerConcurrency     = 4
 	feedFetchBudget        = 75 * time.Second
 	automaticSearchTimeout = 90 * time.Second
 	manualSearchTimeout    = 15 * time.Second
@@ -426,16 +427,35 @@ func searchOneWithDB(
 		Err   error
 	}
 	indexerResults := make([]indexerResult, len(indexers))
-	var indexerWG sync.WaitGroup
-	for i, indexer := range indexers {
-		indexerWG.Add(1)
-		go func(index int, indexer IndexerConfig) {
-			defer indexerWG.Done()
-			logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
-			items, err := FetchTorznabFlareSolverr(ctx, indexer, query, externalIDs, cfg.FlaresolverrURL)
-			indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
-		}(i, indexer)
+	// An installation can have many indexers. Keep the fan-out bounded: title
+	// searches already run concurrently, so one unbounded goroutine per indexer
+	// would otherwise multiply the number of simultaneous HTTP requests.
+	jobs := make(chan int)
+	workers := indexerConcurrency
+	if workers > len(indexers) {
+		workers = len(indexers)
 	}
+	var indexerWG sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		indexerWG.Add(1)
+		go func() {
+			defer indexerWG.Done()
+			for index := range jobs {
+				indexer := indexers[index]
+				if ctx.Err() != nil {
+					indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Err: ctx.Err()}
+					continue
+				}
+				logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
+				items, err := FetchTorznabFlareSolverr(ctx, indexer, query, externalIDs, cfg.FlaresolverrURL)
+				indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
+			}
+		}()
+	}
+	for index := range indexers {
+		jobs <- index
+	}
+	close(jobs)
 
 	var webResults []models.Release
 	var webWG sync.WaitGroup

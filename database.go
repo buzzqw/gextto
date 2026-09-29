@@ -665,6 +665,16 @@ type Database struct {
 	path string
 }
 
+// Close closes the underlying SQLite connection. The OS reclaims the handle at
+// process exit, but an explicit close keeps shutdown deterministic and lets the
+// daemon be embedded without leaking connections.
+func (d *Database) Close() error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	return d.db.Close()
+}
+
 // OpenDatabase opens the database at path, applies the shared pragmas and runs
 // the schema migrations.
 func OpenDatabase(path string) (*Database, error) {
@@ -971,20 +981,37 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		if err != nil {
 			return false, "", err
 		}
-		if err := d.saveUpgradeBackup(d.db, hash, previous); err != nil {
+		// The backup and the update must be atomic: a failure after the backup
+		// write would otherwise leave an orphan upgrade_backup row pointing at
+		// an upgrade that was never applied.
+		tx, err := d.db.Begin()
+		if err != nil {
+			return false, "", err
+		}
+		upgradeCommitted := false
+		defer func() {
+			if !upgradeCommitted {
+				_ = tx.Rollback()
+			}
+		}()
+		if err := d.saveUpgradeBackup(tx, hash, previous); err != nil {
 			return false, "", err
 		}
 		var hashTakenElsewhere bool
-		if err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM episodes WHERE magnet_hash=?1 AND NOT (series_id=?2 AND season=?3 AND episode=?4))", hash, sid, season, episode).Scan(&hashTakenElsewhere); err != nil {
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM episodes WHERE magnet_hash=?1 AND NOT (series_id=?2 AND season=?3 AND episode=?4))", hash, sid, season, episode).Scan(&hashTakenElsewhere); err != nil {
 			return false, "", err
 		}
 		var episodeHash any
 		if !hashTakenElsewhere {
 			episodeHash = hash
 		}
-		if _, err := d.db.Exec("UPDATE episodes SET title=?1,quality_score=?2,magnet_hash=COALESCE(?3,magnet_hash),magnet_link=?4,downloaded_at=NULL,archive_path=NULL,media_info_json='' WHERE id=?5", release.Title, score, episodeHash, release.Magnet, dbID); err != nil {
+		if _, err := tx.Exec("UPDATE episodes SET title=?1,quality_score=?2,magnet_hash=COALESCE(?3,magnet_hash),magnet_link=?4,downloaded_at=NULL,archive_path=NULL,media_info_json='' WHERE id=?5", release.Title, score, episodeHash, release.Magnet, dbID); err != nil {
 			return false, "", err
 		}
+		if err := tx.Commit(); err != nil {
+			return false, "", err
+		}
+		upgradeCommitted = true
 		return true, "upgrade", nil
 	}
 	var hashTakenElsewhere bool
@@ -1369,12 +1396,27 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 		if err != nil {
 			return false, "", err
 		}
-		if err := d.saveUpgradeBackup(d.db, hash, previous); err != nil {
+		// Atomic backup + update: see the series upgrade path for rationale.
+		tx, err := d.db.Begin()
+		if err != nil {
 			return false, "", err
 		}
-		if _, err := d.db.Exec("UPDATE movies SET title=?1,quality_score=?2,magnet_hash=?3,magnet_link=?4,downloaded_at=NULL,media_info_json='' WHERE id=?5", release.Title, score, hash, release.Magnet, id); err != nil {
+		upgradeCommitted := false
+		defer func() {
+			if !upgradeCommitted {
+				_ = tx.Rollback()
+			}
+		}()
+		if err := d.saveUpgradeBackup(tx, hash, previous); err != nil {
 			return false, "", err
 		}
+		if _, err := tx.Exec("UPDATE movies SET title=?1,quality_score=?2,magnet_hash=?3,magnet_link=?4,downloaded_at=NULL,media_info_json='' WHERE id=?5", release.Title, score, hash, release.Magnet, id); err != nil {
+			return false, "", err
+		}
+		if err := tx.Commit(); err != nil {
+			return false, "", err
+		}
+		upgradeCommitted = true
 		return true, "upgrade", nil
 	}
 	if _, err := d.db.Exec("INSERT INTO movies(name,year,title,quality_score,magnet_hash,magnet_link,downloaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)", release.Title, release.Year, release.Title, score, hash, release.Magnet, nil); err != nil {
@@ -3325,7 +3367,9 @@ func (d *Database) ReconcileMissingTorrents(liveHashes map[string]struct{}) (int
 	}
 	completedRows.Close()
 	for _, hash := range cleared {
-		_ = d.MarkTorrentRemovedAt(hash)
+		if err := d.MarkTorrentRemovedAt(hash); err != nil {
+			logging.Warn("reconcile: cannot record removed_at for completed torrent", "hash", hash, "error", err)
+		}
 	}
 	return reconciled, nil
 }
@@ -3646,7 +3690,14 @@ func (d *Database) MarkPackCompleted(release *models.Release, episodes []PackEpi
 
 // clearPlaceholders deletes the not-yet-downloaded placeholders of a release.
 func (d *Database) clearPlaceholders(magnet string) error {
-	digest, _ := utils.MagnetHash(magnet)
+	digest, ok := utils.MagnetHash(magnet)
+	if !ok {
+		// No usable magnet hash: match only by the exact magnet link so an
+		// empty digest cannot delete unrelated rows that legitimately have an
+		// empty magnet_hash.
+		_, err := d.db.Exec("DELETE FROM episodes WHERE magnet_link=?1 AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", magnet)
+		return err
+	}
 	_, err := d.db.Exec("DELETE FROM episodes WHERE (lower(magnet_hash)=lower(?1) OR magnet_link=?2) AND downloaded_at IS NULL AND COALESCE(archive_path,'')=''", digest, magnet)
 	return err
 }

@@ -23,6 +23,14 @@ type I18nDb struct {
 	db *sql.DB
 }
 
+// Close closes the underlying SQLite connection (see Database.Close).
+func (d *I18nDb) Close() error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	return d.db.Close()
+}
+
 // Translation is one persisted key/value pair for a language.
 type Translation struct {
 	Lang  string `json:"lang"`

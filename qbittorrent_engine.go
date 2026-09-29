@@ -1281,13 +1281,25 @@ func (e *qbittorrentEngine) dataDir() string  { return e.settings.dataDir }
 // ---------------------------------------------------------------------------
 
 func (e *qbittorrentEngine) ensureCategory(ctx context.Context) {
-	if e.settings.Category == "" || e.categoryReady {
+	if e.settings.Category == "" {
 		return
 	}
-	if err := e.client.CreateCategory(ctx, e.settings.Category, ""); err != nil {
-		logging.Debug("qbittorrent category creation skipped", "category", e.settings.Category, "error", err.Error())
+	e.mu.Lock()
+	if e.categoryReady {
+		e.mu.Unlock()
+		return
 	}
+	category := e.settings.Category
+	e.mu.Unlock()
+	// Create the category outside the lock: it is a network call and the
+	// idempotent double-create is harmless, while categoryReady is guarded so
+	// concurrent adds do not race on the flag.
+	if err := e.client.CreateCategory(ctx, category, ""); err != nil {
+		logging.Debug("qbittorrent category creation skipped", "category", category, "error", err.Error())
+	}
+	e.mu.Lock()
 	e.categoryReady = true
+	e.mu.Unlock()
 }
 
 func (e *qbittorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) (string, error) {

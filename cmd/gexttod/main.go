@@ -105,14 +105,17 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 	archive, err := gextto.OpenArchive(filepath.Join(cfg.DataDir, constants.DefaultArchiveFile))
 	if err != nil {
 		return err
 	}
+	defer archive.Close()
 	comics, err := gextto.OpenComicsDb(filepath.Join(cfg.DataDir, "gextto_comics.db"))
 	if err != nil {
 		return err
 	}
+	defer comics.Close()
 	engine := gextto.NewEngine().WithDB(db)
 	torrents, err := gextto.NewLibtorrentClient(&cfg)
 	if err != nil {
@@ -122,6 +125,7 @@ func runDaemon(dryRun bool, configOption *string) error {
 	if err != nil {
 		return err
 	}
+	defer i18n.Close()
 	if _, err := i18n.SeedDefaultTranslations(); err != nil {
 		logging.Warn("translation seeding failed", "error", err)
 	}

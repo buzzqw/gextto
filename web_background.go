@@ -1621,7 +1621,9 @@ func cycleWorker(state *AppState) {
 						for _, series := range cfg.Series {
 							names = append(names, series.Name)
 						}
+						done := state.trackOperation()
 						go func(names []string) {
+							defer done()
 							var renamed, discarded, duplicates, errs int64
 							for _, name := range names {
 								_, value := seriesRenameApply(state, name, true, false, false)

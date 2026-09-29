@@ -130,6 +130,14 @@ type ComicsDb struct {
 	db *sql.DB
 }
 
+// Close closes the underlying SQLite connection (see Database.Close).
+func (d *ComicsDb) Close() error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	return d.db.Close()
+}
+
 const defaultComicsHistoryLimit int64 = 100
 
 // HistoryLimit is the shared retention limit for comics and Weekly Pack

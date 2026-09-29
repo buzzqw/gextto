@@ -3,10 +3,58 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+// TestAPIDocumentationMatchesRouter prevents the integration route table from
+// silently drifting when a handler is added or removed. Server-rendered /ui
+// routes are intentionally internal and are not part of docs/API.md.
+func TestAPIDocumentationMatchesRouter(t *testing.T) {
+	if _, err := os.Stat("docs/API.md"); err != nil {
+		t.Skip("API documentation is unavailable outside the source tree")
+	}
+	Router(newTestAppState(t))
+	want := map[string]struct{}{}
+	contents, err := os.ReadFile("docs/API.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(contents), "\n") {
+		parts := strings.Split(line, "`")
+		if len(parts) != 3 || !strings.HasPrefix(parts[0], "| ") || !strings.HasSuffix(parts[2], " |") {
+			continue
+		}
+		method := strings.TrimSpace(strings.TrimPrefix(parts[0], "|"))
+		method = strings.TrimSpace(strings.TrimSuffix(method, "|"))
+		if method == "GET" || method == "POST" || method == "DELETE" {
+			want[method+" "+parts[1]] = struct{}{}
+		}
+	}
+	got := map[string]struct{}{}
+	for _, route := range RegisteredRoutes() {
+		if route == "GET /{$}" {
+			got["GET /"] = struct{}{}
+			continue
+		}
+		if strings.Contains(route, " /ui") {
+			continue
+		}
+		got[route] = struct{}{}
+	}
+	for route := range want {
+		if _, ok := got[route]; !ok {
+			t.Errorf("documented route is not registered: %s", route)
+		}
+	}
+	for route := range got {
+		if _, ok := want[route]; !ok {
+			t.Errorf("registered route is not documented: %s", route)
+		}
+	}
+}
 
 // TestEveryGetRouteRespondsWithoutServerError installs the real router and calls
 // every registered GET endpoint with a placeholder parameter. The daemon must

@@ -704,7 +704,9 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// Cancelled on shutdown so a manual cycle releases the torrent engine
 	// before the native session is destroyed.
 	cycleCtx, cancelCycle := s.BackgroundContext()
+	done := s.trackOperation()
 	go func() {
+		defer done()
 		defer cancelCycle()
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()

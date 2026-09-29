@@ -476,7 +476,9 @@ func RedownloadMovie(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // RenameProgressView is `rename_progress_view`.
 func RenameProgressView(w http.ResponseWriter, r *http.Request, s *AppState) {
+	s.rename_progress_mu.Lock()
 	progress := *s.rename_progress
+	s.rename_progress_mu.Unlock()
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "progress": progress})
 }
 

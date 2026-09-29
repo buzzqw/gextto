@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/rules"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -1122,7 +1123,13 @@ func gibSetting(settings map[string]string, key string, defaultValue float64) ui
 	if gib <= 0.0 {
 		return 0
 	}
-	return uint64(gib * 1024.0 * 1024.0 * 1024.0)
+	const gibBytes = 1024.0 * 1024.0 * 1024.0
+	// Saturate instead of overflowing the float->uint64 conversion for absurd
+	// inputs (the conversion is otherwise implementation-defined).
+	if gib >= float64(^uint64(0))/gibBytes {
+		return ^uint64(0)
+	}
+	return uint64(gib * gibBytes)
 }
 
 // FindSeriesMatch finds the monitored series a release belongs to, honouring
@@ -1866,7 +1873,11 @@ func (c *Config) loadConfigDB() error {
 			}
 		}
 	}
-	columns, _ := tableColumns(conn, "movies_config")
+	columns, err := tableColumns(conn, "movies_config")
+	if err != nil {
+		logging.Warn("loadConfigDB: cannot read movies_config schema", "error", err)
+		columns = map[string]bool{}
+	}
 	hasMovieMetadata := columns["tmdb_id"] && columns["tvdb_id"] && columns["original_title"] && columns["overview"] && columns["poster_path"]
 	hasDisableUpgrades := columns["disable_upgrades"]
 	hasRequirements := columns["language_requirements"] && columns["subtitle_requirements"]
@@ -1887,7 +1898,14 @@ func (c *Config) loadConfigDB() error {
 	default:
 		movieQuery = "SELECT id,name,year,quality,language,enabled,subtitle,'','','','','','','','',0 FROM movies_config"
 	}
-	if rows, err := conn.Query(movieQuery); err == nil {
+	rows, err = conn.Query(movieQuery)
+	if err != nil {
+		// A missing movies_config table is benign (no movies configured yet);
+		// any other error must not silently drop the monitored movie list.
+		if !strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			logging.Warn("loadConfigDB: cannot load movies", "error", err)
+		}
+	} else {
 		movies := []MovieConfig{}
 		for rows.Next() {
 			var (

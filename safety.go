@@ -16,27 +16,39 @@ var workerRestartDelay = 5 * time.Second
 // safeGo runs fn on its own goroutine and restarts it if it panics. A long-lived
 // worker (torrent events, cycles, backups, housekeeping) must never be able to
 // kill the process: a programming error there is logged and retried, and the
-// daemon keeps serving.
+// daemon keeps serving. Production workers should prefer safeGoLoop so the
+// restart delay is also interruptible on shutdown.
 func safeGo(name string, fn func()) {
-	go func() {
-		for {
-			panicked := false
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						panicked = true
-						logging.Error("background worker panicked; restarting",
-							"worker", name, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
-					}
-				}()
-				fn()
+	go safeGoLoop(name, nil, fn)
+}
+
+// safeGoLoop runs fn and restarts it after a panic, sleeping workerRestartDelay
+// between attempts. When stop is non-nil and is closed, a pending restart sleep
+// is interrupted and the loop returns, so a panicked worker cannot delay
+// shutdown. The caller owns goroutine lifecycle and WaitGroup accounting, so a
+// restart never double-reports completion.
+func safeGoLoop(name string, stop <-chan struct{}, fn func()) {
+	for {
+		panicked := false
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					panicked = true
+					logging.Error("background worker panicked; restarting",
+						"worker", name, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+				}
 			}()
-			if !panicked {
-				return
-			}
-			time.Sleep(workerRestartDelay)
+			fn()
+		}()
+		if !panicked {
+			return
 		}
-	}()
+		select {
+		case <-stop:
+			return
+		case <-time.After(workerRestartDelay):
+		}
+	}
 }
 
 // guardHandler wraps an HTTP handler so a panic returns a clean 500 response and

@@ -609,7 +609,9 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusConflict, "rename is disabled")
 		return
 	}
+	s.rename_progress_mu.Lock()
 	if s.rename_progress.Running {
+		s.rename_progress_mu.Unlock()
 		jsonError(w, http.StatusConflict, "a rename is already running")
 		return
 	}
@@ -619,6 +621,7 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 	s.rename_progress.Series = ""
 	s.rename_progress.Message = "starting"
 	s.rename_progress.Errors = 0
+	s.rename_progress_mu.Unlock()
 	names := []string{}
 	for index := range cfg.Series {
 		if cfg.Series[index].Enabled {
@@ -626,18 +629,25 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	total := len(names)
+	s.rename_progress_mu.Lock()
 	s.rename_progress.Total = total
 	s.rename_progress.Message = "running"
+	s.rename_progress_mu.Unlock()
+	done := s.trackOperation()
 	go func() {
+		defer done()
 		errors := 0
 		for index, name := range names {
+			s.rename_progress_mu.Lock()
 			s.rename_progress.Current = index
 			s.rename_progress.Series = name
+			s.rename_progress_mu.Unlock()
 			status, _ := seriesRenameApply(s, name, true, force, sourceOnly)
 			if status != http.StatusOK {
 				errors++
 			}
 		}
+		s.rename_progress_mu.Lock()
 		s.rename_progress.Running = false
 		s.rename_progress.Current = total
 		s.rename_progress.Series = ""
@@ -647,6 +657,7 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		} else {
 			s.rename_progress.Message = fmt.Sprintf("completed with %d error(s)", errors)
 		}
+		s.rename_progress_mu.Unlock()
 		logging.Info("background rename-all finished", "total", total, "errors", errors)
 	}()
 	jsonStatus(w, http.StatusAccepted, map[string]any{"ok": true, "total": total})

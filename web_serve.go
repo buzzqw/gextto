@@ -42,10 +42,10 @@ func (l nodelayListener) Accept() (net.Conn, error) {
 func startBackgroundWorkers(state *AppState) {
 	register := func(name string, run func()) {
 		state.bgWG.Add(1)
-		safeGo(name, func() {
+		go func() {
 			defer state.bgWG.Done()
-			run()
-		})
+			safeGoLoop(name, state.bgStop, run)
+		}()
 	}
 	register("torrent_event_worker", func() {
 		torrentEventWorker(state.config_path, state.cfg, state, state.db, state.comics, state.torrent_events)
@@ -69,18 +69,21 @@ func (s *AppState) BackgroundStop() <-chan struct{} { return s.bgStop }
 // shutting down. Long operations that touch the torrent engine (the acquisition
 // cycle, manual cycles) take it so they abort before the session is destroyed.
 func (s *AppState) BackgroundContext() (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-	if s.bgStop == nil {
-		return ctx, cancel
+	if s == nil || s.bgContext == nil {
+		return context.WithCancel(context.Background())
 	}
-	go func() {
-		select {
-		case <-s.bgStop:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
+	return context.WithCancel(s.bgContext)
+}
+
+// trackOperation registers a long-lived operation that may touch the torrent
+// engine, so stopBackgroundWorkers waits for it before the native session is
+// destroyed. Callers must invoke the returned function exactly once when the
+// operation completes. The Add happens synchronously in the caller (a handler
+// or an already-tracked worker), which is always before bgWG.Wait starts, so it
+// cannot race the shutdown wait.
+func (s *AppState) trackOperation() func() {
+	s.bgWG.Add(1)
+	return s.bgWG.Done
 }
 
 // stopping reports whether a shutdown has been requested.
@@ -109,23 +112,18 @@ func (s *AppState) SleepBackground(d time.Duration) bool {
 	}
 }
 
-// stopBackgroundWorkers signals every worker to stop and waits for them, so the
-// libtorrent session can be destroyed without a late List()/Add() hitting a
-// closed session handle (which aborts the process through boost).
+// stopBackgroundWorkers signals every worker to stop and waits for all of them.
+// The native torrent session is destroyed immediately after this function
+// returns, so continuing after an arbitrary timeout would permit a late
+// List()/Add() against a closed CGo handle.
 func stopBackgroundWorkers(state *AppState) {
-	state.bgStopOnce.Do(func() { close(state.bgStop) })
-	done := make(chan struct{})
-	go func() {
-		state.bgWG.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(15 * time.Second):
-		// A long cycle may still be running; systemd's stop timeout is the hard
-		// limit. The session lock still protects the hot List path.
-		logging.Warn("background workers did not stop in time; continuing shutdown")
-	}
+	state.bgStopOnce.Do(func() {
+		if state.bgCancel != nil {
+			state.bgCancel()
+		}
+		close(state.bgStop)
+	})
+	state.bgWG.Wait()
 }
 
 func shutdownServers(servers ...*http.Server) {

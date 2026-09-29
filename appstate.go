@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"context"
 	"sync"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -21,6 +22,7 @@ func NewAppState(
 	notifier *Notifier,
 	tmdb *TmdbClient,
 ) *AppState {
+	backgroundContext, stopBackgroundContext := context.WithCancel(context.Background())
 	state := &AppState{
 		cfg:             cfg,
 		config_path:     configPath,
@@ -38,6 +40,8 @@ func NewAppState(
 		rename_progress: &RenameProgress{},
 		config_cache:    &ConfigCache{},
 		bgStop:          make(chan struct{}),
+		bgContext:       backgroundContext,
+		bgCancel:        stopBackgroundContext,
 	}
 	// Install the configured transfer backend. A refused activation (invalid
 	// path mappings, an unavailable build tag, a port conflict) falls back to

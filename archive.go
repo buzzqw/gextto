@@ -16,6 +16,14 @@ type Archive struct {
 	path string
 }
 
+// Close closes the underlying SQLite connection (see Database.Close).
+func (a *Archive) Close() error {
+	if a == nil || a.db == nil {
+		return nil
+	}
+	return a.db.Close()
+}
+
 // ArchiveEntry is one row of the archive with the parsed release attached.
 type ArchiveEntry struct {
 	ID           int64           `json:"id"`
@@ -386,11 +394,19 @@ func (a *Archive) DeleteIDs(ids []int64) (int, error) {
 
 // Delete removes the row matching the magnet or its infohash.
 func (a *Archive) Delete(magnet string) (bool, error) {
-	hash, _ := utils.MagnetHash(magnet)
-	result, err := a.db.Exec(
-		"DELETE FROM archive WHERE magnet=?1 OR lower(magnet_hash)=lower(?2)",
-		magnet, hash,
-	)
+	hash, ok := utils.MagnetHash(magnet)
+	var query string
+	var args []any
+	if ok {
+		query = "DELETE FROM archive WHERE magnet=?1 OR lower(magnet_hash)=lower(?2)"
+		args = []any{magnet, hash}
+	} else {
+		// No usable magnet hash: match only by the exact magnet link so an
+		// empty digest cannot delete unrelated rows with an empty magnet_hash.
+		query = "DELETE FROM archive WHERE magnet=?1"
+		args = []any{magnet}
+	}
+	result, err := a.db.Exec(query, args...)
 	if err != nil {
 		return false, err
 	}

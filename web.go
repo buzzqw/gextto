@@ -6,6 +6,7 @@ package gextto
 // the daemon (the parts shared by all handler groups).
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -481,7 +482,11 @@ type AppState struct {
 	last_cycle      *CycleState
 	cycle_lock      *sync.Mutex
 	rename_progress *RenameProgress
-	config_cache    *ConfigCache
+	// rename_progress_mu guards rename_progress: the rename-all job writes its
+	// progress from a background goroutine while the UI polls it, and two
+	// concurrent rename requests must not both pass the "already running" check.
+	rename_progress_mu sync.Mutex
+	config_cache       *ConfigCache
 	// Background-worker lifecycle. bgStop is closed when the daemon starts
 	// shutting down and bgWG tracks every worker, so Serve waits for them before
 	// returning and the torrent session is destroyed only when no worker can
@@ -489,6 +494,8 @@ type AppState struct {
 	bgStop     chan struct{}
 	bgStopOnce sync.Once
 	bgWG       sync.WaitGroup
+	bgContext  context.Context
+	bgCancel   context.CancelFunc
 }
 
 // ---------------------------------------------------------------------------
