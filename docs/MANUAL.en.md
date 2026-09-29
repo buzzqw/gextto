@@ -1,10 +1,15 @@
-# Gextto — User Manual
+# Gextto User Manual
 
-This manual covers the everyday use of Gextto through its web interface and
-terminal TUI. The web UI is available in **English** and **Italian** (header
-language switch); this document describes the English labels, the Italian ones are in
-[`MANUAL.it.md`](MANUAL.it.md). The **Manual** page inside the app shows this
-document in the language selected in the header.
+This is the operational guide for Gextto's web UI and terminal TUI. The web
+interface is available in English and Italian; this document uses English
+labels. For Italian labels, read [MANUAL.it.md](MANUAL.it.md). The in-app
+**Manual** page follows the language selected in its header.
+
+> [!IMPORTANT]
+> Start in **dry-run**. Verify paths, source access and one test title before
+> enabling active downloads. The UI is an unauthenticated administrative
+> interface: keep it trusted or protect it with a firewall and authenticated
+> HTTPS reverse proxy.
 
 ## How to use this guide
 
@@ -66,7 +71,8 @@ See [`SECURITY.md`](SECURITY.md) for the full network model.
 - [9. Maintenance](#9-maintenance)
 - [10. Health, Logs, Charts](#10-health-logs-charts)
 - [11. Notifications](#11-notifications)
-- [12. Troubleshooting](#12-troubleshooting)
+- [12. Quick reference](#12-quick-reference)
+- [13. Troubleshooting](#13-troubleshooting)
 
 ---
 
@@ -779,7 +785,7 @@ an HTTP test with delivery of a real event. For SMTP, check host, port, TLS,
 user and sender: a reachable server may still reject the sender or require a
 different authentication method.
 
-## Quick reference
+## 12. Quick reference
 
 ### Which action to use
 
@@ -805,7 +811,7 @@ different authentication method.
 - **Seed**: sharing a torrent after completion.
 - **NAS**: network destination used for the library or configured paths.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 - **A source is unreachable** — check *Configuration → Sources → Verify* and the
   sources health panel. For Jackett verify the base URL, API key and that at

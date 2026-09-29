@@ -1,9 +1,12 @@
-# Gextto TUI
+# Gextto terminal UI (TUI)
 
-Interfaccia a terminale per un daemon Gextto in esecuzione. Replica la vecchia
-TUI Python di Rextto e la supera: bilingue (italiano/inglese), filtro e
-ordinamento dei torrent, dettagli con sotto-viste, stream dei log via SSE e
-nessuna dipendenza oltre a `golang.org/x/sys`.
+Interfaccia a terminale per un daemon Gextto già in esecuzione. È bilingue
+(italiano/inglese), offre filtro e ordinamento torrent, dettagli, log SSE e non
+legge mai direttamente i database.
+
+> [!NOTE]
+> La TUI usa l'API HTTP del daemon. Il daemon deve quindi essere avviato e
+> raggiungibile dall'URL indicato prima di aprire la TUI.
 
 ## Avvio
 
@@ -19,7 +22,7 @@ la directory che contiene `gexttod`.
 La lingua viene scelta in quest'ordine: `--lang`, `GEXTTO_LANG`, la lingua
 attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 
-## Schede
+## Schede disponibili
 
 1. **Stato** — modalità (dry-run/attiva), torrent, prossimo ciclo, ultimo ciclo,
    elementi visti nei feed.
@@ -31,7 +34,7 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 6. **Mancanti** — episodi mancanti della libreria monitorata.
 7. **Blocklist** — release bloccate, con rimozione interattiva.
 
-## Tasti
+## Scorciatoie da tastiera
 
 | Ambito | Tasti |
 | --- | --- |

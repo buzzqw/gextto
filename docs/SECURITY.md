@@ -1,4 +1,7 @@
-# Security policy
+# Gextto security policy
+
+Gextto controls downloads and can rename, move or remove files as its service
+user. Treat its web interface, API token and backups as administrative assets.
 
 ## Supported versions
 
@@ -29,12 +32,17 @@ as an administrative interface.
   be reachable from another machine. HTTPS and upstream authentication should
   be provided by that proxy.
 
+> [!WARNING]
+> Do not expose port 5000 directly to the public Internet.
+
 ## What the daemon deliberately does
 
-- **No shell.** External programs (event hooks, `megadl`, `ffprobe`,
-  `systemctl`, `apt-cache`) are executed with `exec.Command` and explicit
-  arguments. Event-hook arguments are split with quote awareness and the child
-  is killed after a timeout.
+- **No implicit shell.** The daemon's own invocations of `megadl`, `ffprobe`,
+  `systemctl` and `apt-cache` use `exec.Command` with explicit arguments and no
+  shell. **Event hooks are the exception**: a hook runs any absolute-path
+  executable you configure, so editing hooks is equivalent to granting command
+  execution as the service user. Only define hooks you trust, and treat the
+  ability to change them as root-equivalent.
 - **Parameterised SQL.** Every user value is bound as a query parameter; dynamic
   SQL is limited to internal literals and clamped integers.
 - **No unverified TLS skipping.** The daemon never sets
@@ -48,17 +56,21 @@ as an administrative interface.
   verifies the published `.sha256` when present, stages the payload and swaps it
   with renames; a failure leaves the running installation untouched.
 
-## Things to be aware of
+## Operational responsibilities
 
 - **Gextto can write to the filesystem as the user that runs it.** Paths you
   configure (library/NAS root, download/temp folders, tag-directory rules,
   archive paths) are used verbatim for renaming and moving files. Only configure
   paths you trust, and run the daemon as a dedicated unprivileged account.
 - **External URLs are fetched by the server.** Archive download links, comic
-  pages and FlareSolverr requests are retrieved by the daemon. Because Jackett
+  pages, FlareSolverr requests and manually added torrent URLs (`send-magnet`,
+  `archive/add`, `search/add`) are retrieved by the daemon. Because Jackett
   and Prowlarr commonly run on the same host or LAN, private/loopback URLs are
   *not* blocked by default: protect the token and the network instead of
   relying on an SSRF filter.
+- **The configuration API returns integration keys in cleartext.** `GET
+  /api/config` includes indexer, TMDB and TVDB keys. Anyone who can call that
+  endpoint can read them; protect the port as described above.
 - **Event hooks and integrations receive your data.** A webhook payload, a
   Telegram message or a hook script contains titles, paths and hashes. Review
   the destinations you configure.

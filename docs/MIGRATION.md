@@ -1,10 +1,14 @@
-# Migrating an existing installation to gextto
+# Migrating an existing installation to Gextto
 
-gextto stores its databases and torrent state under its own names
+Gextto stores its databases and torrent state under its own names
 (`gextto_series.db`, `gextto_archive.db`, `gextto_config.db`,
 `gextto_comics.db`, `gextto_torrents_state/`). The `migrate` command copies a
 previous installation into this layout **without touching the source**, so the
 operation is reversible.
+
+> [!IMPORTANT]
+> Stop the old daemon before going live. During the trial, use a different UI
+> and engine port if the old service is still running.
 
 ## What the migration does
 
@@ -22,7 +26,7 @@ operation is reversible.
 
 The source directory is only read.
 
-## Procedure
+## Migration procedure
 
 ### 1. Stop the old daemon
 
@@ -93,7 +97,7 @@ sudo systemctl enable --now gextto.service
 A per-user unit (`~/.config/systemd/user/gextto.service`) works too, but it only
 starts at login unless lingering is enabled: `sudo loginctl enable-linger <user>`.
 
-## Verification
+## Verify before enabling downloads
 
 ```bash
 systemctl status gextto.service            # or: systemctl --user status gextto
@@ -106,7 +110,7 @@ The status payload must report `"name": "gextto"`, `"active": true` and the
 expected `seen` counts; the torrent session should list the migrated torrents
 (`/api/torrents`).
 
-## Rollback
+## Roll back safely
 
 Because the source was never modified:
 

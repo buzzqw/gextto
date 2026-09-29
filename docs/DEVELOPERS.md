@@ -1,7 +1,14 @@
-# Developer manual
+# Developing Gextto
 
-This guide is for contributors who build, test or extend Gextto. Normal
-installation and update instructions are in the main README.
+This guide is for contributors who build, test or extend Gextto. For installing
+and operating a daemon, use the repository README and user manual instead.
+
+## Contributor workflow
+
+1. Make a focused change and preserve existing user data and configuration.
+2. Format changed Go files, run the focused test, then run the full suite.
+3. Update the user-facing documentation and API reference with the behavior.
+4. Inspect `git diff --check` before committing.
 
 ## Project layout
 
@@ -21,8 +28,8 @@ assembles and starts the executable.
 
 ## Requirements and build
 
-Install Go 1.26 or newer, a C++17 toolchain and the `libtorrent-rasterbar`
-development headers. The normal build embeds the web UI and does not need a
+Install Go 1.26 or newer, a C++17 toolchain and `libtorrent-rasterbar`
+development headers. The normal build embeds the web UI; it does not need a
 separate frontend build.
 
 ```bash
@@ -72,7 +79,8 @@ When adding an API endpoint:
 2. register it in `web_router.go`;
 3. add authorization, validation and bounded input handling;
 4. document it in `docs/API.md`;
-5. add a focused Go test and, when it changes the UI, a Playwright test.
+5. add a focused Go test and, when it changes the UI, a Playwright test;
+6. keep the route table in `docs/API.md` aligned.
 
 Use the existing JSON helpers and keep destructive operations explicit and
 confirmable in the UI.
@@ -86,11 +94,12 @@ in fixtures committed to the repository.
 
 ## Testing
 
-Useful checks before a commit:
+Run these checks before a commit:
 
 ```bash
 gofmt -w changed.go
 go test ./...
+go test -race ./...
 node --check uiweb/static/gextto-ui.js
 git diff --check
 ```
@@ -101,6 +110,27 @@ The end-to-end suite is under `uiweb/end2end` and requires a running daemon:
 cd uiweb/end2end
 npx playwright test
 ```
+
+## Concurrency and safety
+
+The daemon mixes HTTP handlers, long-lived workers and a CGo libtorrent
+session, so a few invariants are load-bearing:
+
+- **The native session handle is shared state.** Reads of `LibtorrentClient.session`
+  must take `sessionMu.RLock()`; `Shutdown` destroys the handle under
+  `sessionMu.Lock()`. Never read the field directly in a new method — a cgo
+  call on a destroyed session aborts the process.
+- **Goroutines started by HTTP handlers** (manual cycle, rename-all) must be
+  tracked in a `WaitGroup` or derive from `BackgroundContext()` so they finish
+  before the torrent session is torn down.
+- **Run `go test -race ./...`.** It catches the races above; do not merge a
+  change that introduces a new race.
+- New endpoints must validate and bound every user input and restrict filesystem
+  paths to the configured roots before use.
+
+Two technical reports — [`gextto-terra.md`](../gextto-terra.md) and
+[`pro-terra.md`](../pro-terra.md) — collect the known improvement backlog in
+this area.
 
 ## Packaging and releases
 

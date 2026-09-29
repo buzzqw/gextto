@@ -1,108 +1,98 @@
 # Gextto
 
-Gextto è un demone self-hosted per cercare, scaricare e archiviare
-automaticamente serie TV, film e fumetti. La gestione avviene dalla UI web.
+Gextto è un demone self-hosted che cerca, seleziona, scarica, verifica, rinomina
+e archivia serie TV, film e fumetti. L'interfaccia web è il piano di controllo;
+il demone continua a funzionare come servizio.
 
-> English: [`README.md`](README.md) · Manuale completo:
-> [`docs/MANUAL.it.md`](docs/MANUAL.it.md)
+> **English:** [README.md](README.md) · **Guida completa:**
+> [manuale italiano](docs/MANUAL.it.md)
 
-## Cos'è Gextto
+## In breve
 
-Gextto automatizza il ciclo completo della libreria: cerca le release, sceglie
-quella migliore, scarica, controlla il file, lo rinomina e lo archivia nel
-percorso configurato.
+- Un solo servizio gestisce ciclo di ricerca, database SQLite, coda torrent,
+  post-processing e archivio.
+- Il motore predefinito è libtorrent integrato. qBittorrent-nox e anacrolix
+  opzionale sono alternative, non servizi aggiuntivi necessari.
+- La scelta delle release considera qualità, sorgente, codec, audio, HDR, lingue
+  e dimensione. `ffprobe` può aggiungere le caratteristiche del file archiviato.
+- UI web responsive e TUI mostrano salute, log, backup, manutenzione e
+  integrazioni con Trakt, Simkl, Jellyfin e Plex.
 
-## Perché scegliere Gextto
+## Installazione Linux
 
-- **Un solo servizio**: UI, database, ricerca, coda torrent e archiviazione
-  lavorano insieme, senza un orchestratore esterno.
-- **Torrent integrati**: libtorrent è incluso e non richiede un servizio
-  aggiuntivo; sono disponibili anche qBittorrent-nox e anacrolix.
-- **Scelte basate sulla qualità**: risoluzione, sorgente, codec, audio, HDR,
-  lingue e dimensione vengono valutati prima del download e degli upgrade.
-- **Controllo reale dei file**: `ffprobe`/MediaInfo verificano codec, audio,
-  HDR e lingue del file effettivo, non solo il nome della release.
-- **Serie, film e fumetti**: metadati TMDB/TVDB, episodi mancanti, calendario,
-  ricerca manuale, rinomina e percorsi NAS.
-- **Gestione semplice**: interfaccia web responsive in italiano e inglese,
-  backup, log, salute del servizio e integrazioni con Trakt, Simkl, Jellyfin e
-  Plex.
-
-## Installazione
-
-### Installazione ufficiale su Linux
-
-Su un server Linux 64 bit con systemd, esegui l'installer come **root** (tramite
-`sudo` oppure da una shell root):
+L'installer ufficiale è destinato a server Linux 64 bit con systemd. Eseguilo
+come root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-L'installer configura il servizio e conserva dati e configurazione in
-`/var/lib/gextto`. La UI sarà disponibile su `http://<server>:5000`.
+Installa il programma in `/opt/gextto`, conserva i dati del servizio in
+`/var/lib/gextto` ed espone la UI sulla porta 5000.
 
-### Installazione da codice sorgente
+> [!IMPORTANT]
+> La UI web è un'interfaccia amministrativa senza autenticazione. Mantienila in
+> una rete fidata oppure proteggila con firewall e reverse proxy HTTPS dotato di
+> autenticazione. Leggi prima la [politica di sicurezza](docs/SECURITY.md).
 
-Questa modalità è descritta nel [manuale per sviluppatori](docs/DEVELOPERS.md).
+### Installazione dal sorgente
+
+Servono Go 1.26+, compilatore C++17 e header di sviluppo libtorrent-rasterbar.
+La build normale include la UI web: non è richiesto un build frontend separato.
+Consulta il [manuale sviluppatori](docs/DEVELOPERS.md).
+
+```bash
+make build
+```
+
+## Primo avvio sicuro
+
+1. Apri `http://<server>:5000` e completa il setup.
+2. Configura percorsi, una sorgente e, se necessarie, credenziali TMDB/TVDB.
+3. Mantieni il **dry-run**, aggiungi un titolo di prova ed esegui una ricerca o
+   un ciclo.
+4. Controlla **Salute** e **Log**, inclusi permessi filesystem e risultati della
+   sorgente.
+5. Abilita la modalità attiva solo quando l'esito è corretto.
+
+Checklist, configurazione NAS e diagnostica sono nel
+[manuale utente](docs/MANUAL.it.md).
 
 ## Aggiornamento
 
-### Installazione ufficiale
-
-Ripeti il comando di installazione:
+Per l'installazione ufficiale ripeti l'installer. Se disponibile, verifica il
+checksum della release e sostituisce il payload in modo atomico, senza toccare
+dati e configurazione.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
 ```
 
-### Installazione da repository
+Da un checkout sorgente:
 
 ```bash
-cd /percorso/del/gextto
 git pull --ff-only
 ./scripts/update.sh
-```
-
-Lo script compila l'ultima versione e riavvia il servizio. Database,
-configurazione, download e archivi non vengono cancellati.
-
-Verifica che il servizio sia attivo:
-
-```bash
 curl -fsS http://127.0.0.1:5000/api/health
 ```
 
-## Primo avvio
-
-1. Apri la UI web e completa il setup iniziale.
-2. Configura percorsi, sorgenti e chiavi TMDB/TVDB.
-3. Lascia attiva la modalità dry-run finché la configurazione non è verificata.
-4. Abilita la modalità attiva quando vuoi iniziare i download.
-
-Per la configurazione dettagliata consulta il
-[manuale utente](docs/MANUAL.it.md).
-
-## Cosa offre
-
-- gestione di serie TV, film e fumetti;
-- ricerca automatica e manuale delle release;
-- torrent con libtorrent integrato o backend alternativi;
-- rinomina, archiviazione e controllo reale dei file multimediali;
-- ricerca episodi mancanti, calendario, backup e manutenzione;
-- integrazioni con Trakt, Simkl, Jellyfin, Plex e notifiche.
-
 ## Documentazione
 
-- [Manuale utente italiano](docs/MANUAL.it.md)
-- [English user manual](docs/MANUAL.en.md)
-- [API HTTP](docs/API.md)
-- [Migrazione da un'installazione esistente](docs/MIGRATION.md)
-- [Sicurezza](docs/SECURITY.md)
-- [TUI da terminale](docs/tui.md)
-- [Manuale utenti avanzati](docs/ADVANCED.it.md)
-- [Manuale sviluppatori](docs/DEVELOPERS.md)
+| Esigenza | Documento |
+|---|---|
+| Usare il servizio | [Manuale italiano](docs/MANUAL.it.md) · [English manual](docs/MANUAL.en.md) |
+| NAS, reverse proxy, ripristino | [Guida avanzata](docs/ADVANCED.it.md) |
+| Integrazioni HTTP | [Riferimento API](docs/API.md) |
+| Migrare un'installazione | [Guida migrazione](docs/MIGRATION.md) |
+| Client da terminale | [Riferimento TUI](docs/tui.md) |
+| Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
+| Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
+
+Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
+Le revisioni del codice rivolte ai contributor sono raccolte in
+[gextto-terra](gextto-terra.md) e [pro-terra](pro-terra.md).
 
 ## Licenza
 
-Vedi [LICENSE](LICENSE).
+Gextto è distribuito con [EUPL-1.2](LICENSE). I componenti di terze parti sono
+indicati in [NOTICE](NOTICE).

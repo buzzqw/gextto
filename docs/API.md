@@ -1,6 +1,26 @@
-# gextto HTTP API
+# Gextto HTTP API
 
-Generated route table of the web/API surface served by the daemon.
+Questa è la tabella delle route pubbliche registrate dal daemon. È un
+riferimento di superficie, non un contratto di integrazione stabile per ogni
+payload: prima di automatizzare un'azione, verifica richiesta e risposta sulla
+build in esecuzione.
+
+## Prima di usare l'API
+
+- L'API non ha autenticazione integrata. Non esporla su Internet: usa loopback
+  oppure un reverse proxy con TLS e autenticazione.
+- Le route che modificano configurazione, file, torrent o database usano di
+  norma `POST`/`DELETE`; trattale come azioni amministrative e conserva backup.
+- I segnaposto tra parentesi graffe, ad esempio `{hash}`, fanno parte del
+  percorso e devono essere codificati correttamente dal client.
+- Alcune route sono alias storici (`run_now`/`run-now`, per esempio). Le nuove
+  integrazioni dovrebbero preferire la forma più leggibile quando disponibile.
+
+La UI server-rendered usa inoltre route interne sotto `/ui`; non fanno parte di
+questa tabella di integrazione. Per verifiche operative usa prima
+`GET /api/health` e `GET /api/status`.
+
+## Route
 
 | Method | Path |
 |---|---|
@@ -190,8 +210,10 @@ Generated route table of the web/API surface served by the daemon.
 | POST | `/api/tmdb/discover` |
 | POST | `/api/tmdb/search` |
 | GET | `/api/torrent-backend` |
+| GET | `/api/torrent-backend/qbittorrent/update` |
 | POST | `/api/torrent-backend` |
 | POST | `/api/torrent-backend/preflight` |
+| POST | `/api/torrent-backend/qbittorrent/update` |
 | POST | `/api/torrent-backend/test` |
 | GET | `/api/torrent-migrations` |
 | POST | `/api/torrent-migrations/cancel` |
@@ -270,4 +292,4 @@ Generated route table of the web/API surface served by the daemon.
 | GET | `/feed.xml` |
 | GET | `/magnet` |
 
-Total routes: 255
+Total routes: 267

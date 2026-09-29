@@ -1,11 +1,15 @@
-# Gextto — Manuale utente
+# Manuale utente di Gextto
 
-Questo manuale descrive l'uso quotidiano di Gextto dalla sua interfaccia web e
-dalla TUI terminale. La UI web è disponibile in **italiano** e **inglese**
-(selettore lingua in alto); qui sono usate le etichette italiane, la versione
-inglese è in
-[`MANUAL.en.md`](MANUAL.en.md). La pagina **Manuale** dentro l'app mostra questo
-documento nella lingua scelta in alto.
+Questa è la guida operativa per la UI web e la TUI terminale di Gextto. La UI è
+disponibile in italiano e inglese; qui sono usate le etichette italiane. Per le
+etichette inglesi consulta [MANUAL.en.md](MANUAL.en.md). La pagina **Manuale**
+dell'app segue la lingua selezionata nell'intestazione.
+
+> [!IMPORTANT]
+> Inizia in **dry-run**. Verifica percorsi, accesso alle sorgenti e un titolo di
+> prova prima di abilitare i download. La UI è amministrativa e senza
+> autenticazione: lasciala in una rete fidata o proteggila con firewall e
+> reverse proxy HTTPS autenticato.
 
 ## Come usare questa guida
 
@@ -67,7 +71,8 @@ indica quale build è in esecuzione. Vedi
 - [9. Manutenzione](#9-manutenzione)
 - [10. Salute, Log, Grafici](#10-salute-log-grafici)
 - [11. Notifiche](#11-notifiche)
-- [12. Risoluzione problemi](#12-risoluzione-problemi)
+- [12. Riferimento rapido](#12-riferimento-rapido)
+- [13. Risoluzione problemi](#13-risoluzione-problemi)
 
 ---
 
@@ -804,7 +809,7 @@ HTTP con la consegna dell'evento reale. Per SMTP controlla host, porta, TLS,
 utente e mittente: un server raggiungibile può comunque rifiutare il mittente o
 richiedere autenticazione diversa.
 
-## Riferimento rapido
+## 12. Riferimento rapido
 
 ### Quando usare quale azione
 
@@ -831,7 +836,7 @@ richiedere autenticazione diversa.
 - **Seed**: condivisione del torrent dopo il completamento.
 - **NAS**: destinazione di rete usata per la libreria o per i percorsi configurati.
 
-## 12. Risoluzione problemi
+## 13. Risoluzione problemi
 
 - **Una sorgente non risponde** — controlla *Configurazione → Sorgenti → Verifica*
   e il pannello stato sorgenti; per Jackett verifica URL base, API key e che

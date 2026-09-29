@@ -1,8 +1,12 @@
-# Manuale per utenti avanzati
+# Operatività avanzata di Gextto
 
-Questa guida raccoglie le configurazioni utili quando Gextto viene eseguito su
-un NAS, su più macchine o dietro un reverse proxy. Per l'uso normale consulta il
-[manuale utente](MANUAL.it.md).
+Usa questa guida per NAS, installazioni su più macchine, reverse proxy e
+ripristino. Per l'uso quotidiano consulta il [manuale utente](MANUAL.it.md).
+
+> [!IMPORTANT]
+> Prima di modificare storage o backend torrent, sospendi i cicli automatici
+> (oppure usa il dry-run), crea un backup, verifica i percorsi con l'utente del
+> servizio e prova una modifica alla volta.
 
 ## Percorsi e permessi
 
@@ -17,9 +21,9 @@ di avviare upgrade o ricerca episodi mancanti.
 
 ## Rete e sicurezza
 
-Gextto non include autenticazione utente. Se la UI è raggiungibile da un'altra
-macchina, usa firewall o reverse proxy con HTTPS e autenticazione. Per accesso
-locale preferisci `127.0.0.1:5000`.
+Gextto non include autenticazione utente. Quando possibile ascolta su
+`127.0.0.1:5000`; per accesso remoto usa firewall e reverse proxy HTTPS con
+autenticazione.
 
 Non esporre direttamente la porta amministrativa su Internet. Per i dettagli
 vedi [Sicurezza](SECURITY.md).
@@ -31,8 +35,9 @@ vedi [Sicurezza](SECURITY.md).
 - **anacrolix**: backend Go alternativo, da usare solo dopo aver verificato
   compatibilità e prestazioni.
 
-Un torrent appartiene a un solo backend alla volta. Prima di cambiare backend
-metti in pausa i download e verifica i percorsi condivisi o le mappature NAS.
+Un torrent appartiene a un solo backend alla volta. Prima di cambiarlo metti in
+pausa i download, esegui il preflight e verifica percorsi condivisi o mappature
+NAS.
 
 ## MediaInfo e ffprobe
 
@@ -66,15 +71,16 @@ git pull --ff-only
 Lo script ricompila e riavvia il servizio senza modificare i dati. Per
 installazioni ufficiali usa invece l'installer descritto nel README.
 
-## Diagnostica rapida
+## Diagnosi rapida
 
 Controlla nell'ordine:
 
 1. `curl -fsS http://127.0.0.1:5000/api/health`;
-2. stato e permessi dei percorsi nel pannello **Salute**;
-3. sorgenti e indexer con il pulsante **Verifica**;
-4. log filtrati per `ERROR`, `WARN`, `torrent` o `ffprobe`;
-5. stato del servizio con `systemctl` o `systemctl --user`.
+2. `curl -fsS http://127.0.0.1:5000/api/status`;
+3. stato e permessi dei percorsi nel pannello **Salute**;
+4. sorgenti e indexer con il pulsante **Verifica**;
+5. log filtrati per `ERROR`, `WARN`, `torrent` o `ffprobe`;
+6. stato del servizio con `systemctl` o `systemctl --user`.
 
 Non cancellare database o torrent state per risolvere un errore senza prima
 fare un backup.
