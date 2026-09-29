@@ -170,3 +170,28 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_temp_dir", Label: "Cartella temporanea libtorrent", Tab: "paths"},
 	{Key: "libtorrent_torrent_copy_dir", Label: "Copia i file .torrent in", Tab: "paths"},
 }
+
+// uiSettingSearchTerms contains common concepts that are useful when searching
+// for a setting but are intentionally not repeated in its visible label.
+var uiSettingSearchTerms = map[string]string{
+	"libtorrent_auto_optimize":               "memoria memo memory ram cache buffer ottimizzazione optimization risorse resources",
+	"libtorrent_dynamic_queue":               "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_dynamic_queue_min":           "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_dynamic_queue_max":           "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_dont_count_slow_torrents":    "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_active_downloads":            "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_active_seeds":                "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_active_limit":                "memoria memo memory ram coda queue risorse resources",
+	"libtorrent_cache_size":                  "memoria memo memory ram cache buffer disco disk",
+	"libtorrent_cache_expiry":                "memoria memo memory ram cache buffer disco disk",
+	"libtorrent_aio_threads":                 "memoria memo memory ram buffer disco disk thread threads",
+	"libtorrent_ramdisk_enabled":             "memoria memo memory ram ramdisk tmpfs",
+	"libtorrent_ramdisk_threshold_gb":        "memoria memo memory ram ramdisk tmpfs spazio space",
+	"libtorrent_ramdisk_margin_gb":           "memoria memo memory ram ramdisk tmpfs spazio space",
+	"libtorrent_ramdisk_min_free_bytes":      "memoria memo memory ram ramdisk tmpfs spazio space",
+	"libtorrent_preallocate":                 "memoria memo memory ram spazio space disco disk",
+	"libtorrent_connections_limit":           "memoria memo memory ram risorse resources connessioni connections",
+	"libtorrent_max_connections_per_torrent": "memoria memo memory ram risorse resources connessioni connections",
+	"libtorrent_max_uploads_per_torrent":     "memoria memo memory ram risorse resources upload",
+	"min_free_space_gb":                      "memoria memo memory ram spazio space disco disk",
+}

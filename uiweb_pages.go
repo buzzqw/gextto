@@ -329,6 +329,7 @@ type uiSearchEntry struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
 	Tab   string `json:"tab"`
+	Terms string `json:"terms,omitempty"`
 }
 
 // uiSettingsPageFrom builds one settings tab from the curated settings index
@@ -506,7 +507,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 
 	entries := make([]uiSearchEntry, 0, len(cfg.Settings))
 	for _, def := range uiSettingsIndex {
-		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab})
+		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab, Terms: uiSettingSearchTerms[def.Key]})
 	}
 	for _, key := range keys {
 		if strings.HasPrefix(strings.ToLower(key), "score") {

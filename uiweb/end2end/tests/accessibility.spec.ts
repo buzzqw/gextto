@@ -32,6 +32,13 @@ test.describe("accessibilità automatizzata", () => {
     expect(unnamed).toEqual([]);
   });
 
+  test("la ricerca impostazioni comprende sinonimi comuni", async ({ page }) => {
+    await page.goto("/?view=settings");
+    const search = page.locator("[data-settings-search]");
+    await search.fill("memo");
+    await expect(page.locator("[data-settings-results] .settings-result").first()).toBeVisible();
+  });
+
   test("i dialoghi mantengono il focus e lo restituiscono all'apertura", async ({ page }) => {
     await page.goto("/?view=movies");
     const opener = page.getByRole("button", { name: "Aggiungi manualmente" });

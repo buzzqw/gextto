@@ -2730,8 +2730,16 @@
     var tabSelect = settingsView.querySelector("[data-settings-tab-select]");
     var resultsBox = settingsView.querySelector("[data-settings-results]");
     var settingsBody = settingsView.querySelector("[data-settings-body]");
+    var settingsByKey = Object.create(null);
+    settingsIndex.forEach(function (entry) {
+      if (entry && entry.key) settingsByKey[String(entry.key).toLowerCase()] = entry;
+    });
+    function settingsSearchText(key, label) {
+      var entry = settingsByKey[String(key || "").toLowerCase()];
+      return [key, label, entry && entry.terms].filter(Boolean).join(" ").toLowerCase();
+    }
     function settingsMatches(entry, query) {
-      var text = [entry && entry.key, entry && entry.label].filter(Boolean).join(" ").toLowerCase();
+      var text = settingsSearchText(entry && entry.key, entry && entry.label);
       return query.split(/\s+/).filter(Boolean).every(function (part) {
         return text.indexOf(part) >= 0;
       });
