@@ -576,6 +576,13 @@ func BestEpisodeFile(dir string, season, episode int64) (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	return BestEpisodeFileFromFiles(files, season, episode)
+}
+
+// BestEpisodeFileFromFiles is BestEpisodeFile over an already-enumerated file
+// list, so callers that process many episodes can walk the directory once
+// instead of once per episode.
+func BestEpisodeFileFromFiles(files []string, season, episode int64) (string, bool) {
 	best := ""
 	bestScore := int64(0)
 	haveBest := false
@@ -699,9 +706,12 @@ func moveAcrossDevices(source, target string) error {
 
 // StagePackFile copies one season-pack episode into the destination through a
 // temporary `.gextto-part` file (implementation of `stage_pack_file`).
+// destinationFiles is the pre-enumerated content of the destination directory,
+// so the caller can walk it once for the whole pack instead of once per episode.
 func StagePackFile(
 	file *PackSourceFile,
 	source, destination string,
+	destinationFiles []string,
 	cfg *Config,
 	releaseQualityScore int64,
 ) (string, bool, error) {
@@ -711,7 +721,7 @@ func StagePackFile(
 	}
 	season := file.Season
 	episode := file.Episode
-	if existing, ok := BestEpisodeFile(destination, season, episode); ok {
+	if existing, ok := BestEpisodeFileFromFiles(destinationFiles, season, episode); ok {
 		existingScore := cfg.FileScore(existing, "series", "")
 		incomingScore := cfg.FileScore(file.Path, "series", "")
 		if existingScore >= maxInt64(incomingScore, releaseQualityScore) {

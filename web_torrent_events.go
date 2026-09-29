@@ -1862,9 +1862,14 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			guard := AcquireArchiveImport(release.Series)
 			defer guard.Release()
 			processed := []PackFileResult{}
+			// Enumerate the destination once and reuse it for every episode:
+			// each episode's "is there a better existing file?" check walks the
+			// directory, and a full-season pack would otherwise re-walk it N
+			// times on the (possibly slow) archive mount.
+			destinationFiles, _ := VideoFiles(destination)
 			for index := range matching {
 				file := matching[index]
-				placed, ok, err := StagePackFile(&file, source, destination, cfg, cfg.ReleaseScore(&release))
+				placed, ok, err := StagePackFile(&file, source, destination, destinationFiles, cfg, cfg.ReleaseScore(&release))
 				if err != nil {
 					return false, err
 				}
