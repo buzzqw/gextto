@@ -4599,13 +4599,19 @@ func (d *Database) Info() (map[string]any, error) {
 	counts := make(map[string]any)
 	for _, table := range []string{"series", "episodes", "movies", "pending_downloads", "cycle_history", "torrent_meta", "gap_search_log", "ignored_episodes", "blocklist"} {
 		var count int64
-		_ = d.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&count)
+		if err := d.db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&count); err != nil {
+			return nil, err
+		}
 		counts[table] = count
 	}
 	var downloadedEpisodes int64
-	_ = d.db.QueryRow("SELECT COUNT(*) FROM episodes WHERE downloaded_at IS NOT NULL").Scan(&downloadedEpisodes)
+	if err := d.db.QueryRow("SELECT COUNT(*) FROM episodes WHERE downloaded_at IS NOT NULL").Scan(&downloadedEpisodes); err != nil {
+		return nil, err
+	}
 	var downloadedMovies int64
-	_ = d.db.QueryRow("SELECT COUNT(*) FROM movies WHERE downloaded_at IS NOT NULL AND removed_at IS NULL").Scan(&downloadedMovies)
+	if err := d.db.QueryRow("SELECT COUNT(*) FROM movies WHERE downloaded_at IS NOT NULL AND removed_at IS NULL").Scan(&downloadedMovies); err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"counts":              counts,
 		"downloaded_episodes": downloadedEpisodes,
