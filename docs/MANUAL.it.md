@@ -1,9 +1,11 @@
 # Manuale utente di Gextto
 
 Questa è la guida operativa per la UI web e la TUI terminale di Gextto. La UI è
-disponibile in italiano e inglese; qui sono usate le etichette italiane. Per le
-etichette inglesi consulta [MANUAL.en.md](MANUAL.en.md). La pagina **Manuale**
-dell'app segue la lingua selezionata nell'intestazione.
+disponibile in italiano, inglese e tedesco; qui sono usate le etichette italiane.
+Per le etichette inglesi consulta [MANUAL.en.md](MANUAL.en.md). La UI tedesca
+usa il catalogo tedesco incorporato e, per la documentazione estesa, il manuale
+inglese come fallback. La pagina **Manuale** dell'app segue la lingua
+selezionata nell'intestazione.
 
 > [!IMPORTANT]
 > Inizia in **dry-run**. Verifica percorsi, accesso alle sorgenti e un titolo di

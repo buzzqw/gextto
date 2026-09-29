@@ -26,5 +26,12 @@ func TestPicksVariantByLanguage(t *testing.T) {
 	if IsEnglish() {
 		t.Fatal("ita should map to italian")
 	}
+	SetLanguage("deu")
+	if got := Pick("ciao", "hello"); got != "hello" {
+		t.Fatalf("German fallback = %q, want hello", got)
+	}
+	if Language() != "de" || IsEnglish() {
+		t.Fatalf("German language = %q english=%v", Language(), IsEnglish())
+	}
 	SetLanguage("it")
 }

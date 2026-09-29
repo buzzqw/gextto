@@ -17,6 +17,9 @@ import (
 //go:embed internal_translations.yml
 var defaultTranslations string
 
+//go:embed internal_translations_de.yml
+var defaultGermanTranslations string
+
 // I18nDb is the persisted interface-translation database. It shares the
 // `gextto_config.db` schema with the daemon.
 type I18nDb struct {
@@ -192,43 +195,51 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 		   OR lower(value) LIKE '%amule%'`); err != nil {
 		return 0, fmt.Errorf("remove obsolete aMule/eD2k translations: %w", err)
 	}
-	var defaults map[string]map[string]string
-	if err := yaml.Unmarshal([]byte(defaultTranslations), &defaults); err != nil {
-		return 0, fmt.Errorf("parse default translations: %w", err)
-	}
-	langs := make([]string, 0, len(defaults))
-	for lang := range defaults {
-		langs = append(langs, lang)
-	}
-	sort.Strings(langs)
 	inserted := 0
-	for _, lang := range langs {
-		storage := storageLanguage(lang)
-		entries := defaults[lang]
-		keys := make([]string, 0, len(entries))
-		for key := range entries {
-			keys = append(keys, key)
+	for _, catalog := range []struct {
+		name string
+		raw  string
+	}{
+		{name: "default", raw: defaultTranslations},
+		{name: "German", raw: defaultGermanTranslations},
+	} {
+		var defaults map[string]map[string]string
+		if err := yaml.Unmarshal([]byte(catalog.raw), &defaults); err != nil {
+			return inserted, fmt.Errorf("parse %s translations: %w", catalog.name, err)
 		}
-		sort.Strings(keys)
-		tx, err := i.db.Begin()
-		if err != nil {
-			return inserted, err
+		langs := make([]string, 0, len(defaults))
+		for lang := range defaults {
+			langs = append(langs, lang)
 		}
-		for _, key := range keys {
-			res, err := tx.Exec("INSERT OR IGNORE INTO translations(lang,key,value) VALUES (?1,?2,?3)", storage, key, entries[key])
+		sort.Strings(langs)
+		for _, lang := range langs {
+			storage := storageLanguage(lang)
+			entries := defaults[lang]
+			keys := make([]string, 0, len(entries))
+			for key := range entries {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			tx, err := i.db.Begin()
 			if err != nil {
-				_ = tx.Rollback()
+				return inserted, fmt.Errorf("begin %s translations: %w", catalog.name, err)
+			}
+			for _, key := range keys {
+				res, err := tx.Exec("INSERT OR IGNORE INTO translations(lang,key,value) VALUES (?1,?2,?3)", storage, key, entries[key])
+				if err != nil {
+					_ = tx.Rollback()
+					return inserted, err
+				}
+				affected, err := res.RowsAffected()
+				if err != nil {
+					_ = tx.Rollback()
+					return inserted, err
+				}
+				inserted += int(affected)
+			}
+			if err := tx.Commit(); err != nil {
 				return inserted, err
 			}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				_ = tx.Rollback()
-				return inserted, err
-			}
-			inserted += int(affected)
-		}
-		if err := tx.Commit(); err != nil {
-			return inserted, err
 		}
 	}
 	return inserted, nil

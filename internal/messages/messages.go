@@ -14,11 +14,15 @@ var (
 	language = "it"
 )
 
-// SetLanguage sets the active language from a public code (it, en, ita, eng, ...).
+// SetLanguage sets the active language from a public code (it, en, de, ita,
+// eng, ...).
 func SetLanguage(lang string) {
 	normalized := "it"
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(lang)), "en") {
+	code := strings.ToLower(strings.TrimSpace(lang))
+	if strings.HasPrefix(code, "en") {
 		normalized = "en"
+	} else if strings.HasPrefix(code, "de") {
+		normalized = "de"
 	}
 	mu.Lock()
 	language = normalized
@@ -37,10 +41,11 @@ func IsEnglish() bool {
 	return Language() == "en"
 }
 
-// Pick returns the English variant when the interface language is English,
-// otherwise the Italian one.
+// Pick returns the English variant when the interface language is English or
+// German. German backend messages currently use English as a fallback because
+// these notifications have no separate German catalog yet.
 func Pick(italian, english string) string {
-	if IsEnglish() {
+	if IsEnglish() || Language() == "de" {
 		return english
 	}
 	return italian

@@ -612,8 +612,13 @@ func uiLogsDataFrom(s *AppState) uiLogsData {
 func uiManualDataFrom(s *AppState) uiManualData {
 	text := uiManualTextIT
 	if s != nil {
-		if lang, err := s.i18n.Language(); err == nil && strings.EqualFold(strings.TrimSpace(lang), "en") {
-			text = uiManualTextEN
+		if lang, err := s.i18n.Language(); err == nil {
+			switch strings.ToLower(strings.TrimSpace(lang)) {
+			case "en", "de":
+				// German currently falls back to the English manual until its
+				// long-form documentation is translated separately.
+				text = uiManualTextEN
+			}
 		}
 	}
 	return uiManualData{Lines: uiManualLines(text)}

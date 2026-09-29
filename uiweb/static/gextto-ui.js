@@ -127,7 +127,9 @@
   // Italian labels. Reuse the persisted translation catalog here so the new
   // UI follows the language selected in the top bar, including labels added by
   // partials and client-side dialogs.
+  var uiLanguage = document.documentElement.getAttribute("lang") || "it";
   var uiTranslations = {};
+  var uiEnglishCatalog = {};
   var uiEnglishFallbacks = {
     "Cerca impostazioni": "Search settings",
     "Configurazione": "Configuration",
@@ -261,11 +263,17 @@
     "Traduzioni": "Translations"
   };
 
-  function uiEnglishText(value) {
+  // German has a bundled catalog; this fallback object carries labels added by
+  // the redesigned UI before they reach the persisted catalog.
+  var uiGermanFallbacks = {};
+  var uiFallbacks = { en: uiEnglishFallbacks, de: uiGermanFallbacks };
+
+  function uiTranslatedText(value) {
     if (!value) return value;
     var match = String(value).match(/^(\s*)([\s\S]*?)(\s*)$/);
     var core = match ? match[2] : String(value);
-    var translated = uiTranslations[core] || uiEnglishFallbacks[core];
+    var translated = uiTranslations[core] || (uiFallbacks[uiLanguage] || {})[core];
+    if (!translated && uiLanguage === "de") translated = uiEnglishCatalog[core];
     var matchDownloads = core.match(/^(\d+) torrent · (\d+) HTTP fumetti · aggiornato (.+)$/);
     if (!translated && matchDownloads) translated = matchDownloads[1] + " torrents · " + matchDownloads[2] + " comic HTTP downloads · updated " + matchDownloads[3];
     var matchSelected = core.match(/^(\d+) selezionati$/);
@@ -283,8 +291,8 @@
   }
 
   function translateUIValue(value) {
-    if (document.documentElement.getAttribute("lang") !== "en") return value;
-    return uiEnglishText(value);
+    if (uiLanguage !== "en" && uiLanguage !== "de") return value;
+    return uiTranslatedText(value);
   }
 
   function translateUIJSONAttribute(node, attribute) {
@@ -330,20 +338,30 @@
   }
 
   function translateUI() {
-    if (document.documentElement.getAttribute("lang") === "en") {
+    if (uiLanguage === "en" || uiLanguage === "de") {
       translateUINode(document.body);
-      document.title = uiEnglishText(document.title.replace(/^Gextto · /, "")) === document.title.replace(/^Gextto · /, "")
+      document.title = uiTranslatedText(document.title.replace(/^Gextto · /, "")) === document.title.replace(/^Gextto · /, "")
         ? document.title
-        : "Gextto · " + uiEnglishText(document.title.replace(/^Gextto · /, ""));
+        : "Gextto · " + uiTranslatedText(document.title.replace(/^Gextto · /, ""));
     }
   }
 
   function loadUITranslations() {
-    if (document.documentElement.getAttribute("lang") !== "en") return;
-    api("/api/i18n?lang=en", "GET").then(function (data) {
+    if (uiLanguage !== "en" && uiLanguage !== "de") return;
+    api("/api/i18n?lang=" + encodeURIComponent(uiLanguage), "GET").then(function (data) {
       (data && data.items || []).forEach(function (item) {
         if (item && item.key && item.value) uiTranslations[item.key] = item.value;
       });
+      var catalogReady = Promise.resolve();
+      if (uiLanguage === "de") {
+        catalogReady = api("/api/i18n?lang=en", "GET").then(function (english) {
+          (english && english.items || []).forEach(function (item) {
+            if (item && item.key && item.value) uiEnglishCatalog[item.key] = item.value;
+          });
+        });
+      }
+      return catalogReady;
+    }).then(function () {
       translateUI();
       if (window.MutationObserver) {
         var observer = new MutationObserver(function (mutations) {

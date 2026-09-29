@@ -90,6 +90,12 @@ func TestLanguageEndpointSwitchesActive(t *testing.T) {
 	if stored, err := state.i18n.Language(); err != nil || stored != "en" {
 		t.Fatalf("stored language = %q err=%v", stored, err)
 	}
+	if status, body := webPostJSON(t, server, "/api/i18n/language", `{"lang":"de"}`); status != http.StatusOK {
+		t.Fatalf("set German language -> %d: %s", status, body)
+	}
+	if stored, err := state.i18n.Language(); err != nil || stored != "de" {
+		t.Fatalf("stored German language = %q err=%v", stored, err)
+	}
 }
 
 func TestScorePreviewNoRenameAndLanguageEndpoints(t *testing.T) {

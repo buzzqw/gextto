@@ -234,6 +234,28 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if value, ok := find("Cartelle osservate"); !ok || value != "Watched folders" {
 		t.Errorf("bundled translation = %q (present=%v), want Watched folders", value, ok)
 	}
+	findGerman := func(key string) (string, bool) {
+		list, err := db.List("de")
+		if err != nil {
+			t.Fatalf("List(de): %v", err)
+		}
+		for _, entry := range list {
+			if entry.Key == key {
+				return entry.Value, true
+			}
+		}
+		return "", false
+	}
+	if value, ok := findGerman("Configurazione"); !ok || value != "Konfiguration" {
+		t.Errorf("German bundled translation = %q (present=%v), want Konfiguration", value, ok)
+	}
+	germanCount := len(func() []Translation {
+		items, err := db.List("de")
+		if err != nil {
+			t.Fatalf("List(de): %v", err)
+		}
+		return items
+	}())
 
 	second, err := db.SeedDefaultTranslations()
 	if err != nil {
@@ -243,9 +265,9 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 		t.Errorf("second seed inserted %d rows, want 0 (idempotent)", second)
 	}
 
-	// After deleting the language the same defaults can be reseeded. The third
-	// seed also restores the bundled value the user edit had shadowed, so it
-	// inserts exactly one more row than the first seed.
+	// After deleting English, the same English defaults can be reseeded. German
+	// is still present, so the third seed inserts the original English portion
+	// plus one row for the edited key.
 	if _, err := db.DeleteLang("eng"); err != nil {
 		t.Fatalf("DeleteLang(eng): %v", err)
 	}
@@ -253,8 +275,9 @@ func TestI18nSeedDefaultTranslationsIsIdempotentAndPreservesEdits(t *testing.T) 
 	if err != nil {
 		t.Fatalf("third seed: %v", err)
 	}
-	if third != first+1 {
-		t.Errorf("third seed inserted %d rows, want %d", third, first+1)
+	wantThird := first - germanCount + 1
+	if third != wantThird {
+		t.Errorf("third seed inserted %d rows, want %d", third, wantThird)
 	}
 	if value, ok := find("Consenti aggiornamenti"); !ok || value == "MY VALUE" {
 		t.Errorf("reseeded translation = %q (present=%v), want the bundled value", value, ok)
