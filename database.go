@@ -1661,6 +1661,16 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 	limit = clampInt(limit, 1, 20_000)
 	limit64 := int64(limit)
 	targets := make([]MediaInfoBackfillTarget, 0)
+
+	// Read the candidate rows and close the cursor *before* touching the
+	// filesystem: with a single SQLite connection, holding *sql.Rows open
+	// across os.Stat would block every other query for the whole scan.
+	type seriesCandidate struct {
+		series          string
+		season, episode int64
+		path            string
+	}
+	seriesCandidates := make([]seriesCandidate, 0)
 	rows, err := d.db.Query("SELECT s.name, e.season, e.episode, e.archive_path FROM episodes e JOIN series s ON s.id=e.series_id WHERE COALESCE(e.media_info_json,'')='' AND COALESCE(e.archive_path,'')<>'' ORDER BY e.id DESC")
 	if err != nil {
 		return nil, err
@@ -1672,54 +1682,69 @@ func (d *Database) MediaInfoBackfillTargets(limit int) ([]MediaInfoBackfillTarge
 			rows.Close()
 			return nil, err
 		}
-		if !mediaInfoBackfillPathExists(path) {
-			continue
-		}
-		seasonValue := season
-		episodeValue := episode
-		targets = append(targets, MediaInfoBackfillTarget{
-			Kind:    "series",
-			Series:  series,
-			Season:  &seasonValue,
-			Episode: &episodeValue,
-			Path:    path,
-		})
-		if int64(len(targets)) >= limit64 {
-			break
-		}
+		seriesCandidates = append(seriesCandidates, seriesCandidate{series: series, season: season, episode: episode, path: path})
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
 		return nil, err
 	}
 	rows.Close()
+	for _, candidate := range seriesCandidates {
+		if !mediaInfoBackfillPathExists(candidate.path) {
+			continue
+		}
+		seasonValue := candidate.season
+		episodeValue := candidate.episode
+		targets = append(targets, MediaInfoBackfillTarget{
+			Kind:    "series",
+			Series:  candidate.series,
+			Season:  &seasonValue,
+			Episode: &episodeValue,
+			Path:    candidate.path,
+		})
+		if int64(len(targets)) >= limit64 {
+			return targets, nil
+		}
+	}
+
 	if len(targets) < limit {
+		type movieCandidate struct {
+			name string
+			year sql.NullInt64
+			path string
+		}
+		movieCandidates := make([]movieCandidate, 0)
 		movieRows, err := d.db.Query("SELECT m.name, m.year, t.processed_path FROM movies m JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE COALESCE(m.media_info_json,'')='' AND COALESCE(t.processed_path,'')<>'' AND m.removed_at IS NULL ORDER BY m.id DESC")
 		if err != nil {
 			return nil, err
 		}
-		defer movieRows.Close()
 		for movieRows.Next() {
 			var name, path string
 			var year sql.NullInt64
 			if err := movieRows.Scan(&name, &year, &path); err != nil {
+				movieRows.Close()
 				return nil, err
 			}
-			if !mediaInfoBackfillPathExists(path) {
+			movieCandidates = append(movieCandidates, movieCandidate{name: name, year: year, path: path})
+		}
+		if err := movieRows.Err(); err != nil {
+			movieRows.Close()
+			return nil, err
+		}
+		movieRows.Close()
+		for _, candidate := range movieCandidates {
+			if !mediaInfoBackfillPathExists(candidate.path) {
 				continue
 			}
 			targets = append(targets, MediaInfoBackfillTarget{
 				Kind: "movie",
-				Name: name,
-				Year: nullInt64Ptr(year),
-				Path: path,
+				Name: candidate.name,
+				Year: nullInt64Ptr(candidate.year),
+				Path: candidate.path,
 			})
 			if int64(len(targets)) >= limit64 {
 				break
 			}
-		}
-		if err := movieRows.Err(); err != nil {
-			return nil, err
 		}
 	}
 	return targets, nil
@@ -4224,8 +4249,18 @@ func (d *Database) PruneKeywords(keywords []string) (int, error) {
 
 // PurgeSeries removes every trace of a series that is no longer monitored.
 func (d *Database) PurgeSeries(name string) (int, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
 	removed := 0
-	rows, err := d.db.Query("SELECT id FROM series WHERE lower(name)=lower(?1)", name)
+	rows, err := tx.Query("SELECT id FROM series WHERE lower(name)=lower(?1)", name)
 	if err != nil {
 		return removed, err
 	}
@@ -4244,24 +4279,24 @@ func (d *Database) PurgeSeries(name string) (int, error) {
 	}
 	rows.Close()
 	for _, id := range ids {
-		if result, err := d.db.Exec("DELETE FROM episodes WHERE series_id=?1", id); err != nil {
+		if result, err := tx.Exec("DELETE FROM episodes WHERE series_id=?1", id); err != nil {
 			return removed, err
 		} else if affected, _ := result.RowsAffected(); affected > 0 {
 			removed += int(affected)
 		}
-		if result, err := d.db.Exec("DELETE FROM pending_downloads WHERE series_id=?1", id); err != nil {
+		if result, err := tx.Exec("DELETE FROM pending_downloads WHERE series_id=?1", id); err != nil {
 			return removed, err
 		} else if affected, _ := result.RowsAffected(); affected > 0 {
 			removed += int(affected)
 		}
-		if result, err := d.db.Exec("DELETE FROM series WHERE id=?1", id); err != nil {
+		if result, err := tx.Exec("DELETE FROM series WHERE id=?1", id); err != nil {
 			return removed, err
 		} else if affected, _ := result.RowsAffected(); affected > 0 {
 			removed += int(affected)
 		}
 	}
 	for _, table := range []string{"series_metadata", "episode_metadata", "ignored_episodes", "gap_search_log", "series_status"} {
-		result, err := d.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE lower(series_name)=lower(?1)", table), name)
+		result, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE lower(series_name)=lower(?1)", table), name)
 		if err != nil {
 			return removed, err
 		}
@@ -4269,22 +4304,40 @@ func (d *Database) PurgeSeries(name string) (int, error) {
 			removed += int(affected)
 		}
 	}
+	if err := tx.Commit(); err != nil {
+		return removed, err
+	}
+	committed = true
 	return removed, nil
 }
 
 // PurgeMovie removes every trace of a movie that is no longer monitored.
 func (d *Database) PurgeMovie(name string) (int, error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
 	removed := 0
-	if result, err := d.db.Exec("DELETE FROM pending_movies WHERE lower(name)=lower(?1)", name); err != nil {
+	if result, err := tx.Exec("DELETE FROM pending_movies WHERE lower(name)=lower(?1)", name); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
-	if result, err := d.db.Exec("DELETE FROM movies WHERE lower(COALESCE(name,''))=lower(?1)", name); err != nil {
+	if result, err := tx.Exec("DELETE FROM movies WHERE lower(COALESCE(name,''))=lower(?1)", name); err != nil {
 		return removed, err
 	} else if affected, _ := result.RowsAffected(); affected > 0 {
 		removed += int(affected)
 	}
+	if err := tx.Commit(); err != nil {
+		return removed, err
+	}
+	committed = true
 	return removed, nil
 }
 
