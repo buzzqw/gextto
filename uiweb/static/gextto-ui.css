@@ -587,6 +587,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .table-pagination .page-label { color: var(--muted); font-size: 0.85rem; }
 .table-panel-footer { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
 .table-panel-footer .form-grid { margin: 0; }
+.table-panel-footer > .form-actions { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
 .row-actions { display: flex; flex-wrap: nowrap; gap: 6px; white-space: nowrap; min-width: max-content; }
 .row-actions .btn { flex: none; }
 

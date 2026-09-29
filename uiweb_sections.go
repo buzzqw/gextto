@@ -401,7 +401,8 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 					Path: "/api/comics/weekly/settings", Submit: "Salva storico",
 					Fields: []uiFormField{{Name: "history_limit", Label: "Storico da conservare", Kind: "number", Value: strconv.FormatInt(historyLimit, 10)}},
 				},
-				Empty: "Nessun Weekly Pack registrato.",
+				FooterActions: []uiActionButton{{Label: "Svuota storico Weekly Pack", Class: "danger", Method: "POST", Path: "/api/comics/weekly/history/clear", Body: "{}", Confirm: "Eliminare tutto lo storico dei Weekly Pack?", Hint: "Elimina tutte le voci dello storico Weekly Pack, senza toccare lo storico fumetti."}},
+				Empty:         "Nessun Weekly Pack registrato.",
 			})),
 			sectionComicsLinks(),
 		}}, true

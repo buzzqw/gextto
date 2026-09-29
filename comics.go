@@ -495,6 +495,16 @@ func (d *ComicsDb) ClearHistory() (int64, error) {
 	return result.RowsAffected()
 }
 
+// ClearWeeklyHistory removes the Weekly Pack history without touching comic
+// download history.
+func (d *ComicsDb) ClearWeeklyHistory() (int64, error) {
+	result, err := d.db.Exec("DELETE FROM comics_weekly")
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 // Weekly returns the most recent weekly pack rows.
 func (d *ComicsDb) Weekly(limit int64) ([]map[string]any, error) {
 	rows, err := d.db.Query("SELECT pack_date,magnet,torrent_url,sent_at,found_at,size_bytes FROM comics_weekly ORDER BY pack_date DESC LIMIT ?1", clampInt64(limit, 1, 500))
