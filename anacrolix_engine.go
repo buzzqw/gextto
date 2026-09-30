@@ -114,11 +114,11 @@ func anacrolixSettingsFromConfig(cfg *Config) anacrolixSettings {
 		DhtBootstrapNodes:  settingOrDefault(cfg.Settings, "anacrolix_dht_bootstrap_nodes", cfg.Libtorrent.DhtBootstrapNodes),
 		IpFilterPath:       settingOrDefault(cfg.Settings, "anacrolix_ipfilter_path", cfg.Libtorrent.IpFilterPath),
 		ApplyIpFilter:      settingsBool(cfg, "anacrolix_apply_ip_filter", cfg.Libtorrent.ApplyIpFilter),
-		ProxyType:          settingsParseInt(cfg, "anacrolix_proxy_type", cfg.Libtorrent.ProxyType),
-		ProxyHost:          settingOrDefault(cfg.Settings, "anacrolix_proxy_host", cfg.Libtorrent.ProxyHost),
-		ProxyPort:          settingsParseInt(cfg, "anacrolix_proxy_port", cfg.Libtorrent.ProxyPort),
-		ProxyUser:          settingOrDefault(cfg.Settings, "anacrolix_proxy_user", cfg.Libtorrent.ProxyUser),
-		ProxyPassword:      settingOrDefault(cfg.Settings, "anacrolix_proxy_password", cfg.Libtorrent.ProxyPassword),
+		ProxyType:          settingsParseInt(cfg, "anacrolix_proxy_type", 0),
+		ProxyHost:          settingOrDefault(cfg.Settings, "anacrolix_proxy_host", ""),
+		ProxyPort:          settingsParseInt(cfg, "anacrolix_proxy_port", 0),
+		ProxyUser:          settingOrDefault(cfg.Settings, "anacrolix_proxy_user", ""),
+		ProxyPassword:      settingOrDefault(cfg.Settings, "anacrolix_proxy_password", ""),
 		MaxConnsPerTorrent: int(settingsParseInt(cfg, "anacrolix_max_conns_per_torrent", cfg.Libtorrent.MaxConnectionsPerTorrent)),
 	}
 }

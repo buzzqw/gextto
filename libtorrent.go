@@ -867,13 +867,6 @@ func (c *LibtorrentClient) applyExtendedSettings(cfg *Config) error {
 	}
 	addInt("in_enc_policy", policy)
 	addInt("out_enc_policy", policy)
-	if lt.ProxyType > 0 {
-		addInt("proxy_type", lt.ProxyType)
-		addText("proxy_host", lt.ProxyHost)
-		addInt("proxy_port", lt.ProxyPort)
-		addText("proxy_username", lt.ProxyUser)
-		addText("proxy_password", lt.ProxyPassword)
-	}
 	addText("ip_filter_path", lt.IpFilterPath)
 	addText("listen_interfaces", effectiveListenInterfaces(lt))
 	// Killswitch VPN: forza il traffico in uscita sulla scheda scelta.

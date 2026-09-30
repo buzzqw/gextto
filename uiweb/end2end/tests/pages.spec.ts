@@ -94,12 +94,12 @@ test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) =
   await page.goto("/?view=settings");
   const search = page.locator("[data-settings-search]");
   await expect(search).toBeVisible({ timeout: 20000 });
-  await search.fill("proxy");
-  const hit = page.locator("a.settings-result").filter({ hasText: "Proxy host" }).first();
+  await search.fill("ram disk");
+  const hit = page.locator("a.settings-result").filter({ hasText: "Cartella RAM disk" }).first();
   await expect(hit).toBeVisible();
   await hit.click();
   await expect(page.locator("h1").filter({ hasText: "Configurazione" })).toBeVisible();
-  await expect(page.locator("#setting-libtorrent_proxy_host")).toBeVisible();
+  await expect(page.locator("#setting-libtorrent_ramdisk_dir")).toBeVisible();
 });
 
 test.describe("mobile", () => {

@@ -90,7 +90,6 @@ func seedTestSetup(t *testing.T) (*Database, *Config, models.TorrentView, string
 	}
 
 	cfg := DefaultConfig()
-	cfg.Libtorrent.StopAtRatio = true
 	cfg.Libtorrent.SeedRatio = 0.5
 	cfg.Settings = map[string]string{}
 

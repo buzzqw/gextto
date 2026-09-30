@@ -474,7 +474,7 @@ highlighted with a “Save all” bar.
   `/api/v2.0/indexers/all/results/torznab/api`. The health check uses `t=caps`
   with the same key, so it checks the API rather than only Jackett's home page.
   Results may identify the source as `jackett:TrackerName`.
-- **libtorrent** — connections/performance, protocols/trackers, security/proxy,
+- **libtorrent** — connections/performance, protocols/trackers, security,
   RAM disk and ports, speed limits and scheduler; apply/optimise/update check.
   If you move a torrent's storage to a folder that **already holds the data**,
   it is not rejected: Gextto associates the torrent with the existing files and

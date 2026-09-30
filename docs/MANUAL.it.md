@@ -481,7 +481,7 @@ evidenziate con la barra “Salva tutte”.
   `/api/v2.0/indexers/all/results/torznab/api`. Il controllo di salute usa
   `t=caps` con la stessa API key, quindi verifica l'API e non soltanto la home di
   Jackett. Nei risultati la sorgente può apparire come `jackett:NomeTracker`.
-- **libtorrent** — connessioni/prestazioni, protocolli/tracker, sicurezza/proxy,
+- **libtorrent** — connessioni/prestazioni, protocolli/tracker, sicurezza,
   RAM disk e porte, limiti di velocità e scheduler; applica/ottimizza/verifica
   aggiornamenti. Se sposti lo storage di un torrent in una cartella che
   **contiene già i dati**, non viene rifiutato: Gextto associa il torrent ai file

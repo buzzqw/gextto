@@ -647,7 +647,6 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 func TestUiSettingDefaultsMatchSafeRuntimeDefaults(t *testing.T) {
 	want := map[string]string{
 		"active":                       "false",
-		"libtorrent_proxy_port":        "0",
 		"libtorrent_listen_interfaces": "0.0.0.0:6881-6891",
 		"qbittorrent_poll_interval_ms": "1500",
 		"trash_retention_days":         "0",

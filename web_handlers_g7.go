@@ -677,7 +677,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"rename_template", "archive_root", "trash_path", "libtorrent_dir",
 		"libtorrent_temp_dir", "libtorrent_ramdisk_dir", "libtorrent_extra_settings",
 		"cleanup_upgrades", "cleanup_min_score_diff", "upgrade_min_score_diff", "cleanup_action", "dry_run",
-		"min_free_space_gb", "trash_retention_days", "archive_retention_days", "archive_cleanup_enabled",
+		"min_free_space_gb", "trash_retention_days", "archive_cleanup_enabled",
 		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",
 		"move_episodes", "rename_verify_interval", "auto_remove_completed", "telegram_bot_token",
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",

@@ -16,7 +16,6 @@ import (
 
 func TestSeedLimitsReachedMatchesPolicy(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.Libtorrent.StopAtRatio = true
 	cfg.Libtorrent.SeedRatio = 0.5
 	cfg.Libtorrent.SeedTimeDays = 1
 

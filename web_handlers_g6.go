@@ -865,7 +865,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 	}
 	cfg := latestConfig(s)
 	var globalRatio *float64
-	if cfg.Libtorrent.StopAtRatio && cfg.Libtorrent.SeedRatio > 0.0 {
+	if cfg.Libtorrent.SeedRatio > 0.0 {
 		value := cfg.Libtorrent.SeedRatio
 		globalRatio = &value
 	}

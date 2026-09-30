@@ -200,7 +200,6 @@ func transferTestConfig(t *testing.T, dataDir string, port uint16) Config {
 	cfg.Libtorrent.Natpmp = false
 	cfg.Libtorrent.DynamicQueue = false
 	cfg.Libtorrent.SeedRatio = 0
-	cfg.Libtorrent.StopAtRatio = false
 	cfg.Libtorrent.ActiveDownloads = 5
 	cfg.Libtorrent.ActiveSeeds = 5
 	cfg.Libtorrent.ActiveLimit = 10

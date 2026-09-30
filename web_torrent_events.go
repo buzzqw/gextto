@@ -840,7 +840,7 @@ func tev_effectiveDownloadForRatio(torrent *models.TorrentView) float64 {
 func tev_seedLimitsReached(cfg *Config, torrent *models.TorrentView) (bool, bool) {
 	globalRatio := 0.0
 	globalRatioSet := false
-	if cfg.Libtorrent.StopAtRatio && cfg.Libtorrent.SeedRatio > 0.0 {
+	if cfg.Libtorrent.SeedRatio > 0.0 {
 		globalRatio = cfg.Libtorrent.SeedRatio
 		globalRatioSet = true
 	}
@@ -1376,7 +1376,7 @@ func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]
 func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry, seedCopyWarnings map[string]time.Time) {
 	ratioLimit := 0.0
 	ratioLimitSet := false
-	if cfg.Libtorrent.StopAtRatio && cfg.Libtorrent.SeedRatio > 0.0 {
+	if cfg.Libtorrent.SeedRatio > 0.0 {
 		ratioLimit = cfg.Libtorrent.SeedRatio
 		ratioLimitSet = true
 	}

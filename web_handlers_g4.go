@@ -782,6 +782,9 @@ func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	if !archiveDaysSet {
+		// Legacy fallback: `archive_retention_days` was the original name of
+		// `archive_max_age_days`. Kept only so an old database still works; it is
+		// no longer exposed in the settings UI.
 		if value, ok := cfg.Settings["archive_retention_days"]; ok {
 			if parsed, err := strconv.ParseInt(value, 10, 64); err == nil {
 				archiveDays = parsed
@@ -797,9 +800,6 @@ func CleanupDatabase(w http.ResponseWriter, r *http.Request, s *AppState) {
 	archiveCleanupEnabled := false
 	if value, ok := cfg.Settings["archive_cleanup_enabled"]; ok {
 		archiveCleanupEnabled = gh4_truthy(value)
-	}
-	if _, ok := cfg.Settings["archive_retention_days"]; ok {
-		archiveCleanupEnabled = true
 	}
 	archiveRemoved := 0
 	if archiveCleanupEnabled && archiveDays > 0 {

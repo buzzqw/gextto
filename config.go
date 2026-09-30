@@ -181,7 +181,6 @@ type LibtorrentSettings struct {
 	SeedRatio        float64 `json:"seed_ratio"`
 	SeedTimeMinutes  int64   `json:"seed_time_minutes"`
 	SeedTimeDays     int64   `json:"seed_time_days"`
-	StopAtRatio      bool    `json:"stop_at_ratio"`
 	ActiveDownloads  int64   `json:"active_downloads"`
 	ActiveSeeds      int64   `json:"active_seeds"`
 	ActiveLimit      int64   `json:"active_limit"`
@@ -216,11 +215,6 @@ type LibtorrentSettings struct {
 	AllowMultipleConnectionsPerIp bool   `json:"allow_multiple_connections_per_ip"`
 	ApplyIpFilter                 bool   `json:"apply_ip_filter"`
 	Encryption                    int64  `json:"encryption"`
-	ProxyType                     int64  `json:"proxy_type"`
-	ProxyHost                     string `json:"proxy_host"`
-	ProxyPort                     int64  `json:"proxy_port"`
-	ProxyUser                     string `json:"proxy_user"`
-	ProxyPassword                 string `json:"proxy_password"`
 	IpFilterPath                  string `json:"ip_filter_path"`
 	ListenInterfaces              string `json:"listen_interfaces"`
 	// Interfaccia forzata per il traffico in uscita (killswitch VPN). Quando è
@@ -239,7 +233,6 @@ func DefaultLibtorrentSettings() LibtorrentSettings {
 		SeedRatio:                     0.0,
 		SeedTimeMinutes:               0,
 		SeedTimeDays:                  0,
-		StopAtRatio:                   false,
 		ActiveDownloads:               3,
 		ActiveSeeds:                   3,
 		ActiveLimit:                   5,
@@ -271,11 +264,6 @@ func DefaultLibtorrentSettings() LibtorrentSettings {
 		AllowMultipleConnectionsPerIp: true,
 		ApplyIpFilter:                 true,
 		Encryption:                    1,
-		ProxyType:                     0,
-		ProxyHost:                     "",
-		ProxyPort:                     0,
-		ProxyUser:                     "",
-		ProxyPassword:                 "",
 		IpFilterPath:                  "",
 		ListenInterfaces:              "",
 		OutgoingInterface:             "",
@@ -2111,7 +2099,6 @@ func (c *Config) loadConfigDB() error {
 		SeedRatio:                     numberSettingFloat(c.Settings, "libtorrent_seed_ratio", 0.0),
 		SeedTimeMinutes:               numberSettingInt(c.Settings, "libtorrent_seed_time", 0),
 		SeedTimeDays:                  numberSettingInt(c.Settings, "libtorrent_seed_time_days", 0),
-		StopAtRatio:                   configBoolSetting(mapValue(c.Settings, "libtorrent_stop_at_ratio")),
 		ActiveDownloads:               numberSettingInt(c.Settings, "libtorrent_active_downloads", 3),
 		ActiveSeeds:                   numberSettingInt(c.Settings, "libtorrent_active_seeds", 3),
 		ActiveLimit:                   numberSettingInt(c.Settings, "libtorrent_active_limit", 5),
@@ -2143,11 +2130,6 @@ func (c *Config) loadConfigDB() error {
 		AllowMultipleConnectionsPerIp: boolSettingOr(c.Settings, "libtorrent_allow_multiple_connections_per_ip", true),
 		ApplyIpFilter:                 boolSettingOr(c.Settings, "libtorrent_apply_ip_filter", true),
 		Encryption:                    numberSettingInt(c.Settings, "libtorrent_encryption", 1),
-		ProxyType:                     numberSettingInt(c.Settings, "libtorrent_proxy_type", 0),
-		ProxyHost:                     settingOrDefault(c.Settings, "libtorrent_proxy_host", ""),
-		ProxyPort:                     numberSettingInt(c.Settings, "libtorrent_proxy_port", 0),
-		ProxyUser:                     settingOrDefault(c.Settings, "libtorrent_proxy_user", ""),
-		ProxyPassword:                 settingOrDefault(c.Settings, "libtorrent_proxy_password", ""),
 		IpFilterPath:                  settingOrDefault(c.Settings, "libtorrent_ipfilter_url", ""),
 		ListenInterfaces:              settingOrDefault(c.Settings, "libtorrent_listen_interfaces", ""),
 		OutgoingInterface:             settingOrDefault(c.Settings, "libtorrent_outgoing_interface", ""),
