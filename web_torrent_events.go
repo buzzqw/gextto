@@ -1076,7 +1076,7 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, torrent *models.
 		logging.Debug("post-seeding relocation was not applied", "hash", torrent.Hash, "name", torrent.Name)
 		return false
 	}
-	logging.Debug("📁 MOVING TO NAS — post-seeding relocation",
+	logging.Info("📁 MOVING TO NAS — post-seeding relocation",
 		"hash", torrent.Hash,
 		"name", torrent.Name,
 		"from", current,
@@ -1503,7 +1503,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 									nextAttempt: time.Now().Add(600 * time.Second),
 									inFlight:    true,
 								}
-								logging.Info("📁 MOVING TO NAS — completed download archived at the end of the seed",
+								logging.Debug("📁 MOVING TO NAS — completed download archived at the end of the seed",
 									"hash", torrent.Hash, "name", torrent.Name, "from", torrent.SavePath, "to", dest)
 								continue
 							}
@@ -1885,14 +1885,8 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 				}
 				if value {
 					discarded = true
-				} else {
-					removed, err := CleanupOldEpisodeWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, release.Quality)
-					if err != nil {
-						return false, err
-					}
-					if removed > 0 {
-						logging.Info(fmt.Sprintf("🗑️ Upgrade cleanup — %d obsolete episode file(s) moved to trash", removed))
-					}
+				} else if _, err := CleanupOldEpisodeWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, release.Quality); err != nil {
+					return false, err
 				}
 			}
 		}
@@ -2463,7 +2457,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		return false, nil
 	case "storage_moved":
-		logging.Info("torrent storage move completed",
+		logging.Debug("torrent storage move completed",
 			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
 		delete(postSeedMoves, event.Hash)
 		delete(retries, strings.ToLower(event.Hash))

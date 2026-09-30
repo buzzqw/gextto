@@ -220,6 +220,18 @@ func handleDuplicate(file string, cfg *Config) error {
 	return err
 }
 
+// logInferiorFileReplaced records that an existing lower-quality file was
+// removed because a better release replaced it, so the reason is visible in the
+// log instead of only a bare count.
+func logInferiorFileReplaced(cfg *Config, file, replacement string) {
+	action := "moved to trash"
+	if cfg.CleanupAction == "delete" {
+		action = "deleted"
+	}
+	logging.Info(fmt.Sprintf("🗑️ previous file %s (inferior quality) — replaced by «%s»", action, filepath.Base(replacement)),
+		"file", file, "replacement", replacement)
+}
+
 // MoveToTrash moves a file or directory to the trash with a unique name; it
 // falls back to a recursive copy + remove when the trash is on another
 // filesystem (a plain rename fails with EXDEV, typical with a NAS).
@@ -442,6 +454,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 					}
 					removeEmptyParents(file, archivePath)
 					removed++
+					logInferiorFileReplaced(cfg, file, newFile)
 					continue
 				}
 			}
@@ -454,6 +467,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 		}
 		removeEmptyParents(file, archivePath)
 		removed++
+		logInferiorFileReplaced(cfg, file, newFile)
 	}
 	return removed, nil
 }
@@ -762,6 +776,7 @@ func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 					}
 					removeEmptyParents(file, archivePath)
 					removed++
+					logInferiorFileReplaced(cfg, file, newFile)
 					continue
 				}
 			}
@@ -774,6 +789,7 @@ func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 		}
 		removeEmptyParents(file, archivePath)
 		removed++
+		logInferiorFileReplaced(cfg, file, newFile)
 	}
 	return removed, nil
 }
