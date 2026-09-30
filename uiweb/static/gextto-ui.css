@@ -1316,10 +1316,59 @@ pre.log-view { margin: 0; }
   .data-table.torrent-table .row-actions .btn { min-height: 40px; }
 
   /* Episode actions also wrap instead of forcing a very wide table. */
-  .data-table.series-episodes { min-width: 620px; }
+.data-table.series-episodes { min-width: 620px; }
   .data-table.series-episodes th:nth-child(5),
   .data-table.series-episodes td:nth-child(5),
   .data-table.series-episodes th:nth-child(6),
   .data-table.series-episodes td:nth-child(6) { display: none; }
   .data-table.series-episodes .row-actions { flex-wrap: wrap; white-space: normal; }
+}
+
+/* Episode actions use the same compact icon controls as Scarico. Keep the
+   table responsive too: six text buttons used to force a horizontal scroll. */
+.data-table.series-episodes .row-actions { min-width: 0; }
+.episode-sources-modal { width: min(1180px, calc(100vw - 32px)); max-width: 100%; }
+.episode-sources-modal .modal-body { min-width: 0; overflow-x: hidden; }
+.episode-sources-table { width: 100%; min-width: 0; table-layout: fixed; }
+.episode-sources-table th,
+.episode-sources-table td { overflow-wrap: anywhere; word-break: break-word; }
+.episode-sources-table th:nth-child(1),
+.episode-sources-table td:nth-child(1) { width: 39%; }
+.episode-sources-table th:nth-child(2),
+.episode-sources-table td:nth-child(2) { width: 14%; }
+.episode-sources-table th:nth-child(3),
+.episode-sources-table td:nth-child(3) { width: 16%; }
+.episode-sources-table th:nth-child(4),
+.episode-sources-table td:nth-child(4) { width: 17%; }
+.episode-sources-table th:nth-child(5),
+.episode-sources-table td:nth-child(5) { width: 14%; }
+.episode-sources-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; gap: 4px; }
+
+@media (max-width: 640px) {
+  .data-table.series-episodes { min-width: 0; table-layout: fixed; }
+  .data-table.series-episodes th,
+  .data-table.series-episodes td { padding-left: 5px; padding-right: 5px; overflow-wrap: anywhere; }
+  .data-table.series-episodes th:nth-child(1),
+  .data-table.series-episodes td:nth-child(1),
+  .data-table.series-episodes th:nth-child(2),
+  .data-table.series-episodes td:nth-child(2) { width: 28px; }
+  .data-table.series-episodes th:nth-child(3),
+  .data-table.series-episodes td:nth-child(3) { width: 27%; }
+  .data-table.series-episodes th:nth-child(4),
+  .data-table.series-episodes td:nth-child(4) { width: 22%; }
+  .data-table.series-episodes th:last-child,
+  .data-table.series-episodes td:last-child { width: 142px; }
+  .episode-sources-modal { width: calc(100vw - 16px); }
+  .episode-sources-table th,
+  .episode-sources-table td { padding: 7px 5px; font-size: 0.8rem; }
+  .episode-sources-table th:nth-child(2),
+  .episode-sources-table td:nth-child(2),
+  .episode-sources-table th:nth-child(4),
+  .episode-sources-table td:nth-child(4) { display: none; }
+  .episode-sources-table th:nth-child(1),
+  .episode-sources-table td:nth-child(1) { width: 47%; }
+  .episode-sources-table th:nth-child(3),
+  .episode-sources-table td:nth-child(3) { width: 25%; }
+  .episode-sources-table th:nth-child(5),
+  .episode-sources-table td:nth-child(5) { width: 28%; }
 }

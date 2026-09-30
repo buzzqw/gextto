@@ -867,7 +867,7 @@
     overlay.className = "overlay";
     overlay._removeOnClose = true;
     var modal = document.createElement("div");
-    modal.className = "modal torrent-modal";
+    modal.className = "modal episode-sources-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "http-detail-title");
@@ -1036,7 +1036,7 @@
     if (tab === "trackers") {
       var trackers = (data && data.trackers) || [];
       var table = document.createElement("table");
-      table.className = "data-table";
+      table.className = "data-table episode-sources-table";
       table.innerHTML = "<thead><tr><th title=\"URL del tracker annunciato dal torrent\">Tracker</th><th title=\"Ordine del tracker nel tier\">Tier</th><th title=\"Stato dell'ultima verifica del tracker\">Esito</th></tr></thead>";
       accessibleDataTable(table, "Tracker del torrent");
       var tbody = document.createElement("tbody");
