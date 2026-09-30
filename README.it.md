@@ -45,18 +45,23 @@ Sono osservazioni di riferimento su un'installazione Linux x86_64 con libtorrent
 integrato, non benchmark indipendenti dall'hardware:
 
 - dopo il riavvio, con cinque torrent ripristinati e nessun download attivo, il
-  servizio ha usato circa **170–190 MiB** di memoria cgroup; l'RSS del processo
-  era circa **76 MiB**;
+  processo demone aveva un RSS di circa **75–85 MiB**. Il valore del cgroup
+  systemd può essere molto più alto perché include anche la cache del filesystem:
+  in un'osservazione era di circa **584 MiB**, di cui circa **525 MiB** di cache
+  file e solo circa **51 MiB** di memoria anonima;
 - in circa cinque minuti nello stesso stato prevalentemente inattivo, il tempo
   CPU accumulato è stato di circa **7 secondi** (circa **2% di un core in media**);
 - un ciclo attivo di ricerca/download può usare temporaneamente più memoria: in
-  un ciclo ad alto carico è stato osservato un picco di circa **1,4 GiB**, mentre
-  il consumo residente è poi tornato nella fascia bassa.
+  un ciclo ad alto carico è stato osservato un picco di circa **1,4 GiB** di
+  memoria cgroup, mentre il consumo residente del processo è poi tornato nella
+  fascia bassa.
 
-Usa questi valori come esempi di dimensionamento, non come garanzie. Le variabili
-principali sono numero di torrent attivi, cache e connessioni libtorrent,
-concorrenza dei provider, scansioni `ffprobe`/archivio e dimensione del ciclo in
-corso.
+Usa questi valori come esempi di dimensionamento, non come garanzie. Per il
+consumo residente effettivo del demone è più utile l'RSS del processo; il totale
+cgroup include anche la cache del filesystem, in gran parte recuperabile. Le
+variabili principali sono numero di torrent attivi, cache e connessioni
+libtorrent, concorrenza dei provider, scansioni `ffprobe`/archivio e dimensione
+del ciclo in corso.
 
 ## Installazione Linux
 

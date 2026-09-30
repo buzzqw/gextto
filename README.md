@@ -43,18 +43,23 @@ torrents, archive scans and optional integrations.
 These are reference observations from a Linux x86_64 installation using the
 embedded libtorrent engine, not hardware-independent benchmarks:
 
-- after restart, with five restored torrents and no active downloads, the
-  service used about **170–190 MiB** of cgroup memory; the process RSS was about
-  **76 MiB**;
+- after restart, with five restored torrents and no active downloads, the daemon
+  process RSS was about **75–85 MiB**. The systemd cgroup value can be much
+  higher because it also accounts for filesystem cache: one observation showed
+  about **584 MiB** cgroup memory, including roughly **525 MiB** of file cache
+  and only about **51 MiB** of anonymous memory;
 - over roughly five minutes in that mostly idle state, accumulated CPU time was
   about **7 seconds** (around **2% of one CPU core on average**);
 - an active search/download cycle can temporarily use substantially more memory:
-  a peak of about **1.4 GiB** was observed during a high-load cycle, while the
-  resident baseline returned to the lower range afterward.
+  a peak of about **1.4 GiB** cgroup memory was observed during a high-load
+  cycle, while the process resident baseline returned to the lower range
+  afterward.
 
-Use these figures as sizing examples, not guarantees. The main variables are
-active torrent count, libtorrent cache and connections, concurrent providers,
-`ffprobe`/archive scans and the size of the current cycle.
+Use these figures as sizing examples, not guarantees. For the daemon's actual
+resident footprint, prefer process RSS; cgroup totals also include reclaimable
+filesystem cache. The main variables are active torrent count, libtorrent cache
+and connections, concurrent providers, `ffprobe`/archive scans and the size of
+the current cycle.
 
 ## Install on Linux
 
