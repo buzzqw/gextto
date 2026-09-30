@@ -19,6 +19,39 @@ funzionare come servizio.
 - UI web responsive e TUI mostrano salute, log, backup, manutenzione e
   integrazioni con Trakt, Simkl, Jellyfin e Plex.
 
+## Interfaccia web e menu
+
+La UI web è un piano di controllo completo, non solo una pagina di stato. È
+responsive su desktop e mobile e il selettore di lingua supporta attualmente
+**Italiano, English, Deutsch, Français, Español e Polski**. Il manuale esteso è
+integrato in italiano e inglese; per le altre lingue la documentazione lunga usa
+il manuale inglese come fallback. Nella barra superiore sono disponibili anche
+ricerca impostazioni, metriche CPU/RAM e trasferimenti, tema, dimensione testo,
+aggiornamento e stato del servizio.
+
+| Voce | Funzioni |
+|---|---|
+| **Dashboard** | Avvio del ciclo completo o limitato a un dominio, prossimo ciclo, titoli configurati, spazio libero, torrent attivi, ultimi download, prossime uscite, risultati dei feed, grafici dischi/risorse e collegamenti rapidi. |
+| **Scarico** | Sessione torrent completa: aggiunta magnet o `.torrent`, coda/progresso/ETA/peer/ratio, pausa/ripresa/recheck/rimozione, dettagli, tracker, priorità file, limiti, spostamento storage, seeding e storico download. |
+| **Serie TV** | Libreria monitorata con stagioni, episodi, qualità/lingue/sottotitoli, alias, percorso NAS, ricerca mancanti, upgrade, ricerca manuale, scansione archivio e rinomina/riparazione controllata. |
+| **Film** | Libreria con identità titolo/anno, qualità, requisiti linguistici, esclusioni, ricerca immediata, migliori risultati, corrispondenze archivio, decisioni upgrade, riscaricamento e modifica metadati. |
+| **Mancanti** | Vista orientata ai gap per episodi e stagioni mancanti, con filtri, ricerche e azioni consapevoli di forza, ignora, riattiva e riscarica. |
+| **Esplora** | Scoperta TMDB (tendenze, popolari, più votati, programmazione e prossime uscite), ricerca titoli, ricerca release e aggiunta alla libreria, con protezione dai duplicati già monitorati. |
+| **Archivio** | Ricerca full-text delle release archiviate, paginazione, dettagli sorgente/qualità, accodamento multiplo, copia magnet, eliminazione e spiegazione **Perché non questa?**; include anche i titoli visti nei feed. |
+| **Fumetti** | Fumetti monitorati tramite GetComics, scelta del post, gestione metadati/copertina/tag, estrazione link, weekly pack, download HTTP e storico con azioni. |
+| **Configurazione** | Daemon, sorgenti RSS/indexer/motori web/FlareSolverr, libtorrent, motore torrent, scoring, template di rinomina, acquisizione, notifiche, percorsi/NAS, retention avanzate e traduzioni. |
+| **Integrazioni** | Autenticazione/watchlist/scrobbling Trakt e Simkl, aggiornamento libreria Jellyfin/Plex e hook per programmi esterni. |
+| **Manutenzione** | Backup, azioni di ripristino, pulizia cestino, scansioni archivio, backfill MediaInfo, ricalcolo scoring, pulizia duplicati, rinomina manuale cartelle, manutenzione database e riavvio servizio. |
+| **Salute** | Integrità database, percorsi e permessi, spazio libero, stato provider/backend, CPU/RAM e diagnostica del servizio. |
+| **Log** | Coda live e storico del log daemon con filtro, numero righe e controlli segui/aggiorna, per analizzare cicli, provider e vita dei torrent. |
+| **Blocklist** | Consultazione e gestione delle release bloccate per qualità, identità, provider o scelta utente, evitando che rientrino silenziosamente nei cicli. |
+| **Manuale** | Guida operativa integrata nella UI; segue la lingua selezionata, con versioni complete italiana e inglese e fallback inglese per le altre lingue. |
+| **Licenza** | Licenza EUPL-1.2 del progetto e note sulle dipendenze di terze parti incluse o opzionali. |
+
+La shell mobile mantiene sempre raggiungibili le pagine operative principali:
+Dashboard, Scarico, Serie TV, Film, Salute e Log; le altre pagine di scoperta e
+sistema restano disponibili dalla navigazione.
+
 ## Efficienza delle risorse
 
 Gextto è stato ottimizzato per mantenere un uso delle risorse prevedibile e

@@ -19,6 +19,38 @@ service.
 - The responsive web UI and terminal TUI expose health, logs, backups,
   maintenance and integrations with Trakt, Simkl, Jellyfin and Plex.
 
+## Web interface and menu
+
+The web UI is a complete control plane, not only a status page. It is responsive
+on desktop and mobile, and the language selector currently supports **Italiano,
+English, Deutsch, Français, Español and Polski**. The long-form manual is
+bundled in Italian and English; the other UI languages use the English manual as
+their documentation fallback. The top bar also provides settings search, CPU/RAM
+and transfer metrics, theme/font controls, refresh and service status.
+
+| Menu | What it provides |
+|---|---|
+| **Dashboard** | Cycle controls for all domains or one domain, next-cycle timing, configured-title and free-space metrics, active torrents, recent downloads, upcoming series releases, feed results, disk/resource charts and quick links. |
+| **Downloads** | Full torrent session: add magnets or `.torrent` files, queue/progress/ETA/peer/ratio data, pause/resume/recheck/remove, per-torrent details, trackers, content priorities, limits, storage moves, seeding controls and download history. |
+| **Series** | Monitored TV library with seasons, episodes, quality/language/subtitle rules, aliases, NAS path, missing searches, upgrades, manual search, archive scan and controlled rename/repair actions. |
+| **Movies** | Monitored movie library with title/year identity, quality and language requirements, exclusions, immediate search, best matches, archive matches, upgrade decisions, re-download and metadata editing. |
+| **Missing** | Gap-oriented view of missing episodes and seasons, with filters, candidate searches and actions to force, ignore, reactivate or re-download intentionally. |
+| **Explore** | TMDB discovery (trending, popular, top-rated, now-playing/upcoming), title lookup, release search and add-to-library actions, with duplicate protection for titles already monitored. |
+| **Archive** | Full-text archive/release search, pagination, source and quality details, bulk queueing, magnet copying/deletion and “why not this one?” explanations; also exposes feed-seen series and movies. |
+| **Comics** | GetComics-based monitored comics, post selection, metadata/cover/tag handling, link extraction, weekly packs, HTTP downloads and history actions. |
+| **Configuration** | Daemon mode, sources, RSS/indexers/web engines/FlareSolverr, libtorrent, torrent engine, scoring, rename templates, acquisition, notifications, paths/NAS, advanced retention and translations. |
+| **Integrations** | Trakt and Simkl authentication/watchlists/scrobbling, Jellyfin/Plex library refresh and event hooks for external programs. |
+| **Maintenance** | Backups and restore-related actions, trash cleanup, archive scans, MediaInfo backfill, scoring recalculation, duplicate cleanup, manual folder rename, database maintenance and service restart. |
+| **Health** | Database integrity, paths and permissions, free space, provider/backend status, CPU/RAM and service diagnostics. |
+| **Logs** | Live and historical daemon log tail with filtering, line count and follow/refresh controls, useful for cycles, provider failures and torrent lifecycle events. |
+| **Blocklist** | Review and manage releases blocked by quality, identity, provider or user decisions, so rejected candidates do not return silently. |
+| **Manual** | The bundled operational guide, rendered inside the UI; it follows the selected language, with Italian and English full versions and English fallback for other languages. |
+| **License** | EUPL-1.2 project license and bundled/optional third-party notices. |
+
+The mobile shell keeps the most important operational pages reachable: Dashboard,
+Downloads, Series, Movies, Health and Logs remain immediately available, while
+the remaining discovery and system pages are available through the navigation.
+
 ## Resource efficiency
 
 Gextto has been extensively optimized to keep its resource footprint predictable
