@@ -39,6 +39,25 @@ self-hosted. Il consumo effettivo dipende dal numero di titoli monitorati, dalle
 sorgenti configurate, dai torrent attivi, dalle scansioni dell'archivio e dalle
 integrazioni opzionali.
 
+### Misurazioni indicative
+
+Sono osservazioni di riferimento su un'installazione Linux x86_64 con libtorrent
+integrato, non benchmark indipendenti dall'hardware:
+
+- dopo il riavvio, con cinque torrent ripristinati e nessun download attivo, il
+  servizio ha usato circa **170–190 MiB** di memoria cgroup; l'RSS del processo
+  era circa **76 MiB**;
+- in circa cinque minuti nello stesso stato prevalentemente inattivo, il tempo
+  CPU accumulato è stato di circa **7 secondi** (circa **2% di un core in media**);
+- un ciclo attivo di ricerca/download può usare temporaneamente più memoria: in
+  un ciclo ad alto carico è stato osservato un picco di circa **1,4 GiB**, mentre
+  il consumo residente è poi tornato nella fascia bassa.
+
+Usa questi valori come esempi di dimensionamento, non come garanzie. Le variabili
+principali sono numero di torrent attivi, cache e connessioni libtorrent,
+concorrenza dei provider, scansioni `ffprobe`/archivio e dimensione del ciclo in
+corso.
+
 ## Installazione Linux
 
 L'installer ufficiale è destinato a server Linux 64 bit con systemd. Eseguilo

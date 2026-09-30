@@ -38,6 +38,24 @@ contained RAM footprint for a self-hosted media automation service. Actual
 usage depends on the number of monitored titles, configured sources, active
 torrents, archive scans and optional integrations.
 
+### Indicative measurements
+
+These are reference observations from a Linux x86_64 installation using the
+embedded libtorrent engine, not hardware-independent benchmarks:
+
+- after restart, with five restored torrents and no active downloads, the
+  service used about **170–190 MiB** of cgroup memory; the process RSS was about
+  **76 MiB**;
+- over roughly five minutes in that mostly idle state, accumulated CPU time was
+  about **7 seconds** (around **2% of one CPU core on average**);
+- an active search/download cycle can temporarily use substantially more memory:
+  a peak of about **1.4 GiB** was observed during a high-load cycle, while the
+  resident baseline returned to the lower range afterward.
+
+Use these figures as sizing examples, not guarantees. The main variables are
+active torrent count, libtorrent cache and connections, concurrent providers,
+`ffprobe`/archive scans and the size of the current cycle.
+
 ## Install on Linux
 
 The official installer targets 64-bit Linux systems with systemd. Run it as
