@@ -304,6 +304,16 @@ func TestUiLogsAndFeedParity(t *testing.T) {
 			t.Fatalf("explore page missing %q", marker)
 		}
 	}
+	// The release calendar must stay at the top of Esplora: the trending grid
+	// grows tall and would otherwise push it below the fold.
+	calendarIndex := strings.Index(string(body), "Calendario TMDB")
+	discoverIndex := strings.Index(string(body), "Di tendenza su TMDB")
+	if calendarIndex < 0 || discoverIndex < 0 {
+		t.Fatalf("explore page missing calendar or discover panel")
+	}
+	if calendarIndex > discoverIndex {
+		t.Fatalf("explore page calendar must come before the trending panel")
+	}
 }
 
 // TestUiHistoryFolderColumn pins the "Cartella libreria / NAS" rendering: the
