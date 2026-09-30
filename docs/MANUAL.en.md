@@ -711,6 +711,9 @@ arguments if the command may be recorded in system logs.
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**
   (probes archived files without data via `ffprobe` and stores it) and restart
   the service.
+- Long operations (**Scan archives**, **Refresh MediaInfo**, **Rename all**) run
+  in the background: the page is not blocked, you can keep using Gextto, cancel
+  them from the message and see the outcome when they finish.
 - **Rename folder contents** — enter a folder and press **Browse** to select it
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal

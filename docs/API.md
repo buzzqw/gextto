@@ -15,6 +15,10 @@ build in esecuzione.
   percorso e devono essere codificati correttamente dal client.
 - Alcune route sono alias storici (`run_now`/`run-now`, per esempio). Le nuove
   integrazioni dovrebbero preferire la forma più leggibile quando disponibile.
+- Le operazioni lunghe (`/api/scan-all-archives`,
+  `/api/maintenance/backfill-media-info`, `/api/rename-all`) rispondono `202` con
+  un `job_id`: segui stato, progresso ed esito con `GET /api/jobs/{id}` e annulla
+  con `POST /api/jobs/{id}/cancel`. L'elenco completo è su `GET /api/jobs`.
 
 La UI server-rendered usa inoltre route interne sotto `/ui`; non fanno parte di
 questa tabella di integrazione. Per verifiche operative usa prima

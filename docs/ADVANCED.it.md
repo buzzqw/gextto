@@ -17,7 +17,8 @@ utilizzabile.
 
 Con un NAS controlla UID/GID, mount all'avvio e permessi di lettura/scrittura.
 Dopo aver spostato una libreria usa **Manutenzione → Scansiona archivi** prima
-di avviare upgrade o ricerca episodi mancanti.
+di avviare upgrade o ricerca episodi mancanti. La scansione gira in background:
+puoi proseguire, l'esito appare quando finisce.
 
 ## Rete e sicurezza
 

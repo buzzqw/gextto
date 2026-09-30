@@ -728,6 +728,9 @@ token o password negli argomenti se il comando finisce nei log del sistema.
 - Backup immediato, pulisci cestino, ricalcola scoring, scansiona archivi,
   **Aggiorna MediaInfo** (analizza con `ffprobe` i file archiviati senza dati e
   li salva) e riavvia il servizio.
+- Le operazioni lunghe (**Scansiona archivi**, **Aggiorna MediaInfo**, **Rinomina
+  tutto**) girano in background: la pagina non resta bloccata, puoi continuare a
+  usare Gextto, annullarle dal messaggio e vederne l'esito quando finiscono.
 - **Rinomina contenuto cartella** — inserisci una cartella e premi **Sfoglia** per
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta

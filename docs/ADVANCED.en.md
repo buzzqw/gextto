@@ -16,7 +16,8 @@ visible to the client but not to the daemon cannot be used.
 
 For a NAS, verify UID/GID, mounts at boot and read/write permissions. After
 moving a library, use **Maintenance → Scan archives** before starting upgrades
-or missing-episode searches.
+or missing-episode searches. The scan runs in the background: you can keep
+working and see the outcome when it finishes.
 
 ## Network and security
 
