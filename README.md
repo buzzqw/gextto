@@ -19,6 +19,25 @@ service.
 - The responsive web UI and terminal TUI expose health, logs, backups,
   maintenance and integrations with Trakt, Simkl, Jellyfin and Plex.
 
+## Resource efficiency
+
+Gextto has been extensively optimized to keep its resource footprint predictable
+and modest, especially when idle or waiting for the next scheduled cycle:
+
+- the daemon is a single service and uses embedded libtorrent, without requiring
+  a separate torrent stack;
+- feed, indexer, web-search and background work use bounded concurrency rather
+  than unbounded goroutines;
+- provider backoff, retry windows and cooldowns prevent repeated failures from
+  turning into CPU- and network-heavy retry storms;
+- the torrent queue, speed policies, RAM-disk reconciliation and database work
+  are applied incrementally instead of busy-looping.
+
+This results in low CPU usage outside active searches and transfers and a
+contained RAM footprint for a self-hosted media automation service. Actual
+usage depends on the number of monitored titles, configured sources, active
+torrents, archive scans and optional integrations.
+
 ## Install on Linux
 
 The official installer targets 64-bit Linux systems with systemd. Run it as

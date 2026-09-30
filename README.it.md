@@ -19,6 +19,26 @@ funzionare come servizio.
 - UI web responsive e TUI mostrano salute, log, backup, manutenzione e
   integrazioni con Trakt, Simkl, Jellyfin e Plex.
 
+## Efficienza delle risorse
+
+Gextto è stato ottimizzato per mantenere un uso delle risorse prevedibile e
+contenuto, soprattutto quando è inattivo o in attesa del ciclo programmato:
+
+- il demone è un singolo servizio e usa libtorrent integrato, senza richiedere
+  uno stack torrent separato;
+- feed, indexer, ricerche web e attività in background usano concorrenza limitata
+  invece di creare goroutine senza limite;
+- backoff dei provider, finestre di retry e cooldown impediscono che gli errori
+  ripetuti diventino raffiche di richieste, consumo CPU e traffico inutili;
+- coda torrent, profili di velocità, riconciliazione del RAM disk e database
+  vengono gestiti in modo incrementale, senza cicli di attesa attiva.
+
+Il risultato è un basso uso della CPU al di fuori delle ricerche e dei download
+attivi e un consumo di RAM contenuto per un servizio di automazione multimediale
+self-hosted. Il consumo effettivo dipende dal numero di titoli monitorati, dalle
+sorgenti configurate, dai torrent attivi, dalle scansioni dell'archivio e dalle
+integrazioni opzionali.
+
 ## Installazione Linux
 
 L'installer ufficiale è destinato a server Linux 64 bit con systemd. Eseguilo
