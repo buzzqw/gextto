@@ -55,6 +55,14 @@ type StorageMoveRetry struct {
 
 const tev_maxStorageMoveRetries uint8 = 5
 
+const (
+	// Keep the existing metadata recovery cadence separate from the stalled
+	// download state machine below.
+	tev_metadataRetryInterval = 10 * time.Minute
+	// Report a continuing metadata problem periodically, not on every retry.
+	tev_metadataWarnInterval = time.Hour
+)
+
 // ---------------------------------------------------------------------------
 // small scalar helpers
 // ---------------------------------------------------------------------------
@@ -689,13 +697,18 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 // monitor_metadata
 // ---------------------------------------------------------------------------
 
-// MonitorMetadata implements `monitor_metadata`.
-func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen map[string]time.Time) {
-	const timeout = 600 * time.Second
+func tev_metadataRetryWarningDue(lastWarning, now time.Time) bool {
+	return lastWarning.IsZero() || now.Sub(lastWarning) >= tev_metadataWarnInterval
+}
+
+// MonitorMetadata implements `monitor_metadata`. The retry cadence and give-up
+// policy are intentionally unchanged; only the repeated warning is rate-limited.
+func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, waitStart, firstSeen, lastWarning map[string]time.Time) {
 	giveupMinutes := tev_settingFloatOr(cfg, "libtorrent_metadata_giveup_min", 1440.0)
 	if giveupMinutes <= 0 {
 		clear(waitStart)
 		clear(firstSeen)
+		clear(lastWarning)
 		return
 	}
 	giveup := time.Duration(giveupMinutes * 60.0 * float64(time.Second))
@@ -706,17 +719,20 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 		if torrent.HasMetadata {
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
+			delete(lastWarning, torrent.Hash)
 			continue
 		}
 		// A paused magnet is waiting for a download slot and must not age out.
 		if torrent.State == "paused" {
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
+			delete(lastWarning, torrent.Hash)
 			continue
 		}
 		if torrent.State != "downloading_metadata" {
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
+			delete(lastWarning, torrent.Hash)
 			continue
 		}
 		started, ok := firstSeen[torrent.Hash]
@@ -748,14 +764,27 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			})
 			delete(waitStart, torrent.Hash)
 			delete(firstSeen, torrent.Hash)
-		} else if now.Sub(retryAt) >= timeout {
+			delete(lastWarning, torrent.Hash)
+		} else if now.Sub(retryAt) >= tev_metadataRetryInterval {
 			value, err := torrents.Reannounce(torrent.Hash)
 			if err != nil {
 				logging.Debug("metadata reannounce failed",
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 			} else if value {
-				logging.Warn("torrent metadata still unavailable; reannouncing",
-					"hash", torrent.Hash, "name", torrent.Name)
+				previousWarning := lastWarning[torrent.Hash]
+				if tev_metadataRetryWarningDue(previousWarning, now) {
+					logging.Warn("torrent metadata still unavailable; reannouncing",
+						"hash", torrent.Hash,
+						"name", torrent.Name,
+						"elapsed_minutes", int(now.Sub(started).Minutes()),
+						"retry_minutes", int(tev_metadataRetryInterval/time.Minute))
+					lastWarning[torrent.Hash] = now
+				} else {
+					logging.Debug("torrent metadata retry still pending",
+						"hash", torrent.Hash,
+						"name", torrent.Name,
+						"elapsed_minutes", int(now.Sub(started).Minutes()))
+				}
 			} else {
 				logging.Debug("metadata reannounce unavailable in current mode",
 					"hash", torrent.Hash, "name", torrent.Name)
@@ -766,11 +795,13 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 	for hash := range waitStart {
 		if _, ok := live[hash]; !ok {
 			delete(waitStart, hash)
+			delete(lastWarning, hash)
 		}
 	}
 	for hash := range firstSeen {
 		if _, ok := live[hash]; !ok {
 			delete(firstSeen, hash)
+			delete(lastWarning, hash)
 		}
 	}
 }

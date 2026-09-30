@@ -333,6 +333,25 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	logging.Info(fmt.Sprintf("✅ Scraping: %d unique releases after filters", len(all)))
 	sourceStats := append([]logging.SourceStatEntry{}, feedStats...)
 	sourceStats = append(sourceStats, logging.TakeSourceStats()...)
+	providerFailures := map[string]int{}
+	failedSources := map[string]int{}
+	for _, entry := range sourceStats {
+		if entry.Stats.Fail == 0 {
+			continue
+		}
+		providerFailures[entry.Kind] += entry.Stats.Fail
+		failedSources[entry.Kind]++
+	}
+	if len(providerFailures) > 0 {
+		logging.Warn("provider failures in cycle",
+			"feed_failures", providerFailures["feed"],
+			"feed_sources", failedSources["feed"],
+			"indexer_failures", providerFailures["indexer"],
+			"indexer_sources", failedSources["indexer"],
+			"web_failures", providerFailures["web"],
+			"web_sources", failedSources["web"],
+		)
+	}
 	printSourceReport(sourceStats)
 	cache.Save()
 	return all, nil
@@ -530,7 +549,10 @@ func searchOneWithDB(
 			if providerDB != nil {
 				_ = providerDB.ProviderFailure("indexer", result.Name, message)
 			}
-			logging.Warn("indexer search failed",
+			// SourceStats and the cycle-level provider summary retain the failure
+			// details. Logging every failed title/indexer pair at WARN makes a
+			// single provider outage look like dozens of independent incidents.
+			logging.Debug("indexer search failed",
 				"indexer", result.Name,
 				"query", result.Query,
 				"error", message)

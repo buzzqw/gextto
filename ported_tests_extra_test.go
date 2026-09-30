@@ -134,6 +134,19 @@ func TestStallTimerRequiresRealProgress(t *testing.T) {
 	}
 }
 
+func TestMetadataRetryWarningIsRateLimited(t *testing.T) {
+	now := time.Now()
+	if !tev_metadataRetryWarningDue(time.Time{}, now) {
+		t.Fatal("first metadata retry must be reported")
+	}
+	if tev_metadataRetryWarningDue(now.Add(-30*time.Minute), now) {
+		t.Fatal("metadata retry warning should be rate limited")
+	}
+	if !tev_metadataRetryWarningDue(now.Add(-time.Hour), now) {
+		t.Fatal("metadata retry warning should reappear after the interval")
+	}
+}
+
 func TestParseSeasonEpisodeFromArchiveFilenames(t *testing.T) {
 	cases := []struct {
 		name    string

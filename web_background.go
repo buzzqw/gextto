@@ -532,6 +532,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	postSeedMoves := map[string]struct{}{}
 	metadataWaitStart := map[string]time.Time{}
 	metadataFirstSeen := map[string]time.Time{}
+	metadataLastWarning := map[string]time.Time{}
 	stallWaitStart := map[string]StallWatch{}
 	// Periodic RAM-disk reconciliation: the metadata event fires once, so a
 	// missed event (restart/race) used to leave an oversized torrent on the
@@ -770,7 +771,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				lastSequential = &sequential
 			}
 		}
-		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen)
+		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
 		if now.Sub(lastRamdiskCheck) >= 30*time.Second {
 			ReconcileRamdisk(cfg, torrents, ramdiskAttempts)
