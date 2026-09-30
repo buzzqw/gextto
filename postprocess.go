@@ -90,9 +90,10 @@ func parseTagDirRules(raw string) []map[string]any {
 	return rules
 }
 
-// DestinationFor resolves the archive folder of a release (implementation of
-// `destination_for`).
-func DestinationFor(release *models.Release, cfg *Config) (string, bool) {
+// ConfiguredDestinationFor resolves only an explicitly configured archive
+// destination. It deliberately does not fall back to the download directory:
+// folder-shaped downloads must stay there when no NAS/archive is configured.
+func ConfiguredDestinationFor(release *models.Release, cfg *Config) (string, bool) {
 	if raw, ok := cfg.Settings["tag_dir_rules"]; ok {
 		if rules := parseTagDirRules(raw); rules != nil {
 			for _, rule := range rules {
@@ -117,7 +118,21 @@ func DestinationFor(release *models.Release, cfg *Config) (string, bool) {
 		}
 	}
 	if cfg.ArchiveRoot != nil {
-		return *cfg.ArchiveRoot, true
+		if destination := strings.TrimSpace(*cfg.ArchiveRoot); destination != "" {
+			return destination, true
+		}
+	}
+	return "", false
+}
+
+// DestinationFor resolves the archive folder of a release (implementation of
+// `destination_for`). Its historical download-directory fallback remains for
+// direct single-file downloads; folder-shaped downloads use
+// ConfiguredDestinationFor when they must distinguish a real archive from the
+// download area.
+func DestinationFor(release *models.Release, cfg *Config) (string, bool) {
+	if destination, ok := ConfiguredDestinationFor(release, cfg); ok {
+		return destination, true
 	}
 	return cfg.LibtorrentDir, true
 }

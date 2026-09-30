@@ -294,6 +294,19 @@ func TestResolvesSeriesArchiveBeforeGlobalArchive(t *testing.T) {
 	}
 }
 
+func TestConfiguredDestinationForDoesNotUseDownloadFallback(t *testing.T) {
+	cfg := DefaultConfig()
+	release := models.Release{Kind: "series", Series: stringPtr("Example")}
+	if destination, ok := ConfiguredDestinationFor(&release, &cfg); ok || destination != "" {
+		t.Fatalf("without an archive destination got %q, %v", destination, ok)
+	}
+	archive := filepath.Join(t.TempDir(), "nas")
+	cfg.ArchiveRoot = &archive
+	if destination, ok := ConfiguredDestinationFor(&release, &cfg); !ok || destination != archive {
+		t.Fatalf("configured archive destination = %q, %v", destination, ok)
+	}
+}
+
 func TestPlacesSeriesEpisodesInConfiguredSeasonSubfolder(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Series = append(cfg.Series, SeriesConfig{

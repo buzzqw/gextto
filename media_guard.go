@@ -87,6 +87,38 @@ func validateCompletedFile(path string) error {
 	return nil
 }
 
+// resolveMovieCompletedFile returns the actual video to validate/process when
+// a movie torrent has a directory as its top-level item. The directory itself
+// is deliberately preserved: storage moves already relocate the complete
+// torrent tree, including subtitles, artwork and NFO files. We only resolve an
+// unambiguous movie file; picking one from a multi-video folder could archive
+// the wrong title or leave the torrent tree inconsistent.
+func resolveMovieCompletedFile(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("stat completed movie path %s: %w", path, err)
+	}
+	if !info.IsDir() {
+		return path, nil
+	}
+	files, err := VideoFiles(path)
+	if err != nil {
+		return "", fmt.Errorf("scan completed movie folder %s: %w", path, err)
+	}
+	// Samples are auxiliary clips, not the movie to archive. Ignore them only
+	// when there is exactly one real video left, otherwise fail safely.
+	mainFiles := make([]string, 0, len(files))
+	for _, file := range files {
+		if !strings.Contains(strings.ToLower(filepath.Base(file)), "sample") {
+			mainFiles = append(mainFiles, file)
+		}
+	}
+	if len(mainFiles) != 1 {
+		return "", fmt.Errorf("completed movie folder %s contains %d non-sample video files", path, len(mainFiles))
+	}
+	return mainFiles[0], nil
+}
+
 func allZero(data []byte) bool {
 	for _, value := range data {
 		if value != 0 {

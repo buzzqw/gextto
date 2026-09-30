@@ -325,6 +325,27 @@ limite finale, `DOWNLOAD FAILED — stalled`.
 limiti di seed. Un torrent rimosso dalla sessione non equivale necessariamente a
 un file rimosso dalla libreria.
 
+### Completamento di file e cartelle
+
+Il comportamento dipende dalla forma del torrent e dalla presenza di una
+destinazione **Libreria/NAS** configurata:
+
+| Contenuto completato | NAS configurato | NAS non configurato |
+|---|---|---|
+| Episodio singolo come file | il video viene archiviato e rinominato secondo le regole della serie | resta nel percorso di download secondo il comportamento del file singolo |
+| Episodio singolo dentro una cartella | il video viene copiato nel NAS e rinominato; la cartella sorgente resta intatta durante il seeding e poi viene spostata nel **Cestino** | la cartella resta intatta nella cartella Download, anche dopo la fine del seeding |
+| Season pack dentro una cartella | i video degli episodi vengono cercati ricorsivamente, copiati nel percorso NAS della serie e rinominati; il pack sorgente resta per il seeding e poi viene spostato nel **Cestino** | il pack resta intatto nella cartella Download, anche dopo la fine del seeding |
+
+Per i season pack vengono importati nell'archivio i file video che riportano una
+identità episodio riconoscibile, per esempio `S01E02` o `1x02`. Sottotitoli, NFO,
+artwork e altri allegati del pack non vengono copiati nell'archivio: restano nella
+cartella sorgente fino al suo spostamento nel Cestino. La cartella sorgente non
+viene mai spostata o eliminata mentre il torrent sta ancora facendo seeding.
+
+Il Cestino deve essere configurato in *Configurazione → Percorsi*. Se non c'è una
+destinazione NAS, Gextto non tratta la cartella Download come archivio e non la
+sposta automaticamente nel Cestino.
+
 ## 4. Serie TV
 
 Aggiungi una serie via ricerca TMDB o manualmente (titolo, qualità, lingue,

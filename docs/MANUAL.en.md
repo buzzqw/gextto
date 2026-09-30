@@ -323,6 +323,27 @@ Peers without byte progress do not reset the timer. Look for `DOWNLOAD STALLED`,
 seeding limits. Removing a torrent from the session does not necessarily remove
 the file from the library.
 
+### Completion of files and folders
+
+The outcome depends on the torrent shape and on whether a **Library/NAS**
+destination is configured:
+
+| Completed content | NAS configured | NAS not configured |
+|---|---|---|
+| Single episode as a file | the video is archived and renamed using the series rules | it remains in the download path according to the single-file behavior |
+| Single episode inside a folder | the video is copied to the NAS and renamed; the source folder stays intact while seeding and is then moved to **Trash** | the folder stays intact in the Download directory, even after seeding ends |
+| Season pack inside a folder | episode videos are searched recursively, copied to the series NAS path and renamed; the source pack remains for seeding and is then moved to **Trash** | the pack stays intact in the Download directory, even after seeding ends |
+
+For season packs, the archive receives video files with a recognisable episode
+identity, such as `S01E02` or `1x02`. Subtitles, NFO files, artwork and other
+sidecars are not copied to the archive: they remain in the source folder until
+that folder is moved to Trash. The source folder is never moved or deleted while
+the torrent is still seeding.
+
+Trash must be configured under *Configuration → Paths*. Without a NAS
+destination, Gextto does not treat the Download directory as an archive and does
+not move the folder to Trash automatically.
+
 ## 4. Series
 
 Add a series via TMDB search or manually (title, quality, languages, seasons,

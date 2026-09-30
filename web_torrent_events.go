@@ -934,7 +934,37 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		}
 		archivedPack := tev_archivedPackSourceDisposable(db, torrent.Hash, torrent.SavePath)
 		archivedCopy := tev_completedSourceDisposable(db, torrent.Hash, torrent.SavePath)
-		if !archivedCopy || (!archivedPack && !cfg.Libtorrent.AutoRemoveCompleted) {
+		source := CompletionPath(&models.TorrentEvent{
+			Kind:     "torrent_finished",
+			Hash:     torrent.Hash,
+			Name:     torrent.Name,
+			SavePath: torrent.SavePath,
+		})
+		sourceIsFolder := false
+		if info, statErr := os.Stat(source); statErr == nil {
+			sourceIsFolder = info.IsDir()
+		}
+		archiveFolder := archivedPack || (archivedCopy && sourceIsFolder)
+		if !archivedCopy || (!archiveFolder && !cfg.Libtorrent.AutoRemoveCompleted) {
+			continue
+		}
+		if archiveFolder && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
+			removed, err := torrents.Remove(torrent.Hash, false)
+			if err != nil {
+				logging.Warn("seeded archived folder removal failed",
+					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+				continue
+			}
+			if removed {
+				_ = db.MarkTorrentRemovedAt(torrent.Hash)
+			}
+			if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
+				logging.Error("could not move seeded archived folder to trash",
+					"hash", torrent.Hash, "name", torrent.Name, "source", source, "error", moveErr.Error())
+			} else {
+				logging.Info("seeded archived folder moved to trash",
+					"hash", torrent.Hash, "name", torrent.Name, "source", source, "trash", target)
+			}
 			continue
 		}
 		removed, err := torrents.Remove(torrent.Hash, archivedCopy)
@@ -1539,7 +1569,91 @@ func normalizeReleaseSeries(cfg *Config, release *models.Release) {
 	}
 }
 
+// tev_resolveEpisodeCompletedFile resolves a single episode stored below a
+// torrent directory. It is intentionally strict when there are several video
+// files: the wrong file must never be moved into the series archive.
+func tev_resolveEpisodeCompletedFile(path string, release *models.Release) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("stat completed episode path %s: %w", path, err)
+	}
+	if !info.IsDir() {
+		return path, nil
+	}
+	files, err := VideoFiles(path)
+	if err != nil {
+		return "", fmt.Errorf("scan completed episode folder %s: %w", path, err)
+	}
+	if len(files) == 1 {
+		return files[0], nil
+	}
+	if release.Season != nil && release.Episode != nil {
+		matches := make([]string, 0, len(files))
+		for _, file := range files {
+			if filenameMatchesEpisode(filepath.Base(file), *release.Season, *release.Episode) {
+				matches = append(matches, file)
+			}
+		}
+		if len(matches) == 1 {
+			return matches[0], nil
+		}
+	}
+	return "", fmt.Errorf("completed episode folder %s contains %d ambiguous video files", path, len(files))
+}
+
+// tev_completeEpisodeFolderWithArchive copies only the episode video to the
+// configured series archive. The complete source folder remains untouched
+// while the torrent seeds; RemoveSeededCompleted moves it to the Trash after
+// the configured seed limit is reached.
+func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient) (bool, error) {
+	source := CompletionPath(event)
+	video, err := tev_resolveEpisodeCompletedFile(source, release)
+	if err != nil {
+		return false, err
+	}
+	if err := ValidateDestinationFrom(video, destination); err != nil {
+		return false, err
+	}
+	target := filepath.Join(destination, filepath.Base(video))
+	sourceHandled := false
+	sourcePreserved := false
+	seriesName := ""
+	if release.Series != nil {
+		seriesName = *release.Series
+	}
+	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName); resolveErr != nil {
+		return false, resolveErr
+	} else if resolved {
+		sourceHandled = true
+	} else {
+		if err := copyFileAtomically(video, target); err != nil {
+			return false, err
+		}
+		sourceHandled = true
+		sourcePreserved = true
+	}
+	processedEvent := *event
+	processedEvent.SavePath = destination
+	processedEvent.Name = filepath.Base(target)
+	processed, err := tev_completeTorrentOptions(cfg, db, torrents, &processedEvent, release, tmdb, sourcePreserved)
+	if err != nil {
+		return false, err
+	}
+	if processed && sourceHandled {
+		logging.Info("single episode copied to archive; source folder kept for seeding",
+			"hash", event.Hash, "name", event.Name, "source", source, "archive", target)
+	}
+	return processed, nil
+}
+
 func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient) (bool, error) {
+	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, false)
+}
+
+// tev_completeTorrentOptions controls whether the original torrent source must
+// remain available for seeding. Folder-shaped single episodes are imported by
+// copying their video to the NAS, so they use preserveSource=true.
+func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, preserveSource bool) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
 	guard := AcquireArchiveImport(release.Series)
@@ -1580,6 +1694,20 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, eve
 			"name", event.Name, "title", release.Title, "path", resolved)
 		path = resolved
 		recoveredExisting = true
+	}
+	if release.Kind == "movie" {
+		resolved, resolveErr := resolveMovieCompletedFile(path)
+		if resolveErr != nil {
+			return false, resolveErr
+		}
+		if !SamePath(resolved, path) {
+			logging.Debug("completed movie folder resolved to its video file",
+				"hash", event.Hash,
+				"folder", path,
+				"video", resolved,
+			)
+			path = resolved
+		}
 	}
 	// Refuse to archive a broken download: a zero-filled (preallocated but
 	// never written) or unrecognised video file must not replace a good copy.
@@ -1739,7 +1867,7 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, eve
 		processedPath,
 		suffix,
 	))
-	if recoveredExisting || (renamedSet && !SamePath(processedPath, path)) {
+	if !preserveSource && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {
 			logging.Warn("renamed torrent removal failed",
@@ -1883,12 +2011,27 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			release = *corrected
 		}
 		normalizeReleaseSeries(cfg, &release)
+		archiveDestination, hasArchiveDestination := ConfiguredDestinationFor(&release, cfg)
 		destination, hasDestination := DestinationFor(&release, cfg)
 		current := event.SavePath
-		if release.IsPack {
-			if !hasDestination {
-				return tev_completeTorrent(cfg, db, torrents, &event, &release, tmdb)
+		if release.Kind == "series" && !release.IsPack {
+			if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil && sourceInfo.IsDir() {
+				if !hasArchiveDestination {
+					size, sizeErr := SizeOfPath(source)
+					if sizeErr != nil {
+						return false, sizeErr
+					}
+					if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
+						return false, err
+					}
+					logging.Info("single episode folder completed; no archive destination, kept in downloads",
+						"hash", event.Hash, "name", event.Name, "path", source)
+					return true, nil
+				}
+				return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
 			}
+		}
+		if release.IsPack {
 			size, err := SizeOfPath(source)
 			if err != nil {
 				return false, err
@@ -1920,6 +2063,27 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				}
 				tev_discardCompletedSource(cfg, db, torrents, &event, errorMessage)
 				return false, nil
+			}
+			if !hasArchiveDestination {
+				entries := make([]PackEpisode, 0, len(matching))
+				for _, file := range matching {
+					fileSize, sizeErr := SizeOfPath(file.Path)
+					if sizeErr != nil {
+						return false, sizeErr
+					}
+					entries = append(entries, PackEpisode{
+						Episode:   file.Episode,
+						Path:      file.Path,
+						SizeBytes: fileSize,
+						Score:     cfg.ReleaseScore(&release),
+					})
+				}
+				if err := db.MarkPackCompleted(&release, entries, source, size); err != nil {
+					return false, err
+				}
+				logging.Info("season pack completed; no archive destination, kept in downloads",
+					"hash", event.Hash, "name", event.Name, "path", source, "episodes", len(entries))
+				return true, nil
 			}
 			// Serialize against the periodic/manual rename repair for this
 			// series: it scans the archive and would otherwise rename/trash

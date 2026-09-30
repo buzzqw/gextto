@@ -60,6 +60,44 @@ func TestValidateCompletedFile(t *testing.T) {
 	}
 }
 
+func TestResolveMovieCompletedFileKeepsFolderTree(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "Cold Storage")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	video := filepath.Join(folder, "Cold Storage.mkv")
+	if err := os.WriteFile(video, []byte("\x1a\x45\xdf\xa3\x00\x00\x00\x00\x00\x00\x00\x00"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	subtitle := filepath.Join(folder, "Cold Storage.en.srt")
+	if err := os.WriteFile(subtitle, []byte("subtitle"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveMovieCompletedFile(folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != video {
+		t.Fatalf("resolved = %q, want %q", resolved, video)
+	}
+	if _, err := os.Stat(subtitle); err != nil {
+		t.Fatalf("folder contents were changed: %v", err)
+	}
+}
+
+func TestResolveMovieCompletedFileRejectsAmbiguousFolder(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"first.mkv", "second.mp4"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("video"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := resolveMovieCompletedFile(root); err == nil {
+		t.Fatal("expected an ambiguous movie folder to be rejected")
+	}
+}
+
 func TestQuarantineCorruptFile(t *testing.T) {
 	dir := t.TempDir()
 	trash := filepath.Join(dir, "trash")
