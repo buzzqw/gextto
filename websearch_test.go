@@ -12,6 +12,16 @@ import (
 )
 
 func TestEngineCooldownBlocksAfterAFailure(t *testing.T) {
+	// The cooldown map is process-global: clear this test's entry before and
+	// after the assertion so the test stays idempotent under `go test -count=N`.
+	clearCooldown := func() {
+		engineCooldownMu.Lock()
+		delete(engineCooldown, "test-cooldown-engine")
+		engineCooldownMu.Unlock()
+	}
+	clearCooldown()
+	t.Cleanup(clearCooldown)
+
 	if engine_in_cooldown("test-cooldown-engine") {
 		t.Fatal("engine should not start in cooldown")
 	}

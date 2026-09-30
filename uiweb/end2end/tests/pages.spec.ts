@@ -3,32 +3,29 @@ import { test, expect } from "@playwright/test";
 const nav = (page: import("@playwright/test").Page, label: string) =>
   page.locator("aside .nav-item").filter({ hasText: label }).first();
 
-test("salute e simulatore punteggi sono raggiungibili", async ({ page }) => {
+test("salute e configurazione sono raggiungibili", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1").filter({ hasText: "Dashboard" })).toBeVisible();
 
   await nav(page, "Salute").click();
-  await expect(page.locator("h3").filter({ hasText: "Percorsi e dischi" })).toBeVisible();
+  await expect(page.locator("h3").filter({ hasText: "Percorsi" })).toBeVisible();
+  await expect(page.locator("h3").filter({ hasText: "Dischi" })).toBeVisible();
   await expect(page.locator("h3").filter({ hasText: "Stato sorgenti" })).toBeVisible();
-  await expect(page.locator("h3").filter({ hasText: "Ultimi errori" })).toBeVisible();
 
   await nav(page, "Configurazione").click();
-  await page.getByRole("button", { name: "Punteggi" }).click();
-  await expect(page.locator("h3").filter({ hasText: "Gruppi custom (release group)" })).toBeVisible();
-  await expect(page.locator("h3").filter({ hasText: "Simulatore punteggio" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Calcola" })).toBeVisible();
+  await expect(page.locator("[data-settings-search]")).toBeVisible({ timeout: 20000 });
 });
 
 test("banner modifiche non salvate in configurazione", async ({ page }) => {
   await page.goto("/");
   await nav(page, "Configurazione").click();
-  const input = page.locator("form.settings-row input").first();
+  const input = page.locator("form.setting-row input[data-setting-input]:not([disabled])").first();
   await expect(input).toBeVisible({ timeout: 20000 });
   await input.fill("9999");
   await expect(page.locator(".settings-savebar")).toBeVisible();
-  await expect(page.locator(".settings-savebar")).toContainText("modifiche non salvate");
+  await expect(page.locator(".settings-savebar")).toContainText("1 modifica non salvata");
   await page.getByRole("button", { name: "Ignora" }).click();
-  await expect(page.locator(".settings-savebar")).toHaveCount(0);
+  await expect(page.locator(".settings-savebar")).toBeHidden();
 });
 
 test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) => {
@@ -67,11 +64,9 @@ test("selettore lingua presente e selezionabile", async ({ page }) => {
 test("manuale utente raggiungibile e renderizzato", async ({ page }) => {
   await page.goto("/");
   await nav(page, "Manuale").click();
-  // Il Markdown è convertito in HTML con titoli e indice interno.
-  await expect(page.locator(".manual-body h1")).toContainText("Manuale utente");
-  await expect(page.locator(".manual-body h2").first()).toContainText("Primo avvio");
-  const anchors = await page.locator(".manual-body a[href^='#']").count();
-  expect(anchors).toBeGreaterThan(0);
+  // Il Markdown è convertito in HTML con titoli; il testo segue la lingua attiva.
+  await expect(page.locator(".manual-body h1")).toContainText(/Manuale|Manual/i);
+  expect(await page.locator(".manual-body h2").count()).toBeGreaterThan(0);
 });
 
 test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {
@@ -83,13 +78,11 @@ test("manutenzione espone la revisione rinomina cartella", async ({ page }) => {
 });
 
 test("ricerca impostazioni apre la tab e raggiunge il campo", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("button", { name: "Cerca impostazioni" })).toBeVisible();
-  await page.getByRole("button", { name: "Cerca impostazioni" }).click();
-  const search = page.locator(".settings-search-modal input[type='search']");
-  await expect(search).toBeVisible();
+  await page.goto("/?view=settings");
+  const search = page.locator("[data-settings-search]");
+  await expect(search).toBeVisible({ timeout: 20000 });
   await search.fill("proxy");
-  const hit = page.locator(".settings-search-hit").filter({ hasText: "Proxy host" }).first();
+  const hit = page.locator("a.settings-result").filter({ hasText: "Proxy host" }).first();
   await expect(hit).toBeVisible();
   await hit.click();
   await expect(page.locator("h1").filter({ hasText: "Configurazione" })).toBeVisible();

@@ -15,7 +15,7 @@
   {{if .Filter}}<input type="search" class="input" aria-label="Filtra l'elenco" placeholder="Filtra l'elenco…" data-ui-filter />{{end}}
   <button class="btn sm" data-ui-refresh title="{{if .RefreshHint}}{{.RefreshHint}}{{else}}Ricarica i dati{{end}}">Aggiorna</button>
 </div>
-<div class="table-wrap">
+<div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
   <table class="data-table {{.Class}}">
     <caption class="sr-only">{{.Title}}</caption>
     <thead data-ui-head></thead>

@@ -464,7 +464,7 @@
   // Inline feedback keeps the page context visible; browser alerts were easy
   // to miss on mobile and blocked the rest of the interface.
   var toastHost = null;
-  function notify(message, kind) {
+  function notify(message, kind, action) {
     if (!toastHost) {
       toastHost = document.createElement("div");
       toastHost.className = "toast-host";
@@ -483,6 +483,17 @@
     close.textContent = "×";
     close.addEventListener("click", function () { toast.remove(); });
     toast.appendChild(text);
+    if (action && action.label && typeof action.onClick === "function") {
+      var actionButton = document.createElement("button");
+      actionButton.className = "btn sm";
+      actionButton.type = "button";
+      actionButton.textContent = String(action.label);
+      actionButton.addEventListener("click", function () {
+        toast.remove();
+        action.onClick();
+      });
+      toast.appendChild(actionButton);
+    }
     toast.appendChild(close);
     toastHost.appendChild(toast);
     window.setTimeout(function () { if (toast.parentNode) toast.remove(); }, kind === "err" ? 7000 : 3500);
@@ -1454,10 +1465,15 @@
   });
 
   // ---- generic list pages -------------------------------------------------
+  // esc() escapes a value for HTML text and for both double- and single-quoted
+  // attributes. It escapes the full set & < > " ' so the same helper is safe in
+  // every context the client currently builds with innerHTML. New code should
+  // still prefer textContent and setAttribute for plain data (see the technical
+  // review, section "HTML dinamico e sicurezza del rendering").
   function esc(value) {
     return String(value === null || value === undefined ? "" : value)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   // safeHref returns an escaped href only for http/https/magnet links, so a
   // malicious release or comic field cannot inject javascript: URLs.
@@ -2078,6 +2094,33 @@
   });
 
   // ---- generic actions ----------------------------------------------------
+  // When an endpoint answers 202 with a job id (long operations moved to the
+  // background job manager), follow the job to completion instead of reloading
+  // immediately, so the toast reports success, failure or cancellation.
+  function trackBackgroundJob(jobId, label) {
+    var attempts = 0;
+    function poll() {
+      attempts += 1;
+      if (attempts > 600) return; // ~15 minutes at 1.5s, then give up silently
+      pollRequest("/api/jobs/" + encodeURIComponent(jobId)).then(function (data) {
+        var job = data && data.job ? data.job : null;
+        if (!job || job.state === "queued" || job.state === "running") {
+          window.setTimeout(poll, 1500);
+          return;
+        }
+        if (job.state === "succeeded") {
+          notify(label + " completata", "ok");
+        } else if (job.state === "canceled") {
+          notify(label + " annullata", "info");
+        } else {
+          notify(label + " non riuscita" + (job.error ? ": " + job.error : ""), "err");
+        }
+        window.setTimeout(function () { location.reload(); }, 1200);
+      }).catch(function () { window.setTimeout(poll, 3000); });
+    }
+    poll();
+  }
+
   document.addEventListener("click", function (event) {
     var element = event.target.closest("[data-api]");
     if (!element) return;
@@ -2095,7 +2138,17 @@
         if (partials[view]) { load(); return; }
         var message = "Operazione completata";
         if (data && typeof data === "object" && data.message) message = String(data.message);
-        notify(message, "ok");
+        var jobId = data && typeof data === "object" && data.job_id ? String(data.job_id) : "";
+        notify(message, "ok", jobId ? {
+          label: "Annulla",
+          onClick: function () {
+            api("/api/jobs/" + encodeURIComponent(jobId) + "/cancel", "POST", {}).catch(function () {});
+          }
+        } : null);
+        if (jobId) {
+          trackBackgroundJob(jobId, (element.textContent || "").trim() || "Operazione");
+          return;
+        }
         window.setTimeout(function () { location.reload(); }, 1400);
       })
       .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })

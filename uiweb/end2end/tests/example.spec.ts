@@ -6,33 +6,33 @@ const nav = (page: import("@playwright/test").Page, label: string) =>
 test("dashboard and configuration areas are usable", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveTitle("Gextto");
+  await expect(page).toHaveTitle(/Gextto/);
   await expect(page.locator("h1").filter({ hasText: "Dashboard" })).toBeVisible();
   await expect(page.getByText("Azioni rapide")).toBeVisible();
   await page.getByRole("button", { name: "Carica risultati" }).click();
-  await expect(page.getByRole("button", { name: "Aggiorna risultati" })).toBeVisible();
+  await expect(page.locator("[data-dashboard-feed-status]")).toContainText(/release/i, { timeout: 15000 });
 
   await nav(page, "Blocklist").click();
   await expect(page.locator("h3").filter({ hasText: "Blocklist" })).toBeVisible();
 
   await nav(page, "Integrazioni").click();
   await expect(page.locator("h3").filter({ hasText: "Trakt" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Registra gestore magnet nel browser" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Magnet handler" })).toBeVisible();
 
   await nav(page, "Archivio").click();
-  await expect(page.locator("h3").filter({ hasText: "Archivio torrent" })).toBeVisible();
-  await expect(page.getByText(/Pagina 1 \/ /)).toBeVisible();
+  await expect(page.locator("h1").filter({ hasText: "Archivio" })).toBeVisible();
+  await expect(page.locator("table.archive-table")).toBeVisible();
 
   await nav(page, "Configurazione").click();
-  await page.getByRole("button", { name: "Traduzioni" }).click();
-  await expect(page.getByRole("button", { name: "Esporta" })).toBeVisible();
+  await page.getByRole("link", { name: "Traduzioni" }).click();
+  await expect(page.getByRole("link", { name: "Esporta YAML" })).toBeVisible();
 
   await nav(page, "Manutenzione").click();
-  await expect(page.getByRole("button", { name: "Backup", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Backup ora" })).toBeVisible();
 
   // "Grafici"/"Attività" non sono più pagine a sé: i dati live sono in Salute/Log.
   await nav(page, "Salute").click();
-  await expect(page.locator("h3").filter({ hasText: "Runtime" })).toBeVisible();
+  await expect(page.locator("h3").filter({ hasText: "Stato provider" })).toBeVisible();
   await nav(page, "Log").click();
   await expect(page.locator("h3").filter({ hasText: "Log daemon" })).toBeVisible();
 

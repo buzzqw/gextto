@@ -290,7 +290,7 @@
     <div class="panel-body">
       {{if or .Rows .HTTPDownloads}}
       <p class="table-scroll-hint">Scorri lateralmente per vedere tutte le colonne</p>
-      <div class="table-wrap">
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Tabella torrent e download HTTP">
         <table class="data-table torrent-table">
           <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
           <thead><tr>
