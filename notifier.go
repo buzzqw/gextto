@@ -489,6 +489,16 @@ func formatEvent(event string, data map[string]any) string {
 			stats = ""
 		}
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
+		if seeding, ok := mapLookup(data, "seeding").(bool); ok && seeding {
+			return fmt.Sprintf(
+				"%s\n\n📺 %s\n\n💾 %s%s\n%s",
+				messages.Pick("📥 DOWNLOAD COMPLETATO — IN SEED", "📥 DOWNLOAD COMPLETE — SEEDING"),
+				seriesEpisode(),
+				formatBytes(size),
+				stats,
+				messages.Pick("⏳ Sarà archiviato a fine seed", "⏳ Will be archived when seeding ends"),
+			)
+		}
 		return fmt.Sprintf(
 			"%s\n\n📺 %s\n\n💾 %s%s\n%s: %s",
 			messages.Pick("✅ DOWNLOAD COMPLETATO", "✅ DOWNLOAD COMPLETE"),

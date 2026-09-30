@@ -920,7 +920,11 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// can no longer seed and would re-download the release on the next
 			// check (seen as a duplicate). Drop those torrents, but keep
 			// no-rename/in-place completions seeding as before.
-			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
+			//
+			// Only when the user asked for automatic removal: with the setting
+			// off the torrent is paused and stays listed as completed, and the
+			// user clears it with "Pulisci completati".
+			if processed && cfg.Libtorrent.AutoRemoveCompleted && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
 				isPack := false
 				if meta, err := db.TorrentMeta(event.Hash); err == nil && meta != nil {
 					isPack = meta.Release.IsPack
@@ -1022,11 +1026,12 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			TrimMemory()
 		}
 		DetachErrorTorrents(torrents, db, startupHashes)
-		DetachCompletedArchivedSingles(torrents, db)
+		DetachCompletedArchivedSingles(cfg, torrents, db)
 		RejectActivePackIdentityMismatches(torrents, db)
-		// Remove completed torrents that have finished seeding (archived packs
-		// always, other torrents with `auto_remove_completed`) before the seed
-		// policy moves them to disk only to delete them.
+		// Remove completed torrents that have finished seeding before the seed
+		// policy moves them to disk only to delete them. With automatic removal
+		// off, completed torrents stay listed as completed until the user runs
+		// "Pulisci completati".
 		RemoveSeededCompleted(cfg, torrents, db, postSeedMoves)
 		// Enforce the seed policy only after handling this tick's events: with a
 		// very low seed limit a just-finished torrent could otherwise be removed

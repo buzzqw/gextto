@@ -246,3 +246,37 @@ func TestNotifierFormatHelpers(t *testing.T) {
 		t.Fatalf("formatDuration(9) = %q, want %q", got, want)
 	}
 }
+
+// TestFormatEventSeedingNotification pins the wording split: a completion that
+// keeps seeding uses the same event but a different message than the final
+// "archived" one.
+func TestFormatEventSeedingNotification(t *testing.T) {
+	seeding := formatEvent("torrent_completed", map[string]any{
+		"series":     "Show",
+		"season":     int64(1),
+		"episode":    int64(2),
+		"size_bytes": int64(1000),
+		"path":       "/downloads/x.mkv",
+		"seeding":    true,
+	})
+	if !strings.Contains(seeding, "SEED") {
+		t.Fatalf("seeding message = %q", seeding)
+	}
+	if strings.Contains(seeding, "Archiviato") || strings.Contains(seeding, "Archived") {
+		t.Fatalf("seeding message must not say archived: %q", seeding)
+	}
+
+	archived := formatEvent("torrent_completed", map[string]any{
+		"series":     "Show",
+		"season":     int64(1),
+		"episode":    int64(2),
+		"size_bytes": int64(1000),
+		"path":       "/nas/x.mkv",
+	})
+	if strings.Contains(archived, "SEED") {
+		t.Fatalf("archived message must not say seeding: %q", archived)
+	}
+	if !strings.Contains(archived, "/nas/x.mkv") {
+		t.Fatalf("archived message must carry the path: %q", archived)
+	}
+}

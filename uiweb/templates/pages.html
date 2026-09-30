@@ -358,7 +358,7 @@
     <div class="panel-body">
       <div class="toolbar download-global-toolbar">
         <button class="btn sm" type="button" data-api="/api/torrents/remove_completed" data-method="POST" data-body='{"delete_files":false}' title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
-        <label class="check"><input type="checkbox" data-auto-remove-completed {{if .AutoRemoveCompleted}}checked{{end}} /> <span>Elimina i completati dopo il seed</span></label>
+        <label class="check" title="Attivo: a fine seed il torrent completato esce dall'elenco della sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non cambia dove finiscono i file."><input type="checkbox" data-auto-remove-completed {{if .AutoRemoveCompleted}}checked{{end}} /> <span>Elimina i completati dopo il seed</span></label>
         <label class="field inline-field"><span>Tag</span>
           <select class="input" data-download-tag-filter aria-label="Filtra per tag">
             <option value="">Tutti i tag</option>

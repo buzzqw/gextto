@@ -884,6 +884,20 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		if !completed {
 			continue
 		}
+		// Never interfere with a move/rename in progress: a torrent libtorrent is
+		// moving, or a tracked release whose library copy is not in place yet
+		// (end-of-seed archive pending), must be left alone. Removing it now would
+		// abort the move and could leave the file behind.
+		if torrent.State == "moving" {
+			skipped++
+			continue
+		}
+		if meta, err := s.db.TorrentMeta(torrent.Hash); err == nil && meta != nil {
+			if processed, err := s.db.TorrentProcessed(torrent.Hash); err == nil && (processed == nil || strings.TrimSpace(*processed) == "") {
+				skipped++
+				continue
+			}
+		}
 		if torrent.SeedRatio == 0.0 || torrent.SeedDays == 0 {
 			skipped++
 			continue

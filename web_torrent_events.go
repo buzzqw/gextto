@@ -480,7 +480,13 @@ func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes ma
 }
 
 // DetachCompletedArchivedSingles implements `detach_completed_archived_singles`.
-func DetachCompletedArchivedSingles(torrents TorrentSession, db *Database) {
+func DetachCompletedArchivedSingles(cfg *Config, torrents TorrentSession, db *Database) {
+	// Completed singles stay in the session (shown as completed) unless the
+	// user asked for automatic removal; this recovery pass must not remove
+	// them behind the user's back.
+	if cfg != nil && !cfg.Libtorrent.AutoRemoveCompleted {
+		return
+	}
 	for _, torrent := range torrents.List() {
 		meta, _ := db.TorrentMeta(torrent.Hash)
 		status, _ := db.TorrentStatus(torrent.Hash)
@@ -945,7 +951,12 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			sourceIsFolder = info.IsDir()
 		}
 		archiveFolder := archivedPack || (archivedCopy && sourceIsFolder)
-		if !archivedCopy || (!archiveFolder && !cfg.Libtorrent.AutoRemoveCompleted) {
+		if !archivedCopy {
+			continue
+		}
+		if !cfg.Libtorrent.AutoRemoveCompleted {
+			// The user wants completed torrents to stay listed (shown as
+			// completed) and to clear them manually with "Pulisci completati".
 			continue
 		}
 		if archiveFolder && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
@@ -967,7 +978,13 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			}
 			continue
 		}
-		removed, err := torrents.Remove(torrent.Hash, archivedCopy)
+		deleteFiles := archivedCopy
+		if !archiveFolder && !settingsBool(cfg, "move_episodes", false) {
+			// Copy mode keeps the download source; move mode already moved it
+			// into the library at the end of the seed.
+			deleteFiles = false
+		}
+		removed, err := torrents.Remove(torrent.Hash, deleteFiles)
 		if err != nil {
 			logging.Warn("seeded torrent removal failed",
 				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
@@ -1464,6 +1481,37 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if tev_postSeedRelocate(cfg, torrents, &torrent, postSeedMoves, retries) {
 			continue
 		}
+		// Archive at the end of the seed: a completed torrent that kept its
+		// source for seeding is moved into its library destination now, then
+		// renamed by the storage_moved handler. Removal happens after the move,
+		// so the file is never deleted before it is archived. `postSeedMoves`
+		// protects the source while libtorrent copies it, and the guard on
+		// `completed_source_disposable` skips torrents whose library copy is
+		// already in place (copy mode / folder and pack import).
+		if _, archiving := postSeedMoves[torrent.Hash]; !archiving {
+			if _, retrying := retries[strings.ToLower(torrent.Hash)]; !retrying {
+				if !tev_completedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
+					if meta, metaErr := db.TorrentMeta(torrent.Hash); metaErr == nil && meta != nil {
+						release := meta.Release
+						if dest, ok := ConfiguredDestinationFor(&release, cfg); ok && !SamePath(torrent.SavePath, dest) {
+							if moved, moveErr := torrents.MoveStorage(torrent.Hash, dest); moveErr == nil && moved {
+								postSeedMoves[torrent.Hash] = struct{}{}
+								retries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
+									destination: dest,
+									postSeed:    true,
+									attempts:    0,
+									nextAttempt: time.Now().Add(600 * time.Second),
+									inFlight:    true,
+								}
+								logging.Info("📁 MOVING TO NAS — completed download archived at the end of the seed",
+									"hash", torrent.Hash, "name", torrent.Name, "from", torrent.SavePath, "to", dest)
+								continue
+							}
+						}
+					}
+				}
+			}
+		}
 		if cfg.Libtorrent.AutoRemoveCompleted {
 			if !tev_completedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
 				if tev_seedCopyWarningDue(seedCopyWarnings, torrent.Hash) {
@@ -1602,9 +1650,10 @@ func tev_resolveEpisodeCompletedFile(path string, release *models.Release) (stri
 }
 
 // tev_completeEpisodeFolderWithArchive copies only the episode video to the
-// configured series archive. The complete source folder remains untouched
-// while the torrent seeds; RemoveSeededCompleted moves it to the Trash after
-// the configured seed limit is reached.
+// configured series archive, for both a single episode file and a folder that
+// contains it. The source stays in the download folder while the torrent seeds;
+// RemoveSeededCompleted drops the torrent after the configured seed limit when
+// automatic removal is enabled, and keeps the source in copy mode.
 func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, destination string, tmdb *TmdbClient) (bool, error) {
 	source := CompletionPath(event)
 	video, err := tev_resolveEpisodeCompletedFile(source, release)
@@ -1640,7 +1689,7 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		return false, err
 	}
 	if processed && sourceHandled {
-		logging.Info("single episode copied to archive; source folder kept for seeding",
+		logging.Info("single episode copied to archive; source kept for seeding",
 			"hash", event.Hash, "name", event.Name, "source", source, "archive", target)
 	}
 	return processed, nil
@@ -1650,9 +1699,71 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, eve
 	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, false)
 }
 
+// tev_notifySeeding announces a completed download that is now seeding from the
+// download folder and will be moved into the library at the end of the seed.
+// The same `torrent_completed` event is used, flagged with `seeding` so the
+// message differs from the final "archived" notification.
+func tev_notifySeeding(db *Database, notifier *Notifier, event *models.TorrentEvent, release *models.Release, path string, sizeBytes int64) {
+	if notifier == nil || event == nil {
+		return
+	}
+	var durationSeconds *int64
+	var averageSpeedBps *int64
+	if times, err := db.TorrentTimes(event.Hash); err == nil && times != nil {
+		if created, ok := utils.ParseTimestamp(times.CreatedAt); ok {
+			completed := time.Now().UTC()
+			if times.CompletedAt != nil {
+				if parsed, ok := utils.ParseTimestamp(*times.CompletedAt); ok {
+					completed = parsed
+				}
+			}
+			seconds := int64(completed.Sub(created).Seconds())
+			if seconds < 1 {
+				seconds = 1
+			}
+			speed := int64(float64(sizeBytes) / float64(seconds))
+			durationSeconds = &seconds
+			averageSpeedBps = &speed
+		}
+	}
+	var kindValue, seriesValue, seasonValue, episodeValue any
+	title := event.Name
+	if release != nil {
+		kindValue = release.Kind
+		title = release.Title
+		if release.Series != nil {
+			seriesValue = *release.Series
+		}
+		if release.Season != nil {
+			seasonValue = *release.Season
+		}
+		if release.Episode != nil {
+			episodeValue = *release.Episode
+		}
+	}
+	if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+		"hash":              event.Hash,
+		"name":              event.Name,
+		"title":             title,
+		"kind":              kindValue,
+		"series":            seriesValue,
+		"season":            seasonValue,
+		"episode":           episodeValue,
+		"path":              path,
+		"size_bytes":        sizeBytes,
+		"duration_seconds":  durationSeconds,
+		"average_speed_bps": averageSpeedBps,
+		"seeding":           true,
+	}); err != nil {
+		logging.Warn("seeding notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
+	} else {
+		logging.Debug("seeding notification sent", "hash", event.Hash, "title", title)
+	}
+}
+
 // tev_completeTorrentOptions controls whether the original torrent source must
-// remain available for seeding. Folder-shaped single episodes are imported by
-// copying their video to the NAS, so they use preserveSource=true.
+// remain available for seeding. Single episodes are imported by copying their
+// video to the library, so they use preserveSource=true.
 func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, preserveSource bool) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
@@ -1867,7 +1978,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 		processedPath,
 		suffix,
 	))
-	if !preserveSource && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
+	if !preserveSource && cfg.Libtorrent.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {
 			logging.Warn("renamed torrent removal failed",
@@ -2015,7 +2126,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		destination, hasDestination := DestinationFor(&release, cfg)
 		current := event.SavePath
 		if release.Kind == "series" && !release.IsPack {
-			if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil && sourceInfo.IsDir() {
+			if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil {
 				if !hasArchiveDestination {
 					size, sizeErr := SizeOfPath(source)
 					if sizeErr != nil {
@@ -2024,11 +2135,36 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
 						return false, err
 					}
-					logging.Info("single episode folder completed; no archive destination, kept in downloads",
+					logging.Info("single episode completed; no archive destination, kept in downloads for seeding",
 						"hash", event.Hash, "name", event.Name, "path", source)
 					return true, nil
 				}
-				return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
+				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) {
+					// Folder episodes (and single files in copy mode) are imported
+					// by copying the video to the library while the source stays
+					// in the download folder for seeding.
+					return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
+				}
+				// Move mode: keep the source in the download folder so the torrent
+				// can actually seed; the move and rename into the library happen at
+				// the end of the seed (see EnforceSeedPolicy). The episode is marked
+				// downloaded now (without an archive path, so the library still looks
+				// empty) so the gap filler does not fetch it again while it seeds.
+				// When the archive destination IS the download folder there is
+				// nothing to move: fall through to the in-place rename below.
+				if !SamePath(filepath.Dir(source), archiveDestination) {
+					size, sizeErr := SizeOfPath(source)
+					if sizeErr != nil {
+						return false, sizeErr
+					}
+					if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
+						return false, err
+					}
+					tev_notifySeeding(db, notifier, &event, &release, source, size)
+					logging.Info("single episode completed; kept in downloads for seeding, will be archived at the end of the seed",
+						"hash", event.Hash, "name", event.Name, "path", source)
+					return false, nil
+				}
 			}
 		}
 		if release.IsPack {
@@ -2232,6 +2368,23 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		if SamePath(current, destination) {
 			return tev_completeTorrent(cfg, db, torrents, &event, &release, tmdb)
+		}
+		if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, "move_episodes", false) {
+			// Move mode: keep the movie in the download folder so the torrent can
+			// seed; the move and rename into the library happen at the end of the
+			// seed (see EnforceSeedPolicy). The release is marked downloaded now
+			// (without an archive path) so the gap filler does not fetch it again.
+			size, sizeErr := SizeOfPath(source)
+			if sizeErr != nil {
+				return false, sizeErr
+			}
+			if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
+				return false, err
+			}
+			tev_notifySeeding(db, notifier, &event, &release, source, size)
+			logging.Info("movie completed; kept in downloads for seeding, will be archived at the end of the seed",
+				"hash", event.Hash, "name", event.Name, "path", source)
+			return false, nil
 		}
 		if _, exists := moveRequests[event.Hash]; exists {
 			return false, nil

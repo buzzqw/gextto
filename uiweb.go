@@ -714,6 +714,14 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			row.Source = values[1]
 			row.Reason = values[2]
 		}
+		// A completed torrent kept in the session (automatic removal off) is
+		// reported as completed by libtorrent as "paused" after the seed limit;
+		// show the state the user cares about instead of a bare pause.
+		if row.Archived && view.State == "paused" {
+			row.State = "Completato"
+			row.StateClass = "ok"
+			row.ProgressClass = "seed"
+		}
 		if view.State == "seeding" || view.State == "finished" {
 			row.SeedInfinite = view.SeedRatio == 0 || view.SeedDays == 0
 		}
