@@ -985,7 +985,10 @@ pre.log-view { margin: 0; }
    behaviour (the "Sistema" group already collapses them on mobile). */
 .nav-optional { opacity: 0.92; }
 .nav-mobile-hidden { display: none; }
-.nav-mobile-system-extra { display: none; }
+/* Le voci "extra" servono solo al menu Sistema dei telefoni: vanno nascoste
+   anche quando il gruppo Sistema è aperto (regole più specifiche come
+   `.system-group .nav-item` le riattiverebbero su desktop). */
+.sidebar .nav-group.system-group .nav-mobile-system-extra { display: none !important; }
 @media (min-width: 901px) { .nav-mobile-hidden { display: flex; } }
 
 @media (max-width: 560px) {
@@ -1188,7 +1191,7 @@ pre.log-view { margin: 0; }
   .sidebar .system-group.open .nav-item,
   .sidebar .system-group.open .nav-more { display: inline-flex; }
   .sidebar .system-group.open .nav-mobile-always { display: none; }
-  .sidebar .system-group.open .nav-mobile-system-extra { display: inline-flex; }
+  .sidebar .system-group.open .nav-mobile-system-extra { display: inline-flex !important; }
   .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
   /* Turn the top controls into a small two-column control pad instead of a

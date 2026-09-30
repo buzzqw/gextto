@@ -28,6 +28,19 @@ test("banner modifiche non salvate in configurazione", async ({ page }) => {
   await expect(page.locator(".settings-savebar")).toBeHidden();
 });
 
+test("il menu non ha voci duplicate", async ({ page }) => {
+  await page.goto("/");
+  // Su desktop il gruppo Sistema è espanso: eventuali voci "mobile" riattivate
+  // per errore comparirebbero qui come duplicati.
+  const ids: string[] = await page.locator("aside .nav-item:visible").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-nav")).filter((id): id is string => Boolean(id))
+  );
+  const counts = new Map<string, number>();
+  for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const duplicates = [...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
+  expect(duplicates).toEqual([]);
+});
+
 test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) => {
   await page.goto("/");
   await nav(page, "Scarico").click();
