@@ -48,3 +48,27 @@ jobs:
         env:
           GEXTTO_BUILD: ${{ github.run_number }}
         run: scripts/build-daemon.sh
+
+  # Phase 0 of the technical review: run the race detector as a separate,
+  # non-blocking job. Its result is collected before it becomes required.
+  race:
+    name: race detector (x86_64, non-blocking)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libtorrent-rasterbar-dev
+
+      - name: Race test
+        run: make test-race

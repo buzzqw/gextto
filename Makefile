@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-real test-anacrolix build-anacrolix vet fmt check-ui installer-test tidy package clean run
+.PHONY: all build fast test test-race test-real test-anacrolix build-anacrolix vet fmt check-ui installer-test tidy package clean run
 
 all: build
 
@@ -18,6 +18,11 @@ test: check-ui installer-test
 
 test-real:
 	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
+
+# Race detector run (technical review, phase 0). Kept separate from `test` so it
+# can stay non-blocking until the shared state has been audited.
+test-race:
+	CGO_ENABLED=1 go test -race ./...
 
 # Optional native-Go backend. The default build and `make test` do not compile
 # it; the MPL-2.0 review gate still applies.
