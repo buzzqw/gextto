@@ -1195,10 +1195,19 @@ func SaveLibraryHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // ScanAllArchives implements `scan_all_archives`.
+//
+// The scan is long (it walks every archive folder) and used to run inside the
+// HTTP request. It is now a background job: the request validates quickly and
+// returns 202 with a job id, while /api/jobs/{id} exposes progress, result and
+// errors. Cancellation is observed between series; a single folder scan is never
+// interrupted half-way.
 func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	updated := 0
-	errorsList := []map[string]any{}
+	type scanTarget struct {
+		name string
+		path string
+	}
+	targets := []scanTarget{}
 	for index := range cfg.Series {
 		series := &cfg.Series[index]
 		if !series.Enabled || strings.TrimSpace(series.ArchivePath) == "" {
@@ -1207,14 +1216,49 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if gh4_archiveImportBusyContains(series.Name) {
 			continue
 		}
-		_, count, err := gh4_scanArchivePath(s.db, series, series.ArchivePath, cfg)
-		if err != nil {
-			errorsList = append(errorsList, map[string]any{"series": series.Name, "error": err.Error()})
-			continue
-		}
-		updated += count
+		targets = append(targets, scanTarget{name: series.Name, path: series.ArchivePath})
 	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "updated": updated, "errors": errorsList})
+
+	job, created := s.jobs.Create("scan-archives", "scan-archives")
+	if !created {
+		jsonError(w, http.StatusConflict, "an archive scan is already running")
+		return
+	}
+	if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
+		updated := 0
+		errorsList := []map[string]any{}
+		for index, target := range targets {
+			if ctx.Err() != nil {
+				return
+			}
+			s.jobs.SetProgress(jobID, float64(index)/float64(len(targets)), target.name)
+			series := gh4_findSeries(cfg, target.name)
+			if series == nil {
+				continue
+			}
+			_, count, err := gh4_scanArchivePath(s.db, series, target.path, cfg)
+			if err != nil {
+				errorsList = append(errorsList, map[string]any{"series": target.name, "error": err.Error()})
+				continue
+			}
+			updated += count
+		}
+		if len(errorsList) > 0 {
+			logging.Warn("archive scan finished with errors", "updated", updated, "errors", len(errorsList), "job_id", jobID)
+			s.jobs.Fail(jobID, fmt.Errorf("archive scan finished with %d error(s); updated=%d", len(errorsList), updated))
+			return
+		}
+		logging.Info("archive scan completed", "updated", updated, "job_id", jobID)
+	}); err != nil {
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonStatus(w, http.StatusAccepted, map[string]any{
+		"ok":      true,
+		"job_id":  job.ID,
+		"total":   len(targets),
+		"message": "Scansione archivi avviata",
+	})
 }
 
 // SeriesEpisodes implements `series_episodes`.

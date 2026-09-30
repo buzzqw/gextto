@@ -83,7 +83,7 @@ func mediaInfoBackfillWorker(state *AppState) {
 		if enabled {
 			if Available() {
 				warnedUnavailable = false
-				report, err := gh0_runMediaInfoBackfill(state, batch)
+				report, err := gh0_runMediaInfoBackfill(state.bgContext, state, batch, nil)
 				if err != nil {
 					logging.Warn("MediaInfo backfill run failed", "error", err)
 				} else {

@@ -1253,12 +1253,36 @@ func BackfillMediaInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if limit > 5000 {
 		limit = 5000
 	}
-	report, err := gh0_runMediaInfoBackfill(s, limit)
-	if err != nil {
+
+	// The backfill runs ffprobe on many files and used to block the request.
+	// It is now a background job: the request returns 202 immediately while the
+	// detailed report stays available on /api/jobs/{id} (job result).
+	job, created := s.jobs.Create("media-info-backfill", "media-info-backfill")
+	if !created {
+		jsonError(w, http.StatusConflict, "a MediaInfo backfill is already running")
+		return
+	}
+	if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
+		report, err := gh0_runMediaInfoBackfill(ctx, s, limit, func(done, total int) {
+			if total > 0 {
+				s.jobs.SetProgress(jobID, float64(done)/float64(total), "")
+			}
+		})
+		if err != nil {
+			s.jobs.Fail(jobID, err)
+			return
+		}
+		s.jobs.SetResult(jobID, report)
+		logging.Info("media info backfill completed", "job_id", jobID)
+	}); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	jsonStatus(w, http.StatusOK, report)
+	jsonStatus(w, http.StatusAccepted, map[string]any{
+		"ok":      true,
+		"job_id":  job.ID,
+		"message": "Aggiornamento MediaInfo avviato",
+	})
 }
 
 func gh0_logMediaInfoFailure(target MediaInfoBackfillTarget, reason string, items *[]any) {
@@ -1278,18 +1302,25 @@ func gh0_logMediaInfoFailure(target MediaInfoBackfillTarget, reason string, item
 	})
 }
 
-func gh0_runMediaInfoBackfill(s *AppState, limit int) (map[string]any, error) {
+func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onProgress func(done, total int)) (map[string]any, error) {
 	targets, err := s.db.MediaInfoBackfillTargets(limit)
 	if err != nil {
 		return nil, err
 	}
+	total := len(targets)
 	probed := 0
 	failed := 0
 	skipped := 0
 	failedItems := []any{}
 	missingItems := []any{}
 	missingFiles := []string{}
-	for _, target := range targets {
+	for index, target := range targets {
+		if ctx != nil && ctx.Err() != nil {
+			break
+		}
+		if onProgress != nil {
+			onProgress(index, total)
+		}
 		if _, err := os.Stat(target.Path); err != nil {
 			skipped++
 			reason := "file non esistente"
@@ -1345,6 +1376,8 @@ func gh0_runMediaInfoBackfill(s *AppState, limit int) (map[string]any, error) {
 	return map[string]any{
 		"ok":            true,
 		"candidates":    len(targets),
+		"total":         total,
+		"canceled":      ctx != nil && ctx.Err() != nil,
 		"probed":        probed,
 		"analyzed":      probed,
 		"failed":        failed,

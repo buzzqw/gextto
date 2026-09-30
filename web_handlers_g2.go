@@ -613,19 +613,6 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusConflict, "rename is disabled")
 		return
 	}
-	s.rename_progress_mu.Lock()
-	if s.rename_progress.Running {
-		s.rename_progress_mu.Unlock()
-		jsonError(w, http.StatusConflict, "a rename is already running")
-		return
-	}
-	s.rename_progress.Running = true
-	s.rename_progress.Current = 0
-	s.rename_progress.Total = 0
-	s.rename_progress.Series = ""
-	s.rename_progress.Message = "starting"
-	s.rename_progress.Errors = 0
-	s.rename_progress_mu.Unlock()
 	names := []string{}
 	for index := range cfg.Series {
 		if cfg.Series[index].Enabled {
@@ -633,19 +620,42 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	total := len(names)
+
+	// The job manager owns de-duplication, observability and cancellation. The
+	// legacy rename_progress struct is kept in sync for /api/rename-progress
+	// API compatibility; the job id is additive.
+	job, created := s.jobs.Create("rename-all", "rename-all")
+	if !created {
+		jsonError(w, http.StatusConflict, "a rename is already running")
+		return
+	}
+
 	s.rename_progress_mu.Lock()
+	s.rename_progress.Running = true
+	s.rename_progress.Current = 0
 	s.rename_progress.Total = total
+	s.rename_progress.Series = ""
 	s.rename_progress.Message = "running"
+	s.rename_progress.Errors = 0
 	s.rename_progress_mu.Unlock()
-	done := s.trackOperation()
-	go func() {
-		defer done()
+
+	if err := s.jobs.Start(job.ID, func(ctx context.Context, jobID string) {
 		errors := 0
+		canceled := false
 		for index, name := range names {
+			// Cancellation is observed between series, so the single series is
+			// never interrupted half-way.
+			if ctx.Err() != nil {
+				canceled = true
+				break
+			}
 			s.rename_progress_mu.Lock()
 			s.rename_progress.Current = index
 			s.rename_progress.Series = name
 			s.rename_progress_mu.Unlock()
+			if total > 0 {
+				s.jobs.SetProgress(jobID, float64(index)/float64(total), name)
+			}
 			status, _ := seriesRenameApply(s, name, true, force, sourceOnly)
 			if status != http.StatusOK {
 				errors++
@@ -656,15 +666,25 @@ func RenameAll(w http.ResponseWriter, r *http.Request, s *AppState) {
 		s.rename_progress.Current = total
 		s.rename_progress.Series = ""
 		s.rename_progress.Errors = errors
-		if errors == 0 {
+		switch {
+		case canceled:
+			s.rename_progress.Message = "cancelled"
+		case errors == 0:
 			s.rename_progress.Message = "completed"
-		} else {
+		default:
 			s.rename_progress.Message = fmt.Sprintf("completed with %d error(s)", errors)
 		}
 		s.rename_progress_mu.Unlock()
-		logging.Info("background rename-all finished", "total", total, "errors", errors)
-	}()
-	jsonStatus(w, http.StatusAccepted, map[string]any{"ok": true, "total": total})
+		logging.Info("background rename-all finished", "total", total, "errors", errors, "job_id", jobID)
+	}); err != nil {
+		s.rename_progress_mu.Lock()
+		s.rename_progress.Running = false
+		s.rename_progress.Message = "not started"
+		s.rename_progress_mu.Unlock()
+		jsonError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	jsonStatus(w, http.StatusAccepted, map[string]any{"ok": true, "total": total, "job_id": job.ID})
 }
 
 // SaveBackupSettings implements `save_backup_settings`.

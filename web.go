@@ -487,6 +487,10 @@ type AppState struct {
 	// concurrent rename requests must not both pass the "already running" check.
 	rename_progress_mu sync.Mutex
 	config_cache       *ConfigCache
+	// jobs tracks long-running background operations with an observable state
+	// (see docs/revisione-1.md, section 7). Handlers create and query jobs, and
+	// stopBackgroundWorkers closes the manager on shutdown.
+	jobs *JobManager
 	// Background-worker lifecycle. bgStop is closed when the daemon starts
 	// shutting down and bgWG tracks every worker, so Serve waits for them before
 	// returning and the torrent session is destroyed only when no worker can

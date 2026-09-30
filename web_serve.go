@@ -124,6 +124,10 @@ func stopBackgroundWorkers(state *AppState) {
 		close(state.bgStop)
 	})
 	state.bgWG.Wait()
+	if state.jobs != nil {
+		// Cancel and wait for any operation still tracked by the job manager.
+		state.jobs.Close()
+	}
 }
 
 func shutdownServers(servers ...*http.Server) {

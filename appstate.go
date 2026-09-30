@@ -39,6 +39,7 @@ func NewAppState(
 		cycle_lock:      &sync.Mutex{},
 		rename_progress: &RenameProgress{},
 		config_cache:    &ConfigCache{},
+		jobs:            NewJobManager(2, 50),
 		bgStop:          make(chan struct{}),
 		bgContext:       backgroundContext,
 		bgCancel:        stopBackgroundContext,

@@ -112,6 +112,9 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | POST | `/api/indexer/test` |
 | POST | `/api/jellyfin/refresh` |
 | POST | `/api/jellyfin/test` |
+| GET | `/api/jobs` |
+| GET | `/api/jobs/{id}` |
+| POST | `/api/jobs/{id}/cancel` |
 | GET | `/api/last_cycle` |
 | GET | `/api/last_cycles` |
 | POST | `/api/libtorrent/check-update` |
