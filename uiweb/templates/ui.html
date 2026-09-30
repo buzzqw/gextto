@@ -71,6 +71,7 @@
         <button class="btn" title="Testo più piccolo" data-font="-5">A−</button>
         <button class="btn" title="Dimensione testo predefinita (100%)" data-font="100"><span data-font-label>Testo 100%</span></button>
         <button class="btn" title="Testo più grande" data-font="+5">A+</button>
+        <button class="btn font-picker-trigger" title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog" aria-expanded="false" data-font-open><span>Font</span><span class="font-picker-arrow" aria-hidden="true">▾</span></button>
         <select class="lang-select" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" data-lang>
           <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
           <option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>English</option>

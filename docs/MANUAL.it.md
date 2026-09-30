@@ -233,6 +233,11 @@ il pacchetto Linux autonomo descritto nel README (*Pacchetto Linux autonomo*).
 
 ## 2. Dashboard
 
+- **Controlli dell'interfaccia** — la barra superiore offre tema, dimensione del
+  testo e menu a discesa **Font**. Applica un preset generico, un font locale
+  rilevato o una famiglia inserita manualmente all'interfaccia e ai log. La scelta
+  resta locale al browser; il rilevamento dei font installati dipende dal supporto
+  del browser alla Local Font Access API e può richiedere un'autorizzazione.
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
 - **Pulsanti ciclo** — avvia un ciclo completo o di un solo dominio (Serie, Film,
   Fumetti) o un backup immediato.

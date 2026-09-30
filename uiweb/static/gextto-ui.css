@@ -73,7 +73,7 @@ html, body {
 body {
   background: radial-gradient(1000px 520px at 82% -12%, var(--glow) 0, transparent 62%), var(--bg);
   color: var(--text);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  font-family: var(--ui-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif);
   font-size: 1rem;
   line-height: 1.45;
   -webkit-text-size-adjust: 100%;
@@ -506,6 +506,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .btn.sm { min-height: 36px; padding: 6px 11px; font-size: 0.86rem; }
 .btn.sm.icon-action { width: 2.25rem; min-width: 2.25rem; padding: 6px 0; font-size: 1rem; }
 .icon-action span { line-height: 1; }
+.font-picker-trigger { gap: 8px; padding-right: 11px; }
+.font-picker-arrow { font-size: 0.78em; line-height: 1; opacity: 0.8; }
 .btn.primary { background: var(--accent-action); border-color: var(--accent-action); color: #04121f; }
 .btn.danger { background: color-mix(in srgb, var(--err) 22%, var(--surface)); border-color: color-mix(in srgb, var(--err) 45%, transparent); color: var(--text); }
 
@@ -675,11 +677,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
   overflow: auto;
   background: var(--surface-2);
   border-radius: var(--radius-sm);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;
   white-space: pre-wrap;
   word-break: break-word;
 }
+.log-view { font-family: var(--ui-font-family, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif); }
+.output { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .output:empty { display: none; }
 .kv { margin: 0; display: grid; grid-template-columns: minmax(110px, 28%) 1fr; gap: 4px 12px; }
 .kv dt { color: var(--muted); font-size: 0.82rem; }
@@ -896,6 +899,12 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .modal-head h3 { font-size: 1rem; margin: 0; }
 .modal-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .modal-body h4 { margin: 0; }
+.font-modal { width: min(560px, 96vw); }
+.font-modal .setting-hint { margin: 0; }
+.font-detect-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.font-detect-status { flex: 1 1 220px; min-width: 0; }
+.font-custom-row { display: flex; align-items: flex-end; gap: 8px; }
+.font-custom-row .field { flex: 1; min-width: 0; }
 .trash-modal { width: min(900px, 96vw); }
 .trash-modal .table-wrap { max-width: 100%; }
 .trash-table { min-width: 620px; }

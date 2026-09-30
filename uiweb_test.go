@@ -457,7 +457,7 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 		t.Fatal("shell still depends on the legacy stylesheet")
 	}
 	// The classic shell structure must be present (top bar + main frame).
-	for _, marker := range []string{`class="main-shell"`, `class="topbar"`, `class="top-actions"`, `class="sidebar"`, `class="brand"`, `Gextto · EXpert Torrent Transfer Orchestrator`, `data-metric="cpu"`, `data-theme-toggle`} {
+	for _, marker := range []string{`class="main-shell"`, `class="topbar"`, `class="top-actions"`, `class="sidebar"`, `class="brand"`, `Gextto · EXpert Torrent Transfer Orchestrator`, `data-metric="cpu"`, `data-theme-toggle`, `data-font-open`} {
 		if !strings.Contains(html, marker) {
 			t.Fatalf("shell missing %q", marker)
 		}
@@ -470,6 +470,8 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 		".app-shell { flex-direction: row; }",
 		"@media (max-width: 900px)",
 		".settings-tab-select-wrap",
+		"--ui-font-family",
+		".log-view { font-family: var(--ui-font-family",
 		// Mobile usability markers: snap navigation, touch targets, two-column
 		// dashboard, safe-area aware dialogs and contained table scrolling.
 		"scroll-snap-type: x proximity",

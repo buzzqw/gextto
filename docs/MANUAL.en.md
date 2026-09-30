@@ -233,6 +233,11 @@ standalone Linux package described in the README (*Standalone Linux package*).
 
 ## 2. Dashboard
 
+- **Interface controls** — the top bar offers theme, text size and a **Font**
+  dropdown. It applies a generic preset, a detected local font or a manually
+  entered family to the interface and logs. The choice is local to the browser;
+  installed-font detection depends on browser support for the Local Font Access
+  API and may require permission.
 - **Manual global search** — searches archive + indexers + web engines.
 - **Cycle buttons** — run a full cycle or a single domain (Series, Movies,
   Comics) or a backup now.

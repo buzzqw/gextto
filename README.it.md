@@ -29,6 +29,13 @@ il manuale inglese come fallback. Nella barra superiore sono disponibili anche
 ricerca impostazioni, metriche CPU/RAM e trasferimenti, tema, dimensione testo,
 aggiornamento e stato del servizio.
 
+Il menu a discesa **Font** include preset generici sicuri e, nei browser che
+supportano la Local Font Access API, può elencare le famiglie installate sul
+dispositivo dell'utente. La scelta viene applicata subito all'interfaccia e ai
+log e viene salvata localmente nel browser. I browser senza questa API mantengono
+i preset e il campo per inserire manualmente il nome della famiglia; per leggere
+i font installati può essere richiesta un'autorizzazione del browser.
+
 | Voce | Funzioni |
 |---|---|
 | **Dashboard** | Avvio del ciclo completo o limitato a un dominio, prossimo ciclo, titoli configurati, spazio libero, torrent attivi, ultimi download, prossime uscite, risultati dei feed, grafici dischi/risorse e collegamenti rapidi. |

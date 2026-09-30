@@ -35,6 +35,10 @@
   function closeAccessibleDialog(dialog, remove) {
     if (!dialog) return;
     dialog.hidden = true;
+    if (dialog._fontOpener) {
+      dialog._fontOpener.setAttribute("aria-expanded", "false");
+      dialog._fontOpener = null;
+    }
     if (activeDialog === dialog) activeDialog = dialog._previousDialog || null;
     if (remove || dialog._removeOnClose) dialog.remove();
     var previous = dialog._previousFocus;
@@ -2535,7 +2539,7 @@
   }
   Array.prototype.forEach.call(document.querySelectorAll("[data-ui-search-post]"), renderSearch);
 
-  // ---- shell: navigation, theme, font scale, language, live metrics --------
+  // ---- shell: navigation, theme, fonts, language, live metrics --------------
   document.addEventListener("click", function (event) {
     var nav = event.target.closest("[data-nav]");
     if (nav) {
@@ -2562,6 +2566,11 @@
     var font = event.target.closest("[data-font]");
     if (font) {
       setFontScale(readFontScale() + parseInt(font.getAttribute("data-font"), 10));
+      return;
+    }
+    var fontOpen = event.target.closest("[data-font-open]");
+    if (fontOpen) {
+      openFontPicker(fontOpen);
       return;
     }
     var theme = event.target.closest("[data-theme-toggle]");
@@ -2617,6 +2626,136 @@
     if (label) label.textContent = "Testo " + percent + "%";
     storageSet("gextto_font_scale", String(percent));
   }
+  var fontPresets = [
+    { id: "system", label: "Sistema", css: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, system-ui, sans-serif" },
+    { id: "sans", label: "Sans-serif", css: "sans-serif" },
+    { id: "serif", label: "Serif", css: "serif" },
+    { id: "mono", label: "Monospace", css: "monospace" }
+  ];
+  var fontPickerOverlay = null;
+  function fontPreset(id) {
+    for (var i = 0; i < fontPresets.length; i++) {
+      if (fontPresets[i].id === id) return fontPresets[i];
+    }
+    return null;
+  }
+  function readFontFamily() {
+    var value = storageGet("gextto_font_family") || "system";
+    if (fontPreset(value) || value.indexOf("local:") === 0) return value;
+    return "system";
+  }
+  function quoteFontName(name) {
+    return '"' + String(name).slice(0, 160).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/[\r\n]/g, " ") + '"';
+  }
+  function fontFamilyCSS(value) {
+    var preset = fontPreset(value);
+    if (preset) return preset.css;
+    if (value.indexOf("local:") === 0 && value.length > 6) return quoteFontName(value.slice(6)) + ", system-ui, sans-serif";
+    return fontPresets[0].css;
+  }
+  function setFontFamily(value, persist) {
+    if (!fontPreset(value) && value.indexOf("local:") !== 0) value = "system";
+    document.documentElement.style.setProperty("--ui-font-family", fontFamilyCSS(value));
+    if (persist !== false) storageSet("gextto_font_family", value);
+    if (fontPickerOverlay) syncFontPicker();
+  }
+  function fontOption(select, value, label) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  }
+  function syncFontPicker() {
+    if (!fontPickerOverlay) return;
+    var select = fontPickerOverlay.querySelector("[data-font-family]");
+    if (select) select.value = readFontFamily();
+    var custom = fontPickerOverlay.querySelector("[data-font-custom]");
+    if (custom && readFontFamily().indexOf("local:") === 0) custom.value = readFontFamily().slice(6);
+  }
+  function addDetectedFont(select, family) {
+    family = String(family || "").trim().slice(0, 160);
+    if (!family) return;
+    var value = "local:" + family;
+    if (Array.prototype.some.call(select.options, function (option) { return option.value === value; })) return;
+    fontOption(select, value, family);
+  }
+  function openFontPicker(opener) {
+    opener.setAttribute("aria-expanded", "true");
+    if (!fontPickerOverlay) {
+      fontPickerOverlay = document.createElement("div");
+      fontPickerOverlay.id = "font-picker-overlay";
+      fontPickerOverlay.className = "overlay";
+      fontPickerOverlay.hidden = true;
+      fontPickerOverlay.innerHTML = '<div class="modal font-modal" role="dialog" aria-modal="true" aria-labelledby="font-picker-title">' +
+        '<div class="modal-head"><h3 id="font-picker-title">Tipo di carattere</h3><button class="btn sm" type="button" data-font-close>Chiudi</button></div>' +
+        '<div class="modal-body">' +
+        '<p class="setting-hint">Scegli un font predisposto oppure rileva quelli installati sul dispositivo. La scelta viene salvata solo in questo browser.</p>' +
+        '<label class="field"><span>Font dell’interfaccia</span><select data-font-family aria-label="Font dell’interfaccia"></select></label>' +
+        '<div class="font-detect-row"><button class="btn" type="button" data-font-detect>Rileva font installati</button><span class="font-detect-status muted" data-font-status></span></div>' +
+        '<div class="font-custom-row"><label class="field"><span>Nome font personalizzato</span><input type="text" data-font-custom maxlength="160" placeholder="es. Noto Sans"></label><button class="btn" type="button" data-font-apply-custom>Applica</button></div>' +
+        '</div></div>';
+      document.body.appendChild(fontPickerOverlay);
+      var select = fontPickerOverlay.querySelector("[data-font-family]");
+      fontPresets.forEach(function (preset) { fontOption(select, preset.id, preset.label); });
+      var current = readFontFamily();
+      if (current.indexOf("local:") === 0) addDetectedFont(select, current.slice(6));
+      select.addEventListener("change", function () { setFontFamily(select.value); });
+      fontPickerOverlay.querySelector("[data-font-apply-custom]").addEventListener("click", function () {
+        var input = fontPickerOverlay.querySelector("[data-font-custom]");
+        var name = String(input.value || "").trim();
+        if (!name) return;
+        addDetectedFont(select, name);
+        setFontFamily("local:" + name);
+      });
+      fontPickerOverlay.querySelector("[data-font-custom]").addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          fontPickerOverlay.querySelector("[data-font-apply-custom]").click();
+        }
+      });
+      fontPickerOverlay.querySelector("[data-font-detect]").addEventListener("click", function (event) {
+        detectLocalFonts(select, event.currentTarget);
+      });
+      fontPickerOverlay.addEventListener("click", function (event) {
+        if (event.target === fontPickerOverlay || event.target.closest("[data-font-close]")) closeAccessibleDialog(fontPickerOverlay);
+      });
+      // The picker itself is opened by a user gesture, so compatible browsers
+      // may ask for permission here. Installed families then appear by their
+      // real name instead of being advertised as uncertain presets.
+      fontPickerOverlay._fontDetectionAttempted = false;
+    }
+    fontPickerOverlay._fontOpener = opener;
+    syncFontPicker();
+    if (!fontPickerOverlay._fontDetectionAttempted) {
+      fontPickerOverlay._fontDetectionAttempted = true;
+      detectLocalFonts(fontPickerOverlay.querySelector("[data-font-family]"), fontPickerOverlay.querySelector("[data-font-detect]"));
+    }
+    openAccessibleDialog(fontPickerOverlay, opener);
+  }
+  function detectLocalFonts(select, button) {
+    var status = fontPickerOverlay && fontPickerOverlay.querySelector("[data-font-status]");
+    if (!window.queryLocalFonts) {
+      if (status) status.textContent = "Il browser non supporta il rilevamento automatico.";
+      return;
+    }
+    button.disabled = true;
+    if (status) status.textContent = "Richiesta autorizzazione…";
+    window.queryLocalFonts().then(function (fonts) {
+      var families = {};
+      (fonts || []).forEach(function (font) {
+        var family = String(font.family || "").trim();
+        if (family) families[family.toLocaleLowerCase()] = family;
+      });
+      Object.keys(families).sort(function (a, b) { return families[a].localeCompare(families[b]); }).forEach(function (key) {
+        addDetectedFont(select, families[key]);
+      });
+      if (status) status.textContent = Object.keys(families).length + " font rilevati.";
+    }).catch(function (error) {
+      if (status) status.textContent = error && error.name === "NotAllowedError" ? "Accesso ai font non autorizzato." : "Rilevamento non riuscito.";
+    }).finally(function () {
+      button.disabled = false;
+    });
+  }
   function setTheme(mode) {
     document.documentElement.setAttribute("data-theme", mode);
     var button = document.querySelector("[data-theme-toggle]");
@@ -2624,6 +2763,7 @@
     storageSet("gextto_theme", mode);
   }
   setFontScale(readFontScale());
+  setFontFamily(readFontFamily(), false);
   setTheme(storageGet("gextto_theme") === "light" ? "light" : "dark");
   var langSelect = document.querySelector("[data-lang]");
   if (langSelect) langSelect.addEventListener("change", function () {

@@ -28,6 +28,13 @@ bundled in Italian and English; the other UI languages use the English manual as
 their documentation fallback. The top bar also provides settings search, CPU/RAM
 and transfer metrics, theme/font controls, refresh and service status.
 
+The **Font** dropdown includes safe generic presets and, in browsers that support
+the Local Font Access API, can list the font families installed on the user's
+device. The choice is applied to the interface and logs immediately and is saved
+locally in that browser. Browsers without the API still support the presets and a
+manual font-family name; browser permission may be required to inspect installed
+fonts.
+
 | Menu | What it provides |
 |---|---|
 | **Dashboard** | Cycle controls for all domains or one domain, next-cycle timing, configured-title and free-space metrics, active torrents, recent downloads, upcoming series releases, feed results, disk/resource charts and quick links. |
