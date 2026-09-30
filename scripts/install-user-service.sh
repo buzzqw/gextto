@@ -138,7 +138,6 @@ Environment=GEXTTO_LISTEN=$LISTEN
 Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT
 Environment=GEXTTO_ACTIVE=$ACTIVE
 Environment=GEXTTO_DRY_RUN=$SERVICE_DRY_RUN
-Environment=GEXTTO_LIBTORRENT=1
 Environment=GEXTTO_LOG=$LOG
 Restart=on-failure
 RestartSec=5

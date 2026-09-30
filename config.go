@@ -797,7 +797,7 @@ func DefaultConfig() Config {
 		FlaresolverrURL:     nil,
 		TmdbAPIKey:          nil,
 		RenameEpisodes:      false,
-		LibtorrentEnabled:   false,
+		LibtorrentEnabled:   true,
 		Libtorrent:          DefaultLibtorrentSettings(),
 		RenameFormat:        defaultRenameFormatValue,
 		RenameTemplate:      defaultRenameTemplateValue,
@@ -2090,7 +2090,7 @@ func (c *Config) loadConfigDB() error {
 	} else {
 		c.CleanupAction = "move"
 	}
-	c.LibtorrentEnabled = configBoolSetting(mapValue(c.Settings, "libtorrent_enabled"))
+	c.LibtorrentEnabled = boolSettingOr(c.Settings, "libtorrent_enabled", true)
 	c.Libtorrent = LibtorrentSettings{
 		PortMin:                       numberSettingUint16(c.Settings, "libtorrent_port_min", 6881),
 		PortMax:                       numberSettingUint16(c.Settings, "libtorrent_port_max", 6891),

@@ -94,6 +94,7 @@ spa:
   Accoda selezionate: Agregar seleccionar
   Accoda un magnet o un URL .torrent senza uscire dall'archivio: Agregue una URL magnética o .torrent sin salir del
   Acquisizione: archivo Adquisición
+  Seed e completamento: Seed y finalización
   Acquisizione automatica: Adquisición automática
   Action applied to: Acción aplicada a
   Adult: Adulto
@@ -3811,3 +3812,8 @@ spa:
   📺 Serie TV: 📺 Serie de televisión
   🔎 Esplora release: 🔎 Explorar lanzamientos
   🛠 Manutenzione: 🛠 Mantenimiento
+  Disattivata: Desactivada
+  Attivata: Activada
+  HTTP con credenziali: HTTP con credenciales
+  SOCKS4: SOCKS4
+  SOCKS5 (hostname): SOCKS5 (nombre de host)

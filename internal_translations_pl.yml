@@ -95,6 +95,7 @@ pol:
   Accoda selezionate: Dołącz wybierz
   Accoda un magnet o un URL .torrent senza uscire dall'archivio: Dołącz magnes lub adres URL .torrent bez opuszczania
   Acquisizione: Archiwum Nabycie
+  Seed e completamento: Seedowanie i ukończenie
   Acquisizione automatica: Automatyczne pozyskiwanie
   Action applied to: Działanie zastosowane do
   Adult: Dorosły
@@ -3804,3 +3805,8 @@ pol:
   📺 Serie TV: 📺 seriale
   🔎 Esplora release: 🔎 Przeglądaj wydania
   🛠 Manutenzione: 🛠 Konserwacja
+  Disattivata: Wyłączona
+  Attivata: Włączona
+  HTTP con credenziali: HTTP z poświadczeniami
+  SOCKS4: SOCKS4
+  SOCKS5 (hostname): SOCKS5 (nazwa hosta)

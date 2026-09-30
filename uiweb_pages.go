@@ -932,6 +932,35 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 			{Value: "delete", Label: "Elimina definitivamente", Selected: selected == "delete"},
 		}
 	}
+	if key == "libtorrent_encryption" {
+		selected := strings.TrimSpace(value)
+		if selected != "0" && selected != "2" {
+			selected = "1"
+		}
+		field.Kind = "select"
+		field.Options = []uiFormOption{
+			{Value: "0", Label: "Disattivata", Selected: selected == "0"},
+			{Value: "1", Label: "Attivata", Selected: selected == "1"},
+			{Value: "2", Label: "Forzata", Selected: selected == "2"},
+		}
+	}
+	if key == "anacrolix_proxy_type" {
+		selected := strings.TrimSpace(value)
+		switch selected {
+		case "0", "1", "2", "3", "4", "5":
+		default:
+			selected = "0"
+		}
+		field.Kind = "select"
+		field.Options = []uiFormOption{
+			{Value: "0", Label: "Nessuno", Selected: selected == "0"},
+			{Value: "1", Label: "SOCKS4", Selected: selected == "1"},
+			{Value: "2", Label: "SOCKS5", Selected: selected == "2"},
+			{Value: "3", Label: "HTTP", Selected: selected == "3"},
+			{Value: "4", Label: "HTTP con credenziali", Selected: selected == "4"},
+			{Value: "5", Label: "SOCKS5 (hostname)", Selected: selected == "5"},
+		}
+	}
 	if items, ok := uiJSONScalarList(value); ok {
 		field.Kind = "tags"
 		field.TagJSON = true

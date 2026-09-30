@@ -96,6 +96,7 @@ fra:
   Accoda selezionate: Accéder sélectionnées
   Accoda un magnet o un URL .torrent senza uscire dall'archivio: Accordez un aimant ou une URL .torrent sans quitter l'archive
   Acquisizione: Acquisition
+  Seed e completamento: Seed et finalisation
   Acquisizione automatica: Acquisition automatique
   Action applied to: Action appliquée sur
   Adult: Adult
@@ -3858,3 +3859,8 @@ fra:
   📺 Serie TV: 📺 Série TV
   🔎 Esplora release: 🔎 Explorez les versions
   🛠 Manutenzione: 🛠Entretien
+  Disattivata: Désactivée
+  Attivata: Activée
+  HTTP con credenziali: HTTP avec identifiants
+  SOCKS4: SOCKS4
+  SOCKS5 (hostname): SOCKS5 (nom d'hôte)

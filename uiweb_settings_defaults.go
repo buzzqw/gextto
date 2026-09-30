@@ -30,7 +30,7 @@ var uiSettingDefaults = map[string]string{
 	"content_filters":   "",
 
 	// --- Libtorrent ---------------------------------------------------------
-	"libtorrent_enabled":                           "false",
+	"libtorrent_enabled":                           "true",
 	"libtorrent_dynamic_queue":                     "false",
 	"libtorrent_auto_optimize":                     "false",
 	"libtorrent_preallocate":                       "false",

@@ -34,6 +34,7 @@ eng:
 
   # Acquisition tab
   "Acquisizione": "Acquisition"
+  "Seed e completamento": "Seeding and completion"
   "Acquisizione automatica": "Automatic acquisition"
   "Attesa prima del download, protezione dagli episodi vecchi e pulizia periodica. Le regole di sanità (sottotitoli hardcoded e dimensione anomala) sono automatiche.": "Wait before downloading, protection from older episodes and periodic cleanup. Sanity rules (hardcoded subtitles and absurd sizes) are automatic."
   "Delay serie (minuti, 0 = nessuno)": "Series delay (minutes, 0 = none)"
@@ -3166,3 +3167,8 @@ eng:
   "— nessuna preferenza —": "— no preference —"
   "⬆ Upload (KB/s) — 0 = nessun limite": "⬆ Upload (KB/s) — 0 = no limit"
   "⬇ Download (KB/s) — 0 = nessun limite": "⬇ Downloads (KB/s) — 0 = no limit"
+  "Disattivata": "Disabled"
+  "Attivata": "Enabled"
+  "HTTP con credenziali": "HTTP with credentials"
+  "SOCKS4": "SOCKS4"
+  "SOCKS5 (hostname)": "SOCKS5 (hostname)"

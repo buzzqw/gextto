@@ -96,6 +96,7 @@ deu:
   Accoda selezionate: Ausgewählte anhängen
   Accoda un magnet o un URL .torrent senza uscire dall'archivio: Hängen Sie eine Magnet- oder .torrent-URL an, ohne das Archiv zu verlassen
   Acquisizione: Erwerb
+  Seed e completamento: Seeding und Abschluss
   Acquisizione automatica: Automatische Erfassung
   Action applied to: Aktion angewendet auf
   Adult: Erwachsene
@@ -3863,3 +3864,8 @@ deu:
   📺 Serie TV: 📺 Fernsehserie
   🔎 Esplora release: 🔎 Entdecken Sie Veröffentlichungen
   🛠 Manutenzione: 🛠 Wartung
+  Disattivata: Deaktiviert
+  Attivata: Aktiviert
+  HTTP con credenziali: HTTP mit Anmeldedaten
+  SOCKS4: SOCKS4
+  SOCKS5 (hostname): SOCKS5 (Hostname)
