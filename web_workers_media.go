@@ -132,6 +132,36 @@ func calendarWarmupWorker(state *AppState) {
 	}
 }
 
+// flareSolverrSweeperWorker destroys the FlareSolverr browser sessions owned by
+// Gextto once their reuse window expires, and the sessions orphaned by a
+// previous Gextto run. Without it a Cloudflare-protected domain that is not
+// queried again keeps a whole browser (hundreds of MB) alive indefinitely,
+// which is how several gigabytes of Chromium can pile up between two cycles.
+func flareSolverrSweeperWorker(state *AppState) {
+	if !state.SleepBackground(30 * time.Second) {
+		return
+	}
+	firstRun := true
+	for {
+		cfg := latestConfig(state)
+		if endpoint := flareSolverrEndpointFromConfig(cfg); endpoint != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			if firstRun {
+				// Sessions from the previous run are untracked after a restart
+				// (the map is in-memory): reconcile them once at startup, before
+				// the sweep, so the same id is not destroyed twice.
+				reconcileFlareSolverrSessions(ctx, defaultHTTPClient, endpoint)
+			}
+			sweepStaleFlareSolverrSessions(ctx, defaultHTTPClient, endpoint)
+			cancel()
+		}
+		firstRun = false
+		if !state.SleepBackground(2 * time.Minute) {
+			return
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // bwm_ helpers
 // ---------------------------------------------------------------------------

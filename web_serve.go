@@ -58,6 +58,7 @@ func startBackgroundWorkers(state *AppState) {
 	register("housekeeping_worker", func() { housekeepingWorker(state) })
 	register("media_info_backfill_worker", func() { mediaInfoBackfillWorker(state) })
 	register("calendar_warmup_worker", func() { calendarWarmupWorker(state) })
+	register("flare_solverr_sweeper_worker", func() { flareSolverrSweeperWorker(state) })
 	register("db_checkpoint_worker", func() { dbCheckpointWorker(state) })
 }
 

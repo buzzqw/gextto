@@ -600,9 +600,10 @@ func httpDo(ctx context.Context, client *http.Client, method, rawURL string, hea
 
 // fsSolution is the subset of a FlareSolverr /v1 reply Gextto uses.
 type fsSolution struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Session string `json:"session"`
+	Status   string   `json:"status"`
+	Message  string   `json:"message"`
+	Session  string   `json:"session"`
+	Sessions []string `json:"sessions"`
 	// Solution holds the origin response; its Status is the page's HTTP status.
 	Solution struct {
 		Status    int                `json:"status"`
@@ -734,6 +735,92 @@ func destroyFlareSolverrSession(ctx context.Context, client *http.Client, endpoi
 	}
 	var out fsSolution
 	return fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.destroy", "session": id}, &out)
+}
+
+// flareSolverrEndpointFromConfig returns the FlareSolverr /v1 endpoint, or ""
+// when the service is not configured.
+func flareSolverrEndpointFromConfig(cfg *Config) string {
+	if cfg == nil || cfg.FlaresolverrURL == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(*cfg.FlaresolverrURL)
+	if raw == "" {
+		return ""
+	}
+	return strings.TrimRight(raw, "/") + "/v1"
+}
+
+// sweepStaleFlareSolverrSessions destroys every tracked session whose reuse
+// window (fsSessionTTL) has expired. acquireFlareSolverrSession only destroys
+// the session of the domain being queried, so a domain not queried again would
+// otherwise keep its whole FlareSolverr browser (hundreds of MB) alive forever.
+func sweepStaleFlareSolverrSessions(ctx context.Context, client *http.Client, endpoint string) int {
+	if strings.TrimSpace(endpoint) == "" {
+		return 0
+	}
+	now := time.Now()
+	type staleSession struct{ domain, id string }
+	pending := []staleSession{}
+	fsSessionMu.Lock()
+	for domain, entry := range fsSessionByDomain {
+		if entry.id != "" && now.Sub(entry.lastUsed) >= fsSessionTTL {
+			pending = append(pending, staleSession{domain: domain, id: entry.id})
+			delete(fsSessionByDomain, domain)
+		}
+	}
+	fsSessionMu.Unlock()
+	for _, item := range pending {
+		if err := destroyFlareSolverrSession(ctx, client, endpoint, item.id); err != nil {
+			logging.Debug("stale FlareSolverr session destroy failed",
+				"domain", item.domain, "session", item.id, "error", err.Error())
+		}
+	}
+	if len(pending) > 0 {
+		logging.Info("destroyed stale FlareSolverr sessions", "count", len(pending))
+	}
+	return len(pending)
+}
+
+// reconcileFlareSolverrSessions destroys FlareSolverr sessions that Gextto no
+// longer tracks. They are left over from a previous Gextto run (the session map
+// is in-memory) and would otherwise keep their browsers alive indefinitely.
+func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, endpoint string) int {
+	if strings.TrimSpace(endpoint) == "" {
+		return 0
+	}
+	var list fsSolution
+	if err := fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.list"}, &list); err != nil {
+		logging.Debug("FlareSolverr sessions.list failed", "error", err.Error())
+		return 0
+	}
+	if list.Status != "" && list.Status != "ok" {
+		return 0
+	}
+	fsSessionMu.Lock()
+	known := make(map[string]struct{}, len(fsSessionByDomain))
+	for _, entry := range fsSessionByDomain {
+		if entry.id != "" {
+			known[entry.id] = struct{}{}
+		}
+	}
+	fsSessionMu.Unlock()
+	destroyed := 0
+	for _, id := range list.Sessions {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := known[id]; ok {
+			continue
+		}
+		if err := destroyFlareSolverrSession(ctx, client, endpoint, id); err == nil {
+			destroyed++
+		}
+	}
+	if destroyed > 0 {
+		logging.Info("destroyed orphaned FlareSolverr sessions", "count", destroyed)
+	}
+	return destroyed
 }
 
 func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolverr, rawURL string) (string, error) {
