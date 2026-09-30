@@ -867,7 +867,7 @@
     overlay.className = "overlay";
     overlay._removeOnClose = true;
     var modal = document.createElement("div");
-    modal.className = "modal episode-sources-modal";
+    modal.className = "modal torrent-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "http-detail-title");
@@ -4988,11 +4988,11 @@
   // selected episode without starting another network search.
   function openEpisodeSources(path, label, opener) {
     var overlay = document.createElement("div");
-    overlay.className = "overlay";
+    overlay.className = "overlay episode-sources-overlay";
     overlay.setAttribute("data-episode-sources-panel", "");
     overlay._removeOnClose = true;
     var modal = document.createElement("div");
-    modal.className = "modal torrent-modal";
+    modal.className = "modal episode-sources-modal";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "episode-sources-title");

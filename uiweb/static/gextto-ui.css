@@ -1327,7 +1327,8 @@ pre.log-view { margin: 0; }
 /* Episode actions use the same compact icon controls as Scarico. Keep the
    table responsive too: six text buttons used to force a horizontal scroll. */
 .data-table.series-episodes .row-actions { min-width: 0; }
-.episode-sources-modal { width: calc(100vw - 32px); max-width: none; }
+.episode-sources-overlay { padding-left: 0; padding-right: 0; }
+.episode-sources-modal { width: 100%; max-width: none; }
 .episode-sources-modal .modal-body { min-width: 0; overflow-x: hidden; }
 .episode-sources-table { width: 100%; min-width: 0; table-layout: fixed; }
 .episode-sources-table th,
@@ -1358,7 +1359,8 @@ pre.log-view { margin: 0; }
   .data-table.series-episodes td:nth-child(4) { width: 22%; }
   .data-table.series-episodes th:last-child,
   .data-table.series-episodes td:last-child { width: 142px; }
-  .episode-sources-modal { width: calc(100vw - 16px); }
+  .episode-sources-overlay { padding-left: 8px; padding-right: 8px; }
+  .episode-sources-modal { width: 100%; }
   .episode-sources-table th,
   .episode-sources-table td { padding: 7px 5px; font-size: 0.8rem; }
   .episode-sources-table th:nth-child(2),
