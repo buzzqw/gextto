@@ -108,6 +108,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/episodes/{series}/{season}/{episode}/force", ForceEpisode)
 	handle(s, mux, "POST /api/episodes/{series}/{season}/{episode}/redownload", RedownloadEpisode)
 	handle(s, mux, "POST /api/episodes/{series}/{season}/{episode}/search", SearchEpisode)
+	handle(s, mux, "GET /api/episodes/{series}/{season}/{episode}/sources", EpisodeSources)
 	handle(s, mux, "DELETE /api/episodes/{series}/{season}/{episode}", DeleteEpisode)
 	handle(s, mux, "POST /api/missing/search", SearchMissing)
 	handle(s, mux, "GET /api/calendar", Calendar)

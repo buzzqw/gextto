@@ -971,6 +971,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	for _, gap := range gaps {
 		_ = s.db.MarkGapSearched(series.Name, gap[0], gap[1])
 	}
+	logging.Info("manual missing search completed", "series", series.Name, "episodes", len(gaps), "results", len(results))
 	episodes := make([]map[string]any, 0, len(gaps))
 	for _, gap := range gaps {
 		episodes = append(episodes, map[string]any{"season": gap[0], "episode": gap[1]})

@@ -385,18 +385,18 @@
   <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-labelledby="torrent-detail-title">
     <div class="modal-head">
       <h3 id="torrent-detail-title" data-torrent-detail-name>Dettagli torrent</h3>
-      <button class="btn sm" type="button" data-torrent-detail-close>Chiudi</button>
+      <button class="btn sm" type="button" data-torrent-detail-close title="Chiudi i dettagli del torrent">Chiudi</button>
     </div>
     <div class="modal-body">
       <div class="toolbar torrent-detail-tabs" role="tablist" aria-label="Sezioni dettagli torrent">
-        <button class="btn sm" type="button" role="tab" aria-selected="true" aria-controls="torrent-subdetail-output" data-torrent-subdetail="general">Generale</button>
-        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="trackers">Tracker</button>
-        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="files">Contenuto</button>
-        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="peers">Peers</button>
-        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="limits">Limiti</button>
-        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="storage">Storage</button>
-        <button class="btn sm" type="button" data-torrent-export="magnet">Copia magnet</button>
-        <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener">Esporta .torrent</a>
+        <button class="btn sm" type="button" role="tab" aria-selected="true" aria-controls="torrent-subdetail-output" data-torrent-subdetail="general" title="Mostra stato, progresso e azioni del torrent">Generale</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="trackers" title="Mostra e modifica i tracker del torrent">Tracker</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="files" title="Mostra i file del torrent e modifica la loro priorità">Contenuto</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="peers" title="Mostra i peer connessi e le relative velocità">Peers</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="limits" title="Imposta velocità massime e limiti di seeding per questo torrent">Limiti</button>
+        <button class="btn sm" type="button" role="tab" aria-selected="false" aria-controls="torrent-subdetail-output" data-torrent-subdetail="storage" title="Sposta il percorso di storage del torrent">Storage</button>
+        <button class="btn sm" type="button" data-torrent-export="magnet" title="Copia negli appunti il link magnet del torrent">Copia magnet</button>
+        <a class="btn sm" data-torrent-export="export.torrent" target="_blank" rel="noopener" title="Scarica il file .torrent">Esporta .torrent</a>
       </div>
       <div class="output" data-torrent-detail-output aria-live="polite"></div>
       <div id="torrent-subdetail-output" data-torrent-subdetail-output role="tabpanel" aria-live="polite" hidden></div>

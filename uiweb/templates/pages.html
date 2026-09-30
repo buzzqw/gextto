@@ -603,10 +603,11 @@
               <td class="numeric">{{.QualityScore}}</td>
               <td class="numeric">{{humanBytes .SizeBytes}}</td>
               <td class="row-actions">
-                <button class="btn sm" data-api="{{.SearchPath}}" data-method="POST" data-body="{}" title="Cerca manualmente questa puntata">Cerca</button>
+                <button class="btn sm" data-api="{{.SearchPath}}" data-action-label="Cerca S{{.Season}}E{{.Episode}}" data-method="POST" data-body="{}" title="Cerca manualmente questa puntata">Cerca</button>
                 <button class="btn sm" data-api="{{.ForcePath}}" data-method="POST" data-body="{}" title="Forza il download ignorando i controlli di qualità">Forza</button>
                 <button class="btn sm" data-api="{{.IgnorePath}}" data-method="POST" data-body="{{.IgnoreBody}}" title="Ignora o riabilita questa puntata">{{if .Ignored}}Riabilita{{else}}Ignora{{end}}</button>
                 <button class="btn sm" data-api="{{.Redownload}}" data-method="POST" data-body="{}" title="Rendi di nuovo scaricabile questa puntata">Riscarica</button>
+                <button class="btn sm" type="button" data-episode-sources="{{.SourcesPath}}" data-episode-label="S{{.Season}}E{{.Episode}}" title="Mostra le sorgenti Feed RSS e archivio di questa puntata">Sorgenti</button>
                 <button class="btn sm danger" data-api="{{.DeletePath}}" data-method="DELETE" data-body="{}" data-confirm="Eliminare questa puntata dall'archivio?" title="Elimina questa puntata">Elimina</button>
               </td>
             </tr>

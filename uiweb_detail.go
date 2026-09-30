@@ -31,6 +31,7 @@ type uiEpisodeRow struct {
 	ForcePath    string
 	Redownload   string
 	SearchPath   string
+	SourcesPath  string
 	DeletePath   string
 }
 
@@ -210,6 +211,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 			ForcePath:    base + "/force",
 			Redownload:   base + "/redownload",
 			SearchPath:   base + "/search",
+			SourcesPath:  base + "/sources",
 			DeletePath:   base,
 		})
 	}

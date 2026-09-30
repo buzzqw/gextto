@@ -97,6 +97,7 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | POST | `/api/episodes/{series}/{season}/{episode}/ignore` |
 | POST | `/api/episodes/{series}/{season}/{episode}/redownload` |
 | POST | `/api/episodes/{series}/{season}/{episode}/search` |
+| GET | `/api/episodes/{series}/{season}/{episode}/sources` |
 | GET | `/api/event-hooks` |
 | POST | `/api/event-hooks` |
 | GET | `/api/feed.xml` |

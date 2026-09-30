@@ -1006,6 +1006,11 @@
       label.textContent = pair[0];
       var value = document.createElement("strong");
       value.textContent = pair[1];
+      if (pair[2]) {
+        row.title = pair[2];
+        label.title = pair[2];
+        value.title = pair[2];
+      }
       row.appendChild(label);
       row.appendChild(value);
       wrap.appendChild(row);
@@ -1032,18 +1037,21 @@
       var trackers = (data && data.trackers) || [];
       var table = document.createElement("table");
       table.className = "data-table";
-      table.innerHTML = "<thead><tr><th>Tracker</th><th>Tier</th><th>Esito</th></tr></thead>";
+      table.innerHTML = "<thead><tr><th title=\"URL del tracker annunciato dal torrent\">Tracker</th><th title=\"Ordine del tracker nel tier\">Tier</th><th title=\"Stato dell'ultima verifica del tracker\">Esito</th></tr></thead>";
       accessibleDataTable(table, "Tracker del torrent");
       var tbody = document.createElement("tbody");
       trackers.forEach(function (tracker) {
         var tr = document.createElement("tr");
         var url = document.createElement("td");
         url.className = "truncate";
+        url.title = "URL del tracker annunciato dal torrent";
         url.textContent = String(tracker.url || "");
         var tier = document.createElement("td");
         tier.className = "numeric";
+        tier.title = "Ordine del tracker nel tier";
         tier.textContent = String(tracker.tier === undefined ? "—" : tracker.tier);
         var state = document.createElement("td");
+        state.title = "Indica se il tracker è stato verificato dal client";
         state.textContent = tracker.verified ? "verificato" : "non verificato";
         tr.appendChild(url); tr.appendChild(tier); tr.appendChild(state);
         tbody.appendChild(tr);
@@ -1055,10 +1063,12 @@
       form.className = "field span-full";
       var label = document.createElement("span");
       label.textContent = "Modifica tracker (tier|url per riga)";
+      label.title = "Inserisci un tracker per riga nel formato tier|URL";
       var textarea = document.createElement("textarea");
       textarea.className = "input";
       textarea.setAttribute("data-trackers-text", "");
       textarea.setAttribute("aria-label", "Modifica tracker, un tier e URL per riga");
+      textarea.title = "Un tracker per riga, nel formato tier|URL";
       textarea.rows = 4;
       textarea.value = trackers.map(function (tracker) {
         return (tracker.tier === undefined ? "0" : tracker.tier) + "|" + (tracker.url || "");
@@ -1066,6 +1076,7 @@
       var save = document.createElement("button");
       save.className = "btn sm primary";
       save.textContent = "Salva tracker";
+      save.title = "Salva la lista dei tracker del torrent";
       save.addEventListener("click", function () {
         var lines = textarea.value.split("\n").map(function (line) { return line.trim(); }).filter(Boolean);
         var items = lines.map(function (line) {
@@ -1086,7 +1097,7 @@
       var files = (data && data.files) || [];
       var fileTable = document.createElement("table");
       fileTable.className = "data-table";
-      fileTable.innerHTML = "<thead><tr><th>File</th><th>Dimensione</th><th>Scaricato</th><th>Priorità</th></tr></thead>";
+      fileTable.innerHTML = "<thead><tr><th title=\"Percorso del file dentro il torrent\">File</th><th title=\"Dimensione totale del file\">Dimensione</th><th title=\"Dati già scaricati per questo file\">Scaricato</th><th title=\"Priorità usata per scegliere i pezzi da scaricare\">Priorità</th></tr></thead>";
       accessibleDataTable(fileTable, "File del torrent");
       var fileBody = document.createElement("tbody");
       var priorities = files.map(function (file) { return Number(file.priority) || 0; });
@@ -1099,14 +1110,17 @@
         path.textContent = String(file.path || "");
         var size = document.createElement("td");
         size.className = "numeric";
+        size.title = "Dimensione totale del file";
         size.textContent = humanBytes(file.size || 0);
         var done = document.createElement("td");
         done.className = "numeric";
+        done.title = "Dati già scaricati per questo file";
         done.textContent = humanBytes(file.downloaded || 0);
         var priority = document.createElement("td");
         var select = document.createElement("select");
         select.className = "input";
         select.setAttribute("aria-label", "Priorità del file " + String(file.path || index + 1));
+        select.title = "Scegli se saltare il file o modificarne la priorità di download";
         [["0", "Salta"], ["1", "Normale"], ["4", "Predefinita"], ["6", "Alta"], ["7", "Massima"]].forEach(function (option) {
           var node = document.createElement("option");
           node.value = option[0];
@@ -1133,22 +1147,27 @@
       var peers = (data && data.peers) || [];
       var peerTable = document.createElement("table");
       peerTable.className = "data-table";
-      peerTable.innerHTML = "<thead><tr><th>Indirizzo</th><th>Client</th><th>↓</th><th>↑</th><th>Seed</th></tr></thead>";
+      peerTable.innerHTML = "<thead><tr><th title=\"Indirizzo del peer remoto\">Indirizzo</th><th title=\"Nome del client BitTorrent remoto\">Client</th><th title=\"Velocità di download dal peer\">↓</th><th title=\"Velocità di upload verso il peer\">↑</th><th title=\"Indica se il peer è un seed completo\">Seed</th></tr></thead>";
       accessibleDataTable(peerTable, "Peer del torrent");
       var peerBody = document.createElement("tbody");
       peers.forEach(function (peer) {
         var tr = document.createElement("tr");
         var address = document.createElement("td");
+        address.title = "Indirizzo del peer remoto";
         address.textContent = String(peer.address || "");
         var client = document.createElement("td");
+        client.title = "Nome del client BitTorrent remoto";
         client.textContent = String(peer.client || "—");
         var down = document.createElement("td");
         down.className = "numeric";
+        down.title = "Velocità di download dal peer";
         down.textContent = humanRate(peer.download_rate || 0);
         var up = document.createElement("td");
         up.className = "numeric";
+        up.title = "Velocità di upload verso il peer";
         up.textContent = humanRate(peer.upload_rate || 0);
         var seed = document.createElement("td");
+        seed.title = "Indica se il peer è un seed completo";
         seed.textContent = peer.seed ? "sì" : "no";
         tr.appendChild(address); tr.appendChild(client); tr.appendChild(down); tr.appendChild(up); tr.appendChild(seed);
         peerBody.appendChild(tr);
@@ -1162,15 +1181,16 @@
       var torrent = (data && data.torrent) || {};
       var limitForm = document.createElement("div");
       limitForm.className = "form-grid";
-      limitForm.appendChild(numberField("data-limit-dl", "Download (KiB/s)", torrent.download_limit));
-      limitForm.appendChild(numberField("data-limit-ul", "Upload (KiB/s)", torrent.upload_limit));
-      limitForm.appendChild(numberField("data-limit-ratio", "Ratio seed", torrent.seed_ratio));
-      limitForm.appendChild(numberField("data-limit-days", "Giorni seed", torrent.seed_days));
+      limitForm.appendChild(numberField("data-limit-dl", "Download (KiB/s)", torrent.download_limit, "Limite di download per questo torrent in KiB/s; -1 usa il limite globale e 0 è illimitato."));
+      limitForm.appendChild(numberField("data-limit-ul", "Upload (KiB/s)", torrent.upload_limit, "Limite di upload per questo torrent in KiB/s; -1 usa il limite globale e 0 è illimitato."));
+      limitForm.appendChild(numberField("data-limit-ratio", "Ratio seed", torrent.seed_ratio, "Ferma il seeding al rapporto upload/download indicato; -1 usa il limite globale, 0 è illimitato."));
+      limitForm.appendChild(numberField("data-limit-days", "Giorni seed", torrent.seed_days, "Ferma il seeding dopo questi giorni; -1 usa il limite globale, 0 è illimitato."));
       var actions = document.createElement("div");
       actions.className = "form-actions";
       var saveLimits = document.createElement("button");
       saveLimits.className = "btn sm primary";
       saveLimits.textContent = "Salva limiti";
+      saveLimits.title = "Applica e salva i limiti inseriti per questo torrent";
       saveLimits.addEventListener("click", function () {
         var value = function (name, multiplier) {
           var node = limitForm.querySelector("[" + name + "]");
@@ -1197,12 +1217,13 @@
     if (tab === "storage") {
       var storageForm = document.createElement("div");
       storageForm.className = "form-grid";
-      storageForm.appendChild(textField("data-storage-path", "Nuovo percorso di storage", torrent_save_path(data)));
+      storageForm.appendChild(textField("data-storage-path", "Nuovo percorso di storage", torrent_save_path(data), "Percorso della cartella in cui spostare i dati del torrent."));
       var storageActions = document.createElement("div");
       storageActions.className = "form-actions";
       var moveButton = document.createElement("button");
       moveButton.className = "btn sm primary";
       moveButton.textContent = "Sposta storage";
+      moveButton.title = "Sposta i dati del torrent nel nuovo percorso";
       moveButton.addEventListener("click", function () {
         var node = storageForm.querySelector("[data-storage-path]");
         var path = node ? node.value.trim() : "";
@@ -1228,28 +1249,34 @@
     return node;
   }
 
-  function numberField(attr, label, value) {
+  function numberField(attr, label, value, hint) {
     var wrap = document.createElement("label");
     wrap.className = "field";
+    if (hint) wrap.title = hint;
     var span = document.createElement("span");
     span.textContent = label;
+    if (hint) span.title = hint;
     var input = document.createElement("input");
     input.className = "input";
     input.type = "number";
     input.setAttribute(attr, "");
+    if (hint) input.title = hint;
     if (value !== undefined && value !== null && value !== "") input.value = String(value);
     wrap.appendChild(span); wrap.appendChild(input);
     return wrap;
   }
 
-  function textField(attr, label, value) {
+  function textField(attr, label, value, hint) {
     var wrap = document.createElement("label");
     wrap.className = "field span-full";
+    if (hint) wrap.title = hint;
     var span = document.createElement("span");
     span.textContent = label;
+    if (hint) span.title = hint;
     var input = document.createElement("input");
     input.className = "input";
     input.setAttribute(attr, "");
+    if (hint) input.title = hint;
     input.value = value || "";
     wrap.appendChild(span); wrap.appendChild(input);
     return wrap;
@@ -1271,25 +1298,26 @@
     if (exportTorrent) exportTorrent.href = "/api/torrents/" + encodeURIComponent(hash) + "/export.torrent";
 
     output.appendChild(statGrid([
-      ["Stato", String(torrent.state || "—")],
-      ["Progresso", (Number(torrent.progress) || 0).toFixed(1) + "%"],
-      ["Dimensione", humanBytes(torrent.total_size || 0)],
-      ["Scaricato", humanBytes(torrent.total_done || 0)],
-      ["↓ / ↑", humanRate(torrent.download_rate || 0) + " / " + humanRate(torrent.upload_rate || 0)],
-      ["Peer / Seed", String(torrent.num_peers || 0) + " / " + String(torrent.num_seeds || 0)],
-      ["Posizione coda", String(torrent.queue_position === undefined ? "—" : torrent.queue_position)],
-      ["Metadata", torrent.has_metadata ? "presenti" : "in attesa"],
-      ["Versione torrent", String(torrent.torrent_version || "—")],
-      ["Auto-managed", torrent.auto_managed ? "sì" : "no"],
-      ["Percorso", String(torrent.save_path || "—")]
+      ["Stato", String(torrent.state || "—"), "Stato attuale del torrent nel client."],
+      ["Progresso", (Number(torrent.progress) || 0).toFixed(1) + "%", "Percentuale di dati già completati."],
+      ["Dimensione", humanBytes(torrent.total_size || 0), "Dimensione totale dei dati del torrent."],
+      ["Scaricato", humanBytes(torrent.total_done || 0), "Quantità di dati già scaricata."],
+      ["↓ / ↑", humanRate(torrent.download_rate || 0) + " / " + humanRate(torrent.upload_rate || 0), "Velocità correnti di download e upload."],
+      ["Peer / Seed", String(torrent.num_peers || 0) + " / " + String(torrent.num_seeds || 0), "Peer connessi e seed completi disponibili."],
+      ["Posizione coda", String(torrent.queue_position === undefined ? "—" : torrent.queue_position), "Posizione assegnata al torrent nella coda del client."],
+      ["Metadata", torrent.has_metadata ? "presenti" : "in attesa", "Indica se il client ha già ricevuto l'elenco dei file."],
+      ["Versione torrent", String(torrent.torrent_version || "—"), "Versione del formato metainfo del torrent."],
+      ["Auto-managed", torrent.auto_managed ? "sì" : "no", "Indica se il client gestisce automaticamente l'avvio e la coda."],
+      ["Percorso", String(torrent.save_path || "—"), "Cartella in cui sono salvati i dati del torrent."]
     ]));
 
     var toolbar = document.createElement("div");
     toolbar.className = "toolbar";
-    var toggle = function (label, endpoint, body, confirmText) {
+    var toggle = function (label, endpoint, body, confirmText, hint) {
       var button = document.createElement("button");
       button.className = "btn sm";
       button.textContent = label;
+      button.title = hint || label;
       button.addEventListener("click", function () {
         if (confirmText && !confirm(confirmText)) return;
         button.disabled = true;
@@ -1300,15 +1328,16 @@
       });
       return button;
     };
-    toolbar.appendChild(toggle(torrent.no_rename ? "Rinomina abilitata" : "Non rinominare", "/api/torrents/" + encodeURIComponent(hash) + "/no_rename", { value: !torrent.no_rename }));
-    toolbar.appendChild(toggle("Annuncia", "/api/torrents/" + encodeURIComponent(hash) + "/reannounce", {}));
-    toolbar.appendChild(toggle("Riavvia torrent", "/api/torrents/" + encodeURIComponent(hash) + "/restart", {}));
-    toolbar.appendChild(toggle(torrent.super_seeding ? "Disattiva super seeding" : "Super seeding", "/api/torrents/" + encodeURIComponent(hash) + "/super-seeding", { enabled: !torrent.super_seeding }));
-    toolbar.appendChild(toggle("Pin", "/api/torrents/pin", { hash: hash }));
-    toolbar.appendChild(toggle("Segna come fallito", "/api/torrents/" + encodeURIComponent(hash) + "/mark_failed", {}, "Segnare questo torrent come fallito?"));
+    toolbar.appendChild(toggle(torrent.no_rename ? "Rinomina abilitata" : "Non rinominare", "/api/torrents/" + encodeURIComponent(hash) + "/no_rename", { value: !torrent.no_rename }, "", "Impedisce o consente al client di rinominare i file del torrent."));
+    toolbar.appendChild(toggle("Annuncia", "/api/torrents/" + encodeURIComponent(hash) + "/reannounce", {}, "", "Invia subito un nuovo annuncio ai tracker."));
+    toolbar.appendChild(toggle("Riavvia torrent", "/api/torrents/" + encodeURIComponent(hash) + "/restart", {}, "", "Riavvia il torrent e le connessioni ai peer."));
+    toolbar.appendChild(toggle(torrent.super_seeding ? "Disattiva super seeding" : "Super seeding", "/api/torrents/" + encodeURIComponent(hash) + "/super-seeding", { enabled: !torrent.super_seeding }, "", "Attiva o disattiva il super seeding per questo torrent."));
+    toolbar.appendChild(toggle("Pin", "/api/torrents/pin", { hash: hash }, "", "Mantiene questo torrent fissato nell'elenco."));
+    toolbar.appendChild(toggle("Segna come fallito", "/api/torrents/" + encodeURIComponent(hash) + "/mark_failed", {}, "Segnare questo torrent come fallito?", "Segna il torrent come fallito per la gestione successiva."));
     var tagButton = document.createElement("button");
     tagButton.className = "btn sm";
     tagButton.textContent = "Tag";
+    tagButton.title = "Assegna o modifica i tag del torrent";
     tagButton.addEventListener("click", function () {
       var entered = window.prompt("Tag del torrent (separati da virgola):", "");
       if (entered === null) return;
@@ -1324,15 +1353,19 @@
     removeForm.className = "form-grid";
     var removeWrap = document.createElement("label");
     removeWrap.className = "field";
+    removeWrap.title = "Scegli se rimuovere solo il torrent o anche i file e il blocklist.";
     var removeLabel = document.createElement("span");
     removeLabel.textContent = "Rimozione";
+    removeLabel.title = "Scegli cosa rimuovere dalla sessione";
     var removeSelect = document.createElement("select");
     removeSelect.className = "input";
     removeSelect.setAttribute("data-remove-mode", "");
-    [["session", "Solo sessione"], ["files", "Sessione + file"], ["blocklist", "Sessione + blocklist"], ["files_blocklist", "File + blocklist"]].forEach(function (option) {
+    removeSelect.title = "Scegli se mantenere i file, eliminarli o aggiungere il torrent al blocklist";
+    [["session", "Solo sessione", "Rimuove il torrent dalla sessione e mantiene i file"], ["files", "Sessione + file", "Rimuove il torrent e tutti i file scaricati"], ["blocklist", "Sessione + blocklist", "Rimuove il torrent e blocca nuovamente il magnet"], ["files_blocklist", "File + blocklist", "Rimuove torrent e file e blocca nuovamente il magnet"]].forEach(function (option) {
       var node = document.createElement("option");
       node.value = option[0];
       node.textContent = option[1];
+      node.title = option[2];
       removeSelect.appendChild(node);
     });
     removeWrap.appendChild(removeLabel); removeWrap.appendChild(removeSelect);
@@ -1341,6 +1374,7 @@
     var removeButton = document.createElement("button");
     removeButton.className = "btn sm danger";
     removeButton.textContent = "Rimuovi";
+    removeButton.title = "Rimuovi il torrent secondo l'opzione selezionata";
     removeButton.addEventListener("click", function () {
       var mode = removeSelect.value;
       var deleteFiles = mode === "files" || mode === "files_blocklist";
@@ -1359,12 +1393,13 @@
     // Web seeds.
     var webForm = document.createElement("div");
     webForm.className = "form-grid";
-    webForm.appendChild(textField("data-web-seeds", "Web seed (URL separati da spazio)", ""));
+    webForm.appendChild(textField("data-web-seeds", "Web seed (URL separati da spazio)", "", "URL HTTP/FTP da usare come sorgenti alternative per scaricare i dati."));
     var webActions = document.createElement("div");
     webActions.className = "form-actions";
     var addSeed = document.createElement("button");
     addSeed.className = "btn sm";
     addSeed.textContent = "Aggiungi";
+    addSeed.title = "Aggiungi gli URL inseriti come web seed";
     addSeed.addEventListener("click", function () {
       var node = webForm.querySelector("[data-web-seeds]");
       var urls = (node && node.value.trim()) || "";
@@ -1378,6 +1413,7 @@
     var removeSeed = document.createElement("button");
     removeSeed.className = "btn sm danger";
     removeSeed.textContent = "Rimuovi";
+    removeSeed.title = "Rimuovi gli URL inseriti dai web seed";
     removeSeed.addEventListener("click", function () {
       var node = webForm.querySelector("[data-web-seeds]");
       var urls = (node && node.value.trim()) || "";
@@ -2126,18 +2162,26 @@
     if (!element) return;
     var confirmMessage = element.getAttribute("data-confirm");
     if (confirmMessage && !confirm(confirmMessage)) return;
+    var actionPath = element.getAttribute("data-api") || "";
+    var actionLabel = element.getAttribute("data-action-label") || (element.textContent || "").trim() || "Operazione";
+    var isSearchAction = /\/search(?:\/|$)/.test(actionPath) || /^cerca\b/i.test(actionLabel);
     var body = {};
     try { body = JSON.parse(element.getAttribute("data-body") || "{}"); } catch (error) { body = {}; }
     element.disabled = true;
-    api(element.getAttribute("data-api"), element.getAttribute("data-method") || "POST", body)
+    if (isSearchAction) notify(actionLabel + ": ricerca avviata…", "info");
+    api(actionPath, element.getAttribute("data-method") || "POST", body)
       .then(function (data) {
+        var message = "Operazione completata";
+        if (data && typeof data === "object" && data.message) message = String(data.message);
+        if (isSearchAction && data && Array.isArray(data.results)) {
+          message = actionLabel + ": ricerca terminata · " + data.results.length + " risultati trovati";
+          if (data.feed_matches !== undefined) message += " (" + data.feed_matches + " da RSS)";
+        }
         refreshComicsDownloadTables();
         var container = element.closest(".panel") &&
           element.closest(".panel").querySelector("[data-ui-table]");
-        if (container && container._refetch) { container._refetch(); return; }
-        if (partials[view]) { load(); return; }
-        var message = "Operazione completata";
-        if (data && typeof data === "object" && data.message) message = String(data.message);
+        if (container && container._refetch) { container._refetch(); notify(message, "ok"); return; }
+        if (partials[view]) { load(); notify(message, "ok"); return; }
         var jobId = data && typeof data === "object" && data.job_id ? String(data.job_id) : "";
         notify(message, "ok", jobId ? {
           label: "Annulla",
@@ -2149,7 +2193,7 @@
           trackBackgroundJob(jobId, (element.textContent || "").trim() || "Operazione");
           return;
         }
-        window.setTimeout(function () { location.reload(); }, 1400);
+        window.setTimeout(function () { location.reload(); }, isSearchAction ? 4500 : 1400);
       })
       .catch(function (error) { notify("Azione non riuscita: " + error.message, "err"); })
       .then(function () { element.disabled = false; });
@@ -4940,12 +4984,135 @@
     }).then(function () { button.disabled = false; });
   });
 
+  // Episode sources: show the feed/archive entries already collected for the
+  // selected episode without starting another network search.
+  function openEpisodeSources(path, label, opener) {
+    var overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.setAttribute("data-episode-sources-panel", "");
+    overlay._removeOnClose = true;
+    var modal = document.createElement("div");
+    modal.className = "modal torrent-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "episode-sources-title");
+    var head = document.createElement("div");
+    head.className = "modal-head";
+    var title = document.createElement("h3");
+    title.id = "episode-sources-title";
+    title.textContent = "Sorgenti " + (label || "episodio");
+    var close = document.createElement("button");
+    close.className = "btn sm";
+    close.type = "button";
+    close.textContent = "Chiudi";
+    close.title = "Chiudi l'elenco delle sorgenti";
+    head.appendChild(title);
+    head.appendChild(close);
+    var body = document.createElement("div");
+    body.className = "modal-body";
+    body.appendChild(muted("Caricamento sorgenti…"));
+    modal.appendChild(head);
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    function dismiss() {
+      closeAccessibleDialog(overlay, true);
+    }
+    close.addEventListener("click", dismiss);
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay) dismiss();
+    });
+    openAccessibleDialog(overlay, opener);
+    api(path, "GET").then(function (data) {
+      var results = data && Array.isArray(data.results) ? data.results : [];
+      body.innerHTML = "";
+      var summary = document.createElement("p");
+      summary.className = "muted";
+      summary.textContent = results.length + (results.length === 1 ? " sorgente trovata" : " sorgenti trovate") + ".";
+      body.appendChild(summary);
+      if (!results.length) {
+        body.appendChild(muted("Nessuna sorgente Feed RSS o archivio disponibile per questa puntata."));
+        return;
+      }
+      var table = document.createElement("table");
+      table.className = "data-table";
+      table.innerHTML = "<thead><tr><th title=\"Titolo della release trovata\">Release</th><th title=\"Origine della voce\">Origine</th><th title=\"Feed o sito che ha fornito la release\">Sorgente</th><th title=\"Qualità tecnica rilevata\">Qualità</th><th title=\"Azioni disponibili\">Azioni</th></tr></thead>";
+      accessibleDataTable(table, "Sorgenti dell'episodio");
+      var tbody = document.createElement("tbody");
+      results.forEach(function (item) {
+        var release = item && item.release ? item.release : item || {};
+        var quality = release.quality || {};
+        var tr = document.createElement("tr");
+        var titleCell = document.createElement("td");
+        titleCell.className = "truncate";
+        titleCell.title = String(release.title || "");
+        titleCell.textContent = String(release.title || "—");
+        var originCell = document.createElement("td");
+        originCell.textContent = String(item && item.origin || "—");
+        originCell.title = "Origine: " + originCell.textContent;
+        var sourceCell = document.createElement("td");
+        var source = String(release.source || "");
+        sourceCell.textContent = sourceLabel(source) || "—";
+        sourceCell.title = source;
+        var qualityCell = document.createElement("td");
+        qualityCell.className = "truncate";
+        var qualityText = [quality.resolution, quality.codec, quality.audio, quality.language]
+          .filter(function (value) { return value; }).join(" · ");
+        qualityCell.textContent = qualityText || "—";
+        qualityCell.title = qualityText || "Qualità non disponibile";
+        var actionsCell = document.createElement("td");
+        actionsCell.className = "row-actions";
+        var magnet = String(release.magnet || "");
+        if (/^(https?:|magnet:)/i.test(magnet)) {
+          var magnetLink = document.createElement("a");
+          magnetLink.className = "btn sm";
+          magnetLink.href = magnet;
+          magnetLink.textContent = "Magnet";
+          magnetLink.title = "Apri il magnet della release";
+          actionsCell.appendChild(magnetLink);
+        }
+        var torrentURL = String(release.torrent_url || "");
+        if (/^https?:/i.test(torrentURL)) {
+          var torrentLink = document.createElement("a");
+          torrentLink.className = "btn sm";
+          torrentLink.href = torrentURL;
+          torrentLink.target = "_blank";
+          torrentLink.rel = "noopener";
+          torrentLink.textContent = ".torrent";
+          torrentLink.title = "Apri il file .torrent della release";
+          actionsCell.appendChild(torrentLink);
+        }
+        if (!actionsCell.childNodes.length) actionsCell.textContent = "—";
+        tr.appendChild(titleCell);
+        tr.appendChild(originCell);
+        tr.appendChild(sourceCell);
+        tr.appendChild(qualityCell);
+        tr.appendChild(actionsCell);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+    }).catch(function (error) {
+      body.innerHTML = '<p class="alert">' + esc(error.message) + "</p>";
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-episode-sources]");
+    if (!button) return;
+    event.preventDefault();
+    openEpisodeSources(button.getAttribute("data-episode-sources") || "", button.getAttribute("data-episode-label") || "episodio", button);
+  });
+
   // Series header actions: Cerca mancanti / Scansiona archivio / Aggiorna da TMDB.
   document.addEventListener("click", function (event) {
     var button = event.target.closest("[data-series-action]");
     if (!button) return;
     var label = button.getAttribute("data-action-label") || "Operazione";
     button.disabled = true;
+    var isMissingSearch = button.getAttribute("data-series-action").indexOf("/search-missing") >= 0;
+    if (isMissingSearch) notify(label + ": ricerca avviata…", "info");
     api(button.getAttribute("data-series-action"), "POST", {}).then(function (data) {
       if (data && data.metadata_available === false) {
         notify(label + ": metadati episodi non disponibili. Premi prima “Aggiorna da TMDB”.", "err");
@@ -4953,12 +5120,14 @@
         return;
       }
       var extra = "";
-      if (data && data.searched !== undefined) extra = " · " + data.searched + " episodi verificati";
+      if (isMissingSearch && data && Array.isArray(data.results)) {
+        extra = " · ricerca terminata: " + (data.searched || 0) + " episodi verificati · " + data.results.length + " risultati trovati";
+      } else if (data && data.searched !== undefined) extra = " · " + data.searched + " episodi verificati";
       else if (data && data.updated !== undefined) extra = " · " + data.updated + " file aggiornati";
       else if (data && data.air_dates_updated !== undefined) extra = " · " + data.air_dates_updated + " date aggiornate";
       else if (data && Array.isArray(data.results)) extra = " · " + data.results.length + " risultati";
       notify(label + ": completato" + extra, "ok");
-      window.setTimeout(function () { location.reload(); }, 700);
+      window.setTimeout(function () { location.reload(); }, isMissingSearch ? 4500 : 1400);
     }).catch(function (error) {
       notify(label + " non riuscito: " + error.message, "err");
       button.disabled = false;

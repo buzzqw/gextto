@@ -1100,12 +1100,39 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 			feedMatches++
 		}
 	}
+	logging.Info("manual episode search completed", "series", seriesName, "season", season, "episode", episode, "results", len(results), "feed_matches", feedMatches)
 	_ = s.db.MarkGapSearched(series.Name, season, episode)
 	jsonResponse(w, map[string]any{
 		"ok":           true,
 		"query":        query,
 		"results":      results,
 		"feed_matches": feedMatches,
+	})
+}
+
+// EpisodeSources returns the sources already collected for one episode. It is
+// deliberately read-only: opening the list must not start another search.
+func EpisodeSources(w http.ResponseWriter, r *http.Request, s *AppState) {
+	seriesName := pathParam(r, "series")
+	season, okSeason := pathInt(r, "season")
+	episode, okEpisode := pathInt(r, "episode")
+	if !okSeason || !okEpisode {
+		jsonError(w, http.StatusBadRequest, "invalid episode")
+		return
+	}
+	cfg := latestConfig(s)
+	series, ok := gh7_find_series(cfg, seriesName)
+	if !ok {
+		jsonError(w, http.StatusNotFound, "series not found")
+		return
+	}
+	results := gh7_stored_series_episode_sources(s, series, season, episode)
+	jsonResponse(w, map[string]any{
+		"ok":      true,
+		"series":  series.Name,
+		"season":  season,
+		"episode": episode,
+		"results": results,
 	})
 }
 
