@@ -750,7 +750,7 @@
 {{define "lang_single_options"}}<option value="">—</option><option value="ita">Italiano</option><option value="eng">Inglese</option><option value="spa">Spagnolo</option><option value="fra">Francese</option><option value="deu">Tedesco</option>{{end}}
 
 {{define "settings_field"}}
-<form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}">
+<form class="setting-row" data-setting-key="{{.Key}}" id="setting-{{.Key}}"{{if .Disabled}} data-setting-disabled="true"{{end}}>
   <div class="setting-info">
     <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
     <div class="setting-meta">
@@ -759,7 +759,9 @@
     </div>
   </div>
   <div class="setting-control">
-    {{if .Managed}}
+    {{if .Disabled}}
+    <input class="input" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" disabled title="{{.DisabledNote}}" />
+    {{else if .Managed}}
     <input class="input" id="input-{{.Key}}" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
     {{else if eq .Kind "structured"}}
     <p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
@@ -783,23 +785,24 @@
     {{end}}
   </div>
   <div class="setting-actions">
-    <small class="setting-status muted" data-setting-status aria-live="polite"></small>
-    {{if and (ne .Kind "structured") (not .Managed)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
+    <small class="setting-status muted" data-setting-status aria-live="polite">{{if .Disabled}}{{.DisabledNote}}{{end}}</small>
+    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
   </div>
 </form>
 {{end}}
 
 {{define "settings_field_grid"}}
-<form class="field" data-setting-key="{{.Key}}" id="setting-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>
+<form class="field" data-setting-key="{{.Key}}" id="setting-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}{{if .Disabled}} data-setting-disabled="true"{{end}}>
   <label class="field-label" for="input-{{.Key}}">{{.Label}}</label>
   <div class="field-row">
-    {{if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled />
+    {{if .Disabled}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" disabled title="{{.DisabledNote}}" />
+    {{else if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled />
     {{else if eq .Kind "bool"}}<select class="input" data-setting-input id="input-{{.Key}}"><option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option><option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option></select>
     {{else if eq .Kind "select"}}<select class="input" data-setting-input id="input-{{.Key}}">{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
     {{else}}<input class="input" data-setting-input id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
-    {{if and (ne .Kind "structured") (not .Managed)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
+    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
   </div>
-  <small class="muted" data-setting-status aria-live="polite"></small>
+  <small class="muted" data-setting-status aria-live="polite">{{if .Disabled}}{{.DisabledNote}}{{end}}</small>
 </form>
 {{end}}
 

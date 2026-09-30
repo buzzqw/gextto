@@ -99,6 +99,11 @@ type uiSettingField struct {
 	// Managed marks a field the automatic optimization controls: it renders
 	// read-only with the value "Auto" (like rextto) instead of an editable box.
 	Managed bool
+	// Disabled marks a field that does not apply to the selected torrent
+	// engine: it renders read-only with an explanation, so the page never
+	// suggests a control has an effect when the active engine ignores it.
+	Disabled     bool
+	DisabledNote string
 	// Options is set for Kind=="select": a fixed list to choose from.
 	Options []uiFormOption
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
@@ -372,6 +377,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		order = append(order, tab.ID)
 	}
 	fieldsByTab := map[string][]uiSettingField{}
+	activeBackend := uiActiveTorrentBackend(cfg)
 	for _, def := range uiSettingsIndex {
 		if _, ok := labels[def.Tab]; !ok {
 			continue
@@ -380,7 +386,12 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		if raw, present := cfg.Settings[def.Key]; present {
 			value = raw
 		}
-		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], uiSettingFieldFor(def.Key, def.Label, value))
+		field := uiSettingFieldFor(def.Key, def.Label, value)
+		if !uiBackendAllows(uiSettingAllowedBackends(def.Key), activeBackend) {
+			field.Disabled = true
+			field.DisabledNote = "Non attivo con il motore «" + uiBackendLabel(activeBackend) + "»."
+		}
+		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], field)
 	}
 
 	// Structured settings are edited with real forms (feed lines, indexer rows,
@@ -737,6 +748,99 @@ var uiManagedSetting = map[string]bool{
 	"libtorrent_active_seeds":     true,
 	"libtorrent_active_limit":     true,
 	"libtorrent_cache_size":       true,
+}
+
+// uiLibtorrentEngineOnlySettings lists the options read only by the embedded
+// libtorrent session (see libtorrent.go). Seed, stall, queue, speed, directory
+// and RAM-disk options are intentionally excluded: the automation layer applies
+// those with every engine, so they must stay editable.
+var uiLibtorrentEngineOnlySettings = map[string]bool{
+	"libtorrent_enabled":                           true,
+	"libtorrent_auto_optimize":                     true,
+	"libtorrent_extra_settings":                    true,
+	"libtorrent_active_limit":                      true,
+	"libtorrent_active_seeds":                      true,
+	"libtorrent_aio_threads":                       true,
+	"libtorrent_alert_queue_size":                  true,
+	"libtorrent_allow_multiple_connections_per_ip": true,
+	"libtorrent_announce_interval":                 true,
+	"libtorrent_announce_to_all_tiers":             true,
+	"libtorrent_announce_to_all_trackers":          true,
+	"libtorrent_cache_expiry":                      true,
+	"libtorrent_cache_size":                        true,
+	"libtorrent_connections_limit":                 true,
+	"libtorrent_dont_count_slow_torrents":          true,
+	"libtorrent_dynamic_queue":                     true,
+	"libtorrent_dynamic_queue_max":                 true,
+	"libtorrent_dynamic_queue_min":                 true,
+	"libtorrent_encryption":                        true,
+	"libtorrent_half_open_limit":                   true,
+	"libtorrent_listen_interfaces":                 true,
+	"libtorrent_lsd":                               true,
+	"libtorrent_max_uploads_per_torrent":           true,
+	"libtorrent_natpmp":                            true,
+	"libtorrent_outgoing_interface":                true,
+	"libtorrent_prefer_rc4":                        true,
+	"libtorrent_torrent_connect_boost":             true,
+	"libtorrent_upload_slots_limit":                true,
+}
+
+// uiLibtorrentAlsoAnacrolixSettings are libtorrent session options that the
+// anacrolix backend reads as fallbacks (the `anacrolix_*` keys override them).
+// They apply to the embedded and anacrolix engines; only qBittorrent ignores
+// them, so they are disabled only for that backend.
+var uiLibtorrentAlsoAnacrolixSettings = map[string]bool{
+	"libtorrent_dht":                         true,
+	"libtorrent_pex":                         true,
+	"libtorrent_utp":                         true,
+	"libtorrent_upnp":                        true,
+	"libtorrent_apply_ip_filter":             true,
+	"libtorrent_dht_bootstrap_nodes":         true,
+	"libtorrent_ipfilter_url":                true,
+	"libtorrent_max_connections_per_torrent": true,
+	"libtorrent_port_min":                    true,
+	"libtorrent_port_max":                    true,
+}
+
+// uiSettingAllowedBackends lists the torrent engines a setting applies to. A
+// nil/empty result means every engine.
+func uiSettingAllowedBackends(key string) []string {
+	switch {
+	case strings.HasPrefix(key, "qbittorrent_"):
+		return []string{BackendQbittorrent}
+	case strings.HasPrefix(key, "anacrolix_"):
+		return []string{BackendAnacrolix}
+	case uiLibtorrentEngineOnlySettings[key]:
+		return []string{BackendEmbedded}
+	case uiLibtorrentAlsoAnacrolixSettings[key]:
+		return []string{BackendEmbedded, BackendAnacrolix}
+	}
+	return nil
+}
+
+func uiBackendAllows(allowed []string, backend string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	for _, candidate := range allowed {
+		if candidate == backend {
+			return true
+		}
+	}
+	return false
+}
+
+// uiActiveTorrentBackend returns the configured transfer backend, defaulting to
+// the embedded engine.
+func uiActiveTorrentBackend(cfg *Config) string {
+	if cfg != nil {
+		if raw, ok := cfg.Settings["torrent_backend"]; ok {
+			if value := strings.TrimSpace(raw); value != "" {
+				return value
+			}
+		}
+	}
+	return BackendEmbedded
 }
 
 // uiRenameEditorFrom builds the rename-composition editor of the Rinomina tab.

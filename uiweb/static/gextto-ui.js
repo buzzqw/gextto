@@ -2266,6 +2266,7 @@
     if (input) form.setAttribute("data-original-value", input.value);
     form.addEventListener("submit", function (event) {
       event.preventDefault();
+      if (form.hasAttribute("data-setting-disabled")) return;
       var currentInput = form.querySelector("[data-setting-input]");
       if (!currentInput) return; // structured value, edited from its dedicated section
       var button = form.querySelector("button[type=submit]");
@@ -2383,7 +2384,17 @@
           if (status) status.textContent = "Errore";
           notify("Configurazione anacrolix non riuscita: " + error.message, "err");
         });
+        return;
       }
+      // Embedded libtorrent: save and reload so the engine-specific fields are
+      // enabled/disabled according to the selected backend.
+      if (status) status.textContent = "Salvataggio…";
+      api("/api/config/settings", "POST", { key: "torrent_backend", value: backendSelect.value })
+        .then(function () { window.setTimeout(function () { location.reload(); }, 600); })
+        .catch(function (error) {
+          if (status) status.textContent = "Errore";
+          notify("Cambio motore non riuscito: " + error.message, "err");
+        });
     });
   }
 

@@ -661,6 +661,57 @@ func TestUiSettingDefaultsMatchSafeRuntimeDefaults(t *testing.T) {
 	}
 }
 
+func TestUiSettingBackendRestrictions(t *testing.T) {
+	// Engine-specific options are limited to their engine.
+	if got := uiSettingAllowedBackends("qbittorrent_url"); len(got) != 1 || got[0] != BackendQbittorrent {
+		t.Fatalf("qbittorrent_url allowed = %v", got)
+	}
+	if got := uiSettingAllowedBackends("anacrolix_dht"); len(got) != 1 || got[0] != BackendAnacrolix {
+		t.Fatalf("anacrolix_dht allowed = %v", got)
+	}
+	if got := uiSettingAllowedBackends("libtorrent_encryption"); len(got) != 1 || got[0] != BackendEmbedded {
+		t.Fatalf("libtorrent_encryption allowed = %v", got)
+	}
+	// Options the automation layer uses with every engine stay shared.
+	for _, key := range []string{"libtorrent_seed_ratio", "libtorrent_seed_time_days", "libtorrent_stall_after_min", "libtorrent_dir", "libtorrent_ramdisk_enabled"} {
+		if got := uiSettingAllowedBackends(key); got != nil {
+			t.Fatalf("%s must stay shared, got %v", key, got)
+		}
+	}
+	if !uiBackendAllows(nil, BackendQbittorrent) {
+		t.Fatalf("shared settings must be allowed on every backend")
+	}
+	if uiBackendAllows([]string{BackendEmbedded}, BackendQbittorrent) {
+		t.Fatalf("embedded-only settings must not be allowed on qbittorrent")
+	}
+}
+
+// TestUiSettingsDisableOtherEngineOptions checks that, with the embedded engine
+// selected, the qBittorrent options render read-only instead of looking active.
+func TestUiSettingsDisableOtherEngineOptions(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, _, body := webGet(t, server, "/ui?view=settings&tab=backend")
+	if code != http.StatusOK {
+		t.Fatalf("backend settings -> %d", code)
+	}
+	page := string(body)
+	if !strings.Contains(page, "Non attivo con il motore") {
+		t.Fatalf("expected the disabled note on non-active engine options")
+	}
+	// A qBittorrent field must render inside a disabled form while the embedded
+	// engine is active.
+	if !strings.Contains(page, `data-setting-key="qbittorrent_url" id="setting-qbittorrent_url" data-setting-disabled="true"`) {
+		t.Fatalf("qbittorrent_url should be inside a disabled form")
+	}
+	// The transfer-engine selector itself stays enabled.
+	if !strings.Contains(page, `data-setting-key="torrent_backend"`) || strings.Contains(page, `data-setting-key="torrent_backend" id="setting-torrent_backend" data-setting-disabled`) {
+		t.Fatalf("torrent_backend must stay editable")
+	}
+}
+
 func TestAnacrolixSettingsHaveExplanatoryTooltips(t *testing.T) {
 	for _, key := range []string{
 		"anacrolix_path_mappings", "anacrolix_data_dir", "anacrolix_listen_port",
