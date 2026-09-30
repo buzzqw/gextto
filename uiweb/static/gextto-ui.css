@@ -975,6 +975,7 @@ pre.log-view { margin: 0; }
    behaviour (the "Sistema" group already collapses them on mobile). */
 .nav-optional { opacity: 0.92; }
 .nav-mobile-hidden { display: none; }
+.nav-mobile-system-extra { display: none; }
 @media (min-width: 901px) { .nav-mobile-hidden { display: flex; } }
 
 @media (max-width: 560px) {
@@ -1052,6 +1053,7 @@ pre.log-view { margin: 0; }
   .nav-count { display: none; }
   .nav-more { display: inline-flex; }
   .nav-group.system-group .nav-item { display: none; }
+  .nav-group.system-group .nav-mobile-always { display: inline-flex; }
   .nav-group.system-group.open .nav-item { display: inline-flex; }
   .sidebar-foot { display: none; }
   .main-shell { margin-left: 0; }
@@ -1140,7 +1142,9 @@ pre.log-view { margin: 0; }
 
 @media (max-width: 560px) {
   /* A bottom navigation is easier to reach with one hand and remains
-     available while inspecting a long list. */
+     available while inspecting a long list. Keep it focused on the five
+     destinations used most often; secondary pages remain reachable from the
+     dashboard and the Sistema menu. */
   .sidebar {
     position: fixed;
     inset: auto 0 0;
@@ -1152,7 +1156,99 @@ pre.log-view { margin: 0; }
     box-shadow: 0 -10px 28px rgba(2, 8, 23, 0.24);
   }
   .sidebar nav { min-width: max-content; }
+  .sidebar .nav-search,
+  .sidebar .nav-mobile-hidden { display: none !important; }
+  .sidebar .system-group.open {
+    position: fixed;
+    z-index: 45;
+    left: 8px;
+    right: 8px;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: min(60dvh, 420px);
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .sidebar .system-group.open .nav-item,
+  .sidebar .system-group.open .nav-more { display: inline-flex; }
+  .sidebar .system-group.open .nav-mobile-always { display: none; }
+  .sidebar .system-group.open .nav-mobile-system-extra { display: inline-flex; }
   .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+  /* Turn the top controls into a small two-column control pad instead of a
+     horizontally scrolling strip. */
+  .top-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+  }
+  .top-actions .lang-select,
+  .top-actions .btn,
+  .top-actions .system-pill { width: 100%; min-width: 0; }
+  .top-actions .system-pill { justify-content: center; }
+
+  /* Quick actions should be reachable with one thumb and never form a long
+     line of narrow buttons. */
+  .dashboard-quick-actions,
+  .dashboard-explore-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+  .dashboard-quick-actions > *,
+  .dashboard-explore-actions > * { width: 100%; min-width: 0; }
+  .dashboard-quick-actions > :first-child { grid-column: 1 / -1; }
+  .dashboard-quick-actions .btn,
+  .dashboard-explore-actions .btn { min-height: 44px; }
+
+  /* The explanation is useful on desktop but needlessly pushes the actual
+     next-run value below the fold on a phone. */
+  .dashboard-next-panel .dashboard-next-description { display: none; }
+  .dashboard-intro p,
+  .dashboard-search-panel,
+  .dashboard-explore-panel,
+  .dashboard-session-grid,
+  .dashboard-collection-grid,
+  .dashboard-feed-panel,
+  .dashboard-consumption-panel { display: none; }
+  .dashboard-summary-grid .dashboard-secondary-metric { display: none; }
+
+  /* Library lists keep the title, the useful status and the row actions in
+     view. Secondary metadata remains available on the detail page instead of
+     forcing a wide horizontal table on a phone. */
+  .data-table.series-table,
+  .data-table.movie-table { min-width: 0; table-layout: fixed; }
+  .data-table.series-table th:nth-child(2),
+  .data-table.series-table td:nth-child(2),
+  .data-table.series-table th:nth-child(3),
+  .data-table.series-table td:nth-child(3),
+  .data-table.series-table th:nth-child(4),
+  .data-table.series-table td:nth-child(4),
+  .data-table.series-table th:nth-child(6),
+  .data-table.series-table td:nth-child(6),
+  .data-table.series-table th:nth-child(7),
+  .data-table.series-table td:nth-child(7),
+  .data-table.movie-table th:nth-child(3),
+  .data-table.movie-table td:nth-child(3),
+  .data-table.movie-table th:nth-child(4),
+  .data-table.movie-table td:nth-child(4) { display: none; }
+  .data-table.series-table th:first-child,
+  .data-table.series-table td:first-child,
+  .data-table.movie-table th:first-child,
+  .data-table.movie-table td:first-child { width: 48%; }
+  .data-table.series-table th:last-child,
+  .data-table.series-table td:last-child,
+  .data-table.movie-table th:last-child,
+  .data-table.movie-table td:last-child { width: 24%; }
+  .data-table.series-table .row-actions,
+  .data-table.movie-table .row-actions { white-space: normal; }
 
   /* Keep the download controls readable instead of producing a long row of
      tiny buttons. Selection actions are grouped into two thumb-sized columns. */

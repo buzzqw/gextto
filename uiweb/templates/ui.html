@@ -36,10 +36,16 @@
        {{range .Groups}}
        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
           {{if .System}}<button class="nav-more" type="button" title="Mostra o nascondi le voci di sistema" aria-expanded="{{if .Open}}true{{else}}false{{end}}" data-nav-more><span>Sistema</span><span data-nav-more-icon aria-hidden="true">{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
-         {{range .Items}}
-           <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
-         {{end}}
-      </div>
+          {{range .Items}}
+            <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
+          {{end}}
+          {{if .System}}
+            <a class="nav-item nav-mobile-system-extra" href="/?view=gaps" data-nav="gaps"><span>Mancanti</span></a>
+            <a class="nav-item nav-mobile-system-extra" href="/?view=search" data-nav="search"><span>Esplora</span></a>
+            <a class="nav-item nav-mobile-system-extra" href="/?view=archive" data-nav="archive"><span>Archivio</span></a>
+            <a class="nav-item nav-mobile-system-extra" href="/?view=comics" data-nav="comics"><span>Fumetti</span></a>
+          {{end}}
+       </div>
       {{end}}
     </nav>
     <div class="sidebar-foot">
@@ -139,7 +145,7 @@
   <div class="panel">
     <div class="panel-head"><h3>Azioni rapide</h3></div>
     <div class="panel-body">
-      <div class="toolbar">
+      <div class="toolbar dashboard-quick-actions">
         <button class="btn primary" data-cycle="full" title="Cerca ora nuovi episodi, film e fumetti e riempi i gap">Avvia ciclo (tutto)</button>
         <button class="btn" data-cycle="series" title="Ciclo limitato alle serie TV">Serie TV</button>
         <button class="btn" data-cycle="movies" title="Ciclo limitato ai film">Film</button>
@@ -149,11 +155,11 @@
       </div>
     </div>
   </div>
-  <div class="panel">
+  <div class="panel dashboard-next-panel">
     <div class="panel-head"><h3>Prossima ricerca automatica</h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
     <div class="panel-body">
       <div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div>
-      <p class="muted">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti, secondo l'intervallo configurato.</p>
+      <p class="muted dashboard-next-description">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti, secondo l'intervallo configurato.</p>
     </div>
   </div>
   <div class="dashboard-intro">
@@ -164,18 +170,18 @@
     </div>
     <span class="mode-badge{{if .DryRun}} dry{{else}} active{{end}}" title="{{if .DryRun}}Nessun download reale: Gextto analizza i candidati ma non scarica.{{else}}Gextto può scaricare e archiviare i contenuti.{{end}}">{{if .DryRun}}DRY-RUN{{else}}ATTIVO{{end}}</span>
   </div>
-  <div class="grid-4">
-    <div class="metric mint"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
-    <div class="metric blue"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
-    <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
-    <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{humanBytesU .FreeSpace}}</strong></div>
-    <div class="metric"><span class="metric-sub">Visti nei feed</span><strong>{{.SeenGroups}}</strong></div>
-    <div class="metric amber"><span class="metric-sub">Cestino</span><strong>{{humanBytesU .TrashBytes}}</strong></div>
-    <div class="metric mint"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
-    <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
+  <div class="grid-4 dashboard-summary-grid">
+    <div class="metric mint dashboard-primary-metric"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
+    <div class="metric blue dashboard-primary-metric"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
+    <div class="metric amber dashboard-primary-metric"><span class="metric-sub">Spazio libero</span><strong>{{humanBytesU .FreeSpace}}</strong></div>
+    <div class="metric mint dashboard-primary-metric"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
+    <div class="metric blue dashboard-secondary-metric"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
+    <div class="metric dashboard-secondary-metric"><span class="metric-sub">Visti nei feed</span><strong>{{.SeenGroups}}</strong></div>
+    <div class="metric amber dashboard-secondary-metric"><span class="metric-sub">Cestino</span><strong>{{humanBytesU .TrashBytes}}</strong></div>
+    <div class="metric dashboard-secondary-metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
   </div>
 
-  <div class="panel">
+  <div class="panel dashboard-search-panel">
     <div class="panel-head"><h3>Cerca</h3><small class="muted" data-ui-count></small></div>
     <div class="panel-body">
       <form class="search-row" data-ui-search-post data-endpoint="/api/search" data-results="results" data-add="/api/search/add">
@@ -199,7 +205,7 @@
   <div class="panel dashboard-explore-panel">
     <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
     <div class="panel-body">
-      <div class="toolbar">
+      <div class="toolbar dashboard-explore-actions">
         <a class="btn" href="/?view=series">📺 Serie TV</a>
         <a class="btn" href="/?view=movies">🎬 Film</a>
         <a class="btn" href="/?view=search">🔎 Esplora release</a>
@@ -210,7 +216,7 @@
     </div>
   </div>
 
-  <div class="grid-2">
+  <div class="grid-2 dashboard-session-grid">
     <div class="panel">
       <div class="panel-head"><h3>Sessione</h3><small class="muted">{{.UpdatedAt}}</small></div>
       <div class="panel-body">
@@ -244,7 +250,7 @@
     </div>
   </div>
 
-  <div class="panel" data-dashboard-feed>
+  <div class="panel dashboard-feed-panel" data-dashboard-feed>
     <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted" data-dashboard-feed-status aria-live="polite"></small></div>
     <div class="panel-body">
       <div class="toolbar"><button class="btn sm" type="button" data-dashboard-feed-load>Carica risultati</button></div>
@@ -258,7 +264,7 @@
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel dashboard-consumption-panel">
     <div class="panel-head"><h3>Consumo banda</h3></div>
     <div class="panel-body">
       <div class="row"><span>Totale storico</span><strong>{{humanBytes .Consumption.TotalBytes}}</strong></div>

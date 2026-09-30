@@ -933,6 +933,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 	case "series":
 		return uiTableSpec{
 			Title:    "Serie monitorate",
+			Class:    "series-table",
 			Endpoint: "/api/config/library",
 			ItemsKey: "series",
 			ColumnsJSON: uiJSON([]uiColumn{
@@ -955,6 +956,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 	case "movies":
 		return uiTableSpec{
 			Title:    "Film monitorati",
+			Class:    "movie-table",
 			Endpoint: "/api/config/library",
 			ItemsKey: "movies",
 			ColumnsJSON: uiJSON([]uiColumn{

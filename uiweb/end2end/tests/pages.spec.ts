@@ -118,4 +118,16 @@ test.describe("mobile", () => {
     await expect(performance.locator('[data-metric="dl"]')).toBeVisible();
     await expect(performance.locator('[data-metric="ul"]')).toBeVisible();
   });
+
+  test("mobile mostra salute e log e raccoglie il resto in Sistema", async ({ page }) => {
+    await page.goto("/");
+    await expect(nav(page, "Salute")).toBeVisible();
+    await expect(nav(page, "Log")).toBeVisible();
+    await expect(nav(page, "Archivio")).toBeHidden();
+
+    await page.locator("[data-nav-more]").click();
+    await expect(nav(page, "Configurazione")).toBeVisible();
+    await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
+    await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
+  });
 });

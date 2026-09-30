@@ -61,6 +61,7 @@ type uiNavItem struct {
 	Active       bool
 	Optional     bool
 	MobileHidden bool
+	MobileAlways bool
 	Count        int
 }
 
@@ -226,6 +227,7 @@ type uiNavDefinitionItem struct {
 	Label        string
 	Optional     bool
 	MobileHidden bool
+	MobileAlways bool
 }
 
 var uiNavGroups = []uiNavDefinition{
@@ -238,15 +240,15 @@ var uiNavGroups = []uiNavDefinition{
 	}},
 	{Label: "Scoperta", Items: []uiNavDefinitionItem{
 		{ID: "search", Label: "Esplora", MobileHidden: true},
-		{ID: "archive", Label: "Archivio"},
-		{ID: "comics", Label: "Fumetti"},
+		{ID: "archive", Label: "Archivio", MobileHidden: true},
+		{ID: "comics", Label: "Fumetti", MobileHidden: true},
 	}},
 	{Label: "Sistema", Items: []uiNavDefinitionItem{
 		{ID: "settings", Label: "Configurazione"},
 		{ID: "integrations", Label: "Integrazioni"},
 		{ID: "maintenance", Label: "Manutenzione"},
-		{ID: "health", Label: "Salute"},
-		{ID: "logs", Label: "Log"},
+		{ID: "health", Label: "Salute", MobileAlways: true},
+		{ID: "logs", Label: "Log", MobileAlways: true},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
 		{ID: "manual", Label: "Manuale"},
 		{ID: "license", Label: "Licenza", Optional: true},
@@ -285,6 +287,7 @@ func uiNavigation(view string, counts map[string]int) []uiNavGroup {
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,
+				MobileAlways: item.MobileAlways,
 				Count:        counts[item.ID],
 			})
 		}
