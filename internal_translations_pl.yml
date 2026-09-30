@@ -440,7 +440,7 @@ pol:
   Cartella destinazione: Folder docelowy
   Cartella di archivio predefinita per i contenuti senza percorso dedicato.: Domyślny folder archiwum dla treści bez dedykowanej ścieżki.
   Cartella di destinazione: Folder docelowy
-  Cartella di download predefinita di libtorrent.: Domyślny folder pobierania libtorrent.
+  Cartella di download predefinita per tutti i motori.: Domyślny folder pobierania dla każdego silnika.
   ? 'Cartella di salvataggio. Lascia vuoto per usare la predefinita: i torrent entro la soglia vanno in RAM disk e poi su disco.'
   : 'Zapisz folder. Pozostaw puste, aby użyć ustawienia domyślnego: torrenty w ramach progu trafiają na dysk RAM, a następnie na dysk.'
   Cartella dove vengono spostati i file sostituiti/duplicati.: Folder, do którego przenoszone są zastąpione/zduplikowane pliki.
@@ -455,7 +455,6 @@ pol:
   Cartella rimossa dalla condivisione: Folder usunięty z udostępniania
   Cartella sul NAS dove vengono archiviati gli episodi di questa serie: Folder na serwerze NAS, w którym przechowywane są odcinki tej serii
   Cartella temporanea: Folder tymczasowy
-  Cartella temporanea libtorrent: Tymczasowy folder libtorrent
   Cartella temporanea per i download in corso.: Folder tymczasowy do pobierania w toku.
   Cartella trash: Folder śmieci
   Cartelle osservate: Obserwowane foldery
@@ -856,7 +855,7 @@ pol:
   Download e storico: Pliki do pobrania i historia
   Download globale (KiB/s, 0 = illimitato): Pobieranie globalne (KiB/s, 0 = nieograniczone)
   Download in pausa: Pobieranie wstrzymane
-  Download libtorrent: Pobierz libtorrent
+  Cartella download: Folder pobierania
   Download live: Pobieranie na żywo
   Download reinviato: Pobieranie przesłane ponownie
   Download rimosso: Pobierz usunięte

@@ -450,7 +450,7 @@ fra:
   Cartella destinazione: Dossier de destination
   Cartella di archivio predefinita per i contenuti senza percorso dedicato.: Dossier d'archive par défaut pour le contenu sans chemin dédié.
   Cartella di destinazione: Dossier de destination
-  Cartella di download predefinita di libtorrent.: Dossier de téléchargement libtorrent par défaut.
+  Cartella di download predefinita per tutti i motori.: Dossier de téléchargement par défaut pour chaque moteur.
   ? 'Cartella di salvataggio. Lascia vuoto per usare la predefinita: i torrent entro la soglia vanno in RAM disk e poi su disco.'
   : 'Enregistrer le dossier. Laissez vide pour utiliser la valeur par défaut : les torrents dans le seuil vont sur le disque RAM, puis sur le
     disque.'
@@ -466,7 +466,6 @@ fra:
   Cartella rimossa dalla condivisione: Dossier retiré du partage
   Cartella sul NAS dove vengono archiviati gli episodi di questa serie: Dossier sur le NAS où sont stockés les épisodes de cette série
   Cartella temporanea: Dossier temporaire
-  Cartella temporanea libtorrent: Dossier libtorrent temporaire
   Cartella temporanea per i download in corso.: Dossier temporaire pour les téléchargements en cours.
   Cartella trash: Dossier Corbeille
   Cartelle osservate: Dossiers surveillés
@@ -875,7 +874,7 @@ fra:
   Download e storico: Téléchargements et historique
   Download globale (KiB/s, 0 = illimitato): Téléchargement global (KiB/s, 0 = illimité)
   Download in pausa: Téléchargement en pause
-  Download libtorrent: Télécharger libtorrent
+  Cartella download: Dossier de téléchargement
   Download live: Téléchargement en direct
   Download reinviato: Téléchargement soumis à nouveau
   Download rimosso: Téléchargement supprimé

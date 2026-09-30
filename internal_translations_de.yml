@@ -453,7 +453,7 @@ deu:
   Cartella destinazione: Zielordner
   Cartella di archivio predefinita per i contenuti senza percorso dedicato.: Standardarchivordner für Inhalte ohne dedizierten Pfad.
   Cartella di destinazione: Zielordner
-  Cartella di download predefinita di libtorrent.: Standard-Libtorrent-Downloadordner.
+  Cartella di download predefinita per tutti i motori.: Standard-Download-Ordner für jede Engine.
   ? 'Cartella di salvataggio. Lascia vuoto per usare la predefinita: i torrent entro la soglia vanno in RAM disk e poi su disco.'
   : 'Ordner speichern. Lassen Sie das Feld leer, um die Standardeinstellung zu verwenden: Torrents innerhalb des Schwellenwerts werden auf die
     RAM-Disk und dann auf die Festplatte verschoben.'
@@ -469,7 +469,6 @@ deu:
   Cartella rimossa dalla condivisione: Ordner aus der Freigabe entfernt
   Cartella sul NAS dove vengono archiviati gli episodi di questa serie: Ordner auf dem NAS, in dem die Episoden dieser Serie gespeichert sind
   Cartella temporanea: Temporärer Ordner
-  Cartella temporanea libtorrent: Temporärer libtorrent-Ordner
   Cartella temporanea per i download in corso.: Temporärer Ordner für laufende Downloads.
   Cartella trash: Papierkorbordner
   Cartelle osservate: Ordner beobachtet
@@ -873,7 +872,7 @@ deu:
   Download e storico: Downloads und Verlauf
   Download globale (KiB/s, 0 = illimitato): Globaler Download (KiB/s, 0 = unbegrenzt)
   Download in pausa: Download angehalten
-  Download libtorrent: Libtorrent-Download
+  Cartella download: Download-Ordner
   Download live: Live-Downloads
   Download reinviato: Nochmals herunterladen
   Download rimosso: Download entfernt

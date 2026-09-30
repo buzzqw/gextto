@@ -168,8 +168,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "archive_root", Label: "Cartella archivio", Tab: "paths"},
 	{Key: "trash_path", Label: "Cartella trash", Tab: "paths"},
 	{Key: "cleanup_action", Label: "Azione cleanup", Tab: "paths"},
-	{Key: "libtorrent_dir", Label: "Download libtorrent", Tab: "paths"},
-	{Key: "libtorrent_temp_dir", Label: "Cartella temporanea libtorrent", Tab: "paths"},
+	{Key: "libtorrent_dir", Label: "Cartella download", Tab: "paths"},
+	{Key: "libtorrent_temp_dir", Label: "Cartella temporanea", Tab: "paths"},
 	{Key: "libtorrent_torrent_copy_dir", Label: "Copia i file .torrent in", Tab: "paths"},
 }
 

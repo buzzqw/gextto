@@ -100,7 +100,7 @@ var uiSettingTooltipText = map[string]string{
 	"blacklist":                                    "Parole vietate, una per riga: le release che le contengono vengono scartate.",
 	"archive_root":                                 "Cartella di archivio predefinita per i contenuti senza percorso dedicato.",
 	"trash_path":                                   "Cartella dove vengono spostati i file sostituiti/duplicati.",
-	"libtorrent_dir":                               "Cartella di download predefinita di libtorrent.",
+	"libtorrent_dir":                               "Cartella di download predefinita per tutti i motori.",
 	"libtorrent_temp_dir":                          "Cartella temporanea per i download in corso.",
 	"libtorrent_ramdisk_dir":                       "RAM disk da usare per i download in corso, se disponibile.",
 	"libtorrent_ramdisk_enabled":                   "Scarica in RAM i torrent che rientrano nella soglia; i più grandi vanno su disco.",

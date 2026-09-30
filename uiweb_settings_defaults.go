@@ -20,7 +20,6 @@ var uiSettingDefaults = map[string]string{
 	"refresh_interval":        "21600",
 	"max_release_age_days":    "0",
 	"gap_fill_max_per_series": "0",
-	"gap_fill_max_per_cycle":  "30",
 	"gap_filling":             "yes",
 	"gap_deep_interval_hours": "6",
 	"gap_deep_max_per_cycle":  "5",

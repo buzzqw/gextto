@@ -876,7 +876,6 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"source_filters":                       cfg.SourceFilters,
 		"max_release_age_days":                 cfg.MaxReleaseAgeDays,
 		"gap_fill_max_per_series":              settingsParseUint(cfg, "gap_fill_max_per_series", 0),
-		"gap_fill_max_per_cycle":               settingsParseUint(cfg, "gap_fill_max_per_cycle", 30),
 		"gap_filling":                          settingsBool(cfg, "gap_filling", true),
 		"gap_deep_interval_hours":              settingsParseInt(cfg, "gap_deep_interval_hours", 6),
 		"gap_deep_max_per_cycle":               settingsParseUint(cfg, "gap_deep_max_per_cycle", 5),

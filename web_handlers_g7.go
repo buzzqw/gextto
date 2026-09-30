@@ -671,7 +671,7 @@ func gh7_setting_key_allowed(key string) bool {
 	}
 	switch key {
 	case "active", "refresh_interval", "url", "indexers", "websearch_engines", "blacklist",
-		"content_filters", "max_release_age_days", "gap_fill_max_per_series", "gap_fill_max_per_cycle",
+		"content_filters", "max_release_age_days", "gap_fill_max_per_series",
 		"gap_filling", "gap_deep_interval_hours", "gap_deep_max_per_cycle", "flaresolverr_url",
 		"tmdb_api_key", "tmdb_language", "default_language", "rename_episodes", "rename_format",
 		"rename_template", "archive_root", "trash_path", "libtorrent_dir",

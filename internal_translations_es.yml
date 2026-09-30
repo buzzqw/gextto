@@ -442,7 +442,7 @@ spa:
   Cartella destinazione: Carpeta de destino
   Cartella di archivio predefinita per i contenuti senza percorso dedicato.: Carpeta de archivo predeterminada para contenido sin ruta dedicada.
   Cartella di destinazione: Carpeta de destino
-  Cartella di download predefinita di libtorrent.: Carpeta de descarga de libtorrent predeterminada.
+  Cartella di download predefinita per tutti i motori.: Carpeta de descargas predeterminada para todos los motores.
   ? 'Cartella di salvataggio. Lascia vuoto per usare la predefinita: i torrent entro la soglia vanno in RAM disk e poi su disco.'
   : 'Guardar carpeta. Déjelo en blanco para usar el valor predeterminado: los torrents dentro del umbral van al disco RAM y luego al disco.'
   Cartella dove vengono spostati i file sostituiti/duplicati.: Carpeta donde se mueven los archivos reemplazados/duplicados.
@@ -457,7 +457,6 @@ spa:
   Cartella rimossa dalla condivisione: Carpeta eliminada del uso compartido
   Cartella sul NAS dove vengono archiviati gli episodi di questa serie: Carpeta en el NAS donde se almacenan los episodios de esta serie
   Cartella temporanea: Carpeta temporal
-  Cartella temporanea libtorrent: Carpeta temporal libtorrent
   Cartella temporanea per i download in corso.: Carpeta temporal para descargas en curso.
   Cartella trash: Carpeta de papelera
   Cartelle osservate: Carpetas vigiladas
@@ -860,7 +859,7 @@ spa:
   Download e storico: Descargas e historial
   Download globale (KiB/s, 0 = illimitato): Descarga global (KiB/s, 0 = ilimitado)
   Download in pausa: Descarga pausada
-  Download libtorrent: Descargar libtorrent
+  Cartella download: Carpeta de descargas
   Download live: Descarga en vivo
   Download reinviato: Descargar reenviado
   Download rimosso: Descarga eliminada
