@@ -62,7 +62,7 @@ puramente di rete non sono stati introdotti):
 
 ## 1. Sincronizzare l'accesso all'handle nativo di libtorrent
 
-**Evidenza.** In [`libtorrent.go`](libtorrent.go), `session unsafe.Pointer` è
+**Evidenza.** In [`libtorrent.go`](../libtorrent.go), `session unsafe.Pointer` è
 protetto da `sessionMu sync.RWMutex` (righe 199–204), ma l'unico lettore che
 acquisisce il lock è `listUncached` (righe 1226–1241). Tutti gli altri metodi
 leggono `c.session` senza lock: `Remove` (riga 2238), `MoveStorage` (1587),
@@ -93,10 +93,10 @@ attuale.
 ## 2. Vincolare il programma degli event hook
 
 **Evidenza.** `POST /api/event-hooks` →
-[`SaveEventHooks`](web_handlers_g3.go) (riga 484) persiste una lista di
-`EventHook`. [`ValidateHooks`](hooks.go) (righe 135–159) controlla solo che
+[`SaveEventHooks`](../web_handlers_g3.go) (riga 484) persiste una lista di
+`EventHook`. [`ValidateHooks`](../hooks.go) (righe 135–159) controlla solo che
 `Program` sia non vuoto e **assoluto**, e i limiti di lunghezza; non esiste
-un allowlist di eseguibili. [`RunHook`](hooks.go) (riga 536) esegue
+un allowlist di eseguibili. [`RunHook`](../hooks.go) (riga 536) esegue
 `exec.CommandContext(ctx, program, args...)` con `program` libero e `args`
 derivati da `SplitArgs`. Con `Program: "/bin/bash"` e `Args: "-c <comando>"` si
 ottiene una shell arbitraria.
@@ -119,10 +119,10 @@ integrazione che dimostri il rifiuto di `/bin/sh`; documento aggiornato.
 ## 3. Filtrare gli URL remoti (SSRF) e vincolare i percorsi utente
 
 **Evidenza.** Tre endpoint scaricano un URL fornito dall'utente e lo trattano
-come `.torrent`/magnet: `POST /api/send-magnet` ([`SendMagnet`](web_handlers_g2.go),
+come `.torrent`/magnet: `POST /api/send-magnet` ([`SendMagnet`](../web_handlers_g2.go),
 righe 798–815), `POST /api/archive/add` e `POST /api/search/add`
-([`gh0_downloadAndAdd`](web_handlers_g0.go), righe 1055–1066). L'unica
-validazione è il prefisso `http(s)://` ([`gh0_isTorrentURL`](web_handlers_g0.go),
+([`gh0_downloadAndAdd`](../web_handlers_g0.go), righe 1055–1066). L'unica
+validazione è il prefisso `http(s)://` ([`gh0_isTorrentURL`](../web_handlers_g0.go),
 riga 1038). `defaultHTTPClient` segue i redirect e non ha restrizioni di rete.
 Anche le URL di integrazione sono scrivibili in modo anonimo
 (`flaresolverr_url`, `jellyfin_*`, `plex_*`, `qbittorrent_url`, `indexers`,
@@ -131,7 +131,7 @@ Anche le URL di integrazione sono scrivibili in modo anonimo
 **Rischio.** SSRF: il daemon può essere indotto a richiedere indirizzi interni
 (metadati cloud `169.254.169.254`, servizi LAN, il proprio listener motore) con
 il corpo della risposta salvato su disco o riflesso negli errori. Vale anche
-per `IpfilterUpdate` quando `IpFilterPath` è una URL ([`web_handlers_g7.go`](web_handlers_g7.go),
+per `IpfilterUpdate` quando `IpFilterPath` è una URL ([`web_handlers_g7.go`](../web_handlers_g7.go),
 righe 848–880).
 
 **Proposta.** Un unico helper HTTP condiviso che (a) rifiuti schemi diversi da
@@ -148,11 +148,11 @@ gli host dichiarati.
 
 ### 3.1 Percorsi utente non vincolati
 
-`GET /api/browse_dir` ([`web_handlers_g6.go`](web_handlers_g6.go), 516–559)
+`GET /api/browse_dir` ([`web_handlers_g6.go`](../web_handlers_g6.go), 516–559)
 elenca qualunque directory raggiungibile; `POST /api/mkdir`
-([`web_handlers_g0.go`](web_handlers_g0.go), 983–999) crea directory con
+([`web_handlers_g0.go`](../web_handlers_g0.go), 983–999) crea directory con
 `os.MkdirAll` senza limitazione alle radici configurate; `POST /api/upload-torrent`
-([`web_handlers_g3.go`](web_handlers_g3.go), 778–782) accetta un `save_path`
+([`web_handlers_g3.go`](../web_handlers_g3.go), 778–782) accetta un `save_path`
 libero, a differenza di `MoveTorrentStorage` che applica
 `gh7_path_starts_with`. **Proposta:** riusare la stessa regola di
 "percorso dentro le radici configurate" già presente per il rename/move in tutti
@@ -161,7 +161,7 @@ caratteri come `\0`.
 
 ## 4. Non esporre le chiavi in `ConfigView`
 
-**Evidenza.** `GET /api/config` ([`ConfigView`](web_handlers_core.go)) restituisce
+**Evidenza.** `GET /api/config` ([`ConfigView`](../web_handlers_core.go)) restituisce
 `"api_key": indexer.APIKey` (riga 760) e i valori `tmdb_api_key` (895) e
 `tvdb_api_key` (898) in chiaro, mentre per Jellyfin/Plex/qBittorrent espone solo
 un flag `*_configured` (891 e simili). Lo stesso handler usa già
@@ -180,15 +180,15 @@ booleani; controllo che nessun consumer interno dipenda dai campi rimossi.
 
 ## 5. Tracciare le goroutine avviate dagli handler
 
-**Evidenza.** `stopBackgroundWorkers` ([`web_serve.go`](web_serve.go), 108–116)
+**Evidenza.** `stopBackgroundWorkers` ([`web_serve.go`](../web_serve.go), 108–116)
 attende solo le 10 goroutine registrate in `bgWG`. Tre goroutine non tracciate
 toccano il motore torrent e possono sopravvivere alla distruzione della
 sessione:
 
-- ciclo manuale: [`RunNow`](web_handlers_g1.go) (riga 707) usa
+- ciclo manuale: [`RunNow`](../web_handlers_g1.go) (riga 707) usa
   `s.BackgroundContext()` (non `r.Context()`) e poi `RunCycleDomain`;
-- rinomina globale: [`RenameAll`](web_handlers_g2.go) (riga 631);
-- riparazione rinomina archivio: [`web_background.go`](web_background.go)
+- rinomina globale: [`RenameAll`](../web_handlers_g2.go) (riga 631);
+- riparazione rinomina archivio: [`web_background.go`](../web_background.go)
   (riga 1624).
 
 `Serve` restituisce, `ShutdownEmbedded` distrugge la sessione, ma una di queste
@@ -215,20 +215,20 @@ su avvio/arresto ripetuti.
 
 **Evidenza e proposta.**
 
-- `requireEmbedded` ([`torrent_engine.go`](torrent_engine.go), 399–404) legge
+- `requireEmbedded` ([`torrent_engine.go`](../torrent_engine.go), 399–404) legge
   `s.torrent_engine` senza `engine_mu`, mentre `activeEngine`/`setActiveEngine`
   lo usano. Il backend può cambiare a runtime: **leggere sotto
   `engine_mu.RLock()`**.
-- `RenameProgress` ([`web.go`](web.go), 406) è una struct senza mutex, scritta da
+- `RenameProgress` ([`web.go`](../web.go), 406) è una struct senza mutex, scritta da
   `RenameAll` e copiata da `RenameProgressView`: **proteggerla con un mutex o uno
   snapshot atomico**. Lo stesso check-and-set su `Running` (612–616) consente due
   rinomine concorrenti.
 - `cycle_lock` è trattenuto per l'intero `RunCycle` (minuti): **valutare il
   lock solo intorno alla sezione critica di stato**, lasciando il lavoro lungo
   fuori lock o con `TryLock` + stato "in corso" idempotente.
-- `qbittorrentEngine.categoryReady` ([`qbittorrent_engine.go`](qbittorrent_engine.go),
+- `qbittorrentEngine.categoryReady` ([`qbittorrent_engine.go`](../qbittorrent_engine.go),
   1283–1291) è una read-modify-write senza lock: **proteggerla con `e.mu`**.
-- `safeGo` ([`safety.go`](safety.go), 20–40) dorme `workerRestartDelay` senza
+- `safeGo` ([`safety.go`](../safety.go), 20–40) dorme `workerRestartDelay` senza
   `SleepBackground`: **usare `SleepBackground`** così il restart non ritarda
   l'arresto.
 - I quattro handle `*sql.DB` aperti in `cmd/gexttod/main.go` non vengono mai
@@ -236,7 +236,7 @@ su avvio/arresto ripetuti.
 
 ## 7. Rendere transazionali le scritture correlate
 
-**Evidenza.** `checkSeriesScoredInner` ([`database.go`](database.go), 827–1001)
+**Evidenza.** `checkSeriesScoredInner` ([`database.go`](../database.go), 827–1001)
 e `CheckMovieScoredWith` (1307–1383) eseguono, fuori transazione,
 `INSERT`/`SELECT`/`saveUpgradeBackup`/`UPDATE`: se l'`UPDATE` fallisce dopo il
 backup, resta una riga `upgrade_backup` orfana e l'upgrade è applicato a metà.
@@ -255,7 +255,7 @@ l'assenza di righe orfane (rollback completo).
 
 ## 8. Gestire l'hash magnet mancante nei `DELETE`
 
-**Evidenza.** `clearPlaceholders` ([`database.go`](database.go), 3649) fa
+**Evidenza.** `clearPlaceholders` ([`database.go`](../database.go), 3649) fa
 `digest, _ := utils.MagnetHash(magnet)` ignorando `ok`. Per un rilascio senza
 magnet (es. solo `.torrent` URL) `digest` è vuoto e il predicato diventa
 `WHERE (lower(magnet_hash)=lower('') OR magnet_link=?)`, che può cancellare le
@@ -270,17 +270,17 @@ righe con `magnet_hash` legittimamente vuoto. Stesso schema in `archive.go:389`
 ## 9. Correggere errori ignorati e limiti
 
 - `MarkTorrentRemovedAt` ignorato in `ReconcileMissingTorrents`
-  ([`database.go`](database.go), 3328): un `UPDATE` fallito fa sparire la voce
+  ([`database.go`](../database.go), 3328): un `UPDATE` fallito fa sparire la voce
   dalla cronologia download senza segnale.
-- `tableColumns` ignorato in [`config.go`](config.go) (1869) più l'errore di
+- `tableColumns` ignorato in [`config.go`](../config.go) (1869) più l'errore di
   `Query` (1890): la lista film monitorati può caricarsi vuota in silenzio.
 - `ALTER TABLE ... ADD COLUMN` ignorati in `SaveLibrary` (2555–2566): una
   migrazione fallita prosegue con schema vecchio senza segnale.
-- `HTTPDownload` ([`httpx.go`](httpx.go), 113–122) usa `io.Copy` senza limite di
+- `HTTPDownload` ([`httpx.go`](../httpx.go), 113–122) usa `io.Copy` senza limite di
   dimensione, a differenza degli altri helper: applicare `copyLimited`.
-- `postJSON` ([`notifier.go`](notifier.go), 295) usa `context.Background()` e
+- `postJSON` ([`notifier.go`](../notifier.go), 295) usa `context.Background()` e
   ignora la cancellazione: propagare il contesto del chiamante.
-- `gibSetting` ([`config.go`](config.go), 1125) converte `float64 → uint64` senza
+- `gibSetting` ([`config.go`](../config.go), 1125) converte `float64 → uint64` senza
   limite superiore (overflow); `maxInt64(timeframeHours,0)*60` e le durate derivate
   possono traboccare per valori estremi: clampare gli ingressi.
 

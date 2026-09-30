@@ -155,7 +155,7 @@ npm run test:a11y
 La suite automatica attuale copre le sezioni principali della UI con 12 test di
 accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
-Consulta l'[analisi di accessibilità](accessibility-analysis.md) per ambito e
+Consulta l'[analisi di accessibilità](docs/accessibility-analysis.md) per ambito e
 limitazioni note.
 
 ## Primo avvio sicuro
@@ -204,7 +204,7 @@ rilevato e lascia intatti dati e configurazione. Usa
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
-| Ambito e test accessibilità | [Analisi accessibilità](accessibility-analysis.md) |
+| Ambito e test accessibilità | [Analisi accessibilità](docs/accessibility-analysis.md) |
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
 
