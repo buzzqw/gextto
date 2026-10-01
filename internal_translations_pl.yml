@@ -826,6 +826,7 @@ pol:
   : Po upływie tych minut bez zwiększenia liczby ukończonych bajtów torrent uważa się za zablokowany. Obecność rówieśników nie wystarczy, aby
     zresetować timer.
   Dopo questo periodo senza progresso il torrent viene rimosso; 0 disabilita la rimozione automatica.: Po tym okresie braku postępu torrent jest
+  Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo.: Po tym okresie braku postępu torrent jest automatycznie usuwany. Ustaw 0, aby całkowicie wyłączyć automatyczne usuwanie z powodu zastoju.
     usuwany; 0 wyłącza automatyczne usuwanie.
   Dov'è finito Esporta?: Dokąd poszedł Eksport?
   Download: Pobierz
@@ -2581,6 +2582,7 @@ pol:
   Rimozione: Usunięcie
   Rimozione in corso...: Usuwanie...
   Rimozione stalled (minuti, 0 = mai): Usuwanie zablokowanych (minuty, 0 = nigdy)
+  Rimozione stalled (minuti, 0 = disattivata): Usuwanie zablokowanych (minuty, 0 = wyłączone)
   Rimuove dall'archivio i magnet link trovati da Jackett o dai siti vecchi di un tot di giorni.: Usuwa z archiwum linki magnetyczne znalezione
     przez Jacketta lub ze stron, które mają określoną liczbę dni.
   'Rimuove dalla lista: torrent al 100% + download HTTP/Mega completati o in errore. NON cancella i file su disco.': 'Usuwa z listy: 100% torrentów

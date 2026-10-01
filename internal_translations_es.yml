@@ -830,6 +830,7 @@ spa:
   : Transcurridos estos minutos sin aumento de bytes completados, el torrent se considera bloqueado. La presencia de compañeros no es suficiente
     para restablecer el cronómetro.
   Dopo questo periodo senza progresso il torrent viene rimosso; 0 disabilita la rimozione automatica.: Pasado este periodo sin progreso se elimina
+  Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo.: Después de este periodo sin progreso, el torrent se elimina automáticamente. Establece 0 para desactivar por completo la eliminación automática por estancamiento.
     el torrent; 0 desactiva la eliminación automática.
   Dov'è finito Esporta?: ¿A dónde se fue Exportar?
   Download: Descargas
@@ -2584,6 +2585,7 @@ spa:
   Rimozione: Eliminación
   Rimozione in corso...: Eliminando...
   Rimozione stalled (minuti, 0 = mai): Eliminando estancamiento (minutos, 0 = nunca)
+  Rimozione stalled (minuti, 0 = disattivata): Eliminación por estancamiento (minutos, 0 = desactivada)
   Rimuove dall'archivio i magnet link trovati da Jackett o dai siti vecchi di un tot di giorni.: Elimina del archivo los enlaces magnet encontrados
     por Jackett o sitios web que tienen más de una determinada cantidad de días.
   'Rimuove dalla lista: torrent al 100% + download HTTP/Mega completati o in errore. NON cancella i file su disco.': 'Elimina de la lista: torrents

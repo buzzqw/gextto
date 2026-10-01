@@ -40,7 +40,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_dont_count_slow_torrents", Label: "Non contare i torrent fermi negli slot attivi", Tab: "libtorrent"},
 	{Key: "libtorrent_stall_after_min", Label: "Considera stalled dopo (minuti)", Tab: "seeding"},
 	{Key: "libtorrent_stall_retry_min", Label: "Retry stalled (minuti)", Tab: "seeding"},
-	{Key: "libtorrent_stall_giveup_min", Label: "Rimozione stalled (minuti, 0 = mai)", Tab: "seeding"},
+	{Key: "libtorrent_stall_giveup_min", Label: "Rimozione stalled (minuti, 0 = disattivata)", Tab: "seeding"},
 	{Key: "libtorrent_sequential", Label: "Download sequenziale", Tab: "libtorrent"},
 	{Key: "libtorrent_active_downloads", Label: "Download attivi", Tab: "libtorrent"},
 	{Key: "libtorrent_active_seeds", Label: "Seed attivi", Tab: "libtorrent"},

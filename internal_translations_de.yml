@@ -843,6 +843,7 @@ deu:
   : Nach diesen Minuten ohne einen Anstieg der abgeschlossenen Bytes gilt der Torrent als blockiert. Die Anwesenheit von Peers reicht nicht aus,
     um den Timer zurückzusetzen.
   Dopo questo periodo senza progresso il torrent viene rimosso; 0 disabilita la rimozione automatica.: Nach Ablauf dieser Zeit ohne Fortschritt
+  Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo.: Nach diesem Zeitraum ohne Fortschritt wird der Torrent automatisch entfernt. Mit 0 wird die automatische Entfernung wegen Stillstand vollständig deaktiviert.
     wird der Torrent entfernt; 0 deaktiviert die automatische Entfernung.
   Dov'è finito Esporta?: Wo ist Exportieren geblieben?
   Download: Downloads
@@ -2619,6 +2620,7 @@ deu:
   Rimozione: Entfernung
   Rimozione in corso...: Entfernung läuft...
   Rimozione stalled (minuti, 0 = mai): Angehaltene Entfernung (Minuten, 0 = nie)
+  Rimozione stalled (minuti, 0 = disattivata): Entfernung bei Stillstand (Minuten, 0 = deaktiviert)
   Rimuove dall'archivio i magnet link trovati da Jackett o dai siti vecchi di un tot di giorni.: Entfernt Magnet-Links aus dem Archiv, die von
     Jackett oder von Websites stammen und älter als eine bestimmte Anzahl von Tagen sind.
   'Rimuove dalla lista: torrent al 100% + download HTTP/Mega completati o in errore. NON cancella i file su disco.': 'Entfernt aus der Liste:

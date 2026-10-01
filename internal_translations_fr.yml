@@ -845,6 +845,7 @@ fra:
   : Après ces minutes sans augmentation des octets complétés, le torrent est considéré comme bloqué. La présence de pairs ne suffit pas à remettre
     le chronomètre à zéro.
   Dopo questo periodo senza progresso il torrent viene rimosso; 0 disabilita la rimozione automatica.: Après cette période sans progression le
+  Dopo questo periodo senza progresso il torrent viene rimosso automaticamente. Imposta 0 per disattivare completamente la rimozione automatica per stallo.: Après cette période sans progression, le torrent est supprimé automatiquement. Définissez 0 pour désactiver complètement la suppression automatique en cas de blocage.
     torrent est supprimé ; 0 désactive la suppression automatique.
   Dov'è finito Esporta?: Où est passé l'Export ?
   Download: Téléchargements
@@ -2618,6 +2619,7 @@ fra:
   Rimozione: Suppression
   Rimozione in corso...: Suppression en cours...
   Rimozione stalled (minuti, 0 = mai): Suppression bloquée (minutes, 0 = jamais)
+  Rimozione stalled (minuti, 0 = disattivata): Suppression en cas de blocage (minutes, 0 = désactivée)
   Rimuove dall'archivio i magnet link trovati da Jackett o dai siti vecchi di un tot di giorni.: Supprime de l'archive les liens magnet trouvés
     par Jackett ou sur des sites plus anciens d'un certain nombre de jours.
   'Rimuove dalla lista: torrent al 100% + download HTTP/Mega completati o in errore. NON cancella i file su disco.': 'Supprime de la liste : les
