@@ -391,17 +391,19 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		return uiMovieDetail{}, false
 	}
 	detail := uiMovieDetail{
-		ID:                   movie.ID,
-		Name:                 movie.Name,
-		Year:                 movie.Year,
-		Quality:              movie.Quality,
-		Language:             movie.Language,
-		TmdbID:               movie.TmdbID,
-		TvdbID:               movie.TvdbID,
-		Overview:             movie.Overview,
-		Subtitle:             movie.Subtitle,
-		Exclude:              movie.Exclude,
-		LanguageRequirements: movie.LanguageRequirements,
+		ID:       movie.ID,
+		Name:     movie.Name,
+		Year:     movie.Year,
+		Quality:  movie.Quality,
+		Language: movie.Language,
+		TmdbID:   movie.TmdbID,
+		TvdbID:   movie.TvdbID,
+		Overview: movie.Overview,
+		Subtitle: movie.Subtitle,
+		Exclude:  movie.Exclude,
+		// The persisted form is canonical JSON for the API/database. The edit
+		// form accepts the human-readable comma-separated representation.
+		LanguageRequirements: strings.Join(parseLanguageRequirements(movie.LanguageRequirements), ","),
 		SubtitleRequirements: movie.SubtitleRequirements,
 		Enabled:              movie.Enabled,
 		Poster:               movie.PosterPath,

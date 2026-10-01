@@ -437,7 +437,7 @@ func TestV2PanelsPagesRender(t *testing.T) {
 
 func TestV2DetailPagesRender(t *testing.T) {
 	state := newTestAppState(t)
-	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true}}); err != nil {
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show", Seasons: "*", Quality: "1080p", Language: "ita"}}, []MovieConfig{{ID: 7, Name: "Test Movie", Year: "2020", Enabled: true, LanguageRequirements: `[{"language":"ita","required":true}]`}}); err != nil {
 		t.Fatalf("SaveLibrary: %v", err)
 	}
 	server := httptest.NewServer(Router(state))
@@ -452,7 +452,7 @@ func TestV2DetailPagesRender(t *testing.T) {
 		t.Fatalf("root series detail -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=movies&movie=7", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Test Movie") {
+	if code != http.StatusOK || !strings.Contains(body, "Test Movie") || !strings.Contains(body, `name="language_requirements" value="ita"`) || strings.Contains(body, `name="language_requirements" value="[{\"language\":\"ita\"`) {
 		t.Fatalf("movie detail -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
