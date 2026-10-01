@@ -3,7 +3,7 @@ package gextto
 // uiweb.go is the first concrete slice of the UI migration to Go + server-side
 // rendering for the server-side UI migration.
 //
-// The shell is a plain HTML document served at `/` and `/ui`. Dynamic regions
+// The classic shell is a plain HTML document served at `/ui`. Dynamic regions
 // are fetched from `/ui/partial/...` endpoints and actions reuse the existing
 // JSON APIs, so the API contract and all current behaviour are untouched.
 //

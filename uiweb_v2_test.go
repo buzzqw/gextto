@@ -68,6 +68,19 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 	}
 }
 
+func TestV2IsTheDefaultRootUI(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/", nil)
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-page"`) {
+		t.Fatalf("GET / should render the official v2 shell -> %d", code)
+	}
+	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
+		t.Fatal("official root UI must not load the classic script")
+	}
+}
+
 func TestV2CoversEveryClassicMenuScreen(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

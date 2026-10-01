@@ -9,7 +9,10 @@ Portare l'interfaccia da *SSR + `gextto-ui.js`* (5.427 righe di client) a
 
 La v2:
 
-- vive su un indirizzo separato: **`/v2`** (nessuna modifica a `/`);
+- è l'interfaccia ufficiale su **`/`**; **`/v2`** resta un alias tecnico di
+  rollback durante il periodo di stabilizzazione;
+- la vecchia UI resta raggiungibile solo su **`/ui`** come fallback esplicito,
+  ma non è più l'interfaccia predefinita;
 - riusa le stesse API JSON, gli stessi view-model Go (`uiDashboardDataFrom`,
   `uiTorrentsDataFrom`, `uiSettingsPageFrom`, `uiSeriesDetailFrom`,
   `uiMovieDetailFrom`, `uiTableSpecFor`, …) e lo stesso CSS di base
@@ -181,16 +184,17 @@ gofmt e suite completa sono verdi.
 
 ## 9. Promozione a UI di default
 
-1. registrare gli handler `/v2` anche su `/` (o reindirizzare `/` → `/v2`);
-2. mantenere `/v2` come alias durante il periodo di doppia disponibilità;
-3. chiudere i residui di §4 e aggiornare i link ai dettagli (già in v2).
+La promozione è stata eseguita: `/` usa `V2Page`, `/v2` resta alias tecnico e
+`/ui` è mantenuta temporaneamente come fallback di rollback. Dopo un periodo di
+esercizio senza regressioni si potranno disattivare le route e gli asset della UI
+classica.
 
-## 10. Rimozione della v2
+## 10. Rimozione della UI classica dopo lo stabilizzamento
 
-```bash
-rm -rf uiweb/v2 uiweb_v2*.go
-# poi togliere la chiamata registerV2Routes(s, mux) in web_router.go
-```
+La rimozione sicura della UI classica richiede prima di spostare il CSS condiviso
+attualmente servito da `/ui/static/gextto-ui.css` dentro gli asset v2. Solo dopo
+si potranno disattivare `/ui`, `/ui/partial/*` e il vecchio JavaScript/template.
+I view-model Go e gli handler API condivisi non vanno rimossi.
 
 ## 11. Prossimi passi
 

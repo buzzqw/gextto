@@ -15,8 +15,8 @@ package gextto
 //     data and the look come from the same source as the classic UI;
 //   - the JSON APIs are untouched (the TUI and external clients keep working).
 //
-// Promotion to the default UI later is a routing change only: point "/" at
-// these handlers once v2 reaches parity and is approved.
+// The v2 handlers are the official UI at "/"; /v2 remains their explicit
+// technical alias during stabilization.
 //
 // Migration is delivered in verified batches. Views that are not migrated yet
 // answer with v2_unavailable and link back to the classic page instead of

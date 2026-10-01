@@ -472,9 +472,9 @@ func TestUiShellServesOwnStylesheet(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, _, body := webGet(t, server, "/")
+	code, _, body := webGet(t, server, "/ui")
 	if code != http.StatusOK {
-		t.Fatalf("GET / -> %d", code)
+		t.Fatalf("GET /ui -> %d", code)
 	}
 	html := string(body)
 	if !strings.Contains(html, "/ui/static/gextto-ui.css") {

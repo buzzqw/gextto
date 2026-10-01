@@ -9,7 +9,9 @@ import "net/http"
 // cache-control middleware.
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
-	handle(s, mux, "GET /{$}", UiPage)
+	// UI ufficiale: la v2 è ora servita alla radice. Le route /v2 e /ui
+	// restano disponibili come alias/rollback durante il periodo di sicurezza.
+	handle(s, mux, "GET /{$}", V2Page)
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)
 	handle(s, mux, "GET /api/i18n", I18nList)
@@ -301,8 +303,8 @@ func registerUIRoutes(s *AppState, mux *http.ServeMux) {
 	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
 	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
 
-	// UI v2 (SSR + HTMX) lives entirely in uiweb_v2.go and uiweb/v2. The classic
-	// interface at / is untouched; promotion happens by pointing / at these
-	// handlers once v2 is approved.
+	// UI v2 (SSR + HTMX) lives entirely in uiweb_v2.go and uiweb/v2. It is the
+	// official interface at /; the classic interface remains available at /ui
+	// only as a temporary rollback path.
 	registerV2Routes(s, mux)
 }
