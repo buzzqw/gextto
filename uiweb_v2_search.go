@@ -39,7 +39,7 @@ type v2ExplainView struct {
 // V2Search runs the manual release search server-side.
 func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := strings.TrimSpace(r.FormValue("q"))
-	view := v2SearchViewFrom(s, query, "/v2?view=search")
+	view := v2SearchViewFrom(s, query, "/?view=search")
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
 }
@@ -84,7 +84,7 @@ func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	redirect := strings.TrimSpace(r.FormValue("redirect"))
 	if !strings.HasPrefix(redirect, "/v2") {
-		redirect = "/v2?view=search"
+		redirect = "/?view=search"
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)

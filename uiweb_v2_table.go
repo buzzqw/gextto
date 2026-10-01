@@ -731,10 +731,10 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		return template.HTML(`<span title="` + stdhtml.EscapeString(full) + `">` + stdhtml.EscapeString(v2FolderLabel(full)) + `</span>`)
 	case "series_link":
 		name := v2String(item[column.Key])
-		return template.HTML(`<a href="/v2?view=series&amp;series=` + url.QueryEscape(name) + `" title="Apri il dettaglio della serie">` + stdhtml.EscapeString(name) + `</a>`)
+		return template.HTML(`<a href="/?view=series&amp;series=` + url.QueryEscape(name) + `" title="Apri il dettaglio della serie">` + stdhtml.EscapeString(name) + `</a>`)
 	case "movie_link":
 		name := v2String(item[column.Key])
-		return template.HTML(`<a href="/v2?view=movies&amp;movie=` + url.QueryEscape(v2String(item["id"])) + `" title="Apri il dettaglio del film">` + stdhtml.EscapeString(name) + `</a>`)
+		return template.HTML(`<a href="/?view=movies&amp;movie=` + url.QueryEscape(v2String(item["id"])) + `" title="Apri il dettaglio del film">` + stdhtml.EscapeString(name) + `</a>`)
 	case "url", "getcomics":
 		href := v2String(raw)
 		if href == "" {

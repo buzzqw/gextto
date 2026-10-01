@@ -113,7 +113,7 @@ func TestV2MovieHistoryIsAvailableFromLibrary(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("movie history -> %d", code)
 	}
-	for _, marker := range []string{"Film monitorati", "Film scaricati", "Nessun film scaricato.", `href="/v2?view=movies&amp;tab=downloaded"`} {
+	for _, marker := range []string{"Film monitorati", "Film scaricati", "Nessun film scaricato.", `href="/?view=movies&amp;tab=downloaded"`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("movie history missing %q", marker)
 		}
@@ -410,7 +410,7 @@ func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
 	}
 }
 
-func TestV2LibraryLinksStayInsideV2(t *testing.T) {
+func TestV2LibraryLinksUseCanonicalRoot(t *testing.T) {
 	state := newTestAppState(t)
 	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show"}}, []MovieConfig{{ID: 7, Name: "Test Movie"}}); err != nil {
 		t.Fatalf("SaveLibrary: %v", err)
@@ -419,13 +419,30 @@ func TestV2LibraryLinksStayInsideV2(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	for view, marker := range map[string]string{
-		"series": `/v2?view=series&amp;series=Test+Show`,
-		"movies": `/v2?view=movies&amp;movie=7`,
+		"series": `/?view=series&amp;series=Test+Show`,
+		"movies": `/?view=movies&amp;movie=7`,
 	} {
 		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)
 		if code != http.StatusOK || !strings.Contains(body, marker) {
 			t.Fatalf("%s detail link missing: status=%d", view, code)
 		}
+	}
+}
+
+func TestV2NavigationUsesCanonicalRootURLs(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=dashboard", nil)
+	if code != http.StatusOK {
+		t.Fatalf("root dashboard -> %d", code)
+	}
+	if strings.Contains(body, `href="/v2?view=`) {
+		t.Fatal("visible navigation must use canonical root URLs")
+	}
+	if !strings.Contains(body, `href="/?view=dashboard"`) {
+		t.Fatal("dashboard link must use canonical root URL")
 	}
 }
 

@@ -32,9 +32,9 @@ func v2ContentDetail(s *AppState, r *http.Request, view string) (string, any, bo
 // replaces the edited series, then saves the array exactly like /api/config/series.
 func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := strings.TrimSpace(r.FormValue("name"))
-	redirect := "/v2?view=series"
+	redirect := "/?view=series"
 	if name != "" {
-		redirect = "/v2?view=series&series=" + url.QueryEscape(name)
+		redirect = "/?view=series&series=" + url.QueryEscape(name)
 	}
 	if name != "" {
 		if raw, status := v2InternalJSON(s, http.MethodGet, "/api/config/library", nil, nil); status < 400 {

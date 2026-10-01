@@ -219,7 +219,7 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if view == "" {
 			view = "dashboard"
 		}
-		target = "/v2?view=" + url.QueryEscape(view)
+		target = "/?view=" + url.QueryEscape(view)
 	}
 	w.Header().Set("HX-Redirect", target)
 	w.WriteHeader(http.StatusNoContent)
@@ -279,7 +279,7 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if render != "" && strings.HasPrefix(path, "/api/") {
 		raw, status := v2InternalJSON(s, http.MethodPost, path, nil, encoded)
 		if r.Header.Get("HX-Request") == "" {
-			http.Redirect(w, r, "/v2?view="+url.QueryEscape(view), http.StatusSeeOther)
+			http.Redirect(w, r, "/?view="+url.QueryEscape(view), http.StatusSeeOther)
 			return
 		}
 		dict, eng := v2Dictionaries(s)
@@ -306,7 +306,7 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if view == "" {
 			view = "dashboard"
 		}
-		target = "/v2?view=" + url.QueryEscape(view)
+		target = "/?view=" + url.QueryEscape(view)
 	}
 	w.Header().Set("HX-Redirect", target)
 	w.WriteHeader(http.StatusNoContent)

@@ -62,10 +62,10 @@ func V2TrashDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2InternalJSON(s, http.MethodPost, "/api/trash/delete", nil, body)
 	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("HX-Redirect", "/v2?view=maintenance")
+	w.Header().Set("HX-Redirect", "/?view=maintenance")
 	w.WriteHeader(http.StatusNoContent)
 }
 

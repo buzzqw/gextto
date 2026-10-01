@@ -72,7 +72,7 @@ func v2DuplicatesViewFrom(s *AppState, r *http.Request) v2DuplicatesView {
 // V2Duplicates runs the duplicate scan/cleanup and re-renders the panel.
 func V2Duplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" && r.FormValue("execute") == "" && r.FormValue("preview") == "" {
-		http.Redirect(w, r, "/v2?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -149,7 +149,7 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 // V2DBMaintenance runs VACUUM/ANALYZE (or just refreshes sizes) and re-renders.
 func V2DBMaintenance(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -249,7 +249,7 @@ func v2RamdiskState(s *AppState) v2RamdiskView {
 // V2Ramdisk selects/creates a RAM disk and re-renders the panel.
 func V2Ramdisk(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -670,7 +670,7 @@ func V2JobCancel(w http.ResponseWriter, r *http.Request, s *AppState) {
 		v2InternalJSON(s, http.MethodPost, "/api/jobs/"+url.PathEscape(id)+"/cancel", nil, []byte("{}"))
 	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=maintenance", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -1132,7 +1132,7 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"Redirect": strings.TrimSpace(r.FormValue("redirect")),
 	}
 	if view["Redirect"] == "" {
-		view["Redirect"] = "/v2?view=search"
+		view["Redirect"] = "/?view=search"
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)

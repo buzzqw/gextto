@@ -51,7 +51,7 @@ func V2SettingsFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
-	target := "/v2?view=settings"
+	target := "/?view=settings"
 	if tab != "" {
 		target += "&tab=" + url.QueryEscape(tab)
 	}
@@ -248,7 +248,7 @@ func v2ListEditorViewFrom(s *AppState, editor uiListEditor, key, view, tab strin
 			}
 		}
 	}
-	redirect := "/v2?view=" + view
+	redirect := "/?view=" + view
 	if tab != "" {
 		redirect += "&tab=" + url.QueryEscape(tab)
 	}

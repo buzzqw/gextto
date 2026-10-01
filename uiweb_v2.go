@@ -268,7 +268,7 @@ func v2NavGroups(view string, counts map[string]int) []uiNavGroup {
 			out.Items = append(out.Items, uiNavItem{
 				ID:           item.ID,
 				Label:        item.Label,
-				Href:         "/v2?view=" + item.ID,
+				Href:         "/?view=" + item.ID,
 				Active:       item.ID == view,
 				Optional:     item.Optional,
 				MobileHidden: item.MobileHidden,
@@ -371,7 +371,7 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 		uiDashboardData: base,
 		Calendar:        v2DashboardCalendarFrom(s),
 		Jobs:            &jobs,
-		Search:          v2SearchView{Redirect: "/v2?view=dashboard"},
+		Search:          v2SearchView{Redirect: "/?view=dashboard"},
 	}
 }
 
@@ -563,7 +563,7 @@ func (d *v2DiscardWriter) WriteHeader(code int)        { d.code = code }
 // answering 204 (HTMX then reloads the page).
 func V2RunCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=dashboard", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=dashboard", http.StatusSeeOther)
 		return
 	}
 	query := r.URL.Query()
@@ -939,7 +939,7 @@ func V2DownloadsTable(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message, isErr = v2TorrentBulkAction(s, r, r.FormValue("bulk"))
 	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=downloads", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -1233,7 +1233,7 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 	}
 	raw, status := v2InternalJSON(s, http.MethodPost, path, nil, body)
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=downloads", http.StatusSeeOther)
+		http.Redirect(w, r, "/?view=downloads", http.StatusSeeOther)
 		return
 	}
 	if status >= 400 {
@@ -1476,7 +1476,7 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 	render := func(status string, isErr bool) {
 		if r.Header.Get("HX-Request") == "" {
-			http.Redirect(w, r, "/v2?view=settings", http.StatusSeeOther)
+			http.Redirect(w, r, "/?view=settings", http.StatusSeeOther)
 			return
 		}
 		v2Render(w, http.StatusOK, "v2_setting_field", v2Field{uiSettingField: field, Status: status, Error: isErr}, dict, eng)

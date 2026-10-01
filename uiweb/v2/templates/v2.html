@@ -40,7 +40,7 @@
         {{range .Items}}
         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
         {{end}}
-        {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/v2?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>{{end}}
+        {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>{{end}}
       </div>
       {{end}}
     </nav>
@@ -174,7 +174,7 @@
           <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
           <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
           <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
-          <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
+          <a class="btn" href="/?view=downloads">Vai a Scarico</a>
         </div>
       </div>
     </div>
@@ -247,7 +247,7 @@
   <div class="panel dashboard-explore-panel">
     <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
     <div class="panel-body"><div class="toolbar dashboard-explore-actions">
-       <a class="btn" href="/v2?view=series">📺 Serie TV</a><a class="btn" href="/v2?view=movies">🎬 Film</a><a class="btn" href="/v2?view=search">🔎 Esplora release</a><a class="btn" href="/v2?view=gaps">⚠ Mancanti</a><a class="btn" href="/v2?view=comics">📚 Fumetti</a><a class="btn" href="/v2?view=archive">📦 Archivio</a><a class="btn" href="/v2?view=maintenance">🛠 Manutenzione</a>
+       <a class="btn" href="/?view=series">📺 Serie TV</a><a class="btn" href="/?view=movies">🎬 Film</a><a class="btn" href="/?view=search">🔎 Esplora release</a><a class="btn" href="/?view=gaps">⚠ Mancanti</a><a class="btn" href="/?view=comics">📚 Fumetti</a><a class="btn" href="/?view=archive">📦 Archivio</a><a class="btn" href="/?view=maintenance">🛠 Manutenzione</a>
     </div></div>
   </div>
   <div class="panel dashboard-feed-panel">
@@ -556,7 +556,7 @@
       <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
     </div>
     <div class="chip-row">
-      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/v2?view=settings&tab={{.ID}}" hx-get="/v2/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/v2?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
+      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&tab={{.ID}}" hx-get="/v2/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
     </div>
   </div>
   {{template "v2_settings_body" .}}
@@ -741,7 +741,7 @@
 {{define "v2_settings_search"}}
 {{if .Matches}}
 <table class="data-table"><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
-<tbody>{{range .Matches}}<tr><td><a href="/v2?view=settings&tab={{.Tab}}&highlight={{.Key}}" hx-get="/v2/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
+<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}" hx-get="/v2/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">Nessuna impostazione corrisponde a «{{.Query}}».</p>{{end}}
 {{end}}
 
@@ -978,8 +978,8 @@
 {{define "v2_movies"}}
 <div class="view">
   <nav class="toolbar" role="tablist" aria-label="Sezioni film">
-    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/v2?view=movies">Film monitorati</a>
-    <a class="chip{{if eq .Tab "downloaded"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "downloaded"}}true{{else}}false{{end}}" href="/v2?view=movies&amp;tab=downloaded">Film scaricati</a>
+    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/?view=movies">Film monitorati</a>
+    <a class="chip{{if eq .Tab "downloaded"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "downloaded"}}true{{else}}false{{end}}" href="/?view=movies&amp;tab=downloaded">Film scaricati</a>
   </nav>
   {{if eq .Tab "downloaded"}}
     {{template "v2_table_panel" .History}}
@@ -1016,7 +1016,7 @@
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/v2?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
@@ -1327,7 +1327,7 @@
        <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
       {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
       {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
-       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/v2?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
+       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
          <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
        </form>{{end}}
     </div>
@@ -1501,10 +1501,10 @@
 {{define "v2_series_detail"}}
 <div class="view">
   <div class="toolbar">
-    <a class="btn sm" href="/v2?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
+    <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
     <button class="btn sm" type="button" hx-get="/v2/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
   </div>
   <div id="v2-rename-preview"></div>
@@ -1539,7 +1539,7 @@
              <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
              {{range .SeasonButtons}}
              <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
-               <input type="hidden" name="redirect" value="/v2?view=series&amp;series={{$.PathName}}" />
+               <input type="hidden" name="redirect" value="/?view=series&amp;series={{$.PathName}}" />
                <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
                <input type="hidden" name="method" value="POST" />
                <input type="hidden" name="body" value='{"season":{{.Season}},"ignored":{{if .Ignored}}false{{else}}true{{end}}}' />
@@ -1575,12 +1575,12 @@
               <td class="numeric">{{.QualityScore}}</td>
               <td class="numeric">{{bytes .SizeBytes}}</td>
               <td class="row-actions">
-                {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" $.PathName) "Path" .SearchPath "Method" "POST" "Body" "{}" "Label" "🔍" "Class" "icon-action" "Title" "Cerca manualmente questa puntata")}}
-                {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
-                {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
-                {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .SearchPath "Method" "POST" "Body" "{}" "Label" "🔍" "Class" "icon-action" "Title" "Cerca manualmente questa puntata")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
                 <button class="btn sm icon-action" type="button" hx-get="/v2/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti della puntata" aria-label="Sorgenti S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
-                {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
+                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
               </td>
             </tr>
             {{end}}
@@ -1627,11 +1627,11 @@
 {{define "v2_movie_detail"}}
 <div class="view">
   <div class="toolbar">
-    <a class="btn sm" href="/v2?view=movies" title="Torna all'elenco dei film">← Film</a>
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/redownload" .ID) "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Rendi di nuovo scaricabile")}}
-    {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/metadata" .ID) "Method" "POST" "Body" "{\"source\":\"tmdb\"}" "Label" "Aggiorna TMDB" "Class" "" "Title" "Applica i metadati TMDB")}}
-    {{template "v2_action_btn" (dict "Redirect" "/v2?view=movies" "Path" (printf "/api/movies/%d" .ID) "Method" "DELETE" "Body" "{}" "Label" "Elimina" "Class" "danger" "Title" "Elimina questo film" "Confirm" "Eliminare questo film?")}}
+    <a class="btn sm" href="/?view=movies" title="Torna all'elenco dei film">← Film</a>
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/redownload" .ID) "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Rendi di nuovo scaricabile")}}
+    {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/metadata" .ID) "Method" "POST" "Body" "{\"source\":\"tmdb\"}" "Label" "Aggiorna TMDB" "Class" "" "Title" "Applica i metadati TMDB")}}
+    {{template "v2_action_btn" (dict "Redirect" "/?view=movies" "Path" (printf "/api/movies/%d" .ID) "Method" "DELETE" "Body" "{}" "Label" "Elimina" "Class" "danger" "Title" "Elimina questo film" "Confirm" "Eliminare questo film?")}}
   </div>
 
   <div class="panel">
@@ -1642,7 +1642,7 @@
       {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
       <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
         <input type="hidden" name="view" value="movies" />
-        <input type="hidden" name="redirect" value="/v2?view=movies&amp;movie={{.ID}}" />
+        <input type="hidden" name="redirect" value="/?view=movies&amp;movie={{.ID}}" />
         <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
@@ -1669,7 +1669,7 @@
         <td class="truncate" title="{{.Title}}">{{.Title}}</td>
         <td title="{{.Source}}">{{sourceLabel .Source}}</td>
         <td class="row-actions">
-           {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
+           {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
            <form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="{{.ExplainBody}}" /><button class="btn sm" type="submit">Perché non questo?</button></form>
            {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
         </td>

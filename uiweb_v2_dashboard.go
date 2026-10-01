@@ -22,7 +22,7 @@ type v2DashboardFeedView struct {
 }
 
 func V2DashboardSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2SearchViewFrom(s, strings.TrimSpace(r.FormValue("q")), "/v2?view=dashboard")
+	view := v2SearchViewFrom(s, strings.TrimSpace(r.FormValue("q")), "/?view=dashboard")
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_dashboard_search_results", view, dict, eng)
 }

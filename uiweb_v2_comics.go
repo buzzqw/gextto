@@ -239,9 +239,9 @@ func V2ComicsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			v2Render(w, http.StatusOK, "v2_comics_save_result", map[string]any{"Error": true, "Message": v2JSONError(raw)}, dict, eng)
 			return
 		}
-		w.Header().Set("HX-Redirect", "/v2?view=comics")
+		w.Header().Set("HX-Redirect", "/?view=comics")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	http.Redirect(w, r, "/v2?view=comics", http.StatusSeeOther)
+	http.Redirect(w, r, "/?view=comics", http.StatusSeeOther)
 }
