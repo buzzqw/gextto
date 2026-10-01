@@ -168,11 +168,11 @@
       <div class="panel-head"><h3>Azioni rapide</h3></div>
       <div class="panel-body">
         <div class="toolbar dashboard-quick-actions">
-          <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-swap="none" hx-on::after-request="window.location.reload()">Avvia ciclo (tutto)</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
-          <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
+          <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-target="#v2-modal" hx-swap="innerHTML">Avvia ciclo (tutto)</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-target="#v2-modal" hx-swap="innerHTML">Serie TV</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-target="#v2-modal" hx-swap="innerHTML">Film</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-target="#v2-modal" hx-swap="innerHTML">Fumetti</button>
+          <form method="post" action="/v2/dashboard/backup" hx-post="/v2/dashboard/backup" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
           <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
           <a class="btn" href="/?view=downloads">Vai a Scarico</a>
         </div>
@@ -256,6 +256,16 @@
   </div>
   {{template "v2_dashboard_calendar" .Calendar}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  <div id="v2-modal"></div>
+</div>
+{{end}}
+
+{{define "v2_action_notice"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-action-notice-title">
+    <div class="modal-head"><h3 id="v2-action-notice-title">{{.Title}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body"><p{{if .Error}} class="htx-status err"{{else}} class="htx-status ok"{{end}}>{{.Message}}</p></div>
+  </div>
 </div>
 {{end}}
 

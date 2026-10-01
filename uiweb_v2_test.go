@@ -3,10 +3,12 @@ package gextto
 // uiweb_v2_test.go covers the isolated SSR+HTMX interface under /v2.
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 )
@@ -154,6 +156,28 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	}
 	if strings.Index(body, ">Rimuovi tag<") > strings.Index(body, `placeholder="Nuovo tag"`) {
 		t.Fatal("new tag field should appear to the right of the remove-tag action")
+	}
+}
+
+func TestV2RunCycleShowsDashboardConfirmation(t *testing.T) {
+	state := newTestAppState(t)
+	state.cfg.Active = true
+	config, err := json.Marshal(state.cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(state.config_path, config, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodPost, "/v2/run-cycle", url.Values{"domain": {"series"}})
+	if code != http.StatusOK || !strings.Contains(body, "Monitoraggio Serie TV") || !strings.Contains(body, "Monitoraggio Serie TV avviato.") {
+		t.Fatalf("cycle confirmation missing: status=%d body=%q", code, body)
 	}
 }
 

@@ -119,6 +119,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /v2/empty", V2Empty)
 	v2Handle(s, mux, "POST /v2/language", V2SetLanguage)
 	v2Handle(s, mux, "POST /v2/run-cycle", V2RunCycle)
+	v2Handle(s, mux, "POST /v2/dashboard/backup", V2DashboardBackup)
 	v2Handle(s, mux, "POST /v2/dashboard/search", V2DashboardSearch)
 	v2Handle(s, mux, "GET /v2/dashboard/feed", V2DashboardFeed)
 	v2Handle(s, mux, "POST /v2/dashboard/feed/add", V2DashboardFeedAdd)
@@ -553,24 +554,67 @@ func V2SetLanguage(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // v2DiscardWriter swallows a JSON response when a v2 action reuses an existing
 // JSON handler internally.
-type v2DiscardWriter struct{ code int }
+type v2DiscardWriter struct {
+	code int
+	buf  bytes.Buffer
+}
 
 func (d *v2DiscardWriter) Header() http.Header         { return http.Header{} }
-func (d *v2DiscardWriter) Write(b []byte) (int, error) { return len(b), nil }
+func (d *v2DiscardWriter) Write(b []byte) (int, error) { return d.buf.Write(b) }
 func (d *v2DiscardWriter) WriteHeader(code int)        { d.code = code }
 
 // V2RunCycle starts a manual cycle by reusing the existing RunNow handler and
-// answering 204 (HTMX then reloads the page).
+// returning a modal confirmation to the dashboard action that requested it.
 func V2RunCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, "/?view=dashboard", http.StatusSeeOther)
 		return
 	}
 	query := r.URL.Query()
-	query.Set("domain", strings.TrimSpace(r.FormValue("domain")))
+	domain := strings.TrimSpace(r.FormValue("domain"))
+	query.Set("domain", domain)
 	r.URL.RawQuery = query.Encode()
-	RunNow(&v2DiscardWriter{}, r, s)
-	w.WriteHeader(http.StatusNoContent)
+	result := &v2DiscardWriter{}
+	RunNow(result, r, s)
+	labels := map[string]string{"series": "Serie TV", "movies": "Film", "comics": "Fumetti"}
+	label := labels[domain]
+	if label == "" {
+		label = "completo"
+	}
+	notice := map[string]any{
+		"Title":   "Monitoraggio " + label,
+		"Message": "Monitoraggio " + label + " avviato.",
+		"Error":   result.code >= http.StatusBadRequest,
+	}
+	var response struct {
+		Queued bool   `json:"queued"`
+		Error  string `json:"error"`
+	}
+	if json.Unmarshal(result.buf.Bytes(), &response) == nil {
+		if response.Queued {
+			notice["Message"] = "Monitoraggio " + label + " già in corso: richiesta accodata."
+		} else if response.Error != "" {
+			notice["Message"] = response.Error
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_action_notice", notice, dict, eng)
+}
+
+// V2DashboardBackup creates a backup and reports its result in the same
+// confirmation modal used by the dashboard's manual monitoring actions.
+func V2DashboardBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
+	raw, status := v2InternalJSON(s, http.MethodPost, "/api/backup", nil, []byte(`{}`))
+	notice := map[string]any{
+		"Title":   "Backup",
+		"Message": "Backup completato.",
+		"Error":   status >= http.StatusBadRequest,
+	}
+	if status >= http.StatusBadRequest {
+		notice["Message"] = v2JSONError(raw)
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_action_notice", notice, dict, eng)
 }
 
 // --- i18n: translate the rendered HTML exactly like the classic client did ---
