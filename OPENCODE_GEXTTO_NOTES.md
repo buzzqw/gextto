@@ -49,3 +49,15 @@ Il file unit dell'utente è normalmente:
 - Route HTTP: `web_router.go`.
 - Documentazione API: `docs/API.md`.
 - Per le sorgenti di una puntata: `GET /api/episodes/{series}/{season}/{episode}/sources`.
+
+### UI v2 (SSR + HTMX), sperimentale e isolata
+
+- Accesso: `http://127.0.0.1:5000/v2` (la UI classica su `/` resta invariata).
+- Codice: `uiweb_v2.go`, `uiweb_v2_table.go`, `uiweb_v2_sections.go`,
+  `uiweb_v2_search.go`, `uiweb_v2_detail.go`, `uiweb_v2_settings_extras.go`,
+  `uiweb_v2_maintenance.go`, `uiweb_v2_widgets.go`,
+  `uiweb/v2/templates/v2.html`, `uiweb/v2/static/htmx.min.js`.
+- Registrazione: una sola riga `registerV2Routes(s, mux)` in `web_router.go`.
+- Report completo, copertura, benchmark e prossimi passi: `docs/UI_V2.md`.
+- Porting completo: nessun widget "non migrato" residuo; la scansione delle 16
+  voci `/v2?view=…` non mostra segnaposto.

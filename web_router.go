@@ -299,4 +299,9 @@ func registerUIRoutes(s *AppState, mux *http.ServeMux) {
 	handle(s, mux, "GET /ui/partial/dashboard", UiPartialDashboard)
 	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
 	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
+
+	// UI v2 (SSR + HTMX) lives entirely in uiweb_v2.go and uiweb/v2. The classic
+	// interface at / is untouched; promotion happens by pointing / at these
+	// handlers once v2 is approved.
+	registerV2Routes(s, mux)
 }

@@ -1,0 +1,202 @@
+# Gextto UI v2 (SSR + HTMX) — migrazione, stato e report
+
+Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1153)` · libtorrent 2.0.11.0
+
+## 1. Obiettivo e approccio
+
+Portare l'interfaccia da *SSR + `gextto-ui.js`* (5.427 righe di client) a
+*SSR + HTMX*, senza toccare l'interfaccia classica finché la v2 non è approvata.
+
+La v2:
+
+- vive su un indirizzo separato: **`/v2`** (nessuna modifica a `/`);
+- riusa le stesse API JSON, gli stessi view-model Go (`uiDashboardDataFrom`,
+  `uiTorrentsDataFrom`, `uiSettingsPageFrom`, `uiSeriesDetailFrom`,
+  `uiMovieDetailFrom`, `uiTableSpecFor`, …) e lo stesso CSS di base
+  (`/ui/static/gextto-ui.css`), quindi dati e look restano coerenti;
+- non duplica l'accesso ai dati: le tabelle sono renderizzate dal server
+  chiamando internamente gli handler delle API esistenti;
+- traduce l'HTML lato server con lo stesso meccanismo del client classico.
+
+Accesso:
+
+```
+http://127.0.0.1:5000/v2
+http://127.0.0.1:5000/v2?view=downloads
+```
+
+## 2. Architettura
+
+| File | Ruolo |
+| --- | --- |
+| `uiweb_v2.go` | shell, navigazione `/v2`, dispatch delle pagine, i18n server-side, Scarico, Configurazione, Log, shell/panels |
+| `uiweb_v2_table.go` | renderer generico delle tabelle (formati, azioni, filtro, ordinamento, paginazione) + ponte interno verso le API JSON |
+| `uiweb_v2_sections.go` | renderer dei pannelli (Manutenzione, Integrazioni) + forward generico di azioni/form |
+| `uiweb_v2_search.go` | Esplora: ricerca release server-side + "Aggiungi" |
+| `uiweb_v2_detail.go` | dettagli Serie/Film + modale sorgenti puntata |
+| `uiweb_v2_settings_extras.go` | editor strutturati: feed, gruppi checkbox, editor a righe, rinomina, traduzioni |
+| `uiweb_v2_maintenance.go` | widget Manutenzione: cestino, verifica sorgenti |
+| `uiweb_v2_widgets.go` | widget completati: duplicati, ottimizzazione DB, RAM disk, rinomina cartella, progresso rinomina, OAuth/PIN, job in background, upload torrent, Esplora TMDB, traduzioni per chiave, anteprima rinomina |
+| `uiweb_v2_test.go` / `uiweb_v2_bench_test.go` | test e benchmark |
+| `uiweb/v2/templates/v2.html` | tutti i template v2 (unico file) |
+| `uiweb/v2/static/htmx.min.js` | HTMX vendorizzato (nessuna CDN) |
+| `uiweb/v2/static/v2-core.js` | **unico** script v2: tema, font, focus dei modali, scroll log |
+| `uiweb/v2/static/v2.css` | rifiniture d'interfaccia sopra il CSS condiviso |
+| `web_router.go` | **1 sola riga**: `registerV2Routes(s, mux)` |
+
+Punti chiave:
+
+- **Ponte interno**: gli handler v2 chiamano gli handler API esistenti tramite il
+  router in-process (`v2InternalJSON`), quindi validazione e comportamento sono
+  gli stessi della UI classica, senza chiamate di rete.
+- **i18n server-side**: dopo il render l'HTML viene tradotto con un tokenizer
+  (`v2TranslateHTML`) che replica il comportamento del client classico (text node
+  interi, attributi `title`/`placeholder`/`aria-label`, fallback inglese) e non
+  tocca `<script>`/`<style>`. Con lingua italiana l'HTML esce invariato.
+- **JS minimale**: HTMX fa richieste e swap; `v2-core.js` copre solo preferenze
+  (tema/font in `localStorage`) e comportamento accessibile dei modali.
+- **Route isolate**: `/v2` è registrato con `v2Handle`, che non entra nella
+  tabella delle route API: `docs/API.md` e il test di parità restano invariati.
+
+## 3. Copertura
+
+Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
+
+| Menu | Stato | Note |
+| --- | --- | --- |
+| Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
+| Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
+| Serie TV | ✅ | elenco + **dettaglio**: hero, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina** |
+| Film | ✅ | elenco + **dettaglio**: hero, modifica, azioni, corrispondenze archivio, storico |
+| Mancanti | ✅ | tabella gap + Cerca/Ignora |
+| Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
+| Archivio | ✅ | tabella + ricerca + paginazione |
+| Fumetti | ✅ | tabella fumetti + **coda download HTTP** |
+| Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
+| Integrazioni | ✅ | **schede Trakt e Simkl complete** (stato, OAuth/PIN con avvio+conferma, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
+| Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
+| Salute | ✅ | metriche, percorsi, dischi, errori, **sorgenti** (manuale) e **provider** |
+| Log | ✅ | filtro, limite righe, aggiornamento automatico ogni 5 s, **colorazione dei livelli lato server**, scroll automatico |
+| Blocklist | ✅ | tabella + rimozione |
+| Manuale | ✅ | render server-side (IT/EN) |
+| Licenza | ✅ | render server-side |
+
+Interfaccia migliorata (solo in v2, tramite `v2.css`): barra superiore sticky,
+stato attivo della navigazione più chiaro, tabelle con hover/zebra e header
+sticky, backdrop dei modali con blur, focus ring sempre visibile, toolbar che
+vanno a capo correttamente, adattamento mobile delle azioni in alto.
+
+## 4. Residui consapevoli (nessun widget non migrato)
+
+Dopo questa tornata **non resta nessun pannello "non migrato"**: la scansione
+live delle 16 voci `/v2?view=…` non mostra più alcun segnaposto né link
+"Apri nella UI classica". Restano solo scelte editoriali, non lacune:
+
+- **Dettaglio torrent, tab Limiti / Storage**: descrittive; le regole di limiti
+  temporanei e storage si impostano da Configurazione. Nessuna azione mancante.
+- **"Ultimi trovati nei feed"** in Dashboard: resta su richiesta (è una vista
+  diagnostica, non un flusso operativo).
+- **Gruppo "feed" / TMDB/TVDB**: le viste sono server-side; il calendario carica
+  in modo asincrono con HTMX (`hx-trigger="load"`) per non bloccare la pagina.
+- **Azioni lunghe**: la v2 avvia l'azione e mostra l'avanzamento nel pannello
+  **Operazioni in background** (polling + annullamento), senza una barra
+  dedicata alla singola azione.
+
+## 5. Differenze accettate (parità)
+
+- **Ordinamento** delle tabelle generiche è server-side (in classica era client);
+  il filtro elenco è server-side.
+- **Modali**: focus-trap, Escape e click sul backdrop ora funzionano
+  (`v2-core.js`), come in classica.
+- **Log**: aggiornamento a intervalli invece del follow SSE; colorazione
+  equivalente.
+- **Azioni lunghe**: la v2 espone un pannello **Operazioni in background** con
+  avanzamento e annullamento (polling `/api/jobs`); le azioni brevi eseguono e
+  ricaricano.
+
+## 6. Test
+
+- `go test .` → **verde** (include la suite v2 completa, compreso
+  `uiweb_v2_widgets_test.go`).
+- `go test ./...` → **verde**, tutti i package.
+- `scripts/check-ui-settings-index.sh` → OK (149 impostazioni, 12 tab).
+- `scripts/installer-selftest.sh` → tutti i check passati.
+- `go vet .` pulito; `gofmt -l` pulito.
+- Verifica live sul daemon con dati reali: 16/16 voci `/v2?view=…` → 200 e
+  **0 segnaposto non migrati**; integrazioni con schede Trakt/Simkl e OAuth;
+  manutenzione con duplicati/db/ramdisk/rinomina/progresso/job; scarico con
+  upload e tag; Esplora con calendario, tendenze e ricerca TMDB reali; anteprima
+  rinomina reale (`9-1-1`: 16/16 già corretti); IT→EN con traduzioni reali.
+
+Test v2 aggiunti (`uiweb_v2_test.go`, `uiweb_v2_widgets_test.go`):
+
+1. shell, navigazione, assenza di `gextto-ui.js`;
+2. Scarico + azioni (refresh, row action, ordinamento) + upload + tag in massa;
+3. frammenti dettaglio/rimozione;
+4. Configurazione: pagina, body, ricerca, salvataggio, chiave negata, editor
+   strutturati (feed, checkbox, righe, rinomina, traduzioni) e modifica per chiave;
+5. Log + asset statico + fallback no-JS + view sconosciuta;
+6. tabelle generiche (6 viste) + library toggle + azione generica + path forgiato;
+7. pannelli Manutenzione/Integrazioni + `HX-Redirect` 204 + cestino; widget
+   duplicati, db, ramdisk, rinomina cartella, progresso e job;
+8. cambio lingua persistito;
+9. dettagli Serie/Film + salvataggio serie + modale sorgenti + anteprima rinomina;
+10. traduzione HTML identica al client (testo/attributi/script/italiano);
+11. Esplora TMDB: calendario, prompt di ricerca vuoto, aggiunta con id mancante.
+
+## 7. Benchmark (`go test -run '^$' -bench BenchmarkV2 -benchmem`)
+
+CPU: Intel N97 · Go 1.26 · CGO on
+
+| Benchmark | Tempo | Allocazioni |
+| --- | --- | --- |
+| `V2TranslateHTML` (pagina con 200 righe, dizionario 3.000 voci) | ~0,42 ms | 4.248 |
+| `V2FormatCell` (6 colonne) | ~2,9 µs | 16 |
+| `V2RenderTableFragment` (500 righe) | ~1,05 ms | 5.798 |
+| `V2RenderShell` (shell + contenuto) | ~0,30 ms | 1.348 |
+
+Costo di rendering server ~1–3 ms per pagina: trascurabile su LAN. La traduzione
+è il percorso più costoso e vale solo per lingue ≠ IT.
+
+## 8. Review logica e funzionale
+
+**Correttezza**
+
+- Le route `/v2` non alterano il contratto API e non toccano `/`.
+- Le azioni generiche accettano solo path `/api/…` (test su path forgiato → non
+  inoltrato).
+- Il salvataggio impostazioni replica i vincoli della UI classica
+  (`gh7_setting_key_allowed`, `validateBackendSetting`, secret vuoto non
+  sovrascritto, JSON-array preservato) ed è coperto da test.
+- `v2TranslateHTML` preserva `<script>`/`<style>` e con IT restituisce l'HTML
+  byte-per-byte.
+- Gli editor a righe salvano con la stessa forma della classica (wrap/postKey/
+  array) e usano nomi `campo__indice` per non mescolare le righe.
+
+**Punti di attenzione residui** (vedi §4). Nessun problema bloccante: build, vet,
+gofmt e suite completa sono verdi.
+
+## 9. Promozione a UI di default
+
+1. registrare gli handler `/v2` anche su `/` (o reindirizzare `/` → `/v2`);
+2. mantenere `/v2` come alias durante il periodo di doppia disponibilità;
+3. chiudere i residui di §4 e aggiornare i link ai dettagli (già in v2).
+
+## 10. Rimozione della v2
+
+```bash
+rm -rf uiweb/v2 uiweb_v2*.go
+# poi togliere la chiamata registerV2Routes(s, mux) in web_router.go
+```
+
+## 11. Prossimi passi
+
+Il porting è completo: nessuna voce di menu, nessun widget speciale di
+Manutenzione/Integrazioni e nessun flusso operativo resta solo nella UI classica.
+Passi successivi consigliati:
+
+1. promuovere `/v2` a UI predefinita (vedi §9), mantenendo `/` come alias;
+2. barra di avanzamento contestuale alla singola azione lunga (oltre al pannello
+   job già presente);
+3. rendere editabili i tab Limiti/Storage del dettaglio torrent;
+4. convertire i benchmark v2 in test di performance in CI.

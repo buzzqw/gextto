@@ -1,0 +1,141 @@
+/* Gextto UI v2 — layered refinements over the shared stylesheet.
+ *
+ * The base look (colours, layout, components) comes from /ui/static/gextto-ui.css
+ * so v2 stays visually consistent with the classic UI. This file only adds
+ * polish that is safe and additive: sticky chrome, clearer tables, a smoother
+ * modal backdrop and a stronger focus ring.
+ */
+
+:root {
+  --v2-radius: 10px;
+  --v2-shadow: 0 10px 30px rgba(0, 0, 0, .28);
+}
+
+/* Sticky top bar so metrics and language/theme controls stay reachable. */
+.v2-topbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(6px);
+}
+
+/* Navigation: clearer active state and hover feedback. */
+.sidebar .nav-item {
+  border-radius: var(--v2-radius);
+  transition: background-color .12s ease, color .12s ease;
+}
+.sidebar .nav-item:hover {
+  background: rgba(127, 127, 127, .12);
+}
+.sidebar .nav-item.active {
+  background: rgba(76, 175, 120, .16);
+}
+.sidebar .nav-group {
+  margin-bottom: 4px;
+}
+
+/* Tables: zebra rows and a clear hover, easier to scan than plain rows. */
+.data-table tbody tr:hover {
+  background: rgba(127, 127, 127, .07);
+}
+.data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel-bg, var(--surface, inherit));
+}
+.data-table td,
+.data-table th {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+/* Toolbars wrap cleanly and keep a consistent gap. */
+.toolbar {
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.toolbar .input {
+  min-width: 160px;
+}
+
+/* Cards and panels: slightly rounder, with a soft shadow on hover for panels
+   that contain actions. */
+.panel,
+.card {
+  border-radius: var(--v2-radius);
+}
+.panel {
+  transition: box-shadow .15s ease;
+}
+.panel:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
+}
+
+/* Modals: dim + blur the backdrop; the server renders the markup and v2-core.js
+   only manages focus. */
+.overlay {
+  background: rgba(0, 0, 0, .55);
+  backdrop-filter: blur(3px);
+}
+.overlay .modal {
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
+}
+
+/* Stronger, always-visible keyboard focus ring. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent, #4ec97a);
+  outline-offset: 2px;
+}
+
+/* Status messages from table actions. */
+.htx-status.ok { color: #4ec97a; }
+.htx-status.err { color: #ff6b6b; }
+
+/* Log lines: one per row, readable in the <pre>. */
+.log-view { max-height: 60vh; overflow: auto; }
+.log-view .log-line { display: block; white-space: pre-wrap; word-break: break-word; }
+
+/* Small screens: the top bar actions scroll instead of overflowing. */
+@media (max-width: 900px) {
+  .top-actions {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+}
+
+/* v2 widgets: card grids and the maintenance review tables. */
+.tmdb-card-body .tmdb-overview {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.tmdb-card form {
+  margin-top: auto;
+}
+.folder-rename-table select.compact {
+  max-width: 320px;
+}
+.folder-rename-table td {
+  vertical-align: middle;
+}
+.gantt-placeholder { display: none; }
+.integration-card .panel {
+  border: 0;
+  box-shadow: none;
+}
+.calendar-grid .list-item img.list-poster {
+  width: 46px;
+  height: 69px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: none;
+}
