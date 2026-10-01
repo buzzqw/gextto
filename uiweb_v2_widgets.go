@@ -1112,8 +1112,12 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if kind != "movie" {
 		kind = "series"
 	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		name = strings.TrimSpace(r.FormValue("query"))
+	}
 	view := map[string]string{
-		"Kind": kind, "Name": strings.TrimSpace(r.FormValue("name")),
+		"Kind": kind, "Name": name,
 		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
 		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
 		"Language": strings.TrimSpace(r.FormValue("language")), "Seasons": "1+",

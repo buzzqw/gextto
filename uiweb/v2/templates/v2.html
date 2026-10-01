@@ -975,7 +975,7 @@
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/v2?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/v2?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
