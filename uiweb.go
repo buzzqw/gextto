@@ -125,6 +125,7 @@ type uiConsumption struct {
 type uiRecentDownload struct {
 	Name         string
 	Kind         string
+	Status       string
 	Season       int64
 	Episode      int64
 	QualityScore int64
@@ -458,16 +459,19 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 			Last7:      stats.Last7DaysBytes,
 		}
 	}
-	if recent, err := s.db.RecentDownloads(8); err == nil {
+	if recent, _, err := s.db.CompletedTorrents(0, 8, ""); err == nil {
 		for _, item := range recent {
+			completedAt := item.CompletedAt
+			if completedAt == "" {
+				completedAt = item.UpdatedAt
+			}
 			data.Recent = append(data.Recent, uiRecentDownload{
-				Name:         item.Name,
+				Name:         gh4_historyDisplayName(item.Name, item.Source),
 				Kind:         item.Kind,
-				Season:       uiDerefInt64(item.Season),
-				Episode:      uiDerefInt64(item.Episode),
+				Status:       item.Status,
 				QualityScore: item.QualityScore,
-				SizeBytes:    item.SizeBytes,
-				DownloadedAt: item.DownloadedAt,
+				SizeBytes:    item.TotalSize,
+				DownloadedAt: completedAt,
 			})
 		}
 	}

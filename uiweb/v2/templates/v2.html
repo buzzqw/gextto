@@ -144,23 +144,37 @@
     <div class="metric"><span class="metric-sub">Motore</span><strong>{{.Backend}}</strong><small class="muted">libtorrent {{.LibtorrentVersion}}</small></div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>Azioni rapide</h3></div>
-    <div class="panel-body">
-      <div class="toolbar dashboard-quick-actions">
-        <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-swap="none" hx-on::after-request="window.location.reload()">Avvia ciclo (tutto)</button>
-        <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
-        <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
-        <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
-        <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
-        <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
-        <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
+  <div class="dashboard-actions-next-grid">
+    <div class="dashboard-actions-column">
+      <div class="panel dashboard-quick-panel">
+        <div class="panel-head"><h3>Azioni rapide</h3></div>
+        <div class="panel-body">
+          <div class="toolbar dashboard-quick-actions">
+            <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-swap="none" hx-on::after-request="window.location.reload()">Avvia ciclo (tutto)</button>
+            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
+            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
+            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
+            <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
+            <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
+            <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
+          </div>
+        </div>
+      </div>
+      <div class="panel dashboard-search-panel">
+        <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
+        <div class="panel-body">
+          <form class="search-row" hx-post="/v2/dashboard/search" hx-target="#v2-dashboard-search-results" hx-swap="outerHTML">
+            <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
+            <button class="btn primary" type="submit">Cerca</button>
+          </form>
+          <div id="v2-dashboard-search-results">{{template "v2_dashboard_search_results" .Search}}</div>
+        </div>
       </div>
     </div>
-  </div>
-  <div class="panel dashboard-next-panel">
-    <div class="panel-head"><h3>Prossima ricerca automatica</h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
-    <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div><p class="muted">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
+    <div class="panel dashboard-next-panel">
+      <div class="panel-head"><h3><span>Prossima ricerca</span><span>automatica</span></h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
+      <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div><p class="muted dashboard-next-description">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
+    </div>
   </div>
 
   <div class="grid-2 dashboard-session-grid">
@@ -184,14 +198,13 @@
         <div class="row"><span>Errori</span><strong>{{.CycleErrors}}</strong></div>
       </div>
     </div>
-  </div>
-
-  <div class="panel">
-    <div class="panel-head"><h3>Consumo banda</h3></div>
-    <div class="panel-body">
-      <div class="row"><span>Totale storico</span><strong>{{bytes .Consumption.TotalBytes}}</strong></div>
-      <div class="row"><span>Ultimi 30 giorni</span><strong>{{bytes .Consumption.Last30}}</strong></div>
-      <div class="row"><span>Ultimi 7 giorni</span><strong>{{bytes .Consumption.Last7}}</strong></div>
+    <div class="panel dashboard-consumption-panel">
+      <div class="panel-head"><h3>Consumo banda</h3></div>
+      <div class="panel-body">
+        <div class="row"><span>Totale storico</span><strong>{{bytes .Consumption.TotalBytes}}</strong></div>
+        <div class="row"><span>Ultimi 30 giorni</span><strong>{{bytes .Consumption.Last30}}</strong></div>
+        <div class="row"><span>Ultimi 7 giorni</span><strong>{{bytes .Consumption.Last7}}</strong></div>
+      </div>
     </div>
   </div>
 
@@ -199,19 +212,9 @@
     <div class="panel-head"><h3>Ultimi download</h3><small class="muted">Libreria</small></div>
     <div class="panel-body">
       {{if .Recent}}
-      <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Concluso</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td>{{.Kind}}</td><td>{{.QualityScore}}</td><td>{{bytes .SizeBytes}}</td><td>{{.DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Punteggio</th><th scope="col">Stato</th><th scope="col">Concluso</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td>{{.Kind}}</td><td>{{.QualityScore}}</td><td>{{.Status}}</td><td>{{.DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
       {{else}}<p class="muted">Nessun download recente.</p>{{end}}
-    </div>
-  </div>
-  <div class="panel dashboard-search-panel">
-    <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
-    <div class="panel-body">
-      <form class="search-row" hx-post="/v2/dashboard/search" hx-target="#v2-dashboard-search-results" hx-swap="outerHTML">
-        <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
-        <button class="btn primary" type="submit">Cerca</button>
-      </form>
-      <div id="v2-dashboard-search-results">{{template "v2_dashboard_search_results" .Search}}</div>
     </div>
   </div>
   <div class="panel dashboard-explore-panel">
