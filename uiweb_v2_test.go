@@ -144,6 +144,9 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "v2-settings-body") {
 		t.Fatalf("settings page -> %d", code)
 	}
+	if strings.Index(body, "Cerca una impostazione per nome o chiave.") > strings.Index(body, `class="chip-row"`) {
+		t.Fatalf("settings search hint must precede settings tabs")
+	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=libtorrent", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)

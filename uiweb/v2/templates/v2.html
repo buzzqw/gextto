@@ -505,10 +505,10 @@
       <input type="search" class="input settings-search" name="q" aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off"
              hx-get="/v2/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
     </label>
+    <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
     <div class="chip-row">
       {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/v2?view=settings&tab={{.ID}}" hx-get="/v2/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/v2?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
     </div>
-    <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
   </div>
   {{template "v2_settings_body" .}}
 </div>
