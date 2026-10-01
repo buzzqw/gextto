@@ -731,6 +731,15 @@ func (e *qbittorrentEngine) SyncStats() map[string]any {
 	return stats
 }
 
+// SessionHealthy reports whether List is backed by a successful qBittorrent
+// snapshot. An empty list during an outage is not evidence that torrents were
+// removed from the external session.
+func (e *qbittorrentEngine) SessionHealthy() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.connected
+}
+
 // Close restores qBittorrent's queueing preference when Gextto temporarily
 // disabled it. Gextto owns scheduling while running, but must not leave a
 // user's external qBittorrent configuration altered after shutdown.

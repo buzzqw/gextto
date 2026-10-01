@@ -32,6 +32,7 @@ func TestUpgradeReasonPortsLegacyRules(t *testing.T) {
 	}{
 		{"resolution jump", Quality{Resolution: "2160p", Source: "webdl", Codec: "h264", Audio: "aac"}, "resolution"},
 		{"hdtv to webdl", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac"}, "source"},
+		{"webrip to webdl", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac"}, "source"},
 		{"hdr", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac", HDR: "HDR10"}, "hdr"},
 		{"repack", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac", IsRepack: true}, "repack"},
 	}
@@ -39,6 +40,9 @@ func TestUpgradeReasonPortsLegacyRules(t *testing.T) {
 		old := base
 		if tc.name == "hdtv to webdl" {
 			old.Source = "hdtv"
+		}
+		if tc.name == "webrip to webdl" {
+			old.Source = "webrip"
 		}
 		got := tc.q.UpgradeReason(&old, tc.q.Score(), old.Score(), 200)
 		if got != tc.want {

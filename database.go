@@ -938,6 +938,23 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if err := d.db.QueryRow("SELECT id FROM series WHERE name = ?1", seriesName).Scan(&sid); err != nil {
 		return false, "", err
 	}
+	// A library file can be removed or moved outside Gextto. Do not let its old
+	// database row make the episode look permanently downloaded: reset only on
+	// a definite ENOENT (permissions and temporary mount errors are preserved).
+	missingArchivedFile := false
+	var persistedArchivePath string
+	err = d.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&persistedArchivePath)
+	if err == nil && strings.TrimSpace(persistedArchivePath) != "" {
+		if _, statErr := os.Stat(persistedArchivePath); errors.Is(statErr, os.ErrNotExist) {
+			if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
+				return false, "", updateErr
+			}
+			missingArchivedFile = true
+			logging.Warn("archive file missing; episode made eligible for recovery", "series", seriesName, "season", season, "episode", episode, "path", persistedArchivePath)
+		}
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, "", err
+	}
 	if !manual && live != nil {
 		key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
 		if _, ok := live.Episodes[key]; ok {
@@ -956,7 +973,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	// Core best practice (always on, no user option): never fetch an older
 	// episode that is not a recognised gap when a later episode or season is
 	// already archived.
-	if !manual && !context.GapEpisode {
+	if !manual && !context.GapEpisode && !missingArchivedFile {
 		var archivedHere bool
 		if err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3 AND (downloaded_at IS NOT NULL OR COALESCE(archive_path,'')<>''))", sid, season, episode).Scan(&archivedHere); err != nil {
 			return false, "", err
@@ -1032,7 +1049,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		}
 		oldQuality := ParseQuality(dbTitle)
 		enrichQualityWithMediaInfo(dbMediaInfo, &oldQuality)
-		if !manual && release.Quality.UpgradeReason(&oldQuality, score, dbScore, minScoreDiff) == "" {
+		if !manual && !missingArchivedFile && release.Quality.UpgradeReason(&oldQuality, score, dbScore, minScoreDiff) == "" {
 			return false, "duplicate", nil
 		}
 		previous, err := d.loadSeriesUpgradeBackup(d.db, dbID, seriesName)

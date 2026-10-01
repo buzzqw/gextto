@@ -183,11 +183,15 @@ func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff i
 	if newRes > oldRes {
 		return "resolution"
 	}
-	if old.Source == "hdtv" && q.Source == "webdl" && newRes >= oldRes {
-		return "source"
-	}
 	if q.IsRemux() && !old.IsRemux() && newRes >= oldRes && newScore >= oldScore {
 		return "remux"
+	}
+	// WEB-DL is a reliable source upgrade over the two broadcast/re-encode
+	// variants even though WEBRip -> WEB-DL is only a 50-point score delta.
+	// Do not treat WEBRip over HDTV as an upgrade: it is commonly a lossy
+	// re-encode and its higher source rank alone is not sufficient evidence.
+	if q.Source == "webdl" && (old.Source == "hdtv" || old.Source == "webrip") && newRes >= oldRes {
+		return "source"
 	}
 	if q.HasHDR() && !old.HasHDR() && newRes >= oldRes {
 		return "hdr"

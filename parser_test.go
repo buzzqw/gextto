@@ -24,6 +24,16 @@ func TestParsesPartialSeasonPack(t *testing.T) {
 	}
 }
 
+func TestParsesMultiEpisodeAboveNinetyNine(t *testing.T) {
+	release := ParseRelease("Long.Running.Show.S01E100E101.1080p.WEB-DL", testMagnet, "test")
+	if release == nil || release.Kind != "series" || !release.IsPack {
+		t.Fatalf("release = %#v, want multi-episode series pack", release)
+	}
+	if want := []int64{100, 101}; !reflect.DeepEqual(release.EpisodeRange, want) {
+		t.Fatalf("episode_range = %v, want %v", release.EpisodeRange, want)
+	}
+}
+
 func TestCorrectsPackSeasonFromTheActualTorrentName(t *testing.T) {
 	advertised := ParseRelease("Slow.Horses.S06E01-06.1080p.WEB-DL.ITA", testMagnet, "test")
 	if advertised == nil {

@@ -2356,13 +2356,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				}
 				processed = append(processed, partial...)
 			}
-			allDiscarded := len(processed) > 0
-			for _, item := range processed {
-				if !item.Discarded {
-					allDiscarded = false
-					break
-				}
-			}
+			allDiscarded := tev_allPackFilesDiscarded(processed)
 			if allDiscarded {
 				restored, err := db.RestoreUpgrade(event.Hash)
 				if err != nil {
@@ -2613,4 +2607,16 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	default:
 		return false, nil
 	}
+}
+
+// tev_allPackFilesDiscarded is true when staging/post-processing retained no
+// importable episode. An empty result is discarded too: marking such a pack
+// completed would suppress its gaps even though no library file was kept.
+func tev_allPackFilesDiscarded(processed []PackFileResult) bool {
+	for _, item := range processed {
+		if !item.Discarded {
+			return false
+		}
+	}
+	return true
 }

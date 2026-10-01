@@ -615,6 +615,32 @@ func TestManualMissingSearchUsesArchivePresenceNotClientState(t *testing.T) {
 	assertEqual(t, missing, [][2]int64{{1, 1}, {1, 3}})
 }
 
+func TestMissingArchivedEpisodeIsEligibleForRecovery(t *testing.T) {
+	db := newTestDB(t)
+	release := testRelease()
+	if _, _, err := db.CheckSeries(&release); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(t.TempDir(), "deleted-outside-gextto.mkv")
+	if _, err := db.db.Exec("UPDATE episodes SET downloaded_at=?1,archive_path=?2,size_bytes=123 WHERE series_id=(SELECT id FROM series WHERE name=?3) AND season=1 AND episode=1", nowSQLite(), missing, *release.Series); err != nil {
+		t.Fatal(err)
+	}
+	approved, reason, err := db.CheckSeries(&release)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !approved || reason != "upgrade" {
+		t.Fatalf("missing archived file recovery = approved:%v reason:%q", approved, reason)
+	}
+	var archivePath string
+	if err := db.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=(SELECT id FROM series WHERE name=?1) AND season=1 AND episode=1", *release.Series).Scan(&archivePath); err != nil {
+		t.Fatal(err)
+	}
+	if archivePath != "" {
+		t.Fatalf("stale archive path was retained: %q", archivePath)
+	}
+}
+
 func TestSeasonPackRegistersAllEpisodesAndRollsBackAsOneRelease(t *testing.T) {
 	db := newTestDB(t)
 	pack := testRelease()

@@ -48,6 +48,14 @@ type TorrentSession interface {
 	RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64
 }
 
+// TorrentSessionHealth is optionally implemented by backends whose List result
+// can be stale or empty while their external daemon is unavailable. Callers
+// that perform destructive reconciliation must skip it until such a backend
+// has a confirmed live snapshot.
+type TorrentSessionHealth interface {
+	SessionHealthy() bool
+}
+
 // TorrentPieceRun is a compact run of consecutive pieces that share a state.
 // Exposed by GET /api/torrents/{hash}/pieces for backends that support it.
 type TorrentPieceRun struct {

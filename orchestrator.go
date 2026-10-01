@@ -123,15 +123,23 @@ func RunCycleDomain(
 	}
 
 	// Tracked torrents that are no longer in the session would remain "active"
-	// without reconciliation and block re-downloads forever.
-	liveHashes := map[string]struct{}{}
-	for _, torrent := range torrents.List() {
-		liveHashes[strings.ToLower(torrent.Hash)] = struct{}{}
-	}
-	if count, err := db.ReconcileMissingTorrents(liveHashes); err != nil {
-		logging.Warn("torrent reconciliation failed", "error", err)
-	} else if count > 0 {
-		logging.Info("torrents reconciled: marked missing from session", "count", count)
+	// without reconciliation and block re-downloads forever. An external backend
+	// may return an empty/stale snapshot while offline; that is never evidence
+	// that every tracked torrent was removed.
+	snapshot := torrents.List() // refresh an external backend before health check
+	health, reportsHealth := torrents.(TorrentSessionHealth)
+	if reportsHealth && !health.SessionHealthy() {
+		logging.Warn("torrent reconciliation skipped: backend snapshot unavailable")
+	} else {
+		liveHashes := map[string]struct{}{}
+		for _, torrent := range snapshot {
+			liveHashes[strings.ToLower(torrent.Hash)] = struct{}{}
+		}
+		if count, err := db.ReconcileMissingTorrents(liveHashes); err != nil {
+			logging.Warn("torrent reconciliation failed", "error", err)
+		} else if count > 0 {
+			logging.Info("torrents reconciled: marked missing from session", "count", count)
+		}
 	}
 
 	releases, err := engine.ScrapeAll(ctx, cfg)

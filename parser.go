@@ -800,7 +800,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		joined := capture[3]
 		var episodes []int64
 		for _, match := range episodeTokenRe.FindAllStringSubmatch(joined, -1) {
-			if value, err := strconv.ParseInt(match[1], 10, 64); err == nil && value <= 99 {
+			if value, err := strconv.ParseInt(match[1], 10, 64); err == nil && value > 0 {
 				episodes = append(episodes, value)
 			}
 		}
