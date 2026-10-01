@@ -1282,18 +1282,13 @@
   <div class="tmdb-card">
     <div class="tmdb-poster{{if not .Poster}} placeholder{{end}}">{{if .Poster}}<img loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}N/D{{end}}</div>
     <div class="tmdb-card-body">
-      <strong class="truncate" title="{{.Name}}">{{.Name}}</strong>
-      <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}</small>
+       {{if .TmdbURL}}<a class="tmdb-result-title truncate" href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TMDB">{{.Name}}</a>{{else}}<strong class="truncate" title="{{.Name}}">{{.Name}}</strong>{{end}}
+       <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
       {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
       {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
-      {{else}}<form hx-post="/v2/tmdb/add" hx-swap="outerHTML">
-        <input type="hidden" name="kind" value="{{.Kind}}" />
-        <input type="hidden" name="name" value="{{.Name}}" />
-         <input type="hidden" name="year" value="{{.Year}}" />
-         <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
-         <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
-        <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
-      </form>{{end}}
+       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}" hx-target="#v2-modal" hx-swap="innerHTML">
+         <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
+       </form>{{end}}
     </div>
   </div>
   {{end}}
@@ -1307,12 +1302,12 @@
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
   <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
   <div class="modal-body"><form class="form-grid" hx-post="/v2/tmdb/add" hx-swap="none">
-    <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="manual"><input type="hidden" name="redirect" value="/v2?view={{.Kind}}">
-    <label class="field"><span>Titolo</span><input class="input" name="name" required></label><label class="field"><span>Anno</span><input class="input" name="year"></label>
-    <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id"></label>
-    <label class="field"><span>Qualità richiesta</span><input class="input" name="quality" placeholder="es. 1080p"></label><label class="field"><span>Lingue</span><input class="input" name="language" value="ita"></label>
+    <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
+    <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
+    <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
+    <label class="field"><span>Qualità richiesta</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 1080p"></label><label class="field"><span>Lingue</span><input class="input" name="language" value="{{.Language}}"></label>
     <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle"></label>
-    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="1+"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><input class="input" name="archive_path"></label>{{end}}
+    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><input class="input" name="archive_path"></label>{{end}}
     <label class="field span-full"><span>Esclusioni</span><input class="input" name="exclude" placeholder="cam, ts"></label>
     <div class="form-actions"><button class="btn primary" type="submit">Conferma</button></div>
   </form></div>
@@ -1343,8 +1338,8 @@
     <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted">Serie TV e film</small></div>
     <div class="panel-body">
       <div class="toolbar"><strong class="muted">Tipo</strong>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" type="submit">Serie TV</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit">Film</button></form>
+         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
+         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
       </div>
       <div class="toolbar" style="margin-top:8px"><strong class="muted">Elenco</strong>
         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza settimana</button></form>
@@ -1361,7 +1356,7 @@
     <div class="panel-head"><h3>Esplora TMDB (ricerca)</h3></div>
     <div class="panel-body">
       <form class="toolbar" hx-post="/v2/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
-        <select class="input" name="kind" aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
+         <select class="input" name="kind" data-v2-discover-select aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
         <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
         <button class="btn primary" type="submit">Cerca su TMDB</button>
       </form>
@@ -1374,9 +1369,10 @@
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
         <button class="btn primary" type="submit">Cerca</button>
       </form>
-      <div id="v2-search-results">{{template "v2_search_results" .}}</div>
+       <div id="v2-search-results">{{template "v2_search_results" .}}</div>
     </div>
   </div>
+  <div id="v2-modal"></div>
 </div>
 {{end}}
 

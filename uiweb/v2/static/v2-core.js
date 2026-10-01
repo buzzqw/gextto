@@ -449,6 +449,13 @@
   });
 
   document.addEventListener("click", function (event) {
+    var discoverKind = event.target.closest && event.target.closest("[data-v2-discover-kind]");
+    if (discoverKind) {
+      var kind = discoverKind.getAttribute("data-v2-discover-kind");
+      document.querySelectorAll("[data-v2-discover-kind]").forEach(function (button) {
+        button.classList.toggle("primary", button.getAttribute("data-v2-discover-kind") === kind);
+      });
+    }
     var browse = event.target.closest && event.target.closest("[data-v2-browse-for]");
     if (browse) {
       var scope = browse.closest("form") || browse.closest(".setting-row");
@@ -468,6 +475,14 @@
       updateLogsFollowButton();
       if (logsFollow) pinLogTail();
     }
+  });
+  document.addEventListener("change", function (event) {
+    var select = event.target.matches && event.target.matches("[data-v2-discover-select]") ? event.target : null;
+    if (!select) return;
+    var kind = select.value;
+    document.querySelectorAll("[data-v2-discover-kind]").forEach(function (button) {
+      button.classList.toggle("primary", button.getAttribute("data-v2-discover-kind") === kind);
+    });
   });
 
   function pinLogTail() {

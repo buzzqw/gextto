@@ -920,15 +920,23 @@ type v2TMDBItem struct {
 	Name      string
 	Year      string
 	TvdbID    string
+	TvdbURL   string
 	Poster    string
 	Overview  string
 	TmdbID    string
+	TmdbURL   string
 	Vote      float64
 	InLibrary bool
 }
 
 func v2TMDBItemFromMap(kind string, item map[string]any) v2TMDBItem {
-	out := v2TMDBItem{Kind: kind, TmdbID: v2AnyString(item["id"]), TvdbID: v2AnyString(item["tvdb_id"]), InLibrary: v2Truthy(item["in_library"])}
+	out := v2TMDBItem{Kind: kind, TmdbID: v2AnyID(item["id"]), TvdbID: v2AnyID(item["tvdb_id"]), InLibrary: v2Truthy(item["in_library"])}
+	tmdbKind, tvdbKind := "movie", "movie"
+	if kind != "movie" {
+		tmdbKind, tvdbKind = "tv", "series"
+	}
+	out.TmdbURL = tmdbURL(out.TmdbID, tmdbKind)
+	out.TvdbURL = tvdbURL(out.TvdbID, tvdbKind)
 	out.Name = v2AnyString(item["name"])
 	if out.Name == "" {
 		out.Name = v2AnyString(item["title"])
@@ -1100,8 +1108,17 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if kind != "movie" {
 		kind = "series"
 	}
+	view := map[string]string{
+		"Kind": kind, "Name": strings.TrimSpace(r.FormValue("name")),
+		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
+		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
+		"Language": "ita", "Seasons": "1+", "Redirect": "/v2?view=search",
+	}
+	if language := strings.TrimSpace(r.FormValue("language")); language != "" {
+		view["Language"] = language
+	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_tmdb_manual", map[string]string{"Kind": kind}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
 }
 
 func v2AnyString(value any) string {
@@ -1113,6 +1130,18 @@ func v2AnyString(value any) string {
 	default:
 		return fmt.Sprint(value)
 	}
+}
+
+func v2AnyID(value any) string {
+	switch typed := value.(type) {
+	case float64:
+		return strconv.FormatInt(int64(typed), 10)
+	case json.Number:
+		if parsed, err := typed.Int64(); err == nil {
+			return strconv.FormatInt(parsed, 10)
+		}
+	}
+	return v2AnyString(value)
 }
 
 func v2AnyInt(value any) int64 {

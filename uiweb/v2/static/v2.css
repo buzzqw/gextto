@@ -142,6 +142,15 @@ html, body {
   font-size: 1.1rem;
   text-align: center;
 }
+.tmdb-result-title {
+  display: block;
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.tmdb-result-title:hover {
+  color: var(--accent-2);
+}
 
 /* Downloads: keep the three action groups readable instead of making one
    dense wall of controls. They still wrap naturally on narrow screens. */
