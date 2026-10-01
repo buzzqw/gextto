@@ -2106,7 +2106,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// restart, or storage_moved): never post-process an already archived
 		// release again. A "completed" row whose file is missing is re-processed
 		// instead of being skipped forever.
-		if tevIgnoreRepeatedCompletion(db, event.Hash, event.Name) {
+		if tevIgnoreRepeatedCompletion(db, event.Hash) {
 			return false, nil
 		}
 		release := metadata.Release
@@ -2477,7 +2477,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// A post-seeding relocation happens after the release was already
 		// committed. Do not run rename/copy/pack processing a second time, but
 		// do re-process a "completed" torrent whose archived copy is missing.
-		if tevIgnoreRepeatedCompletion(db, event.Hash, event.Name) {
+		if tevIgnoreRepeatedCompletion(db, event.Hash) {
 			delete(moveRequests, event.Hash)
 			return false, nil
 		}

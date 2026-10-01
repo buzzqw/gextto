@@ -2116,17 +2116,16 @@ func tevDirHasFile(dir string, depth int) bool {
 
 // tevIgnoreRepeatedCompletion mirrors the "already completed" guard but only
 // when the archived copy is really on disk.
-func tevIgnoreRepeatedCompletion(db *Database, hash, name string) bool {
+func tevIgnoreRepeatedCompletion(db *Database, hash string) bool {
 	status, err := db.TorrentStatus(hash)
 	if err != nil || status == nil || *status != "completed" {
 		return false
 	}
 	if tevArchivedCopyPresent(db, hash) {
-		logging.Debug("ignoring completion for an already archived torrent", "hash", hash, "name", name)
+		logging.Debug("ignoring completion for an already archived torrent")
 		return true
 	}
-	logging.Warn("re-processing a completed torrent whose archived copy is missing",
-		"hash", hash, "name", name)
+	logging.Debug("completed torrent archive is not recorded yet; continuing post-processing")
 	return false
 }
 
