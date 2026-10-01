@@ -1188,6 +1188,22 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 			Empty:  "Nessun film monitorizzato.",
 			Filter: true,
 		}, true
+	case "movie-history":
+		return uiTableSpec{
+			Title:    "Film scaricati",
+			Class:    "movie-history-table",
+			Endpoint: "/api/movies/history",
+			ItemsKey: "items",
+			ColumnsJSON: uiJSON([]uiColumn{
+				{Key: "name", Label: "Titolo", Format: "truncate", Sortable: true},
+				{Key: "year", Label: "Anno", Format: "number", Sortable: true},
+				{Key: "quality_score", Label: "Punteggio", Format: "number", Sortable: true},
+				{Key: "size_bytes", Label: "Dimensione", Format: "bytes", Sortable: true},
+				{Key: "downloaded_at", Label: "Scaricato", Format: "datetime", Sortable: true},
+			}),
+			Empty:  "Nessun film scaricato.",
+			Filter: true,
+		}, true
 	case "gaps":
 		return uiTableSpec{
 			Title:    "Episodi mancanti",

@@ -93,13 +93,29 @@ func TestV2CoversEveryClassicMenuScreen(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
-	for _, view := range []string{"dashboard", "downloads", "series", "movies", "gaps", "search", "archive", "comics", "settings", "integrations", "maintenance", "health", "logs", "blocklist", "manual", "license"} {
+	for _, view := range []string{"dashboard", "downloads", "series", "movies", "movie-history", "gaps", "search", "archive", "comics", "settings", "integrations", "maintenance", "health", "logs", "blocklist", "manual", "license"} {
 		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)
 		if code != http.StatusOK {
 			t.Fatalf("%s -> %d", view, code)
 		}
 		if strings.Contains(body, "non è ancora migrata nella UI v2") {
 			t.Fatalf("%s still renders the unavailable placeholder", view)
+		}
+	}
+}
+
+func TestV2MovieHistoryIsAvailableFromLibrary(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=movie-history", nil)
+	if code != http.StatusOK {
+		t.Fatalf("movie history -> %d", code)
+	}
+	for _, marker := range []string{"Film scaricati", "Nessun film scaricato.", `href="/v2?view=movie-history"`} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("movie history missing %q", marker)
 		}
 	}
 }
