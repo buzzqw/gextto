@@ -90,7 +90,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Sblocca pin"} {
+	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Sblocca pin", `title="Incolla un link magnet`, `title="Avvia il download subito`, `title="Ricarica l'elenco dei torrent`, `title="Applica temporaneamente i limiti`, `title="Metti in pausa i torrent selezionati`} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}
@@ -125,12 +125,12 @@ func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/v2/downloads/detail?hash=deadbeef&tab=files", nil)
-	if code != http.StatusOK || !strings.Contains(body, "v2-detail-panel") {
+	code, body := v2Request(t, server, http.MethodGet, "/v2/downloads/detail?hash=deadbeef&tab=general", nil)
+	if code != http.StatusOK || !strings.Contains(body, "v2-detail-panel") || !strings.Contains(body, `title="Mostra la sezione`) {
 		t.Fatalf("detail modal -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2/downloads/remove?hash=deadbeef", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Solo torrent") {
+	if code != http.StatusOK || !strings.Contains(body, "Solo torrent") || !strings.Contains(body, `title="Rimuove il torrent dalla sessione`) {
 		t.Fatalf("remove modal -> %d", code)
 	}
 }
