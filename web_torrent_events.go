@@ -2390,7 +2390,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			}
 			tev_notifySeeding(db, notifier, &event, &release, source, size)
 			logging.Info("movie completed; kept in downloads for seeding, will be archived at the end of the seed",
-				"hash", event.Hash, "name", event.Name, "path", source)
+				"path", source)
 			return false, nil
 		}
 		if _, exists := moveRequests[event.Hash]; exists {
