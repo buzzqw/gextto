@@ -444,12 +444,20 @@ func TestV2DetailPagesRender(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodGet, "/v2?view=series&series=Test%20Show", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Test Show") || !strings.Contains(body, "Episodi") {
+	if code != http.StatusOK || !strings.Contains(body, "Test Show") || !strings.Contains(body, "Episodi") || !strings.Contains(body, `data-v2-browse-for="archive_path"`) {
 		t.Fatalf("series detail -> %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/?view=series&series=Test%20Show", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Test Show") || !strings.Contains(body, `data-v2-browse-for="archive_path"`) {
+		t.Fatalf("root series detail -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=movies&movie=7", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Test Movie") {
 		t.Fatalf("movie detail -> %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/?view=movies&movie=7", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Test Movie") {
+		t.Fatalf("root movie detail -> %d", code)
 	}
 	// Saving a series answers HX-Redirect with 204 for an HTMX request.
 	saveRequest, err := http.NewRequest(http.MethodPost, server.URL+"/v2/series/save", strings.NewReader(url.Values{"name": {"Test Show"}, "seasons": {"1-3"}, "quality": {"720p"}}.Encode()))

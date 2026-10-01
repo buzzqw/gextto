@@ -122,6 +122,7 @@ type episodeResult struct {
 
 // CastMember mirrors the `CastMember`.
 type CastMember struct {
+	ID        *int64  `json:"id"`
 	Name      *string `json:"name"`
 	Character *string `json:"character"`
 	Order     *int64  `json:"order"`

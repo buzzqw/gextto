@@ -1555,7 +1555,7 @@
          <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
-        <label class="field span-full"><span>Percorso archivio (NAS)</span><input class="input" name="archive_path" value="{{.ArchivePath}}" /></label>
+         <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button></div>
       </form>

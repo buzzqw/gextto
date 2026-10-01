@@ -300,9 +300,9 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		TmdbURL:         tmdbURL(series.TmdbID, "tv"),
 		TvdbURL:         tvdbURL(series.TvdbID, "series"),
 	}
-	if strings.HasPrefix(r.URL.Path, "/v2") {
-		uiSeriesMetadataFrom(s, series.Name, &detail)
-	}
+	// The v2 interface is served both at / and at /v2. Load the metadata for
+	// both paths so the official root UI also renders poster, genres and cast.
+	uiSeriesMetadataFrom(s, series.Name, &detail)
 	return detail, true
 }
 
@@ -360,7 +360,13 @@ func uiSeriesMetadataFrom(s *AppState, name string, detail *uiSeriesDetail) {
 	if cast, ok := info["cast"].([]any); ok {
 		for _, value := range cast {
 			if item, ok := value.(map[string]any); ok {
-				detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(item["name"]), Character: v2AnyString(item["character"]), URL: v2AnyString(item["url"])})
+				personURL := v2AnyString(item["url"])
+				if personURL == "" {
+					if personID := int64(v2Float(item["id"])); personID > 0 {
+						personURL = fmt.Sprintf("https://www.themoviedb.org/person/%d", personID)
+					}
+				}
+				detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(item["name"]), Character: v2AnyString(item["character"]), URL: personURL})
 			}
 		}
 	}
@@ -402,22 +408,26 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		TmdbURL:              tmdbURL(movie.TmdbID, "movie"),
 		TvdbURL:              tvdbURL(movie.TvdbID, "movie"),
 	}
-	if strings.HasPrefix(r.URL.Path, "/v2") {
-		if raw, status := v2InternalJSON(s, http.MethodGet, "/api/movies/"+strconv.FormatInt(movie.ID, 10), nil, nil); status < 400 {
-			var payload struct {
-				Metadata map[string]any   `json:"metadata"`
-				Cast     []map[string]any `json:"cast"`
+	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/movies/"+strconv.FormatInt(movie.ID, 10), nil, nil); status < 400 {
+		var payload struct {
+			Metadata map[string]any   `json:"metadata"`
+			Cast     []map[string]any `json:"cast"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			detail.Overview = v2AnyString(payload.Metadata["overview"])
+			detail.Poster = v2AnyString(payload.Metadata["poster_path"])
+			if detail.Poster != "" && !strings.HasPrefix(detail.Poster, "http") {
+				detail.Poster = "https://image.tmdb.org/t/p/w300" + detail.Poster
 			}
-			if json.Unmarshal(raw, &payload) == nil {
-				detail.Overview = v2AnyString(payload.Metadata["overview"])
-				detail.Poster = v2AnyString(payload.Metadata["poster_path"])
-				if detail.Poster != "" && !strings.HasPrefix(detail.Poster, "http") {
-					detail.Poster = "https://image.tmdb.org/t/p/w300" + detail.Poster
+			detail.ReleaseDate = v2AnyString(payload.Metadata["release_date"])
+			for _, person := range payload.Cast {
+				personURL := v2AnyString(person["url"])
+				if personURL == "" {
+					if personID := int64(v2Float(person["id"])); personID > 0 {
+						personURL = fmt.Sprintf("https://www.themoviedb.org/person/%d", personID)
+					}
 				}
-				detail.ReleaseDate = v2AnyString(payload.Metadata["release_date"])
-				for _, person := range payload.Cast {
-					detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(person["name"]), Character: v2AnyString(person["character"]), URL: v2AnyString(person["url"])})
-				}
+				detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(person["name"]), Character: v2AnyString(person["character"]), URL: personURL})
 			}
 		}
 	}
