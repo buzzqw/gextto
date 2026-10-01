@@ -280,6 +280,9 @@ html, body {
 .v2-topbar-sticky .top-metric-cycle {
   min-width: 92px;
 }
+.v2-topbar-sticky .top-live-status {
+  display: contents;
+}
 .v2-topbar-sticky .current-time {
   margin-left: auto;
   color: var(--muted);

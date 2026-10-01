@@ -500,7 +500,9 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 // page or replacing the controls in the top bar.
 func V2ChromePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	templateName := "v2_live_top_metrics"
-	if r.URL.Query().Get("mobile") == "1" {
+	if r.URL.Query().Get("status") == "1" {
+		templateName = "v2_live_status"
+	} else if r.URL.Query().Get("mobile") == "1" {
 		templateName = "v2_live_mobile_metrics"
 	}
 	dict, eng := v2Dictionaries(s)

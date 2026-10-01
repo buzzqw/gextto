@@ -69,6 +69,7 @@
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
         <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
+        {{template "v2_live_status" .Chrome}}
       </div>
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">
@@ -105,6 +106,11 @@
   <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong>{{.Torrents}}</strong></div>
   <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
   <div class="top-metric" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.NextCycle}}</strong></div>
+</div>
+{{end}}
+
+{{define "v2_live_status"}}
+<div id="v2-live-status" class="top-live-status" hx-get="/v2/partial/chrome?status=1" hx-trigger="every 5s" hx-swap="outerHTML">
   <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Status}}</span>
   <time class="current-time" datetime="{{.CurrentTime}}" aria-label="Ora attuale" title="Ora attuale">{{.CurrentTime}}</time>
 </div>
