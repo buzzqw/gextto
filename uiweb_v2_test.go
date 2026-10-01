@@ -66,6 +66,14 @@ func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
 		t.Fatal("v2 page must not load the classic UI script")
 	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2/partial/chrome", nil)
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-live-top-metrics"`) {
+		t.Fatalf("live chrome partial -> %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2/partial/chrome?mobile=1", nil)
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-live-mobile-metrics"`) {
+		t.Fatalf("live mobile chrome partial -> %d", code)
+	}
 }
 
 func TestV2IsTheDefaultRootUI(t *testing.T) {
@@ -208,8 +216,12 @@ func TestV2DownloadsPageAndActions(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodGet, "/v2?view=downloads", nil)
-	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) {
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) || !strings.Contains(body, "Download in sessione") || strings.Contains(body, "Download session") || !strings.Contains(body, `Auto: on`) || !strings.Contains(body, `every 5s`) {
 		t.Fatalf("downloads page -> %d", code)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/downloads/table", url.Values{"auto_state": {"1"}})
+	if code != http.StatusOK || !strings.Contains(body, `name="auto_state" value="1"`) || !strings.Contains(body, `every 5s`) {
+		t.Fatalf("automatic refresh state -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodPost, "/v2/downloads/table", url.Values{"refresh": {"1"}})
 	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) {

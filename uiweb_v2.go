@@ -152,6 +152,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 
 	// Log (frammento aggiornabile).
 	v2Handle(s, mux, "GET /v2/partial/logs", V2LogsPartial)
+	v2Handle(s, mux, "GET /v2/partial/chrome", V2ChromePartial)
 
 	// Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist, Fumetti).
 	v2Handle(s, mux, "GET /v2/table", V2Table)
@@ -493,6 +494,17 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
+}
+
+// V2ChromePartial refreshes the live performance metrics without reloading the
+// page or replacing the controls in the top bar.
+func V2ChromePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	templateName := "v2_live_top_metrics"
+	if r.URL.Query().Get("mobile") == "1" {
+		templateName = "v2_live_mobile_metrics"
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, templateName, uiShellChromeFrom(s), dict, eng)
 }
 
 // V2Empty clears a modal container.
@@ -861,6 +873,13 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 	}
 	v2SortRows(rows, sortKey, dir)
 	settings := uiDownloadsPageFor(s)
+	auto := r.FormValue("auto")
+	if auto == "" {
+		auto = r.FormValue("auto_state")
+	}
+	// Keep the live download list updating on first entry. The explicit `0`
+	// value from the Auto button is still respected and disables polling.
+	autoEnabled := auto == "" || auto == "1"
 	return v2TorrentsView{
 		Rows:                rows,
 		HTTPDownloads:       data.HTTPDownloads,
@@ -869,7 +888,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		Sort:                sortKey,
 		Dir:                 dir,
 		Filter:              filter,
-		Auto:                r.FormValue("auto") == "1",
+		Auto:                autoEnabled,
 		Columns:             v2TorrentColumns,
 		TagOptions:          uiDownloadTagOptions(s, latestConfig(s)),
 		TagFilter:           tagFilter,

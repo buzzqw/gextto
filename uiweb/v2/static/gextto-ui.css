@@ -236,6 +236,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   scrollbar-width: thin;
 }
 .top-actions > * { flex: none; }
+.top-live-metrics { display: contents; }
 
 .icon-btn {
   display: inline-grid; place-items: center; width: 42px; height: 42px; flex: none;
@@ -264,6 +265,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 @media (max-width: 700px) {
   .top-actions { flex-wrap: nowrap; overflow-x: auto; }
   .top-actions > .top-metric { display: none; }
+  .top-actions .top-live-metrics .top-metric { display: none; }
   .top-actions > [data-font] { display: none; }
   .top-actions .lang-select,
   .top-actions .btn,

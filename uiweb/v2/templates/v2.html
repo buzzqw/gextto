@@ -52,13 +52,7 @@
         <h1>{{.Title}}</h1>
       </div>
       <div class="top-actions">
-        <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .Chrome.CPUFrequency}} <small class="metric-frequency">{{.Chrome.CPUFrequency}}</small>{{end}}</span><strong>{{.Chrome.CPU}}</strong></div>
-        <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div>
-        <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Chrome.Download}}</strong></div>
-        <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Chrome.Upload}}</strong></div>
-        <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong>{{.Chrome.Torrents}}</strong></div>
-        <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong>{{.Chrome.Peers}}/{{.Chrome.Seeds}}</strong></div>
-        <div class="top-metric" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.Chrome.NextCycle}}</strong></div>
+        {{template "v2_live_top_metrics" .Chrome}}
         <form method="post" action="/v2/language" class="lang-form">
           <select class="lang-select" name="lang" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" onchange="this.form.submit()">
             <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
@@ -80,7 +74,7 @@
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">
       <div class="mobile-performance-head"><span class="eyebrow">Connessioni e prestazioni</span><small class="muted">Aggiornamento automatico</small></div>
-      <div class="mobile-performance-grid"><div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .Chrome.CPUFrequency}} <small class="metric-frequency">{{.Chrome.CPUFrequency}}</small>{{end}}</span><strong>{{.Chrome.CPU}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Chrome.Download}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Chrome.Upload}}</strong></div></div>
+      {{template "v2_live_mobile_metrics" .Chrome}}
     </section>
     <div class="content" id="v2-page" data-view="{{.Page}}">
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
@@ -102,6 +96,27 @@
 </div>
 </body>
 </html>{{end}}
+
+{{define "v2_live_top_metrics"}}
+<div id="v2-live-top-metrics" class="top-live-metrics" hx-get="/v2/partial/chrome" hx-trigger="load, every 5s" hx-swap="outerHTML">
+  <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
+  <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
+  <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Download}}</strong></div>
+  <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Upload}}</strong></div>
+  <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong>{{.Torrents}}</strong></div>
+  <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong>{{.Peers}}/{{.Seeds}}</strong></div>
+  <div class="top-metric" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.NextCycle}}</strong></div>
+</div>
+{{end}}
+
+{{define "v2_live_mobile_metrics"}}
+<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/v2/partial/chrome?mobile=1" hx-trigger="load, every 5s" hx-swap="outerHTML">
+  <div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
+  <div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
+  <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Download}}</strong></div>
+  <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Upload}}</strong></div>
+</div>
+{{end}}
 
 {{define "v2_unavailable"}}
 <div class="view">
@@ -292,7 +307,7 @@
     </div>
   </div>
   <div class="panel">
-    <div class="panel-head"><h3>Download session</h3><small class="muted">Tabella e azioni renderizzate dal server via HTMX</small></div>
+    <div class="panel-head"><h3>Download in sessione</h3><small class="muted">Tabella e azioni renderizzate dal server via HTMX</small></div>
     <div class="panel-body">{{template "v2_torrents_wrap" .}}</div>
   </div>
   <div id="v2-modal"></div>
@@ -307,6 +322,7 @@
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     <input type="hidden" name="sort" value="{{.Sort}}">
     <input type="hidden" name="dir" value="{{.Dir}}">
+    <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
     <div class="toolbar download-global-toolbar">
       <input id="v2-filter" class="input" type="search" name="filter" value="{{.Filter}}"
               placeholder="Filtra i torrent… ( -parola esclude )" aria-label="Filtra i torrent" title="Filtra per nome o tag; anteponi - a una parola per escluderla" hx-preserve="true" />
