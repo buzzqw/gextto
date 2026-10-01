@@ -142,6 +142,48 @@ html, body {
   font-size: 1.1rem;
   text-align: center;
 }
+
+/* Downloads: keep the three action groups readable instead of making one
+   dense wall of controls. They still wrap naturally on narrow screens. */
+.download-global-toolbar,
+.download-temp-toolbar,
+.download-bulk-toolbar {
+  column-gap: 10px;
+  row-gap: 10px;
+  padding: 10px 0;
+}
+.download-global-toolbar {
+  padding-top: 0;
+}
+.download-temp-toolbar,
+.download-bulk-toolbar {
+  margin-top: 2px;
+  padding: 12px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 65%, transparent);
+}
+.download-temp-toolbar > .muted:first-child {
+  flex: 1 1 100%;
+  font-weight: 700;
+}
+.download-global-toolbar > .muted {
+  margin-left: auto;
+}
+.download-bulk-toolbar .check:first-child {
+  margin-right: 4px;
+}
+.download-bulk-toolbar [data-v2-selected-count] {
+  margin-right: 2px;
+}
+.download-bulk-toolbar .htx-status {
+  flex: 1 1 100%;
+}
+.torrent-table th,
+.torrent-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
 .dashboard-session-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
