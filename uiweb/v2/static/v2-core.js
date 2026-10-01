@@ -126,6 +126,7 @@
     if (!activeDialog || !document.contains(activeDialog)) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      if (activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
       if (activeDialog.id === "v2-font-overlay") { closeFontPicker(); return; }
       closeDialog();
       return;
@@ -141,6 +142,7 @@
 
   document.addEventListener("click", function (event) {
     if (!activeDialog) return;
+    if (event.target === activeDialog && activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
     if (event.target === activeDialog && activeDialog.id !== "v2-font-overlay") { closeDialog(); return; }
     if (event.target === activeDialog && activeDialog.id === "v2-font-overlay") closeFontPicker();
   }, true);
@@ -194,6 +196,75 @@
     }
   }
 
+  // Server-side folder picker: unlike a native browser picker this browses
+  // the machine/container where Gextto is actually running.
+  var folderBrowser = null;
+  function closeFolderBrowser() {
+    if (!folderBrowser) return;
+    var overlay = folderBrowser;
+    folderBrowser = null;
+    if (activeDialog === overlay) activeDialog = null;
+    overlay.remove();
+    restoreFocus();
+  }
+  function loadFolderBrowser(overlay) {
+    var list = overlay.querySelector("[data-v2-browse-list]");
+    var path = overlay.querySelector("[data-v2-browse-path]");
+    list.textContent = "Caricamento…";
+    fetch("/api/browse_dir?path=" + encodeURIComponent(overlay._current || ""), { credentials: "same-origin" })
+      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Impossibile leggere le cartelle"); return data; }); })
+      .then(function (data) {
+        overlay._current = String(data.path || overlay._current || "");
+        overlay._parent = data.parent || "";
+        path.value = overlay._current;
+        list.textContent = "";
+        var dirs = data.dirs || [];
+        if (!dirs.length) { list.textContent = "Nessuna sottocartella."; return; }
+        dirs.forEach(function (dir) {
+          var button = document.createElement("button");
+          button.className = "path-item";
+          button.type = "button";
+          button.title = dir;
+          button.textContent = dir;
+          button.addEventListener("click", function () { overlay._current = dir; loadFolderBrowser(overlay); });
+          list.appendChild(button);
+        });
+        ensureTooltips(overlay);
+      })
+      .catch(function (error) { list.textContent = error.message; });
+  }
+  function createFolder(overlay) {
+    var name = String(overlay.querySelector("[data-v2-browse-new]").value || "").trim();
+    if (!name) return;
+    var base = (overlay._current || "/").replace(/\/+$/, "");
+    var target = (base || "/") + "/" + name;
+    fetch("/api/mkdir", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: target }) })
+      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Impossibile creare la cartella"); return data; }); })
+      .then(function () { overlay._target.value = target; closeFolderBrowser(); })
+      .catch(function (error) { overlay.querySelector("[data-v2-browse-message]").textContent = error.message; });
+  }
+  function openFolderBrowser(input) {
+    closeFolderBrowser();
+    var overlay = document.createElement("div");
+    overlay.id = "v2-browse-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">Sfoglia cartelle</h3><button class="btn sm" type="button" data-v2-browse-close>Chiudi</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="Vai alla cartella superiore">↑ Su</button><input class="input mono" type="text" data-v2-browse-path aria-label="Percorso corrente" title="Modifica il percorso e premi Invio per navigare" /><button class="btn sm primary" type="button" data-v2-browse-select title="Usa questa cartella">Seleziona</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="Crea una nuova cartella dentro quella corrente">Crea cartella</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="Nome nuova cartella" placeholder="Nuova cartella" title="Nome della nuova cartella" /><button class="btn sm primary" type="button" data-v2-browse-create title="Crea la cartella e selezionala">Crea e usa</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
+    document.body.appendChild(overlay);
+    overlay._target = input;
+    overlay._current = String(input.value || "").trim();
+    folderBrowser = overlay;
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay || event.target.closest("[data-v2-browse-close]")) closeFolderBrowser();
+      else if (event.target.closest("[data-v2-browse-up]")) { overlay._current = overlay._parent || overlay._current; loadFolderBrowser(overlay); }
+      else if (event.target.closest("[data-v2-browse-select]")) { input.value = overlay._current; closeFolderBrowser(); }
+      else if (event.target.closest("[data-v2-browse-create-prompt]")) { var entered = window.prompt("Nome nuova cartella:", ""); if (entered) { overlay.querySelector("[data-v2-browse-new]").value = entered; createFolder(overlay); } }
+      else if (event.target.closest("[data-v2-browse-create]")) createFolder(overlay);
+    });
+    overlay.addEventListener("keydown", function (event) { if (event.key === "Enter" && event.target.matches("[data-v2-browse-path]")) { event.preventDefault(); overlay._current = event.target.value.trim(); loadFolderBrowser(overlay); } });
+    openDialog(overlay, input);
+    loadFolderBrowser(overlay);
+  }
+
   function copyText(value, button) {
     if (!value) return;
     var done = function () {
@@ -239,6 +310,13 @@
   });
 
   document.addEventListener("click", function (event) {
+    var browse = event.target.closest && event.target.closest("[data-v2-browse-for]");
+    if (browse) {
+      var scope = browse.closest("form") || browse.closest(".setting-row");
+      var input = scope && scope.querySelector('[name="value"]');
+      if (input) openFolderBrowser(input);
+      return;
+    }
     var copy = event.target.closest && event.target.closest("[data-v2-copy]");
     if (copy) {
       event.preventDefault();

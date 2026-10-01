@@ -157,6 +157,10 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
 	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=paths", nil)
+	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="libtorrent_dir"`) {
+		t.Fatalf("path folder browser -> %d", code)
+	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=rename", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Italiano") || !strings.Contains(body, `value="it-IT"`) || !strings.Contains(body, `value="ita"`) {
 		t.Fatalf("language selects -> %d", code)

@@ -671,7 +671,7 @@
       <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
     </div>
   </div>
-  <div class="setting-control">
+  <div class="setting-control{{if or (eq .Key "archive_root") (eq .Key "trash_path") (eq .Key "libtorrent_dir") (eq .Key "libtorrent_temp_dir") (eq .Key "libtorrent_torrent_copy_dir") (eq .Key "libtorrent_ramdisk_dir")}} setting-control-browse{{end}}">
     {{if .Disabled}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled title="{{.DisabledNote}}" />
     {{else if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
     {{else if eq .Kind "structured"}}<p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
@@ -679,9 +679,10 @@
     {{else if eq .Kind "select"}}<select class="input" name="value" id="input-{{.Key}}">{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
     {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}">{{.Value}}</textarea>
     {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
-    {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
-    {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
-  </div>
+     {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
+     {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
+     {{if or (eq .Key "archive_root") (eq .Key "trash_path") (eq .Key "libtorrent_dir") (eq .Key "libtorrent_temp_dir") (eq .Key "libtorrent_torrent_copy_dir") (eq .Key "libtorrent_ramdisk_dir")}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
+   </div>
   <div class="setting-actions">
     <small class="setting-status muted" aria-live="polite">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Disabled}}{{.DisabledNote}}{{end}}</small>
     {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}

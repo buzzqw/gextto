@@ -32,6 +32,15 @@
 .settings-search-row .settings-results > * {
   margin: 0;
 }
+.setting-control-browse {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setting-control-browse .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 @media (max-width: 760px) {
   .settings-search-row {
     display: block;
