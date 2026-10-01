@@ -779,6 +779,80 @@ func TestMovieRemuxUpgradeIsAllowedWithSmallScoreDelta(t *testing.T) {
 	assertEqual(t, reason, "upgrade")
 }
 
+func TestRollbackReleaseRestoresMovieUpgrade(t *testing.T) {
+	db := newTestDB(t)
+	old := models.Release{
+		Title:   "Example Movie",
+		Magnet:  "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Source:  "rss",
+		Quality: models.Quality{Resolution: "1080p", Source: "webdl"},
+		Kind:    "movie",
+		Year:    int64Ptr(2024),
+		Seeders: -1,
+		Peers:   -1,
+	}
+	if approved, _, err := db.CheckMovie(&old); err != nil || !approved {
+		t.Fatalf("initial movie approval: approved=%v err=%v", approved, err)
+	}
+	if err := db.RegisterTorrent(&old); err != nil {
+		t.Fatal(err)
+	}
+	upgrade := old
+	upgrade.Magnet = "magnet:?xt=urn:btih:fedcba9876543210fedcba9876543210fedcba98"
+	upgrade.Quality.Source = "remux"
+	if approved, reason, err := db.CheckMovieScored(&upgrade, upgrade.Quality.Score(), 200); err != nil || !approved || reason != "upgrade" {
+		t.Fatalf("upgrade approval: approved=%v reason=%q err=%v", approved, reason, err)
+	}
+	if err := db.RollbackRelease(&upgrade); err != nil {
+		t.Fatal(err)
+	}
+	var hash, title string
+	var count int
+	if err := db.db.QueryRow("SELECT magnet_hash,title FROM movies WHERE name='Example Movie' AND year=2024 AND removed_at IS NULL").Scan(&hash, &title); err != nil {
+		t.Fatal(err)
+	}
+	if hash != "0123456789012345678901234567890123456789" || title != old.Title {
+		t.Fatalf("old movie was not restored: hash=%q title=%q", hash, title)
+	}
+	if err := db.db.QueryRow("SELECT COUNT(*) FROM upgrade_backup").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("upgrade backup remained after rollback: %d", count)
+	}
+}
+
+func TestUpgradeBackupAccumulatesSeasonPackRows(t *testing.T) {
+	db := newTestDB(t)
+	tx, err := db.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, backup := range []upgradeBackup{
+		{Kind: "series", RowID: 1, Title: "Show S01E01"},
+		{Kind: "series", RowID: 2, Title: "Show S01E02"},
+	} {
+		if err := db.saveUpgradeBackup(tx, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", backup); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var raw string
+	if err := db.db.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	backups, err := decodeUpgradeBackups(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(backups) != 2 || backups[0].RowID != 1 || backups[1].RowID != 2 {
+		t.Fatalf("season pack backups = %+v", backups)
+	}
+}
+
 func TestRecentDownloadsMergesSeriesAndMovies(t *testing.T) {
 	db := newTestDB(t)
 	release := testRelease()

@@ -47,6 +47,8 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 		resolution = 400
 	case "576p":
 		resolution = 80
+	case "360p":
+		resolution = 20
 	}
 	source := int64(0)
 	switch q.Source {

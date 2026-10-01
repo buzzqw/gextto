@@ -13,32 +13,34 @@ import (
 // classic one, which showed the same figures from /api/status, /api/health and
 // /api/torrents.
 type uiShellChrome struct {
-	Version   string
-	DryRun    bool
-	Status    string
-	CPU       string
-	RAM       string
-	Download  string
-	Upload    string
-	NextCycle string
-	Lang      string
-	Torrents  int
-	Peers     int
-	Seeds     int
+	Version      string
+	DryRun       bool
+	Status       string
+	CPU          string
+	CPUFrequency string
+	RAM          string
+	Download     string
+	Upload       string
+	NextCycle    string
+	Lang         string
+	Torrents     int
+	Peers        int
+	Seeds        int
 }
 
 func uiShellChromeFrom(s *AppState) uiShellChrome {
 	cfg := latestConfig(s)
 	chrome := uiShellChrome{
-		Version:   "1.0." + constants.Build,
-		DryRun:    cfg.DryRun,
-		Status:    "offline",
-		CPU:       "—",
-		RAM:       "0 B",
-		Download:  "0 B",
-		Upload:    "0 B",
-		NextCycle: "—",
-		Lang:      "it",
+		Version:      "1.0." + constants.Build,
+		DryRun:       cfg.DryRun,
+		Status:       "offline",
+		CPU:          "—",
+		CPUFrequency: currentCPUFrequency(),
+		RAM:          "0 B",
+		Download:     "0 B",
+		Upload:       "0 B",
+		NextCycle:    "—",
+		Lang:         "it",
 	}
 
 	trash := ""

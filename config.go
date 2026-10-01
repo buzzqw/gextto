@@ -1427,7 +1427,7 @@ func resolutionPixels(value string) (int64, bool) {
 func resolutionAllowed(quality *models.Quality, requirement string) bool {
 	requirement = strings.ToLower(requirement)
 	resolution := func(value string) *int64 {
-		for _, candidate := range []string{"2160p", "1080p", "720p", "576p", "480p"} {
+		for _, candidate := range []string{"2160p", "1080p", "720p", "576p", "480p", "360p"} {
 			if strings.Contains(value, candidate) {
 				if parsed, ok := resolutionPixels(candidate); ok {
 					return &parsed
@@ -1466,6 +1466,12 @@ func languageSubtitleAllowed(quality *models.Quality, language string, subtitle 
 	requested := []string{}
 	for _, value := range strings.Split(language, ",") {
 		normalized := normalizeLanguageCode(value)
+		// These are UI/configuration sentinels, not literal audio language
+		// codes.  Treating `any` as a required language made the v2
+		// "Qualsiasi" option reject every release.
+		if normalized == "any" || normalized == "*" || normalized == "none" || normalized == "custom" {
+			continue
+		}
 		if normalized != "" {
 			requested = append(requested, normalized)
 		}
@@ -1478,6 +1484,9 @@ func languageSubtitleAllowed(quality *models.Quality, language string, subtitle 
 			for _, value := range quality.Languages {
 				detected = append(detected, normalizeLanguageCode(value))
 			}
+		}
+		if len(requested) == 1 && requested[0] == "multi" {
+			return len(detected) > 1
 		}
 		found := false
 		for _, value := range detected {
@@ -1513,6 +1522,16 @@ func QualityAllowed(quality *models.Quality, requirement string, language string
 
 // MovieReleaseAllowed checks a movie release against the title requirements.
 func (c *Config) MovieReleaseAllowed(movie *MovieConfig, quality *models.Quality) bool {
+	return c.movieQualityAllowed(movie, quality)
+}
+
+// MovieReleaseAllowedForTitle applies the movie's technical requirements and
+// its title-specific exclusion list to the raw release title.
+func (c *Config) MovieReleaseAllowedForTitle(movie *MovieConfig, quality *models.Quality, title string) bool {
+	return c.movieQualityAllowed(movie, quality) && !titleExcluded(movie.Exclude, title)
+}
+
+func (c *Config) movieQualityAllowed(movie *MovieConfig, quality *models.Quality) bool {
 	requiredLanguages := parseLanguageRequirements(movie.LanguageRequirements)
 	language := ""
 	if len(requiredLanguages) == 0 {
@@ -1536,13 +1555,30 @@ func (c *Config) MovieReleaseAllowed(movie *MovieConfig, quality *models.Quality
 		return !flag || quality.HasSubtitle
 	}
 	for _, value := range required {
-		if isSubtitleFlag(value) && quality.HasSubtitle {
+		if (isSubtitleFlag(value) || value == "any" || value == "multi") && quality.HasSubtitle {
 			return true
 		}
 		for _, item := range quality.SubtitleLanguages {
 			if normalizeLanguageCode(item) == value {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// titleExcluded reports whether a release title contains one of the
+// per-title exclusion tokens. An empty title is intentionally never rejected;
+// callers can use this helper before canonicalising a matched movie/series.
+func titleExcluded(exclude, title string) bool {
+	if strings.TrimSpace(title) == "" {
+		return false
+	}
+	lowered := strings.ToLower(title)
+	for _, word := range strings.Split(exclude, ",") {
+		word = strings.TrimSpace(word)
+		if word != "" && strings.Contains(lowered, strings.ToLower(word)) {
+			return true
 		}
 	}
 	return false
@@ -1611,17 +1647,7 @@ func (c *Config) SeriesReleaseAllowed(series *SeriesConfig, quality *models.Qual
 	if !QualityAllowed(quality, series.Quality, series.Language, series.Subtitle) {
 		return false
 	}
-	lowered := strings.ToLower(title)
-	for _, word := range strings.Split(series.Exclude, ",") {
-		word = strings.TrimSpace(word)
-		if word == "" {
-			continue
-		}
-		if strings.Contains(lowered, strings.ToLower(word)) {
-			return false
-		}
-	}
-	return true
+	return !titleExcluded(series.Exclude, title)
 }
 
 // ReleaseAllowed reports whether a release passes every global filter.

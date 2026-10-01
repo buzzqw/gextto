@@ -112,6 +112,31 @@ func healthPageSize() uint64 {
 	return uint64(size)
 }
 
+// currentCPUFrequency returns the current frequency of the first logical CPU
+// in a compact label suitable for the always-visible UI chrome. Linux exposes
+// a live cpufreq value in kHz; /proc/cpuinfo is the fallback used by systems
+// without the cpufreq sysfs driver.
+func currentCPUFrequency() string {
+	if raw, err := os.ReadFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"); err == nil {
+		if value, err := strconv.ParseFloat(strings.TrimSpace(string(raw)), 64); err == nil && value > 0 {
+			return fmt.Sprintf("%.2f GHz", value/1_000_000)
+		}
+	}
+	if raw, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+		for _, line := range strings.Split(string(raw), "\n") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 || !strings.EqualFold(strings.TrimSpace(parts[0]), "cpu MHz") {
+				continue
+			}
+			value, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			if err == nil && value > 0 {
+				return fmt.Sprintf("%.2f GHz", value/1_000)
+			}
+		}
+	}
+	return ""
+}
+
 func healthSatSub(a, b uint64) uint64 {
 	if a < b {
 		return 0

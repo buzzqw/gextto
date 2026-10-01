@@ -1050,7 +1050,7 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 			continue
 		}
 		matched := cfg.FindMovieMatchManual(release.Title, release.Year)
-		if matched == nil || matched.ID != movie.ID || !cfg.MovieReleaseAllowed(movie, &release.Quality) {
+		if matched == nil || matched.ID != movie.ID || !cfg.MovieReleaseAllowedForTitle(movie, &release.Quality, release.Title) {
 			continue
 		}
 		hash, ok := utils.MagnetHash(release.Magnet)

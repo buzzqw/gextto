@@ -766,6 +766,7 @@ func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 			items[position] = map[string]any{
 				"series":  series.Name,
 				"tmdb_id": *tmdbID,
+				"tvdb_id": strings.TrimSpace(series.TvdbID),
 				"episode": gh0_toMap(episode),
 				"poster":  poster,
 			}

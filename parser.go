@@ -474,6 +474,8 @@ func ParseQuality(title string) models.Quality {
 		resolution = "576p"
 	case strings.Contains(low, "480p") || strings.Contains(low, "ntsc"):
 		resolution = "480p"
+	case strings.Contains(low, "360p"):
+		resolution = "360p"
 	}
 
 	// --- Sorgente ---

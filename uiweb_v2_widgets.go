@@ -908,6 +908,8 @@ func V2SeriesRenameExecute(w http.ResponseWriter, r *http.Request, s *AppState) 
 type v2CalendarItem struct {
 	Series   string
 	Poster   string
+	TmdbURL  string
+	TvdbURL  string
 	Name     string
 	AirDate  string
 	Season   int
@@ -973,12 +975,18 @@ func V2TmdbCalendar(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Items []struct {
 				Series  string         `json:"series"`
 				Poster  *string        `json:"poster"`
+				TmdbID  string         `json:"tmdb_id"`
+				TvdbID  string         `json:"tvdb_id"`
 				Episode map[string]any `json:"episode"`
 			} `json:"items"`
 		}
 		if json.Unmarshal(raw, &payload) == nil {
 			for _, entry := range payload.Items {
-				item := v2CalendarItem{Series: entry.Series}
+				item := v2CalendarItem{
+					Series:  entry.Series,
+					TmdbURL: tmdbURL(entry.TmdbID, "tv"),
+					TvdbURL: tvdbURL(entry.TvdbID, "series"),
+				}
 				if entry.Poster != nil {
 					item.Poster = *entry.Poster
 				}

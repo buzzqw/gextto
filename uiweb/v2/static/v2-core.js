@@ -448,13 +448,46 @@
     });
   });
 
+  var discoverKind = "series";
+
+  function setDiscoverKind(kind) {
+    discoverKind = kind === "movie" ? "movie" : "series";
+    document.querySelectorAll("[data-v2-discover-kind-input]").forEach(function (input) {
+      input.value = discoverKind;
+    });
+    document.querySelectorAll("[data-v2-discover-kind]").forEach(function (button) {
+      button.classList.toggle("primary", button.getAttribute("data-v2-discover-kind") === discoverKind);
+    });
+  }
+
+  function setDiscoverChoice(choice) {
+    document.querySelectorAll("[data-v2-discover-choice]").forEach(function (form) {
+      var active = form.getAttribute("data-v2-discover-choice") === choice;
+      var button = form.querySelector("button");
+      if (button) {
+        button.classList.toggle("primary", active);
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", active ? "true" : "false");
+      }
+    });
+  }
+
+  function discoverChoiceTarget(event) {
+    var target = event && event.target;
+    return target && target.closest && target.closest("[data-v2-discover-choice]");
+  }
+
+  setDiscoverChoice("trending:week");
+
   document.addEventListener("click", function (event) {
     var discoverKind = event.target.closest && event.target.closest("[data-v2-discover-kind]");
     if (discoverKind) {
       var kind = discoverKind.getAttribute("data-v2-discover-kind");
-      document.querySelectorAll("[data-v2-discover-kind]").forEach(function (button) {
-        button.classList.toggle("primary", button.getAttribute("data-v2-discover-kind") === kind);
-      });
+      setDiscoverKind(kind);
+    }
+    var discoverChoice = discoverChoiceTarget(event);
+    if (discoverChoice) {
+      setDiscoverChoice(discoverChoice.getAttribute("data-v2-discover-choice"));
     }
     var browse = event.target.closest && event.target.closest("[data-v2-browse-for]");
     if (browse) {
@@ -476,6 +509,27 @@
       if (logsFollow) pinLogTail();
     }
   });
+  // Apply the visual state on pointer-down too. This happens before HTMX can
+  // process the submit and also covers touch input where the click event can
+  // be delayed or suppressed.
+  document.addEventListener("pointerdown", function (event) {
+    var discoverChoice = discoverChoiceTarget(event);
+    if (discoverChoice) setDiscoverChoice(discoverChoice.getAttribute("data-v2-discover-choice"));
+  }, true);
+  // Capture submit as well as click: HTMX handles the form submission before
+  // the bubbling click handler in some browsers, so this keeps the selected
+  // list visible even when the response is very fast.
+  document.addEventListener("submit", function (event) {
+    var form = event.target && event.target.closest && event.target.closest("[data-v2-discover-choice]");
+    var submitter = event.submitter;
+    var kindButton = submitter && submitter.closest && submitter.closest("[data-v2-discover-kind]");
+    if (kindButton) setDiscoverKind(kindButton.getAttribute("data-v2-discover-kind"));
+    if (form) {
+      var kindInput = form.querySelector('input[name="kind"]');
+      if (kindInput) kindInput.value = discoverKind;
+      setDiscoverChoice(form.getAttribute("data-v2-discover-choice"));
+    }
+  }, true);
   document.addEventListener("change", function (event) {
     var preset = event.target.closest && event.target.closest("[data-preset-for]");
     if (preset && preset.value) {
@@ -485,10 +539,7 @@
     }
     var select = event.target.matches && event.target.matches("[data-v2-discover-select]") ? event.target : null;
     if (!select) return;
-    var kind = select.value;
-    document.querySelectorAll("[data-v2-discover-kind]").forEach(function (button) {
-      button.classList.toggle("primary", button.getAttribute("data-v2-discover-kind") === kind);
-    });
+    setDiscoverKind(select.value);
   });
 
   function pinLogTail() {

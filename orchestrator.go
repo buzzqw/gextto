@@ -557,7 +557,7 @@ func RunCycleDomain(
 				// Not monitored: never log these, they are pure noise.
 				continue
 			}
-			if !cfg.MovieReleaseAllowed(movie, &release.Quality) {
+			if !cfg.MovieReleaseAllowedForTitle(movie, &release.Quality, release.Title) {
 				logCandidateRejected(&release, "excluded by the movie quality/language/subtitle rules")
 				continue
 			}

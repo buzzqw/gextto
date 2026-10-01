@@ -151,6 +151,18 @@ html, body {
 .tmdb-result-title:hover {
   color: var(--accent-2);
 }
+.metric-frequency {
+  color: var(--muted);
+  font-size: .68rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.v2-discover-choice > .btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04121f;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+}
 
 /* Downloads: keep the three action groups readable instead of making one
    dense wall of controls. They still wrap naturally on narrow screens. */
@@ -485,6 +497,27 @@ html, body {
   object-fit: cover;
   border-radius: 6px;
   flex: none;
+}
+.calendar-grid .list-item > .calendar-item-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.calendar-grid .list-item strong.calendar-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.2;
+}
+.calendar-grid .calendar-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.calendar-grid .calendar-title a:hover {
+  color: var(--accent-2);
+  text-decoration: underline;
 }
 
 .detail-poster {

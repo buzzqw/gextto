@@ -323,6 +323,11 @@ type sqlQueryRower interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
+type sqlQueryExecer interface {
+	sqlExecer
+	sqlQueryRower
+}
+
 // nowSQLite is the canonical in-database timestamp format.
 func nowSQLite() string {
 	return time.Now().UTC().Format("2006-01-02 15:04:05")
@@ -1994,6 +1999,29 @@ func (d *Database) RollbackRelease(release *models.Release) error {
 			_ = tx.Rollback()
 		}
 	}()
+	// An upgrade changes the existing library row before the torrent is handed
+	// to the engine. If the engine refuses the torrent, restore every previous
+	// row captured for this hash instead of deleting the library entry.
+	var payload sql.NullString
+	backupErr := tx.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", hash).Scan(&payload)
+	if backupErr == nil && payload.Valid {
+		backups, err := decodeUpgradeBackups(payload.String)
+		if err != nil {
+			return err
+		}
+		if len(backups) > 0 {
+			for _, backup := range backups {
+				if err := restoreUpgradeBackupTx(tx, backup); err != nil {
+					return err
+				}
+			}
+			if _, err := tx.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", hash); err != nil {
+				return err
+			}
+		}
+	} else if backupErr != nil && !errors.Is(backupErr, sql.ErrNoRows) {
+		return backupErr
+	}
 	if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_hash=?1 OR magnet_link=?2", hash, release.Magnet); err != nil {
 		return err
 	}
@@ -3935,12 +3963,72 @@ func (d *Database) MarkTorrentError(hash, failureError string) error {
 	return nil
 }
 
-func (d *Database) saveUpgradeBackup(exec sqlExecer, newHash string, backup upgradeBackup) error {
-	payload, err := json.Marshal(backup)
+func (d *Database) saveUpgradeBackup(exec sqlQueryExecer, newHash string, backup upgradeBackup) error {
+	backups := []upgradeBackup{}
+	var existing sql.NullString
+	err := exec.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", strings.ToLower(newHash)).Scan(&existing)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil && existing.Valid {
+		backups, err = decodeUpgradeBackups(existing.String)
+		if err != nil {
+			return err
+		}
+	}
+	backups = append(backups, backup)
+	// Preserve the old single-object representation for ordinary upgrades;
+	// packs use an array once more than one episode needs restoring.
+	var payloadBytes []byte
+	if len(backups) == 1 && strings.TrimSpace(existing.String) == "" {
+		payloadBytes, err = json.Marshal(backups[0])
+	} else {
+		payloadBytes, err = json.Marshal(backups)
+	}
 	if err != nil {
 		return err
 	}
-	_, err = exec.Exec("INSERT OR REPLACE INTO upgrade_backup(new_hash,payload_json,created_at) VALUES (?1,?2,?3)", strings.ToLower(newHash), string(payload), nowSQLite())
+	_, err = exec.Exec("INSERT OR REPLACE INTO upgrade_backup(new_hash,payload_json,created_at) VALUES (?1,?2,?3)", strings.ToLower(newHash), string(payloadBytes), nowSQLite())
+	return err
+}
+
+// decodeUpgradeBackups accepts both the original single-backup JSON object and
+// the multi-row form used by season-pack upgrades.
+func decodeUpgradeBackups(raw string) ([]upgradeBackup, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "null" {
+		return nil, nil
+	}
+	if strings.HasPrefix(trimmed, "[") {
+		var backups []upgradeBackup
+		if err := json.Unmarshal([]byte(trimmed), &backups); err != nil {
+			return nil, err
+		}
+		return validUpgradeBackups(backups), nil
+	}
+	var backup upgradeBackup
+	if err := json.Unmarshal([]byte(trimmed), &backup); err != nil {
+		return nil, err
+	}
+	return validUpgradeBackups([]upgradeBackup{backup}), nil
+}
+
+func validUpgradeBackups(backups []upgradeBackup) []upgradeBackup {
+	valid := backups[:0]
+	for _, backup := range backups {
+		if backup.Kind != "" && backup.RowID > 0 {
+			valid = append(valid, backup)
+		}
+	}
+	return valid
+}
+
+func restoreUpgradeBackupTx(tx *sql.Tx, backup upgradeBackup) error {
+	if backup.Kind == "series" {
+		_, err := tx.Exec("UPDATE episodes SET quality_score=?1,magnet_hash=?2,magnet_link=?3,downloaded_at=?4,archive_path=?5,size_bytes=?6,title=?7 WHERE id=?8", backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.ArchivePath, backup.SizeBytes, backup.Title, backup.RowID)
+		return err
+	}
+	_, err := tx.Exec("UPDATE movies SET name=?1,year=?2,title=?3,quality_score=?4,magnet_hash=?5,magnet_link=?6,downloaded_at=?7,size_bytes=?8,removed_at=NULL WHERE id=?9", backup.Name, backup.Year, backup.Title, backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.SizeBytes, backup.RowID)
 	return err
 }
 
@@ -3955,12 +4043,15 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	var backup upgradeBackup
 	if !payload.Valid {
 		return false, nil
 	}
-	if err := json.Unmarshal([]byte(payload.String), &backup); err != nil {
+	backups, err := decodeUpgradeBackups(payload.String)
+	if err != nil {
 		return false, err
+	}
+	if len(backups) == 0 {
+		return false, nil
 	}
 	tx, err := d.db.Begin()
 	if err != nil {
@@ -3972,16 +4063,35 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 			_ = tx.Rollback()
 		}
 	}()
-	if backup.Kind == "series" {
-		if _, err := tx.Exec("UPDATE episodes SET quality_score=?1,magnet_hash=?2,magnet_link=?3,downloaded_at=?4,archive_path=?5,size_bytes=?6,title=?7 WHERE id=?8", backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.ArchivePath, backup.SizeBytes, backup.Title, backup.RowID); err != nil {
-			return false, err
+	// A season pack can have inserted episodes that were not upgrades and thus
+	// have no backup row of their own. Recover the release magnet from the
+	// registered metadata so those placeholders are removed together with the
+	// restored upgrades.
+	newMagnet := ""
+	var metadataJSON sql.NullString
+	if err := tx.QueryRow("SELECT metadata_json FROM torrent_meta WHERE lower(hash)=?1", normalized).Scan(&metadataJSON); err == nil && metadataJSON.Valid {
+		var metadata models.TorrentMeta
+		if json.Unmarshal([]byte(metadataJSON.String), &metadata) == nil {
+			newMagnet = metadata.Release.Magnet
 		}
-	} else {
-		if _, err := tx.Exec("UPDATE movies SET name=?1,year=?2,title=?3,quality_score=?4,magnet_hash=?5,magnet_link=?6,downloaded_at=?7,size_bytes=?8,removed_at=NULL WHERE id=?9", backup.Name, backup.Year, backup.Title, backup.QualityScore, backup.MagnetHash, backup.MagnetLink, backup.DownloadedAt, backup.SizeBytes, backup.RowID); err != nil {
+	}
+	for _, backup := range backups {
+		if err := restoreUpgradeBackupTx(tx, backup); err != nil {
 			return false, err
 		}
 	}
 	if _, err := tx.Exec("DELETE FROM upgrade_backup WHERE new_hash=?1", normalized); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec("DELETE FROM episodes WHERE lower(COALESCE(magnet_hash,''))=?1", normalized); err != nil {
+		return false, err
+	}
+	if newMagnet != "" {
+		if _, err := tx.Exec("DELETE FROM episodes WHERE magnet_link=?1", newMagnet); err != nil {
+			return false, err
+		}
+	}
+	if _, err := tx.Exec("DELETE FROM movies WHERE lower(COALESCE(magnet_hash,''))=?1", normalized); err != nil {
 		return false, err
 	}
 	if err := tx.Commit(); err != nil {

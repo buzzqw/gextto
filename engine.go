@@ -248,7 +248,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			}
 			count := 0
 			for j := range items {
-				if cfg.ReleaseAllowed(&items[j]) && cfg.MovieReleaseAllowed(movie, &items[j].Quality) {
+				if cfg.ReleaseAllowed(&items[j]) && cfg.MovieReleaseAllowedForTitle(movie, &items[j].Quality, items[j].Title) {
 					count++
 				}
 			}

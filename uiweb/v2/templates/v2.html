@@ -54,7 +54,7 @@
         <h1>{{.Title}}</h1>
       </div>
       <div class="top-actions">
-        <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU</span><strong>{{.Chrome.CPU}}</strong></div>
+        <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .Chrome.CPUFrequency}} <small class="metric-frequency">{{.Chrome.CPUFrequency}}</small>{{end}}</span><strong>{{.Chrome.CPU}}</strong></div>
         <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div>
         <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Chrome.Download}}</strong></div>
         <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Chrome.Upload}}</strong></div>
@@ -83,7 +83,7 @@
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">
       <div class="mobile-performance-head"><span class="eyebrow">Connessioni e prestazioni</span><small class="muted">Aggiornamento automatico</small></div>
-      <div class="mobile-performance-grid"><div class="mobile-performance-tile"><span class="top-metric-label">CPU</span><strong>{{.Chrome.CPU}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Chrome.Download}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Chrome.Upload}}</strong></div></div>
+      <div class="mobile-performance-grid"><div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .Chrome.CPUFrequency}} <small class="metric-frequency">{{.Chrome.CPUFrequency}}</small>{{end}}</span><strong>{{.Chrome.CPU}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Chrome.Download}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Chrome.Upload}}</strong></div></div>
     </section>
     <div class="content" id="v2-page" data-view="{{.Page}}">
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
@@ -1265,10 +1265,10 @@
   {{range .Items}}
   <div class="list-item">
     {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">N/D</div>{{end}}
-    <div>
-      <strong>{{.Series}}</strong>
-      <small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}—{{end}}</small>
-    </div>
+     <div class="calendar-item-copy">
+       <strong class="calendar-title">{{if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Series}} su TMDB">{{.Series}}</a>{{else}}{{.Series}}{{end}}</strong>
+       <small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}—{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
+     </div>
   </div>
   {{end}}
 </div>
@@ -1339,16 +1339,16 @@
     <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted">Serie TV e film</small></div>
     <div class="panel-body">
       <div class="toolbar"><strong class="muted">Tipo</strong>
-         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
-         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
+         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
+         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
       </div>
       <div class="toolbar" style="margin-top:8px"><strong class="muted">Elenco</strong>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza settimana</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
-        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
+          <form class="v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">Tendenza settimana</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
       </div>
       <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/v2/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
     </div>

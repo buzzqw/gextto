@@ -454,6 +454,47 @@ func TestQualityRulesSupportRangesAndMultiLanguageRequirements(t *testing.T) {
 	}
 }
 
+func TestQualitySentinelLanguagesAndLowResolutionRequirements(t *testing.T) {
+	cfg := DefaultConfig()
+	quality := models.Quality{Resolution: "360p", Language: "deu", Languages: []string{"deu"}}
+	if parsed := ParseQuality("Example.360p.WEB"); parsed.Resolution != "360p" {
+		t.Fatalf("360p release parsed as %q", parsed.Resolution)
+	}
+	if !QualityAllowed(&quality, "360p", "any", "") {
+		t.Fatal("any language must not reject a release")
+	}
+	if QualityAllowed(&quality, "480p", "any", "") {
+		t.Fatal("360p must not satisfy a 480p minimum")
+	}
+	multi := quality
+	multi.Languages = []string{"ita", "eng"}
+	multi.Language = "ita"
+	if !QualityAllowed(&multi, "", "multi", "") {
+		t.Fatal("multi language must require more than one detected audio language")
+	}
+
+	movie := MovieConfig{Name: "Example", Quality: "any", Language: "any", Exclude: "cam, ts"}
+	if cfg.MovieReleaseAllowedForTitle(&movie, &models.Quality{Language: "eng"}, "Example.2026.WEB") == false {
+		t.Fatal("allowed movie release was rejected")
+	}
+	if cfg.MovieReleaseAllowedForTitle(&movie, &models.Quality{Language: "eng"}, "Example.2026.CAM") {
+		t.Fatal("movie exclusion token must reject the release")
+	}
+}
+
+func TestMovieSubtitleAnyRequirementNeedsSubtitles(t *testing.T) {
+	cfg := DefaultConfig()
+	movie := MovieConfig{Quality: "any", Language: "any", SubtitleRequirements: "any"}
+	without := &models.Quality{Language: "eng"}
+	if cfg.MovieReleaseAllowed(&movie, without) {
+		t.Fatal("any subtitle requirement must reject a release without subtitles")
+	}
+	with := &models.Quality{Language: "eng", HasSubtitle: true}
+	if !cfg.MovieReleaseAllowed(&movie, with) {
+		t.Fatal("any subtitle requirement must accept subtitles")
+	}
+}
+
 func TestGlobalFiltersRejectBlacklistedAndStaleReleases(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Blacklist = []string{"cam"}
