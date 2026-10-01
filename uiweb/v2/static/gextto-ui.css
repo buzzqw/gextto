@@ -723,6 +723,11 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-detail-tabs [role="tab"].tab-active { background: var(--accent); border-color: var(--accent); color: #04121f; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 .download-bulk-toolbar { flex-wrap: wrap; }
 .download-bulk-toolbar .compact { width: 150px; min-width: 120px; }
+.download-bulk-toolbar input[name="new_tag"] {
+  width: 150px;
+  min-width: 120px;
+  flex: 0 0 150px;
+}
 .torrent-add-main {
   display: grid;
   grid-template-columns: minmax(280px, 2fr) minmax(190px, 1fr) minmax(190px, 1fr) auto;
