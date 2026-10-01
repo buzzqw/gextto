@@ -459,7 +459,7 @@
     var browse = event.target.closest && event.target.closest("[data-v2-browse-for]");
     if (browse) {
       var scope = browse.closest("form") || browse.closest(".setting-row");
-      var input = scope && scope.querySelector('[name="value"]');
+      var input = scope && (scope.querySelector("[data-v2-browse-input]") || scope.querySelector('[name="value"]'));
       if (input) openFolderBrowser(input);
       return;
     }

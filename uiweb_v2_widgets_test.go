@@ -188,4 +188,13 @@ func TestV2TmdbExploreEndpoints(t *testing.T) {
 	}); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
 		t.Fatalf("tmdb section form -> %d: %s", code, body)
 	}
+	if code, body := v2Request(t, server, http.MethodGet, "/v2/tmdb/manual?kind=series&redirect=%2Fv2%3Fview%3Dseries", nil); code != http.StatusOK ||
+		!strings.Contains(body, `name="quality"`) || !strings.Contains(body, `name="language"`) ||
+		!strings.Contains(body, `name="archive_path"`) || !strings.Contains(body, `data-v2-browse-for="archive_path"`) ||
+		!strings.Contains(body, `hx-target="#v2-tmdb-add-result"`) {
+		t.Fatalf("tmdb manual form -> %d: %s", code, body)
+	}
+	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=series", nil); code != http.StatusOK || !strings.Contains(body, `id="v2-modal"`) {
+		t.Fatalf("series add modal target -> %d", code)
+	}
 }

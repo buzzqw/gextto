@@ -950,6 +950,7 @@
     </div>
   {{end}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  <div id="v2-modal"></div>
 </div>
 {{end}}
 
@@ -974,7 +975,7 @@
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/v2?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
@@ -1286,7 +1287,7 @@
        <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
       {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
       {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
-       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}" hx-target="#v2-modal" hx-swap="innerHTML">
+       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/v2?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
          <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
        </form>{{end}}
     </div>
@@ -1301,15 +1302,15 @@
 {{define "v2_tmdb_manual"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
   <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
-  <div class="modal-body"><form class="form-grid" hx-post="/v2/tmdb/add" hx-swap="none">
+  <div class="modal-body"><form class="form-grid" method="post" action="/v2/tmdb/add" hx-post="/v2/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
     <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
     <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
-    <label class="field"><span>Qualità richiesta</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 1080p"></label><label class="field"><span>Lingue</span><input class="input" name="language" value="{{.Language}}"></label>
+    <label class="field"><span>Qualità richiesta</span><select class="input" name="quality"><option value=""{{if eq .Quality ""}} selected{{end}}>Qualsiasi</option><option value="720p"{{if eq .Quality "720p"}} selected{{end}}>720p</option><option value="720p+"{{if eq .Quality "720p+"}} selected{{end}}>720p+</option><option value="1080p"{{if eq .Quality "1080p"}} selected{{end}}>1080p</option><option value="1080p+"{{if eq .Quality "1080p+"}} selected{{end}}>1080p+</option><option value="2160p"{{if eq .Quality "2160p"}} selected{{end}}>2160p 4K</option><option value="2160p+"{{if eq .Quality "2160p+"}} selected{{end}}>2160p+ 4K+</option></select></label><label class="field"><span>Lingue</span><select class="input" name="language"><option value=""{{if eq .Language ""}} selected{{end}}>Predefinita (ita)</option><option value="ita"{{if eq .Language "ita"}} selected{{end}}>Italiano</option><option value="eng"{{if eq .Language "eng"}} selected{{end}}>Inglese</option><option value="ita,eng"{{if eq .Language "ita,eng"}} selected{{end}}>Italiano + Inglese</option><option value="multi"{{if eq .Language "multi"}} selected{{end}}>Multi</option><option value="any"{{if eq .Language "any"}} selected{{end}}>Qualsiasi</option></select></label>
     <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle"></label>
-    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><input class="input" name="archive_path"></label>{{end}}
+    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><span class="field-row"><input class="input" name="archive_path" data-v2-browse-input><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>{{end}}
     <label class="field span-full"><span>Esclusioni</span><input class="input" name="exclude" placeholder="cam, ts"></label>
-    <div class="form-actions"><button class="btn primary" type="submit">Conferma</button></div>
+    <div class="form-actions"><button class="btn primary" type="submit">Conferma</button><small id="v2-tmdb-add-result" class="muted" role="alert" aria-live="assertive"></small></div>
   </form></div>
 </div></div>
 {{end}}

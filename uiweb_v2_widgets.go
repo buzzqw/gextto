@@ -1108,7 +1108,7 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
-	kind := strings.TrimSpace(r.FormValue("kind"))
+	kind := strings.ToLower(strings.TrimSpace(r.FormValue("kind")))
 	if kind != "movie" {
 		kind = "series"
 	}
@@ -1116,10 +1116,11 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"Kind": kind, "Name": strings.TrimSpace(r.FormValue("name")),
 		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
 		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
-		"Language": "ita", "Seasons": "1+", "Redirect": "/v2?view=search",
+		"Language": strings.TrimSpace(r.FormValue("language")), "Seasons": "1+",
+		"Redirect": strings.TrimSpace(r.FormValue("redirect")),
 	}
-	if language := strings.TrimSpace(r.FormValue("language")); language != "" {
-		view["Language"] = language
+	if view["Redirect"] == "" {
+		view["Redirect"] = "/v2?view=search"
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
