@@ -28,13 +28,10 @@
      <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
        <span class="brand-mark" aria-hidden="true">G</span>
        <div><strong>Gextto</strong><small title="Nome esteso: Gextto EXpert Torrent Transfer Orchestrator">EXpert Torrent Transfer Orchestrator · v{{.Chrome.Version}}</small></div>
-    </div>
-    <nav aria-label="Navigazione principale">
-       <a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search>
-          <span class="nav-search-icon" aria-hidden="true">🔍</span><span>Cerca impostazioni</span>
-       </a>
-       {{range .Groups}}
-       <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
+     </div>
+     <nav aria-label="Navigazione principale">
+        {{range .Groups}}
+        <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
           {{if .System}}<button class="nav-more" type="button" title="Mostra o nascondi le voci di sistema" aria-expanded="{{if .Open}}true{{else}}false{{end}}" data-nav-more><span>Sistema</span><span data-nav-more-icon aria-hidden="true">{{if .Open}}▲{{else}}▾{{end}}</span></button>{{end}}
           {{range .Items}}
             <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count" data-nav-count="{{.ID}}"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
@@ -44,8 +41,9 @@
             <a class="nav-item nav-mobile-system-extra" href="/?view=search" data-nav="search"><span>Esplora</span></a>
             <a class="nav-item nav-mobile-system-extra" href="/?view=archive" data-nav="archive"><span>Archivio</span></a>
             <a class="nav-item nav-mobile-system-extra" href="/?view=comics" data-nav="comics"><span>Fumetti</span></a>
-          {{end}}
-       </div>
+           {{end}}
+           {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo" data-nav-search><span class="nav-search-icon" aria-hidden="true">🔍</span><span>Cerca impostazioni</span></a>{{end}}
+        </div>
       {{end}}
     </nav>
     <div class="sidebar-foot">
