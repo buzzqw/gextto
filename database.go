@@ -1555,7 +1555,7 @@ func (d *Database) RegisterTorrentScored(release *models.Release, qualityScore i
 		return err
 	}
 	_, err = d.db.Exec(
-		"INSERT INTO torrent_meta(hash,kind,title,series_name,season,episode,year,quality_score,source,metadata_json,status,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'queued',?11,?11) ON CONFLICT(hash) DO UPDATE SET kind=excluded.kind,title=excluded.title,series_name=excluded.series_name,season=excluded.season,episode=excluded.episode,year=excluded.year,quality_score=excluded.quality_score,source=excluded.source,metadata_json=excluded.metadata_json,status=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.status ELSE 'queued' END,updated_at=excluded.updated_at",
+		"INSERT INTO torrent_meta(hash,kind,title,series_name,season,episode,year,quality_score,source,metadata_json,status,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'queued',?11,?11) ON CONFLICT(hash) DO UPDATE SET kind=excluded.kind,title=excluded.title,series_name=excluded.series_name,season=excluded.season,episode=excluded.episode,year=excluded.year,quality_score=excluded.quality_score,source=excluded.source,metadata_json=excluded.metadata_json,status=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.status ELSE 'queued' END,error=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.error ELSE NULL END,removed_at=CASE WHEN torrent_meta.status='completed' THEN torrent_meta.removed_at ELSE NULL END,updated_at=excluded.updated_at",
 		hash, release.Kind, release.Title, release.Series, release.Season, release.Episode, release.Year, qualityScore, release.Source, string(metadata), now,
 	)
 	return err
