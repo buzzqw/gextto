@@ -87,11 +87,11 @@ func (w *noCacheWriter) Flush() {
 func (w *noCacheWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 // UiNoCache disables browser caching for the UI shell (`/`) and its assets
-// (`/ui/*`), mirroring `ui_no_cache`.
+// (`/v2/*`), mirroring `ui_no_cache`.
 func UiNoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if path != "/" && !strings.HasPrefix(path, "/ui") {
+		if path != "/" && !strings.HasPrefix(path, "/v2") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -160,7 +160,7 @@ const magnetPage = `<!doctype html>
 
 // Favicon serves the site favicon.
 func Favicon(w http.ResponseWriter, r *http.Request, s *AppState) {
-	data, err := fs.ReadFile(uiwebStaticFS(), "favicon.ico")
+	data, err := fs.ReadFile(v2StaticFSRoot(), "favicon.ico")
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return

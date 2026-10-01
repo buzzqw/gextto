@@ -15,8 +15,8 @@ and operating a daemon, use the repository README and user manual instead.
 ```text
 cmd/gexttod/       executable entry point
 *.go               daemon, database, web handlers and services
-uiweb/templates/   server-rendered HTML templates
-uiweb/static/      CSS and browser JavaScript
+uiweb/v2/templates/ server-rendered HTML templates
+uiweb/v2/static/   CSS and browser JavaScript
 uiweb/end2end/     Playwright tests
 internal/           shared packages and backend helpers
 scripts/            build, update, packaging and service helpers
@@ -69,9 +69,10 @@ detected service.
 
 ## Web UI and API changes
 
-The server-rendered UI is assembled in `uiweb.go`, `uiweb_sections.go`,
-`uiweb_pages.go` and `uiweb/templates`. Static browser behavior belongs in
-`uiweb/static/gextto-ui.js`; styles belong in `gextto-ui.css`.
+The server-rendered UI is assembled in `uiweb_v2.go`, `uiweb_sections.go`,
+`uiweb_pages.go` and `uiweb/v2/templates`. Static browser behavior belongs in
+`uiweb/v2/static/v2-core.js`; styles belong in `uiweb/v2/static/gextto-ui.css`
+and `v2.css`.
 
 When adding an API endpoint:
 
@@ -100,7 +101,7 @@ Run these checks before a commit:
 gofmt -w changed.go
 go test ./...
 go test -race ./...
-node --check uiweb/static/gextto-ui.js
+node --check uiweb/v2/static/v2-core.js
 git diff --check
 ```
 

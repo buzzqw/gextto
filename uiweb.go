@@ -3,20 +3,15 @@ package gextto
 // uiweb.go is the first concrete slice of the UI migration to Go + server-side
 // rendering for the server-side UI migration.
 //
-// The classic shell is a plain HTML document served at `/ui`. Dynamic regions
-// are fetched from `/ui/partial/...` endpoints and actions reuse the existing
-// JSON APIs, so the API contract and all current behaviour are untouched.
+// Shared server-side view-models and formatters used by the official UI.
+// Dynamic regions and actions reuse the existing JSON APIs, so the API contract
+// and all current behaviour are untouched.
 //
 // The document and its JSON calls are served without an authentication layer;
 // the daemon is meant to listen on a trusted interface (default 127.0.0.1).
 
 import (
-	"bytes"
-	"embed"
-	"html/template"
-	"io/fs"
 	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,12 +19,11 @@ import (
 	"strings"
 	"time"
 
+	_ "embed"
+
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 )
-
-//go:embed uiweb/templates/*.html uiweb/static/*
-var uiwebFS embed.FS
 
 //go:embed LICENSE
 var uiLicenseText string
@@ -39,20 +33,6 @@ var uiManualTextIT string
 
 //go:embed docs/MANUAL.en.md
 var uiManualTextEN string
-
-var uiwebTemplates = template.Must(template.New("ui").Funcs(template.FuncMap{
-	"humanBytes":  logging.HumanBytesI64,
-	"humanBytesU": func(value uint64) string { return logging.HumanBytesI64(saturatingInt64(value)) },
-	"humanRate":   func(value uint64) string { return logging.HumanRate(saturatingInt64(value)) },
-	"derefUint64": func(value *uint64) uint64 {
-		if value == nil {
-			return 0
-		}
-		return *value
-	},
-	"json":        uiJSON,
-	"sourceLabel": uiSourceLabel,
-}).ParseFS(uiwebFS, "uiweb/templates/*.html"))
 
 // uiNavItem is one navigation entry of the new shell.
 type uiNavItem struct {
@@ -71,15 +51,6 @@ type uiNavGroup struct {
 	Items  []uiNavItem
 	Open   bool
 	System bool
-}
-
-// uiShellData renders the application frame.
-type uiShellData struct {
-	Title   string
-	Page    string
-	Groups  []uiNavGroup
-	Content any
-	Chrome  uiShellChrome
 }
 
 // uiDashboardData is the view-model of the dashboard partial.
@@ -284,17 +255,6 @@ var uiNavGroups = []uiNavDefinition{
 	}},
 }
 
-func uiPageLabel(view string) string {
-	for _, group := range uiNavGroups {
-		for _, item := range group.Items {
-			if item.ID == view {
-				return item.Label
-			}
-		}
-	}
-	return "Dashboard"
-}
-
 func uiIsSystemPage(view string) bool {
 	for _, item := range uiNavGroups[len(uiNavGroups)-1].Items {
 		if item.ID == view {
@@ -302,140 +262,6 @@ func uiIsSystemPage(view string) bool {
 		}
 	}
 	return false
-}
-
-func uiNavigation(view string, counts map[string]int) []uiNavGroup {
-	groups := make([]uiNavGroup, 0, len(uiNavGroups))
-	for index, group := range uiNavGroups {
-		out := uiNavGroup{Label: group.Label}
-		for _, item := range group.Items {
-			out.Items = append(out.Items, uiNavItem{
-				ID:           item.ID,
-				Label:        item.Label,
-				Href:         "/?view=" + item.ID,
-				Active:       item.ID == view,
-				Optional:     item.Optional,
-				MobileHidden: item.MobileHidden,
-				MobileAlways: item.MobileAlways,
-				Count:        counts[item.ID],
-			})
-		}
-		if index == len(uiNavGroups)-1 {
-			out.Open = uiIsSystemPage(view)
-			out.System = true
-		}
-		groups = append(groups, out)
-	}
-	return groups
-}
-
-func uiRender(w http.ResponseWriter, status int, name string, data any) {
-	var buffer bytes.Buffer
-	if err := uiwebTemplates.ExecuteTemplate(&buffer, name, data); err != nil {
-		logging.Error("new UI template render failed", "template", name, "error", err)
-		http.Error(w, "template error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
-	_, _ = w.Write(buffer.Bytes())
-}
-
-// UiPage serves the new shell with the requested page rendered server-side, so
-// the interface is usable even without JavaScript. The optional client script
-// only adds polling and actions.
-func UiPage(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := strings.TrimSpace(r.URL.Query().Get("view"))
-	if view == "" {
-		view = "dashboard"
-	}
-	content := uiPageContent(s, r, view)
-	renderPage := view
-	switch content.(type) {
-	case uiSeriesDetail:
-		renderPage = "series-detail"
-	case uiMovieDetail:
-		renderPage = "movie-detail"
-	case uiPanelsPage:
-		renderPage = "panels"
-	case uiDownloadsPage:
-		renderPage = "downloads"
-	}
-	cfg := latestConfig(s)
-	uiRender(w, http.StatusOK, "shell", uiShellData{
-		Title:   uiPageLabel(view),
-		Page:    renderPage,
-		Groups:  uiNavigation(view, uiNavCounts(s, cfg)),
-		Content: content,
-		Chrome:  uiShellChromeFrom(s),
-	})
-}
-
-// uiPageContent builds the view-model of the requested page. Pages that are not
-// migrated yet get the placeholder model, which links back to the dashboard so
-// the user is never left at a dead end.
-func uiPageContent(s *AppState, r *http.Request, view string) any {
-	switch view {
-	case "dashboard":
-		return uiDashboardDataFrom(s)
-	case "downloads":
-		return uiDownloadsPageFor(s)
-	case "health":
-		return uiHealthDataFrom(s)
-	case "logs":
-		return uiLogsDataFrom(s)
-	case "manual":
-		return uiManualDataFrom(s)
-	case "license":
-		return uiLicenseData{Text: uiLicenseText}
-	case "settings":
-		tab := ""
-		if r != nil {
-			tab = r.URL.Query().Get("tab")
-		}
-		return uiSettingsPageFrom(s, tab)
-	}
-	if view == "series" && r != nil {
-		if detail, ok := uiSeriesDetailFrom(s, r); ok {
-			return detail
-		}
-	}
-	if view == "movies" && r != nil {
-		if detail, ok := uiMovieDetailFrom(s, r); ok {
-			return detail
-		}
-	}
-	if page, ok := uiPanelsPageFor(view, s); ok {
-		page.Groups = uiGroupSections(page.Sections)
-		return page
-	}
-	if spec, ok := uiTableSpecFor(view); ok {
-		if spec.Search && r != nil {
-			spec.Query = r.URL.Query().Get(spec.SearchParam)
-		}
-		return spec
-	}
-	if page, ok := uiSearchPageFor(view); ok {
-		return page
-	}
-	return map[string]any{"Title": uiPageLabel(view)}
-}
-
-// UiPartialDashboard renders the dashboard with server-side data.
-func UiPartialDashboard(w http.ResponseWriter, r *http.Request, s *AppState) {
-	uiRender(w, http.StatusOK, "dashboard", uiDashboardDataFrom(s))
-}
-
-// UiPartialTorrents renders the Scarico table with server-side data.
-func UiPartialTorrents(w http.ResponseWriter, r *http.Request, s *AppState) {
-	uiRender(w, http.StatusOK, "torrents", uiTorrentsDataFrom(s))
-}
-
-// UiPartialUnavailable is the honest placeholder for pages not migrated yet:
-// it never pretends the feature is gone and points back to the dashboard.
-func UiPartialUnavailable(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := strings.TrimSpace(r.URL.Query().Get("view"))
-	uiRender(w, http.StatusOK, "unavailable", map[string]any{"Title": uiPageLabel(view)})
 }
 
 func uiDashboardDataFrom(s *AppState) uiDashboardData {
@@ -886,13 +712,4 @@ func uiDerefInt64(value *int64) int64 {
 		return 0
 	}
 	return *value
-}
-
-// uiwebStaticFS exposes the new UI static assets (/ui/static/*).
-func uiwebStaticFS() fs.FS {
-	sub, err := fs.Sub(uiwebFS, "uiweb/static")
-	if err != nil {
-		return nil
-	}
-	return sub
 }

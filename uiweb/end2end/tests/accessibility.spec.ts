@@ -55,7 +55,7 @@ test.describe("accessibilità automatizzata", () => {
   });
 
   test("il polling non perde il focus sul controllo del torrent", async ({ page }) => {
-    await page.route("**/ui/partial/torrents", async (route) => {
+    await page.route("**/v2/downloads/table", async (route) => {
       await route.fulfill({
         contentType: "text/html; charset=utf-8",
         body: `<div class="view" data-torrents-slot>

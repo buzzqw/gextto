@@ -1,38 +1,35 @@
-# Gextto UI v2 (SSR + HTMX) — migrazione, stato e report
+# Gextto UI (SSR + HTMX) — stato e report
 
 Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1158)` · libtorrent 2.0.11.0
 
 ## 1. Obiettivo e approccio
 
-Portare l'interfaccia da *SSR + `gextto-ui.js`* (5.427 righe di client) a
-*SSR + HTMX*, senza toccare l'interfaccia classica finché la v2 non è approvata.
+L'interfaccia ufficiale usa *SSR + HTMX* e non dipende più dal vecchio client
+`gextto-ui.js`.
 
 La v2:
 
-- è l'interfaccia ufficiale su **`/`**; **`/v2`** resta un alias tecnico di
-  rollback durante il periodo di stabilizzazione;
-- la vecchia UI resta raggiungibile solo su **`/ui`** come fallback esplicito,
-  ma non è più l'interfaccia predefinita;
+- è l'interfaccia ufficiale su **`/`**; **`/v2`** resta un alias tecnico;
 - riusa le stesse API JSON, gli stessi view-model Go (`uiDashboardDataFrom`,
   `uiTorrentsDataFrom`, `uiSettingsPageFrom`, `uiSeriesDetailFrom`,
   `uiMovieDetailFrom`, `uiTableSpecFor`, …) e lo stesso CSS di base
-  (`/ui/static/gextto-ui.css`), quindi dati e look restano coerenti;
+  (`/v2/static/gextto-ui.css`), quindi dati e look restano coerenti;
 - non duplica l'accesso ai dati: le tabelle sono renderizzate dal server
   chiamando internamente gli handler delle API esistenti;
-- traduce l'HTML lato server con lo stesso meccanismo del client classico.
+- traduce l'HTML lato server con lo stesso meccanismo di localizzazione.
 
 Accesso:
 
 ```
-http://127.0.0.1:5000/v2
-http://127.0.0.1:5000/v2?view=downloads
+http://127.0.0.1:5000/
+http://127.0.0.1:5000/?view=downloads
 ```
 
 ## 2. Architettura
 
 | File | Ruolo |
 | --- | --- |
-| `uiweb_v2.go` | shell, navigazione `/v2`, dispatch delle pagine, i18n server-side, Scarico, Configurazione, Log, shell/panels |
+| `uiweb_v2.go` | shell, navigazione, dispatch delle pagine, i18n server-side, Scarico, Configurazione, Log, shell/panels |
 | `uiweb_v2_table.go` | renderer generico delle tabelle (formati, azioni, filtro, ordinamento, paginazione) + ponte interno verso le API JSON |
 | `uiweb_v2_sections.go` | renderer dei pannelli (Manutenzione, Integrazioni) + forward generico di azioni/form |
 | `uiweb_v2_search.go` | Esplora: ricerca release server-side + "Aggiungi" |
@@ -49,12 +46,12 @@ http://127.0.0.1:5000/v2?view=downloads
 
 Punti chiave:
 
-- **Ponte interno**: gli handler v2 chiamano gli handler API esistenti tramite il
+- **Ponte interno**: gli handler chiamano gli handler API esistenti tramite il
   router in-process (`v2InternalJSON`), quindi validazione e comportamento sono
-  gli stessi della UI classica, senza chiamate di rete.
+  gli stessi delle API, senza chiamate di rete.
 - **i18n server-side**: dopo il render l'HTML viene tradotto con un tokenizer
-  (`v2TranslateHTML`) che replica il comportamento del client classico (text node
-  interi, attributi `title`/`placeholder`/`aria-label`, fallback inglese) e non
+  (`v2TranslateHTML`) che gestisce text node interi, attributi
+  `title`/`placeholder`/`aria-label`, fallback inglese e non
   tocca `<script>`/`<style>`. Con lingua italiana l'HTML esce invariato.
 - **JS minimale**: HTMX fa richieste e swap; `v2-core.js` copre solo preferenze
   (tema/font in `localStorage`) e comportamento accessibile dei modali.
@@ -69,8 +66,8 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | --- | --- | --- |
 | Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
 | Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **limiti/storage**, **tracker/file priority/web seed**, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
-| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale avanzata resta classica |
-| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale avanzata resta classica |
+| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale avanzata non è disponibile |
+| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale avanzata non è disponibile |
 | Mancanti | ✅ | tabella gap + form di ricerca + Cerca/Ignora |
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
@@ -97,8 +94,8 @@ portati:
 
 - **"Ultimi trovati nei feed"** in Dashboard: resta su richiesta (è una vista
   diagnostica, non un flusso operativo).
-- **Aggiunta manuale di serie e film**: il flusso TMDB è v2 e server-side, mentre
-  il form completo con requisiti avanzati/percorso NAS resta nella UI classica.
+- **Aggiunta manuale di serie e film**: il flusso TMDB è server-side, mentre il
+  form completo con requisiti avanzati/percorso NAS non è ancora disponibile.
 - **Gruppo "feed" / TMDB/TVDB**: le viste sono server-side; il calendario carica
   in modo asincrono con HTMX (`hx-trigger="load"`) per non bloccare la pagina.
 - **Azioni lunghe**: la v2 avvia l'azione e mostra l'avanzamento nel pannello
@@ -107,10 +104,9 @@ portati:
 
 ## 5. Differenze accettate (parità)
 
-- **Ordinamento** delle tabelle generiche è server-side (in classica era client);
+- **Ordinamento** delle tabelle generiche è server-side;
   il filtro elenco è server-side.
-- **Modali**: focus-trap, Escape e click sul backdrop ora funzionano
-  (`v2-core.js`), come in classica.
+- **Modali**: focus-trap, Escape e click sul backdrop funzionano (`v2-core.js`).
 - **Log**: aggiornamento a intervalli invece del follow SSE; colorazione
   equivalente.
 - **Azioni lunghe**: la v2 espone un pannello **Operazioni in background** con
@@ -168,10 +164,10 @@ Costo di rendering server ~1–3 ms per pagina: trascurabile su LAN. La traduzio
 
 **Correttezza**
 
-- Le route `/v2` non alterano il contratto API e non toccano `/`.
+- Le route UI non alterano il contratto API; `/` e `/v2` usano lo stesso handler.
 - Le azioni generiche accettano solo path `/api/…` (test su path forgiato → non
   inoltrato).
-- Il salvataggio impostazioni replica i vincoli della UI classica
+- Il salvataggio impostazioni replica i vincoli già usati dalle API
   (`gh7_setting_key_allowed`, `validateBackendSetting`, secret vuoto non
   sovrascritto, JSON-array preservato) ed è coperto da test.
 - `v2TranslateHTML` preserva `<script>`/`<style>` e con IT restituisce l'HTML
@@ -184,28 +180,23 @@ gofmt e suite completa sono verdi.
 
 ## 9. Promozione a UI di default
 
-La promozione è stata eseguita: `/` usa `V2Page`, `/v2` resta alias tecnico e
-`/ui` è mantenuta temporaneamente come fallback di rollback. Dopo un periodo di
-esercizio senza regressioni si potranno disattivare le route e gli asset della UI
-classica.
+La promozione è stata eseguita: `/` usa `V2Page` e `/v2` resta alias tecnico.
 
-## 10. Rimozione della UI classica dopo lo stabilizzamento
+## 10. Rimozione della UI classica
 
-La rimozione sicura della UI classica richiede prima di spostare il CSS condiviso
-attualmente servito da `/ui/static/gextto-ui.css` dentro gli asset v2. Solo dopo
-si potranno disattivare `/ui`, `/ui/partial/*` e il vecchio JavaScript/template.
-I view-model Go e gli handler API condivisi non vanno rimossi.
+Completata: sono stati rimossi template, JavaScript, CSS e route `/ui` della UI
+precedente. Il CSS necessario è ora embedded in `uiweb/v2/static/`; i view-model
+Go e gli handler API condivisi sono stati mantenuti.
 
 ## 11. Prossimi passi
 
 Il porting copre tutte le voci di menu, i dettagli Serie/Film, il dettaglio
 torrent, i flussi secondari dei fumetti e i widget speciali di
 Manutenzione/Integrazioni; solo la diagnostica feed del Dashboard e l'aggiunta
-manuale avanzata restano consapevolmente nella UI classica (vedi §4).
+manuale avanzata restano da completare (vedi §4).
 Passi successivi consigliati:
 
-1. promuovere `/v2` a UI predefinita (vedi §9), mantenendo `/` come alias;
-2. barra di avanzamento contestuale alla singola azione lunga (oltre al pannello
+1. barra di avanzamento contestuale alla singola azione lunga (oltre al pannello
    job già presente);
-3. portare il form completo di aggiunta manuale Serie/Film;
-4. convertire i benchmark v2 in test di performance in CI.
+2. portare il form completo di aggiunta manuale Serie/Film;
+3. convertire i benchmark in test di performance in CI.

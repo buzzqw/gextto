@@ -1,6 +1,6 @@
 /* Gextto UI v2 — layered refinements over the shared stylesheet.
  *
- * The base look (colours, layout, components) comes from /ui/static/gextto-ui.css
+ * The base look (colours, layout, components) comes from gextto-ui.css.
  * so v2 stays visually consistent with the classic UI. This file only adds
  * polish that is safe and additive: sticky chrome, clearer tables, a smoother
  * modal backdrop and a stronger focus ring.

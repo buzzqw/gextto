@@ -39,7 +39,7 @@ func v2Request(t *testing.T, server *httptest.Server, method, path string, form 
 	return response.StatusCode, string(raw)
 }
 
-func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
+func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
@@ -48,7 +48,7 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET /v2 -> %d", code)
 	}
-	for _, want := range []string{`id="v2-page"`, "/ui/static/gextto-ui.css", "/v2/static/htmx.min.js", ">Scarico<", ">Configurazione<"} {
+	for _, want := range []string{`id="v2-page"`, "/v2/static/gextto-ui.css", "/v2/static/htmx.min.js", ">Scarico<", ">Configurazione<"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("v2 shell missing %q", want)
 		}
@@ -310,8 +310,8 @@ func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	if !strings.Contains(body, "ensureTooltips") {
 		t.Fatalf("global tooltip coverage script -> %d", code)
 	}
-	// Unmigrated views fall back to a placeholder that links to the classic UI.
-	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=view-inesistente", nil); code != http.StatusOK || !strings.Contains(body, "non è ancora migrata nella UI v2") {
+	// Unknown views render a safe placeholder without exposing a legacy UI.
+	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=view-inesistente", nil); code != http.StatusOK || !strings.Contains(body, "Questa sezione non è disponibile.") || strings.Contains(body, "UI classica") {
 		t.Fatalf("unavailable placeholder -> %d", code)
 	}
 	// Migrated list pages render server-side rows.

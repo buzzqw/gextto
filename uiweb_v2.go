@@ -1,15 +1,13 @@
 package gextto
 
 // uiweb_v2.go implements the "v2" user interface: a server-rendered (SSR)
-// interface driven by HTMX instead of uiweb/static/gextto-ui.js.
+// interface driven by HTMX instead of the removed legacy browser bundle.
 //
-// It is deliberately isolated and additive, so the classic UI keeps working
-// unchanged while v2 grows:
+// It is the official server-rendered interface:
 //
-//   - every route lives under /v2 and is registered by the single
-//     registerV2Routes(s, mux) call in web_router.go;
-//   - templates and static files are embedded from uiweb/v2 and never touch
-//     uiweb/templates or uiweb/static;
+//   - the public shell lives at /, while the technical /v2 alias and all
+//     fragment/action routes are registered by registerV2Routes(s, mux);
+//   - templates and static files are embedded from uiweb/v2;
 //   - it reuses the existing Go view-models (uiDashboardDataFrom,
 //     uiTorrentsDataFrom, uiSettingsPageFrom, ...) and the shared CSS, so the
 //     data and the look come from the same source as the classic UI;
@@ -18,9 +16,8 @@ package gextto
 // The v2 handlers are the official UI at "/"; /v2 remains their explicit
 // technical alias during stabilization.
 //
-// Migration is delivered in verified batches. Views that are not migrated yet
-// answer with v2_unavailable and link back to the classic page instead of
-// pretending the feature is gone.
+// Unknown views answer with v2_unavailable instead of pretending the feature
+// exists.
 
 import (
 	"bytes"

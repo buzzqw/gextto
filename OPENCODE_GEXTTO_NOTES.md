@@ -43,16 +43,16 @@ Il file unit dell'utente è normalmente:
 
 ## UI e API
 
-- Template principali: `uiweb/templates/pages.html` e `uiweb/templates/ui.html`.
-- JavaScript UI: `uiweb/static/gextto-ui.js`.
+- Template principale: `uiweb/v2/templates/v2.html`.
+- Asset UI: `uiweb/v2/static/` (HTMX, `v2-core.js`, CSS).
 - Dettagli serie: `uiweb_detail.go`.
 - Route HTTP: `web_router.go`.
 - Documentazione API: `docs/API.md`.
 - Per le sorgenti di una puntata: `GET /api/episodes/{series}/{season}/{episode}/sources`.
 
-### UI v2 (SSR + HTMX), sperimentale e isolata
+### UI principale (SSR + HTMX)
 
-- Accesso: `http://127.0.0.1:5000/v2` (la UI classica su `/` resta invariata).
+- Accesso: `http://127.0.0.1:5000/` (`/v2` resta alias tecnico).
 - Codice: `uiweb_v2.go`, `uiweb_v2_table.go`, `uiweb_v2_sections.go`,
   `uiweb_v2_search.go`, `uiweb_v2_detail.go`, `uiweb_v2_settings_extras.go`,
   `uiweb_v2_maintenance.go`, `uiweb_v2_widgets.go`,

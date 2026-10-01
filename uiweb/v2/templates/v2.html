@@ -1,8 +1,6 @@
 {{/*
-  Gextto UI v2 — server-rendered pages driven by HTMX.
-  Isolated from the classic UI: it lives under /v2, uses its own embedded
-  templates and static files, and shares only the CSS and the Go view-models.
-  Promotion to the default UI later means pointing "/" at these routes.
+  Gextto UI — server-rendered pages driven by HTMX.
+  It uses the official embedded templates and static files.
 */}}
 
 {{define "v2_shell"}}<!doctype html>
@@ -22,7 +20,7 @@
     } catch (error) { /* storage may be unavailable */ }
   }());
 </script>
-<link rel="stylesheet" href="/ui/static/gextto-ui.css">
+<link rel="stylesheet" href="/v2/static/gextto-ui.css">
 <link rel="stylesheet" href="/v2/static/v2.css">
 <script src="/v2/static/htmx.min.js" defer></script>
 <script src="/v2/static/v2-core.js" defer></script>
@@ -33,7 +31,7 @@
   <aside class="sidebar" id="app-sidebar">
     <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
       <span class="brand-mark" aria-hidden="true">G</span>
-      <div><strong>Gextto</strong><small>EXpert Torrent Transfer Orchestrator · v{{.Chrome.Version}} · UI ufficiale</small></div>
+      <div><strong>Gextto</strong><small>EXpert Torrent Transfer Orchestrator · v{{.Chrome.Version}}</small></div>
     </div>
     <nav aria-label="Navigazione principale">
       {{range .Groups}}
@@ -46,7 +44,7 @@
       </div>
       {{end}}
     </nav>
-    <div class="sidebar-foot"><span class="pulse"></span><span>{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}} · ufficiale</span></div>
+    <div class="sidebar-foot"><span class="pulse"></span><span>{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}}</span></div>
   </aside>
   <main class="main-shell">
     <header class="topbar v2-topbar-sticky">
@@ -77,7 +75,6 @@
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
         <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
-        <a class="btn" href="/?view={{.Page}}" title="Apri la stessa pagina nella UI classica">Classica</a>
         <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Chrome.Status}}</span>
       </div>
     </header>
@@ -111,8 +108,8 @@
   <div class="panel">
     <div class="panel-head"><h3>{{.Title}}</h3></div>
     <div class="panel-body">
-      <p class="muted">Questa sezione non è ancora migrata nella UI v2.</p>
-      <p><a class="btn" href="/?view={{.View}}">Apri nella UI classica</a> <a class="btn" href="/v2?view=dashboard">Torna alla dashboard v2</a></p>
+      <p class="muted">Questa sezione non è disponibile.</p>
+      <p><a class="btn" href="/">Torna alla dashboard</a></p>
     </div>
   </div>
 </div>
@@ -1052,7 +1049,6 @@
     {{if .OAuth.Name}}
     <div class="toolbar">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>
     {{end}}
-    {{if .ClassicURL}}<p><a class="btn" href="{{.ClassicURL}}">Apri nella UI classica</a></p>{{end}}
   </div>
 </div>
 {{end}}

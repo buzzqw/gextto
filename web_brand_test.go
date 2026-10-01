@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestBrandingHasNoLegacyName guards the rebranding of the server-rendered
+// TestBrandingHasNoLegacyName guards the branding of the official server-rendered
 // shell. The legacy tokens are assembled at runtime so the guard itself does
 // not embed the previous name anywhere in the source tree.
 func TestBrandingHasNoLegacyName(t *testing.T) {
@@ -20,7 +20,7 @@ func TestBrandingHasNoLegacyName(t *testing.T) {
 
 	state := newTestAppState(t)
 	recorder := httptest.NewRecorder()
-	UiPage(recorder, httptest.NewRequest(http.MethodGet, "/", nil), state)
+	V2Page(recorder, httptest.NewRequest(http.MethodGet, "/", nil), state)
 	body := recorder.Body.Bytes()
 	if !bytes.Contains(body, []byte("Gextto")) {
 		t.Fatal("index does not mention Gextto")
@@ -31,7 +31,7 @@ func TestBrandingHasNoLegacyName(t *testing.T) {
 		}
 	}
 
-	css, err := fs.ReadFile(uiwebStaticFS(), "gextto-ui.css")
+	css, err := fs.ReadFile(v2StaticFSRoot(), "gextto-ui.css")
 	if err != nil {
 		t.Fatal("embedded server UI stylesheet missing")
 	}

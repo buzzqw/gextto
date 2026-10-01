@@ -295,15 +295,15 @@ func TestWebApiIndexAndUIAsset(t *testing.T) {
 		t.Fatalf("GET /: body does not contain <html: %s", body)
 	}
 
-	status, _, asset := webGet(t, server, "/ui/static/gextto-ui.js")
+	status, _, asset := webGet(t, server, "/v2/static/v2-core.js")
 	if status != http.StatusOK {
-		t.Fatalf("GET /ui/static/gextto-ui.js: status = %d", status)
+		t.Fatalf("GET /v2/static/v2-core.js: status = %d", status)
 	}
 	if len(asset) == 0 {
-		t.Fatal("GET /ui/static/gextto-ui.js: empty body")
+		t.Fatal("GET /v2/static/v2-core.js: empty body")
 	}
 
-	for _, path := range []string{"/legacy", "/pkg/ui.js", "/pkg/ui_bg.wasm"} {
+	for _, path := range []string{"/legacy", "/ui", "/ui/", "/ui/static/gextto-ui.css", "/pkg/ui.js", "/pkg/ui_bg.wasm"} {
 		status, _, _ := webGet(t, server, path)
 		if status != http.StatusNotFound {
 			t.Fatalf("GET %s: status = %d, want %d", path, status, http.StatusNotFound)

@@ -1,7 +1,7 @@
 # Accessibility analysis of the Gextto web interface
 
 **Analysis date:** 29 September 2026  
-**Scope:** the web interface in `uiweb/templates/`, `uiweb/static/` and the
+**Scope:** the web interface in `uiweb/v2/templates/`, `uiweb/v2/static/` and the
 Playwright tests in `uiweb/end2end/`  
 **Reference:** WCAG 2.1 AA, with practices compatible with WCAG 2.2
 

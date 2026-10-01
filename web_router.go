@@ -9,8 +9,7 @@ import "net/http"
 // cache-control middleware.
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
-	// UI ufficiale: la v2 è ora servita alla radice. Le route /v2 e /ui
-	// restano disponibili come alias/rollback durante il periodo di sicurezza.
+	// Interfaccia principale: la v2 è servita alla radice; /v2 resta un alias tecnico.
 	handle(s, mux, "GET /{$}", V2Page)
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)
@@ -286,25 +285,6 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run_now", RunNow)
 	handle(s, mux, "POST /api/run-now", RunNow)
-	registerUIRoutes(s, mux)
-	return mux
-}
-
-// registerUIRoutes keeps server-rendered UI routes separate from the public API
-// registration above. Future route groups can follow the same pattern without
-// changing the router's external contract.
-func registerUIRoutes(s *AppState, mux *http.ServeMux) {
-	// The shell is public, while every data partial and action route uses the
-	// same shared middleware.
-	mux.Handle("GET /ui/static/", UiNoCache(http.StripPrefix("/ui/static/", http.FileServer(http.FS(uiwebStaticFS())))))
-	handle(s, mux, "GET /ui", UiPage)
-	handle(s, mux, "GET /ui/", UiPage)
-	handle(s, mux, "GET /ui/partial/dashboard", UiPartialDashboard)
-	handle(s, mux, "GET /ui/partial/torrents", UiPartialTorrents)
-	handle(s, mux, "GET /ui/partial/unavailable", UiPartialUnavailable)
-
-	// UI v2 (SSR + HTMX) lives entirely in uiweb_v2.go and uiweb/v2. It is the
-	// official interface at /; the classic interface remains available at /ui
-	// only as a temporary rollback path.
 	registerV2Routes(s, mux)
+	return mux
 }

@@ -49,7 +49,7 @@ test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) 
 });
 
 test("selezione torrent mantenuta durante il polling", async ({ page }) => {
-  await page.route("**/ui/partial/torrents", async (route) => {
+  await page.route("**/v2/downloads/table", async (route) => {
     await route.fulfill({
       contentType: "text/html; charset=utf-8",
       body: `<div class="view" data-torrents-slot>

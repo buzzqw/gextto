@@ -49,7 +49,6 @@ type v2Section struct {
 	ManualAdd     string
 	TestFTP       bool
 	ListEditor    *v2ListEditorView
-	ClassicURL    string
 	// Integration cards (Trakt, Simkl) carry their child sections inline.
 	Children    []v2Section
 	Status      string
@@ -138,8 +137,6 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 			item.ListEditor = &editorView
 			item.Title = section.Editor.Title
 			item.Hint = section.Editor.Hint
-		} else {
-			item.ClassicURL = "/?view=" + view
 		}
 	case "sources_check", "trash_panel":
 		// Rendered with dedicated server-side markup.
@@ -164,7 +161,7 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.FolderRename = &v2FolderRenameView{}
 		item.Title = "Rinomina contenuto cartella"
 	default:
-		item.ClassicURL = "/?view=" + view
+		// Keep unknown section kinds visible without exposing a legacy fallback.
 	}
 	return item
 }
