@@ -194,6 +194,10 @@
   }
 
   var logsFollow = true;
+  // HTMX replaces the complete <pre> every five seconds. Retain the viewport
+  // while follow is paused; otherwise replacing the node makes the browser
+  // appear to resume scrolling even though pinLogTail correctly did nothing.
+  var pausedLogScrollTop = null;
   function updateLogsFollowButton() {
     var button = document.querySelector("[data-v2-logs-follow]");
     if (button) button.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Segui ultime righe";
@@ -541,9 +545,17 @@
     }
     var follow = event.target.closest && event.target.closest("[data-v2-logs-follow]");
     if (follow) {
+      event.preventDefault();
       logsFollow = !logsFollow;
+      if (!logsFollow) {
+        var logView = document.getElementById("v2-logs-view");
+        pausedLogScrollTop = logView ? logView.scrollTop : 0;
+      }
       updateLogsFollowButton();
-      if (logsFollow) pinLogTail();
+      if (logsFollow) {
+        pausedLogScrollTop = null;
+        pinLogTail();
+      }
     }
   });
   // Apply the visual state on pointer-down too. This happens before HTMX can
@@ -590,8 +602,17 @@
     ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); return; }
     updateTorrentSelection();
+    if (!logsFollow && event.target.id === "v2-logs-view" && pausedLogScrollTop !== null) {
+      event.target.scrollTop = pausedLogScrollTop;
+    }
     // Keep the log tail pinned to the newest line after the periodic refresh.
     pinLogTail();
+  });
+
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (logsFollow || !target || target.id !== "v2-logs-view") return;
+    pausedLogScrollTop = target.scrollTop;
   });
 
   // ------------------------------------------------------------ font picker --
