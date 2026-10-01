@@ -1041,6 +1041,7 @@ int gextto_lt_associate_storage(gextto_lt_session* session, const char* hash, co
         // already holds the payload this associates (and seeds) it instead of
         // failing with "already exists".
         handle.move_storage(destination, lt::move_flags_t::reset_save_path);
+        handle.force_recheck();
         return 1;
     } catch (const std::exception& exception) {
         set_error(error, error_size, exception.what());

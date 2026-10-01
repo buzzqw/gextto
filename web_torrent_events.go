@@ -1078,6 +1078,24 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 		return false
 	}
 	tev_clearEmptyDestination(destination, torrent.Name)
+	if associated, err := tev_associateExistingPostSeedStorage(torrents, db, torrent, destination); associated || err != nil {
+		if err != nil {
+			logging.Warn("existing post-seed archive could not be associated",
+				"hash", torrent.Hash, "name", torrent.Name, "destination", destination, "error", err.Error())
+			return false
+		}
+		logging.Info("📁 existing post-seed archive associated",
+			"destination", destination, "size", logging.HumanBytesI64(torrent.TotalSize))
+		postSeedMoves[torrent.Hash] = struct{}{}
+		storageMoveRetries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
+			destination: destination,
+			postSeed:    true,
+			attempts:    0,
+			nextAttempt: time.Now().Add(600 * time.Second),
+			inFlight:    true,
+		}
+		return true
+	}
 	moved, err := torrents.MoveStorage(torrent.Hash, destination)
 	if err != nil {
 		logging.Warn("post-seeding relocation failed",
@@ -1105,6 +1123,90 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 		inFlight:    true,
 	}
 	return true
+}
+
+// tev_associateExistingPostSeedStorage recovers a post-seed move interrupted
+// after the destination was populated but before the storage_moved event was
+// persisted. The normal move must not be retried in that case: libtorrent
+// correctly refuses to overwrite the already existing archive copy.
+func tev_associateExistingPostSeedStorage(torrents TorrentSession, db *Database, torrent *models.TorrentView, destination string) (bool, error) {
+	associator, ok := torrents.(interface {
+		AssociateStorage(hash, destination string) (bool, error)
+	})
+	if !ok || torrent == nil || torrent.TotalSize <= 0 {
+		return false, nil
+	}
+	target := CompletionPath(&models.TorrentEvent{
+		Hash:     torrent.Hash,
+		Name:     torrent.Name,
+		SavePath: destination,
+	})
+	if _, err := os.Stat(target); err != nil {
+		return false, nil
+	}
+	size, err := SizeOfPath(target)
+	if err != nil || size < torrent.TotalSize {
+		return false, nil
+	}
+	associated, err := associator.AssociateStorage(torrent.Hash, destination)
+	if err != nil {
+		return false, err
+	}
+	if !associated {
+		return false, nil
+	}
+	// reset_save_path deliberately does not emit libtorrent's
+	// storage_moved alert. Persist the already archived payload immediately so
+	// the completion history and "Pulisci completati" can see it, rather than
+	// leaving the torrent forever in the unarchived state.
+	if err := db.MarkTorrentCompleted(torrent.Hash, target, size); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// RecoverCompletedArchives repairs a completed torrent whose storage was
+// already associated with its archive before the completion record was saved.
+// This is primarily for recovery after a daemon restart between reset_save_path
+// and the next completion pass.
+func RecoverCompletedArchives(cfg *Config, torrents TorrentSession, db *Database) {
+	for _, torrent := range torrents.List() {
+		status, err := db.TorrentStatus(torrent.Hash)
+		if err != nil || status == nil || *status != "completed" {
+			continue
+		}
+		processed, err := db.TorrentProcessed(torrent.Hash)
+		if err != nil || processed == nil || strings.TrimSpace(*processed) != "" {
+			continue
+		}
+		meta, err := db.TorrentMeta(torrent.Hash)
+		if err != nil || meta == nil {
+			continue
+		}
+		destination, ok := ConfiguredDestinationFor(&meta.Release, cfg)
+		if !ok || !SamePath(torrent.SavePath, destination) {
+			continue
+		}
+		target := CompletionPath(&models.TorrentEvent{
+			Hash:     torrent.Hash,
+			Name:     torrent.Name,
+			SavePath: torrent.SavePath,
+		})
+		size, err := SizeOfPath(target)
+		if err != nil || torrent.TotalSize <= 0 || size < torrent.TotalSize {
+			continue
+		}
+		if torrent.Progress < 99.99 {
+			if checked, checkErr := torrents.ForceRecheck(torrent.Hash); checkErr != nil || !checked {
+				logging.Debug("existing archive recheck could not be started", "error", checkErr)
+			}
+		}
+		if err := db.MarkTorrentCompleted(torrent.Hash, target, size); err != nil {
+			logging.Warn("existing archive completion could not be recorded", "error", err)
+			continue
+		}
+		logging.Info("existing archive completion recorded", "path", target)
+	}
 }
 
 // tev_ramdiskRelocation implements `ramdisk_relocation`. It returns the reason and

@@ -778,6 +778,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastRamdiskCheck = now
 		}
 		RetryStorageMoves(torrents, moveRequests, postSeedMoves, storageMoveRetries)
+		RecoverCompletedArchives(cfg, torrents, db)
 		torrentEvents := torrents.PollEvents()
 		eventHashes := map[string]struct{}{}
 		for _, event := range torrentEvents {

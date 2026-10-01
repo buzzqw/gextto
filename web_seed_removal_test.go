@@ -17,6 +17,7 @@ type stubTorrentSession struct {
 	removed     []string
 	deleteFlags []bool
 	moved       map[string]string
+	associated  map[string]string
 }
 
 func (s *stubTorrentSession) List() []models.TorrentView        { return s.list }
@@ -39,6 +40,13 @@ func (s *stubTorrentSession) MoveStorage(hash, destination string) (bool, error)
 		s.moved = map[string]string{}
 	}
 	s.moved[hash] = destination
+	return true, nil
+}
+func (s *stubTorrentSession) AssociateStorage(hash, destination string) (bool, error) {
+	if s.associated == nil {
+		s.associated = map[string]string{}
+	}
+	s.associated[hash] = destination
 	return true, nil
 }
 
@@ -212,6 +220,40 @@ func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
 	if got := session.moved[seedTestHash]; got != library {
 		t.Fatalf("RAM-disk post-seed destination = %q, want %q", got, library)
+	}
+}
+
+// TestEnforceSeedPolicyAssociatesExistingArchive recovers a destination that
+// was populated before a restart interrupted the storage_moved event.
+func TestEnforceSeedPolicyAssociatesExistingArchive(t *testing.T) {
+	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
+	library := filepath.Dir(processed)
+	cfg.ArchiveRoot = &library
+	target := filepath.Join(library, filepath.Base(source))
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkTorrentCompleted(seedTestHash, source, int64(len(data))); err != nil {
+		t.Fatal(err)
+	}
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+	if got := session.associated[seedTestHash]; got != library {
+		t.Fatalf("existing archive association = %q, want %q", got, library)
+	}
+	if got, err := db.TorrentProcessed(seedTestHash); err != nil || got == nil || *got != target {
+		t.Fatalf("existing archive processed path = %v, %v; want %q", got, err, target)
+	}
+	if _, moved := session.moved[seedTestHash]; moved {
+		t.Fatalf("existing archive should be associated, not moved: %v", session.moved)
 	}
 }
 
