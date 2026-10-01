@@ -227,12 +227,28 @@
     <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted">Caricamento su richiesta</small></div>
     <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/v2/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
   </div>
-  {{range .PanelTables}}{{template "v2_table_panel" .}}{{end}}
+  {{template "v2_dashboard_calendar" .Calendar}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
 </div>
 {{end}}
 
 {{define "v2_dashboard_search_results"}}{{template "v2_search_results" .}}{{end}}
+
+{{define "v2_dashboard_calendar"}}
+<div class="view">
+  <div class="panel dashboard-calendar-panel">
+    <div class="panel-head"><h3>Prossime uscite</h3><small class="muted">Serie TV</small></div>
+    <div class="panel-body">
+      <div class="dashboard-list">
+        {{if .}}{{range .}}<div class="list-item">
+          {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">N/D</div>{{end}}
+          <div><strong>{{.Series}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}data non disponibile{{end}}</small></div>
+        </div>{{end}}{{else}}<p class="muted">Nessuna uscita in programma.</p>{{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
 
 {{define "v2_dashboard_feed"}}
 {{if .Error}}<p class="alert">{{.Error}}</p>

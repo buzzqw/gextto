@@ -91,7 +91,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("dashboard -> %d", code)
 	}
-	for _, marker := range []string{"Backup", "Prossima ricerca", "automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-actions-next-grid", "dashboard-actions-column", "dashboard-consumption-panel"} {
+	for _, marker := range []string{"Backup", "Prossima ricerca", "automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-actions-next-grid", "dashboard-actions-column", "dashboard-consumption-panel", "dashboard-calendar-panel"} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("dashboard missing %q", marker)
 		}

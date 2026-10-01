@@ -292,9 +292,49 @@ func v2NavGroups(view string, counts map[string]int) []uiNavGroup {
 // download history), which the classic UI loaded with JavaScript.
 type v2DashboardView struct {
 	uiDashboardData
+	Calendar    []v2DashboardCalendarItem
 	PanelTables []v2TableData
 	Jobs        *v2JobsView
 	Search      v2SearchView
+}
+
+type v2DashboardCalendarItem struct {
+	Series  string
+	Poster  string
+	Season  int
+	Episode int
+	AirDate string
+}
+
+// v2DashboardCalendarFrom keeps the calendar presentation aligned with the
+// classic UI and rextto: the existing API already returns the next episode,
+// its air date and the TMDB poster URL.
+func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
+	raw, status := v2InternalJSON(s, http.MethodGet, "/api/calendar", nil, nil)
+	if status >= http.StatusBadRequest {
+		return nil
+	}
+	var payload struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil
+	}
+	out := make([]v2DashboardCalendarItem, 0, len(payload.Items))
+	for _, item := range payload.Items {
+		episode, _ := item["episode"].(map[string]any)
+		out = append(out, v2DashboardCalendarItem{
+			Series:  v2String(item["series"]),
+			Poster:  v2SafeHref(v2String(item["poster"])),
+			Season:  int(v2Float(episode["season_number"])),
+			Episode: int(v2Float(episode["episode_number"])),
+			AirDate: v2String(episode["air_date"]),
+		})
+		if len(out) >= 6 {
+			break
+		}
+	}
+	return out
 }
 
 type v2HealthView struct {
@@ -331,7 +371,7 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 	jobs := v2JobsViewFrom(s)
 	return v2DashboardView{
 		uiDashboardData: base,
-		PanelTables:     v2SectionTables(s, r, base.Panels, []string{"dashboard-calendar"}),
+		Calendar:        v2DashboardCalendarFrom(s),
 		Jobs:            &jobs,
 		Search:          v2SearchView{Redirect: "/v2?view=dashboard"},
 	}
