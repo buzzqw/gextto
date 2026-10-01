@@ -11,6 +11,34 @@
   --v2-shadow: 0 10px 30px rgba(0, 0, 0, .28);
 }
 
+/* Keep the initial search hint beside the field so the settings header does
+   not consume a full extra line before the tab chips. */
+.settings-search-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.settings-search-row .settings-search-wrap {
+  flex: 1 1 440px;
+}
+.settings-search-row .settings-results {
+  flex: 0 1 420px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+.settings-search-row .settings-results > * {
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .settings-search-row {
+    display: block;
+  }
+  .settings-search-row .settings-results {
+    margin-top: 8px;
+  }
+}
+
 /* Sticky top bar so metrics and language/theme controls stay reachable. */
 .v2-topbar-sticky {
   position: sticky;

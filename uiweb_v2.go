@@ -613,12 +613,17 @@ func v2TranslateHTML(raw string, dict, eng map[string]string) string {
 			tag := strings.ToLower(string(name))
 			out.WriteByte('<')
 			out.Write(name)
+			titleTranslated := false
 			for hasAttr {
 				key, value, more := tokenizer.TagAttr()
 				attrName := strings.ToLower(string(key))
 				text := string(value)
 				if v2TranslatableAttr(attrName) {
-					text = v2TranslateText(text, dict, eng)
+					translated := v2TranslateText(text, dict, eng)
+					if attrName == "title" && translated != text {
+						titleTranslated = true
+					}
+					text = translated
 				}
 				out.WriteByte(' ')
 				out.Write(key)
@@ -626,6 +631,9 @@ func v2TranslateHTML(raw string, dict, eng map[string]string) string {
 				out.WriteString(xhtml.EscapeString(text))
 				out.WriteByte('"')
 				hasAttr = more
+			}
+			if titleTranslated {
+				out.WriteString(` data-v2-title-translated="true"`)
 			}
 			if tokenType == xhtml.SelfClosingTagToken {
 				out.WriteString("/>")

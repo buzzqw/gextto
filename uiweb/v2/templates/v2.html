@@ -499,13 +499,15 @@
       <div><span class="eyebrow">Configurazione</span><h2>{{.ActiveLabel}}</h2></div>
       <span class="settings-save-hint">Nella v2 ogni campo è un piccolo form HTMX</span>
     </div>
-    <label class="settings-search-wrap">
-      <span class="settings-search-icon" aria-hidden="true">⌕</span>
-      <span class="sr-only">Cerca impostazioni</span>
-      <input type="search" class="input settings-search" name="q" aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off"
-             hx-get="/v2/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
-    </label>
-    <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
+    <div class="settings-search-row">
+      <label class="settings-search-wrap">
+        <span class="settings-search-icon" aria-hidden="true">⌕</span>
+        <span class="sr-only">Cerca impostazioni</span>
+        <input type="search" class="input settings-search" name="q" aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off"
+               hx-get="/v2/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
+      </label>
+      <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
+    </div>
     <div class="chip-row">
       {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/v2?view=settings&tab={{.ID}}" hx-get="/v2/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/v2?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
     </div>
@@ -558,7 +560,7 @@
     <form method="post" action="/v2/settings/checkbox" hx-post="/v2/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML">
       <input type="hidden" name="key" value="{{.Key}}" />
       <div class="toolbar checkbox-row">
-        {{range .Options}}<label class="check"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
+         {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
       </div>
       {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/v2/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">Salva</button></div>{{end}}
     </form>
@@ -577,8 +579,8 @@
       {{range .Rows}}{{template "v2_list_row" (dict "Editor" $ "Row" .)}}{{end}}
     </div>
     <div class="form-actions">
-      <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/v2/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend">Aggiungi riga</button>
-      <button class="btn sm primary" type="submit">Salva</button>
+       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/v2/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" title="Aggiungi una nuova riga">Aggiungi riga</button>
+       <button class="btn sm primary" type="submit" title="Salva le righe di questa sezione">Salva</button>
     </div>
   </form>
 </div>
@@ -588,14 +590,14 @@
 <div class="card list-row">
   {{range .Row.Fields}}
   {{$value := .Value}}{{$name := .Name}}{{$index := $.Row.Index}}
-  <label class="field{{if .Wide}} wide{{end}}"><span>{{.Label}}</span>
+   <label class="field{{if .Wide}} wide{{end}}" title="{{.Label}}"><span>{{.Label}}</span>
     {{if eq .Kind "bool"}}<select class="input" name="{{$name}}__{{$index}}"><option value="true"{{if eq $value "true"}} selected{{end}}>Sì</option><option value="false"{{if eq $value "false"}} selected{{end}}>No</option></select>
     {{else if eq .Kind "number"}}<input class="input" type="number" name="{{$name}}__{{$index}}" value="{{$value}}" />
     {{else if eq .Kind "select"}}<select class="input" name="{{$name}}__{{$index}}">{{range .Options}}<option value="{{.Value}}"{{if eq $value .Value}} selected{{end}}>{{.Label}}</option>{{end}}</select>
     {{else}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" />{{end}}
   </label>
   {{end}}
-  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/v2/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/v2/empty" hx-target="closest .list-row" hx-swap="outerHTML">Rimuovi</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/v2/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/v2/empty" hx-target="closest .list-row" hx-swap="outerHTML" title="Rimuovi questa riga">Rimuovi</button></div>
 </div>
 {{end}}
 
@@ -604,12 +606,12 @@
   <div class="panel-head"><h3>Composizione del nome</h3>{{if .Status}}<small class="muted">{{.Status}}</small>{{end}}</div>
   <div class="panel-body">
     <form method="post" action="/v2/settings/rename-save" hx-post="/v2/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form">
-      <label class="field"><span>Formato</span><select class="input" name="format" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
-      <label class="field"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
-      <div class="form-actions"><button class="btn sm primary" type="submit">Salva rinomina</button></div>
+      <label class="field" title="Scegli il formato predefinito per il nome"><span>Formato</span><select class="input" name="format" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+      <label class="field" title="Template usato per comporre il nome personalizzato"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
+      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva la composizione del nome">Salva rinomina</button></div>
     </form>
     <div class="field" style="margin-top:12px"><span>Pezzi del nome (clicca per aggiungere)</span>
-      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/v2/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML">{{.Label}}</button>{{end}}</div>
+      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/v2/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" title="Aggiungi il token {{.Label}} al template">{{.Label}}</button>{{end}}</div>
     </div>
     <div class="field" style="margin-top:12px"><span>Anteprima</span>{{template "v2_rename_preview_code" .}}</div>
   </div>
@@ -663,7 +665,7 @@
       hx-post="/v2/settings/save" hx-target="this" hx-swap="outerHTML">
   <input type="hidden" name="key" value="{{.Key}}">
   <div class="setting-info">
-    <label class="setting-label" for="input-{{.Key}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
+    <label class="setting-label" for="input-{{.Key}}" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}">{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
     <div class="setting-meta">
       {{if .Hint}}<small class="setting-hint" title="{{.Hint}}">{{.Hint}}</small>{{end}}
       <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
@@ -1295,7 +1297,7 @@
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
   <input type="hidden" name="body" value="{{.Body}}">
-  <button class="btn sm {{.Class}}" type="submit"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</button>
+  <button class="btn sm {{.Class}}" type="submit" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
 </form>
 {{end}}
 
@@ -1651,7 +1653,7 @@
 
 {{define "v2_form_field"}}
 {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
-{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}"{{if .Hint}} title="{{.Hint}}"{{end}}>
+{{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}">
   <input type="hidden" name="_v2_kind_{{.Name}}" value="{{.Kind}}" />
   <span>{{.Label}}</span>
   {{if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>

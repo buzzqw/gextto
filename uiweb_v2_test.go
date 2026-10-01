@@ -147,6 +147,9 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if strings.Index(body, "Cerca una impostazione per nome o chiave.") > strings.Index(body, `class="chip-row"`) {
 		t.Fatalf("settings search hint must precede settings tabs")
 	}
+	if !strings.Contains(body, `class="settings-search-row"`) {
+		t.Fatalf("settings search row missing")
+	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=libtorrent", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
@@ -184,8 +187,12 @@ func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/v2/static/htmx.min.js", nil); code != http.StatusOK || !strings.Contains(body, "htmx") {
 		t.Fatalf("htmx asset -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(body, "htmx:afterRequest") {
+	code, body := v2Request(t, server, http.MethodGet, "/v2/static/v2-core.js", nil)
+	if code != http.StatusOK || !strings.Contains(body, "htmx:afterRequest") {
 		t.Fatalf("settings tab sync script -> %d", code)
+	}
+	if !strings.Contains(body, "ensureTooltips") {
+		t.Fatalf("global tooltip coverage script -> %d", code)
 	}
 	// Unmigrated views fall back to a placeholder that links to the classic UI.
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=view-inesistente", nil); code != http.StatusOK || !strings.Contains(body, "non è ancora migrata nella UI v2") {
@@ -446,6 +453,9 @@ func TestV2TranslateHTMLMirrorsClientBehaviour(t *testing.T) {
 	}
 	if !strings.Contains(got, `title="Paths"`) {
 		t.Fatalf("attribute not translated: %s", got)
+	}
+	if !strings.Contains(got, `data-v2-title-translated="true"`) {
+		t.Fatalf("translated title marker missing: %s", got)
 	}
 	if !strings.Contains(got, "var Percorsi = 1;") {
 		t.Fatalf("script content must not be translated: %s", got)

@@ -160,6 +160,40 @@
     if (button) button.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Segui ultime righe";
   }
 
+  // Every interactive field gets at least a localized native tooltip. Pages
+  // rendered by HTMX can add controls after the initial load, so this is
+  // deliberately idempotent and runs after every swap. Explicit, explanatory
+  // titles remain untouched.
+  function ensureTooltips(root) {
+    root = root || document;
+    var nodes = root.querySelectorAll ? root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea') : [];
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      if (node.disabled) continue;
+      // A translated server-side title is more useful than the visible label.
+      // If the active language is not Italian and the title was not translated
+      // by the catalog, replace it with a label/aria description below rather
+      // than exposing an Italian tooltip in another locale.
+      if (document.documentElement.lang && document.documentElement.lang !== "it" && !node.hasAttribute("data-v2-title-translated")) {
+        node.removeAttribute("title");
+      }
+      if (String(node.getAttribute("title") || "").trim()) continue;
+      var text = node.getAttribute("aria-label") || node.getAttribute("placeholder") || "";
+      if (!text) {
+        var label = node.closest && node.closest("label");
+        var labelText = label && label.querySelector("span:not(.sr-only)");
+        text = labelText ? labelText.textContent : (label ? label.textContent : node.textContent);
+      }
+      text = String(text || "").replace(/\s+/g, " ").trim();
+      if (!text) {
+        if (node.matches("select")) text = "Seleziona un valore";
+        else if (node.matches("textarea,input")) text = "Inserisci un valore";
+        else text = "Esegui azione";
+      }
+      node.setAttribute("title", text);
+    }
+  }
+
   function copyText(value, button) {
     if (!value) return;
     var done = function () {
@@ -227,6 +261,7 @@
 
   document.addEventListener("htmx:afterSwap", function (event) {
     if (!event.target) return;
+    ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); return; }
     updateTorrentSelection();
     // Keep the log tail pinned to the newest line after the periodic refresh.
@@ -342,5 +377,5 @@
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });
 
-  document.addEventListener("DOMContentLoaded", function () { scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); });
 })();
