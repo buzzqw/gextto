@@ -149,6 +149,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/backup", ListBackups)
 	handle(s, mux, "POST /api/backup", CreateBackup)
 	handle(s, mux, "GET /api/backup/list", ListBackups)
+	handle(s, mux, "POST /api/backup/verify", ValidateBackup)
 	handle(s, mux, "GET /api/backup/settings", BackupSettings)
 	handle(s, mux, "POST /api/backup/settings", SaveBackupSettings)
 	handle(s, mux, "POST /api/backup/send-telegram", BackupSendTelegram)

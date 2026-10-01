@@ -436,6 +436,10 @@ type ProviderStatus struct {
 	DisabledTill      string `json:"disabled_till"`
 	MostRecentFailure string `json:"most_recent_failure"`
 	LastError         string `json:"last_error"`
+	// UserMessage and SuggestedAction turn a transport-level error into the
+	// operational information shown in the Health page.
+	UserMessage     string `json:"user_message,omitempty"`
+	SuggestedAction string `json:"suggested_action,omitempty"`
 }
 
 // TorrentEvent is a lifecycle event emitted by the torrent session.

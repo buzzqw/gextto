@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -168,8 +169,18 @@ func CreateSnapshot(dataDir, backupRoot string, retain int) (string, error) {
 	for _, name := range databases {
 		source := filepath.Join(dataDir, name)
 		info, err := os.Stat(source)
-		if err != nil || !info.Mode().IsRegular() {
+		if errors.Is(err, os.ErrNotExist) {
+			// A database is absent only on installations where the corresponding
+			// feature has never been used; it is safe to omit it.
 			continue
+		}
+		if err != nil {
+			// Permission and I/O errors must not be mistaken for an optional DB:
+			// publishing a partial backup would make disaster recovery unreliable.
+			return "", fmt.Errorf("impossibile leggere %s per il backup: %w", name, err)
+		}
+		if !info.Mode().IsRegular() {
+			return "", fmt.Errorf("database %s non è un file regolare", name)
 		}
 		snapshot := filepath.Join(temp, name)
 		if err := snapshotDatabase(source, snapshot); err != nil {

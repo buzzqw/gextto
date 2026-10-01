@@ -226,7 +226,19 @@ func (t *TmdbClient) getJSON(ctx context.Context, rawURL string, params [][2]str
 		}
 		response, err := t.client.Do(request)
 		if err != nil {
-			return err
+			// A temporary DNS/TCP reset is as recoverable as a 5xx. Do not retry
+			// caller cancellation: that is a deliberate lifecycle event, not a
+			// TMDB outage.
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if attempt == 2 {
+				return fmt.Errorf("TMDB request failed: %w", err)
+			}
+			if err := tmdbRetryWait(ctx, attempt); err != nil {
+				return err
+			}
+			continue
 		}
 		if response.StatusCode >= 200 && response.StatusCode < 300 {
 			decodeErr := json.NewDecoder(response.Body).Decode(target)
@@ -238,13 +250,20 @@ func (t *TmdbClient) getJSON(ctx context.Context, rawURL string, params [][2]str
 		if !retryable || attempt == 2 {
 			return fmt.Errorf("TMDB request failed: HTTP %d", response.StatusCode)
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Duration(250*(attempt+1)) * time.Millisecond):
+		if err := tmdbRetryWait(ctx, attempt); err != nil {
+			return err
 		}
 	}
 	return errors.New("unreachable")
+}
+
+func tmdbRetryWait(ctx context.Context, attempt int) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(time.Duration(250*(attempt+1)) * time.Millisecond):
+		return nil
+	}
 }
 
 func (t *TmdbClient) cacheGet(key string) (*string, bool) {

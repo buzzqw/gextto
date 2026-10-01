@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // newTestAppState builds a fully wired, hermetic AppState backed by temporary
@@ -368,6 +370,30 @@ func TestWebApiBackup(t *testing.T) {
 	status, _, body := webGet(t, server, "/api/backup")
 	if status != http.StatusOK {
 		t.Fatalf("status code = %d, body = %s", status, body)
+	}
+}
+
+func TestWebApiBackupVerify(t *testing.T) {
+	state := newTestAppState(t)
+	path, err := CreateSnapshot(state.cfg.DataDir, filepath.Join(state.cfg.DataDir, "backups"), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	status, body := webPostJSON(t, server, "/api/backup/verify", `{"name":"`+filepath.Base(path)+`"}`)
+	if status != http.StatusOK || !strings.Contains(string(body), `"valid":true`) {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+}
+
+func TestProviderGuidanceIsActionable(t *testing.T) {
+	message, action := gh5_providerGuidance(models.ProviderStatus{LastError: "HTTP 401 unauthorized"})
+	if message != "Il provider ha rifiutato l’accesso." {
+		t.Fatalf("message = %q", message)
+	}
+	if !strings.Contains(action, "credenziali") || !strings.Contains(action, "Azzera") {
+		t.Fatalf("action = %q", action)
 	}
 }
 

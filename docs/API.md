@@ -38,6 +38,7 @@ Per verifiche operative usa prima
 | GET | `/api/backup` |
 | POST | `/api/backup` |
 | GET | `/api/backup/list` |
+| POST | `/api/backup/verify` |
 | POST | `/api/backup/send-telegram` |
 | GET | `/api/backup/settings` |
 | POST | `/api/backup/settings` |

@@ -472,6 +472,9 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Key: "size_bytes", Label: "Dimensione", Format: "bytes"}, {Key: "modified", Label: "Modificato"},
 			}),
 			Empty: "Nessun backup creato.", Note: "Nome mostra il percorso completo del file ZIP. I backup locali vengono creati nella cartella backups della directory dati.",
+			ActionsJSON: uiJSON([]uiAction{
+				{Label: "Verifica", Class: "secondary", Method: "POST", Path: "/api/backup/verify", Body: `{"name":"{name}"}`},
+			}),
 		})),
 	}
 }

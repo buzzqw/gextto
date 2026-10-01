@@ -433,7 +433,8 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 					{Key: "kind", Label: "Tipo"},
 					{Key: "level", Label: "Livello", Format: "number"},
 					{Key: "disabled_till", Label: "Disabilitato fino a"},
-					{Key: "last_error", Label: "Ultimo errore", Format: "truncate"},
+					{Key: "user_message", Label: "Situazione", Format: "truncate"},
+					{Key: "suggested_action", Label: "Cosa fare", Format: "truncate"},
 				}),
 				ActionsJSON: uiJSON([]uiAction{
 					{Label: "Azzera", Class: "primary", Method: "POST", Path: "/api/providers/status", Body: `{"provider":"{provider}"}`},

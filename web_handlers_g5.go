@@ -8,6 +8,7 @@ package gextto
 // the `gh5_` prefix to avoid clashing with the sibling handler files.
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -684,6 +685,55 @@ func ListBackups(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"items": items})
 }
 
+// ValidateBackup verifies a named local backup before a recovery operation.
+// It never extracts the archive: ZIP names are untrusted and a validation must
+// not be able to write into the data directory.
+func ValidateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
+	var input struct {
+		Name string `json:"name"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		jsonError(w, http.StatusBadRequest, "Nome backup non valido")
+		return
+	}
+	name := filepath.Base(strings.TrimSpace(input.Name))
+	if name == "." || name == "" || name != strings.TrimSpace(input.Name) || filepath.Ext(name) != ".zip" {
+		jsonError(w, http.StatusBadRequest, "Seleziona un file ZIP dalla lista dei backup")
+		return
+	}
+	path := filepath.Join(latestConfig(s).DataDir, "backups", name)
+	if err := verifyZipArchive(path); err != nil {
+		logging.Warn("backup verification failed", "path", path, "error", err)
+		jsonError(w, http.StatusUnprocessableEntity, "Il backup non è leggibile o è danneggiato; usa un’altra copia.")
+		return
+	}
+	reader, err := zip.OpenReader(path)
+	if err != nil {
+		jsonError(w, http.StatusUnprocessableEntity, "Il backup non è leggibile o è danneggiato; usa un’altra copia.")
+		return
+	}
+	defer reader.Close()
+	archiveDatabases := make([]string, 0, len(databases))
+	known := make(map[string]struct{}, len(databases))
+	for _, database := range databases {
+		known[database] = struct{}{}
+	}
+	for _, entry := range reader.File {
+		if _, ok := known[entry.Name]; ok {
+			archiveDatabases = append(archiveDatabases, entry.Name)
+		}
+	}
+	sort.Strings(archiveDatabases)
+	jsonResponse(w, map[string]any{
+		"ok":        true,
+		"name":      name,
+		"valid":     true,
+		"entries":   len(reader.File),
+		"databases": archiveDatabases,
+		"message":   "Backup verificato: lo ZIP è leggibile e tutti i file interni hanno superato il controllo d’integrità.",
+	})
+}
+
 // MediaInfoGet implements `media_info_get`.
 func MediaInfoGet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := r.URL.Query()
@@ -775,7 +825,34 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err != nil {
 		items = []models.ProviderStatus{}
 	}
+	for index := range items {
+		items[index].UserMessage, items[index].SuggestedAction = gh5_providerGuidance(items[index])
+	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
+}
+
+// gh5_providerGuidance keeps connection details in the diagnostic field while
+// giving the person operating Gextto an immediately useful explanation. The
+// provider is retried automatically after its backoff; "Azzera" is only useful
+// once the external cause has been fixed.
+func gh5_providerGuidance(status models.ProviderStatus) (string, string) {
+	errText := strings.ToLower(status.LastError)
+	switch {
+	case strings.Contains(errText, "429") || strings.Contains(errText, "rate limit"):
+		return "Il provider ha limitato temporaneamente le richieste.", "Attendi il nuovo tentativo automatico; riduci le ricerche manuali se il problema continua."
+	case strings.Contains(errText, "401") || strings.Contains(errText, "403") || strings.Contains(errText, "unauthorized") || strings.Contains(errText, "forbidden"):
+		return "Il provider ha rifiutato l’accesso.", "Controlla credenziali, API key o cookie del provider; poi usa Azzera per riprovare subito."
+	case strings.Contains(errText, "404"):
+		return "L’indirizzo configurato del provider non è stato trovato.", "Controlla URL e percorso del provider; poi usa Azzera per riprovare subito."
+	case strings.Contains(errText, "timeout") || strings.Contains(errText, "deadline exceeded"):
+		return "Il provider non ha risposto entro il tempo previsto.", "Verifica rete e disponibilità del provider; Gextto riproverà automaticamente."
+	case strings.Contains(errText, "no such host") || strings.Contains(errText, "network is unreachable") || strings.Contains(errText, "connection refused") || strings.Contains(errText, "x509"):
+		return "Il provider non è raggiungibile dalla rete di Gextto.", "Verifica DNS, rete, certificato e URL; poi usa Azzera per riprovare subito."
+	case strings.Contains(errText, "5") && strings.Contains(errText, "http"):
+		return "Il provider ha segnalato un errore temporaneo del proprio servizio.", "Attendi il nuovo tentativo automatico; non è necessaria una modifica locale."
+	default:
+		return "Il provider non ha completato l’ultima richiesta.", "Consulta il dettaglio tecnico, verifica la configurazione e usa Azzera dopo la correzione."
+	}
 }
 
 // RemoveComic implements `remove_comic`.

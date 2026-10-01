@@ -3,12 +3,20 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
+
+type tmdbRoundTripper func(*http.Request) (*http.Response, error)
+
+func (f tmdbRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
 
 // tmdbTestServer points tmdbAPIBaseURL at a hermetic httptest server for the
 // duration of the test.
@@ -441,6 +449,25 @@ func TestTmdbGetJSONRetriesOn429ThenSucceeds(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].ID != 42 {
 		t.Fatalf("items = %+v", items)
+	}
+}
+
+func TestTmdbGetJSONRetriesTransientNetworkFailure(t *testing.T) {
+	var calls atomic.Int32
+	client := &TmdbClient{
+		client: &http.Client{Transport: tmdbRoundTripper(func(*http.Request) (*http.Response, error) {
+			if calls.Add(1) == 1 {
+				return nil, errors.New("temporary network reset")
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"results":[]}`))}, nil
+		})},
+		key: tmdbTestKey(), language: "it-IT", cache: map[string]*string{}, cacheMu: &sync.Mutex{},
+	}
+	if _, err := client.SearchSeries(context.Background(), "x"); err != nil {
+		t.Fatalf("SearchSeries: %v", err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("calls = %d, want 2", calls.Load())
 	}
 }
 
