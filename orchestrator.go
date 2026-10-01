@@ -141,6 +141,19 @@ func RunCycleDomain(
 			logging.Info("torrents reconciled: marked missing from session", "count", count)
 		}
 	}
+	// A known missing episode must not wait for the broad title sweep below.
+	// That sweep fans out across every monitored title and can take many minutes
+	// when public web engines are slow. Archive candidates are already local and
+	// are therefore evaluated and started first; the normal cycle still runs
+	// afterwards to discover new releases and to cover gaps not in the archive.
+	if !domainIs(domain, "movies") {
+		if err := prioritizeArchiveGapDownloads(ctx, cfg, db, archive, notifier, torrents, stats); err != nil {
+			if cycleCancelled(ctx) {
+				return stats, nil
+			}
+			return nil, err
+		}
+	}
 
 	releases, err := engine.ScrapeAll(ctx, cfg)
 	if err != nil {
@@ -1040,6 +1053,179 @@ func RunCycleDomain(
 	}
 	logging.Info(cycleDivider)
 	return stats, nil
+}
+
+// prioritizeArchiveGapDownloads starts archive-backed missing episodes before
+// the expensive all-title remote search. It intentionally uses the same
+// approval and torrent-registration path as the main candidate loop, while
+// limiting its input to releases that demonstrably cover a current gap.
+func prioritizeArchiveGapDownloads(
+	ctx context.Context,
+	cfg *Config,
+	db *Database,
+	archive *Archive,
+	notifier *Notifier,
+	torrents TorrentEngine,
+	stats *models.CycleStats,
+) error {
+	gapFilling := true
+	if value, ok := cfg.Settings["gap_filling"]; ok {
+		gapFilling = value == "yes" || value == "true" || value == "1"
+	}
+	if !gapFilling {
+		return nil
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		return err
+	}
+	blocklisted, err := db.BlocklistedHashes()
+	if err != nil {
+		return fmt.Errorf("load blocklist for priority gaps: %w", err)
+	}
+
+	type priorityCandidate struct {
+		release models.Release
+		gaps    map[gapTarget]struct{}
+		score   int64
+	}
+	candidates := map[string]*priorityCandidate{}
+	for _, gap := range gaps {
+		season := gap.Season
+		series := cfg.FindSeriesMatch(gap.Series, &season)
+		if series == nil {
+			continue
+		}
+		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
+		items, searchErr := archive.Search(query)
+		if searchErr != nil {
+			return searchErr
+		}
+		for _, item := range items {
+			hash, ok := utils.MagnetHash(item[1])
+			if !ok {
+				continue
+			}
+			if _, blocked := blocklisted[hash]; blocked {
+				continue
+			}
+			release := ParseRelease(item[0], item[1], "archive:"+item[2])
+			if release == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
+				continue
+			}
+			if !strings.EqualFold(*release.Series, series.Name) || *release.Season != gap.Season || !releaseHasEpisode(release, gap.Episode) {
+				continue
+			}
+			if cfg.AllReleaseDeniedReason(release) != "" || !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+				continue
+			}
+			// Keep the configured spelling so the database, archive index and
+			// torrent metadata all identify the same monitored series.
+			canonicalName := series.Name
+			release.Series = &canonicalName
+			score := cfg.ReleaseScore(release)
+			candidate, exists := candidates[hash]
+			if !exists || score > candidate.score {
+				gapSet := map[gapTarget]struct{}{}
+				if candidate != nil {
+					for existingGap := range candidate.gaps {
+						gapSet[existingGap] = struct{}{}
+					}
+				}
+				candidate = &priorityCandidate{release: *release, gaps: gapSet, score: score}
+				candidates[hash] = candidate
+			}
+			candidate.gaps[gapTarget{Series: series.Name, Season: gap.Season, Episode: gap.Episode}] = struct{}{}
+		}
+	}
+	if len(candidates) == 0 {
+		logging.Info("priority gap pass: no archive candidates")
+		return nil
+	}
+
+	live := &models.LiveDownloads{Hashes: map[string]struct{}{}, Episodes: map[models.LiveEpisodeKey]struct{}{}}
+	for _, torrent := range torrents.List() {
+		live.Hashes[strings.ToLower(torrent.Hash)] = struct{}{}
+		if key := ParseEpisodeKey(torrent.Name); key != nil {
+			live.Episodes[*key] = struct{}{}
+		}
+	}
+	logging.Info("priority gap pass: archive candidates ready", "count", len(candidates))
+	started := 0
+	for hash, candidate := range candidates {
+		if cycleCancelled(ctx) {
+			return nil
+		}
+		release := candidate.release
+		series := cfg.FindSeriesMatch(*release.Series, release.Season)
+		if series == nil {
+			continue
+		}
+		approved, reason, err := db.CheckSeriesScored(&release, candidate.score, cfg.UpgradeMinScoreDiff, &models.ApprovalContext{
+			Archive:       &models.ArchiveQualityIndex{},
+			Live:          live,
+			ForbidUpgrade: series.DisableUpgrades,
+			GapEpisode:    true,
+		})
+		if err != nil {
+			return err
+		}
+		if !approved {
+			logging.Debug("priority gap skipped", "target", releaseTarget(&release), "reason", reason)
+			continue
+		}
+		var preferredPath *string
+		if directory, ok := DownloadDirFor(&release, cfg); ok {
+			preferredPath = &directory
+		}
+		added, err := torrents.AddWithPath(release.Magnet, cfg, preferredPath)
+		if err != nil {
+			_ = db.RollbackRelease(&release)
+			stats.Error("add_failed")
+			logging.Warn("priority gap add failed", "target", releaseTarget(&release), "error", err)
+			continue
+		}
+		if !added {
+			if err := db.RollbackRelease(&release); err != nil {
+				return err
+			}
+			stats.Error("torrent_rejected")
+			continue
+		}
+		if err := db.RegisterTorrentScored(&release, candidate.score); err != nil {
+			return err
+		}
+		_ = db.SetTorrentReason(hash, "gap_filled")
+		live.Hashes[hash] = struct{}{}
+		for gap := range candidate.gaps {
+			live.Episodes[models.LiveEpisodeKey{Series: gap.Series, Season: gap.Season, Episode: gap.Episode}] = struct{}{}
+		}
+		stats.DownloadsStarted++
+		stats.GapsFilled++
+		started++
+		logging.Info("✅ priority gap download started", "target", releaseTarget(&release), "source", release.Source, "score", candidate.score)
+		if err := notifier.NotifyEvent("download_started", map[string]any{
+			"title": release.Title, "kind": release.Kind, "series": release.Series, "season": release.Season,
+			"episode": release.Episode, "source": release.Source, "magnet_hash": hash,
+			"quality_score": candidate.score, "reason": "gap_filled", "approval_reason": reason,
+		}); err != nil {
+			logging.Warn("download notification failed", "error", err)
+		}
+	}
+	logging.Info("priority gap pass completed", "started", started, "candidates", len(candidates))
+	return nil
+}
+
+func releaseHasEpisode(release *models.Release, episode int64) bool {
+	if release.Episode != nil && *release.Episode == episode {
+		return true
+	}
+	for _, item := range release.EpisodeRange {
+		if item == episode {
+			return true
+		}
+	}
+	return false
 }
 
 // domainIs reports whether the optional domain equals value.
