@@ -460,6 +460,28 @@ html, body {
 .htx-status.ok { color: #4ec97a; }
 .htx-status.err { color: #ff6b6b; }
 
+/* Non-blocking feedback for dashboard quick actions. */
+#v2-toast-region {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1000;
+  max-width: min(380px, calc(100vw - 40px));
+}
+.v2-toast {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid rgba(78, 201, 122, .6);
+  border-radius: var(--v2-radius);
+  background: var(--panel, #1c2420);
+  box-shadow: var(--v2-shadow);
+  color: inherit;
+}
+.v2-toast strong { color: #4ec97a; }
+.v2-toast.error { border-color: rgba(255, 107, 107, .7); }
+.v2-toast.error strong { color: #ff6b6b; }
+
 /* Log lines: one per row, readable in the <pre>. */
 .log-view { max-height: 60vh; overflow: auto; }
 .log-view .log-line { display: block; white-space: pre-wrap; word-break: break-word; }

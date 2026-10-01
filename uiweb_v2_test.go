@@ -176,7 +176,7 @@ func TestV2RunCycleShowsDashboardConfirmation(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodPost, "/v2/run-cycle", url.Values{"domain": {"series"}})
-	if code != http.StatusOK || !strings.Contains(body, "Monitoraggio Serie TV") || !strings.Contains(body, "Monitoraggio Serie TV avviato.") {
+	if code != http.StatusOK || !strings.Contains(body, `class="v2-toast`) || !strings.Contains(body, "Monitoraggio Serie TV avviato.") {
 		t.Fatalf("cycle confirmation missing: status=%d body=%q", code, body)
 	}
 }
