@@ -619,15 +619,15 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 /* Keep archive actions visible: a long release title must not push the
    action column beyond the viewport. Actions wrap when the panel is narrow. */
 .archive-table { width: 100%; min-width: 0; table-layout: fixed; }
-.archive-table th:nth-child(1), .archive-table td:nth-child(1) { width: 42%; }
-.archive-table th:nth-child(2), .archive-table td:nth-child(2) { width: 15%; }
+.archive-table th:nth-child(1), .archive-table td:nth-child(1) { width: 28%; }
+.archive-table th:nth-child(2), .archive-table td:nth-child(2) { width: 14%; }
 .archive-table th:nth-child(3), .archive-table td:nth-child(3) { width: 8%; }
-.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 15%; }
-.archive-table th:last-child, .archive-table td:last-child { width: 20%; }
+.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 14%; }
+.archive-table th:last-child, .archive-table td:last-child { width: 36%; }
 .archive-table td:first-child .cell-truncate { display: block; max-width: 100%; }
 .archive-table th, .archive-table td { padding: 8px 10px; }
 .archive-table td { white-space: nowrap; }
-.archive-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; }
+.archive-table .row-actions { min-width: 0; flex-wrap: nowrap; white-space: nowrap; }
 .table-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .table-pagination .page-label { color: var(--muted); font-size: 0.85rem; }
 .table-panel-footer { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
