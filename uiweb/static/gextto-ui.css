@@ -619,10 +619,10 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 /* Keep archive actions visible: a long release title must not push the
    action column beyond the viewport. Actions wrap when the panel is narrow. */
 .archive-table { width: 100%; min-width: 0; table-layout: fixed; }
-.archive-table th:nth-child(1), .archive-table td:nth-child(1) { width: 28%; }
+.archive-table th:nth-child(1), .archive-table td:nth-child(1) { width: 34%; }
 .archive-table th:nth-child(2), .archive-table td:nth-child(2) { width: 14%; }
 .archive-table th:nth-child(3), .archive-table td:nth-child(3) { width: 8%; }
-.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 14%; }
+.archive-table th:nth-child(4), .archive-table td:nth-child(4) { width: 8%; }
 .archive-table th:last-child, .archive-table td:last-child { width: 36%; }
 .archive-table td:first-child .cell-truncate { display: block; max-width: 100%; }
 .archive-table th, .archive-table td { padding: 8px 10px; }
