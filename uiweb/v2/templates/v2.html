@@ -44,6 +44,7 @@
         {{end}}
       </div>
       {{end}}
+      <a class="nav-item nav-search" href="/v2?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>
     </nav>
     <div class="sidebar-foot"><span class="pulse"></span><span>{{if .Chrome.DryRun}}dry-run{{else}}attivo{{end}} · v2</span></div>
   </aside>
@@ -307,6 +308,7 @@
       <button class="btn sm" type="submit" name="bulk" value="pause">Pausa</button>
       <button class="btn sm" type="submit" name="bulk" value="resume">Riprendi</button>
       <button class="btn sm" type="submit" name="bulk" value="recheck">Recheck</button>
+      <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
       <label class="field inline-field"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
       <input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" />
       <button class="btn sm" type="submit" name="bulk" value="tag">Assegna tag</button>
@@ -408,6 +410,7 @@
     </div>
     <div class="toolbar detail-links">
       <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet" target="_blank" rel="noopener">Magnet</a>
+      <button class="btn sm" type="button" data-v2-copy="{{.Magnet}}"{{if not .Magnet}} disabled{{end}}>Copia magnet</button>
       <a class="btn sm" href="/api/torrents/{{.Hash}}/export.torrent" download>Esporta .torrent</a>
     </div>
     <form class="toolbar detail-tag-form" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
@@ -558,6 +561,7 @@
         {{range .Options}}<label class="check"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
       </div>
       {{if .Custom}}<div class="toolbar" style="margin-top:10px"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /></div>{{end}}
+      {{if .TestKind}}<div class="toolbar" style="margin-top:10px"><input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/v2/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span></div>{{end}}
       <div class="form-actions"><button class="btn sm primary" type="submit">Salva</button></div>
     </form>
   </div>
@@ -593,7 +597,7 @@
     {{else}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" />{{end}}
   </label>
   {{end}}
-  <div class="form-actions"><button class="btn sm danger" type="button" hx-get="/v2/empty" hx-target="closest .list-row" hx-swap="outerHTML">Rimuovi</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/v2/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/v2/empty" hx-target="closest .list-row" hx-swap="outerHTML">Rimuovi</button></div>
 </div>
 {{end}}
 
@@ -738,8 +742,9 @@
           <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>
           <option value="1000"{{if eq .LinesNum 1000}} selected{{end}}>1000</option>
           <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
-        </select>
-        <button class="btn sm primary" type="submit">Aggiorna</button>
+         </select>
+        <button class="btn sm primary" type="button" data-v2-logs-follow>⏸ Ferma scorrimento</button>
+         <button class="btn sm primary" type="submit">Aggiorna</button>
       </form>
       {{template "v2_logs_view" .}}
     </div>
@@ -806,9 +811,21 @@
     </form>
     {{end}}
   </div></div>{{end}}{{end}}
-  {{if not $has}}<p class="muted">Nessun link trovato.</p>{{end}}
+{{if not $has}}<p class="muted">Nessun link trovato.</p>{{end}}
 {{end}}
 {{end}}
+
+{{define "v2_comics_explore_results"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>
+{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}}</td><td>{{.Date}}</td><td class="row-actions"><form hx-post="/v2/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">Scarica</button></form><button class="btn sm" type="button" hx-get="/v2/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">Seleziona</button></td></tr>{{end}}</tbody></table></div>
+{{else}}<p class="muted">Nessun risultato su GetComics.</p>{{end}}
+{{end}}
+
+{{define "v2_comics_explore_select"}}
+<div class="card editor-card" id="v2-comics-explore-selection"><h3>Fumetto selezionato</h3><p class="muted">{{.Title}}</p><form class="form-grid" hx-post="/v2/comics/explore/add" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="tag_url" value="{{.TagURL}}"><input type="hidden" name="post_url" value="{{.URL}}"><input type="hidden" name="cover_url" value="{{.CoverURL}}"><input type="hidden" name="publisher" value="{{.Publisher}}"><input type="hidden" name="description" value="{{.Description}}"><input type="hidden" name="from_date" value="{{.Date}}"><label class="field span-full"><span>Percorso archivio (opzionale)</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita"></label><div class="form-actions"><button class="btn sm primary" type="submit">Aggiungi fumetto selezionato</button><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-comics-explore-selection" hx-swap="outerHTML">Annulla</button></div></form></div>
+{{end}}
+
+{{define "v2_comics_explore_action"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
 
 {{define "v2_comics_download_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
 
@@ -929,7 +946,7 @@
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
@@ -1284,6 +1301,10 @@
 </form>
 {{end}}
 
+{{define "v2_ftp_test_result"}}<span class="{{if .OK}}htx-status ok{{else}}htx-status err{{end}}">{{.Message}}</span>{{end}}
+{{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} sorgenti verificate</span>{{else}}<span class="htx-status err">Nessun risultato</span>{{end}}{{end}}
+{{define "v2_list_test_result"}}<span class="htx-status {{if .OK}}ok{{else}}err{{end}}">{{.Message}}</span>{{end}}
+
 {{define "v2_search"}}
 <div class="view">
   <div class="panel">
@@ -1347,6 +1368,10 @@
         <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
         <input type="hidden" name="redirect" value="{{$.Redirect}}" />
         <button class="btn sm primary" type="submit">Aggiungi</button>
+      </form>
+      <form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
+        <input type="hidden" name="release" value="{{.ExplainJSON}}" />
+        <button class="btn sm" type="submit">Perché non questo?</button>
       </form>
     </td>
   </tr>{{end}}</tbody>
@@ -1538,8 +1563,9 @@
         <td class="truncate" title="{{.Title}}">{{.Title}}</td>
         <td title="{{.Source}}">{{sourceLabel .Source}}</td>
         <td class="row-actions">
-          {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
-          {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
+           {{template "v2_action_btn" (dict "Redirect" (printf "/v2?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
+           <form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="{{.ExplainBody}}" /><button class="btn sm" type="submit">Perché non questo?</button></form>
+           {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
         </td>
       </tr>{{end}}</tbody>
     </table></div></div>

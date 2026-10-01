@@ -20,6 +20,7 @@ type v2SearchResult struct {
 	Seeders     int64
 	SizeBytes   int64
 	ReleaseJSON string
+	ExplainJSON string
 }
 
 type v2SearchView struct {
@@ -63,6 +64,7 @@ func v2SearchViewFrom(s *AppState, query, redirect string) v2SearchView {
 						Seeders:     release.Seeders,
 						SizeBytes:   release.SizeBytes,
 						ReleaseJSON: string(encoded),
+						ExplainJSON: string(encoded),
 					})
 				}
 			}

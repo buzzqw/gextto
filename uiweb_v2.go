@@ -144,6 +144,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /v2/settings/checkbox", V2SettingsCheckbox)
 	v2Handle(s, mux, "GET /v2/settings/editor-row", V2SettingsEditorRow)
 	v2Handle(s, mux, "POST /v2/settings/editor-save", V2SettingsEditorSave)
+	v2Handle(s, mux, "POST /v2/settings/editor-test", V2SettingsEditorTest)
+	v2Handle(s, mux, "GET /v2/settings/source-test", V2SettingsSourceTest)
 	v2Handle(s, mux, "POST /v2/settings/rename-token", V2SettingsRenameToken)
 	v2Handle(s, mux, "POST /v2/settings/rename-preview", V2SettingsRenamePreview)
 	v2Handle(s, mux, "POST /v2/settings/rename-save", V2SettingsRenameSave)
@@ -163,6 +165,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Pannelli (Manutenzione, Integrazioni).
 	v2Handle(s, mux, "POST /v2/section/action", V2SectionAction)
 	v2Handle(s, mux, "POST /v2/section/form", V2SectionForm)
+	v2Handle(s, mux, "POST /v2/section/test-ftp", V2SectionTestFTP)
 
 	// Esplora (ricerca release).
 	v2Handle(s, mux, "POST /v2/search", V2Search)
@@ -179,6 +182,9 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Fumetti: link finder, download diretto e modifica della libreria.
 	v2Handle(s, mux, "POST /v2/comics/links", V2ComicsLinks)
 	v2Handle(s, mux, "POST /v2/comics/download", V2ComicsDownload)
+	v2Handle(s, mux, "POST /v2/comics/explore/download", V2ComicsExploreDownload)
+	v2Handle(s, mux, "GET /v2/comics/explore/select", V2ComicsExploreSelect)
+	v2Handle(s, mux, "POST /v2/comics/explore/add", V2ComicsExploreAdd)
 	v2Handle(s, mux, "GET /v2/comics/edit", V2ComicsEdit)
 	v2Handle(s, mux, "POST /v2/comics/save", V2ComicsSave)
 
@@ -931,6 +937,10 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 			}
 		case "remove":
 			if removed, err := engine.Remove(hash, false); err == nil && removed {
+				done++
+			}
+		case "unpin":
+			if raw, status := v2InternalJSON(s, http.MethodPost, "/api/torrents/unpin", nil, []byte(`{}`)); status < 400 && raw != nil {
 				done++
 			}
 		case "tag", "untag":

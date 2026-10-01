@@ -7,6 +7,104 @@ import (
 	"strings"
 )
 
+type v2ComicExploreItem struct {
+	Title       string
+	URL         string
+	TagURL      string
+	CoverURL    string
+	Publisher   string
+	Description string
+	Date        string
+}
+
+type v2ComicExploreView struct {
+	Items []v2ComicExploreItem
+	Error string
+}
+
+func v2SectionComicsResult(raw []byte, status int) v2ComicExploreView {
+	view := v2ComicExploreView{}
+	if status >= 400 {
+		view.Error = v2JSONError(raw)
+		return view
+	}
+	var payload struct {
+		Items []v2ComicExploreItem `json:"items"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		view.Error = "risposta GetComics non valida"
+		return view
+	}
+	view.Items = payload.Items
+	return view
+}
+
+func V2ComicsExploreDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
+	postURL := strings.TrimSpace(r.FormValue("url"))
+	title := strings.TrimSpace(r.FormValue("title"))
+	raw, status := v2InternalJSON(s, http.MethodPost, "/api/comics/links", nil, mustJSON(ComicLinksInput{Url: postURL}))
+	message := "download non avviato"
+	if status >= 400 {
+		message = v2JSONError(raw)
+	} else {
+		var payload struct {
+			Links ComicLinks `json:"links"`
+		}
+		if json.Unmarshal(raw, &payload) != nil {
+			message = "risposta GetComics non valida"
+		} else {
+			link := ""
+			method := "direct"
+			if len(payload.Links.DownloadNow) > 0 {
+				link = payload.Links.DownloadNow[0]
+				method = "download_now"
+			} else if len(payload.Links.Direct) > 0 {
+				link = payload.Links.Direct[0]
+			}
+			if link == "" {
+				message = "Download Now non trovato per questo post"
+			} else {
+				downloadRaw, downloadStatus := v2InternalJSON(s, http.MethodPost, "/api/comics/download", nil, mustJSON(ComicDownloadInput{Url: link, Method: method, Title: "Comic " + title, PostUrl: postURL}))
+				status = downloadStatus
+				if status < 400 {
+					message = "avviato"
+				} else {
+					message = "download non avviato: " + v2JSONError(downloadRaw)
+				}
+			}
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, dict, eng)
+}
+
+func V2ComicsExploreSelect(w http.ResponseWriter, r *http.Request, s *AppState) {
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_comics_explore_select", v2ComicExploreItem{
+		Title: r.FormValue("title"), URL: r.FormValue("url"), TagURL: r.FormValue("tag_url"),
+		CoverURL: r.FormValue("cover_url"), Publisher: r.FormValue("publisher"),
+		Description: r.FormValue("description"), Date: r.FormValue("date"),
+	}, dict, eng)
+}
+
+func V2ComicsExploreAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
+	payload := ComicInput{Title: r.FormValue("title"), TagUrl: r.FormValue("tag_url"), PostUrl: r.FormValue("post_url"),
+		CoverUrl: r.FormValue("cover_url"), Publisher: r.FormValue("publisher"), Description: r.FormValue("description"),
+		FromDate: r.FormValue("from_date"), SavePath: r.FormValue("save_path")}
+	raw, status := v2InternalJSON(s, http.MethodPost, "/api/comics", nil, mustJSON(payload))
+	message := "fumetto aggiunto"
+	if status >= 400 {
+		message = v2JSONError(raw)
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_comics_explore_action", map[string]any{"Error": status >= 400, "Message": message}, dict, eng)
+}
+
+func mustJSON(value any) []byte {
+	body, _ := json.Marshal(value)
+	return body
+}
+
 // v2ComicsLinksView is deliberately small: the link finder returns grouped
 // URLs, while the template turns each one into an explicit download action.
 type v2ComicsLinksView struct {

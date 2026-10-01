@@ -47,6 +47,7 @@ type v2Section struct {
 	FormSubmit    string
 	FormRender    string
 	ManualAdd     string
+	TestFTP       bool
 	ListEditor    *v2ListEditorView
 	ClassicURL    string
 	// Integration cards (Trakt, Simkl) carry their child sections inline.
@@ -104,6 +105,7 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.FormSubmit = section.Form.Submit
 		item.FormRender = section.Form.Render
 		item.ManualAdd = section.Form.ManualAdd
+		item.TestFTP = section.Form.TestFTP
 		if item.FormSubmit == "" {
 			item.FormSubmit = "Salva"
 		}
@@ -165,6 +167,38 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.ClassicURL = "/?view=" + view
 	}
 	return item
+}
+
+// V2SectionTestFTP tests the backup FTP values currently displayed in the
+// section without saving them first.
+func V2SectionTestFTP(w http.ResponseWriter, r *http.Request, s *AppState) {
+	body, _ := json.Marshal(FtpTestInput{
+		Host:     v2StringPointer(strings.TrimSpace(r.FormValue("backup_ftp_host"))),
+		User:     v2StringPointer(strings.TrimSpace(r.FormValue("backup_ftp_user"))),
+		Password: v2StringPointer(r.FormValue("backup_ftp_password")),
+		Path:     v2StringPointer(strings.TrimSpace(r.FormValue("backup_ftp_path"))),
+	})
+	raw, status := v2InternalJSON(s, http.MethodPost, "/api/backup/test-ftp", nil, body)
+	message := "FTP non riuscito: " + v2JSONError(raw)
+	ok := false
+	if status < 400 {
+		var payload struct {
+			OK    bool   `json:"ok"`
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(raw, &payload) == nil && payload.OK {
+			ok = true
+			message = "FTP OK: connessione, login, trasferimento e rimozione completati"
+		} else if payload.Error != "" {
+			message = "FTP non riuscito: " + payload.Error
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_ftp_test_result", map[string]any{"OK": ok, "Message": message}, dict, eng)
+}
+
+func v2StringPointer(value string) *string {
+	return &value
 }
 
 // V2SectionAction forwards a maintenance/settings action to the existing API and
@@ -260,6 +294,10 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 		case "releases":
 			result := v2SectionReleaseResult(raw, status)
 			v2Render(w, http.StatusOK, "v2_search_results", result, dict, eng)
+			return
+		case "comics":
+			result := v2SectionComicsResult(raw, status)
+			v2Render(w, http.StatusOK, "v2_comics_explore_results", result, dict, eng)
 			return
 		}
 	}

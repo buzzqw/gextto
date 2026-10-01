@@ -154,6 +154,33 @@
     if (all) all.checked = rows.length > 0 && selected.length === rows.length;
   }
 
+  var logsFollow = true;
+  function updateLogsFollowButton() {
+    var button = document.querySelector("[data-v2-logs-follow]");
+    if (button) button.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Segui ultime righe";
+  }
+
+  function copyText(value, button) {
+    if (!value) return;
+    var done = function () {
+      var previous = button.textContent;
+      button.textContent = "Copiato";
+      window.setTimeout(function () { button.textContent = previous; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(value).then(done).catch(function () {});
+      return;
+    }
+    var area = document.createElement("textarea");
+    area.value = value;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand("copy"); done(); } catch (error) { /* clipboard unavailable */ }
+    area.remove();
+  }
+
   document.addEventListener("change", function (event) {
     if (event.target.matches && event.target.matches("[data-v2-select-all]")) {
       var rows = document.querySelectorAll("[data-v2-select]");
@@ -164,7 +191,23 @@
     }
   });
 
+  document.addEventListener("click", function (event) {
+    var copy = event.target.closest && event.target.closest("[data-v2-copy]");
+    if (copy) {
+      event.preventDefault();
+      copyText(copy.getAttribute("data-v2-copy") || "", copy);
+      return;
+    }
+    var follow = event.target.closest && event.target.closest("[data-v2-logs-follow]");
+    if (follow) {
+      logsFollow = !logsFollow;
+      updateLogsFollowButton();
+      if (logsFollow) pinLogTail();
+    }
+  });
+
   function pinLogTail() {
+    if (!logsFollow) return;
     var logView = document.getElementById("v2-logs-view");
     if (logView) logView.scrollTop = logView.scrollHeight;
   }
@@ -286,5 +329,5 @@
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });
 
-  document.addEventListener("DOMContentLoaded", function () { scanModal(); pinLogTail(); updateTorrentSelection(); });
+  document.addEventListener("DOMContentLoaded", function () { scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); });
 })();

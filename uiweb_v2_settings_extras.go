@@ -70,6 +70,9 @@ type v2CheckboxGroup struct {
 	Options           []uiCheckboxOption
 	Custom            bool
 	CustomPlaceholder string
+	TestQuery         string
+	TestKind          string
+	TestLabel         string
 	Status            string
 	Error             bool
 }
@@ -80,9 +83,40 @@ func v2CheckboxGroupsFrom(groups []uiCheckboxGroup) []v2CheckboxGroup {
 		out = append(out, v2CheckboxGroup{
 			Key: group.Key, Title: group.Title, Hint: group.Hint,
 			Options: group.Options, Custom: group.Custom, CustomPlaceholder: group.CustomPlaceholder,
+			TestQuery: group.TestQuery, TestKind: group.TestKind, TestLabel: group.TestLabel,
 		})
 	}
 	return out
+}
+
+type v2SourceTestItem struct {
+	Name  string
+	OK    bool
+	Error string
+}
+
+type v2SourceTestView struct {
+	Items []v2SourceTestItem
+}
+
+func V2SettingsSourceTest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	query := url.Values{}
+	query.Set("q", strings.TrimSpace(r.FormValue("q")))
+	if kind := strings.TrimSpace(r.FormValue("kind")); kind != "" {
+		query.Set("kind", kind)
+	}
+	raw, status := v2InternalJSON(s, http.MethodGet, "/api/sources/health", query, nil)
+	view := v2SourceTestView{}
+	if status < 400 {
+		var payload struct {
+			Items []v2SourceTestItem `json:"items"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			view.Items = payload.Items
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_source_test_result", view, dict, eng)
 }
 
 // V2SettingsCheckbox saves a checkbox group immediately.
@@ -235,7 +269,7 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	index, _ := strconv.Atoi(r.FormValue("index"))
-	view := v2ListEditorView{Key: key, View: r.FormValue("view"), Tab: r.FormValue("tab"), NextIndex: index + 1}
+	view := v2ListEditorView{Key: key, View: r.FormValue("view"), Tab: r.FormValue("tab"), NextIndex: index + 1, HasTest: editor.TestEndpoint != ""}
 	row := v2ListRowFrom(editor.Fields, map[string]any{}, index)
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
@@ -249,6 +283,42 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body + addButton))
+}
+
+func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
+	key := strings.TrimSpace(r.FormValue("editor"))
+	editor, ok := v2ListEditorByKey(key)
+	if !ok || editor.TestEndpoint == "" {
+		http.Error(w, "test editor sconosciuto", http.StatusNotFound)
+		return
+	}
+	index := strings.TrimSpace(r.FormValue("index"))
+	values := map[string]any{}
+	for _, field := range editor.Fields {
+		values[field.Name] = r.FormValue(field.Name + "__" + index)
+	}
+	body, _ := json.Marshal(values)
+	raw, status := v2InternalJSON(s, http.MethodPost, editor.TestEndpoint, nil, body)
+	okResult := false
+	message := "Test non riuscito"
+	if status < 400 {
+		var payload struct {
+			OK    bool   `json:"ok"`
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			okResult = payload.OK
+			if okResult {
+				message = "OK"
+			} else if payload.Error != "" {
+				message = "Errore: " + payload.Error
+			}
+		}
+	} else {
+		message += ": " + v2JSONError(raw)
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_list_test_result", map[string]any{"OK": okResult, "Message": message}, dict, eng)
 }
 
 // V2SettingsEditorSave saves a structured list editor.

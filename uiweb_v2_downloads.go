@@ -12,6 +12,9 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var path string
 	var body []byte
 	switch op {
+	case "unpin":
+		path = "/api/torrents/unpin"
+		body = []byte(`{}`)
 	case "clear_completed":
 		path = "/api/torrents/remove_completed"
 		body, _ = json.Marshal(RemoveCompletedInput{DeleteFiles: false})

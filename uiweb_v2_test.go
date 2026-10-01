@@ -90,7 +90,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("downloads -> %d", code)
 	}
-	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Dettagli"} {
+	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Sblocca pin"} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("downloads missing %q", marker)
 		}
@@ -267,7 +267,7 @@ func TestV2PanelsPagesRender(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodGet, "/v2?view=maintenance", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Backup disponibili") || !strings.Contains(body, "Pulizia database") {
+	if code != http.StatusOK || !strings.Contains(body, "Backup disponibili") || !strings.Contains(body, "Pulizia database") || !strings.Contains(body, "Test FTP") {
 		t.Fatalf("maintenance page -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=integrations", nil)
@@ -350,7 +350,7 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 		t.Fatalf("i18n tab -> %d", code)
 	}
 	// Add-row fragment for a structured editor.
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/settings/editor-row?editor=indexers&index=0&view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "list-row") {
+	if code, body := v2Request(t, server, http.MethodGet, "/v2/settings/editor-row?editor=indexers&index=0&view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "list-row") || !strings.Contains(body, "Testa") {
 		t.Fatalf("editor row -> %d", code)
 	}
 	// Checkbox group save returns the re-rendered panel.
