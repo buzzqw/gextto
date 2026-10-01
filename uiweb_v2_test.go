@@ -173,6 +173,9 @@ func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/v2/static/htmx.min.js", nil); code != http.StatusOK || !strings.Contains(body, "htmx") {
 		t.Fatalf("htmx asset -> %d", code)
 	}
+	if code, body := v2Request(t, server, http.MethodGet, "/v2/static/v2-core.js", nil); code != http.StatusOK || !strings.Contains(body, "htmx:afterRequest") {
+		t.Fatalf("settings tab sync script -> %d", code)
+	}
 	// Unmigrated views fall back to a placeholder that links to the classic UI.
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=view-inesistente", nil); code != http.StatusOK || !strings.Contains(body, "non è ancora migrata nella UI v2") {
 		t.Fatalf("unavailable placeholder -> %d", code)

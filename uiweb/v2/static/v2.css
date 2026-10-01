@@ -66,6 +66,17 @@
   min-width: 160px;
 }
 
+/* Keep the exclusion editor compact; its save action belongs beside the
+   custom-filter field instead of on a separate line below the panel. */
+.v2-checkbox-panel-content_filters {
+  max-width: 760px;
+}
+.v2-checkbox-custom-actions .input {
+  width: min(100%, 360px);
+  min-width: 180px;
+  flex: 0 1 360px;
+}
+
 /* Cards and panels: slightly rounder, with a soft shadow on hover for panels
    that contain actions. */
 .panel,

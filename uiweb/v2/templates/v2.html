@@ -551,7 +551,7 @@
 {{end}}
 
 {{define "v2_checkbox_group"}}
-<div class="panel settings-panel">
+<div class="panel settings-panel v2-checkbox-panel-{{.Key}}">
   <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</small></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
@@ -560,9 +560,7 @@
       <div class="toolbar checkbox-row">
         {{range .Options}}<label class="check"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
       </div>
-      {{if .Custom}}<div class="toolbar" style="margin-top:10px"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /></div>{{end}}
-      {{if .TestKind}}<div class="toolbar" style="margin-top:10px"><input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/v2/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span></div>{{end}}
-      <div class="form-actions"><button class="btn sm primary" type="submit">Salva</button></div>
+      {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/v2/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">Salva</button></div>{{end}}
     </form>
   </div>
 </div>

@@ -191,6 +191,19 @@
     }
   });
 
+  // Settings tabs swap only the body with HTMX. Keep the chip highlight in
+  // sync with the tab that completed the request instead of leaving the
+  // initially rendered "Daemon" chip active.
+  document.body.addEventListener("htmx:afterRequest", function (event) {
+    var detail = event.detail || {};
+    if (!detail.successful) return;
+    var chip = detail.elt && detail.elt.closest && detail.elt.closest(".settings-view .chip");
+    if (!chip) return;
+    Array.prototype.forEach.call(document.querySelectorAll(".settings-view .chip-row .chip"), function (item) {
+      item.classList.toggle("active", item === chip);
+    });
+  });
+
   document.addEventListener("click", function (event) {
     var copy = event.target.closest && event.target.closest("[data-v2-copy]");
     if (copy) {
