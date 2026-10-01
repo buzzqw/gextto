@@ -35,12 +35,17 @@ locally in that browser. Browsers without the API still support the presets and 
 manual font-family name; browser permission may be required to inspect installed
 fonts.
 
+The official interface is served at `http://<host>:5000/`; `/v2` remains a
+technical alias and the old `/ui` route has been removed. The **Downloads** page
+refreshes the session every 5 seconds, including progress and speed for comic HTTP
+downloads; the live transfer metrics in the top bar use the same interval.
+
 | Menu | What it provides |
 |---|---|
 | **Dashboard** | Cycle controls for all domains or one domain, next-cycle timing, configured-title and free-space metrics, active torrents, recent downloads, upcoming series releases, feed results, disk/resource charts and quick links. |
-| **Downloads** | Full torrent session: add magnets or `.torrent` files, queue/progress/ETA/peer/ratio data, pause/resume/recheck/remove, per-torrent details, trackers, content priorities, limits, storage moves, seeding controls and download history. |
-| **Series** | Monitored TV library with seasons, episodes, quality/language/subtitle rules, aliases, NAS path, missing searches, upgrades, manual search, archive scan and controlled rename/repair actions. |
-| **Movies** | Monitored movie library with title/year identity, quality and language requirements, exclusions, immediate search, best matches, archive matches, upgrade decisions, re-download and metadata editing. |
+| **Downloads** | Full torrent and HTTP session: add magnets or `.torrent` files, queue/progress/ETA/peer/ratio data, pause/resume/recheck/remove, per-torrent details, trackers, content priorities, limits, storage moves, seeding controls, comic downloads and history. |
+| **Series** | Monitored TV library with seasons, episodes, quality/language/subtitle rules, aliases, browseable NAS path, missing searches, upgrades, manual search, archive scan, TVDB/TMDB cast links and controlled rename/repair actions. |
+| **Movies** | Monitored movie library with title/year identity, quality and readable language requirements, exclusions, immediate search, best matches, archive matches, TMDB cast links, upgrade decisions, re-download and metadata editing. |
 | **Missing** | Gap-oriented view of missing episodes and seasons, with filters, candidate searches and actions to force, ignore, reactivate or re-download intentionally. |
 | **Explore** | TMDB discovery (trending, popular, top-rated, now-playing/upcoming), title lookup, release search and add-to-library actions, with duplicate protection for titles already monitored. |
 | **Archive** | Full-text archive/release search, pagination, source and quality details, bulk queueing, magnet copying/deletion and “why not this one?” explanations; also exposes feed-seen series and movies. |

@@ -1,6 +1,6 @@
 # Gextto UI (SSR + HTMX) — stato e report
 
-Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1158)` · libtorrent 2.0.11.0
+Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1229)` · libtorrent 2.0.11.0
 
 ## 1. Obiettivo e approccio
 
@@ -57,6 +57,8 @@ Punti chiave:
   (tema/font in `localStorage`) e comportamento accessibile dei modali.
 - **Route isolate**: `/v2` è registrato con `v2Handle`, che non entra nella
   tabella delle route API: `docs/API.md` e il test di parità restano invariati.
+  La UI ufficiale è alla radice `/`; i frammenti HTMX interni sono sotto `/v2`
+  e la vecchia route `/ui` è stata rimossa.
 
 ## 3. Copertura
 
@@ -65,9 +67,9 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | Menu | Stato | Note |
 | --- | --- | --- |
 | Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
-| Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **limiti/storage**, **tracker/file priority/web seed**, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
-| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale avanzata non è disponibile |
-| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale avanzata non è disponibile |
+| Scarico | ✅ | tabella torrent + HTTP, aggiornamento automatico ogni **5 s** già attivo, progressione/velocità HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **limiti/storage**, **tracker/file priority/web seed**, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa** |
+| Serie TV | ✅ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast con link TVDB/TMDB, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie con **Sfoglia** per il percorso NAS, azioni serie, **anteprima/esecuzione rinomina** |
+| Film | ✅ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast con link TMDB, modifica, requisiti linguistici mostrati in formato leggibile, azioni, corrispondenze archivio e storico |
 | Mancanti | ✅ | tabella gap + form di ricerca + Cerca/Ignora |
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
@@ -94,8 +96,9 @@ portati:
 
 - **"Ultimi trovati nei feed"** in Dashboard: resta su richiesta (è una vista
   diagnostica, non un flusso operativo).
-- **Aggiunta manuale di serie e film**: il flusso TMDB è server-side, mentre il
-  form completo con requisiti avanzati/percorso NAS non è ancora disponibile.
+- **Aggiunta manuale avanzata**: il flusso TMDB è disponibile server-side e
+  include i principali campi di qualità, lingua, sottotitoli ed esclusioni; i
+  campi API più specialistici non sono esposti nel form.
 - **Gruppo "feed" / TMDB/TVDB**: le viste sono server-side; il calendario carica
   in modo asincrono con HTMX (`hx-trigger="load"`) per non bloccare la pagina.
 - **Azioni lunghe**: la v2 avvia l'azione e mostra l'avanzamento nel pannello
@@ -192,11 +195,11 @@ Go e gli handler API condivisi sono stati mantenuti.
 
 Il porting copre tutte le voci di menu, i dettagli Serie/Film, il dettaglio
 torrent, i flussi secondari dei fumetti e i widget speciali di
-Manutenzione/Integrazioni; solo la diagnostica feed del Dashboard e l'aggiunta
-manuale avanzata restano da completare (vedi §4).
+Manutenzione/Integrazioni; resta da completare solo la diagnostica feed del
+Dashboard (vedi §4).
 Passi successivi consigliati:
 
 1. barra di avanzamento contestuale alla singola azione lunga (oltre al pannello
    job già presente);
-2. portare il form completo di aggiunta manuale Serie/Film;
+2. esporre nel form eventuali campi specialistici ancora disponibili solo via API;
 3. convertire i benchmark in test di performance in CI.

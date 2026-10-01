@@ -24,6 +24,12 @@ compatto, con navigazione in alto scorrevole, metriche della dashboard su due
 colonne, finestre a tutta larghezza e tabelle che scorrono orizzontalmente
 dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
 
+La UI ufficiale si apre su `http://<host>:5000/`; `/v2` resta un alias tecnico e
+la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
+automaticamente la sessione ogni 5 secondi; il pulsante **Auto: on/off** consente
+di disattivare o riattivare il polling. Anche i tile CPU/RAM e le velocità nella
+barra superiore vengono aggiornati ogni 5 secondi.
+
 Il percorso consigliato per una nuova installazione è:
 
 1. configurare percorsi e sorgenti;
@@ -278,7 +284,10 @@ bloccata, già presente o inferiore al file archiviato.
 
 - **Aggiungi** un magnet/URL `.torrent` oppure carica un file `.torrent`;
   opzionalmente percorso di salvataggio, “Scarica subito” e “Non rinominare”.
-- **Card sessione**: velocità download/upload, numero torrent e peer.
+- **Download in sessione**: velocità download/upload, numero torrent e peer;
+  l'elenco si aggiorna automaticamente ogni 5 secondi.
+- I download HTTP dei fumetti mostrano stato, progressione, byte scaricati e
+  velocità nella stessa lista dei torrent.
 - **Filtro per tag** e **limiti di velocità temporanei** (DL/UL per N minuti).
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
   l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
@@ -360,7 +369,9 @@ stagioni, alias, esclusioni, percorso NAS, sottotitoli, timeframe).
   Completezza, Ultimo download; filtrala con la casella di ricerca.
 - Azioni bulk: imposta lingua, elimina selezionate.
 - **Dettaglio serie**: locandina/trama/cast, badge (anno, rete, stato,
-  completezza) e, se configurate, un badge **“stagioni disattivate”**.
+  completezza), link del cast alle schede TVDB/TMDB e, se configurate, un badge
+  **“stagioni disattivate”**. Il percorso archivio è visibile nella testata e
+  il form di modifica include **Sfoglia** per scegliere una cartella server.
 - Azioni: cerca mancanti, scansiona archivio, aggiorna da TMDB, anteprima/esegui
   rinomina, modifica.
   L'anteprima di rinomina elenca i nomi *Vecchio → Nuovo* e ha un pulsante
@@ -415,11 +426,13 @@ episodio per episodio.
 ## 5. Film
 
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua).
-- L'editor gestisce qualità, lingua base, sottotitoli, esclusioni e fino a **tre
-  lingue richieste** con flag “obbligatoria” per riga.
+- L'editor gestisce qualità, lingua base, sottotitoli, esclusioni e **Lingue
+  richieste**. Nel form il valore è mostrato in formato leggibile, per esempio
+  `ita,eng`, non come JSON interno.
 - **Dettaglio film**: locandina, trama, cast, modifica, riscarica, **Cerca subito**,
-  tabella dei “migliori trovati” dalle sorgenti e tabella **corrispondenze
-  archivio** dove ogni riga offre **Perché non questa?**.
+  nomi del cast collegati alle schede TMDB, tabella dei “migliori trovati” dalle
+  sorgenti e tabella **corrispondenze archivio** dove ogni riga offre **Perché
+  non questa?**.
 
 ### Aggiungere e scegliere un film
 
@@ -433,10 +446,11 @@ Il film viene identificato usando titolo e anno quando disponibili. Evita di
 creare duplicati con lo stesso film scritto in modi diversi: correggi i metadati
 del film monitorato invece di aggiungerlo nuovamente.
 
-Le lingue richieste possono essere opzionali o obbligatorie. Una lingua
-obbligatoria deve essere presente perché la release sia ammessa; una preferenza
-opzionale influenza la scelta e lo score senza trasformarsi automaticamente in un
-blocco.
+Le lingue richieste sono inserite nel form come codici separati da virgola, per
+esempio `ita,eng`. Il database/API può conservarle nella forma JSON canonica,
+ma la UI converte il valore in una forma leggibile prima di mostrarlo. Le regole
+interne distinguono requisiti obbligatori e preferenze opzionali; non modificare
+manualmente il JSON se non stai usando direttamente l'API.
 
 ## 6. Esplora, Archivio, Fumetti
 
@@ -466,7 +480,8 @@ blocco.
   il tag, la copertina e i metadati, e usa quel post per il download senza
   sostituirlo con un albo omonimo. Sono inoltre disponibili lista monitorati,
   estrazione link da un post, impostazioni weekly pack e storico con
-  reinvia/elimina/forza.
+  reinvia/elimina/forza. I download HTTP diretti compaiono in **Download in
+  sessione** con stato, byte, progressione, velocità e azioni pausa/riprendi.
 
 ## 7. Configurazione
 

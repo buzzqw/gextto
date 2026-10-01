@@ -74,6 +74,12 @@ The server-rendered UI is assembled in `uiweb_v2.go`, `uiweb_sections.go`,
 `uiweb/v2/static/v2-core.js`; styles belong in `uiweb/v2/static/gextto-ui.css`
 and `v2.css`.
 
+The official UI is served at `/`; `/v2` is a technical alias and the removed
+legacy `/ui` route must not be reintroduced. Live shell metrics are rendered by
+the `/v2/partial/chrome` HTMX fragment, while the Scarico table uses its own
+5-second polling fragment. Keep both polling fragments free of a recursive
+`load` trigger when they replace themselves with `outerHTML`.
+
 When adding an API endpoint:
 
 1. implement the handler with the shared `AppState` signature;

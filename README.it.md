@@ -36,12 +36,18 @@ log e viene salvata localmente nel browser. I browser senza questa API mantengon
 i preset e il campo per inserire manualmente il nome della famiglia; per leggere
 i font installati può essere richiesta un'autorizzazione del browser.
 
+L'interfaccia ufficiale è disponibile alla radice `http://<host>:5000/`; `/v2`
+resta un alias tecnico. La vecchia route `/ui` è stata rimossa. Il menu **Scarico**
+aggiorna automaticamente la sessione ogni 5 secondi, includendo progressione e
+velocità dei download HTTP dei fumetti; le metriche live nella barra superiore
+seguono lo stesso intervallo.
+
 | Voce | Funzioni |
 |---|---|
 | **Dashboard** | Avvio del ciclo completo o limitato a un dominio, prossimo ciclo, titoli configurati, spazio libero, torrent attivi, ultimi download, prossime uscite, risultati dei feed, grafici dischi/risorse e collegamenti rapidi. |
-| **Scarico** | Sessione torrent completa: aggiunta magnet o `.torrent`, coda/progresso/ETA/peer/ratio, pausa/ripresa/recheck/rimozione, dettagli, tracker, priorità file, limiti, spostamento storage, seeding e storico download. |
-| **Serie TV** | Libreria monitorata con stagioni, episodi, qualità/lingue/sottotitoli, alias, percorso NAS, ricerca mancanti, upgrade, ricerca manuale, scansione archivio e rinomina/riparazione controllata. |
-| **Film** | Libreria con identità titolo/anno, qualità, requisiti linguistici, esclusioni, ricerca immediata, migliori risultati, corrispondenze archivio, decisioni upgrade, riscaricamento e modifica metadati. |
+| **Scarico** | Sessione torrent e HTTP completa: aggiunta magnet o `.torrent`, coda/progresso/ETA/peer/ratio, pausa/ripresa/recheck/rimozione, dettagli, tracker, priorità file, limiti, spostamento storage, seeding, download fumetti e storico. |
+| **Serie TV** | Libreria monitorata con stagioni, episodi, qualità/lingue/sottotitoli, alias, percorso NAS con sfoglia, ricerca mancanti, upgrade, ricerca manuale, scansione archivio, cast collegato a TVDB/TMDB e rinomina/riparazione controllata. |
+| **Film** | Libreria con identità titolo/anno, qualità, requisiti linguistici leggibili, esclusioni, ricerca immediata, migliori risultati, corrispondenze archivio, cast collegato a TMDB, decisioni upgrade, riscaricamento e modifica metadati. |
 | **Mancanti** | Vista orientata ai gap per episodi e stagioni mancanti, con filtri, ricerche e azioni consapevoli di forza, ignora, riattiva e riscarica. |
 | **Esplora** | Scoperta TMDB (tendenze, popolari, più votati, programmazione e prossime uscite), ricerca titoli, ricerca release e aggiunta alla libreria, con protezione dai duplicati già monitorati. |
 | **Archivio** | Ricerca full-text delle release archiviate, paginazione, dettagli sorgente/qualità, accodamento multiplo, copia magnet, eliminazione e spiegazione **Perché non questa?**; include anche i titoli visti nei feed. |

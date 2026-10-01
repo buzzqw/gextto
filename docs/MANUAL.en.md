@@ -24,6 +24,12 @@ compact layout with a scrollable top navigation, the dashboard metrics in two
 columns, full-width dialogs and tables that scroll horizontally inside their
 panel. Every action stays reachable by touch.
 
+The official UI is served at `http://<host>:5000/`; `/v2` remains a technical
+alias and the old `/ui` route no longer exists. The **Downloads** page refreshes
+the session automatically every 5 seconds; the **Auto: on/off** button can disable
+or re-enable polling. CPU/RAM tiles and the transfer rates in the top bar use the
+same 5-second refresh.
+
 The recommended path for a new installation is:
 
 1. configure paths and sources;
@@ -277,7 +283,10 @@ inferior to the archived file.
 
 - **Add** a magnet/.torrent URL or upload a `.torrent` file; optionally set a
   save path, “Download now” and “Do not rename”.
-- **Session cards**: download/upload rate, torrent and peer counts.
+- **Downloads in session**: download/upload rate, torrent and peer counts; the
+  list refreshes automatically every 5 seconds.
+- Comic HTTP downloads show status, progress, downloaded bytes and speed in the
+  same list as torrents.
 - **Tag filter** and **temporary speed limits** (DL/UL for N minutes).
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — click a
   header to sort. **Bulk actions**: pause, resume, recheck, remove.
@@ -358,7 +367,9 @@ aliases, exclusions, NAS path, subtitles, timeframe).
   Completeness, Last download; filter it with the search box.
 - Bulk actions: set language, delete selected.
 - **Series detail**: poster/plot/cast, badges (year, network, status,
-  completeness), and, if configured, a **“disabled seasons”** badge.
+  completeness), cast links to TVDB/TMDB and, if configured, a **“disabled
+  seasons”** badge. The archive path is shown in the header and the edit form
+  includes **Browse** for choosing a server-side folder.
 - Actions: search missing, scan archive, refresh from TMDB, rename preview /
   execute, edit.
   The rename preview lists the *Old → New* names and has a **Force rename**
@@ -413,11 +424,12 @@ fill several episodes, but archive comparison still happens episode by episode.
 
 - Tabs **Monitored / Downloaded**; sortable columns (name, year, quality,
   language).
-- The editor supports quality, base language, subtitles, exclusions and up to
-  **three required languages** with a per-row “required” flag.
-- **Movie detail**: poster, plot, cast, edit, re-download, **Search now**, a
-  “best matches” table from the sources and an **archive matches** table where
-  each row offers **Why not this one?**.
+- The editor supports quality, base language, subtitles, exclusions and
+  **Required languages**. The form shows a readable value such as `ita,eng`, not
+  the internal JSON representation.
+- **Movie detail**: poster, plot, cast with TMDB links, edit, re-download,
+  **Search now**, a “best matches” table from the sources and an **archive
+  matches** table where each row offers **Why not this one?**.
 
 ### Adding and selecting a movie
 
@@ -431,9 +443,11 @@ Movies are identified by title and year when available. Avoid creating duplicate
 with different spellings: correct the monitored movie metadata instead of adding
 it again.
 
-Required languages can be optional or mandatory. A mandatory language must be
-present for the release to be accepted; an optional preference affects selection
-and score without automatically blocking the release.
+Required languages are entered as comma-separated codes, for example `ita,eng`.
+The database/API may keep the canonical JSON form, but the UI converts it to a
+readable value before displaying it. Internal rules distinguish mandatory
+requirements from optional preferences; do not edit the JSON manually unless you
+are using the API directly.
 
 ## 6. Explore, Archive, Comics
 
@@ -459,7 +473,9 @@ and score without automatically blocking the release.
   exact GetComics result and confirm. Gextto saves the selected post, tag,
   cover and metadata, then uses that post for downloading instead of replacing
   it with a similarly named issue. The monitored list, post link extraction,
-  weekly-pack settings and resend/delete/force history are also available.
+  weekly-pack settings and resend/delete/force history are also available. Direct
+  HTTP downloads appear in **Downloads in session** with status, bytes, progress,
+  speed and pause/resume actions.
 
 ## 7. Configuration
 

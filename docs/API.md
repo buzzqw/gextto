@@ -20,8 +20,10 @@ build in esecuzione.
   un `job_id`: segui stato, progresso ed esito con `GET /api/jobs/{id}` e annulla
   con `POST /api/jobs/{id}/cancel`. L'elenco completo è su `GET /api/jobs`.
 
-La UI server-rendered usa inoltre route interne sotto `/ui`; non fanno parte di
-questa tabella di integrazione. Per verifiche operative usa prima
+La UI server-rendered ufficiale è disponibile su `/`; `/v2` è un alias tecnico.
+Le route HTMX interne sotto `/v2` non fanno parte di questa tabella di
+integrazione e possono cambiare. La vecchia route `/ui` non è più disponibile.
+Per verifiche operative usa prima
 `GET /api/health` e `GET /api/status`.
 
 ## Route
