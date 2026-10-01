@@ -1295,6 +1295,41 @@
 
 {{define "v2_tmdb_add_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">aggiunto</span>{{end}}{{end}}
 
+{{define "v2_quality_options"}}
+<option value=""{{if eq . ""}} selected{{end}}>Qualsiasi</option>
+<option value="360p"{{if eq . "360p"}} selected{{end}}>360p</option>
+<option value="480p"{{if eq . "480p"}} selected{{end}}>480p</option>
+<option value="576p"{{if eq . "576p"}} selected{{end}}>576p</option>
+<option value="720p"{{if eq . "720p"}} selected{{end}}>720p</option>
+<option value="720p+"{{if eq . "720p+"}} selected{{end}}>720p+</option>
+<option value="720p-1080p"{{if eq . "720p-1080p"}} selected{{end}}>720p-1080p</option>
+<option value="1080p"{{if eq . "1080p"}} selected{{end}}>1080p</option>
+<option value="1080p+"{{if eq . "1080p+"}} selected{{end}}>1080p+</option>
+<option value="2160p"{{if eq . "2160p"}} selected{{end}}>2160p 4K</option>
+<option value="2160p+"{{if eq . "2160p+"}} selected{{end}}>2160p+ 4K+</option>
+{{if and . (not (or (eq . "360p") (eq . "480p") (eq . "576p") (eq . "720p") (eq . "720p+") (eq . "720p-1080p") (eq . "1080p") (eq . "1080p+") (eq . "2160p") (eq . "2160p+")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
+{{end}}
+
+{{define "v2_language_options"}}
+<option value=""{{if eq . ""}} selected{{end}}>Predefinita (ita)</option>
+<option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
+<option value="eng"{{if eq . "eng"}} selected{{end}}>Inglese</option>
+<option value="ita,eng"{{if eq . "ita,eng"}} selected{{end}}>Italiano + Inglese</option>
+<option value="multi"{{if eq . "multi"}} selected{{end}}>Multi</option>
+<option value="any"{{if eq . "any"}} selected{{end}}>Qualsiasi</option>
+{{if and . (not (or (eq . "ita") (eq . "eng") (eq . "ita,eng") (eq . "multi") (eq . "any")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
+{{end}}
+
+{{define "v2_subtitle_options"}}
+<option value=""{{if eq . ""}} selected{{end}}>Nessuno</option>
+<option value="ita"{{if eq . "ita"}} selected{{end}}>Italiano</option>
+<option value="eng"{{if eq . "eng"}} selected{{end}}>Inglese</option>
+<option value="ita,eng"{{if eq . "ita,eng"}} selected{{end}}>Italiano + Inglese</option>
+<option value="multi"{{if eq . "multi"}} selected{{end}}>Multi</option>
+<option value="any"{{if eq . "any"}} selected{{end}}>Qualsiasi</option>
+{{if and . (not (or (eq . "ita") (eq . "eng") (eq . "ita,eng") (eq . "multi") (eq . "any")))}}<option value="{{.}}" selected>{{.}}</option>{{end}}
+{{end}}
+
 {{define "v2_tmdb_manual"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
   <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
@@ -1515,9 +1550,9 @@
         <input type="hidden" name="name" value="{{.Name}}" />
         <label class="field"><span>Nome</span><input class="input" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
-        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" placeholder="es. 720p-1080p" /></label>
-        <label class="field"><span>Lingue</span><input class="input" name="language" value="{{.Language}}" placeholder="es. ita,eng" /></label>
-        <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle" value="{{.Subtitle}}" placeholder="es. ita,eng" /></label>
+         <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
+         <label class="field"><span>Lingue</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
+         <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}" /></label>
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
         <label class="field span-full"><span>Percorso archivio (NAS)</span><input class="input" name="archive_path" value="{{.ArchivePath}}" /></label>
@@ -1561,9 +1596,9 @@
         <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
         <label class="field"><span>Nome</span><input class="input" name="name" value="{{.Name}}" /></label>
         <label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}" /></label>
-        <label class="field"><span>Qualità</span><input class="input" name="quality" value="{{.Quality}}" /></label>
-        <label class="field"><span>Lingua</span><input class="input" name="language" value="{{.Language}}" /></label>
-        <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle" value="{{.Subtitle}}" /></label>
+         <label class="field"><span>Qualità</span><select class="input" name="quality">{{template "v2_quality_options" .Quality}}</select></label>
+         <label class="field"><span>Lingua</span><select class="input" name="language">{{template "v2_language_options" .Language}}</select></label>
+         <label class="field"><span>Sottotitoli</span><select class="input" name="subtitle">{{template "v2_subtitle_options" .Subtitle}}</select></label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
         <label class="field span-full"><span>Lingue richieste</span><input class="input" name="language_requirements" value="{{.LanguageRequirements}}" /></label>
         <label class="field span-full"><span>Requisiti sottotitoli</span><input class="input" name="subtitle_requirements" value="{{.SubtitleRequirements}}" /></label>
