@@ -738,15 +738,15 @@
     <div class="panel-body">
       <form class="toolbar logs-toolbar" hx-get="/v2/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
             hx-trigger="submit, input changed delay:300ms, change, every 5s">
-        <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" />
-        <select class="input compact" name="lines" aria-label="Numero di righe">
+         <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+         <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
           <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
           <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>
           <option value="1000"{{if eq .LinesNum 1000}} selected{{end}}>1000</option>
           <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
          </select>
-        <button class="btn sm primary" type="button" data-v2-logs-follow>⏸ Ferma scorrimento</button>
-         <button class="btn sm primary" type="submit">Aggiorna</button>
+         <button class="btn sm primary" type="button" data-v2-logs-follow title="Ferma o riattiva lo scorrimento automatico del log">⏸ Ferma scorrimento</button>
+          <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
       </form>
       {{template "v2_logs_view" .}}
     </div>

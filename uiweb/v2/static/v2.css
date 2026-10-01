@@ -237,6 +237,25 @@
 /* Log lines: one per row, readable in the <pre>. */
 .log-view { max-height: 60vh; overflow: auto; }
 .log-view .log-line { display: block; white-space: pre-wrap; word-break: break-word; }
+.logs-toolbar {
+  flex-wrap: nowrap;
+}
+.logs-toolbar input[name="filter"] {
+  flex: 1 1 260px;
+  min-width: 160px;
+}
+.logs-toolbar select[name="lines"] {
+  flex: 0 0 78px;
+  min-width: 78px;
+}
+@media (max-width: 700px) {
+  .logs-toolbar {
+    flex-wrap: wrap;
+  }
+  .logs-toolbar input[name="filter"] {
+    flex-basis: 100%;
+  }
+}
 
 /* Small screens: the top bar actions scroll instead of overflowing. */
 @media (max-width: 900px) {

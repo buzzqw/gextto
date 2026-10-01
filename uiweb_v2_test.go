@@ -195,6 +195,9 @@ func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=logs", nil); code != http.StatusOK || !strings.Contains(body, "v2-logs-view") {
 		t.Fatalf("logs page -> %d", code)
 	}
+	if code, css := v2Request(t, server, http.MethodGet, "/v2/static/v2.css", nil); code != http.StatusOK || !strings.Contains(css, ".logs-toolbar") {
+		t.Fatalf("logs toolbar layout missing -> %d", code)
+	}
 	if code, body := v2Request(t, server, http.MethodGet, "/v2/static/htmx.min.js", nil); code != http.StatusOK || !strings.Contains(body, "htmx") {
 		t.Fatalf("htmx asset -> %d", code)
 	}
