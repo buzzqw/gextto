@@ -145,35 +145,33 @@
   </div>
 
   <div class="dashboard-actions-next-grid">
-    <div class="dashboard-actions-column">
-      <div class="panel dashboard-quick-panel">
-        <div class="panel-head"><h3>Azioni rapide</h3></div>
-        <div class="panel-body">
-          <div class="toolbar dashboard-quick-actions">
-            <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-swap="none" hx-on::after-request="window.location.reload()">Avvia ciclo (tutto)</button>
-            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
-            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
-            <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
-            <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
-            <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
-            <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
-          </div>
-        </div>
-      </div>
-      <div class="panel dashboard-search-panel">
-        <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
-        <div class="panel-body">
-          <form class="search-row" data-v2-dashboard-search>
-            <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
-            <button class="btn primary" type="submit">Cerca</button>
-          </form>
-          <div id="v2-dashboard-search-results">{{template "v2_dashboard_search_results" .Search}}</div>
+    <div class="panel dashboard-quick-panel">
+      <div class="panel-head"><h3>Azioni rapide</h3></div>
+      <div class="panel-body">
+        <div class="toolbar dashboard-quick-actions">
+          <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-swap="none" hx-on::after-request="window.location.reload()">Avvia ciclo (tutto)</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
+          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
+          <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
+          <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
+          <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
         </div>
       </div>
     </div>
     <div class="panel dashboard-next-panel">
       <div class="panel-head"><h3><span>Prossima ricerca</span><span>automatica</span></h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
       <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div><p class="muted dashboard-next-description">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
+    </div>
+  </div>
+  <div class="panel dashboard-search-panel">
+    <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
+    <div class="panel-body">
+      <form class="search-row" data-v2-dashboard-search>
+        <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <div id="v2-dashboard-search-results">{{template "v2_dashboard_search_results" .Search}}</div>
     </div>
   </div>
 

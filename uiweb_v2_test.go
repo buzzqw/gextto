@@ -91,7 +91,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("dashboard -> %d", code)
 	}
-	for _, marker := range []string{"Backup", "Prossima ricerca", "automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-actions-next-grid", "dashboard-actions-column", "dashboard-consumption-panel", "dashboard-calendar-panel"} {
+	for _, marker := range []string{"Backup", "Prossima ricerca", "automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-actions-next-grid", "dashboard-consumption-panel", "dashboard-calendar-panel"} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("dashboard missing %q", marker)
 		}
@@ -103,7 +103,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(script, "/api/search/archive") || !strings.Contains(script, "v2-dashboard-search-overlay") {
 		t.Fatalf("dashboard two-phase search missing -> %d", code)
 	}
-	if strings.Index(body, "dashboard-actions-column") > strings.Index(body, "dashboard-next-panel") || strings.Index(body, "dashboard-search-panel") > strings.Index(body, "dashboard-next-panel") || strings.Index(body, "Ultimo ciclo") > strings.Index(body, "Consumo banda") {
+	if strings.Index(body, "dashboard-actions-next-grid") > strings.Index(body, "dashboard-search-panel") || strings.Index(body, "Ultimo ciclo") > strings.Index(body, "Consumo banda") {
 		t.Fatalf("dashboard panel order is incorrect")
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=downloads", nil)
