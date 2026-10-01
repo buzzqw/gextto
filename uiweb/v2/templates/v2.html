@@ -70,6 +70,7 @@
         <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
         <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
         <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Chrome.Status}}</span>
+        <time class="current-time" datetime="{{.Chrome.CurrentTime}}" aria-label="Ora attuale" title="Ora attuale">{{.Chrome.CurrentTime}}</time>
       </div>
     </header>
     <section class="mobile-performance" aria-label="Connessioni e prestazioni">

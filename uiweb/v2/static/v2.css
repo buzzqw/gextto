@@ -280,6 +280,13 @@ html, body {
 .v2-topbar-sticky .top-metric-cycle {
   min-width: 92px;
 }
+.v2-topbar-sticky .current-time {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .v2-theme-toggle {
   width: 62px;
   min-width: 62px;

@@ -16,6 +16,7 @@ type uiShellChrome struct {
 	Version      string
 	DryRun       bool
 	Status       string
+	CurrentTime  string
 	CPU          string
 	CPUFrequency string
 	RAM          string
@@ -34,6 +35,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		Version:      "1.0." + constants.Build,
 		DryRun:       cfg.DryRun,
 		Status:       "offline",
+		CurrentTime:  uiNowClock(),
 		CPU:          "—",
 		CPUFrequency: currentCPUFrequency(),
 		RAM:          "0 B",
