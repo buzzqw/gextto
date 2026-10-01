@@ -630,6 +630,13 @@
       if (magnetValue) { copyText(magnetValue).then(function () { notify("Magnet copiato", "ok"); }); }
       return;
     }
+    var archiveCopyButton = event.target.closest("[data-archive-copy]");
+    if (archiveCopyButton) {
+      event.preventDefault();
+      var archiveMagnetValue = archiveCopyButton.getAttribute("data-magnet") || "";
+      if (archiveMagnetValue) { copyText(archiveMagnetValue).then(function () { notify("Magnet copiato", "ok"); }); }
+      return;
+    }
     var detailButton = event.target.closest("[data-torrent-detail]");
     if (detailButton) {
        openTorrentDetail(detailButton.getAttribute("data-hash") || "", detailButton);
@@ -1778,6 +1785,11 @@
                   };
                   return '<button class="btn sm" data-release-explain="' + esc(JSON.stringify(explainRelease)) +
                     '" title="Mostra perché questa release viene accettata o scartata">' + esc(action.label || "Perché non questo?") + "</button>";
+                }
+                if (action.kind === "copy-magnet") {
+                  var archiveMagnet = String(row.magnet || "").trim();
+                  return '<button class="btn sm" type="button" data-archive-copy="magnet" data-magnet="' + esc(archiveMagnet) + '"' +
+                    (archiveMagnet ? "" : " disabled") + ' title="Copia il magnet negli appunti">' + esc(action.label || "Copia magnet") + "</button>";
                 }
                 if (action.kind === "comic-weekly-force") {
                   var weeklyMagnet = String(row.magnet || "").trim();

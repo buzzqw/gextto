@@ -819,6 +819,13 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		}
 		encoded, _ := json.Marshal(release)
 		return `<form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + stdhtml.EscapeString(string(encoded)) + `" /><button class="btn sm" type="submit">` + stdhtml.EscapeString(action.Label) + `</button></form>`
+	case "copy-magnet":
+		magnet := strings.TrimSpace(v2String(item["magnet"]))
+		disabled := ""
+		if magnet == "" {
+			disabled = " disabled"
+		}
+		return `<button class="btn sm" type="button" data-v2-copy="` + stdhtml.EscapeString(magnet) + `"` + disabled + ` title="Copia il magnet negli appunti">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "comic-weekly-force":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		torrent := strings.TrimSpace(v2String(item["torrent_url"]))

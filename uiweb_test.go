@@ -1015,6 +1015,9 @@ func TestUiArchiveAndComicsActions(t *testing.T) {
 	if !strings.Contains(string(archive), "release-explain") {
 		t.Fatal("archive table is missing the release-explain action kind")
 	}
+	if !strings.Contains(string(archive), "copy-magnet") {
+		t.Fatal("archive table is missing the copy-magnet action kind")
+	}
 
 	code, _, comics := webGet(t, server, "/ui?view=comics")
 	if code != http.StatusOK {
