@@ -53,6 +53,9 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 			t.Fatalf("v2 shell missing %q", want)
 		}
 	}
+	if !strings.Contains(body, `class="crumb v2-product-crumb"`) || strings.Index(body, "EXpert Torrent Transfer Orchestrator") > strings.Index(body, ">Dashboard<") {
+		t.Fatalf("v2 product name must be above the Dashboard title")
+	}
 	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
 		t.Fatal("v2 page must not load the classic UI script")
 	}

@@ -62,6 +62,17 @@
   backdrop-filter: blur(6px);
 }
 
+/* Keep the product name above the current page title, with a deliberate
+   two-line break so the Dashboard heading is clearly separated below it. */
+.v2-product-crumb {
+  white-space: normal !important;
+  line-height: 1.1;
+  margin-bottom: 2px;
+}
+.v2-product-crumb span {
+  display: block;
+}
+
 /* The operational chrome is dense by design. Tighten metric padding and let
    the theme label use two lines so the final refresh button remains visible. */
 .v2-topbar-sticky .top-actions {
