@@ -113,6 +113,23 @@
 .dashboard-next-panel .dashboard-next-description {
   margin-bottom: 0;
 }
+.v2-search-overlay .modal {
+  width: min(1120px, 96vw);
+}
+.v2-search-overlay .modal-body {
+  min-height: 120px;
+}
+.v2-search-overlay .v2-search-results {
+  max-height: min(62vh, 680px);
+  overflow: auto;
+}
+.v2-search-overlay .v2-search-status {
+  display: block;
+  margin-bottom: 10px;
+}
+.v2-search-overlay .data-table {
+  min-width: 720px;
+}
 .dashboard-session-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

@@ -127,6 +127,7 @@
     if (event.key === "Escape") {
       event.preventDefault();
       if (activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
+      if (activeDialog.id === "v2-dashboard-search-overlay") { closeDashboardSearch(); return; }
       if (activeDialog.id === "v2-font-overlay") { closeFontPicker(); return; }
       closeDialog();
       return;
@@ -143,6 +144,7 @@
   document.addEventListener("click", function (event) {
     if (!activeDialog) return;
     if (event.target === activeDialog && activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
+    if (event.target === activeDialog && activeDialog.id === "v2-dashboard-search-overlay") { closeDashboardSearch(); return; }
     if (event.target === activeDialog && activeDialog.id !== "v2-font-overlay") { closeDialog(); return; }
     if (event.target === activeDialog && activeDialog.id === "v2-font-overlay") closeFontPicker();
   }, true);
@@ -195,6 +197,156 @@
       node.setAttribute("title", text);
     }
   }
+
+  // ------------------------------------------------------- dashboard search --
+  // Show local archive matches immediately, then replace them with the full
+  // RSS/indexer/web result set when the slower search completes.
+  var dashboardSearchOverlay = null;
+  var dashboardSearchToken = 0;
+  function closeDashboardSearch() {
+    if (!dashboardSearchOverlay) return;
+    var overlay = dashboardSearchOverlay;
+    dashboardSearchOverlay = null;
+    if (activeDialog === overlay) activeDialog = null;
+    overlay.remove();
+    restoreFocus();
+  }
+  function searchBytes(value) {
+    var number = Number(value || 0);
+    if (!isFinite(number) || number <= 0) return "0 B";
+    var units = ["B", "KB", "MB", "GB", "TB"];
+    var index = 0;
+    while (number >= 1024 && index < units.length - 1) { number /= 1024; index++; }
+    return (index ? number.toFixed(1) : Math.round(number)) + " " + units[index];
+  }
+  function dashboardSearchRequest(path, query) {
+    return fetch(path, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: query })
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) throw new Error(data.error || "Ricerca non riuscita");
+        return data;
+      });
+    });
+  }
+  function renderDashboardSearchResults(overlay, releases) {
+    var root = overlay.querySelector("[data-v2-search-results]");
+    root.textContent = "";
+    if (!releases.length) {
+      var empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Nessun risultato compatibile.";
+      root.appendChild(empty);
+      return;
+    }
+    var wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    var table = document.createElement("table");
+    table.className = "data-table";
+    var head = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    ["Titolo", "Sorgente", "Punteggio", "Dimensione", "Seed", "Azioni"].forEach(function (label) {
+      var cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = label;
+      headRow.appendChild(cell);
+    });
+    head.appendChild(headRow);
+    var body = document.createElement("tbody");
+    releases.forEach(function (release) {
+      var row = document.createElement("tr");
+      var title = document.createElement("td");
+      title.className = "truncate";
+      title.title = String(release.title || "");
+      title.textContent = String(release.title || "—");
+      row.appendChild(title);
+      [release.source || "—", release.score || 0, searchBytes(release.size_bytes), release.seeders || 0].forEach(function (value) {
+        var cell = document.createElement("td");
+        cell.textContent = String(value);
+        row.appendChild(cell);
+      });
+      var actions = document.createElement("td");
+      actions.className = "row-actions";
+      var add = document.createElement("button");
+      add.className = "btn sm primary";
+      add.type = "button";
+      add.textContent = "Aggiungi";
+      add.title = "Accoda questa release";
+      add.addEventListener("click", function () {
+        add.disabled = true;
+        var form = new URLSearchParams();
+        form.set("release", JSON.stringify(release));
+        form.set("redirect", "/v2?view=dashboard");
+        fetch("/v2/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
+          .then(function (response) { if (!response.ok) throw new Error("Impossibile accodare la release"); add.textContent = "Accodata"; })
+          .catch(function (error) { add.disabled = false; add.textContent = error.message; });
+      });
+      actions.appendChild(add);
+      if (release.magnet && navigator.clipboard && navigator.clipboard.writeText) {
+        var copy = document.createElement("button");
+        copy.className = "btn sm";
+        copy.type = "button";
+        copy.textContent = "Copia";
+        copy.title = "Copia il magnet negli appunti";
+        copy.addEventListener("click", function () { navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = "Copiato"; }); });
+        actions.appendChild(copy);
+      }
+      row.appendChild(actions);
+      body.appendChild(row);
+    });
+    table.appendChild(head);
+    table.appendChild(body);
+    wrap.appendChild(table);
+    root.appendChild(wrap);
+    ensureTooltips(overlay);
+  }
+  function openDashboardSearch(query, opener) {
+    closeDashboardSearch();
+    var overlay = document.createElement("div");
+    overlay.id = "v2-dashboard-search-overlay";
+    overlay.className = "overlay v2-search-overlay";
+    var safeQuery = String(query).replace(/[&<>"']/g, function (char) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char];
+    });
+    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-dashboard-search-title"><div class="modal-head"><h3 id="v2-dashboard-search-title">Risultati ricerca: ' + safeQuery + '</h3><button class="btn sm" type="button" data-v2-search-close title="Chiudi i risultati">Chiudi</button></div><div class="modal-body"><small class="muted v2-search-status" data-v2-search-status>Ricerca nell’archivio…</small><div class="v2-search-results" data-v2-search-results><p class="muted">Caricamento…</p></div></div></div>';
+    document.body.appendChild(overlay);
+    dashboardSearchOverlay = overlay;
+    overlay.addEventListener("click", function (event) { if (event.target === overlay || event.target.closest("[data-v2-search-close]")) closeDashboardSearch(); });
+    openDialog(overlay, opener);
+    return overlay;
+  }
+  document.addEventListener("submit", function (event) {
+    var form = event.target.closest && event.target.closest("[data-v2-dashboard-search]");
+    if (!form) return;
+    event.preventDefault();
+    var input = form.querySelector("input[name=q]");
+    var query = String(input && input.value || "").trim();
+    if (!query) return;
+    var token = ++dashboardSearchToken;
+    var overlay = openDashboardSearch(query, form.querySelector("button"));
+    var status = overlay.querySelector("[data-v2-search-status]");
+    var fullDone = false;
+    dashboardSearchRequest("/api/search/archive", query).then(function (data) {
+      if (token !== dashboardSearchToken || fullDone) return;
+      var results = data.results || [];
+      renderDashboardSearchResults(overlay, results);
+      status.textContent = "Archivio: " + results.length + " · ricerca RSS, indexer e web in corso…";
+    }).catch(function () {});
+    dashboardSearchRequest("/api/search", query).then(function (data) {
+      if (token !== dashboardSearchToken) return;
+      fullDone = true;
+      var results = data.results || [];
+      renderDashboardSearchResults(overlay, results);
+      status.textContent = results.length + " risultati trovati";
+    }).catch(function (error) {
+      if (token !== dashboardSearchToken) return;
+      fullDone = true;
+      status.textContent = "Ricerca web non riuscita: " + error.message;
+    });
+  });
 
   // Server-side folder picker: unlike a native browser picker this browses
   // the machine/container where Gextto is actually running.

@@ -163,7 +163,7 @@
       <div class="panel dashboard-search-panel">
         <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
         <div class="panel-body">
-          <form class="search-row" hx-post="/v2/dashboard/search" hx-target="#v2-dashboard-search-results" hx-swap="outerHTML">
+          <form class="search-row" data-v2-dashboard-search>
             <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
             <button class="btn primary" type="submit">Cerca</button>
           </form>
