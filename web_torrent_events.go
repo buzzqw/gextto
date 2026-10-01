@@ -1039,7 +1039,7 @@ func tev_clearEmptyDestination(destination, name string) {
 }
 
 // tev_postSeedRelocate implements `post_seed_relocate`.
-func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry) bool {
+func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry) bool {
 	if retry, ok := storageMoveRetries[strings.ToLower(torrent.Hash)]; ok && retry.postSeed {
 		return true
 	}
@@ -1055,7 +1055,20 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, torrent *models.
 	if !inRamdisk && !inTemp {
 		return false
 	}
+	// A torrent that seeded from RAM/tmp must be moved directly to its
+	// configured archive destination when one exists. LibtorrentDir is only the
+	// work/download directory and is the fallback for releases without an
+	// archive destination. Moving to LibtorrentDir first makes the completion
+	// handler scan the whole work tree (including unrelated backups) and leaves
+	// the completed file outside its library.
 	destination := cfg.LibtorrentDir
+	if db != nil {
+		if meta, err := db.TorrentMeta(torrent.Hash); err == nil && meta != nil {
+			if configured, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && strings.TrimSpace(configured) != "" {
+				destination = configured
+			}
+		}
+	}
 	if SamePath(current, destination) {
 		return false
 	}
@@ -1478,7 +1491,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if !stopped {
 			continue
 		}
-		if tev_postSeedRelocate(cfg, torrents, &torrent, postSeedMoves, retries) {
+		if tev_postSeedRelocate(cfg, torrents, db, &torrent, postSeedMoves, retries) {
 			continue
 		}
 		// Archive at the end of the seed: a completed torrent that kept its

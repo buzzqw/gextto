@@ -197,6 +197,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
   cursor: pointer;
 }
 .nav-more:hover { filter: brightness(1.1); }
+.nav-more-indicator { font-size: 1.1em; line-height: 1; }
 
 /* The system entries stay collapsed on mobile until "Sistema" is opened. */
 .nav-group.system-group .nav-item { display: none; }
@@ -1114,6 +1115,7 @@ pre.log-view { margin: 0; }
 @media (max-width: 899px) {
   /* Touch targets: 44px minimum on navigation and icon buttons. */
   .nav-item, .nav-more { min-height: 44px; }
+  .check { min-height: 44px; }
   .btn.sm { min-height: 40px; }
   .icon-btn { width: 44px; height: 44px; }
 
@@ -1247,8 +1249,6 @@ pre.log-view { margin: 0; }
      next-run value below the fold on a phone. */
   .dashboard-next-panel .dashboard-next-description { display: none; }
   .dashboard-intro p,
-  .dashboard-search-panel,
-  .dashboard-explore-panel,
   .dashboard-session-grid,
   .dashboard-collection-grid,
   .dashboard-feed-panel,

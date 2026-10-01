@@ -35,8 +35,8 @@
     </div>
     <nav aria-label="Navigazione principale">
       {{range .Groups}}
-      <div class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-        {{if .System}}<div class="nav-more" aria-hidden="true"><span>Sistema</span></div>{{end}}
+       <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
+         {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span>Sistema</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
         {{range .Items}}
         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
         {{end}}
@@ -246,7 +246,7 @@
   <div class="panel dashboard-explore-panel">
     <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
     <div class="panel-body"><div class="toolbar dashboard-explore-actions">
-      <a class="btn" href="/v2?view=series">📺 Serie TV</a><a class="btn" href="/v2?view=movies">🎬 Film</a><a class="btn" href="/v2?view=search">🔎 Esplora release</a><a class="btn" href="/v2?view=comics">📚 Fumetti</a><a class="btn" href="/v2?view=archive">📦 Archivio</a><a class="btn" href="/v2?view=maintenance">🛠 Manutenzione</a>
+       <a class="btn" href="/v2?view=series">📺 Serie TV</a><a class="btn" href="/v2?view=movies">🎬 Film</a><a class="btn" href="/v2?view=search">🔎 Esplora release</a><a class="btn" href="/v2?view=gaps">⚠ Mancanti</a><a class="btn" href="/v2?view=comics">📚 Fumetti</a><a class="btn" href="/v2?view=archive">📦 Archivio</a><a class="btn" href="/v2?view=maintenance">🛠 Manutenzione</a>
     </div></div>
   </div>
   <div class="panel dashboard-feed-panel">

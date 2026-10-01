@@ -493,6 +493,35 @@ html, body {
   }
 }
 
+/* These phone rules must live after the shared stylesheet: the v2 chrome is
+   loaded last and otherwise turns the compact control pad back into a clipped
+   horizontal row. */
+@media (max-width: 700px) {
+  .v2-topbar-sticky {
+    padding-top: calc(10px + env(safe-area-inset-top));
+  }
+  .v2-topbar-sticky .top-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .v2-topbar-sticky .top-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    overflow: visible;
+  }
+  .v2-topbar-sticky .top-actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+  .v2-topbar-sticky .top-live-status {
+    display: contents;
+  }
+}
+
 /* v2 widgets: card grids and the maintenance review tables. */
 .tmdb-card-body .tmdb-overview {
   display: -webkit-box;

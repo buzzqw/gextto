@@ -76,6 +76,43 @@
   }
   setFamily(readFamily(), false);
 
+  // ------------------------------------------------------ mobile navigation --
+  // The system group is a real control on phones, not just a visual label.
+  function setSystemMenu(open) {
+    var group = document.getElementById("app-system-menu");
+    var toggle = document.querySelector("[data-mobile-system-toggle]");
+    if (!group || !toggle) return;
+    group.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    var indicator = toggle.querySelector(".nav-more-indicator");
+    if (indicator) indicator.textContent = open ? "−" : "＋";
+  }
+  var systemGroup = document.getElementById("app-system-menu");
+  if (systemGroup) setSystemMenu(systemGroup.classList.contains("open"));
+
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-mobile-system-toggle]");
+    if (toggle) {
+      var group = document.getElementById("app-system-menu");
+      setSystemMenu(!(group && group.classList.contains("open")));
+      return;
+    }
+    var group = document.getElementById("app-system-menu");
+    if (group && group.classList.contains("open") && !event.target.closest("#app-system-menu")) {
+      setSystemMenu(false);
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    var group = document.getElementById("app-system-menu");
+    if (group && group.classList.contains("open")) {
+      setSystemMenu(false);
+      var toggle = document.querySelector("[data-mobile-system-toggle]");
+      if (toggle) toggle.focus();
+    }
+  });
+
   // -------------------------------------------------------------- dialogs --
   var activeDialog = null;
   var activeOpener = null;

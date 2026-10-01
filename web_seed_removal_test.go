@@ -193,6 +193,28 @@ func TestEnforceSeedPolicyArchivesAtSeedEnd(t *testing.T) {
 	}
 }
 
+// TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive makes sure the
+// RAM-disk post-seed relocation does not first move a completed torrent back to
+// the generic download directory. That directory may contain unrelated files
+// and is not the release's configured archive destination.
+func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
+	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	cfg.LibtorrentDir = filepath.Join(t.TempDir(), "downloads")
+	library := filepath.Dir(processed)
+	cfg.ArchiveRoot = &library
+	if err := db.MarkTorrentCompleted(seedTestHash, source, 5); err != nil {
+		t.Fatal(err)
+	}
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+	if got := session.moved[seedTestHash]; got != library {
+		t.Fatalf("RAM-disk post-seed destination = %q, want %q", got, library)
+	}
+}
+
 // TestEnforceSeedPolicySkipsAlreadyArchivedCopy makes sure the end-of-seed
 // archive does not move a source whose library copy is already in place.
 func TestEnforceSeedPolicySkipsAlreadyArchivedCopy(t *testing.T) {
