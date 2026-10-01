@@ -641,6 +641,44 @@ func TestMissingArchivedEpisodeIsEligibleForRecovery(t *testing.T) {
 	}
 }
 
+func TestArchiveScanKeepsBetterExistingFilePath(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	better := filepath.Join(dir, "Show.S01E01.1080p.WEB-DL.mkv")
+	inferior := filepath.Join(dir, "Show.S01E01.720p.HDTV.mkv")
+	if err := os.WriteFile(better, []byte("better"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(inferior, []byte("inferior"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SyncArchiveFileScored("Show", 1, 1, filepath.Base(better), better, 6, 1200); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SyncArchiveFileScored("Show", 1, 1, filepath.Base(inferior), inferior, 8, 500); err != nil {
+		t.Fatal(err)
+	}
+	var path string
+	if err := db.db.QueryRow("SELECT archive_path FROM episodes WHERE series_id=(SELECT id FROM series WHERE name='Show') AND season=1 AND episode=1").Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	if path != better {
+		t.Fatalf("inferior scan replaced better path: %q", path)
+	}
+	if err := os.Remove(better); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SyncArchiveFileScored("Show", 1, 1, filepath.Base(inferior), inferior, 8, 500); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.db.QueryRow("SELECT archive_path FROM episodes WHERE series_id=(SELECT id FROM series WHERE name='Show') AND season=1 AND episode=1").Scan(&path); err != nil {
+		t.Fatal(err)
+	}
+	if path != inferior {
+		t.Fatalf("missing better path was not repaired: %q", path)
+	}
+}
+
 func TestSeasonPackRegistersAllEpisodesAndRollsBackAsOneRelease(t *testing.T) {
 	db := newTestDB(t)
 	pack := testRelease()

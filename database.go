@@ -3089,7 +3089,21 @@ func (d *Database) SyncArchiveFileScored(seriesName string, season, episode int6
 	if err := d.db.QueryRow("SELECT id FROM series WHERE name=?1", seriesName).Scan(&seriesID); err != nil {
 		return err
 	}
-	_, err := d.db.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path,size_bytes) VALUES (?1,?2,?3,?4,?5,datetime('now'),?6,?7) ON CONFLICT(series_id,season,episode) DO UPDATE SET title=CASE WHEN excluded.quality_score>=episodes.quality_score THEN excluded.title ELSE episodes.title END,downloaded_at=excluded.downloaded_at,archive_path=excluded.archive_path,size_bytes=excluded.size_bytes,quality_score=MAX(excluded.quality_score, episodes.quality_score)", seriesID, season, episode, title, qualityScore, path, sizeBytes)
+	// A scan may encounter duplicate files in arbitrary filesystem order. Never
+	// replace the path of a better existing copy with an inferior manual/legacy
+	// file; do replace it when the recorded path has disappeared.
+	replacePath := true
+	var currentPath string
+	var currentScore int64
+	rowErr := d.db.QueryRow("SELECT COALESCE(archive_path,''),quality_score FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", seriesID, season, episode).Scan(&currentPath, &currentScore)
+	if rowErr == nil && qualityScore < currentScore && strings.TrimSpace(currentPath) != "" {
+		if _, statErr := os.Stat(currentPath); statErr == nil {
+			replacePath = false
+		}
+	} else if rowErr != nil && !errors.Is(rowErr, sql.ErrNoRows) {
+		return rowErr
+	}
+	_, err := d.db.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,downloaded_at,archive_path,size_bytes) VALUES (?1,?2,?3,?4,?5,datetime('now'),?6,?7) ON CONFLICT(series_id,season,episode) DO UPDATE SET title=CASE WHEN excluded.quality_score>=episodes.quality_score THEN excluded.title ELSE episodes.title END,downloaded_at=excluded.downloaded_at,archive_path=CASE WHEN ?8 THEN excluded.archive_path ELSE episodes.archive_path END,size_bytes=CASE WHEN ?8 THEN excluded.size_bytes ELSE episodes.size_bytes END,quality_score=MAX(excluded.quality_score, episodes.quality_score)", seriesID, season, episode, title, qualityScore, path, sizeBytes, replacePath)
 	return err
 }
 

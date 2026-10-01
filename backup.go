@@ -79,14 +79,30 @@ func snapshotDatabase(source, destination string) error {
 	return nil
 }
 
-// verifyZipArchive opens the archive and reads its central directory, so a
-// truncated or corrupt file is rejected before it is published.
+// verifyZipArchive reads every entry so a truncated archive or a bad entry CRC
+// is rejected before it is published. Opening only the central directory would
+// accept corruption in compressed entry data.
 func verifyZipArchive(path string) error {
 	reader, err := zip.OpenReader(path)
 	if err != nil {
 		return err
 	}
-	return reader.Close()
+	defer reader.Close()
+	for _, file := range reader.File {
+		entry, err := file.Open()
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(io.Discard, entry)
+		closeErr := entry.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	return nil
 }
 
 // addZipFile adds a file to the zip with standard deflate compression.

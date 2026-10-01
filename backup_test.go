@@ -3,6 +3,7 @@ package gextto
 import (
 	"archive/zip"
 	"bytes"
+	"hash/crc32"
 	"io"
 	"os"
 	"path/filepath"
@@ -277,6 +278,34 @@ func TestBackupCopySnapshotCopiesArchive(t *testing.T) {
 
 	if _, err := CopySnapshot("", targetDir); err == nil {
 		t.Error("CopySnapshot with empty source should fail")
+	}
+}
+
+func TestBackupVerificationReadsEntriesAndRejectsBadCRC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "corrupt.zip")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	// CreateRaw lets the test deliberately publish a central directory whose
+	// checksum does not match the stored payload.
+	header := &zip.FileHeader{Name: "data.txt", Method: zip.Store, CRC32: crc32.ChecksumIEEE([]byte("different")), CompressedSize64: 3, UncompressedSize64: 3}
+	entry, err := writer.CreateRaw(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := entry.Write([]byte("bad")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyZipArchive(path); err == nil {
+		t.Fatal("archive with a bad entry checksum was accepted")
 	}
 }
 
