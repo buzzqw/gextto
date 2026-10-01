@@ -153,6 +153,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Esplora (ricerca release).
 	v2Handle(s, mux, "POST /v2/search", V2Search)
 	v2Handle(s, mux, "POST /v2/search/add", V2SearchAdd)
+	v2Handle(s, mux, "POST /v2/search/explain", V2SearchExplain)
 
 	// Esplora TMDB (calendario, tendenze, ricerca).
 	v2Handle(s, mux, "GET /v2/tmdb/calendar", V2TmdbCalendar)
@@ -343,18 +344,15 @@ func v2ComicsViewFrom(s *AppState, r *http.Request) v2ComicsView {
 type v2PanelsView struct {
 	Groups []v2Group
 	Jobs   *v2JobsView
+	Stack  bool
 }
 
 func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
-	cfg := latestConfig(s)
-	var sections []uiPageSection
-	switch view {
-	case "maintenance":
-		sections = uiMaintenanceSections(s, cfg)
-	case "integrations":
-		sections = uiIntegrationSections(s, cfg)
+	page := v2PanelsView{}
+	if panels, ok := uiPanelsPageFor(view, s); ok {
+		page.Groups = v2SectionGroups(s, r, view, panels.Sections)
+		page.Stack = panels.Stack
 	}
-	page := v2PanelsView{Groups: v2SectionGroups(s, r, view, sections)}
 	if view == "maintenance" {
 		jobs := v2JobsViewFrom(s)
 		page.Jobs = &jobs
@@ -373,6 +371,13 @@ func v2DownloadsViewFrom(s *AppState, r *http.Request) v2DownloadsView {
 
 // v2Content maps a view to its body template and view-model.
 func v2Content(s *AppState, r *http.Request, view string) (string, any) {
+	// A selected series/movie is a detail page; only the bare menu views use
+	// the section-composed list page below.
+	if view == "series" || view == "movies" {
+		if body, content, ok := v2ContentDetail(s, r, view); ok {
+			return body, content
+		}
+	}
 	switch view {
 	case "dashboard":
 		return "v2_dashboard", v2DashboardViewFrom(s, r)
@@ -389,15 +394,12 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_manual", uiManualDataFrom(s)
 	case "license":
 		return "v2_license", uiLicenseData{Text: uiLicenseText}
-	case "maintenance", "integrations":
+	case "series", "movies", "gaps", "archive", "blocklist", "maintenance", "integrations":
 		return "v2_panels_page", v2PanelsViewFrom(s, r, view)
 	case "search":
 		return "v2_search", v2SearchView{}
 	case "comics":
 		return "v2_comics", v2ComicsViewFrom(s, r)
-	}
-	if body, content, ok := v2ContentDetail(s, r, view); ok {
-		return body, content
 	}
 	if spec, ok := uiTableSpecFor(view); ok {
 		return "v2_table_page", v2TableDataFrom(s, r, view, spec)

@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // v2Button is a uiActionButton plus the view it belongs to, so the button form
@@ -43,6 +45,7 @@ type v2Section struct {
 	FormPath      string
 	FormWrap      string
 	FormSubmit    string
+	FormRender    string
 	ListEditor    *v2ListEditorView
 	ClassicURL    string
 	// Integration cards (Trakt, Simkl) carry their child sections inline.
@@ -98,6 +101,7 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.FormPath = section.Form.Path
 		item.FormWrap = section.Form.Wrap
 		item.FormSubmit = section.Form.Submit
+		item.FormRender = section.Form.Render
 		if item.FormSubmit == "" {
 			item.FormSubmit = "Salva"
 		}
@@ -194,18 +198,39 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	wrap := strings.TrimSpace(r.FormValue("wrap"))
 
 	values := map[string]any{}
+	kinds := map[string]string{}
 	for key, list := range r.Form {
 		switch key {
-		case "view", "path", "wrap":
+		case "view", "path", "wrap", "render":
+			continue
+		}
+		if strings.HasPrefix(key, "_v2_kind_") {
+			if len(list) > 0 {
+				kinds[strings.TrimPrefix(key, "_v2_kind_")] = list[0]
+			}
 			continue
 		}
 		if len(list) == 0 {
 			continue
 		}
 		value := list[0]
-		if number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
-			values[key] = number
-		} else {
+		switch kinds[key] {
+		case "number":
+			if number, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+				values[key] = number
+			} else {
+				values[key] = value
+			}
+		case "select":
+			switch strings.ToLower(strings.TrimSpace(value)) {
+			case "true":
+				values[key] = true
+			case "false":
+				values[key] = false
+			default:
+				values[key] = value
+			}
+		default:
 			values[key] = value
 		}
 	}
@@ -214,6 +239,25 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 		payload = map[string]any{wrap: values}
 	}
 	encoded, _ := json.Marshal(payload)
+	render := strings.TrimSpace(r.FormValue("render"))
+	if render != "" && strings.HasPrefix(path, "/api/") {
+		raw, status := v2InternalJSON(s, http.MethodPost, path, nil, encoded)
+		if r.Header.Get("HX-Request") == "" {
+			http.Redirect(w, r, "/v2?view="+url.QueryEscape(view), http.StatusSeeOther)
+			return
+		}
+		dict, eng := v2Dictionaries(s)
+		switch render {
+		case "tmdb":
+			result := v2SectionTMDBResult(r.FormValue("kind"), raw, status)
+			v2Render(w, http.StatusOK, "v2_tmdb_results", result, dict, eng)
+			return
+		case "releases":
+			result := v2SectionReleaseResult(raw, status)
+			v2Render(w, http.StatusOK, "v2_search_results", result, dict, eng)
+			return
+		}
+	}
 	if strings.HasPrefix(path, "/api/") {
 		v2InternalJSON(s, http.MethodPost, path, nil, encoded)
 	}
@@ -222,4 +266,50 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	w.Header().Set("HX-Redirect", "/v2?view="+url.QueryEscape(view))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// v2SectionTMDBResult adapts the JSON returned by /api/tmdb/search to the same
+// cards used by the dedicated Esplora page. The API also returns TVDB fallback
+// entries, which use an absolute "poster" field instead of poster_path.
+func v2SectionTMDBResult(kind string, raw []byte, status int) map[string]any {
+	result := map[string]any{"Kind": kind}
+	if status >= 400 {
+		result["Error"] = v2JSONError(raw)
+		return result
+	}
+	var payload struct {
+		Items []map[string]any `json:"items"`
+	}
+	if json.Unmarshal(raw, &payload) != nil {
+		result["Error"] = "risposta TMDB non valida"
+		return result
+	}
+	items := make([]v2TMDBItem, 0, len(payload.Items))
+	for _, item := range payload.Items {
+		items = append(items, v2TMDBItemFromMap(kind, item))
+	}
+	result["Items"] = items
+	return result
+}
+
+func v2SectionReleaseResult(raw []byte, status int) v2SearchView {
+	result := v2SearchView{Searched: true}
+	if status >= 400 {
+		result.Error = v2JSONError(raw)
+		return result
+	}
+	var payload struct {
+		Results []models.Release `json:"results"`
+	}
+	if json.Unmarshal(raw, &payload) != nil {
+		return result
+	}
+	for _, release := range payload.Results {
+		encoded, _ := json.Marshal(release)
+		result.Results = append(result.Results, v2SearchResult{
+			Title: release.Title, Source: v2SourceLabel(release.Source), Score: release.Score,
+			Seeders: release.Seeders, SizeBytes: release.SizeBytes, ReleaseJSON: string(encoded),
+		})
+	}
+	return result
 }

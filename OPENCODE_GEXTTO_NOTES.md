@@ -59,5 +59,6 @@ Il file unit dell'utente è normalmente:
   `uiweb/v2/templates/v2.html`, `uiweb/v2/static/htmx.min.js`.
 - Registrazione: una sola riga `registerV2Routes(s, mux)` in `web_router.go`.
 - Report completo, copertura, benchmark e prossimi passi: `docs/UI_V2.md`.
-- Porting completo: nessun widget "non migrato" residuo; la scansione delle 16
-  voci `/v2?view=…` non mostra segnaposto.
+- Tutte le 16 voci `/v2?view=…` rendono senza segnaposto di pagina; i flussi
+  secondari dei fumetti e la diagnostica feed del Dashboard restano documentati
+  come residui consapevoli in `docs/UI_V2.md`.

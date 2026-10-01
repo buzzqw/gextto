@@ -179,6 +179,49 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 	}
 }
 
+func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	wants := map[string][]string{
+		"series":  {"Aggiungi una serie", "Serie monitorate"},
+		"movies":  {"Aggiungi un film", "Film monitorati"},
+		"gaps":    {"Cerca un episodio mancante", "Episodi mancanti"},
+		"archive": {"Aggiungi all&#39;archivio"},
+	}
+	for view, markers := range wants {
+		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)
+		if code != http.StatusOK {
+			t.Fatalf("%s page -> %d", view, code)
+		}
+		for _, marker := range markers {
+			if !strings.Contains(body, marker) {
+				t.Fatalf("%s page missing %q", view, marker)
+			}
+		}
+	}
+}
+
+func TestV2LibraryLinksStayInsideV2(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "Test Show"}}, []MovieConfig{{ID: 7, Name: "Test Movie"}}); err != nil {
+		t.Fatalf("SaveLibrary: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	for view, marker := range map[string]string{
+		"series": `/v2?view=series&amp;series=Test+Show`,
+		"movies": `/v2?view=movies&amp;movie=7`,
+	} {
+		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)
+		if code != http.StatusOK || !strings.Contains(body, marker) {
+			t.Fatalf("%s detail link missing: status=%d", view, code)
+		}
+	}
+}
+
 func TestV2PanelsPagesRender(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

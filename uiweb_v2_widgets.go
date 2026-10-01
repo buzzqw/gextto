@@ -917,6 +917,7 @@ type v2TMDBItem struct {
 	Kind      string
 	Name      string
 	Year      string
+	TvdbID    string
 	Poster    string
 	Overview  string
 	TmdbID    string
@@ -924,33 +925,27 @@ type v2TMDBItem struct {
 	InLibrary bool
 }
 
-func v2TMDBItemFrom(kind string, item TmdbItem) v2TMDBItem {
-	out := v2TMDBItem{Kind: kind, InLibrary: item.InLibrary, TmdbID: strconv.FormatInt(item.ID, 10)}
-	if item.Name != nil {
-		out.Name = strings.TrimSpace(*item.Name)
+func v2TMDBItemFromMap(kind string, item map[string]any) v2TMDBItem {
+	out := v2TMDBItem{Kind: kind, TmdbID: v2AnyString(item["id"]), TvdbID: v2AnyString(item["tvdb_id"]), InLibrary: v2Truthy(item["in_library"])}
+	out.Name = v2AnyString(item["name"])
+	if out.Name == "" {
+		out.Name = v2AnyString(item["title"])
 	}
-	if out.Name == "" && item.Title != nil {
-		out.Name = strings.TrimSpace(*item.Title)
-	}
-	date := ""
-	if item.FirstAirDate != nil {
-		date = strings.TrimSpace(*item.FirstAirDate)
-	}
-	if date == "" && item.ReleaseDate != nil {
-		date = strings.TrimSpace(*item.ReleaseDate)
+	date := v2AnyString(item["first_air_date"])
+	if date == "" {
+		date = v2AnyString(item["release_date"])
 	}
 	if len(date) >= 4 {
 		out.Year = date[:4]
 	}
-	if item.PosterPath != nil {
-		out.Poster = "https://image.tmdb.org/t/p/w154" + *item.PosterPath
+	out.Poster = v2AnyString(item["poster"])
+	if out.Poster == "" {
+		if path := v2AnyString(item["poster_path"]); path != "" {
+			out.Poster = "https://image.tmdb.org/t/p/w154" + path
+		}
 	}
-	if item.Overview != nil {
-		out.Overview = strings.TrimSpace(*item.Overview)
-	}
-	if item.VoteAverage != nil {
-		out.Vote = *item.VoteAverage
-	}
+	out.Overview = v2AnyString(item["overview"])
+	out.Vote = v2Float(item["vote_average"])
 	return out
 }
 
@@ -1041,11 +1036,11 @@ func v2TmdbRenderResults(w http.ResponseWriter, s *AppState, kind string, body [
 		view.Error = v2JSONError(raw)
 	} else {
 		var payload struct {
-			Items []TmdbItem `json:"items"`
+			Items []map[string]any `json:"items"`
 		}
 		if json.Unmarshal(raw, &payload) == nil {
 			for _, item := range payload.Items {
-				view.Items = append(view.Items, v2TMDBItemFrom(kind, item))
+				view.Items = append(view.Items, v2TMDBItemFromMap(kind, item))
 			}
 		}
 	}
@@ -1060,6 +1055,7 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Name:     strings.TrimSpace(r.FormValue("name")),
 		Year:     strings.TrimSpace(r.FormValue("year")),
 		TmdbId:   strings.TrimSpace(r.FormValue("tmdb_id")),
+		TvdbId:   strings.TrimSpace(r.FormValue("tvdb_id")),
 		Language: "ita",
 	}
 	if payload.Kind == "" {

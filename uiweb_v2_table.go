@@ -143,6 +143,34 @@ func v2SpecFor(s *AppState, view string) (uiTableSpec, bool) {
 			return v2ComicsDownloadSpec(spec), true
 		}
 	}
+	// Section-composed pages use stable view names such as integrations-t0
+	// because one page can contain several tables. Resolve those names back to
+	// the original section specs so sorting, pagination and row actions keep
+	// working after an HTMX swap.
+	if separator := strings.LastIndex(view, "-t"); separator > 0 {
+		base := view[:separator]
+		index, err := strconv.Atoi(view[separator+2:])
+		if err == nil && index >= 0 {
+			if page, ok := uiPanelsPageFor(base, s); ok {
+				specs := make([]uiTableSpec, 0)
+				var collect func([]uiPageSection)
+				collect = func(sections []uiPageSection) {
+					for _, section := range sections {
+						if section.Kind == "table" {
+							specs = append(specs, section.Table)
+						}
+						if section.Kind == "integration" {
+							collect(section.Integration.Children)
+						}
+					}
+				}
+				collect(page.Sections)
+				if index < len(specs) {
+					return specs[index], true
+				}
+			}
+		}
+	}
 	return uiTableSpec{}, false
 }
 
@@ -686,10 +714,10 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 		return template.HTML(`<span title="` + stdhtml.EscapeString(full) + `">` + stdhtml.EscapeString(v2FolderLabel(full)) + `</span>`)
 	case "series_link":
 		name := v2String(item[column.Key])
-		return template.HTML(`<a href="/?view=series&amp;series=` + url.QueryEscape(name) + `" title="Apri il dettaglio (UI classica)">` + stdhtml.EscapeString(name) + `</a>`)
+		return template.HTML(`<a href="/v2?view=series&amp;series=` + url.QueryEscape(name) + `" title="Apri il dettaglio della serie">` + stdhtml.EscapeString(name) + `</a>`)
 	case "movie_link":
 		name := v2String(item[column.Key])
-		return template.HTML(`<a href="/?view=movies&amp;movie=` + url.QueryEscape(v2String(item["id"])) + `" title="Apri il dettaglio (UI classica)">` + stdhtml.EscapeString(name) + `</a>`)
+		return template.HTML(`<a href="/v2?view=movies&amp;movie=` + url.QueryEscape(v2String(item["id"])) + `" title="Apri il dettaglio del film">` + stdhtml.EscapeString(name) + `</a>`)
 	case "url", "getcomics":
 		href := v2String(raw)
 		if href == "" {
@@ -775,7 +803,12 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 	case "comic-edit":
 		return `<a class="btn sm" href="/?view=comics" title="Modifica dal fumetto nella UI classica">` + stdhtml.EscapeString(action.Label) + `</a>`
 	case "release-explain":
-		return ""
+		release := item
+		if nested, ok := item["release"].(map[string]any); ok {
+			release = nested
+		}
+		encoded, _ := json.Marshal(release)
+		return `<form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + stdhtml.EscapeString(string(encoded)) + `" /><button class="btn sm" type="submit">` + stdhtml.EscapeString(action.Label) + `</button></form>`
 	}
 
 	path := v2Substitute(action.Path, item, true)

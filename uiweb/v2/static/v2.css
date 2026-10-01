@@ -19,6 +19,12 @@
   backdrop-filter: blur(6px);
 }
 
+.v2-section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Navigation: clearer active state and hover feedback. */
 .sidebar .nav-item {
   border-radius: var(--v2-radius);

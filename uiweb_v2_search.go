@@ -26,6 +26,12 @@ type v2SearchView struct {
 	Query    string
 	Results  []v2SearchResult
 	Searched bool
+	Error    string
+}
+
+type v2ExplainView struct {
+	Trace DecisionTrace
+	Error string
 }
 
 // V2Search runs the manual release search server-side.
@@ -53,6 +59,8 @@ func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 					})
 				}
 			}
+		} else {
+			view.Error = v2JSONError(raw)
 		}
 	}
 	dict, eng := v2Dictionaries(s)
@@ -72,4 +80,31 @@ func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	w.Header().Set("HX-Redirect", "/v2?view=search")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// V2SearchExplain renders the decision trace for an archive release without
+// sending the user back to the classic UI.
+func V2SearchExplain(w http.ResponseWriter, r *http.Request, s *AppState) {
+	release := strings.TrimSpace(r.FormValue("release"))
+	view := v2ExplainView{}
+	if !json.Valid([]byte(release)) {
+		view.Error = "release non valida"
+	} else {
+		body, _ := json.Marshal(map[string]json.RawMessage{"release": json.RawMessage(release)})
+		raw, status := v2InternalJSON(s, http.MethodPost, "/api/search/explain", nil, body)
+		if status >= 400 {
+			view.Error = v2JSONError(raw)
+		} else {
+			var payload struct {
+				Trace DecisionTrace `json:"trace"`
+			}
+			if err := json.Unmarshal(raw, &payload); err != nil {
+				view.Error = "risposta spiegazione non valida"
+			} else {
+				view.Trace = payload.Trace
+			}
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_explain_modal", view, dict, eng)
 }

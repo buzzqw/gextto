@@ -726,7 +726,7 @@
 <div class="view">
   {{range .Groups}}
     {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
-    <div class="{{if gt (len .Sections) 1}}grid-2{{end}}">
+    <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
       {{range .Sections}}{{template "v2_section" .}}{{end}}
     </div>
   {{end}}
@@ -749,13 +749,15 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
+    <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" {{if .FormRender}}hx-target="#v2-form-output-{{.View}}-{{.FormRender}}" hx-swap="innerHTML"{{else}}hx-swap="none"{{end}}>
       <input type="hidden" name="view" value="{{.View}}">
       <input type="hidden" name="path" value="{{.FormPath}}">
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
+      {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
       <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}</div>
     </form>
+    {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
 </div>
 {{else if eq .Kind "settings"}}
@@ -1047,8 +1049,9 @@
       {{else}}<form hx-post="/v2/tmdb/add" hx-swap="outerHTML">
         <input type="hidden" name="kind" value="{{.Kind}}" />
         <input type="hidden" name="name" value="{{.Name}}" />
-        <input type="hidden" name="year" value="{{.Year}}" />
-        <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
+         <input type="hidden" name="year" value="{{.Year}}" />
+         <input type="hidden" name="tmdb_id" value="{{.TmdbID}}" />
+         <input type="hidden" name="tvdb_id" value="{{.TvdbID}}" />
         <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
       </form>{{end}}
     </div>
@@ -1119,7 +1122,8 @@
 {{end}}
 
 {{define "v2_search_results"}}
-{{if .Results}}
+{{if .Error}}<p class="alert">{{.Error}}</p>
+{{else if .Results}}
 <div class="table-wrap"><table class="data-table">
   <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Seed</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>
@@ -1138,6 +1142,24 @@
 </table></div>
 {{else if .Searched}}<p class="muted">Nessun risultato per «{{.Query}}».</p>
 {{else}}<p class="muted">Inserisci una ricerca.</p>{{end}}
+{{end}}
+
+{{define "v2_explain_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-explain-title">
+    <div class="modal-head"><h3 id="v2-explain-title">Perché non questo?</h3>
+      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">
+      {{if .Error}}<p class="alert">{{.Error}}</p>{{else}}
+      <p><span class="badge {{if or (eq .Trace.Decision "approved") (eq .Trace.Decision "accept")}}ok{{else if eq .Trace.Decision "rejected"}}err{{else}}warn{{end}}">{{.Trace.Decision}}</span></p>
+      {{if .Trace.Candidate}}<h4>{{.Trace.Candidate}}</h4>{{end}}
+      {{if .Trace.Reason}}<p class="muted">Motivo: {{.Trace.Reason}}</p>{{end}}
+      <div class="stat-grid"><div class="row"><span>Punteggio</span><strong>{{.Trace.Score}}</strong></div><div class="row"><span>Obiettivo</span><strong>{{.Trace.Target}}</strong></div></div>
+      {{if .Trace.Steps}}<table class="data-table"><thead><tr><th>Regola</th><th>Esito</th><th>Dettaglio</th></tr></thead><tbody>{{range .Trace.Steps}}<tr><td>{{.Rule}}</td><td>{{.Result}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody></table>{{end}}
+      {{end}}
+    </div>
+  </div>
+</div>
 {{end}}
 
 {{define "v2_series_detail"}}
@@ -1385,6 +1407,7 @@
 {{define "v2_form_field"}}
 {{if eq .Kind "hidden"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}" />
 {{else}}<label class="field{{if eq .Kind "area"}} span-full{{end}}"{{if .Hint}} title="{{.Hint}}"{{end}}>
+  <input type="hidden" name="_v2_kind_{{.Name}}" value="{{.Kind}}" />
   <span>{{.Label}}</span>
   {{if eq .Kind "select"}}<select class="input" name="{{.Name}}">{{range .Options}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select>
   {{else if eq .Kind "area"}}<textarea class="input" name="{{.Name}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>

@@ -66,12 +66,12 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | --- | --- | --- |
 | Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
 | Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
-| Serie TV | ✅ | elenco + **dettaglio**: hero, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina** |
-| Film | ✅ | elenco + **dettaglio**: hero, modifica, azioni, corrispondenze archivio, storico |
-| Mancanti | ✅ | tabella gap + Cerca/Ignora |
+| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale resta classica |
+| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale resta classica |
+| Mancanti | ✅ | tabella gap + form di ricerca + Cerca/Ignora |
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
-| Archivio | ✅ | tabella + ricerca + paginazione |
-| Fumetti | ✅ | tabella fumetti + **coda download HTTP** |
+| Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
+| Fumetti | ⚠️ | tabella fumetti + **coda download HTTP**; esplorazione GetComics, weekly pack, storico e modifica restano nella UI classica |
 | Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
 | Integrazioni | ✅ | **schede Trakt e Simkl complete** (stato, OAuth/PIN con avvio+conferma, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
 | Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
@@ -86,16 +86,21 @@ stato attivo della navigazione più chiaro, tabelle con hover/zebra e header
 sticky, backdrop dei modali con blur, focus ring sempre visibile, toolbar che
 vanno a capo correttamente, adattamento mobile delle azioni in alto.
 
-## 4. Residui consapevoli (nessun widget non migrato)
+## 4. Residui consapevoli
 
-Dopo questa tornata **non resta nessun pannello "non migrato"**: la scansione
-live delle 16 voci `/v2?view=…` non mostra più alcun segnaposto né link
-"Apri nella UI classica". Restano solo scelte editoriali, non lacune:
+Dopo questa tornata la scansione live delle 16 voci `/v2?view=…` non mostra
+segnaposto di pagina. Restano però i seguenti flussi esplicitamente non ancora
+portati:
 
 - **Dettaglio torrent, tab Limiti / Storage**: descrittive; le regole di limiti
   temporanei e storage si impostano da Configurazione. Nessuna azione mancante.
 - **"Ultimi trovati nei feed"** in Dashboard: resta su richiesta (è una vista
   diagnostica, non un flusso operativo).
+- **Fumetti**: i flussi secondari GetComics/Weekly Pack/storico e la modifica
+  della scheda usano ancora la UI classica; la tabella principale e la coda HTTP
+  sono già v2.
+- **Aggiunta manuale di serie e film**: il flusso TMDB è v2 e server-side, mentre
+  il form completo con requisiti avanzati/percorso NAS resta nella UI classica.
 - **Gruppo "feed" / TMDB/TVDB**: le viste sono server-side; il calendario carica
   in modo asincrono con HTMX (`hx-trigger="load"`) per non bloccare la pagina.
 - **Azioni lunghe**: la v2 avvia l'azione e mostra l'avanzamento nel pannello
@@ -136,7 +141,8 @@ Test v2 aggiunti (`uiweb_v2_test.go`, `uiweb_v2_widgets_test.go`):
 4. Configurazione: pagina, body, ricerca, salvataggio, chiave negata, editor
    strutturati (feed, checkbox, righe, rinomina, traduzioni) e modifica per chiave;
 5. Log + asset statico + fallback no-JS + view sconosciuta;
-6. tabelle generiche (6 viste) + library toggle + azione generica + path forgiato;
+6. tabelle generiche (6 viste), pannelli/form delle pagine libreria + library
+   toggle + azione generica + path forgiato;
 7. pannelli Manutenzione/Integrazioni + `HX-Redirect` 204 + cestino; widget
    duplicati, db, ramdisk, rinomina cartella, progresso e job;
 8. cambio lingua persistito;
@@ -191,8 +197,9 @@ rm -rf uiweb/v2 uiweb_v2*.go
 
 ## 11. Prossimi passi
 
-Il porting è completo: nessuna voce di menu, nessun widget speciale di
-Manutenzione/Integrazioni e nessun flusso operativo resta solo nella UI classica.
+Il porting copre tutte le voci di menu e i widget speciali di
+Manutenzione/Integrazioni; i flussi secondari dei fumetti e la diagnostica feed
+del Dashboard restano consapevolmente nella UI classica (vedi §4).
 Passi successivi consigliati:
 
 1. promuovere `/v2` a UI predefinita (vedi §9), mantenendo `/` come alias;

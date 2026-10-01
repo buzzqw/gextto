@@ -181,4 +181,11 @@ func TestV2TmdbExploreEndpoints(t *testing.T) {
 	if code, _ := v2Request(t, server, http.MethodPost, "/v2/tmdb/add", url.Values{"kind": {"series"}, "name": {"X"}}); code != http.StatusOK {
 		t.Fatalf("tmdb add -> %d", code)
 	}
+	// The list-page TMDB form uses the same server-rendered result fragment.
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/section/form", url.Values{
+		"view": {"series"}, "path": {"/api/tmdb/search"}, "render": {"tmdb"},
+		"kind": {"series"}, "query": {"Example"},
+	}); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
+		t.Fatalf("tmdb section form -> %d: %s", code, body)
+	}
 }
