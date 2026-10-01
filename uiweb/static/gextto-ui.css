@@ -629,7 +629,13 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .archive-table td { white-space: nowrap; }
 .archive-table th:last-child { text-align: right; }
 .archive-table td:last-child { padding-right: 2px; }
-.archive-table .row-actions { min-width: 0; flex-wrap: nowrap; white-space: nowrap; justify-content: flex-end; }
+.archive-table td.row-actions {
+  display: table-cell;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+.archive-table td.row-actions .btn { margin-left: 4px; }
 .table-pagination { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; }
 .table-pagination .page-label { color: var(--muted); font-size: 0.85rem; }
 .table-panel-footer { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
