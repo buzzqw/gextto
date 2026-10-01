@@ -135,8 +135,8 @@ type uiRecentDownload struct {
 	DownloadedAt string
 }
 
-// uiRecentDestination keeps the useful NAS/library folder while hiding the
-// local home prefix and the processed file name from the dashboard.
+// uiRecentDestination keeps only the useful destination folder name while
+// hiding the local home prefix and the processed file name from the dashboard.
 func uiRecentDestination(path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -155,7 +155,10 @@ func uiRecentDestination(path string) string {
 			folder = strings.TrimPrefix(folder, homePrefix)
 		}
 	}
-	return folder
+	if folder == "trasferimento" || strings.HasPrefix(folder, "trasferimento"+string(filepath.Separator)) {
+		return "trasferimento"
+	}
+	return filepath.Base(filepath.Clean(folder))
 }
 
 type uiFeedMatch struct {

@@ -352,11 +352,14 @@ func TestUiRecentDestinationShowsRelativeFolder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := uiRecentDestination(home + "/SerieTVArchivio/Slow Horses/episode.mkv"); got != "SerieTVArchivio/Slow Horses" {
+	if got := uiRecentDestination(home + "/SerieTVArchivio/Slow Horses/episode.mkv"); got != "Slow Horses" {
 		t.Fatalf("relative file destination = %q", got)
 	}
-	if got := uiRecentDestination(home + "/SerieTVArchivio/CIA"); got != "SerieTVArchivio/CIA" {
+	if got := uiRecentDestination(home + "/SerieTVArchivio/CIA"); got != "CIA" {
 		t.Fatalf("folder destination = %q", got)
+	}
+	if got := uiRecentDestination(home + "/trasferimento/episode.mkv"); got != "trasferimento" {
+		t.Fatalf("unmoved destination = %q", got)
 	}
 }
 
