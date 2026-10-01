@@ -11,6 +11,12 @@
   --v2-shadow: 0 10px 30px rgba(0, 0, 0, .28);
 }
 
+/* Horizontal scrolling belongs to the individual toolbars/tables, never to
+   the whole Dashboard page. */
+html, body {
+  overflow-x: hidden;
+}
+
 /* Keep the initial search hint beside the field so the settings header does
    not consume a full extra line before the tab chips. */
 .settings-search-row {
@@ -153,6 +159,23 @@
   .dashboard-summary-grid .metric small {
     font-size: 0.66rem;
     line-height: 1.15;
+  }
+}
+
+/* The page title only needs enough room for a short label such as Dashboard.
+   Giving it the old 18vw slot needlessly pushes the operational controls to
+   the right and creates a horizontal chrome scroll on medium desktops. */
+@media (min-width: 901px) {
+  .v2-topbar-sticky .topbar-title {
+    flex: 0 1 clamp(120px, 11vw, 150px);
+  }
+  .v2-topbar-sticky {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .content {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }
 
