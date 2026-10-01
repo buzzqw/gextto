@@ -11,12 +11,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+// Hashes identify torrent content internally, but add no useful context to the
+// operator-facing log. Keep them out of every rendered message centrally so a
+// new call site cannot accidentally expose one.
+var torrentHashPattern = regexp.MustCompile(`(?i)\b[0-9a-f]{40,64}\b`)
 
 // Level is a log severity.
 type Level int
@@ -131,16 +137,19 @@ func logf(level Level, message string, kv []any) {
 	sb.WriteString(" [")
 	sb.WriteString(component())
 	sb.WriteString("] ")
-	sb.WriteString(message)
+	sb.WriteString(redactTorrentHashes(message))
 	for i := 0; i+1 < len(kv); i += 2 {
 		key, _ := kv[i].(string)
 		if key == "" {
 			key = fmt.Sprint(kv[i])
 		}
+		if logFieldContainsTorrentHash(key) {
+			continue
+		}
 		sb.WriteString(" · ")
 		sb.WriteString(key)
 		sb.WriteString(": ")
-		sb.WriteString(formatValue(kv[i+1]))
+		sb.WriteString(redactTorrentHashes(formatValue(kv[i+1])))
 	}
 	sb.WriteByte('\n')
 
@@ -148,6 +157,15 @@ func logf(level Level, message string, kv []any) {
 	logMu.Lock()
 	_, _ = io.WriteString(writer, line)
 	logMu.Unlock()
+}
+
+func logFieldContainsTorrentHash(key string) bool {
+	key = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(key), "_", ""))
+	return strings.Contains(key, "hash") || strings.Contains(key, "magnet")
+}
+
+func redactTorrentHashes(value string) string {
+	return torrentHashPattern.ReplaceAllString(value, "[redacted]")
 }
 
 func formatValue(value any) string {

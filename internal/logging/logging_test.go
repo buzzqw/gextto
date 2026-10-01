@@ -105,3 +105,23 @@ func TestReadableFormatterLayout(t *testing.T) {
 		t.Fatalf("missing structured fields: %q", text)
 	}
 }
+
+func TestReadableFormatterDoesNotExposeTorrentHashes(t *testing.T) {
+	dir := t.TempDir()
+	closeLog := Init(dir, "redacted.log", 1<<20, 2)
+	defer closeLog()
+	hash := "449c4e37be4464b10497f74827548892b061fc22"
+	Info("torrent accepted "+hash, "hash", hash, "name", "Example")
+
+	data, err := os.ReadFile(FilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, hash) || strings.Contains(text, "hash:") {
+		t.Fatalf("torrent hash leaked in log: %q", text)
+	}
+	if !strings.Contains(text, "torrent accepted [redacted]") || !strings.Contains(text, "name: Example") {
+		t.Fatalf("expected redacted readable log: %q", text)
+	}
+}
