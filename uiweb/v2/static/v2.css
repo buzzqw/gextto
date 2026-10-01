@@ -122,6 +122,22 @@ html, body {
 .dashboard-search-results-table {
   margin-top: 10px;
 }
+.dashboard-search-results-table .data-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+.dashboard-search-results-table th:nth-child(1) { width: 61%; }
+.dashboard-search-results-table th:nth-child(2) { width: 15%; }
+.dashboard-search-results-table th:nth-child(3) { width: 8%; }
+.dashboard-search-results-table th:nth-child(4) { width: 16%; }
+.dashboard-search-results-table td:first-child { min-width: 0; }
+.dashboard-search-results-table td.row-actions {
+  display: table-cell;
+  width: 16%;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+}
 .dashboard-recent-table {
   width: 100%;
   table-layout: fixed;
