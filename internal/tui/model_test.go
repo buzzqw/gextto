@@ -47,6 +47,9 @@ func TestTabsAndGlobalKeys(t *testing.T) {
 	if action := m.Update(runeKey('5')); action.Kind != ActionLoadArchive || m.Tab != TabArchive {
 		t.Fatalf("5 should open archive and load it, tab=%v action=%+v", m.Tab, action)
 	}
+	if action := m.Update(runeKey('l')); action.Kind != ActionRefresh || m.Tab != TabLibrary {
+		t.Fatalf("l should open Library: tab=%v action=%+v", m.Tab, action)
+	}
 }
 
 func TestHelpOverlay(t *testing.T) {

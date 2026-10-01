@@ -98,6 +98,9 @@ func (m *Model) Update(k Key) Action {
 			return Action{Kind: ActionLoadConfig}
 		}
 		return Action{}
+	case k.Kind == KeyRune && k.Rune == 'l':
+		m.Tab = TabLibrary
+		return m.loadTabAction()
 	case k.Kind == KeyTab:
 		m.Tab = Tab((int(m.Tab) + 1) % tabCount)
 		return m.loadTabAction()

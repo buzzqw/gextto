@@ -118,7 +118,7 @@ var catalog = map[string][2]string{
 	"label.enabled":       {"ON", "ON"},
 	"label.disabled":      {"OFF", "OFF"},
 
-	"hint.global":        {"q esci · ? aiuto · r aggiorna · a magnet/URL · t file · c ciclo · s cerca · e eventi · g impostazioni", "q quit · ? help · r refresh · a magnet/URL · t file · c cycle · s search · e events · g settings"},
+	"hint.global":        {"q esci · ? aiuto · r aggiorna · a magnet/URL · t file · c ciclo · s cerca · l libreria · e eventi · g impostazioni", "q quit · ? help · r refresh · a magnet/URL · t file · c cycle · s search · l library · e events · g settings"},
 	"hint.tabs":          {"Tab/1-8", "Tab/1-8"},
 	"hint.torrents":      {"↑↓/PgUp/PgDn seleziona · Invio dettagli · p pausa/riprendi · b riavvia · d rimuovi · X pulisci completati · k verifica · R riannuncia · n senza-rinomina · i/u pin · L limiti · o ordina · F filtro", "↑↓/PgUp/PgDn select · Enter details · p pause/resume · b restart · d remove · X clean completed · k recheck · R reannounce · n no-rename · i/u pin · L limits · o sort · F filter"},
 	"hint.logs":          {"↑↓/PgUp/PgDn scorri · / filtro · f segui/ferma · Home/End", "↑↓/PgUp/PgDn scroll · / filter · f follow/pause · Home/End"},
@@ -239,7 +239,7 @@ var catalog = map[string][2]string{
 	"help.title":     {"Gextto TUI — comandi da tastiera", "Gextto TUI — keyboard help"},
 	"help.close":     {"Premi Esc, Invio o ? per chiudere", "Press Esc, Enter or ? to close"},
 	"help.global":    {"Globali:  1-8/Tab schede · r aggiorna · ? chiudi aiuto · q esci", "Global:  1-8/Tab tabs · r refresh · ? close help · q quit"},
-	"help.global2":   {"          a magnet/URL · t file .torrent · c ciclo · s cerca · e eventi · g impostazioni", "          a magnet/URL · t .torrent file · c cycle · s search · e events · g settings"},
+	"help.global2":   {"          a magnet/URL · t file .torrent · c ciclo · s cerca · l libreria · e eventi · g impostazioni", "          a magnet/URL · t .torrent file · c cycle · s search · l library · e events · g settings"},
 	"help.torrents":  {"Torrent:  ↑↓ o PgUp/PgDn · Home/End · Invio dettagli", "Torrents: ↑↓ or PgUp/PgDn · Home/End · Enter details"},
 	"help.torrents2": {"          p pausa/riprendi · b riavvia · d rimuovi · X pulisci completati", "          p pause/resume · b restart · d remove · X clean completed"},
 	"help.torrents3": {"          k verifica · R riannuncia · n senza-rinomina · i/u pin · L limiti", "          k recheck · R reannounce · n no-rename · i/u pin · L limits"},

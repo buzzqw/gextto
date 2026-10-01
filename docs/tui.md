@@ -46,7 +46,7 @@ download HTTP dei fumetti.
 
 | Ambito | Tasti |
 | --- | --- |
-| Globali | `1`-`8`/`Tab` schede · `r` aggiorna · `?` aiuto · `q` esci |
+| Globali | `1`-`8`/`Tab` schede · `l` Libreria · `r` aggiorna · `?` aiuto · `q` esci |
 | Aggiunta | `a` magnet/URL · `t` file `.torrent` · `c` ciclo · `s` cerca · `e` eventi |
 | Download | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli torrent · `p` pausa/riprendi · `d`/`D` rimuovi (torrent con o senza file; HTTP dalla lista) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti · `o`/`O` ordina · `F` filtro |
 | Dettagli | `1` generale · `2` tracker · `3` file · `4` peer · `↑↓` scorri · `Esc`/`Invio` indietro |
