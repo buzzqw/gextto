@@ -56,6 +56,13 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 	if !strings.Contains(body, `class="crumb v2-product-crumb"`) || strings.Index(body, "EXpert Torrent Transfer Orchestrator") > strings.Index(body, ">Dashboard<") {
 		t.Fatalf("v2 product name must be above the Dashboard title")
 	}
+	if strings.Count(body, `class="metric"`)+strings.Count(body, `class="metric `) != 8 {
+		t.Fatalf("dashboard summary should contain 8 metric tiles")
+	}
+	code, css := v2Request(t, server, http.MethodGet, "/v2/static/v2.css", nil)
+	if code != http.StatusOK || !strings.Contains(css, "grid-template-columns: repeat(8, minmax(0, 1fr))") {
+		t.Fatalf("dashboard eight-column layout missing -> %d", code)
+	}
 	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
 		t.Fatal("v2 page must not load the classic UI script")
 	}

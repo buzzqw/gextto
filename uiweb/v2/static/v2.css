@@ -73,6 +73,32 @@
   display: block;
 }
 
+/* The dashboard summary is a compact KPI strip: on a desktop it fits all
+   eight indicators on one row, while narrower layouts keep the normal grid. */
+.dashboard-summary-grid {
+  gap: 8px;
+}
+@media (min-width: 1180px) {
+  .dashboard-summary-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+  .dashboard-summary-grid .metric {
+    gap: 2px;
+    padding: 9px 8px;
+  }
+  .dashboard-summary-grid .metric .metric-sub {
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+  .dashboard-summary-grid .metric strong {
+    font-size: 1.1rem;
+  }
+  .dashboard-summary-grid .metric small {
+    font-size: 0.66rem;
+    line-height: 1.15;
+  }
+}
+
 /* The operational chrome is dense by design. Tighten metric padding and let
    the theme label use two lines so the final refresh button remains visible. */
 .v2-topbar-sticky .top-actions {
