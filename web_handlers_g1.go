@@ -735,14 +735,20 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 			taskDomain,
 		)
 		if runErr != nil {
-			logging.Error("manual cycle failed", "error", runErr.Error())
+			logging.Error("manual monitoring failed", "domain", gh1_domainLabel(taskDomain), "error", runErr.Error())
 			return
 		}
 		if stats != nil {
-			logging.Info("manual cycle completed",
+			logging.Info("manual monitoring completed",
+				"domain", gh1_domainLabel(taskDomain),
+				"releases_examined", stats.Scraped,
+				"compatible_releases", stats.Candidates,
 				"downloads_started", stats.DownloadsStarted,
-				"gaps_filled", stats.GapsFilled)
+				"gaps_filled", stats.GapsFilled,
+				"errors", stats.Errors)
 			s.last_cycle.Set(*stats)
+		} else {
+			logging.Info("manual monitoring completed", "domain", gh1_domainLabel(taskDomain), "result", "no report")
 		}
 	}()
 	message := "Ciclo avviato"
