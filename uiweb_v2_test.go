@@ -53,8 +53,8 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 			t.Fatalf("v2 shell missing %q", want)
 		}
 	}
-	if !strings.Contains(body, `class="crumb v2-product-crumb"`) || strings.Index(body, "EXpert Torrent Transfer Orchestrator") > strings.Index(body, ">Dashboard<") {
-		t.Fatalf("v2 product name must be above the Dashboard title")
+	if strings.Contains(body, `class="crumb v2-product-crumb"`) {
+		t.Fatalf("v2 topbar should not duplicate the product name above the page title")
 	}
 	if strings.Count(body, `class="metric"`)+strings.Count(body, `class="metric `) != 8 {
 		t.Fatalf("dashboard summary should contain 8 metric tiles")

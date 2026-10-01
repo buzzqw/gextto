@@ -62,17 +62,6 @@
   backdrop-filter: blur(6px);
 }
 
-/* Keep the product name above the current page title, with a deliberate
-   two-line break so the Dashboard heading is clearly separated below it. */
-.v2-product-crumb {
-  white-space: normal !important;
-  line-height: 1.1;
-  margin-bottom: 2px;
-}
-.v2-product-crumb span {
-  display: block;
-}
-
 /* The dashboard summary is a compact KPI strip: on a desktop it fits all
    eight indicators on one row, while narrower layouts keep the normal grid. */
 .dashboard-summary-grid {
