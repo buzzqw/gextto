@@ -1443,10 +1443,10 @@
           <span class="badge">stagioni {{.Seasons}}</span>
           <span class="badge">{{.DownloadedCount}}/{{.EpisodeCount}} episodi</span>
           {{if .Gaps}}<span class="badge warn">{{.Gaps}} mancanti</span>{{end}}
-          <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
-          <span class="badge">{{.StatusLabel}}</span>
-        </div>
-        {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge">ultima {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge">Prossima: {{.NextEpisode}}</span>{{end}}
+           <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
+           <span class="badge">{{.StatusLabel}}</span>
+           {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge">ultima {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge">Prossima: {{.NextEpisode}}</span>{{end}}
+         </div>
         {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{.}}</span>{{end}}</div>{{end}}
         {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
         {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
