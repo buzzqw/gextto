@@ -127,7 +127,6 @@
     if (event.key === "Escape") {
       event.preventDefault();
       if (activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
-      if (activeDialog.id === "v2-dashboard-search-overlay") { closeDashboardSearch(); return; }
       if (activeDialog.id === "v2-font-overlay") { closeFontPicker(); return; }
       closeDialog();
       return;
@@ -144,7 +143,6 @@
   document.addEventListener("click", function (event) {
     if (!activeDialog) return;
     if (event.target === activeDialog && activeDialog.id === "v2-browse-overlay") { closeFolderBrowser(); return; }
-    if (event.target === activeDialog && activeDialog.id === "v2-dashboard-search-overlay") { closeDashboardSearch(); return; }
     if (event.target === activeDialog && activeDialog.id !== "v2-font-overlay") { closeDialog(); return; }
     if (event.target === activeDialog && activeDialog.id === "v2-font-overlay") closeFontPicker();
   }, true);
@@ -199,18 +197,9 @@
   }
 
   // ------------------------------------------------------- dashboard search --
-  // Show local archive matches immediately, then replace them with the full
-  // RSS/indexer/web result set when the slower search completes.
-  var dashboardSearchOverlay = null;
+  // Match the classic/rextto layout: results stay below the form, the local
+  // archive is rendered first, and a second request fills the same table.
   var dashboardSearchToken = 0;
-  function closeDashboardSearch() {
-    if (!dashboardSearchOverlay) return;
-    var overlay = dashboardSearchOverlay;
-    dashboardSearchOverlay = null;
-    if (activeDialog === overlay) activeDialog = null;
-    overlay.remove();
-    restoreFocus();
-  }
   function searchBytes(value) {
     var number = Number(value || 0);
     if (!isFinite(number) || number <= 0) return "0 B";
@@ -232,38 +221,47 @@
       });
     });
   }
-  function renderDashboardSearchResults(overlay, releases) {
-    var root = overlay.querySelector("[data-v2-search-results]");
+  function renderDashboardSearchResults(panel, releases) {
+    panel._searchItems = releases || [];
+    var root = panel.querySelector("[data-v2-search-body]");
+    var filter = panel.querySelector("[data-v2-dashboard-search-filter]");
+    var count = panel.querySelector("[data-v2-search-count]");
+    var terms = String(filter.value || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+    var visible = terms.length ? panel._searchItems.filter(function (release) {
+      var quality = release.quality || {};
+      var text = (String(release.title || "") + " " + String(release.source || "") + " " + String(quality.resolution || "") + " " + String(quality.codec || "")).toLowerCase();
+      return terms.every(function (term) { return term.charAt(0) === "-" ? text.indexOf(term.slice(1)) < 0 : text.indexOf(term) >= 0; });
+    }) : panel._searchItems;
+    count.textContent = terms.length ? visible.length + "/" + panel._searchItems.length + " risultati" : panel._searchItems.length + " risultati";
     root.textContent = "";
     if (!releases.length) {
-      var empty = document.createElement("p");
-      empty.className = "muted";
-      empty.textContent = "Nessun risultato compatibile.";
-      root.appendChild(empty);
+      var emptyRow = document.createElement("tr");
+      var emptyCell = document.createElement("td");
+      emptyCell.className = "muted";
+      emptyCell.colSpan = 4;
+      emptyCell.textContent = terms.length ? "Nessun risultato con questo filtro." : "Nessun risultato compatibile.";
+      emptyRow.appendChild(emptyCell);
+      root.appendChild(emptyRow);
       return;
     }
-    var wrap = document.createElement("div");
-    wrap.className = "table-wrap";
-    var table = document.createElement("table");
-    table.className = "data-table";
-    var head = document.createElement("thead");
-    var headRow = document.createElement("tr");
-    ["Titolo", "Sorgente", "Punteggio", "Dimensione", "Seed", "Azioni"].forEach(function (label) {
-      var cell = document.createElement("th");
-      cell.scope = "col";
-      cell.textContent = label;
-      headRow.appendChild(cell);
-    });
-    head.appendChild(headRow);
-    var body = document.createElement("tbody");
-    releases.forEach(function (release) {
+    if (!visible.length) {
+      var noMatch = document.createElement("tr");
+      var noMatchCell = document.createElement("td");
+      noMatchCell.className = "muted";
+      noMatchCell.colSpan = 4;
+      noMatchCell.textContent = "Nessun risultato con questo filtro.";
+      noMatch.appendChild(noMatchCell);
+      root.appendChild(noMatch);
+      return;
+    }
+    visible.forEach(function (release) {
       var row = document.createElement("tr");
       var title = document.createElement("td");
-      title.className = "truncate";
+      title.className = "release-title truncate";
       title.title = String(release.title || "");
       title.textContent = String(release.title || "—");
       row.appendChild(title);
-      [release.source || "—", release.score || 0, searchBytes(release.size_bytes), release.seeders || 0].forEach(function (value) {
+      [release.source || "—", release.score || 0].forEach(function (value) {
         var cell = document.createElement("td");
         cell.textContent = String(value);
         row.appendChild(cell);
@@ -285,38 +283,16 @@
           .catch(function (error) { add.disabled = false; add.textContent = error.message; });
       });
       actions.appendChild(add);
-      if (release.magnet && navigator.clipboard && navigator.clipboard.writeText) {
-        var copy = document.createElement("button");
-        copy.className = "btn sm";
-        copy.type = "button";
-        copy.textContent = "Copia";
-        copy.title = "Copia il magnet negli appunti";
-        copy.addEventListener("click", function () { navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = "Copiato"; }); });
-        actions.appendChild(copy);
-      }
+      var copy = document.createElement("button");
+      copy.className = "btn sm";
+      copy.type = "button";
+      copy.textContent = "Copia";
+      copy.title = "Copia il magnet negli appunti";
+      copy.addEventListener("click", function () { if (navigator.clipboard && release.magnet) navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = "Copiato"; }); });
+      actions.appendChild(copy);
       row.appendChild(actions);
-      body.appendChild(row);
+      root.appendChild(row);
     });
-    table.appendChild(head);
-    table.appendChild(body);
-    wrap.appendChild(table);
-    root.appendChild(wrap);
-    ensureTooltips(overlay);
-  }
-  function openDashboardSearch(query, opener) {
-    closeDashboardSearch();
-    var overlay = document.createElement("div");
-    overlay.id = "v2-dashboard-search-overlay";
-    overlay.className = "overlay v2-search-overlay";
-    var safeQuery = String(query).replace(/[&<>"']/g, function (char) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char];
-    });
-    overlay.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-dashboard-search-title"><div class="modal-head"><h3 id="v2-dashboard-search-title">Risultati ricerca: ' + safeQuery + '</h3><button class="btn sm" type="button" data-v2-search-close title="Chiudi i risultati">Chiudi</button></div><div class="modal-body"><small class="muted v2-search-status" data-v2-search-status>Ricerca nell’archivio…</small><div class="v2-search-results" data-v2-search-results><p class="muted">Caricamento…</p></div></div></div>';
-    document.body.appendChild(overlay);
-    dashboardSearchOverlay = overlay;
-    overlay.addEventListener("click", function (event) { if (event.target === overlay || event.target.closest("[data-v2-search-close]")) closeDashboardSearch(); });
-    openDialog(overlay, opener);
-    return overlay;
   }
   document.addEventListener("submit", function (event) {
     var form = event.target.closest && event.target.closest("[data-v2-dashboard-search]");
@@ -326,26 +302,37 @@
     var query = String(input && input.value || "").trim();
     if (!query) return;
     var token = ++dashboardSearchToken;
-    var overlay = openDashboardSearch(query, form.querySelector("button"));
-    var status = overlay.querySelector("[data-v2-search-status]");
+    var panel = form.closest(".dashboard-search-panel");
+    var filter = panel.querySelector("[data-v2-dashboard-search-filter]");
+    var status = panel.querySelector("[data-v2-search-status]");
+    filter.disabled = false;
+    filter.value = "";
+    status.textContent = "Ricerca nell’archivio…";
+    panel.querySelector("[data-v2-search-body]").innerHTML = '<tr><td class="muted" colspan="4">Ricerca nell’archivio…</td></tr>';
     var fullDone = false;
     dashboardSearchRequest("/api/search/archive", query).then(function (data) {
       if (token !== dashboardSearchToken || fullDone) return;
       var results = data.results || [];
-      renderDashboardSearchResults(overlay, results);
+      renderDashboardSearchResults(panel, results);
       status.textContent = "Archivio: " + results.length + " · ricerca RSS, indexer e web in corso…";
     }).catch(function () {});
     dashboardSearchRequest("/api/search", query).then(function (data) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
       var results = data.results || [];
-      renderDashboardSearchResults(overlay, results);
+      renderDashboardSearchResults(panel, results);
       status.textContent = results.length + " risultati trovati";
     }).catch(function (error) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
       status.textContent = "Ricerca web non riuscita: " + error.message;
     });
+  });
+  document.addEventListener("input", function (event) {
+    var filter = event.target.matches && event.target.matches("[data-v2-dashboard-search-filter]") ? event.target : null;
+    if (!filter) return;
+    var panel = filter.closest(".dashboard-search-panel");
+    if (panel && panel._searchItems) renderDashboardSearchResults(panel, panel._searchItems);
   });
 
   // Server-side folder picker: unlike a native browser picker this browses

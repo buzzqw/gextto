@@ -113,22 +113,19 @@
 .dashboard-next-panel .dashboard-next-description {
   margin-bottom: 0;
 }
-.v2-search-overlay .modal {
-  width: min(1120px, 96vw);
+.dashboard-search-results-toolbar {
+  margin-top: 10px;
+  align-items: center;
 }
-.v2-search-overlay .modal-body {
-  min-height: 120px;
+.dashboard-search-results-toolbar .input {
+  flex: 1 1 320px;
+  min-width: 220px;
 }
-.v2-search-overlay .v2-search-results {
-  max-height: min(62vh, 680px);
-  overflow: auto;
+.dashboard-search-results-toolbar small {
+  flex: 0 0 auto;
 }
-.v2-search-overlay .v2-search-status {
-  display: block;
-  margin-bottom: 10px;
-}
-.v2-search-overlay .data-table {
-  min-width: 720px;
+.dashboard-search-results-table {
+  margin-top: 10px;
 }
 .dashboard-session-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
