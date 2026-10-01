@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -343,6 +344,19 @@ func TestUiHistoryFolderColumn(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("history download table not found")
+	}
+}
+
+func TestUiRecentDestinationShowsRelativeFolder(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := uiRecentDestination(home + "/SerieTVArchivio/Slow Horses/episode.mkv"); got != "SerieTVArchivio/Slow Horses" {
+		t.Fatalf("relative file destination = %q", got)
+	}
+	if got := uiRecentDestination(home + "/SerieTVArchivio/CIA"); got != "SerieTVArchivio/CIA" {
+		t.Fatalf("folder destination = %q", got)
 	}
 }
 

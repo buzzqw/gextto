@@ -17,6 +17,7 @@ import (
 	"io/fs"
 	"math"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -132,6 +133,29 @@ type uiRecentDownload struct {
 	QualityScore int64
 	SizeBytes    int64
 	DownloadedAt string
+}
+
+// uiRecentDestination keeps the useful NAS/library folder while hiding the
+// local home prefix and the processed file name from the dashboard.
+func uiRecentDestination(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	folder := path
+	// ProcessedPath is normally a file, but pack/foreign-torrent records can
+	// already contain a folder. Only strip the final component when it has a
+	// file extension.
+	if filepath.Ext(filepath.Base(path)) != "" {
+		folder = filepath.Dir(path)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		homePrefix := filepath.Clean(home) + string(filepath.Separator)
+		if strings.HasPrefix(folder, homePrefix) {
+			folder = strings.TrimPrefix(folder, homePrefix)
+		}
+	}
+	return folder
 }
 
 type uiFeedMatch struct {
@@ -466,15 +490,11 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 			if completedAt == "" {
 				completedAt = item.UpdatedAt
 			}
-			destination := ""
-			if item.ProcessedPath != "" {
-				destination = filepath.Dir(item.ProcessedPath)
-			}
 			data.Recent = append(data.Recent, uiRecentDownload{
 				Name:         gh4_historyDisplayName(item.Name, item.Source),
 				Kind:         item.Kind,
 				Status:       item.Status,
-				Destination:  destination,
+				Destination:  uiRecentDestination(item.ProcessedPath),
 				QualityScore: item.QualityScore,
 				SizeBytes:    item.TotalSize,
 				DownloadedAt: completedAt,
