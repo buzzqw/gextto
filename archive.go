@@ -201,14 +201,16 @@ func (a *Archive) CanonicalizeTorrentURL(torrentURL, magnet string) error {
 	return tx.Commit()
 }
 
-// Search returns up to 200 (title, magnet, source) tuples matching an FTS5
-// query.
+// Search returns up to 200 newest (title, magnet, source) tuples matching an
+// FTS5 query. Ordering by discovery time ensures recently released episodes are
+// not hidden behind older catalogue entries when a monitored title has more
+// than 200 matches.
 func (a *Archive) Search(query string) ([][3]string, error) {
 	term := ftsQuery(query)
 	if term == "" {
 		return [][3]string{}, nil
 	}
-	rows, err := a.db.Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 LIMIT 200", term)
+	rows, err := a.db.Query("SELECT archive.title,archive.magnet,COALESCE(archive.source,'archive') FROM archive JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC LIMIT 200", term)
 	if err != nil {
 		return nil, err
 	}

@@ -112,6 +112,34 @@ func TestRetainsDistinctHashesAndDeduplicatesTheSameMagnet(t *testing.T) {
 	}
 }
 
+func TestSearchPrefersRecentMatchesWhenResultLimitApplies(t *testing.T) {
+	archive := openTestArchive(t)
+	releases := make([]models.Release, 0, 201)
+	for index := 0; index < 201; index++ {
+		releases = append(releases, models.Release{
+			Title:  fmt.Sprintf("Example Show old release %03d", index),
+			Magnet: fmt.Sprintf("magnet:?xt=urn:btih:%040x", index+1),
+			Source: "test",
+		})
+	}
+	if err := archive.SaveBatch(releases, &Config{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.db.Exec("UPDATE archive SET title='Example Show latest release', added_at='2099-01-01 00:00:00' WHERE magnet=?1", releases[200].Magnet); err != nil {
+		t.Fatal(err)
+	}
+	found, err := archive.Search("Example Show")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 200 {
+		t.Fatalf("len(Search) = %d, want 200", len(found))
+	}
+	if found[0][0] != "Example Show latest release" {
+		t.Fatalf("first search result = %q, want most recent release", found[0][0])
+	}
+}
+
 func TestStoresAndCanonicalizesTorrentURLs(t *testing.T) {
 	archive := openTestArchive(t)
 	torrentURL := "http://jackett:9117/dl/test/?path=ZXhhbXBsZQ"
