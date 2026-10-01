@@ -989,6 +989,10 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 			}}, field.Options...)
 		}
 	}
+	if key == "tvdb_language" || key == "tmdb_language" || key == "default_language" {
+		field.Kind = "select"
+		field.Options = uiLanguageOptions(key, strings.TrimSpace(value))
+	}
 	if items, ok := uiJSONScalarList(value); ok {
 		field.Kind = "tags"
 		field.TagJSON = true
@@ -1012,6 +1016,56 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 		field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(value)
 	}
 	return field
+}
+
+func uiLanguageOptions(key, selected string) []uiFormOption {
+	type languageOption struct {
+		Value string
+		Label string
+	}
+	var options []languageOption
+	if key == "tmdb_language" {
+		options = []languageOption{
+			{Value: "it-IT", Label: "Italiano"},
+			{Value: "en-US", Label: "Inglese (USA)"},
+			{Value: "en-GB", Label: "Inglese (Regno Unito)"},
+			{Value: "es-ES", Label: "Spagnolo"},
+			{Value: "fr-FR", Label: "Francese"},
+			{Value: "de-DE", Label: "Tedesco"},
+			{Value: "pt-PT", Label: "Portoghese"},
+			{Value: "pt-BR", Label: "Portoghese (Brasile)"},
+			{Value: "ja-JP", Label: "Giapponese"},
+			{Value: "ko-KR", Label: "Coreano"},
+			{Value: "zh-CN", Label: "Cinese"},
+			{Value: "ru-RU", Label: "Russo"},
+		}
+	} else {
+		options = []languageOption{
+			{Value: "ita", Label: "Italiano"},
+			{Value: "eng", Label: "Inglese"},
+			{Value: "spa", Label: "Spagnolo"},
+			{Value: "fra", Label: "Francese"},
+			{Value: "deu", Label: "Tedesco"},
+			{Value: "por", Label: "Portoghese"},
+			{Value: "jpn", Label: "Giapponese"},
+			{Value: "kor", Label: "Coreano"},
+			{Value: "zho", Label: "Cinese"},
+			{Value: "rus", Label: "Russo"},
+		}
+	}
+	result := make([]uiFormOption, 0, len(options)+1)
+	found := false
+	for _, option := range options {
+		isSelected := option.Value == selected
+		if isSelected {
+			found = true
+		}
+		result = append(result, uiFormOption{Value: option.Value, Label: option.Label, Selected: isSelected})
+	}
+	if selected != "" && !found {
+		result = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, result...)
+	}
+	return result
 }
 
 // uiJSONScalarList reports whether value is a JSON array of scalars and returns
