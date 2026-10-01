@@ -480,8 +480,26 @@ func coreTailLines(path string, limit int) []string {
 		return empty
 	}
 	data, err := io.ReadAll(file)
-	if err != nil || !utf8.Valid(data) {
+	if err != nil {
 		return empty
+	}
+	if !utf8.Valid(data) {
+		// The window can begin in the middle of a multi-byte UTF-8 rune
+		// (logs commonly contain emoji). Move past the partial rune before
+		// validating the buffer; otherwise one unlucky line-count value makes
+		// the whole log appear empty.
+		aligned := false
+		for offset := 1; offset <= utf8.UTFMax && offset < len(data); offset++ {
+			if utf8.Valid(data[offset:]) {
+				data = data[offset:]
+				start += int64(offset)
+				aligned = true
+				break
+			}
+		}
+		if !aligned {
+			return empty
+		}
 	}
 	lines := rustLines(string(data))
 	if start > 0 && len(lines) > 0 {
