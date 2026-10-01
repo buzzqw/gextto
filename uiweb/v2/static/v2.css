@@ -22,10 +22,12 @@
   flex: 1 1 440px;
 }
 .settings-search-row .settings-results {
-  flex: 0 1 420px;
+  flex: 0 0 auto;
+  min-width: max-content;
   margin: 0;
   display: flex;
   align-items: center;
+  white-space: nowrap;
 }
 .settings-search-row .settings-results > * {
   margin: 0;
@@ -36,6 +38,10 @@
   }
   .settings-search-row .settings-results {
     margin-top: 8px;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

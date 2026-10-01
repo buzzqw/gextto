@@ -150,6 +150,9 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if !strings.Contains(body, `class="settings-search-row"`) {
 		t.Fatalf("settings search row missing")
 	}
+	if code, css := v2Request(t, server, http.MethodGet, "/v2/static/v2.css", nil); code != http.StatusOK || !strings.Contains(css, "white-space: nowrap") {
+		t.Fatalf("settings search hint nowrap style missing -> %d", code)
+	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=libtorrent", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
