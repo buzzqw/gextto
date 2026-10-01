@@ -117,6 +117,43 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	}
 }
 
+func TestV2TmdbMovieAddKeepsMovieKind(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	form := url.Values{
+		"kind":     {"movie"},
+		"name":     {"The Rush - Corsa contro il tempo"},
+		"year":     {"2026"},
+		"tmdb_id":  {"1377237"},
+		"language": {"ita"},
+		"redirect": {"/v2?view=search"},
+	}
+	code, _ := v2Request(t, server, http.MethodPost, "/v2/tmdb/add", form)
+	if code != http.StatusNoContent {
+		t.Fatalf("movie add -> %d, want %d", code, http.StatusNoContent)
+	}
+	cfg, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundMovie := false
+	for _, movie := range cfg.Movies {
+		if movie.Name == "The Rush - Corsa contro il tempo" {
+			foundMovie = true
+		}
+	}
+	for _, series := range cfg.Series {
+		if series.Name == "The Rush - Corsa contro il tempo" {
+			t.Fatal("movie was added to the series library")
+		}
+	}
+	if !foundMovie {
+		t.Fatal("movie was not added to the movie library")
+	}
+}
+
 func TestV2DownloadsPageAndActions(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

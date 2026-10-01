@@ -1060,8 +1060,12 @@ func v2TmdbRenderResults(w http.ResponseWriter, s *AppState, kind string, body [
 
 // V2TmdbAdd adds a TMDB result to the library.
 func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
+	kind := strings.ToLower(strings.TrimSpace(r.FormValue("kind")))
+	if kind != "movie" && kind != "series" {
+		kind = "series"
+	}
 	payload := TmdbAddInput{
-		Kind:        r.FormValue("kind"),
+		Kind:        kind,
 		Name:        strings.TrimSpace(r.FormValue("name")),
 		Year:        strings.TrimSpace(r.FormValue("year")),
 		TmdbId:      strings.TrimSpace(r.FormValue("tmdb_id")),
