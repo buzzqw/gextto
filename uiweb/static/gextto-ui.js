@@ -3297,6 +3297,14 @@
     var discoverState = { kind: "series", mode: "trending", window: "week" };
     var discoverResults = discoverPanel.querySelector("[data-discover-results]");
     var discoverStatus = discoverPanel.querySelector("[data-discover-status]");
+    var syncDiscoverMode = function (selected) {
+      Array.prototype.forEach.call(discoverPanel.querySelectorAll("[data-discover-mode]"), function (other) {
+        var active = other === selected;
+        other.classList.toggle("primary", active);
+        other.classList.toggle("active", active);
+        other.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    };
     var runDiscover = function () {
       discoverResults.innerHTML = '<p class="muted">Caricamento…</p>';
       if (discoverStatus) discoverStatus.textContent = "";
@@ -3323,9 +3331,11 @@
       button.addEventListener("click", function () {
         discoverState.mode = button.getAttribute("data-discover-mode");
         discoverState.window = button.getAttribute("data-discover-window") || "week";
+        syncDiscoverMode(button);
         runDiscover();
       });
     });
+    syncDiscoverMode(discoverPanel.querySelector('[data-discover-mode="trending"][data-discover-window="week"]'));
     runDiscover();
   }
 
