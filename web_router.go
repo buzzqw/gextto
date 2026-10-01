@@ -220,6 +220,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/maintenance/clean-duplicates", CleanDuplicates)
 	handle(s, mux, "POST /api/maintenance/restore-source", RestoreSource)
 	handle(s, mux, "POST /api/search", ManualSearch)
+	handle(s, mux, "POST /api/search/dashboard", ManualSearchDashboard)
 	handle(s, mux, "POST /api/search/archive", ManualArchiveSearch)
 	handle(s, mux, "GET /api/manual-search", ManualSearchGet)
 	handle(s, mux, "POST /api/search/add", AddSearchResult)

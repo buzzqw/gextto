@@ -126,6 +126,7 @@ type uiRecentDownload struct {
 	Name         string
 	Kind         string
 	Status       string
+	Destination  string
 	Season       int64
 	Episode      int64
 	QualityScore int64
@@ -469,6 +470,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 				Name:         gh4_historyDisplayName(item.Name, item.Source),
 				Kind:         item.Kind,
 				Status:       item.Status,
+				Destination:  item.ProcessedPath,
 				QualityScore: item.QualityScore,
 				SizeBytes:    item.TotalSize,
 				DownloadedAt: completedAt,

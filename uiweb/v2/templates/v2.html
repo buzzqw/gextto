@@ -219,8 +219,8 @@
     <div class="panel-head"><h3>Ultimi download</h3><small class="muted">Libreria</small></div>
     <div class="panel-body">
       {{if .Recent}}
-      <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Punteggio</th><th scope="col">Stato</th><th scope="col">Concluso</th></tr></thead>
-      <tbody>{{range .Recent}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td>{{.Kind}}</td><td>{{.QualityScore}}</td><td>{{.Status}}</td><td>{{.DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Nome</th><th scope="col">Tipo</th><th scope="col">Punteggio</th><th scope="col">Stato</th><th scope="col">Destinazione</th><th scope="col">Concluso</th></tr></thead>
+      <tbody>{{range .Recent}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td>{{.Kind}}</td><td>{{.QualityScore}}</td><td>{{.Status}}</td><td class="truncate" title="{{.Destination}}">{{if .Destination}}{{.Destination}}{{else}}—{{end}}</td><td>{{.DownloadedAt}}</td></tr>{{end}}</tbody></table></div>
       {{else}}<p class="muted">Nessun download recente.</p>{{end}}
     </div>
   </div>

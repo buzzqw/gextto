@@ -508,6 +508,17 @@ func LastCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // ManualSearch implements `manual_search`.
 func ManualSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
+	manualSearch(w, r, s, false)
+}
+
+// ManualSearchDashboard is the v2 manual search. Unlike the classic endpoint,
+// it keeps globally rejected releases visible because the user is explicitly
+// inspecting arbitrary RSS/indexer/web results and may choose to queue one.
+func ManualSearchDashboard(w http.ResponseWriter, r *http.Request, s *AppState) {
+	manualSearch(w, r, s, true)
+}
+
+func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRejected bool) {
 	if !gh2_setupComplete(s.cfg) {
 		jsonError(w, http.StatusConflict, "complete the initial setup first")
 		return
@@ -522,16 +533,43 @@ func ManualSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "query must contain 1-256 characters")
 		return
 	}
-	s.cycle_lock.Lock()
-	defer s.cycle_lock.Unlock()
+	searchScope := "classic"
+	if includeRejected {
+		searchScope = "dashboard"
+	}
+	startedAt := time.Now()
+	logging.Info("manual search started", "query", query, "scope", searchScope)
 	cfg := latestConfig(s)
-	const manualSearchBudget = 90 * time.Second
+	manualSearchBudget := 90 * time.Second
+	if includeRejected {
+		// The Dashboard search must not wait behind the automatic cycle. The
+		// cycle can legitimately hold cycle_lock for several minutes while
+		// scraping feeds, leaving the browser with a fetch that appears to have
+		// failed at the network layer. Search providers still receive this
+		// bounded request context and return completed sources.
+		manualSearchBudget = 20 * time.Second
+	} else {
+		// Preserve the classic endpoint's existing serialization with cycles.
+		s.cycle_lock.Lock()
+		defer s.cycle_lock.Unlock()
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), manualSearchBudget)
 	defer cancel()
-	results := s.engine.SearchQueryManual(ctx, cfg, query)
+	var results []models.Release
+	if includeRejected {
+		results = s.engine.SearchQueryManualAll(ctx, cfg, query)
+	} else {
+		results = s.engine.SearchQueryManual(ctx, cfg, query)
+	}
 	if ctx.Err() == context.DeadlineExceeded {
-		logging.Warn("manual search budget expired; returning archive results", "query", query, "timeout_secs", int64(manualSearchBudget.Seconds()))
-		results = nil
+		logging.Warn("manual search budget expired; keeping completed search results", "query", query, "timeout_secs", int64(manualSearchBudget.Seconds()), "results", len(results))
+		// searchOneWithDB deliberately preserves releases received before the
+		// deadline. The v2 dashboard must show those partial RSS/indexer/web
+		// results instead of throwing them away and falling back to the archive.
+		if !includeRejected {
+			// Keep the classic endpoint's historical behaviour unchanged.
+			results = nil
+		}
 	}
 	results = append(results, gh2_archiveReleasesForQuery(s, cfg, query)...)
 	seen := map[string]struct{}{}
@@ -554,6 +592,7 @@ func ManualSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	sort.SliceStable(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
+	logging.Info("manual search completed", "query", query, "scope", searchScope, "results", len(results), "duration_ms", time.Since(startedAt).Milliseconds())
 	jsonResponse(w, map[string]any{"ok": true, "query": query, "results": results})
 }
 

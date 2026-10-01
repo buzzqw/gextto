@@ -173,6 +173,7 @@ questa tabella di integrazione. Per verifiche operative usa prima
 | POST | `/api/scan-all-archives` |
 | POST | `/api/score/preview` |
 | POST | `/api/search` |
+| POST | `/api/search/dashboard` |
 | POST | `/api/search/add` |
 | POST | `/api/search/archive` |
 | POST | `/api/search/explain` |

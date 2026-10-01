@@ -100,7 +100,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 		t.Fatalf("dashboard search form missing")
 	}
 	code, script := v2Request(t, server, http.MethodGet, "/v2/static/v2-core.js", nil)
-	if code != http.StatusOK || !strings.Contains(script, "/api/search/archive") || !strings.Contains(script, "data-v2-dashboard-search-filter") {
+	if code != http.StatusOK || !strings.Contains(script, "/api/search/archive") || !strings.Contains(script, "/api/search/dashboard") || !strings.Contains(script, "data-v2-dashboard-search-filter") {
 		t.Fatalf("dashboard two-phase search missing -> %d", code)
 	}
 	if strings.Index(body, "dashboard-actions-next-grid") > strings.Index(body, "dashboard-search-panel") || strings.Index(body, "Ultimo ciclo") > strings.Index(body, "Consumo banda") {

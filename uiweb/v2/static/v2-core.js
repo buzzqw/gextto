@@ -316,7 +316,7 @@
       renderDashboardSearchResults(panel, results);
       status.textContent = "Archivio: " + results.length + " · ricerca RSS, indexer e web in corso…";
     }).catch(function () {});
-    dashboardSearchRequest("/api/search", query).then(function (data) {
+    dashboardSearchRequest("/api/search/dashboard", query).then(function (data) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
       var results = data.results || [];
