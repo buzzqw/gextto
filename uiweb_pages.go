@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	internalutils "github.com/buzzqw/gextto/internal/utils"
 )
 
 // uiweb_pages.go defines the data-driven list pages and action pages of the new
@@ -92,7 +94,7 @@ type uiSettingField struct {
 	Key   string
 	Label string
 	Value string
-	Kind  string // text|bool|area|secret|tags
+	Kind  string // text|bool|area|secret|tags|select
 	// Placeholder is the default value shown greyed out when the setting is
 	// still unset, so the form mirrors rextto/extto instead of looking empty.
 	Placeholder string
@@ -959,6 +961,32 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 			{Value: "3", Label: "HTTP", Selected: selected == "3"},
 			{Value: "4", Label: "HTTP con credenziali", Selected: selected == "4"},
 			{Value: "5", Label: "SOCKS5 (hostname)", Selected: selected == "5"},
+		}
+	}
+	if key == "libtorrent_outgoing_interface" {
+		selected := strings.TrimSpace(value)
+		field.Kind = "select"
+		field.Options = []uiFormOption{{
+			Value: "", Label: "Auto (interfaccia predefinita)", Selected: selected == "",
+		}}
+		found := false
+		for _, iface := range internalutils.NetworkInterfaces() {
+			if iface.Name == selected {
+				found = true
+			}
+			label := iface.Name
+			if iface.Kind != "" {
+				label += " · " + iface.Kind
+			}
+			if iface.IP != "" {
+				label += " · " + iface.IP
+			}
+			field.Options = append(field.Options, uiFormOption{Value: iface.Name, Label: label, Selected: iface.Name == selected})
+		}
+		if selected != "" && !found {
+			field.Options = append([]uiFormOption{{
+				Value: selected, Label: selected + " (non rilevata)", Selected: true,
+			}}, field.Options...)
 		}
 	}
 	if items, ok := uiJSONScalarList(value); ok {

@@ -634,7 +634,7 @@ func TestUiSettingsTabsAndSearch(t *testing.T) {
 		}
 	}
 	code, _, body = webGet(t, server, "/ui?view=settings&tab=libtorrent")
-	if code != http.StatusOK || !strings.Contains(string(body), `value="0.0.0.0:6881-6891"`) || !strings.Contains(string(body), "Il valore proposto va bene nella maggior parte dei casi") {
+	if code != http.StatusOK || !strings.Contains(string(body), `value="0.0.0.0:6881-6891"`) || !strings.Contains(string(body), "Il valore proposto va bene nella maggior parte dei casi") || !strings.Contains(string(body), "Auto (interfaccia predefinita)") {
 		t.Fatalf("libtorrent settings should propose listen interfaces")
 	}
 	// An unknown tab falls back to the first available tab, never a blank page.
