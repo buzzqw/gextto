@@ -77,6 +77,17 @@
   flex: 0 1 360px;
 }
 
+/* The preset selector is compact; give the custom filename template the
+   majority of the row. */
+.v2-rename-form {
+  grid-template-columns: minmax(170px, .38fr) minmax(0, 1fr);
+}
+@media (max-width: 760px) {
+  .v2-rename-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Cards and panels: slightly rounder, with a soft shadow on hover for panels
    that contain actions. */
 .panel,

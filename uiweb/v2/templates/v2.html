@@ -603,7 +603,7 @@
 <div class="panel settings-panel" id="v2-rename-editor">
   <div class="panel-head"><h3>Composizione del nome</h3>{{if .Status}}<small class="muted">{{.Status}}</small>{{end}}</div>
   <div class="panel-body">
-    <form method="post" action="/v2/settings/rename-save" hx-post="/v2/settings/rename-save" hx-swap="none" class="form-grid">
+    <form method="post" action="/v2/settings/rename-save" hx-post="/v2/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form">
       <label class="field"><span>Formato</span><select class="input" name="format" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
       <label class="field"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
       <div class="form-actions"><button class="btn sm primary" type="submit">Salva rinomina</button></div>

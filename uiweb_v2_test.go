@@ -354,7 +354,7 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "Filtri per sorgente") {
 		t.Fatalf("advanced tab -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "Composizione del nome") {
+	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "Composizione del nome") || !strings.Contains(body, "v2-rename-form") {
 		t.Fatalf("rename tab -> %d", code)
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=i18n", nil); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
