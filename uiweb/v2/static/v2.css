@@ -62,6 +62,43 @@
   backdrop-filter: blur(6px);
 }
 
+/* The operational chrome is dense by design. Tighten metric padding and let
+   the theme label use two lines so the final refresh button remains visible. */
+.v2-topbar-sticky .top-actions {
+  gap: 5px;
+  min-width: 0;
+  overflow: visible;
+}
+.v2-topbar-sticky .top-metric {
+  min-width: 64px;
+  padding-left: 7px;
+  padding-right: 7px;
+}
+.v2-topbar-sticky .top-metric-rate {
+  min-width: 82px;
+}
+.v2-topbar-sticky .top-metric-cycle {
+  min-width: 92px;
+}
+.v2-theme-toggle {
+  width: 62px;
+  min-width: 62px;
+  padding-left: 5px;
+  padding-right: 5px;
+  white-space: normal;
+  line-height: 1.05;
+  text-align: center;
+}
+@media (min-width: 701px) and (max-width: 1180px) {
+  .v2-topbar-sticky {
+    flex-wrap: wrap;
+  }
+  .v2-topbar-sticky .topbar-title,
+  .v2-topbar-sticky .top-actions {
+    flex: 1 1 100%;
+  }
+}
+
 .v2-section-stack {
   display: flex;
   flex-direction: column;
