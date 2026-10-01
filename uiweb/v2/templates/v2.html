@@ -643,13 +643,14 @@
 {{end}}
 
 {{define "v2_i18n_table"}}
-<div id="v2-i18n-table" class="table-wrap"><table class="data-table">
+<div id="v2-i18n-table" class="table-wrap"><table class="data-table i18n-table">
   <caption class="sr-only">Traduzioni configurate</caption>
-  <thead><tr><th scope="col">Chiave</th><th scope="col">Valore</th><th scope="col"></th></tr></thead>
+  <colgroup><col class="i18n-key-col" /><col class="i18n-value-col" /></colgroup>
+  <thead><tr><th scope="col">Chiave</th><th scope="col">Valore</th></tr></thead>
   <tbody>{{range .Rows}}<tr>
-    <td><code>{{.Key}}</code></td>
-    <td colspan="2">
-      <form class="toolbar" hx-post="/v2/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
+    <td class="i18n-key"><code>{{.Key}}</code></td>
+    <td class="i18n-value">
+      <form class="i18n-value-form" hx-post="/v2/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
         <input type="hidden" name="lang" value="{{$.Language}}" />
         <input type="hidden" name="key" value="{{.Key}}" />
         <input class="input" name="value" value="{{.Value}}" aria-label="Traduzione per {{.Key}}" />

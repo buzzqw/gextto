@@ -99,6 +99,38 @@
   padding-bottom: 7px;
 }
 
+/* Translation values must use the available cell width instead of being
+   pushed past the right edge by long source keys. */
+.i18n-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.i18n-table .i18n-key-col {
+  width: 32%;
+}
+.i18n-table .i18n-value-col {
+  width: 68%;
+}
+.i18n-table .i18n-key {
+  overflow-wrap: anywhere;
+}
+.i18n-table .i18n-value {
+  min-width: 0;
+  overflow: hidden;
+}
+.i18n-value-form {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  align-items: center;
+}
+.i18n-value-form .input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+
 /* Toolbars wrap cleanly and keep a consistent gap. */
 .toolbar {
   gap: 8px;
