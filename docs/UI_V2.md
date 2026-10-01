@@ -1,6 +1,6 @@
 # Gextto UI v2 (SSR + HTMX) — migrazione, stato e report
 
-Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1153)` · libtorrent 2.0.11.0
+Data: 2026-10-01 · Build di riferimento: `gexttod 0.1.0 (build 1158)` · libtorrent 2.0.11.0
 
 ## 1. Obiettivo e approccio
 
@@ -65,13 +65,13 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | Menu | Stato | Note |
 | --- | --- | --- |
 | Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
-| Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
-| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale resta classica |
-| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale resta classica |
+| Scarico | ✅ | tabella torrent + HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **limiti/storage**, **tracker/file priority/web seed**, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa**, auto-refresh |
+| Serie TV | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie, azioni serie, **anteprima/esecuzione rinomina**; l'aggiunta manuale avanzata resta classica |
+| Film | ⚠️ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast, modifica, azioni, corrispondenze archivio, storico; l'aggiunta manuale avanzata resta classica |
 | Mancanti | ✅ | tabella gap + form di ricerca + Cerca/Ignora |
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
-| Fumetti | ⚠️ | tabella fumetti + **coda download HTTP**; esplorazione GetComics, weekly pack, storico e modifica restano nella UI classica |
+| Fumetti | ✅ | tabella fumetti + **coda download HTTP**, esplorazione GetComics, link finder/download, weekly pack, storico e modifica |
 | Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
 | Integrazioni | ✅ | **schede Trakt e Simkl complete** (stato, OAuth/PIN con avvio+conferma, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
 | Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
@@ -92,13 +92,8 @@ Dopo questa tornata la scansione live delle 16 voci `/v2?view=…` non mostra
 segnaposto di pagina. Restano però i seguenti flussi esplicitamente non ancora
 portati:
 
-- **Dettaglio torrent, tab Limiti / Storage**: descrittive; le regole di limiti
-  temporanei e storage si impostano da Configurazione. Nessuna azione mancante.
 - **"Ultimi trovati nei feed"** in Dashboard: resta su richiesta (è una vista
   diagnostica, non un flusso operativo).
-- **Fumetti**: i flussi secondari GetComics/Weekly Pack/storico e la modifica
-  della scheda usano ancora la UI classica; la tabella principale e la coda HTTP
-  sono già v2.
 - **Aggiunta manuale di serie e film**: il flusso TMDB è v2 e server-side, mentre
   il form completo con requisiti avanzati/percorso NAS resta nella UI classica.
 - **Gruppo "feed" / TMDB/TVDB**: le viste sono server-side; il calendario carica
@@ -146,9 +141,11 @@ Test v2 aggiunti (`uiweb_v2_test.go`, `uiweb_v2_widgets_test.go`):
 7. pannelli Manutenzione/Integrazioni + `HX-Redirect` 204 + cestino; widget
    duplicati, db, ramdisk, rinomina cartella, progresso e job;
 8. cambio lingua persistito;
-9. dettagli Serie/Film + salvataggio serie + modale sorgenti + anteprima rinomina;
-10. traduzione HTML identica al client (testo/attributi/script/italiano);
-11. Esplora TMDB: calendario, prompt di ricerca vuoto, aggiunta con id mancante.
+9. dettagli Serie/Film + metadati poster/cast + salvataggio serie + modale sorgenti + anteprima rinomina;
+10. dettaglio torrent: tab tracker/file/peer/limiti/storage e azioni di modifica;
+11. Fumetti: pannelli GetComics, weekly, storico, link finder/download e modifica;
+12. traduzione HTML identica al client (testo/attributi/script/italiano);
+13. Esplora TMDB: calendario, discovery, modalità giornaliera, prompt di ricerca vuoto, aggiunta con id mancante.
 
 ## 7. Benchmark (`go test -run '^$' -bench BenchmarkV2 -benchmem`)
 
@@ -197,13 +194,14 @@ rm -rf uiweb/v2 uiweb_v2*.go
 
 ## 11. Prossimi passi
 
-Il porting copre tutte le voci di menu e i widget speciali di
-Manutenzione/Integrazioni; i flussi secondari dei fumetti e la diagnostica feed
-del Dashboard restano consapevolmente nella UI classica (vedi §4).
+Il porting copre tutte le voci di menu, i dettagli Serie/Film, il dettaglio
+torrent, i flussi secondari dei fumetti e i widget speciali di
+Manutenzione/Integrazioni; solo la diagnostica feed del Dashboard e l'aggiunta
+manuale avanzata restano consapevolmente nella UI classica (vedi §4).
 Passi successivi consigliati:
 
 1. promuovere `/v2` a UI predefinita (vedi §9), mantenendo `/` come alias;
 2. barra di avanzamento contestuale alla singola azione lunga (oltre al pannello
    job già presente);
-3. rendere editabili i tab Limiti/Storage del dettaglio torrent;
+3. portare il form completo di aggiunta manuale Serie/Film;
 4. convertire i benchmark v2 in test di performance in CI.

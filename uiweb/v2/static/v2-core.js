@@ -145,6 +145,25 @@
     if (event.target === activeDialog && activeDialog.id === "v2-font-overlay") closeFontPicker();
   }, true);
 
+  function updateTorrentSelection() {
+    var selected = document.querySelectorAll("[data-v2-select]:checked");
+    var label = document.querySelector("[data-v2-selected-count]");
+    if (label) label.textContent = selected.length + " selezionati · Azioni:";
+    var all = document.querySelector("[data-v2-select-all]");
+    var rows = document.querySelectorAll("[data-v2-select]");
+    if (all) all.checked = rows.length > 0 && selected.length === rows.length;
+  }
+
+  document.addEventListener("change", function (event) {
+    if (event.target.matches && event.target.matches("[data-v2-select-all]")) {
+      var rows = document.querySelectorAll("[data-v2-select]");
+      for (var i = 0; i < rows.length; i++) rows[i].checked = event.target.checked;
+      updateTorrentSelection();
+    } else if (event.target.matches && event.target.matches("[data-v2-select]")) {
+      updateTorrentSelection();
+    }
+  });
+
   function pinLogTail() {
     var logView = document.getElementById("v2-logs-view");
     if (logView) logView.scrollTop = logView.scrollHeight;
@@ -153,6 +172,7 @@
   document.addEventListener("htmx:afterSwap", function (event) {
     if (!event.target) return;
     if (event.target.id === "v2-modal") { scanModal(); return; }
+    updateTorrentSelection();
     // Keep the log tail pinned to the newest line after the periodic refresh.
     pinLogTail();
   });
@@ -266,5 +286,5 @@
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });
 
-  document.addEventListener("DOMContentLoaded", function () { scanModal(); pinLogTail(); });
+  document.addEventListener("DOMContentLoaded", function () { scanModal(); pinLogTail(); updateTorrentSelection(); });
 })();

@@ -89,6 +89,7 @@ type v2TableRow struct {
 
 type v2TableData struct {
 	View       string
+	FooterView string
 	Title      string
 	Class      string
 	Empty      string
@@ -106,12 +107,14 @@ type v2TableData struct {
 	Colspan    int
 	// Refresh shows the "Aggiorna" button; Manual marks a table that must not
 	// load automatically (the source health check is slow and on demand).
-	Refresh     bool
-	Manual      bool
-	Filter      bool
-	FilterQuery string
-	Sort        string
-	Dir         string
+	Refresh       bool
+	Manual        bool
+	Filter        bool
+	FilterQuery   string
+	Sort          string
+	Dir           string
+	FooterForm    *uiFormSection
+	FooterActions []uiActionButton
 }
 
 // v2SpecFor returns the table spec of a view. It covers the list pages via
@@ -224,6 +227,12 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 	data.Refresh = spec.Search || spec.PageSize > 0 || spec.ManualOnly || spec.RefreshHint != "" || spec.Filter
 	data.Filter = spec.Filter
 	data.FilterQuery = r.FormValue("f")
+	data.FooterForm = spec.FooterForm
+	data.FooterActions = spec.FooterActions
+	data.FooterView = view
+	if separator := strings.LastIndex(view, "-t"); separator > 0 {
+		data.FooterView = view[:separator]
+	}
 
 	// Manual tables (source health) must not load on their own: the check is
 	// slow and is triggered explicitly by the Aggiorna button.
@@ -801,7 +810,8 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		vals := `{"view":"` + view + `","series":"` + templateEscapeJSAttr(series) + `","season":"` + templateEscapeJSAttr(season) + `","episode":"` + templateEscapeJSAttr(episode) + `"}`
 		return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" hx-post="/v2/table/gap-search" hx-vals='` + vals + `' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "comic-edit":
-		return `<a class="btn sm" href="/?view=comics" title="Modifica dal fumetto nella UI classica">` + stdhtml.EscapeString(action.Label) + `</a>`
+		id := v2String(item["id"])
+		return `<button class="btn sm" type="button" hx-get="/v2/comics/edit?id=` + url.QueryEscape(id) + `" hx-target="#v2-modal" hx-swap="innerHTML" title="Modifica il fumetto monitorato">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "release-explain":
 		release := item
 		if nested, ok := item["release"].(map[string]any); ok {

@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -64,6 +65,24 @@ type uiSeriesDetail struct {
 	IgnoredSeasons  []int64
 	SeasonButtons   []uiSeasonButton
 	StatusLabel     string
+	Poster          string
+	Overview        string
+	Year            string
+	Network         string
+	Country         string
+	Vote            string
+	LastAirDate     string
+	NextEpisode     string
+	Genres          []string
+	Cast            []uiDetailPerson
+	TmdbURL         string
+	TvdbURL         string
+}
+
+type uiDetailPerson struct {
+	Name      string
+	Character string
+	URL       string
 }
 
 // uiSeasonButton is one season toggle in the series header.
@@ -140,6 +159,11 @@ type uiMovieDetail struct {
 	Enabled              bool
 	History              []MovieHistory
 	Matches              []uiMovieMatch
+	Poster               string
+	ReleaseDate          string
+	Cast                 []uiDetailPerson
+	TmdbURL              string
+	TvdbURL              string
 }
 
 // uiMagnetURL only trusts links with a safe scheme so the archive match links
@@ -253,7 +277,7 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 	for season := int64(1); season <= maxSeason; season++ {
 		seasonButtons = append(seasonButtons, uiSeasonButton{Season: season, Ignored: containsInt64(ignoredSeasons, season)})
 	}
-	return uiSeriesDetail{
+	detail := uiSeriesDetail{
 		Name:            series.Name,
 		PathName:        escaped,
 		Seasons:         series.Seasons,
@@ -273,7 +297,73 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		IgnoredSeasons:  ignoredSeasons,
 		SeasonButtons:   seasonButtons,
 		StatusLabel:     uiSeriesStatusLabel(len(rows), downloadedCount, ignoredSeasons),
-	}, true
+		TmdbURL:         tmdbURL(series.TmdbID, "tv"),
+		TvdbURL:         tvdbURL(series.TvdbID, "series"),
+	}
+	if strings.HasPrefix(r.URL.Path, "/v2") {
+		uiSeriesMetadataFrom(s, series.Name, &detail)
+	}
+	return detail, true
+}
+
+func tmdbURL(id, kind string) string {
+	if strings.TrimSpace(id) == "" {
+		return ""
+	}
+	return "https://www.themoviedb.org/" + kind + "/" + url.PathEscape(strings.TrimSpace(id))
+}
+
+func tvdbURL(id, kind string) string {
+	if strings.TrimSpace(id) == "" {
+		return ""
+	}
+	return "https://thetvdb.com/dereferrer/" + kind + "/" + url.PathEscape(strings.TrimSpace(id))
+}
+
+func uiSeriesMetadataFrom(s *AppState, name string, detail *uiSeriesDetail) {
+	raw, status := v2InternalJSON(s, http.MethodGet, "/api/series/"+url.PathEscape(name)+"/info", nil, nil)
+	if status >= 400 {
+		return
+	}
+	var payload struct {
+		Info map[string]any `json:"info"`
+	}
+	if json.Unmarshal(raw, &payload) != nil || payload.Info == nil {
+		return
+	}
+	info := payload.Info
+	detail.Poster = v2AnyString(info["poster"])
+	detail.Overview = v2AnyString(info["overview"])
+	detail.Year = v2AnyString(info["year"])
+	detail.Network = v2AnyString(info["network"])
+	detail.Country = v2AnyString(info["country"])
+	if vote := v2Float(info["vote"]); vote > 0 {
+		detail.Vote = fmt.Sprintf("%.1f", vote)
+	}
+	detail.LastAirDate = v2AnyString(info["last_air_date"])
+	if next, ok := info["next_episode"].(map[string]any); ok && next["name"] != nil {
+		detail.NextEpisode = "S" + v2AnyString(next["season_number"]) + "E" + v2AnyString(next["episode_number"]) + " · " + v2AnyString(next["air_date"])
+	}
+	if detail.TmdbURL == "" {
+		detail.TmdbURL = tmdbURL(v2AnyString(info["tmdb_id"]), "tv")
+	}
+	if detail.TvdbURL == "" {
+		detail.TvdbURL = v2AnyString(info["tvdb_url"])
+	}
+	if genres, ok := info["genres"].([]any); ok {
+		for _, genre := range genres {
+			if text := v2AnyString(genre); text != "" {
+				detail.Genres = append(detail.Genres, text)
+			}
+		}
+	}
+	if cast, ok := info["cast"].([]any); ok {
+		for _, value := range cast {
+			if item, ok := value.(map[string]any); ok {
+				detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(item["name"]), Character: v2AnyString(item["character"]), URL: v2AnyString(item["url"])})
+			}
+		}
+	}
 }
 
 // uiMovieDetailFrom returns the movie detail when the `movie` query selects a
@@ -308,6 +398,28 @@ func uiMovieDetailFrom(s *AppState, r *http.Request) (uiMovieDetail, bool) {
 		LanguageRequirements: movie.LanguageRequirements,
 		SubtitleRequirements: movie.SubtitleRequirements,
 		Enabled:              movie.Enabled,
+		Poster:               movie.PosterPath,
+		TmdbURL:              tmdbURL(movie.TmdbID, "movie"),
+		TvdbURL:              tvdbURL(movie.TvdbID, "movie"),
+	}
+	if strings.HasPrefix(r.URL.Path, "/v2") {
+		if raw, status := v2InternalJSON(s, http.MethodGet, "/api/movies/"+strconv.FormatInt(movie.ID, 10), nil, nil); status < 400 {
+			var payload struct {
+				Metadata map[string]any   `json:"metadata"`
+				Cast     []map[string]any `json:"cast"`
+			}
+			if json.Unmarshal(raw, &payload) == nil {
+				detail.Overview = v2AnyString(payload.Metadata["overview"])
+				detail.Poster = v2AnyString(payload.Metadata["poster_path"])
+				if detail.Poster != "" && !strings.HasPrefix(detail.Poster, "http") {
+					detail.Poster = "https://image.tmdb.org/t/p/w300" + detail.Poster
+				}
+				detail.ReleaseDate = v2AnyString(payload.Metadata["release_date"])
+				for _, person := range payload.Cast {
+					detail.Cast = append(detail.Cast, uiDetailPerson{Name: v2AnyString(person["name"]), Character: v2AnyString(person["character"]), URL: v2AnyString(person["url"])})
+				}
+			}
+		}
 	}
 	if all, err := s.db.DownloadedMovies(200); err == nil {
 		for _, item := range all {

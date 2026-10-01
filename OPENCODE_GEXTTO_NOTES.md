@@ -59,6 +59,6 @@ Il file unit dell'utente è normalmente:
   `uiweb/v2/templates/v2.html`, `uiweb/v2/static/htmx.min.js`.
 - Registrazione: una sola riga `registerV2Routes(s, mux)` in `web_router.go`.
 - Report completo, copertura, benchmark e prossimi passi: `docs/UI_V2.md`.
-- Tutte le 16 voci `/v2?view=…` rendono senza segnaposto di pagina; i flussi
-  secondari dei fumetti e la diagnostica feed del Dashboard restano documentati
-  come residui consapevoli in `docs/UI_V2.md`.
+- Tutte le 16 voci `/v2?view=…` rendono senza segnaposto di pagina; sono coperti
+  anche dettagli Serie/Film, dettaglio torrent e flussi secondari Fumetti. I soli
+  residui consapevoli sono documentati in `docs/UI_V2.md`.

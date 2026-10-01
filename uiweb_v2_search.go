@@ -27,6 +27,7 @@ type v2SearchView struct {
 	Results  []v2SearchResult
 	Searched bool
 	Error    string
+	Redirect string
 }
 
 type v2ExplainView struct {
@@ -37,7 +38,13 @@ type v2ExplainView struct {
 // V2Search runs the manual release search server-side.
 func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 	query := strings.TrimSpace(r.FormValue("q"))
-	view := v2SearchView{Query: query}
+	view := v2SearchViewFrom(s, query, "/v2?view=search")
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+}
+
+func v2SearchViewFrom(s *AppState, query, redirect string) v2SearchView {
+	view := v2SearchView{Query: query, Redirect: redirect}
 	if query != "" {
 		view.Searched = true
 		body, _ := json.Marshal(map[string]string{"query": query})
@@ -63,8 +70,7 @@ func V2Search(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Error = v2JSONError(raw)
 		}
 	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_search_results", view, dict, eng)
+	return view
 }
 
 // V2SearchAdd adds a release to the acquisition queue.
@@ -74,11 +80,15 @@ func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]json.RawMessage{"release": json.RawMessage(release)})
 		v2InternalJSON(s, http.MethodPost, "/api/search/add", nil, body)
 	}
+	redirect := strings.TrimSpace(r.FormValue("redirect"))
+	if !strings.HasPrefix(redirect, "/v2") {
+		redirect = "/v2?view=search"
+	}
 	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/v2?view=search", http.StatusSeeOther)
+		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return
 	}
-	w.Header().Set("HX-Redirect", "/v2?view=search")
+	w.Header().Set("HX-Redirect", redirect)
 	w.WriteHeader(http.StatusNoContent)
 }
 

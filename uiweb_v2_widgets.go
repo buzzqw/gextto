@@ -702,6 +702,7 @@ func v2TorrentAddOptionsFrom(r *http.Request) v2TorrentAddOptions {
 		QueueTop:     r.FormValue("queue_top") == "1",
 		FirstLast:    r.FormValue("first_last") == "1",
 		MetadataOnly: r.FormValue("metadata_only") == "1",
+		Preallocate:  r.FormValue("preallocate") == "1",
 	}
 }
 
@@ -742,6 +743,7 @@ func V2DownloadsAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			QueueTop:       options.QueueTop,
 			FirstLast:      options.FirstLast,
 			StopAtMetadata: options.MetadataOnly,
+			Preallocate:    &options.Preallocate,
 		}
 		if savePath != "" {
 			payload.SavePath = &savePath
@@ -1051,18 +1053,29 @@ func v2TmdbRenderResults(w http.ResponseWriter, s *AppState, kind string, body [
 // V2TmdbAdd adds a TMDB result to the library.
 func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 	payload := TmdbAddInput{
-		Kind:     r.FormValue("kind"),
-		Name:     strings.TrimSpace(r.FormValue("name")),
-		Year:     strings.TrimSpace(r.FormValue("year")),
-		TmdbId:   strings.TrimSpace(r.FormValue("tmdb_id")),
-		TvdbId:   strings.TrimSpace(r.FormValue("tvdb_id")),
-		Language: "ita",
+		Kind:        r.FormValue("kind"),
+		Name:        strings.TrimSpace(r.FormValue("name")),
+		Year:        strings.TrimSpace(r.FormValue("year")),
+		TmdbId:      strings.TrimSpace(r.FormValue("tmdb_id")),
+		TvdbId:      strings.TrimSpace(r.FormValue("tvdb_id")),
+		Quality:     strings.TrimSpace(r.FormValue("quality")),
+		Language:    strings.TrimSpace(r.FormValue("language")),
+		Seasons:     strings.TrimSpace(r.FormValue("seasons")),
+		ArchivePath: strings.TrimSpace(r.FormValue("archive_path")),
+		Exclude:     strings.TrimSpace(r.FormValue("exclude")),
+		Subtitle:    strings.TrimSpace(r.FormValue("subtitle")),
+		Aliases:     strings.TrimSpace(r.FormValue("aliases")),
 	}
 	if payload.Kind == "" {
 		payload.Kind = "series"
 	}
 	if payload.Kind != "movie" {
-		payload.Seasons = "1+"
+		if payload.Seasons == "" {
+			payload.Seasons = "1+"
+		}
+	}
+	if payload.Language == "" {
+		payload.Language = "ita"
 	}
 	body, _ := json.Marshal(payload)
 	raw, status := v2InternalJSON(s, http.MethodPost, "/api/tmdb/add", nil, body)
@@ -1072,9 +1085,23 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		result["Error"] = true
 	} else {
 		result["Message"] = "aggiunto"
+		if redirect := strings.TrimSpace(r.FormValue("redirect")); r.Header.Get("HX-Request") != "" && strings.HasPrefix(redirect, "/v2") {
+			w.Header().Set("HX-Redirect", redirect)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_add_result", result, dict, eng)
+}
+
+func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
+	kind := strings.TrimSpace(r.FormValue("kind"))
+	if kind != "movie" {
+		kind = "series"
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_tmdb_manual", map[string]string{"Kind": kind}, dict, eng)
 }
 
 func v2AnyString(value any) string {

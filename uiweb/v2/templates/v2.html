@@ -59,6 +59,7 @@
         <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Chrome.Download}}</strong></div>
         <div class="top-metric top-metric-rate" title="Velocità di upload"><span class="top-metric-label">↑ Upload</span><strong>{{.Chrome.Upload}}</strong></div>
         <div class="top-metric" title="Torrent nella sessione"><span class="top-metric-label">Torrent</span><strong>{{.Chrome.Torrents}}</strong></div>
+        <div class="top-metric" title="Peer connessi / Seed"><span class="top-metric-label">P/S</span><strong>{{.Chrome.Peers}}/{{.Chrome.Seeds}}</strong></div>
         <div class="top-metric" title="Tempo stimato al prossimo ciclo"><span class="top-metric-label">Prossimo ciclo</span><strong>{{.Chrome.NextCycle}}</strong></div>
         <form method="post" action="/v2/language" class="lang-form">
           <select class="lang-select" name="lang" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" onchange="this.form.submit()">
@@ -75,10 +76,15 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
+        <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
         <a class="btn" href="/?view={{.Page}}" title="Apri la stessa pagina nella UI classica">Classica</a>
         <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Chrome.Status}}</span>
       </div>
     </header>
+    <section class="mobile-performance" aria-label="Connessioni e prestazioni">
+      <div class="mobile-performance-head"><span class="eyebrow">Connessioni e prestazioni</span><small class="muted">Aggiornamento automatico</small></div>
+      <div class="mobile-performance-grid"><div class="mobile-performance-tile"><span class="top-metric-label">CPU</span><strong>{{.Chrome.CPU}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.Chrome.RAM}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Chrome.Download}}</strong></div><div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Chrome.Upload}}</strong></div></div>
+    </section>
     <div class="content" id="v2-page" data-view="{{.Page}}">
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
       {{else if eq .Body "v2_downloads"}}{{template "v2_downloads" .Content}}
@@ -145,9 +151,15 @@
         <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-swap="none" hx-on::after-request="window.location.reload()">Serie TV</button>
         <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-swap="none" hx-on::after-request="window.location.reload()">Film</button>
         <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-swap="none" hx-on::after-request="window.location.reload()">Fumetti</button>
+        <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline"><input type="hidden" name="view" value="dashboard"><input type="hidden" name="path" value="/api/backup"><input type="hidden" name="method" value="POST"><input type="hidden" name="body" value="{}"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
+        <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
         <a class="btn" href="/v2?view=downloads">Vai a Scarico</a>
       </div>
     </div>
+  </div>
+  <div class="panel dashboard-next-panel">
+    <div class="panel-head"><h3>Prossima ricerca automatica</h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
+    <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div><p class="muted">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
   </div>
 
   <div class="grid-2 dashboard-session-grid">
@@ -191,11 +203,39 @@
       {{else}}<p class="muted">Nessun download recente.</p>{{end}}
     </div>
   </div>
+  <div class="panel dashboard-search-panel">
+    <div class="panel-head"><h3>Cerca</h3><small class="muted">Archivio, indexer e motori web</small></div>
+    <div class="panel-body">
+      <form class="search-row" hx-post="/v2/dashboard/search" hx-target="#v2-dashboard-search-results" hx-swap="outerHTML">
+        <input type="search" name="q" aria-label="Cerca in archivio, indexer e motori web" placeholder="Cerca in archivio, indexer e motori web…" />
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <div id="v2-dashboard-search-results">{{template "v2_dashboard_search_results" .Search}}</div>
+    </div>
+  </div>
+  <div class="panel dashboard-explore-panel">
+    <div class="panel-head"><h3>Esplora</h3><small class="muted">Accesso rapido alla libreria</small></div>
+    <div class="panel-body"><div class="toolbar dashboard-explore-actions">
+      <a class="btn" href="/v2?view=series">📺 Serie TV</a><a class="btn" href="/v2?view=movies">🎬 Film</a><a class="btn" href="/v2?view=search">🔎 Esplora release</a><a class="btn" href="/v2?view=comics">📚 Fumetti</a><a class="btn" href="/v2?view=archive">📦 Archivio</a><a class="btn" href="/v2?view=maintenance">🛠 Manutenzione</a>
+    </div></div>
+  </div>
+  <div class="panel dashboard-feed-panel">
+    <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted">Caricamento su richiesta</small></div>
+    <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/v2/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
+  </div>
   {{range .PanelTables}}{{template "v2_table_panel" .}}{{end}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
-  <p class="muted">Gli "ultimi trovati nei feed" restano nella UI classica (richiesta su domanda).</p>
 </div>
 {{end}}
+
+{{define "v2_dashboard_search_results"}}{{template "v2_search_results" .}}{{end}}
+
+{{define "v2_dashboard_feed"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>
+{{else if .Rows}}<table class="data-table"><thead><tr><th>Monitorato</th><th>Tipo</th><th>Release</th><th>Fonte</th><th>Azioni</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{.Name}}</td><td>{{if eq .Kind "movie"}}Film{{else}}Serie TV{{end}}</td><td class="truncate" title="{{.Title}}">{{.Title}}</td><td>{{.Source}}</td><td><form hx-post="/v2/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">Accoda</button></form></td></tr>{{end}}</tbody></table>
+{{else}}<p class="muted">Nessuna release trovata.</p>{{end}}
+{{end}}
+{{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
 
 {{/* ------------------------------------------------------------------ */}}
 {{/* Scarico                                                             */}}
@@ -216,10 +256,13 @@
         </div>
         <div class="toolbar torrent-options">
           <label class="check"><input type="checkbox" name="start" value="1" checked /> <span>Scarica subito</span></label>
-          <label class="check"><input type="checkbox" name="no_rename" value="1" /> <span>Non rinominare</span></label>
-          <label class="check"><input type="checkbox" name="sequential" value="1" /> <span>Sequenziale</span></label>
-          <label class="check"><input type="checkbox" name="first_last" value="1" /> <span>Primo/ultimo pezzo</span></label>
-          <label class="check"><input type="checkbox" name="metadata_only" value="1" /> <span>Solo metadati</span></label>
+           <label class="check"><input type="checkbox" name="no_rename" value="1" /> <span>Non rinominare</span></label>
+           <label class="check"><input type="checkbox" name="sequential" value="1" /> <span>Sequenziale</span></label>
+           <label class="check"><input type="checkbox" name="seed_mode" value="1" /> <span>Salta verifica</span></label>
+           <label class="check"><input type="checkbox" name="queue_top" value="1" /> <span>In cima alla coda</span></label>
+           <label class="check"><input type="checkbox" name="first_last" value="1" /> <span>Primo/ultimo pezzo</span></label>
+           <label class="check"><input type="checkbox" name="metadata_only" value="1" /> <span>Solo metadati</span></label>
+           <label class="check"><input type="checkbox" name="preallocate" value="1" checked /> <span>Prealloca spazio</span></label>
         </div>
       </form>
     </div>
@@ -237,7 +280,7 @@
 <div id="v2-torrents-wrap">
   <form id="v2-torrent-form" method="post" action="/v2/downloads/table"
         hx-post="/v2/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
-        hx-trigger="submit, input changed delay:300ms from:#v2-filter{{if .Auto}}, every 5s{{end}}">
+         hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     <input type="hidden" name="sort" value="{{.Sort}}">
     <input type="hidden" name="dir" value="{{.Dir}}">
     <div class="toolbar download-global-toolbar">
@@ -245,14 +288,27 @@
              placeholder="Filtra i torrent… ( -parola esclude )" aria-label="Filtra i torrent" hx-preserve="true" />
       <button class="btn sm" type="submit" name="refresh" value="1">Aggiorna</button>
       <button class="btn sm{{if .Auto}} primary{{end}}" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}">Auto: {{if .Auto}}on{{else}}off{{end}}</button>
+      <label class="field inline-field"><span>Tag</span><select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/v2/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
       <span class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
     </div>
+    <div class="toolbar download-temp-toolbar">
+      <span class="muted">{{if .TempActive}}Limite temporaneo attivo{{else}}Limite temporaneo disattivo{{end}}</span>
+      <label class="field inline-field"><span>DL KiB/s</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" /></label>
+      <label class="field inline-field"><span>UL KiB/s</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" /></label>
+      <label class="field inline-field"><span>minuti</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" /></label>
+      <button class="btn sm primary" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML">Applica</button>
+      <button class="btn sm danger" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML">Rimuovi</button>
+    </div>
     <div class="toolbar download-bulk-toolbar">
-      <span class="muted">Azioni sui torrent selezionati:</span>
+      <label class="check"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
+      <span class="muted" data-v2-selected-count>0 selezionati · Azioni:</span>
       <button class="btn sm" type="submit" name="bulk" value="pause">Pausa</button>
       <button class="btn sm" type="submit" name="bulk" value="resume">Riprendi</button>
       <button class="btn sm" type="submit" name="bulk" value="recheck">Recheck</button>
-      <label class="field inline-field"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}</select></label>
+      <label class="field inline-field"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
+      <input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" />
       <button class="btn sm" type="submit" name="bulk" value="tag">Assegna tag</button>
       <button class="btn sm" type="submit" name="bulk" value="untag">Rimuovi tag</button>
       <button class="btn sm danger" type="submit" name="bulk" value="remove" title="Rimuove i torrent selezionati dalla sessione mantenendo i file">Rimuovi (sessione)</button>
@@ -265,14 +321,14 @@
       <table class="data-table torrent-table">
         <caption class="sr-only">Torrent e download HTTP nella sessione</caption>
         <thead><tr>
-          <th scope="col"><span class="sr-only">Selezione</span></th>
+           <th scope="col"><span class="sr-only">Selezione</span></th>
           {{range .Columns}}<th scope="col" class="th-sort"><button class="table-sort-button" type="submit" name="sort_click" value="{{.Key}}">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button></th>{{end}}
           <th scope="col">Azioni</th>
         </tr></thead>
         <tbody>
           {{range .Rows}}
           <tr data-hash="{{.Hash}}">
-            <td><input type="checkbox" name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" /></td>
+             <td><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" /></td>
             <td class="torrent-name">
               <span class="truncate" title="{{.Name}}">{{.Name}}</span>
               {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
@@ -308,6 +364,7 @@
             <td class="row-actions">
               {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" name="http_action" value="pause:{{.ID}}" title="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
               {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi"><span aria-hidden="true">▶</span></button>{{end}}
+              <button class="btn sm icon-action" type="button" hx-get="/v2/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli"><span aria-hidden="true">ⓘ</span></button>
               <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" title="Rimuovi"><span aria-hidden="true">🗑️</span></button>
             </td>
           </tr>
@@ -339,22 +396,75 @@
 {{if .Error}}<p class="muted">{{.Error}}</p>{{else}}
 <div>
 {{if eq .Tab "general"}}
-  <div class="panel"><div class="panel-body">{{range .General}}<div class="row"><span>{{.Label}}</span><strong>{{.Value}}</strong></div>{{end}}</div></div>
+  <div class="panel"><div class="panel-body"><div class="stat-grid">{{range .General}}<div class="row"><span>{{.Label}}</span><strong class="truncate" title="{{.Value}}">{{.Value}}</strong></div>{{end}}</div>
+    <div class="toolbar detail-actions">
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "no_rename" "Body" (printf `{"value":%t}` (not .NoRename)) "Label" (ternary .NoRename "Rinomina abilitata" "Non rinominare"))}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia")}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "restart" "Body" "{}" "Label" "Riavvia")}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding"))}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin")}}
+      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "mark_failed" "Body" "{}" "Label" "Segna come fallito" "Class" "danger" "Confirm" "Segnare questo torrent come fallito?")}}
+      <button class="btn sm" type="button" hx-get="/v2/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML">Rimuovi</button>
+    </div>
+    <div class="toolbar detail-links">
+      <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet" target="_blank" rel="noopener">Magnet</a>
+      <a class="btn sm" href="/api/torrents/{{.Hash}}/export.torrent" download>Esporta .torrent</a>
+    </div>
+    <form class="toolbar detail-tag-form" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+      <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="tag" />
+      <input class="input" name="tag" placeholder="tag del torrent" aria-label="Tag del torrent" /><button class="btn sm" type="submit">Salva tag</button>
+    </form>
+    <form class="form-grid detail-web-seeds" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+      <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="web-seeds" />
+      <label class="field span-full"><span>Web seed (URL separati da spazio)</span><input class="input" name="urls" placeholder="https://example/file.zip" /></label>
+      <div class="form-actions"><button class="btn sm" type="submit" name="remove" value="false">Aggiungi</button><button class="btn sm danger" type="submit" name="remove" value="true">Rimuovi</button></div>
+    </form>
+  </div></div>
 {{else if eq .Tab "trackers"}}
-  {{if .Trackers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">URL</th><th scope="col">Tier</th><th scope="col">Stato</th><th scope="col">Fails</th><th scope="col">Seed/Peer</th></tr></thead><tbody>{{range .Trackers}}<tr><td class="truncate" title="{{.URL}}">{{.URL}}</td><td>{{.Tier}}</td><td>{{if .Message}}{{.Message}}{{else}}ok{{end}}</td><td>{{.Fails}}</td><td>{{.ScrapeComplete}}/{{.ScrapeIncomplete}}</td></tr>{{end}}</tbody></table></div>
-  {{else}}<p class="muted">Nessun tracker.</p>{{end}}
+  {{if .Trackers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">URL</th><th scope="col">Tier</th><th scope="col">Stato</th><th scope="col">Fails</th><th scope="col">Seed/Peer</th></tr></thead><tbody>{{range .Trackers}}<tr><td class="truncate" title="{{.URL}}">{{.URL}}</td><td>{{.Tier}}</td><td>{{if .Message}}{{.Message}}{{else if .Verified}}verificato{{else}}non verificato{{end}}</td><td>{{.Fails}}</td><td>{{.ScrapeComplete}}/{{.ScrapeIncomplete}}</td></tr>{{end}}</tbody></table></div>{{else}}<p class="muted">Nessun tracker.</p>{{end}}
+  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="trackers" /><input type="hidden" name="op" value="trackers" />
+    <label class="field span-full"><span>Modifica tracker (tier|URL per riga)</span><textarea class="input" name="trackers" rows="4" placeholder="0|https://tracker.example/announce">{{range .Trackers}}{{.Tier}}|{{.URL}}
+{{end}}</textarea></label>
+    <div class="form-actions"><button class="btn sm primary" type="submit">Salva tracker</button></div>
+  </form>
 {{else if eq .Tab "files"}}
-  {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col">Priorità</th></tr></thead><tbody>{{range .Files}}<tr><td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{bytes .Size}}</td><td>{{bytes .Downloaded}}</td><td>{{.Priority}}</td></tr>{{end}}</tbody></table></div>
+  {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col">Priorità</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option><option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option></select></form></td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun file.</p>{{end}}
 {{else if eq .Tab "peers"}}
-  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{.Client}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td></tr>{{end}}</tbody></table></div>
+  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th><th scope="col">Seed</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{.Client}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
+{{else if eq .Tab "limits"}}
+  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />
+    <label class="field"><span>Download (KiB/s)</span><input class="input" type="number" name="download_limit" value="{{kib .Torrent.DownloadLimit}}" title="-1 globale, 0 illimitato" /></label>
+    <label class="field"><span>Upload (KiB/s)</span><input class="input" type="number" name="upload_limit" value="{{kib .Torrent.UploadLimit}}" title="-1 globale, 0 illimitato" /></label>
+    <label class="field"><span>Ratio seed</span><input class="input" type="number" step="0.01" name="seed_ratio" value="{{.Torrent.SeedRatio}}" title="-1 globale, 0 illimitato" /></label>
+    <label class="field"><span>Giorni seed</span><input class="input" type="number" name="seed_days" value="{{.Torrent.SeedDays}}" title="-1 globale, 0 illimitato" /></label>
+    <label class="field"><span>Connessioni massime</span><input class="input" type="number" name="max_connections" value="-1" /></label>
+    <label class="field"><span>Upload massimi</span><input class="input" type="number" name="max_uploads" value="-1" /></label>
+    <div class="form-actions"><button class="btn sm primary" type="submit">Salva limiti</button></div>
+  </form>
+{{else if eq .Tab "storage"}}
+  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="storage" /><input type="hidden" name="op" value="storage" />
+    <label class="field span-full"><span>Nuovo percorso di storage</span><input class="input" name="path" value="{{.Torrent.SavePath}}" required /></label>
+    <div class="form-actions"><button class="btn sm primary" type="submit">Sposta storage</button></div>
+  </form>
 {{else}}
-  <p class="muted">Scheda descrittiva nella v2: si modifica dalla pagina classica.</p>
+  <p class="muted">Scheda non disponibile.</p>
   <div class="panel"><div class="panel-body">{{range .General}}<div class="row"><span>{{.Label}}</span><strong>{{.Value}}</strong></div>{{end}}</div></div>
 {{end}}
 </div>
 {{end}}
+
+{{end}}
+
+{{define "v2_detail_action"}}
+<form method="post" action="/v2/downloads/detail/action" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
+  <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
+  <button class="btn sm {{.Class}}" type="submit"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
+</form>
 {{end}}
 
 {{define "v2_remove_modal"}}
@@ -671,10 +781,58 @@
 
 {{define "v2_comics"}}
 <div class="view">
-  {{template "v2_table_panel" .Main}}
+  {{range .Groups}}
+    {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+    <div class="v2-section-stack">{{range .Sections}}{{template "v2_section" .}}{{end}}</div>
+  {{end}}
+  <div class="section-group-label">Download</div>
   {{template "v2_table_panel" .Downloads}}
+  <div id="v2-modal"></div>
 </div>
 {{end}}
+
+{{define "v2_comics_links_result"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>
+{{else}}
+  {{$has := false}}
+  {{range .Groups}}{{if .Items}}{{$has = true}}<div class="field comic-link-group"><span>{{.Label}}</span><div class="toolbar">
+    {{range $i, $item := .Items}}
+    <form hx-post="/v2/comics/download" hx-target="this" hx-swap="outerHTML" style="display:inline">
+      <input type="hidden" name="url" value="{{$item}}" />
+      <input type="hidden" name="method" value="{{.Method}}" />
+      <input type="hidden" name="title" value="Comic {{.Label}} {{$i | addOne}}" />
+      <input type="hidden" name="post_url" value="{{$.PostURL}}" />
+      <button class="btn sm" type="submit" title="{{$item}}">Scarica</button>
+    </form>
+    {{end}}
+  </div></div>{{end}}{{end}}
+  {{if not $has}}<p class="muted">Nessun link trovato.</p>{{end}}
+{{end}}
+{{end}}
+
+{{define "v2_comics_download_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
+
+{{define "v2_comic_edit_modal"}}
+<div class="overlay" style="display:block">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-comic-edit-title">
+    <div class="modal-head"><h3 id="v2-comic-edit-title">Modifica fumetto monitorato</h3>
+      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">
+      <form class="form-grid" method="post" action="/v2/comics/save" hx-post="/v2/comics/save" hx-swap="none">
+        <label class="field"><span>Titolo</span><input class="input" name="title" value="{{.Title}}" readonly /></label>
+        <label class="field"><span>Data inizio</span><input class="input" type="date" name="from_date" value="{{.FromDate}}" /></label>
+        <label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" value="{{.SavePath}}" placeholder="cartella fumetti predefinita" /></label>
+        <input type="hidden" name="tag_url" value="{{.TagURL}}" /><input type="hidden" name="post_url" value="{{.PostURL}}" />
+        <input type="hidden" name="cover_url" value="{{.CoverURL}}" /><input type="hidden" name="publisher" value="{{.Publisher}}" />
+        <input type="hidden" name="description" value="{{.Description}}" />
+        <div class="form-actions"><button class="btn primary" type="submit">Salva</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_comics_save_result"}}{{if .Error}}<p class="alert">{{.Message}}</p>{{else}}<p class="muted">Salvato.</p>{{end}}{{end}}
 
 {{define "v2_table_panel"}}
 <div class="view">
@@ -690,10 +848,26 @@
         {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
         {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
       </form>{{end}}
-      {{template "v2_table_body" .}}
+       {{template "v2_table_body" .}}
+       {{if or .FooterForm .FooterActions}}
+       <div class="table-panel-footer">
+         {{if .FooterForm}}{{template "v2_table_footer_form" .}}{{end}}
+         {{if .FooterActions}}<div class="form-actions">{{range .FooterActions}}{{template "v2_button" (dict "View" $.View "Path" .Path "Method" .Method "Body" .Body "Label" .Label "Class" .Class "Confirm" .Confirm "Hint" .Hint)}}{{end}}</div>{{end}}
+       </div>
+       {{end}}
     </div>
   </div>
 </div>
+{{end}}
+
+{{define "v2_table_footer_form"}}
+<form class="form-grid table-footer-form" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
+  <input type="hidden" name="view" value="{{.FooterView}}" />
+  <input type="hidden" name="path" value="{{.FooterForm.Path}}" />
+  <input type="hidden" name="wrap" value="{{.FooterForm.Wrap}}" />
+  {{range .FooterForm.Fields}}{{template "v2_form_field" .}}{{end}}
+  <div class="form-actions"><button class="btn sm primary" type="submit">{{if .FooterForm.Submit}}{{.FooterForm.Submit}}{{else}}Salva{{end}}</button></div>
+</form>
 {{end}}
 
 {{define "v2_table_body"}}
@@ -755,7 +929,7 @@
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
@@ -775,6 +949,18 @@
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
     <div class="toolbar">{{range .Links}}<a class="btn sm" href="{{.Href}}"{{if .Hint}} title="{{.Hint}}"{{end}}>{{.Label}}</a>{{end}}</div>
+  </div>
+</div>
+{{else if eq .Kind "comics_links"}}
+<div class="panel comics-links-panel">
+  <div class="panel-head"><h3>{{.Title}}</h3></div>
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <form class="toolbar" hx-post="/v2/comics/links" hx-target="#v2-comics-links-output" hx-swap="innerHTML">
+      <input class="input" type="url" name="url" placeholder="https://getcomics.org/..." aria-label="URL del post GetComics" required />
+      <button class="btn sm primary" type="submit">Trova link</button>
+    </form>
+    <div id="v2-comics-links-output" aria-live="polite"><p class="muted">Nessun link ancora cercato.</p></div>
   </div>
 </div>
 {{else if eq .Kind "integration"}}{{template "v2_integration_card" .}}
@@ -1017,6 +1203,15 @@
 
 {{define "v2_torrent_add_result"}}{{if .Error}}<p class="alert">{{.Message}}</p>{{else}}<p class="muted">{{.Message}}</p>{{end}}{{end}}
 
+{{define "v2_http_download_detail"}}
+<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-http-title">
+  <div class="modal-head"><h3 id="v2-http-title">{{.Title}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+  <div class="modal-body"><div class="stat-grid"><div class="row"><span>Metodo</span><strong>{{.Method}}</strong></div><div class="row"><span>Stato</span><strong>{{.Status}}</strong></div><div class="row"><span>Progresso</span><strong>{{printf "%.1f" .Progress}}%</strong></div><div class="row"><span>Scaricato</span><strong>{{bytesU .DownloadedBytes}}</strong></div><div class="row"><span>Velocità</span><strong>{{rate .SpeedBytes}}</strong></div><div class="row"><span>ETA</span><strong>{{if .ETASeconds}}{{.ETASeconds}} s{{else}}—{{end}}</strong></div></div>
+    {{if .URL}}<p class="muted"><strong>URL:</strong> <code>{{.URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>Destinazione:</strong> <code>{{.Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>Temporaneo:</strong> <code>{{.Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+  </div>
+</div></div>
+{{end}}
+
 {{define "v2_tmdb_calendar"}}
 {{if .Error}}<p class="alert">{{.Error}}</p>
 {{else if .Items}}
@@ -1063,6 +1258,22 @@
 
 {{define "v2_tmdb_add_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">aggiunto</span>{{end}}{{end}}
 
+{{define "v2_tmdb_manual"}}
+<div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
+  <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+  <div class="modal-body"><form class="form-grid" hx-post="/v2/tmdb/add" hx-swap="none">
+    <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="manual"><input type="hidden" name="redirect" value="/v2?view={{.Kind}}">
+    <label class="field"><span>Titolo</span><input class="input" name="name" required></label><label class="field"><span>Anno</span><input class="input" name="year"></label>
+    <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id"></label>
+    <label class="field"><span>Qualità richiesta</span><input class="input" name="quality" placeholder="es. 1080p"></label><label class="field"><span>Lingue</span><input class="input" name="language" value="ita"></label>
+    <label class="field"><span>Sottotitoli</span><input class="input" name="subtitle"></label>
+    {{if eq .Kind "series"}}<label class="field"><span>Stagioni</span><input class="input" name="seasons" value="1+"></label><label class="field"><span>Alias</span><input class="input" name="aliases"></label><label class="field span-full"><span>Percorso NAS</span><input class="input" name="archive_path"></label>{{end}}
+    <label class="field span-full"><span>Esclusioni</span><input class="input" name="exclude" placeholder="cam, ts"></label>
+    <div class="form-actions"><button class="btn primary" type="submit">Conferma</button></div>
+  </form></div>
+</div></div>
+{{end}}
+
 {{define "v2_button"}}
 <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
   <input type="hidden" name="view" value="{{.View}}">
@@ -1076,36 +1287,25 @@
 {{define "v2_search"}}
 <div class="view">
   <div class="panel">
-    <div class="panel-head"><h3>Ricerca release</h3><small class="muted">Feed, indexer e motori web (fino a 90 s)</small></div>
-    <div class="panel-body">
-      <form class="search-row" method="post" action="/v2/search" hx-post="/v2/search" hx-target="#v2-search-results" hx-swap="outerHTML">
-        <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
-        <button class="btn primary" type="submit">Cerca</button>
-      </form>
-      <div id="v2-search-results">{{template "v2_search_results" .}}</div>
-    </div>
-  </div>
-  <div class="panel">
     <div class="panel-head"><h3>Calendario TMDB</h3><small class="muted">Prossime uscite</small></div>
     <div class="panel-body" hx-get="/v2/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
   <div class="panel">
-    <div class="panel-head"><h3>Di tendenza su TMDB</h3></div>
+    <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted">Serie TV e film</small></div>
     <div class="panel-body">
-      <form class="toolbar" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
-        <input type="hidden" name="kind" value="series" />
-        <button class="btn sm primary" type="submit" name="mode" value="trending" title="Serie di tendenza questa settimana">Serie · Tendenza</button>
-        <button class="btn sm" type="submit" name="mode" value="popular">Serie · Popolari</button>
-        <button class="btn sm" type="submit" name="mode" value="top_rated">Serie · Più votati</button>
-      </form>
-      <form class="toolbar" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
-        <input type="hidden" name="kind" value="movie" />
-        <button class="btn sm primary" type="submit" name="mode" value="trending" title="Film di tendenza questa settimana">Film · Tendenza</button>
-        <button class="btn sm" type="submit" name="mode" value="popular">Film · Popolari</button>
-        <button class="btn sm" type="submit" name="mode" value="now_playing">Film · In programmazione</button>
-        <button class="btn sm" type="submit" name="mode" value="upcoming">Film · Prossime uscite</button>
-      </form>
-      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite"><p class="muted">Scegli un elenco per iniziare.</p></div>
+      <div class="toolbar"><strong class="muted">Tipo</strong>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" type="submit">Serie TV</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit">Film</button></form>
+      </div>
+      <div class="toolbar" style="margin-top:8px"><strong class="muted">Elenco</strong>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza settimana</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
+        <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
+      </div>
+      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/v2/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
     </div>
   </div>
   <div class="panel">
@@ -1116,6 +1316,16 @@
         <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
         <button class="btn primary" type="submit">Cerca su TMDB</button>
       </form>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Ricerca release</h3><small class="muted">Feed, indexer e motori web (fino a 90 s)</small></div>
+    <div class="panel-body">
+      <form class="search-row" method="post" action="/v2/search" hx-post="/v2/search" hx-target="#v2-search-results" hx-swap="outerHTML">
+        <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
+        <button class="btn primary" type="submit">Cerca</button>
+      </form>
+      <div id="v2-search-results">{{template "v2_search_results" .}}</div>
     </div>
   </div>
 </div>
@@ -1135,6 +1345,7 @@
     <td class="row-actions">
       <form method="post" action="/v2/search/add" hx-post="/v2/search/add" hx-swap="none" style="display:inline">
         <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
+        <input type="hidden" name="redirect" value="{{$.Redirect}}" />
         <button class="btn sm primary" type="submit">Aggiungi</button>
       </form>
     </td>
@@ -1175,8 +1386,11 @@
 
   <div class="panel">
     <div class="panel-body series-hero">
+      <div class="series-hero-main">
+        {{if .Poster}}<img class="series-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}<div class="series-poster placeholder">N/D</div>{{end}}
       <div class="series-hero-body">
         <div class="series-hero-top"><h2>{{.Name}}</h2></div>
+        <div class="series-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</div>
         <div class="series-badges">
           {{if .Quality}}<span class="badge">Qualità {{.Quality}}</span>{{end}}
           {{if .Language}}<span class="badge">Lingua {{.Language}}</span>{{end}}
@@ -1186,6 +1400,10 @@
           <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
           <span class="badge">{{.StatusLabel}}</span>
         </div>
+        {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge">ultima {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge">Prossima: {{.NextEpisode}}</span>{{end}}
+        {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{.}}</span>{{end}}</div>{{end}}
+        {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
+        {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
         {{if .ArchivePath}}<p class="muted"><small>Archivio: <code title="{{.ArchivePath}}">{{.ArchivePath}}</code></small></p>{{end}}
         {{if .SeasonButtons}}
         <div class="season-toggles">
@@ -1201,6 +1419,7 @@
           {{end}}
         </div>
         {{end}}
+      </div>
       </div>
     </div>
   </div>
@@ -1287,7 +1506,9 @@
   <div class="panel">
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
-      {{if .Overview}}<p>{{.Overview}}</p>{{end}}
+      {{if .Poster}}<img class="detail-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{end}}{{if .Overview}}<p>{{.Overview}}</p>{{end}}
+      <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}{{if .ReleaseDate}}<span class="badge">uscita {{.ReleaseDate}}</span>{{end}}</div>
+      {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
       <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
         <input type="hidden" name="view" value="movies" />
         <input type="hidden" name="redirect" value="/v2?view=movies&amp;movie={{.ID}}" />

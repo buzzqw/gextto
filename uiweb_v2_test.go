@@ -58,6 +58,45 @@ func TestV2ShellRendersNavigationAndReusesClassicCss(t *testing.T) {
 	}
 }
 
+func TestV2CoversEveryClassicMenuScreen(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	for _, view := range []string{"dashboard", "downloads", "series", "movies", "gaps", "search", "archive", "comics", "settings", "integrations", "maintenance", "health", "logs", "blocklist", "manual", "license"} {
+		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)
+		if code != http.StatusOK {
+			t.Fatalf("%s -> %d", view, code)
+		}
+		if strings.Contains(body, "non è ancora migrata nella UI v2") {
+			t.Fatalf("%s still renders the unavailable placeholder", view)
+		}
+	}
+}
+
+func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=dashboard", nil)
+	if code != http.StatusOK {
+		t.Fatalf("dashboard -> %d", code)
+	}
+	for _, marker := range []string{"Backup", "Prossima ricerca automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati"} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("dashboard missing %q", marker)
+		}
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2?view=downloads", nil)
+	if code != http.StatusOK {
+		t.Fatalf("downloads -> %d", code)
+	}
+	for _, marker := range []string{"Pulisci completati", "Elimina completati dopo il seed", "Limite temporaneo", "Nuovo tag", "Prealloca spazio", "Dettagli"} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("downloads missing %q", marker)
+		}
+	}
+}
+
 func TestV2DownloadsPageAndActions(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
@@ -325,6 +364,41 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 	// Trash widget renders (empty state in the hermetic state).
 	if code, body := v2Request(t, server, http.MethodGet, "/v2/partial/trash", nil); code != http.StatusOK || !strings.Contains(body, "Cestino") {
 		t.Fatalf("trash partial -> %d", code)
+	}
+}
+
+func TestV2ComicsPageIncludesAllClassicFlows(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=comics", nil)
+	if code != http.StatusOK {
+		t.Fatalf("comics page -> %d", code)
+	}
+	for _, marker := range []string{
+		"Esplora GetComics", "Pianificazione settimanale", "Cerca un Weekly Pack",
+		"Storico fumetti", "Storico Weekly Pack", "Scarica da GetComics", "v2-modal",
+	} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("comics page missing %q", marker)
+		}
+	}
+}
+
+func TestV2TorrentDetailExposesEditableTabs(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2/downloads/detail?hash=deadbeef&tab=limits", nil)
+	if code != http.StatusOK {
+		t.Fatalf("detail modal -> %d", code)
+	}
+	for _, marker := range []string{"Limiti", "Storage", "/v2/downloads/detail/panel"} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("detail modal missing %q", marker)
+		}
 	}
 }
 

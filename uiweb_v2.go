@@ -31,6 +31,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -60,6 +61,13 @@ var v2Templates = template.Must(template.New("v2").Funcs(template.FuncMap{
 			return whenTrue
 		}
 		return whenFalse
+	},
+	"addOne": func(value int) int { return value + 1 },
+	"kib": func(value int64) int64 {
+		if value < 0 {
+			return value
+		}
+		return value / 1024
 	},
 	"dict": v2Dict,
 }).ParseFS(v2TemplatesFS, "uiweb/v2/templates/*.html"))
@@ -114,11 +122,17 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /v2/empty", V2Empty)
 	v2Handle(s, mux, "POST /v2/language", V2SetLanguage)
 	v2Handle(s, mux, "POST /v2/run-cycle", V2RunCycle)
+	v2Handle(s, mux, "POST /v2/dashboard/search", V2DashboardSearch)
+	v2Handle(s, mux, "GET /v2/dashboard/feed", V2DashboardFeed)
+	v2Handle(s, mux, "POST /v2/dashboard/feed/add", V2DashboardFeedAdd)
 
 	// Scarico.
 	v2Handle(s, mux, "POST /v2/downloads/table", V2DownloadsTable)
+	v2Handle(s, mux, "POST /v2/downloads/settings", V2DownloadsSettings)
+	v2Handle(s, mux, "GET /v2/downloads/http-detail", V2HTTPDownloadDetail)
 	v2Handle(s, mux, "GET /v2/downloads/detail", V2DownloadsDetail)
 	v2Handle(s, mux, "GET /v2/downloads/detail/panel", V2DownloadsDetailPanel)
+	v2Handle(s, mux, "POST /v2/downloads/detail/action", V2DownloadsDetailAction)
 	v2Handle(s, mux, "GET /v2/downloads/remove", V2DownloadsRemoveModal)
 	v2Handle(s, mux, "POST /v2/downloads/remove", V2DownloadsRemove)
 
@@ -160,6 +174,13 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /v2/tmdb/discover", V2TmdbDiscover)
 	v2Handle(s, mux, "POST /v2/tmdb/search", V2TmdbSearch)
 	v2Handle(s, mux, "POST /v2/tmdb/add", V2TmdbAdd)
+	v2Handle(s, mux, "GET /v2/tmdb/manual", V2TmdbManual)
+
+	// Fumetti: link finder, download diretto e modifica della libreria.
+	v2Handle(s, mux, "POST /v2/comics/links", V2ComicsLinks)
+	v2Handle(s, mux, "POST /v2/comics/download", V2ComicsDownload)
+	v2Handle(s, mux, "GET /v2/comics/edit", V2ComicsEdit)
+	v2Handle(s, mux, "POST /v2/comics/save", V2ComicsSave)
 
 	// Dettagli Serie/Film.
 	v2Handle(s, mux, "POST /v2/series/save", V2SeriesSave)
@@ -267,6 +288,7 @@ type v2DashboardView struct {
 	uiDashboardData
 	PanelTables []v2TableData
 	Jobs        *v2JobsView
+	Search      v2SearchView
 }
 
 type v2HealthView struct {
@@ -305,6 +327,7 @@ func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 		uiDashboardData: base,
 		PanelTables:     v2SectionTables(s, r, base.Panels, []string{"dashboard-calendar"}),
 		Jobs:            &jobs,
+		Search:          v2SearchView{Redirect: "/v2?view=dashboard"},
 	}
 }
 
@@ -317,7 +340,7 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 }
 
 type v2ComicsView struct {
-	Main      v2TableData
+	Groups    []v2Group
 	Downloads v2TableData
 }
 
@@ -334,9 +357,11 @@ func v2ComicsDownloadSpec(spec uiTableSpec) uiTableSpec {
 }
 
 func v2ComicsViewFrom(s *AppState, r *http.Request) v2ComicsView {
+	page, _ := uiPanelsPageFor("comics", s)
+	groups := v2SectionGroups(s, r, "comics", page.Sections)
 	spec, _ := uiTableSpecFor("comics")
 	return v2ComicsView{
-		Main:      v2TableDataFrom(s, r, "comics", spec),
+		Groups:    groups,
 		Downloads: v2TableDataFrom(s, r, "comics-downloads", v2ComicsDownloadSpec(spec)),
 	}
 }
@@ -636,18 +661,24 @@ var v2TorrentColumns = []v2Column{
 }
 
 type v2TorrentsView struct {
-	Rows          []uiTorrentRow
-	HTTPDownloads []ComicDownload
-	Count         int
-	UpdatedAt     string
-	Sort          string
-	Dir           string
-	Filter        string
-	Auto          bool
-	Columns       []v2Column
-	TagOptions    []string
-	Message       string
-	Error         bool
+	Rows                []uiTorrentRow
+	HTTPDownloads       []ComicDownload
+	Count               int
+	UpdatedAt           string
+	Sort                string
+	Dir                 string
+	Filter              string
+	Auto                bool
+	Columns             []v2Column
+	TagOptions          []string
+	TagFilter           string
+	TempDL              int64
+	TempUL              int64
+	TempMinutes         int64
+	TempActive          bool
+	AutoRemoveCompleted bool
+	Message             string
+	Error               bool
 }
 
 func v2SortArrow(sortKey, dir, key string) string {
@@ -758,20 +789,46 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 	}
 	filter := r.FormValue("filter")
 	rows := v2FilterRows(data.Rows, filter)
+	tagFilter := strings.TrimSpace(r.FormValue("tag_filter"))
+	if tagFilter != "" {
+		filtered := rows[:0]
+		for _, row := range rows {
+			matched := tagFilter == "__none__" && len(row.Tags) == 0
+			if tagFilter != "__none__" {
+				for _, tag := range row.Tags {
+					if strings.EqualFold(strings.TrimSpace(tag), tagFilter) {
+						matched = true
+						break
+					}
+				}
+			}
+			if matched {
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
+	}
 	v2SortRows(rows, sortKey, dir)
+	settings := uiDownloadsPageFor(s)
 	return v2TorrentsView{
-		Rows:          rows,
-		HTTPDownloads: data.HTTPDownloads,
-		Count:         data.Count,
-		UpdatedAt:     data.UpdatedAt,
-		Sort:          sortKey,
-		Dir:           dir,
-		Filter:        filter,
-		Auto:          r.FormValue("auto") == "1",
-		Columns:       v2TorrentColumns,
-		TagOptions:    uiDownloadTagOptions(s, latestConfig(s)),
-		Message:       message,
-		Error:         isErr,
+		Rows:                rows,
+		HTTPDownloads:       data.HTTPDownloads,
+		Count:               data.Count,
+		UpdatedAt:           data.UpdatedAt,
+		Sort:                sortKey,
+		Dir:                 dir,
+		Filter:              filter,
+		Auto:                r.FormValue("auto") == "1",
+		Columns:             v2TorrentColumns,
+		TagOptions:          uiDownloadTagOptions(s, latestConfig(s)),
+		TagFilter:           tagFilter,
+		TempDL:              settings.TempDL,
+		TempUL:              settings.TempUL,
+		TempMinutes:         settings.TempMinutes,
+		TempActive:          settings.TempActive,
+		AutoRemoveCompleted: settings.AutoRemoveCompleted,
+		Message:             message,
+		Error:               isErr,
 	}
 }
 
@@ -878,6 +935,13 @@ func v2TorrentBulkAction(s *AppState, r *http.Request, action string) (string, b
 			}
 		case "tag", "untag":
 			tag := strings.TrimSpace(r.FormValue("tag"))
+			if action == "tag" && tag == "__new__" {
+				tag = strings.TrimSpace(r.FormValue("new_tag"))
+				if tag != "" {
+					catalogBody, _ := json.Marshal(map[string]string{"tag": tag})
+					v2InternalJSON(s, http.MethodPost, "/api/download-tags", nil, catalogBody)
+				}
+			}
 			if action == "untag" {
 				tag = ""
 			}
@@ -900,6 +964,9 @@ type v2DetailView struct {
 	Hash     string
 	Name     string
 	Tab      string
+	Torrent  models.TorrentView
+	Magnet   string
+	NoRename bool
 	Tabs     []v2DetailTab
 	General  []v2KV
 	Trackers []models.TrackerView
@@ -933,11 +1000,14 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		return view
 	}
 	view.Name = torrent.Name
+	view.Torrent = torrent
 	magnet := ""
 	if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
 		magnet = meta.Release.Magnet
 	}
 	noRename, _ := s.db.TorrentNoRename(hash)
+	view.NoRename = noRename
+	view.Magnet = magnet
 	view.General = []v2KV{
 		{Label: "Stato", Value: uiStateLabel(torrent.State)},
 		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", torrent.Progress)},
@@ -945,6 +1015,10 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Scaricato", Value: logging.HumanBytesI64(torrent.TotalDone)},
 		{Label: "↓ / ↑", Value: logging.HumanRate(saturatingInt64(torrent.DownloadRate)) + " / " + logging.HumanRate(saturatingInt64(torrent.UploadRate))},
 		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
+		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
+		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
+		{Label: "Versione torrent", Value: torrent.TorrentVersion},
+		{Label: "Auto-managed", Value: ternaryString(torrent.AutoManaged, "sì", "no")},
 		{Label: "Save path", Value: torrent.SavePath},
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
@@ -982,6 +1056,113 @@ func V2DownloadsDetailPanel(w http.ResponseWriter, r *http.Request, s *AppState)
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, r.FormValue("hash"), tab), dict, eng)
+}
+
+// V2DownloadsDetailAction keeps all torrent-detail mutations inside the v2
+// modal. The browser submits ordinary form fields; this handler translates them
+// into the existing JSON API payloads and returns the refreshed active tab.
+func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState) {
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	op := strings.TrimSpace(r.FormValue("op"))
+	tab := strings.TrimSpace(r.FormValue("tab"))
+	if tab == "" {
+		tab = "general"
+	}
+	if hash == "" {
+		http.Error(w, "torrent mancante", http.StatusBadRequest)
+		return
+	}
+	path := ""
+	body := []byte(r.FormValue("body"))
+	if body == nil || len(body) == 0 {
+		body = []byte(`{}`)
+	}
+	switch op {
+	case "no_rename", "reannounce", "restart", "mark_failed", "super-seeding":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/" + op
+	case "pin":
+		path = "/api/torrents/pin"
+		body, _ = json.Marshal(map[string]any{"hash": hash})
+	case "tag":
+		path = "/api/torrent-tags"
+		body, _ = json.Marshal(map[string]string{"hash": hash, "tag": r.FormValue("tag")})
+	case "limits":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/limits"
+		download := v2ParseInt(r.FormValue("download_limit"), -1) * 1024
+		upload := v2ParseInt(r.FormValue("upload_limit"), -1) * 1024
+		ratio := v2ParseFloat(r.FormValue("seed_ratio"), -1)
+		days := v2ParseInt(r.FormValue("seed_days"), -1)
+		maxConnections := v2ParseInt(r.FormValue("max_connections"), -1)
+		maxUploads := v2ParseInt(r.FormValue("max_uploads"), -1)
+		body, _ = json.Marshal(map[string]any{"download_limit": download, "upload_limit": upload,
+			"seed_ratio": ratio, "seed_days": days, "max_connections": maxConnections, "max_uploads": maxUploads})
+	case "storage":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/storage"
+		body, _ = json.Marshal(StoragePath{Path: strings.TrimSpace(r.FormValue("path"))})
+	case "web-seeds":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/web-seeds"
+		urls := strings.Fields(strings.TrimSpace(r.FormValue("urls")))
+		body, _ = json.Marshal(WebSeedsInput{Urls: urls, Remove: r.FormValue("remove") == "true"})
+	case "trackers":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/trackers"
+		entries := []TrackerEntryInput{}
+		for _, line := range strings.Split(r.FormValue("trackers"), "\n") {
+			parts := strings.SplitN(strings.TrimSpace(line), "|", 2)
+			if len(parts) != 2 || strings.TrimSpace(parts[1]) == "" {
+				continue
+			}
+			tier, _ := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
+			entries = append(entries, TrackerEntryInput{Tier: int32(tier), Url: strings.TrimSpace(parts[1])})
+		}
+		body, _ = json.Marshal(TrackersInput{Trackers: entries})
+	case "files-priority":
+		path = "/api/torrents/" + url.PathEscape(hash) + "/files/priority"
+		files, _, _ := s.activeEngine().Files(hash)
+		priorities := make([]int32, len(files))
+		for index, file := range files {
+			priorities[index] = int32(file.Priority)
+		}
+		index := int(v2ParseInt(r.FormValue("index"), -1))
+		if index < 0 || index >= len(priorities) {
+			http.Error(w, "indice file non valido", http.StatusBadRequest)
+			return
+		}
+		priorities[index] = int32(v2ParseInt(r.FormValue("priority"), 0))
+		body, _ = json.Marshal(FilePrioritiesInput{Priorities: priorities})
+	default:
+		http.Error(w, "azione dettaglio non valida", http.StatusBadRequest)
+		return
+	}
+	raw, status := v2InternalJSON(s, http.MethodPost, path, nil, body)
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/v2?view=downloads", http.StatusSeeOther)
+		return
+	}
+	if status >= 400 {
+		view := v2DetailViewFrom(s, hash, tab)
+		view.Error = v2JSONError(raw)
+		dict, eng := v2Dictionaries(s)
+		v2Render(w, http.StatusOK, "v2_detail_panel", view, dict, eng)
+		return
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, hash, tab), dict, eng)
+}
+
+func v2ParseInt(value string, fallback int64) int64 {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func v2ParseFloat(value string, fallback float64) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 // V2DownloadsRemoveModal renders the remove-with-options dialog.

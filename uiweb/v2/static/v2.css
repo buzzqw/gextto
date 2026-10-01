@@ -145,3 +145,26 @@
   border-radius: 6px;
   flex: none;
 }
+
+.detail-poster {
+  width: 150px;
+  max-height: 225px;
+  object-fit: cover;
+  border-radius: 8px;
+  float: left;
+  margin: 0 16px 10px 0;
+}
+.series-overview { max-width: 80ch; line-height: 1.5; }
+.series-genres, .detail-links { margin-top: 8px; }
+.table-panel-footer { margin-top: 14px; border-top: 1px solid rgba(127,127,127,.18); padding-top: 12px; }
+.table-footer-form { align-items: end; }
+.comic-link-group { margin-top: 12px; }
+.comic-link-group > span { display: block; margin-bottom: 6px; font-weight: 600; }
+.detail-actions { margin-top: 14px; }
+.detail-tag-form { margin-top: 10px; }
+.detail-tag-form .input { min-width: 220px; }
+.torrent-detail-tabs { overflow-x: auto; }
+@media (max-width: 700px) {
+  .detail-poster { width: 100px; max-height: 150px; }
+  .table-footer-form { display: grid; }
+}

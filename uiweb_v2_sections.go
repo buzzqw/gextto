@@ -46,6 +46,7 @@ type v2Section struct {
 	FormWrap      string
 	FormSubmit    string
 	FormRender    string
+	ManualAdd     string
 	ListEditor    *v2ListEditorView
 	ClassicURL    string
 	// Integration cards (Trakt, Simkl) carry their child sections inline.
@@ -102,6 +103,7 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.FormWrap = section.Form.Wrap
 		item.FormSubmit = section.Form.Submit
 		item.FormRender = section.Form.Render
+		item.ManualAdd = section.Form.ManualAdd
 		if item.FormSubmit == "" {
 			item.FormSubmit = "Salva"
 		}
@@ -114,6 +116,9 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 		item.Title = section.Links.Title
 		item.Hint = section.Links.Hint
 		item.Links = section.Links.Links
+	case "comics_links":
+		item.Title = "Scarica da GetComics"
+		item.Hint = "Incolla l'URL di un post GetComics per risolvere i link disponibili e avviare un download."
 	case "oauth":
 		item.Title = section.OAuth.Name
 		item.OAuth = section.OAuth
@@ -201,7 +206,7 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	kinds := map[string]string{}
 	for key, list := range r.Form {
 		switch key {
-		case "view", "path", "wrap", "render":
+		case "view", "path", "wrap", "render", "redirect":
 			continue
 		}
 		if strings.HasPrefix(key, "_v2_kind_") {
@@ -261,10 +266,14 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(path, "/api/") {
 		v2InternalJSON(s, http.MethodPost, path, nil, encoded)
 	}
-	if view == "" {
-		view = "dashboard"
+	target := strings.TrimSpace(r.FormValue("redirect"))
+	if !strings.HasPrefix(target, "/v2") {
+		if view == "" {
+			view = "dashboard"
+		}
+		target = "/v2?view=" + url.QueryEscape(view)
 	}
-	w.Header().Set("HX-Redirect", "/v2?view="+url.QueryEscape(view))
+	w.Header().Set("HX-Redirect", target)
 	w.WriteHeader(http.StatusNoContent)
 }
 
