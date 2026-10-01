@@ -693,7 +693,15 @@ func RunCycleDomain(
 		}
 	}
 	if minFreeBytes != nil {
-		if free := FreeSpaceBytes(cfg.LibtorrentDir); free != nil && *free < *minFreeBytes {
+		free := FreeSpaceBytes(cfg.LibtorrentDir)
+		if free == nil {
+			logging.Warn("cycle: cannot determine free space, downloads skipped",
+				"path", cfg.LibtorrentDir,
+				"minimum", logging.HumanBytes(*minFreeBytes))
+			stats.Error("min_free_space_unavailable")
+			return stats, nil
+		}
+		if *free < *minFreeBytes {
 			logging.Warn("cycle: free space below min_free_space_gb, downloads skipped",
 				"free", logging.HumanBytes(*free),
 				"minimum", logging.HumanBytes(*minFreeBytes))

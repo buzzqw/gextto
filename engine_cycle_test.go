@@ -48,6 +48,21 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 	}
 }
 
+func TestCycleSkipsDownloadsWhenConfiguredFreeSpaceCannotBeRead(t *testing.T) {
+	state := newCycleState(t)
+	cfg := *state.cfg
+	cfg.LibtorrentDir = "\x00unreadable-download-volume"
+	cfg.Settings = map[string]string{"min_free_space_gb": "1"}
+
+	stats, err := RunCycle(context.Background(), &cfg, state.engine, state.db, state.archive, state.comics, state.notifier, state.activeEngine())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.ErrorDetails["min_free_space_unavailable"] != 1 {
+		t.Fatalf("free-space error details = %+v", stats.ErrorDetails)
+	}
+}
+
 // TestCycleCancelledContextAborts verifies that a cycle with an already
 // cancelled context (daemon shutting down) returns cleanly without doing work,
 // so the torrent session can be destroyed without a late engine call.

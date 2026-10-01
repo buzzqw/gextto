@@ -708,6 +708,16 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		s.cycle_lock.Unlock()
 		running = false
 	}
+	if !s.manualCyclePending.CompareAndSwap(false, true) {
+		logging.Info("manual cycle request coalesced", "domain", gh1_domainLabel(domain))
+		jsonStatus(w, http.StatusAccepted, map[string]any{
+			"ok":      true,
+			"started": false,
+			"queued":  true,
+			"message": "Ciclo manuale già avviato o accodato",
+		})
+		return
+	}
 	logging.Info("manual cycle requested", "domain", gh1_domainLabel(domain), "queued", running)
 	taskDomain := domain
 	// Cancelled on shutdown so a manual cycle releases the torrent engine
@@ -717,6 +727,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	go func() {
 		defer done()
 		defer cancelCycle()
+		defer s.manualCyclePending.Store(false)
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
 		logging.Info("manual cycle started", "domain", gh1_domainLabel(taskDomain))

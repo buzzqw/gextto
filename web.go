@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -474,14 +475,18 @@ type AppState struct {
 	// the embedded libtorrent adapter (see activeEngine in torrent_engine.go).
 	// engine_mu guards it because the backend can be switched at runtime while
 	// the background worker reads it.
-	engine_mu       sync.RWMutex
-	torrent_engine  TorrentEngine
-	torrent_events  *EventLog
-	notifier        *Notifier
-	tmdb            *TmdbClient
-	last_cycle      *CycleState
-	cycle_lock      *sync.Mutex
-	rename_progress *RenameProgress
+	engine_mu      sync.RWMutex
+	torrent_engine TorrentEngine
+	torrent_events *EventLog
+	notifier       *Notifier
+	tmdb           *TmdbClient
+	last_cycle     *CycleState
+	cycle_lock     *sync.Mutex
+	// manualCyclePending coalesces repeated manual cycle requests while one is
+	// waiting for, or holding, cycle_lock. Without it a rapid series of clicks
+	// could create an unbounded backlog of full monitoring runs.
+	manualCyclePending atomic.Bool
+	rename_progress    *RenameProgress
 	// rename_progress_mu guards rename_progress: the rename-all job writes its
 	// progress from a background goroutine while the UI polls it, and two
 	// concurrent rename requests must not both pass the "already running" check.

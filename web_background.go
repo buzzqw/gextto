@@ -1581,6 +1581,13 @@ func cycleWorker(state *AppState) {
 								return
 							}
 							if reloaded, err := LoadConfig(state.config_path); err == nil && !reloaded.Active {
+								// Carry the reloaded inactive state out of the delay. Without
+								// this assignment the stale `cfg.Active` below could still
+								// launch exactly one unwanted scheduled cycle.
+								cfg = reloaded
+								if state.cfg.DryRun {
+									cfg.DryRun = true
+								}
 								break
 							}
 						}
