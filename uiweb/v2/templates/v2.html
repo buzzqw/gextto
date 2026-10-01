@@ -98,7 +98,7 @@
 </html>{{end}}
 
 {{define "v2_live_top_metrics"}}
-<div id="v2-live-top-metrics" class="top-live-metrics" hx-get="/v2/partial/chrome" hx-trigger="load, every 5s" hx-swap="outerHTML">
+<div id="v2-live-top-metrics" class="top-live-metrics" hx-get="/v2/partial/chrome" hx-trigger="every 5s" hx-swap="outerHTML">
   <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
   <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
   <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Download}}</strong></div>
@@ -110,7 +110,7 @@
 {{end}}
 
 {{define "v2_live_mobile_metrics"}}
-<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/v2/partial/chrome?mobile=1" hx-trigger="load, every 5s" hx-swap="outerHTML">
+<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/v2/partial/chrome?mobile=1" hx-trigger="every 5s" hx-swap="outerHTML">
   <div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
   <div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
   <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Download}}</strong></div>
