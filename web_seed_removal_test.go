@@ -164,6 +164,19 @@ func TestRemoveSeededCompletedKeepsSourceBeforeArchive(t *testing.T) {
 	}
 }
 
+func TestSeedingCompletionAlreadyRecorded(t *testing.T) {
+	db, _, _, _, _ := seedTestSetup(t)
+	if tevSeedingCompletionAlreadyRecorded(db, seedTestHash) {
+		t.Fatal("an archived completion must not be treated as an unarchived seeding completion")
+	}
+	if _, err := db.db.Exec("UPDATE torrent_meta SET processed_path='' WHERE hash=?", seedTestHash); err != nil {
+		t.Fatal(err)
+	}
+	if !tevSeedingCompletionAlreadyRecorded(db, seedTestHash) {
+		t.Fatal("expected completed torrent without an archive path to suppress duplicate completion")
+	}
+}
+
 // TestDetachCompletedArchivedSinglesHonorsAutoRemove makes sure the recovery
 // pass does not remove kept completed singles behind the user's back.
 func TestDetachCompletedArchivedSinglesHonorsAutoRemove(t *testing.T) {

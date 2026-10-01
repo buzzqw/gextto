@@ -1814,6 +1814,19 @@ func tev_completeTorrent(cfg *Config, db *Database, torrents TorrentSession, eve
 	return tev_completeTorrentOptions(cfg, db, torrents, event, release, tmdb, false)
 }
 
+// tevSeedingCompletionAlreadyRecorded suppresses duplicate finished alerts for
+// a single episode deliberately retained in its download directory while it
+// seeds. It does not apply to storage_moved, which is the later event that
+// imports the file into the archive at the end of seeding.
+func tevSeedingCompletionAlreadyRecorded(db *Database, hash string) bool {
+	status, err := db.TorrentStatus(hash)
+	if err != nil || status == nil || *status != "completed" {
+		return false
+	}
+	processed, err := db.TorrentProcessed(hash)
+	return err == nil && (processed == nil || strings.TrimSpace(*processed) == "")
+}
+
 // tev_notifySeeding announces a completed download that is now seeding from the
 // download folder and will be moved into the library at the end of the seed.
 // The same `torrent_completed` event is used, flagged with `seeding` so the
@@ -2209,6 +2222,10 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// release again. A "completed" row whose file is missing is re-processed
 		// instead of being skipped forever.
 		if tevIgnoreRepeatedCompletion(db, event.Hash) {
+			return false, nil
+		}
+		if tevSeedingCompletionAlreadyRecorded(db, event.Hash) {
+			logging.Debug("ignoring duplicate completion while single episode is seeding", "name", event.Name)
 			return false, nil
 		}
 		release := metadata.Release
