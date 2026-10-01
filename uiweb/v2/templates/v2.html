@@ -84,10 +84,11 @@
       {{else if eq .Body "v2_logs"}}{{template "v2_logs" .Content}}
       {{else if eq .Body "v2_manual"}}{{template "v2_manual" .Content}}
       {{else if eq .Body "v2_license"}}{{template "v2_license" .Content}}
-      {{else if eq .Body "v2_comics"}}{{template "v2_comics" .Content}}
-      {{else if eq .Body "v2_table_page"}}{{template "v2_table_panel" .Content}}
-      {{else if eq .Body "v2_panels_page"}}{{template "v2_panels_page" .Content}}
-      {{else if eq .Body "v2_search"}}{{template "v2_search" .Content}}
+       {{else if eq .Body "v2_comics"}}{{template "v2_comics" .Content}}
+       {{else if eq .Body "v2_table_page"}}{{template "v2_table_panel" .Content}}
+       {{else if eq .Body "v2_panels_page"}}{{template "v2_panels_page" .Content}}
+		{{else if eq .Body "v2_movies"}}{{template "v2_movies" .Content}}
+       {{else if eq .Body "v2_search"}}{{template "v2_search" .Content}}
       {{else if eq .Body "v2_series_detail"}}{{template "v2_series_detail" .Content}}
       {{else if eq .Body "v2_movie_detail"}}{{template "v2_movie_detail" .Content}}
       {{else}}{{template "v2_unavailable" .Content}}{{end}}
@@ -970,6 +971,26 @@
     </div>
   {{end}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
+  <div id="v2-modal"></div>
+</div>
+{{end}}
+
+{{define "v2_movies"}}
+<div class="view">
+  <nav class="toolbar" role="tablist" aria-label="Sezioni film">
+    <a class="chip{{if eq .Tab "monitored"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "monitored"}}true{{else}}false{{end}}" href="/v2?view=movies">Film monitorati</a>
+    <a class="chip{{if eq .Tab "downloaded"}} active{{end}}" role="tab" aria-selected="{{if eq .Tab "downloaded"}}true{{else}}false{{end}}" href="/v2?view=movies&amp;tab=downloaded">Film scaricati</a>
+  </nav>
+  {{if eq .Tab "downloaded"}}
+    {{template "v2_table_panel" .History}}
+  {{else}}
+    {{range .Monitored.Groups}}
+      {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+      <div class="{{if $.Monitored.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
+        {{range .Sections}}{{template "v2_section" .}}{{end}}
+      </div>
+    {{end}}
+  {{end}}
   <div id="v2-modal"></div>
 </div>
 {{end}}

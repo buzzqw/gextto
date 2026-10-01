@@ -416,6 +416,26 @@ type v2PanelsView struct {
 	Stack  bool
 }
 
+// v2MovieLibraryView keeps the monitored library and its download history in
+// one Film page, selected through the same in-page tabs used by rextto.
+type v2MovieLibraryView struct {
+	Tab       string
+	Monitored v2PanelsView
+	History   v2TableData
+}
+
+func v2MovieLibraryViewFrom(s *AppState, r *http.Request) v2MovieLibraryView {
+	page := v2MovieLibraryView{Tab: r.FormValue("tab")}
+	if page.Tab == "downloaded" {
+		spec, _ := uiTableSpecFor("movie-history")
+		page.History = v2TableDataFrom(s, r, "movie-history", spec)
+		return page
+	}
+	page.Tab = "monitored"
+	page.Monitored = v2PanelsViewFrom(s, r, "movies")
+	return page
+}
+
 func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
 	page := v2PanelsView{}
 	if panels, ok := uiPanelsPageFor(view, s); ok {
@@ -463,7 +483,9 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_manual", uiManualDataFrom(s)
 	case "license":
 		return "v2_license", uiLicenseData{Text: uiLicenseText}
-	case "series", "movies", "gaps", "archive", "blocklist", "maintenance", "integrations":
+	case "movies":
+		return "v2_movies", v2MovieLibraryViewFrom(s, r)
+	case "series", "gaps", "archive", "blocklist", "maintenance", "integrations":
 		return "v2_panels_page", v2PanelsViewFrom(s, r, view)
 	case "search":
 		return "v2_search", v2SearchView{}
