@@ -2,6 +2,10 @@ package gextto
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 )
@@ -124,5 +128,69 @@ func TestCycleDomainNoSourcesIsNoOp(t *testing.T) {
 				t.Fatalf("RunCycleDomain(%s): DownloadsStarted = %d, want 0", domain, stats.DownloadsStarted)
 			}
 		})
+	}
+}
+
+func TestScrapeAllRetainsFastIndexerResultsWhenSearchTimesOut(t *testing.T) {
+	fast := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Example.Show.S01E01.1080p.WEB-DL</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`)
+	}))
+	defer fast.Close()
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer slow.Close()
+
+	oldTimeout := automaticSearchTimeout
+	automaticSearchTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { automaticSearchTimeout = oldTimeout })
+	oldIndexerTimeout := indexerRequestTimeout
+	indexerRequestTimeout = time.Second
+	t.Cleanup(func() { indexerRequestTimeout = oldIndexerTimeout })
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Series = []SeriesConfig{{Name: "Example Show", Enabled: true}}
+	cfg.FeedURLs = nil
+	cfg.Indexers = []IndexerConfig{{Name: "fast", URL: fast.URL, Enabled: true}, {Name: "slow", URL: slow.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+
+	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(releases) != 1 || releases[0].Title != "Example.Show.S01E01.1080p.WEB-DL" {
+		t.Fatalf("fast result lost after timeout: %+v", releases)
+	}
+}
+
+func TestScrapeAllSearchesSeriesAliases(t *testing.T) {
+	var mutex sync.Mutex
+	queries := map[string]int{}
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		mutex.Lock()
+		queries[query]++
+		mutex.Unlock()
+		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Series = []SeriesConfig{{Name: "Canonical Show", Aliases: []string{"Titolo Alternativo"}, Enabled: true}}
+	cfg.FeedURLs = nil
+	cfg.Indexers = []IndexerConfig{{Name: "test", URL: indexer.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+
+	if _, err := state.engine.ScrapeAll(context.Background(), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	mutex.Lock()
+	defer mutex.Unlock()
+	if queries["Canonical Show"] != 1 || queries["Titolo Alternativo"] != 1 {
+		t.Fatalf("alias queries = %+v", queries)
 	}
 }

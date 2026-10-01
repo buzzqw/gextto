@@ -36,19 +36,21 @@ type Engine struct {
 
 // Concurrency and timeout budgets, copied verbatim .
 const (
-	queryConcurrency       = 2
-	feedConcurrency        = 4
-	indexerConcurrency     = 4
-	feedFetchBudget        = 75 * time.Second
-	automaticSearchTimeout = 90 * time.Second
-	manualSearchTimeout    = 15 * time.Second
+	queryConcurrency    = 2
+	feedConcurrency     = 4
+	indexerConcurrency  = 4
+	feedFetchBudget     = 75 * time.Second
+	manualSearchTimeout = 15 * time.Second
 )
 
 // indexerRequestTimeout bounds a single indexer/manager request. It is shorter
 // than automaticSearchTimeout so that one slow source fails on its own while the
 // healthy sources still return their results, instead of consuming the whole
 // search budget.
-var indexerRequestTimeout = 60 * time.Second
+var (
+	automaticSearchTimeout = 90 * time.Second
+	indexerRequestTimeout  = 60 * time.Second
+)
 
 // NewEngine builds the default engine, mirroring `Engine::new`.
 func NewEngine() *Engine {
@@ -138,6 +140,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		IDs   [][2]string
 	}
 	var targets []searchTarget
+	seenTargets := map[string]struct{}{}
 	for _, series := range cfg.Series {
 		if !series.Enabled {
 			continue
@@ -151,13 +154,30 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		if strings.TrimSpace(series.TmdbID) != "" {
 			ids = append(ids, [2]string{"tmdbid", strings.TrimSpace(series.TmdbID)})
 		}
-		targets = append(targets, searchTarget{Query: series.Name, IDs: ids})
+		queries := append([]string{series.Name}, series.Aliases...)
+		for _, query := range queries {
+			query = strings.TrimSpace(query)
+			if query == "" {
+				continue
+			}
+			key := strings.ToLower(query)
+			if _, exists := seenTargets[key]; exists {
+				continue
+			}
+			seenTargets[key] = struct{}{}
+			targets = append(targets, searchTarget{Query: query, IDs: ids})
+		}
 	}
 	for _, movie := range cfg.Movies {
 		if !movie.Enabled {
 			continue
 		}
-		targets = append(targets, searchTarget{Query: fmt.Sprintf("%s %s", movie.Name, movie.Year)})
+		query := fmt.Sprintf("%s %s", movie.Name, movie.Year)
+		key := strings.ToLower(query)
+		if _, exists := seenTargets[key]; !exists {
+			seenTargets[key] = struct{}{}
+			targets = append(targets, searchTarget{Query: query})
+		}
 	}
 	targetsTotal := len(targets)
 	logging.Info(fmt.Sprintf(
@@ -190,7 +210,6 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 					"query", query,
 					"timeout_secs", int(automaticSearchTimeout.Seconds()))
 				timeoutQueries <- query
-				items = nil
 			}
 			logging.Debug("scheduled title search completed",
 				"query", query,
@@ -229,7 +248,16 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	usable := func(query string, items []models.Release) int {
 		for i := range cfg.Series {
 			series := &cfg.Series[i]
-			if series.Name != query {
+			matchesQuery := strings.EqualFold(series.Name, query)
+			if !matchesQuery {
+				for _, alias := range series.Aliases {
+					if strings.EqualFold(strings.TrimSpace(alias), query) {
+						matchesQuery = true
+						break
+					}
+				}
+			}
+			if !matchesQuery {
 				continue
 			}
 			count := 0
@@ -410,7 +438,6 @@ func (e *Engine) SearchQuery(ctx context.Context, cfg *Config, query string) []m
 		logging.Warn("gap-fill title search timed out",
 			"query", query,
 			"timeout_secs", int(automaticSearchTimeout.Seconds()))
-		return []models.Release{}
 	}
 	return items
 }

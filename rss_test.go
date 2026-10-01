@@ -3,7 +3,11 @@ package gextto
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +15,36 @@ import (
 	"github.com/buzzqw/gextto/internal/cache"
 	"github.com/buzzqw/gextto/internal/models"
 )
+
+func TestTraditionalListingResolvesEveryVisibleDetailLink(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/listing" {
+			for index := 1; index <= 13; index++ {
+				_, _ = fmt.Fprintf(w, `<a href="/torrent/%d">Example.Show.S01E%02d.1080p.WEB-DL</a>`, index, index)
+			}
+			return
+		}
+		index, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/torrent/"))
+		_, _ = fmt.Fprintf(w, `<a href="magnet:?xt=urn:btih:abcdefabcdefabcdefabcdefabcdefabcdefab%02x&amp;dn=Example.Show.S01E%02d.1080p.WEB-DL">download</a>`, index, index)
+	}))
+	defer server.Close()
+
+	base, err := url.Parse(server.URL + "/listing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := fetch_html(context.Background(), base.String(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items, _, _, err := fetch_traditional_listing(context.Background(), defaultHTTPClient, base.String(), body, "Corsaro", "test", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 13 {
+		t.Fatalf("resolved detail releases = %d, want 13", len(items))
+	}
+}
 
 func TestFlareSolverrErrorMessageIsUserFriendly(t *testing.T) {
 	if got := flaresolverr_error_message(context.DeadlineExceeded); got != "FlareSolverr did not respond in time" {

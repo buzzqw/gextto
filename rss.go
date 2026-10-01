@@ -1226,9 +1226,6 @@ func fetch_traditional_listing(ctx context.Context, client *http.Client, rawURL,
 		if title == "" {
 			continue
 		}
-		if len(pending) >= 12 {
-			continue
-		}
 		if detail, err := base.Parse(href); err == nil {
 			pending = append(pending, rssDetailLink{title: title, url: detail})
 		}
