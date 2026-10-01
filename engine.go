@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/cache"
@@ -41,6 +42,9 @@ const (
 	indexerConcurrency  = 4
 	feedFetchBudget     = 75 * time.Second
 	manualSearchTimeout = 15 * time.Second
+	// A full library can take several minutes: keep the operator informed while
+	// bounded title searches are still in flight, without logging every title.
+	searchProgressInterval = time.Minute
 )
 
 // indexerRequestTimeout bounds a single indexer/manager request. It is shorter
@@ -193,6 +197,33 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	results := make([]searchResult, len(targets))
 	timeoutQueries := make(chan string, len(targets))
 	var searchWG sync.WaitGroup
+	var searchesCompleted atomic.Int32
+	searchStarted := time.Now()
+	progressDone := make(chan struct{})
+	defer close(progressDone)
+	if targetsTotal > 0 {
+		go func() {
+			ticker := time.NewTicker(searchProgressInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-progressDone:
+					return
+				case <-ticker.C:
+					completed := int(searchesCompleted.Load())
+					remaining := targetsTotal - completed
+					if remaining < 0 {
+						remaining = 0
+					}
+					logging.Info("title search progress",
+						"completed", completed,
+						"total", targetsTotal,
+						"remaining", remaining,
+						"elapsed", logging.HumanDuration(int64(time.Since(searchStarted).Seconds())))
+				}
+			}
+		}()
+	}
 	searchSem := make(chan struct{}, queryConcurrency)
 	for i, target := range targets {
 		searchWG.Add(1)
@@ -200,6 +231,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		go func(index int, query string, ids [][2]string) {
 			defer searchWG.Done()
 			defer func() { <-searchSem }()
+			defer searchesCompleted.Add(1)
 			started := time.Now()
 			searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
 			items := searchOneWithDB(searchCtx, cfg, query, ids, nil, e.db, false)
