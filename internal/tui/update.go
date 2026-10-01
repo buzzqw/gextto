@@ -104,8 +104,11 @@ func (m *Model) Update(k Key) Action {
 	case k.Kind == KeyBackTab:
 		m.Tab = Tab((int(m.Tab) + tabCount - 1) % tabCount)
 		return m.loadTabAction()
-	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '7':
+	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '7' && m.Tab != TabLibrary:
 		m.Tab = Tab(k.Rune - '1')
+		return m.loadTabAction()
+	case k.Kind == KeyRune && k.Rune == '8' && m.Tab != TabLibrary:
+		m.Tab = TabLibrary
 		return m.loadTabAction()
 	}
 
@@ -124,6 +127,8 @@ func (m *Model) Update(k Key) Action {
 		return m.updateMissing(k)
 	case TabBlocklist:
 		return m.updateBlocklist(k)
+	case TabLibrary:
+		return m.updateLibrary(k)
 	}
 	return Action{}
 }
@@ -215,6 +220,11 @@ func (m *Model) submitPrompt() Action {
 		return Action{Kind: ActionRunCycle, Domain: domain}
 	case PromptSearch:
 		if value == "" {
+			return Action{}
+		}
+		if m.Tab == TabLibrary {
+			m.LibraryFilter = value
+			m.LibrarySelected, m.LibraryScroll = 0, 0
 			return Action{}
 		}
 		return Action{Kind: ActionSearch, Text: value}
@@ -354,7 +364,8 @@ func (m *Model) updateDetail(k Key) Action {
 }
 
 func (m *Model) updateTorrents(k Key) Action {
-	count := len(m.VisibleTorrents())
+	items := m.VisibleDownloads()
+	count := len(items)
 	page := 10
 	switch {
 	case k.Kind == KeyDown:
@@ -376,7 +387,17 @@ func (m *Model) updateTorrents(k Key) Action {
 	case k.Kind != KeyRune:
 		return Action{}
 	default:
-		torrent := m.SelectedTorrent()
+		row := m.SelectedDownload()
+		torrent := row.Torrent
+		if row.HTTP != nil {
+			switch k.Rune {
+			case 'p':
+				return Action{Kind: ActionHTTPPauseToggle, HTTPID: row.HTTP.ID}
+			case 'd', 'D':
+				m.Confirm = &confirm{MessageKey: "prompt.httpremove", Args: []any{Shorten(row.HTTP.Title, 40)}, Action: Action{Kind: ActionHTTPRemove, HTTPID: row.HTTP.ID}}
+			}
+			return Action{}
+		}
 		hash := ""
 		if torrent != nil {
 			hash = torrent.Hash
@@ -642,6 +663,25 @@ func (m *Model) updateBlocklist(k Key) Action {
 			entry := m.Blocklist[m.BlocklistSelected]
 			m.Confirm = &confirm{MessageKey: "prompt.blocklistremove", Args: []any{Shorten(entry.Title, 45)}, Action: Action{Kind: ActionRemoveBlocklist, Hash: entry.Hash}}
 		}
+	}
+	return Action{}
+}
+
+func (m *Model) updateLibrary(k Key) Action {
+	switch {
+	case k.Kind == KeyRune && k.Rune == '1':
+		m.Library = LibrarySeries
+		m.LibrarySelected, m.LibraryScroll = 0, 0
+	case k.Kind == KeyRune && k.Rune == '2':
+		m.Library = LibraryMovies
+		m.LibrarySelected, m.LibraryScroll = 0, 0
+	case k.Kind == KeyRune && k.Rune == '3':
+		m.Library = LibraryComics
+		m.LibrarySelected, m.LibraryScroll = 0, 0
+	case k.Kind == KeyRune && k.Rune == 's':
+		m.Prompt = newPrompt(PromptSearch, m.LibraryFilter)
+	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
+		m.LibrarySelected = moveSelection(m.LibrarySelected, len(m.VisibleLibrary()), k.Kind)
 	}
 	return Action{}
 }

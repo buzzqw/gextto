@@ -170,6 +170,40 @@ func TestClientReadsCatalogViews(t *testing.T) {
 	}
 }
 
+func TestClientReadsLiveDownloadsAndLibraries(t *testing.T) {
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request, _ string) {
+		switch r.URL.Path {
+		case "/api/comics/downloads":
+			writeJSON(t, w, []map[string]any{{"id": "http-1", "title": "Comic", "status": "downloading", "progress": 25}})
+		case "/api/series":
+			writeJSON(t, w, map[string]any{"items": []map[string]any{{"name": "Series", "enabled": true}}})
+		case "/api/movies":
+			writeJSON(t, w, map[string]any{"items": []map[string]any{{"id": 3, "name": "Movie", "year": "2026"}}})
+		case "/api/comics":
+			writeJSON(t, w, []map[string]any{{"id": 4, "title": "Comic", "enabled": false}})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	ctx := context.Background()
+	downloads, err := client.ComicDownloads(ctx)
+	if err != nil || len(downloads) != 1 || downloads[0].ID != "http-1" {
+		t.Fatalf("ComicDownloads: %v %+v", err, downloads)
+	}
+	series, err := client.Series(ctx)
+	if err != nil || len(series) != 1 || series[0].Name != "Series" {
+		t.Fatalf("Series: %v %+v", err, series)
+	}
+	movies, err := client.Movies(ctx)
+	if err != nil || len(movies) != 1 || movies[0].ID != 3 {
+		t.Fatalf("Movies: %v %+v", err, movies)
+	}
+	comics, err := client.Comics(ctx)
+	if err != nil || len(comics) != 1 || comics[0].Title != "Comic" {
+		t.Fatalf("Comics: %v %+v", err, comics)
+	}
+}
+
 func TestClientWritesEndpoints(t *testing.T) {
 	client, recorded := newTestClient(t, func(w http.ResponseWriter, r *http.Request, body string) {
 		if r.Method == http.MethodPost {
@@ -225,27 +259,39 @@ func TestClientWritesEndpoints(t *testing.T) {
 	if err := client.SetSpeedLimits(ctx, 100, 50); err != nil {
 		t.Fatalf("SetSpeedLimits: %v", err)
 	}
+	if err := client.PauseHTTPDownload(ctx, "http-1"); err != nil {
+		t.Fatalf("PauseHTTPDownload: %v", err)
+	}
+	if err := client.ResumeHTTPDownload(ctx, "http-1"); err != nil {
+		t.Fatalf("ResumeHTTPDownload: %v", err)
+	}
+	if err := client.RemoveHTTPDownload(ctx, "http-1"); err != nil {
+		t.Fatalf("RemoveHTTPDownload: %v", err)
+	}
 	if _, err := client.CleanTrash(ctx); err != nil {
 		t.Fatalf("CleanTrash: %v", err)
 	}
 
 	want := map[string]string{
-		"POST /api/run_now?domain=movies":     "",
-		"POST /api/send-magnet":               `"magnet":"magnet:?xt=urn:btih:x"`,
-		"POST /api/search":                    `"query":"query"`,
-		"POST /api/search/add":                `"release"`,
-		"POST /api/torrents/abc/pause":        "",
-		"POST /api/torrents/abc/resume":       "",
-		"POST /api/torrents/abc/restart":      "",
-		"POST /api/torrents/abc/recheck":      "",
-		"POST /api/torrents/abc/reannounce":   "",
-		"POST /api/torrents/abc/remove":       `"delete_files":true`,
-		"POST /api/torrents/pin":              `"hash":"abc"`,
-		"POST /api/torrents/unpin":            "",
-		"POST /api/torrents/abc/no_rename":    `"value":true`,
-		"POST /api/torrents/remove_completed": `"delete_files":false`,
-		"POST /api/set-speed-limits":          `"download_kib":100`,
-		"POST /api/maintenance/clean-trash":   `"force":true`,
+		"POST /api/run_now?domain=movies":          "",
+		"POST /api/send-magnet":                    `"magnet":"magnet:?xt=urn:btih:x"`,
+		"POST /api/search":                         `"query":"query"`,
+		"POST /api/search/add":                     `"release"`,
+		"POST /api/torrents/abc/pause":             "",
+		"POST /api/torrents/abc/resume":            "",
+		"POST /api/torrents/abc/restart":           "",
+		"POST /api/torrents/abc/recheck":           "",
+		"POST /api/torrents/abc/reannounce":        "",
+		"POST /api/torrents/abc/remove":            `"delete_files":true`,
+		"POST /api/torrents/pin":                   `"hash":"abc"`,
+		"POST /api/torrents/unpin":                 "",
+		"POST /api/torrents/abc/no_rename":         `"value":true`,
+		"POST /api/torrents/remove_completed":      `"delete_files":false`,
+		"POST /api/set-speed-limits":               `"download_kib":100`,
+		"POST /api/comics/downloads/http-1/pause":  "",
+		"POST /api/comics/downloads/http-1/resume": "",
+		"POST /api/comics/downloads/http-1/remove": `"delete_files":false`,
+		"POST /api/maintenance/clean-trash":        `"force":true`,
 	}
 	seen := map[string]bool{}
 	for _, request := range *recorded {

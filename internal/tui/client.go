@@ -45,6 +45,53 @@ type Torrent struct {
 	UploadLimit     int64    `json:"upload_limit"`
 }
 
+// ComicDownload mirrors one live HTTP/MEGA comic download.
+type ComicDownload struct {
+	ID              string  `json:"id"`
+	Title           string  `json:"title"`
+	Method          string  `json:"method"`
+	Status          string  `json:"status"`
+	Progress        float64 `json:"progress"`
+	DownloadedBytes uint64  `json:"downloaded_bytes"`
+	TotalBytes      *uint64 `json:"total_bytes"`
+	SpeedBytes      uint64  `json:"speed_bytes"`
+	ETASeconds      *uint64 `json:"eta_seconds"`
+	Error           *string `json:"error"`
+	Tag             string  `json:"tag"`
+}
+
+// SeriesLibraryItem is the compact row returned by /api/series.
+type SeriesLibraryItem struct {
+	Name        string   `json:"name"`
+	Seasons     string   `json:"seasons"`
+	Quality     string   `json:"quality"`
+	Language    string   `json:"language"`
+	ArchivePath string   `json:"archive_path"`
+	Enabled     bool     `json:"enabled"`
+	Aliases     []string `json:"aliases"`
+}
+
+// MovieLibraryItem is the compact row returned by /api/movies.
+type MovieLibraryItem struct {
+	ID                   int64  `json:"id"`
+	Name                 string `json:"name"`
+	Year                 string `json:"year"`
+	Quality              string `json:"quality"`
+	Language             string `json:"language"`
+	LanguageRequirements string `json:"language_requirements"`
+	Enabled              bool   `json:"enabled"`
+}
+
+// ComicLibraryItem is the compact row returned by /api/comics.
+type ComicLibraryItem struct {
+	ID                    int64  `json:"id"`
+	Title                 string `json:"title"`
+	Publisher             string `json:"publisher"`
+	FromDate              string `json:"from_date"`
+	LatestDownloadedTitle string `json:"latest_downloaded_title"`
+	Enabled               bool   `json:"enabled"`
+}
+
 // TorrentDetail is the response of /api/torrents/{hash}.
 type TorrentDetail struct {
 	OK       bool    `json:"ok"`
@@ -327,6 +374,50 @@ func (c *Client) Torrents(ctx context.Context) ([]Torrent, error) {
 	return torrents, err
 }
 
+// ComicDownloads fetches the live HTTP/MEGA comic downloads.
+func (c *Client) ComicDownloads(ctx context.Context) ([]ComicDownload, error) {
+	var downloads []ComicDownload
+	err := c.get(ctx, "/api/comics/downloads", &downloads)
+	if downloads == nil {
+		downloads = []ComicDownload{}
+	}
+	return downloads, err
+}
+
+// Series fetches the monitored TV series summary rows.
+func (c *Client) Series(ctx context.Context) ([]SeriesLibraryItem, error) {
+	var response struct {
+		Items []SeriesLibraryItem `json:"items"`
+	}
+	err := c.get(ctx, "/api/series", &response)
+	if response.Items == nil {
+		response.Items = []SeriesLibraryItem{}
+	}
+	return response.Items, err
+}
+
+// Movies fetches the monitored movie summary rows.
+func (c *Client) Movies(ctx context.Context) ([]MovieLibraryItem, error) {
+	var response struct {
+		Items []MovieLibraryItem `json:"items"`
+	}
+	err := c.get(ctx, "/api/movies", &response)
+	if response.Items == nil {
+		response.Items = []MovieLibraryItem{}
+	}
+	return response.Items, err
+}
+
+// Comics fetches the monitored comic summary rows.
+func (c *Client) Comics(ctx context.Context) ([]ComicLibraryItem, error) {
+	var items []ComicLibraryItem
+	err := c.get(ctx, "/api/comics", &items)
+	if items == nil {
+		items = []ComicLibraryItem{}
+	}
+	return items, err
+}
+
 // TorrentDetail fetches one torrent with its magnet and no-rename flag.
 func (c *Client) TorrentDetail(ctx context.Context, hash string) (TorrentDetail, error) {
 	var detail TorrentDetail
@@ -490,6 +581,21 @@ func (c *Client) Pause(ctx context.Context, hash string) error {
 // Resume resumes a torrent.
 func (c *Client) Resume(ctx context.Context, hash string) error {
 	return c.postJSON(ctx, "/api/torrents/"+url.PathEscape(hash)+"/resume", map[string]any{}, nil)
+}
+
+// PauseHTTPDownload pauses a live comic HTTP download.
+func (c *Client) PauseHTTPDownload(ctx context.Context, id string) error {
+	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/pause", map[string]any{}, nil)
+}
+
+// ResumeHTTPDownload resumes a paused comic HTTP download.
+func (c *Client) ResumeHTTPDownload(ctx context.Context, id string) error {
+	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/resume", map[string]any{}, nil)
+}
+
+// RemoveHTTPDownload removes a live comic HTTP download without deleting files.
+func (c *Client) RemoveHTTPDownload(ctx context.Context, id string) error {
+	return c.postJSON(ctx, "/api/comics/downloads/"+url.PathEscape(id)+"/remove", map[string]any{"delete_files": false}, nil)
 }
 
 // Restart restarts a torrent.

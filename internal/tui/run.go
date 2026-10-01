@@ -330,25 +330,33 @@ func applyStream(model *Model, event streamEvent) {
 
 // refreshResult carries one background poll of the daemon.
 type refreshResult struct {
-	status       *Status
-	statusErr    string
-	metrics      *DashboardStats
-	hasMetrics   bool
-	torrents     []Torrent
-	hasTorrents  bool
-	logs         []string
-	hasLogs      bool
-	archive      []ArchiveEntry
-	hasArchive   bool
-	archiveTotal int
-	archivePages int
-	archivePage  int
-	missing      []Gap
-	hasMissing   bool
-	blocklist    []BlocklistEntry
-	hasBlocklist bool
-	health       *Health
-	healthErr    string
+	status        *Status
+	statusErr     string
+	metrics       *DashboardStats
+	hasMetrics    bool
+	torrents      []Torrent
+	hasTorrents   bool
+	logs          []string
+	hasLogs       bool
+	archive       []ArchiveEntry
+	hasArchive    bool
+	archiveTotal  int
+	archivePages  int
+	archivePage   int
+	missing       []Gap
+	hasMissing    bool
+	blocklist     []BlocklistEntry
+	hasBlocklist  bool
+	health        *Health
+	healthErr     string
+	httpDownloads []ComicDownload
+	hasHTTP       bool
+	series        []SeriesLibraryItem
+	hasSeries     bool
+	movies        []MovieLibraryItem
+	hasMovies     bool
+	comics        []ComicLibraryItem
+	hasComics     bool
 }
 
 // fetchModel polls the daemon with a short timeout. It is safe to call from a
@@ -368,11 +376,18 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 			result.metrics = &stats
 			result.hasMetrics = true
 		}
+		if health, err := client.Health(callCtx); err == nil {
+			result.health = &health
+		}
 	}
-	if tab == TabTorrents {
+	if tab == TabTorrents || tab == TabStatus {
 		if torrents, err := client.Torrents(callCtx); err == nil {
 			result.torrents = torrents
 			result.hasTorrents = true
+		}
+		if downloads, err := client.ComicDownloads(callCtx); err == nil {
+			result.httpDownloads = downloads
+			result.hasHTTP = true
 		}
 	}
 	if tab == TabLogs && includeLogs {
@@ -399,6 +414,16 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 		if items, err := client.Blocklist(callCtx); err == nil {
 			result.blocklist = items
 			result.hasBlocklist = true
+		}
+	case TabLibrary:
+		if series, err := client.Series(callCtx); err == nil {
+			result.series, result.hasSeries = series, true
+		}
+		if movies, err := client.Movies(callCtx); err == nil {
+			result.movies, result.hasMovies = movies, true
+		}
+		if comics, err := client.Comics(callCtx); err == nil {
+			result.comics, result.hasComics = comics, true
 		}
 	}
 	if tab == TabHealth {
@@ -430,11 +455,23 @@ func (m *Model) applyRefresh(result refreshResult) {
 	} else if result.statusErr != "" {
 		m.SetDaemonState(false, result.statusErr)
 	}
+	if result.hasTorrents {
+		m.SetTorrents(result.torrents)
+	}
+	if result.hasHTTP {
+		m.SetHTTPDownloads(result.httpDownloads)
+	}
 	if result.hasMetrics && result.metrics != nil {
 		m.SetMetrics(*result.metrics)
 	}
-	if result.hasTorrents {
-		m.SetTorrents(result.torrents)
+	if result.hasSeries {
+		m.SetLibrary(result.series)
+	}
+	if result.hasMovies {
+		m.SetLibrary(result.movies)
+	}
+	if result.hasComics {
+		m.SetLibrary(result.comics)
 	}
 	if result.hasLogs && !m.LogStreamConnected {
 		m.SetLogs(result.logs)
@@ -562,6 +599,38 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		} else {
 			result.message = tr.T("msg.paused")
 		}
+		result.refresh = true
+	case ActionHTTPPauseToggle:
+		downloads, err := client.ComicDownloads(callCtx)
+		if err != nil {
+			return fail("msg.actionfailed", tr.T("label.downloads"), err)
+		}
+		paused := false
+		for _, download := range downloads {
+			if download.ID == action.HTTPID {
+				paused = strings.EqualFold(download.Status, "paused")
+				break
+			}
+		}
+		if paused {
+			err = client.ResumeHTTPDownload(callCtx, action.HTTPID)
+		} else {
+			err = client.PauseHTTPDownload(callCtx, action.HTTPID)
+		}
+		if err != nil {
+			return fail("msg.actionfailed", tr.T("label.downloads"), err)
+		}
+		if paused {
+			result.message = tr.T("msg.resumed")
+		} else {
+			result.message = tr.T("msg.paused")
+		}
+		result.refresh = true
+	case ActionHTTPRemove:
+		if err := client.RemoveHTTPDownload(callCtx, action.HTTPID); err != nil {
+			return fail("msg.actionfailed", tr.T("label.downloads"), err)
+		}
+		result.message = tr.T("msg.removed")
 		result.refresh = true
 	case ActionRestart:
 		if err := client.Restart(callCtx, action.Hash); err != nil {

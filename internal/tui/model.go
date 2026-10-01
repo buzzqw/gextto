@@ -17,6 +17,16 @@ const (
 	TabArchive
 	TabMissing
 	TabBlocklist
+	TabLibrary
+)
+
+// LibraryKind selects the compact monitored-library view.
+type LibraryKind int
+
+const (
+	LibrarySeries LibraryKind = iota
+	LibraryMovies
+	LibraryComics
 )
 
 // SortMode selects the torrent list ordering.
@@ -112,6 +122,8 @@ const (
 	ActionLoadConfig
 	ActionSaveSetting
 	ActionSetLanguage
+	ActionHTTPPauseToggle
+	ActionHTTPRemove
 )
 
 // Action is a request emitted by Update and executed against the daemon.
@@ -120,6 +132,7 @@ type Action struct {
 	Domain      string
 	Text        string
 	Hash        string
+	HTTPID      string
 	DeleteFiles bool
 	DL, UL      int64
 	Release     map[string]any
@@ -230,13 +243,22 @@ type Model struct {
 	TransferHistory   []TransferSample
 	Notification      string
 	NotificationUntil time.Time
+	HTTPStates        map[string]string
 
-	Torrents     []Torrent
-	Archive      []ArchiveEntry
-	ArchiveTotal int
-	ArchivePages int
-	Missing      []Gap
-	Blocklist    []BlocklistEntry
+	Torrents        []Torrent
+	HTTPDownloads   []ComicDownload
+	Series          []SeriesLibraryItem
+	Movies          []MovieLibraryItem
+	Comics          []ComicLibraryItem
+	Library         LibraryKind
+	LibrarySelected int
+	LibraryScroll   int
+	LibraryFilter   string
+	Archive         []ArchiveEntry
+	ArchiveTotal    int
+	ArchivePages    int
+	Missing         []Gap
+	Blocklist       []BlocklistEntry
 
 	Logs               []string
 	LogFilter          string
@@ -282,6 +304,7 @@ func NewModel(tr *Translator) *Model {
 		DetailView:    DetailGeneral,
 		ArchivePage:   1,
 		ColorsEnabled: true,
+		HTTPStates:    make(map[string]string),
 	}
 }
 
@@ -293,14 +316,14 @@ func (m *Model) SetStatus(status Status) { m.Status = &status }
 // SetTorrents replaces the torrent list.
 func (m *Model) SetTorrents(torrents []Torrent) {
 	selectedHash := ""
-	if selected := m.SelectedTorrent(); selected != nil {
-		selectedHash = selected.Hash
+	if selected := m.SelectedDownload(); selected.Torrent != nil {
+		selectedHash = selected.Torrent.Hash
 	}
 	m.Torrents = torrents
-	visible := m.visibleTorrents()
+	visible := m.VisibleDownloads()
 	if selectedHash != "" {
-		for index, torrent := range visible {
-			if torrent.Hash == selectedHash {
+		for index, row := range visible {
+			if row.Torrent != nil && row.Torrent.Hash == selectedHash {
 				m.Selected = index
 				return
 			}
@@ -309,6 +332,50 @@ func (m *Model) SetTorrents(torrents []Torrent) {
 	if m.Selected >= len(visible) {
 		m.Selected = max(0, len(visible)-1)
 	}
+}
+
+// SetHTTPDownloads replaces the live HTTP download list and emits notifications
+// only for transitions observed after the first snapshot.
+func (m *Model) SetHTTPDownloads(downloads []ComicDownload) {
+	selectedID := ""
+	if selected := m.SelectedDownload(); selected.HTTP != nil {
+		selectedID = selected.HTTP.ID
+	}
+	first := len(m.HTTPStates) == 0 && len(m.HTTPDownloads) == 0
+	current := make(map[string]string, len(downloads))
+	for _, download := range downloads {
+		current[download.ID] = download.Status
+		if !first && m.HTTPStates[download.ID] != download.Status {
+			name := firstNonEmpty(download.Title, download.ID)
+			switch strings.ToLower(download.Status) {
+			case "completed", "error", "stalled":
+				m.SetNotification(m.Tr.Format("msg.notifyhttp", name, m.Tr.StateLabel(download.Status)))
+			}
+		}
+	}
+	m.HTTPStates = current
+	m.HTTPDownloads = append([]ComicDownload(nil), downloads...)
+	if selectedID != "" {
+		for index, item := range m.VisibleDownloads() {
+			if item.HTTP != nil && item.HTTP.ID == selectedID {
+				m.Selected = index
+				return
+			}
+		}
+	}
+	m.Selected = min(m.Selected, max(0, len(m.VisibleDownloads())-1))
+}
+
+func (m *Model) SetLibrary(items any) {
+	switch value := items.(type) {
+	case []SeriesLibraryItem:
+		m.Series = append([]SeriesLibraryItem(nil), value...)
+	case []MovieLibraryItem:
+		m.Movies = append([]MovieLibraryItem(nil), value...)
+	case []ComicLibraryItem:
+		m.Comics = append([]ComicLibraryItem(nil), value...)
+	}
+	m.LibrarySelected = min(m.LibrarySelected, max(0, len(m.VisibleLibrary())-1))
 }
 
 // SetHealth replaces the health report.
@@ -323,6 +390,10 @@ func (m *Model) SetMetrics(stats DashboardStats) {
 	m.Metrics = &stats
 	download, hasDownload := metricNumber(stats.TorrentStats, "dl_info_speed", "download_rate", "download_speed")
 	upload, hasUpload := metricNumber(stats.TorrentStats, "up_info_speed", "upload_rate", "upload_speed")
+	download += m.httpDownloadRate()
+	if download > 0 {
+		hasDownload = true
+	}
 	if !hasDownload && !hasUpload {
 		return
 	}
@@ -330,6 +401,14 @@ func (m *Model) SetMetrics(stats DashboardStats) {
 	if len(m.TransferHistory) > 60 {
 		m.TransferHistory = m.TransferHistory[len(m.TransferHistory)-60:]
 	}
+}
+
+func (m *Model) httpDownloadRate() float64 {
+	rate := 0.0
+	for _, item := range m.HTTPDownloads {
+		rate += float64(item.SpeedBytes)
+	}
+	return rate
 }
 
 // SetConfig replaces the daemon settings shown by the TUI settings panel.
@@ -351,6 +430,10 @@ func (m *Model) ObserveEvent(event Event) {
 	switch {
 	case strings.Contains(kind, "finished"):
 		m.SetNotification(m.Tr.Format("msg.notifyfinished", name))
+	case strings.Contains(kind, "stalled"):
+		m.SetNotification(m.Tr.Format("msg.notifystalled", name))
+	case strings.Contains(kind, "archiv"):
+		m.SetNotification(m.Tr.Format("msg.notifyarchived", name))
 	case strings.Contains(kind, "error") || strings.Contains(kind, "failed"):
 		message := firstNonEmpty(event.Message, m.Tr.T("msg.unknownerror"))
 		m.SetNotification(m.Tr.Format("msg.notifyerror", name, message))
@@ -555,11 +638,165 @@ func (m *Model) visibleTorrents() []Torrent { return m.VisibleTorrents() }
 
 // SelectedTorrent returns the highlighted torrent, if any.
 func (m *Model) SelectedTorrent() *Torrent {
-	items := m.VisibleTorrents()
-	if m.Selected < 0 || m.Selected >= len(items) {
+	item := m.SelectedDownload()
+	if item.Torrent == nil {
 		return nil
 	}
-	return &items[m.Selected]
+	copy := *item.Torrent
+	return &copy
+}
+
+// DownloadRow is a normalized row in the unified torrent/HTTP list.
+type DownloadRow struct {
+	Torrent *Torrent
+	HTTP    *ComicDownload
+}
+
+func (m *Model) VisibleDownloads() []DownloadRow {
+	rows := make([]DownloadRow, 0, len(m.Torrents)+len(m.HTTPDownloads))
+	for index := range m.Torrents {
+		item := m.Torrents[index]
+		rows = append(rows, DownloadRow{Torrent: &item})
+	}
+	for index := range m.HTTPDownloads {
+		item := m.HTTPDownloads[index]
+		rows = append(rows, DownloadRow{HTTP: &item})
+	}
+	if filter := strings.ToLower(strings.TrimSpace(m.Filter)); filter != "" {
+		filtered := rows[:0]
+		for _, row := range rows {
+			name, state, id := downloadRowFields(row)
+			if strings.Contains(strings.ToLower(name), filter) || strings.Contains(strings.ToLower(state), filter) || strings.Contains(strings.ToLower(id), filter) {
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		left, right := rows[i], rows[j]
+		if m.SortDesc {
+			left, right = right, left
+		}
+		leftName, leftState, _ := downloadRowFields(left)
+		rightName, rightState, _ := downloadRowFields(right)
+		var less bool
+		switch m.Sort {
+		case SortProgress:
+			less = downloadRowProgress(left) > downloadRowProgress(right)
+		case SortState:
+			less = leftState < rightState
+		case SortRate:
+			less = downloadRowRate(left) > downloadRowRate(right)
+		case SortSize:
+			less = downloadRowSize(left) > downloadRowSize(right)
+		default:
+			less = strings.ToLower(leftName) < strings.ToLower(rightName)
+		}
+		return less
+	})
+	return rows
+}
+
+func downloadRowFields(row DownloadRow) (name, state, id string) {
+	if row.Torrent != nil {
+		return row.Torrent.Name, row.Torrent.State, row.Torrent.Hash
+	}
+	if row.HTTP != nil {
+		return row.HTTP.Title, row.HTTP.Status, row.HTTP.ID
+	}
+	return "", "", ""
+}
+func downloadRowProgress(row DownloadRow) float64 {
+	if row.Torrent != nil {
+		return row.Torrent.Progress
+	}
+	if row.HTTP != nil {
+		return row.HTTP.Progress
+	}
+	return 0
+}
+func downloadRowRate(row DownloadRow) float64 {
+	if row.Torrent != nil {
+		return float64(row.Torrent.DownloadRate + row.Torrent.UploadRate)
+	}
+	if row.HTTP != nil {
+		return float64(row.HTTP.SpeedBytes)
+	}
+	return 0
+}
+func downloadRowSize(row DownloadRow) uint64 {
+	if row.Torrent != nil {
+		return row.Torrent.TotalSize
+	}
+	if row.HTTP != nil && row.HTTP.TotalBytes != nil {
+		return *row.HTTP.TotalBytes
+	}
+	return 0
+}
+
+func (m *Model) SelectedDownload() DownloadRow {
+	items := m.VisibleDownloads()
+	if m.Selected < 0 || m.Selected >= len(items) {
+		return DownloadRow{}
+	}
+	return items[m.Selected]
+}
+
+func (m *Model) VisibleLibrary() []string {
+	items := []string{}
+	filter := strings.ToLower(strings.TrimSpace(m.LibraryFilter))
+	add := func(name string) {
+		if filter == "" || strings.Contains(strings.ToLower(name), filter) {
+			items = append(items, name)
+		}
+	}
+	switch m.Library {
+	case LibraryMovies:
+		for _, item := range m.Movies {
+			add(item.Name)
+		}
+	case LibraryComics:
+		for _, item := range m.Comics {
+			add(item.Title)
+		}
+	default:
+		for _, item := range m.Series {
+			add(item.Name)
+		}
+	}
+	return items
+}
+
+// LibraryRow is the normalized display row for one monitored title.
+type LibraryRow struct {
+	Name    string
+	Meta    string
+	Enabled bool
+}
+
+func (m *Model) VisibleLibraryRows() []LibraryRow {
+	rows := []LibraryRow{}
+	filter := strings.ToLower(strings.TrimSpace(m.LibraryFilter))
+	add := func(row LibraryRow) {
+		if filter == "" || strings.Contains(strings.ToLower(row.Name), filter) || strings.Contains(strings.ToLower(row.Meta), filter) {
+			rows = append(rows, row)
+		}
+	}
+	switch m.Library {
+	case LibraryMovies:
+		for _, item := range m.Movies {
+			add(LibraryRow{Name: item.Name, Meta: strings.TrimSpace(strings.Join([]string{item.Year, item.Quality, item.Language}, " · ")), Enabled: item.Enabled})
+		}
+	case LibraryComics:
+		for _, item := range m.Comics {
+			add(LibraryRow{Name: item.Title, Meta: strings.TrimSpace(strings.Join([]string{item.Publisher, item.LatestDownloadedTitle}, " · ")), Enabled: item.Enabled})
+		}
+	default:
+		for _, item := range m.Series {
+			add(LibraryRow{Name: item.Name, Meta: strings.TrimSpace(strings.Join([]string{item.Seasons, item.Quality, item.Language}, " · ")), Enabled: item.Enabled})
+		}
+	}
+	return rows
 }
 
 // FilteredLogs returns the log lines matching the active filter.

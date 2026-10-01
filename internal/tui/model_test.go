@@ -499,6 +499,50 @@ func TestRenderPromptShowsCursor(t *testing.T) {
 	}
 }
 
+func TestUnifiedDownloadsAndHTTPActions(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetTorrents([]Torrent{{Hash: "torrent", Name: "Torrent", State: "downloading", Progress: 20}})
+	m.SetHTTPDownloads([]ComicDownload{{ID: "http-1", Title: "Comic HTTP", Status: "downloading", Progress: 40, SpeedBytes: 1024}})
+	items := m.VisibleDownloads()
+	if len(items) != 2 || items[0].HTTP == nil || items[1].Torrent == nil {
+		t.Fatalf("unexpected unified rows: %+v", items)
+	}
+	m.Selected = 0
+	if action := m.Update(runeKey('p')); action.Kind != ActionHTTPPauseToggle || action.HTTPID != "http-1" {
+		t.Fatalf("p should pause HTTP download: %+v", action)
+	}
+	m.Selected = 1
+	if action := m.Update(runeKey('p')); action.Kind != ActionPauseToggle || action.Hash != "torrent" {
+		t.Fatalf("p should pause torrent: %+v", action)
+	}
+}
+
+func TestLibraryViewsAndNotificationTransitions(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabLibrary
+	m.SetLibrary([]SeriesLibraryItem{{Name: "Example", Seasons: "1-2", Quality: "1080p", Enabled: true}})
+	m.SetLibrary([]MovieLibraryItem{{Name: "Movie", Year: "2026", Quality: "4K", Enabled: true}})
+	m.SetLibrary([]ComicLibraryItem{{Title: "Comic", Publisher: "Publisher", Enabled: false}})
+	if action := m.Update(runeKey('2')); action.Kind != ActionNone || m.Library != LibraryMovies {
+		t.Fatalf("2 should switch library view: %+v kind=%v", action, m.Library)
+	}
+	if len(m.VisibleLibraryRows()) != 1 || m.VisibleLibraryRows()[0].Name != "Movie" {
+		t.Fatalf("movie rows = %+v", m.VisibleLibraryRows())
+	}
+	m.Update(runeKey('s'))
+	typeText(m, "Movie")
+	m.Update(kindKey(KeyEnter))
+	if m.LibraryFilter != "Movie" {
+		t.Fatalf("library filter = %q", m.LibraryFilter)
+	}
+	m.SetHTTPDownloads([]ComicDownload{{ID: "x", Title: "X", Status: "downloading"}})
+	m.SetHTTPDownloads([]ComicDownload{{ID: "x", Title: "X", Status: "completed"}})
+	if !strings.Contains(strings.ToLower(m.Notification), "completato") && !strings.Contains(strings.ToLower(m.Notification), "completed") {
+		t.Fatalf("completion notification = %q", m.Notification)
+	}
+}
+
 func TestRenderError(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	m.SetError("connection refused")
