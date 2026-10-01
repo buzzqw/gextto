@@ -1470,7 +1470,10 @@
       <div class="series-hero-main">
         {{if .Poster}}<img class="series-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}<div class="series-poster placeholder">N/D</div>{{end}}
       <div class="series-hero-body">
-        <div class="series-hero-top"><h2>{{.Name}}</h2></div>
+         <div class="series-hero-top">
+           <h2>{{.Name}}</h2>
+           {{if .ArchivePath}}<p class="muted series-archive"><small>Archivio: <code title="{{.ArchivePath}}">{{.ArchivePath}}</code></small></p>{{end}}
+         </div>
         <div class="series-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</div>
         <div class="series-badges">
           {{if .Quality}}<span class="badge">Qualità {{.Quality}}</span>{{end}}
@@ -1484,22 +1487,25 @@
          </div>
         {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{.}}</span>{{end}}</div>{{end}}
         {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
-        {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
-        {{if .ArchivePath}}<p class="muted"><small>Archivio: <code title="{{.ArchivePath}}">{{.ArchivePath}}</code></small></p>{{end}}
-        {{if .SeasonButtons}}
-        <div class="season-toggles">
-          <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
-          {{range .SeasonButtons}}
-          <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
-            <input type="hidden" name="redirect" value="/v2?view=series&amp;series={{$.PathName}}" />
-            <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
-            <input type="hidden" name="method" value="POST" />
-            <input type="hidden" name="body" value='{"season":{{.Season}},"ignored":{{if .Ignored}}false{{else}}true{{end}}}' />
-            <button class="btn sm {{if .Ignored}}warn{{else}}primary{{end}}" type="submit" title="Attiva o disattiva la stagione {{.Season}}">S{{.Season}}</button>
-          </form>
-          {{end}}
-        </div>
-        {{end}}
+         {{if or .Cast .SeasonButtons}}
+         <div class="series-cast-season">
+           {{if .Cast}}<p class="muted series-cast"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
+           {{if .SeasonButtons}}
+           <div class="season-toggles">
+             <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
+             {{range .SeasonButtons}}
+             <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
+               <input type="hidden" name="redirect" value="/v2?view=series&amp;series={{$.PathName}}" />
+               <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
+               <input type="hidden" name="method" value="POST" />
+               <input type="hidden" name="body" value='{"season":{{.Season}},"ignored":{{if .Ignored}}false{{else}}true{{end}}}' />
+               <button class="btn sm {{if .Ignored}}warn{{else}}primary{{end}}" type="submit" title="Attiva o disattiva la stagione {{.Season}}">S{{.Season}}</button>
+             </form>
+             {{end}}
+           </div>
+           {{end}}
+         </div>
+         {{end}}
       </div>
       </div>
     </div>

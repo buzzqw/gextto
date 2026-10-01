@@ -528,7 +528,7 @@ html, body {
   float: left;
   margin: 0 16px 10px 0;
 }
-.series-overview { max-width: 80ch; line-height: 1.5; }
+.series-overview { max-width: none; line-height: 1.5; }
 .series-genres, .detail-links { margin-top: 8px; }
 .table-panel-footer { margin-top: 14px; border-top: 1px solid rgba(127,127,127,.18); padding-top: 12px; }
 .table-footer-form { align-items: end; }

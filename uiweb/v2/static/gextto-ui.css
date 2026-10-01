@@ -941,10 +941,13 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .series-hero-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .series-hero-body h2 { margin: 0; font-size: 1.4rem; }
 .series-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.series-archive { margin: 0; text-align: right; }
 .series-badges, .series-genres { display: flex; flex-wrap: wrap; gap: 6px; }
 .series-overview { margin: 0; max-width: none; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
 .series-links { display: flex; gap: 8px; flex-wrap: wrap; }
 .season-toggles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.series-cast-season { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+.series-cast { margin: 0; flex: 1 1 520px; min-width: 0; }
 .season-list { display: flex; flex-direction: column; gap: 10px; }
 .season-block > summary { cursor: pointer; padding: 6px 0; }
 .season-block > summary::marker { color: var(--muted); }
