@@ -1215,7 +1215,7 @@ func uiTableSpecFor(view string) (uiTableSpec, bool) {
 				{Key: "title", Label: "Titolo", Format: "truncate"},
 				{Key: "source", Label: "Sorgente", Format: "source"},
 				{Key: "quality_score", Label: "Punteggio", Format: "number"},
-				{Key: "added_at", Label: "Aggiunto"},
+				{Key: "added_at", Label: "Aggiunto", Format: "date"},
 			}),
 			Empty:       "Archivio vuoto.",
 			Search:      true,

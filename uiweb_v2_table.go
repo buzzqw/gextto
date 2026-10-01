@@ -589,6 +589,14 @@ func v2CompactDateTime(value string) string {
 	return raw
 }
 
+func v2CompactDate(value string) string {
+	compact := v2CompactDateTime(value)
+	if fields := strings.Fields(compact); len(fields) > 0 {
+		return fields[0]
+	}
+	return compact
+}
+
 func v2FolderLabel(path string) string {
 	value := strings.TrimRight(strings.TrimSpace(path), `/\`)
 	if value == "" {
@@ -761,6 +769,8 @@ func v2Fmt(value any, format string) string {
 		return v2SourceLabel(v2String(value))
 	case "datetime":
 		return v2CompactDateTime(v2String(value))
+	case "date":
+		return v2CompactDate(v2String(value))
 	}
 	return v2String(value)
 }

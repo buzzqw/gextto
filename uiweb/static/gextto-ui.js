@@ -1589,6 +1589,7 @@
       case "percent": return Number(value).toFixed(1) + "%";
       case "source": return sourceLabel(value);
       case "datetime": return compactDateTime(value);
+      case "date": return compactDateTime(value).split(" ")[0];
     }
     if (typeof value === "object") {
       return value.name || value.title || value.label || value.path || "—";
