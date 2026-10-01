@@ -128,6 +128,9 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 			t.Fatalf("downloads missing %q", marker)
 		}
 	}
+	if strings.Index(body, ">Rimuovi tag<") > strings.Index(body, `placeholder="Nuovo tag"`) {
+		t.Fatal("new tag field should appear to the right of the remove-tag action")
+	}
 }
 
 func TestV2TmdbMovieAddKeepsMovieKind(t *testing.T) {

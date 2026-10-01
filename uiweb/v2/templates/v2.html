@@ -331,11 +331,11 @@
        <button class="btn sm" type="submit" name="bulk" value="pause" title="Metti in pausa i torrent selezionati">Pausa</button>
        <button class="btn sm" type="submit" name="bulk" value="resume" title="Riprendi i torrent selezionati">Riprendi</button>
        <button class="btn sm" type="submit" name="bulk" value="recheck" title="Forza la verifica dei dati dei torrent selezionati">Recheck</button>
-      <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
-       <label class="field inline-field" title="Scegli il tag da assegnare o rimuovere sui torrent selezionati"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
-       <input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" title="Nome del nuovo tag da creare e assegnare" />
-       <button class="btn sm" type="submit" name="bulk" value="tag" title="Assegna il tag scelto ai torrent selezionati">Assegna tag</button>
-       <button class="btn sm" type="submit" name="bulk" value="untag" title="Rimuove il tag dai torrent selezionati">Rimuovi tag</button>
+        <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
+        <label class="field inline-field" title="Scegli il tag da assegnare o rimuovere sui torrent selezionati"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
+        <button class="btn sm" type="submit" name="bulk" value="tag" title="Assegna il tag scelto ai torrent selezionati">Assegna tag</button>
+        <button class="btn sm" type="submit" name="bulk" value="untag" title="Rimuove il tag dai torrent selezionati">Rimuovi tag</button>
+        <input class="input compact" name="new_tag" aria-label="Nuovo tag" placeholder="Nuovo tag" title="Nome del nuovo tag da creare e assegnare" />
       <button class="btn sm danger" type="submit" name="bulk" value="remove" title="Rimuove i torrent selezionati dalla sessione mantenendo i file">Rimuovi (sessione)</button>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
     </div>
