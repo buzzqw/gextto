@@ -326,6 +326,24 @@ func TestMovieSubtitlesOptionalButRequirementsMandatory(t *testing.T) {
 	}
 }
 
+func TestSeriesSubtitlePreference(t *testing.T) {
+	cfg := DefaultConfig()
+	series := SeriesConfig{Name: "Example", Seasons: "1+", Quality: "any", Language: "ita", Subtitle: "ita,eng"}
+	withoutSubtitles := models.Quality{Language: "ita", Languages: []string{"ita"}}
+	if !cfg.SeriesReleaseAllowed(&series, &withoutSubtitles, "Example S01E01") {
+		t.Fatal("preferred subtitles must not block a series release")
+	}
+	if got := SeriesSubtitleBonus(&series, &withoutSubtitles); got != 0 {
+		t.Fatalf("expected no subtitle bonus, got %d", got)
+	}
+	withItalianSubtitles := withoutSubtitles
+	withItalianSubtitles.HasSubtitle = true
+	withItalianSubtitles.SubtitleLanguages = []string{"ita"}
+	if got := SeriesSubtitleBonus(&series, &withItalianSubtitles); got != 50 {
+		t.Fatalf("expected Italian subtitle bonus, got %d", got)
+	}
+}
+
 func TestMovieMatchingRequiresYearAndHonorsExclusions(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Movies = append(cfg.Movies, MovieConfig{

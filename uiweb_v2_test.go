@@ -154,6 +154,38 @@ func TestV2TmdbMovieAddKeepsMovieKind(t *testing.T) {
 	}
 }
 
+func TestV2TmdbSeriesAddKeepsSubtitle(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	form := url.Values{
+		"kind":     {"series"},
+		"name":     {"Subtitle Test Series"},
+		"tmdb_id":  {"987654"},
+		"language": {"ita"},
+		"subtitle": {"ita,eng"},
+		"seasons":  {"1+"},
+	}
+	code, _ := v2Request(t, server, http.MethodPost, "/v2/tmdb/add", form)
+	if code != http.StatusOK && code != http.StatusNoContent {
+		t.Fatalf("series add -> %d", code)
+	}
+	cfg, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, series := range cfg.Series {
+		if series.Name == "Subtitle Test Series" {
+			if series.Subtitle != "ita,eng" {
+				t.Fatalf("subtitle = %q, want ita,eng", series.Subtitle)
+			}
+			return
+		}
+	}
+	t.Fatal("series was not added")
+}
+
 func TestV2DownloadsPageAndActions(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

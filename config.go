@@ -1563,7 +1563,19 @@ func isSubtitleFlag(value string) bool {
 // preferred subtitles ("Sottotitoli" field). It never blocks the download: it
 // only helps prefer, at equal quality, releases that contain them.
 func MovieSubtitleBonus(movie *MovieConfig, quality *models.Quality) int64 {
-	preferred := strings.TrimSpace(movie.Subtitle)
+	return subtitlePreferenceBonus(movie.Subtitle, quality)
+}
+
+// SeriesSubtitleBonus is the optional score bonus for a monitored series'
+// preferred subtitle languages. The series subtitle field is a preference, not
+// a hard requirement; generic values such as yes/true/1 still mean that the
+// release must carry subtitles, as in the legacy rule.
+func SeriesSubtitleBonus(series *SeriesConfig, quality *models.Quality) int64 {
+	return subtitlePreferenceBonus(series.Subtitle, quality)
+}
+
+func subtitlePreferenceBonus(raw string, quality *models.Quality) int64 {
+	preferred := strings.TrimSpace(raw)
 	if preferred == "" {
 		return 0
 	}
@@ -1573,7 +1585,7 @@ func MovieSubtitleBonus(movie *MovieConfig, quality *models.Quality) int64 {
 		hasPreferred = isSubtitleFlag(preferred) && quality.HasSubtitle
 	} else {
 		for _, value := range wanted {
-			if isSubtitleFlag(value) && quality.HasSubtitle {
+			if (isSubtitleFlag(value) || value == "any" || value == "multi") && quality.HasSubtitle {
 				hasPreferred = true
 				break
 			}
@@ -1660,7 +1672,13 @@ func (c *Config) ReleaseScore(release *models.Release) int64 {
 	if release.Kind == "movie" {
 		movie = c.FindMovieMatch(release.Title, release.Year)
 	}
-	return c.releaseScoreWithMovie(release, movie)
+	score := c.releaseScoreWithMovie(release, movie)
+	if movie == nil && release.Series != nil {
+		if series := c.FindSeriesMatch(*release.Series, release.Season); series != nil {
+			score += SeriesSubtitleBonus(series, &release.Quality)
+		}
+	}
+	return score
 }
 
 // ReleaseScoreForMovie is the variant used by a movie-specific search, where

@@ -310,6 +310,13 @@ func ExplainWithArchive(
 				"value": bonus,
 			})
 		}
+	} else if series != nil {
+		if bonus := SeriesSubtitleBonus(series, &evaluated.Quality); bonus != 0 {
+			scoreComponents = append(scoreComponents, map[string]any{
+				"label": "preferenza sottotitoli",
+				"value": bonus,
+			})
+		}
 	}
 	if sizeBonus := rules.SizeScoreBonus(&evaluated); sizeBonus != 0 {
 		scoreComponents = append(scoreComponents, map[string]any{
