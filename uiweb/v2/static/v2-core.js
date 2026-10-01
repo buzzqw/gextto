@@ -477,6 +477,12 @@
     }
   });
   document.addEventListener("change", function (event) {
+    var preset = event.target.closest && event.target.closest("[data-preset-for]");
+    if (preset && preset.value) {
+      var scope = preset.closest("form") || preset.closest(".form-grid") || preset.closest(".panel");
+      var input = scope && scope.querySelector('[name="' + preset.getAttribute("data-preset-for") + '"]');
+      if (input) input.value = preset.value;
+    }
     var select = event.target.matches && event.target.matches("[data-v2-discover-select]") ? event.target : null;
     if (!select) return;
     var kind = select.value;
