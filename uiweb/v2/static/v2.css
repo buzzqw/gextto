@@ -126,12 +126,12 @@ html, body {
   width: 100%;
   table-layout: fixed;
 }
-.dashboard-recent-table th:nth-child(1) { width: 34%; }
+.dashboard-recent-table th:nth-child(1) { width: 44%; }
 .dashboard-recent-table th:nth-child(2) { width: 8%; }
-.dashboard-recent-table th:nth-child(3) { width: 10%; }
-.dashboard-recent-table th:nth-child(4) { width: 8%; }
-.dashboard-recent-table th:nth-child(5) { width: 20%; }
-.dashboard-recent-table th:nth-child(6) { width: 20%; }
+.dashboard-recent-table th:nth-child(3) { width: 9%; }
+.dashboard-recent-table th:nth-child(4) { width: 6%; }
+.dashboard-recent-table th:nth-child(5) { width: 19%; }
+.dashboard-recent-table th:nth-child(6) { width: 14%; }
 .dashboard-recent-table td {
   overflow: hidden;
   text-overflow: ellipsis;
