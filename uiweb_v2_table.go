@@ -840,23 +840,11 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 	case "comic-weekly-force":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		torrent := strings.TrimSpace(v2String(item["torrent_url"]))
-		link := magnet
-		method := "magnet"
-		if link == "" {
-			link = torrent
-			method = "torrent"
-		}
-		bodyJSON, _ := json.Marshal(map[string]string{
-			"url": link, "method": method,
-			"title":    "Weekly Pack " + v2String(item["pack_date"]),
-			"post_url": "", "save_path": "",
-		})
-		vals := `{"view":"` + templateEscapeJSAttr(view) + `","path":"/api/comics/download","method":"POST","body":"` + templateEscapeJSAttr(string(bodyJSON)) + `"}`
 		disabled := ""
-		if link == "" {
+		if magnet == "" && torrent == "" {
 			disabled = " disabled"
 		}
-		return `<button class="btn sm" type="button" hx-post="/v2/table/action" hx-vals='` + vals + `' hx-target="#v2-table-body-` + templateEscapeJSAttr(view) + `" hx-swap="outerHTML" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button>`
+		return `<form hx-post="/v2/comics/weekly/force" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="date" value="` + stdhtml.EscapeString(v2String(item["pack_date"])) + `"><input type="hidden" name="magnet" value="` + stdhtml.EscapeString(magnet) + `"><input type="hidden" name="torrent" value="` + stdhtml.EscapeString(torrent) + `"><button class="btn sm" type="submit" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button></form>`
 	}
 
 	path := v2Substitute(action.Path, item, true)

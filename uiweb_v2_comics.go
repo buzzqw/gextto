@@ -181,6 +181,40 @@ func V2ComicsDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2Render(w, http.StatusOK, "v2_comics_download_result", result, dict, eng)
 }
 
+// V2ComicsWeeklyForce queues a Weekly Pack from its recorded magnet or torrent
+// link. It is separate from the generic table action so the user sees whether
+// the pack was queued or was already present in the torrent client.
+func V2ComicsWeeklyForce(w http.ResponseWriter, r *http.Request, s *AppState) {
+	date := strings.TrimSpace(r.FormValue("date"))
+	magnet := strings.TrimSpace(r.FormValue("magnet"))
+	torrent := strings.TrimSpace(r.FormValue("torrent"))
+	link := magnet
+	method := "magnet"
+	if link == "" {
+		link = torrent
+		method = "torrent"
+	}
+	result := map[string]any{"Title": "Weekly Pack", "Error": false}
+	if date == "" || link == "" {
+		result["Error"] = true
+		result["Message"] = "link del Weekly Pack non disponibile"
+	} else {
+		payload := ComicDownloadInput{
+			Url: link, Method: method, Title: "Weekly Pack " + date,
+			PostUrl: "weekly:" + date,
+		}
+		raw, status := v2InternalJSON(s, http.MethodPost, "/api/comics/download", nil, mustJSON(payload))
+		if status >= 400 {
+			result["Error"] = true
+			result["Message"] = v2JSONError(raw)
+		} else {
+			result["Message"] = "Weekly Pack " + date + " accodato via " + method
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_action_notice", result, dict, eng)
+}
+
 type v2ComicEditView struct {
 	ID          int64
 	Title       string

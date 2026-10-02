@@ -409,6 +409,18 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 	if code, _ := v2Request(t, server, http.MethodPost, "/v2/table/action", url.Values{"view": {"blocklist"}, "path": {"http://evil.example/x"}, "method": {"POST"}, "body": {"{}"}}); code != http.StatusOK {
 		t.Fatalf("table action forged path -> %d", code)
 	}
+	// A Weekly Pack force action has a dedicated endpoint, so the user receives
+	// an explicit queued/already-queued result instead of a silently refreshed
+	// generic table.
+	weeklyAction := v2RenderAction("comics-t1", map[string]any{
+		"pack_date": "2026-09-23", "magnet": "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+	}, uiAction{Label: "Forza", Kind: "comic-weekly-force"}, uiTableSpec{})
+	if !strings.Contains(weeklyAction, `hx-post="/v2/comics/weekly/force"`) || strings.Contains(weeklyAction, "/v2/table/action") {
+		t.Fatalf("weekly force action = %q", weeklyAction)
+	}
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/comics/weekly/force", url.Values{"date": {"2026-09-23"}}); code != http.StatusOK || !strings.Contains(body, "link del Weekly Pack non disponibile") {
+		t.Fatalf("weekly force unavailable-link response -> %d: %s", code, body)
+	}
 }
 
 func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
@@ -827,4 +839,3 @@ func TestSafeV2Redirect(t *testing.T) {
 		}
 	}
 }
-

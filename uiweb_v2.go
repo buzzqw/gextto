@@ -182,6 +182,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Fumetti: link finder, download diretto e modifica della libreria.
 	v2Handle(s, mux, "POST /v2/comics/links", V2ComicsLinks)
 	v2Handle(s, mux, "POST /v2/comics/download", V2ComicsDownload)
+	v2Handle(s, mux, "POST /v2/comics/weekly/force", V2ComicsWeeklyForce)
 	v2Handle(s, mux, "POST /v2/comics/explore/download", V2ComicsExploreDownload)
 	v2Handle(s, mux, "GET /v2/comics/explore/select", V2ComicsExploreSelect)
 	v2Handle(s, mux, "POST /v2/comics/explore/add", V2ComicsExploreAdd)
