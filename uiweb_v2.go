@@ -1417,14 +1417,12 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 			_ = s.db.Blocklist(&meta.Release, "manual")
 		}
 	}
-	removed, err := s.activeEngine().Remove(hash, deleteFiles)
+	cfg := latestConfig(s)
+	removed, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
 	message := "torrent rimosso"
 	isErr := false
 	if err != nil || !removed {
 		message, isErr = "rimozione non riuscita", true
-	} else {
-		_ = s.db.MarkTorrentRemoved(hash)
-		_ = s.db.ForgetRemovedTorrent(hash)
 	}
 
 	dict, eng := v2Dictionaries(s)

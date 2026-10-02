@@ -963,7 +963,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	}
 	if !manual {
 		var exists bool
-		if err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND episode=?3 AND status NOT IN ('completed','error','removed'))", seriesName, season, episode).Scan(&exists); err != nil {
+		if err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND (episode=?3 OR episode IS NULL) AND status NOT IN ('completed','error','removed'))", seriesName, season, episode).Scan(&exists); err != nil {
 			return false, "", err
 		}
 		if exists {
@@ -1270,19 +1270,27 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		if err != nil {
 			return false, "", err
 		}
+		packAlreadyActive := false
 		for activeRows.Next() {
-			var activeEpisode int64
+			var activeEpisode sql.NullInt64
 			if err := activeRows.Scan(&activeEpisode); err != nil {
 				activeRows.Close()
 				return false, "", err
 			}
-			activeEpisodes[activeEpisode] = true
+			if activeEpisode.Valid {
+				activeEpisodes[activeEpisode.Int64] = true
+			} else {
+				packAlreadyActive = true
+			}
 		}
 		if err := activeRows.Err(); err != nil {
 			activeRows.Close()
 			return false, "", err
 		}
 		activeRows.Close()
+		if packAlreadyActive {
+			return false, "active_pack", nil
+		}
 	}
 	// Pre-load the existing episodes for the whole season in one query instead
 	// of one SELECT per episode (the same N+1 as the active check above).

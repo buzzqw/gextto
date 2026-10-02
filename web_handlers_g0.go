@@ -1494,13 +1494,8 @@ func RemoveTorrentLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	deleteFiles := input.DeleteFiles || gh0_torrentFilesAreDisposable(s.db, input.Hash)
-	removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, input.Hash)
-	removed, err := s.activeEngine().Remove(input.Hash, deleteFiles)
-	if err == nil && removed {
-		logManualTorrentRemoval(input.Hash, deleteFiles, removalName, removalState, removalHasMetadata)
-		_ = s.db.MarkTorrentRemoved(input.Hash)
-	}
+	cfg := latestConfig(s)
+	removed, err := SafeRemoveTorrent(s, cfg, input.Hash, input.DeleteFiles)
 	status, body := gh0_torrentAction(removed, err)
 	jsonStatus(w, status, body)
 }

@@ -668,14 +668,8 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 			_ = s.db.Blocklist(&meta.Release, "manual")
 		}
 	}
-	deleteFiles := input.DeleteFiles || gh1_torrentFilesAreDisposable(s.db, hash)
-	removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
-	removed, removeErr := s.activeEngine().Remove(hash, deleteFiles)
-	if removeErr == nil && removed {
-		logManualTorrentRemoval(hash, deleteFiles, removalName, removalState, removalHasMetadata)
-		_ = s.db.MarkTorrentRemoved(hash)
-		_ = s.db.ForgetRemovedTorrent(hash)
-	}
+	cfg := latestConfig(s)
+	removed, removeErr := SafeRemoveTorrent(s, cfg, hash, input.DeleteFiles)
 	status, value := gh1_torrentAction(removed, removeErr)
 	jsonStatus(w, status, value)
 }

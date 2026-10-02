@@ -1009,14 +1009,9 @@ func ReannounceTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 func RemoveTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := pathParam(r, "hash")
 	gh7_blocklist_mismatched_pack(s.activeEngine(), s.db, hash)
-	deleteFiles := gh7_torrent_files_are_disposable(s.db, hash)
-	removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
-	removed, err := s.activeEngine().Remove(hash, deleteFiles)
-	if err == nil && removed && s.db != nil {
-		logManualTorrentRemoval(hash, deleteFiles, removalName, removalState, removalHasMetadata)
-		_ = s.db.MarkTorrentRemoved(hash)
-		_ = s.db.ForgetRemovedTorrent(hash)
-	}
+	deleteFiles := r.URL.Query().Get("delete_files") == "1" || r.URL.Query().Get("delete_files") == "true"
+	cfg := latestConfig(s)
+	removed, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
 	gh7_torrent_action(w, removed, err)
 }
 

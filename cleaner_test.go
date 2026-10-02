@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // cleanerWrite writes a small file for the cleaner tests.
@@ -374,4 +375,61 @@ func TestRemovesEmptiedSubdirectoriesAfterCleanup(t *testing.T) {
 	}
 	info, err := os.Stat(archive)
 	assertTrue(t, err == nil && info.IsDir(), "la radice della serie resta")
+}
+
+func TestSweepStaleTempFiles(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	staleCopy := filepath.Join(archive, ".Example.S01E01.mkv.gextto-copy-12345")
+	cleanerWrite(t, staleCopy, "stale copy data")
+	freshCopy := filepath.Join(archive, ".Example.S01E02.mkv.gextto-copy-67890")
+	cleanerWrite(t, freshCopy, "fresh copy data")
+
+	stalePart := filepath.Join(archive, "Example.S01E03.mkv.gextto-part")
+	cleanerWrite(t, stalePart, "stale part data")
+	freshPart := filepath.Join(archive, "Example.S01E04.mkv.gextto-part")
+	cleanerWrite(t, freshPart, "fresh part data")
+
+	regularFile := filepath.Join(archive, "Example.S01E05.mkv")
+	cleanerWrite(t, regularFile, "regular video")
+
+	// Set modification time on stale files to 3 hours ago
+	threeHoursAgo := time.Now().Add(-3 * time.Hour)
+	if err := os.Chtimes(staleCopy, threeHoursAgo, threeHoursAgo); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(stalePart, threeHoursAgo, threeHoursAgo); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archive
+
+	cleaned := SweepStaleTempFiles(&cfg)
+	if cleaned != 2 {
+		t.Fatalf("expected 2 stale files cleaned, got %d", cleaned)
+	}
+
+	// Verify stale files were deleted
+	if cleanerFileExists(staleCopy) {
+		t.Errorf("stale copy %s should have been removed", staleCopy)
+	}
+	if cleanerFileExists(stalePart) {
+		t.Errorf("stale part %s should have been removed", stalePart)
+	}
+
+	// Verify fresh files and regular files were preserved
+	if !cleanerFileExists(freshCopy) {
+		t.Errorf("fresh copy %s should have been preserved", freshCopy)
+	}
+	if !cleanerFileExists(freshPart) {
+		t.Errorf("fresh part %s should have been preserved", freshPart)
+	}
+	if !cleanerFileExists(regularFile) {
+		t.Errorf("regular file %s should have been preserved", regularFile)
+	}
 }

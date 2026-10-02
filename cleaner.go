@@ -980,3 +980,71 @@ func saturatingAddInt64(a, b int64) int64 {
 	}
 	return a + b
 }
+
+// SweepStaleTempFiles cleans up abandoned `.gextto-copy-*` and `*.gextto-part` files
+// left behind by aborted atomic copies or daemon crashes. Only files older than
+// minAge (2 hours) are removed so in-progress transfers are never disturbed.
+func SweepStaleTempFiles(cfg *Config) int {
+	if cfg == nil {
+		return 0
+	}
+	roots := []string{}
+	addRoot := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			for _, r := range roots {
+				if SamePath(r, p) {
+					return
+				}
+			}
+			roots = append(roots, p)
+		}
+	}
+	addRoot(cfg.LibtorrentDir)
+	if cfg.LibtorrentTempDir != nil {
+		addRoot(*cfg.LibtorrentTempDir)
+	}
+	if cfg.RamdiskDir() != nil {
+		addRoot(*cfg.RamdiskDir())
+	}
+	if cfg.ArchiveRoot != nil {
+		addRoot(*cfg.ArchiveRoot)
+	}
+	for _, s := range cfg.Series {
+		addRoot(s.ArchivePath)
+	}
+
+	cleaned := 0
+	now := time.Now()
+	const minAge = 2 * time.Hour
+
+	for _, root := range roots {
+		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() {
+				rel, relErr := filepath.Rel(root, path)
+				if relErr == nil && strings.Count(rel, string(os.PathSeparator)) > 3 {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			name := info.Name()
+			isStaleTemp := (strings.HasPrefix(name, ".") && strings.Contains(name, ".gextto-copy-")) ||
+				strings.HasSuffix(name, ".gextto-part")
+			if isStaleTemp && now.Sub(info.ModTime()) > minAge {
+				if remErr := os.Remove(path); remErr == nil {
+					cleaned++
+					logging.Info("🧹 removed stale temporary copy file",
+						"file", path, "size", logging.HumanBytesI64(info.Size()), "age", now.Sub(info.ModTime()).Round(time.Minute).String())
+				}
+			}
+			return nil
+		})
+	}
+	return cleaned
+}

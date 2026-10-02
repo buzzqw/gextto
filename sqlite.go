@@ -12,7 +12,7 @@ import (
 // A single connection is kept so concurrent goroutines never race on write
 // locks, matching the single `Mutex<Connection>` of the original.
 func OpenSQLite(path string) (*sql.DB, error) {
-	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)"
+	dsn := "file:" + path + "?_pragma=busy_timeout(10000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=cache_size(-8000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", path, err)
@@ -28,6 +28,7 @@ func OpenSQLite(path string) (*sql.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("wal %s: %w", path, err)
 	}
+	_, _ = db.Exec("PRAGMA synchronous=NORMAL")
 	return db, nil
 }
 

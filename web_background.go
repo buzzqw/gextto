@@ -1346,16 +1346,25 @@ func bg_cleanupEmptyTempDirs(cfg *Config, torrents TorrentSession) {
 	}
 }
 
-// tempCleanupWorker periodically cleans the empty folders in the libtorrent temp
-// directory.
+// tempCleanupWorker periodically cleans empty folders and stale temporary copy
+// files left behind by crashes or aborted transfers.
 func tempCleanupWorker(state *AppState) {
 	const cleanupPeriod = 30 * time.Minute
+	// Run initial sweep 60s after startup to clean remnants from previous runs
+	if !state.SleepBackground(60 * time.Second) {
+		return
+	}
+	cfg := latestConfig(state)
+	bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
+	SweepStaleTempFiles(cfg)
+
 	for {
 		if !state.SleepBackground(cleanupPeriod) {
 			return
 		}
 		cfg := latestConfig(state)
 		bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
+		SweepStaleTempFiles(cfg)
 	}
 }
 

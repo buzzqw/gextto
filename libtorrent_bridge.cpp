@@ -1472,7 +1472,7 @@ int gextto_lt_save_resume(gextto_lt_session* session, const char* state_dir, cha
             std::error_code remove_ec;
             std::filesystem::remove(entry.path(), remove_ec);
         }
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
         std::string failure;
         while (!pending.empty() && std::chrono::steady_clock::now() < deadline) {
             session->session.wait_for_alert(std::chrono::milliseconds(250));
