@@ -1172,7 +1172,7 @@
         <input type="hidden" name="path" value="{{.OAuth.StartPath}}" />
         <button class="btn sm primary" type="submit" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
       </form>
-      <form hx-post="/v2/oauth/poll" hx-target="#v2-oauth-output-{{if eq .OAuth.StartPath "/api/trakt/auth/start"}}trakt{{else}}simkl{{end}}" hx-swap="innerHTML" style="display:inline">
+      <form class="oauth-poll-form" hx-post="/v2/oauth/poll" hx-target="#v2-oauth-output-{{if eq .OAuth.StartPath "/api/trakt/auth/start"}}trakt{{else}}simkl{{end}}" hx-swap="innerHTML">
         <input type="hidden" name="path" value="{{.OAuth.PollPath}}" />
         <input class="input" name="code" aria-label="Codice o PIN di accesso" placeholder="codice" />
         <button class="btn sm" type="submit" title="Conferma il codice/PIN inserito">Conferma</button>

@@ -455,6 +455,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 }
 
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.oauth-poll-form { display: inline-flex; align-items: center; gap: 8px; }
+.oauth-poll-form .input { width: 180px; }
 .logs-toolbar { flex-wrap: nowrap; }
 .logs-toolbar [data-logs-filter] { flex: 1 1 auto; min-width: 120px; }
 .logs-toolbar [data-logs-lines] { flex: 0 0 76px; width: 76px; min-width: 76px; }
@@ -710,6 +712,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .list-row .form-actions { grid-column: 1 / -1; }
 /* URL / API key fields get more room when the row is wide enough. */
 @media (min-width: 720px) {
+  .list-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .list-row .field.wide { grid-column: span 2; }
 }
 .check { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; color: var(--muted); font-size: 0.88rem; }
@@ -860,6 +863,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .integration-body { display: flex; flex-direction: column; gap: 14px; }
 .integration-block { display: flex; flex-direction: column; gap: 8px; }
 .integration-block + .integration-block { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.integration-card .form-grid { align-items: start; }
 .integration-subtitle { margin: 0; color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .integration-subtitle:empty { display: none; }
 
