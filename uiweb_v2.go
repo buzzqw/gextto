@@ -1186,11 +1186,33 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	noRename, _ := s.db.TorrentNoRename(hash)
 	view.NoRename = noRename
 	view.Magnet = magnet
+	archived := false
+	if processed, err := s.db.TorrentProcessed(hash); err == nil && processed != nil && strings.TrimSpace(*processed) != "" {
+		archived = true
+	}
+	isCompleted := archived
+	if !isCompleted {
+		if status, err := s.db.TorrentStatus(hash); err == nil && status != nil && *status == "completed" {
+			isCompleted = true
+		}
+	}
+	stateLabel := uiStateLabel(torrent.State)
+	progressVal := torrent.Progress
+	doneVal := torrent.TotalDone
+	if isCompleted {
+		progressVal = 100.0
+		if torrent.TotalSize > 0 && doneVal < torrent.TotalSize {
+			doneVal = torrent.TotalSize
+		}
+		if torrent.State == "paused" {
+			stateLabel = "Completato"
+		}
+	}
 	view.General = []v2KV{
-		{Label: "Stato", Value: uiStateLabel(torrent.State)},
-		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", torrent.Progress)},
+		{Label: "Stato", Value: stateLabel},
+		{Label: "Progresso", Value: fmt.Sprintf("%.1f%%", progressVal)},
 		{Label: "Dimensione", Value: logging.HumanBytesI64(torrent.TotalSize)},
-		{Label: "Scaricato", Value: logging.HumanBytesI64(torrent.TotalDone)},
+		{Label: "Scaricato", Value: logging.HumanBytesI64(doneVal)},
 		{Label: "↓ / ↑", Value: logging.HumanRate(saturatingInt64(torrent.DownloadRate)) + " / " + logging.HumanRate(saturatingInt64(torrent.UploadRate))},
 		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
 		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},

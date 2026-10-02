@@ -346,3 +346,22 @@ func TestHandleTorrentEventDefersSingleFileArchive(t *testing.T) {
 		t.Fatalf("source must stay in downloads for seeding: %v", err)
 	}
 }
+
+func TestRemoveSeededCompletedRecognizesArchivedNasCopy(t *testing.T) {
+	db, cfg, view, _, processed := seedTestSetup(t)
+	// Simulate the file having been moved to NAS, so libtorrent reports 0 progress and paused state
+	view.Progress = 0.0
+	view.TotalDone = 0
+	view.State = "paused"
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	cfg.Libtorrent.AutoRemoveCompleted = true
+	RemoveSeededCompleted(cfg, session, db, map[string]struct{}{})
+	if len(session.removed) != 1 || session.removed[0] != seedTestHash {
+		t.Fatalf("archived torrent with 0 local progress must be recognized as completed and removed, got: %v", session.removed)
+	}
+	if _, err := os.Stat(processed); err != nil {
+		t.Fatalf("library copy must stay: %v", err)
+	}
+}
+

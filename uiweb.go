@@ -645,6 +645,13 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			row.StateClass = "ok"
 			row.ProgressClass = "seed"
 		}
+		if row.Archived || row.State == "Completato" {
+			row.Progress = 100.0
+			row.ProgressPct = "100.0"
+			if row.TotalSize > 0 && row.TotalDone < row.TotalSize {
+				row.TotalDone = row.TotalSize
+			}
+		}
 		if view.State == "seeding" || view.State == "finished" {
 			row.SeedInfinite = view.SeedRatio == 0 || view.SeedDays == 0
 		}

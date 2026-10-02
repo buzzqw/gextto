@@ -1321,6 +1321,15 @@ func gh3DecorateTorrents(s *AppState, items []models.TorrentView) []map[string]a
 		value["archived"] = archived
 		value["source"] = entry[1]
 		value["reason"] = entry[2]
+		if archived || item.State == "finished" {
+			value["progress"] = 100.0
+			if item.TotalSize > 0 && item.TotalDone < item.TotalSize {
+				value["total_done"] = item.TotalSize
+			}
+			if item.State == "paused" && archived {
+				value["state"] = "Completato"
+			}
+		}
 		decorated = append(decorated, value)
 	}
 	return decorated

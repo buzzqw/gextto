@@ -880,7 +880,11 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 	removed := []string{}
 	skipped := 0
 	for _, torrent := range s.activeEngine().List() {
-		completed := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
+		status, _ := s.db.TorrentStatus(torrent.Hash)
+		processed, _ := s.db.TorrentProcessed(torrent.Hash)
+		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
+		isCompletedDB := status != nil && *status == "completed"
+		completed := torrent.Progress >= 99.99 || torrent.State == "finished" || torrent.State == "seeding" || isCompletedDB || isArchived
 		if !completed {
 			continue
 		}
@@ -893,7 +897,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			continue
 		}
 		if meta, err := s.db.TorrentMeta(torrent.Hash); err == nil && meta != nil {
-			if processed, err := s.db.TorrentProcessed(torrent.Hash); err == nil && (processed == nil || strings.TrimSpace(*processed) == "") {
+			if processed == nil || strings.TrimSpace(*processed) == "" {
 				skipped++
 				continue
 			}
@@ -922,7 +926,15 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			ratioReached = download > 0.0 && float64(torrent.AllTimeUpload)/download >= *ratioLimit
 		}
 		timeReached := timeLimit != nil && torrent.SeedingSeconds >= *timeLimit
-		if !ratioReached && !timeReached {
+		canRemove := false
+		if ratioReached || timeReached {
+			canRemove = true
+		} else if isArchived && torrent.State == "paused" {
+			canRemove = true
+		} else if ratioLimit == nil && timeLimit == nil && (torrent.State == "paused" || torrent.State == "finished" || isArchived) {
+			canRemove = true
+		}
+		if !canRemove {
 			skipped++
 			continue
 		}

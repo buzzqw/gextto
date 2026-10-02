@@ -929,13 +929,18 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 		}
 		// Real completeness, not just a momentary libtorrent state: a torrent
 		// that was relocated mid-download can briefly report "finished" while
-		// its file is still incomplete.
-		completed := torrent.Progress >= 99.99 && torrent.TotalSize > 0 && torrent.TotalDone >= torrent.TotalSize
+		// its file is still incomplete. Also recognize torrents already completed
+		// and archived in the database whose download files were moved to NAS.
+		status, _ := db.TorrentStatus(torrent.Hash)
+		processed, _ := db.TorrentProcessed(torrent.Hash)
+		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
+		isCompletedDB := status != nil && *status == "completed"
+		completed := (torrent.Progress >= 99.99 && torrent.TotalSize > 0 && torrent.TotalDone >= torrent.TotalSize) || isArchived || isCompletedDB
 		if !completed {
 			continue
 		}
 		ratioReached, timeReached := tev_seedLimitsReached(cfg, &torrent)
-		if !ratioReached && !timeReached {
+		if !ratioReached && !timeReached && (!isArchived || torrent.State != "paused") {
 			continue
 		}
 		archivedPack := tev_archivedPackSourceDisposable(db, torrent.Hash, torrent.SavePath)

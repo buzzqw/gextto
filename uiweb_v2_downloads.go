@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -39,6 +40,24 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	message := "Impostazione salvata"
 	if status >= 400 {
 		message = v2JSONError(raw)
+	} else if op == "clear_completed" {
+		var reply struct {
+			Removed int `json:"removed"`
+			Skipped int `json:"skipped"`
+		}
+		if err := json.Unmarshal(raw, &reply); err == nil {
+			if reply.Removed > 0 {
+				if reply.Removed == 1 {
+					message = "1 torrent completato rimosso dalla sessione"
+				} else {
+					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione", reply.Removed)
+				}
+			} else if reply.Skipped > 0 {
+				message = fmt.Sprintf("Nessun torrent rimosso (%d ancora in seed)", reply.Skipped)
+			} else {
+				message = "Nessun torrent completato da rimuovere"
+			}
+		}
 	}
 	if r.Header.Get("HX-Request") == "" {
 		query := url.Values{"view": {"downloads"}, "msg": {message}}
