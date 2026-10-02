@@ -205,8 +205,13 @@ func V2ComicsWeeklyForce(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/comics/download", nil, mustJSON(payload))
 		if status >= 400 {
-			result["Error"] = true
-			result["Message"] = v2JSONError(raw)
+			message := v2JSONError(raw)
+			if strings.Contains(strings.ToLower(message), "magnet duplicato") {
+				result["Message"] = "Weekly Pack " + date + " già in coda"
+			} else {
+				result["Error"] = true
+				result["Message"] = message
+			}
 		} else {
 			result["Message"] = "Weekly Pack " + date + " accodato via " + method
 		}
