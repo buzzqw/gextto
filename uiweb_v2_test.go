@@ -264,6 +264,10 @@ func TestV2DownloadsPageAndActions(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `name="auto_state" value="1"`) || !strings.Contains(body, `every 5s`) {
 		t.Fatalf("automatic refresh state -> %d", code)
 	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/downloads/settings", url.Values{"op": {"clear_completed"}})
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-toast-region" hx-swap-oob="innerHTML"`) || !strings.Contains(body, "Nessun torrent completato da rimuovere") {
+		t.Fatalf("clear completed toast -> %d: %s", code, body)
+	}
 	code, body = v2Request(t, server, http.MethodPost, "/v2/downloads/table", url.Values{"refresh": {"1"}})
 	if code != http.StatusOK || !strings.Contains(body, `id="v2-torrents-wrap"`) {
 		t.Fatalf("refresh -> %d", code)

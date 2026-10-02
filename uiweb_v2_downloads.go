@@ -12,6 +12,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	op := strings.TrimSpace(r.FormValue("op"))
 	var path string
 	var body []byte
+	torrentNames := map[string]string{}
 	switch op {
 	case "unpin":
 		path = "/api/torrents/unpin"
@@ -19,6 +20,9 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case "clear_completed":
 		path = "/api/torrents/remove_completed"
 		body, _ = json.Marshal(RemoveCompletedInput{DeleteFiles: false})
+		for _, torrent := range s.activeEngine().List() {
+			torrentNames[strings.ToLower(strings.TrimSpace(torrent.Hash))] = strings.TrimSpace(torrent.Name)
+		}
 	case "auto_remove":
 		path = "/api/config/settings"
 		body, _ = json.Marshal(SettingInput{Key: "auto_remove_completed", Value: r.FormValue("value")})
@@ -42,15 +46,25 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		message = v2JSONError(raw)
 	} else if op == "clear_completed" {
 		var reply struct {
-			Removed int `json:"removed"`
-			Skipped int `json:"skipped"`
+			Removed int      `json:"removed"`
+			Skipped int      `json:"skipped"`
+			Items   []string `json:"items"`
 		}
 		if err := json.Unmarshal(raw, &reply); err == nil {
 			if reply.Removed > 0 {
+				names := make([]string, 0, len(reply.Items))
+				for _, hash := range reply.Items {
+					name := torrentNames[strings.ToLower(strings.TrimSpace(hash))]
+					if name == "" {
+						name = hash
+					}
+					names = append(names, name)
+				}
+				list := strings.Join(names, " · ")
 				if reply.Removed == 1 {
-					message = "1 torrent completato rimosso dalla sessione"
+					message = "1 torrent completato rimosso dalla sessione: " + list
 				} else {
-					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione", reply.Removed)
+					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione: %s", reply.Removed, list)
 				}
 			} else if reply.Skipped > 0 {
 				message = fmt.Sprintf("Nessun torrent rimosso (%d ancora in seed)", reply.Skipped)
@@ -65,7 +79,15 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_torrents_wrap", v2TorrentsViewFrom(s, r, message, status >= 400), dict, eng)
+	view := v2TorrentsViewFrom(s, r, message, status >= 400)
+	if op == "clear_completed" {
+		v2Render(w, http.StatusOK, "v2_downloads_settings_result", map[string]any{
+			"View":   view,
+			"Notice": map[string]any{"Title": "Pulisci completati", "Message": message, "Error": status >= 400},
+		}, dict, eng)
+		return
+	}
+	v2Render(w, http.StatusOK, "v2_torrents_wrap", view, dict, eng)
 }
 
 func V2HTTPDownloadDetail(w http.ResponseWriter, r *http.Request, s *AppState) {

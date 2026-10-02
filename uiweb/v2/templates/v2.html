@@ -281,6 +281,11 @@
 </div>
 {{end}}
 
+{{define "v2_downloads_settings_result"}}
+{{template "v2_torrents_wrap" .View}}
+<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>
+{{end}}
+
 {{define "v2_dashboard_search_results"}}{{template "v2_search_results" .}}{{end}}
 
 {{define "v2_dashboard_calendar"}}
@@ -359,7 +364,7 @@
        <button class="btn sm" type="submit" name="refresh" value="1" title="Ricarica l'elenco dei torrent e lo stato dei download">Aggiorna</button>
        <button class="btn sm{{if .Auto}} primary{{end}}" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}" title="{{if .Auto}}Disattiva l'aggiornamento automatico ogni 5 secondi{{else}}Attiva l'aggiornamento automatico ogni 5 secondi{{end}}">Auto: {{if .Auto}}on{{else}}off{{end}}</button>
        <label class="field inline-field" title="Mostra solo i torrent associati al tag selezionato"><span>Tag</span><select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-      <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+       <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
       <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/v2/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
       <span class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
     </div>
