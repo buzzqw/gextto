@@ -24,7 +24,9 @@ docs/               user, advanced-user and developer documentation
 ```
 
 The root Go package contains the application logic. `cmd/gexttod/main.go` only
-assembles and starts the executable.
+assembles and starts the executable. For a file-by-file map of that package,
+the torrent backends and where to make common changes, see
+[ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Requirements and build
 

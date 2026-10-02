@@ -15,6 +15,7 @@ specifiche.
 | [Sicurezza](SECURITY.md) | Esposizione di rete, segreti e segnalazione vulnerabilità. |
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
+| [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
 
 > [!NOTE]
 > I percorsi, le porte e i comandi qui descritti sono esempi. Verifica sempre
