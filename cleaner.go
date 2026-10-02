@@ -18,6 +18,10 @@ import (
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
+// ErrInferiorDuplicate is returned when an incoming release is discarded
+// because an existing file is equal or superior in quality.
+var ErrInferiorDuplicate = errors.New("release inferior to existing file")
+
 // IndexArchive implements `index_archive`: scans an archive folder
 // recursively, groups video files by `(season, episode)` and keeps the file
 // with the highest score. It implements the legacy

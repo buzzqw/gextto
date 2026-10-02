@@ -89,12 +89,7 @@ func bg_countKey(values map[string]any, key string) int64 {
 }
 
 func bg_archiveImportBusyContains(name string) bool {
-	// Uses the package-level guard maintained by web.go (AcquireArchiveImport),
-	// so a rename is skipped while an import is writing the same series.
-	archiveImportBusyMu.Lock()
-	defer archiveImportBusyMu.Unlock()
-	_, busy := archiveImportBusy[name]
-	return busy
+	return ArchiveImportBusyContains(name)
 }
 
 func bg_linkArchiveFile(db *Database, series string, season, episode int64, cfg *Config, path string) {

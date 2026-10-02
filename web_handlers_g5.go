@@ -23,7 +23,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -139,18 +138,8 @@ func gh5_purgeRemovedLibrary(db *Database, previousSeries []SeriesConfig, previo
 	}
 }
 
-// gh5_archiveImportBusy tracks series whose archive is being written by a
-// torrent post-processing run, so a manual scan can skip them.
-var (
-	gh5_archiveImportBusyMu sync.Mutex
-	gh5_archiveImportBusy   = map[string]struct{}{}
-)
-
 func gh5_archiveImportBusyContains(name string) bool {
-	gh5_archiveImportBusyMu.Lock()
-	defer gh5_archiveImportBusyMu.Unlock()
-	_, ok := gh5_archiveImportBusy[name]
-	return ok
+	return ArchiveImportBusyContains(name)
 }
 
 var gh5_seasonEpisodePatterns = []*regexp.Regexp{

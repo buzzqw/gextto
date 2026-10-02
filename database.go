@@ -1025,6 +1025,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 			comparisonScore := disk.Score
 			if dbRow {
 				comparisonQuality = MergeQuality(disk.Quality, ParseQuality(dbTitle))
+				enrichQualityWithMediaInfo(dbMediaInfo, &comparisonQuality)
 				if dbScore > comparisonScore {
 					comparisonScore = dbScore
 				}

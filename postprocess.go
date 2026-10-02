@@ -742,7 +742,7 @@ func StagePackFile(
 		existingScore := cfg.FileScore(existing, "series", "")
 		incomingScore := cfg.FileScore(file.Path, "series", "")
 		if existingScore >= maxInt64(incomingScore, releaseQualityScore) {
-			return existing, true, nil
+			return "", false, nil
 		}
 	}
 	identityPattern, err := utils.CachedRegex(`(?i)(?:s\d{1,2}e|\d{1,2}x)\d{1,4}`)
@@ -851,7 +851,14 @@ func ProcessPackFiles(
 			}
 		}
 		renamed, err := RenameEpisode(ctx, actual, &episodeRelease, cfg, tmdb)
-		if err != nil {
+		if errors.Is(err, ErrInferiorDuplicate) {
+			results = append(results, PackFileResult{
+				Episode:   episode,
+				Path:      actual,
+				Discarded: true,
+			})
+			continue
+		} else if err != nil {
 			return nil, err
 		}
 		finalPath := actual
@@ -944,8 +951,7 @@ func RenameEpisode(
 		return "", err
 	}
 	if resolved {
-		ApplySidecars(source, target, cfg)
-		return target, nil
+		return "", ErrInferiorDuplicate
 	}
 	if err := moveAcrossDevices(source, target); err != nil {
 		return "", err
@@ -1004,21 +1010,27 @@ func episodeTarget(
 	if series == nil {
 		return "", "", false, nil
 	}
-	tmdbID := series.TmdbID
-	if strings.TrimSpace(tmdbID) == "" {
-		resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
-		if err != nil {
-			return "", "", false, err
+	var resolvedTitle *string
+	if tmdb != nil {
+		tmdbID := series.TmdbID
+		if strings.TrimSpace(tmdbID) == "" {
+			resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
+			if err != nil {
+				return "", "", false, err
+			}
+			if resolved != nil {
+				tmdbID = *resolved
+			} else {
+				tmdbID = ""
+			}
 		}
-		if resolved != nil {
-			tmdbID = *resolved
-		} else {
-			tmdbID = ""
+		if tmdbID != "" {
+			t, err := tmdb.EpisodeTitle(ctx, tmdbID, season, episode)
+			if err != nil {
+				return "", "", false, err
+			}
+			resolvedTitle = t
 		}
-	}
-	resolvedTitle, err := tmdb.EpisodeTitle(ctx, tmdbID, season, episode)
-	if err != nil {
-		return "", "", false, err
 	}
 	title := fmt.Sprintf("Episodio %d", episode)
 	if resolvedTitle != nil {
@@ -1156,13 +1168,15 @@ func RenameMovie(
 	if movie := cfg.FindMovieMatchManual(release.Title, release.Year); movie != nil {
 		configuredName = movie.Name
 	}
-	tmdbItem, err := tmdb.SearchMovie(ctx, configuredName, release.Year)
-	if err != nil {
-		return "", err
-	}
 	officialTitle := configuredName
-	if tmdbItem != nil && tmdbItem.Title != nil {
-		officialTitle = *tmdbItem.Title
+	if tmdb != nil {
+		tmdbItem, err := tmdb.SearchMovie(ctx, configuredName, release.Year)
+		if err != nil {
+			return "", err
+		}
+		if tmdbItem != nil && tmdbItem.Title != nil {
+			officialTitle = *tmdbItem.Title
+		}
 	}
 	officialYear := release.Year
 	files, err := VideoFiles(path)
@@ -1245,7 +1259,7 @@ func RenameMovie(
 		return "", err
 	}
 	if resolved {
-		return target, nil
+		return "", ErrInferiorDuplicate
 	}
 	if err := moveAcrossDevices(source, target); err != nil {
 		return "", err
@@ -1589,26 +1603,83 @@ type mediaTags struct {
 }
 
 // readMediaTags runs the `mediainfo` binary and parses its JSON output (implementation of
-// `read_media_tags`). Any failure yields empty tags.
+// `read_media_tags`), falling back to `ffprobe` when `mediainfo` is not available or incomplete.
 func readMediaTags(path string) mediaTags {
 	// Bounded timeout so a hung probe or a stuck file cannot pin a worker
 	// indefinitely (mirrors the ffprobe probe in mediainfo.go).
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	var tags mediaTags
 	output, err := exec.CommandContext(ctx, "mediainfo", "--Output=JSON", path).Output()
-	if err != nil {
-		return mediaTags{}
+	if err == nil {
+		decoder := json.NewDecoder(bytes.NewReader(output))
+		decoder.UseNumber()
+		var value any
+		if err := decoder.Decode(&value); err == nil {
+			if object, ok := value.(map[string]any); ok {
+				tags = parseMediaTags(object)
+			}
+		}
 	}
-	decoder := json.NewDecoder(bytes.NewReader(output))
-	decoder.UseNumber()
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return mediaTags{}
+	// Fallback/enrichment using ffprobe via Probe (mediainfo.go)
+	if tags.Resolution == nil || tags.VideoCodec == nil || tags.AudioCodec == nil || tags.HDR == nil {
+		if probe := Probe(path); probe != nil {
+			tags = enrichTagsWithProbe(tags, probe)
+		}
 	}
-	if object, ok := value.(map[string]any); ok {
-		return parseMediaTags(object)
+	return tags
+}
+
+// enrichTagsWithProbe merges ffprobe probe results into mediaTags when fields are missing.
+func enrichTagsWithProbe(tags mediaTags, probe *MediaInfo) mediaTags {
+	if tags.Resolution == nil {
+		if res := probe.Resolution(); res != "" {
+			tags.Resolution = &res
+		}
 	}
-	return mediaTags{}
+	if tags.VideoCodec == nil {
+		if label, ok := CodecLabel(probe.VideoCodec); ok {
+			tags.VideoCodec = &label
+		}
+	}
+	if tags.AudioCodec == nil {
+		if label, ok := AudioLabel(probe.AudioCodec); ok {
+			tags.AudioCodec = &label
+		}
+	}
+	if tags.Channels == nil && probe.AudioChannels > 0 {
+		var ch string
+		switch probe.AudioChannels {
+		case 1:
+			ch = "Mono"
+		case 2:
+			ch = "Stereo"
+		case 6:
+			ch = "5.1"
+		case 8:
+			ch = "7.1"
+		default:
+			ch = fmt.Sprintf("%dch", probe.AudioChannels)
+		}
+		tags.Channels = &ch
+	}
+	if tags.HDR == nil && probe.HDR != "" {
+		hdr := probe.HDR
+		tags.HDR = &hdr
+	}
+	if tags.Languages == nil && len(probe.AudioLanguages) > 0 {
+		langs := make([]string, 0, len(probe.AudioLanguages))
+		for _, l := range probe.AudioLanguages {
+			if mapped := mediaLanguage(l); mapped != nil && !containsString(langs, *mapped) {
+				langs = append(langs, *mapped)
+			}
+		}
+		if len(langs) > 0 {
+			joined := strings.Join(langs, "+")
+			tags.Languages = &joined
+		}
+	}
+	return tags
 }
 
 // mediaText returns the first non-empty string stored under keys in track.

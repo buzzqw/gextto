@@ -419,10 +419,7 @@ func gh4_scanArchivePath(db *Database, series *SeriesConfig, path string, cfg *C
 // gh4_archiveImportBusyContains reports whether a series archive is currently
 // being written by a post-processing run (shared `archiveImportBusy` set).
 func gh4_archiveImportBusyContains(name string) bool {
-	archiveImportBusyMu.Lock()
-	defer archiveImportBusyMu.Unlock()
-	_, ok := archiveImportBusy[name]
-	return ok
+	return ArchiveImportBusyContains(name)
 }
 
 // ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ package gextto
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -1796,7 +1797,22 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	if resolved, resolveErr := ResolveExistingTarget(video, target, cfg.ReleaseScore(release), cfg, "series", seriesName); resolveErr != nil {
 		return false, resolveErr
 	} else if resolved {
-		sourceHandled = true
+		restored, err := db.RestoreUpgrade(event.Hash)
+		if err != nil {
+			return false, err
+		}
+		if !restored {
+			if err := db.RollbackRelease(release); err != nil {
+				return false, err
+			}
+		}
+		if err := db.MarkTorrentError(event.Hash, "release inferior to existing file"); err != nil {
+			return false, err
+		}
+		tev_discardCompletedSource(cfg, db, torrents, event, "release inferior to existing file")
+		logging.Warn("completed release discarded as inferior",
+			"hash", event.Hash, "name", event.Name, "title", release.Title)
+		return false, nil
 	} else {
 		if err := copyFileAtomically(video, target); err != nil {
 			return false, err
@@ -1971,24 +1987,27 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	noRename, _ := db.TorrentNoRename(event.Hash)
 	renamed := ""
 	renamedSet := false
+	discarded := false
 	if noRename {
 		logging.Info(fmt.Sprintf("rename skipped — torrent marked no-rename: «%s»", event.Name),
 			"name", event.Name, "title", release.Title)
 	} else if release.Kind == "movie" {
 		value, err := RenameMovie(context.Background(), path, release, cfg, tmdb)
-		if err != nil {
+		if errors.Is(err, ErrInferiorDuplicate) {
+			discarded = true
+		} else if err != nil {
 			return false, err
-		}
-		if value != "" {
+		} else if value != "" {
 			renamed = value
 			renamedSet = true
 		}
 	} else {
 		value, err := RenameEpisode(context.Background(), path, release, cfg, tmdb)
-		if err != nil {
+		if errors.Is(err, ErrInferiorDuplicate) {
+			discarded = true
+		} else if err != nil {
 			return false, err
-		}
-		if value != "" {
+		} else if value != "" {
 			renamed = value
 			renamedSet = true
 		}
@@ -1997,7 +2016,6 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	if renamedSet {
 		processedPath = renamed
 	}
-	discarded := false
 	if release.Kind == "series" && !release.IsPack {
 		if release.Series != nil && release.Season != nil && release.Episode != nil {
 			newFile := renamed
@@ -2389,6 +2407,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					return false, err
 				}
 				if !ok {
+					processed = append(processed, PackFileResult{
+						Episode:   file.Episode,
+						Path:      file.Path,
+						Discarded: true,
+					})
 					continue
 				}
 				partial, err := ProcessPackFiles(context.Background(), []PackInput{{Path: placed, Source: file}}, &release, cfg, tmdb)

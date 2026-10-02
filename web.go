@@ -456,6 +456,15 @@ func (g *ArchiveImportGuard) Release() {
 	g.series = nil
 }
 
+// ArchiveImportBusyContains reports whether an archive import is currently
+// in progress for series name.
+func ArchiveImportBusyContains(name string) bool {
+	archiveImportBusyMu.Lock()
+	defer archiveImportBusyMu.Unlock()
+	_, ok := archiveImportBusy[strings.TrimSpace(name)]
+	return ok
+}
+
 // ---------------------------------------------------------------------------
 // Application state ( lines 296-320)
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -827,4 +828,101 @@ func postprocessJSONString(value string) string {
 		return `"` + value + `"`
 	}
 	return string(encoded)
+}
+
+func TestStagePackFileSkipsInferiorEpisode(t *testing.T) {
+	dir := t.TempDir()
+	existingFile := filepath.Join(dir, "Show.S01E01.1080p.WEB-DL.H264.mkv")
+	if err := os.WriteFile(existingFile, []byte("good video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, err := VideoFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	packSource := filepath.Join(t.TempDir(), "Show.S01E01.720p.HDTV.mkv")
+	if err := os.WriteFile(packSource, []byte("inferior video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file := PackSourceFile{
+		Path:    packSource,
+		Season:  1,
+		Episode: 1,
+	}
+	placed, ok, err := StagePackFile(&file, filepath.Dir(packSource), dir, files, &cfg, 400)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok || placed != "" {
+		t.Fatalf("expected inferior pack file to be skipped, got placed=%q, ok=%v", placed, ok)
+	}
+}
+
+func TestRenameEpisodeReturnsErrInferiorDuplicate(t *testing.T) {
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.RenameEpisodes = true
+	cfg.CleanupUpgrades = true
+	cfg.RenameFormat = "standard"
+	trashDir := t.TempDir()
+	cfg.TrashPath = &trashDir
+
+	seriesName := "TestShow"
+	cfg.Series = append(cfg.Series, SeriesConfig{
+		Name:        seriesName,
+		ArchivePath: dir,
+	})
+
+	// Pre-create target file with standard naming format
+	existingTarget := filepath.Join(dir, "TestShow - S01E01 - Episodio 1 [480p][h264].mkv")
+	if err := os.WriteFile(existingTarget, []byte("existing file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Incoming source with matching/inferior quality targeting the same path
+	sourceFile := filepath.Join(dir, "TestShow.S01E01.480p.x264.mkv")
+	if err := os.WriteFile(sourceFile, []byte("incoming file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s1 := int64(1)
+	e1 := int64(1)
+	release := models.Release{
+		Kind:    "series",
+		Series:  &seriesName,
+		Season:  &s1,
+		Episode: &e1,
+		Title:   "TestShow.S01E01.480p.x264",
+		Quality: ParseQuality("TestShow.S01E01.480p.x264"),
+	}
+
+	res, err := RenameEpisode(context.Background(), sourceFile, &release, &cfg, nil)
+	if !errors.Is(err, ErrInferiorDuplicate) {
+		t.Fatalf("expected ErrInferiorDuplicate, got res=%q, err=%v", res, err)
+	}
+	if res != "" {
+		t.Fatalf("expected empty result string, got %q", res)
+	}
+}
+
+func TestEnrichTagsWithProbe(t *testing.T) {
+	probe := &MediaInfo{
+		Width:          1920,
+		Height:         1080,
+		VideoCodec:     "hevc",
+		AudioCodec:     "eac3",
+		AudioChannels:  6,
+		HDR:            "HDR10",
+		AudioLanguages: []string{"ita", "eng"},
+	}
+	var emptyTags mediaTags
+	enriched := enrichTagsWithProbe(emptyTags, probe)
+
+	assertStringPointer(t, enriched.Resolution, "1080p")
+	assertStringPointer(t, enriched.VideoCodec, "h265")
+	assertStringPointer(t, enriched.AudioCodec, "ddp")
+	assertStringPointer(t, enriched.Channels, "5.1")
+	assertStringPointer(t, enriched.HDR, "HDR10")
+	assertStringPointer(t, enriched.Languages, "IT+EN")
 }

@@ -939,6 +939,29 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			continue
 		}
 		deleteFiles := input.DeleteFiles || gh6_torrentFilesAreDisposable(s.db, torrent.Hash)
+		source := CompletionPath(&models.TorrentEvent{
+			Kind:     "torrent_finished",
+			Hash:     torrent.Hash,
+			Name:     torrent.Name,
+			SavePath: torrent.SavePath,
+		})
+		if deleteFiles && !input.DeleteFiles {
+			if !tev_completedSourceDisposable(s.db, torrent.Hash, torrent.SavePath) {
+				deleteFiles = false
+			}
+		}
+		if deleteFiles && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
+			if _, statErr := os.Stat(source); statErr == nil {
+				if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
+					logging.Error("could not move completed torrent source to trash",
+						"hash", torrent.Hash, "name", torrent.Name, "source", source, "error", moveErr.Error())
+				} else {
+					logging.Info("completed torrent source moved to trash",
+						"hash", torrent.Hash, "name", torrent.Name, "source", source, "trash", target)
+				}
+			}
+			deleteFiles = false
+		}
 		ok, err := s.activeEngine().Remove(torrent.Hash, deleteFiles)
 		if err != nil {
 			logging.Warn("completed torrent removal failed", "hash", torrent.Hash, "name", torrent.Name, "error", err)
