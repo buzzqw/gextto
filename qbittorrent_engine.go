@@ -32,6 +32,7 @@ import (
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/qbittorrent"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // qbittorrentSettings is the fully-resolved configuration of the adapter.
@@ -610,8 +611,11 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 	var downloading []candidate
 	var paused []candidate
 	for _, view := range views {
+		if view.Progress >= 99.99 {
+			continue
+		}
 		switch view.State {
-		case "downloading":
+		case "downloading", "downloading_metadata", "stalled":
 			downloading = append(downloading, candidate{view.Hash, view.QueuePosition, view.Name})
 		case "paused":
 			if _, ok := e.policyPaused[view.Hash]; ok {
@@ -1102,7 +1106,8 @@ func (e *qbittorrentEngine) SetFilePriorities(hash string, priorities []int32) (
 	}
 	grouped := map[int][]int{}
 	for index, priority := range priorities {
-		grouped[int(priority)] = append(grouped[int(priority)], index)
+		norm := qbNormalizeFilePriority(int(priority))
+		grouped[norm] = append(grouped[norm], index)
 	}
 	ctx, cancel := e.requestContext()
 	defer cancel()
@@ -1112,6 +1117,19 @@ func (e *qbittorrentEngine) SetFilePriorities(hash string, priorities []int32) (
 		}
 	}
 	return true, nil
+}
+
+func qbNormalizeFilePriority(p int) int {
+	switch {
+	case p <= 0:
+		return qbittorrent.FilePrioritySkip
+	case p >= 7:
+		return qbittorrent.FilePriorityMaximal
+	case p >= 4:
+		return qbittorrent.FilePriorityHigh
+	default:
+		return qbittorrent.FilePriorityNormal
+	}
 }
 
 func (e *qbittorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
@@ -1160,7 +1178,7 @@ func (e *qbittorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit in
 		}
 		applied = true
 	}
-	if seedRatio != 0 || seedDays != 0 {
+	if seedRatio >= -1.0 || seedDays >= -1 {
 		ratio := -2.0
 		switch {
 		case seedRatio > 0:
@@ -1429,6 +1447,15 @@ func (e *qbittorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *C
 				e.persistTorrentCopy(hash, torrentPath)
 				return &hash, nil
 			}
+		}
+	}
+	// Fallback: if qBittorrent didn't return a new hash (e.g. already added, or slow
+	// indexing), extract the infohash directly from the .torrent file metadata.
+	if data, readErr := os.ReadFile(torrentPath); readErr == nil {
+		if hash, ok := utils.TorrentInfoHash(data); ok {
+			hash = strings.ToLower(hash)
+			e.persistTorrentCopy(hash, torrentPath)
+			return &hash, nil
 		}
 	}
 	return nil, nil

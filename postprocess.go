@@ -245,7 +245,7 @@ func pathStartsWith(path, prefix string) bool {
 // SamePath reports whether two paths refer to the same filesystem location
 // (implementation of `same_path`).
 func SamePath(left, right string) bool {
-	if left == right {
+	if left == right || filepath.Clean(left) == filepath.Clean(right) {
 		return true
 	}
 	leftPath, leftErr := canonicalizePath(left)

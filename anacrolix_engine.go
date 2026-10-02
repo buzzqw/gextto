@@ -141,8 +141,9 @@ type anacrolixManifestEntry struct {
 }
 
 type anacrolixSample struct {
-	done int64
-	at   time.Time
+	done    int64
+	written int64
+	at      time.Time
 }
 
 // anacrolixEngine is a TorrentEngine backed by the in-process anacrolix client.
@@ -365,9 +366,11 @@ func (e *anacrolixEngine) register(handle *torrent.Torrent, savePath string, opt
 		paused:     options.Paused,
 		uploadOnly: options.SeedMode,
 	}
-	hash := handle.InfoHash().HexString()
+	hash := strings.ToLower(handle.InfoHash().HexString())
 	if options.SeedMode {
 		handle.DisallowDataDownload()
+	} else if !options.Paused && handle.Info() != nil {
+		handle.DownloadAll()
 	}
 	e.mu.Lock()
 	e.state[hash] = entry
@@ -460,7 +463,7 @@ func (e *anacrolixEngine) addTorrentFileInternal(torrentPath, savePath string, o
 		return nil, fmt.Errorf("anacrolix: add torrent: %w", err)
 	}
 	e.register(handle, savePath, options)
-	hash := handle.InfoHash().HexString()
+	hash := strings.ToLower(handle.InfoHash().HexString())
 	e.persistTorrent(hash, meta)
 	return &hash, nil
 }
@@ -483,10 +486,27 @@ func (e *anacrolixEngine) toView(entry *anacrolixTorrent, now time.Time) models.
 	if total > 0 {
 		progress = float64(done) / float64(total) * 100.0
 	}
+	stats := handle.Stats()
+	written := stats.BytesWrittenData.Int64()
+	downloaded := stats.BytesReadData.Int64()
+	if downloaded < done {
+		downloaded = done
+	}
+
+	checking := false
+	for _, run := range handle.PieceStateRuns() {
+		if run.PieceState.Hashing || run.PieceState.QueuedForHash {
+			checking = true
+			break
+		}
+	}
+
 	state := "downloading"
 	switch {
 	case entry.paused:
 		state = "paused"
+	case checking:
+		state = "checking_files"
 	case !hasMetadata:
 		state = "downloading_metadata"
 	case handle.Seeding():
@@ -499,14 +519,19 @@ func (e *anacrolixEngine) toView(entry *anacrolixTorrent, now time.Time) models.
 	}
 	sample := e.samples[hash]
 	downloadRate := uint64(0)
+	uploadRate := uint64(0)
 	if !sample.at.IsZero() {
 		elapsed := now.Sub(sample.at).Seconds()
-		if elapsed > 0 && done >= sample.done {
-			downloadRate = uint64(float64(done-sample.done) / elapsed)
+		if elapsed > 0 {
+			if done >= sample.done {
+				downloadRate = uint64(float64(done-sample.done) / elapsed)
+			}
+			if written >= sample.written {
+				uploadRate = uint64(float64(written-sample.written) / elapsed)
+			}
 		}
 	}
-	e.samples[hash] = anacrolixSample{done: done, at: now}
-	stats := handle.Stats()
+	e.samples[hash] = anacrolixSample{done: done, written: written, at: now}
 	view := models.TorrentView{
 		Hash:              hash,
 		Name:              handle.Name(),
@@ -515,10 +540,14 @@ func (e *anacrolixEngine) toView(entry *anacrolixTorrent, now time.Time) models.
 		State:             state,
 		DownloadRate:      downloadRate,
 		DownloadRateTotal: downloadRate,
+		UploadRate:        uploadRate,
+		UploadRateTotal:   uploadRate,
+		AllTimeUpload:     written,
+		AllTimeDownload:   downloaded,
 		TotalSize:         total,
 		TotalDone:         done,
 		HasMetadata:       hasMetadata,
-		IsSeeding:         handle.Seeding(),
+		IsSeeding:         handle.Seeding() || entry.uploadOnly,
 		NumPeers:          stats.ActivePeers,
 		NumSeeds:          stats.ConnectedSeeders,
 		NumComplete:       stats.ConnectedSeeders,
@@ -542,11 +571,16 @@ func (e *anacrolixEngine) sync() error {
 	next := map[string]models.TorrentView{}
 	for hash, entry := range e.state {
 		view := e.toView(entry, now)
-		// Persist metadata as soon as it is available so a restart is safe.
+		// Persist metadata and queue download pieces as soon as metadata is available.
 		if view.HasMetadata {
-			if info := entry.handle.Info(); info != nil && !fileExists(filepath.Join(e.settings.MetadataDir, hash+".torrent")) {
-				mi := entry.handle.Metainfo()
-				e.persistTorrent(hash, &mi)
+			if info := entry.handle.Info(); info != nil {
+				if !entry.paused && !entry.uploadOnly {
+					entry.handle.DownloadAll()
+				}
+				if !fileExists(filepath.Join(e.settings.MetadataDir, hash+".torrent")) {
+					mi := entry.handle.Metainfo()
+					e.persistTorrent(hash, &mi)
+				}
 			}
 		}
 		next[hash] = view
@@ -566,6 +600,9 @@ func (e *anacrolixEngine) diffLocked(previous, current models.TorrentView) {
 	}
 	if previous.Progress < 99.99 && current.Progress >= 99.99 {
 		e.events = append(e.events, models.TorrentEvent{Kind: "torrent_finished", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath})
+	}
+	if previous.State == "checking_files" && current.State != "checking_files" {
+		e.events = append(e.events, models.TorrentEvent{Kind: "torrent_checked", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath})
 	}
 	if previous.State != "error" && current.State == "error" {
 		e.events = append(e.events, models.TorrentEvent{Kind: "torrent_error", Hash: current.Hash, Name: current.Name, SavePath: current.SavePath, Message: current.Error})
@@ -643,6 +680,9 @@ func (e *anacrolixEngine) Resume(hash string) (bool, error) {
 	}
 	entry.handle.AllowDataDownload()
 	entry.handle.AllowDataUpload()
+	if !entry.uploadOnly && entry.handle.Info() != nil {
+		entry.handle.DownloadAll()
+	}
 	e.mu.Lock()
 	entry.paused = false
 	entry.stalled = false
@@ -724,16 +764,15 @@ func (e *anacrolixEngine) Remove(hash string, deleteFiles bool) (bool, error) {
 	normalized := strings.ToLower(strings.TrimSpace(hash))
 	name := entry.handle.Name()
 	entry.handle.Drop()
-	if deleteFiles {
-		content := filepath.Join(entry.savePath, name)
-		if name == "" || !pathWithin(content, entry.savePath) {
-			content = entry.savePath
-		}
-		if info, err := os.Stat(content); err == nil {
-			if info.IsDir() {
-				_ = os.RemoveAll(content)
-			} else {
-				_ = os.Remove(content)
+	if deleteFiles && strings.TrimSpace(name) != "" {
+		content := filepath.Clean(filepath.Join(entry.savePath, name))
+		if pathWithin(content, entry.savePath) && !SamePath(content, entry.savePath) {
+			if info, err := os.Stat(content); err == nil {
+				if info.IsDir() {
+					_ = os.RemoveAll(content)
+				} else {
+					_ = os.Remove(content)
+				}
 			}
 		}
 	}
@@ -806,16 +845,17 @@ func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
 	if !pathWithin(source, entry.savePath) {
 		return false, fmt.Errorf("anacrolix: refusing unsafe source path %s", source)
 	}
-	info, err := os.Stat(source)
-	if err != nil {
+	if _, err := os.Stat(source); err != nil {
 		return false, fmt.Errorf("anacrolix: source data missing: %w", err)
 	}
-	if info.IsDir() {
-		if entries, readErr := os.ReadDir(source); readErr == nil && len(entries) > 0 {
-			return false, fmt.Errorf("anacrolix: destination already populated: %s", target)
+	if targetInfo, targetErr := os.Stat(target); targetErr == nil {
+		if targetInfo.IsDir() {
+			if entries, readErr := os.ReadDir(target); readErr == nil && len(entries) > 0 {
+				return false, fmt.Errorf("anacrolix: destination already populated: %s", target)
+			}
+		} else {
+			return false, fmt.Errorf("anacrolix: destination file already exists: %s", target)
 		}
-	} else if fileExists(target) {
-		return false, fmt.Errorf("anacrolix: destination file already exists: %s", target)
 	}
 	if err := os.MkdirAll(destination, 0o755); err != nil {
 		return false, err
@@ -856,6 +896,14 @@ func (e *anacrolixEngine) MoveStorage(hash, destination string) (bool, error) {
 			logging.Debug("anacrolix move: resume after move failed", "hash", hash, "error", err.Error())
 		}
 	}
+	e.mu.Lock()
+	e.events = append(e.events, models.TorrentEvent{
+		Kind:     "storage_moved",
+		Hash:     hash,
+		Name:     name,
+		SavePath: destination,
+	})
+	e.mu.Unlock()
 	logging.Info("📁 anacrolix storage moved", "hash", hash, "from", entry.savePath, "to", destination)
 	return true, nil
 }

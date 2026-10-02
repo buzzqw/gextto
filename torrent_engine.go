@@ -152,7 +152,7 @@ var capabilityLevels = map[string]map[string]string{
 		"recheck": "full", "move": "full", "limits": "full", "files": "full", "peers": "full",
 		"trackers": "full", "events": "full", "stats": "full", "sequential": "full",
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
-		"piece_diagnostics": "partial", "categories": "full", "tags": "full", "sync": "none",
+		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "none",
 		"preferences": "full", "super_seeding": "full", "upload_mode": "full",
 		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
 	},
@@ -169,7 +169,7 @@ var capabilityLevels = map[string]map[string]string{
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
 		"recheck": "full", "move": "partial", "limits": "partial", "files": "full", "peers": "full",
 		"trackers": "full", "events": "full", "stats": "full", "sequential": "none",
-		"first_last": "none", "seed_policy": "full", "ramdisk": "none", "fastresume": "none",
+		"first_last": "none", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "full", "categories": "none", "tags": "none", "sync": "none",
 		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
 		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
@@ -405,11 +405,17 @@ type torrentEngineEmbeddedExtras interface {
 // backend. When another engine is active it returns an explicit capability
 // error so libtorrent-only endpoints never act on the wrong session.
 func (s *AppState) requireEmbedded(capability string) (*LibtorrentClient, error) {
+	if s == nil {
+		return nil, backendCapabilityError(BackendEmbedded, capability)
+	}
 	s.engine_mu.RLock()
 	engine := s.torrent_engine
 	s.engine_mu.RUnlock()
 	if engine != nil {
 		return nil, backendCapabilityError(engine.Name(), capability)
+	}
+	if s.torrents == nil {
+		return nil, backendCapabilityError(BackendEmbedded, capability)
 	}
 	return s.torrents, nil
 }

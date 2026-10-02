@@ -874,7 +874,8 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // IpfilterUpdate handles POST /api/torrents/ipfilter_update.
 func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("ip_filter"); err != nil {
+	client, err := s.requireEmbedded("ip_filter")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -898,7 +899,7 @@ func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		localPath = path
 	}
-	rules, err := s.torrents.LoadIPFilter(localPath)
+	rules, err := client.LoadIPFilter(localPath)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

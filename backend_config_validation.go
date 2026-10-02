@@ -33,7 +33,7 @@ func validateBackendSetting(key, value string) error {
 		}
 		return validateBackendInteger(key, raw, 1, 300)
 	case "qbittorrent_poll_interval_ms":
-		if raw == "" {
+		if raw == "" || raw == "0" {
 			return nil
 		}
 		return validateBackendInteger(key, raw, 250, 60000)

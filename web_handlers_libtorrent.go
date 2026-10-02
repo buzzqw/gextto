@@ -24,7 +24,8 @@ type TorrentFlagInput struct {
 
 // SetTorrentUploadMode implements POST /api/torrents/{hash}/upload-mode.
 func SetTorrentUploadMode(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("upload_mode"); err != nil {
+	client, err := s.requireEmbedded("upload_mode")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -34,7 +35,7 @@ func SetTorrentUploadMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ok, err := s.torrents.SetUploadMode(hash, input.Enabled)
+	ok, err := client.SetUploadMode(hash, input.Enabled)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -48,7 +49,8 @@ func SetTorrentUploadMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetTorrentShareMode implements POST /api/torrents/{hash}/share-mode.
 func SetTorrentShareMode(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("share_mode"); err != nil {
+	client, err := s.requireEmbedded("share_mode")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -58,7 +60,7 @@ func SetTorrentShareMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ok, err := s.torrents.SetShareMode(hash, input.Enabled)
+	ok, err := client.SetShareMode(hash, input.Enabled)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -72,7 +74,8 @@ func SetTorrentShareMode(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetTorrentFlag implements POST /api/torrents/{hash}/flags.
 func SetTorrentFlag(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("torrent_flags"); err != nil {
+	client, err := s.requireEmbedded("torrent_flags")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -88,7 +91,7 @@ func SetTorrentFlag(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "unknown torrent flag")
 		return
 	}
-	ok, err := s.torrents.SetTorrentFlag(hash, input.Flag, input.Enabled)
+	ok, err := client.SetTorrentFlag(hash, input.Flag, input.Enabled)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -102,12 +105,13 @@ func SetTorrentFlag(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // ScrapeTorrent implements POST /api/torrents/{hash}/scrape.
 func ScrapeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("scrape"); err != nil {
+	client, err := s.requireEmbedded("scrape")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
 	hash := pathParam(r, "hash")
-	ok, err := s.torrents.ScrapeTracker(hash)
+	ok, err := client.ScrapeTracker(hash)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -121,12 +125,13 @@ func ScrapeTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // TorrentDhtAnnounce implements POST /api/torrents/{hash}/dht-announce.
 func TorrentDhtAnnounce(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("dht_announce"); err != nil {
+	client, err := s.requireEmbedded("dht_announce")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
 	hash := pathParam(r, "hash")
-	ok, err := s.torrents.ForceDhtAnnounce(hash)
+	ok, err := client.ForceDhtAnnounce(hash)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
@@ -162,11 +167,12 @@ func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // LibtorrentSessionStats implements GET /api/libtorrent/session-stats.
 func LibtorrentSessionStats(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("session_stats"); err != nil {
+	client, err := s.requireEmbedded("session_stats")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
-	values, err := s.torrents.SessionStats()
+	values, err := client.SessionStats()
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return

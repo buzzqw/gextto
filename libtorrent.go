@@ -2254,7 +2254,11 @@ func (c *LibtorrentClient) Shutdown(cfg *Config) error {
 	if c.session == nil {
 		return nil
 	}
-	saved, errMessage := cgoLtSaveResume(c.session, cfg.StateDir)
+	stateDir := c.stateDir
+	if cfg != nil && cfg.StateDir != "" {
+		stateDir = cfg.StateDir
+	}
+	saved, errMessage := cgoLtSaveResume(c.session, stateDir)
 	if saved == 0 {
 		// Destroy the session anyway so buffered pieces are flushed.
 		cgoLtDestroy(c.session)

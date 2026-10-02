@@ -459,12 +459,13 @@ func gh5_applyWatchlistImport(cfg *Config, entries []gh5_watchlistEntry) map[str
 
 // ApplyLibtorrentSettings implements `apply_libtorrent_settings`.
 func ApplyLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("apply_settings"); err != nil {
+	client, err := s.requireEmbedded("apply_settings")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
 	cfg := latestConfig(s)
-	result, err := s.torrents.ApplySettings(cfg)
+	result, err := client.ApplySettings(cfg)
 	gh5_torrentAction(w, result, err)
 }
 
@@ -1177,7 +1178,8 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetSuperSeeding implements `set_super_seeding`.
 func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if _, err := s.requireEmbedded("super_seeding"); err != nil {
+	client, err := s.requireEmbedded("super_seeding")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -1189,7 +1191,7 @@ func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	result, err := s.torrents.SetSuperSeeding(hash, input.Enabled)
+	result, err := client.SetSuperSeeding(hash, input.Enabled)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return

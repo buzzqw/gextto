@@ -1669,7 +1669,8 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 		})
 		return
 	}
-	if _, err := s.requireEmbedded("optimize_settings"); err != nil {
+	client, err := s.requireEmbedded("optimize_settings")
+	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
@@ -1682,7 +1683,7 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 		}
 	}
 	optimized := latestConfig(s)
-	if _, err := s.torrents.ApplySettings(optimized); err != nil {
+	if _, err := client.ApplySettings(optimized); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
