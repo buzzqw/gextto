@@ -771,6 +771,11 @@ func RunCycleDomain(
 			return stats, nil
 		}
 		release := best[i]
+		// Older persisted entries and a few third-party feeds can store a valid
+		// magnet in TorrentURL. Recover it before deciding that a torrent file
+		// must be fetched over HTTP; a magnet is already directly usable by the
+		// torrent engine and must never be passed to HTTPGetBytes.
+		promoteTorrentURLMagnet(&release)
 		// Feeds that expose only a `.torrent` link (for example TorrentLeech)
 		// have no magnet: download the file, derive its infohash, and retain the
 		// file for adding it (private trackers require it for announcing).
@@ -1441,6 +1446,9 @@ func humanDuration(seconds int64) string {
 // it in the state dir. Returns the equivalent magnet and the file path used
 // when adding it.
 func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL string) (string, string, error) {
+	if !IsTorrentURL(rawURL) {
+		return "", "", fmt.Errorf("torrent source is not an HTTP(S) torrent link")
+	}
 	payload, err := engine.FetchTorrent(ctx, rawURL)
 	if err != nil {
 		return "", "", err
@@ -1458,6 +1466,22 @@ func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL 
 		return "", "", err
 	}
 	return "magnet:?xt=urn:btih:" + hash, path, nil
+}
+
+// promoteTorrentURLMagnet repairs a legacy/malformed release that carries a
+// valid magnet in TorrentURL instead of Magnet. It returns true when a direct
+// magnet source was recovered.
+func promoteTorrentURLMagnet(release *models.Release) bool {
+	if release == nil || strings.TrimSpace(release.Magnet) != "" || release.TorrentURL == nil {
+		return false
+	}
+	magnet, ok := utils.SanitizeMagnet(strings.TrimSpace(*release.TorrentURL), &release.Title)
+	if !ok {
+		return false
+	}
+	release.Magnet = magnet
+	release.TorrentURL = nil
+	return true
 }
 
 // incumbentWins is true when `incumbent` must not be replaced by `candidate`:

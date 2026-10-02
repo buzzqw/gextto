@@ -1205,7 +1205,10 @@ func RecoverCompletedArchives(cfg *Config, torrents TorrentSession, db *Database
 			logging.Warn("existing archive completion could not be recorded", "error", err)
 			continue
 		}
-		logging.Info("existing archive completion recorded", "path", target)
+		// This recovery can legitimately race the normal post-seed
+		// storage_moved alert. It is useful for diagnostics after an interrupted
+		// move, but redundant in the operator log after "MOVING TO NAS".
+		logging.Debug("recovered existing archive completion record", "path", target)
 	}
 }
 
@@ -2066,6 +2069,40 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	if err := db.MarkReleaseCompleted(release, processedPath, size); err != nil {
 		return false, err
 	}
+	suffix := " (kept original name)"
+	if renamedSet {
+		suffix = ""
+	}
+	// Download completion is logged when the payload first reaches 100%. This
+	// later handler records the separate archive/import phase (often after a
+	// seed period), so the two lifecycle messages retain their real order.
+	logging.Info(fmt.Sprintf("📁 Archive import complete — «%s» · %s · saved to %s%s",
+		release.Title,
+		logging.HumanBytesI64(size),
+		processedPath,
+		suffix,
+	))
+	if !preserveSource && cfg.Libtorrent.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
+		removed, err := torrents.Remove(event.Hash, false)
+		if err != nil {
+			logging.Warn("renamed torrent removal failed",
+				"hash", event.Hash, "name", event.Name, "error", err.Error())
+		} else if removed {
+			_ = db.MarkTorrentRemovedAt(event.Hash)
+			logging.Debug("torrent removed after rename: archived under a different path",
+				"hash", event.Hash, "name", event.Name)
+		} else {
+			logging.Debug("renamed torrent already removed", "hash", event.Hash, "name", event.Name)
+		}
+	}
+	return true, nil
+}
+
+// tev_logDownloadComplete logs the moment the torrent payload becomes complete,
+// before a deferred seeding relocation can start. In move mode the final
+// library path does not exist yet, so it deliberately reports the seeding path
+// rather than claiming that the archive import already happened.
+func tev_logDownloadComplete(db *Database, event *models.TorrentEvent, release *models.Release, path string, size int64) {
 	durationSeconds := int64(0)
 	averageSpeed := int64(0)
 	if times, err := db.TorrentTimes(event.Hash); err == nil && times != nil {
@@ -2088,32 +2125,13 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			averageSpeed = dividend / seconds
 		}
 	}
-	suffix := " (kept original name)"
-	if renamedSet {
-		suffix = ""
-	}
-	logging.Info(fmt.Sprintf("🎉 Download complete — «%s» · %s · downloaded in %s at %s · saved to %s%s",
+	logging.Info(fmt.Sprintf("🎉 Download complete — «%s» · %s · downloaded in %s at %s · retained for seeding in %s",
 		release.Title,
 		logging.HumanBytesI64(size),
 		logging.HumanDuration(durationSeconds),
 		logging.HumanRate(averageSpeed),
-		processedPath,
-		suffix,
+		path,
 	))
-	if !preserveSource && cfg.Libtorrent.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
-		removed, err := torrents.Remove(event.Hash, false)
-		if err != nil {
-			logging.Warn("renamed torrent removal failed",
-				"hash", event.Hash, "name", event.Name, "error", err.Error())
-		} else if removed {
-			_ = db.MarkTorrentRemovedAt(event.Hash)
-			logging.Debug("torrent removed after rename: archived under a different path",
-				"hash", event.Hash, "name", event.Name)
-		} else {
-			logging.Debug("renamed torrent already removed", "hash", event.Hash, "name", event.Name)
-		}
-	}
-	return true, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -2286,8 +2304,9 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					if err := db.MarkReleaseCompleted(&release, "", size); err != nil {
 						return false, err
 					}
+					tev_logDownloadComplete(db, &event, &release, source, size)
 					tev_notifySeeding(db, notifier, &event, &release, source, size)
-					logging.Info("single episode completed; kept in downloads for seeding, will be archived at the end of the seed",
+					logging.Info("single episode retained for seeding; archive relocation will happen at the end of the seed",
 						"hash", event.Hash, "name", event.Name, "path", source)
 					return false, nil
 				}

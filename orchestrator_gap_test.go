@@ -49,3 +49,14 @@ func TestCompleteSeasonPackCoversEveryGapInItsSeason(t *testing.T) {
 		t.Fatal("complete pack does not match its season gap")
 	}
 }
+
+func TestPromoteTorrentURLMagnetKeepsDirectMagnetAcquisition(t *testing.T) {
+	url := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Example"
+	release := &models.Release{Title: "Example", TorrentURL: &url}
+	if !promoteTorrentURLMagnet(release) {
+		t.Fatal("magnet stored as a torrent URL was not promoted")
+	}
+	if release.TorrentURL != nil || release.Magnet == "" {
+		t.Fatalf("release = %+v, want magnet with no torrent URL", release)
+	}
+}

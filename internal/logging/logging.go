@@ -1,9 +1,7 @@
 // Package logging provides the readable, rotating logger used across gextto.
 //
-// Each line uses `date time LEVEL [component] message · key: value`, mirroring
-// gextto's tracing formatter: local time, right-aligned level, the last path
-// segment of the caller's package as the component and structured fields after
-// the message.
+// Each line uses `date time LEVEL message · key: value`: local time,
+// right-aligned level and the user-facing message followed by structured fields.
 package logging
 
 import (
@@ -12,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -102,25 +99,6 @@ func Enabled(level Level) bool {
 	return level >= minLevel
 }
 
-func component() string {
-	pc, file, _, ok := runtime.Caller(3)
-	if !ok {
-		return "gextto"
-	}
-	_ = pc
-	base := filepath.Base(file)
-	base = strings.TrimSuffix(base, ".go")
-	base = strings.TrimSuffix(base, "_test")
-	// Collapse the generated handler files to their logical module.
-	if strings.HasPrefix(base, "web_handlers_g") {
-		return "web"
-	}
-	if base == "" {
-		return "gextto"
-	}
-	return base
-}
-
 func logf(level Level, message string, kv []any) {
 	logMu.Lock()
 	if level < minLevel {
@@ -134,9 +112,7 @@ func logf(level Level, message string, kv []any) {
 	sb.WriteString(time.Now().Format("2006-01-02 15:04:05"))
 	sb.WriteByte(' ')
 	fmt.Fprintf(&sb, "%5s", level.String())
-	sb.WriteString(" [")
-	sb.WriteString(component())
-	sb.WriteString("] ")
+	sb.WriteByte(' ')
 	sb.WriteString(redactTorrentHashes(message))
 	for i := 0; i+1 < len(kv); i += 2 {
 		key, _ := kv[i].(string)

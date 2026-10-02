@@ -511,6 +511,26 @@ func bg_i64PtrValue(value int64) *int64 {
 	return &value
 }
 
+// bg_completedArchivePresent distinguishes a real integrity discrepancy from
+// libtorrent's transient paused/zero-progress state immediately after a
+// storage relocation. The database path and on-disk size are the authoritative
+// evidence that the archived payload is already present.
+func bg_completedArchivePresent(db *Database, hash string, totalSize int64) (string, bool) {
+	if db == nil || totalSize <= 0 {
+		return "", false
+	}
+	processed, err := db.TorrentProcessed(hash)
+	if err != nil || processed == nil || strings.TrimSpace(*processed) == "" {
+		return "", false
+	}
+	path := *processed
+	size, err := SizeOfPath(path)
+	if err != nil || size < totalSize {
+		return path, false
+	}
+	return path, true
+}
+
 // ---------------------------------------------------------------------------
 // torrent_event_worker
 // ---------------------------------------------------------------------------
@@ -843,10 +863,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					discrepancy := strings.TrimSpace(found.Error) != ""
 					if status, statusErr := db.TorrentStatus(event.Hash); statusErr == nil && status != nil &&
 						*status == "completed" && found.Progress < 99.99 {
+						if archivePath, present := bg_completedArchivePresent(db, event.Hash, found.TotalSize); present && strings.TrimSpace(found.Error) == "" {
+							// After MoveStorage, libtorrent may emit torrent_checked while
+							// its resumed session still reports paused/0%. The verified
+							// archived payload is present, so this is not corruption.
+							logging.Debug("integrity check reported a transient state after archive relocation",
+								"name", event.Name, "path", archivePath, "state", found.State)
+							continue
+						}
 						discrepancy = true
 					}
 					if discrepancy {
-						logging.Warn("torrent integrity check found a discrepancy",
+						logging.Warn("completed torrent needs integrity verification",
 							"hash", event.Hash, "name", event.Name, "state", found.State,
 							"progress", found.Progress, "checked_bytes", found.TotalDone, "total_bytes", found.TotalSize,
 							"error", found.Error)

@@ -98,8 +98,11 @@ func TestReadableFormatterLayout(t *testing.T) {
 		t.Fatalf("read log: %v", err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "INFO [logging] hello world") {
+	if !strings.Contains(text, "INFO hello world") {
 		t.Fatalf("missing formatted line: %q", text)
+	}
+	if strings.Contains(text, "[logging]") {
+		t.Fatalf("technical component leaked into readable log: %q", text)
 	}
 	if !strings.Contains(text, "key: value") || !strings.Contains(text, "count: 3") {
 		t.Fatalf("missing structured fields: %q", text)

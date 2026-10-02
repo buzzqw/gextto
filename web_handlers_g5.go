@@ -230,11 +230,14 @@ type gh5_ftpConfig struct {
 }
 
 type gh5_backupSteps struct {
-	path        string
-	ftpUploaded bool
-	ftpError    *string
-	cloudCopied bool
-	cloudError  *string
+	path             string
+	ftpUploaded      bool
+	ftpHost          string
+	ftpRemote        string
+	ftpError         *string
+	cloudCopied      bool
+	cloudDestination string
+	cloudError       *string
 }
 
 // gh5_backupFtpConfig mirrors the web module `backup_ftp_config`.
@@ -287,13 +290,14 @@ func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cl
 
 	steps := gh5_backupSteps{path: path}
 	if ftp != nil {
+		steps.ftpHost = ftp.host
+		steps.ftpRemote = ftp.remote
 		if err := UploadFTP(path, ftp.host, ftp.user, ftp.password, ftp.remote); err != nil {
 			message := err.Error()
 			steps.ftpError = &message
 			logging.Warn("backup FTP upload failed", "path", path, "host", ftp.host, "error", message)
 		} else {
 			steps.ftpUploaded = true
-			logging.Info("backup uploaded to FTP", "path", path, "host", ftp.host, "remote", ftp.remote)
 		}
 	}
 	if cloudDir != nil {
@@ -303,7 +307,7 @@ func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cl
 			logging.Warn("backup cloud copy failed", "directory", *cloudDir, "error", message)
 		} else {
 			steps.cloudCopied = true
-			logging.Info("backup copied to cloud folder", "dest", destination)
+			steps.cloudDestination = destination
 		}
 	}
 	return steps, nil
@@ -544,8 +548,11 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"backup completed",
 		"path", steps.path,
 		"ftp_uploaded", steps.ftpUploaded,
+		"ftp_host", steps.ftpHost,
+		"ftp_remote", steps.ftpRemote,
 		"ftp_error", gh5_optionalString(steps.ftpError),
 		"cloud_copied", steps.cloudCopied,
+		"cloud_destination", steps.cloudDestination,
 		"cloud_error", gh5_optionalString(steps.cloudError),
 		"telegram_uploaded", telegramUploaded,
 	)
