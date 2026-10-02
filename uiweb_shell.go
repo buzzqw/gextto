@@ -2,11 +2,54 @@ package gextto
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/constants"
 	"github.com/buzzqw/gextto/internal/logging"
 )
+
+// healthStatusGrace is how long a non-ok health status must persist before the
+// top bar shows it. A single failed probe (a momentarily missing mount, a
+// transient write error) must not make the always-visible pill flash
+// "degraded"; the previous status stays visible until the problem is confirmed.
+const healthStatusGrace = 5 * time.Second
+
+// healthStatusDebouncer hides short-lived health problems from the top bar. Its
+// zero value is ready to use.
+type healthStatusDebouncer struct {
+	mu sync.Mutex
+	// effective is the status actually shown to the user.
+	effective string
+	// pending is the last observed non-ok status and since is when it first
+	// appeared; together they measure how long the problem has lasted.
+	pending string
+	since   time.Time
+}
+
+// update folds a raw health status into the debounced status to display at now.
+func (d *healthStatusDebouncer) update(raw string, now time.Time) string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if raw == "" || raw == "ok" {
+		d.effective = "ok"
+		d.pending = ""
+		d.since = time.Time{}
+		return d.effective
+	}
+	if d.pending != raw {
+		// A new problem started: keep the previous status until it lasts.
+		d.pending = raw
+		d.since = now
+	}
+	if d.effective == "" {
+		d.effective = "ok"
+	}
+	if !d.since.IsZero() && now.Sub(d.since) >= healthStatusGrace {
+		d.effective = raw
+	}
+	return d.effective
+}
 
 // uiweb_shell.go builds the always-visible chrome of the new UI (sidebar footer,
 // top bar metrics, language) so the server-rendered interface matches the
@@ -45,23 +88,9 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		Lang:         "it",
 	}
 
-	trash := ""
-	if s.cfg.TrashPath != nil {
-		trash = *s.cfg.TrashPath
-	}
-	ramdisk := ""
-	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
-		ramdisk = value
-	}
-	health := CheckWithPaths(&HealthPaths{
-		DataDir:      s.cfg.DataDir,
-		TrashPath:    trash,
-		DownloadPath: s.cfg.LibtorrentDir,
-		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
-		RamdiskPath:  ramdisk,
-	})
+	health := CheckWithPaths(uiHealthPathsFrom(s))
 	if health.Status != "" {
-		chrome.Status = health.Status
+		chrome.Status = s.health_status.update(health.Status, time.Now())
 	}
 	if health.ProcessCPUPercent != nil {
 		chrome.CPU = strconv.FormatFloat(*health.ProcessCPUPercent, 'f', 1, 64) + "%"

@@ -8,6 +8,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -211,8 +212,11 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if body == "" {
 		body = "{}"
 	}
+	flash := ""
+	flashErr := false
 	if strings.HasPrefix(path, "/api/") {
-		v2InternalJSON(s, method, path, nil, []byte(body))
+		raw, status := v2InternalJSON(s, method, path, nil, []byte(body))
+		flash, flashErr = v2ActionFlash(path, raw, status)
 	}
 	target := strings.TrimSpace(r.FormValue("redirect"))
 	if !strings.HasPrefix(target, "/v2") {
@@ -221,8 +225,44 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		target = "/?view=" + url.QueryEscape(view)
 	}
+	if flash != "" {
+		if parsed, err := url.Parse(target); err == nil {
+			query := parsed.Query()
+			query.Set("toast", flash)
+			if flashErr {
+				query.Set("toast_err", "1")
+			} else {
+				query.Del("toast_err")
+			}
+			parsed.RawQuery = query.Encode()
+			target = parsed.String()
+		}
+	}
 	w.Header().Set("HX-Redirect", target)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// v2ActionFlash turns the JSON result of a forwarded action into a short toast
+// message, so a click never looks like it did nothing.
+func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
+	if status >= http.StatusBadRequest {
+		if message := v2JSONError(raw); message != "" {
+			return message, true
+		}
+		return "Operazione non riuscita.", true
+	}
+	if path == "/api/maintenance/clean-trash" {
+		var payload struct {
+			Files int `json:"files"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			if payload.Files == 0 {
+				return "Cestino già vuoto: nessun elemento da eliminare.", false
+			}
+			return fmt.Sprintf("Cestino svuotato: %d elementi eliminati.", payload.Files), false
+		}
+	}
+	return "Operazione completata.", false
 }
 
 // V2SectionForm forwards a rendered form to the existing API. Numbers are sent

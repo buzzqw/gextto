@@ -154,6 +154,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Log (frammento aggiornabile).
 	v2Handle(s, mux, "GET /v2/partial/logs", V2LogsPartial)
 	v2Handle(s, mux, "GET /v2/partial/chrome", V2ChromePartial)
+	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
+	v2Handle(s, mux, "GET /v2/partial/health/tile", V2HealthTilePartial)
 
 	// Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist, Fumetti).
 	v2Handle(s, mux, "GET /v2/table", V2Table)
@@ -232,6 +234,10 @@ type v2ShellData struct {
 	Content any
 	Chrome  uiShellChrome
 	Body    string
+	// Flash carries a one-shot feedback message (usually set by V2SectionAction
+	// through the redirect URL) rendered as a toast on every page.
+	Flash    string
+	FlashErr bool
 }
 
 func v2Render(w http.ResponseWriter, status int, name string, data any, dict, eng map[string]string) {
@@ -508,12 +514,14 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	body, content := v2Content(s, r, view)
 	cfg := latestConfig(s)
 	page := v2ShellData{
-		Title:   v2PageLabel(view),
-		Page:    view,
-		Groups:  v2NavGroups(view, uiNavCounts(s, cfg)),
-		Content: content,
-		Chrome:  uiShellChromeFrom(s),
-		Body:    body,
+		Title:    v2PageLabel(view),
+		Page:     view,
+		Groups:   v2NavGroups(view, uiNavCounts(s, cfg)),
+		Content:  content,
+		Chrome:   uiShellChromeFrom(s),
+		Body:     body,
+		Flash:    strings.TrimSpace(r.FormValue("toast")),
+		FlashErr: r.FormValue("toast_err") == "1",
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
@@ -530,6 +538,35 @@ func V2ChromePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, templateName, uiShellChromeFrom(s), dict, eng)
+}
+
+// V2HealthTilePartial refreshes a single Salute tile without reloading the page.
+// The caller picks the tile with `name`; Stato, Memoria and Uptime poll every
+// few seconds, while Disco polls hourly.
+func V2HealthTilePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	var (
+		templateName string
+		data         uiHealthData
+	)
+	switch r.URL.Query().Get("name") {
+	case "status":
+		templateName = "v2_health_tile_status"
+		data = uiHealthStatusTileFrom(s)
+	case "memory":
+		templateName = "v2_health_tile_memory"
+		data = uiHealthMemoryTileFrom(s)
+	case "uptime":
+		templateName = "v2_health_tile_uptime"
+		data = uiHealthUptimeTileFrom(s)
+	case "disk":
+		templateName = "v2_health_tile_disk"
+		data = uiHealthDiskTileFrom(s)
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, templateName, data, dict, eng)
 }
 
 // V2Empty clears a modal container.

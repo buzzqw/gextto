@@ -374,9 +374,9 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	return data
 }
 
-// uiHealthDataFrom builds the Salute view-model from the same health check used
-// by the JSON API, so the two pages cannot diverge.
-func uiHealthDataFrom(s *AppState) uiHealthData {
+// uiHealthPathsFrom collects the operational paths inspected by the Salute page
+// from the live configuration, shared by the full page and the tile fragments.
+func uiHealthPathsFrom(s *AppState) *HealthPaths {
 	trash := ""
 	if s.cfg.TrashPath != nil {
 		trash = *s.cfg.TrashPath
@@ -385,13 +385,19 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	if value, ok := s.cfg.Settings["libtorrent_ramdisk_dir"]; ok {
 		ramdisk = value
 	}
-	health := CheckWithPaths(&HealthPaths{
+	return &HealthPaths{
 		DataDir:      s.cfg.DataDir,
 		TrashPath:    trash,
 		DownloadPath: s.cfg.LibtorrentDir,
 		ArchiveRoot:  gh3DerefString(s.cfg.ArchiveRoot),
 		RamdiskPath:  ramdisk,
-	})
+	}
+}
+
+// uiHealthDataFrom builds the Salute view-model from the same health check used
+// by the JSON API, so the two pages cannot diverge.
+func uiHealthDataFrom(s *AppState) uiHealthData {
+	health := CheckWithPaths(uiHealthPathsFrom(s))
 	usedPct := "n/d"
 	if health.DiskTotalBytes > 0 {
 		used := health.DiskTotalBytes - health.DiskFreeBytes
@@ -461,6 +467,63 @@ func healthStatusReason(health Health) string {
 		}
 	}
 	return strings.Join(problems, "; ")
+}
+
+// The Salute tiles refreshed every few seconds have their own builders so the
+// 5s polling stays lightweight: each one skips the expensive parts of
+// CheckWithPaths (disk scan, trash walk, log read) and computes only its own
+// value. The full page still uses the complete health check.
+
+// uiHealthStatusTileFrom builds the Stato tile.
+func uiHealthStatusTileFrom(s *AppState) uiHealthData {
+	paths := uiHealthPathsFrom(s)
+	info, statErr := os.Stat(paths.DataDir)
+	writable := statErr == nil && info.IsDir() && write_probe(paths.DataDir)
+	status := "degraded"
+	if writable {
+		status = "ok"
+	}
+	health := Health{
+		Status:          status,
+		DataDirWritable: writable,
+		Paths:           path_checks(paths),
+	}
+	return uiHealthData{Health: health, StatusReason: healthStatusReason(health)}
+}
+
+// uiHealthMemoryTileFrom builds the Memoria processo tile.
+func uiHealthMemoryTileFrom(s *AppState) uiHealthData {
+	memoryTotalBytes, _ := memory_info()
+	return uiHealthData{Health: Health{
+		ResidentBytes:    healthResidentBytes(),
+		MemoryTotalBytes: memoryTotalBytes,
+	}}
+}
+
+// uiHealthUptimeTileFrom builds the Uptime tile.
+func uiHealthUptimeTileFrom(s *AppState) uiHealthData {
+	processUptime := process_uptime_seconds()
+	uptime := healthUptimeSeconds()
+	return uiHealthData{
+		Health:        Health{ProcessUptimeSeconds: processUptime, UptimeSeconds: uptime},
+		Uptime:        logging.HumanDuration(saturatingInt64(uptime)),
+		ProcessUptime: logging.HumanDuration(saturatingInt64(processUptime)),
+	}
+}
+
+// uiHealthDiskTileFrom builds the Disco dati tile on its own so it can refresh
+// hourly without re-running the rest of the health check.
+func uiHealthDiskTileFrom(s *AppState) uiHealthData {
+	totalBytes, freeBytes := disk_space(uiHealthPathsFrom(s).DownloadPath)
+	usedPct := "n/d"
+	if totalBytes > 0 {
+		used := totalBytes - freeBytes
+		usedPct = strconv.FormatFloat(float64(used)/float64(totalBytes)*100, 'f', 1, 64) + "%"
+	}
+	return uiHealthData{
+		Health:      Health{DiskTotalBytes: totalBytes, DiskFreeBytes: freeBytes},
+		DiskUsedPct: usedPct,
+	}
 }
 
 // uiLogsDataFrom reads the same log tail the JSON API exposes.

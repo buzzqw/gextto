@@ -424,7 +424,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 	return []uiPageSection{
 		sectionActions(uiActionSection{Label: "Azioni", Hint: "Operazioni di manutenzione del daemon e della libreria.", Buttons: []uiActionButton{
 			{Label: "Backup ora", Class: "primary", Method: "POST", Path: "/api/backup", Body: "{}", Confirm: "Creare ora uno snapshot di backup dei database?", Hint: "Crea subito uno snapshot di backup dei database."},
-			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: "{}", Confirm: "Eliminare definitivamente gli elementi nel cestino?", Hint: "Elimina definitivamente gli elementi nel cestino."},
+			{Label: "Pulisci trash", Method: "POST", Path: "/api/maintenance/clean-trash", Body: `{"force":true}`, Confirm: "Eliminare definitivamente tutti gli elementi nel cestino?", Hint: "Svuota completamente il cestino. La conservazione automatica (trash_retention_days) non si applica a questa azione manuale."},
 			{Label: "Ricalcola punteggi", Method: "POST", Path: "/api/database/rescore", Body: "{}", Confirm: "Ricalcolare i punteggi delle release archiviate con i pesi attuali?", Hint: "Ricalcola lo score delle release archiviate con i pesi attuali."},
 			{Label: "Scansiona archivi", Method: "POST", Path: "/api/scan-all-archives", Body: "{}", Confirm: "Rileggere le cartelle archivio e aggiornare la libreria?", Hint: "Rilegge le cartelle archivio e aggiorna la libreria."},
 			{Label: "Aggiorna MediaInfo", Method: "POST", Path: "/api/maintenance/backfill-media-info", Body: "{}", Confirm: "Analizzare con ffprobe i file archiviati senza MediaInfo?", Hint: "Analizza con ffprobe i file archiviati senza MediaInfo."},

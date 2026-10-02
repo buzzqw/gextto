@@ -814,12 +814,12 @@ the others.
   so an API-key or configured-indexer problem is distinguished from simple host
   reachability.
 - **Web logs** — live SSE stream with text filter, line count and follow/pause.
-  Lines are English and explicitly formatted as `date time  LEVEL [component]
-  message · key: value`, with highlighted keywords (NAS, download, sources,
-  filters, errors). Every cycle prints a **SOURCE REPORT** with each source's
-  outcome, the filter decisions, and the download events (start, metadata,
-  NAS move, completion). Torrent messages always include the readable name or
-  title; the hash is only a technical correlation field for errors.
+  Lines are English and explicitly formatted as `date time  LEVEL message ·
+  key: value`, with highlighted keywords (NAS, download, sources, filters,
+  errors). Every cycle prints a **SOURCE REPORT** with each source's outcome,
+  the filter decisions, and download events (start, metadata, completion, any
+  NAS move and archive import). Torrent messages always include the readable
+  name or title; torrent hashes are hidden from the user-facing log.
 - **Charts** — CPU/RAM/download/upload/disk/ram-disk sparklines and daily
   consumption.
 - **Activity** — recent torrent events and downloads.

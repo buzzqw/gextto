@@ -106,13 +106,17 @@ func BackupTestFtp(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // CleanTrash is `clean_trash`.
 func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
+	// Use the live configuration, not the startup snapshot, so this endpoint
+	// empties the same trash folder the UI lists and the single-entry delete
+	// uses. The fallback also matches those handlers when trash_path is unset.
+	cfg := latestConfig(s)
+	if cfg.DryRun {
 		jsonError(w, http.StatusConflict, "dry-run does not delete trash")
 		return
 	}
-	if s.cfg.TrashPath == nil {
-		jsonError(w, http.StatusConflict, "trash path is not configured")
-		return
+	trashPath := filepath.Join(cfg.DataDir, "trash")
+	if cfg.TrashPath != nil {
+		trashPath = *cfg.TrashPath
 	}
 	var input CleanTrashInput
 	if !gh3DecodeOptionalJSON(w, r, &input) {
@@ -120,14 +124,14 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	retentionDays := int64(0)
 	if !input.Force {
-		if parsed, err := strconv.ParseInt(latestConfig(s).Settings["trash_retention_days"], 10, 64); err == nil {
+		if parsed, err := strconv.ParseInt(cfg.Settings["trash_retention_days"], 10, 64); err == nil {
 			retentionDays = parsed
 		}
 		if retentionDays < 0 {
 			retentionDays = 0
 		}
 	}
-	files, byteCount, err := gh3RemoveTrashContents(*s.cfg.TrashPath, retentionDays)
+	files, byteCount, err := gh3RemoveTrashContents(trashPath, retentionDays)
 	if err != nil {
 		jsonStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
 		return

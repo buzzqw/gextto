@@ -486,7 +486,10 @@ type AppState struct {
 	// waiting for, or holding, cycle_lock. Without it a rapid series of clicks
 	// could create an unbounded backlog of full monitoring runs.
 	manualCyclePending atomic.Bool
-	rename_progress    *RenameProgress
+	// health_status debounces the top-bar status so "degraded" only appears
+	// after it has persisted for a few seconds (see uiShellChromeFrom).
+	health_status   healthStatusDebouncer
+	rename_progress *RenameProgress
 	// rename_progress_mu guards rename_progress: the rename-all job writes its
 	// progress from a background goroutine while the UI polls it, and two
 	// concurrent rename requests must not both pass the "already running" check.

@@ -460,7 +460,7 @@ html, body {
 .htx-status.ok { color: #4ec97a; }
 .htx-status.err { color: #ff6b6b; }
 
-/* Non-blocking feedback for dashboard quick actions. */
+/* Non-blocking feedback for quick actions and section/settings actions. */
 #v2-toast-region {
   position: fixed;
   right: 20px;

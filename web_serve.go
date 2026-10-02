@@ -60,6 +60,7 @@ func startBackgroundWorkers(state *AppState) {
 	register("calendar_warmup_worker", func() { calendarWarmupWorker(state) })
 	register("flare_solverr_sweeper_worker", func() { flareSolverrSweeperWorker(state) })
 	register("db_checkpoint_worker", func() { dbCheckpointWorker(state) })
+	register("health_monitor_worker", func() { healthMonitorWorker(state) })
 }
 
 // BackgroundStop is closed as soon as the daemon begins shutting down. Workers

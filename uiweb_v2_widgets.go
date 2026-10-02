@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,12 +29,14 @@ import (
 // ---------------------------------------------------------------------------
 
 type v2DuplicatesItem struct {
-	Series         string
-	Season         int64
-	Episode        int64
-	Path           string
-	ResolutionRank int
-	BestRank       int
+	// The JSON tags are required: encoding/json does not map `resolution_rank`
+	// onto a field named ResolutionRank, so without them the ranks stayed 0.
+	Series         string `json:"series"`
+	Season         int64  `json:"season"`
+	Episode        int64  `json:"episode"`
+	Path           string `json:"path"`
+	ResolutionRank int    `json:"resolution_rank"`
+	BestRank       int    `json:"best_rank"`
 }
 
 type v2DuplicatesView struct {
@@ -41,8 +44,16 @@ type v2DuplicatesView struct {
 	Count    int
 	Removed  int
 	Executed bool
-	Message  string
-	Error    bool
+	// Scanned marks a preview that already ran, so "0 duplicates" is shown
+	// explicitly instead of the initial "press Preview" prompt.
+	Scanned bool
+	Message string
+	Error   bool
+	// Notify drives an out-of-band toast that reports the outcome (how many and
+	// which duplicates), so a scan that finds something is never silent.
+	Notify        bool
+	NotifyMessage string
+	NotifyError   bool
 }
 
 func v2DuplicatesViewFrom(s *AppState, r *http.Request) v2DuplicatesView {
@@ -53,6 +64,9 @@ func v2DuplicatesViewFrom(s *AppState, r *http.Request) v2DuplicatesView {
 	if status >= 400 {
 		view.Error = true
 		view.Message = v2JSONError(raw)
+		view.Notify = true
+		view.NotifyMessage = view.Message
+		view.NotifyError = true
 		return view
 	}
 	var payload struct {
@@ -66,7 +80,48 @@ func v2DuplicatesViewFrom(s *AppState, r *http.Request) v2DuplicatesView {
 		view.Items = payload.Items
 	}
 	view.Executed = execute
+	view.Scanned = true
+	if execute {
+		if view.Removed == 1 {
+			view.Notify = true
+			view.NotifyMessage = "Pulizia completata: 1 file spostato nel cestino."
+		} else if view.Removed > 1 {
+			view.Notify = true
+			view.NotifyMessage = fmt.Sprintf("Pulizia completata: %d file spostati nel cestino.", view.Removed)
+		}
+		return view
+	}
+	if view.Count > 0 {
+		view.Notify = true
+		view.NotifyMessage = v2DuplicatesFoundMessage(view.Items, view.Count)
+	}
 	return view
+}
+
+// v2DuplicatesFoundMessage summarises the scan result: how many duplicates were
+// found and which files, capped so the toast stays readable (the table below
+// lists them all).
+func v2DuplicatesFoundMessage(items []v2DuplicatesItem, count int) string {
+	names := make([]string, 0, 3)
+	for _, item := range items {
+		if len(names) >= 3 {
+			break
+		}
+		names = append(names, filepath.Base(item.Path))
+	}
+	message := "Nessun duplicato inferiore"
+	if count == 1 {
+		message = "Trovato 1 duplicato inferiore"
+	} else if count > 1 {
+		message = fmt.Sprintf("Trovati %d duplicati inferiori", count)
+	}
+	if len(names) > 0 {
+		message += ": " + strings.Join(names, ", ")
+		if count > len(names) {
+			message += fmt.Sprintf(" e altri %d", count-len(names))
+		}
+	}
+	return message + "."
 }
 
 // V2Duplicates runs the duplicate scan/cleanup and re-renders the panel.

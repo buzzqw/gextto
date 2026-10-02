@@ -77,6 +77,22 @@
       {{template "v2_live_mobile_metrics" .Chrome}}
     </section>
     <div class="content" id="v2-page" data-view="{{.Page}}">
+      {{/* Global transient feedback: section/settings actions redirect here
+           with ?msg=... so every page can show the result of a click. */}}
+      <div id="v2-toast-region" aria-live="polite" aria-atomic="true">{{if .Flash}}{{template "v2_action_notice" (dict "Title" "Operazione" "Message" .Flash "Error" .FlashErr)}}{{end}}</div>
+      {{if .Flash}}<script>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          if (params.has("toast") || params.has("toast_err")) {
+            params.delete("toast");
+            params.delete("toast_err");
+            var query = params.toString();
+            window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
+          }
+        } catch (error) { /* history may be unavailable */ }
+      }());
+      </script>{{end}}
       {{if eq .Body "v2_dashboard"}}{{template "v2_dashboard" .Content}}
       {{else if eq .Body "v2_downloads"}}{{template "v2_downloads" .Content}}
       {{else if eq .Body "v2_settings"}}{{template "v2_settings" .Content}}
@@ -256,7 +272,6 @@
   </div>
   {{template "v2_dashboard_calendar" .Calendar}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
-  <div id="v2-toast-region" aria-live="polite" aria-atomic="true"></div>
 </div>
 {{end}}
 
@@ -759,10 +774,10 @@
 {{define "v2_health"}}
 <div class="view">
   <div class="grid-4">
-    <div class="metric{{if ne .Health.Status "ok"}} amber{{end}}"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
-    <div class="metric"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted">su {{bytesU .Health.MemoryTotalBytes}}</small></div>
-    <div class="metric"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
-    <div class="metric"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
+    {{template "v2_health_tile_status" .}}
+    {{template "v2_health_tile_memory" .}}
+    {{template "v2_health_tile_disk" .}}
+    {{template "v2_health_tile_uptime" .}}
   </div>
   <div class="grid-2">
     <div class="panel">
@@ -779,6 +794,25 @@
   {{end}}
   {{range .PanelTables}}{{template "v2_table_panel" .}}{{end}}
 </div>
+{{end}}
+
+{{/* Riquadri della Salute: Stato, Memoria e Uptime si aggiornano ogni 5s
+     mentre la pagina e' aperta; Disco dati ogni ora. All'ingresso nella pagina
+     tutti i riquadri sono resi freschi dal render completo. */}}
+{{define "v2_health_tile_status"}}
+<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/v2/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
+{{end}}
+
+{{define "v2_health_tile_memory"}}
+<div class="metric" id="v2-health-tile-memory" hx-get="/v2/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted">su {{bytesU .Health.MemoryTotalBytes}}</small></div>
+{{end}}
+
+{{define "v2_health_tile_disk"}}
+<div class="metric" id="v2-health-tile-disk" hx-get="/v2/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
+{{end}}
+
+{{define "v2_health_tile_uptime"}}
+<div class="metric" id="v2-health-tile-uptime" hx-get="/v2/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -1145,6 +1179,7 @@
 {{define "v2_oauth_output"}}{{.Text}}{{end}}
 
 {{define "v2_duplicates_panel"}}
+{{if .Notify}}<div id="v2-toast-region" hx-swap-oob="true"><div class="v2-toast{{if .NotifyError}} error{{end}}" role="status" hx-get="/v2/empty" hx-trigger="load delay:8s" hx-target="#v2-toast-region" hx-swap="innerHTML"><strong>Duplicati video</strong><span>{{.NotifyMessage}}</span></div></div>{{end}}
 <div class="panel" id="v2-duplicates-panel">
   <div class="panel-head"><h3>Duplicati video in libreria</h3></div>
   <div class="panel-body">
@@ -1152,11 +1187,11 @@
     <div class="toolbar">
       <form hx-post="/v2/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="execute" value="0" />
-        <button class="btn sm" type="submit">Anteprima duplicati</button>
+        <button class="btn sm" type="submit" data-v2-toast-title="Duplicati video" data-v2-toast-message="Analisi avviata: i risultati arriveranno qui tra poco.">Anteprima duplicati</button>
       </form>
       <form hx-post="/v2/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="execute" value="1" />
-        <button class="btn sm danger" type="submit" hx-confirm="Spostare nel cestino le copie inferiori?">Pulisci duplicati</button>
+        <button class="btn sm danger" type="submit" hx-confirm="Spostare nel cestino le copie inferiori?" data-v2-toast-title="Duplicati video" data-v2-toast-message="Pulizia avviata: i risultati arriveranno qui tra poco.">Pulisci duplicati</button>
       </form>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
     </div>
@@ -1167,7 +1202,8 @@
       <thead><tr><th scope="col">Serie</th><th scope="col">Stagione</th><th scope="col">Episodio</th><th scope="col">File</th><th scope="col">Risoluzione</th></tr></thead>
       <tbody>{{range .Items}}<tr><td>{{.Series}}</td><td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td><td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{.ResolutionRank}} (migliore {{.BestRank}})</td></tr>{{end}}</tbody>
     </table></div>
-    {{else}}<p class="muted">{{if .Count}}{{.Count}} file inferiori{{else}}Premi Anteprima per cercare i duplicati.{{end}}</p>{{end}}
+    {{else if .Scanned}}<p class="muted">Nessun duplicato inferiore trovato.</p>
+    {{else}}<p class="muted">Premi Anteprima per cercare i duplicati.</p>{{end}}
   </div>
 </div>
 {{end}}

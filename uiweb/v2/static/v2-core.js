@@ -720,6 +720,39 @@
     if (target.closest("[data-theme-toggle]")) { event.preventDefault(); toggleTheme(); }
   });
 
+  // --------------------------------------------------------------- toasts --
+  // Transient feedback for actions whose server response arrives later (e.g.
+  // the duplicate scan). The shell renders the toast for redirecting actions;
+  // this one fires the moment the button is clicked, so the user knows the
+  // work started before the panel updates with the results.
+  function showToast(title, message, isError) {
+    var region = document.getElementById("v2-toast-region");
+    if (!region) return;
+    var toast = document.createElement("div");
+    toast.className = "v2-toast" + (isError ? " error" : "");
+    toast.setAttribute("role", "status");
+    var strong = document.createElement("strong");
+    strong.textContent = title || "Operazione";
+    var span = document.createElement("span");
+    span.textContent = message || "";
+    toast.appendChild(strong);
+    toast.appendChild(span);
+    region.appendChild(toast);
+    window.setTimeout(function () {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 6000);
+  }
+
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest ? event.target.closest("[data-v2-toast-message]") : null;
+    if (!trigger) return;
+    showToast(
+      trigger.getAttribute("data-v2-toast-title"),
+      trigger.getAttribute("data-v2-toast-message"),
+      trigger.getAttribute("data-v2-toast-error") === "1"
+    );
+  });
+
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });

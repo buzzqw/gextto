@@ -6,6 +6,9 @@ package gextto
 // per-key translation editor.
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -197,5 +200,95 @@ func TestV2TmdbExploreEndpoints(t *testing.T) {
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=series", nil); code != http.StatusOK || !strings.Contains(body, `id="v2-modal"`) {
 		t.Fatalf("series add modal target -> %d", code)
+	}
+}
+
+// TestV2DuplicatesPreviewFeedbackAndRanks covers the v2 duplicate panel: the
+// rank fields must decode from the JSON (they need explicit tags) and a preview
+// that finds nothing must say so instead of looking like nothing happened.
+func TestV2DuplicatesPreviewFeedbackAndRanks(t *testing.T) {
+	raw := []byte(`{"ok":true,"count":1,"items":[{"series":"Example","season":1,"episode":1,"path":"/x.mkv","resolution_rank":720,"best_rank":1080}]}`)
+	var payload struct {
+		Count int
+		Items []v2DuplicatesItem
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(payload.Items) != 1 || payload.Items[0].ResolutionRank != 720 || payload.Items[0].BestRank != 1080 {
+		t.Fatalf("ranks not decoded: %+v", payload.Items)
+	}
+
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/v2?view=maintenance", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance -> %d", code)
+	}
+	for _, want := range []string{
+		`data-v2-toast-title="Duplicati video"`,
+		`data-v2-toast-message="Analisi avviata`,
+		`data-v2-toast-message="Pulizia avviata`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("maintenance page missing %q", want)
+		}
+	}
+
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/duplicates", url.Values{"execute": {"0"}}); code != http.StatusOK || !strings.Contains(body, "Nessun duplicato inferiore trovato") {
+		t.Fatalf("preview with no results -> %d: %s", code, body)
+	}
+}
+
+// TestV2DuplicatesFoundMessage checks the toast text names the duplicates.
+func TestV2DuplicatesFoundMessage(t *testing.T) {
+	items := []v2DuplicatesItem{
+		{Path: "/a/Example - S01E01 - [480p].avi"},
+		{Path: "/a/Example - S02E02 - [720p].mkv"},
+	}
+	message := v2DuplicatesFoundMessage(items, 2)
+	if !strings.Contains(message, "2") || !strings.Contains(message, "Example - S01E01 - [480p].avi") {
+		t.Fatalf("message = %q", message)
+	}
+	many := make([]v2DuplicatesItem, 5)
+	for index := range many {
+		many[index] = v2DuplicatesItem{Path: fmt.Sprintf("/a/f%d.mkv", index)}
+	}
+	if capped := v2DuplicatesFoundMessage(many, 5); !strings.Contains(capped, "e altri 2") {
+		t.Fatalf("capped message = %q", capped)
+	}
+	if single := v2DuplicatesFoundMessage([]v2DuplicatesItem{{Path: "/a/only.mkv"}}, 1); !strings.Contains(single, "Trovato 1 duplicato inferiore") {
+		t.Fatalf("singular message = %q", single)
+	}
+}
+
+// TestV2DuplicatesPanelRendersOOBToast checks a scan that finds something emits
+// an out-of-band toast (and the table still lists the files).
+func TestV2DuplicatesPanelRendersOOBToast(t *testing.T) {
+	var buffer bytes.Buffer
+	view := v2DuplicatesView{
+		Scanned: true,
+		Count:   1,
+		Items: []v2DuplicatesItem{{
+			Series:         "Example",
+			Season:         1,
+			Episode:        1,
+			Path:           "/a/Example - S01E01 - [480p].avi",
+			ResolutionRank: 480,
+			BestRank:       1080,
+		}},
+		Notify:        true,
+		NotifyMessage: "Trovati 1 duplicati inferiori: Example - S01E01 - [480p].avi.",
+	}
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_duplicates_panel", view); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	out := buffer.String()
+	for _, want := range []string{`hx-swap-oob="true"`, "Trovati 1 duplicati inferiori", "480 (migliore 1080)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("panel missing %q: %s", want, out)
+		}
 	}
 }

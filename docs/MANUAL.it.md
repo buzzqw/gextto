@@ -835,13 +835,13 @@ la pulizia degli altri.
   un problema di API key o di configurazione degli indexer viene quindi distinto
   dalla semplice raggiungibilità della macchina.
 - **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
-  Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO [componente]
-  messaggio · campo: valore`, con parole chiave evidenziate (NAS, download,
-  sorgenti, filtri, errori). Ogni ciclo stampa un **SOURCE REPORT** con l'esito
-  di ogni sorgente, le decisioni dei filtri, e gli eventi di download (avvio,
-  metadati, spostamento su NAS, completamento). I messaggi torrent includono
-  sempre nome o titolo leggibile; l'hash è solo un campo tecnico per correlare
-  gli errori.
+  Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO messaggio
+  · campo: valore`, con parole chiave evidenziate (NAS, download, sorgenti,
+  filtri, errori). Ogni ciclo stampa un **SOURCE REPORT** con l'esito di ogni
+  sorgente, le decisioni dei filtri e gli eventi di download (avvio, metadati,
+  completamento, eventuale spostamento su NAS e importazione in archivio). I
+  messaggi torrent includono sempre nome o titolo leggibile; gli hash torrent
+  sono nascosti nel log utente.
 - **Grafici** — sparkline CPU/RAM/download/upload/disco/RAM disk e consumo
   giornaliero.
 - **Attività** — eventi torrent recenti e download.

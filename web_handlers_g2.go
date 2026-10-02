@@ -363,9 +363,23 @@ func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	if execute {
+		logging.Info("duplicate cleanup completed", "removed", removed)
 		jsonResponse(w, map[string]any{"ok": true, "execute": true, "removed": removed})
 		return
 	}
+	// Record what the scan found, with enough detail to locate each file, so the
+	// log answers "what, where and why" without opening the UI again.
+	for _, candidate := range candidates {
+		logging.Warn("inferior duplicate found",
+			"series", candidate.Series,
+			"season", candidate.Season,
+			"episode", candidate.Episode,
+			"file", candidate.Path,
+			"rank", candidate.ResolutionRank,
+			"best", candidate.BestRank,
+		)
+	}
+	logging.Info("duplicate scan completed", "found", len(candidates))
 	jsonResponse(w, map[string]any{"ok": true, "execute": false, "count": len(candidates), "items": candidates})
 }
 

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -671,8 +672,13 @@ func tree_stats(path string) (uint64, uint64) {
 	return files, bytes
 }
 
+// healthProbeSeq makes every probe file unique. Concurrent health checks (the
+// UI polls plus the background monitor) would otherwise collide on the same
+// `.health-probe-<pid>` name and make a writable directory look degraded.
+var healthProbeSeq atomic.Uint64
+
 func write_probe(dataDir string) bool {
-	path := filepath.Join(dataDir, fmt.Sprintf(".health-probe-%d", os.Getpid()))
+	path := filepath.Join(dataDir, fmt.Sprintf(".health-probe-%d-%d", os.Getpid(), healthProbeSeq.Add(1)))
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 	if err != nil {
 		return false

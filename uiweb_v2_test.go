@@ -660,3 +660,110 @@ func TestV2TranslateHTMLMirrorsClientBehaviour(t *testing.T) {
 		t.Fatalf("Italian must be untouched: %s", italian)
 	}
 }
+
+// TestV2HealthTilesPollIndependently checks the Salute tiles refresh on their
+// own schedules: Stato, Memoria and Uptime every 5s, Disco dati hourly.
+func TestV2HealthTilesPollIndependently(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=health", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /v2?view=health -> %d", code)
+	}
+	for _, want := range []string{
+		`id="v2-health-tile-status" hx-get="/v2/partial/health/tile?name=status" hx-trigger="every 5s"`,
+		`id="v2-health-tile-memory" hx-get="/v2/partial/health/tile?name=memory" hx-trigger="every 5s"`,
+		`id="v2-health-tile-uptime" hx-get="/v2/partial/health/tile?name=uptime" hx-trigger="every 5s"`,
+		`id="v2-health-tile-disk" hx-get="/v2/partial/health/tile?name=disk" hx-trigger="every 3600s"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("health page missing %q", want)
+		}
+	}
+
+	for _, name := range []string{"status", "memory", "disk", "uptime"} {
+		code, body = v2Request(t, server, http.MethodGet, "/v2/partial/health/tile?name="+name, nil)
+		if code != http.StatusOK {
+			t.Fatalf("tile %s -> %d", name, code)
+		}
+		if !strings.Contains(body, `id="v2-health-tile-`+name+`"`) {
+			t.Fatalf("tile %s body missing its id: %s", name, body)
+		}
+	}
+
+	if code, _ := v2Request(t, server, http.MethodGet, "/v2/partial/health/tile?name=bogus", nil); code != http.StatusNotFound {
+		t.Fatalf("unknown tile -> %d, want 404", code)
+	}
+}
+
+// TestV2ActionFlash covers the toast text derived from a forwarded action.
+func TestV2ActionFlash(t *testing.T) {
+	message, isErr := v2ActionFlash("/api/maintenance/clean-trash", []byte(`{"ok":true,"files":3}`), http.StatusOK)
+	if isErr || !strings.Contains(message, "3") {
+		t.Fatalf("clean trash success -> %q err=%v", message, isErr)
+	}
+	message, isErr = v2ActionFlash("/api/maintenance/clean-trash", []byte(`{"ok":true,"files":0}`), http.StatusOK)
+	if isErr || !strings.Contains(message, "già vuoto") {
+		t.Fatalf("clean trash empty -> %q err=%v", message, isErr)
+	}
+	message, isErr = v2ActionFlash("/api/backup", []byte(`{"ok":false,"error":"disco pieno"}`), http.StatusInternalServerError)
+	if !isErr || !strings.Contains(message, "disco pieno") {
+		t.Fatalf("error flash -> %q err=%v", message, isErr)
+	}
+	message, isErr = v2ActionFlash("/api/scan-all-archives", []byte(`{"ok":true}`), http.StatusOK)
+	if isErr || message == "" {
+		t.Fatalf("generic success -> %q err=%v", message, isErr)
+	}
+}
+
+// TestV2MaintenanceTrashActionAndFlash checks the Pulisci trash action empties
+// the whole trash and that a redirect flash is rendered as a global toast.
+func TestV2MaintenanceTrashActionAndFlash(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=maintenance", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance page -> %d", code)
+	}
+	if !strings.Contains(body, `path" value="/api/maintenance/clean-trash"`) {
+		t.Fatal("maintenance page is missing the clean-trash action")
+	}
+	if !strings.Contains(body, `force&#34;:true`) {
+		t.Fatal("clean-trash action must force-empty the whole trash")
+	}
+	if !strings.Contains(body, `id="v2-toast-region"`) {
+		t.Fatal("global toast region missing from the shell")
+	}
+
+	// A flash arriving from a redirect is rendered and clears itself.
+	code, body = v2Request(t, server, http.MethodGet, "/v2?view=maintenance&toast=Cestino+svuotato%3A+3+elementi&toast_err=0", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance with flash -> %d", code)
+	}
+	if !strings.Contains(body, `Cestino svuotato: 3 elementi`) || !strings.Contains(body, `class="v2-toast"`) {
+		t.Fatalf("flash toast not rendered: %s", body)
+	}
+
+	// The action endpoint reports its outcome through the redirect URL. The test
+	// state runs in dry-run, so clean-trash fails and the toast is an error.
+	response, err := http.PostForm(server.URL+"/v2/section/action", url.Values{
+		"view":   {"maintenance"},
+		"path":   {"/api/maintenance/clean-trash"},
+		"method": {"POST"},
+		"body":   {`{"force":true}`},
+	})
+	if err != nil {
+		t.Fatalf("section action: %v", err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("section action -> %d, want 204", response.StatusCode)
+	}
+	if redirect := response.Header.Get("HX-Redirect"); !strings.Contains(redirect, "toast_err=1") || !strings.Contains(redirect, "view=maintenance") {
+		t.Fatalf("action redirect missing toast: %q", redirect)
+	}
+}
