@@ -12,8 +12,8 @@ service.
 
 - One service owns the search cycle, SQLite databases, torrent queue,
   post-processing and library archive.
-- The default transfer engine is embedded libtorrent. qBittorrent-nox and the
-  optional anacrolix build are alternatives, not additional required services.
+- The default transfer engine is embedded libtorrent. qBittorrent-nox is an
+  optional alternative, not an additional required service.
 - Release selection uses quality, source, codec, audio, HDR, language and size.
   `ffprobe` can enrich those decisions with the properties of archived files.
 - The responsive web UI and terminal TUI expose health, logs, backups,

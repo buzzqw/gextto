@@ -10,10 +10,6 @@ calling out explicitly:
 
 - libtorrent (BSD-3-Clause): the default embedded BitTorrent engine, linked
   through CGo (libtorrent_bridge.cpp + libtorrent_bridge.h).
-- github.com/anacrolix/torrent (Mozilla Public License 2.0): the optional native
-  Go torrent backend. It is only compiled when the daemon is built with the
-  `anacrolix` build tag (see `make build-anacrolix`).
-  The default build does not include it.
 
 The full licence texts of the vendored/module dependencies are available from
 the Go module cache and the upstream projects.

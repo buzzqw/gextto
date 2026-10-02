@@ -1871,8 +1871,6 @@ pol:
   Motivo: Powód
   Motore: Silnik
   Motore Interno: Silnik wewnętrzny
-  ? 'Motore che muove i byte: libtorrent integrato (default), qBittorrent-nox o anacrolix. Il cambio si applica al riavvio del servizio.'
-  : 'Silnik przenoszenia bajtów: wbudowany libtorrent (domyślnie), qBittorrent-nox lub anacrolix. Zmiana obowiązuje po ponownym uruchomieniu usługi.'
   Motore occupato, riprova tra poco: Silnik zajęty, spróbuj ponownie wkrótce
   Motori aggiornati: Zaktualizowane silniki
   Motori di ricerca web usati per il gap-filling quando feed e indexer non trovano nulla: Wyszukiwarki internetowe używane do wypełniania luk,
@@ -2384,7 +2382,6 @@ pol:
     il controllo generale delle sorgenti.
   : Ta sekcja przeprowadza prawdziwe wyszukiwanie za pomocą zapytań, a także obejmuje testy portów i powiadomień; zamiast tego sekcja Stan źródła
     w Zdrowie pokazuje ogólną kontrolę źródeł.
-  'Questo binario non include anacrolix: usa il target make build-anacrolix.': 'Ten plik binarny nie zawiera anacrolixu: użyj celu make build-anacrolix.'
   ? 'Questo pannello serve a fare una copia o una modifica avanzata delle traduzioni dell''interfaccia. Scegli una lingua e premi Esporta per
     caricare nell''editor le coppie chiave/valore salvate; modifica il testo YAML e premi Importa per aggiornare o aggiungere le traduzioni. Le
     chiavi non presenti nel file importato non vengono cancellate. Esempio: "Testa porte": "Test ports". Dopo l''importazione l''interfaccia si
@@ -3547,11 +3544,6 @@ pol:
   ad ogni ciclo: każdy cykl
   agganciato con successo!: pomyślnie podłączono!
   aggiunta manuale: ręczne dodawanie
-  anacrolix: anakrolix
-  ? anacrolix gira nello stesso processo di Gextto e normalmente non richiede mapping. Il campo è mantenuto per compatibilità e viene validato,
-    ma non crea una namespace separata.
-  : anacrolix działa w tym samym procesie co Gextto i zwykle nie wymaga mapowania. Pole jest zachowywane ze względu na zgodność i sprawdzane,
-    ale nie tworzy oddzielnej przestrzeni nazw.
   anno n/d: rok nie dotyczy
   aria2c: powietrze2c
   attiva: aktywuj

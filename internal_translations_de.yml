@@ -1896,9 +1896,6 @@ deu:
   Motivo: Grund
   Motore: Engine
   Motore Interno: Interner Motor
-  ? 'Motore che muove i byte: libtorrent integrato (default), qBittorrent-nox o anacrolix. Il cambio si applica al riavvio del servizio.'
-  : 'Byte-Verschiebungs-Engine: integrierter libtorrent (Standard), qBittorrent-nox oder anacrolix. Die Änderung wird wirksam, wenn der Dienst
-    neu gestartet wird.'
   Motore occupato, riprova tra poco: Engine beschäftigt, bitte versuchen Sie es in Kürze erneut
   Motori aggiornati: Aktualisierte Motoren
   Motori di ricerca web usati per il gap-filling quando feed e indexer non trovano nulla: Web-Suchmaschinen werden zum Füllen von Lücken eingesetzt,
@@ -2420,8 +2417,6 @@ deu:
     il controllo generale delle sorgenti.
   : Dieser Abschnitt führt eine echte Suche mit Abfragen durch und umfasst auch Port- und Benachrichtigungstests; Der Abschnitt „Quellenstatus“
     in Health zeigt stattdessen die allgemeine Kontrolle der Quellen.
-  'Questo binario non include anacrolix: usa il target make build-anacrolix.': 'Diese Binärdatei enthält kein Anacrolix: Verwenden Sie das Ziel
-    make build-anacrolix.'
   ? 'Questo pannello serve a fare una copia o una modifica avanzata delle traduzioni dell''interfaccia. Scegli una lingua e premi Esporta per
     caricare nell''editor le coppie chiave/valore salvate; modifica il testo YAML e premi Importa per aggiornare o aggiungere le traduzioni. Le
     chiavi non presenti nel file importato non vengono cancellate. Esempio: "Testa porte": "Test ports". Dopo l''importazione l''interfaccia si
@@ -3604,11 +3599,6 @@ deu:
   ad ogni ciclo: bei jedem Zyklus
   agganciato con successo!: erfolgreich verknüpft!
   aggiunta manuale: manuelle Zugabe
-  anacrolix: Anacrolix
-  ? anacrolix gira nello stesso processo di Gextto e normalmente non richiede mapping. Il campo è mantenuto per compatibilità e viene validato,
-    ma non crea una namespace separata.
-  : Anacrolix läuft im gleichen Prozess wie Gextto und erfordert normalerweise keine Zuordnung. Das Feld wird aus Kompatibilitätsgründen beibehalten
-    und validiert, erstellt jedoch keinen separaten Namespace.
   anno n/d: Jahr k.A
   aria2c: aria2c
   attiva: aktiv

@@ -1876,9 +1876,6 @@ spa:
   Motivo: Motivo
   Motore: Motor
   Motore Interno: Motor Interno
-  ? 'Motore che muove i byte: libtorrent integrato (default), qBittorrent-nox o anacrolix. Il cambio si applica al riavvio del servizio.'
-  : 'Motor de movimiento de bytes: libtorrent integrado (predeterminado), qBittorrent-nox o anacrolix. El cambio se aplica cuando se reinicia
-    el servicio.'
   Motore occupato, riprova tra poco: Motor ocupado, vuelve a intentarlo en un momento
   Motori aggiornati: Motores actualizados
   Motori di ricerca web usati per il gap-filling quando feed e indexer non trovano nulla: Motores de búsqueda web utilizados para llenar espacios
@@ -2386,7 +2383,6 @@ spa:
     il controllo generale delle sorgenti.
   : Esta sección realiza una búsqueda real con consultas y también incluye pruebas de puertos y notificaciones; en cambio, la sección Estado de
     las fuentes en Salud muestra el control general de las fuentes.
-  'Questo binario non include anacrolix: usa il target make build-anacrolix.': 'Este binario no incluye anacrolix: use el objetivo make build-anacrolix.'
   ? 'Questo pannello serve a fare una copia o una modifica avanzata delle traduzioni dell''interfaccia. Scegli una lingua e premi Esporta per
     caricare nell''editor le coppie chiave/valore salvate; modifica il testo YAML e premi Importa per aggiornare o aggiungere le traduzioni. Le
     chiavi non presenti nel file importato non vengono cancellate. Esempio: "Testa porte": "Test ports". Dopo l''importazione l''interfaccia si
@@ -3552,11 +3548,6 @@ spa:
   ad ogni ciclo: cada ciclo
   agganciato con successo!: ¡vinculado con éxito!
   aggiunta manuale: adición manual
-  anacrolix: anacrolix
-  ? anacrolix gira nello stesso processo di Gextto e normalmente non richiede mapping. Il campo è mantenuto per compatibilità e viene validato,
-    ma non crea una namespace separata.
-  : Anacrolix se ejecuta en el mismo proceso que Gextto y normalmente no requiere mapeo. El campo se conserva por compatibilidad y se valida,
-    pero no crea un espacio de nombres independiente.
   anno n/d: año n/a
   aria2c: aria2c
   attiva: activar

@@ -5,7 +5,6 @@
 #   GEXTTO_BUMP_BUILD=1 scripts/...      # increment the build number first
 #   GEXTTO_BUILD=1234 scripts/...        # force a specific number (CI)
 #   GEXTTO_BINARY=/path/gexttod scripts/...
-#   GEXTTO_TAGS=anacrolix scripts/...    # optional build tags (anacrolix backend)
 #
 # The build number is what `gexttod --version` prints and identifies the exact
 # binary.

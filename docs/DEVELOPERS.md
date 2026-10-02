@@ -39,13 +39,8 @@ make build
 go test ./...
 ```
 
-The executable is written to `bin/gexttod`. The optional native-Go torrent
-backend uses the `anacrolix` build tag:
-
-```bash
-make build-anacrolix
-make test-anacrolix
-```
+The executable is written to `bin/gexttod`. Supported torrent backends are
+embedded libtorrent and the qBittorrent-nox Web API adapter.
 
 ## Local development
 

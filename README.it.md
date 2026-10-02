@@ -12,8 +12,8 @@ funzionare come servizio.
 
 - Un solo servizio gestisce ciclo di ricerca, database SQLite, coda torrent,
   post-processing e archivio.
-- Il motore predefinito è libtorrent integrato. qBittorrent-nox e anacrolix
-  opzionale sono alternative, non servizi aggiuntivi necessari.
+- Il motore predefinito è libtorrent integrato. qBittorrent-nox è un'alternativa
+  opzionale, non un servizio aggiuntivo necessario.
 - La scelta delle release considera qualità, sorgente, codec, audio, HDR, lingue
   e dimensione. `ffprobe` può aggiungere le caratteristiche del file archiviato.
 - UI web responsive e TUI mostrano salute, log, backup, manutenzione e

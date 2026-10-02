@@ -114,7 +114,6 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 | `torrent_engine_select.go` | scelta del backend da `torrent_backend` + preflight. |
 | `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` | backend libtorrent (C++/cgo, default). |
 | `qbittorrent_engine.go` + `qbittorrent_runtime.go` | backend qBittorrent. |
-| `anacrolix_config.go` + `anacrolix_engine.go` | backend nativo Go, solo con build tag `anacrolix`. |
 | `torrent_migration.go` | preparazione della migrazione tra backend. |
 | `torrent_removal.go` | registrazione delle rimozioni manuali. |
 
@@ -160,7 +159,7 @@ Il **bridge C++** per libtorrent è la coppia nella root:
   spezzare l'enorme tabella di handler in file maneggiabili.
 - `uiweb_v2_*.go`: tutto ciò che riguarda la **UI v2** (SSR + HTMX). `uiweb_*.go`
   senza `_v2` è il livello condiviso/classico.
-- `libtorrent_*`, `qbittorrent_*`, `anacrolix_*`: i tre backend torrent.
+- `libtorrent_*`, `qbittorrent_*`: i backend torrent.
 - `*_test.go`: test accanto al file che verificano.
 - Gli helper privati di un gruppo usano il prefisso del gruppo (`gh2_...`,
   `gh3_...`, `bg_...`) per evitare collisioni tra file dello stesso package.

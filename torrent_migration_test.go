@@ -55,11 +55,6 @@ func TestMigrationPlanRejectsIncompleteTarget(t *testing.T) {
 	if plan.Ready {
 		t.Fatal("qbittorrent plan must not be ready without a URL")
 	}
-	// anacrolix without the build tag must not be ready.
-	plan = BuildMigrationPlan(state, state.cfg, BackendAnacrolix)
-	if plan.Ready && newAnacrolixEngine == nil {
-		t.Fatal("anacrolix plan must not be ready without the build tag")
-	}
 }
 
 func TestMigrationPlanListsManagedTorrents(t *testing.T) {

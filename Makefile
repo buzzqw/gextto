@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-race test-real test-anacrolix build-anacrolix vet fmt check-ui installer-test tidy package clean run
+.PHONY: all build fast test test-race test-real vet fmt check-ui installer-test tidy package clean run
 
 all: build
 
@@ -23,14 +23,6 @@ test-real:
 # can stay non-blocking until the shared state has been audited.
 test-race:
 	CGO_ENABLED=1 go test -race ./...
-
-# Optional native-Go backend. The default build and `make test` do not compile
-# it; the MPL-2.0 review gate still applies.
-test-anacrolix:
-	CGO_ENABLED=1 go test -tags anacrolix -timeout 600s ./...
-
-build-anacrolix:
-	GEXTTO_TAGS=anacrolix GEXTTO_BUMP_BUILD=1 scripts/build-daemon.sh
 
 vet:
 	CGO_ENABLED=1 go vet ./...

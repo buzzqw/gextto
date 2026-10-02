@@ -33,7 +33,6 @@ vedi [Sicurezza](SECURITY.md).
 
 - **libtorrent integrato**: predefinito, senza servizio esterno;
 - **qBittorrent-nox**: utile quando il motore torrent deve vivere separato;
-- **anacrolix**: backend Go alternativo, da usare solo dopo aver verificato
   compatibilità e prestazioni.
 
 Un torrent appartiene a un solo backend alla volta. Prima di cambiarlo metti in

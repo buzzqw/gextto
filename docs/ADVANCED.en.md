@@ -32,7 +32,6 @@ Do not expose the administrative port directly to the Internet. See
 
 - **Embedded libtorrent**: the default, with no external service;
 - **qBittorrent-nox**: useful when the torrent engine should run separately;
-- **anacrolix**: an alternative Go backend; verify compatibility and performance
   before using it in production.
 
 A torrent belongs to one backend at a time. Pause downloads before switching,

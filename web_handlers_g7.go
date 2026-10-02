@@ -682,15 +682,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
 		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
 		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
-		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "qbittorrent_managed", "anacrolix_path_mappings",
-		"anacrolix_data_dir", "anacrolix_listen_port", "anacrolix_tcp", "anacrolix_utp",
-		"anacrolix_dht", "anacrolix_pex", "anacrolix_trackers", "anacrolix_upnp",
-		"anacrolix_dht_bootstrap_nodes", "anacrolix_max_conns_per_torrent",
-		"anacrolix_download_limit_kib", "anacrolix_upload_limit_kib",
-		"anacrolix_piece_hashers", "anacrolix_max_unverified_mb",
-		"anacrolix_ipfilter_path", "anacrolix_apply_ip_filter",
-		"anacrolix_proxy_type", "anacrolix_proxy_host", "anacrolix_proxy_port",
-		"anacrolix_proxy_user", "anacrolix_proxy_password":
+		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "qbittorrent_managed":
 		return true
 	}
 	return false

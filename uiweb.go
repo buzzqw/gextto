@@ -762,8 +762,6 @@ func uiBackendLabel(name string) string {
 	switch name {
 	case BackendQbittorrent:
 		return "qBittorrent-nox"
-	case BackendAnacrolix:
-		return "anacrolix"
 	default:
 		return "libtorrent integrato"
 	}

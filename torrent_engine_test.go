@@ -91,7 +91,7 @@ func TestCapabilityParityIsComplete(t *testing.T) {
 		t.Fatal("empty capability parity")
 	}
 	for capability, row := range parity {
-		for _, backend := range []string{BackendEmbedded, BackendQbittorrent, BackendAnacrolix} {
+		for _, backend := range []string{BackendEmbedded, BackendQbittorrent} {
 			if strings.TrimSpace(row[backend]) == "" {
 				t.Fatalf("capability %q missing backend %q", capability, backend)
 			}
@@ -116,27 +116,12 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	if _, _, err := selectTorrentEngine(&cfg); err == nil {
 		t.Fatal("qbittorrent without url must be refused")
 	}
-	// anacrolix is available only in builds compiled with the tag.
+	// Removed backend values fall back to the embedded implementation.
 	cfg2 := DefaultConfig()
-	cfg2.DataDir = t.TempDir()
-	cfg2.StateDir = filepath.Join(cfg2.DataDir, "state")
-	cfg2.LibtorrentDir = filepath.Join(cfg2.DataDir, "downloads")
-	cfg2.Settings["torrent_backend"] = BackendAnacrolix
+	cfg2.Settings["torrent_backend"] = "anacrolix"
 	engine, _, err := selectTorrentEngine(&cfg2)
-	if newAnacrolixEngine == nil {
-		if err == nil {
-			t.Fatal("anacrolix must be refused without the build tag")
-		}
-		return
-	}
-	if err != nil {
-		t.Fatalf("anacrolix select with tag: %v", err)
-	}
-	if engine == nil || engine.Name() != BackendAnacrolix {
-		t.Fatalf("anacrolix engine = %v", engine)
-	}
-	if closer, ok := engine.(interface{ Close() error }); ok {
-		_ = closer.Close()
+	if err != nil || engine != nil || TorrentBackendName(&cfg2) != BackendEmbedded {
+		t.Fatalf("legacy anacrolix selection must fall back to embedded: engine=%v err=%v", engine, err)
 	}
 }
 

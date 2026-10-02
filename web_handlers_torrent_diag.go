@@ -3,7 +3,6 @@ package gextto
 // web_handlers_torrent_diag.go adds backend-agnostic torrent diagnostics and
 // selective download:
 //
-//   - GET  /api/torrents/{hash}/pieces          per-piece runs (anacrolix)
 //   - GET  /api/torrents/{hash}/pieces/runs     alias
 //   - POST /api/torrents/{hash}/selective       apply a file-selection profile
 //

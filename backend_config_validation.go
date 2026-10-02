@@ -14,10 +14,10 @@ func validateBackendSetting(key, value string) error {
 	switch key {
 	case "torrent_backend":
 		switch raw {
-		case "", BackendEmbedded, BackendQbittorrent, BackendAnacrolix:
+		case "", BackendEmbedded, BackendQbittorrent:
 			return nil
 		default:
-			return fmt.Errorf("torrent_backend must be embedded, qbittorrent or anacrolix")
+			return fmt.Errorf("torrent_backend must be embedded or qbittorrent")
 		}
 	case "qbittorrent_url":
 		if raw == "" {
@@ -37,44 +37,9 @@ func validateBackendSetting(key, value string) error {
 			return nil
 		}
 		return validateBackendInteger(key, raw, 250, 60000)
-	case "qbittorrent_path_mappings", "anacrolix_path_mappings":
+	case "qbittorrent_path_mappings":
 		_, err := ParsePathMappings(value)
 		return err
-	case "anacrolix_listen_port", "anacrolix_proxy_port":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 0, 65535)
-	case "anacrolix_max_conns_per_torrent":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 0, 2147483647)
-	case "anacrolix_download_limit_kib", "anacrolix_upload_limit_kib":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 0, 9007199254740)
-	case "anacrolix_piece_hashers":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 1, 256)
-	case "anacrolix_max_unverified_mb":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 1, 8796093022207)
-	case "anacrolix_proxy_type":
-		if raw == "" {
-			return nil
-		}
-		return validateBackendInteger(key, raw, 0, 5)
-	case "anacrolix_tcp", "anacrolix_utp", "anacrolix_dht", "anacrolix_pex", "anacrolix_trackers", "anacrolix_upnp", "anacrolix_apply_ip_filter":
-		if raw == "" || raw == "true" || raw == "false" || raw == "yes" || raw == "no" || raw == "1" || raw == "0" {
-			return nil
-		}
-		return fmt.Errorf("%s must be true/false", key)
 	}
 	return nil
 }

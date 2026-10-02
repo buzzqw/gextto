@@ -684,8 +684,6 @@ func uiSettingGroupTitle(tab, key string) string {
 		switch {
 		case strings.HasPrefix(lowered, "qbittorrent_"):
 			return "qBittorrent-nox"
-		case strings.HasPrefix(lowered, "anacrolix_"):
-			return "anacrolix"
 		default:
 			return "Motore torrent"
 		}
@@ -787,35 +785,14 @@ var uiLibtorrentEngineOnlySettings = map[string]bool{
 	"libtorrent_upload_slots_limit":                true,
 }
 
-// uiLibtorrentAlsoAnacrolixSettings are libtorrent session options that the
-// anacrolix backend reads as fallbacks (the `anacrolix_*` keys override them).
-// They apply to the embedded and anacrolix engines; only qBittorrent ignores
-// them, so they are disabled only for that backend.
-var uiLibtorrentAlsoAnacrolixSettings = map[string]bool{
-	"libtorrent_dht":                         true,
-	"libtorrent_pex":                         true,
-	"libtorrent_utp":                         true,
-	"libtorrent_upnp":                        true,
-	"libtorrent_apply_ip_filter":             true,
-	"libtorrent_dht_bootstrap_nodes":         true,
-	"libtorrent_ipfilter_url":                true,
-	"libtorrent_max_connections_per_torrent": true,
-	"libtorrent_port_min":                    true,
-	"libtorrent_port_max":                    true,
-}
-
 // uiSettingAllowedBackends lists the torrent engines a setting applies to. A
 // nil/empty result means every engine.
 func uiSettingAllowedBackends(key string) []string {
 	switch {
 	case strings.HasPrefix(key, "qbittorrent_"):
 		return []string{BackendQbittorrent}
-	case strings.HasPrefix(key, "anacrolix_"):
-		return []string{BackendAnacrolix}
 	case uiLibtorrentEngineOnlySettings[key]:
 		return []string{BackendEmbedded}
-	case uiLibtorrentAlsoAnacrolixSettings[key]:
-		return []string{BackendEmbedded, BackendAnacrolix}
 	}
 	return nil
 }
@@ -835,14 +812,7 @@ func uiBackendAllows(allowed []string, backend string) bool {
 // uiActiveTorrentBackend returns the configured transfer backend, defaulting to
 // the embedded engine.
 func uiActiveTorrentBackend(cfg *Config) string {
-	if cfg != nil {
-		if raw, ok := cfg.Settings["torrent_backend"]; ok {
-			if value := strings.TrimSpace(raw); value != "" {
-				return value
-			}
-		}
-	}
-	return BackendEmbedded
+	return TorrentBackendName(cfg)
 }
 
 // uiRenameEditorFrom builds the rename-composition editor of the Rinomina tab.
@@ -885,15 +855,14 @@ func uiRenameEditorFrom(cfg *Config) *uiRenameEditor {
 // uiTorrentBackendOptions is the combo list of the transfer engines.
 func uiTorrentBackendOptions(value string) []uiFormOption {
 	value = strings.TrimSpace(value)
-	if value == "" {
+	if value == "" || strings.EqualFold(value, "anacrolix") {
 		value = BackendEmbedded
 	}
 	options := []uiFormOption{
 		{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded},
 		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
-		{Value: BackendAnacrolix, Label: "anacrolix", Selected: value == BackendAnacrolix},
 	}
-	if value != BackendEmbedded && value != BackendQbittorrent && value != BackendAnacrolix {
+	if value != BackendEmbedded && value != BackendQbittorrent {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
 		for index := 1; index < len(options); index++ {
 			options[index].Selected = false
@@ -944,23 +913,6 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 			{Value: "0", Label: "Disattivata", Selected: selected == "0"},
 			{Value: "1", Label: "Attivata", Selected: selected == "1"},
 			{Value: "2", Label: "Forzata", Selected: selected == "2"},
-		}
-	}
-	if key == "anacrolix_proxy_type" {
-		selected := strings.TrimSpace(value)
-		switch selected {
-		case "0", "1", "2", "3", "4", "5":
-		default:
-			selected = "0"
-		}
-		field.Kind = "select"
-		field.Options = []uiFormOption{
-			{Value: "0", Label: "Nessuno", Selected: selected == "0"},
-			{Value: "1", Label: "SOCKS4", Selected: selected == "1"},
-			{Value: "2", Label: "SOCKS5", Selected: selected == "2"},
-			{Value: "3", Label: "HTTP", Selected: selected == "3"},
-			{Value: "4", Label: "HTTP con credenziali", Selected: selected == "4"},
-			{Value: "5", Label: "SOCKS5 (hostname)", Selected: selected == "5"},
 		}
 	}
 	if key == "libtorrent_outgoing_interface" {

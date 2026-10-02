@@ -566,7 +566,7 @@ evidenziate con la barra “Salva tutte”.
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
-### Motore torrent (integrato, qBittorrent-nox, anacrolix)
+### Motore torrent (integrato, qBittorrent-nox)
 
 Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
 archivio; è sostituibile solo il piano di trasferimento, scelto in
@@ -587,11 +587,8 @@ dati.
   aggiorna con backup e rollback; un watchdog la riavvia dopo un'uscita inattesa
   e, dopo ripetuti crash, torna al motore integrato. Se qBittorrent è spento
   all'avvio, Gextto continua a riprovare invece di fallire.
-- **anacrolix** — motore BitTorrent nativo Go, nello stesso processo (senza Web
-  API e senza CGo). Richiede una build con il tag `anacrolix`; la build
-  predefinita mantiene libtorrent e lo rifiuta. Le sue opzioni coprono porta di
-  ascolto, TCP/uTP/DHT/PEX/tracker/UPnP, limiti di connessioni e banda, piece
-  hasher, proxy, filtro IP e percorsi.
+Se la configurazione salvata seleziona un backend non più supportato, Gextto
+torna al motore integrato e registra un avviso nel log.
 
 Il riquadro di configurazione mostra il motore attivo, il suo stato e un test di
 raggiungibilità/percorsi, così puoi validare un backend prima di passare. Quale

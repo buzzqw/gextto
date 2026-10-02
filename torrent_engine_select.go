@@ -35,16 +35,10 @@ func alternativeBackendActive(cfg *Config) bool {
 			return false
 		}
 		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
-	case BackendAnacrolix:
-		return newAnacrolixEngine != nil && validateAnacrolixConfig(cfg) == nil
 	default:
 		return false
 	}
 }
-
-// newAnacrolixEngine is installed by the build-tagged anacrolix implementation.
-// It is nil in the default build, where anacrolix is not compiled in.
-var newAnacrolixEngine func(*Config) (TorrentEngine, error)
 
 // selectTorrentEngine builds the configured backend. A nil engine means the
 // embedded libtorrent adapter. The second return value is a human-readable
@@ -71,18 +65,6 @@ func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
 			note := "qBittorrent is not reachable at startup; the adapter stays installed and will retry"
 			logging.Warn(note, "url", settings.Client.BaseURL)
 			return engine, note, nil
-		}
-		return engine, "", nil
-	case BackendAnacrolix:
-		if newAnacrolixEngine == nil {
-			return nil, "", fmt.Errorf("torrent_backend=anacrolix requires a build with the `anacrolix` tag")
-		}
-		if err := validateAnacrolixConfig(cfg); err != nil {
-			return nil, "", err
-		}
-		engine, err := newAnacrolixEngine(cfg)
-		if err != nil {
-			return nil, "", err
 		}
 		return engine, "", nil
 	default:
@@ -182,7 +164,7 @@ func PreflightQbittorrentWith(settings qbittorrentSettings) QbittorrentPreflight
 }
 
 // ShutdownTorrentEngine releases the active engine when it owns process-level
-// resources (the anacrolix client, for example). The embedded engine is closed
+// resources. The embedded engine is closed
 // by the daemon through LibtorrentClient.Shutdown.
 func ShutdownTorrentEngine(s *AppState) error {
 	engine := s.activeEngine()
@@ -206,6 +188,9 @@ func ShutdownEmbedded(s *AppState, cfg *Config) error {
 // ConfigureTorrentEngine installs the engine selected by the current settings.
 // It is called at startup and whenever the backend settings change.
 func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
+	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.Settings["torrent_backend"]), "anacrolix") {
+		logging.Warn("torrent backend anacrolix has been removed; falling back to embedded libtorrent")
+	}
 	engine, note, err := selectTorrentEngine(cfg)
 	if err != nil {
 		return err

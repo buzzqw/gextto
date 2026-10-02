@@ -138,9 +138,6 @@ var _ TorrentEngine = embeddedEngine{}
 const (
 	BackendEmbedded    = "embedded"
 	BackendQbittorrent = "qbittorrent"
-	// BackendAnacrolix is only selectable in builds compiled with the
-	// `anacrolix` build tag; the default build rejects it explicitly.
-	BackendAnacrolix = "anacrolix"
 )
 
 // capabilityLevels is the single source of truth for the parity matrix. It is
@@ -163,15 +160,6 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"preferences": "partial", "super_seeding": "partial", "upload_mode": "none",
-		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
-	},
-	BackendAnacrolix: {
-		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
-		"recheck": "full", "move": "partial", "limits": "partial", "files": "full", "peers": "full",
-		"trackers": "full", "events": "full", "stats": "full", "sequential": "none",
-		"first_last": "none", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
-		"piece_diagnostics": "full", "categories": "none", "tags": "none", "sync": "none",
-		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
 		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
 	},
 }

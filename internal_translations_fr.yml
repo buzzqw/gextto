@@ -1899,9 +1899,6 @@ fra:
   Motivo: Raison
   Motore: Moteur
   Motore Interno: Moteur Interne
-  ? 'Motore che muove i byte: libtorrent integrato (default), qBittorrent-nox o anacrolix. Il cambio si applica al riavvio del servizio.'
-  : 'Moteur de déplacement d''octets : libtorrent intégré (par défaut), qBittorrent-nox ou anacrolix. Le changement s''applique au redémarrage
-    du service.'
   Motore occupato, riprova tra poco: Moteur occupé, réessayez dans un instant
   Motori aggiornati: Moteurs mis à jour
   Motori di ricerca web usati per il gap-filling quando feed e indexer non trovano nulla: Les moteurs de recherche Web sont utilisés pour combler
@@ -2421,7 +2418,6 @@ fra:
     il controllo generale delle sorgenti.
   : Cette section effectue une véritable recherche avec des requêtes et comprend également des tests de port et de notification ; la section État
     de la source dans Santé affiche à la place le contrôle général des sources.
-  'Questo binario non include anacrolix: usa il target make build-anacrolix.': 'Ce binaire n''inclut pas anacrolix : utilisez la cible make build-anacrolix.'
   ? 'Questo pannello serve a fare una copia o una modifica avanzata delle traduzioni dell''interfaccia. Scegli una lingua e premi Esporta per
     caricare nell''editor le coppie chiave/valore salvate; modifica il testo YAML e premi Importa per aggiornare o aggiungere le traduzioni. Le
     chiavi non presenti nel file importato non vengono cancellate. Esempio: "Testa porte": "Test ports". Dopo l''importazione l''interfaccia si
@@ -3600,11 +3596,6 @@ fra:
   ad ogni ciclo: chaque cycle
   agganciato con successo!: lié avec succès !
   aggiunta manuale: ajout manuel
-  anacrolix: Anacrolix
-  ? anacrolix gira nello stesso processo di Gextto e normalmente non richiede mapping. Il campo è mantenuto per compatibilità e viene validato,
-    ma non crea una namespace separata.
-  : Anacrolix s'exécute selon le même processus que Gextto et ne nécessite normalement pas de mappage. Le champ est conservé pour des raisons
-    de compatibilité et est validé, mais ne crée pas d'espace de noms distinct.
   anno n/d: année n/a
   aria2c: aria2c
   attiva: activer

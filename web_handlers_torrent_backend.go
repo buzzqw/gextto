@@ -46,8 +46,6 @@ func TorrentBackendName(cfg *Config) string {
 	switch value {
 	case BackendQbittorrent:
 		return BackendQbittorrent
-	case BackendAnacrolix:
-		return BackendAnacrolix
 	default:
 		return BackendEmbedded
 	}
@@ -66,7 +64,6 @@ func TorrentBackendStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"capability_matrix": CapabilityMatrix(active.Name()),
 		"capability_parity": CapabilityParity(),
 		"qbittorrent_url":   settingsOr(cfg, "qbittorrent_url", ""),
-		"anacrolix_built":   newAnacrolixEngine != nil,
 	}
 	if engine, ok := active.(*qbittorrentEngine); ok {
 		payload["sync"] = engine.SyncStats()
@@ -205,21 +202,6 @@ func TorrentBackendPreflight(w http.ResponseWriter, r *http.Request, s *AppState
 		jsonResponse(w, QbittorrentPreflight{OK: true, Connected: true})
 		return
 	}
-	if configured == BackendAnacrolix {
-		if newAnacrolixEngine == nil {
-			jsonStatus(w, http.StatusConflict, map[string]any{
-				"ok":    false,
-				"error": "torrent_backend=anacrolix requires a build with the `anacrolix` tag",
-			})
-			return
-		}
-		if err := validateAnacrolixConfig(cfg); err != nil {
-			jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
-			return
-		}
-		jsonResponse(w, map[string]any{"ok": true, "backend": BackendAnacrolix})
-		return
-	}
 	result := PreflightQbittorrent(cfg)
 	if err := validateBackendMappings(result.Mappings, requiredBackendPaths(cfg)); err != nil {
 		result.Errors = append(result.Errors, err.Error())
@@ -256,17 +238,6 @@ func TorrentBackendActivate(w http.ResponseWriter, r *http.Request, s *AppState)
 					"ok": false, "preflight": result,
 					"error": firstOr(result.Errors, "preflight failed"),
 				})
-				return
-			}
-		case BackendAnacrolix:
-			if newAnacrolixEngine == nil {
-				jsonStatus(w, http.StatusConflict, map[string]any{
-					"ok": false, "error": "torrent_backend=anacrolix requires a build with the `anacrolix` tag",
-				})
-				return
-			}
-			if err := validateAnacrolixConfig(cfg); err != nil {
-				jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": err.Error()})
 				return
 			}
 		}

@@ -555,7 +555,7 @@ highlighted with a “Save all” bar.
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
-### Torrent engine (embedded, qBittorrent-nox, anacrolix)
+### Torrent engine (embedded, qBittorrent-nox)
 
 Gextto always keeps its own database, queue, scoring, post-processing, renaming
 and archive; only the transfer plane is pluggable, chosen in
@@ -576,11 +576,8 @@ same data.
   restarts it after an unexpected exit and, after repeated crashes, falls back to
   the embedded engine. If qBittorrent is down at startup, Gextto keeps retrying
   instead of failing.
-- **anacrolix** — a native Go BitTorrent engine that runs in-process (no Web API,
-  no CGo). It requires a build with the `anacrolix` tag; the default build keeps
-  libtorrent and refuses it. Its options cover listening port, TCP/uTP/DHT/PEX/
-  trackers/UPnP, connection and bandwidth limits, piece hashers, proxy, IP filter
-  and paths.
+If the saved configuration selects a backend that is no longer supported,
+Gextto falls back to the embedded engine and logs a warning.
 
 The configuration tile shows the active engine, its status and a
 reachability/path test, so you can validate a backend before switching.

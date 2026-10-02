@@ -115,10 +115,6 @@ func BuildMigrationPlan(s *AppState, cfg *Config, target string) MigrationManife
 				plan.Warnings = append(plan.Warnings, err.Error())
 			}
 		}
-	case BackendAnacrolix:
-		if newAnacrolixEngine == nil {
-			plan.Warnings = append(plan.Warnings, "anacrolix non compilato (serve il build tag `anacrolix`)")
-		}
 	default:
 		plan.Warnings = append(plan.Warnings, fmt.Sprintf("backend target sconosciuto: %s", target))
 	}
