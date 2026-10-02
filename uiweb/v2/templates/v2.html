@@ -398,7 +398,7 @@
         </tr></thead>
         <tbody>
           {{range .Rows}}
-          <tr data-hash="{{.Hash}}">
+          <tr id="v2-torrent-{{.Hash}}" data-hash="{{.Hash}}">
              <td><input type="checkbox" data-v2-select name="hash" value="{{.Hash}}" aria-label="Seleziona {{.Name}}" title="Seleziona questo torrent per le azioni di gruppo" /></td>
             <td class="torrent-name">
               <span class="truncate" title="{{.Name}}">{{.Name}}</span>
@@ -425,7 +425,7 @@
           </tr>
           {{end}}
           {{range .HTTPDownloads}}
-          <tr data-http-download="{{.ID}}">
+          <tr id="v2-http-download-{{.ID}}" data-http-download="{{.ID}}">
             <td></td>
             <td class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></td>
             <td><span class="badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span></td>
@@ -436,7 +436,7 @@
                   {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" name="http_action" value="pause:{{.ID}}" title="Metti in pausa il download HTTP" aria-label="Metti in pausa il download HTTP"><span aria-hidden="true">⏸</span></button>{{end}}
                {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
                <button class="btn sm icon-action" type="button" hx-get="/v2/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
-               <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
+                <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
             </td>
           </tr>
           {{end}}
@@ -547,10 +547,10 @@
     <div class="modal-body">
       <p class="muted">{{.Name}}</p>
       <div class="remove-options">
-        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
-        <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
-        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
-        <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>
+        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
+        <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
+        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
+        <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>
       </div>
     </div>
   </div>

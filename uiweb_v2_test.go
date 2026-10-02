@@ -288,7 +288,7 @@ func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 		t.Fatalf("detail modal -> %d", code)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2/downloads/remove?hash=deadbeef", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Solo torrent") || !strings.Contains(body, `title="Rimuove il torrent dalla sessione`) {
+	if code != http.StatusOK || !strings.Contains(body, "Solo torrent") || !strings.Contains(body, `title="Rimuove il torrent dalla sessione`) || !strings.Contains(body, `hx-disabled-elt="this"`) || !strings.Contains(body, `v2-torrent-deadbeef`) {
 		t.Fatalf("remove modal -> %d", code)
 	}
 }
