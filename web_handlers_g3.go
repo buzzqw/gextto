@@ -1086,7 +1086,11 @@ func gh3AddRelease(s *AppState, release models.Release) (int, any) {
 	if !gh3SetupComplete(s.cfg) {
 		return http.StatusConflict, map[string]any{"ok": false, "error": "complete the initial setup first"}
 	}
-	isURL := gh3IsTorrentURL(release.Magnet)
+	source := strings.TrimSpace(release.Magnet)
+	if source == "" && release.TorrentURL != nil {
+		source = strings.TrimSpace(*release.TorrentURL)
+	}
+	isURL := gh3IsTorrentURL(source)
 	status, value := gh3AddParsedRelease(s, release)
 	if isURL && status == http.StatusBadRequest {
 		if found := gh3ResolveBySearch(s, release.Title); found != nil {
@@ -1102,6 +1106,12 @@ func gh3AddRelease(s *AppState, release models.Release) (int, any) {
 // gh3AddParsedRelease implements `add_parsed_release`.
 func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 	source := strings.TrimSpace(release.Magnet)
+	if source == "" && release.TorrentURL != nil {
+		source = strings.TrimSpace(*release.TorrentURL)
+	}
+	if source == "" {
+		return http.StatusBadRequest, map[string]any{"ok": false, "error": "release has no magnet or torrent URL"}
+	}
 	if gh3IsTorrentURL(source) {
 		hash, err := gh3DownloadAndAdd(s, source, AddOptions{})
 		if err != nil {

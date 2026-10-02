@@ -631,7 +631,7 @@ func SearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	query := fmt.Sprintf("%s S%02dE%02d", strings.TrimSpace(input.Series), input.Season, input.Episode)
-	results := s.engine.SearchQueryManual(r.Context(), cfg, query)
+	results := s.engine.SearchSeriesEpisode(r.Context(), cfg, series, input.Season, input.Episode, true)
 	if entries, err := s.archive.Search(query); err == nil {
 		for _, entry := range entries {
 			if release := ParseRelease(entry[0], entry[1], "archive:"+entry[2]); release != nil {
@@ -652,11 +652,11 @@ func SearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
 			continue
 		}
-		hash, ok := utils.MagnetHash(release.Magnet)
-		if !ok || seen[hash] {
+		key, ok := releaseDedupKey(&release)
+		if !ok || seen[key] {
 			continue
 		}
-		seen[hash] = true
+		seen[key] = true
 		filtered = append(filtered, release)
 	}
 	sort.SliceStable(filtered, func(a, b int) bool {

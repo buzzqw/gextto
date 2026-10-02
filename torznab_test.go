@@ -5,19 +5,45 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestProwlarrURLRequestsAFullPage(t *testing.T) {
 	indexer := IndexerConfig{Name: "Prowlarr", URL: "http://host:9696", APIKey: "secret", Enabled: true}
 	full := torznabRequestURL(indexer, "Show S01E02", nil)
-	for _, fragment := range []string{"/api/v1/search?", "query=Show+S01E02", "type=search", "limit=100", "apikey=secret"} {
+	for _, fragment := range []string{"/api/v1/search?", "query=Show+S01E02%7Bseason%3A1%7D%7Bepisode%3A2%7D", "type=tvsearch", "limit=100", "apikey=secret"} {
 		if !strings.Contains(full, fragment) {
 			t.Fatalf("Prowlarr URL %q missing %q", full, fragment)
 		}
+	}
+}
+
+func TestManagerRequestsUseStructuredTVAndMovieSearches(t *testing.T) {
+	prowlarr := IndexerConfig{Name: "Prowlarr", URL: "http://host:9696", APIKey: "secret", Enabled: true}
+	full := torznabRequestURLForType(prowlarr, "Example Show", [][2]string{{"tvdbid", "123"}, {"tmdbid", "456"}}, searchTypeTV)
+	parsed, err := url.Parse(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := parsed.Query()
+	if values.Get("type") != "tvsearch" || values.Get("query") != "Example Show{tvdbid:123}{tmdbid:456}" {
+		t.Fatalf("Prowlarr TV request = %q", full)
+	}
+
+	jackett := IndexerConfig{Name: "Jackett", URL: "http://host:9117", APIKey: "secret", Enabled: true}
+	full = torznabRequestURLForType(jackett, "Example Film 2026", [][2]string{{"tmdbid", "789"}}, searchTypeMovie)
+	parsed, err = url.Parse(full)
+	if err != nil {
+		t.Fatal(err)
+	}
+	values = parsed.Query()
+	if values.Get("t") != "movie" || values.Get("tmdbid") != "789" {
+		t.Fatalf("Jackett movie request = %q", full)
 	}
 }
 
@@ -38,6 +64,29 @@ func TestJackettURLUsesTvsearchForEpisodes(t *testing.T) {
 	withIDs := torznabRequestURL(indexer, "Show S01E02", [][2]string{{"imdbid", "tt1234"}})
 	if !strings.Contains(withIDs, "imdbid=tt1234") {
 		t.Fatalf("external id not forwarded: %q", withIDs)
+	}
+}
+
+func TestManagerSeasonFallbackUsesStructuredSeasonSearch(t *testing.T) {
+	ids := [][2]string{{"tvdbid", "123"}, {"tmdbid", "456"}}
+	prowlarr := IndexerConfig{Name: "Prowlarr", URL: "http://host:9696", APIKey: "secret", Enabled: true}
+	parsed, err := url.Parse(torznabRequestURLForType(prowlarr, "Example Show S02", ids, searchTypeTV))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := parsed.Query()
+	if values.Get("type") != searchTypeTV || values.Get("query") != "Example Show S02{tvdbid:123}{tmdbid:456}{season:2}" {
+		t.Fatalf("Prowlarr season request = %q", parsed.String())
+	}
+
+	jackett := IndexerConfig{Name: "Jackett", URL: "http://host:9117", APIKey: "secret", Enabled: true}
+	parsed, err = url.Parse(torznabRequestURLForType(jackett, "Example Show S02", ids, searchTypeTV))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values = parsed.Query()
+	if values.Get("t") != searchTypeTV || values.Get("season") != "2" || values.Get("ep") != "" || values.Get("tvdbid") != "123" {
+		t.Fatalf("Jackett season request = %q", parsed.String())
 	}
 }
 
@@ -63,6 +112,32 @@ func TestParseProwlarrJSONRebuildsMagnetFromInfoHash(t *testing.T) {
 	}
 	if release.Seeders != 12 || release.Peers != 3 || release.SizeBytes != 1500000000 {
 		t.Fatalf("metadata = %+v", release)
+	}
+}
+
+func TestProwlarrPreservesPublishDateAndV2InfoHash(t *testing.T) {
+	hash := strings.Repeat("a", 64)
+	body := `[{"title":"Show S01E02 1080p WEB-DL","infoHash":"` + hash + `","size":1500000000,"protocol":"torrent","publishDate":"2026-09-01T12:00:00Z"}]`
+	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	if err != nil || len(releases) != 1 {
+		t.Fatalf("parse = %+v, %v", releases, err)
+	}
+	if !strings.Contains(releases[0].Magnet, "urn:btmh:1220"+hash) {
+		t.Fatalf("v2 magnet = %q", releases[0].Magnet)
+	}
+	if got := releases[0].DiscoveredAt.Format(time.RFC3339); got != "2026-09-01T12:00:00Z" {
+		t.Fatalf("publish date = %q", got)
+	}
+}
+
+func TestProwlarrPreservesTMDBID(t *testing.T) {
+	body := `[{"title":"Example Film 1080p WEB-DL","infoHash":"` + strings.Repeat("e", 40) + `","tmdbId":987,"size":1500000000,"protocol":"torrent"}]`
+	releases, err := parse_prowlarr_json(body, "Prowlarr")
+	if err != nil || len(releases) != 1 {
+		t.Fatalf("parse = %+v, %v", releases, err)
+	}
+	if got := releases[0].TmdbID; got != "987" {
+		t.Fatalf("tmdb id = %q", got)
 	}
 }
 
@@ -124,6 +199,32 @@ func TestResolveProwlarrMagnetsFollowsDownloadRedirect(t *testing.T) {
 	releases := parseProwlarrItems(items, "prowlarr")
 	if len(releases) != 1 || !strings.Contains(releases[0].Magnet, hash) {
 		t.Fatalf("release not produced from the resolved magnet: %+v", releases)
+	}
+}
+
+func TestProwlarrProxyMagnetAndTorrentURLAreRetained(t *testing.T) {
+	const hash = "dddddddddddddddddddddddddddddddddddddddd"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("link") == "magnet" {
+			w.Header().Set("Location", "magnet:?xt=urn:btih:"+hash)
+			w.WriteHeader(http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/x-bittorrent")
+		_, _ = w.Write([]byte("torrent payload"))
+	}))
+	defer server.Close()
+
+	magnetBody := `[{"title":"Show S01E01 1080p","protocol":"torrent","magnetUrl":"` + server.URL + `/12/download?link=magnet"}]`
+	releases, err := parseProwlarrBody(context.Background(), magnetBody, "Prowlarr")
+	if err != nil || len(releases) != 1 || !strings.Contains(releases[0].Magnet, hash) {
+		t.Fatalf("proxy magnet releases = %+v, %v", releases, err)
+	}
+
+	torrentBody := `[{"title":"Show S01E02 1080p","protocol":"torrent","downloadUrl":"` + server.URL + `/12/download?link=torrent"}]`
+	releases, err = parseProwlarrBody(context.Background(), torrentBody, "Prowlarr")
+	if err != nil || len(releases) != 1 || releases[0].TorrentURL == nil {
+		t.Fatalf("proxy torrent releases = %+v, %v", releases, err)
 	}
 }
 

@@ -288,11 +288,11 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 	seen := map[string]struct{}{}
 	deduped := make([]gh7_episode_result, 0, len(allowed))
 	for _, result := range allowed {
-		hash, ok := utils.MagnetHash(result.Release.Magnet)
+		key, ok := releaseDedupKey(&result.Release)
 		if !ok {
 			continue
 		}
-		key := hash + ":" + result.Origin
+		key += ":" + result.Origin
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -309,9 +309,8 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 // episode, keeping the origin on every result.
 func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Config, series SeriesConfig, season, episode int64) []gh7_episode_result {
 	results := gh7_stored_series_episode_sources(s, series, season, episode)
-	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
 	if s.engine != nil {
-		for _, release := range s.engine.SearchQueryManual(ctx, cfg, query) {
+		for _, release := range s.engine.SearchSeriesEpisode(ctx, cfg, &series, season, episode, true) {
 			if gh7_release_matches_series_episode(&release, series, season, episode) {
 				results = append(results, gh7_episode_result{Release: release, Origin: "Indexer / web"})
 			}

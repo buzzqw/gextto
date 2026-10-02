@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -245,11 +246,11 @@ func gh2_finalizeEpisodeSearchResults(results []gh2_episodeSource, cfg *Config, 
 	seen := map[string]struct{}{}
 	deduped := make([]gh2_episodeSource, 0, len(filtered))
 	for _, result := range filtered {
-		hash, ok := utils.MagnetHash(result.Release.Magnet)
+		key, ok := releaseDedupKey(&result.Release)
 		if !ok {
 			continue
 		}
-		key := hash + ":" + result.Origin
+		key += ":" + result.Origin
 		if _, exists := seen[key]; exists {
 			continue
 		}
@@ -472,12 +473,18 @@ func FlaresolverrTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "URL FlareSolverr non configurato")
 		return
 	}
-	endpoint := strings.TrimRight(configured, "/") + "/v1"
+	endpoint := flareSolverrEndpoint(configured)
 	host := domain_of(configured)
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	body, _, err := HTTPPostJSON(ctx, endpoint, nil, []byte(`{"cmd": "sessions.list"}`))
+	body, statusCode, err := HTTPPostJSON(ctx, endpoint, nil, []byte(`{"cmd": "sessions.list"}`))
 	if err != nil {
+		logging.Info("flaresolverr test", "host", host, "ok", false, "error", err.Error())
+		jsonError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if statusCode >= http.StatusBadRequest {
+		err := fmt.Errorf("HTTP %d", statusCode)
 		logging.Info("flaresolverr test", "host", host, "ok", false, "error", err.Error())
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
@@ -967,17 +974,31 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 			break
 		}
 	}
-	var liveReleases []models.Release
-	if len(gaps) > 0 {
-		liveReleases = s.engine.SearchQueryManual(r.Context(), cfg, series.Name)
+	liveReleases := make([][]models.Release, len(gaps))
+	if s.engine != nil && len(gaps) > 0 {
+		// A generic title query can return only recent episodes and miss an old
+		// gap. Search every displayed gap with the structured TV identity, while
+		// keeping the manual fan-out bounded.
+		sem := make(chan struct{}, 3)
+		var wg sync.WaitGroup
+		for index, gap := range gaps {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(index int, season, episode int64) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				liveReleases[index] = s.engine.SearchSeriesEpisode(r.Context(), cfg, series, season, episode, true)
+			}(index, gap[0], gap[1])
+		}
+		wg.Wait()
 	}
 	results := []gh2_episodeResult{}
-	for _, gap := range gaps {
+	for index, gap := range gaps {
 		season, episode := gap[0], gap[1]
 		episodeResults := gh2_storedSeriesEpisodeSources(s, series, season, episode)
-		for index := range liveReleases {
-			if gh2_releaseMatchesSeriesEpisode(&liveReleases[index], series, season, episode) {
-				episodeResults = append(episodeResults, gh2_episodeSource{Release: liveReleases[index], Origin: "Indexer / web"})
+		for releaseIndex := range liveReleases[index] {
+			if gh2_releaseMatchesSeriesEpisode(&liveReleases[index][releaseIndex], series, season, episode) {
+				episodeResults = append(episodeResults, gh2_episodeSource{Release: liveReleases[index][releaseIndex], Origin: "Indexer / web"})
 			}
 		}
 		for _, result := range gh2_finalizeEpisodeSearchResults(episodeResults, cfg, series) {
@@ -992,11 +1013,11 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	seen := map[string]struct{}{}
 	deduped := make([]gh2_episodeResult, 0, len(results))
 	for _, result := range results {
-		hash, ok := utils.MagnetHash(result.Release.Magnet)
+		key, ok := releaseDedupKey(&result.Release)
 		if !ok {
 			continue
 		}
-		key := hash + ":" + result.Origin
+		key += ":" + result.Origin
 		if _, exists := seen[key]; exists {
 			continue
 		}

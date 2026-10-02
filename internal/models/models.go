@@ -333,18 +333,22 @@ type ApprovalContext struct {
 
 // Release is a candidate release discovered from a source.
 type Release struct {
-	Title        string    `json:"title"`
-	Magnet       string    `json:"magnet"`
-	TorrentURL   *string   `json:"torrent_url"`
-	Source       string    `json:"source"`
-	Quality      Quality   `json:"quality"`
-	Kind         string    `json:"kind"`
-	Series       *string   `json:"series"`
-	Season       *int64    `json:"season"`
-	Episode      *int64    `json:"episode"`
-	IsPack       bool      `json:"is_pack"`
-	EpisodeRange []int64   `json:"episode_range"`
-	Year         *int64    `json:"year"`
+	Title        string  `json:"title"`
+	Magnet       string  `json:"magnet"`
+	TorrentURL   *string `json:"torrent_url"`
+	Source       string  `json:"source"`
+	Quality      Quality `json:"quality"`
+	Kind         string  `json:"kind"`
+	Series       *string `json:"series"`
+	Season       *int64  `json:"season"`
+	Episode      *int64  `json:"episode"`
+	IsPack       bool    `json:"is_pack"`
+	EpisodeRange []int64 `json:"episode_range"`
+	Year         *int64  `json:"year"`
+	// TmdbID is supplied by Prowlarr's native search response. Unlike a title
+	// string, it identifies a movie unambiguously when the release name omits
+	// its year.
+	TmdbID       string    `json:"tmdb_id,omitempty"`
 	DiscoveredAt time.Time `json:"discovered_at"`
 	SizeBytes    int64     `json:"size_bytes"`
 	Seeders      int64     `json:"seeders"`

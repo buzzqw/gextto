@@ -413,10 +413,9 @@ func RunCycleDomain(
 
 	// Phase 1 (every cycle, free): local archive search only.
 	type liveCandidate struct {
-		Series  string
+		Series  *SeriesConfig
 		Season  int64
 		Episode int64
-		Query   string
 	}
 	var liveCandidates []liveCandidate
 	livePerSeries := map[string]int{}
@@ -427,6 +426,11 @@ func RunCycleDomain(
 	}
 	for i := range archiveGaps {
 		gap := archiveGaps[i]
+		season := gap.Season
+		series := cfg.FindSeriesMatch(gap.Series, &season)
+		if series == nil {
+			continue
+		}
 		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
 		found := false
 		if items, err := archive.Search(query); err == nil {
@@ -439,23 +443,28 @@ func RunCycleDomain(
 					continue
 				}
 				release := ParseRelease(item[0], item[1], "archive:"+item[2])
-				if release == nil {
+				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
 					continue
 				}
 				if reason := cfg.AllReleaseDeniedReason(release); reason != "" {
 					if cfg.ReleaseIsMonitored(release) {
 						rules.LogRejection(release, reason)
 					}
-				} else {
-					logging.Debug("archive release found",
-						"series", gap.Series,
-						"season", gap.Season,
-						"episode", gap.Episode,
-						"title", release.Title,
-						"source", release.Source)
-					releases = append(releases, *release)
-					found = true
+					continue
 				}
+				if !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
+					continue
+				}
+				canonicalName := series.Name
+				release.Series = &canonicalName
+				logging.Debug("archive release found",
+					"series", gap.Series,
+					"season", gap.Season,
+					"episode", gap.Episode,
+					"title", release.Title,
+					"source", release.Source)
+				releases = append(releases, *release)
+				found = true
 			}
 		}
 		if found {
@@ -469,28 +478,16 @@ func RunCycleDomain(
 		if gapLimit > 0 && livePerSeries[gap.Series] >= gapLimit {
 			continue
 		}
-		season := gap.Season
 		if recentlySearched, err := db.GapRecentlySearched(gap.Series, gap.Season, gap.Episode, 23); err != nil {
 			return nil, err
 		} else if recentlySearched {
 			continue
 		}
-		// legacy queries only the series name (+ language), never SxxExx.
-		language := ""
-		if entry := cfg.FindSeriesMatch(gap.Series, &season); entry != nil {
-			language = entry.Language
-		}
-		liveQuery := gap.Series
-		if trimmed := strings.TrimSpace(language); trimmed != "" &&
-			language != "any" && language != "*" && language != "none" && language != "custom" {
-			liveQuery = gap.Series + " " + language
-		}
 		livePerSeries[gap.Series]++
 		liveCandidates = append(liveCandidates, liveCandidate{
-			Series:  gap.Series,
+			Series:  series,
 			Season:  gap.Season,
 			Episode: gap.Episode,
-			Query:   liveQuery,
 		})
 	}
 	logging.Info(fmt.Sprintf(
@@ -510,27 +507,49 @@ func RunCycleDomain(
 			go func(index int, candidate liveCandidate) {
 				defer gapWG.Done()
 				defer func() { <-gapSem }()
+				query := fmt.Sprintf("%s S%02dE%02d", candidate.Series.Name, candidate.Season, candidate.Episode)
 				logging.Debug("gap-fill live search started",
-					"series", candidate.Series,
+					"series", candidate.Series.Name,
 					"season", candidate.Season,
 					"episode", candidate.Episode,
-					"query", candidate.Query)
+					"query", query)
 				started := time.Now()
-				found := engine.SearchQuery(ctx, cfg, candidate.Query)
+				appendValid := func(found []models.Release) {
+					for i := range found {
+						release := found[i]
+						if !releaseMatchesConfiguredEpisode(&release, candidate.Series, candidate.Season, candidate.Episode) ||
+							cfg.AllReleaseDeniedReason(&release) != "" ||
+							!cfg.SeriesReleaseAllowed(candidate.Series, &release.Quality, release.Title) {
+							continue
+						}
+						canonicalName := candidate.Series.Name
+						release.Series = &canonicalName
+						foundResults[index] = append(foundResults[index], release)
+					}
+				}
+				appendValid(engine.SearchSeriesEpisode(ctx, cfg, candidate.Series, candidate.Season, candidate.Episode, false))
+				if len(foundResults[index]) == 0 {
+					seasonQuery := fmt.Sprintf("%s S%02d", candidate.Series.Name, candidate.Season)
+					logging.Debug("gap-fill season fallback started",
+						"series", candidate.Series.Name,
+						"season", candidate.Season,
+						"episode", candidate.Episode,
+						"query", seasonQuery)
+					appendValid(engine.SearchSeriesSeason(ctx, cfg, candidate.Series, candidate.Season, false))
+				}
 				logging.Debug("gap-fill live search completed",
-					"series", candidate.Series,
+					"series", candidate.Series.Name,
 					"season", candidate.Season,
 					"episode", candidate.Episode,
-					"query", candidate.Query,
+					"query", query,
 					"elapsed_ms", time.Since(started).Milliseconds(),
-					"results", len(found))
-				foundResults[index] = found
+					"results", len(foundResults[index]))
 			}(i, candidate)
 		}
 		gapWG.Wait()
 		for i := range liveCandidates {
 			releases = append(releases, foundResults[i]...)
-			_ = db.MarkGapSearched(liveCandidates[i].Series, liveCandidates[i].Season, liveCandidates[i].Episode)
+			_ = db.MarkGapSearched(liveCandidates[i].Series.Name, liveCandidates[i].Season, liveCandidates[i].Episode)
 		}
 	}
 	if domainIs(domain, "series") {
@@ -573,7 +592,7 @@ func RunCycleDomain(
 				continue
 			}
 		} else {
-			movie := cfg.FindMovieMatch(release.Title, release.Year)
+			movie := cfg.FindMovieMatchForRelease(&release, false)
 			if movie == nil {
 				// Not monitored: never log these, they are pure noise.
 				continue
@@ -787,16 +806,8 @@ func RunCycleDomain(
 		releaseScore := cfg.ReleaseScore(&release)
 		// A candidate that fills a known archive gap, or that scores above the
 		// bypass threshold, is never held by a delay profile.
-		isGap := false
-		if release.Series != nil && release.Season != nil && release.Episode != nil {
-			if _, ok := gapTargets[gapTarget{
-				Series:  *release.Series,
-				Season:  *release.Season,
-				Episode: *release.Episode,
-			}]; ok {
-				isGap = true
-			}
-		}
+		gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
+		isGap := len(gapEpisodes) > 0
 		bypassDelay := isGap || (cfg.DelayBypassScore() > 0 && releaseScore >= cfg.DelayBypassScore())
 		if release.Kind == "series" && !isReadyPending {
 			seriesName := ""
@@ -869,7 +880,7 @@ func RunCycleDomain(
 				forbidUpgrade = series.DisableUpgrades
 			}
 		} else {
-			if movie := cfg.FindMovieMatch(release.Title, release.Year); movie != nil {
+			if movie := cfg.FindMovieMatchForRelease(&release, false); movie != nil {
 				forbidUpgrade = movie.DisableUpgrades
 			}
 		}
@@ -890,7 +901,6 @@ func RunCycleDomain(
 			return nil, err
 		}
 		score := releaseScore
-		gapEpisodes := gapEpisodesForRelease(&release, gapTargets)
 		fromArchive := strings.HasPrefix(release.Source, "archive:")
 		decisionReason := approvalReason
 		if fromArchive {
@@ -1110,10 +1120,7 @@ func prioritizeArchiveGapDownloads(
 				continue
 			}
 			release := ParseRelease(item[0], item[1], "archive:"+item[2])
-			if release == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
-				continue
-			}
-			if !strings.EqualFold(*release.Series, series.Name) || *release.Season != gap.Season || !releaseHasEpisode(release, gap.Episode) {
+			if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
 				continue
 			}
 			if cfg.AllReleaseDeniedReason(release) != "" || !cfg.SeriesReleaseAllowed(series, &release.Quality, release.Title) {
@@ -1222,6 +1229,27 @@ func releaseHasEpisode(release *models.Release, episode int64) bool {
 	}
 	for _, item := range release.EpisodeRange {
 		if item == episode {
+			return true
+		}
+	}
+	return false
+}
+
+// releaseMatchesConfiguredEpisode verifies the identity of a gap hit before it
+// suppresses an online lookup or enters candidate selection. Archive FTS is a
+// discovery mechanism, not proof that its result covers the requested episode.
+func releaseMatchesConfiguredEpisode(release *models.Release, series *SeriesConfig, season, episode int64) bool {
+	if release == nil || series == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
+		return false
+	}
+	if *release.Season != season || (!releaseHasEpisode(release, episode) && !hasCompleteRange(release)) {
+		return false
+	}
+	if SeriesNamesMatch(series.Name, *release.Series) {
+		return true
+	}
+	for _, alias := range series.Aliases {
+		if SeriesNamesMatch(alias, *release.Series) {
 			return true
 		}
 	}
@@ -1460,12 +1488,20 @@ func gapEpisodesForRelease(release *models.Release, gapTargets map[gapTarget]str
 	series := *release.Series
 	season := *release.Season
 	var episodes []int64
-	for _, episode := range release.EpisodeRange {
-		if episode <= 0 {
-			continue
+	if hasCompleteRange(release) {
+		for target := range gapTargets {
+			if target.Series == series && target.Season == season {
+				episodes = append(episodes, target.Episode)
+			}
 		}
-		if _, ok := gapTargets[gapTarget{Series: series, Season: season, Episode: episode}]; ok {
-			episodes = append(episodes, episode)
+	} else {
+		for _, episode := range release.EpisodeRange {
+			if episode <= 0 {
+				continue
+			}
+			if _, ok := gapTargets[gapTarget{Series: series, Season: season, Episode: episode}]; ok {
+				episodes = append(episodes, episode)
+			}
 		}
 	}
 	slices.Sort(episodes)

@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 const testMagnet = "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
@@ -133,6 +135,14 @@ func TestAcceptsJackettDownloadURLsAsTorrentSources(t *testing.T) {
 	}
 	if release.TorrentURL == nil || *release.TorrentURL != url {
 		t.Fatalf("torrent_url = %v, want %q", release.TorrentURL, url)
+	}
+}
+
+func TestReleaseDedupKeyRetainsTorrentOnlyRelease(t *testing.T) {
+	url := "https://prowlarr.example/12/download?link=abc"
+	release := &models.Release{TorrentURL: &url}
+	if got, ok := releaseDedupKey(release); !ok || got != "url:"+url {
+		t.Fatalf("dedup key = %q, %v", got, ok)
 	}
 }
 

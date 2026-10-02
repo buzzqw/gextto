@@ -113,7 +113,7 @@ func decisionReleaseMatch(cfg *Config, release *models.Release) (*SeriesConfig, 
 		}
 		return cfg.FindSeriesMatch(name, release.Season), nil
 	} else if release.Kind == "movie" {
-		return nil, cfg.FindMovieMatchManual(release.Title, release.Year)
+		return nil, cfg.FindMovieMatchForRelease(release, true)
 	}
 	return nil, nil
 }

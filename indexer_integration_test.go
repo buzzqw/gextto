@@ -86,6 +86,137 @@ func TestManagerSourceSkipsFlareSolverr(t *testing.T) {
 	}
 }
 
+func TestExternalTorznabCanFallbackToFlareSolverr(t *testing.T) {
+	resetCloudflareMemoryForTest(t)
+	var flareCalls atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer target.Close()
+	flare := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var command struct {
+			Cmd     string `json:"cmd"`
+			Session string `json:"session"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&command)
+		flareCalls.Add(1)
+		switch command.Cmd {
+		case "sessions.create":
+			if !strings.HasPrefix(command.Session, fsSessionPrefix) {
+				t.Fatalf("session id %q does not have Gextto prefix", command.Session)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "session": command.Session})
+		case "request.get":
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "solution": map[string]any{
+				"response": `<rss><channel><item><title>Example.S01E01.1080p</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`,
+			}})
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer flare.Close()
+
+	// This is a direct Torznab API, not a Jackett/Prowlarr manager. Its URL
+	// already includes /api, so it must keep the optional FlareSolverr fallback.
+	indexer := IndexerConfig{Name: "private Torznab", URL: target.URL + "/api", APIKey: "k", Enabled: true}
+	releases, err := FetchTorznabFlareSolverr(context.Background(), indexer, "Example S01E01", nil, &flare.URL)
+	if err != nil {
+		t.Fatalf("external Torznab fallback: %v", err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("releases = %d, want 1", len(releases))
+	}
+	if calls := flareCalls.Load(); calls != 2 {
+		t.Fatalf("FlareSolverr calls = %d, want create + request", calls)
+	}
+}
+
+func TestIndexerSearchRetainsTorrentOnlyResults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Example.Show.S01E01.1080p</title><link>http://jackett:9117/dl/tracker/?path=ZXhhbXBsZQ</link></item></channel></rss>`)
+	}))
+	defer server.Close()
+	cfg := DefaultConfig()
+	cfg.Indexers = []IndexerConfig{{Name: "Jackett", URL: server.URL, Enabled: true, Manager: ManagerJackett}}
+	cfg.WebsearchEngines = nil
+	releases := searchOneWithDB(context.Background(), &cfg, "Example Show S01E01", nil, nil, nil, false)
+	if len(releases) != 1 || releases[0].TorrentURL == nil {
+		t.Fatalf("torrent-only indexer result was discarded: %+v", releases)
+	}
+}
+
+func TestSeriesEpisodeSearchUsesEpisodeAndExternalIDs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/api/v1/search" {
+			t.Fatalf("path = %q", got)
+		}
+		values := r.URL.Query()
+		if values.Get("type") != searchTypeTV {
+			t.Fatalf("type = %q", values.Get("type"))
+		}
+		if got := values.Get("query"); got != "Example Show S02E03{tvdbid:123}{tmdbid:456}{season:2}{episode:3}" {
+			t.Fatalf("query = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `[]`)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.WebsearchEngines = nil
+	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
+	series := &SeriesConfig{Name: "Example Show", TvdbID: "123", TmdbID: "456", Enabled: true}
+	if releases := NewEngine().SearchSeriesEpisode(context.Background(), &cfg, series, 2, 3, false); len(releases) != 0 {
+		t.Fatalf("releases = %+v, want none", releases)
+	}
+}
+
+func TestSeriesSeasonSearchUsesSeasonAndExternalIDs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		values := r.URL.Query()
+		if values.Get("type") != searchTypeTV {
+			t.Fatalf("type = %q", values.Get("type"))
+		}
+		if got := values.Get("query"); got != "Example Show S02{tvdbid:123}{tmdbid:456}{season:2}" {
+			t.Fatalf("query = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `[]`)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.WebsearchEngines = nil
+	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
+	series := &SeriesConfig{Name: "Example Show", TvdbID: "123", TmdbID: "456", Enabled: true}
+	if releases := NewEngine().SearchSeriesSeason(context.Background(), &cfg, series, 2, false); len(releases) != 0 {
+		t.Fatalf("releases = %+v, want none", releases)
+	}
+}
+
+func TestMovieSearchUsesMovieTypeAndTMDBID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		values := r.URL.Query()
+		if values.Get("type") != searchTypeMovie {
+			t.Fatalf("type = %q", values.Get("type"))
+		}
+		if got := values.Get("query"); got != "Example Film 2026{tmdbid:987}" {
+			t.Fatalf("query = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `[]`)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.WebsearchEngines = nil
+	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
+	movie := &MovieConfig{Name: "Example Film", Year: "2026", TmdbID: "987", Enabled: true}
+	if releases := NewEngine().SearchMovie(context.Background(), &cfg, movie, false, false); len(releases) != 0 {
+		t.Fatalf("releases = %+v, want none", releases)
+	}
+}
+
 func TestProwlarrIndexerHealth(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

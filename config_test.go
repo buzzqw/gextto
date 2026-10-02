@@ -408,6 +408,15 @@ func TestManualMovieMatchingToleratesPunctuationAndMissingYear(t *testing.T) {
 	}
 }
 
+func TestProwlarrTMDBIDMatchesMovieWithoutReleaseYear(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Movies = []MovieConfig{{Name: "Example Film", Year: "2026", TmdbID: "987", Enabled: true}}
+	release := &models.Release{Title: "Example Film 1080p WEB-DL", Kind: "movie", TmdbID: "987"}
+	if got := cfg.FindMovieMatchForRelease(release, false); got == nil || got.Name != "Example Film" {
+		t.Fatalf("Prowlarr TMDB release match = %#v", got)
+	}
+}
+
 func TestQualityRulesSupportRangesAndMultiLanguageRequirements(t *testing.T) {
 	quality := models.Quality{
 		Resolution: "1080p",

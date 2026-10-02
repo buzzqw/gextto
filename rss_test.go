@@ -270,6 +270,28 @@ func TestOnlyCloudflareStatusesTriggerFlareSolverr(t *testing.T) {
 	}
 }
 
+func TestRSSRateLimitDoesNotFallbackToFlareSolverr(t *testing.T) {
+	resetCloudflareMemoryForTest(t)
+	var flareCalls int
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer target.Close()
+	flare := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flareCalls++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer flare.Close()
+
+	_, err := fetch_body(context.Background(), target.Client(), target.URL, &flare.URL)
+	if err == nil || !strings.Contains(err.Error(), "HTTP 429") {
+		t.Fatalf("fetch error = %v, want HTTP 429", err)
+	}
+	if flareCalls != 0 {
+		t.Fatalf("FlareSolverr calls = %d, want 0 for a rate limit", flareCalls)
+	}
+}
+
 func TestHostLimiterIsSharedPerDomain(t *testing.T) {
 	a := host_semaphore("https://torrentgalaxy.one/get-posts/user:X/")
 	b := host_semaphore("https://torrentgalaxy.one/post-detail/1/")

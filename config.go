@@ -1406,6 +1406,28 @@ func (c *Config) FindMovieMatchManual(title string, year *int64) *MovieConfig {
 	return nil
 }
 
+// FindMovieMatchForRelease resolves a monitored movie from a collected
+// release. Prowlarr supplies TmdbID in its native JSON response; use that
+// authoritative identifier before the title/year fallback, because release
+// titles frequently omit the theatrical year.
+func (c *Config) FindMovieMatchForRelease(release *models.Release, manual bool) *MovieConfig {
+	if release == nil {
+		return nil
+	}
+	if tmdbID := strings.TrimSpace(release.TmdbID); tmdbID != "" {
+		for index := range c.Movies {
+			movie := &c.Movies[index]
+			if movie.Enabled && strings.TrimSpace(movie.TmdbID) == tmdbID {
+				return movie
+			}
+		}
+	}
+	if manual {
+		return c.FindMovieMatchManual(release.Title, release.Year)
+	}
+	return c.FindMovieMatch(release.Title, release.Year)
+}
+
 // absInt64 returns the absolute value of value.
 func absInt64(value int64) int64 {
 	if value < 0 {
@@ -1666,7 +1688,7 @@ func (c *Config) ReleaseIsMonitored(release *models.Release) bool {
 		}
 		return c.FindSeriesMatch(*release.Series, release.Season) != nil
 	case "movie":
-		return c.FindMovieMatch(release.Title, release.Year) != nil
+		return c.FindMovieMatchForRelease(release, false) != nil
 	default:
 		return false
 	}
@@ -1696,7 +1718,7 @@ func (c *Config) QualityScore(quality *models.Quality) int64 {
 func (c *Config) ReleaseScore(release *models.Release) int64 {
 	var movie *MovieConfig
 	if release.Kind == "movie" {
-		movie = c.FindMovieMatch(release.Title, release.Year)
+		movie = c.FindMovieMatchForRelease(release, false)
 	}
 	score := c.releaseScoreWithMovie(release, movie)
 	if movie == nil && release.Series != nil {

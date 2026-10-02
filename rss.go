@@ -3,6 +3,8 @@ package gextto
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -646,41 +648,86 @@ const fsSessionTTL = 5 * time.Minute
 
 type fsSessionEntry struct {
 	id       string
+	endpoint string
+	domain   string
 	lastUsed time.Time
 }
 
 var (
-	fsSessionMu       sync.Mutex
-	fsSessionByDomain = map[string]fsSessionEntry{}
-	fsSessionDisabled = map[string]bool{}
+	fsSessionMu          sync.Mutex
+	fsSessionByDomain    = map[string]fsSessionEntry{}
+	fsSessionDisabled    = map[string]bool{}
+	fsSessionCreateMu    sync.Mutex
+	fsSessionCreateLocks = map[string]*sync.Mutex{}
 )
+
+const fsSessionPrefix = "gextto-"
+
+// flareSolverrSessionKey scopes a browser session to both its FlareSolverr
+// instance and target domain. A session id created by one instance is not valid
+// on another instance after the configured endpoint changes.
+func flareSolverrSessionKey(endpoint, rawURL string) (string, string) {
+	domain := strings.ToLower(domain_of(rawURL))
+	if domain == "" {
+		return "", ""
+	}
+	return strings.TrimRight(endpoint, "/") + "\x00" + domain, domain
+}
+
+// flareSolverrCreationLock serializes session creation only for one target
+// endpoint/domain pair. Without this, simultaneous detail-page requests can
+// create several browsers and retain just the last id in the map.
+func flareSolverrCreationLock(key string) *sync.Mutex {
+	fsSessionCreateMu.Lock()
+	defer fsSessionCreateMu.Unlock()
+	lock := fsSessionCreateLocks[key]
+	if lock == nil {
+		lock = &sync.Mutex{}
+		fsSessionCreateLocks[key] = lock
+	}
+	return lock
+}
+
+func newFlareSolverrSessionID() string {
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err == nil {
+		return fsSessionPrefix + hex.EncodeToString(random[:])
+	}
+	// crypto/rand failures are exceptionally rare. Keep the ownership prefix in
+	// the fallback too, so reconciliation never touches another client's session.
+	return fmt.Sprintf("%s%d", fsSessionPrefix, time.Now().UnixNano())
+}
 
 // acquireFlareSolverrSession returns a reusable session id for the URL's domain,
 // or "" when sessions are unavailable (the caller then runs statelessly).
 func acquireFlareSolverrSession(ctx context.Context, client *http.Client, endpoint, rawURL string) string {
-	domain := domain_of(rawURL)
-	if domain == "" {
+	key, domain := flareSolverrSessionKey(endpoint, rawURL)
+	if key == "" {
 		return ""
 	}
+	creationLock := flareSolverrCreationLock(key)
+	creationLock.Lock()
+	defer creationLock.Unlock()
 	fsSessionMu.Lock()
 	if fsSessionDisabled[endpoint] {
 		fsSessionMu.Unlock()
 		return ""
 	}
-	entry, ok := fsSessionByDomain[domain]
+	entry, ok := fsSessionByDomain[key]
 	if ok && entry.id != "" {
 		if time.Since(entry.lastUsed) < fsSessionTTL {
 			fsSessionMu.Unlock()
 			return entry.id
 		}
-		delete(fsSessionByDomain, domain)
+		delete(fsSessionByDomain, key)
 		fsSessionMu.Unlock()
 		_ = destroyFlareSolverrSession(ctx, client, endpoint, entry.id)
 	} else {
 		fsSessionMu.Unlock()
 	}
 	var out fsSolution
-	if err := fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.create"}, &out); err != nil {
+	requestedID := newFlareSolverrSessionID()
+	if err := fsAPI(ctx, client, endpoint, map[string]any{"cmd": "sessions.create", "session": requestedID}, &out); err != nil {
 		fsSessionMu.Lock()
 		fsSessionDisabled[endpoint] = true
 		fsSessionMu.Unlock()
@@ -694,38 +741,38 @@ func acquireFlareSolverrSession(ctx context.Context, client *http.Client, endpoi
 		return ""
 	}
 	fsSessionMu.Lock()
-	fsSessionByDomain[domain] = fsSessionEntry{id: id, lastUsed: time.Now()}
+	fsSessionByDomain[key] = fsSessionEntry{id: id, endpoint: endpoint, domain: domain, lastUsed: time.Now()}
 	fsSessionMu.Unlock()
 	return id
 }
 
 // touchFlareSolverrSession refreshes the reuse window of a domain's session.
-func touchFlareSolverrSession(rawURL string) {
-	domain := domain_of(rawURL)
-	if domain == "" {
+func touchFlareSolverrSession(endpoint, rawURL string) {
+	key, _ := flareSolverrSessionKey(endpoint, rawURL)
+	if key == "" {
 		return
 	}
 	fsSessionMu.Lock()
-	if entry, ok := fsSessionByDomain[domain]; ok {
+	if entry, ok := fsSessionByDomain[key]; ok {
 		entry.lastUsed = time.Now()
-		fsSessionByDomain[domain] = entry
+		fsSessionByDomain[key] = entry
 	}
 	fsSessionMu.Unlock()
 }
 
 // forgetFlareSolverrSession removes and returns a domain's session id.
-func forgetFlareSolverrSession(rawURL string) string {
-	domain := domain_of(rawURL)
-	if domain == "" {
+func forgetFlareSolverrSession(endpoint, rawURL string) string {
+	key, _ := flareSolverrSessionKey(endpoint, rawURL)
+	if key == "" {
 		return ""
 	}
 	fsSessionMu.Lock()
 	defer fsSessionMu.Unlock()
-	entry, ok := fsSessionByDomain[domain]
+	entry, ok := fsSessionByDomain[key]
 	if !ok {
 		return ""
 	}
-	delete(fsSessionByDomain, domain)
+	delete(fsSessionByDomain, key)
 	return entry.id
 }
 
@@ -747,7 +794,21 @@ func flareSolverrEndpointFromConfig(cfg *Config) string {
 	if raw == "" {
 		return ""
 	}
-	return strings.TrimRight(raw, "/") + "/v1"
+	return flareSolverrEndpoint(raw)
+}
+
+// flareSolverrEndpoint accepts either a service base URL or the API URL itself.
+// The settings UI documents the base URL, but accepting `/v1` avoids producing
+// an invalid `/v1/v1` endpoint for manually configured installations.
+func flareSolverrEndpoint(raw string) string {
+	endpoint := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if endpoint == "" {
+		return ""
+	}
+	if !strings.HasSuffix(strings.ToLower(endpoint), "/v1") {
+		return endpoint + "/v1"
+	}
+	return endpoint
 }
 
 // sweepStaleFlareSolverrSessions destroys every tracked session whose reuse
@@ -762,10 +823,10 @@ func sweepStaleFlareSolverrSessions(ctx context.Context, client *http.Client, en
 	type staleSession struct{ domain, id string }
 	pending := []staleSession{}
 	fsSessionMu.Lock()
-	for domain, entry := range fsSessionByDomain {
-		if entry.id != "" && now.Sub(entry.lastUsed) >= fsSessionTTL {
-			pending = append(pending, staleSession{domain: domain, id: entry.id})
-			delete(fsSessionByDomain, domain)
+	for key, entry := range fsSessionByDomain {
+		if entry.endpoint == endpoint && entry.id != "" && now.Sub(entry.lastUsed) >= fsSessionTTL {
+			pending = append(pending, staleSession{domain: entry.domain, id: entry.id})
+			delete(fsSessionByDomain, key)
 		}
 	}
 	fsSessionMu.Unlock()
@@ -799,7 +860,7 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 	fsSessionMu.Lock()
 	known := make(map[string]struct{}, len(fsSessionByDomain))
 	for _, entry := range fsSessionByDomain {
-		if entry.id != "" {
+		if entry.endpoint == endpoint && entry.id != "" {
 			known[entry.id] = struct{}{}
 		}
 	}
@@ -807,7 +868,7 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 	destroyed := 0
 	for _, id := range list.Sessions {
 		id = strings.TrimSpace(id)
-		if id == "" {
+		if id == "" || !strings.HasPrefix(id, fsSessionPrefix) {
 			continue
 		}
 		if _, ok := known[id]; ok {
@@ -828,7 +889,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 		return "", err
 	}
 	defer utils.ReleaseFlareSolverr()
-	endpoint := strings.TrimRight(flaresolverr, "/") + "/v1"
+	endpoint := flareSolverrEndpoint(flaresolverr)
 	session := acquireFlareSolverrSession(ctx, client, endpoint, rawURL)
 
 	fetch := func(useSession string) (string, error) {
@@ -864,7 +925,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 	if err != nil && session != "" {
 		// The session may have expired inside FlareSolverr; drop it and retry
 		// once stateless so a stale session never blocks a fetch.
-		if stale := forgetFlareSolverrSession(rawURL); stale != "" {
+		if stale := forgetFlareSolverrSession(endpoint, rawURL); stale != "" {
 			_ = destroyFlareSolverrSession(ctx, client, endpoint, stale)
 		}
 		body, err = fetch("")
@@ -872,7 +933,7 @@ func fetch_with_flaresolverr(ctx context.Context, client *http.Client, flaresolv
 	if err != nil {
 		return "", err
 	}
-	touchFlareSolverrSession(rawURL)
+	touchFlareSolverrSession(endpoint, rawURL)
 	return body, nil
 }
 
@@ -1092,10 +1153,6 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 				}
 			}
 		}
-	}
-	// Stream ostinato: ultima spiaggia FlareSolverr, se configurato.
-	if flaresolverr != nil && strings.TrimSpace(*flaresolverr) != "" && !flareTried {
-		return flaresolverr_or(ctx, client, *flaresolverr, rawURL, "direct attempts exhausted", false)
 	}
 	return "", fmt.Errorf("%s", lastTransient)
 }
@@ -1475,6 +1532,11 @@ func extract_magnet(body string) string {
 const (
 	ManagerProwlarr = "prowlarr"
 	ManagerJackett  = "jackett"
+
+	searchTypeAuto    = ""
+	searchTypeGeneric = "search"
+	searchTypeTV      = "tvsearch"
+	searchTypeMovie   = "movie"
 )
 
 // normalizeManagerKind maps user input to a known manager id, or "" otherwise.
@@ -1514,7 +1576,14 @@ func managerKind(indexer IndexerConfig) string {
 // Those managers handle Cloudflare themselves, so FlareSolverr must not be used
 // for them.
 func isManagerSource(indexer IndexerConfig) bool {
-	return managerKind(indexer) != ""
+	if explicitManagerKind(indexer) != "" {
+		return true
+	}
+	lowerURL := strings.ToLower(strings.TrimSpace(indexer.URL))
+	lowerName := strings.ToLower(strings.TrimSpace(indexer.Name))
+	return strings.Contains(lowerURL, "prowlarr") || strings.Contains(lowerURL, "jackett") ||
+		strings.Contains(lowerURL, ":9696") || strings.Contains(lowerURL, ":9117") ||
+		strings.Contains(lowerName, "prowlarr") || strings.Contains(lowerName, "jackett")
 }
 
 func torznab_endpoint(indexer IndexerConfig) string {
@@ -1550,6 +1619,56 @@ func jsonStringValue(value any) string {
 	return text
 }
 
+// jsonIdentifierValue converts the numeric IDs emitted by Prowlarr's JSON API
+// to their configuration representation without risking float rounding.
+func jsonIdentifierValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case json.Number:
+		return strings.TrimSpace(typed.String())
+	case float64:
+		if typed == math.Trunc(typed) {
+			return strconv.FormatInt(int64(typed), 10)
+		}
+	}
+	return ""
+}
+
+func prowlarrInfoHashMagnet(hash, title string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if !isHexString(hash) {
+		return ""
+	}
+	var magnet string
+	switch len(hash) {
+	case 40:
+		magnet = "magnet:?xt=urn:btih:" + hash
+	case 64:
+		magnet = "magnet:?xt=urn:btmh:1220" + hash
+	default:
+		return ""
+	}
+	return magnet + "&dn=" + url.QueryEscape(title)
+}
+
+func prowlarrPublishedAt(item map[string]any) time.Time {
+	if value := strings.TrimSpace(jsonStringValue(item["publishDate"])); value != "" {
+		if parsed, ok := parseRSSDate(value); ok {
+			return parsed
+		}
+	}
+	return time.Now().UTC()
+}
+
+func prowlarrDownloadURL(item map[string]any) *string {
+	value := strings.TrimSpace(jsonStringValue(item["downloadUrl"]))
+	if IsTorrentURL(value) {
+		return &value
+	}
+	return nil
+}
+
 func parseProwlarrItems(items []map[string]any, source string) []models.Release {
 	var out []models.Release
 	for _, item := range items {
@@ -1568,23 +1687,26 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 			}
 		}
 		if !strings.HasPrefix(magnet, "magnet:") {
-			// Rebuild the link from the infohash when the JSON omits the magnet
-			// (several indexers only expose it that way through Prowlarr).
-			if hash := strings.ToLower(strings.TrimSpace(jsonStringValue(item["infoHash"]))); (len(hash) == 40 || len(hash) == 64) && isHexString(hash) {
-				magnet = "magnet:?xt=urn:btih:" + hash + "&dn=" + url.QueryEscape(title)
-			}
-		}
-		if !strings.HasPrefix(magnet, "magnet:") {
-			continue
+			// Prowlarr can omit the magnet but retain its v1/v2 infohash.
+			magnet = prowlarrInfoHashMagnet(jsonStringValue(item["infoHash"]), title)
 		}
 		label := source
 		if indexer := jsonStringValue(item["indexer"]); indexer != "" {
 			label = "prowlarr:" + indexer
 		}
-		release := ParseRelease(title, magnet, label)
+		discoveredAt := prowlarrPublishedAt(item)
+		var release *models.Release
+		if strings.HasPrefix(magnet, "magnet:") {
+			release = ParseReleaseAt(title, magnet, label, discoveredAt)
+		} else if torrentURL := prowlarrDownloadURL(item); torrentURL != nil {
+			// Prowlarr's download proxy can return a torrent file when the indexer
+			// exposes no infohash. Preserve it for the normal torrent-file path.
+			release = ParseReleaseSource(title, "", torrentURL, label, discoveredAt)
+		}
 		if release == nil {
 			continue
 		}
+		release.TmdbID = jsonIdentifierValue(item["tmdbId"])
 		if size := jsonNumberInt(item["size"]); size != nil && *size > 0 {
 			// Drop samples/NFO fragments that are never the episode.
 			if *size < 50_000_000 {
@@ -1614,9 +1736,11 @@ func parseProwlarrItems(items []map[string]any, source string) []models.Release 
 }
 
 // resolveProwlarrMagnets fills in `magnetUrl` for items that only expose a
-// Prowlarr `downloadUrl`: following it without redirects returns a `magnet:`
+// Prowlarr proxy link: following it without redirects returns a `magnet:`
 // Location. Several indexers (e.g. LimeTorrents) expose no magnet nor infohash
-// otherwise, and would be silently dropped.
+// otherwise, and would be silently dropped. Resolution is intentionally bounded
+// both in count and concurrency, so a slow manager cannot consume a full title
+// search timeout.
 func resolveProwlarrMagnets(ctx context.Context, items []map[string]any) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -1624,36 +1748,69 @@ func resolveProwlarrMagnets(ctx context.Context, items []map[string]any) {
 			return http.ErrUseLastResponse
 		},
 	}
-	resolved := 0
+	type proxyCandidate struct {
+		item map[string]any
+		url  string
+	}
+	candidates := make([]proxyCandidate, 0, 12)
 	for _, item := range items {
-		if resolved >= 12 {
+		if len(candidates) >= 12 {
 			break
 		}
 		if strings.HasPrefix(jsonStringValue(item["magnetUrl"]), "magnet:") {
 			continue
 		}
-		if hash := strings.TrimSpace(jsonStringValue(item["infoHash"])); hash != "" {
+		if prowlarrInfoHashMagnet(jsonStringValue(item["infoHash"]), "") != "" {
 			continue
 		}
-		download := jsonStringValue(item["downloadUrl"])
-		if !strings.HasPrefix(download, "http") {
+		// Prowlarr turns both MagnetUrl and DownloadUrl into its HTTP proxy
+		// links. Try the magnet proxy first: it usually redirects to a magnet
+		// and avoids downloading a torrent file just to obtain its hash.
+		candidate := ""
+		for _, value := range []string{jsonStringValue(item["magnetUrl"]), jsonStringValue(item["downloadUrl"])} {
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "http://") ||
+				strings.HasPrefix(strings.ToLower(strings.TrimSpace(value)), "https://") {
+				candidate = value
+				break
+			}
+		}
+		if candidate == "" {
 			continue
 		}
-		resolved++
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, download, nil)
-		if err != nil {
-			continue
-		}
-		response, err := client.Do(request)
-		if err != nil {
-			continue
-		}
-		location := response.Header.Get("Location")
-		_ = response.Body.Close()
-		if strings.HasPrefix(location, "magnet:") {
-			item["magnetUrl"] = location
-		}
+		candidates = append(candidates, proxyCandidate{item: item, url: candidate})
 	}
+	workers := 3
+	if workers > len(candidates) {
+		workers = len(candidates)
+	}
+	jobs := make(chan proxyCandidate)
+	var workersWG sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		workersWG.Add(1)
+		go func() {
+			defer workersWG.Done()
+			for candidate := range jobs {
+				request, err := http.NewRequestWithContext(ctx, http.MethodGet, candidate.url, nil)
+				if err != nil {
+					continue
+				}
+				response, err := client.Do(request)
+				if err != nil {
+					continue
+				}
+				location := response.Header.Get("Location")
+				_ = response.Body.Close()
+				if strings.HasPrefix(location, "magnet:") {
+					candidate.item["magnetUrl"] = location
+				}
+			}
+		}()
+	}
+	for _, candidate := range candidates {
+		jobs <- candidate
+	}
+	close(jobs)
+	workersWG.Wait()
 }
 
 func parse_prowlarr_json(body, source string) ([]models.Release, error) {
@@ -1666,8 +1823,8 @@ func parse_prowlarr_json(body, source string) ([]models.Release, error) {
 	return parseProwlarrItems(items, source), nil
 }
 
-// parseProwlarrBody decodes a Prowlarr JSON reply, resolves the missing magnets
-// through the proxy download URLs, then parses the items.
+// parseProwlarrBody decodes a Prowlarr JSON reply, resolves missing magnets
+// through Prowlarr proxy URLs, then parses the items.
 func parseProwlarrBody(ctx context.Context, body, source string) ([]models.Release, error) {
 	decoder := json.NewDecoder(strings.NewReader(body))
 	decoder.UseNumber()
@@ -1689,6 +1846,25 @@ func isHexString(value string) bool {
 	return value != ""
 }
 
+// releaseDedupKey returns the stable key used when presenting or collecting a
+// release. Magnets deduplicate by infohash; direct torrent files have no hash
+// until downloaded, so their URL is retained as the temporary identity.
+func releaseDedupKey(release *models.Release) (string, bool) {
+	if release == nil {
+		return "", false
+	}
+	if hash, ok := utils.MagnetHash(release.Magnet); ok {
+		return hash, true
+	}
+	if release.TorrentURL != nil {
+		value := strings.TrimSpace(*release.TorrentURL)
+		if IsTorrentURL(value) {
+			return "url:" + value, true
+		}
+	}
+	return "", false
+}
+
 // episodeFromQuery extracts a season/episode pair from a search query such as
 // "Show S01E02" so Jackett can be queried with t=tvsearch.
 func episodeFromQuery(query string) (int64, int64, bool) {
@@ -1704,35 +1880,102 @@ func episodeFromQuery(query string) (int64, int64, bool) {
 	return season, episode, true
 }
 
+// seasonFromQuery extracts a season from either an episode query (`S01E02`) or
+// a season-pack query (`S01`). It lets manager APIs constrain the fallback
+// season search instead of relying only on the literal title text.
+func seasonFromQuery(query string) (int64, bool) {
+	if season, _, ok := episodeFromQuery(query); ok {
+		return season, true
+	}
+	match := utils.MustCachedRegex(`(?i)(?:^|[ ._-])s(\d{1,2})(?:$|[ ._-])`).FindStringSubmatch(query)
+	if match == nil {
+		return 0, false
+	}
+	season, err := strconv.ParseInt(match[1], 10, 64)
+	if err != nil || season <= 0 {
+		return 0, false
+	}
+	return season, true
+}
+
+// normalizeSearchType selects the explicit manager search type, retaining the
+// historical automatic episode detection for generic/manual callers.
+func normalizeSearchType(searchType, query string) string {
+	switch searchType {
+	case searchTypeTV, searchTypeMovie, searchTypeGeneric:
+		return searchType
+	default:
+		if _, _, ok := episodeFromQuery(query); ok {
+			return searchTypeTV
+		}
+		return searchTypeGeneric
+	}
+}
+
+func prowlarrQuery(query, searchType string, externalIDs [][2]string) string {
+	if searchType != searchTypeTV && searchType != searchTypeMovie {
+		return query
+	}
+	var tokens []string
+	for _, pair := range externalIDs {
+		key := strings.ToLower(strings.TrimSpace(pair[0]))
+		value := strings.TrimSpace(pair[1])
+		if value == "" {
+			continue
+		}
+		switch {
+		case searchType == searchTypeTV && (key == "imdbid" || key == "tvdbid" || key == "tmdbid" || key == "tvmazeid"):
+			tokens = append(tokens, "{"+key+":"+value+"}")
+		case searchType == searchTypeMovie && (key == "imdbid" || key == "tmdbid" || key == "traktid"):
+			tokens = append(tokens, "{"+key+":"+value+"}")
+		}
+	}
+	if searchType == searchTypeTV {
+		if season, ok := seasonFromQuery(query); ok {
+			tokens = append(tokens, fmt.Sprintf("{season:%d}", season))
+			if _, episode, hasEpisode := episodeFromQuery(query); hasEpisode {
+				tokens = append(tokens, fmt.Sprintf("{episode:%d}", episode))
+			}
+		}
+	}
+	return query + strings.Join(tokens, "")
+}
+
 // torznabRequestURL builds the full Torznab/Prowlarr request URL, including the
 // API key. Extracted so it can be tested without networking.
 func torznabRequestURL(indexer IndexerConfig, query string, externalIDs [][2]string) string {
+	return torznabRequestURLForType(indexer, query, externalIDs, searchTypeAuto)
+}
+
+func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [][2]string, requestedType string) string {
 	endpoint := torznab_endpoint(indexer)
 	isProwlarrJSON := strings.HasSuffix(endpoint, "/api/v1/search")
+	searchType := normalizeSearchType(requestedType, query)
 	var pairs []string
 	appendPair := func(key, value string) {
 		pairs = append(pairs, url.QueryEscape(key)+"="+url.QueryEscape(value))
 	}
 	if isProwlarrJSON {
-		appendPair("query", query)
-		appendPair("type", "search")
+		appendPair("query", prowlarrQuery(query, searchType, externalIDs))
+		appendPair("type", searchType)
 		// Ask for a full page; the default is much smaller.
 		appendPair("limit", "100")
 	} else {
-		// Jackett/Caps: a real tvsearch filters by season/episode server-side
-		// and returns more relevant releases than a plain free-text search.
-		if season, episode, ok := episodeFromQuery(query); ok {
-			appendPair("t", "tvsearch")
-			appendPair("season", strconv.FormatInt(season, 10))
-			appendPair("ep", strconv.FormatInt(episode, 10))
-		} else {
-			appendPair("t", "search")
+		appendPair("t", searchType)
+		// Jackett accepts Torznab's structured TV/movie parameters directly.
+		if searchType == searchTypeTV {
+			if season, ok := seasonFromQuery(query); ok {
+				appendPair("season", strconv.FormatInt(season, 10))
+				if _, episode, hasEpisode := episodeFromQuery(query); hasEpisode {
+					appendPair("ep", strconv.FormatInt(episode, 10))
+				}
+			}
 		}
 		appendPair("q", query)
 		appendPair("extended", "1")
 		appendPair("limit", "100")
 		for _, pair := range externalIDs {
-			if strings.TrimSpace(pair[1]) != "" {
+			if strings.TrimSpace(pair[0]) != "" && strings.TrimSpace(pair[1]) != "" {
 				appendPair(pair[0], pair[1])
 			}
 		}
@@ -1762,13 +2005,17 @@ func FetchTorznabWith(ctx context.Context, indexer IndexerConfig, query string, 
 // FetchTorznabFlareSolverr runs a Torznab search with an optional FlareSolverr
 // fallback when the indexer blocks the request (Cloudflare / 403).
 func FetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query string, externalIDs [][2]string, flaresolverr *string) ([]models.Release, error) {
+	return fetchTorznabFlareSolverr(ctx, indexer, query, externalIDs, flaresolverr, searchTypeAuto)
+}
+
+func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query string, externalIDs [][2]string, flaresolverr *string, searchType string) ([]models.Release, error) {
 	// Jackett and Prowlarr handle Cloudflare inside the manager: routing their
 	// (usually local) endpoint through FlareSolverr only wastes 20-30s and hides
 	// the real auth/network error.
 	if isManagerSource(indexer) {
 		flaresolverr = nil
 	}
-	fullURL := torznabRequestURL(indexer, query, externalIDs)
+	fullURL := torznabRequestURLForType(indexer, query, externalIDs, searchType)
 	headers := map[string]string{}
 	if session, ok := session_for(fullURL); ok {
 		if session.userAgent != "" {

@@ -35,6 +35,20 @@ type Engine struct {
 	db     *Database
 }
 
+func seriesExternalIDs(series *SeriesConfig) [][2]string {
+	if series == nil {
+		return nil
+	}
+	ids := make([][2]string, 0, 2)
+	if value := strings.TrimSpace(series.TvdbID); value != "" {
+		ids = append(ids, [2]string{"tvdbid", value})
+	}
+	if value := strings.TrimSpace(series.TmdbID); value != "" {
+		ids = append(ids, [2]string{"tmdbid", value})
+	}
+	return ids
+}
+
 // Concurrency and timeout budgets, copied verbatim .
 const (
 	queryConcurrency    = 2
@@ -142,6 +156,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	type searchTarget struct {
 		Query string
 		IDs   [][2]string
+		Type  string
 	}
 	var targets []searchTarget
 	seenTargets := map[string]struct{}{}
@@ -151,13 +166,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		}
 		// Pass the real external ids to Torznab: `tvdbid` with the TVDB id and
 		// `tmdbid` with the TMDB id.
-		var ids [][2]string
-		if strings.TrimSpace(series.TvdbID) != "" {
-			ids = append(ids, [2]string{"tvdbid", strings.TrimSpace(series.TvdbID)})
-		}
-		if strings.TrimSpace(series.TmdbID) != "" {
-			ids = append(ids, [2]string{"tmdbid", strings.TrimSpace(series.TmdbID)})
-		}
+		ids := seriesExternalIDs(&series)
 		queries := append([]string{series.Name}, series.Aliases...)
 		for _, query := range queries {
 			query = strings.TrimSpace(query)
@@ -169,7 +178,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 				continue
 			}
 			seenTargets[key] = struct{}{}
-			targets = append(targets, searchTarget{Query: query, IDs: ids})
+			targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeTV})
 		}
 	}
 	for _, movie := range cfg.Movies {
@@ -180,7 +189,11 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		key := strings.ToLower(query)
 		if _, exists := seenTargets[key]; !exists {
 			seenTargets[key] = struct{}{}
-			targets = append(targets, searchTarget{Query: query})
+			ids := [][2]string{}
+			if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
+				ids = append(ids, [2]string{"tmdbid", tmdbID})
+			}
+			targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeMovie})
 		}
 	}
 	targetsTotal := len(targets)
@@ -228,13 +241,13 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	for i, target := range targets {
 		searchWG.Add(1)
 		searchSem <- struct{}{}
-		go func(index int, query string, ids [][2]string) {
+		go func(index int, query string, ids [][2]string, searchType string) {
 			defer searchWG.Done()
 			defer func() { <-searchSem }()
 			defer searchesCompleted.Add(1)
 			started := time.Now()
 			searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
-			items := searchOneWithDB(searchCtx, cfg, query, ids, nil, e.db, false)
+			items := searchOneWithDBType(searchCtx, cfg, query, ids, nil, e.db, false, searchType)
 			timedOut := errors.Is(searchCtx.Err(), context.DeadlineExceeded)
 			cancel()
 			if timedOut {
@@ -248,7 +261,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 				"elapsed_ms", time.Since(started).Milliseconds(),
 				"results", len(items))
 			results[index] = searchResult{Query: query, Items: items}
-		}(i, target.Query, target.IDs)
+		}(i, target.Query, target.IDs, target.Type)
 	}
 	searchWG.Wait()
 	close(timeoutQueries)
@@ -367,12 +380,8 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		// A feed with only a `.torrent` link (e.g. TorrentLeech) has no magnet:
 		// do not drop it here, the infohash is resolved in the cycle. In that
 		// case deduplicate by URL.
-		var dedupKey string
-		if hash, ok := utils.MagnetHash(release.Magnet); ok {
-			dedupKey = hash
-		} else if release.TorrentURL != nil {
-			dedupKey = "url:" + *release.TorrentURL
-		} else {
+		dedupKey, ok := releaseDedupKey(&release)
+		if !ok {
 			logging.Debug("filter skipped",
 				"title", release.Title,
 				"source", release.Source,
@@ -494,6 +503,60 @@ func (e *Engine) SearchQueryIDs(ctx context.Context, cfg *Config, query string, 
 	return searchOneWithDB(ctx, cfg, query, externalIDs, nil, e.db, false)
 }
 
+// SearchSeriesEpisode searches one known episode using its structured TV
+// identity. It is used by gap filling and episode-level manual searches: a
+// broad title search can miss older episodes even when the indexer supports an
+// exact season/episode request.
+func (e *Engine) SearchSeriesEpisode(ctx context.Context, cfg *Config, series *SeriesConfig, season, episode int64, manual bool) []models.Release {
+	if series == nil || season < 1 || episode < 1 {
+		return nil
+	}
+	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
+	var webTimeout *time.Duration
+	if manual {
+		timeout := manualSearchTimeout
+		webTimeout = &timeout
+	}
+	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV)
+}
+
+// SearchSeriesSeason is the broader fallback for a known episode gap. It can
+// discover partial and complete season packs that an episode-specific indexer
+// query does not return. Callers must still verify that each result covers the
+// target episode before accepting it.
+func (e *Engine) SearchSeriesSeason(ctx context.Context, cfg *Config, series *SeriesConfig, season int64, manual bool) []models.Release {
+	if series == nil || season < 1 {
+		return nil
+	}
+	query := fmt.Sprintf("%s S%02d", series.Name, season)
+	var webTimeout *time.Duration
+	if manual {
+		timeout := manualSearchTimeout
+		webTimeout = &timeout
+	}
+	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV)
+}
+
+// SearchMovie searches one configured movie using its movie mode and TMDB id
+// where available. `includeRejected` is reserved for the manual movie view,
+// which applies its own per-movie filters before displaying results.
+func (e *Engine) SearchMovie(ctx context.Context, cfg *Config, movie *MovieConfig, manual, includeRejected bool) []models.Release {
+	if movie == nil || !movie.Enabled {
+		return nil
+	}
+	query := strings.TrimSpace(movie.Name + " " + movie.Year)
+	ids := make([][2]string, 0, 1)
+	if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
+		ids = append(ids, [2]string{"tmdbid", tmdbID})
+	}
+	var webTimeout *time.Duration
+	if manual {
+		timeout := manualSearchTimeout
+		webTimeout = &timeout
+	}
+	return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie)
+}
+
 // searchOneWithDB runs the indexer and web fan-outs concurrently, then applies
 // the global filters (unless `includeRejected`) and deduplicates by infohash.
 func searchOneWithDB(
@@ -504,6 +567,19 @@ func searchOneWithDB(
 	webTimeout *time.Duration,
 	providerDB *Database,
 	includeRejected bool,
+) []models.Release {
+	return searchOneWithDBType(ctx, cfg, query, externalIDs, webTimeout, providerDB, includeRejected, searchTypeAuto)
+}
+
+func searchOneWithDBType(
+	ctx context.Context,
+	cfg *Config,
+	query string,
+	externalIDs [][2]string,
+	webTimeout *time.Duration,
+	providerDB *Database,
+	includeRejected bool,
+	searchType string,
 ) []models.Release {
 	if cfg != nil {
 		ConfigureCloudflareState(cfg.DataDir)
@@ -555,7 +631,7 @@ func searchOneWithDB(
 				}
 				logging.Debug("indexer search started", "indexer", indexer.Name, "query", query)
 				requestCtx, cancel := context.WithTimeout(ctx, indexerRequestTimeout)
-				items, err := FetchTorznabFlareSolverr(requestCtx, indexer, query, externalIDs, cfg.FlaresolverrURL)
+				items, err := fetchTorznabFlareSolverr(requestCtx, indexer, query, externalIDs, cfg.FlaresolverrURL, searchType)
 				cancel()
 				indexerResults[index] = indexerResult{Name: indexer.Name, Query: query, Items: items, Err: err}
 			}
@@ -631,11 +707,13 @@ func searchOneWithDB(
 				continue
 			}
 		}
-		if hash, ok := utils.MagnetHash(release.Magnet); ok {
-			if _, duplicate := seen[hash]; !duplicate {
-				seen[hash] = struct{}{}
-				kept = append(kept, release)
-			}
+		dedupKey, ok := releaseDedupKey(&release)
+		if !ok {
+			continue
+		}
+		if _, duplicate := seen[dedupKey]; !duplicate {
+			seen[dedupKey] = struct{}{}
+			kept = append(kept, release)
 		}
 	}
 	return kept

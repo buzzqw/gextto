@@ -1030,11 +1030,8 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusNotFound, "movie not found")
 		return
 	}
-	query := movie.Name
-	if strings.TrimSpace(movie.Year) != "" {
-		query = fmt.Sprintf("%s %s", movie.Name, movie.Year)
-	}
-	results := s.engine.SearchQueryManualAll(r.Context(), cfg, query)
+	query := strings.TrimSpace(movie.Name + " " + movie.Year)
+	results := s.engine.SearchMovie(r.Context(), cfg, movie, true, true)
 	entries, _ := s.archive.Search(query)
 	for _, entry := range entries {
 		release := ParseRelease(entry[0], entry[1], "archive:"+entry[2])
@@ -1049,11 +1046,11 @@ func MovieSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if release.Kind != "movie" {
 			continue
 		}
-		matched := cfg.FindMovieMatchManual(release.Title, release.Year)
+		matched := cfg.FindMovieMatchForRelease(release, true)
 		if matched == nil || matched.ID != movie.ID || !cfg.MovieReleaseAllowedForTitle(movie, &release.Quality, release.Title) {
 			continue
 		}
-		hash, ok := utils.MagnetHash(release.Magnet)
+		hash, ok := releaseDedupKey(release)
 		if !ok {
 			continue
 		}

@@ -717,6 +717,14 @@ func IsTorrentURL(value string) bool {
 			return true
 		}
 	}
+	// Prowlarr wraps direct torrent downloads in a manager-local proxy URL such
+	// as `/12/download?apikey=...&link=...`. The response is still a torrent
+	// file, even though its path has no `.torrent` suffix.
+	if strings.HasSuffix(path, "/download") {
+		if _, ok := parsed.Query()["link"]; ok {
+			return true
+		}
+	}
 	return false
 }
 
