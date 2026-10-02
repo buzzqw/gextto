@@ -513,9 +513,46 @@ func coreTailLines(path string, limit int) []string {
 	return lines[skip:]
 }
 
+// coreLogBaseName is the base name of the daemon log. The rotating writer keeps
+// the current file plus numbered backups (`gextto.log.1`, `gextto.log.2`, ...).
+const coreLogBaseName = "gextto.log"
+
+// coreLogFiles lists the daemon log files that actually exist, in reading order:
+// the current file first, then the rotated backups from newest to oldest.
+func coreLogFiles(dir string) []string {
+	// The current file is always offered, even before it is created, so the
+	// selector is never empty and the default is the log currently in use.
+	files := []string{coreLogBaseName}
+	for index := 1; index <= 99; index++ {
+		name := fmt.Sprintf("%s.%d", coreLogBaseName, index)
+		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() {
+			files = append(files, name)
+		}
+	}
+	return files
+}
+
+// coreResolveLog selects a log file by name, refusing anything outside the known
+// set so the query parameter can never escape the data directory. An empty or
+// unknown name falls back to the current log.
+func coreResolveLog(dir, name string) (string, string) {
+	available := coreLogFiles(dir)
+	if name != "" {
+		for _, candidate := range available {
+			if candidate == name {
+				return filepath.Join(dir, candidate), candidate
+			}
+		}
+	}
+	if len(available) > 0 {
+		return filepath.Join(dir, available[0]), available[0]
+	}
+	return filepath.Join(dir, coreLogBaseName), coreLogBaseName
+}
+
 // Logs returns the tail of the daemon log.
 func Logs(w http.ResponseWriter, r *http.Request, s *AppState) {
-	limit := int(queryInt(r, "limit", 200))
+	limit := queryIntVal(r, "limit", 200)
 	if limit < 1 {
 		limit = 1
 	}

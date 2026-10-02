@@ -598,6 +598,19 @@ func queryInt(r *http.Request, key string, def int64) int64 {
 	return value
 }
 
+// queryIntVal parses an integer query parameter directly into an int.
+func queryIntVal(r *http.Request, key string, def int) int {
+	raw := strings.TrimSpace(r.URL.Query().Get(key))
+	if raw == "" {
+		return def
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return def
+	}
+	return value
+}
+
 // decodeJSON decodes the request body into target.
 func decodeJSON(r *http.Request, target any) error {
 	return json.NewDecoder(r.Body).Decode(target)

@@ -29,7 +29,6 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -485,7 +484,7 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_health", v2HealthViewFrom(s, r)
 	case "logs":
 		linesNum, _ := strconv.Atoi(r.FormValue("lines"))
-		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum)
+		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"))
 	case "manual":
 		return "v2_manual", uiManualDataFrom(s)
 	case "license":
@@ -1301,12 +1300,18 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 		for index, file := range files {
 			priorities[index] = int32(file.Priority)
 		}
-		index := int(v2ParseInt(r.FormValue("index"), -1))
-		if index < 0 || index >= len(priorities) {
+		parsedIndex, err := strconv.Atoi(strings.TrimSpace(r.FormValue("index")))
+		if err != nil || parsedIndex < 0 || parsedIndex >= len(priorities) {
 			http.Error(w, "indice file non valido", http.StatusBadRequest)
 			return
 		}
-		priorities[index] = int32(v2ParseInt(r.FormValue("priority"), 0))
+		p := v2ParseInt32(r.FormValue("priority"), 0)
+		if p < 0 {
+			p = 0
+		} else if p > 7 {
+			p = 7
+		}
+		priorities[parsedIndex] = p
 		body, _ = json.Marshal(FilePrioritiesInput{Priorities: priorities})
 	default:
 		http.Error(w, "azione dettaglio non valida", http.StatusBadRequest)
@@ -1326,6 +1331,28 @@ func V2DownloadsDetailAction(w http.ResponseWriter, r *http.Request, s *AppState
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_detail_panel", v2DetailViewFrom(s, hash, tab), dict, eng)
+}
+
+func v2ParseInt32(value string, fallback int32) int32 {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 32)
+	if err != nil {
+		return fallback
+	}
+	return int32(parsed)
+}
+
+// safeV2Redirect validates that a redirect target is a safe relative path
+// within the /v2 tree, guarding against open-redirect attacks.
+func safeV2Redirect(raw, fallback string) string {
+	cleaned := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
+	if !strings.HasPrefix(cleaned, "/v2") {
+		return fallback
+	}
+	parsed, err := url.Parse(cleaned)
+	if err != nil || parsed.Hostname() != "" || parsed.Scheme != "" {
+		return fallback
+	}
+	return cleaned
 }
 
 func v2ParseInt(value string, fallback int64) int64 {
@@ -1608,6 +1635,10 @@ type v2LogsView struct {
 	Count    int
 	Filter   string
 	LinesNum int
+	// Log is the selected log file name; LogFiles lists the files available in
+	// the data directory (current first, then rotated backups).
+	Log      string
+	LogFiles []string
 }
 
 var v2LogHighlight = []struct {
@@ -1632,12 +1663,18 @@ func v2HighlightLogLine(line string) template.HTML {
 	return template.HTML(escaped)
 }
 
-func v2LogsViewFrom(s *AppState, filter string, linesNum int) v2LogsView {
+func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string) v2LogsView {
 	if linesNum <= 0 || linesNum > 5000 {
 		linesNum = 500
 	}
-	raw := coreTailLines(filepath.Join(s.cfg.DataDir, "gextto.log"), linesNum)
-	view := v2LogsView{Filter: filter, LinesNum: linesNum}
+	path, selected := coreResolveLog(s.cfg.DataDir, logName)
+	raw := coreTailLines(path, linesNum)
+	view := v2LogsView{
+		Filter:   filter,
+		LinesNum: linesNum,
+		Log:      selected,
+		LogFiles: coreLogFiles(s.cfg.DataDir),
+	}
 	needle := strings.ToLower(filter)
 	for _, line := range raw {
 		if needle != "" && !strings.Contains(strings.ToLower(line), needle) {
@@ -1653,7 +1690,7 @@ func v2LogsViewFrom(s *AppState, filter string, linesNum int) v2LogsView {
 // also updates the line count out of band, since only the <pre> is swapped.
 func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	linesNum, _ := strconv.Atoi(r.FormValue("lines"))
-	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum)
+	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"))
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_logs_view", view); err != nil {

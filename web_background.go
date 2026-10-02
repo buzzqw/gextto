@@ -1393,9 +1393,9 @@ func housekeepingWorker(state *AppState) {
 				)
 			}
 		}
-		hours := uint64(24)
+		hours := int64(24)
 		if value, ok := cfg.Settings["housekeeping_interval_hours"]; ok {
-			if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64); err == nil {
+			if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
 				hours = parsed
 			}
 		}

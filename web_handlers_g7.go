@@ -702,8 +702,16 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if term == "" {
 		term = queryParam(r, "query")
 	}
-	page := int(queryInt(r, "page", 1))
-	limit := int(queryInt(r, "limit", 100))
+	page := queryIntVal(r, "page", 1)
+	if page < 1 {
+		page = 1
+	}
+	limit := queryIntVal(r, "limit", 100)
+	if limit < 1 {
+		limit = 1
+	} else if limit > 1000 {
+		limit = 1000
+	}
 	result, err := s.archive.BrowsePage(term, page, limit)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -767,3 +768,63 @@ func TestV2MaintenanceTrashActionAndFlash(t *testing.T) {
 		t.Fatalf("action redirect missing toast: %q", redirect)
 	}
 }
+
+// TestV2LogsSelectorReadsChosenFile checks the Log page offers the available
+// gextto log files (current first) and reads the one the user selects.
+func TestV2LogsSelectorReadsChosenFile(t *testing.T) {
+	state := newTestAppState(t)
+	dir := state.cfg.DataDir
+	if err := os.WriteFile(filepath.Join(dir, "gextto.log"), []byte("CURRENT-MARKER\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gextto.log.1"), []byte("BACKUP-MARKER\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/v2?view=logs", nil)
+	if code != http.StatusOK {
+		t.Fatalf("logs page -> %d", code)
+	}
+	for _, want := range []string{
+		`name="log"`,
+		`value="gextto.log" selected`,
+		`gextto.log (attivo)`,
+		`value="gextto.log.1"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("logs page missing %q", want)
+		}
+	}
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2/partial/logs?log=gextto.log.1", nil)
+	if code != http.StatusOK || !strings.Contains(body, "BACKUP-MARKER") || strings.Contains(body, "CURRENT-MARKER") {
+		t.Fatalf("partial did not read the selected backup -> %d: %s", code, body)
+	}
+}
+
+func TestSafeV2Redirect(t *testing.T) {
+	fallback := "/v2?view=settings"
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"/v2", "/v2"},
+		{"/v2/settings?tab=advanced", "/v2/settings?tab=advanced"},
+		{"https://evil.com/v2", fallback},
+		{"//evil.com", fallback},
+		{"/\\evil.com", fallback},
+		{"/v2/..//evil.com", "/v2/..//evil.com"},
+		{"javascript:alert(1)", fallback},
+		{"", fallback},
+		{"/?view=search", fallback},
+	}
+	for _, tc := range tests {
+		got := safeV2Redirect(tc.input, fallback)
+		if got != tc.want {
+			t.Errorf("safeV2Redirect(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+

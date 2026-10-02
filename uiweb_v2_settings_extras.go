@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"sort"
@@ -278,8 +279,11 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	body := v2TranslateHTML(buffer.String(), dict, eng)
+	safeKey := html.EscapeString(key)
+	safeView := html.EscapeString(url.QueryEscape(r.FormValue("view")))
+	safeTab := html.EscapeString(url.QueryEscape(r.FormValue("tab")))
 	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/v2/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend">Aggiungi riga</button>`,
-		key, key, index+1, url.QueryEscape(r.FormValue("view")), url.QueryEscape(r.FormValue("tab")), key)
+		safeKey, url.QueryEscape(key), index+1, safeView, safeTab, safeKey)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body + addButton))
@@ -363,7 +367,7 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(editor.PostPath, "/api/") {
 		v2InternalJSON(s, http.MethodPost, editor.PostPath, nil, body)
 	}
-	if redirect := strings.TrimSpace(r.FormValue("redirect")); strings.HasPrefix(redirect, "/v2") {
+	if redirect := safeV2Redirect(r.FormValue("redirect"), ""); redirect != "" {
 		if r.Header.Get("HX-Request") == "" {
 			http.Redirect(w, r, redirect, http.StatusSeeOther)
 			return

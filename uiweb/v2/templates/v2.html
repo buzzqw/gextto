@@ -835,6 +835,9 @@
          </select>
          <button class="btn sm primary" type="button" data-v2-logs-follow title="Ferma o riattiva lo scorrimento automatico del log">⏸ Ferma scorrimento</button>
           <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+         <select class="input compact" name="log" aria-label="File di log" title="Scegli quale file di log leggere; il primo è quello attivo">
+          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . "gextto.log"}} (attivo){{end}}</option>{{end}}
+         </select>
       </form>
       {{template "v2_logs_view" .}}
     </div>

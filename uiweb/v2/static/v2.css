@@ -489,12 +489,16 @@ html, body {
   flex-wrap: nowrap;
 }
 .logs-toolbar input[name="filter"] {
-  flex: 1 1 260px;
-  min-width: 160px;
+  flex: 1 1 140px;
+  min-width: 110px;
 }
 .logs-toolbar select[name="lines"] {
   flex: 0 0 78px;
   min-width: 78px;
+}
+.logs-toolbar select[name="log"] {
+  flex: 0 0 180px;
+  min-width: 150px;
 }
 @media (max-width: 700px) {
   .logs-toolbar {

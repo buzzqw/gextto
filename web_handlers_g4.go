@@ -1392,14 +1392,14 @@ func TestNotification(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // TorrentHistory implements `torrent_history`.
 func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
-	limit := queryInt(r, "limit", 10)
+	limit := queryIntVal(r, "limit", 10)
 	if limit < 1 {
 		limit = 1
 	}
 	if limit > 200 {
 		limit = 200
 	}
-	page := queryInt(r, "page", 1)
+	page := queryIntVal(r, "page", 1)
 	if page < 1 {
 		page = 1
 	}
@@ -1474,16 +1474,17 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 		// the rows we loaded.
 		total = torrentTotal + int64(len(combined)-len(torrents))
 	}
-	pages := (total + limit - 1) / limit
+	limit64 := int64(limit)
+	pages := (total + limit64 - 1) / limit64
 	if pages < 1 {
 		pages = 1
 	}
 	offset := (page - 1) * limit
-	start := int(offset)
+	start := offset
 	if start > len(combined) {
 		start = len(combined)
 	}
-	end := start + int(limit)
+	end := start + limit
 	if end > len(combined) {
 		end = len(combined)
 	}

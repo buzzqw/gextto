@@ -733,7 +733,12 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 			}
 		}
 		if action.Domain == "refresh_interval" {
-			if seconds, err := strconv.ParseUint(action.Text, 10, 64); err == nil {
+			if seconds, err := strconv.ParseInt(action.Text, 10, 64); err == nil {
+				if seconds < 1 {
+					seconds = 1
+				} else if seconds > 3600 {
+					seconds = 3600
+				}
 				result.refreshInterval = time.Duration(seconds) * time.Second
 			}
 		}
