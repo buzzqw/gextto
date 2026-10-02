@@ -68,7 +68,7 @@
         <button class="btn" type="button" data-font="+5" title="Testo più grande">A+</button>
         <button class="btn" type="button" data-font-open title="Scegli il tipo di carattere dell'interfaccia" aria-haspopup="dialog">Font</button>
         <button class="btn v2-theme-toggle" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
-        <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
+        <button class="btn btn-refresh" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati" aria-label="Ricarica i dati mostrati"><span class="btn-refresh-icon" aria-hidden="true">↺</span><span class="btn-refresh-label">Aggiorna</span></button>
         {{template "v2_live_status" .Chrome}}
       </div>
     </header>

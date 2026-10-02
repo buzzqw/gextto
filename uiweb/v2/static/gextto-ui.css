@@ -1192,7 +1192,24 @@ pre.log-view { margin: 0; }
     border-bottom: 0;
     box-shadow: 0 -10px 28px rgba(2, 8, 23, 0.24);
   }
-  .sidebar nav { min-width: max-content; }
+  /* Equal-width tab bar: each primary destination gets the same share of
+     the nav strip. No horizontal scroll; secondary pages go into Sistema. */
+  .sidebar nav { min-width: 0; width: 100%; justify-content: stretch; }
+  .sidebar nav .nav-item,
+  .sidebar .nav-more {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 88px;
+    justify-content: center;
+    padding: 5px 3px;
+    font-size: 0.70rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Optional nav items move into the Sistema panel on phones. */
+  .sidebar .nav-optional { display: none !important; }
   .sidebar .nav-search,
   .sidebar .nav-mobile-hidden { display: none !important; }
   .sidebar .system-group.open {
@@ -1218,18 +1235,25 @@ pre.log-view { margin: 0; }
   .sidebar .system-group.open .nav-mobile-system-extra { display: inline-flex !important; }
   .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
-  /* Turn the top controls into a small two-column control pad instead of a
-     horizontally scrolling strip. */
+  /* Topbar: hide font-size controls, font picker, theme toggle and language
+     form — all accessible from the Settings page.
+     What remains: service-status pill (left) + Refresh button (right). */
+  .top-actions > [data-font],
+  .top-actions > [data-font-open],
+  .top-actions > .v2-theme-toggle,
+  .top-actions > .lang-form { display: none !important; }
+
+  /* Single compact row — no grid needed with fewer elements. */
   .top-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
     gap: 8px;
     overflow: visible;
   }
-  .top-actions .lang-select,
-  .top-actions .btn,
-  .top-actions .system-pill { width: 100%; min-width: 0; }
-  .top-actions .system-pill { justify-content: center; }
+  .top-actions > * { flex: none; }
+  /* Push live status (service pill + clock) to the far right. */
+  .top-actions > .top-live-metrics + * { margin-left: auto; }
 
   /* Quick actions should be reachable with one thumb and never form a long
      line of narrow buttons. */
@@ -1310,31 +1334,72 @@ pre.log-view { margin: 0; }
   .download-bulk-toolbar .input { min-width: 0; }
   .download-bulk-toolbar .compact { width: 100%; }
 
-  /* The full desktop torrent table contains secondary peer/rate columns. Keep
-     the useful mobile summary in view and leave the remaining details to the
-     torrent detail dialog. */
+  /* Torrent table → card tiles.
+     Each row becomes a self-contained summary card: header line with the
+     name and status badge, a progress row and a full-width actions strip.
+     Secondary columns (rates, ETA, peers, ratio) go into the detail dialog. */
   .data-table.torrent-table {
-    min-width: 720px;
-    table-layout: fixed;
+    display: block;
+    min-width: 0 !important;
+    table-layout: auto;
   }
-  .data-table.torrent-table th:nth-child(5),
-  .data-table.torrent-table td:nth-child(5),
-  .data-table.torrent-table th:nth-child(6),
-  .data-table.torrent-table td:nth-child(6),
-  .data-table.torrent-table th:nth-child(8),
-  .data-table.torrent-table td:nth-child(8),
-  .data-table.torrent-table th:nth-child(9),
-  .data-table.torrent-table td:nth-child(9) { display: none; }
-  .data-table.torrent-table th:nth-child(1),
-  .data-table.torrent-table td:nth-child(1) { width: 42px; }
-  .data-table.torrent-table th:nth-child(2),
-  .data-table.torrent-table td:nth-child(2) { width: 30%; }
-  .data-table.torrent-table th:nth-child(4),
-  .data-table.torrent-table td:nth-child(4) { width: 24%; }
-  .data-table.torrent-table th:nth-child(10),
-  .data-table.torrent-table td:nth-child(10) { width: 28%; }
+  .data-table.torrent-table thead { display: none; }
+  .data-table.torrent-table tbody { display: flex; flex-direction: column; }
+  .data-table.torrent-table tr {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 8px;
+    row-gap: 4px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-soft);
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .data-table.torrent-table tbody tr:last-child { border-bottom: 0; }
+  .data-table.torrent-table tbody tr:hover { background: var(--surface-2); }
+
+  /* cell 1 — checkbox */
+  .data-table.torrent-table td:nth-child(1) {
+    display: flex; align-items: flex-start; padding: 3px 0 0;
+    grid-column: 1; grid-row: 1;
+  }
+  /* cell 2 — name + tags + origin */
+  .data-table.torrent-table td:nth-child(2) {
+    display: block; padding: 0; min-width: 0;
+    grid-column: 2; grid-row: 1;
+  }
   .data-table.torrent-table .torrent-name { min-width: 0; max-width: none; }
-  .data-table.torrent-table .row-actions { min-width: 0; flex-wrap: wrap; white-space: normal; }
+  /* cell 3 — status badge */
+  .data-table.torrent-table td:nth-child(3) {
+    display: flex; align-items: flex-start; padding: 2px 0 0;
+    grid-column: 3; grid-row: 1;
+  }
+  /* cell 4 — progress bar */
+  .data-table.torrent-table td:nth-child(4) {
+    display: block; padding: 0; min-width: 0;
+    grid-column: 2 / 4; grid-row: 2;
+  }
+  /* cells 5–9 — download rate / upload rate / ETA / peers / ratio — hidden;
+     details reachable via the ⓘ dialog */
+  .data-table.torrent-table td:nth-child(5),
+  .data-table.torrent-table td:nth-child(6),
+  .data-table.torrent-table td:nth-child(7),
+  .data-table.torrent-table td:nth-child(8),
+  .data-table.torrent-table td:nth-child(9) { display: none !important; }
+  /* cell 10 — actions strip (full width, thumb-sized icons) */
+  .data-table.torrent-table td:nth-child(10) {
+    display: flex !important;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 6px 0 0;
+    border-top: 1px solid var(--line-soft);
+    grid-column: 1 / -1;
+    grid-row: 3;
+    min-width: 0;
+    white-space: normal;
+  }
   .data-table.torrent-table .row-actions .btn { min-height: 40px; }
 
   /* Episode actions also wrap instead of forcing a very wide table. */

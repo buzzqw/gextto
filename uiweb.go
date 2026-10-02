@@ -232,7 +232,10 @@ type uiNavDefinitionItem struct {
 
 var uiNavGroups = []uiNavDefinition{
 	{Label: "Panoramica", Items: []uiNavDefinitionItem{{ID: "dashboard", Label: "Dashboard"}}},
-	{Label: "Download", Items: []uiNavDefinitionItem{{ID: "downloads", Label: "Scarico"}}},
+	{Label: "Download", Items: []uiNavDefinitionItem{
+		{ID: "downloads", Label: "Scarico"},
+		{ID: "logs", Label: "Log", MobileAlways: true},
+	}},
 	{Label: "Libreria", Items: []uiNavDefinitionItem{
 		{ID: "series", Label: "Serie TV"},
 		{ID: "movies", Label: "Film"},
@@ -248,7 +251,6 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "integrations", Label: "Integrazioni"},
 		{ID: "maintenance", Label: "Manutenzione"},
 		{ID: "health", Label: "Salute", MobileAlways: true},
-		{ID: "logs", Label: "Log", MobileAlways: true},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
 		{ID: "manual", Label: "Manuale"},
 		{ID: "license", Label: "Licenza", Optional: true},

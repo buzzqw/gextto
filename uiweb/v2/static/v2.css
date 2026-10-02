@@ -623,3 +623,87 @@ html, body {
   .detail-poster { width: 100px; max-height: 150px; }
   .table-footer-form { display: grid; }
 }
+
+/* ================================================================
+   Mobile UX refinements — post-cascade overrides
+   Placed last in v2.css (which loads after gextto-ui.css) so these
+   rules reliably win over earlier same-specificity declarations.
+   ================================================================ */
+
+@media (max-width: 560px) {
+
+  /* --- Topbar -------------------------------------------------- */
+  /* v2.css had a 2-column grid for all controls; replace with a
+     lean single row showing only the refresh button and the live
+     status indicator. All other controls live in Settings. */
+  .v2-topbar-sticky .top-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+  .v2-topbar-sticky .top-actions > * { flex: none; }
+
+  /* Live status: restore block display (overrides display:contents)
+     and push the pill + clock to the far right. */
+  .v2-topbar-sticky .top-live-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  /* Clock already uses margin-left:auto on desktop; reset inside flex. */
+  .v2-topbar-sticky .top-live-status .current-time { margin-left: 0; }
+
+  /* --- Performance strip --------------------------------------- */
+  /* Show all four KPIs on one compact row instead of a 2×2 grid.
+     Saves vertical space so the page content appears sooner. */
+  .mobile-performance-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .mobile-performance-tile {
+    min-height: 44px;
+    padding: 5px 6px;
+    gap: 1px;
+  }
+  .mobile-performance-tile strong { font-size: 0.88rem; }
+  .mobile-performance-tile .top-metric-label { font-size: 0.58rem; }
+
+}
+
+/* --- Refresh button: compact icon on phones, full label on desktop --- */
+.btn-refresh-icon { font-size: 1.1rem; line-height: 1; }
+@media (min-width: 561px) {
+  .btn-refresh-icon { display: none; }
+}
+@media (max-width: 560px) {
+  .btn-refresh-label { display: none; }
+  .btn-refresh { min-width: 42px; padding: 0 10px; }
+
+  /* Mobile-performance head: hide the title row to save vertical space;
+     the tile labels already describe each metric. */
+  .mobile-performance-head { display: none; }
+  .mobile-performance { padding: 6px 12px 8px; }
+
+  /* Bottom nav: active item gets a subtle underline accent instead of the
+     wide pill background so tabs look good at equal widths. */
+  #app-sidebar .nav-item.active {
+    background: transparent;
+    border-bottom: 2px solid var(--accent);
+    border-radius: 0;
+    color: var(--text);
+    padding-bottom: 3px;
+  }
+  /* Sistema (nav-more) button: same tab style as nav-items */
+  #app-sidebar .nav-more {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.70rem;
+    border-radius: 0;
+  }
+  #app-sidebar .nav-more:hover { filter: none; color: var(--text); }
+}
