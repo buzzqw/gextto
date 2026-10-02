@@ -24,7 +24,7 @@ type uiPageSection struct {
 	OAuth    uiOAuthSection
 	Settings uiSettingsSection
 	Editor   uiListEditor
-	// Integration groups several sections in one provider tile (Trakt, Simkl).
+	// Integration groups several sections in one provider tile (Simkl).
 	Integration uiIntegrationCardSection
 }
 
@@ -480,54 +480,13 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 }
 
 func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
-	traktCalendarDays := settingsOr(cfg, "trakt_calendar_days", "7")
 	simklCalendarDays := settingsOr(cfg, "simkl_calendar_days", "7")
-	traktStatus, traktStatusClass := integrationStatus(cfg, "trakt")
 	simklStatus, simklStatusClass := integrationStatus(cfg, "simkl")
 	group := func(name string, section uiPageSection) uiPageSection {
 		section.Group = name
 		return section
 	}
 	return []uiPageSection{
-		sectionIntegration(uiIntegrationCardSection{
-			Title: "Trakt", Status: traktStatus, StatusClass: traktStatusClass,
-			Children: []uiPageSection{
-				sectionOAuth(uiOAuthSection{Name: "Accesso", StartPath: "/api/trakt/auth/start", PollPath: "/api/trakt/auth/poll", Buttons: []uiActionButton{
-					{Label: "Refresh token", Method: "POST", Path: "/api/trakt/auth/refresh", Body: "{}", Hint: "Rinnova il token di accesso Trakt."},
-					{Label: "Revoca", Class: "danger", Method: "POST", Path: "/api/trakt/auth/revoke", Body: "{}", Hint: "Revoca l'accesso e rimuove il token salvato."},
-					{Label: "Importa watchlist", Method: "POST", Path: "/api/trakt/watchlist/import", Body: "{}", Hint: "Importa le serie della watchlist Trakt nella libreria."},
-				}}),
-				sectionForm(uiFormSection{
-					Title: "Impostazioni", Hint: "Crea un'app API su trakt.tv e incolla client ID e secret.", Path: "/api/trakt/settings", Submit: "Salva Trakt",
-					Wrap: "values",
-					Fields: []uiFormField{
-						{Name: "trakt_client_id", Label: "Client ID", Value: settingsOr(cfg, "trakt_client_id", ""), Hint: "Client ID dell'app creata su trakt.tv."},
-						{Name: "trakt_client_secret", Label: "Client secret", Kind: "text", Hint: "Client secret dell'app creata su trakt.tv (non visualizzato)."},
-						{Name: "trakt_calendar_days", Label: "Giorni calendario", Value: traktCalendarDays, Hint: "Quanti giorni avanti mostrare nel calendario Trakt."},
-						boolFieldHint("trakt_watchlist_sync", "Sincronizza watchlist", "Sincronizza automaticamente la watchlist Trakt ad ogni ciclo.", settingsBool(cfg, "trakt_watchlist_sync", false)),
-						boolFieldHint("trakt_scrobble_enabled", "Scrobble", "Invia a Trakt gli episodi visti (scrobble).", settingsBool(cfg, "trakt_scrobble_enabled", false)),
-					},
-				}),
-				sectionTable(uiTableSpec{
-					Title:    "Watchlist Trakt",
-					Endpoint: "/api/trakt/watchlist",
-					ItemsKey: "",
-					ColumnsJSON: uiJSON([]uiColumn{
-						{Key: "show", Label: "Serie"}, {Key: "movie", Label: "Film"}, {Key: "listed_at", Label: "Aggiunto"},
-					}),
-					Empty: "Watchlist vuota o Trakt non configurato.",
-				}),
-				sectionTable(uiTableSpec{
-					Title:    "Calendario Trakt",
-					Endpoint: "/api/trakt/calendar",
-					ItemsKey: "",
-					ColumnsJSON: uiJSON([]uiColumn{
-						{Key: "first_aired", Label: "Quando"}, {Key: "episode", Label: "Episodio"}, {Key: "show", Label: "Serie"},
-					}),
-					Empty: "Nessuna uscita o Trakt non configurato.",
-				}),
-			},
-		}),
 		sectionIntegration(uiIntegrationCardSection{
 			Title: "Simkl", Status: simklStatus, StatusClass: simklStatusClass,
 			Children: []uiPageSection{

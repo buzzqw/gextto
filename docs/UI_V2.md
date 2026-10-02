@@ -75,7 +75,7 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
 | Fumetti | ✅ | tabella fumetti + **coda download HTTP**, esplorazione GetComics, link finder/download, weekly pack, storico e modifica |
 | Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
-| Integrazioni | ✅ | **schede Trakt e Simkl complete** (stato, OAuth/PIN con avvio+conferma, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
+| Integrazioni | ✅ | scheda Simkl (stato, PIN, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
 | Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
 | Salute | ✅ | metriche, percorsi, dischi, errori, **sorgenti** (manuale) e **provider** |
 | Log | ✅ | filtro, limite righe, aggiornamento automatico ogni 5 s, **colorazione dei livelli lato server**, scroll automatico |
@@ -125,7 +125,7 @@ portati:
 - `scripts/installer-selftest.sh` → tutti i check passati.
 - `go vet .` pulito; `gofmt -l` pulito.
 - Verifica live sul daemon con dati reali: 16/16 voci `/v2?view=…` → 200 e
-  **0 segnaposto non migrati**; integrazioni con schede Trakt/Simkl e OAuth;
+  **0 segnaposto non migrati**; integrazioni con Simkl;
   manutenzione con duplicati/db/ramdisk/rinomina/progresso/job; scarico con
   upload e tag; Esplora con calendario, tendenze e ricerca TMDB reali; anteprima
   rinomina reale (`9-1-1`: 16/16 già corretti); IT→EN con traduzioni reali.

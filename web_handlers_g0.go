@@ -497,31 +497,6 @@ func gh0_saveProviderSettings(s *AppState, input SettingsPatch, allowed []string
 }
 
 // ---------------------------------------------------------------------------
-// trakt_calendar
-// ---------------------------------------------------------------------------
-
-func TraktCalendar(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	client := (&TraktClient{}).FromSettings(cfg.Settings)
-	if !client.Configured() || !client.Authenticated() {
-		jsonError(w, http.StatusConflict, "Trakt non configurato")
-		return
-	}
-	days := int64(7)
-	if raw, ok := cfg.Settings["trakt_calendar_days"]; ok {
-		if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(raw), 10, 64); parseErr == nil {
-			days = parsed
-		}
-	}
-	value, err := client.Calendar(r.Context(), days)
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	jsonStatus(w, http.StatusOK, value)
-}
-
-// ---------------------------------------------------------------------------
 // simkl_auth_revoke
 // ---------------------------------------------------------------------------
 

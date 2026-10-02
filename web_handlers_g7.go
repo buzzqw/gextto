@@ -662,7 +662,7 @@ func gh7_json_string(value map[string]any, key string) string {
 func gh7_setting_key_allowed(key string) bool {
 	for _, prefix := range []string{
 		"libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
-		"trakt_", "simkl_", "backup_", "notify_", "jellyfin_", "plex_",
+		"simkl_", "backup_", "notify_", "jellyfin_", "plex_",
 	} {
 		if strings.HasPrefix(key, prefix) {
 			return true
@@ -1539,22 +1539,6 @@ func TorrentPeersLegacy(w http.ResponseWriter, r *http.Request, s *AppState) {
 	legacy.URL.RawPath = ""
 	legacy.SetPathValue("hash", input.Hash)
 	TorrentPeers(w, legacy, s)
-}
-
-// TraktAuthStart handles POST /api/trakt/auth/start.
-func TraktAuthStart(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	client := (&TraktClient{}).FromSettings(cfg.Settings)
-	if !client.Configured() {
-		jsonError(w, http.StatusConflict, "Trakt non configurato")
-		return
-	}
-	value, err := client.DeviceStart(r.Context())
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"ok": true, "data": value})
 }
 
 // TvdbSearch handles POST /api/tvdb/search.

@@ -698,7 +698,7 @@ type RamDiskSelectInput struct {
 	Path string `json:"path"`
 }
 
-// AuthCode is the input of the trakt/simkl auth poll endpoints.
+// AuthCode is the input of the Simkl PIN poll endpoint.
 type AuthCode struct {
 	Code string `json:"code"`
 }

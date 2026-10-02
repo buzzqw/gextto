@@ -959,8 +959,6 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"tvdb_api_key":                         tvdbAPIKey,
 		"tvdb_configured":                      tvdbKey != nil,
 		"tvdb_language":                        cfg.TvdbLanguage(),
-		"trakt_configured":                     settingsOr(cfg, "trakt_client_id", "") != "",
-		"trakt_authenticated":                  settingsOr(cfg, "trakt_access_token", "") != "",
 		"simkl_configured":                     settingsOr(cfg, "simkl_client_id", "") != "",
 		"simkl_authenticated":                  settingsOr(cfg, "simkl_access_token", "") != "",
 		"backup_send_telegram":                 settingsBool(cfg, "backup_send_telegram", false),

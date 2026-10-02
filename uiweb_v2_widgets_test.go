@@ -41,10 +41,13 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("integrations page -> %d", code)
 	}
-	for _, want := range []string{"Trakt", "Simkl", "Avvia accesso", "FlareSolverr"} {
+	for _, want := range []string{"Simkl", "Avvia accesso", "FlareSolverr"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("integrations page missing %q", want)
 		}
+	}
+	if strings.Contains(body, "Trakt") {
+		t.Fatal("integrations page still contains Trakt")
 	}
 	if strings.Contains(body, "non è ancora migrato") {
 		t.Fatal("integrations page still shows unmigrated placeholders")
@@ -111,7 +114,7 @@ func TestV2OAuthAndTranslationKey(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/oauth/start", url.Values{"path": {"http://evil.example/x"}}); code != http.StatusOK || !strings.Contains(body, "endpoint non valido") {
 		t.Fatalf("oauth forged path -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/oauth/poll", url.Values{"path": {"/api/trakt/auth/poll"}, "code": {"123456"}}); code != http.StatusOK {
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/oauth/poll", url.Values{"path": {"/api/simkl/auth/poll"}, "code": {"123456"}}); code != http.StatusOK {
 		t.Fatalf("oauth poll -> %d: %s", code, body)
 	}
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/settings/i18n/set", url.Values{"lang": {"en"}, "key": {"Chiave"}, "value": {"Key"}}); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
@@ -128,6 +131,26 @@ func TestV2OAuthAndTranslationKey(t *testing.T) {
 		}
 		if !found {
 			t.Fatal("translation not persisted")
+		}
+	}
+}
+
+func TestTraktIntegrationRoutesRemoved(t *testing.T) {
+	server := httptest.NewServer(Router(newTestAppState(t)))
+	t.Cleanup(server.Close)
+
+	for _, request := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/trakt/status"},
+		{http.MethodPost, "/api/trakt/auth/start"},
+		{http.MethodGet, "/api/trakt/calendar"},
+		{http.MethodPost, "/api/trakt/scrobble"},
+	} {
+		code, body := v2Request(t, server, request.method, request.path, nil)
+		if code != http.StatusNotFound {
+			t.Errorf("removed route %s %s -> %d: %s", request.method, request.path, code, body)
 		}
 	}
 }

@@ -1,87 +1,43 @@
 import { test, expect } from "@playwright/test";
 
-// The maintenance actions that moved to the background job manager answer 202
-// with a job id. The client must follow the job to completion and report the
-// real outcome instead of reloading right after "started".
+const jobsPanel = (state: string, includeCancel: boolean) => `
+  <div class="panel" id="v2-jobs-panel">
+    <div class="panel-head"><h3>Operazioni in background</h3><small>1 in corso · 1 recenti</small></div>
+    <div class="panel-body"><table class="data-table"><tbody><tr>
+      <td>scan-archives</td><td><span class="badge">${state}</span></td>
+      <td><div class="progress"><span style="width:25%"></span></div><small>25%</small></td>
+      <td>Scansione archivi</td>
+      <td>${includeCancel ? '<form hx-post="/v2/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML"><input type="hidden" name="id" value="test-job" /><button type="submit">Annulla</button></form>' : ""}</td>
+    </tr></tbody></table></div>
+  </div>`;
 
-test("un'azione con job_id riporta il completamento", async ({ page }) => {
-  let polls = 0;
-  await page.route("**/api/scan-all-archives", async (route) => {
-    await route.fulfill({
-      status: 202,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, job_id: "test-job-1", message: "Scansione archivi avviata" }),
-    });
-  });
-  await page.route("**/api/jobs/test-job-1", async (route) => {
-    polls += 1;
-    const state = polls < 2 ? "running" : "succeeded";
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ job: { id: "test-job-1", kind: "scan-archives", state } }),
-    });
-  });
-
-  await page.on("dialog", (dialog) => void dialog.accept());
-  await page.goto("/?view=maintenance");
-  await page.getByRole("button", { name: "Scansiona archivi" }).click();
-
-  await expect(page.locator(".toast", { hasText: "Scansione archivi avviata" })).toBeVisible();
-  await expect(page.locator(".toast", { hasText: "completata" })).toBeVisible({ timeout: 10000 });
-  expect(polls).toBeGreaterThanOrEqual(2);
-});
-
-test("un job fallito riporta l'errore", async ({ page }) => {
-  await page.route("**/api/scan-all-archives", async (route) => {
-    await route.fulfill({
-      status: 202,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, job_id: "test-job-err", message: "Scansione archivi avviata" }),
-    });
-  });
-  await page.route("**/api/jobs/test-job-err", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ job: { id: "test-job-err", kind: "scan-archives", state: "failed", error: "cartella non leggibile" } }),
-    });
-  });
-
-  await page.on("dialog", (dialog) => void dialog.accept());
-  await page.goto("/?view=maintenance");
-  await page.getByRole("button", { name: "Scansiona archivi" }).click();
-
-  await expect(page.locator(".toast", { hasText: "non riuscita" })).toBeVisible({ timeout: 10000 });
-  await expect(page.locator(".toast", { hasText: "cartella non leggibile" })).toBeVisible();
-});
-
-test("un job in corso offre il pulsante Annulla", async ({ page }) => {
+test("la sezione operazioni mostra stato e permette di annullare un job", async ({ page }) => {
   let canceled = false;
-  await page.route("**/api/scan-all-archives", async (route) => {
-    await route.fulfill({
-      status: 202,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, job_id: "test-job-cancel", message: "Scansione archivi avviata" }),
-    });
+  await page.route("**/v2/partial/jobs", async (route) => {
+    await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: jobsPanel("in corso", true) });
   });
-  await page.route("**/api/jobs/test-job-cancel/cancel", async (route) => {
+  await page.route("**/v2/jobs/cancel", async (route) => {
     canceled = true;
-    await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ ok: true }) });
-  });
-  await page.route("**/api/jobs/test-job-cancel", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({ job: { id: "test-job-cancel", kind: "scan-archives", state: canceled ? "canceled" : "running" } }),
-    });
+    await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: jobsPanel("annullato", false) });
   });
 
-  await page.on("dialog", (dialog) => void dialog.accept());
   await page.goto("/?view=maintenance");
-  await page.getByRole("button", { name: "Scansiona archivi" }).click();
+  const panel = await page.evaluate(async () => {
+    const response = await fetch("/v2/partial/jobs");
+    return response.text();
+  });
+  await page.evaluate((html) => {
+    const host = document.querySelector("#v2-page");
+    if (!host) throw new Error("pagina v2 non trovata");
+    host.querySelector("#v2-jobs-panel")?.remove();
+    host.insertAdjacentHTML("beforeend", html);
+    const jobs = host.querySelector("#v2-jobs-panel");
+    if (jobs) (window as unknown as { htmx: { process(node: Element): void } }).htmx.process(jobs);
+  }, panel);
 
-  const cancelButton = page.locator(".toast button", { hasText: "Annulla" });
-  await expect(cancelButton).toBeVisible();
-  await cancelButton.click();
-
-  await expect(page.locator(".toast", { hasText: "annullata" })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#v2-jobs-panel")).toContainText("in corso");
+  await page.locator("#v2-jobs-panel button", { hasText: "Annulla" }).click();
+  await expect(page.locator("#v2-jobs-panel")).toContainText("annullato");
   expect(canceled).toBe(true);
+  expect(panel).toContain("Operazioni in background");
 });

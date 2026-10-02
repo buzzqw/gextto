@@ -797,49 +797,6 @@ func SaveBackupSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "saved": saved})
 }
 
-// SaveTraktSettings implements `save_trakt_settings`.
-func SaveTraktSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
-	var input SettingsPatch
-	if err := decodeJSON(r, &input); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	allowed := map[string]struct{}{
-		"trakt_client_id":        {},
-		"trakt_client_secret":    {},
-		"trakt_watchlist_sync":   {},
-		"trakt_scrobble_enabled": {},
-		"trakt_calendar_days":    {},
-	}
-	keys := make([]string, 0, len(input.Values))
-	for key := range input.Values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	saved := []string{}
-	for _, key := range keys {
-		raw := input.Values[key]
-		if _, ok := allowed[key]; !ok || gh2_isJSONNull(raw) {
-			continue
-		}
-		value, ok := gh2_settingsValue(raw)
-		if !ok {
-			jsonError(w, http.StatusBadRequest, "invalid setting value")
-			return
-		}
-		if len(value) > 4096 {
-			jsonError(w, http.StatusBadRequest, "setting too long")
-			return
-		}
-		if err := SaveSetting(s.cfg.DataDir, key, value); err != nil {
-			jsonError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		saved = append(saved, key)
-	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "saved": saved})
-}
-
 // SendMagnet implements `send_magnet`.
 func SendMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !gh2_setupComplete(s.cfg) {
@@ -1146,31 +1103,6 @@ func TorrentTrackers(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "trackers": trackers})
-}
-
-// TraktSettings implements `trakt_settings`.
-func TraktSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	client := (&TraktClient{}).FromSettings(cfg.Settings)
-	clientID := cfg.Settings["trakt_client_id"]
-	_, clientIDPresent := cfg.Settings["trakt_client_id"]
-	secret := cfg.Settings["trakt_client_secret"]
-	_, secretPresent := cfg.Settings["trakt_client_secret"]
-	calendarDays := "7"
-	if value, ok := cfg.Settings["trakt_calendar_days"]; ok {
-		calendarDays = value
-	}
-	jsonResponse(w, map[string]any{
-		"ok":                       true,
-		"configured":               client.Configured(),
-		"authenticated":            client.Authenticated(),
-		"client_id":                clientID,
-		"client_id_configured":     clientIDPresent && clientID != "",
-		"client_secret_configured": secretPresent && secret != "",
-		"watchlist_sync":           gh2_truthy(cfg.Settings["trakt_watchlist_sync"]),
-		"scrobble_enabled":         gh2_truthy(cfg.Settings["trakt_scrobble_enabled"]),
-		"calendar_days":            calendarDays,
-	})
 }
 
 // UpdateMovie implements `update_movie`.

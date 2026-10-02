@@ -740,16 +740,6 @@ func Torrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, gh3DecorateTorrents(s, live))
 }
 
-// TraktStatus is `trakt_status`.
-func TraktStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	client := (&TraktClient{}).FromSettings(cfg.Settings)
-	jsonResponse(w, map[string]any{
-		"configured":    client.Configured(),
-		"authenticated": client.Authenticated(),
-	})
-}
-
 // UploadTorrent is `upload_torrent`.
 func UploadTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !gh3SetupComplete(s.cfg) {

@@ -38,9 +38,10 @@
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
          {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span>Sistema</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
         {{range .Items}}
-        <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
-        {{end}}
-        {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>{{end}}
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
+         {{end}}
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}"><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>{{end}}
       </div>
       {{end}}
     </nav>
@@ -1168,18 +1169,18 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     <div class="toolbar">
-      <form hx-post="/v2/oauth/start" hx-target="#v2-oauth-output-{{if eq .OAuth.StartPath "/api/trakt/auth/start"}}trakt{{else}}simkl{{end}}" hx-swap="innerHTML" style="display:inline">
+      <form hx-post="/v2/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" style="display:inline">
         <input type="hidden" name="path" value="{{.OAuth.StartPath}}" />
         <button class="btn sm primary" type="submit" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
       </form>
-      <form class="oauth-poll-form" hx-post="/v2/oauth/poll" hx-target="#v2-oauth-output-{{if eq .OAuth.StartPath "/api/trakt/auth/start"}}trakt{{else}}simkl{{end}}" hx-swap="innerHTML">
+      <form class="oauth-poll-form" hx-post="/v2/oauth/poll" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML">
         <input type="hidden" name="path" value="{{.OAuth.PollPath}}" />
         <input class="input" name="code" aria-label="Codice o PIN di accesso" placeholder="codice" />
         <button class="btn sm" type="submit" title="Conferma il codice/PIN inserito">Conferma</button>
       </form>
       {{range .Buttons}}{{template "v2_button" .}}{{end}}
     </div>
-    <div class="output" id="v2-oauth-output-{{if eq .OAuth.StartPath "/api/trakt/auth/start"}}trakt{{else}}simkl{{end}}" aria-live="polite"></div>
+    <div class="output" id="v2-oauth-output-simkl" aria-live="polite"></div>
   </div>
 </div>
 {{end}}

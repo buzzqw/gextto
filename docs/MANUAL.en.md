@@ -692,8 +692,7 @@ scan). If `ffprobe` is missing, the backfill pauses by itself.
 
 ## 8. Integrations
 
-- **Trakt / Simkl** — credentials, PIN/OAuth flows, watchlist import, calendar,
-  scrobble/mark-watched.
+- **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
 - **Event hooks** — run an external program on Gextto events
   (`download_started`, `torrent_completed`, `season_pack_completed`,
@@ -707,8 +706,8 @@ scan). If `ffprobe` is missing, the backfill pauses by itself.
 Integrations are not required to download and archive media. Enable them one at
 a time and use the test button whenever one is available:
 
-- **Trakt/Simkl**: complete the PIN/OAuth flow, verify that the correct account
-  is shown, and only then enable watchlist import or scrobbling;
+- **Simkl**: complete the PIN flow, verify that the correct account is shown,
+  and then use watchlist import;
 - **Jellyfin/Plex**: enter a URL reachable by the daemon and a token with the
   minimum required permissions, then test a library refresh;
 - **Hooks**: first configure a harmless program that writes a log, verify its

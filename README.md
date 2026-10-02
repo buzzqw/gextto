@@ -17,7 +17,7 @@ service.
 - Release selection uses quality, source, codec, audio, HDR, language and size.
   `ffprobe` can enrich those decisions with the properties of archived files.
 - The responsive web UI and terminal TUI expose health, logs, backups,
-  maintenance and integrations with Trakt, Simkl, Jellyfin and Plex.
+  maintenance and integrations with Simkl, Jellyfin and Plex.
 
 ### Torrent engines
 
@@ -58,7 +58,7 @@ downloads; the live transfer metrics in the top bar use the same interval.
 | **Archive** | Full-text archive/release search, pagination, source and quality details, bulk queueing, magnet copying/deletion and “why not this one?” explanations; also exposes feed-seen series and movies. |
 | **Comics** | GetComics-based monitored comics, post selection, metadata/cover/tag handling, link extraction, weekly packs, HTTP downloads and history actions. |
 | **Configuration** | Daemon mode, sources, RSS/indexers/web engines/FlareSolverr, libtorrent, torrent engine, scoring, rename templates, acquisition, notifications, paths/NAS, advanced retention and translations. |
-| **Integrations** | Trakt and Simkl authentication/watchlists/scrobbling, Jellyfin/Plex library refresh and event hooks for external programs. |
+| **Integrations** | Simkl authentication/watchlists, Jellyfin/Plex library refresh and event hooks for external programs. |
 | **Maintenance** | Backups and restore-related actions, trash cleanup, archive scans, MediaInfo backfill, scoring recalculation, duplicate cleanup, manual folder rename, database maintenance and service restart. |
 | **Health** | Database integrity, paths and permissions, free space, provider/backend status, CPU/RAM and service diagnostics. |
 | **Logs** | Live and historical daemon log tail with filtering, line count and follow/refresh controls, useful for cycles, provider failures and torrent lifecycle events. |

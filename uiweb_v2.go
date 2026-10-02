@@ -208,7 +208,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /v2/maintenance/folder-rename/apply", V2FolderRenameApply)
 	v2Handle(s, mux, "GET /v2/partial/rename-progress", V2RenameProgress)
 
-	// OAuth / PIN (Trakt, Simkl).
+	// OAuth / PIN (Simkl).
 	v2Handle(s, mux, "POST /v2/oauth/start", V2OAuthStart)
 	v2Handle(s, mux, "POST /v2/oauth/poll", V2OAuthPoll)
 

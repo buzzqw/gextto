@@ -859,7 +859,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 }
 .section-group .grid-2 { align-items: start; }
 
-/* Provider tile (Trakt, Simkl): one panel with stacked sub-sections. */
+/* Provider tile (Simkl): one panel with stacked sub-sections. */
 .integration-body { display: flex; flex-direction: column; gap: 14px; }
 .integration-block { display: flex; flex-direction: column; gap: 8px; }
 .integration-block + .integration-block { border-top: 1px solid var(--line-soft); padding-top: 14px; }
@@ -1013,6 +1013,7 @@ pre.log-view { margin: 0; }
    behaviour (the "Sistema" group already collapses them on mobile). */
 .nav-optional { opacity: 0.92; }
 .nav-mobile-hidden { display: none; }
+.nav-mobile-system-extra { display: none; }
 /* Le voci "extra" servono solo al menu Sistema dei telefoni: vanno nascoste
    anche quando il gruppo Sistema è aperto (regole più specifiche come
    `.system-group .nav-item` le riattiverebbero su desktop). */

@@ -1498,60 +1498,6 @@ func TorrentHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
-// TraktAuthPoll implements `trakt_auth_poll`.
-func TraktAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
-		jsonError(w, http.StatusConflict, "dry-run does not save integration tokens")
-		return
-	}
-	var input AuthCode
-	if err := decodeJSON(r, &input); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	cfg := latestConfig(s)
-	value, err := new(TraktClient).FromSettings(cfg.Settings).DevicePoll(r.Context(), input.Code)
-	if err != nil {
-		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-	access, accessErr := TokenString(value, "access_token")
-	refresh, refreshErr := TokenString(value, "refresh_token")
-	if accessErr != nil || refreshErr != nil {
-		jsonStatus(w, http.StatusBadGateway, map[string]any{
-			"ok":    false,
-			"error": "Trakt response did not contain tokens",
-			"data":  value,
-		})
-		return
-	}
-	if err := SaveSetting(cfg.DataDir, "trakt_access_token", access); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := SaveSetting(cfg.DataDir, "trakt_refresh_token", refresh); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "authenticated": true})
-}
-
-// TraktWatchlist implements `trakt_watchlist`.
-func TraktWatchlist(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := latestConfig(s)
-	client := new(TraktClient).FromSettings(cfg.Settings)
-	if !client.Configured() || !client.Authenticated() {
-		jsonError(w, http.StatusConflict, "Trakt non configurato")
-		return
-	}
-	value, err := client.Watchlist(r.Context())
-	if err != nil {
-		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-	jsonStatus(w, http.StatusOK, value)
-}
-
 // WatchedFoldersView implements `watched_folders_view`.
 func WatchedFoldersView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)

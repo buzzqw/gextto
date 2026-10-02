@@ -14,16 +14,18 @@ const languages = [
 
 test("le lingue complete traducono le intestazioni delle tabelle", async ({ page }) => {
   await page.goto("/?view=blocklist");
-  const head = page.locator("[data-ui-head]");
+  const head = page.locator("main table.data-table thead").first();
   await expect(head.locator("th").first()).toHaveText("Titolo");
 
   for (const language of languages) {
     await page.locator(".lang-select").selectOption(language.code);
+    await page.waitForLoadState("domcontentloaded");
     await expect(head.locator("th").first()).toHaveText(language.title, { timeout: 15000 });
     await expect(head.locator("th").nth(1)).toHaveText(language.reason, { timeout: 15000 });
   }
 
   // Leave the shared test server on its default language for the other specs.
   await page.locator(".lang-select").selectOption("it");
+  await page.waitForLoadState("domcontentloaded");
   await expect(head.locator("th").first()).toHaveText("Titolo", { timeout: 15000 });
 });

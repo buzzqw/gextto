@@ -34,9 +34,9 @@ test.describe("accessibilità automatizzata", () => {
 
   test("la ricerca impostazioni comprende sinonimi comuni", async ({ page }) => {
     await page.goto("/?view=settings");
-    const search = page.locator("[data-settings-search]");
+    const search = page.locator("input.settings-search");
     await search.fill("memo");
-    await expect(page.locator("[data-settings-results] .settings-result").first()).toBeVisible();
+    await expect(page.locator("#v2-settings-search a").first()).toBeVisible();
   });
 
   test("i dialoghi mantengono il focus e lo restituiscono all'apertura", async ({ page }) => {
@@ -70,29 +70,18 @@ test.describe("accessibilità automatizzata", () => {
     await expect(pause).toBeFocused();
   });
 
-  test("le intestazioni ordinabili funzionano da tastiera e aggiornano aria-sort", async ({ page }) => {
-    await page.route("**/api/search/archive", async (route) => {
+  test("la ricerca release è utilizzabile da tastiera", async ({ page }) => {
+    await page.route("**/v2/search", async (route) => {
       await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({ results: [{ title: "Test release", source: "test", score: 10 }] }),
-      });
-    });
-    await page.route("**/api/search", async (route) => {
-      await route.fulfill({
-        contentType: "application/json",
-        body: JSON.stringify({ results: [{ title: "Test release", source: "test", score: 10 }] }),
+        contentType: "text/html; charset=utf-8",
+        body: `<div id="v2-search-results"><p>Risultati per test</p><table class="data-table"><tbody><tr><td>Test release</td></tr></tbody></table></div>`,
       });
     });
     await page.goto("/?view=search");
-    const input = page.locator("form[data-ui-search-post] input[type=search]");
+    const input = page.locator("form.search-row input[type=search]");
     await input.fill("test");
     await input.press("Enter");
-    const header = page.locator("th[data-release-sort=title]");
-    await expect(header).toBeVisible();
-    await header.locator("button").press("Enter");
-    await expect(header).toHaveAttribute("aria-sort", "ascending");
-    await header.locator("button").press("Enter");
-    await expect(header).toHaveAttribute("aria-sort", "descending");
+    await expect(page.locator("#v2-search-results")).toContainText("Test release");
   });
 
   test("il layout non richiede scorrimento orizzontale a 320px", async ({ page }) => {

@@ -17,7 +17,7 @@ funzionare come servizio.
 - La scelta delle release considera qualità, sorgente, codec, audio, HDR, lingue
   e dimensione. `ffprobe` può aggiungere le caratteristiche del file archiviato.
 - UI web responsive e TUI mostrano salute, log, backup, manutenzione e
-  integrazioni con Trakt, Simkl, Jellyfin e Plex.
+  integrazioni con Simkl, Jellyfin e Plex.
 
 ### Motori torrent
 
@@ -60,7 +60,7 @@ seguono lo stesso intervallo.
 | **Archivio** | Ricerca full-text delle release archiviate, paginazione, dettagli sorgente/qualità, accodamento multiplo, copia magnet, eliminazione e spiegazione **Perché non questa?**; include anche i titoli visti nei feed. |
 | **Fumetti** | Fumetti monitorati tramite GetComics, scelta del post, gestione metadati/copertina/tag, estrazione link, weekly pack, download HTTP e storico con azioni. |
 | **Configurazione** | Daemon, sorgenti RSS/indexer/motori web/FlareSolverr, libtorrent, motore torrent, scoring, template di rinomina, acquisizione, notifiche, percorsi/NAS, retention avanzate e traduzioni. |
-| **Integrazioni** | Autenticazione/watchlist/scrobbling Trakt e Simkl, aggiornamento libreria Jellyfin/Plex e hook per programmi esterni. |
+| **Integrazioni** | Autenticazione/watchlist Simkl, aggiornamento libreria Jellyfin/Plex e hook per programmi esterni. |
 | **Manutenzione** | Backup, azioni di ripristino, pulizia cestino, scansioni archivio, backfill MediaInfo, ricalcolo scoring, pulizia duplicati, rinomina manuale cartelle, manutenzione database e riavvio servizio. |
 | **Salute** | Integrità database, percorsi e permessi, spazio libero, stato provider/backend, CPU/RAM e diagnostica del servizio. |
 | **Log** | Coda live e storico del log daemon con filtro, numero righe e controlli segui/aggiorna, per analizzare cicli, provider e vita dei torrent. |

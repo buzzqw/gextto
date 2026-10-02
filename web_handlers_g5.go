@@ -337,12 +337,6 @@ type gh5_watchlistTitle struct {
 	year  string
 }
 
-type gh5_watchlistEntry struct {
-	kind  string
-	title string
-	year  string
-}
-
 // gh5_collectWatchlistEntries mirrors the web module `collect_watchlist_entries`.
 func gh5_collectWatchlistEntries(value any, out *[]gh5_watchlistTitle) {
 	switch node := value.(type) {
@@ -362,94 +356,6 @@ func gh5_collectWatchlistEntries(value any, out *[]gh5_watchlistTitle) {
 		for _, child := range node {
 			gh5_collectWatchlistEntries(child, out)
 		}
-	}
-}
-
-// gh5_collectWatchlistInto mirrors the web module `collect_watchlist`.
-func gh5_collectWatchlistInto(value any, out *[]gh5_watchlistEntry) {
-	switch node := value.(type) {
-	case []any:
-		for _, item := range node {
-			gh5_collectWatchlistInto(item, out)
-		}
-	case map[string]any:
-		typed := false
-		for key, child := range node {
-			var kind string
-			switch key {
-			case "show", "shows", "anime", "series", "tv":
-				kind = "series"
-			case "movie", "movies":
-				kind = "movie"
-			default:
-				continue
-			}
-			typed = true
-			titles := []gh5_watchlistTitle{}
-			gh5_collectWatchlistEntries(child, &titles)
-			for _, title := range titles {
-				*out = append(*out, gh5_watchlistEntry{kind: kind, title: title.title, year: title.year})
-			}
-		}
-		if !typed {
-			for _, child := range node {
-				gh5_collectWatchlistInto(child, out)
-			}
-		}
-	}
-}
-
-// gh5_applyWatchlistImport mirrors the web module `apply_watchlist_import`.
-func gh5_applyWatchlistImport(cfg *Config, entries []gh5_watchlistEntry) map[string]any {
-	seriesAdded := 0
-	moviesAdded := 0
-	for _, entry := range entries {
-		if strings.TrimSpace(entry.title) == "" {
-			continue
-		}
-		if entry.kind == "series" {
-			exists := false
-			for index := range cfg.Series {
-				if strings.EqualFold(cfg.Series[index].Name, entry.title) {
-					exists = true
-					break
-				}
-			}
-			if exists {
-				continue
-			}
-			cfg.Series = append(cfg.Series, SeriesConfig{
-				Name:     entry.title,
-				Seasons:  "1+",
-				Language: "ita",
-				Enabled:  true,
-			})
-			seriesAdded++
-		} else {
-			exists := false
-			for index := range cfg.Movies {
-				if strings.EqualFold(cfg.Movies[index].Name, entry.title) {
-					exists = true
-					break
-				}
-			}
-			if exists {
-				continue
-			}
-			cfg.Movies = append(cfg.Movies, MovieConfig{
-				Name:     entry.title,
-				Year:     entry.year,
-				Language: "ita",
-				Enabled:  true,
-			})
-			moviesAdded++
-		}
-	}
-	return map[string]any{
-		"series_added": seriesAdded,
-		"movies_added": moviesAdded,
-		"series_total": len(cfg.Series),
-		"movies_total": len(cfg.Movies),
 	}
 }
 
@@ -1337,61 +1243,4 @@ func TorrentNoRenameList(w http.ResponseWriter, r *http.Request, s *AppState) {
 		torrents = append(torrents, map[string]any{"hash": item[0], "name": item[1]})
 	}
 	jsonResponse(w, map[string]any{"ok": true, "torrents": torrents})
-}
-
-// TraktAuthRefresh implements `trakt_auth_refresh`.
-func TraktAuthRefresh(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
-		jsonError(w, http.StatusConflict, "dry-run does not save integration tokens")
-		return
-	}
-	cfg := latestConfig(s)
-	client := new(TraktClient).FromSettings(cfg.Settings)
-	if !client.Configured() || !client.Authenticated() {
-		jsonError(w, http.StatusConflict, "Trakt non configurato")
-		return
-	}
-	value, err := client.Refresh(r.Context())
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	access, accessErr := TokenString(value, "access_token")
-	refresh, refreshErr := TokenString(value, "refresh_token")
-	if accessErr != nil || refreshErr != nil {
-		jsonError(w, http.StatusBadGateway, "Trakt response did not contain refresh tokens")
-		return
-	}
-	if err := SaveSetting(cfg.DataDir, "trakt_access_token", access); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := SaveSetting(cfg.DataDir, "trakt_refresh_token", refresh); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{"ok": true})
-}
-
-// TraktWatchlistImport implements `trakt_watchlist_import`.
-func TraktWatchlistImport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	cfg := *latestConfig(s)
-	value, err := new(TraktClient).FromSettings(cfg.Settings).Watchlist(r.Context())
-	if err != nil {
-		jsonError(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	entries := []gh5_watchlistEntry{}
-	gh5_collectWatchlistInto(value, &entries)
-	report := gh5_applyWatchlistImport(&cfg, entries)
-	if err := SaveLibrary(s.cfg.DataDir, cfg.Series, cfg.Movies); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	jsonResponse(w, map[string]any{
-		"ok":     true,
-		"source": "trakt",
-		"found":  len(entries),
-		"report": report,
-	})
 }

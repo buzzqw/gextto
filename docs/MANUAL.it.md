@@ -707,8 +707,8 @@ backfill si mette in pausa da solo.
 
 ## 8. Integrazioni
 
-- **Trakt / Simkl** — credenziali, flussi PIN/OAuth, import watchlist, calendario,
-  scrobble/segna come visto.
+- **Simkl** — credenziali, flusso PIN, import watchlist, calendario e segna come
+  visto.
 - **Jellyfin / Plex** — URL + token del server e pulsante di aggiornamento
   libreria.
 - **Hook eventi** — esegue un programma esterno su eventi Gextto
@@ -723,8 +723,8 @@ backfill si mette in pausa da solo.
 Le integrazioni non sono necessarie per scaricare e archiviare i media. Attivale
 una alla volta e usa sempre il pulsante di test quando disponibile:
 
-- **Trakt/Simkl**: completa il flusso PIN/OAuth, verifica che l'account corretto
-  sia visualizzato e solo dopo abilita import watchlist o scrobbling;
+- **Simkl**: completa il flusso PIN, verifica che l'account corretto sia
+  visualizzato e solo dopo usa l'import watchlist;
 - **Jellyfin/Plex**: inserisci URL raggiungibile dal demone e token con i permessi
   minimi necessari, poi prova l'aggiornamento libreria;
 - **Hook**: configura prima un programma innocuo che scriva un log, verifica i

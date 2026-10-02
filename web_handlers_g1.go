@@ -1096,33 +1096,6 @@ func TorrentTags(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "items": items})
 }
 
-func TraktScrobble(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if s.cfg.DryRun {
-		jsonError(w, http.StatusConflict, "dry-run does not scrobble")
-		return
-	}
-	if !(&TraktClient{}).FromSettings(latestConfig(s).Settings).Configured() {
-		jsonError(w, http.StatusConflict, "Trakt non configurato")
-		return
-	}
-	var input ScrobbleInput
-	if err := decodeJSON(r, &input); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	action := "stop"
-	if input.Action != nil {
-		action = *input.Action
-	}
-	cfg := latestConfig(s)
-	value, err := new(TraktClient).FromSettings(cfg.Settings).Scrobble(r.Context(), action, input.Payload)
-	if err != nil {
-		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
-		return
-	}
-	jsonStatus(w, http.StatusOK, value)
-}
-
 func UnpinTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	ok, err := s.activeEngine().SetPin("", false)
 	if err == nil {

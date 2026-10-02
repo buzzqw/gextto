@@ -50,7 +50,7 @@ type v2Section struct {
 	ManualAdd     string
 	TestFTP       bool
 	ListEditor    *v2ListEditorView
-	// Integration cards (Trakt, Simkl) carry their child sections inline.
+	// Integration cards (Simkl) carry their child sections inline.
 	Children    []v2Section
 	Status      string
 	StatusClass string

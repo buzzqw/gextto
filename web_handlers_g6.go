@@ -1408,12 +1408,6 @@ func TorrentPeers(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true, "peers": peers})
 }
 
-// TraktAuthRevoke implements `trakt_auth_revoke`.
-func TraktAuthRevoke(w http.ResponseWriter, r *http.Request, s *AppState) {
-	status, payload := gh6_revokeIntegrationTokens(s, []string{"trakt_access_token", "trakt_refresh_token"})
-	jsonStatus(w, status, payload)
-}
-
 // TrashEntries implements `trash_entries`.
 func TrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
