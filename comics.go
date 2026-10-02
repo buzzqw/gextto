@@ -866,6 +866,15 @@ const (
 	comicsUserAgent            = "gextto/0.1 comics"
 	comicsHTTPDownloadTimeout  = 1800 * time.Second
 	comicsHTTPDownloadAttempts = 3
+	// Torrent metainfo files are normally small.  The bound prevents an HTTP
+	// comic download from being read back in full merely to distinguish it from
+	// a torrent after it has completed.
+	maxComicTorrentMetainfoSize = 16 << 20
+)
+
+var (
+	errComicDownloadHTML    = errors.New("comic download returned HTML instead of a file")
+	errComicDownloadTorrent = errors.New("comic download returned a torrent file instead of a comic archive")
 )
 
 // GetComicsClient is the GetComics scraper.
@@ -1083,6 +1092,7 @@ func (c *GetComicsClient) WeeklyLinks(date string) (string, ComicLinks, error) {
 			return "", ComicLinks{}, err
 		}
 		links, _ := parseComicLinks(string(body), target)
+		links = weeklyPackLinks(links)
 		if len(links.Magnets) > 0 || len(links.Torrents) > 0 || len(links.Mega) > 0 || len(links.Direct) > 0 {
 			return target, links, nil
 		}
@@ -1097,6 +1107,7 @@ func (c *GetComicsClient) WeeklyLinks(date string) (string, ComicLinks, error) {
 					continue
 				}
 				if links, err := c.Links(post.URL); err == nil {
+					links = weeklyPackLinks(links)
 					if len(links.Magnets) > 0 || len(links.Torrents) > 0 || len(links.Mega) > 0 || len(links.Direct) > 0 {
 						return post.URL, links, nil
 					}
@@ -1231,6 +1242,9 @@ func downloadHTTPRegistered(client *http.Client, rawURL, targetDir, title, id st
 			return outcome, path, nil
 		}
 		wrapped := fmt.Errorf("GET %s: %w", rawURL, err)
+		if isPermanentComicDownloadError(err) {
+			return comicHTTPCompleted, "", wrapped
+		}
 		if attempt < comicsHTTPDownloadAttempts {
 			logging.Warn("comic download attempt failed; retrying", "attempt", attempt, "error", wrapped)
 			time.Sleep(time.Duration(2*attempt) * time.Second)
@@ -1295,6 +1309,14 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	// The `.part` file was already complete: the server answers 416 and it only
 	// needs to be renamed.
 	if offset > 0 && response.StatusCode == http.StatusRequestedRangeNotSatisfiable {
+		isTorrent, err := comicFileIsTorrent(temporary)
+		if err != nil {
+			return comicHTTPCompleted, "", err
+		}
+		if isTorrent {
+			_ = os.Remove(temporary)
+			return comicHTTPCompleted, "", errComicDownloadTorrent
+		}
 		if err := os.Rename(temporary, destination); err != nil {
 			return comicHTTPCompleted, "", err
 		}
@@ -1304,7 +1326,7 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 		return comicHTTPCompleted, "", fmt.Errorf("HTTP status %d", response.StatusCode)
 	}
 	if contentType := strings.ToLower(response.Header.Get("Content-Type")); strings.Contains(contentType, "text/html") {
-		return comicHTTPCompleted, "", fmt.Errorf("comic download returned HTML instead of a file")
+		return comicHTTPCompleted, "", errComicDownloadHTML
 	}
 	// Resume only when the server confirms the Range (206); otherwise restart.
 	resumed := offset > 0 && response.StatusCode == http.StatusPartialContent
@@ -1400,10 +1422,41 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	if downloaded == 0 {
 		return comicHTTPCompleted, "", fmt.Errorf("comic download is empty")
 	}
+	isTorrent, err := comicFileIsTorrent(temporary)
+	if err != nil {
+		return comicHTTPCompleted, "", err
+	}
+	if isTorrent {
+		_ = os.Remove(temporary)
+		return comicHTTPCompleted, "", errComicDownloadTorrent
+	}
 	if err := os.Rename(temporary, destination); err != nil {
 		return comicHTTPCompleted, "", err
 	}
 	return comicHTTPCompleted, destination, nil
+}
+
+func isPermanentComicDownloadError(err error) bool {
+	return errors.Is(err, errComicDownloadHTML) || errors.Is(err, errComicDownloadTorrent)
+}
+
+// comicFileIsTorrent identifies a completed BitTorrent metainfo file without
+// treating its extension or content type as authoritative. Some GetComics
+// redirects serve `.torrent` data as application/octet-stream.
+func comicFileIsTorrent(path string) (bool, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	if info.Size() <= 0 || info.Size() > maxComicTorrentMetainfoSize {
+		return false, nil
+	}
+	payload, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	_, ok := utils.TorrentInfoHash(payload)
+	return ok, nil
 }
 
 // DownloadTorrentFile downloads a `.torrent` file to targetDir.
@@ -1440,6 +1493,9 @@ func DownloadTorrentFile(client *http.Client, rawURL, targetDir string) (string,
 	}
 	if len(payload) == 0 {
 		return "", fmt.Errorf("torrent file is empty")
+	}
+	if _, ok := utils.TorrentInfoHash(payload); !ok {
+		return "", fmt.Errorf("torrent URL did not return valid torrent metainfo")
 	}
 	destination := filepath.Join(targetDir, utils.StableID(rawURL)+".torrent")
 	temporary := withPartExtension(destination)
@@ -1802,6 +1858,7 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 					logging.Debug("comics: weekly pack links failed", "date", date, "post", post.URL)
 					continue
 				}
+				links = weeklyPackLinks(links)
 				magnet := firstComicString(links.Magnets)
 				torrentURL := firstComicString(links.Torrents)
 				directURL := firstComicString(links.DownloadNow)
@@ -1854,7 +1911,7 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 	return downloaded, nil
 }
 
-// sendWeeklyPack sends a weekly pack (direct file, magnet or `.torrent`) to the
+// sendWeeklyPack sends a weekly pack (magnet, `.torrent` or direct file) to the
 // client. It returns true when it was accepted and marked as sent.
 func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngine, notifier *Notifier, defaultRoot string, mainDB *Database, cfg *Config, date, magnet, torrentURL, directURL string) (bool, error) {
 	target := comicDownloadDir(cfg)
@@ -1863,22 +1920,9 @@ func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngin
 		target = &value
 	}
 	_ = os.MkdirAll(*target, 0o755)
-	if directURL != "" {
-		title := fmt.Sprintf("Weekly Pack %s", date)
-		path, err := client.DownloadDirect(directURL, *target, title)
-		if err != nil {
-			return false, err
-		}
-		if err := db.MarkWeeklySent(date); err != nil {
-			return false, err
-		}
-		size := uint64(0)
-		if info, statErr := os.Stat(path); statErr == nil {
-			size = uint64(info.Size())
-		}
-		_ = notifier.NotifyComicComplete(title, path, size, "http")
-		return true, nil
-	}
+	// A Weekly Pack commonly exposes the same torrent both as a magnet and as a
+	// GetComics `/dls/` redirect. Prefer torrent transports so a metainfo file
+	// is never mistaken for the pack itself and saved with a `.cbz` extension.
 	if magnet != "" {
 		hash, ok := utils.MagnetHash(magnet)
 		if ok {
@@ -1899,23 +1943,46 @@ func sendWeeklyPack(db *ComicsDb, client *GetComicsClient, torrents TorrentEngin
 				return true, nil
 			}
 		}
-	} else if torrentURL != "" {
+	}
+	if torrentURL != "" {
 		title := fmt.Sprintf("Weekly Pack %s", date)
 		torrentDir := filepath.Join(*target, ".torrents")
-		if path, err := client.DownloadTorrent(torrentURL, torrentDir); err == nil {
-			if hash, err := torrents.AddTorrentFile(path, *target); err == nil && hash != nil {
-				_ = os.Remove(path)
-				_ = mainDB.SetTorrentTag(*hash, "Comic")
-				if err := db.AddTorrent(*hash, fmt.Sprintf("weekly:%s", date), title, *target); err != nil {
-					return false, err
-				}
-				if err := db.MarkWeeklySent(date); err != nil {
-					return false, err
-				}
-				_ = notifier.NotifyEvent("comic_queued", map[string]any{"title": title, "hash": *hash, "method": "torrent"})
-				return true, nil
-			}
+		path, err := client.DownloadTorrent(torrentURL, torrentDir)
+		if err != nil {
+			return false, err
 		}
+		hash, err := torrents.AddTorrentFile(path, *target)
+		if err != nil {
+			return false, err
+		}
+		if hash != nil {
+			_ = os.Remove(path)
+			_ = mainDB.SetTorrentTag(*hash, "Comic")
+			if err := db.AddTorrent(*hash, fmt.Sprintf("weekly:%s", date), title, *target); err != nil {
+				return false, err
+			}
+			if err := db.MarkWeeklySent(date); err != nil {
+				return false, err
+			}
+			_ = notifier.NotifyEvent("comic_queued", map[string]any{"title": title, "hash": *hash, "method": "torrent"})
+			return true, nil
+		}
+	}
+	if directURL != "" {
+		title := fmt.Sprintf("Weekly Pack %s", date)
+		path, err := client.DownloadDirect(directURL, *target, title)
+		if err != nil {
+			return false, err
+		}
+		if err := db.MarkWeeklySent(date); err != nil {
+			return false, err
+		}
+		size := uint64(0)
+		if info, statErr := os.Stat(path); statErr == nil {
+			size = uint64(info.Size())
+		}
+		_ = notifier.NotifyComicComplete(title, path, size, "http")
+		return true, nil
 	}
 	return false, nil
 }
@@ -2928,8 +2995,10 @@ func parseComicLinks(html, pageURL string) (ComicLinks, error) {
 		text := strings.ToLower(textContentHTML(anchor))
 		normalizedText := strings.NewReplacer("-", " ", "_", " ").Replace(text)
 		titleAttr := strings.ToLower(anchor.attrs["title"])
+		normalizedTitle := strings.NewReplacer("-", " ", "_", " ").Replace(titleAttr)
 		isDownloadNow := strings.Contains(normalizedText, "download now") ||
-			strings.Contains(strings.NewReplacer("-", " ", "_", " ").Replace(titleAttr), "download now")
+			strings.Contains(normalizedTitle, "download now")
+		isTorrent := strings.Contains(normalizedText, "torrent") || strings.Contains(normalizedTitle, "torrent")
 		parsed, _ := url.Parse(joined)
 		path := ""
 		host := ""
@@ -2951,7 +3020,9 @@ func parseComicLinks(html, pageURL string) (ComicLinks, error) {
 			if !containsComicString(links.Mega, joined) {
 				links.Mega = append(links.Mega, joined)
 			}
-		case strings.HasSuffix(lowerHref, ".torrent"):
+		// GetComics wraps torrent files in `/dls/` URLs without a `.torrent`
+		// suffix. Their link text/title still explicitly says TORRENT.
+		case strings.HasSuffix(lowerHref, ".torrent") || isTorrent:
 			if !containsComicString(links.Torrents, joined) {
 				links.Torrents = append(links.Torrents, joined)
 			}
@@ -2966,6 +3037,33 @@ func parseComicLinks(html, pageURL string) (ComicLinks, error) {
 		}
 	}
 	return links, nil
+}
+
+// weeklyPackLinks removes links to individual GetComics post pages. Weekly Pack
+// articles contain a long list of red "Download" links, one for every comic in
+// the week; those are not links to the pack and must not be passed to the HTTP
+// downloader as if they were archives.
+func weeklyPackLinks(links ComicLinks) ComicLinks {
+	links.Direct = filterWeeklyPackDirectLinks(links.Direct)
+	links.DownloadNow = filterWeeklyPackDirectLinks(links.DownloadNow)
+	return links
+}
+
+func filterWeeklyPackDirectLinks(values []string) []string {
+	filtered := make([]string, 0, len(values))
+	for _, value := range values {
+		parsed, err := url.Parse(value)
+		if err != nil {
+			continue
+		}
+		host := strings.ToLower(parsed.Hostname())
+		path := strings.ToLower(parsed.Path)
+		if (host == "getcomics.org" || host == "www.getcomics.org") && !strings.HasPrefix(path, "/dls/") {
+			continue
+		}
+		filtered = append(filtered, value)
+	}
+	return filtered
 }
 
 func containsComicString(values []string, needle string) bool {

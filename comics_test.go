@@ -1,9 +1,11 @@
 package gextto
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -321,6 +323,49 @@ func TestDownloadHTTPResumesAfterTruncatedBody(t *testing.T) {
 	}
 }
 
+func TestDownloadHTTPRejectsTorrentPayloadWithoutRetrying(t *testing.T) {
+	// This is a minimal bencoded metainfo document. GetComics serves these from
+	// opaque `/dls/` URLs as application/octet-stream, so the content type alone
+	// cannot distinguish it from a comic archive.
+	payload := []byte("d4:infod4:name1:xee")
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		attempts++
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = writer.Write(payload)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	_, err := DownloadHTTP(server.Client(), server.URL+"/opaque-download", dir, "Weekly Pack 2026-09-23")
+	if !errors.Is(err, errComicDownloadTorrent) {
+		t.Fatalf("DownloadHTTP error = %v, want torrent payload error", err)
+	}
+	if attempts != 1 {
+		t.Errorf("attempts = %d, want 1 for a permanent content error", attempts)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("download directory contains %v, want no mislabeled torrent", entries)
+	}
+}
+
+func TestDownloadTorrentFileRejectsNonTorrentPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = writer.Write([]byte("this is not bencoded torrent metainfo"))
+	}))
+	defer server.Close()
+
+	_, err := DownloadTorrentFile(server.Client(), server.URL+"/torrent", t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "valid torrent metainfo") {
+		t.Fatalf("DownloadTorrentFile error = %v, want invalid metainfo error", err)
+	}
+}
+
 func TestUpsertWeeklyFillsMissingLinksAndReportsEligibility(t *testing.T) {
 	db := openTestComicsDb(t)
 	// Row recorded without links: pack found but torrent not ready yet.
@@ -509,6 +554,47 @@ func TestParsesPostsAndClassifiesDownloadLinks(t *testing.T) {
 	}
 	if len(links.Direct) != 1 {
 		t.Errorf("direct = %d, want 1", len(links.Direct))
+	}
+}
+
+func TestParsesGetComicsTorrentRedirectAsTorrent(t *testing.T) {
+	html := `<a href="/dls/opaque-torrent-token" title="TORRENT">TORRENT</a><a href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789">MAGNET LINK</a>`
+	links, err := parseComicLinks(html, "https://getcomics.org/other-comics/2026-09-23-weekly-pack/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(links.Torrents) != 1 || links.Torrents[0] != "https://getcomics.org/dls/opaque-torrent-token" {
+		t.Errorf("torrents = %#v, want opaque torrent redirect", links.Torrents)
+	}
+	if len(links.Direct) != 0 {
+		t.Errorf("direct = %#v, torrent redirect must not be a direct comic download", links.Direct)
+	}
+	if len(links.Magnets) != 1 {
+		t.Errorf("magnets = %#v, want magnet link", links.Magnets)
+	}
+}
+
+func TestWeeklyPackLinksSkipsIndividualComicPages(t *testing.T) {
+	links := weeklyPackLinks(ComicLinks{
+		Magnets: []string{"magnet:?xt=urn:btih:0123456789012345678901234567890123456789"},
+		Direct: []string{
+			"https://getcomics.org/dc/adventures-of-superman-book-of-el-12-2026/",
+			"https://getcomics.org/dls/pack-download-token",
+			"https://files.example/weekly-pack.cbz",
+		},
+		DownloadNow: []string{"https://getcomics.org/marvel/example-1-2026/"},
+	})
+	if len(links.Direct) != 2 {
+		t.Fatalf("direct = %#v, want only pack download candidates", links.Direct)
+	}
+	if links.Direct[0] != "https://getcomics.org/dls/pack-download-token" || links.Direct[1] != "https://files.example/weekly-pack.cbz" {
+		t.Errorf("direct = %#v", links.Direct)
+	}
+	if len(links.DownloadNow) != 0 {
+		t.Errorf("download_now = %#v, want no individual comic page", links.DownloadNow)
+	}
+	if len(links.Magnets) != 1 {
+		t.Errorf("magnets = %#v, must be preserved", links.Magnets)
 	}
 }
 
