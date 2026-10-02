@@ -6,11 +6,16 @@
 **Obiettivo:** realizzare un client torrent autonomo, utilizzabile da qualunque applicazione o utente tramite API e CLI, con supporto a torrent v1, v2 e ibridi. Gextto deve poterlo pilotare tramite un adapter, senza esserne un requisito o il proprietario del suo modello dati.
 **Non-obiettivo:** fondere libtorrent e anacrolix nello stesso swarm o farli scaricare contemporaneamente lo stesso torrent.
 
+> **Nota sul prodotto attuale:** questa è una proposta per un daemon futuro e
+> autonomo, non descrive i backend distribuiti oggi con Gextto. Gextto supporta
+> libtorrent integrato e qBittorrent-nox; l'eventuale impiego di Anacrolix qui
+> descritto sarebbe un componente separato, da progettare e validare.
+
 ---
 
 ## 1. Sintesi
 
-Il progetto è **tecnicamente fattibile**, ma è un prodotto autonomo, non una semplice estrazione del codice attuale. La strada consigliata è creare `gextto-torrentd` come processo dedicato, scritto in Go, che usa inizialmente anacrolix come motore BitTorrent e offre API, CLI e un modello dati indipendenti. `gexttod` è uno dei client di tale API, alla pari di una CLI, un'interfaccia web o altri servizi.
+Il progetto è **tecnicamente fattibile**, ma è un prodotto autonomo, non una semplice estrazione del codice attuale. La proposta valuta un daemon dedicato, scritto in Go, che potrebbe usare inizialmente la libreria upstream Anacrolix come motore BitTorrent e offrire API, CLI e un modello dati indipendenti. `gexttod` sarebbe uno dei client di tale API, alla pari di una CLI, un'interfaccia web o altri servizi.
 
 Non deve tentare di riscrivere o combinare i due core BitTorrent. Deve invece separare chiaramente:
 
@@ -31,11 +36,11 @@ L'obiettivo stabile non è solo la parità con il backend libtorrent usato oggi 
 
 Gextto dispone della separazione concettuale nel contratto Go `TorrentEngine` (`torrent_engine.go`). Il piano di controllo mantiene in Gextto ricerca, coda, policy di seed, archiviazione e post-processing; i backend attualmente supportati sono libtorrent integrato e qBittorrent-nox. La proposta torrentd resta un progetto autonomo e non descrive un backend incluso in Gextto.
 
-I backend attuali sono:
+I backend attualmente supportati da Gextto sono:
 
 - **libtorrent integrato**: processo in-process attraverso bridge CGO/C++; è il riferimento funzionale completo;
 - **qBittorrent-nox**: processo esterno pilotato tramite Web API;
-- **Anacrolix**: backend Go rimosso da Gextto; un eventuale uso in `gextto-torrentd` sarebbe indipendente e fuori processo.
+- **Anacrolix**: non è più un backend Gextto; il suo possibile uso in `gextto-torrentd` è soltanto una proposta indipendente e fuori processo.
 
 qBittorrent dimostra che un backend remoto è già compatibile con Gextto, comprese verifica di disponibilità e mapping sicuro dei percorsi. Nel repository Gextto, `gextto-torrentd` comparirà come quarto backend, denominato `torrentd`; il daemon resta però installabile e utilizzabile anche senza Gextto.
 
@@ -468,7 +473,7 @@ Le stime non includono un protocollo BitTorrent proprietario: sono basate sull'u
 ### Test automatici
 
 - test unitari per stato normalizzato, idempotenza, path policy e opzioni;
-- test di contratto contro embedded, qBittorrent, anacrolix e torrentd, con fixture v1, v2 e hybrid;
+- test di contratto contro embedded, qBittorrent e torrentd (con il motore autonomo che verrà scelto), con fixture v1, v2 e hybrid;
 - test di deduplicazione: aggiungere un hybrid prima con `btih`, poi con `btmh`, deve restituire lo stesso `torrent_id` e non creare due download;
 - test di migrazione schema Gextto: hash v1 storico, torrent v2 puro e hybrid devono rimanere interrogabili e rimovibili;
 - integrazione con tracker locale e swarm controllato;

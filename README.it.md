@@ -19,6 +19,13 @@ funzionare come servizio.
 - UI web responsive e TUI mostrano salute, log, backup, manutenzione e
   integrazioni con Trakt, Simkl, Jellyfin e Plex.
 
+### Motori torrent
+
+Gextto supporta il motore libtorrent integrato e l'adapter Web API di
+qBittorrent-nox. Il precedente backend Anacrolix non è più incluso. Le
+configurazioni esistenti con `torrent_backend=anacrolix` ripiegano sul motore
+integrato all'avvio e registrano un avviso nel log.
+
 ## Interfaccia web e menu
 
 La UI web è un piano di controllo completo, non solo una pagina di stato. È

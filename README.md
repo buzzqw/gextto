@@ -19,6 +19,13 @@ service.
 - The responsive web UI and terminal TUI expose health, logs, backups,
   maintenance and integrations with Trakt, Simkl, Jellyfin and Plex.
 
+### Torrent engines
+
+Gextto currently supports the embedded libtorrent engine and the qBittorrent-nox
+Web API adapter. The former Anacrolix backend is no longer included. Existing
+configurations that still set `torrent_backend=anacrolix` fall back to the
+embedded engine at startup and log a warning.
+
 ## Web interface and menu
 
 The web UI is a complete control plane, not only a status page. It is responsive
