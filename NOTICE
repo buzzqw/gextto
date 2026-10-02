@@ -9,7 +9,7 @@ Gextto depends on third-party libraries under their own licences. Two are worth
 calling out explicitly:
 
 - libtorrent (BSD-3-Clause): the default embedded BitTorrent engine, linked
-  through CGo (native/libtorrent_bridge.cpp).
+  through CGo (libtorrent_bridge.cpp + libtorrent_bridge.h).
 - github.com/anacrolix/torrent (Mozilla Public License 2.0): the optional native
   Go torrent backend. It is only compiled when the daemon is built with the
   `anacrolix` build tag (see `make build-anacrolix`).

@@ -1,10 +1,10 @@
 #ifndef GEXTTO_LT_BRIDGE_H
 #define GEXTTO_LT_BRIDGE_H
 
-// Shared ABI between the C++ libtorrent bridge (native/libtorrent_bridge.cpp
-// and the package-root libtorrent_bridge.cpp compiled by cgo) and the cgo
-// preamble. The struct definitions are copied from the bridge's original
-// `extern "C"` block; the function declarations mirror its extern "C" API.
+// Shared ABI between the C++ libtorrent bridge (the package-root
+// libtorrent_bridge.cpp compiled by cgo) and the cgo preamble. The struct
+// definitions are copied from the bridge's original `extern "C"` block; the
+// function declarations mirror its extern "C" API.
 //
 // The header must stay valid C (cgo compiles the preamble with the C
 // compiler), hence `struct gextto_lt_session` is always spelled out and

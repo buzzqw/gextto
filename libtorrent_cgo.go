@@ -1,10 +1,9 @@
 //go:build cgo
 
 // Package gextto: thin cgo wrappers around the C ABI exposed by
-// native/libtorrent_bridge.h. All logic lives in libtorrent.go; this file only
-// marshals Go values across the C boundary. The C++ implementation is
-// libtorrent_bridge.cpp (the verbatim reference lives at
-// native/libtorrent_bridge.cpp).
+// libtorrent_bridge.h. All logic lives in libtorrent.go; this file only
+// marshals Go values across the C boundary. The C++ implementation is the
+// package-root libtorrent_bridge.cpp, compiled by cgo.
 package gextto
 
 /*
@@ -13,7 +12,7 @@ package gextto
 #cgo linux LDFLAGS: -Wl,-rpath,$ORIGIN/lib
 
 #include <stdlib.h>
-#include "native/libtorrent_bridge.h"
+#include "libtorrent_bridge.h"
 
 // Defined in libtorrent_bridge.cpp: releases freed glibc arena memory to the OS.
 void gextto_trim_memory(void);

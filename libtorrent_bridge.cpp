@@ -44,7 +44,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "native/libtorrent_bridge.h"
+#include "libtorrent_bridge.h"
 
 namespace lt = libtorrent;
 
@@ -491,8 +491,8 @@ int gextto_lt_add_file(gextto_lt_session* session, const char* torrent_path, con
 }
 
 // Add-time option flags shared by the `*_ex` entry points. The constants are
-// declared in native/libtorrent_bridge.h so the Go layer and the bridge agree
-// on the ABI.
+// declared in libtorrent_bridge.h so the Go layer and the bridge agree on the
+// ABI.
 static void gextto_apply_add_flags(lt::add_torrent_params& params, int flags) {
     if (flags & GEXTTO_ADD_PAUSED) params.flags |= lt::torrent_flags::paused;
     if (flags & GEXTTO_ADD_SEQUENTIAL) params.flags |= lt::torrent_flags::sequential_download;
@@ -1629,8 +1629,7 @@ int gextto_lt_session_stats(gextto_lt_session* session, char* output, size_t out
 }
 }
 
-/* Return freed glibc arena memory to the operating system (see trim note in
- * native/libtorrent_bridge.cpp). */
+/* Return freed glibc arena memory to the operating system. */
 #include <malloc.h>
 extern "C" void gextto_trim_memory(void) {
 #if defined(__GLIBC__)
