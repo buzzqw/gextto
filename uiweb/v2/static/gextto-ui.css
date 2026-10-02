@@ -458,6 +458,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid color-mix(in srgb, va
 .logs-toolbar { flex-wrap: nowrap; }
 .logs-toolbar [data-logs-filter] { flex: 1 1 auto; min-width: 120px; }
 .logs-toolbar [data-logs-lines] { flex: 0 0 76px; width: 76px; min-width: 76px; }
+.logs-toolbar select[name="log"] { flex: 0 0 auto; width: auto; min-width: 230px; }
 .form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-items: end; }
 .form-grid .span-full, .form-grid .form-actions { grid-column: 1 / -1; }
@@ -1138,6 +1139,7 @@ pre.log-view { margin: 0; }
   .data-table th, .data-table td { padding: 8px 10px; }
   .logs-toolbar { flex-wrap: wrap; }
   .logs-toolbar [data-logs-lines] { flex: 0 0 auto; width: auto; }
+  .logs-toolbar select[name="log"] { flex: 1 1 auto; width: auto; min-width: 180px; }
 
   /* Dashboard metrics use two columns as soon as there is room. */
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
