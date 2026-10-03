@@ -576,6 +576,55 @@ html, body {
 }
 
 /* v2 widgets: card grids and the maintenance review tables. */
+.v2-content-filter-tools-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.v2-content-filter-tools-grid > .panel {
+  min-width: 0;
+}
+.v2-content-archive-prefilters {
+  align-items: flex-start;
+}
+.v2-score-group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 180px) auto;
+  gap: 12px;
+  align-items: end;
+}
+.v2-score-group-row .setting-info,
+.v2-score-group-row .setting-control,
+.v2-score-group-row .setting-actions {
+  min-width: 0;
+}
+.v2-score-group-row .setting-actions {
+  display: flex;
+  gap: 8px;
+}
+.v2-score-group-add {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.v2-score-group-add .field {
+  flex: 1 1 180px;
+}
+@media (max-width: 900px) {
+  .v2-content-filter-tools-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .v2-score-group-row {
+    grid-template-columns: minmax(0, 1fr) minmax(90px, 130px);
+  }
+  .v2-score-group-row .setting-actions {
+    grid-column: 1 / -1;
+  }
+}
+
 .tmdb-card-body .tmdb-overview {
   display: -webkit-box;
   -webkit-line-clamp: 3;

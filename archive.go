@@ -373,18 +373,135 @@ func (a *Archive) BrowsePage(query string, page, limit int) (*ArchivePage, error
 	return &ArchivePage{Items: items, Total: total, Page: page, Pages: pages}, nil
 }
 
+// BrowseContentFilteredPage returns archive rows whose titles match the text
+// query and at least one selected content filter. The regular expression and
+// Unicode-script rules intentionally share titleIsContentFiltered with intake.
+func (a *Archive) BrowseContentFilteredPage(query string, filters []string, page, limit int) (*ArchivePage, error) {
+	if len(filters) == 0 {
+		return nil, fmt.Errorf("selezionare almeno un pre-filtro")
+	}
+	if page < 1 {
+		page = 1
+	}
+	limit = clampInt(limit, 1, 500)
+	rows, err := a.contentFilterCandidates(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []ArchiveEntry{}
+	var total int64
+	start := int64((page - 1) * limit)
+	for rows.Next() {
+		var entry ArchiveEntry
+		if err := rows.Scan(&entry.ID, &entry.Title, &entry.Magnet, &entry.Source, &entry.QualityScore, &entry.AddedAt); err != nil {
+			return nil, err
+		}
+		if !titleIsContentFiltered(entry.Title, filters) {
+			continue
+		}
+		if total >= start && len(items) < limit {
+			entry.Release = ParseRelease(entry.Title, entry.Magnet, "archive:"+entry.Source)
+			items = append(items, entry)
+		}
+		total++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	pages := int((total + int64(limit) - 1) / int64(limit))
+	if pages < 1 {
+		pages = 1
+	}
+	return &ArchivePage{Items: items, Total: total, Page: page, Pages: pages}, nil
+}
+
+// DeleteContentFiltered removes every archive row matching the text query and
+// at least one selected content filter. Filters are kept explicit so bulk
+// deletion cannot accidentally target the entire catalogue.
+func (a *Archive) DeleteContentFiltered(query string, filters []string) (int, error) {
+	if len(filters) == 0 {
+		return 0, fmt.Errorf("selezionare almeno un pre-filtro")
+	}
+	rows, err := a.contentFilterCandidates(query)
+	if err != nil {
+		return 0, err
+	}
+	ids := []int64{}
+	for rows.Next() {
+		var id int64
+		var title string
+		var magnet, source, addedAt string
+		var quality int64
+		if err := rows.Scan(&id, &title, &magnet, &source, &quality, &addedAt); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		if titleIsContentFiltered(title, filters) {
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	return a.DeleteIDs(ids)
+}
+
+func (a *Archive) contentFilterCandidates(query string) (*sql.Rows, error) {
+	includes, excludes := parseArchiveFilter(query)
+	selectSQL := "SELECT archive.id,archive.title,archive.magnet,COALESCE(archive.source,'archive'),COALESCE(archive.quality_score,0),archive.added_at FROM archive"
+	if len(includes) > 0 {
+		return a.db.Query(selectSQL+" JOIN archive_fts ON archive_fts.rowid=archive.id WHERE archive_fts MATCH ?1 ORDER BY archive.added_at DESC,archive.id DESC", ftsMatchExpression(includes, excludes))
+	}
+	if len(excludes) == 0 {
+		return a.db.Query(selectSQL + " ORDER BY archive.added_at DESC,archive.id DESC")
+	}
+	where := make([]string, len(excludes))
+	args := make([]any, len(excludes))
+	for index, word := range excludes {
+		where[index] = fmt.Sprintf("lower(archive.title) NOT LIKE ?%d", index+1)
+		args[index] = "%" + word + "%"
+	}
+	return a.db.Query(selectSQL+" WHERE "+strings.Join(where, " AND ")+" ORDER BY archive.added_at DESC,archive.id DESC", args...)
+}
+
 // DeleteIDs deletes the given row ids, ignoring non-positive ids.
 func (a *Archive) DeleteIDs(ids []int64) (int, error) {
+	const batchSize = 500 // stay below SQLite's portable bind-variable limit
+	unique := make([]int64, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return 0, nil
+	}
 	tx, err := a.db.Begin()
 	if err != nil {
 		return 0, err
 	}
 	removed := 0
-	for _, id := range ids {
-		if id <= 0 {
-			continue
+	for start := 0; start < len(unique); start += batchSize {
+		end := min(start+batchSize, len(unique))
+		placeholders := make([]string, end-start)
+		args := make([]any, end-start)
+		for index, id := range unique[start:end] {
+			placeholders[index] = fmt.Sprintf("?%d", index+1)
+			args[index] = id
 		}
-		result, err := tx.Exec("DELETE FROM archive WHERE id=?1", id)
+		result, err := tx.Exec("DELETE FROM archive WHERE id IN ("+strings.Join(placeholders, ",")+")", args...)
 		if err != nil {
 			_ = tx.Rollback()
 			return 0, err

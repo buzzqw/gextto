@@ -95,6 +95,15 @@ func TestLanguageDoesNotChangeQualityScore(t *testing.T) {
 	}
 }
 
+func TestCustomReleaseGroupScoreUsesConfiguredGroupName(t *testing.T) {
+	quality := Quality{Group: "tbk"}
+	base := quality.Score()
+	got := quality.ScoreWithSettings(map[string]string{"score_group_tbk": "125"})
+	if got != base+125 {
+		t.Fatalf("custom group score = %d, want base %d + 125", got, base)
+	}
+}
+
 func TestStandardBonusOverridesPreserveBaseScore(t *testing.T) {
 	quality := Quality{IsDV: true, IsProper: true, IsRepack: true, IsReal: true, HDR: "HDR10"}
 	settings := map[string]string{

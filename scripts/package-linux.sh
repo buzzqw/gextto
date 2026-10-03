@@ -15,10 +15,17 @@ LABEL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --binary) BINARY="$2"; shift 2 ;;
-    --output) OUTPUT="$2"; shift 2 ;;
-    --arch) ARCH="$2"; shift 2 ;;
-    --label) LABEL="$2"; shift 2 ;;
+    --binary|--output|--arch|--label)
+      option="$1"
+      [[ $# -ge 2 && -n "$2" ]] || { echo "$option requires a value" >&2; exit 2; }
+      case "$option" in
+        --binary) BINARY="$2" ;;
+        --output) OUTPUT="$2" ;;
+        --arch) ARCH="$2" ;;
+        --label) LABEL="$2" ;;
+      esac
+      shift 2
+      ;;
     -h|--help) echo "usage: package-linux.sh [--binary PATH] [--output FILE] [--arch ARCH] [--label TEXT]"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac

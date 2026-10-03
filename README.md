@@ -101,10 +101,13 @@ embedded libtorrent engine, not hardware-independent benchmarks:
   and only about **51 MiB** of anonymous memory;
 - over roughly five minutes in that mostly idle state, accumulated CPU time was
   about **7 seconds** (around **2% of one CPU core on average**);
-- an active search/download cycle can temporarily use substantially more memory:
-  a peak of about **1.4 GiB** cgroup memory was observed during a high-load
-  cycle, while the process resident baseline returned to the lower range
-  afterward.
+- with five torrents in session but no active download, a later sample showed
+  about **168 MiB RSS** and **15 MiB Go heap**; this is an observation, not a
+  guaranteed idle baseline;
+- search/download cycles can have temporary peaks: systemd recorded about
+  **2.1 GiB** as the peak of a previous service instance. The service was later
+  restarted and its RSS returned much lower, so distinguish the peak from its
+  steady resident footprint.
 
 Use these figures as sizing examples, not guarantees. For the daemon's actual
 resident footprint, prefer process RSS; cgroup totals also include reclaimable
@@ -255,4 +258,3 @@ any copyrighted content.
 
 Gextto is licensed under the [EUPL-1.2](LICENSE). See [NOTICE](NOTICE) for
 notices about bundled and optional third-party components.
-

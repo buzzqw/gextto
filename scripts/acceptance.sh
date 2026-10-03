@@ -15,7 +15,10 @@ PID=""
 
 # shellcheck disable=SC2317  # cleanup is invoked indirectly by the EXIT trap
 cleanup() {
-  if [[ -n "$PID" ]]; then kill "$PID" 2>/dev/null || true; fi
+  if [[ -n "$PID" ]]; then
+    kill "$PID" 2>/dev/null || true
+    wait "$PID" 2>/dev/null || true
+  fi
   rm -rf "$DATA"
 }
 trap cleanup EXIT

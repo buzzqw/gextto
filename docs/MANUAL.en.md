@@ -511,11 +511,14 @@ highlighted with a “Save all” bar.
   Under *Security, proxy and network* the **VPN killswitch interface** binds
   listening and outgoing traffic to a chosen interface (e.g. `tun0`, `wg0`);
   the list is read from the server, and the change applies after a restart.
-- **Scores** — weights per category, custom groups and a live simulator. One
-  effective score is used for acquisition, searches, upgrades, post-processing,
-  archive records and rescoring; it also includes the size bonus and, for movies,
-  the preferred-subtitle bonus. Use **Maintenance → Rescore** after changing
-  weights.
+- **Scores** — category weights, custom-group management (add, edit or remove a
+  group and set its bonus/penalty), and a live simulator. The group name must
+  match the release's final group tag, for example `TBK`. Audio language is a
+  per-title eligibility requirement, not a fixed Italian bonus, so English can
+  be preferred instead. Preferred subtitles add a small optional bonus without
+  making a release mandatory. One effective score is used for acquisition,
+  searches, upgrades, post-processing, archive records and rescoring; it also
+  includes the size bonus. Use **Maintenance → Rescore** after changing weights.
   - **Rename** — rename enable, template editor with tokens and live preview,
   TMDB/TVDB keys, language and upgrade thresholds. Verification recovers
   the source token from the original release title stored in the database and

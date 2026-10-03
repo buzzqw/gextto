@@ -68,7 +68,7 @@ done
 
 if [[ "$MODE" == "build" ]]; then
     echo "==> building from $ROOT"
-    ( cd "$ROOT" && make build )
+    ( cd "$ROOT" && GEXTTO_BINARY="$BINARY" make build )
 else
     [[ -x "$BINARY" ]] || { echo "gexttod not found at $BINARY" >&2; exit 1; }
     echo "==> installing published payload"

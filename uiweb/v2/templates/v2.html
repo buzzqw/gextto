@@ -600,6 +600,7 @@
 <div id="v2-settings-body" class="settings-body">
   {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
   {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
+  {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
   {{range .Groups}}
   <div class="panel settings-panel">
     <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
@@ -618,6 +619,32 @@
 </div>
 {{end}}
 
+{{define "v2_score_groups"}}
+<div class="panel settings-panel" id="v2-score-groups">
+  <div class="panel-head"><h3>Gruppi custom</h3><small class="muted">Bonus o penalità per release group</small></div>
+  <div class="panel-body">
+    <p class="hint">Il nome deve corrispondere al tag finale della release (es. TBK). Il punteggio viene sommato allo score tecnico; sono ammessi anche valori negativi.</p>
+    {{if .ScoreNotice}}<p class="{{if .ScoreError}}error{{else}}muted{{end}}" role="status">{{.ScoreNotice}}</p>{{end}}
+    <div class="settings-rows">
+      {{range .ScoreGroups}}
+      <form class="setting-row v2-score-group-row" method="post" action="/v2/settings/score-groups" hx-post="/v2/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
+        <input type="hidden" name="name" value="{{.Name}}" />
+        <div class="setting-info"><strong class="setting-label">{{.Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
+        <div class="setting-control"><input class="input" type="number" name="score" value="{{.Score}}" aria-label="Punteggio gruppo {{.Name}}" /></div>
+        <div class="setting-actions"><button class="btn sm primary" type="submit">Salva</button><button class="btn sm danger" type="submit" name="op" value="delete" hx-confirm="Rimuovere il gruppo {{.Name}}?">Rimuovi</button></div>
+      </form>
+      {{else}}<p class="muted">Nessun gruppo personalizzato configurato.</p>{{end}}
+    </div>
+    <form class="form-actions v2-score-group-add" method="post" action="/v2/settings/score-groups" hx-post="/v2/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
+      <input type="hidden" name="op" value="add" />
+      <label class="field"><span>Nuovo gruppo</span><input class="input" name="name" placeholder="es. TBK" required maxlength="64" pattern="[A-Za-z0-9]+" /></label>
+      <label class="field"><span>Punteggio</span><input class="input" type="number" name="score" value="0" required /></label>
+      <button class="btn sm primary" type="submit">Aggiungi gruppo</button>
+    </form>
+  </div>
+</div>
+{{end}}
+
 {{define "v2_settings_editors"}}
 {{if .ShowFeeds}}
 <div class="card editor-card">
@@ -628,7 +655,11 @@
   </form>
 </div>
 {{end}}
-{{range .CheckboxGroups}}{{template "v2_checkbox_group" .}}{{end}}
+{{range .CheckboxGroups}}
+  {{if eq .Key "content_filters"}}<div class="v2-content-filter-tools-grid">{{end}}
+  {{template "v2_checkbox_group" .}}
+  {{if eq .Key "content_filters"}}{{template "v2_content_archive_cleanup" .}}</div>{{end}}
+{{end}}
 {{range .ListEditors}}{{template "v2_list_editor" .}}{{end}}
 {{end}}
 
@@ -646,7 +677,6 @@
     </form>
   </div>
 </div>
-{{if eq .Key "content_filters"}}{{template "v2_content_archive_cleanup" .}}{{end}}
 {{end}}
 
 {{define "v2_content_archive_cleanup"}}
@@ -654,9 +684,15 @@
   <div class="panel-head"><h3>Pulisci i risultati già archiviati</h3><small class="muted">Ricerca nel catalogo</small></div>
   <div class="panel-body">
     <p class="hint">I filtri escludono nuove release, ma non rimuovono quelle già presenti nell’Archivio. Cerca parole nel titolo per eliminare singoli risultati, quelli selezionati o tutte le corrispondenze.</p>
-    <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML" class="toolbar">
-      <input class="input" type="search" name="q" placeholder="es. porno, XXX, adult" required />
-      <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
+    <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
+      <div class="toolbar">
+        <input class="input" type="search" name="q" placeholder="Parole nel titolo, es. adult o xxx" />
+        <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
+      </div>
+      <p class="muted" style="margin:10px 0 6px">Oppure filtra per i contenuti che verrebbero esclusi:</p>
+      <div class="toolbar checkbox-row v2-content-archive-prefilters">
+         {{range .Options}}<label class="check"><input type="checkbox" name="filter" value="{{.Value}}" /> <span>{{.Label}}</span></label>{{end}}
+      </div>
     </form>
     <div id="v2-content-archive-results" aria-live="polite"></div>
   </div>
@@ -665,11 +701,12 @@
 
 {{define "v2_content_archive_results"}}
   {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
-  {{if .Query}}
+  {{if or .Query .Filters}}
     {{if .Total}}
-    <p class="muted">{{.Total}} risultati per “{{.Query}}”. Mostro i primi {{len .Items}}.</p>
+    <p class="muted">{{.Total}} risultati{{if .Query}} per “{{.Query}}”{{end}}{{if .Filters}} corrispondenti ai pre-filtri selezionati{{end}}. Mostro i primi {{len .Items}}.</p>
     <form method="post" action="/v2/settings/content-archive/delete" hx-post="/v2/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
       <input type="hidden" name="q" value="{{.Query}}" />
+      {{range .Filters}}<input type="hidden" name="filter" value="{{.}}" />{{end}}
       <div class="table-wrap"><table class="table">
         <thead><tr><th></th><th>Titolo</th><th>Fonte</th><th>Azioni</th></tr></thead>
         <tbody>
@@ -685,11 +722,11 @@
       </table></div>
       <div class="form-actions">
         <button class="btn sm danger" type="submit" hx-confirm="Eliminare le voci selezionate dall’Archivio?">Elimina selezionati</button>
-        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci che corrispondono alla ricerca “{{.Query}}”?">Elimina tutti i risultati</button>
+        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci corrispondenti alla ricerca e ai pre-filtri selezionati?">Elimina tutti i risultati</button>
       </div>
     </form>
     {{else}}
-    <p class="muted">Nessun risultato per “{{.Query}}”.</p>
+    <p class="muted">Nessun risultato{{if .Query}} per “{{.Query}}”{{end}}{{if .Filters}} con i pre-filtri selezionati{{end}}.</p>
     {{end}}
   {{end}}
 {{end}}

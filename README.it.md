@@ -104,10 +104,13 @@ integrato, non benchmark indipendenti dall'hardware:
   file e solo circa **51 MiB** di memoria anonima;
 - in circa cinque minuti nello stesso stato prevalentemente inattivo, il tempo
   CPU accumulato è stato di circa **7 secondi** (circa **2% di un core in media**);
-- un ciclo attivo di ricerca/download può usare temporaneamente più memoria: in
-  un ciclo ad alto carico è stato osservato un picco di circa **1,4 GiB** di
-  memoria cgroup, mentre il consumo residente del processo è poi tornato nella
-  fascia bassa.
+- durante un controllo successivo, con cinque torrent in sessione ma nessun
+  download attivo, il processo era intorno a **168 MiB RSS** e **15 MiB di heap
+  Go**; questo è un campione, non un valore di riposo garantito;
+- i cicli di ricerca/download possono avere picchi temporanei: systemd ha
+  registrato circa **2,1 GiB** come massimo di una precedente istanza del
+  servizio. Il processo è stato poi riavviato e il suo RSS è tornato molto più
+  basso. Il picco va quindi distinto dalla memoria residente stabile.
 
 Usa questi valori come esempi di dimensionamento, non come garanzie. Per il
 consumo residente effettivo del demone è più utile l'RSS del processo; il totale

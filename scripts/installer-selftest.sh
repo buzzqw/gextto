@@ -75,6 +75,12 @@ check_install() {
   capture bash "$INSTALL" --dry-run --uninstall --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --dry-run --uninstall works" 0 "uninstalled"
 
+  capture bash "$INSTALL" --dry-run --uninstall --purge --data-dir / --install-dir "$TMP/opt"
+  expect "$label: purge refuses filesystem root" 1 "unsafe data directory target"
+
+  capture bash "$INSTALL" --dry-run --purge --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: purge requires uninstall" 1 "--purge requires --uninstall"
+
   : > "$TMP/local.tar.gz"
   capture bash "$INSTALL" --dry-run --local-archive "$TMP/local.tar.gz" \
     --data-dir "$TMP/data" --install-dir "$TMP/opt"
@@ -105,8 +111,17 @@ check_user_install() {
   capture bash "$USER_INSTALL" --dry-run --uninstall --data-dir "$TMP/udata"
   expect "$label: --dry-run --uninstall works" 0 "uninstalled"
 
+  capture bash "$USER_INSTALL" --dry-run --uninstall --purge --data-dir /
+  expect "$label: purge refuses filesystem root" 1 "unsafe data purge target"
+
+  capture bash "$USER_INSTALL" --dry-run --purge --data-dir "$TMP/udata"
+  expect "$label: purge requires uninstall" 1 "--purge requires --uninstall"
+
   capture bash "$USER_INSTALL" --dry-run --port 8081 --data-dir "$TMP/udata"
   expect "$label: --port is applied" 0 "0.0.0.0:8081"
+
+  capture bash "$USER_INSTALL" --dry-run --port 8081 --listen 127.0.0.1:8181 --data-dir "$TMP/udata"
+  expect "$label: --listen overrides the port-derived address" 0 "127.0.0.1:8181"
 
   # Nothing may be written to the (overridden) unit directory by a dry-run.
   if [[ -e "$XDG_CONFIG_HOME/systemd/user/gextto.service" ]]; then
@@ -116,11 +131,20 @@ check_user_install() {
   fi
 }
 
+check_package_script() {
+  capture bash -n "$ROOT/scripts/package-linux.sh"
+  expect "package-linux.sh: syntax" 0
+
+  capture bash "$ROOT/scripts/package-linux.sh" --binary
+  expect "package-linux.sh: missing option value is rejected" 2 "requires a value"
+}
+
 printf 'installer self-test\n'
 check_common "install.sh" "$INSTALL"
 check_common "install-user-service.sh" "$USER_INSTALL"
 check_install
 check_user_install
+check_package_script
 
 if (( failures > 0 )); then
   printf '\n%d check(s) failed\n' "$failures" >&2

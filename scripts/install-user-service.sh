@@ -22,7 +22,7 @@ PORT="${GEXTTO_PORT:-5000}"
 # Gextto is meant to be used over the LAN from the other PCs of the same owner,
 # so the service listens on every interface by default. Restrict access with a
 # firewall or reverse proxy when the network is not fully trusted.
-LISTEN_OVERRIDE="${GEXTTO_LISTEN:-}"
+LISTEN="${GEXTTO_LISTEN:-}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
 ACTIVE="${GEXTTO_ACTIVE:-1}"
 SERVICE_DRY_RUN="${GEXTTO_DRY_RUN:-0}"
@@ -42,6 +42,17 @@ ACTION="install"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+validate_data_purge_target() {
+  local resolved
+  [[ -n "$DATA_DIR" ]] || die "data directory must not be empty"
+  resolved="$(realpath -m -- "$DATA_DIR")" || die "cannot resolve data directory: $DATA_DIR"
+  case "$resolved" in
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|"$ROOT"|"$HOME")
+      die "refusing unsafe data purge target: $DATA_DIR (resolves to $resolved)"
+      ;;
+  esac
+}
 
 # run executes a mutating command, or prints it when --dry-run is set.
 run() {
@@ -100,6 +111,7 @@ preflight() {
   if ! command -v systemctl >/dev/null 2>&1; then
     die "systemctl is required"
   fi
+  command -v realpath >/dev/null 2>&1 || die "realpath is required"
   if ! systemctl --user show-environment >/dev/null 2>&1; then
     if [[ "$PLAN" == "1" ]]; then
       warn "no systemd user manager detected (dry-run continues)"
@@ -118,7 +130,7 @@ build_binary() {
     return 0
   fi
   log "building $BINARY"
-  ( cd "$ROOT" && make build )
+  ( cd "$ROOT" && GEXTTO_BINARY="$BINARY" make build )
 }
 
 write_unit() {
@@ -228,11 +240,13 @@ print_summary() {
 
 main() {
   parse_args "$@"
+  [[ "$PURGE" != "1" || "$ACTION" == "uninstall" ]] || die "--purge requires --uninstall"
   # Listen address follows the port unless it was given explicitly.
-  LISTEN="${LISTEN_OVERRIDE:-0.0.0.0:$PORT}"
+  LISTEN="${LISTEN:-0.0.0.0:$PORT}"
 
   if [[ "$ACTION" == "uninstall" ]]; then
     [[ "$PLAN" == "1" ]] || preflight
+    [[ "$PURGE" != "1" ]] || validate_data_purge_target
     uninstall
     return 0
   fi

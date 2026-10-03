@@ -610,19 +610,48 @@ func V2SettingsI18nDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 // --- content-filter archive cleanup ----------------------------------------
 
 type v2ContentArchiveResults struct {
-	Query  string
-	Items  []ArchiveEntry
-	Total  int64
-	Notice string
-	Error  bool
+	Query   string
+	Filters []string
+	Items   []ArchiveEntry
+	Total   int64
+	Notice  string
+	Error   bool
 }
 
-func v2ContentArchiveResultsFrom(s *AppState, query, notice string, isError bool) v2ContentArchiveResults {
-	result := v2ContentArchiveResults{Query: query, Notice: notice, Error: isError}
-	if s.archive == nil || strings.TrimSpace(query) == "" {
+func v2ContentArchiveFilters(r *http.Request) []string {
+	wanted := map[string]bool{}
+	for _, raw := range r.Form["filter"] {
+		wanted[strings.ToLower(strings.TrimSpace(raw))] = true
+	}
+	filters := []string{}
+	for _, option := range uiContentFilterOptions {
+		key := strings.ToLower(option.Value)
+		if wanted[key] {
+			filters = append(filters, option.Value)
+			delete(wanted, key)
+		}
+	}
+	return filters
+}
+
+func v2ContentArchiveResultsFrom(s *AppState, query string, filters []string, notice string, isError bool) v2ContentArchiveResults {
+	result := v2ContentArchiveResults{Query: query, Filters: append([]string(nil), filters...), Notice: notice, Error: isError}
+	if s.archive == nil {
 		return result
 	}
-	page, err := s.archive.BrowsePage(query, 1, 100)
+	if strings.TrimSpace(query) == "" && len(filters) == 0 {
+		if result.Notice == "" {
+			result.Notice = "Inserisci parole oppure seleziona uno o più pre-filtri."
+		}
+		return result
+	}
+	var page *ArchivePage
+	var err error
+	if len(filters) > 0 {
+		page, err = s.archive.BrowseContentFilteredPage(query, filters, 1, 100)
+	} else {
+		page, err = s.archive.BrowsePage(query, 1, 100)
+	}
 	if err != nil {
 		result.Notice = err.Error()
 		result.Error = true
@@ -641,8 +670,9 @@ func V2SettingsContentArchiveSearch(w http.ResponseWriter, r *http.Request, s *A
 		return
 	}
 	query := strings.TrimSpace(r.FormValue("q"))
+	filters := v2ContentArchiveFilters(r)
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, "", false), dict, eng)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, "", false), dict, eng)
 }
 
 // V2SettingsContentArchiveDelete deletes one row, selected rows, or all archive
@@ -653,11 +683,16 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 		return
 	}
 	query := strings.TrimSpace(r.FormValue("q"))
+	filters := v2ContentArchiveFilters(r)
 	removed := 0
 	var err error
 	switch {
 	case r.FormValue("delete_all") == "1":
-		removed, err = s.archive.DeleteMatching(query)
+		if len(filters) > 0 {
+			removed, err = s.archive.DeleteContentFiltered(query, filters)
+		} else {
+			removed, err = s.archive.DeleteMatching(query)
+		}
 	case r.FormValue("delete_id") != "":
 		var id int64
 		id, err = strconv.ParseInt(r.FormValue("delete_id"), 10, 64)
@@ -680,5 +715,5 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 		notice = err.Error()
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, notice, err != nil), dict, eng)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, notice, err != nil), dict, eng)
 }

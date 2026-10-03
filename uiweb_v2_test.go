@@ -404,6 +404,34 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	}
 }
 
+func TestV2ScoreGroupsCanBeAddedEditedAndRemoved(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=scores", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Gruppi custom") || !strings.Contains(body, `name="name"`) {
+		t.Fatalf("score groups editor -> %d: %s", code, body)
+	}
+
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"add"}, "name": {"TBK"}, "score": {"125"}})
+	if code != http.StatusOK || !strings.Contains(body, "tbk") || !strings.Contains(body, `value="125"`) {
+		t.Fatalf("add score group -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"save"}, "name": {"tbk"}, "score": {"-25"}})
+	if code != http.StatusOK || !strings.Contains(body, `value="-25"`) {
+		t.Fatalf("edit score group -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"delete"}, "name": {"tbk"}})
+	if code != http.StatusOK || !strings.Contains(body, "Gruppo rimosso") || strings.Contains(body, `value="-25"`) {
+		t.Fatalf("delete score group -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"add"}, "name": {"../../other"}, "score": {"1"}})
+	if code != http.StatusOK || !strings.Contains(body, "Nome gruppo non valido") {
+		t.Fatalf("reject invalid score group -> %d: %s", code, body)
+	}
+}
+
 func TestV2LogsAndStaticAndNoJSFallback(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

@@ -24,6 +24,10 @@ RELEASE="${GEXTTO_RELEASE:-continuous}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
 NO_START="${GEXTTO_NO_START:-0}"
 HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
+CHECKOUT_ROOT=""
+if [[ -f "${BASH_SOURCE[0]}" ]]; then
+  CHECKOUT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 DRY_RUN=0
 PURGE=0
 ACTION="install"
@@ -35,6 +39,19 @@ UNIT_PATH="/etc/systemd/system/gextto.service"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Refuse directory targets that would make an install/chown/rm operation
+# affect a system root, the checkout, or the user's whole home directory.
+validate_directory_target() {
+  local target="$1" label="$2" resolved
+  [[ -n "$target" ]] || die "$label must not be empty"
+  resolved="$(realpath -m -- "$target")" || die "cannot resolve $label: $target"
+  case "$resolved" in
+    /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/media|/mnt|/opt|/proc|/root|/run|/sbin|/srv|/sys|/tmp|/usr|/usr/local|/var|"$CHECKOUT_ROOT"|"$HOME")
+      die "refusing unsafe $label target: $target (resolves to $resolved)"
+      ;;
+  esac
+}
 
 # run executes a mutating command, or prints it when --dry-run is set.
 run() {
@@ -110,7 +127,7 @@ preflight() {
     fail_or_warn "systemd is required (no running systemd detected)"
   fi
   local cmd
-  for cmd in curl tar sha256sum install id useradd; do
+  for cmd in curl tar sha256sum install id useradd realpath; do
     command -v "$cmd" >/dev/null 2>&1 || fail_or_warn "missing required command: $cmd"
   done
 }
@@ -351,6 +368,9 @@ print_summary() {
 
 main() {
   parse_args "$@"
+  [[ "$PURGE" != "1" || "$ACTION" == "uninstall" ]] || die "--purge requires --uninstall"
+  validate_directory_target "$DATA_DIR" "data directory"
+  validate_directory_target "$INSTALL_DIR" "install directory"
 
   if [[ "$ACTION" == "uninstall" ]]; then
     [[ "$DRY_RUN" == "1" ]] || require_root

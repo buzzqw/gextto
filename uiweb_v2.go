@@ -137,6 +137,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /v2/settings/body", V2SettingsBody)
 	v2Handle(s, mux, "GET /v2/settings/search", V2SettingsSearch)
 	v2Handle(s, mux, "POST /v2/settings/save", V2SettingsSave)
+	v2Handle(s, mux, "POST /v2/settings/score-groups", V2SettingsScoreGroup)
 	v2Handle(s, mux, "POST /v2/settings/feed", V2SettingsFeed)
 	v2Handle(s, mux, "POST /v2/settings/checkbox", V2SettingsCheckbox)
 	v2Handle(s, mux, "GET /v2/settings/editor-row", V2SettingsEditorRow)
@@ -1485,6 +1486,9 @@ type v2SettingsView struct {
 	Note        string
 	Empty       string
 	Highlight   string
+	ScoreGroups []v2ScoreGroup
+	ScoreNotice string
+	ScoreError  bool
 	// Structured editors (feeds, checkbox groups, list editors, rename,
 	// translations), rendered on the tab that owns them.
 	EditorsFirst   bool
@@ -1496,14 +1500,34 @@ type v2SettingsView struct {
 	I18n           *v2I18nView
 }
 
+type v2ScoreGroup struct {
+	Name  string
+	Score string
+}
+
+func v2ScoreGroupsFrom(s *AppState) []v2ScoreGroup {
+	cfg := latestConfig(s)
+	groups := []v2ScoreGroup{}
+	for key, value := range cfg.Settings {
+		lower := strings.ToLower(key)
+		if !strings.HasPrefix(lower, "score_group_") || len(lower) == len("score_group_") {
+			continue
+		}
+		groups = append(groups, v2ScoreGroup{Name: strings.TrimPrefix(lower, "score_group_"), Score: value})
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].Name < groups[j].Name })
+	return groups
+}
+
 func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 	page := uiSettingsPageFrom(s, tab)
 	view := v2SettingsView{
-		Tabs:       page.Tabs,
-		ActiveID:   page.ActiveID,
-		FieldsGrid: page.FieldsGrid,
-		Highlight:  highlight,
-		Empty:      "Nessuna impostazione in questa sezione.",
+		Tabs:        page.Tabs,
+		ActiveID:    page.ActiveID,
+		FieldsGrid:  page.FieldsGrid,
+		Highlight:   highlight,
+		ScoreGroups: v2ScoreGroupsFrom(s),
+		Empty:       "Nessuna impostazione in questa sezione.",
 	}
 	for _, ref := range page.Tabs {
 		if ref.Active {
@@ -1542,6 +1566,61 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 		view.I18n = &i18nView
 	}
 	return view
+}
+
+// V2SettingsScoreGroup adds, updates or removes one user-defined release-group
+// score. Group suffixes use the same lower-case spelling as release parsing.
+func V2SettingsScoreGroup(w http.ResponseWriter, r *http.Request, s *AppState) {
+	name := strings.ToLower(strings.TrimSpace(r.FormValue("name")))
+	op := r.FormValue("op")
+	notice := ""
+	isError := false
+	validName := name != "" && len(name) <= 64
+	for _, char := range name {
+		// parseQuality recognizes final release-group tags as alphanumeric
+		// suffixes, so accepting punctuation here would create a group that
+		// can never match a release.
+		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9')) {
+			validName = false
+			break
+		}
+	}
+	if !validName {
+		notice, isError = "Nome gruppo non valido: usa solo lettere e numeri (max 64 caratteri).", true
+	} else {
+		key := "score_group_" + name
+		switch op {
+		case "", "save", "add":
+			value := strings.TrimSpace(r.FormValue("score"))
+			if _, err := strconv.ParseInt(value, 10, 64); err != nil {
+				notice, isError = "Il punteggio deve essere un numero intero.", true
+			} else if op == "add" && latestConfig(s).Settings[key] != "" {
+				notice, isError = "Il gruppo esiste già; modifica il punteggio nella sua riga.", true
+			} else if err := saveConfigSetting(s.cfg.DataDir, key, value); err != nil {
+				notice, isError = err.Error(), true
+			} else {
+				notice = "Punteggio gruppo salvato."
+			}
+		case "delete":
+			removed, err := DeleteSetting(s.cfg.DataDir, key)
+			if err != nil {
+				notice, isError = err.Error(), true
+			} else if !removed {
+				notice, isError = "Gruppo non trovato.", true
+			} else {
+				notice = "Gruppo rimosso."
+			}
+		default:
+			notice, isError = "Operazione gruppo non riconosciuta.", true
+		}
+	}
+	data := struct {
+		ScoreGroups []v2ScoreGroup
+		ScoreNotice string
+		ScoreError  bool
+	}{ScoreGroups: v2ScoreGroupsFrom(s), ScoreNotice: notice, ScoreError: isError}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_score_groups", data, dict, eng)
 }
 
 // v2ListEditorKey maps a list editor to the stable key the row/save endpoints use.

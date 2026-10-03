@@ -519,10 +519,15 @@ evidenziate con la barra “Salva tutte”.
   libero e spazio minimo; i valori restano modificabili. Il pulsante **Testa
   porte** verifica inoltre il bind locale delle porte indicate: non sostituisce
   il controllo del port-forwarding sul router/firewall.
-- **Punteggi** — pesi per categoria, gruppi custom e simulatore live. Il punteggio
-  effettivo è unico per acquisizione, ricerche, upgrade, post-processing,
-  archivio e rescore; comprende anche bonus dimensione e, per i film, sottotitoli
-  preferiti. Usa **Manutenzione → Ricalcola scoring** dopo aver cambiato i pesi.
+- **Punteggi** — pesi per categoria, gestione dei gruppi custom (aggiungi, modifica
+  o rimuovi il gruppo e assegna un bonus/penalità) e simulatore live. Il nome del
+  gruppo deve coincidere con il tag release finale, per esempio `TBK`. La lingua
+  audio è un requisito di ammissibilità per titolo, non un bonus fisso per
+  l'italiano: si può quindi preferire l'inglese. I sottotitoli preferiti danno
+  invece un piccolo bonus opzionale, senza rendere la release obbligatoria. Il
+  punteggio effettivo è unico per acquisizione, ricerche, upgrade,
+  post-processing, archivio e rescore; comprende anche il bonus dimensione. Usa
+  **Manutenzione → Ricalcola scoring** dopo aver cambiato i pesi.
   - **Rinomina** — abilita rinomina, editor del template con token e anteprima,
   chiavi TMDB/TVDB, lingua e soglie di upgrade. La verifica recupera il
   token sorgente dal titolo originale della release nel database ed elimina i

@@ -77,6 +77,58 @@ func TestDeleteMatchingRemovesAllTitleMatchesOnly(t *testing.T) {
 	}
 }
 
+func TestArchiveContentPrefiltersPreviewAndDeleteMatching(t *testing.T) {
+	archive := openTestArchive(t)
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
+		('Adult Porno Movie','magnet:adult','feed','2026-01-01'),
+		('CJK 動画タイトル','magnet:cjk','feed','2026-01-02'),
+		('Family Movie','magnet:family','feed','2026-01-03')`); err != nil {
+		t.Fatalf("insert archive fixtures: %v", err)
+	}
+
+	page, err := archive.BrowseContentFilteredPage("", []string{"[cjk]"}, 1, 100)
+	if err != nil || page.Total != 1 || page.Items[0].Magnet != "magnet:cjk" {
+		t.Fatalf("CJK prefilter page = (%+v, %v), want only CJK title", page, err)
+	}
+	page, err = archive.BrowseContentFilteredPage("movie", []string{"[porno]"}, 1, 100)
+	if err != nil || page.Total != 1 || page.Items[0].Magnet != "magnet:adult" {
+		t.Fatalf("keyword plus adult prefilter page = (%+v, %v), want only adult movie", page, err)
+	}
+	removed, err := archive.DeleteContentFiltered("", []string{"[porno]"})
+	if err != nil || removed != 1 {
+		t.Fatalf("adult prefilter deletion = (%d, %v), want (1, nil)", removed, err)
+	}
+	remaining, err := archive.Count()
+	if err != nil || remaining != 2 {
+		t.Fatalf("remaining count = (%d, %v), want (2, nil)", remaining, err)
+	}
+}
+
+func TestArchiveDeleteIDsBatchesAndDeduplicates(t *testing.T) {
+	archive := openTestArchive(t)
+	ids := make([]int64, 0, 501)
+	for index := 0; index < 501; index++ {
+		result, err := archive.db.Exec("INSERT INTO archive(title,magnet,source,added_at) VALUES (?1,?2,'test',datetime('now'))", fmt.Sprintf("Batch %d", index), fmt.Sprintf("magnet:batch-%d", index))
+		if err != nil {
+			t.Fatalf("insert batch row %d: %v", index, err)
+		}
+		id, err := result.LastInsertId()
+		if err != nil {
+			t.Fatalf("read batch row id %d: %v", index, err)
+		}
+		ids = append(ids, id)
+	}
+	ids = append(ids, ids[0], 0, -1)
+	removed, err := archive.DeleteIDs(ids)
+	if err != nil || removed != 501 {
+		t.Fatalf("DeleteIDs removed (%d, %v), want (501, nil)", removed, err)
+	}
+	count, err := archive.Count()
+	if err != nil || count != 0 {
+		t.Fatalf("archive count = (%d, %v), want (0, nil)", count, err)
+	}
+}
+
 func TestRetainsDistinctHashesAndDeduplicatesTheSameMagnet(t *testing.T) {
 	archive := openTestArchive(t)
 	year := int64(2026)

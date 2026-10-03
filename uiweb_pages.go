@@ -434,11 +434,16 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		// Quality score overrides are the one intentional exception; they are
 		// grouped in the Punteggi tab and edited by ScoreEditor.
 		if strings.HasPrefix(strings.ToLower(key), "score") {
+			// Custom release groups have their own add/edit/delete interface in
+			// the v2 score editor; don't expose them as anonymous key/value rows.
+			if strings.HasPrefix(strings.ToLower(key), "score_group_") {
+				continue
+			}
 			fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(key, uiSettingAutoLabel(key), cfg.Settings[key]))
 		}
 	}
 
-	special := map[string]bool{"sources": true, "advanced": true, "i18n": true}
+	special := map[string]bool{"sources": true, "scores": true, "advanced": true, "i18n": true}
 	tabs := make([]uiSettingsTabRef, 0, len(order))
 	for _, id := range order {
 		if len(fieldsByTab[id]) == 0 && !special[id] {
