@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 func manualTorrentRemovalInfo(s *AppState, hash string) (name, state string, hasMetadata bool) {
@@ -122,6 +124,74 @@ func moveDirAcrossDevices(source, target string) error {
 	return err
 }
 
+func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, finalPath string, sizeBytes int64, torrentName string) {
+	if s == nil || s.notifier == nil {
+		return
+	}
+	var durationSeconds *int64
+	var averageSpeedBps *int64
+	if s.db != nil {
+		if times, err := s.db.TorrentTimes(hash); err == nil && times != nil {
+			if created, ok := utils.ParseTimestamp(times.CreatedAt); ok {
+				completed := time.Now().UTC()
+				if times.CompletedAt != nil {
+					if parsed, ok := utils.ParseTimestamp(*times.CompletedAt); ok {
+						completed = parsed
+					}
+				}
+				seconds := int64(completed.Sub(created).Seconds())
+				if seconds < 1 {
+					seconds = 1
+				}
+				speed := int64(float64(sizeBytes) / float64(seconds))
+				durationSeconds = &seconds
+				averageSpeedBps = &speed
+			}
+		}
+	}
+	title := torrentName
+	var kindValue, seriesValue, seasonValue, episodeValue any
+	if release != nil {
+		title = release.Title
+		kindValue = release.Kind
+		if release.Series != nil {
+			seriesValue = *release.Series
+		}
+		if release.Season != nil {
+			seasonValue = *release.Season
+		}
+		if release.Episode != nil {
+			episodeValue = *release.Episode
+		}
+	}
+	if err := s.notifier.NotifyEvent("torrent_completed", map[string]any{
+		"hash":              hash,
+		"name":              torrentName,
+		"title":             title,
+		"kind":              kindValue,
+		"series":            seriesValue,
+		"season":            seasonValue,
+		"episode":           episodeValue,
+		"path":              finalPath,
+		"size_bytes":        sizeBytes,
+		"duration_seconds":  durationSeconds,
+		"average_speed_bps": averageSpeedBps,
+		"manual":            release == nil,
+	}); err != nil {
+		logging.Warn("archive completion notification failed", "hash", hash, "title", title, "error", err)
+	} else {
+		logging.Info("archive completion notification sent", "hash", hash, "title", title)
+	}
+
+	if release != nil && s.db != nil && finalPath != "" {
+		if info := Probe(finalPath); info != nil {
+			_ = s.db.SetMediaInfo(release, info)
+			logging.Info("🔬 MediaInfo stored for the completed file",
+				"title", release.Title, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
+		}
+	}
+}
+
 // ArchiveAndRemoveTorrent stops a completed torrent from seeding, moves its
 // files to the configured NAS archive destination (or default download dir if
 // none is configured), performs filename renaming and quality checks, updates
@@ -155,6 +225,16 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		return false, fmt.Errorf("impossibile archiviare un download non completato (progresso: %.1f%%)", targetTorrent.Progress)
 	}
 
+	// Fetch release metadata from DB if present
+	var release *models.Release
+	if s.db != nil {
+		if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
+			relCopy := meta.Release
+			release = &relCopy
+			normalizeReleaseSeries(cfg, release)
+		}
+	}
+
 	// Check if already completed and archived on disk
 	if s.db != nil {
 		if processed, err := s.db.TorrentProcessed(hash); err == nil && processed != nil && strings.TrimSpace(*processed) != "" {
@@ -173,6 +253,8 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				if (inRamdisk || inTemp) && !SamePath(source, *processed) {
 					_ = os.RemoveAll(source)
 				}
+				size, _ := SizeOfPath(*processed)
+				notifyArchivedTorrent(s, hash, release, *processed, size, targetTorrent.Name)
 				removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
 				removed, err := s.activeEngine().Remove(hash, false)
 				if err == nil && removed {
@@ -187,16 +269,6 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 
 	// Pause immediately to stop network activity/seeding
 	_, _ = s.activeEngine().Pause(hash)
-
-	// Fetch release metadata from DB if present
-	var release *models.Release
-	if s.db != nil {
-		if meta, err := s.db.TorrentMeta(hash); err == nil && meta != nil {
-			relCopy := meta.Release
-			release = &relCopy
-			normalizeReleaseSeries(cfg, release)
-		}
-	}
 
 	source := CompletionPath(&models.TorrentEvent{
 		Kind:     "torrent_finished",
@@ -270,6 +342,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			return false, fmt.Errorf("tutti gli episodi del season pack sono risultati inferiori ai file esistenti")
 		}
 		entries := []PackEpisode{}
+		episodes := []any{}
 		for _, item := range processed {
 			if item.Discarded {
 				continue
@@ -280,10 +353,43 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				SizeBytes: item.SizeBytes,
 				Score:     item.QualityScore,
 			})
+			episodes = append(episodes, map[string]any{
+				"series":  release.Series,
+				"season":  release.Season,
+				"episode": item.Episode,
+				"path":    item.Path,
+			})
 		}
 		size, _ := SizeOfPath(destination)
 		if s.db != nil {
 			_ = s.db.MarkPackCompleted(release, entries, destination, size)
+		}
+		if s.notifier != nil {
+			discardedList := []any{}
+			for _, item := range processed {
+				if item.Discarded {
+					discardedList = append(discardedList, map[string]any{
+						"episode": item.Episode,
+						"path":    item.Path,
+						"name":    filepath.Base(item.Path),
+					})
+				}
+			}
+			if nErr := s.notifier.NotifyEvent("season_pack_completed", map[string]any{
+				"series":          release.Series,
+				"season":          release.Season,
+				"title":           release.Title,
+				"path":            destination,
+				"size_bytes":      size,
+				"new_count":       len(episodes),
+				"discarded_count": len(discardedList),
+				"episodes":        episodes,
+				"discarded":       discardedList,
+			}); nErr != nil {
+				logging.Warn("archive pack completion notification failed", "hash", hash, "name", targetTorrent.Name, "error", nErr)
+			} else {
+				logging.Info("archive pack completion notification sent", "hash", hash, "name", targetTorrent.Name)
+			}
 		}
 		// Clean up source on ramdisk/temp if needed
 		inRamdisk := false
@@ -355,6 +461,15 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 		if !processed {
 			logging.Warn("archive postprocessing did not keep release (inferior or discarded)", "hash", hash)
+		} else {
+			finalPath := target
+			if s.db != nil {
+				if p, err := s.db.TorrentProcessed(hash); err == nil && p != nil && strings.TrimSpace(*p) != "" {
+					finalPath = *p
+				}
+			}
+			size, _ := SizeOfPath(finalPath)
+			notifyArchivedTorrent(s, hash, release, finalPath, size, targetTorrent.Name)
 		}
 
 		removed, rErr := s.activeEngine().Remove(hash, false)
@@ -381,10 +496,11 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 			}
 		}
 	}
+	size, _ := SizeOfPath(target)
 	if s.db != nil {
-		size, _ := SizeOfPath(target)
 		_ = s.db.MarkTorrentCompleted(hash, target, size)
 	}
+	notifyArchivedTorrent(s, hash, nil, target, size, targetTorrent.Name)
 	removed, rErr := s.activeEngine().Remove(hash, false)
 	if rErr == nil && removed {
 		logManualTorrentRemoval(hash, false, removalName, removalState, removalHasMetadata)
