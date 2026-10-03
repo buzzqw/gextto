@@ -235,6 +235,13 @@ service and leaves the data directory and configuration untouched. Use
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 
+## Support the project
+
+If Gextto is useful to you and you would like to support its development, you
+can make a contribution via PayPal. Thank you!
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
+
 ## ⚖️ Legal & fair use
 
 Gextto is a **download automation tool**. It does not host, index, or distribute

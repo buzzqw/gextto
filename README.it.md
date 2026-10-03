@@ -221,6 +221,13 @@ rilevato e lascia intatti dati e configurazione. Usa
 
 Per l'intera struttura documentale parti dall'[indice della documentazione](docs/README.md).
 
+## Supporta il progetto
+
+Se Gextto ti è utile e vuoi sostenere il suo sviluppo, puoi fare una donazione
+tramite PayPal. Grazie!
+
+[![Dona con PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
+
 ## Licenza
 
 Gextto è distribuito con [EUPL-1.2](LICENSE). I componenti di terze parti sono
