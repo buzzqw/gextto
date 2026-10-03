@@ -354,6 +354,17 @@ func TestV2DownloadsPageAndActions(t *testing.T) {
 	}
 }
 
+func TestV2TorrentColumnsMatchRenderedRowCells(t *testing.T) {
+	// A torrent row has selection + every sortable column + actions. Keeping
+	// Stato in this list prevents the header from drifting one cell left.
+	if len(v2TorrentColumns) != 8 || v2TorrentColumns[1] != (v2Column{Key: "state", Label: "Stato"}) {
+		t.Fatalf("torrent columns = %#v, want Stato after Nome", v2TorrentColumns)
+	}
+	if !v2ValidSort("state") {
+		t.Fatal("state must be a valid torrent sort key")
+	}
+}
+
 func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

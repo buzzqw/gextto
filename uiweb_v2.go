@@ -823,6 +823,7 @@ type v2Column struct{ Key, Label string }
 
 var v2TorrentColumns = []v2Column{
 	{Key: "name", Label: "Nome"},
+	{Key: "state", Label: "Stato"},
 	{Key: "progress", Label: "Progresso"},
 	{Key: "dl", Label: "↓ Download"},
 	{Key: "ul", Label: "↑ Upload"},
@@ -886,6 +887,14 @@ func v2ValidSort(key string) bool {
 func v2SortRows(rows []uiTorrentRow, key, dir string) {
 	less := func(i, j int) bool { return rows[i].Name < rows[j].Name }
 	switch key {
+	case "state":
+		less = func(i, j int) bool {
+			left, right := strings.ToLower(rows[i].State), strings.ToLower(rows[j].State)
+			if left == right {
+				return strings.ToLower(rows[i].Name) < strings.ToLower(rows[j].Name)
+			}
+			return left < right
+		}
 	case "progress":
 		less = func(i, j int) bool { return rows[i].Progress < rows[j].Progress }
 	case "dl":
