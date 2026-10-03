@@ -123,6 +123,12 @@ func (a *Archive) saveChunk(releases []models.Release, cfg *Config) error {
 	}
 	for i := range releases {
 		r := &releases[i]
+		// Content filters are also an archive-ingestion boundary: releases that
+		// the user marked as excluded must not accumulate in the durable archive
+		// just because the scrape found them before candidate evaluation.
+		if cfg != nil && titleIsContentFiltered(r.Title, cfg.ContentFilters) {
+			continue
+		}
 		// RSS sources such as Jackett can expose only a `.torrent` URL.
 		// Do not collapse all those releases into one empty unique magnet.
 		source := r.Magnet

@@ -185,6 +185,29 @@ func TestRetainsDistinctHashesAndDeduplicatesTheSameMagnet(t *testing.T) {
 	}
 }
 
+func TestSaveBatchDoesNotPersistConfiguredContentFilters(t *testing.T) {
+	archive := openTestArchive(t)
+	cfg := &Config{ContentFilters: []string{"[porno]"}}
+	releases := []models.Release{
+		{Title: "Adult.Porno.Movie.2026", Magnet: "magnet:?xt=urn:btih:adult"},
+		{Title: "Family.Movie.2026", Magnet: "magnet:?xt=urn:btih:family"},
+	}
+	if err := archive.SaveBatch(releases, cfg); err != nil {
+		t.Fatalf("SaveBatch: %v", err)
+	}
+	page, err := archive.BrowseContentFilteredPage("", []string{"[porno]"}, 1, 100)
+	if err != nil {
+		t.Fatalf("BrowseContentFilteredPage: %v", err)
+	}
+	if page.Total != 0 {
+		t.Fatalf("filtered archive results = %d, want 0", page.Total)
+	}
+	count, err := archive.Count()
+	if err != nil || count != 1 {
+		t.Fatalf("archive count = (%d, %v), want (1, nil)", count, err)
+	}
+}
+
 func TestSearchPrefersRecentMatchesWhenResultLimitApplies(t *testing.T) {
 	archive := openTestArchive(t)
 	releases := make([]models.Release, 0, 201)
