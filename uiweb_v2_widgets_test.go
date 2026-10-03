@@ -90,6 +90,8 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	}
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/db", url.Values{"action": {"refresh"}}); code != http.StatusOK || !strings.Contains(body, "Ottimizzazione database") {
 		t.Fatalf("db refresh -> %d", code)
+	} else if strings.Contains(body, "presente") && strings.Contains(body, "<td class=\"numeric\">0 B</td>") {
+		t.Fatalf("db refresh returned 0 B for present database files: %s", body)
 	}
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/ramdisk", url.Values{}); code != http.StatusOK || !strings.Contains(body, "RAM disk") {
 		t.Fatalf("ramdisk refresh -> %d", code)

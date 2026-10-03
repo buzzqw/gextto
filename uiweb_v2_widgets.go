@@ -139,10 +139,10 @@ func V2Duplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 // ---------------------------------------------------------------------------
 
 type v2DBFile struct {
-	Name      string
-	Path      string
-	SizeBytes int64
-	Exists    bool
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	SizeBytes int64  `json:"size_bytes"`
+	Exists    bool   `json:"exists"`
 }
 
 type v2DBView struct {
@@ -183,6 +183,8 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 				view.AfterRows = payload.After.Rows
 			}
 		}
+	} else {
+		view.Action = ""
 	}
 	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/db/info", nil, nil); status < 400 {
 		var payload struct {

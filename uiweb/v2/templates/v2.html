@@ -1338,7 +1338,7 @@
 
 {{define "v2_db_panel"}}
 <div class="panel" id="v2-db-panel">
-  <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
+  <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .TotalBytes}}<small class="muted">totale: {{bytes .TotalBytes}}</small>{{end}}{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
   <div class="panel-body">
     <p class="hint">VACUUM compatta i file; ANALYZE aggiorna le statistiche SQLite.</p>
     <div class="table-wrap"><table class="data-table">
