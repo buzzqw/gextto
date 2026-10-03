@@ -980,6 +980,15 @@ func RunCycleDomain(
 			if hash, ok := utils.MagnetHash(release.Magnet); ok {
 				_ = db.SetTorrentReason(hash, decisionReason)
 			}
+			logging.Info("📥 download started",
+				"target", releaseTarget(&release),
+				"title", release.Title,
+				"source", release.Source,
+				"quality", releaseQualityLabel(&release),
+				"score", score,
+				"reason", decisionReason,
+				"approval_reason", approvalReason,
+				"gap_episodes", episodesLabel(gapEpisodes))
 			if isReadyPending {
 				if release.Series != nil && release.Season != nil && release.Episode != nil {
 					if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
