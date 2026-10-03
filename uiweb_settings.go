@@ -29,6 +29,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gap_filling", Label: "Gap filling attivo", Tab: "daemon"},
 	{Key: "gap_deep_interval_hours", Label: "Intervallo deep search (ore)", Tab: "daemon"},
 	{Key: "gap_deep_max_per_cycle", Label: "Deep search massime per ciclo", Tab: "daemon"},
+	{Key: "cycle_title_search", Label: "Ricerca titoli online nel ciclo", Tab: "daemon"},
 	{Key: "active", Label: "Attivo", Tab: "daemon"},
 	{Key: "blacklist", Label: "Blacklist (una parola per riga)", Tab: "sources"},
 	{Key: "libtorrent_enabled", Label: "Client abilitato", Tab: "libtorrent"},

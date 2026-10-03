@@ -235,7 +235,24 @@ service and leaves the data directory and configuration untouched. Use
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 
+## ⚖️ Legal & fair use
+
+Gextto is a **download automation tool**. It does not host, index, or distribute
+any copyrighted content.
+
+- Gextto connects to **indexers you configure** (Jackett, Prowlarr, public RSS
+  feeds). It has no built-in index.
+- What you download is **entirely your responsibility**. Use Gextto only for
+  content you have the right to access — public domain, Creative Commons, or
+  media you own.
+- The torrent integration (libtorrent) is a neutral technology. Gextto does not
+  encourage or facilitate piracy.
+- This project is released under the **EUPL 1.2** open-source license.
+
+> *"With great automation comes great responsibility."*
+
 ## License
 
 Gextto is licensed under the [EUPL-1.2](LICENSE). See [NOTICE](NOTICE) for
 notices about bundled and optional third-party components.
+

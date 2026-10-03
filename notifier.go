@@ -273,7 +273,7 @@ func (n *Notifier) NotifyEvent(event string, data map[string]any) error {
 		}
 	}
 	if n.emailEnabled {
-		if err := n.sendEmail(event, formatEvent(event, data)); err != nil {
+		if err := n.sendEmail(event, formatEmailSubject(event, data), formatEvent(event, data)); err != nil {
 			if firstError == nil {
 				firstError = err
 			}
@@ -321,7 +321,7 @@ func (n *Notifier) throttleTelegram() {
 
 // sendEmail delivers the formatted event over SMTP. A missing recipient/from
 // configuration is a silent no-op (matching gextto).
-func (n *Notifier) sendEmail(event, body string) error {
+func (n *Notifier) sendEmail(event, subject, body string) error {
 	if n.emailFrom == nil || n.emailTo == nil || n.emailPassword == nil {
 		return nil
 	}
@@ -345,7 +345,6 @@ func (n *Notifier) sendEmail(event, body string) error {
 			recipients = append(recipients, recipient)
 		}
 	}
-	subject := sanitizeEmailHeader(fmt.Sprintf("Gextto [%s]", event))
 	message := buildEmailMessage(from, recipients, subject, body)
 	address := fmt.Sprintf("%s:%d", host, port)
 	auth := smtp.PlainAuth("", from, password, host)
@@ -383,6 +382,71 @@ func buildEmailMessage(from string, recipients []string, subject, body string) [
 	message.WriteString("\r\n")
 	message.WriteString(body)
 	return []byte(message.String())
+}
+
+// formatEmailSubject builds a clean, readable email subject for an event.
+func formatEmailSubject(event string, data map[string]any) string {
+	text := func(key string) string {
+		return jsonString(mapLookup(data, key))
+	}
+	title := text("title")
+	if title == "" {
+		title = text("name")
+	}
+	series := text("series")
+	season, hasSeason := jsonInt(mapLookup(data, "season"))
+	episode, hasEpisode := jsonInt(mapLookup(data, "episode"))
+	itemLabel := title
+	if series != "" && hasSeason && hasEpisode {
+		itemLabel = fmt.Sprintf("%s S%02dE%02d", series, season, episode)
+	} else if series != "" {
+		itemLabel = series
+	}
+
+	switch event {
+	case "download_started":
+		if text("kind") == "movie" {
+			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Film in download", "Movie download started"), itemLabel)
+		}
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Nuovo episodio in download", "Episode download started"), itemLabel)
+	case "torrent_completed":
+		if seeding, ok := mapLookup(data, "seeding").(bool); ok && seeding {
+			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download completato (in seed)", "Download complete (seeding)"), itemLabel)
+		}
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download completato", "Download complete"), itemLabel)
+	case "season_pack_completed":
+		if series != "" && hasSeason {
+			return fmt.Sprintf("Gextto: %s — %s S%02d", messages.Pick("Season Pack completato", "Season pack complete"), series, season)
+		}
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Season Pack completato", "Season pack complete"), itemLabel)
+	case "backup_completed":
+		if sched, ok := mapLookup(data, "scheduled").(bool); ok && sched {
+			return fmt.Sprintf("Gextto: %s", messages.Pick("Backup programmato completato", "Scheduled backup completed"))
+		}
+		return fmt.Sprintf("Gextto: %s", messages.Pick("Backup completato", "Backup completed"))
+	case "torrent_error":
+		if itemLabel != "" {
+			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Errore torrent", "Torrent error"), itemLabel)
+		}
+		return fmt.Sprintf("Gextto: %s", messages.Pick("Errore torrent", "Torrent error"))
+	case "download_failed":
+		if itemLabel != "" {
+			return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Download fallito", "Download failed"), itemLabel)
+		}
+		return fmt.Sprintf("Gextto: %s", messages.Pick("Download fallito", "Download failed"))
+	case "comic_queued":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in download", "Comic download started"), itemLabel)
+	case "comic_completed":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto scaricato", "Comic downloaded"), itemLabel)
+	case "comic_error":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Errore fumetto", "Comic error"), itemLabel)
+	case "comic_pending":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in attesa", "Comic pending"), itemLabel)
+	case "gap_filled":
+		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Gap riempito", "Gap filled"), itemLabel)
+	default:
+		return fmt.Sprintf("Gextto [%s]", event)
+	}
 }
 
 // formatEvent renders a human notification text for an event, picking the
@@ -489,10 +553,16 @@ func formatEvent(event string, data map[string]any) string {
 			stats = ""
 		}
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
+		kind := text("kind")
+		mediaIcon := "📺"
+		if kind == "movie" {
+			mediaIcon = "🎬"
+		}
 		if seeding, ok := mapLookup(data, "seeding").(bool); ok && seeding {
 			return fmt.Sprintf(
-				"%s\n\n📺 %s\n\n💾 %s%s\n%s",
+				"%s\n\n%s %s\n\n💾 %s%s\n%s",
 				messages.Pick("📥 DOWNLOAD COMPLETATO — IN SEED", "📥 DOWNLOAD COMPLETE — SEEDING"),
+				mediaIcon,
 				seriesEpisode(),
 				formatBytes(size),
 				stats,
@@ -500,8 +570,9 @@ func formatEvent(event string, data map[string]any) string {
 			)
 		}
 		return fmt.Sprintf(
-			"%s\n\n📺 %s\n\n💾 %s%s\n%s: %s",
+			"%s\n\n%s %s\n\n💾 %s%s\n%s: %s",
 			messages.Pick("✅ DOWNLOAD COMPLETATO", "✅ DOWNLOAD COMPLETE"),
+			mediaIcon,
 			seriesEpisode(),
 			formatBytes(size),
 			stats,
@@ -532,10 +603,28 @@ func formatEvent(event string, data map[string]any) string {
 			valueText(data, "path", ""),
 		)
 	case "torrent_error":
+		name := text("name")
+		if name == "" {
+			name = text("title")
+		}
+		var restoredText string
+		if restored, ok := mapLookup(data, "upgrade_restored").(bool); ok && restored {
+			restoredText = messages.Pick(" (versione precedente ripristinata)", " (previous version restored)")
+		}
+		if name != "" {
+			return fmt.Sprintf(
+				"Gextto: %s «%s» — %s%s",
+				messages.Pick("errore torrent", "torrent error"),
+				name,
+				text("error"),
+				restoredText,
+			)
+		}
 		return fmt.Sprintf(
-			"Gextto: %s — %s",
+			"Gextto: %s — %s%s",
 			messages.Pick("errore torrent", "torrent error"),
 			text("error"),
+			restoredText,
 		)
 	case "gap_filled":
 		return fmt.Sprintf(
@@ -557,10 +646,37 @@ func formatEvent(event string, data map[string]any) string {
 			messages.Pick("disponibile", "available"),
 		)
 	case "download_failed":
+		title := text("title")
+		if title == "" {
+			title = text("name")
+		}
+		errText := text("error")
+		var restoredText string
+		if restored, ok := mapLookup(data, "upgrade_restored").(bool); ok && restored {
+			restoredText = messages.Pick(" (versione precedente ripristinata)", " (previous version restored)")
+		}
+		if errText != "" && title != "" {
+			return fmt.Sprintf(
+				"Gextto: %s «%s» — %s%s",
+				messages.Pick("download fallito", "download failed"),
+				title,
+				errText,
+				restoredText,
+			)
+		}
+		if title != "" {
+			return fmt.Sprintf(
+				"Gextto: %s «%s»%s",
+				messages.Pick("download fallito", "download failed"),
+				title,
+				restoredText,
+			)
+		}
 		return fmt.Sprintf(
-			"Gextto: %s — %s",
+			"Gextto: %s — %s%s",
 			messages.Pick("download fallito", "download failed"),
-			text("title"),
+			errText,
+			restoredText,
 		)
 	case "comic_queued":
 		return fmt.Sprintf(
@@ -608,11 +724,64 @@ func formatEvent(event string, data map[string]any) string {
 			),
 		)
 	case "backup_completed":
-		return fmt.Sprintf(
-			"Gextto: %s — %s",
-			messages.Pick("backup completato", "backup completed"),
-			text("path"),
-		)
+		path := text("path")
+		if path == "" {
+			return messages.Pick("Gextto: backup completato", "Gextto: backup completed")
+		}
+		size, hasSize := jsonInt(mapLookup(data, "size_bytes"))
+		if !hasSize || size <= 0 {
+			if info, err := os.Stat(path); err == nil {
+				size = info.Size()
+				hasSize = true
+			}
+		}
+		var lines []string
+		header := messages.Pick("💾 BACKUP COMPLETATO", "💾 BACKUP COMPLETED")
+		if sched, ok := mapLookup(data, "scheduled").(bool); ok && sched {
+			header = messages.Pick("💾 BACKUP PROGRAMMATO COMPLETATO", "💾 SCHEDULED BACKUP COMPLETED")
+		}
+		lines = append(lines, header, "")
+		lines = append(lines, fmt.Sprintf("📦 %s: %s", messages.Pick("File", "File"), path))
+		if hasSize && size > 0 {
+			lines = append(lines, fmt.Sprintf("📊 %s: %s", messages.Pick("Dimensione", "Size"), formatBytes(size)))
+		}
+
+		cloudCopied, _ := mapLookup(data, "cloud_copied").(bool)
+		cloudDest := text("cloud_destination")
+		cloudErr := text("cloud_error")
+		if cloudCopied && cloudDest != "" {
+			lines = append(lines, fmt.Sprintf("☁️ %s: %s", messages.Pick("Copia cloud", "Cloud copy"), cloudDest))
+		} else if cloudErr != "" {
+			lines = append(lines, fmt.Sprintf("⚠️ %s: %s", messages.Pick("Copia cloud non riuscita", "Cloud copy failed"), cloudErr))
+		}
+
+		ftpUploaded, _ := mapLookup(data, "ftp_uploaded").(bool)
+		ftpHost := text("ftp_host")
+		ftpRemote := text("ftp_remote")
+		ftpErr := text("ftp_error")
+		if ftpUploaded && ftpHost != "" {
+			dest := ftpHost
+			baseName := filepath.Base(path)
+			if ftpRemote != "" {
+				cleanRemote := "/" + strings.Trim(ftpRemote, "/")
+				dest = fmt.Sprintf("%s (%s/%s)", ftpHost, cleanRemote, baseName)
+			} else {
+				dest = fmt.Sprintf("%s (%s)", ftpHost, baseName)
+			}
+			lines = append(lines, fmt.Sprintf("🌐 %s: %s", messages.Pick("Caricato via FTP", "Uploaded via FTP"), dest))
+		} else if ftpErr != "" {
+			dest := ftpHost
+			if dest == "" {
+				dest = "FTP"
+			}
+			lines = append(lines, fmt.Sprintf("⚠️ %s (%s): %s", messages.Pick("Caricamento FTP non riuscito", "FTP upload failed"), dest, ftpErr))
+		}
+
+		if tgUploaded, _ := mapLookup(data, "telegram_uploaded").(bool); tgUploaded {
+			lines = append(lines, fmt.Sprintf("📱 %s", messages.Pick("Inviato anche come allegato Telegram", "Also sent as a Telegram document")))
+		}
+
+		return strings.Join(lines, "\n")
 	default:
 		if value, ok := mapLookup(data, "text").(string); ok {
 			return fmt.Sprintf("Gextto [%s] %s", event, value)

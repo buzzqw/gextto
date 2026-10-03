@@ -192,18 +192,18 @@ func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 }
 
 func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
-	if download, upload, ok := gh6_scheduledSpeedLimits(cfg); ok {
-		return download, upload
-	}
 	now := time.Now().Unix()
 	tempUntil := gh6_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempEnabled := tempUntil > now
+	tempEnabled := false
 	if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
 		tempEnabled = gh6_truthySetting(value)
 	}
 	if tempEnabled && (tempUntil == 0 || tempUntil > now) {
 		return gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
 			gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
+	}
+	if download, upload, ok := gh6_scheduledSpeedLimits(cfg); ok {
+		return download, upload
 	}
 	baseDownload := cfg.Libtorrent.DownloadLimitKib
 	if baseDownload < 0 {

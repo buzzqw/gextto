@@ -68,6 +68,7 @@ var uiSettingTooltipText = map[string]string{
 	"gap_fill_max_per_series":                      "Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato).",
 	"gap_deep_interval_hours":                      "Ogni quante ore fare una ricerca live mirata sugli indexer per i gap.",
 	"gap_deep_max_per_cycle":                       "Numero massimo di ricerche live per ciclo.",
+	"cycle_title_search":                           "Cerca i titoli su indexer durante il ciclo: auto (solo se non ci sono feed configurati), yes (sempre), no (mai, usa solo feed e archivio locale).",
 	"delay_torrent_minutes":                        "Ritarda l'avvio dei download delle serie di questo numero di minuti. 0 avvia subito.",
 	"delay_movies_minutes":                         "Ritarda l'avvio dei download dei film di questo numero di minuti. 0 avvia subito.",
 	"delay_bypass_score":                           "Se una release raggiunge almeno questo punteggio, ignora il delay configurato.",

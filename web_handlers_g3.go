@@ -1152,34 +1152,39 @@ func gh3IsTorrentURL(value string) bool {
 
 // gh3DownloadAndAdd implements `download_and_add`.
 func gh3DownloadAndAdd(s *AppState, rawURL string, options AddOptions) (*string, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
-	request, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	rawURL = strings.TrimSpace(rawURL)
+	addMagnet := func(m string) (*string, error) {
+		hash, ok := utils.MagnetHash(m)
+		if !ok {
+			return nil, fmt.Errorf("invalid magnet link")
+		}
+		added, err := s.activeEngine().AddWithOptions(m, s.cfg, nil, options)
+		if err != nil {
+			return nil, err
+		}
+		if !added {
+			return nil, nil
+		}
+		return &hash, nil
+	}
+	if strings.HasPrefix(rawURL, "magnet:?") {
+		return addMagnet(rawURL)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	payload, magnet, err := s.engine.FetchTorrent(ctx, rawURL)
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("User-Agent", "gextto/0.1")
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 400 {
-		return nil, fmt.Errorf("HTTP %d", response.StatusCode)
-	}
-	payload, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
+	if magnet != "" {
+		return addMagnet(magnet)
 	}
 	path := filepath.Join(s.cfg.StateDir, fmt.Sprintf(".manual-%s.torrent", gh3UUID()))
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err
 	}
-	hash, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
-	_ = os.Remove(path)
-	if err != nil {
-		return nil, err
-	}
-	return hash, nil
+	defer os.Remove(path)
+	return s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, options)
 }
 
 // gh3ResolveBySearch implements `resolve_by_search`.

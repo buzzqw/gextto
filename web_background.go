@@ -735,7 +735,16 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				logging.Debug("speed policy apply failed", "error", err)
 			} else if changed {
 				source := "base limits"
-				if _, _, ok := bg_scheduledSpeedLimits(cfg); ok {
+				nowTs := now.Unix()
+				tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
+				tempEnabled := false
+				if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
+					lowered := strings.ToLower(value)
+					tempEnabled = lowered == "1" || lowered == "true" || lowered == "yes"
+				}
+				if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
+					source = "temporary override"
+				} else if _, _, ok := bg_scheduledSpeedLimits(cfg); ok {
 					source = "schedule"
 				}
 				logging.Info(fmt.Sprintf("🚦 Speed limits applied (%s): %d KB/s down · %d KB/s up", source, downloadKib, uploadKib))
@@ -930,6 +939,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				}
 				_ = notifier.NotifyEvent("torrent_error", map[string]any{
 					"hash":             hash,
+					"name":             event.Name,
+					"title":            event.Name,
 					"error":            handleErr.Error(),
 					"upgrade_restored": restored,
 				})
@@ -1124,21 +1135,22 @@ func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 }
 
 func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
-	// A scheduled speed window has priority over a temporary limit. Once the
-	// window ends, a permanent temporary limit becomes active again.
-	if download, upload, ok := bg_scheduledSpeedLimits(cfg); ok {
-		return download, upload
-	}
 	nowTs := time.Now().Unix()
 	tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempEnabled := tempUntil > nowTs
+	tempEnabled := false
 	if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
 		lowered := strings.ToLower(value)
 		tempEnabled = lowered == "1" || lowered == "true" || lowered == "yes"
 	}
+	// An active temporary limit is an explicit user override and takes precedence
+	// over both the bandwidth schedule and the base limits.
 	if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
 		return bg_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
 			bg_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
+	}
+	// Scheduled speed window applies when no temporary limit is active.
+	if download, upload, ok := bg_scheduledSpeedLimits(cfg); ok {
+		return download, upload
 	}
 	baseDownload := cfg.Libtorrent.DownloadLimitKib
 	if baseDownload < 0 {

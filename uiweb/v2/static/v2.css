@@ -403,6 +403,28 @@ html, body {
 .toolbar .input {
   min-width: 160px;
 }
+.toolbar .archive-search-input {
+  flex: 1 1 520px;
+  max-width: 780px;
+  min-width: 260px;
+  width: auto;
+}
+.archive-indicator {
+  display: none;
+  font-size: 0.85rem;
+  margin-left: 4px;
+}
+.htmx-request .archive-indicator,
+.htmx-request.archive-indicator {
+  display: inline-block;
+}
+@media (max-width: 560px) {
+  .toolbar .archive-search-input {
+    max-width: 100%;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
 
 /* Keep the exclusion editor compact; its save action belongs beside the
    custom-filter field instead of on a separate line below the panel. */

@@ -3,9 +3,11 @@ package gextto
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -13,6 +15,15 @@ import (
 // follows the reqwest defaults used by gextto (redirects, gzip automatic).
 var defaultHTTPClient = &http.Client{
 	Timeout: 90 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if req.URL != nil && strings.EqualFold(req.URL.Scheme, "magnet") {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	},
 }
 
 // Response size limits. They are intentionally generous: the goal is to avoid

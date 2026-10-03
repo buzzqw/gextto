@@ -1029,21 +1029,39 @@ func gh0_sourceIsUsable(source string) bool {
 }
 
 func gh0_downloadAndAdd(ctx context.Context, s *AppState, url string) (*string, string) {
+	url = strings.TrimSpace(url)
+	addMagnet := func(m string) (*string, string) {
+		hash, ok := utils.MagnetHash(m)
+		if !ok {
+			return nil, "invalid magnet link"
+		}
+		added, err := s.activeEngine().AddWithOptions(m, s.cfg, nil, AddOptions{})
+		if err != nil {
+			return nil, err.Error()
+		}
+		if !added {
+			return nil, ""
+		}
+		return &hash, ""
+	}
+	if strings.HasPrefix(url, "magnet:?") {
+		return addMagnet(url)
+	}
 	requestCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	body, status, err := HTTPGetBytes(requestCtx, url, map[string]string{"User-Agent": "gextto/0.1"})
+	payload, magnet, err := s.engine.FetchTorrent(requestCtx, url)
 	if err != nil {
 		return nil, err.Error()
 	}
-	if status < 200 || status >= 300 {
-		return nil, fmt.Sprintf("HTTP status %d", status)
+	if magnet != "" {
+		return addMagnet(magnet)
 	}
 	path := filepath.Join(s.cfg.StateDir, fmt.Sprintf(".manual-%d.torrent", time.Now().UnixNano()))
-	if err := os.WriteFile(path, body, 0o644); err != nil {
+	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		return nil, err.Error()
 	}
+	defer os.Remove(path)
 	result, err := s.activeEngine().AddTorrentFileWithOptions(path, s.cfg, nil, AddOptions{})
-	_ = os.Remove(path)
 	if err != nil {
 		return nil, err.Error()
 	}

@@ -51,7 +51,7 @@ func seriesExternalIDs(series *SeriesConfig) [][2]string {
 
 // Concurrency and timeout budgets, copied verbatim .
 const (
-	queryConcurrency    = 2
+	queryConcurrency    = 6
 	feedConcurrency     = 4
 	indexerConcurrency  = 4
 	feedFetchBudget     = 75 * time.Second
@@ -66,8 +66,8 @@ const (
 // healthy sources still return their results, instead of consuming the whole
 // search budget.
 var (
-	automaticSearchTimeout = 90 * time.Second
-	indexerRequestTimeout  = 60 * time.Second
+	automaticSearchTimeout = 25 * time.Second
+	indexerRequestTimeout  = 20 * time.Second
 )
 
 // NewEngine builds the default engine, mirroring `Engine::new`.
@@ -83,21 +83,62 @@ func (e *Engine) WithDB(db *Database) *Engine {
 	return &Engine{client: NewEngine().client, db: db}
 }
 
-// FetchTorrent downloads a `.torrent` file from a feed that does not expose a
-// magnet. The full URL is never logged: it can carry a passkey.
-func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, error) {
-	payload, status, err := HTTPGetBytes(ctx, rawURL, nil)
-	if err != nil {
-		return nil, err
+// FetchTorrent downloads a `.torrent` file or resolves a magnet redirect from a
+// feed that does not expose a magnet directly. Returns either the torrent file
+// bytes or the target magnet link. The full URL is never logged: it can carry a
+// passkey.
+func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if strings.HasPrefix(rawURL, "magnet:?") {
+		return nil, rawURL, nil
 	}
-	if status < 200 || status >= 300 {
+	var redirectedMagnet string
+	client := &http.Client{
+		Timeout: 90 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return errors.New("stopped after 10 redirects")
+			}
+			if req.URL != nil && strings.EqualFold(req.URL.Scheme, "magnet") {
+				redirectedMagnet = req.URL.String()
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("User-Agent", "gextto/0.1")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if redirectedMagnet != "" {
+		return nil, redirectedMagnet, nil
+	}
+	if loc := resp.Header.Get("Location"); loc != "" && strings.HasPrefix(strings.TrimSpace(loc), "magnet:?") {
+		return nil, strings.TrimSpace(loc), nil
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		host := "feed"
 		if parsed, err := url.Parse(rawURL); err == nil && parsed.Hostname() != "" {
 			host = parsed.Hostname()
 		}
-		return nil, fmt.Errorf("HTTP %d fetching torrent from %s", status, host)
+		return nil, "", fmt.Errorf("HTTP %d fetching torrent from %s", resp.StatusCode, host)
 	}
-	return payload, nil
+	payload, err := readLimitedBody(resp.Body, maxFeedResponseBytes)
+	if err != nil {
+		return nil, "", err
+	}
+	trimmedPayload := strings.TrimSpace(string(payload))
+	if strings.HasPrefix(trimmedPayload, "magnet:?") {
+		return nil, trimmedPayload, nil
+	}
+	return payload, "", nil
 }
 
 // ScrapeAll scans every configured feed and then searches every enabled series
@@ -152,220 +193,227 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	// every magnet resolved in this cycle.
 	cache.Save()
 
-	// Build the per-target search list.
-	type searchTarget struct {
-		Query string
-		IDs   [][2]string
-		Type  string
-	}
-	var targets []searchTarget
-	seenTargets := map[string]struct{}{}
-	for _, series := range cfg.Series {
-		if !series.Enabled {
-			continue
+	if !cfg.ShouldSearchTitlesInCycle() {
+		logging.Info(fmt.Sprintf(
+			"🔎 Step 2/2: online title search skipped (%d feeds provide releases for the local archive)",
+			len(cfg.FeedURLs),
+		))
+	} else {
+		// Build the per-target search list.
+		type searchTarget struct {
+			Query string
+			IDs   [][2]string
+			Type  string
 		}
-		// Pass the real external ids to Torznab: `tvdbid` with the TVDB id and
-		// `tmdbid` with the TMDB id.
-		ids := seriesExternalIDs(&series)
-		queries := append([]string{series.Name}, series.Aliases...)
-		for _, query := range queries {
-			query = strings.TrimSpace(query)
-			if query == "" {
+		var targets []searchTarget
+		seenTargets := map[string]struct{}{}
+		for _, series := range cfg.Series {
+			if !series.Enabled {
 				continue
 			}
+			// Pass the real external ids to Torznab: `tvdbid` with the TVDB id and
+			// `tmdbid` with the TMDB id.
+			ids := seriesExternalIDs(&series)
+			queries := append([]string{series.Name}, series.Aliases...)
+			for _, query := range queries {
+				query = strings.TrimSpace(query)
+				if query == "" {
+					continue
+				}
+				key := strings.ToLower(query)
+				if _, exists := seenTargets[key]; exists {
+					continue
+				}
+				seenTargets[key] = struct{}{}
+				targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeTV})
+			}
+		}
+		for _, movie := range cfg.Movies {
+			if !movie.Enabled {
+				continue
+			}
+			query := fmt.Sprintf("%s %s", movie.Name, movie.Year)
 			key := strings.ToLower(query)
-			if _, exists := seenTargets[key]; exists {
-				continue
-			}
-			seenTargets[key] = struct{}{}
-			targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeTV})
-		}
-	}
-	for _, movie := range cfg.Movies {
-		if !movie.Enabled {
-			continue
-		}
-		query := fmt.Sprintf("%s %s", movie.Name, movie.Year)
-		key := strings.ToLower(query)
-		if _, exists := seenTargets[key]; !exists {
-			seenTargets[key] = struct{}{}
-			ids := [][2]string{}
-			if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
-				ids = append(ids, [2]string{"tmdbid", tmdbID})
-			}
-			targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeMovie})
-		}
-	}
-	targetsTotal := len(targets)
-	logging.Info(fmt.Sprintf(
-		"🔎 Step 2/2: searching %d series/movies (Torznab indexers + web engines)",
-		targetsTotal,
-	))
-
-	// Title search fan-out, bounded by `queryConcurrency`.
-	type searchResult struct {
-		Query string
-		Items []models.Release
-	}
-	results := make([]searchResult, len(targets))
-	timeoutQueries := make(chan string, len(targets))
-	var searchWG sync.WaitGroup
-	var searchesCompleted atomic.Int32
-	searchStarted := time.Now()
-	progressDone := make(chan struct{})
-	defer close(progressDone)
-	if targetsTotal > 0 {
-		go func() {
-			ticker := time.NewTicker(searchProgressInterval)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-progressDone:
-					return
-				case <-ticker.C:
-					completed := int(searchesCompleted.Load())
-					remaining := targetsTotal - completed
-					if remaining < 0 {
-						remaining = 0
-					}
-					logging.Info("title search progress",
-						"completed", completed,
-						"total", targetsTotal,
-						"remaining", remaining,
-						"elapsed", logging.HumanDuration(int64(time.Since(searchStarted).Seconds())))
+			if _, exists := seenTargets[key]; !exists {
+				seenTargets[key] = struct{}{}
+				ids := [][2]string{}
+				if tmdbID := strings.TrimSpace(movie.TmdbID); tmdbID != "" {
+					ids = append(ids, [2]string{"tmdbid", tmdbID})
 				}
+				targets = append(targets, searchTarget{Query: query, IDs: ids, Type: searchTypeMovie})
 			}
-		}()
-	}
-	searchSem := make(chan struct{}, queryConcurrency)
-	for i, target := range targets {
-		searchWG.Add(1)
-		searchSem <- struct{}{}
-		go func(index int, query string, ids [][2]string, searchType string) {
-			defer searchWG.Done()
-			defer func() { <-searchSem }()
-			defer searchesCompleted.Add(1)
-			started := time.Now()
-			searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
-			items := searchOneWithDBType(searchCtx, cfg, query, ids, nil, e.db, false, searchType)
-			timedOut := errors.Is(searchCtx.Err(), context.DeadlineExceeded)
-			cancel()
-			if timedOut {
-				logging.Debug("scheduled title search timed out",
+		}
+		targetsTotal := len(targets)
+		logging.Info(fmt.Sprintf(
+			"🔎 Step 2/2: searching %d series/movies (Torznab indexers)",
+			targetsTotal,
+		))
+
+		// Title search fan-out, bounded by `queryConcurrency`.
+		type searchResult struct {
+			Query string
+			Items []models.Release
+		}
+		results := make([]searchResult, len(targets))
+		timeoutQueries := make(chan string, len(targets))
+		var searchWG sync.WaitGroup
+		var searchesCompleted atomic.Int32
+		searchStarted := time.Now()
+		progressDone := make(chan struct{})
+		if targetsTotal > 0 {
+			go func() {
+				ticker := time.NewTicker(searchProgressInterval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-progressDone:
+						return
+					case <-ticker.C:
+						completed := int(searchesCompleted.Load())
+						remaining := targetsTotal - completed
+						if remaining < 0 {
+							remaining = 0
+						}
+						logging.Info("title search progress",
+							"completed", completed,
+							"total", targetsTotal,
+							"remaining", remaining,
+							"elapsed", logging.HumanDuration(int64(time.Since(searchStarted).Seconds())))
+					}
+				}
+			}()
+		}
+		searchSem := make(chan struct{}, queryConcurrency)
+		for i, target := range targets {
+			searchWG.Add(1)
+			searchSem <- struct{}{}
+			go func(index int, query string, ids [][2]string, searchType string) {
+				defer searchWG.Done()
+				defer func() { <-searchSem }()
+				defer searchesCompleted.Add(1)
+				started := time.Now()
+				searchCtx, cancel := context.WithTimeout(ctx, automaticSearchTimeout)
+				items := searchOneWithDBType(searchCtx, cfg, query, ids, nil, e.db, false, searchType, false)
+				timedOut := errors.Is(searchCtx.Err(), context.DeadlineExceeded)
+				cancel()
+				if timedOut {
+					logging.Debug("scheduled title search timed out",
+						"query", query,
+						"timeout_secs", int(automaticSearchTimeout.Seconds()))
+					timeoutQueries <- query
+				}
+				logging.Debug("scheduled title search completed",
 					"query", query,
-					"timeout_secs", int(automaticSearchTimeout.Seconds()))
-				timeoutQueries <- query
-			}
-			logging.Debug("scheduled title search completed",
-				"query", query,
-				"elapsed_ms", time.Since(started).Milliseconds(),
-				"results", len(items))
-			results[index] = searchResult{Query: query, Items: items}
-		}(i, target.Query, target.IDs, target.Type)
-	}
-	searchWG.Wait()
-	close(timeoutQueries)
-	var timedOutQueries []string
-	for query := range timeoutQueries {
-		timedOutQueries = append(timedOutQueries, query)
-	}
-	if len(timedOutQueries) > 0 {
-		indexerNames := make([]string, 0, len(cfg.Indexers))
-		for _, indexer := range cfg.Indexers {
-			if indexer.Enabled {
-				indexerNames = append(indexerNames, indexer.Name)
-			}
+					"elapsed_ms", time.Since(started).Milliseconds(),
+					"results", len(items))
+				results[index] = searchResult{Query: query, Items: items}
+			}(i, target.Query, target.IDs, target.Type)
 		}
-		providers := strings.Join(indexerNames, ", ")
-		if providers == "" {
-			providers = "no indexers configured"
+		searchWG.Wait()
+		close(progressDone)
+		close(timeoutQueries)
+		var timedOutQueries []string
+		for query := range timeoutQueries {
+			timedOutQueries = append(timedOutQueries, query)
 		}
-		logging.Warn(fmt.Sprintf(
-			"scheduled title searches timed out: %d target(s) · indexers: %s · queries: %s",
-			len(timedOutQueries), providers, strings.Join(timedOutQueries, ", ")),
-			"timeout_secs", int(automaticSearchTimeout.Seconds()))
-	}
+		if len(timedOutQueries) > 0 {
+			indexerNames := make([]string, 0, len(cfg.Indexers))
+			for _, indexer := range cfg.Indexers {
+				if indexer.Enabled {
+					indexerNames = append(indexerNames, indexer.Name)
+				}
+			}
+			providers := strings.Join(indexerNames, ", ")
+			if providers == "" {
+				providers = "no indexers configured"
+			}
+			logging.Warn(fmt.Sprintf(
+				"scheduled title searches timed out: %d target(s) · indexers: %s · queries: %s",
+				len(timedOutQueries), providers, strings.Join(timedOutQueries, ", ")),
+				"timeout_secs", int(automaticSearchTimeout.Seconds()))
+		}
 
-	// "Compatible" count: a release is only useful when it passes the global
-	// filters and those of the searched series/movie (language, quality,
-	// exclude, subtitles). This keeps the log from announcing releases that
-	// will never be downloaded.
-	usable := func(query string, items []models.Release) int {
-		for i := range cfg.Series {
-			series := &cfg.Series[i]
-			matchesQuery := strings.EqualFold(series.Name, query)
-			if !matchesQuery {
-				for _, alias := range series.Aliases {
-					if strings.EqualFold(strings.TrimSpace(alias), query) {
-						matchesQuery = true
-						break
+		// "Compatible" count: a release is only useful when it passes the global
+		// filters and those of the searched series/movie (language, quality,
+		// exclude, subtitles). This keeps the log from announcing releases that
+		// will never be downloaded.
+		usable := func(query string, items []models.Release) int {
+			for i := range cfg.Series {
+				series := &cfg.Series[i]
+				matchesQuery := strings.EqualFold(series.Name, query)
+				if !matchesQuery {
+					for _, alias := range series.Aliases {
+						if strings.EqualFold(strings.TrimSpace(alias), query) {
+							matchesQuery = true
+							break
+						}
 					}
 				}
+				if !matchesQuery {
+					continue
+				}
+				count := 0
+				for j := range items {
+					if cfg.ReleaseAllowed(&items[j]) &&
+						cfg.SeriesReleaseAllowed(series, &items[j].Quality, items[j].Title) {
+						count++
+					}
+				}
+				return count
 			}
-			if !matchesQuery {
-				continue
+			for i := range cfg.Movies {
+				movie := &cfg.Movies[i]
+				if fmt.Sprintf("%s %s", movie.Name, movie.Year) != query {
+					continue
+				}
+				count := 0
+				for j := range items {
+					if cfg.ReleaseAllowed(&items[j]) && cfg.MovieReleaseAllowedForTitle(movie, &items[j].Quality, items[j].Title) {
+						count++
+					}
+				}
+				return count
 			}
 			count := 0
 			for j := range items {
-				if cfg.ReleaseAllowed(&items[j]) &&
-					cfg.SeriesReleaseAllowed(series, &items[j].Quality, items[j].Title) {
+				if cfg.ReleaseAllowed(&items[j]) {
 					count++
 				}
 			}
 			return count
 		}
-		for i := range cfg.Movies {
-			movie := &cfg.Movies[i]
-			if fmt.Sprintf("%s %s", movie.Name, movie.Year) != query {
-				continue
-			}
-			count := 0
-			for j := range items {
-				if cfg.ReleaseAllowed(&items[j]) && cfg.MovieReleaseAllowedForTitle(movie, &items[j].Quality, items[j].Title) {
-					count++
-				}
-			}
-			return count
-		}
-		count := 0
-		for j := range items {
-			if cfg.ReleaseAllowed(&items[j]) {
-				count++
-			}
-		}
-		return count
-	}
 
-	targetsDone := 0
-	targetsWithHits := 0
-	step2Usable := 0
-	for _, result := range results {
-		targetsDone++
-		compatible := usable(result.Query, result.Items)
-		if compatible > 0 {
-			targetsWithHits++
-			step2Usable += compatible
-			// Per-target detail is diagnostic only. The cycle already reports
-			// the total in "Step 2/2 complete".
-			logging.Debug("🔎 compatible releases", "query", result.Query, "compatible", compatible)
-		} else {
-			logging.Debug("🔎 search: no matching releases", "query", result.Query, "found", len(result.Items))
+		targetsDone := 0
+		targetsWithHits := 0
+		step2Usable := 0
+		for _, result := range results {
+			targetsDone++
+			compatible := usable(result.Query, result.Items)
+			if compatible > 0 {
+				targetsWithHits++
+				step2Usable += compatible
+				// Per-target detail is diagnostic only. The cycle already reports
+				// the total in "Step 2/2 complete".
+				logging.Debug("🔎 compatible releases", "query", result.Query, "compatible", compatible)
+			} else {
+				logging.Debug("🔎 search: no matching releases", "query", result.Query, "found", len(result.Items))
+			}
+			all = append(all, result.Items...)
 		}
-		all = append(all, result.Items...)
-	}
-	logging.Info(fmt.Sprintf(
-		"🔎 Step 2/2 complete: %d targets analyzed · %d targets returned compatible releases · %d compatible releases total",
-		targetsDone,
-		targetsWithHits,
-		step2Usable,
-	))
-	engineFailures := TakeEngineFailures()
-	if len(engineFailures) > 0 {
-		detail := make([]string, 0, len(engineFailures))
-		for _, failure := range engineFailures {
-			detail = append(detail, fmt.Sprintf("%s (%d)", failure.Engine, failure.Count))
+		logging.Info(fmt.Sprintf(
+			"🔎 Step 2/2 complete: %d targets analyzed · %d targets returned compatible releases · %d compatible releases total",
+			targetsDone,
+			targetsWithHits,
+			step2Usable,
+		))
+		engineFailures := TakeEngineFailures()
+		if len(engineFailures) > 0 {
+			detail := make([]string, 0, len(engineFailures))
+			for _, failure := range engineFailures {
+				detail = append(detail, fmt.Sprintf("%s (%d)", failure.Engine, failure.Count))
+			}
+			logging.Warn("⚠️ Web engines unreachable in this cycle: " + strings.Join(detail, ", "))
 		}
-		logging.Warn("⚠️ Web engines unreachable in this cycle: " + strings.Join(detail, ", "))
 	}
 
 	seen := map[string]struct{}{}
@@ -517,7 +565,7 @@ func (e *Engine) SearchSeriesEpisode(ctx context.Context, cfg *Config, series *S
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV)
+	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV, true)
 }
 
 // SearchSeriesSeason is the broader fallback for a known episode gap. It can
@@ -534,7 +582,7 @@ func (e *Engine) SearchSeriesSeason(ctx context.Context, cfg *Config, series *Se
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV)
+	return searchOneWithDBType(ctx, cfg, query, seriesExternalIDs(series), webTimeout, e.db, false, searchTypeTV, true)
 }
 
 // SearchMovie searches one configured movie using its movie mode and TMDB id
@@ -554,7 +602,7 @@ func (e *Engine) SearchMovie(ctx context.Context, cfg *Config, movie *MovieConfi
 		timeout := manualSearchTimeout
 		webTimeout = &timeout
 	}
-	return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie)
+	return searchOneWithDBType(ctx, cfg, query, ids, webTimeout, e.db, includeRejected, searchTypeMovie, true)
 }
 
 // searchOneWithDB runs the indexer and web fan-outs concurrently, then applies
@@ -568,7 +616,7 @@ func searchOneWithDB(
 	providerDB *Database,
 	includeRejected bool,
 ) []models.Release {
-	return searchOneWithDBType(ctx, cfg, query, externalIDs, webTimeout, providerDB, includeRejected, searchTypeAuto)
+	return searchOneWithDBType(ctx, cfg, query, externalIDs, webTimeout, providerDB, includeRejected, searchTypeAuto, true)
 }
 
 func searchOneWithDBType(
@@ -580,6 +628,7 @@ func searchOneWithDBType(
 	providerDB *Database,
 	includeRejected bool,
 	searchType string,
+	includeWeb bool,
 ) []models.Release {
 	if cfg != nil {
 		ConfigureCloudflareState(cfg.DataDir)
@@ -644,15 +693,14 @@ func searchOneWithDBType(
 
 	var webResults []models.Release
 	var webWG sync.WaitGroup
-	webWG.Add(1)
-	go func() {
-		defer webWG.Done()
-		if len(cfg.WebsearchEngines) == 0 {
-			return
-		}
-		webResults = SearchWithTimeout(ctx, cfg, query, webTimeout)
-		logging.Debug("web search completed", "query", query, "results", len(webResults))
-	}()
+	if includeWeb && len(cfg.WebsearchEngines) > 0 {
+		webWG.Add(1)
+		go func() {
+			defer webWG.Done()
+			webResults = SearchWithTimeout(ctx, cfg, query, webTimeout)
+			logging.Debug("web search completed", "query", query, "results", len(webResults))
+		}()
+	}
 
 	indexerWG.Wait()
 	for _, result := range indexerResults {
@@ -693,8 +741,10 @@ func searchOneWithDBType(
 				"error", message)
 		}
 	}
-	webWG.Wait()
-	all = append(all, webResults...)
+	if includeWeb && len(cfg.WebsearchEngines) > 0 {
+		webWG.Wait()
+		all = append(all, webResults...)
+	}
 
 	seen := map[string]struct{}{}
 	kept := make([]models.Release, 0, len(all))

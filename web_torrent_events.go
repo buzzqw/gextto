@@ -766,6 +766,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			}
 			_ = notifier.NotifyEvent("torrent_error", map[string]any{
 				"hash":             torrent.Hash,
+				"name":             torrent.Name,
+				"title":            torrent.Name,
 				"error":            "metadata timeout",
 				"upgrade_restored": restored,
 			})

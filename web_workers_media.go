@@ -270,11 +270,15 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 	)
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{
 		"path":              steps.path,
+		"size_bytes":        steps.sizeBytes,
 		"scheduled":         true,
 		"ftp_uploaded":      steps.ftpUploaded,
-		"ftp_error":         steps.ftpError,
+		"ftp_host":          steps.ftpHost,
+		"ftp_remote":        steps.ftpRemote,
+		"ftp_error":         bwm_optionalString(steps.ftpError),
 		"cloud_copied":      steps.cloudCopied,
-		"cloud_error":       steps.cloudError,
+		"cloud_destination": steps.cloudDestination,
+		"cloud_error":       bwm_optionalString(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
 	})
 	return nil

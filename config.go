@@ -935,6 +935,35 @@ func (c *Config) StopOnOldPageRatio() float64 {
 	return 0.8
 }
 
+// ShouldSearchTitlesInCycle reports whether the daemon's scheduled cycle
+// should run the online title search fan-out across Torznab indexers.
+//
+// By default ("auto" or empty), when feeds are configured they provide the
+// continuous stream of releases that populate the local SQLite archive; the
+// cycle then queries the archive in milliseconds, skipping the multi-minute
+// online sweep across dozens of series and movies. When no feeds are
+// configured, title search runs so installations without RSS/HTML feeds can
+// still discover releases on their Torznab indexers.
+//
+// The operator can override this with the `cycle_title_search` setting:
+// - "never" / "no" / "false": never search titles online during cycles.
+// - "always" / "yes" / "true": always search titles online during cycles.
+// - "auto" (default): search titles online only if FeedURLs is empty.
+func (c *Config) ShouldSearchTitlesInCycle() bool {
+	mode := strings.ToLower(strings.TrimSpace(c.Settings["cycle_title_search"]))
+	if mode == "" {
+		mode = strings.ToLower(strings.TrimSpace(c.Settings["title_search_in_cycle"]))
+	}
+	switch mode {
+	case "always", "yes", "true", "1":
+		return true
+	case "never", "no", "false", "0":
+		return false
+	default:
+		return len(c.FeedURLs) == 0
+	}
+}
+
 // DebugEnabled reports whether to log debug-level diagnostics (legacy
 // `debug_*`).
 func (c *Config) DebugEnabled() bool {

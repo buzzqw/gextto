@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -42,6 +43,9 @@ func TestCycleFullNoSourcesIsNoOp(t *testing.T) {
 	}
 	if stats.Scraped != 0 {
 		t.Fatalf("Scraped = %d, want 0", stats.Scraped)
+	}
+	if stats.Candidates != 0 {
+		t.Fatalf("Candidates = %d, want 0", stats.Candidates)
 	}
 	if stats.DownloadsStarted != 0 {
 		t.Fatalf("DownloadsStarted = %d, want 0", stats.DownloadsStarted)
@@ -139,6 +143,9 @@ func TestCycleDomainNoSourcesIsNoOp(t *testing.T) {
 			if stats.Scraped != 0 {
 				t.Fatalf("RunCycleDomain(%s): Scraped = %d, want 0", domain, stats.Scraped)
 			}
+			if stats.Candidates != 0 {
+				t.Fatalf("RunCycleDomain(%s): Candidates = %d, want 0", domain, stats.Candidates)
+			}
 			if stats.DownloadsStarted != 0 {
 				t.Fatalf("RunCycleDomain(%s): DownloadsStarted = %d, want 0", domain, stats.DownloadsStarted)
 			}
@@ -209,3 +216,114 @@ func TestScrapeAllSearchesSeriesAliases(t *testing.T) {
 		t.Fatalf("alias queries = %+v", queries)
 	}
 }
+
+func TestCycleCandidatesCountsOnlySurvivingReleases(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel>
+<item><title>Monitored.Show.S01E01.1080p.WEB-DL</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item>
+<item><title>Unmonitored.Show.S01E01.1080p.WEB-DL</title><link>magnet:?xt=urn:btih:1123456789012345678901234567890123456789</link></item>
+</channel></rss>`)
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Monitored Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	domain := "series"
+	stats, err := RunCycleDomain(
+		context.Background(),
+		&cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		state.activeEngine(),
+		&domain,
+	)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if stats == nil {
+		t.Fatal("RunCycleDomain returned nil stats")
+	}
+	if stats.Scraped < 2 {
+		t.Fatalf("Scraped = %d, want at least 2", stats.Scraped)
+	}
+	if stats.Candidates != 1 {
+		t.Fatalf("Candidates = %d, want 1", stats.Candidates)
+	}
+}
+
+func TestScrapeAllSkipsTitleSearchWhenFeedsConfigured(t *testing.T) {
+	var indexerCalls atomic.Int32
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		indexerCalls.Add(1)
+		_, _ = io.WriteString(w, `<rss><channel></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Feed.Item.S01E01</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`)
+	}))
+	defer feed.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Series = []SeriesConfig{{Name: "Feed Item", Enabled: true}}
+	cfg.FeedURLs = []string{feed.URL}
+	cfg.Indexers = []IndexerConfig{{Name: "test-indexer", URL: indexer.URL, Enabled: true}}
+	cfg.WebsearchEngines = nil
+
+	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(releases) != 1 {
+		t.Fatalf("expected 1 feed release, got %d", len(releases))
+	}
+	if calls := indexerCalls.Load(); calls != 0 {
+		t.Fatalf("expected 0 indexer calls when feeds present, got %d", calls)
+	}
+}
+
+func TestScrapeAllRunsTitleSearchWhenForced(t *testing.T) {
+	var indexerCalls atomic.Int32
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		indexerCalls.Add(1)
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Indexer.Item.S01E01</title><link>magnet:?xt=urn:btih:1123456789012345678901234567890123456789</link></item></channel></rss>`)
+	}))
+	defer indexer.Close()
+
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel><item><title>Feed.Item.S01E01</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item></channel></rss>`)
+	}))
+	defer feed.Close()
+
+	state := newTestAppState(t)
+	cfg := DefaultConfig()
+	cfg.DataDir = state.cfg.DataDir
+	cfg.Series = []SeriesConfig{{Name: "Target Item", Enabled: true}}
+	cfg.FeedURLs = []string{feed.URL}
+	cfg.Indexers = []IndexerConfig{{Name: "test-indexer", URL: indexer.URL, Enabled: true}}
+	cfg.Settings = map[string]string{"cycle_title_search": "always"}
+	cfg.WebsearchEngines = nil
+
+	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls := indexerCalls.Load(); calls != 1 {
+		t.Fatalf("expected 1 indexer call when cycle_title_search=always, got %d", calls)
+	}
+	if len(releases) != 2 {
+		t.Fatalf("expected 2 releases (feed + indexer), got %d: %+v", len(releases), releases)
+	}
+}
+

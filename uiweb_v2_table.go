@@ -89,6 +89,7 @@ type v2TableRow struct {
 
 type v2TableData struct {
 	View       string
+	BaseView   string
 	FooterView string
 	Title      string
 	Class      string
@@ -115,6 +116,14 @@ type v2TableData struct {
 	Dir           string
 	FooterForm    *uiFormSection
 	FooterActions []uiActionButton
+	WebSearch     bool
+	Notice        *v2ActionNotice
+}
+
+type v2ActionNotice struct {
+	Title   string
+	Message string
+	Error   bool
 }
 
 // v2SpecFor returns the table spec of a view. It covers the list pages via
@@ -193,6 +202,10 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		query.Set("page", strconv.Itoa(page))
 		query.Set("limit", strconv.Itoa(spec.PageSize))
 	}
+	web := r.FormValue("web") == "1" || strings.EqualFold(r.FormValue("web"), "true")
+	if web {
+		query.Set("web", "1")
+	}
 
 	var columns []uiColumn
 	if spec.ColumnsJSON != "" {
@@ -205,6 +218,7 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 
 	data := v2TableData{
 		View:       view,
+		BaseView:   view,
 		Title:      spec.Title,
 		Class:      spec.Class,
 		Empty:      spec.Empty,
@@ -219,6 +233,7 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 		Next:       page + 1,
 		Colspan:    len(columns),
 		Total:      0,
+		WebSearch:  web,
 	}
 	if data.HasActions {
 		data.Colspan++
@@ -232,6 +247,7 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 	data.FooterView = view
 	if separator := strings.LastIndex(view, "-t"); separator > 0 {
 		data.FooterView = view[:separator]
+		data.BaseView = view[:separator]
 	}
 
 	// Manual tables (source health) must not load on their own: the check is
@@ -853,7 +869,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		body = "{}"
 	}
 	vals := `{"view":"` + view + `","path":"` + templateEscapeJSAttr(path) + `","method":"` + stdhtml.EscapeString(action.Method) + `","body":"` + templateEscapeJSAttr(body) + `"}`
-	attrs := `hx-post="/v2/table/action" hx-vals='` + vals + `' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
+	attrs := `hx-post="/v2/table/action" hx-vals='` + vals + `' hx-include="closest .panel form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
 	if action.Confirm != "" {
 		attrs += ` hx-confirm="` + stdhtml.EscapeString(action.Confirm) + `"`
 	}
@@ -878,6 +894,10 @@ func v2Substitute(templateText string, item map[string]any, pathMode bool) strin
 			break
 		}
 		key := templateText[i+1 : i+end]
+		if !v2IsValidPlaceholder(key) {
+			out.WriteByte('{')
+			continue
+		}
 		value := v2String(item[key])
 		if pathMode {
 			out.WriteString(url.PathEscape(value))
@@ -892,6 +912,19 @@ func v2Substitute(templateText string, item map[string]any, pathMode bool) strin
 		i += end
 	}
 	return out.String()
+}
+
+func v2IsValidPlaceholder(s string) bool {
+	if len(s) == 0 || len(s) > 64 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // ---------------------------------------------------------------------------
@@ -925,13 +958,47 @@ func V2TableAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		method = http.MethodPost
 	}
 	body := []byte(r.FormValue("body"))
+	var notice *v2ActionNotice
 	// Only allow the daemon's own API paths: never let the form reach arbitrary
 	// URLs (the value is client-controlled).
 	if strings.HasPrefix(path, "/api/") {
-		v2InternalJSON(s, method, path, nil, body)
+		raw, status := v2InternalJSON(s, method, path, nil, body)
+		switch {
+		case strings.HasPrefix(path, "/api/archive/batch-download"):
+			if status >= 200 && status < 300 {
+				var res struct {
+					Accepted int   `json:"accepted"`
+					Rejected []any `json:"rejected"`
+				}
+				_ = json.Unmarshal(raw, &res)
+				if res.Accepted > 0 {
+					notice = &v2ActionNotice{Title: "Download", Message: "Torrent aggiunto ai download con successo."}
+				} else {
+					notice = &v2ActionNotice{Title: "Download", Message: "Torrent non avviato o già presente nei download.", Error: true}
+				}
+			} else {
+				notice = &v2ActionNotice{Title: "Download non riuscito", Message: "Impossibile avviare il download del torrent.", Error: true}
+			}
+		case strings.HasPrefix(path, "/api/archive/delete"):
+			if status >= 200 && status < 300 {
+				notice = &v2ActionNotice{Title: "Archivio", Message: "Elemento rimosso dall'archivio."}
+			} else {
+				notice = &v2ActionNotice{Title: "Archivio", Message: "Impossibile rimuovere l'elemento.", Error: true}
+			}
+		case strings.HasPrefix(path, "/api/blocklist/"):
+			if status >= 200 && status < 300 {
+				notice = &v2ActionNotice{Title: "Blocklist", Message: "Elemento rimosso dalla blocklist."}
+			}
+		default:
+			if status >= 400 {
+				notice = &v2ActionNotice{Title: "Errore", Message: "Operazione non riuscita.", Error: true}
+			}
+		}
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, r, view, spec), dict, eng)
+	data := v2TableDataFrom(s, r, view, spec)
+	data.Notice = notice
+	v2Render(w, http.StatusOK, "v2_table_body", data, dict, eng)
 }
 
 // V2TableLibrary toggles or removes a series/movie, mirroring the classic

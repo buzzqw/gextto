@@ -243,10 +243,14 @@ func RunCycleDomain(
 			movie := &cfg.Movies[i]
 			if movie.Enabled {
 				addArchiveQuery(movie.Name)
+				if orig := strings.TrimSpace(movie.OriginalTitle); orig != "" && !strings.EqualFold(orig, movie.Name) {
+					addArchiveQuery(orig)
+				}
 			}
 		}
 	}
 	archiveHashes := map[string]struct{}{}
+	archiveMatches := 0
 	for _, query := range archiveQueries {
 		items, err := archive.Search(query)
 		if err != nil {
@@ -274,9 +278,15 @@ func RunCycleDomain(
 				}
 			} else {
 				releases = append(releases, *release)
+				archiveMatches++
 			}
 		}
 	}
+	logging.Info(fmt.Sprintf(
+		"🔎 Archive: matched %d releases from archive across %d monitored targets",
+		archiveMatches,
+		len(archiveQueries),
+	))
 
 	readyPending := map[string]struct{}{}
 	pending, err := db.ReadyPending()
@@ -565,7 +575,6 @@ func RunCycleDomain(
 	seriesMinCache := map[string]*int64{}
 	for i := range releases {
 		release := releases[i]
-		stats.Candidates++
 		if release.Kind == "series" {
 			if release.Series == nil {
 				continue
@@ -703,6 +712,7 @@ func RunCycleDomain(
 			}
 		}
 	}
+	stats.Candidates = len(best)
 	logging.Info(fmt.Sprintf("🎯 CANDIDATES — %d release(s) survived the filters", len(best)))
 	for i := range best {
 		release := &best[i]
@@ -782,7 +792,7 @@ func RunCycleDomain(
 		var torrentFile *string
 		if strings.TrimSpace(release.Magnet) == "" {
 			if release.TorrentURL != nil {
-				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL)
+				magnet, path, err := resolveTorrentURL(ctx, engine, cfg, *release.TorrentURL, &release.Title)
 				if err != nil {
 					stats.Error("torrent_link")
 					logging.Warn("torrent link resolution failed",
@@ -798,7 +808,9 @@ func RunCycleDomain(
 				if err := archive.CanonicalizeTorrentURL(*release.TorrentURL, release.Magnet); err != nil {
 					logging.Warn("could not canonicalize archived torrent URL", "error", err)
 				}
-				torrentFile = &path
+				if path != "" {
+					torrentFile = &path
+				}
 			}
 		}
 		reconcilePackIdentityFromMagnet(&release)
@@ -926,7 +938,7 @@ func RunCycleDomain(
 				}
 			}
 			added := false
-			if torrentFile != nil {
+			if torrentFile != nil && *torrentFile != "" {
 				added, err = torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
 			} else {
 				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
@@ -1443,15 +1455,29 @@ func humanDuration(seconds int64) string {
 }
 
 // resolveTorrentURL downloads a `.torrent`, derives its v1 infohash, and saves
-// it in the state dir. Returns the equivalent magnet and the file path used
-// when adding it.
-func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL string) (string, string, error) {
+// it in the state dir, or resolves an HTTP redirect to a magnet link.
+// Returns the equivalent magnet and the file path used when adding it (empty
+// when a magnet was resolved directly).
+func resolveTorrentURL(ctx context.Context, engine *Engine, cfg *Config, rawURL string, fallbackTitle *string) (string, string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if strings.HasPrefix(rawURL, "magnet:?") {
+		if magnet, ok := utils.SanitizeMagnet(rawURL, fallbackTitle); ok {
+			return magnet, "", nil
+		}
+		return rawURL, "", nil
+	}
 	if !IsTorrentURL(rawURL) {
 		return "", "", fmt.Errorf("torrent source is not an HTTP(S) torrent link")
 	}
-	payload, err := engine.FetchTorrent(ctx, rawURL)
+	payload, magnet, err := engine.FetchTorrent(ctx, rawURL)
 	if err != nil {
 		return "", "", err
+	}
+	if magnet != "" {
+		if sanitized, ok := utils.SanitizeMagnet(magnet, fallbackTitle); ok {
+			return sanitized, "", nil
+		}
+		return magnet, "", nil
 	}
 	hash, ok := utils.TorrentInfoHash(payload)
 	if !ok {

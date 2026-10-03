@@ -220,6 +220,7 @@ type gh5_ftpConfig struct {
 
 type gh5_backupSteps struct {
 	path             string
+	sizeBytes        int64
 	ftpUploaded      bool
 	ftpHost          string
 	ftpRemote        string
@@ -277,7 +278,7 @@ func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cl
 	}
 	logging.Info("backup snapshot created", "path", path, "size_bytes", size)
 
-	steps := gh5_backupSteps{path: path}
+	steps := gh5_backupSteps{path: path, sizeBytes: size}
 	if ftp != nil {
 		steps.ftpHost = ftp.host
 		steps.ftpRemote = ftp.remote
@@ -454,18 +455,26 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	)
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{
 		"path":              steps.path,
+		"size_bytes":        steps.sizeBytes,
 		"ftp_uploaded":      steps.ftpUploaded,
-		"ftp_error":         steps.ftpError,
+		"ftp_host":          steps.ftpHost,
+		"ftp_remote":        steps.ftpRemote,
+		"ftp_error":         gh5_optionalString(steps.ftpError),
 		"cloud_copied":      steps.cloudCopied,
-		"cloud_error":       steps.cloudError,
+		"cloud_destination": steps.cloudDestination,
+		"cloud_error":       gh5_optionalString(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
 	})
 	jsonResponse(w, map[string]any{
 		"ok":                true,
 		"path":              steps.path,
+		"size_bytes":        steps.sizeBytes,
 		"ftp_uploaded":      steps.ftpUploaded,
+		"ftp_host":          steps.ftpHost,
+		"ftp_remote":        steps.ftpRemote,
 		"ftp_error":         steps.ftpError,
 		"cloud_copied":      steps.cloudCopied,
+		"cloud_destination": steps.cloudDestination,
 		"cloud_error":       steps.cloudError,
 		"telegram_uploaded": telegramUploaded,
 	})

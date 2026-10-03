@@ -368,14 +368,19 @@
        <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
       <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/v2/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
       <span class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
-    </div>
     <div class="toolbar download-temp-toolbar">
-      <span class="muted">{{if .TempActive}}Limite temporaneo attivo{{else}}Limite temporaneo disattivo{{end}}</span>
-       <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL KiB/s</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" /></label>
-       <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL KiB/s</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" /></label>
-       <label class="field inline-field" title="Durata del limite temporaneo in minuti"><span>minuti</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" /></label>
-       <button class="btn sm primary" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato">Applica</button>
-       <button class="btn sm danger" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il limite temporaneo e ripristina i limiti normali">Rimuovi</button>
+      {{if .TempActive}}
+        <span class="badge ok" title="Limite temporaneo attivo{{if .TempMinutes}} (ancora circa {{.TempMinutes}} min){{else}} (fino a rimozione manuale){{end}}">⚡ Limite temporaneo attivo{{if .TempMinutes}} ({{.TempMinutes}}m){{else}} (perm.){{end}}</span>
+      {{else if .SchedActive}}
+        <span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ Banda programmata attiva ({{.SchedDL}}/{{.SchedUL}} KiB/s)</span>
+      {{else}}
+        <span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">Limiti base ({{.BaseDL}}/{{.BaseUL}} KiB/s)</span>
+      {{end}}
+       <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL KiB/s</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" hx-preserve="true" /></label>
+       <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL KiB/s</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" hx-preserve="true" /></label>
+       <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>minuti</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" hx-preserve="true" /></label>
+       <button class="btn sm primary" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato (o 0 per mantenerli fino a rimozione)">Applica</button>
+       <button class="btn sm danger" type="button" onclick="var d=document.getElementById('v2-temp-dl'),u=document.getElementById('v2-temp-ul'),m=document.getElementById('v2-temp-minutes');if(d)d.value='0';if(u)u.value='0';if(m)m.value='0';" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il limite temporaneo e ripristina i limiti normali">Rimuovi</button>
     </div>
     <div class="toolbar download-bulk-toolbar">
        <label class="check" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
@@ -831,7 +836,7 @@
     <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span id="v2-logs-count">{{.Count}}</span> righe · auto ogni 5 s</small></div>
     <div class="panel-body">
       <form class="toolbar logs-toolbar" hx-get="/v2/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
-            hx-trigger="submit, input changed delay:300ms, change, every 5s">
+            hx-trigger="submit, input changed delay:300ms, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
          <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
          <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
           <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
@@ -840,7 +845,8 @@
           <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
          </select>
          <button class="btn sm primary" type="button" data-v2-logs-follow title="Ferma o riattiva lo scorrimento automatico del log">⏸ Ferma scorrimento</button>
-          <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+         <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+         <button class="btn sm" type="button" data-v2-logs-copy title="Copia le righe di log visibili o la selezione negli appunti">📋 Copia</button>
          <select class="input" name="log" aria-label="File di log" title="Scegli quale file di log leggere; il primo è quello attivo">
           {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . "gextto.log"}} (attivo){{end}}</option>{{end}}
          </select>
@@ -956,13 +962,19 @@
     <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} voci</small></div>
     <div class="panel-body">
       {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/v2/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="submit, input changed delay:300ms">
+      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/v2/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="submit{{if ne .BaseView "archive"}}, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
         {{if .Manual}}<input type="hidden" name="load" value="1" />{{end}}
         <input type="hidden" name="sort" value="{{.Sort}}" />
         <input type="hidden" name="dir" value="{{.Dir}}" />
-        {{if .Search}}<input class="input" type="search" name="q" value="{{.Query}}" placeholder="Cerca…" aria-label="Cerca" />{{end}}
+        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="Cerca…" aria-label="Cerca" />{{end}}
         {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
+        {{if eq .BaseView "archive"}}
+        <label class="check archive-web-check" title="Cerca anche nei motori web e indexer online"><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>Cerca anche nel web</span></label>
+        <button class="btn sm primary" type="submit">Cerca</button>
+        <span class="htmx-indicator muted archive-indicator">Ricerca web in corso…</span>
+        {{else}}
         {{if .Refresh}}<button class="btn sm" type="submit">Aggiorna</button>{{end}}
+        {{end}}
       </form>{{end}}
        {{template "v2_table_body" .}}
        {{if or .FooterForm .FooterActions}}
@@ -991,7 +1003,7 @@
   <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
     <table class="data-table {{.Class}}">
       <caption class="sr-only">{{.Title}}</caption>
-      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/v2/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/v2/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
       <tbody>
         {{if .Rows}}{{range .Rows}}<tr>{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
         {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}
@@ -1000,12 +1012,13 @@
   </div>
   {{if gt .Pages 1}}
   <div class="table-pagination">
-    <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
+    <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
     <span class="page-label">Pagina {{.Page}} di {{.Pages}} · {{.Total}} voci</span>
-    <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
+    <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
   </div>
   {{end}}
 </div>
+{{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" .Notice}}</div>{{end}}
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}

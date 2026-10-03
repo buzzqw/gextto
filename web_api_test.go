@@ -84,7 +84,10 @@ func newTestAppState(t *testing.T) *AppState {
 		t.Fatalf("write test config: %v", err)
 	}
 
-	torrents := &LibtorrentClient{DryRun: true}
+	torrents := &LibtorrentClient{
+		DryRun:   true,
+		torrents: make(map[string]models.TorrentView),
+	}
 
 	state := NewAppState(
 		&cfg,

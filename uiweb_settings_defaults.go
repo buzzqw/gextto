@@ -23,6 +23,7 @@ var uiSettingDefaults = map[string]string{
 	"gap_filling":             "yes",
 	"gap_deep_interval_hours": "6",
 	"gap_deep_max_per_cycle":  "5",
+	"cycle_title_search":      "auto",
 
 	// --- Sorgenti -----------------------------------------------------------
 	"blacklist":         "cam\ncamrip\nts\ntelesync\ntelecine\nscr\nscreener\nworkprint\nsample",

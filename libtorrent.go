@@ -946,6 +946,9 @@ func (c *LibtorrentClient) AddWithOptions(magnet string, cfg *Config, preferredP
 		state = "dry-run"
 	}
 	c.torrentsMu.Lock()
+	if c.torrents == nil {
+		c.torrents = make(map[string]models.TorrentView)
+	}
 	c.torrents[hash] = models.TorrentView{
 		Hash:            hash,
 		Name:            clean,

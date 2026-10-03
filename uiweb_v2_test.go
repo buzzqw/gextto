@@ -401,6 +401,9 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 			t.Fatalf("table fragment %s -> %d", view, code)
 		}
 	}
+	if code, body := v2Request(t, server, http.MethodGet, "/v2/table?view=archive&q=Minions&web=1", nil); code != http.StatusOK || !strings.Contains(body, "v2-table-body-archive") {
+		t.Fatalf("archive table with web search -> %d", code)
+	}
 	// Library toggle/remove reuses the same read-modify-write as the classic UI.
 	if code, _ := v2Request(t, server, http.MethodPost, "/v2/table/library", url.Values{"view": {"series"}, "scope": {"series"}, "name": {"NonEsiste"}, "mode": {"toggle"}}); code != http.StatusOK {
 		t.Fatalf("library toggle -> %d", code)
@@ -425,6 +428,39 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/comics/weekly/force", url.Values{"date": {"2026-09-23"}}); code != http.StatusOK || !strings.Contains(body, "link del Weekly Pack non disponibile") {
 		t.Fatalf("weekly force unavailable-link response -> %d: %s", code, body)
 	}
+
+	// Archive row action properly substitutes JSON placeholders and includes toolbar filters.
+	archiveAction := v2RenderAction("archive", map[string]any{
+		"title":  "Minions 2026",
+		"magnet": "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		"source": "CYBER",
+	}, uiAction{
+		Label:  "Scarica",
+		Method: "POST",
+		Path:   "/api/archive/batch-download",
+		Body:   `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`,
+	}, uiTableSpec{})
+	if !strings.Contains(archiveAction, `hx-include="closest .panel form.toolbar"`) {
+		t.Fatalf("archiveAction missing toolbar hx-include: %s", archiveAction)
+	}
+	if !strings.Contains(archiveAction, `\"title\":\"Minions 2026\"`) {
+		t.Fatalf("archiveAction missing substituted title: %s", archiveAction)
+	}
+
+	// Action execution preserves filter query 'q' and returns an out-of-band toast notice.
+	code, body := v2Request(t, server, http.MethodPost, "/v2/table/action", url.Values{
+		"view":   {"archive"},
+		"path":   {"/api/archive/batch-download"},
+		"method": {"POST"},
+		"body":   {`{"items":[{"title":"Minions 2026","magnet":"magnet:?xt=urn:btih:0123456789012345678901234567890123456789","source":"CYBER"}]}`},
+		"q":      {"minions"},
+	})
+	if code != http.StatusOK {
+		t.Fatalf("archive action -> %d", code)
+	}
+	if !strings.Contains(body, `hx-swap-oob="innerHTML"`) || !strings.Contains(body, `id="v2-toast-region"`) {
+		t.Fatalf("archive action response missing OOB toast notice: %s", body)
+	}
 }
 
 func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
@@ -436,7 +472,7 @@ func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
 		"series":  {"Aggiungi una serie", "Serie monitorate"},
 		"movies":  {"Aggiungi un film", "Film monitorati"},
 		"gaps":    {"Cerca un episodio mancante", "Episodi mancanti"},
-		"archive": {"Aggiungi all&#39;archivio"},
+		"archive": {"Aggiungi all&#39;archivio", "Cerca anche nel web", "archive-search-input"},
 	}
 	for view, markers := range wants {
 		code, body := v2Request(t, server, http.MethodGet, "/v2?view="+view, nil)

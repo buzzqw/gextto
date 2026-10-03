@@ -280,3 +280,119 @@ func TestFormatEventSeedingNotification(t *testing.T) {
 		t.Fatalf("archived message must carry the path: %q", archived)
 	}
 }
+
+func TestFormatEventBackupNotification(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	// Italian test
+	messages.SetLanguage("it")
+	msg := formatEvent("backup_completed", map[string]any{
+		"path":              "/home/andres/backups/gextto-backup.zip",
+		"size_bytes":        int64(15 * 1024 * 1024),
+		"scheduled":         true,
+		"cloud_copied":      true,
+		"cloud_destination": "/mnt/cloud/backups/gextto-backup.zip",
+		"ftp_uploaded":      true,
+		"ftp_host":          "ftp.example.com",
+		"ftp_remote":        "/remote/backups",
+		"telegram_uploaded": true,
+	})
+
+	if !strings.Contains(msg, "BACKUP PROGRAMMATO COMPLETATO") {
+		t.Fatalf("missing scheduled header: %q", msg)
+	}
+	if !strings.Contains(msg, "File: /home/andres/backups/gextto-backup.zip") {
+		t.Fatalf("missing local path: %q", msg)
+	}
+	if !strings.Contains(msg, "Dimensione: 15.00 MB") {
+		t.Fatalf("missing size: %q", msg)
+	}
+	if !strings.Contains(msg, "Copia cloud: /mnt/cloud/backups/gextto-backup.zip") {
+		t.Fatalf("missing cloud destination: %q", msg)
+	}
+	if !strings.Contains(msg, "Caricato via FTP: ftp.example.com (/remote/backups/gextto-backup.zip)") {
+		t.Fatalf("missing ftp info: %q", msg)
+	}
+	if !strings.Contains(msg, "allegato Telegram") {
+		t.Fatalf("missing telegram document marker: %q", msg)
+	}
+
+	// English test with errors
+	messages.SetLanguage("en")
+	msgEn := formatEvent("backup_completed", map[string]any{
+		"path":        "/backups/backup.zip",
+		"cloud_error": "access denied",
+		"ftp_host":    "ftp.bad.com",
+		"ftp_error":   "connection refused",
+	})
+	if !strings.Contains(msgEn, "BACKUP COMPLETED") {
+		t.Fatalf("missing English header: %q", msgEn)
+	}
+	if !strings.Contains(msgEn, "Cloud copy failed: access denied") {
+		t.Fatalf("missing cloud error: %q", msgEn)
+	}
+	if !strings.Contains(msgEn, "FTP upload failed (ftp.bad.com): connection refused") {
+		t.Fatalf("missing ftp error: %q", msgEn)
+	}
+}
+
+func TestFormatEventMovieAndErrors(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+	messages.SetLanguage("it")
+
+	// Movie completion uses movie icon 🎬 instead of 📺
+	movieDone := formatEvent("torrent_completed", map[string]any{
+		"kind":       "movie",
+		"title":      "Minions 2026",
+		"size_bytes": int64(4500000000),
+		"path":       "/movies/Minions (2026).mkv",
+	})
+	if !strings.Contains(movieDone, "🎬 Minions 2026") {
+		t.Fatalf("movie completion missing movie icon: %q", movieDone)
+	}
+
+	// Torrent error with release name and restored upgrade
+	errDone := formatEvent("torrent_error", map[string]any{
+		"name":             "Show S01E01",
+		"error":            "metadata timeout",
+		"upgrade_restored": true,
+	})
+	if !strings.Contains(errDone, "«Show S01E01» — metadata timeout (versione precedente ripristinata)") {
+		t.Fatalf("torrent error formatting unexpected: %q", errDone)
+	}
+
+	// Download failed with release title and error
+	failDone := formatEvent("download_failed", map[string]any{
+		"title":            "Show S01E02",
+		"error":            "stalled download",
+		"upgrade_restored": false,
+	})
+	if !strings.Contains(failDone, "«Show S01E02» — stalled download") {
+		t.Fatalf("download failed formatting unexpected: %q", failDone)
+	}
+}
+
+func TestFormatEmailSubject(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+	messages.SetLanguage("it")
+
+	subj1 := formatEmailSubject("download_started", map[string]any{"series": "FBI", "season": 3, "episode": 1})
+	if subj1 != "Gextto: Nuovo episodio in download — FBI S03E01" {
+		t.Fatalf("subj1 = %q", subj1)
+	}
+
+	subj2 := formatEmailSubject("torrent_completed", map[string]any{"kind": "movie", "title": "Minions 2026"})
+	if subj2 != "Gextto: Download completato — Minions 2026" {
+		t.Fatalf("subj2 = %q", subj2)
+	}
+
+	subj3 := formatEmailSubject("backup_completed", map[string]any{"scheduled": true})
+	if subj3 != "Gextto: Backup programmato completato" {
+		t.Fatalf("subj3 = %q", subj3)
+	}
+}
+
+

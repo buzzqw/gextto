@@ -209,6 +209,12 @@ type uiDownloadsPage struct {
 	TempUL      int64
 	TempActive  bool
 	TempMinutes int64
+	// Active scheduled speed limits and base limits
+	SchedActive bool
+	SchedDL     int64
+	SchedUL     int64
+	BaseDL      int64
+	BaseUL      int64
 	// Tag catalog and selection used by the toolbar filters.
 	TagOptions          []string
 	AutoRemoveCompleted bool
@@ -566,11 +572,21 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 	}
 	if uiSettingString(cfg, "libtorrent_temp_limit_enabled") == "1" {
 		until := uiSettingInt(cfg, "libtorrent_temp_limit_until")
-		if remaining := until - time.Now().Unix(); remaining > 0 {
+		if until == 0 {
+			page.TempActive = true
+			page.TempMinutes = 0
+		} else if remaining := until - time.Now().Unix(); remaining > 0 {
 			page.TempActive = true
 			page.TempMinutes = (remaining + 59) / 60
 		}
 	}
+	if dl, ul, ok := gh6_scheduledSpeedLimits(cfg); ok {
+		page.SchedActive = true
+		page.SchedDL = dl
+		page.SchedUL = ul
+	}
+	page.BaseDL = cfg.Libtorrent.DownloadLimitKib
+	page.BaseUL = cfg.Libtorrent.UploadLimitKib
 	page.Panels = []uiPageSection{
 		sectionTable(uiTableSpec{
 			Title:    "Storico download",

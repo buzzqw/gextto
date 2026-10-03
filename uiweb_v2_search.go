@@ -82,7 +82,10 @@ func V2SearchAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		body, _ := json.Marshal(map[string]json.RawMessage{"release": json.RawMessage(release)})
 		v2InternalJSON(s, http.MethodPost, "/api/search/add", nil, body)
 	}
-	redirect := safeV2Redirect(r.FormValue("redirect"), "/?view=search")
+	redirect := "/?view=search"
+	if r.FormValue("redirect") == "/?view=dashboard" {
+		redirect = "/?view=dashboard"
+	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)
 		return

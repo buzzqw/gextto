@@ -844,6 +844,11 @@ type v2TorrentsView struct {
 	TempUL              int64
 	TempMinutes         int64
 	TempActive          bool
+	SchedActive         bool
+	SchedDL             int64
+	SchedUL             int64
+	BaseDL              int64
+	BaseUL              int64
 	AutoRemoveCompleted bool
 	Message             string
 	Error               bool
@@ -1001,6 +1006,11 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TempUL:              settings.TempUL,
 		TempMinutes:         settings.TempMinutes,
 		TempActive:          settings.TempActive,
+		SchedActive:         settings.SchedActive,
+		SchedDL:             settings.SchedDL,
+		SchedUL:             settings.SchedUL,
+		BaseDL:              settings.BaseDL,
+		BaseUL:              settings.BaseUL,
 		AutoRemoveCompleted: settings.AutoRemoveCompleted,
 		Message:             message,
 		Error:               isErr,

@@ -704,6 +704,31 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	} else if limit > 1000 {
 		limit = 1000
 	}
+	if s.archive == nil {
+		jsonError(w, http.StatusInternalServerError, "archivio non disponibile")
+		return
+	}
+	webParam := queryParam(r, "web")
+	webSearch := webParam == "1" || strings.EqualFold(webParam, "true")
+	if webSearch && strings.TrimSpace(term) != "" && page == 1 && s.engine != nil {
+		cfg := latestConfig(s)
+		if cfg != nil {
+			searchCtx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+			results := s.engine.SearchQueryManualAll(searchCtx, cfg, strings.TrimSpace(term))
+			cancel()
+			if len(results) > 0 {
+				if err := s.archive.SaveBatch(results, cfg); err != nil {
+					logging.Warn("failed to save web search results to archive", "query", term, "error", err)
+				}
+				if s.db != nil {
+					if err := s.db.RecordSeenBatch(results, cfg); err != nil {
+						logging.Debug("archive web search seen recording failed", "error", err)
+					}
+				}
+				logging.Info("archive web search completed", "query", term, "results", len(results))
+			}
+		}
+	}
 	result, err := s.archive.BrowsePage(term, page, limit)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html"
 	"net/http"
 	"net/url"
 	"sort"
@@ -263,14 +262,55 @@ func v2ListEditorViewFrom(s *AppState, editor uiListEditor, key, view, tab strin
 
 // V2SettingsEditorRow returns one empty row (and advances the add button index).
 func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
-	key := r.FormValue("editor")
-	editor, ok := v2ListEditorByKey(key)
+	var canonicalKey string
+	switch r.FormValue("editor") {
+	case "indexers":
+		canonicalKey = "indexers"
+	case "source_filters":
+		canonicalKey = "source_filters"
+	case "tag_dir_rules":
+		canonicalKey = "tag_dir_rules"
+	case "event_hooks":
+		canonicalKey = "event_hooks"
+	case "watched_folders":
+		canonicalKey = "watched_folders"
+	default:
+		http.Error(w, "editor sconosciuto", http.StatusNotFound)
+		return
+	}
+	editor, ok := v2ListEditorByKey(canonicalKey)
 	if !ok {
 		http.Error(w, "editor sconosciuto", http.StatusNotFound)
 		return
 	}
 	index, _ := strconv.Atoi(r.FormValue("index"))
-	view := v2ListEditorView{Key: key, View: r.FormValue("view"), Tab: r.FormValue("tab"), NextIndex: index + 1, HasTest: editor.TestEndpoint != ""}
+	if index < 0 {
+		index = 0
+	}
+	viewName := "settings"
+	if r.FormValue("view") == "settings" {
+		viewName = "settings"
+	}
+	var tabName string
+	switch r.FormValue("tab") {
+	case "sources":
+		tabName = "sources"
+	case "rules":
+		tabName = "rules"
+	case "indexers":
+		tabName = "indexers"
+	case "advanced":
+		tabName = "advanced"
+	default:
+		tabName = "advanced"
+	}
+	view := v2ListEditorView{
+		Key:       canonicalKey,
+		View:      viewName,
+		Tab:       tabName,
+		NextIndex: index + 1,
+		HasTest:   editor.TestEndpoint != "",
+	}
 	row := v2ListRowFrom(editor.Fields, map[string]any{}, index)
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
@@ -279,15 +319,13 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	body := v2TranslateHTML(buffer.String(), dict, eng)
-	safeKey := html.EscapeString(key)
-	safeView := html.EscapeString(url.QueryEscape(r.FormValue("view")))
-	safeTab := html.EscapeString(url.QueryEscape(r.FormValue("tab")))
 	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/v2/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend">Aggiungi riga</button>`,
-		safeKey, url.QueryEscape(key), index+1, safeView, safeTab, safeKey)
+		canonicalKey, canonicalKey, index+1, viewName, tabName, canonicalKey)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body + addButton))
 }
+
 
 func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	key := strings.TrimSpace(r.FormValue("editor"))
@@ -367,16 +405,21 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(editor.PostPath, "/api/") {
 		v2InternalJSON(s, http.MethodPost, editor.PostPath, nil, body)
 	}
-	if redirect := safeV2Redirect(r.FormValue("redirect"), ""); redirect != "" {
-		if r.Header.Get("HX-Request") == "" {
-			http.Redirect(w, r, redirect, http.StatusSeeOther)
-			return
+	tab := r.FormValue("tab")
+	if tab == "" {
+		if rawRedirect := r.FormValue("redirect"); strings.Contains(rawRedirect, "tab=") {
+			if u, err := url.Parse(rawRedirect); err == nil {
+				tab = u.Query().Get("tab")
+			}
 		}
-		w.Header().Set("HX-Redirect", redirect)
-		w.WriteHeader(http.StatusNoContent)
-		return
 	}
-	v2SettingsRedirect(w, r, "advanced")
+	switch tab {
+	case "sources", "rules", "indexers", "advanced", "rename", "i18n", "torrents", "general", "maintenance":
+		// valid tab
+	default:
+		tab = "advanced"
+	}
+	v2SettingsRedirect(w, r, tab)
 }
 
 func v2SplitIndexedField(name string) (string, int, bool) {

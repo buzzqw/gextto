@@ -194,10 +194,43 @@
   }
 
   var logsFollow = true;
-  // HTMX replaces the complete <pre> every five seconds. Retain the viewport
-  // while follow is paused; otherwise replacing the node makes the browser
-  // appear to resume scrolling even though pinLogTail correctly did nothing.
   var pausedLogScrollTop = null;
+  var isLogSelecting = false;
+
+  function hasLogSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false;
+    var logView = document.getElementById("v2-logs-view");
+    if (!logView) return false;
+    try {
+      for (var i = 0; i < sel.rangeCount; i++) {
+        var range = sel.getRangeAt(i);
+        var ancestor = range.commonAncestorContainer;
+        if (ancestor && (ancestor === logView || logView.contains(ancestor))) {
+          return true;
+        }
+      }
+    } catch (e) {
+      return false;
+    }
+    return false;
+  }
+
+  function canPollLogs() {
+    return logsFollow && !isLogSelecting && !hasLogSelection();
+  }
+  window.gexttoCanPollLogs = canPollLogs;
+
+  document.addEventListener("mousedown", function (event) {
+    var logView = document.getElementById("v2-logs-view");
+    if (logView && (event.target === logView || logView.contains(event.target))) {
+      isLogSelecting = true;
+    }
+  }, true);
+  document.addEventListener("mouseup", function () {
+    isLogSelecting = false;
+  }, true);
+
   function updateLogsFollowButton() {
     var button = document.querySelector("[data-v2-logs-follow]");
     if (button) button.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Segui ultime righe";
@@ -543,6 +576,20 @@
       copyText(copy.getAttribute("data-v2-copy") || "", copy);
       return;
     }
+    var copyLogs = event.target.closest && event.target.closest("[data-v2-logs-copy]");
+    if (copyLogs) {
+      event.preventDefault();
+      var textToCopy = "";
+      var sel = window.getSelection();
+      var logView = document.getElementById("v2-logs-view");
+      if (sel && !sel.isCollapsed && logView && logView.contains(sel.anchorNode)) {
+        textToCopy = sel.toString();
+      } else if (logView) {
+        textToCopy = logView.innerText || logView.textContent || "";
+      }
+      if (textToCopy) copyText(textToCopy, copyLogs);
+      return;
+    }
     var follow = event.target.closest && event.target.closest("[data-v2-logs-follow]");
     if (follow) {
       event.preventDefault();
@@ -554,8 +601,14 @@
       updateLogsFollowButton();
       if (logsFollow) {
         pausedLogScrollTop = null;
-        pinLogTail();
+        var form = document.querySelector(".logs-toolbar");
+        if (form && window.htmx) {
+          window.htmx.trigger(form, "submit");
+        } else {
+          pinLogTail();
+        }
       }
+      return;
     }
   });
   // Apply the visual state on pointer-down too. This happens before HTMX can
@@ -597,22 +650,42 @@
     if (logView) logView.scrollTop = logView.scrollHeight;
   }
 
+  document.addEventListener("htmx:configRequest", function (event) {
+    var path = event.detail && event.detail.path;
+    if (!path || path.indexOf("/v2/partial/logs") === -1) return;
+    var trig = event.detail && event.detail.triggeringEvent;
+    var isPolling = !trig || trig.type === "hx:poll:trigger";
+    if (isPolling && !canPollLogs()) {
+      event.preventDefault();
+    }
+  });
+
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var target = event.detail && event.detail.target;
+    if (!target || target.id !== "v2-logs-view") return;
+    var trig = event.detail && event.detail.triggeringEvent;
+    var isPolling = !trig || trig.type === "hx:poll:trigger";
+    if (isPolling && !canPollLogs()) {
+      if (event.detail) event.detail.shouldSwap = false;
+      return;
+    }
+    if (!logsFollow) {
+      pausedLogScrollTop = target.scrollTop;
+    }
+  });
+
   document.addEventListener("htmx:afterSwap", function (event) {
     if (!event.target) return;
     ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); return; }
     updateTorrentSelection();
-    if (!logsFollow && event.target.id === "v2-logs-view" && pausedLogScrollTop !== null) {
-      event.target.scrollTop = pausedLogScrollTop;
+    if (event.target.id === "v2-logs-view") {
+      updateLogsFollowButton();
+      if (!logsFollow && pausedLogScrollTop !== null) {
+        event.target.scrollTop = pausedLogScrollTop;
+      }
     }
-    // Keep the log tail pinned to the newest line after the periodic refresh.
     pinLogTail();
-  });
-
-  document.addEventListener("htmx:beforeSwap", function (event) {
-    var target = event.detail && event.detail.target;
-    if (logsFollow || !target || target.id !== "v2-logs-view") return;
-    pausedLogScrollTop = target.scrollTop;
   });
 
   // ------------------------------------------------------------ font picker --

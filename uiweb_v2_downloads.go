@@ -72,6 +72,17 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 				message = "Nessun torrent completato da rimuovere"
 			}
 		}
+	} else if op == "temp_apply" && status < 400 {
+		dl := v2ParseInt(r.FormValue("download_kib"), 0)
+		ul := v2ParseInt(r.FormValue("upload_kib"), 0)
+		mins := v2ParseInt(r.FormValue("minutes"), 0)
+		if mins > 0 {
+			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL per %d min", dl, ul, mins)
+		} else {
+			message = fmt.Sprintf("Limite temporaneo applicato: %d KiB/s DL · %d KiB/s UL (fino a rimozione)", dl, ul)
+		}
+	} else if op == "temp_clear" && status < 400 {
+		message = "Limite temporaneo rimosso (ripristinati limiti normali)"
 	}
 	if r.Header.Get("HX-Request") == "" {
 		query := url.Values{"view": {"downloads"}, "msg": {message}}
@@ -80,10 +91,14 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	view := v2TorrentsViewFrom(s, r, message, status >= 400)
-	if op == "clear_completed" {
+	if op == "clear_completed" || op == "temp_apply" || op == "temp_clear" {
+		title := "Limiti di velocità"
+		if op == "clear_completed" {
+			title = "Pulisci completati"
+		}
 		v2Render(w, http.StatusOK, "v2_downloads_settings_result", map[string]any{
 			"View":   view,
-			"Notice": map[string]any{"Title": "Pulisci completati", "Message": message, "Error": status >= 400},
+			"Notice": map[string]any{"Title": title, "Message": message, "Error": status >= 400},
 		}, dict, eng)
 		return
 	}
