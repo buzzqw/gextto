@@ -49,6 +49,25 @@ func newTestDB(t *testing.T) *Database {
 	return db
 }
 
+func TestMarkTorrentCompletedUnarchivedIsIdempotent(t *testing.T) {
+	db := newTestDB(t)
+	first, err := db.MarkTorrentCompletedUnarchived("ABC123", "Manual.Movie.mkv")
+	if err != nil || !first {
+		t.Fatalf("first completion = (%v, %v), want (true, nil)", first, err)
+	}
+	second, err := db.MarkTorrentCompletedUnarchived("abc123", "Manual.Movie.mkv")
+	if err != nil || second {
+		t.Fatalf("duplicate completion = (%v, %v), want (false, nil)", second, err)
+	}
+	var name, status string
+	if err := db.db.QueryRow("SELECT name,status FROM torrent_meta WHERE hash='abc123'").Scan(&name, &status); err != nil {
+		t.Fatalf("read completed torrent: %v", err)
+	}
+	if name != "Manual.Movie.mkv" || status != "completed" {
+		t.Fatalf("stored torrent = (%q, %q), want name and completed status", name, status)
+	}
+}
+
 func assertTrue(t *testing.T, value bool, message string) {
 	t.Helper()
 	if !value {

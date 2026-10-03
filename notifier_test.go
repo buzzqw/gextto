@@ -281,6 +281,23 @@ func TestFormatEventSeedingNotification(t *testing.T) {
 	}
 }
 
+func TestFormatEventManualTorrentCompletion(t *testing.T) {
+	message := formatEvent("torrent_completed", map[string]any{
+		"title":      "Minions.&.Monsters.2026.iTA-ENG.WEBDL.2160p.HEVC.HDR.x265-CYBER.mkv",
+		"path":       "/downloads/Minions.&.Monsters.mkv",
+		"size_bytes": int64(1024),
+		"manual":     true,
+	})
+	for _, want := range []string{"AGGIUNTO MANUALMENTE", "Minions.&.Monsters.2026", "1.00 KB", "/downloads/Minions.&.Monsters.mkv"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("manual completion message missing %q: %q", want, message)
+		}
+	}
+	if strings.Contains(message, "Archiviato") {
+		t.Fatalf("manual completion message must not claim the file was archived: %q", message)
+	}
+}
+
 func TestFormatEventBackupNotification(t *testing.T) {
 	previous := messages.Language()
 	t.Cleanup(func() { messages.SetLanguage(previous) })
@@ -394,5 +411,3 @@ func TestFormatEmailSubject(t *testing.T) {
 		t.Fatalf("subj3 = %q", subj3)
 	}
 }
-
-

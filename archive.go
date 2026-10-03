@@ -402,6 +402,26 @@ func (a *Archive) DeleteIDs(ids []int64) (int, error) {
 	return removed, nil
 }
 
+// DeleteMatching removes every archive listing matching a positive title query.
+// Exclusions use the same syntax as BrowsePage; at least one positive term is
+// required so a typo or an exclusion-only query cannot wipe the catalogue.
+func (a *Archive) DeleteMatching(query string) (int, error) {
+	includes, excludes := parseArchiveFilter(query)
+	if len(includes) == 0 {
+		return 0, fmt.Errorf("inserire almeno una parola da cercare")
+	}
+	term := ftsMatchExpression(includes, excludes)
+	result, err := a.db.Exec(
+		"DELETE FROM archive WHERE id IN (SELECT rowid FROM archive_fts WHERE archive_fts MATCH ?1)",
+		term,
+	)
+	if err != nil {
+		return 0, err
+	}
+	removed, err := result.RowsAffected()
+	return int(removed), err
+}
+
 // Delete removes the row matching the magnet or its infohash.
 func (a *Archive) Delete(magnet string) (bool, error) {
 	hash, ok := utils.MagnetHash(magnet)

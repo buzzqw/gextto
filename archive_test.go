@@ -56,6 +56,27 @@ func TestRecentEntriesRespectTheLimit(t *testing.T) {
 	}
 }
 
+func TestDeleteMatchingRemovesAllTitleMatchesOnly(t *testing.T) {
+	archive := openTestArchive(t)
+	if _, err := archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
+		('Adult Porno Release 1','magnet:porno-1','feed','2026-01-01'),
+		('Adult Porno Release 2','magnet:porno-2','feed','2026-01-02'),
+		('Family Movie','magnet:family','feed','2026-01-03')`); err != nil {
+		t.Fatalf("insert archive fixtures: %v", err)
+	}
+	removed, err := archive.DeleteMatching("porno")
+	if err != nil || removed != 2 {
+		t.Fatalf("DeleteMatching = (%d, %v), want (2, nil)", removed, err)
+	}
+	remaining, err := archive.Count()
+	if err != nil || remaining != 1 {
+		t.Fatalf("remaining count = (%d, %v), want (1, nil)", remaining, err)
+	}
+	if _, err := archive.DeleteMatching("-porno"); err == nil {
+		t.Fatal("DeleteMatching should refuse queries without a positive search term")
+	}
+}
+
 func TestRetainsDistinctHashesAndDeduplicatesTheSameMagnet(t *testing.T) {
 	archive := openTestArchive(t)
 	year := int64(2026)

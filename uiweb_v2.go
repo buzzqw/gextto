@@ -149,6 +149,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /v2/settings/i18n", V2SettingsI18nTable)
 	v2Handle(s, mux, "POST /v2/settings/i18n/import", V2SettingsI18nImport)
 	v2Handle(s, mux, "POST /v2/settings/i18n/delete", V2SettingsI18nDelete)
+	v2Handle(s, mux, "GET /v2/settings/content-archive", V2SettingsContentArchiveSearch)
+	v2Handle(s, mux, "POST /v2/settings/content-archive/delete", V2SettingsContentArchiveDelete)
 
 	// Log (frammento aggiornabile).
 	v2Handle(s, mux, "GET /v2/partial/logs", V2LogsPartial)

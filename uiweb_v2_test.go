@@ -42,6 +42,61 @@ func v2Request(t *testing.T, server *httptest.Server, method, path string, form 
 	return response.StatusCode, string(raw)
 }
 
+func TestV2SettingsRedirectUsesOnlyKnownLocalTargets(t *testing.T) {
+	for _, test := range []struct {
+		tab  string
+		want string
+	}{
+		{tab: "sources", want: "/?view=settings&tab=sources"},
+		{tab: "https://evil.example/", want: "/?view=settings"},
+		{tab: "//evil.example/", want: "/?view=settings"},
+	} {
+		t.Run(test.tab, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/v2/settings", nil)
+			response := httptest.NewRecorder()
+			v2SettingsRedirect(response, request, test.tab)
+			if response.Code != http.StatusSeeOther {
+				t.Fatalf("redirect status = %d, want %d", response.Code, http.StatusSeeOther)
+			}
+			if got := response.Header().Get("Location"); got != test.want {
+				t.Fatalf("Location = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestV2ContentFilterArchiveCleanupSearchAndBulkDelete(t *testing.T) {
+	state := newTestAppState(t)
+	if _, err := state.archive.db.Exec(`INSERT INTO archive(title,magnet,source,added_at) VALUES
+		('Adult Porno Release 1','magnet:cleanup-1','feed','2026-01-01'),
+		('Adult Porno Release 2','magnet:cleanup-2','feed','2026-01-02'),
+		('Family Movie','magnet:keep','feed','2026-01-03')`); err != nil {
+		t.Fatalf("insert archive fixtures: %v", err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/v2/settings/body?tab=sources", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Pulisci i risultati già archiviati") {
+		t.Fatalf("content archive cleanup panel missing -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2/settings/content-archive?q=porno", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Adult Porno Release 1") || !strings.Contains(body, "Adult Porno Release 2") {
+		t.Fatalf("content archive search -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/content-archive/delete", url.Values{
+		"q":          {"porno"},
+		"delete_all": {"1"},
+	})
+	if code != http.StatusOK || !strings.Contains(body, "2 voci eliminate") || !strings.Contains(body, "Nessun risultato") {
+		t.Fatalf("bulk content archive delete -> %d: %s", code, body)
+	}
+	remaining, err := state.archive.Count()
+	if err != nil || remaining != 1 {
+		t.Fatalf("archive count after cleanup = (%d, %v), want (1, nil)", remaining, err)
+	}
+}
+
 func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

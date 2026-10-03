@@ -2205,9 +2205,29 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		// mark the row completed so it does not stay "downloading" forever, but
 		// without an archive path (the files are not moved).
 		if event.Kind == "torrent_finished" {
-			if err := db.MarkTorrentCompletedUnarchived(event.Hash); err != nil {
+			firstCompletion, err := db.MarkTorrentCompletedUnarchived(event.Hash, event.Name)
+			if err != nil {
 				logging.Debug("cannot mark foreign torrent completed",
 					"hash", event.Hash, "error", err.Error())
+				return false, err
+			}
+			if firstCompletion {
+				path := CompletionPath(&event)
+				sizeBytes, _ := SizeOfPath(path)
+				if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+					"hash":       event.Hash,
+					"name":       event.Name,
+					"title":      event.Name,
+					"path":       path,
+					"size_bytes": sizeBytes,
+					"manual":     true,
+				}); err != nil {
+					logging.Warn("manual torrent completion notification failed",
+						"hash", event.Hash, "title", event.Name, "error", err)
+				} else {
+					logging.Debug("manual torrent completion notification sent",
+						"hash", event.Hash, "title", event.Name)
+				}
 			}
 			// A foreign torrent can emit this lifecycle alert again after a
 			// session refresh/restart. Completion is not an actionable change for

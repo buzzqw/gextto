@@ -3806,17 +3806,28 @@ func (d *Database) MarkTorrentCompleted(hash, path string, sizeBytes int64) erro
 	return nil
 }
 
-// MarkTorrentCompletedUnarchived marks a torrent that finished but has no
-// registered release metadata (manually added or foreign). It is completed but
-// not archived, so `processed_path` is left untouched and the downloaded files
-// are never treated as a disposable archived copy.
-func (d *Database) MarkTorrentCompletedUnarchived(hash string) error {
+// MarkTorrentCompletedUnarchived records the first completion of a torrent
+// that has no registered release metadata (manually added or foreign). It is
+// completed but not archived, so `processed_path` is left untouched and the
+// downloaded files are never treated as a disposable archived copy. The bool
+// is false for duplicate completion events, allowing callers to notify once.
+func (d *Database) MarkTorrentCompletedUnarchived(hash, name string) (bool, error) {
 	now := nowSQLite()
-	_, err := d.db.Exec(
-		"UPDATE torrent_meta SET status='completed',completed_at=COALESCE(completed_at,?1),error='',updated_at=?1 WHERE hash=?2",
-		now, strings.ToLower(hash),
+	result, err := d.db.Exec(
+		`INSERT INTO torrent_meta(hash,name,status,completed_at,created_at,updated_at)
+		 VALUES (?1,?2,'completed',?3,?3,?3)
+		 ON CONFLICT(hash) DO UPDATE SET
+		   name=CASE WHEN excluded.name<>'' THEN excluded.name ELSE torrent_meta.name END,
+		   status='completed',completed_at=COALESCE(torrent_meta.completed_at,excluded.completed_at),
+		   error='',updated_at=excluded.updated_at
+		 WHERE COALESCE(torrent_meta.status,'')<>'completed'`,
+		strings.ToLower(hash), name, now,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	return rows > 0, err
 }
 
 // MarkReleaseCompleted marks a torrent as completed, updating every episode

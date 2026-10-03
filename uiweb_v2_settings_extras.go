@@ -52,8 +52,28 @@ func V2SettingsFeed(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
 	target := "/?view=settings"
-	if tab != "" {
-		target += "&tab=" + url.QueryEscape(tab)
+	// Select the destination from server-owned constants rather than echoing
+	// even a validated tab value into a redirect URL. The settings editor can
+	// derive `tab` from a submitted form, so keep this boundary explicit.
+	switch tab {
+	case "sources":
+		target += "&tab=sources"
+	case "advanced":
+		target += "&tab=advanced"
+	case "rename":
+		target += "&tab=rename"
+	case "i18n":
+		target += "&tab=i18n"
+	case "rules":
+		target += "&tab=rules"
+	case "indexers":
+		target += "&tab=indexers"
+	case "torrents":
+		target += "&tab=torrents"
+	case "general":
+		target += "&tab=general"
+	case "maintenance":
+		target += "&tab=maintenance"
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, target, http.StatusSeeOther)
@@ -326,7 +346,6 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	_, _ = w.Write([]byte(body + addButton))
 }
 
-
 func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	key := strings.TrimSpace(r.FormValue("editor"))
 	editor, ok := v2ListEditorByKey(key)
@@ -586,4 +605,80 @@ func V2SettingsI18nDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
 		_, _ = s.i18n.DeleteLang(language)
 	}
 	v2SettingsRedirect(w, r, "i18n")
+}
+
+// --- content-filter archive cleanup ----------------------------------------
+
+type v2ContentArchiveResults struct {
+	Query  string
+	Items  []ArchiveEntry
+	Total  int64
+	Notice string
+	Error  bool
+}
+
+func v2ContentArchiveResultsFrom(s *AppState, query, notice string, isError bool) v2ContentArchiveResults {
+	result := v2ContentArchiveResults{Query: query, Notice: notice, Error: isError}
+	if s.archive == nil || strings.TrimSpace(query) == "" {
+		return result
+	}
+	page, err := s.archive.BrowsePage(query, 1, 100)
+	if err != nil {
+		result.Notice = err.Error()
+		result.Error = true
+		return result
+	}
+	result.Items = page.Items
+	result.Total = page.Total
+	return result
+}
+
+// V2SettingsContentArchiveSearch searches archived releases by title for the
+// cleanup panel shown with content filters.
+func V2SettingsContentArchiveSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if s.archive == nil {
+		http.Error(w, "archivio non disponibile", http.StatusInternalServerError)
+		return
+	}
+	query := strings.TrimSpace(r.FormValue("q"))
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, "", false), dict, eng)
+}
+
+// V2SettingsContentArchiveDelete deletes one row, selected rows, or all archive
+// rows matching the active title query, then returns the refreshed results.
+func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if s.archive == nil {
+		http.Error(w, "archivio non disponibile", http.StatusInternalServerError)
+		return
+	}
+	query := strings.TrimSpace(r.FormValue("q"))
+	removed := 0
+	var err error
+	switch {
+	case r.FormValue("delete_all") == "1":
+		removed, err = s.archive.DeleteMatching(query)
+	case r.FormValue("delete_id") != "":
+		var id int64
+		id, err = strconv.ParseInt(r.FormValue("delete_id"), 10, 64)
+		if err == nil {
+			removed, err = s.archive.DeleteIDs([]int64{id})
+		}
+	default:
+		ids := make([]int64, 0, len(r.Form["id"]))
+		for _, raw := range r.Form["id"] {
+			id, parseErr := strconv.ParseInt(raw, 10, 64)
+			if parseErr != nil || id <= 0 {
+				continue
+			}
+			ids = append(ids, id)
+		}
+		removed, err = s.archive.DeleteIDs(ids)
+	}
+	notice := fmt.Sprintf("%d voci eliminate.", removed)
+	if err != nil {
+		notice = err.Error()
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, notice, err != nil), dict, eng)
 }

@@ -553,6 +553,18 @@ func formatEvent(event string, data map[string]any) string {
 			stats = ""
 		}
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
+		if manuallyAdded, _ := mapLookup(data, "manual").(bool); manuallyAdded {
+			return fmt.Sprintf(
+				"%s\n\n📁 %s: %s\n💾 %s: %s\n📂 %s: %s",
+				messages.Pick("✅ DOWNLOAD COMPLETATO (AGGIUNTO MANUALMENTE)", "✅ DOWNLOAD COMPLETE (ADDED MANUALLY)"),
+				messages.Pick("File", "File"),
+				text("title"),
+				messages.Pick("Dimensione", "Size"),
+				formatBytes(size),
+				messages.Pick("Percorso", "Path"),
+				text("path"),
+			)
+		}
 		kind := text("kind")
 		mediaIcon := "📺"
 		if kind == "movie" {

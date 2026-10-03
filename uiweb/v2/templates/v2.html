@@ -646,6 +646,52 @@
     </form>
   </div>
 </div>
+{{if eq .Key "content_filters"}}{{template "v2_content_archive_cleanup" .}}{{end}}
+{{end}}
+
+{{define "v2_content_archive_cleanup"}}
+<div class="panel settings-panel v2-content-archive-cleanup">
+  <div class="panel-head"><h3>Pulisci i risultati già archiviati</h3><small class="muted">Ricerca nel catalogo</small></div>
+  <div class="panel-body">
+    <p class="hint">I filtri escludono nuove release, ma non rimuovono quelle già presenti nell’Archivio. Cerca parole nel titolo per eliminare singoli risultati, quelli selezionati o tutte le corrispondenze.</p>
+    <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML" class="toolbar">
+      <input class="input" type="search" name="q" placeholder="es. porno, XXX, adult" required />
+      <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
+    </form>
+    <div id="v2-content-archive-results" aria-live="polite"></div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_content_archive_results"}}
+  {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
+  {{if .Query}}
+    {{if .Total}}
+    <p class="muted">{{.Total}} risultati per “{{.Query}}”. Mostro i primi {{len .Items}}.</p>
+    <form method="post" action="/v2/settings/content-archive/delete" hx-post="/v2/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
+      <input type="hidden" name="q" value="{{.Query}}" />
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th></th><th>Titolo</th><th>Fonte</th><th>Azioni</th></tr></thead>
+        <tbody>
+          {{range .Items}}
+          <tr>
+            <td><input type="checkbox" name="id" value="{{.ID}}" aria-label="Seleziona {{.Title}}" /></td>
+            <td class="truncate" title="{{.Title}}">{{.Title}}</td>
+            <td>{{.Source}}</td>
+            <td class="row-actions"><button class="btn sm danger" type="submit" name="delete_id" value="{{.ID}}" hx-confirm="Eliminare solo questa voce dall’Archivio?">Elimina</button></td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table></div>
+      <div class="form-actions">
+        <button class="btn sm danger" type="submit" hx-confirm="Eliminare le voci selezionate dall’Archivio?">Elimina selezionati</button>
+        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci che corrispondono alla ricerca “{{.Query}}”?">Elimina tutti i risultati</button>
+      </div>
+    </form>
+    {{else}}
+    <p class="muted">Nessun risultato per “{{.Query}}”.</p>
+    {{end}}
+  {{end}}
 {{end}}
 
 {{define "v2_list_editor"}}
