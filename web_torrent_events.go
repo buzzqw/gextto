@@ -2150,7 +2150,7 @@ func tev_logDownloadComplete(db *Database, event *models.TorrentEvent, release *
 			averageSpeed = dividend / seconds
 		}
 	}
-	logging.Info(fmt.Sprintf("🎉 Download complete — «%s» · %s · downloaded in %s at %s · retained for seeding in %s",
+	logging.Info(fmt.Sprintf("🎉 Download complete — «%s» · %s · downloaded in %s at %s · retained for seeding in %s; archive relocation will happen when seeding ends",
 		release.Title,
 		logging.HumanBytesI64(size),
 		logging.HumanDuration(durationSeconds),
@@ -2351,8 +2351,6 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					}
 					tev_logDownloadComplete(db, &event, &release, source, size)
 					tev_notifySeeding(db, notifier, &event, &release, source, size)
-					logging.Info("single episode retained for seeding; archive relocation will happen at the end of the seed",
-						"hash", event.Hash, "name", event.Name, "path", source)
 					return false, nil
 				}
 			}
