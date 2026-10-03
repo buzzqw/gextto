@@ -7,6 +7,40 @@ type uiSettingDef struct{ Key, Label, Tab string }
 
 type uiSettingsTab struct{ ID, Label string }
 
+// uiScoreSettingDefs is the canonical score editor. Score keys are normally
+// absent until edited, so deriving the UI from persisted settings would leave a
+// fresh installation with no score controls at all.
+var uiScoreSettingDefs = []uiSettingDef{
+	{Key: "score_res_2160p", Label: "2160p", Tab: "scores"}, {Key: "score_res_1080p", Label: "1080p", Tab: "scores"},
+	{Key: "score_res_720p", Label: "720p", Tab: "scores"}, {Key: "score_res_576p", Label: "576p", Tab: "scores"},
+	{Key: "score_source_bluray", Label: "BluRay", Tab: "scores"}, {Key: "score_source_remux", Label: "Remux", Tab: "scores"},
+	{Key: "score_source_webdl", Label: "WEB-DL", Tab: "scores"}, {Key: "score_source_webrip", Label: "WEBRip", Tab: "scores"},
+	{Key: "score_source_hdtv", Label: "HDTV", Tab: "scores"}, {Key: "score_source_dvdrip", Label: "DVDRip", Tab: "scores"},
+	{Key: "score_codec_h265", Label: "H.265 / HEVC", Tab: "scores"}, {Key: "score_codec_h264", Label: "H.264 / AVC", Tab: "scores"},
+	{Key: "score_audio_truehd", Label: "Dolby TrueHD", Tab: "scores"}, {Key: "score_audio_dts-hd", Label: "DTS-HD", Tab: "scores"},
+	{Key: "score_audio_dts", Label: "DTS", Tab: "scores"}, {Key: "score_audio_ddp", Label: "Dolby Digital Plus", Tab: "scores"},
+	{Key: "score_audio_ac3", Label: "AC3", Tab: "scores"}, {Key: "score_audio_5.1", Label: "5.1", Tab: "scores"},
+	{Key: "score_audio_aac", Label: "AAC", Tab: "scores"}, {Key: "score_audio_mp3", Label: "MP3", Tab: "scores"},
+	{Key: "score_bonus_dv", Label: "Dolby Vision", Tab: "scores"}, {Key: "score_bonus_hdr", Label: "HDR", Tab: "scores"},
+	{Key: "score_bonus_proper", Label: "PROPER", Tab: "scores"}, {Key: "score_bonus_repack", Label: "REPACK", Tab: "scores"},
+	{Key: "score_bonus_real", Label: "REAL", Tab: "scores"},
+}
+
+var uiScoreSettingKeys = func() map[string]bool {
+	keys := make(map[string]bool, len(uiScoreSettingDefs))
+	for _, def := range uiScoreSettingDefs {
+		keys[def.Key] = true
+	}
+	return keys
+}()
+
+// These aliases remain honored by the scorer for old installations, but are
+// deliberately not editable: parsing normalizes them to the canonical keys.
+var uiDeprecatedScoreSettingKeys = map[string]bool{
+	"score_codec_x265": true, "score_codec_hevc": true, "score_codec_x264": true,
+	"score_codec_avc": true, "score_audio_eac3": true,
+}
+
 var uiSettingsTabs = []uiSettingsTab{
 	{ID: "daemon", Label: "Daemon"},
 	{ID: "sources", Label: "Sorgenti"},

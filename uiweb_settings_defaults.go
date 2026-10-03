@@ -15,6 +15,33 @@ package gextto
 // uiSettingKind render a Sì/No select, so keep the spelling consistent with the
 // backend readers.
 var uiSettingDefaults = map[string]string{
+	// --- Punteggi -----------------------------------------------------------
+	"score_res_2160p":     "2000",
+	"score_res_1080p":     "1000",
+	"score_res_720p":      "400",
+	"score_res_576p":      "80",
+	"score_source_bluray": "300",
+	"score_source_remux":  "280",
+	"score_source_webdl":  "200",
+	"score_source_webrip": "150",
+	"score_source_hdtv":   "50",
+	"score_source_dvdrip": "20",
+	"score_codec_h265":    "200",
+	"score_codec_h264":    "50",
+	"score_audio_truehd":  "150",
+	"score_audio_dts-hd":  "120",
+	"score_audio_dts":     "100",
+	"score_audio_ddp":     "80",
+	"score_audio_ac3":     "50",
+	"score_audio_5.1":     "50",
+	"score_audio_aac":     "30",
+	"score_audio_mp3":     "10",
+	"score_bonus_dv":      "300",
+	"score_bonus_hdr":     "100",
+	"score_bonus_proper":  "75",
+	"score_bonus_repack":  "50",
+	"score_bonus_real":    "100",
+
 	// --- Daemon -------------------------------------------------------------
 	"active":                  "false",
 	"refresh_interval":        "21600",

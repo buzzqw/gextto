@@ -395,6 +395,9 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		}
 		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], field)
 	}
+	for _, def := range uiScoreSettingDefs {
+		fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(def.Key, def.Label, cfg.Settings[def.Key]))
+	}
 
 	// Structured settings are edited with real forms (feed lines, indexer rows,
 	// JSON editors turned into list editors); they are never repeated as raw
@@ -440,6 +443,9 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		// Quality score overrides are the one intentional exception; they are
 		// grouped in the Punteggi tab and edited by ScoreEditor.
 		if strings.HasPrefix(strings.ToLower(key), "score") {
+			if uiScoreSettingKeys[key] || uiDeprecatedScoreSettingKeys[key] {
+				continue
+			}
 			// Custom release groups have their own add/edit/delete interface in
 			// the v2 score editor; don't expose them as anonymous key/value rows.
 			if strings.HasPrefix(strings.ToLower(key), "score_group_") {
@@ -558,6 +564,9 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	entries := make([]uiSearchEntry, 0, len(cfg.Settings))
 	for _, def := range uiSettingsIndex {
 		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab, Terms: uiSettingSearchTerms[def.Key]})
+	}
+	for _, def := range uiScoreSettingDefs {
+		entries = append(entries, uiSearchEntry{Key: def.Key, Label: def.Label, Tab: def.Tab})
 	}
 	for _, key := range keys {
 		if strings.HasPrefix(strings.ToLower(key), "score") {
@@ -1074,6 +1083,9 @@ func uiSettingKind(key, value string) string {
 	lowered := strings.ToLower(key)
 	if uiSettingIsSecret(key) {
 		return "secret"
+	}
+	if uiScoreSettingKeys[key] {
+		return "number"
 	}
 	// A structured value (e.g. the `indexers` JSON) can embed credentials even
 	// when its key does not: never render those in clear.

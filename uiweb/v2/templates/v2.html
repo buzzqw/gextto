@@ -864,6 +864,7 @@
     {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}">{{.Value}}</textarea>
     {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
      {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
+     {{else if eq .Kind "number"}}<input class="input" type="number" step="1" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
      {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
      {{if or (eq .Key "archive_root") (eq .Key "trash_path") (eq .Key "libtorrent_dir") (eq .Key "libtorrent_temp_dir") (eq .Key "libtorrent_torrent_copy_dir") (eq .Key "libtorrent_ramdisk_dir")}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
    </div>

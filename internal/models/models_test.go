@@ -120,3 +120,52 @@ func TestStandardBonusOverridesPreserveBaseScore(t *testing.T) {
 		t.Fatalf("default overrides changed the score: %d != %d", got, quality.Score())
 	}
 }
+
+func TestScoreSettingsDoNotApplyDTSModifierToDTSHD(t *testing.T) {
+	quality := Quality{Audio: "dts-hd"}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_audio_dts": "0"}), quality.Score(); got != want {
+		t.Fatalf("DTS modifier affected DTS-HD: got %d, want %d", got, want)
+	}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_audio_dts-hd": "200"}), int64(200); got != want {
+		t.Fatalf("DTS-HD modifier = %d, want %d", got, want)
+	}
+}
+
+func TestScoreSettingsUseLegacyAliasesOnlyAsFallback(t *testing.T) {
+	quality := Quality{Codec: "h265", Audio: "ddp"}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_codec_x265": "500", "score_audio_eac3": "90"}), int64(590); got != want {
+		t.Fatalf("legacy aliases score = %d, want %d", got, want)
+	}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_codec_h265": "300", "score_codec_x265": "500"}), int64(380); got != want {
+		t.Fatalf("canonical codec did not take precedence: %d, want %d", got, want)
+	}
+}
+
+func TestUnknownGroupDoesNotBehaveAsGlobalGroup(t *testing.T) {
+	quality := Quality{Group: "unknown"}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_group_unknown": "999"}), quality.Score(); got != want {
+		t.Fatalf("unknown group modifier = %d, want %d", got, want)
+	}
+}
+
+func TestDolbyVisionUsesOnlyItsDedicatedBonus(t *testing.T) {
+	quality := Quality{HDR: "DV", IsDV: true}
+	if got, want := quality.Score(), int64(300); got != want {
+		t.Fatalf("Dolby Vision base score = %d, want %d", got, want)
+	}
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_bonus_hdr": "999"}), int64(300); got != want {
+		t.Fatalf("HDR override affected Dolby Vision: got %d, want %d", got, want)
+	}
+}
+
+func TestConfiguredScoreBreakdownSumsToConfiguredScore(t *testing.T) {
+	quality := Quality{Resolution: "1080p", Source: "webdl", Codec: "h265", Audio: "dts-hd", Group: "tbk"}
+	settings := map[string]string{"score_res_1080p": "900", "score_audio_dts-hd": "200", "score_group_tbk": "75"}
+	var sum int64
+	for _, item := range quality.ScoreBreakdownWithSettings(settings) {
+		sum += item.Value
+	}
+	if got := quality.ScoreWithSettings(settings); sum != got {
+		t.Fatalf("configured breakdown %d != score %d", sum, got)
+	}
+}

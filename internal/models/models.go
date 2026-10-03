@@ -90,7 +90,9 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 		audio = 10
 	}
 	hdr := int64(0)
-	if q.HDR != "" {
+	// Dolby Vision has its own score component. Counting it again as generic
+	// HDR makes the two separately configurable UI modifiers inseparable.
+	if q.HDR != "" && !q.IsDV {
 		hdr = 100
 	}
 	dv := int64(0)
@@ -129,6 +131,17 @@ func (q *Quality) Score() int64 {
 		total += item.Value
 	}
 	return total
+}
+
+// ScoreBreakdownWithSettings reports the same configured technical score used
+// for decisions. The final item carries overrides and custom release groups,
+// which cannot be represented by the fixed base categories alone.
+func (q *Quality) ScoreBreakdownWithSettings(settings map[string]string) []ScoreBreakdownItem {
+	items := q.ScoreBreakdown()
+	if delta := q.ScoreWithSettings(settings) - q.Score(); delta != 0 {
+		items = append(items, ScoreBreakdownItem{Label: "Modificatori configurati", Value: delta})
+	}
+	return items
 }
 
 // HasHDR reports any recognised HDR flavour (Dolby Vision included).
@@ -223,13 +236,21 @@ func (q *Quality) sameNonSourceQuality(other *Quality) bool {
 // ScoreWithSettings applies user score overrides from the settings map.
 func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	score := q.Score()
-	adjust := func(key string, def int64, active bool) {
+	adjust := func(def int64, active bool, keys ...string) {
 		if !active {
 			return
 		}
-		if value, ok := settings[key]; ok {
-			if parsed, err := parseInt64(value); err == nil {
+		// The first key is canonical. Later keys are legacy aliases and are
+		// considered only when the canonical key was never set; this avoids a
+		// DTS-HD release receiving a second DTS modifier.
+		for _, key := range keys {
+			if value, ok := settings[key]; ok {
+				parsed, err := parseInt64(value)
+				if err != nil {
+					continue
+				}
 				score += parsed - def
+				return
 			}
 		}
 	}
@@ -239,7 +260,7 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	}{
 		{"2160p", 2000}, {"1080p", 1000}, {"720p", 400}, {"576p", 80},
 	} {
-		adjust("score_res_"+item.res, item.def, q.Resolution == item.res)
+		adjust(item.def, q.Resolution == item.res, "score_res_"+item.res)
 	}
 	for _, item := range []struct {
 		src string
@@ -248,34 +269,40 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 		{"bluray", 300}, {"remux", 280}, {"webdl", 200}, {"webrip", 150},
 		{"hdtv", 50}, {"dvdrip", 20},
 	} {
-		adjust("score_source_"+item.src, item.def, q.Source == item.src)
+		adjust(item.def, q.Source == item.src, "score_source_"+item.src)
 	}
-	for _, item := range []struct {
-		codec string
-		def   int64
-	}{
-		{"h265", 200}, {"h264", 50}, {"x265", 200}, {"x264", 50}, {"hevc", 200}, {"avc", 50},
-	} {
-		adjust("score_codec_"+item.codec, item.def, q.Codec == item.codec)
+	adjust(200, q.Codec == "h265" || q.Codec == "x265" || q.Codec == "hevc", "score_codec_h265", "score_codec_x265", "score_codec_hevc")
+	adjust(50, q.Codec == "h264" || q.Codec == "x264" || q.Codec == "avc", "score_codec_h264", "score_codec_x264", "score_codec_avc")
+
+	// Audio is a single parsed category. Exact matching keeps DTS and DTS-HD
+	// independent; aliases retain the behavior of old stored configurations.
+	switch {
+	case strings.Contains(q.Audio, "truehd"):
+		adjust(150, true, "score_audio_truehd")
+	case strings.Contains(q.Audio, "dts-hd"):
+		adjust(120, true, "score_audio_dts-hd")
+	case strings.Contains(q.Audio, "dts"):
+		adjust(100, true, "score_audio_dts")
+	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
+		adjust(80, true, "score_audio_ddp", "score_audio_eac3")
+	case strings.Contains(q.Audio, "ac3") || strings.Contains(q.Audio, "5.1"):
+		adjust(50, true, "score_audio_ac3", "score_audio_5.1")
+	case strings.Contains(q.Audio, "aac"):
+		adjust(30, true, "score_audio_aac")
+	case strings.Contains(q.Audio, "mp3"):
+		adjust(10, true, "score_audio_mp3")
 	}
-	for _, item := range []struct {
-		audio string
-		def   int64
-	}{
-		{"truehd", 150}, {"dts-hd", 120}, {"dts", 100}, {"ddp", 80}, {"eac3", 80},
-		{"ac3", 50}, {"5.1", 50}, {"aac", 30}, {"mp3", 10},
-	} {
-		adjust("score_audio_"+item.audio, item.def, strings.Contains(q.Audio, item.audio))
-	}
-	adjust("score_bonus_dv", 300, q.IsDV)
-	adjust("score_bonus_hdr", 100, q.HDR != "")
-	adjust("score_bonus_proper", 75, q.IsProper)
-	adjust("score_bonus_repack", 50, q.IsRepack)
-	adjust("score_bonus_real", 100, q.IsReal)
-	groupKey := "score_group_" + strings.ToLower(q.Group)
-	if value, ok := settings[groupKey]; ok {
-		if parsed, err := parseInt64(value); err == nil {
-			score += parsed
+	adjust(300, q.IsDV, "score_bonus_dv")
+	adjust(100, q.HDR != "" && !q.IsDV, "score_bonus_hdr")
+	adjust(75, q.IsProper, "score_bonus_proper")
+	adjust(50, q.IsRepack, "score_bonus_repack")
+	adjust(100, q.IsReal, "score_bonus_real")
+	if group := strings.ToLower(strings.TrimSpace(q.Group)); group != "" && group != "unknown" {
+		groupKey := "score_group_" + group
+		if value, ok := settings[groupKey]; ok {
+			if parsed, err := parseInt64(value); err == nil {
+				score += parsed
+			}
 		}
 	}
 	return score

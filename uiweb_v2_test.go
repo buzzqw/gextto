@@ -436,6 +436,9 @@ func TestV2ScoreGroupsCanBeAddedEditedAndRemoved(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Gruppi custom") || !strings.Contains(body, `name="name"`) {
 		t.Fatalf("score groups editor -> %d: %s", code, body)
 	}
+	if !strings.Contains(body, `name="value" id="input-score_res_2160p" value="2000"`) || !strings.Contains(body, `type="number"`) {
+		t.Fatalf("canonical score controls missing on fresh configuration: %s", body)
+	}
 	if strings.Index(body, "Gruppi custom") < strings.Index(body, "Risoluzione") {
 		t.Fatalf("custom score groups should appear after the score sections: %s", body)
 	}
@@ -458,6 +461,10 @@ func TestV2ScoreGroupsCanBeAddedEditedAndRemoved(t *testing.T) {
 	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"add"}, "name": {"../../other"}, "score": {"1"}})
 	if code != http.StatusOK || !strings.Contains(body, "Nome gruppo non valido") {
 		t.Fatalf("reject invalid score group -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"add"}, "name": {"unknown"}, "score": {"1"}})
+	if code != http.StatusOK || !strings.Contains(body, "Nome gruppo non valido") {
+		t.Fatalf("reject reserved unknown score group -> %d: %s", code, body)
 	}
 }
 

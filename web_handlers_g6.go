@@ -1115,8 +1115,13 @@ func ScorePreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	quality := release.Quality
 	breakdown := []map[string]any{}
-	for _, item := range quality.ScoreBreakdown() {
+	for _, item := range quality.ScoreBreakdownWithSettings(cfg.Settings) {
 		breakdown = append(breakdown, map[string]any{"label": item.Label, "value": item.Value})
+	}
+	qualityScore := cfg.QualityScore(&quality)
+	releaseScore := cfg.ReleaseScore(release)
+	if delta := releaseScore - qualityScore; delta != 0 {
+		breakdown = append(breakdown, map[string]any{"label": "Modificatori release", "value": delta})
 	}
 	probe := release.Title
 	if release.Series != nil {
@@ -1159,8 +1164,8 @@ func ScorePreview(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"is_pack":        release.IsPack,
 		"year":           release.Year,
 		"quality":        quality,
-		"base_score":     quality.Score(),
-		"score":          cfg.ReleaseScore(release),
+		"base_score":     qualityScore,
+		"score":          releaseScore,
 		"breakdown":      breakdown,
 		"allowed":        cfg.ReleaseAllowed(release),
 		"matched_series": matchedSeries,

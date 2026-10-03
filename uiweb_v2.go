@@ -1575,7 +1575,7 @@ func V2SettingsScoreGroup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	op := r.FormValue("op")
 	notice := ""
 	isError := false
-	validName := name != "" && len(name) <= 64
+	validName := name != "" && name != "unknown" && len(name) <= 64
 	for _, char := range name {
 		// parseQuality recognizes final release-group tags as alphanumeric
 		// suffixes, so accepting punctuation here would create a group that
@@ -1586,7 +1586,7 @@ func V2SettingsScoreGroup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	if !validName {
-		notice, isError = "Nome gruppo non valido: usa solo lettere e numeri (max 64 caratteri).", true
+		notice, isError = "Nome gruppo non valido: usa solo lettere e numeri (max 64 caratteri; «unknown» è riservato).", true
 	} else {
 		key := "score_group_" + name
 		switch op {
@@ -1705,6 +1705,12 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if !gh7_setting_key_allowed(key) || key == "" || len(key) > 128 {
 		render("chiave non modificabile", true)
 		return
+	}
+	if uiScoreSettingKeys[key] {
+		if _, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err != nil {
+			render("il punteggio deve essere un numero intero", true)
+			return
+		}
 	}
 	if uiSettingIsSecret(key) && strings.TrimSpace(value) == "" {
 		render("non modificata", false)
