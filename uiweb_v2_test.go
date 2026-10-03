@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // v2Request always sends HX-Request, exactly like the browser does for the HTMX
@@ -251,6 +252,16 @@ func TestV2RunCycleShowsDashboardConfirmation(t *testing.T) {
 	code, body := v2Request(t, server, http.MethodPost, "/v2/run-cycle", url.Values{"domain": {"series"}})
 	if code != http.StatusOK || !strings.Contains(body, `class="v2-toast`) || !strings.Contains(body, "Monitoraggio Serie TV avviato.") {
 		t.Fatalf("cycle confirmation missing: status=%d body=%q", code, body)
+	}
+	// V2RunCycle deliberately returns before the monitoring goroutine completes.
+	// The state writes in t.TempDir(), so do not let t.TempDir cleanup race that
+	// goroutine on slower CI runners.
+	deadline := time.Now().Add(10 * time.Second)
+	for state.manualCyclePending.Load() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if state.manualCyclePending.Load() {
+		t.Fatal("manual cycle did not finish before test cleanup")
 	}
 }
 
