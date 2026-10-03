@@ -21,10 +21,8 @@ service.
 
 ### Torrent engines
 
-Gextto currently supports the embedded libtorrent engine and the qBittorrent-nox
-Web API adapter. The former Anacrolix backend is no longer included. Existing
-configurations that still set `torrent_backend=anacrolix` fall back to the
-embedded engine at startup and log a warning.
+Gextto supports two transfer engines: the integrated libtorrent engine and the
+qBittorrent-nox Web API adapter.
 
 ## Web interface and menu
 

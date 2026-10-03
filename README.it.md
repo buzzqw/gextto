@@ -21,10 +21,8 @@ funzionare come servizio.
 
 ### Motori torrent
 
-Gextto supporta il motore libtorrent integrato e l'adapter Web API di
-qBittorrent-nox. Il precedente backend Anacrolix non è più incluso. Le
-configurazioni esistenti con `torrent_backend=anacrolix` ripiegano sul motore
-integrato all'avvio e registrano un avviso nel log.
+Gextto supporta due motori di trasferimento: libtorrent integrato e l'adapter
+Web API di qBittorrent-nox.
 
 ## Interfaccia web e menu
 
