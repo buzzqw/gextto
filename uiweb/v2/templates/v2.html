@@ -600,7 +600,6 @@
 <div id="v2-settings-body" class="settings-body">
   {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
   {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
-  {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
   {{range .Groups}}
   <div class="panel settings-panel">
     <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
@@ -616,6 +615,7 @@
   {{if not .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
   {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
   {{if and (not .Groups) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
+  {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
 </div>
 {{end}}
 
