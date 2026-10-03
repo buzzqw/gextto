@@ -818,6 +818,7 @@ type CleanTrashInput struct {
 type RemoveOptionsInput struct {
 	DeleteFiles bool `json:"delete_files"`
 	Blocklist   bool `json:"blocklist"`
+	Archive     bool `json:"archive"`
 }
 
 // TorrentLimitsInput is the input of `set_torrent_limits_legacy`.

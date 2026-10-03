@@ -1441,11 +1441,28 @@ func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	cfg := latestConfig(s)
-	removed, err := SafeRemoveTorrent(s, cfg, hash, deleteFiles)
+	var removed bool
+	var err error
 	message := "torrent rimosso"
 	isErr := false
-	if err != nil || !removed {
-		message, isErr = "rimozione non riuscita", true
+
+	if mode == "archive" {
+		removed, err = ArchiveAndRemoveTorrent(s, cfg, hash)
+		if err != nil || !removed {
+			if err != nil {
+				message = err.Error()
+			} else {
+				message = "archiviazione non riuscita"
+			}
+			isErr = true
+		} else {
+			message = "torrent archiviato e rimosso dal seed"
+		}
+	} else {
+		removed, err = SafeRemoveTorrent(s, cfg, hash, deleteFiles)
+		if err != nil || !removed {
+			message, isErr = "rimozione non riuscita", true
+		}
 	}
 
 	dict, eng := v2Dictionaries(s)

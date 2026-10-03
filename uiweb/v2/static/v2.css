@@ -791,3 +791,145 @@ html, body {
   }
   #app-sidebar .nav-more:hover { filter: none; color: var(--text); }
 }
+
+/* Base declarations for mobile-only helpers (hidden on desktop) */
+.nav-icon { display: none; }
+.torrent-mobile-rates { display: none; }
+.system-backdrop,
+.system-backdrop[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* Fix settings tabs on mobile/tablets <= 700px: smooth horizontal scroll */
+@media (max-width: 700px) {
+  .settings-view .chip-row {
+    display: flex !important;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 6px 0 10px;
+    gap: 6px;
+    scroll-snap-type: x proximity;
+  }
+  .settings-view .chip-row::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-view .chip-row .chip {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 560px) {
+  /* System menu backdrop */
+  .system-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 42;
+    background: rgba(4, 18, 31, 0.65);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .system-backdrop[hidden] {
+    display: none !important;
+  }
+
+  /* Bottom nav icons and compact tabs */
+  #app-sidebar .nav-item,
+  #app-sidebar .nav-more {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 1px;
+    font-size: 0.66rem;
+    line-height: 1.1;
+  }
+  #app-sidebar .nav-icon {
+    display: block;
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+  #app-sidebar .system-group.open .nav-item {
+    flex-direction: row;
+    font-size: 0.82rem;
+    gap: 6px;
+    padding: 8px 12px;
+  }
+  #app-sidebar .system-group.open .nav-icon {
+    font-size: 1rem;
+  }
+
+  /* Torrent cards: live speed and ETA indicators */
+  .torrent-mobile-rates {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    flex-wrap: wrap;
+  }
+  .torrent-mobile-rates span {
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .torrent-mobile-rates .rate-dl {
+    color: var(--accent);
+  }
+  .torrent-mobile-rates .rate-ul {
+    color: var(--accent-2);
+  }
+  .torrent-mobile-rates .rate-eta {
+    color: var(--warn);
+  }
+
+  /* Modal header and body ergonomics on phone screens */
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .modal-head h3 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1rem;
+    flex: 1 1 auto;
+  }
+  .modal-head .btn {
+    flex: 0 0 auto;
+  }
+
+  /* Compact toolbars in Scarico to reduce vertical height */
+  .torrent-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+  .torrent-options .check {
+    min-height: 38px;
+    padding: 2px 6px;
+  }
+  .download-temp-toolbar,
+  .download-bulk-toolbar {
+    padding: 8px;
+    gap: 6px;
+  }
+}
+

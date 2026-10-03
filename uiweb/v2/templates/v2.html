@@ -27,6 +27,7 @@
 </head>
 <body>
 <a class="skip-link" href="#v2-page">Vai al contenuto</a>
+<div id="app-system-backdrop" class="system-backdrop" hidden></div>
 <div class="app-shell">
   <aside class="sidebar" id="app-sidebar">
     <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
@@ -36,12 +37,12 @@
     <nav aria-label="Navigazione principale">
       {{range .Groups}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-         {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span>Sistema</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
+         {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>Sistema</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
         {{range .Items}}
-         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
+         <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
-         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}"><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
-         {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span>Cerca impostazioni</span></a>{{end}}
+         {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span class="nav-icon" aria-hidden="true">🔍</span><span>Cerca impostazioni</span></a>{{end}}
       </div>
       {{end}}
     </nav>
@@ -419,7 +420,7 @@
               {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
             </td>
             <td><span class="badge {{.StateClass}}">{{.State}}</span></td>
-            <td style="min-width:150px"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}</small></td>
+            <td style="min-width:150px"><div class="progress {{.ProgressClass}}"><span style="width:{{.ProgressPct}}%"></span></div><small class="muted">{{.ProgressPct}}% · {{bytes .TotalDone}} / {{bytes .TotalSize}}</small><div class="torrent-mobile-rates" aria-hidden="true">{{if or .DownloadRate .UploadRate}}<span class="rate-dl">↓ {{rate .DownloadRate}}</span><span class="rate-ul">↑ {{rate .UploadRate}}</span>{{end}}{{if and .ETA (ne .ETA "—") (ne .ETA "∞") (ne .ETA "")}}<span class="rate-eta">⏱ {{.ETA}}</span>{{end}}</div></td>
             <td class="numeric">{{rate .DownloadRate}}</td>
             <td class="numeric">{{rate .UploadRate}}</td>
             <td class="numeric">{{.ETA}}</td>
@@ -440,7 +441,7 @@
             <td></td>
             <td class="torrent-name"><span class="truncate" title="{{.Title}}">{{.Title}}</span> <span class="badge">HTTP</span></td>
             <td><span class="badge{{if eq .Status "completed"}} ok{{else if eq .Status "error"}} err{{else if eq .Status "paused"}} warn{{end}}">{{if eq .Status "downloading"}}In scarico{{else if eq .Status "completed"}}Completato{{else if eq .Status "paused"}}In pausa{{else}}{{.Status}}{{end}}</span></td>
-            <td style="min-width:150px">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}</td>
+            <td style="min-width:150px">{{if ge .Progress 0.0}}<div class="progress"><span style="width:{{printf "%.1f" .Progress}}%"></span></div><small class="muted">{{printf "%.1f" .Progress}}% · {{bytesU .DownloadedBytes}}</small>{{else}}<small class="muted">{{bytesU .DownloadedBytes}}</small>{{end}}{{if .SpeedBytes}}<div class="torrent-mobile-rates" aria-hidden="true"><span class="rate-dl">↓ {{rate .SpeedBytes}}</span></div>{{end}}</td>
             <td class="numeric">{{rate .SpeedBytes}}</td>
             <td class="numeric">—</td><td class="numeric">—</td><td class="numeric">—</td><td class="numeric">—</td>
             <td class="row-actions">
@@ -559,6 +560,7 @@
       <p class="muted">{{.Name}}</p>
       <div class="remove-options">
         <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
+        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
         <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
         <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
         <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>

@@ -669,7 +669,13 @@ func RemoveTorrentWithOptions(w http.ResponseWriter, r *http.Request, s *AppStat
 		}
 	}
 	cfg := latestConfig(s)
-	removed, removeErr := SafeRemoveTorrent(s, cfg, hash, input.DeleteFiles)
+	var removed bool
+	var removeErr error
+	if input.Archive {
+		removed, removeErr = ArchiveAndRemoveTorrent(s, cfg, hash)
+	} else {
+		removed, removeErr = SafeRemoveTorrent(s, cfg, hash, input.DeleteFiles)
+	}
 	status, value := gh1_torrentAction(removed, removeErr)
 	jsonStatus(w, status, value)
 }

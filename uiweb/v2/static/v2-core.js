@@ -81,16 +81,22 @@
   function setSystemMenu(open) {
     var group = document.getElementById("app-system-menu");
     var toggle = document.querySelector("[data-mobile-system-toggle]");
+    var backdrop = document.getElementById("app-system-backdrop");
     if (!group || !toggle) return;
     group.classList.toggle("open", open);
     toggle.setAttribute("aria-expanded", open ? "true" : "false");
     var indicator = toggle.querySelector(".nav-more-indicator");
     if (indicator) indicator.textContent = open ? "−" : "＋";
+    if (backdrop) backdrop.hidden = !open;
   }
   var systemGroup = document.getElementById("app-system-menu");
   if (systemGroup) setSystemMenu(systemGroup.classList.contains("open"));
 
   document.addEventListener("click", function (event) {
+    if (event.target && event.target.id === "app-system-backdrop") {
+      setSystemMenu(false);
+      return;
+    }
     var toggle = event.target.closest && event.target.closest("[data-mobile-system-toggle]");
     if (toggle) {
       var group = document.getElementById("app-system-menu");
@@ -230,6 +236,15 @@
   document.addEventListener("mouseup", function () {
     isLogSelecting = false;
   }, true);
+  document.addEventListener("touchstart", function (event) {
+    var logView = document.getElementById("v2-logs-view");
+    if (logView && (event.target === logView || logView.contains(event.target))) {
+      isLogSelecting = true;
+    }
+  }, { passive: true, capture: true });
+  document.addEventListener("touchend", function () {
+    isLogSelecting = false;
+  }, { passive: true, capture: true });
 
   function updateLogsFollowButton() {
     var button = document.querySelector("[data-v2-logs-follow]");

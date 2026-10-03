@@ -12,6 +12,7 @@ type mockTorrentEngine struct {
 	TorrentEngine
 	torrents []models.TorrentView
 	removed  map[string]bool
+	paused   map[string]bool
 }
 
 func (m *mockTorrentEngine) List() []models.TorrentView {
@@ -19,7 +20,18 @@ func (m *mockTorrentEngine) List() []models.TorrentView {
 }
 
 func (m *mockTorrentEngine) Remove(hash string, deleteFiles bool) (bool, error) {
+	if m.removed == nil {
+		m.removed = map[string]bool{}
+	}
 	m.removed[hash] = deleteFiles
+	return true, nil
+}
+
+func (m *mockTorrentEngine) Pause(hash string) (bool, error) {
+	if m.paused == nil {
+		m.paused = map[string]bool{}
+	}
+	m.paused[hash] = true
 	return true, nil
 }
 
@@ -156,5 +168,134 @@ func TestSingleEpisodeBlockedWhenSeasonPackActive(t *testing.T) {
 	}
 	if packReason != "active_pack" {
 		t.Errorf("expected reason 'active_pack', got %q", packReason)
+	}
+}
+
+func TestArchiveAndRemoveTorrentEpisodeMovesAndRenames(t *testing.T) {
+	root := t.TempDir()
+	downloadDir := filepath.Join(root, "downloads")
+	archiveDir := filepath.Join(root, "archive", "TestShow")
+	if err := os.MkdirAll(downloadDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Matroska container magic header + padding
+	mkvHeader := []byte{0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x86, 0x81, 0x01, 0x42, 0xF7, 0x81, 0x01, 0x42, 0xF2, 0x81}
+	testFile := filepath.Join(downloadDir, "TestShow.S01E01.1080p.mkv")
+	if err := os.WriteFile(testFile, mkvHeader, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dbFile := filepath.Join(root, "test.db")
+	db, err := OpenDatabase(dbFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	sName := "TestShow"
+	s1 := int64(1)
+	e1 := int64(1)
+	hash := "1111222233334444555566667777888899990000"
+	rel := models.Release{
+		Kind:      "series",
+		Series:    &sName,
+		Season:    &s1,
+		Episode:   &e1,
+		Title:     "TestShow.S01E01.1080p",
+		Quality:   ParseQuality("TestShow.S01E01.1080p"),
+		SizeBytes: int64(len(mkvHeader)),
+		Magnet:    "magnet:?xt=urn:btih:" + hash,
+	}
+	if err := db.RegisterTorrentScored(&rel, 1000); err != nil {
+		t.Fatal(err)
+	}
+
+	engine := &mockTorrentEngine{
+		torrents: []models.TorrentView{
+			{
+				Hash:      hash,
+				Name:      "TestShow.S01E01.1080p.mkv",
+				SavePath:  downloadDir,
+				State:     "seeding",
+				Progress:  100.0,
+				TotalSize: int64(len(mkvHeader)),
+				TotalDone: int64(len(mkvHeader)),
+			},
+		},
+		removed: map[string]bool{},
+		paused:  map[string]bool{},
+	}
+
+	s := &AppState{
+		torrent_engine: engine,
+		db:             db,
+	}
+
+	cfg := DefaultConfig()
+	cfg.LibtorrentDir = downloadDir
+	cfg.Series = append(cfg.Series, SeriesConfig{
+		Name:        "TestShow",
+		Enabled:     true,
+		ArchivePath: archiveDir,
+	})
+
+	ok, err := ArchiveAndRemoveTorrent(s, &cfg, hash)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected ArchiveAndRemoveTorrent to succeed")
+	}
+
+	// Verify original file is gone from downloadDir
+	if _, err := os.Stat(testFile); !os.IsNotExist(err) {
+		t.Errorf("original file %s should have been moved from downloads", testFile)
+	}
+
+	// Verify file now exists in archiveDir
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("expected 1 file in archiveDir %s, got %v (err: %v)", archiveDir, entries, err)
+	}
+
+	// Verify engine was instructed to pause and remove (deleteFiles = false)
+	if !engine.paused[hash] {
+		t.Errorf("torrent should have been paused before removal")
+	}
+	if val, removed := engine.removed[hash]; !removed || val {
+		t.Errorf("expected engine.Remove(hash, false), got removed=%v, deleteFiles=%v", removed, val)
+	}
+}
+
+func TestArchiveAndRemoveTorrentIncompleteFails(t *testing.T) {
+	root := t.TempDir()
+	downloadDir := filepath.Join(root, "downloads")
+
+	hash := "2222333344445555666677778888999900001111"
+	engine := &mockTorrentEngine{
+		torrents: []models.TorrentView{
+			{
+				Hash:      hash,
+				Name:      "IncompleteShow.mkv",
+				SavePath:  downloadDir,
+				State:     "downloading",
+				Progress:  45.0,
+				TotalSize: 10000,
+				TotalDone: 4500,
+			},
+		},
+		removed: map[string]bool{},
+		paused:  map[string]bool{},
+	}
+
+	s := &AppState{
+		torrent_engine: engine,
+	}
+	cfg := DefaultConfig()
+
+	ok, err := ArchiveAndRemoveTorrent(s, &cfg, hash)
+	if ok || err == nil {
+		t.Fatalf("expected failure archiving incomplete torrent, got ok=%v, err=%v", ok, err)
 	}
 }
