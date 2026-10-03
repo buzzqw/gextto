@@ -816,14 +816,38 @@
     }, 6000);
   }
 
-  document.addEventListener("click", function (event) {
-    var trigger = event.target.closest ? event.target.closest("[data-v2-toast-message]") : null;
-    if (!trigger) return;
-    showToast(
-      trigger.getAttribute("data-v2-toast-title"),
-      trigger.getAttribute("data-v2-toast-message"),
-      trigger.getAttribute("data-v2-toast-error") === "1"
-    );
+  document.addEventListener("htmx:beforeRequest", function (event) {
+    var detail = event.detail || {};
+    var config = detail.requestConfig || {};
+    var verb = String(config.verb || "").toLowerCase();
+    var source = detail.elt;
+    var userEvent = detail.triggeringEvent;
+    if (!source || !userEvent) return; // Ignore polling and automatic page loads.
+
+    var clicked = userEvent.submitter || userEvent.target;
+    var trigger = clicked && clicked.closest ? clicked.closest("[data-v2-toast-message]") : null;
+    if (!trigger && source.closest) trigger = source.closest("[data-v2-toast-message]");
+    if (verb !== "post" && !trigger) return;
+
+    var title = trigger && trigger.getAttribute("data-v2-toast-title");
+    var message = trigger && trigger.getAttribute("data-v2-toast-message");
+    if (!message) message = "Richiesta avviata.";
+    if (config._v2ToastShown) return;
+    config._v2ToastShown = true;
+    config._v2ToastTitle = title || "Operazione";
+    showToast(config._v2ToastTitle, message, false);
+  });
+
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var detail = event.detail || {};
+    var config = detail.requestConfig || {};
+    if (!config._v2ToastShown) return;
+    var xhr = detail.xhr;
+    var response = xhr && xhr.responseText || "";
+    // Some actions provide a more useful server-rendered completion toast.
+    if (response.indexOf('id="v2-toast-region"') !== -1 || response.indexOf("id='v2-toast-region'") !== -1) return;
+    if (detail.successful) showToast(config._v2ToastTitle, "Richiesta completata.", false);
+    else showToast(config._v2ToastTitle, "Operazione non riuscita.", true);
   });
 
   document.addEventListener("keydown", function (event) {

@@ -578,15 +578,28 @@ html, body {
 /* v2 widgets: card grids and the maintenance review tables. */
 .v2-content-filter-tools-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  gap: 18px;
 }
-.v2-content-filter-tools-grid > .panel {
+.v2-content-filter-section,
+.v2-content-archive-cleanup {
   min-width: 0;
+  padding: 0;
 }
-.v2-content-archive-prefilters {
-  align-items: flex-start;
+.v2-content-archive-cleanup {
+  border-top: 1px solid var(--border, rgba(128, 128, 128, .25));
+  padding-top: 16px;
+}
+.v2-content-tools-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.v2-content-tools-heading h4 {
+  margin: 0;
 }
 .v2-score-group-row {
   display: grid;
@@ -610,11 +623,6 @@ html, body {
 }
 .v2-score-group-add .field {
   flex: 1 1 180px;
-}
-@media (max-width: 900px) {
-  .v2-content-filter-tools-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 @media (max-width: 560px) {
   .v2-score-group-row {

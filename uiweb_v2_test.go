@@ -77,18 +77,35 @@ func TestV2ContentFilterArchiveCleanupSearchAndBulkDelete(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	code, body := v2Request(t, server, http.MethodGet, "/v2/settings/body?tab=sources", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Pulisci i risultati già archiviati") {
+	if code != http.StatusOK || !strings.Contains(body, "Filtra e Cancella") || !strings.Contains(body, "Pulisci i risultati già archiviati") || !strings.Contains(body, "v2-content-filter-tools") || !strings.Contains(body, "v2-content-filter-section") || !strings.Contains(body, "v2-content-archive-cleanup") {
 		t.Fatalf("content archive cleanup panel missing -> %d: %s", code, body)
+	}
+	if strings.Count(body, `class="panel settings-panel v2-content-filter-tools"`) != 1 || strings.Contains(body, `class="panel settings-panel v2-checkbox-panel-content_filters"`) {
+		t.Fatalf("content filters and archive cleanup should share one frame: %s", body)
+	}
+	if strings.Count(body, `name="value" value="[non-latino]"`) != 1 || strings.Contains(body, "v2-content-archive-prefilters") {
+		t.Fatalf("content filter options should appear only once in the shared panel: %s", body)
+	}
+	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/checkbox", url.Values{"key": {"content_filters"}, "value": {"non_latin"}})
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-content-filter-section"`) || strings.Contains(body, "Pulisci i risultati già archiviati") {
+		t.Fatalf("saving content filters should update only the inner section -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/v2/settings/body?tab=sources", nil)
+	if code != http.StatusOK || !strings.Contains(body, `name="filter" value="non_latin"`) {
+		t.Fatalf("saved content filters should be preselected for archive cleanup -> %d: %s", code, body)
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/v2/settings/content-archive?q=porno", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Adult Porno Release 1") || !strings.Contains(body, "Adult Porno Release 2") {
 		t.Fatalf("content archive search -> %d: %s", code, body)
 	}
+	if !strings.Contains(body, `data-v2-toast-message="Avvio eliminazione dei risultati selezionati."`) || !strings.Contains(body, `data-v2-toast-message="Avvio eliminazione di tutti i 2 risultati corrispondenti."`) {
+		t.Fatalf("archive deletion buttons should announce operation start -> %s", body)
+	}
 	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/content-archive/delete", url.Values{
 		"q":          {"porno"},
 		"delete_all": {"1"},
 	})
-	if code != http.StatusOK || !strings.Contains(body, "2 voci eliminate") || !strings.Contains(body, "Nessun risultato") {
+	if code != http.StatusOK || !strings.Contains(body, "2 voci eliminate") || !strings.Contains(body, "Nessun risultato") || !strings.Contains(body, `id="v2-toast-region" hx-swap-oob="innerHTML"`) {
 		t.Fatalf("bulk content archive delete -> %d: %s", code, body)
 	}
 	remaining, err := state.archive.Count()
@@ -706,8 +723,8 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/v2/settings/editor-row?editor=indexers&index=0&view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "list-row") || !strings.Contains(body, "Testa") {
 		t.Fatalf("editor row -> %d", code)
 	}
-	// Checkbox group save returns the re-rendered panel.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/settings/checkbox", url.Values{"key": {"content_filters"}, "value": {"[porno]"}}); code != http.StatusOK || !strings.Contains(body, "settings-panel") {
+	// The unified filter/cleanup block saves only its filter section.
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/settings/checkbox", url.Values{"key": {"content_filters"}, "value": {"[porno]"}}); code != http.StatusOK || !strings.Contains(body, `id="v2-content-filter-section"`) {
 		t.Fatalf("checkbox save -> %d", code)
 	}
 	// Comics page shows the main table and the download queue.

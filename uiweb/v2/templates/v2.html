@@ -656,11 +656,35 @@
 </div>
 {{end}}
 {{range .CheckboxGroups}}
-  {{if eq .Key "content_filters"}}<div class="v2-content-filter-tools-grid">{{end}}
-  {{template "v2_checkbox_group" .}}
-  {{if eq .Key "content_filters"}}{{template "v2_content_archive_cleanup" .}}</div>{{end}}
+  {{if eq .Key "content_filters"}}{{template "v2_content_filter_tools" .}}{{else}}{{template "v2_checkbox_group" .}}{{end}}
 {{end}}
 {{range .ListEditors}}{{template "v2_list_editor" .}}{{end}}
+{{end}}
+
+{{define "v2_content_filter_tools"}}
+<div class="panel settings-panel v2-content-filter-tools">
+  <div class="panel-head"><h3>Filtra e Cancella</h3><small class="muted">Esclusioni future e pulizia dei risultati già archiviati</small></div>
+  <div class="panel-body">
+    <div class="v2-content-filter-tools-grid">
+      {{template "v2_content_filter_section" .}}
+      {{template "v2_content_archive_cleanup" .}}
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "v2_content_filter_section"}}
+<section class="v2-content-filter-section" id="v2-content-filter-section">
+  <div class="v2-content-tools-heading"><h4>Filtri contenuto esclusi</h4>{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</div>
+  {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+  <form id="v2-content-filter-form" method="post" action="/v2/settings/checkbox" hx-post="/v2/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML">
+    <input type="hidden" name="key" value="{{.Key}}" />
+    <div class="toolbar checkbox-row">
+      {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
+    </div>
+    {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions"><button class="btn sm primary" type="submit">Salva</button></div>{{end}}
+  </form>
+</section>
 {{end}}
 
 {{define "v2_checkbox_group"}}
@@ -680,26 +704,22 @@
 {{end}}
 
 {{define "v2_content_archive_cleanup"}}
-<div class="panel settings-panel v2-content-archive-cleanup">
-  <div class="panel-head"><h3>Pulisci i risultati già archiviati</h3><small class="muted">Ricerca nel catalogo</small></div>
-  <div class="panel-body">
-    <p class="hint">I filtri escludono nuove release, ma non rimuovono quelle già presenti nell’Archivio. Cerca parole nel titolo per eliminare singoli risultati, quelli selezionati o tutte le corrispondenze.</p>
-    <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
-      <div class="toolbar">
-        <input class="input" type="search" name="q" placeholder="Parole nel titolo, es. adult o xxx" />
-        <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
-      </div>
-      <p class="muted" style="margin:10px 0 6px">Oppure filtra per i contenuti che verrebbero esclusi:</p>
-      <div class="toolbar checkbox-row v2-content-archive-prefilters">
-         {{range .Options}}<label class="check"><input type="checkbox" name="filter" value="{{.Value}}" /> <span>{{.Label}}</span></label>{{end}}
-      </div>
-    </form>
+<section class="v2-content-archive-cleanup">
+  <div class="v2-content-tools-heading"><h4>Pulisci i risultati già archiviati</h4><small class="muted">Ricerca nel catalogo</small></div>
+    <p class="hint">I filtri selezionati sopra impediscono di archiviare nuove release corrispondenti. Non cancellano retroattivamente le voci esistenti: qui puoi trovarle e rimuoverle singolarmente, selezionate o tutte insieme. La ricerca usa gli stessi filtri attivi; modificali e salvali sopra per cambiare i contenuti da trovare.</p>
+     <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
+       {{range .Options}}{{if .Selected}}<input type="hidden" name="filter" value="{{.Value}}" />{{end}}{{end}}
+       <div class="toolbar">
+         <input class="input" type="search" name="q" placeholder="Parole nel titolo, es. adult o xxx" />
+         <button class="btn sm primary" type="submit">Cerca nell’Archivio</button>
+       </div>
+     </form>
     <div id="v2-content-archive-results" aria-live="polite"></div>
-  </div>
-</div>
+</section>
 {{end}}
 
 {{define "v2_content_archive_results"}}
+  {{if .Notice}}<div id="v2-toast-region" hx-swap-oob="innerHTML">{{template "v2_action_notice" (dict "Title" "Archivio" "Message" .Notice "Error" .Error)}}</div>{{end}}
   {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
   {{if or .Query .Filters}}
     {{if .Total}}
@@ -715,14 +735,14 @@
             <td><input type="checkbox" name="id" value="{{.ID}}" aria-label="Seleziona {{.Title}}" /></td>
             <td class="truncate" title="{{.Title}}">{{.Title}}</td>
             <td>{{.Source}}</td>
-            <td class="row-actions"><button class="btn sm danger" type="submit" name="delete_id" value="{{.ID}}" hx-confirm="Eliminare solo questa voce dall’Archivio?">Elimina</button></td>
+            <td class="row-actions"><button class="btn sm danger" type="submit" name="delete_id" value="{{.ID}}" hx-confirm="Eliminare solo questa voce dall’Archivio?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione della voce selezionata.">Elimina</button></td>
           </tr>
           {{end}}
         </tbody>
       </table></div>
       <div class="form-actions">
-        <button class="btn sm danger" type="submit" hx-confirm="Eliminare le voci selezionate dall’Archivio?">Elimina selezionati</button>
-        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci corrispondenti alla ricerca e ai pre-filtri selezionati?">Elimina tutti i risultati</button>
+        <button class="btn sm danger" type="submit" hx-confirm="Eliminare le voci selezionate dall’Archivio?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione dei risultati selezionati.">Elimina selezionati</button>
+        <button class="btn sm danger" type="submit" name="delete_all" value="1" hx-confirm="Eliminare tutte le {{.Total}} voci corrispondenti alla ricerca e ai pre-filtri selezionati?" data-v2-toast-title="Archivio" data-v2-toast-message="Avvio eliminazione di tutti i {{.Total}} risultati corrispondenti.">Elimina tutti i risultati</button>
       </div>
     </form>
     {{else}}

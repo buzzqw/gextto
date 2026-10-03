@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"gopkg.in/yaml.v3"
 )
 
@@ -164,7 +165,11 @@ func V2SettingsCheckbox(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_checkbox_group", group, dict, eng)
+	templateName := "v2_checkbox_group"
+	if key == "content_filters" {
+		templateName = "v2_content_filter_section"
+	}
+	v2Render(w, http.StatusOK, templateName, group, dict, eng)
 }
 
 // --- list editors -----------------------------------------------------------
@@ -684,6 +689,25 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 	}
 	query := strings.TrimSpace(r.FormValue("q"))
 	filters := v2ContentArchiveFilters(r)
+	ids := make([]int64, 0, len(r.Form["id"]))
+	for _, raw := range r.Form["id"] {
+		id, parseErr := strconv.ParseInt(raw, 10, 64)
+		if parseErr != nil || id <= 0 {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	action := "selected"
+	var requested any = len(ids)
+	switch {
+	case r.FormValue("delete_all") == "1":
+		action = "all_matching"
+		requested = "all matching"
+	case r.FormValue("delete_id") != "":
+		action = "single"
+		requested = 1
+	}
+	logging.Info("archive content deletion started", "action", action, "requested", requested, "query", query, "filters", filters)
 	removed := 0
 	var err error
 	switch {
@@ -700,19 +724,14 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 			removed, err = s.archive.DeleteIDs([]int64{id})
 		}
 	default:
-		ids := make([]int64, 0, len(r.Form["id"]))
-		for _, raw := range r.Form["id"] {
-			id, parseErr := strconv.ParseInt(raw, 10, 64)
-			if parseErr != nil || id <= 0 {
-				continue
-			}
-			ids = append(ids, id)
-		}
 		removed, err = s.archive.DeleteIDs(ids)
 	}
 	notice := fmt.Sprintf("%d voci eliminate.", removed)
 	if err != nil {
 		notice = err.Error()
+		logging.Error("archive content deletion failed", "action", action, "deleted", removed, "error", err)
+	} else {
+		logging.Info("archive content deletion completed", "action", action, "deleted", removed, "query", query)
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, notice, err != nil), dict, eng)
