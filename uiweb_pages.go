@@ -413,6 +413,12 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	}
 	keys := make([]string, 0, len(cfg.Settings))
 	for key := range cfg.Settings {
+		// Legacy score_bonus_ita is not a supported scoring rule: language is
+		// intentionally excluded from the quality score, so don't expose it as
+		// an editable override in the Punteggi tab.
+		if strings.EqualFold(key, "score_bonus_ita") {
+			continue
+		}
 		if _, ok := indexed[key]; ok {
 			continue
 		}

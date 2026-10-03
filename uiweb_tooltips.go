@@ -153,9 +153,6 @@ func uiSettingTooltip(key string) string {
 	if text, ok := uiSettingTooltipText[key]; ok {
 		return text
 	}
-	if key == "score_bonus_ita" {
-		return ""
-	}
 	if strings.HasPrefix(key, "score_") {
 		return "Peso usato per scegliere la release migliore: più alto = più preferito."
 	}

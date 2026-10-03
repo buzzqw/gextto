@@ -93,6 +93,9 @@ func TestLanguageDoesNotChangeQualityScore(t *testing.T) {
 	if italian.Score() != english.Score() {
 		t.Fatalf("language changed the score: %d != %d", italian.Score(), english.Score())
 	}
+	if got := italian.ScoreWithSettings(map[string]string{"score_bonus_ita": "500"}); got != italian.Score() {
+		t.Fatalf("legacy Italian-language bonus changed the score: %d != %d", got, italian.Score())
+	}
 }
 
 func TestCustomReleaseGroupScoreUsesConfiguredGroupName(t *testing.T) {

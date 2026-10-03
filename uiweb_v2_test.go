@@ -426,6 +426,9 @@ func TestV2ScoreGroupsCanBeAddedEditedAndRemoved(t *testing.T) {
 	if err := saveConfigSetting(state.cfg.DataDir, "score_bonus_ita", "100"); err != nil {
 		t.Fatalf("seed score bonus setting: %v", err)
 	}
+	if err := saveConfigSetting(state.cfg.DataDir, "score_res_1080p", "1000"); err != nil {
+		t.Fatalf("seed score resolution setting: %v", err)
+	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
@@ -433,11 +436,11 @@ func TestV2ScoreGroupsCanBeAddedEditedAndRemoved(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Gruppi custom") || !strings.Contains(body, `name="name"`) {
 		t.Fatalf("score groups editor -> %d: %s", code, body)
 	}
-	if strings.Index(body, "Gruppi custom") < strings.Index(body, "Bonus") {
+	if strings.Index(body, "Gruppi custom") < strings.Index(body, "Risoluzione") {
 		t.Fatalf("custom score groups should appear after the score sections: %s", body)
 	}
-	if strings.Contains(body, `class="setting-hint" title="Peso usato per scegliere la release migliore: più alto = più preferito."`) {
-		t.Fatalf("score_bonus_ita should not show the generic quality-weight explanation: %s", body)
+	if strings.Contains(body, "score_bonus_ita") {
+		t.Fatalf("unsupported Italian-language score bonus should not be exposed: %s", body)
 	}
 
 	code, body = v2Request(t, server, http.MethodPost, "/v2/settings/score-groups", url.Values{"op": {"add"}, "name": {"TBK"}, "score": {"125"}})
