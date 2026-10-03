@@ -387,6 +387,8 @@ func DbAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func gh0_runDbAction(s *AppState, action string) (int64, int64, int64, int64, error) {
+	start := time.Now()
+	logging.Info("db maintenance action started", "action", action)
 	configPath := filepath.Join(s.cfg.DataDir, "gextto_config.db")
 	configSize := func(path string) int64 {
 		conn, err := OpenConfigDB(path)
@@ -406,12 +408,15 @@ func gh0_runDbAction(s *AppState, action string) (int64, int64, int64, int64, er
 	beforeSize += s.comics.SizeBytes() + configSize(configPath)
 
 	if err := s.db.Optimize(action); err != nil {
+		logging.Error("db maintenance failed on series db", "action", action, "error", err)
 		return 0, 0, 0, 0, err
 	}
 	if err := s.archive.Optimize(action); err != nil {
+		logging.Error("db maintenance failed on archive db", "action", action, "error", err)
 		return 0, 0, 0, 0, err
 	}
 	if err := s.comics.Optimize(action); err != nil {
+		logging.Error("db maintenance failed on comics db", "action", action, "error", err)
 		return 0, 0, 0, 0, err
 	}
 	if conn, err := OpenConfigDB(configPath); err == nil {
@@ -426,6 +431,7 @@ func gh0_runDbAction(s *AppState, action string) (int64, int64, int64, int64, er
 		afterRows += count
 	}
 	afterSize += s.comics.SizeBytes() + configSize(configPath)
+	logging.Info("db maintenance action finished", "action", action, "duration", time.Since(start).String(), "before_bytes", beforeSize, "after_bytes", afterSize)
 	return beforeSize, beforeRows, afterSize, afterRows, nil
 }
 

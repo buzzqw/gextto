@@ -813,6 +813,37 @@
   // the duplicate scan). The shell renders the toast for redirecting actions;
   // this one fires the moment the button is clicked, so the user knows the
   // work started before the panel updates with the results.
+  function autoDismissToast(el) {
+    if (!el || el._v2DismissTimer) return;
+    el._v2DismissTimer = window.setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 6000);
+  }
+
+  function initToastRegion() {
+    var region = document.getElementById("v2-toast-region");
+    if (!region) return;
+    var existing = region.querySelectorAll(".v2-toast");
+    for (var i = 0; i < existing.length; i++) autoDismissToast(existing[i]);
+    if (window.MutationObserver) {
+      new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+          for (var j = 0; j < m.addedNodes.length; j++) {
+            var node = m.addedNodes[j];
+            if (node.nodeType === 1) {
+              if (node.classList && node.classList.contains("v2-toast")) {
+                autoDismissToast(node);
+              } else if (node.querySelectorAll) {
+                var toasts = node.querySelectorAll(".v2-toast");
+                for (var k = 0; k < toasts.length; k++) autoDismissToast(toasts[k]);
+              }
+            }
+          }
+        });
+      }).observe(region, { childList: true, subtree: true });
+    }
+  }
+
   function showToast(title, message, isError) {
     var region = document.getElementById("v2-toast-region");
     if (!region) return;
@@ -826,9 +857,7 @@
     toast.appendChild(strong);
     toast.appendChild(span);
     region.appendChild(toast);
-    window.setTimeout(function () {
-      if (toast.parentNode) toast.parentNode.removeChild(toast);
-    }, 6000);
+    autoDismissToast(toast);
   }
 
   document.addEventListener("htmx:beforeRequest", function (event) {
@@ -869,5 +898,5 @@
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); });
 })();

@@ -418,6 +418,12 @@ html, body {
 .htmx-request.archive-indicator {
   display: inline-block;
 }
+button.htmx-request,
+form.htmx-request button[type="submit"],
+.btn.htmx-request {
+  opacity: 0.6;
+  cursor: wait;
+}
 @media (max-width: 560px) {
   .toolbar .archive-search-input {
     max-width: 100%;
