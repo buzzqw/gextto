@@ -41,8 +41,7 @@ log e viene salvata localmente nel browser. I browser senza questa API mantengon
 i preset e il campo per inserire manualmente il nome della famiglia; per leggere
 i font installati può essere richiesta un'autorizzazione del browser.
 
-L'interfaccia ufficiale è disponibile alla radice `http://<host>:5000/`; `/v2`
-resta un alias tecnico. La vecchia route `/ui` è stata rimossa. Il menu **Scarico**
+L'interfaccia web è disponibile su `http://<host>:5000/`. Il menu **Scarico**
 aggiorna automaticamente la sessione ogni 5 secondi, includendo progressione e
 velocità dei download HTTP dei fumetti; le metriche live nella barra superiore
 seguono lo stesso intervallo.

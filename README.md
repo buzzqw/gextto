@@ -40,8 +40,7 @@ locally in that browser. Browsers without the API still support the presets and 
 manual font-family name; browser permission may be required to inspect installed
 fonts.
 
-The official interface is served at `http://<host>:5000/`; `/v2` remains a
-technical alias and the old `/ui` route has been removed. The **Downloads** page
+The web interface is served at `http://<host>:5000/`. The **Downloads** page
 refreshes the session every 5 seconds, including progress and speed for comic HTTP
 downloads; the live transfer metrics in the top bar use the same interval.
 
