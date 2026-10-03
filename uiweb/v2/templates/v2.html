@@ -1337,19 +1337,29 @@
 {{end}}
 
 {{define "v2_db_panel"}}
+{{if .Notify}}<div id="v2-toast-region" hx-swap-oob="true"><div class="v2-toast{{if .NotifyError}} error{{end}}" role="status" hx-get="/v2/empty" hx-trigger="load delay:8s" hx-target="#v2-toast-region" hx-swap="innerHTML"><strong>Ottimizzazione database</strong><span>{{.NotifyMessage}}</span></div></div>{{end}}
 <div class="panel" id="v2-db-panel">
   <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .TotalBytes}}<small class="muted">totale: {{bytes .TotalBytes}}</small>{{end}}{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
   <div class="panel-body">
-    <p class="hint">VACUUM compatta i file; ANALYZE aggiorna le statistiche SQLite.</p>
+    <p class="hint">L’operazione viene eseguita su tutti i database SQLite (serie, archivio, configurazione e fumetti): VACUUM compatta i file e libera spazio; ANALYZE aggiorna le statistiche SQLite.</p>
     <div class="table-wrap"><table class="data-table">
       <caption class="sr-only">File database</caption>
       <thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Stato</th></tr></thead>
       <tbody>{{range .Files}}<tr><td class="truncate" title="{{.Path}}">{{.Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Exists}}<span class="badge ok">presente</span>{{else}}<span class="badge">assente</span>{{end}}</td></tr>{{end}}</tbody>
     </table></div>
     <div class="toolbar" style="margin-top:10px">
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="vacuum" /><button class="btn sm" type="submit" title="Compatta i database e libera spazio">VACUUM</button></form>
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="analyze" /><button class="btn sm" type="submit" title="Aggiorna le statistiche del query planner">ANALYZE</button></form>
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="refresh" /><button class="btn sm" type="submit">Aggiorna dimensioni</button></form>
+      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">
+        <input type="hidden" name="action" value="vacuum" />
+        <button class="btn sm" type="submit" title="Compatta tutti i database e libera spazio" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">VACUUM</button>
+      </form>
+      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">
+        <input type="hidden" name="action" value="analyze" />
+        <button class="btn sm" type="submit" title="Aggiorna le statistiche del query planner su tutti i database" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">ANALYZE</button>
+      </form>
+      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">
+        <input type="hidden" name="action" value="refresh" />
+        <button class="btn sm" type="submit" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">Aggiorna dimensioni</button>
+      </form>
     </div>
     {{if and .Action (not .Error)}}<div class="stat-grid" style="margin-top:10px"><span class="stat"><strong>{{bytes .BeforeSize}}</strong> prima</span><span class="stat"><strong>{{bytes .AfterSize}}</strong> dopo</span></div>{{end}}
   </div>

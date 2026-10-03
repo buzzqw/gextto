@@ -146,25 +146,32 @@ type v2DBFile struct {
 }
 
 type v2DBView struct {
-	Files      []v2DBFile
-	TotalBytes int64
-	Action     string
-	BeforeSize int64
-	AfterSize  int64
-	BeforeRows int64
-	AfterRows  int64
-	Message    string
-	Error      bool
+	Files         []v2DBFile
+	TotalBytes    int64
+	Action        string
+	BeforeSize    int64
+	AfterSize     int64
+	BeforeRows    int64
+	AfterRows     int64
+	Message       string
+	Error         bool
+	Notify        bool
+	NotifyMessage string
+	NotifyError   bool
 }
 
 func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
-	view := v2DBView{Action: strings.TrimSpace(r.FormValue("action"))}
-	if view.Action == "vacuum" || view.Action == "analyze" {
-		body, _ := json.Marshal(map[string]string{"action": view.Action})
+	action := strings.TrimSpace(r.FormValue("action"))
+	view := v2DBView{Action: action}
+	if action == "vacuum" || action == "analyze" {
+		body, _ := json.Marshal(map[string]string{"action": action})
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/db/action", nil, body)
 		if status >= 400 {
 			view.Error = true
 			view.Message = v2JSONError(raw)
+			view.Notify = true
+			view.NotifyError = true
+			view.NotifyMessage = fmt.Sprintf("Operazione %s non riuscita: %s", strings.ToUpper(action), view.Message)
 		} else {
 			var payload struct {
 				Before struct {
@@ -182,9 +189,23 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 				view.AfterSize = payload.After.SizeBytes
 				view.AfterRows = payload.After.Rows
 			}
+			view.Notify = true
+			if action == "vacuum" {
+				saved := view.BeforeSize - view.AfterSize
+				if saved > 0 {
+					view.NotifyMessage = fmt.Sprintf("VACUUM completato con successo su tutti i database: liberati %s (prima %s, ora %s).", formatBytes(saved), formatBytes(view.BeforeSize), formatBytes(view.AfterSize))
+				} else {
+					view.NotifyMessage = fmt.Sprintf("VACUUM completato con successo su tutti i database: compattati e ottimizzati (%s totali).", formatBytes(view.AfterSize))
+				}
+			} else {
+				view.NotifyMessage = fmt.Sprintf("ANALYZE completato con successo su tutti i database: statistiche del query planner aggiornate (%d righe).", view.AfterRows)
+			}
 		}
 	} else {
 		view.Action = ""
+		if action == "refresh" {
+			view.Notify = true
+		}
 	}
 	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/db/info", nil, nil); status < 400 {
 		var payload struct {
@@ -196,9 +217,17 @@ func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 				view.TotalBytes += file.SizeBytes
 			}
 		}
+		if action == "refresh" && view.Notify {
+			view.NotifyMessage = fmt.Sprintf("Dimensioni aggiornate: totale %s su tutti i %d database.", formatBytes(view.TotalBytes), len(view.Files))
+		}
 	} else if view.Message == "" {
 		view.Error = true
 		view.Message = v2JSONError(raw)
+		if action == "refresh" {
+			view.Notify = true
+			view.NotifyError = true
+			view.NotifyMessage = "Aggiornamento dimensioni non riuscito: " + view.Message
+		}
 	}
 	return view
 }
