@@ -806,7 +806,7 @@ func TestV2TorrentDetailExposesEditableTabs(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("detail modal -> %d", code)
 	}
-	for _, marker := range []string{"Limiti", "Storage", "/v2/downloads/detail/panel"} {
+	for _, marker := range []string{"torrent-modal", "data-v2-detail-tab=\"limits\"", "aria-selected=\"true\"", "Limiti", "Storage", "/v2/downloads/detail/panel"} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("detail modal missing %q", marker)
 		}

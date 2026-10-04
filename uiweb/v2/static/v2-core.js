@@ -109,6 +109,22 @@
     }
   });
 
+  // ------------------------------------------------ torrent detail tabs --
+  // HTMX replaces only the panel content. Keep the persistent tab bar in sync
+  // with the panel requested by the user.
+  document.addEventListener("click", function (event) {
+    var tab = event.target.closest && event.target.closest("[data-v2-detail-tab]");
+    if (!tab) return;
+    var tablist = tab.closest('[role="tablist"]');
+    if (!tablist) return;
+    var tabs = tablist.querySelectorAll("[data-v2-detail-tab]");
+    for (var i = 0; i < tabs.length; i++) {
+      var active = tabs[i] === tab;
+      tabs[i].classList.toggle("primary", active);
+      tabs[i].setAttribute("aria-selected", active ? "true" : "false");
+    }
+  });
+
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
     var group = document.getElementById("app-system-menu");

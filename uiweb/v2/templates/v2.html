@@ -462,12 +462,12 @@
 
 {{define "v2_detail_modal"}}
 <div class="overlay" style="display:block">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-detail-title">
+  <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-labelledby="v2-detail-title">
     <div class="modal-head"><h3 id="v2-detail-title">{{.Name}}</h3>
       <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del torrent">Chiudi</button></div>
     <div class="modal-body">
       <div class="toolbar" role="tablist" aria-label="Sezioni dettagli torrent">
-        {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" hx-get="/v2/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
+        {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/v2/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
       </div>
       <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
     </div>

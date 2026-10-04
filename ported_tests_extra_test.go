@@ -133,6 +133,25 @@ func TestStallTimerRequiresRealProgress(t *testing.T) {
 	}
 }
 
+func TestStallRetryNoticeBackoff(t *testing.T) {
+	now := time.Date(2026, time.October, 4, 12, 0, 0, 0, time.UTC)
+	entry := StallWatch{}
+	want := []time.Duration{time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour, 24 * time.Hour}
+	for index, delay := range want {
+		if !tev_stallRetryNoticeDue(&entry, now) {
+			t.Fatalf("notice %d should be due", index)
+		}
+		tev_scheduleNextStallRetryNotice(&entry, now)
+		if got := entry.nextRetryNoticeAt.Sub(now); got != delay {
+			t.Fatalf("notice %d delay = %s, want %s", index, got, delay)
+		}
+		if tev_stallRetryNoticeDue(&entry, now.Add(delay-time.Second)) {
+			t.Fatalf("notice %d was due before its delay elapsed", index)
+		}
+		now = entry.nextRetryNoticeAt
+	}
+}
+
 func TestMetadataRetryWarningIsRateLimited(t *testing.T) {
 	now := time.Now()
 	if !tev_metadataRetryWarningDue(time.Time{}, now) {
