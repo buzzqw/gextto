@@ -67,7 +67,9 @@ const (
 // search budget.
 var (
 	automaticSearchTimeout = 25 * time.Second
-	indexerRequestTimeout  = 20 * time.Second
+	// 45s: enough for the MirCrew indexer, which may search its forum and thank
+	// a topic on an on-demand query before answering.
+	indexerRequestTimeout = 45 * time.Second
 )
 
 // NewEngine builds the default engine, mirroring `Engine::new`.
