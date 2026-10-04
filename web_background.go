@@ -1572,6 +1572,19 @@ func watchedFoldersWorker(state *AppState) {
 
 // cycleWorker runs the scheduled scrape/cycle loop and, every
 // `rename_verify_interval` hours, performs the archive rename repair.
+func formatScheduledCycleTime(now, due time.Time) string {
+	location := due.Location()
+	now = now.In(location)
+	if now.Year() == due.Year() && now.Month() == due.Month() && now.Day() == due.Day() {
+		return due.Format("15.04")
+	}
+	tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
+	if due.Year() == tomorrow.Year() && due.Month() == tomorrow.Month() && due.Day() == tomorrow.Day() {
+		return "domani " + due.Format("15.04")
+	}
+	return due.Format("02/01 15.04")
+}
+
 func cycleWorker(state *AppState) {
 	// Cancelled on shutdown so a cycle in progress releases the torrent engine
 	// before ShutdownEmbedded destroys the native session.
@@ -1609,8 +1622,7 @@ func cycleWorker(state *AppState) {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
 						logging.Info(fmt.Sprintf("scheduled cycle postponed after restart; next cycle will start in %s, at %s",
-							remaining.Round(time.Second), due.Local().Format("2006-01-02 15:04:05")),
-							"next_cycle_at", due.Format(time.RFC3339),
+							remaining.Round(time.Second), formatScheduledCycleTime(time.Now(), due.Local())),
 							"configured_interval", durationFromSeconds(refresh).String())
 						for {
 							remaining = time.Until(due)
