@@ -1609,7 +1609,7 @@ func cycleWorker(state *AppState) {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
 						logging.Info(fmt.Sprintf("scheduled cycle postponed after restart; next cycle will start in %s, at %s (local time)",
-							remaining.Round(time.Second), due.Local().Format("2006-01-02 15:04:05 MST")),
+							remaining.Round(time.Second), due.Local().Format("2006-01-02 15:04:05")),
 							"next_cycle_at", due.Format(time.RFC3339),
 							"configured_interval", durationFromSeconds(refresh).String())
 						for {
