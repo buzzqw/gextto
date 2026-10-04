@@ -312,6 +312,9 @@ type v2DashboardCalendarItem struct {
 	Season  int
 	Episode int
 	AirDate string
+	// TmdbURL/TvdbURL link the title to its own page; either may be empty.
+	TmdbURL string
+	TvdbURL string
 }
 
 // v2DashboardCalendarFrom keeps the calendar presentation aligned with the
@@ -328,15 +331,24 @@ func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil
 	}
+	cfg := latestConfig(s)
 	out := make([]v2DashboardCalendarItem, 0, len(payload.Items))
 	for _, item := range payload.Items {
 		episode, _ := item["episode"].(map[string]any)
+		name := v2String(item["series"])
+		tmdb, tvdb := "", ""
+		if series := gh3FindSeries(cfg, name); series != nil {
+			tmdb = tmdbURL(series.TmdbID, "tv")
+			tvdb = tvdbURL(series.TvdbID, "series")
+		}
 		out = append(out, v2DashboardCalendarItem{
-			Series:  v2String(item["series"]),
+			Series:  name,
 			Poster:  v2SafeHref(v2String(item["poster"])),
 			Season:  int(v2Float(episode["season_number"])),
 			Episode: int(v2Float(episode["episode_number"])),
 			AirDate: v2String(episode["air_date"]),
+			TmdbURL: tmdb,
+			TvdbURL: tvdb,
 		})
 		if len(out) >= 6 {
 			break

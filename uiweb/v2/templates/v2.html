@@ -298,7 +298,7 @@
       <div class="dashboard-list">
         {{if .}}{{range .}}<div class="list-item">
           {{if .Poster}}<img class="list-poster" loading="lazy" src="{{.Poster}}" alt="{{.Series}}" />{{else}}<div class="list-poster placeholder">N/D</div>{{end}}
-          <div><strong>{{.Series}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}data non disponibile{{end}}</small></div>
+          <div><strong>{{if .TvdbURL}}<a href="{{.TvdbURL}}" target="_blank" rel="noopener" title="Apri la serie su TVDB">{{.Series}}</a>{{else if .TmdbURL}}<a href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri la serie su TMDB">{{.Series}}</a>{{else}}{{.Series}}{{end}}</strong><small>S{{.Season}}E{{.Episode}} · {{if .AirDate}}{{.AirDate}}{{else}}data non disponibile{{end}}</small></div>
         </div>{{end}}{{else}}<p class="muted">Nessuna uscita in programma.</p>{{end}}
       </div>
     </div>
