@@ -287,6 +287,11 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 	if data.Dir != "desc" {
 		data.Dir = "asc"
 	}
+	// The series library is always alphabetical: default to the name column when
+	// no sort is active, instead of showing the raw configuration order.
+	if data.Sort == "" && spec.ItemsKey == "series" {
+		data.Sort = "name"
+	}
 	if column, ok := v2SortableColumn(columns, data.Sort); ok {
 		v2SortItems(items, column, data.Dir)
 	}
