@@ -1880,11 +1880,11 @@
 {{define "v2_sources_rows"}}
 {{if .Results}}
 <div class="table-wrap"><table class="data-table">
-  <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col"></th></tr></thead>
+  <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
   <tbody>{{range .Results}}<tr>
     <td class="truncate" title="{{.Title}}">{{.Title}}</td>
     <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
-    <td>{{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}</td>
+    <td class="row-actions">{{if .Magnet}}<button class="btn sm" type="button" data-v2-copy="{{.Magnet}}" title="Copia il link magnet negli appunti">Copia magnet</button>{{end}}{{if .Body}}{{template "v2_action_btn" (dict "Redirect" $.Redirect "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">{{if .Hint}}{{.Hint}}{{else}}Nessuna sorgente disponibile per questa puntata.{{end}}</p>{{end}}
@@ -1892,7 +1892,7 @@
 
 {{define "v2_sources_modal"}}
 <div class="overlay" style="display:block">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
+  <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
     <div class="modal-head"><h3 id="v2-sources-title">Sorgenti {{.Label}}</h3>
       <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">{{template "v2_sources_rows" .}}</div>
@@ -1902,7 +1902,7 @@
 
 {{define "v2_episode_search_modal"}}
 <div class="overlay" style="display:block">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
+  <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
     <div class="modal-head"><h3 id="v2-sources-title">Cerca {{.Label}}</h3>
       <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">

@@ -991,3 +991,17 @@ form.htmx-request button[type="submit"],
   .mobile-torrent-sort { display: flex; }
   .mobile-torrent-hint { display: block; }
 }
+
+/* Wider sources/search modal so the per-release actions stay visible. */
+.overlay .modal.v2-sources-modal { width: min(1500px, 98vw); }
+.v2-sources-modal .data-table { table-layout: fixed; min-width: 0; }
+.v2-sources-modal .data-table th:nth-child(1),
+.v2-sources-modal .data-table td:nth-child(1) { width: 42%; }
+.v2-sources-modal .data-table th:nth-child(2),
+.v2-sources-modal .data-table td:nth-child(2) { width: 14%; }
+.v2-sources-modal .data-table th:nth-child(3),
+.v2-sources-modal .data-table td:nth-child(3) { width: 8%; }
+.v2-sources-modal .data-table th:nth-child(4),
+.v2-sources-modal .data-table td:nth-child(4) { width: 10%; }
+.v2-sources-modal .data-table th:nth-child(5),
+.v2-sources-modal .data-table td:nth-child(5) { width: 26%; }

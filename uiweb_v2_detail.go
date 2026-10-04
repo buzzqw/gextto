@@ -85,12 +85,14 @@ type v2SourceRow struct {
 	Score     int64
 	SizeBytes int64
 	Magnet    template.URL
+	Body      string
 }
 
 type v2SourcesView struct {
 	Label     string
 	Hint      string
 	OnlineURL string
+	Redirect  string
 	Results   []v2SourceRow
 }
 
@@ -102,6 +104,7 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 	if series == "" || season == "" || episode == "" {
 		return view
 	}
+	view.Redirect = "/?view=series&series=" + url.QueryEscape(series)
 	base := "/api/episodes/" + url.PathEscape(series) + "/" + url.PathEscape(season) + "/" + url.PathEscape(episode)
 	path := base + "/sources"
 	method := http.MethodGet
@@ -126,14 +129,27 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 		if release == nil {
 			release = entry
 		}
-		view.Results = append(view.Results, v2SourceRow{
-			Title:     v2String(release["title"]),
-			Source:    v2SourceLabel(v2String(release["source"])),
+		title := v2String(release["title"])
+		source := v2String(release["source"])
+		link := v2String(release["magnet"])
+		if link == "" {
+			link = v2String(release["torrent_url"])
+		}
+		body, _ := json.Marshal(map[string]any{
+			"items": []map[string]string{{"title": title, "magnet": link, "source": source}},
+		})
+		row := v2SourceRow{
+			Title:     title,
+			Source:    v2SourceLabel(source),
 			Origin:    v2String(entry["origin"]),
 			Score:     int64(v2Float(entry["score"])),
 			SizeBytes: int64(v2Float(release["size_bytes"])),
-			Magnet:    uiMagnetURL(v2String(release["magnet"])),
-		})
+			Magnet:    uiMagnetURL(link),
+		}
+		if strings.TrimSpace(link) != "" {
+			row.Body = string(body)
+		}
+		view.Results = append(view.Results, row)
 	}
 	return view
 }
@@ -143,7 +159,7 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 // search button for that.
 func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), false)
-	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online."}
+	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online.", Redirect: all.Redirect}
 	for _, row := range all.Results {
 		if strings.EqualFold(row.Origin, "Archivio") {
 			view.Results = append(view.Results, row)
@@ -161,7 +177,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 	season := r.FormValue("season")
 	episode := r.FormValue("episode")
 	stored := v2EpisodeResultsView(s, series, season, episode, false)
-	view := v2SourcesView{Label: stored.Label}
+	view := v2SourcesView{Label: stored.Label, Redirect: stored.Redirect}
 	for _, row := range stored.Results {
 		if strings.EqualFold(row.Origin, "Archivio") {
 			view.Results = append(view.Results, row)
@@ -177,7 +193,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 // indexers) and returns just those rows for the async modal section.
 func V2SeriesEpisodeSearchOnline(w http.ResponseWriter, r *http.Request, s *AppState) {
 	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
-	view := v2SourcesView{Label: all.Label, Hint: "Nessun risultato online per questa puntata."}
+	view := v2SourcesView{Label: all.Label, Hint: "Nessun risultato online per questa puntata.", Redirect: all.Redirect}
 	for _, row := range all.Results {
 		if !strings.EqualFold(row.Origin, "Archivio") {
 			view.Results = append(view.Results, row)
