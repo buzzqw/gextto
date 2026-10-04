@@ -364,4 +364,3 @@ func TestRemoveSeededCompletedRecognizesArchivedNasCopy(t *testing.T) {
 		t.Fatalf("library copy must stay: %v", err)
 	}
 }
-

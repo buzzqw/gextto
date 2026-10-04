@@ -47,11 +47,11 @@ func logManualTorrentRemoval(hash string, deleteFiles bool, name, state string, 
 
 // SafeRemoveTorrent safely removes a torrent from the active engine.
 // It ensures that:
-// 1. Files in the permanent archive library (NAS) are NEVER deleted when the user
-//    didn't explicitly request deletion, even if the torrent payload is marked disposable.
-// 2. When file deletion is requested and trash is configured, files are moved
-//    to the trash directory instead of being permanently unlinked.
-// 3. Engine removal is properly recorded in the database.
+//  1. Files in the permanent archive library (NAS) are NEVER deleted when the user
+//     didn't explicitly request deletion, even if the torrent payload is marked disposable.
+//  2. When file deletion is requested and trash is configured, files are moved
+//     to the trash directory instead of being permanently unlinked.
+//  3. Engine removal is properly recorded in the database.
 func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFiles bool) (bool, error) {
 	if s == nil || s.activeEngine() == nil {
 		return false, fmt.Errorf("torrent engine not available")

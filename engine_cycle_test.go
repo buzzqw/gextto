@@ -326,4 +326,3 @@ func TestScrapeAllRunsTitleSearchWhenForced(t *testing.T) {
 		t.Fatalf("expected 2 releases (feed + indexer), got %d: %+v", len(releases), releases)
 	}
 }
-
