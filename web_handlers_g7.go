@@ -1116,6 +1116,25 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	query := fmt.Sprintf("%s S%02dE%02d", series.Name, season, episode)
 	results := gh7_search_series_episode_sources(r.Context(), s, cfg, series, season, episode)
+	// Persist what the online search found so the archive can answer the next
+	// request locally (the feed cycle and the archive web search already do).
+	if len(results) > 0 {
+		releases := make([]models.Release, 0, len(results))
+		for _, result := range results {
+			releases = append(releases, result.Release)
+		}
+		if s.archive != nil {
+			if err := s.archive.SaveBatch(releases, cfg); err != nil {
+				logging.Warn("failed to save episode search results to archive",
+					"series", seriesName, "season", season, "episode", episode, "error", err)
+			}
+		}
+		if s.db != nil {
+			if err := s.db.RecordSeenBatch(releases, cfg); err != nil {
+				logging.Debug("episode search seen recording failed", "error", err)
+			}
+		}
+	}
 	feedMatches := 0
 	for _, result := range results {
 		if result.Origin == "Feed RSS" {
