@@ -1759,7 +1759,7 @@
               <td class="numeric">{{.QualityScore}}</td>
               <td class="numeric">{{bytes .SizeBytes}}</td>
               <td class="row-actions">
-                {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .SearchPath "Method" "POST" "Body" "{}" "Label" "🔍" "Class" "icon-action" "Title" "Cerca manualmente questa puntata")}}
+                <button class="btn sm icon-action" type="button" hx-post="/v2/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
