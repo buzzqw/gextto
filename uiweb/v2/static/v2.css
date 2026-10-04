@@ -748,19 +748,18 @@ form.htmx-request button[type="submit"],
   .v2-topbar-sticky .top-live-status .current-time { margin-left: 0; }
 
   /* --- Performance strip --------------------------------------- */
-  /* Show all four KPIs on one compact row instead of a 2×2 grid.
-     Saves vertical space so the page content appears sooner. */
+  /* A readable 2×2 performance strip is easier to scan than four tiny tiles. */
   .mobile-performance-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 5px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
   }
   .mobile-performance-tile {
-    min-height: 44px;
-    padding: 5px 6px;
-    gap: 1px;
+    min-height: 48px;
+    padding: 6px 8px;
+    gap: 2px;
   }
-  .mobile-performance-tile strong { font-size: 0.88rem; }
-  .mobile-performance-tile .top-metric-label { font-size: 0.58rem; }
+  .mobile-performance-tile strong { font-size: 0.9rem; }
+  .mobile-performance-tile .top-metric-label { font-size: 0.72rem; }
 
 }
 
@@ -937,5 +936,58 @@ form.htmx-request button[type="submit"],
     padding: 8px;
     gap: 6px;
   }
+
+  /* Mobile torrent list: turn the wide data table into readable cards. */
+  .torrent-table { display: block; width: 100%; min-width: 0; }
+  .torrent-table thead { display: none; }
+  .torrent-table tbody { display: grid; gap: 10px; }
+  .torrent-table tbody tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    min-width: 0;
+    padding: 8px 8px 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+  .torrent-table tbody td { display: block; min-width: 0 !important; padding: 5px 4px; border: 0; }
+  .torrent-table tbody td.torrent-select { position: absolute; top: 9px; left: 8px; z-index: 1; padding: 4px; }
+  .torrent-table tbody td.torrent-name { grid-column: 1; grid-row: 1; max-width: none; min-width: 0; padding-left: 38px; }
+  .torrent-table tbody td.torrent-state { grid-column: 2; grid-row: 1; justify-self: end; white-space: nowrap; }
+  .torrent-table tbody td.torrent-progress { grid-column: 1 / -1; grid-row: 2; }
+  .torrent-table tbody td.torrent-dl,
+  .torrent-table tbody td.torrent-ul,
+  .torrent-table tbody td.torrent-eta,
+  .torrent-table tbody td.torrent-peers,
+  .torrent-table tbody td.torrent-ratio { display: none; }
+  .torrent-table tbody td.row-actions { grid-column: 1 / -1; grid-row: 3; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; min-width: 0; }
+  .torrent-table tbody td.row-actions .btn { min-width: 40px; }
+  .torrent-name > .truncate { max-width: 100%; }
+  .mobile-torrent-sort { align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; color: var(--muted); font-size: 0.82rem; }
+  .mobile-torrent-sort select { min-width: 0; flex: 1 1 auto; }
+  .torrent-scroll-hint { display: none; }
+  .mobile-torrent-hint { display: block; margin: 0 0 8px; font-size: 0.76rem; }
+  .download-bulk-toolbar .mobile-bulk-hint { display: block; flex: 0 0 100%; }
+
+  /* Keep the bandwidth controls to a compact, legible grid. */
+  .download-temp-toolbar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; }
+  .download-temp-toolbar > .badge { grid-column: 1 / -1; justify-self: start; }
+  .download-temp-toolbar .field.inline-field { min-width: 0; flex-direction: column; align-items: stretch; gap: 3px; }
+  .download-temp-toolbar .field.inline-field > span { font-size: 0.72rem; }
+  .download-temp-toolbar .input.compact { width: 100%; min-width: 0; }
+  .download-temp-toolbar > .btn { width: 100%; }
+  .download-global-toolbar { display: flex; flex-wrap: wrap; }
+  .download-global-toolbar > #v2-filter { flex: 1 1 100%; min-width: 0; }
+  .download-global-toolbar > .field.inline-field { flex: 1 1 100%; min-width: 0; }
+  .download-global-toolbar > .field.inline-field .input { min-width: 0; flex: 1; }
+  .download-bulk-toolbar { display: flex; flex-wrap: wrap; }
+  .download-bulk-toolbar > * { max-width: 100%; }
 }
 
+.mobile-torrent-sort, .mobile-torrent-hint, .mobile-bulk-hint { display: none; }
+@media (max-width: 560px) {
+  .mobile-torrent-sort { display: flex; }
+  .mobile-torrent-hint { display: block; }
+}

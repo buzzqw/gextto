@@ -77,10 +77,10 @@ test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page })
     });
   });
   await page.goto("/?view=downloads");
-  const checkbox = page.locator("[data-v2-select]").first();
-  if (!(await checkbox.isVisible())) {
-    await page.locator("#v2-torrent-form button[type=submit]").first().click();
-  }
+    const checkbox = page.locator("[data-v2-select]").first();
+    if (!(await checkbox.isVisible())) {
+      await page.locator('#v2-torrent-form button[name="refresh"]').click();
+    }
   await expect(checkbox).toBeVisible();
   await checkbox.check();
   await expect(page.locator("[data-v2-selected-count]")).toContainText("1 selezionati");
@@ -144,6 +144,35 @@ test.describe("mobile", () => {
     await expect(performance).toContainText("RAM");
     await expect(performance).toContainText("download");
     await expect(performance).toContainText("upload");
+    await expect.poll(() => performance.locator(".mobile-performance-grid").evaluate((grid) =>
+      getComputedStyle(grid).gridTemplateColumns.split(" ").length
+    )).toBe(2);
+  });
+
+  test("Scarico usa schede compatte e conserva l'ordinamento touch", async ({ page }) => {
+    await page.goto("/?view=downloads");
+    await expect(page.locator("#v2-sort")).toBeVisible();
+    await expect(page.locator(".mobile-torrent-sort")).toContainText("Ordina per");
+    const cardStyles = await page.evaluate(() => {
+      const table = document.createElement("table");
+      table.className = "data-table torrent-table";
+      table.innerHTML = `<thead><tr><th>Nome</th></tr></thead><tbody><tr><td class="torrent-name">Torrent</td><td class="torrent-state">In scarico</td><td class="torrent-progress">50%</td><td class="row-actions">Azioni</td></tr></tbody>`;
+      document.querySelector(".content")?.append(table);
+      const row = table.querySelector("tbody tr")!;
+      const result = { table: getComputedStyle(table).display, row: getComputedStyle(row).display };
+      table.remove();
+      return result;
+    });
+    expect(cardStyles).toEqual({ table: "block", row: "grid" });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
+  });
+
+  test("schede impostazioni restano raggiungibili con scorrimento orizzontale", async ({ page }) => {
+    await page.goto("/?view=settings");
+    const tabs = page.locator(".settings-view .chip-row").first();
+    await expect(tabs).toBeVisible();
+    await expect.poll(() => tabs.evaluate((element) => getComputedStyle(element).overflowX)).toBe("auto");
   });
 
   test("mobile mostra salute e log e raccoglie il resto in Sistema", async ({ page }) => {
