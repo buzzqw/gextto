@@ -218,8 +218,8 @@ func V2SectionAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		raw, status := v2InternalJSON(s, method, path, nil, []byte(body))
 		flash, flashErr = v2ActionFlash(path, raw, status)
 	}
-	target := strings.TrimSpace(r.FormValue("redirect"))
-	if !strings.HasPrefix(target, "/v2") {
+	target := safeInternalRedirect(r.FormValue("redirect"), "")
+	if target == "" {
 		if view == "" {
 			view = "dashboard"
 		}
@@ -250,6 +250,18 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 			return message, true
 		}
 		return "Operazione non riuscita.", true
+	}
+	if strings.HasSuffix(path, "/search-missing") {
+		var payload struct {
+			Results  []any `json:"results"`
+			Episodes []any `json:"episodes"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			if len(payload.Episodes) == 0 {
+				return "Nessun episodio mancante da cercare.", false
+			}
+			return fmt.Sprintf("Ricerca completata: %d risultati tra %d episodi mancanti.", len(payload.Results), len(payload.Episodes)), false
+		}
 	}
 	if path == "/api/maintenance/clean-trash" {
 		var payload struct {
@@ -341,8 +353,8 @@ func V2SectionForm(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if strings.HasPrefix(path, "/api/") {
 		v2InternalJSON(s, http.MethodPost, path, nil, encoded)
 	}
-	target := strings.TrimSpace(r.FormValue("redirect"))
-	if !strings.HasPrefix(target, "/v2") {
+	target := safeInternalRedirect(r.FormValue("redirect"), "")
+	if target == "" {
 		if view == "" {
 			view = "dashboard"
 		}

@@ -1415,6 +1415,21 @@ func safeV2Redirect(raw, fallback string) string {
 	return cleaned
 }
 
+// safeInternalRedirect accepts any same-site path ("/...") while rejecting
+// protocol-relative ("//host") and absolute URLs, so an action can return to the
+// page it came from (for example a series detail) without opening a redirect.
+func safeInternalRedirect(raw, fallback string) string {
+	cleaned := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
+	if !strings.HasPrefix(cleaned, "/") || strings.HasPrefix(cleaned, "//") {
+		return fallback
+	}
+	parsed, err := url.Parse(cleaned)
+	if err != nil || parsed.Hostname() != "" || parsed.Scheme != "" {
+		return fallback
+	}
+	return cleaned
+}
+
 func v2ParseInt(value string, fallback int64) int64 {
 	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
 	if err != nil {
