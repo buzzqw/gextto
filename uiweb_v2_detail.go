@@ -8,6 +8,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strings"
@@ -83,7 +84,7 @@ type v2SourceRow struct {
 	Origin    string
 	Score     int64
 	SizeBytes int64
-	Magnet    string
+	Magnet    template.URL
 }
 
 type v2SourcesView struct {
@@ -121,13 +122,17 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 		return view
 	}
 	for _, entry := range payload.Results {
+		release, _ := entry["release"].(map[string]any)
+		if release == nil {
+			release = entry
+		}
 		view.Results = append(view.Results, v2SourceRow{
-			Title:     v2String(entry["title"]),
-			Source:    v2SourceLabel(v2String(entry["source"])),
+			Title:     v2String(release["title"]),
+			Source:    v2SourceLabel(v2String(release["source"])),
 			Origin:    v2String(entry["origin"]),
 			Score:     int64(v2Float(entry["score"])),
-			SizeBytes: int64(v2Float(entry["size_bytes"])),
-			Magnet:    v2SafeHref(v2String(entry["magnet"])),
+			SizeBytes: int64(v2Float(release["size_bytes"])),
+			Magnet:    uiMagnetURL(v2String(release["magnet"])),
 		})
 	}
 	return view

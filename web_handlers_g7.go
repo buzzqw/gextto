@@ -168,6 +168,7 @@ echo "Verifica: xdg-mime query default x-scheme-handler/magnet"
 type gh7_episode_result struct {
 	Release models.Release `json:"release"`
 	Origin  string         `json:"origin"`
+	Score   int64          `json:"score"`
 }
 
 // gh7_torrent_action reproduces `torrent_action`: 200 on true, 404 when the
@@ -282,6 +283,7 @@ func gh7_finalize_episode_search_results(results []gh7_episode_result, cfg *Conf
 	allowed := make([]gh7_episode_result, 0, len(results))
 	for _, result := range results {
 		if cfg.ReleaseAllowed(&result.Release) && cfg.SeriesReleaseAllowed(&series, &result.Release.Quality, result.Release.Title) {
+			result.Score = cfg.ReleaseScore(&result.Release)
 			allowed = append(allowed, result)
 		}
 	}
@@ -1147,6 +1149,9 @@ func EpisodeSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	results := gh7_stored_series_episode_sources(s, series, season, episode)
+	for i := range results {
+		results[i].Score = cfg.ReleaseScore(&results[i].Release)
+	}
 	jsonResponse(w, map[string]any{
 		"ok":      true,
 		"series":  series.Name,

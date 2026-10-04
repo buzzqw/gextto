@@ -1883,7 +1883,7 @@
   <thead><tr><th scope="col">Titolo</th><th scope="col">Sorgente</th><th scope="col">Punteggio</th><th scope="col">Dimensione</th><th scope="col"></th></tr></thead>
   <tbody>{{range .Results}}<tr>
     <td class="truncate" title="{{.Title}}">{{.Title}}</td>
-    <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{bytes .SizeBytes}}</td>
+    <td>{{.Source}}</td><td class="numeric">{{.Score}}</td><td class="numeric">{{if .SizeBytes}}{{bytes .SizeBytes}}{{else}}—{{end}}</td>
     <td>{{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}</td>
   </tr>{{end}}</tbody>
 </table></div>
