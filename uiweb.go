@@ -609,10 +609,7 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		if progress > 100 {
 			progress = 100
 		}
-		ratio := 0.0
-		if view.AllTimeDownload > 0 {
-			ratio = float64(view.AllTimeUpload) / float64(view.AllTimeDownload)
-		}
+		ratio := uiTorrentRatio(view.AllTimeUpload, view.AllTimeDownload, view.TotalDone, view.TotalSize)
 		tag := tags[strings.ToLower(view.Hash)]
 		row := uiTorrentRow{
 			Hash:          view.Hash,
@@ -670,6 +667,22 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 		return left < right
 	})
 	return rows
+}
+
+// uiTorrentRatio computes the share ratio. libtorrent reports all_time_download
+// as 0 for torrents restored from resume data, so fall back to the bytes
+// actually downloaded, then to the total size, instead of showing 0.
+func uiTorrentRatio(uploaded, downloaded, totalDone, totalSize int64) float64 {
+	if downloaded <= 0 {
+		downloaded = totalDone
+	}
+	if downloaded <= 0 {
+		downloaded = totalSize
+	}
+	if downloaded <= 0 || uploaded <= 0 {
+		return 0
+	}
+	return float64(uploaded) / float64(downloaded)
 }
 
 // uiSplitTags splits a comma separated torrent tag into clean chips.

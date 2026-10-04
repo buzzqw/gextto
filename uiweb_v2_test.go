@@ -1020,3 +1020,19 @@ func TestSafeV2Redirect(t *testing.T) {
 		}
 	}
 }
+
+// TestUITorrentRatioFallsBackToDownloadedBytes guards the ratio shown in the
+// downloads table and detail: libtorrent reports all_time_download as 0 for
+// torrents restored from resume data, so the ratio falls back to the bytes
+// actually downloaded, then to the total size.
+func TestUITorrentRatioFallsBackToDownloadedBytes(t *testing.T) {
+	if got := uiTorrentRatio(400, 0, 200, 1000); got != 2 {
+		t.Fatalf("ratio with missing all-time download = %v, want 2", got)
+	}
+	if got := uiTorrentRatio(400, 0, 0, 1000); got != 0.4 {
+		t.Fatalf("ratio with only total size available = %v, want 0.4", got)
+	}
+	if got := uiTorrentRatio(400, 100, 0, 1000); got != 4 {
+		t.Fatalf("ratio with all-time download = %v, want 4", got)
+	}
+}

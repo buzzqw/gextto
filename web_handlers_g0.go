@@ -14,6 +14,7 @@ package gextto
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -373,20 +374,35 @@ func DbAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, "action must be vacuum or analyze")
 		return
 	}
-	beforeSize, beforeRows, afterSize, afterRows, err := gh0_runDbAction(s, action)
+	result, err := gh0_runDbAction(s, action)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":     true,
-		"action": action,
-		"before": map[string]any{"size_bytes": beforeSize, "rows": beforeRows},
-		"after":  map[string]any{"size_bytes": afterSize, "rows": afterRows},
+		"ok":                       true,
+		"action":                   action,
+		"before":                   map[string]any{"size_bytes": result.BeforeSize, "rows": result.BeforeRows, "physical_bytes": result.BeforePhysical},
+		"after":                    map[string]any{"size_bytes": result.AfterSize, "rows": result.AfterRows, "physical_bytes": result.AfterPhysical},
+		"reclaimed_bytes":          result.BeforeSize - result.AfterSize,
+		"reclaimed_physical_bytes": result.BeforePhysical - result.AfterPhysical,
 	})
 }
 
-func gh0_runDbAction(s *AppState, action string) (int64, int64, int64, int64, error) {
+// gh0_dbActionResult carries both the logical size (page_count × page_size) and
+// the physical file size (including -wal/-shm) before and after a maintenance
+// action, so the log and the UI can show what was actually reclaimed.
+type gh0_dbActionResult struct {
+	BeforeSize     int64
+	BeforeRows     int64
+	AfterSize      int64
+	AfterRows      int64
+	BeforePhysical int64
+	AfterPhysical  int64
+}
+
+func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
+	var result gh0_dbActionResult
 	start := time.Now()
 	logging.Info("db maintenance action started", "action", action)
 	configPath := filepath.Join(s.cfg.DataDir, "gextto_config.db")
@@ -398,41 +414,94 @@ func gh0_runDbAction(s *AppState, action string) (int64, int64, int64, int64, er
 		defer conn.Close()
 		return ConnectionSizeBytes(conn)
 	}
-
-	beforeSize := s.db.DBSizeBytes()
-	beforeRows := s.db.DBTotalRows()
-	beforeSize += s.archive.SizeBytes()
-	if count, err := s.archive.Count(); err == nil {
-		beforeRows += count
+	configPhysical := func(path string) int64 {
+		conn, err := OpenConfigDB(path)
+		if err != nil {
+			return 0
+		}
+		defer conn.Close()
+		return gh0_physicalBytes(conn)
 	}
-	beforeSize += s.comics.SizeBytes() + configSize(configPath)
+	// collect reads the logical size (page_count × page_size), the row count and
+	// the physical file size (main + -wal + -shm) of every database.
+	collect := func() (int64, int64, int64) {
+		size := s.db.DBSizeBytes() + s.archive.SizeBytes() + s.comics.SizeBytes() + configSize(configPath)
+		rows := s.db.DBTotalRows()
+		if count, err := s.archive.Count(); err == nil {
+			rows += count
+		}
+		physical := gh0_physicalBytes(s.db.db) + gh0_physicalBytes(s.archive.db) + gh0_physicalBytes(s.comics.db) + configPhysical(configPath)
+		return size, rows, physical
+	}
+
+	result.BeforeSize, result.BeforeRows, result.BeforePhysical = collect()
 
 	if err := s.db.Optimize(action); err != nil {
 		logging.Error("db maintenance failed on series db", "action", action, "error", err)
-		return 0, 0, 0, 0, err
+		return result, err
 	}
 	if err := s.archive.Optimize(action); err != nil {
 		logging.Error("db maintenance failed on archive db", "action", action, "error", err)
-		return 0, 0, 0, 0, err
+		return result, err
 	}
 	if err := s.comics.Optimize(action); err != nil {
 		logging.Error("db maintenance failed on comics db", "action", action, "error", err)
-		return 0, 0, 0, 0, err
+		return result, err
 	}
 	if conn, err := OpenConfigDB(configPath); err == nil {
 		_ = OptimizeConnection(conn, action)
 		conn.Close()
 	}
 
-	afterSize := s.db.DBSizeBytes()
-	afterRows := s.db.DBTotalRows()
-	afterSize += s.archive.SizeBytes()
-	if count, err := s.archive.Count(); err == nil {
-		afterRows += count
+	result.AfterSize, result.AfterRows, result.AfterPhysical = collect()
+	logging.Info("db maintenance action finished",
+		"action", action,
+		"duration", time.Since(start).String(),
+		"before_bytes", result.BeforeSize,
+		"after_bytes", result.AfterSize,
+		"reclaimed_bytes", result.BeforeSize-result.AfterSize,
+		"before_physical", result.BeforePhysical,
+		"after_physical", result.AfterPhysical,
+		"reclaimed_physical_bytes", result.BeforePhysical-result.AfterPhysical)
+	return result, nil
+}
+
+// gh0_databaseFile returns the on-disk path of a connection's `main` database.
+func gh0_databaseFile(db *sql.DB) string {
+	if db == nil {
+		return ""
 	}
-	afterSize += s.comics.SizeBytes() + configSize(configPath)
-	logging.Info("db maintenance action finished", "action", action, "duration", time.Since(start).String(), "before_bytes", beforeSize, "after_bytes", afterSize)
-	return beforeSize, beforeRows, afterSize, afterRows, nil
+	rows, err := db.Query("PRAGMA database_list")
+	if err != nil {
+		return ""
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var seq int
+		var name, file string
+		if err := rows.Scan(&seq, &name, &file); err == nil && name == "main" {
+			return file
+		}
+	}
+	return ""
+}
+
+// gh0_fileSetBytes sums a database file and its WAL/SHM companions.
+func gh0_fileSetBytes(path string) int64 {
+	if path == "" {
+		return 0
+	}
+	var total int64
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		if info, err := os.Stat(path + suffix); err == nil {
+			total += info.Size()
+		}
+	}
+	return total
+}
+
+func gh0_physicalBytes(db *sql.DB) int64 {
+	return gh0_fileSetBytes(gh0_databaseFile(db))
 }
 
 // ---------------------------------------------------------------------------
@@ -1409,7 +1478,7 @@ func gh0_runHousekeeping(s *AppState) (*HousekeepingReport, bool) {
 		logging.Warn("housekeeping failed", "error", err)
 		return nil, false
 	}
-	if _, _, _, _, err := gh0_runDbAction(s, "vacuum"); err != nil {
+	if _, err := gh0_runDbAction(s, "vacuum"); err != nil {
 		logging.Warn("housekeeping failed", "error", err)
 		return nil, false
 	}
