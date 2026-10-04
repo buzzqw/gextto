@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // v2ContentDetail returns the detail body when the view selects one item.
@@ -86,6 +88,7 @@ type v2SourceRow struct {
 	SizeBytes int64
 	Magnet    template.URL
 	Body      string
+	Key       string
 }
 
 type v2SourcesView struct {
@@ -145,6 +148,7 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 			Score:     int64(v2Float(entry["score"])),
 			SizeBytes: int64(v2Float(release["size_bytes"])),
 			Magnet:    uiMagnetURL(link),
+			Key:       v2SourceKey(link, title),
 		}
 		if strings.TrimSpace(link) != "" {
 			row.Body = string(body)
@@ -152,6 +156,56 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 		view.Results = append(view.Results, row)
 	}
 	return view
+}
+
+// v2SourceKey returns a stable identity for a release so the same release
+// coming from different origins (feed, archive, indexer) is listed once.
+func v2SourceKey(link, title string) string {
+	if value, ok := utils.MagnetHash(link); ok {
+		return value
+	}
+	if strings.TrimSpace(link) != "" {
+		return link
+	}
+	return "title:" + strings.ToLower(strings.TrimSpace(title))
+}
+
+// v2SourcePreferred reports whether `candidate` is a better copy of the same
+// release than `current` (richer metadata wins, then the origin).
+func v2SourcePreferred(candidate, current v2SourceRow) bool {
+	rank := func(origin string) int {
+		switch {
+		case strings.EqualFold(origin, "Indexer / web"):
+			return 3
+		case strings.EqualFold(origin, "Archivio"):
+			return 2
+		case strings.EqualFold(origin, "Feed RSS"):
+			return 1
+		default:
+			return 0
+		}
+	}
+	if rank(candidate.Origin) != rank(current.Origin) {
+		return rank(candidate.Origin) > rank(current.Origin)
+	}
+	return candidate.SizeBytes > current.SizeBytes
+}
+
+// v2DedupSources keeps one row per release, preserving the original order.
+func v2DedupSources(rows []v2SourceRow) []v2SourceRow {
+	index := map[string]int{}
+	out := make([]v2SourceRow, 0, len(rows))
+	for _, row := range rows {
+		if at, ok := index[row.Key]; ok {
+			if v2SourcePreferred(row, out[at]) {
+				out[at] = row
+			}
+			continue
+		}
+		index[row.Key] = len(out)
+		out = append(out, row)
+	}
+	return out
 }
 
 // V2SeriesSources renders the per-episode sources modal using only the local
@@ -165,6 +219,7 @@ func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 			view.Results = append(view.Results, row)
 		}
 	}
+	view.Results = v2DedupSources(view.Results)
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_sources_modal", view, dict, eng)
 }
@@ -183,6 +238,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 			view.Results = append(view.Results, row)
 		}
 	}
+	view.Results = v2DedupSources(view.Results)
 	view.OnlineURL = "/v2/series/episode-search-online?series=" + url.QueryEscape(series) +
 		"&season=" + url.QueryEscape(season) + "&episode=" + url.QueryEscape(episode)
 	dict, eng := v2Dictionaries(s)
@@ -194,11 +250,20 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 func V2SeriesEpisodeSearchOnline(w http.ResponseWriter, r *http.Request, s *AppState) {
 	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
 	view := v2SourcesView{Label: all.Label, Hint: "Nessun risultato online per questa puntata.", Redirect: all.Redirect}
+	// A release already shown in the archive section must not reappear here.
+	archived := map[string]bool{}
 	for _, row := range all.Results {
-		if !strings.EqualFold(row.Origin, "Archivio") {
-			view.Results = append(view.Results, row)
+		if strings.EqualFold(row.Origin, "Archivio") {
+			archived[row.Key] = true
 		}
 	}
+	for _, row := range all.Results {
+		if strings.EqualFold(row.Origin, "Archivio") || archived[row.Key] {
+			continue
+		}
+		view.Results = append(view.Results, row)
+	}
+	view.Results = v2DedupSources(view.Results)
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_sources_rows", view, dict, eng)
 }
