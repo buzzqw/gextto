@@ -566,6 +566,7 @@ func tev_stallExpired(lastProgressAt *time.Time, lastDone *int64, now time.Time,
 
 var tev_stallRetryNoticeIntervals = [...]time.Duration{
 	time.Hour,
+	3 * time.Hour,
 	6 * time.Hour,
 	12 * time.Hour,
 	24 * time.Hour,
@@ -579,7 +580,7 @@ func tev_stallRetryNoticeDue(entry *StallWatch, now time.Time) bool {
 }
 
 // tev_scheduleNextStallRetryNotice advances the notification-only backoff:
-// one hour, then six, twelve, and every 24 hours thereafter.
+// one hour, then three, six, twelve, and every 24 hours thereafter.
 func tev_scheduleNextStallRetryNotice(entry *StallWatch, now time.Time) {
 	step := entry.retryNoticeStep
 	if step >= uint8(len(tev_stallRetryNoticeIntervals)) {

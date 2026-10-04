@@ -136,7 +136,7 @@ func TestStallTimerRequiresRealProgress(t *testing.T) {
 func TestStallRetryNoticeBackoff(t *testing.T) {
 	now := time.Date(2026, time.October, 4, 12, 0, 0, 0, time.UTC)
 	entry := StallWatch{}
-	want := []time.Duration{time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour, 24 * time.Hour}
+	want := []time.Duration{time.Hour, 3 * time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour, 24 * time.Hour}
 	for index, delay := range want {
 		if !tev_stallRetryNoticeDue(&entry, now) {
 			t.Fatalf("notice %d should be due", index)
