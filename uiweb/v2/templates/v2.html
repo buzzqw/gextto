@@ -1686,6 +1686,7 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=series" title="Torna all'elenco delle serie">← Serie TV</a>
+    <div id="v2-modal"></div>
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
@@ -1812,6 +1813,7 @@
 <div class="view">
   <div class="toolbar">
     <a class="btn sm" href="/?view=movies" title="Torna all'elenco dei film">← Film</a>
+    <div id="v2-modal"></div>
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/search" .ID) "Method" "POST" "Body" "{}" "Label" "Cerca" "Class" "primary" "Title" "Cerca release per questo film")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/redownload" .ID) "Method" "POST" "Body" "{}" "Label" "Riscarica" "Class" "" "Title" "Rendi di nuovo scaricabile")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" .ID) "Path" (printf "/api/movies/%d/metadata" .ID) "Method" "POST" "Body" "{\"source\":\"tmdb\"}" "Label" "Aggiorna TMDB" "Class" "" "Title" "Applica i metadati TMDB")}}
