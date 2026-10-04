@@ -93,6 +93,9 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	} else if strings.Contains(body, "presente") && strings.Contains(body, "<td class=\"numeric\">0 B</td>") {
 		t.Fatalf("db refresh returned 0 B for present database files: %s", body)
 	}
+	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/db", url.Values{"action": {"check"}}); code != http.StatusOK || !strings.Contains(body, "integrità e indici validi") || !strings.Contains(body, "Serie e download") {
+		t.Fatalf("db integrity check -> %d: %s", code, body)
+	}
 	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/ramdisk", url.Values{}); code != http.StatusOK || !strings.Contains(body, "RAM disk") {
 		t.Fatalf("ramdisk refresh -> %d", code)
 	}

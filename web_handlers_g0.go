@@ -370,8 +370,20 @@ func DbAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	action := strings.ToLower(strings.TrimSpace(input.Action))
-	if action != "vacuum" && action != "analyze" {
-		jsonError(w, http.StatusBadRequest, "action must be vacuum or analyze")
+	if action != "vacuum" && action != "analyze" && action != "check" {
+		jsonError(w, http.StatusBadRequest, "action must be vacuum, analyze or check")
+		return
+	}
+	if action == "check" {
+		checks := gh0_runDbCheck(s)
+		ok := true
+		for _, check := range checks {
+			if !check.OK {
+				ok = false
+				break
+			}
+		}
+		jsonStatus(w, http.StatusOK, map[string]any{"ok": ok, "action": action, "checks": checks})
 		return
 	}
 	result, err := gh0_runDbAction(s, action)
@@ -387,6 +399,75 @@ func DbAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"reclaimed_bytes":          result.BeforeSize - result.AfterSize,
 		"reclaimed_physical_bytes": result.BeforePhysical - result.AfterPhysical,
 	})
+}
+
+// gh0_dbCheck is the integrity result of one SQLite database. integrity_check
+// also verifies ordinary SQLite indexes; the archive additionally checks its
+// external-content FTS5 index against the archive table.
+type gh0_dbCheck struct {
+	Name   string `json:"name"`
+	OK     bool   `json:"ok"`
+	Detail string `json:"detail"`
+}
+
+func gh0_checkSQLite(db *sql.DB, checkFTS bool) (bool, string) {
+	if db == nil {
+		return false, "connessione database non disponibile"
+	}
+	rows, err := db.Query("PRAGMA integrity_check")
+	if err != nil {
+		return false, err.Error()
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var result string
+		if err := rows.Scan(&result); err != nil {
+			return false, err.Error()
+		}
+		if !strings.EqualFold(strings.TrimSpace(result), "ok") {
+			return false, result
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, err.Error()
+	}
+	foreignKeys, err := db.Query("PRAGMA foreign_key_check")
+	if err != nil {
+		return false, err.Error()
+	}
+	defer foreignKeys.Close()
+	if foreignKeys.Next() {
+		return false, "violazione di chiave esterna rilevata"
+	}
+	if err := foreignKeys.Err(); err != nil {
+		return false, err.Error()
+	}
+	if checkFTS {
+		if _, err := db.Exec("INSERT INTO archive_fts(archive_fts, rank) VALUES('integrity-check', 1)"); err != nil {
+			return false, "indice FTS: " + err.Error()
+		}
+	}
+	return true, "integrità e indici verificati"
+}
+
+// gh0_runDbCheck verifies the four SQLite files without modifying them.
+func gh0_runDbCheck(s *AppState) []gh0_dbCheck {
+	checks := make([]gh0_dbCheck, 0, 4)
+	add := func(name string, db *sql.DB, fts bool) {
+		ok, detail := gh0_checkSQLite(db, fts)
+		checks = append(checks, gh0_dbCheck{Name: name, OK: ok, Detail: detail})
+	}
+	add("Serie e download", s.db.db, false)
+	add("Archivio", s.archive.db, true)
+	add("Fumetti", s.comics.db, false)
+	config, err := OpenConfigDB(filepath.Join(s.cfg.DataDir, "gextto_config.db"))
+	if err != nil {
+		checks = append(checks, gh0_dbCheck{Name: "Configurazione", OK: false, Detail: err.Error()})
+	} else {
+		defer config.Close()
+		add("Configurazione", config, false)
+	}
+	return checks
 }
 
 // gh0_dbActionResult carries both the logical size (page_count × page_size) and

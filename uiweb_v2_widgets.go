@@ -158,12 +158,49 @@ type v2DBView struct {
 	Notify        bool
 	NotifyMessage string
 	NotifyError   bool
+	Checks        []v2DBCheck
+}
+
+type v2DBCheck struct {
+	Name   string `json:"name"`
+	OK     bool   `json:"ok"`
+	Detail string `json:"detail"`
 }
 
 func v2DBViewFrom(s *AppState, r *http.Request) v2DBView {
 	action := strings.TrimSpace(r.FormValue("action"))
 	view := v2DBView{Action: action}
-	if action == "vacuum" || action == "analyze" {
+	if action == "check" {
+		body, _ := json.Marshal(map[string]string{"action": action})
+		raw, status := v2InternalJSON(s, http.MethodPost, "/api/db/action", nil, body)
+		view.Notify = true
+		if status >= 400 {
+			view.Error = true
+			view.NotifyError = true
+			view.Message = v2JSONError(raw)
+			view.NotifyMessage = "Verifica integrità non riuscita: " + view.Message
+		} else {
+			var payload struct {
+				OK     bool        `json:"ok"`
+				Checks []v2DBCheck `json:"checks"`
+			}
+			if err := json.Unmarshal(raw, &payload); err != nil {
+				view.Error = true
+				view.NotifyError = true
+				view.Message = "risposta di verifica non valida"
+				view.NotifyMessage = view.Message
+			} else {
+				view.Checks = payload.Checks
+				view.Error = !payload.OK
+				view.NotifyError = !payload.OK
+				if payload.OK {
+					view.NotifyMessage = fmt.Sprintf("Verifica completata: integrità e indici validi in tutti i %d database.", len(payload.Checks))
+				} else {
+					view.NotifyMessage = "Verifica completata: sono stati rilevati problemi; consulta il dettaglio qui sotto."
+				}
+			}
+		}
+	} else if action == "vacuum" || action == "analyze" {
 		body, _ := json.Marshal(map[string]string{"action": action})
 		raw, status := v2InternalJSON(s, http.MethodPost, "/api/db/action", nil, body)
 		if status >= 400 {
