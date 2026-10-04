@@ -745,6 +745,13 @@ func v2FormatCell(item map[string]any, column uiColumn) template.HTML {
 			return ""
 		}
 		return template.HTML(`<span title="` + stdhtml.EscapeString(full) + `">` + stdhtml.EscapeString(v2FolderLabel(full)) + `</span>`)
+	case "provider_link":
+		name := v2String(item[column.Key])
+		href := v2SafeHref(v2String(item["url"]))
+		if href == "" {
+			return template.HTML(stdhtml.EscapeString(name))
+		}
+		return template.HTML(`<a href="` + stdhtml.EscapeString(href) + `" target="_blank" rel="noopener" title="Apri il sito del provider">` + stdhtml.EscapeString(name) + `</a>`)
 	case "series_link":
 		name := v2String(item[column.Key])
 		return template.HTML(`<a href="/?view=series&amp;series=` + url.QueryEscape(name) + `" title="Apri il dettaglio della serie">` + stdhtml.EscapeString(name) + `</a>`)

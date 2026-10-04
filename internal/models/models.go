@@ -467,6 +467,8 @@ type ProviderStatus struct {
 	DisabledTill      string `json:"disabled_till"`
 	MostRecentFailure string `json:"most_recent_failure"`
 	LastError         string `json:"last_error"`
+	// URL, when known, turns the provider name into a link to its own site.
+	URL string `json:"url,omitempty"`
 	// UserMessage and SuggestedAction turn a transport-level error into the
 	// operational information shown in the Health page.
 	UserMessage     string `json:"user_message,omitempty"`

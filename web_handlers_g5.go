@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -737,10 +738,92 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if err != nil {
 		items = []models.ProviderStatus{}
 	}
+	cfg := latestConfig(s)
 	for index := range items {
 		items[index].UserMessage, items[index].SuggestedAction = gh5_providerGuidance(items[index])
+		if items[index].URL == "" {
+			items[index].URL = gh5_providerURL(cfg, items[index].Provider)
+		}
+	}
+	// Add a live health row for the MirCrew indexer service when configured.
+	if extra := gh5_mirCrewServiceStatus(cfg); extra != nil {
+		items = append(items, *extra)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
+}
+
+// gh5_mirCrewServiceStatus probes the configured mircrew-indexer Torznab
+// indexer and returns a synthetic "Stato provider" row with its live health.
+// The result is cached briefly so loading the Salute page does not probe the
+// service on every request. The row is only backoff/DB independent: it always
+// reflects the current reachability.
+var gh5_mirCrewProbe struct {
+	sync.Mutex
+	at    time.Time
+	entry *models.ProviderStatus
+}
+
+// gh5_providerURL maps a provider name to the base URL of the matching
+// configured indexer, so the health table can link to its own site.
+func gh5_providerURL(cfg *Config, provider string) string {
+	if cfg == nil {
+		return ""
+	}
+	name := strings.ToLower(strings.TrimSpace(provider))
+	for index := range cfg.Indexers {
+		if strings.ToLower(strings.TrimSpace(cfg.Indexers[index].Name)) != name {
+			continue
+		}
+		base := strings.TrimRight(strings.TrimSpace(cfg.Indexers[index].URL), "/")
+		base = strings.TrimSuffix(base, "/api")
+		return base
+	}
+	return ""
+}
+
+func gh5_mirCrewIndexer(cfg *Config) *IndexerConfig {
+	if cfg == nil {
+		return nil
+	}
+	for index := range cfg.Indexers {
+		name := strings.ToLower(cfg.Indexers[index].Name)
+		rawURL := strings.ToLower(cfg.Indexers[index].URL)
+		if strings.Contains(name, "mircrew") || strings.Contains(rawURL, "mircrew") ||
+			strings.Contains(rawURL, ":9118") {
+			return &cfg.Indexers[index]
+		}
+	}
+	return nil
+}
+
+func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
+	indexer := gh5_mirCrewIndexer(cfg)
+	if indexer == nil {
+		return nil
+	}
+	gh5_mirCrewProbe.Lock()
+	defer gh5_mirCrewProbe.Unlock()
+	if gh5_mirCrewProbe.entry != nil && time.Since(gh5_mirCrewProbe.at) < 20*time.Second {
+		cached := *gh5_mirCrewProbe.entry
+		return &cached
+	}
+	status, reachable, body := gh6_servicesProbe(HealthProbeURL(*indexer), 5*time.Second)
+	entry := models.ProviderStatus{Provider: indexer.Name, Kind: "servizio", URL: gh5_providerURL(cfg, indexer.Name)}
+	switch {
+	case !reachable:
+		entry.UserMessage = "Servizio mircrew-indexer non raggiungibile."
+		entry.SuggestedAction = "Avvia il servizio (systemctl --user start mircrew-indexer) e verifica URL/porta dell’indexer."
+	case status < 200 || status >= 300 || TorznabError(body) != "":
+		entry.UserMessage = fmt.Sprintf("Il servizio ha risposto con HTTP %d.", status)
+		entry.SuggestedAction = "Apri la web UI del servizio e controlla la API key dell’indexer."
+	default:
+		entry.UserMessage = "Servizio mircrew-indexer attivo e raggiungibile."
+		entry.SuggestedAction = "Nessuna azione necessaria."
+	}
+	gh5_mirCrewProbe.at = time.Now()
+	gh5_mirCrewProbe.entry = &entry
+	result := entry
+	return &result
 }
 
 // gh5_providerGuidance keeps connection details in the diagnostic field while
@@ -748,6 +831,9 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 // provider is retried automatically after its backoff; "Azzera" is only useful
 // once the external cause has been fixed.
 func gh5_providerGuidance(status models.ProviderStatus) (string, string) {
+	if status.Level == 0 && strings.TrimSpace(status.LastError) == "" && strings.TrimSpace(status.DisabledTill) == "" {
+		return "Nessun problema rilevato.", "Nessuna azione necessaria."
+	}
 	errText := strings.ToLower(status.LastError)
 	switch {
 	case strings.Contains(errText, "429") || strings.Contains(errText, "rate limit"):

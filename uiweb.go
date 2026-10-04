@@ -437,7 +437,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 				Endpoint: "/api/providers/status",
 				ItemsKey: "items",
 				ColumnsJSON: uiJSON([]uiColumn{
-					{Key: "provider", Label: "Provider"},
+					{Key: "provider", Label: "Provider", Format: "provider_link"},
 					{Key: "kind", Label: "Tipo"},
 					{Key: "level", Label: "Livello", Format: "number"},
 					{Key: "disabled_till", Label: "Disabilitato fino a"},

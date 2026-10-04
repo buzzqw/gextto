@@ -361,7 +361,10 @@ func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	index := strings.TrimSpace(r.FormValue("index"))
 	values := map[string]any{}
 	for _, field := range editor.Fields {
-		values[field.Name] = r.FormValue(field.Name + "__" + index)
+		// Convert by field kind (bool/number/tags) exactly like the save path,
+		// otherwise a bool rendered as "true"/"false" becomes a JSON string and
+		// an indexer's IndexerConfig rejects the body ("invalid request body").
+		values[field.Name] = v2FieldRawValue(editor.Fields, field.Name, r.FormValue(field.Name+"__"+index))
 	}
 	body, _ := json.Marshal(values)
 	raw, status := v2InternalJSON(s, http.MethodPost, editor.TestEndpoint, nil, body)

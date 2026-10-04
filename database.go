@@ -1722,10 +1722,19 @@ func (d *Database) ProviderStatuses() ([]models.ProviderStatus, error) {
 // nil.
 func (d *Database) ClearProviderStatus(provider *string) error {
 	if provider != nil {
-		_, err := d.db.Exec("DELETE FROM provider_status WHERE provider=?1", *provider)
-		return err
+		// A targeted "Azzera" is a reset, not a removal: the row stays so the
+		// Health table keeps showing the provider with an updated (ok) state.
+		return d.ResetProviderStatus(*provider)
 	}
 	_, err := d.db.Exec("DELETE FROM provider_status")
+	return err
+}
+
+// ResetProviderStatus clears a provider's backoff and error but keeps its row.
+func (d *Database) ResetProviderStatus(provider string) error {
+	_, err := d.db.Exec(
+		"UPDATE provider_status SET level=0, disabled_till=NULL, most_recent_failure=NULL, last_error='' WHERE provider=?1",
+		provider)
 	return err
 }
 
