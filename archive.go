@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
@@ -78,11 +79,23 @@ func OpenArchive(path string) (*Archive, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if archiveCount != indexedCount {
+	// I conteggi possono coincidere mentre l'indice è disallineato (es. rebuild
+	// interrotto): FTS5 con content= mantiene una riga vuota per le righe non
+	// indicizzate, quindi il solo COUNT non basta. Verifichiamo l'indice contro
+	// la tabella dei contenuti e ricostruiamo solo se davvero necessario.
+	needsRebuild := archiveCount != indexedCount
+	if !needsRebuild {
+		if _, err := db.Exec("INSERT INTO archive_fts(archive_fts, rank) VALUES('integrity-check', 1)"); err != nil {
+			needsRebuild = true
+		}
+	}
+	if needsRebuild {
+		logging.Warn("archive FTS index out of sync; rebuilding", "rows", archiveCount)
 		if _, err := db.Exec("INSERT INTO archive_fts(archive_fts) VALUES ('rebuild')"); err != nil {
 			_ = db.Close()
 			return nil, err
 		}
+		logging.Info("archive FTS index rebuilt", "rows", archiveCount)
 	}
 	// Ricerca case-insensitive per hash (`lower(COALESCE(magnet_hash,''))`):
 	// un indice di espressione evita la scansione completa.
