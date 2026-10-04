@@ -555,9 +555,11 @@ evidenziate con la barra “Salva tutte”.
    giorni indicato (`0` = nessuna pulizia); lo *Storico download* della sezione
    **Scarico** elimina solo le righe dei torrent già rimossi (`0` = conserva),
    senza toccare l'Archivio. A ogni esecuzione vengono
-  inoltre eliminati automaticamente torrent in errore oltre 7 giorni, log dei
-  gap oltre 30 giorni, backup di upgrade oltre 30 giorni e backoff delle
-  sorgenti scaduti. Alla fine i database vengono compattati con `VACUUM`.
+   inoltre eliminati automaticamente torrent in errore, log dei gap e backup di
+   upgrade più vecchi delle rispettive retention configurate (predefinite:
+   7 giorni per gli errori e 30 per log gap e backup upgrade); vengono rimossi
+   anche i backoff delle sorgenti scaduti. Alla fine i database vengono
+   compattati con `VACUUM`.
   La retention dell'Archivio è separata e si trova in **Configurazione →
   Avanzate**.
 - **Percorsi** — root libreria, cestino, cartelle download/temp/RAM disk, regole
@@ -775,10 +777,11 @@ token o password negli argomenti se il comando finisce nei log del sistema.
   l'esecuzione; nessun riscaricamento.
  - **Database**: prune per cicli/età errori, **retention dei "visti dai feed"**
    (giorni; 0 conserva tutto), prune per keyword con elenco delle righe
-   corrispondenti e **VACUUM / ANALYZE** su tutti i database.
-   La pulizia dei "visti" rimuove solo righe storiche dei feed, non file o
-   download; applica anche la pulizia standard degli ultimi 50 cicli e degli
-   errori torrent più vecchi di 7 giorni.
+    corrispondenti e **VACUUM / ANALYZE** su tutti i database.
+    La pulizia dei "visti" rimuove solo righe storiche dei feed, non file o
+    download; applica anche la pulizia standard degli ultimi 50 cicli e degli
+    errori torrent oltre la retention configurata (7 giorni per impostazione
+    predefinita).
 - **Backup**: retention, schedulazione (manuale, ogni N ore o a un orario fisso
    giornaliero HH:MM), FTP (host/utente/percorso) con **Test FTP** (verifica
    connessione, percorso e upload di prova), copia su cartella cloud/sync, invio

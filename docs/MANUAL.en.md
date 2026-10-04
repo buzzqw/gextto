@@ -543,9 +543,10 @@ highlighted with a “Save all” bar.
    older than the selected number of days (`0` = no cleanup); *Download history*
    in the **Downloads** section removes only rows for torrents already removed
    (`0` = keep), without affecting the Archive. Each run also
-  automatically removes torrents in error older than 7 days, gap logs older
-  than 30 days, upgrade backups older than 30 days, and expired source
-  backoffs. The databases are compacted with `VACUUM` afterwards. Archive
+   automatically removes torrents in error, gap logs, and upgrade backups
+   older than their configured retention periods (defaults: 7 days for errors
+   and 30 days for gap logs and upgrade backups); expired source backoffs are
+   also removed. The databases are compacted with `VACUUM` afterwards. Archive
   retention is separate and is configured under **Configuration → Advanced**.
 - **Paths** — library root, trash, download/temp/RAM-disk dirs, per-tag rules.
    A selected RAM-disk path remains configured, but a directory created under
@@ -755,9 +756,9 @@ arguments if the command may be recorded in system logs.
  - **Database**: prune by cycles/error age, **seen-from-feed retention** (days; 0
    keeps everything), keyword prune with a list of the matching rows, and
    **VACUUM / ANALYZE** across all databases.
-   Seen-from-feed cleanup removes only historical feed rows, not files or
-   downloads; it also applies the standard cleanup of the last 50 cycles and
-   torrent errors older than 7 days.
+    Seen-from-feed cleanup removes only historical feed rows, not files or
+    downloads; it also applies the standard cleanup of the last 50 cycles and
+    torrent errors past the configured retention period (7 days by default).
 - **Backups**: retention, schedule (manual, every N hours or a fixed daily
    HH:MM), FTP host/user/path + **Test FTP** (checks connection, path and a probe
    upload), cloud/sync folder copy, Telegram delivery, list of available backups.
