@@ -80,14 +80,17 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 type v2SourceRow struct {
 	Title     string
 	Source    string
+	Origin    string
 	Score     int64
 	SizeBytes int64
 	Magnet    string
 }
 
 type v2SourcesView struct {
-	Label   string
-	Results []v2SourceRow
+	Label     string
+	Hint      string
+	OnlineURL string
+	Results   []v2SourceRow
 }
 
 // v2EpisodeResultsView builds the modal view for one episode, either from the
@@ -121,6 +124,7 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 		view.Results = append(view.Results, v2SourceRow{
 			Title:     v2String(entry["title"]),
 			Source:    v2SourceLabel(v2String(entry["source"])),
+			Origin:    v2String(entry["origin"]),
 			Score:     int64(v2Float(entry["score"])),
 			SizeBytes: int64(v2Float(entry["size_bytes"])),
 			Magnet:    v2SafeHref(v2String(entry["magnet"])),
@@ -129,23 +133,51 @@ func v2EpisodeResultsView(s *AppState, series, season, episode string, live bool
 	return view
 }
 
-// V2SeriesSources renders the per-episode sources modal. It shows the sources
-// already collected and, when there are none, falls back to a live search so
-// the button is never an empty list.
+// V2SeriesSources renders the per-episode sources modal using only the local
+// archive. It never triggers an online search (MirCrew / RSS feeds); use the
+// search button for that.
 func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), false)
-	if len(view.Results) == 0 {
-		view = v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
+	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), false)
+	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online."}
+	for _, row := range all.Results {
+		if strings.EqualFold(row.Origin, "Archivio") {
+			view.Results = append(view.Results, row)
+		}
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_sources_modal", view, dict, eng)
 }
 
-// V2SeriesEpisodeSearch runs the manual episode search and opens its results in
-// the modal, so the found releases are listed on the page instead of being
-// discarded into a redirect + toast.
+// V2SeriesEpisodeSearch opens the manual episode search modal: the local
+// archive results are shown immediately, then the (slow) feed/indexer results
+// are loaded asynchronously into #v2-sources-online.
 func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
-	view := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
+	series := r.FormValue("series")
+	season := r.FormValue("season")
+	episode := r.FormValue("episode")
+	stored := v2EpisodeResultsView(s, series, season, episode, false)
+	view := v2SourcesView{Label: stored.Label}
+	for _, row := range stored.Results {
+		if strings.EqualFold(row.Origin, "Archivio") {
+			view.Results = append(view.Results, row)
+		}
+	}
+	view.OnlineURL = "/v2/series/episode-search-online?series=" + url.QueryEscape(series) +
+		"&season=" + url.QueryEscape(season) + "&episode=" + url.QueryEscape(episode)
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_sources_modal", view, dict, eng)
+	v2Render(w, http.StatusOK, "v2_episode_search_modal", view, dict, eng)
+}
+
+// V2SeriesEpisodeSearchOnline runs the online part of the search (feeds and
+// indexers) and returns just those rows for the async modal section.
+func V2SeriesEpisodeSearchOnline(w http.ResponseWriter, r *http.Request, s *AppState) {
+	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), true)
+	view := v2SourcesView{Label: all.Label, Hint: "Nessun risultato online per questa puntata."}
+	for _, row := range all.Results {
+		if !strings.EqualFold(row.Origin, "Archivio") {
+			view.Results = append(view.Results, row)
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_sources_rows", view, dict, eng)
 }
