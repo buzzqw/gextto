@@ -57,6 +57,16 @@ test("il menu non ha voci duplicate", async ({ page }) => {
   expect(duplicates).toEqual([]);
 });
 
+test("la navigazione desktop conserva la barra laterale verticale", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  const navStyle = await page.locator(".sidebar nav").evaluate((nav) => ({
+    display: getComputedStyle(nav).display,
+    direction: getComputedStyle(nav).flexDirection,
+  }));
+  expect(navStyle).toEqual({ display: "flex", direction: "column" });
+});
+
 test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) => {
   await page.goto("/");
   await nav(page, "Scarico").click();
@@ -185,5 +195,26 @@ test.describe("mobile", () => {
     await expect(nav(page, "Configurazione")).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
+  });
+
+  test("la navigazione inferiore usa due righe leggibili senza coprire il contenuto", async ({ page }) => {
+    await page.goto("/");
+    const metrics = await page.evaluate(() => {
+      const nav = document.querySelector(".sidebar nav")!;
+      const sidebar = document.querySelector(".sidebar")!;
+      const content = document.querySelector(".content")!;
+      const visibleLinks = Array.from(nav.querySelectorAll<HTMLElement>(".nav-item, .nav-more"))
+        .filter((item) => item.getBoundingClientRect().height > 0);
+      return {
+        rows: getComputedStyle(nav).gridTemplateRows.split(" ").length,
+        sidebarHeight: sidebar.getBoundingClientRect().height,
+        largestLabel: Math.max(...visibleLinks.map((item) => parseFloat(getComputedStyle(item).fontSize))),
+        contentPaddingBottom: parseFloat(getComputedStyle(content).paddingBottom),
+      };
+    });
+    expect(metrics.rows).toBe(2);
+    expect(metrics.sidebarHeight).toBeGreaterThan(100);
+    expect(metrics.largestLabel).toBeGreaterThanOrEqual(12);
+    expect(metrics.contentPaddingBottom).toBeGreaterThanOrEqual(metrics.sidebarHeight);
   });
 });

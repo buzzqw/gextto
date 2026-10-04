@@ -778,7 +778,7 @@ form.htmx-request button[type="submit"],
   .mobile-performance { padding: 6px 12px 8px; }
 
   /* Bottom nav: active item gets a subtle underline accent instead of the
-     wide pill background so tabs look good at equal widths. */
+     wide pill background so tabs stay distinct in the two-row grid. */
   #app-sidebar .nav-item.active {
     background: transparent;
     border-bottom: 2px solid var(--accent);
@@ -856,12 +856,12 @@ form.htmx-request button[type="submit"],
     justify-content: center;
     gap: 2px;
     padding: 4px 1px;
-    font-size: 0.66rem;
-    line-height: 1.1;
+    font-size: 0.76rem;
+    line-height: 1.15;
   }
   #app-sidebar .nav-icon {
     display: block;
-    font-size: 0.95rem;
+    font-size: 1.2rem;
     line-height: 1;
   }
   #app-sidebar .system-group.open .nav-item {

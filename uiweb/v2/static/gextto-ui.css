@@ -1186,7 +1186,7 @@ pre.log-view { margin: 0; }
 
 @media (max-width: 560px) {
   /* A bottom navigation is easier to reach with one hand and remains
-     available while inspecting a long list. Keep it focused on the five
+   available while inspecting a long list. Keep it focused on the primary
      destinations used most often; secondary pages remain reachable from the
      dashboard and the Sistema menu. */
   .sidebar {
@@ -1199,17 +1199,25 @@ pre.log-view { margin: 0; }
     border-bottom: 0;
     box-shadow: 0 -10px 28px rgba(2, 8, 23, 0.24);
   }
-  /* Equal-width tab bar: each primary destination gets the same share of
-     the nav strip. No horizontal scroll; secondary pages go into Sistema. */
-  .sidebar nav { min-width: 0; width: 100%; justify-content: stretch; }
+  /* Two rows give primary destinations enough width for readable labels. */
+  .sidebar nav {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(52px, auto);
+    align-items: stretch;
+    gap: 2px;
+    min-width: 0;
+    width: 100%;
+  }
   .sidebar nav .nav-item,
   .sidebar .nav-more {
-    flex: 1 1 0;
+    flex: none;
     min-width: 0;
-    max-width: 88px;
+    max-width: none;
+    min-height: 52px;
     justify-content: center;
-    padding: 5px 3px;
-    font-size: 0.70rem;
+    padding: 5px 2px;
+    font-size: 0.76rem;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
@@ -1219,12 +1227,15 @@ pre.log-view { margin: 0; }
   .sidebar .nav-optional { display: none !important; }
   .sidebar .nav-search,
   .sidebar .nav-mobile-hidden { display: none !important; }
+  .sidebar .nav-group.system-group:not(.open) .nav-item:not(.nav-mobile-always) {
+    display: none !important;
+  }
   .sidebar .system-group.open {
     position: fixed;
     z-index: 45;
     left: 8px;
     right: 8px;
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    bottom: calc(124px + env(safe-area-inset-bottom));
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
@@ -1240,7 +1251,7 @@ pre.log-view { margin: 0; }
   .sidebar .system-group.open .nav-more { display: inline-flex; }
   .sidebar .system-group.open .nav-mobile-always { display: none; }
   .sidebar .system-group.open .nav-mobile-system-extra { display: inline-flex !important; }
-  .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .content { padding-bottom: calc(136px + env(safe-area-inset-bottom)); }
 
   /* Topbar: hide font-size controls, font picker, theme toggle and language
      form — all accessible from the Settings page.
