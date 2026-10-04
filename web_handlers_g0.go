@@ -392,12 +392,11 @@ func DbAction(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	jsonStatus(w, http.StatusOK, map[string]any{
-		"ok":                       true,
-		"action":                   action,
-		"before":                   map[string]any{"size_bytes": result.BeforeSize, "rows": result.BeforeRows, "physical_bytes": result.BeforePhysical},
-		"after":                    map[string]any{"size_bytes": result.AfterSize, "rows": result.AfterRows, "physical_bytes": result.AfterPhysical},
-		"reclaimed_bytes":          result.BeforeSize - result.AfterSize,
-		"reclaimed_physical_bytes": result.BeforePhysical - result.AfterPhysical,
+		"ok":              true,
+		"action":          action,
+		"before":          map[string]any{"size_bytes": result.BeforeSize, "rows": result.BeforeRows},
+		"after":           map[string]any{"size_bytes": result.AfterSize, "rows": result.AfterRows},
+		"reclaimed_bytes": result.BeforeSize - result.AfterSize,
 	})
 }
 
@@ -470,16 +469,13 @@ func gh0_runDbCheck(s *AppState) []gh0_dbCheck {
 	return checks
 }
 
-// gh0_dbActionResult carries both the logical size (page_count × page_size) and
-// the physical file size (including -wal/-shm) before and after a maintenance
-// action, so the log and the UI can show what was actually reclaimed.
+// gh0_dbActionResult carries the stable logical database size
+// (page_count × page_size) before and after a maintenance action.
 type gh0_dbActionResult struct {
-	BeforeSize     int64
-	BeforeRows     int64
-	AfterSize      int64
-	AfterRows      int64
-	BeforePhysical int64
-	AfterPhysical  int64
+	BeforeSize int64
+	BeforeRows int64
+	AfterSize  int64
+	AfterRows  int64
 }
 
 func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
@@ -495,27 +491,18 @@ func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
 		defer conn.Close()
 		return ConnectionSizeBytes(conn)
 	}
-	configPhysical := func(path string) int64 {
-		conn, err := OpenConfigDB(path)
-		if err != nil {
-			return 0
-		}
-		defer conn.Close()
-		return gh0_physicalBytes(conn)
-	}
-	// collect reads the logical size (page_count × page_size), the row count and
-	// the physical file size (main + -wal + -shm) of every database.
-	collect := func() (int64, int64, int64) {
+	// collect intentionally excludes the transient WAL/SHM files. Their size can
+	// spike during VACUUM and does not represent durable database usage.
+	collect := func() (int64, int64) {
 		size := s.db.DBSizeBytes() + s.archive.SizeBytes() + s.comics.SizeBytes() + configSize(configPath)
 		rows := s.db.DBTotalRows()
 		if count, err := s.archive.Count(); err == nil {
 			rows += count
 		}
-		physical := gh0_physicalBytes(s.db.db) + gh0_physicalBytes(s.archive.db) + gh0_physicalBytes(s.comics.db) + configPhysical(configPath)
-		return size, rows, physical
+		return size, rows
 	}
 
-	result.BeforeSize, result.BeforeRows, result.BeforePhysical = collect()
+	result.BeforeSize, result.BeforeRows = collect()
 
 	if err := s.db.Optimize(action); err != nil {
 		logging.Error("db maintenance failed on series db", "action", action, "error", err)
@@ -534,55 +521,14 @@ func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
 		conn.Close()
 	}
 
-	result.AfterSize, result.AfterRows, result.AfterPhysical = collect()
+	result.AfterSize, result.AfterRows = collect()
 	logging.Info("db maintenance action finished",
 		"action", action,
 		"duration", time.Since(start).String(),
 		"before_bytes", result.BeforeSize,
 		"after_bytes", result.AfterSize,
-		"reclaimed_bytes", result.BeforeSize-result.AfterSize,
-		"before_physical", result.BeforePhysical,
-		"after_physical", result.AfterPhysical,
-		"reclaimed_physical_bytes", result.BeforePhysical-result.AfterPhysical)
+		"reclaimed_bytes", result.BeforeSize-result.AfterSize)
 	return result, nil
-}
-
-// gh0_databaseFile returns the on-disk path of a connection's `main` database.
-func gh0_databaseFile(db *sql.DB) string {
-	if db == nil {
-		return ""
-	}
-	rows, err := db.Query("PRAGMA database_list")
-	if err != nil {
-		return ""
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var seq int
-		var name, file string
-		if err := rows.Scan(&seq, &name, &file); err == nil && name == "main" {
-			return file
-		}
-	}
-	return ""
-}
-
-// gh0_fileSetBytes sums a database file and its WAL/SHM companions.
-func gh0_fileSetBytes(path string) int64 {
-	if path == "" {
-		return 0
-	}
-	var total int64
-	for _, suffix := range []string{"", "-wal", "-shm"} {
-		if info, err := os.Stat(path + suffix); err == nil {
-			total += info.Size()
-		}
-	}
-	return total
-}
-
-func gh0_physicalBytes(db *sql.DB) int64 {
-	return gh0_fileSetBytes(gh0_databaseFile(db))
 }
 
 // ---------------------------------------------------------------------------
