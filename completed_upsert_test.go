@@ -54,3 +54,25 @@ func TestMarkReleaseCompletedCreatesMissingEpisode(t *testing.T) {
 		t.Fatalf("archive path not updated: %q", archivePath)
 	}
 }
+
+func TestMarkReleaseCompletedRecordsEpisodeZeroSpecial(t *testing.T) {
+	db, err := OpenDatabase(filepath.Join(t.TempDir(), "series.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.db.Close()
+	release := ParseRelease("Example.S02E00.Recap.1080p.WEB-DL.ITA", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789", "test")
+	if release == nil || release.IsPack {
+		t.Fatalf("release = %#v, want E00 special", release)
+	}
+	if err := db.MarkReleaseCompleted(release, "/nas/Example/Example - S02E00 - Speciale.mkv", 1234); err != nil {
+		t.Fatal(err)
+	}
+	var archivePath string
+	if err := db.db.QueryRow("SELECT archive_path FROM episodes WHERE series_id=(SELECT id FROM series WHERE name='Example') AND season=2 AND episode=0").Scan(&archivePath); err != nil {
+		t.Fatalf("special row not created: %v", err)
+	}
+	if archivePath == "" {
+		t.Fatal("completed E00 special has no archive path")
+	}
+}

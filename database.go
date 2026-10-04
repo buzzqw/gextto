@@ -3903,7 +3903,9 @@ func (d *Database) MarkReleaseCompleted(release *models.Release, path string, si
 					episodes = []int64{episode}
 				} else {
 					for _, episode := range release.EpisodeRange {
-						if episode > 0 {
+						// E00 is a single special/recap when IsPack is false and
+						// must be recorded like any other completed episode.
+						if episode >= 0 {
 							episodes = append(episodes, episode)
 						}
 					}

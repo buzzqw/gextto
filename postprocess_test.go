@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -550,6 +552,37 @@ func TestRenamesEpisodeWithoutTmdbKeyUsingSafeFallback(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "source.mkv")); err == nil {
 		t.Fatal("source file still exists")
+	}
+}
+
+func TestRenamesEpisodeWhenTMDBDoesNotKnowIt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	previousBaseURL := tmdbAPIBaseURL
+	tmdbAPIBaseURL = server.URL
+	defer func() { tmdbAPIBaseURL = previousBaseURL }()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "source.mkv"), []byte("episode"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	key := "test-key"
+	cfg := DefaultConfig()
+	cfg.RenameEpisodes = true
+	cfg.RenameFormat = "standard"
+	cfg.Series = append(cfg.Series, SeriesConfig{Name: "Example", TmdbID: "1", Enabled: true})
+	release := models.Release{
+		Title: "Example S01E99", Kind: "series", Series: stringPtr("Example"),
+		Season: int64Ptr(1), Episode: int64Ptr(99), EpisodeRange: []int64{99},
+	}
+	renamed, err := RenameEpisode(context.Background(), root, &release, &cfg, NewTmdbClient(&key))
+	if err != nil {
+		t.Fatalf("unknown TMDB episode must use fallback title: %v", err)
+	}
+	if renamed == "" || !strings.Contains(filepath.Base(renamed), "Episodio 99") {
+		t.Fatalf("renamed = %q, want fallback episode title", renamed)
 	}
 }
 

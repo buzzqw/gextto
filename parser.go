@@ -778,6 +778,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		season       *int64
 		episode      *int64
 		episodeRange = []int64{}
+		seasonPack   bool
 	)
 	if capture := rangeRe.FindStringSubmatch(title); capture != nil {
 		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
@@ -880,6 +881,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		season = &seasonValue
 		episode = &zero
 		episodeRange = []int64{0}
+		seasonPack = true
 	}
 	kind := "movie"
 	if season != nil {
@@ -891,7 +893,9 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 			year = &value
 		}
 	}
-	isPack := len(episodeRange) > 1 || (episode != nil && *episode == 0)
+	// E00 is a real special/recap episode, not a complete-season pack. Only
+	// titles matched by seasonPackRe use the {0} range as a pack sentinel.
+	isPack := len(episodeRange) > 1 || seasonPack
 	return &models.Release{
 		Title:        title,
 		Magnet:       sanitizedMagnet,

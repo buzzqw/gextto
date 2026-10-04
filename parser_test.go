@@ -74,6 +74,22 @@ func TestParsesCompleteSeasonPackVariants(t *testing.T) {
 	}
 }
 
+func TestParsesEpisodeZeroAsSpecialNotSeasonPack(t *testing.T) {
+	release := ParseRelease("Silo.S02E00.Season.1.Recap.2160p.WEB-DL.ITA", testMagnet, "test")
+	if release == nil {
+		t.Fatal("ParseRelease returned nil")
+	}
+	if release.IsPack {
+		t.Fatalf("E00 special must not be a season pack: %#v", release)
+	}
+	if release.Season == nil || *release.Season != 2 || release.Episode == nil || *release.Episode != 0 {
+		t.Fatalf("episode identity = season %v episode %v, want S02E00", release.Season, release.Episode)
+	}
+	if want := []int64{0}; !reflect.DeepEqual(release.EpisodeRange, want) {
+		t.Fatalf("episode_range = %v, want %v", release.EpisodeRange, want)
+	}
+}
+
 func TestParsesRenamedBracketQualityTagsWithoutFalseLanguageMatches(t *testing.T) {
 	quality := ParseQuality("The Pitt - S01E01 - Pilot [1080p][DV HDR10][h265][IT+EN].mkv")
 	if quality.Resolution != "1080p" {
