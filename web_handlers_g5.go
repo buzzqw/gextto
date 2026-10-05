@@ -10,6 +10,7 @@ package gextto
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // ---------------------------------------------------------------------------
@@ -749,6 +751,10 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if extra := gh5_mirCrewServiceStatus(cfg); extra != nil {
 		items = append(items, *extra)
 	}
+	// Prowlarr does not leave a backoff row when it is healthy, so probe each
+	// enabled Prowlarr manager and show its live service state alongside saved
+	// provider failures.
+	items = append(items, gh5_prowlarrServiceStatuses(cfg)...)
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
 }
 
@@ -824,6 +830,65 @@ func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
 	gh5_mirCrewProbe.entry = &entry
 	result := entry
 	return &result
+}
+
+type gh5ProwlarrProbeEntry struct {
+	at     time.Time
+	status models.ProviderStatus
+}
+
+var gh5_prowlarrProbe struct {
+	sync.Mutex
+	entries map[string]gh5ProwlarrProbeEntry
+}
+
+// gh5_prowlarrServiceStatuses returns a live service-status row for every
+// enabled Prowlarr manager. This is separate from per-indexer search backoff:
+// a reachable manager can still report an individual indexer failure in Sources.
+func gh5_prowlarrServiceStatuses(cfg *Config) []models.ProviderStatus {
+	if cfg == nil {
+		return nil
+	}
+	items := []models.ProviderStatus{}
+	for _, indexer := range cfg.Indexers {
+		if !indexer.Enabled || managerKind(indexer) != ManagerProwlarr {
+			continue
+		}
+		key := strings.Join([]string{indexer.Name, indexer.URL, indexer.APIKey}, "\x00")
+		gh5_prowlarrProbe.Lock()
+		if cached, ok := gh5_prowlarrProbe.entries[key]; ok && time.Since(cached.at) < 20*time.Second {
+			items = append(items, cached.status)
+			gh5_prowlarrProbe.Unlock()
+			continue
+		}
+		gh5_prowlarrProbe.Unlock()
+
+		status := models.ProviderStatus{
+			Provider: indexer.Name,
+			Kind:     "servizio",
+			URL:      gh5_providerURL(cfg, indexer.Name),
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := managerGet(ctx, HealthProbeURL(indexer), nil)
+		cancel()
+		if err != nil {
+			status.Level = 1
+			status.LastError = utils.RedactURLSecrets(err.Error())
+			status.UserMessage, status.SuggestedAction = gh5_providerGuidance(status)
+		} else {
+			status.UserMessage = "Nessun problema rilevato."
+			status.SuggestedAction = "Nessuna azione necessaria."
+		}
+
+		gh5_prowlarrProbe.Lock()
+		if gh5_prowlarrProbe.entries == nil {
+			gh5_prowlarrProbe.entries = make(map[string]gh5ProwlarrProbeEntry)
+		}
+		gh5_prowlarrProbe.entries[key] = gh5ProwlarrProbeEntry{at: time.Now(), status: status}
+		gh5_prowlarrProbe.Unlock()
+		items = append(items, status)
+	}
+	return items
 }
 
 // gh5_providerGuidance keeps connection details in the diagnostic field while
