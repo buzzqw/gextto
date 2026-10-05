@@ -161,6 +161,9 @@ func parse_feed_body(body, source string) ([]models.Release, error) {
 				sizeBytes = nil
 				seeders = nil
 				peers = nil
+				// Items without a date (many listings omit it) are treated as
+				// found now: the age filter must not discard them for a missing
+				// field, and the value is overwritten when a date is parsed.
 				discoveredAt = time.Now().UTC()
 			}
 			if inItem {
@@ -1195,6 +1198,9 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 	var all []models.Release
 	oldTotal := 0
 	pageTotal := 0
+	// Infohashes already collected: a page that adds none means the source is
+	// ignoring paging or repeating the same listing, so stop walking.
+	seenHashes := map[string]struct{}{}
 	// `feed_max_pages`: number of listing pages to walk (legacy MAX_PAGES).
 	pages := maxPages
 	if pages < 1 {
@@ -1224,6 +1230,29 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 			return nil, err
 		}
 		if len(items) == 0 && total == 0 {
+			break
+		}
+		newHashes := 0
+		for index := range items {
+			hash, ok := utils.MagnetHash(items[index].Magnet)
+			if !ok {
+				// No infohash to compare (for example a `.torrent` link):
+				// count it as new so the page is never dropped on a guess.
+				newHashes++
+				continue
+			}
+			if _, seen := seenHashes[hash]; seen {
+				continue
+			}
+			seenHashes[hash] = struct{}{}
+			newHashes++
+		}
+		if page > 0 && newHashes == 0 {
+			logging.Info(
+				"listing early-stop: page added no new infohash",
+				"feed_url", rawURL,
+				"page", page,
+			)
 			break
 		}
 		all = append(all, items...)

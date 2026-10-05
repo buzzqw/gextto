@@ -63,7 +63,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_sched_ul_limit":                    "Limite di upload in KiB/s durante la programmazione.",
 	"flaresolverr_url":                             "URL del servizio FlareSolverr per aggirare Cloudflare.",
 	"refresh_interval":                             "Intervallo tra le ricerche automatiche di serie e film, in secondi (21600 = 6 ore).",
-	"max_release_age_days":                         "Ignora le release più vecchie di N giorni (0 = nessun limite).",
+	"max_release_age_days":                         "Ignora le release più vecchie di N giorni (0 = nessun limite). Le release senza data sono considerate pubblicate oggi.",
 	"gap_filling":                                  "Attiva il riempimento dei buchi (episodi mancanti) dalle release disponibili.",
 	"gap_fill_max_per_series":                      "Numero massimo di gap da cercare per serie in un ciclo (0 = illimitato).",
 	"gap_deep_interval_hours":                      "Ogni quante ore fare una ricerca live mirata sugli indexer per i gap.",

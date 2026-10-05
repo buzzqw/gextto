@@ -383,3 +383,27 @@ func TestListingUsesMagnetDnWhenAnchorHasNoText(t *testing.T) {
 		t.Fatalf("source = %q", releases[0].Source)
 	}
 }
+
+func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
+	const page = `<html><body>
+<a class="torrent-title-link" href="magnet:?xt=urn:btih:0123456789012345678901234567890123456789">One</a>
+<a class="torrent-title-link" href="magnet:?xt=urn:btih:1123456789012345678901234567890123456789">Two</a>
+</body></html>`
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		_, _ = fmt.Fprint(w, page)
+	}))
+	defer server.Close()
+
+	releases, err := FetchFeed(context.Background(), server.URL+"/?ref=ext.to", nil, 4, 0, 0)
+	if err != nil {
+		t.Fatalf("FetchFeed: %v", err)
+	}
+	if len(releases) != 2 {
+		t.Fatalf("releases = %d, want 2 (a repeated page must stop the walk)", len(releases))
+	}
+	if requests != 2 {
+		t.Fatalf("requests = %d, want 2 (first page + one repeated page)", requests)
+	}
+}
