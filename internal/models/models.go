@@ -105,7 +105,7 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 	}
 	repack := int64(0)
 	if q.IsRepack {
-		repack = 50
+		repack = 100
 	}
 	real := int64(0)
 	if q.IsReal {
