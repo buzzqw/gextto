@@ -485,7 +485,8 @@ are using the API directly.
 
 Tabs: **Daemon, Sources, libtorrent, Torrent engine, Scores, Rename, Advanced,
 Acquisition, Notifications, Paths, Translations**. Unsaved changes are
-highlighted with a “Save all” bar.
+highlighted with a “Save all” bar. The complete per-tab list of every entry is in
+[Appendix A](#appendix-a-reference--configuration).
 
 - **Sources** — RSS feed list, indexers (Jackett/Prowlarr) with a *Verify*
   button, FlareSolverr URL + test, web engines, content filters, blacklist.
@@ -700,6 +701,8 @@ scan). If `ffprobe` is missing, the backfill pauses by itself.
 
 ## 8. Integrations
 
+The complete list of fields and actions is in [Appendix B](#appendix-b-reference--integrations).
+
 - **Simkl** — credentials, PIN flow, watchlist import, calendar and mark-watched.
 - **Jellyfin / Plex** — server URL + token and a library refresh button.
 - **Event hooks** — run an external program on Gextto events
@@ -727,6 +730,8 @@ through placeholders or `GEXTTO_*` variables. Do not put tokens or passwords in
 arguments if the command may be recorded in system logs.
 
 ## 9. Maintenance
+
+The complete list of actions and parameters is in [Appendix C](#appendix-c-reference--maintenance).
 
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**
   (probes archived files without data via `ffprobe` and stores it) and restart
@@ -929,3 +934,341 @@ different authentication method.
 - **FTP backup fails** — use *Test FTP*: it reports the failing step (connection,
   login, remote path, upload, delete) and logs it.
 - **Logs** — see `data/gextto.log` (rotated at 5 MB) or the in-app log viewer.
+
+## Appendix A. Reference — Configuration
+
+Each tab collects the editable settings. The *What it does* column mirrors the description shown in the UI.
+
+### Daemon
+
+| Setting | What it does |
+|---|---|
+| Automatic series/movie search (seconds) | Interval between automatic series/movie searches, in seconds (21600 = 6 hours). |
+| Max release age (days) | Ignore releases older than N days (0 = no limit). Releases without a date are treated as published today. |
+| Max gaps per series/cycle | Maximum gaps to search per series in one cycle (0 = unlimited). |
+| Gap filling enabled | Enable filling recognised gaps (missing episodes) from available releases. |
+| Deep search interval (hours) | How many hours between targeted live indexer searches for gaps. |
+| Max deep searches per cycle | Maximum number of live searches per cycle. |
+| Online title search in the cycle | Search titles on indexers during the cycle: auto (only when no feeds are configured), yes (always), no (never, use only feeds and the local archive). |
+| Active | Enable or disable the Gextto daemon: automatic cycles and downloads. |
+
+### Sources
+
+| Setting | What it does |
+|---|---|
+| Blacklist (one word per line) | Forbidden words, one per line: releases containing them are discarded. |
+| RSS feeds | List of RSS feeds read on every cycle (one URL per line). |
+| Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. |
+| Content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
+
+### libtorrent
+
+| Setting | What it does |
+|---|---|
+| Client enabled | Enable or completely disable the built-in libtorrent client. |
+| Automatic queue and resource management | Automatically adjusts how many torrents are active based on load. |
+| Continuous optimization (periodic) | Periodically applies cache, buffer and queue optimization based on resources. |
+| Preallocate disk space | Reserves all disk space up front before starting the download. |
+| Minimum dynamic download slots | Minimum number of dynamic downloads. The queue changes by at most one at a time. |
+| Maximum dynamic download slots | Maximum number of dynamic downloads. Consecutive consistent samples are required before increasing the queue. |
+| Don't count stalled torrents in active slots | Torrents that are not transferring data do not consume an active slot. |
+| Sequential download | Download files sequentially instead of in scattered pieces. |
+| Active downloads | Base value for active downloads; with the dynamic queue it is adapted at runtime. |
+| Active seeds | Base value for active seeds; with the dynamic queue it drops to 1 when downloads are queued. |
+| Active torrents limit | Base value for the active torrent limit; with the dynamic queue it becomes max(base, downloads + seeds + 2). |
+| Total connections limit | Maximum simultaneous peer connections at session level. |
+| Upload slots | Number of unchoked upload peers (-1 = automatic). |
+| Half-open limit | Maximum half-open connections (-1 = automatic). |
+| Max connections per torrent | Connection limit per torrent (-1 = unlimited). |
+| Max uploads per torrent | Upload limit per torrent (-1 = unlimited). |
+| Disk AIO threads | Dedicated threads for disk operations (-1 = automatic). |
+| Disk cache (blocks, -1 auto) | Disk cache size in blocks (-1 = automatic). |
+| Cache expiry (s) | Seconds of inactivity after which a block leaves the cache. |
+| Alert queue | Libtorrent alert queue size. |
+| DHT | Enable the DHT network to find peers without a tracker. |
+| PEX | Peer Exchange: exchange peers with other clients. |
+| LSD | Local Service Discovery: finds peers on the local network. |
+| UPnP | Opens router ports automatically with UPnP. |
+| NAT-PMP | Opens router ports automatically with NAT-PMP. |
+| uTP | Enable the uTP (UDP) protocol in addition to TCP. |
+| Prefer RC4 | Prefers RC4 encryption on connections. |
+| Announce to all trackers | Announce to all trackers, not just the first of each tier. |
+| Announce to all tiers | Announce to all tiers, not just the first. |
+| Multiple connections per IP | Allows multiple connections from the same IP address. |
+| Announce interval (s) | Minimum interval (seconds) between two announces to the same tracker. |
+| Connect boost | Number of extra connection attempts when the torrent starts. |
+| DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
+| Encryption | Encryption policy: 0 disabled, 1 enabled, 2 forced. |
+| Apply IP filter | Apply the IP filter to trackers as well. |
+| IP filter (file/URL) | Local file or URL of the IP blocklist. |
+| Listen interfaces | Where libtorrent accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
+| Outgoing interface | VPN killswitch: interface used for all outgoing BitTorrent traffic. |
+| RAM disk folder | RAM disk to use for in-progress downloads, if available. |
+| Use the RAM disk | Downloads to RAM the torrents that fit the threshold; larger ones go to disk. |
+| Max size per torrent (GB) | Maximum size of a single torrent allowed on the RAM disk (GB). |
+| Free margin to keep (GB) | Free space to leave on the RAM disk once the download completes (GB). |
+| Minimum free space (bytes, 0 = from margin) | Minimum free space in bytes required to use the RAM disk. 0 = use the configured margin. |
+| Min port | Minimum libtorrent session port (requires service restart). |
+| Max port | Maximum libtorrent session port (requires service restart). |
+| Global download (KiB/s, 0 = unlimited) | Global download limit in KiB/s (0 = unlimited). |
+| Global upload (KiB/s, 0 = unlimited) | Global upload limit in KiB/s (0 = unlimited). |
+| Speed schedule enabled | Enable the time window with different speed limits. |
+| Schedule — start time (HH:MM) | Schedule start time (HH:MM). |
+| Schedule — end time (HH:MM) | Schedule end time (HH:MM). |
+| Schedule — days (0=Mon … 6=Sun, e.g. 0,1,2,3,4) | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). |
+| Schedule — download (KiB/s) | Download limit in KiB/s during the schedule. |
+| Schedule — upload (KiB/s) | Upload limit in KiB/s during the schedule. |
+| Advanced libtorrent settings | Advanced libtorrent settings, one per line in key=value format. |
+| Tab actions | **Optimize** computes cache and buffers based on RAM; **Apply now** immediately reapplies the settings to the active session. |
+
+### Torrent engine
+
+| Setting | What it does |
+|---|---|
+| Torrent engine | Active torrent engine (built-in libtorrent or qBittorrent-nox). |
+| qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |
+| qBittorrent-nox — username | qBittorrent-nox Web UI username. |
+| qBittorrent-nox — password | qBittorrent-nox Web UI password (not shown). |
+| qBittorrent-nox — category | Category applied to torrents added to qBittorrent-nox. |
+| qBittorrent-nox — tag | Tag applied to torrents added to qBittorrent-nox. |
+| qBittorrent-nox — request timeout (seconds) | Timeout in seconds for HTTP requests to qBittorrent-nox. |
+| qBittorrent-nox — polling interval (ms) | Interval in milliseconds between torrent status reads. |
+| qBittorrent-nox — path mappings | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
+| qBittorrent-nox — downloaded and updated by Gextto | Gextto downloads the latest qBittorrent-nox release itself, installs it in the application folder (next to gexttod), starts/stops it with the service and updates it (with backup and rollback). The engine in use is still chosen in “Torrent engine”: this option does not change it. |
+| Tab actions | Install/Optimize qBittorrent-nox, qBittorrent-nox status, Apply engine and Test connection. |
+
+### Scores
+
+Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Remux, WEB-DL, WEBRip, HDTV, DVDRip), codec (H.265, H.264), audio (TrueHD, DTS-HD, DTS, DDP, AC3, 5.1, AAC, MP3), bonus (Dolby Vision, HDR, PROPER, REPACK, REAL). For each: **higher = more preferred**. Custom groups are added here. Use *Maintenance → Recalculate scores* after changing weights.
+
+### Rename
+
+| Setting | What it does |
+|---|---|
+| Rename episodes | Renames downloaded files using TMDB metadata. |
+| TVDB language (e.g. ita, eng) | Preferred language for TVDB metadata (e.g. ita, eng). |
+| TMDB language (e.g. it-IT) | Language used for TMDB metadata (e.g. it-IT, en-US). |
+| Default language (e.g. ita) | Default preferred language for series and movies (e.g. ita, eng). |
+| Upgrade cleanup | Replaces lower versions already archived with better upgrades. |
+| Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
+| Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
+| TMDB API key | TMDB API key for titles, posters and metadata. |
+| TVDB API key | TheTVDB v4 API key for series search and metadata. |
+| Rename format | Template editor with tokens and preview to compose file names. |
+
+### Advanced
+
+| Setting | What it does |
+|---|---|
+| Minimum free space to download (GB) | Minimum free space (GB) on the download folder: below this threshold the cycle does not start downloads. |
+| Trash — retention days (0 = delete everything) | Retention days for non-forced cleanups; 0 deletes the whole trash content. Manual UI actions always empty the trash immediately. |
+| Automatic archive cleanup | Enable automatic archive cleanup according to max age and minimum number to keep. |
+| Archive — max age (days) | Maximum age of archive releases, in days (0 = no limit). |
+| Archive — keep at least N entries | Minimum number of recent releases to always keep in the archive. |
+| Feed pages to read | How many listing pages to read per feed (3 is a good compromise). |
+| Rename verification (hours) | How many hours between checks that archived/renamed files are still present. |
+| Debug (detailed logs) | Enables detailed logs and periodic diagnostics for debugging. |
+| Per-source filters | Keywords to accept or reject for a single source, enabled per row. |
+| Tag → folder rules | Associates a torrent tag with a temporary and a final folder. |
+| Event hooks | Runs a program on selected events (name, events, program, arguments, timeout). |
+| Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
+
+### Acquisition
+
+| Setting | What it does |
+|---|---|
+| Series delay (minutes, 0 = none) | Delays the start of series downloads by this many minutes. 0 starts immediately. |
+| Movie delay (minutes, 0 = none) | Delays the start of movie downloads by this many minutes. 0 starts immediately. |
+| Bypass the delay above this score (0 = never) | If a release reaches at least this score, the configured delay is ignored. |
+| Periodic housekeeping enabled | Enables periodic cleanup of technical data and history. |
+| Housekeeping — interval (hours) | Interval between two automatic housekeeping runs, in hours. |
+| Housekeeping — search-cycle statistics kept | Number of search cycle statistics to keep. |
+| Housekeeping — feed-seen entries (days, 0 = never) | Deletes feed-seen release history rows older than N days. |
+| Housekeeping — download history (days, 0 = keep) | Deletes download history rows of removed torrents older than N days. |
+| Housekeeping — error entries (days) | Deletes error torrent entries older than N days (minimum 1). |
+| Housekeeping — gap search log (days, 0 = never) | Deletes the missing-episode search log older than N days. |
+| Housekeeping — upgrade backups (days, 0 = never) | Deletes backups of files replaced by upgrades older than N days. |
+| Automatic MediaInfo backfill | Periodically analyses with ffprobe the files already present that have no MediaInfo yet. |
+| MediaInfo backfill — interval (minutes) | Minutes between two MediaInfo backfill passes. |
+| MediaInfo backfill — files per run | Maximum number of files analysed in each MediaInfo pass. |
+
+### Seeding and completion
+
+| Setting | What it does |
+|---|---|
+| Consider stalled after (minutes) | After this many minutes without progress the torrent is considered stalled. |
+| Stalled retry (minutes) | Interval between reannounce attempts for stalled torrents. |
+| Stalled removal (minutes, 0 = disabled) | After this period without progress, the torrent is removed automatically. Set 0 to completely disable automatic removal due to stalling. |
+| Global seed ratio (0 = infinite) | Upload/download ratio after which to stop seeding (0 = infinite). |
+| Maximum seed time (minutes, fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. |
+| Max seed (days) | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. |
+| Remove completed items after seeding | On: at the end of seeding the completed torrent is removed from the session (like “Clean completed”). Off: at the end of seeding the torrent stays in the list as Completed and you remove it with “Clean completed”. It does not affect where files are moved. |
+| Move episodes/packs to the archive (do not copy) | On: at the end of seeding the downloaded source is deleted (the file stays in the library). Off: the downloaded source is copied to the library and kept. |
+
+### Notifications
+
+| Setting | What it does |
+|---|---|
+| Telegram enabled | Send notifications to Telegram. |
+| Telegram bot token | Telegram bot token (from @BotFather). |
+| Telegram chat ID | ID of the chat/channel where notifications are sent. |
+| Webhook URL | Webhook URL where events are sent. |
+| Webhook secret | HMAC secret to sign webhook requests. |
+| Email enabled | Send notifications by email. |
+| SMTP | SMTP server as host:port (e.g. smtp.gmail.com:587). |
+| Email sender | Sender address for notification emails. |
+| Email recipient | Email recipients (comma-separated). |
+| Email password | SMTP password/app password (not shown). |
+
+### Paths
+
+| Setting | What it does |
+|---|---|
+| Archive folder | Default archive folder for content without a dedicated path. |
+| Trash folder | Folder where replaced/duplicate files are moved (if left empty, uses the trash subfolder in the data folder). |
+| Cleanup action | What to do with replaced files: move to trash or delete. |
+| Download folder | Default download folder for every engine. |
+| Temporary folder | Temporary folder for in-progress downloads. |
+| Copy .torrent files to | Copy the .torrent files of downloads here (empty = no copy). |
+
+### Translations
+
+| Setting | What it does |
+|---|---|
+| Translations | Export/import the UI string translations as YAML for Italian or English; import adds or updates keys without deleting the others. |
+
+
+## Appendix B. Reference — Integrations
+
+### Simkl
+
+| Field / action | What it does |
+|---|---|
+| Client ID | Client ID of the Simkl app. |
+| Calendar days | How many days ahead to show in the Simkl calendar. |
+| Watchlist status | Status assigned to imported series: Plan to watch, Watching or Completed. |
+| Mark as watched | Marks downloaded episodes as watched on Simkl. |
+| Start access / Confirm | Starts the PIN flow and confirms the code shown by Simkl. |
+| Revoke | Revokes access and removes the stored token. |
+| Import watchlist | Imports the series from the Simkl watchlist into the library. |
+| Watchlist / Calendar | Read-only tables with the watchlist and the upcoming releases. |
+
+### Jellyfin
+
+| Field / action | What it does |
+|---|---|
+| Jellyfin URL | Jellyfin server URL (e.g. `http://127.0.0.1:8096`). |
+| Jellyfin API key | API key generated in Jellyfin → Dashboard → API Keys. |
+| Test connection | Checks that Jellyfin responds. |
+| Refresh library | Asks Jellyfin to refresh its library. |
+
+### Plex
+
+| Field / action | What it does |
+|---|---|
+| Plex URL | Plex server URL (e.g. `http://127.0.0.1:32400`). |
+| Plex token | `X-Plex-Token` used to access the library. |
+| Test connection | Checks that Plex responds. |
+| Refresh library | Asks Plex to refresh its library. |
+
+### Torznab indexers
+
+| Field / action | What it does |
+|---|---|
+| Name | Indexer label (e.g. `jackett` / `prowlarr`). |
+| Base URL | Base URL of the service; Gextto appends the Torznab path. |
+| API key | Indexer API key. |
+| Type | Auto-detected, Prowlarr or Jackett. |
+| Enabled | Enables or disables the indexer. |
+| Test | Tests the indexer (for Jackett it uses `t=caps`). |
+
+### FlareSolverr
+
+| Field / action | What it does |
+|---|---|
+| URL | URL of the FlareSolverr service used to bypass Cloudflare. |
+| Test FlareSolverr | Checks that FlareSolverr responds. |
+
+### Event hooks (Configuration → Advanced)
+
+| Field / action | What it does |
+|---|---|
+| Name | Hook label. |
+| Enabled | Enables or disables the hook. |
+| Events | Events that trigger the hook (empty = all). |
+| Program | Executable to run (without a shell). |
+| Arguments | Arguments with placeholders `{title}`, `{hash}`, `{path}`, `{series}`, `{episode}`; the same values are exposed as `GEXTTO_*` variables. |
+| Timeout (s) | Timeout in seconds (default 60, maximum 24 hours; `0` = default). |
+
+### Browser handlers and source check
+
+| Item | What it does |
+|---|---|
+| Magnet / Torrent handler | Downloads the scripts to open magnets and `.torrent` files directly in Gextto. |
+| Magnet / Torrent `.desktop` | `.desktop` versions for Linux desktop integration. |
+| `install.sh` | Downloads the installation script. |
+| Source check / Refresh | Checks feeds, indexers and web engines; with a query it also measures results, without changing settings. |
+
+## Appendix C. Reference — Maintenance
+
+### Quick actions
+
+| Action | What it does |
+|---|---|
+| Backup now | Immediately creates a database backup snapshot. |
+| Clean trash | Empties the trash completely (forced action: `trash_retention_days` does not apply). |
+| Recalculate scores | Recomputes the score of archived releases with the current weights. |
+| Scan archives | Re-reads the archive folders and updates the library. |
+| Update MediaInfo | Analyses with `ffprobe` the archived files that have no MediaInfo. |
+| Rename all | Renames every archived file using the configured format. |
+| Housekeeping | Cleans technical data and history without touching the library. |
+| Import setup | Imports an existing setup configuration (extto). |
+| Restart service | Restarts the Gextto daemon. |
+
+### Rename folder content
+
+| Item | What it does |
+|---|---|
+| Folder / Browse | Type or pick the folder to analyse from the server. |
+| Scan and propose | Recursively analyses the videos, recognises series/movies with TMDB/TVDB and proposes new names (preview only). |
+| Per-row result | Selects an alternative TMDB/TVDB match. |
+| Accept / reject | Approves or discards the single proposal. |
+| Accept all proposals | Approves every proposal at once. |
+| Apply selected | Renames the selected files that really exist with a valid destination. |
+| Rename progress | Progress of the background operation. |
+
+### Library
+
+| Item | What it does |
+|---|---|
+| Video duplicates — Preview duplicates | Lists inferior duplicates (lower resolution) without deleting anything. |
+| Video duplicates — Clean duplicates | Moves the inferior copies found to the trash. |
+| Database optimisation — VACUUM / ANALYZE | Compacts the databases and refreshes the query planner statistics. |
+| Database optimisation — Refresh sizes | Re-reads size and status of the database files. |
+| Database optimisation — Check integrity and indexes | Checks integrity, foreign keys and indexes (including the archive FTS). |
+| RAM disk | Shows writable `tmpfs`/`ramfs` paths, lets you select one, create a dedicated one and refresh the list. |
+
+### Cleanups
+
+| Item | What it does |
+|---|---|
+| Trash — Open trash | Shows the trash items so you can delete them one by one. |
+| Trash — Empty trash | Deletes every trash item. |
+| Database cleanup — Cycles to keep | Number of cycle statistics to keep. |
+| Database cleanup — Error days | Keeps error torrent entries for at least N days before removing them. |
+
+### Backup
+
+| Item | What it does |
+|---|---|
+| Backups to keep | Number of local ZIP files to keep in the `backups` folder. |
+| Interval (hours) | Automatic backup interval in hours (0 disables the interval). |
+| Time (HH:MM) | Local daily time of the automatic backup; when set it takes precedence over the interval. |
+| FTP host | FTP server host/address (empty = no FTP upload). |
+| FTP user | FTP server user. |
+| FTP password | FTP password (not shown; empty keeps the stored one). |
+| FTP path | Remote destination folder for the ZIP. |
+| Cloud folder | Local path of a folder already synced by a cloud service. |
+| Send to Telegram | Sends a copy to Telegram using the configured bot. |
+| Test FTP | Checks connection, login, remote path, a test upload and removal. |
+| Available backups / Verify | Table of snapshots with label, name, size and date; the Verify button checks the archive. |
