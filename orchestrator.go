@@ -960,12 +960,16 @@ func RunCycleDomain(
 				if free == nil {
 					stats.Error("min_free_space_unavailable")
 					logging.Warn("cycle: cannot determine free space for chosen download path, download skipped", "path", checkPath)
+					// Approval already wrote the episode/movie placeholder: undo it
+					// so the release stays eligible for a later cycle.
+					rollbackReleasePlaceholder(cfg, db, &release)
 					continue
 				}
 				if *free < *floor {
 					stats.Error("min_free_space")
 					logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
 						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
+					rollbackReleasePlaceholder(cfg, db, &release)
 					continue
 				}
 			}
@@ -976,11 +980,7 @@ func RunCycleDomain(
 				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 			}
 			if err != nil {
-				if !cfg.DryRun {
-					if rollbackErr := db.RollbackRelease(&release); rollbackErr != nil {
-						logging.Warn("release rollback failed", "error", rollbackErr)
-					}
-				}
+				rollbackReleasePlaceholder(cfg, db, &release)
 				// A single release refused by the engine must not abort the whole
 				// cycle: the placeholder is already rolled back, so record the
 				// failure and continue with the remaining candidates.
@@ -1353,6 +1353,21 @@ func downloadPathFreeSpaceFloor(cfg *Config, path string, global *uint64) *uint6
 		return &margin
 	}
 	return global
+}
+
+// rollbackReleasePlaceholder undoes the episode/movie placeholder that
+// approval writes before the torrent is handed to the engine. It is called
+// whenever a release is not started after all (space guard, engine refusal),
+// so the release stays eligible for a later cycle instead of looking like an
+// already-downloaded duplicate. Dry runs write no placeholder, so it is a
+// no-op there.
+func rollbackReleasePlaceholder(cfg *Config, db *Database, release *models.Release) {
+	if cfg.DryRun {
+		return
+	}
+	if err := db.RollbackRelease(release); err != nil {
+		logging.Warn("release rollback failed", "error", err)
+	}
 }
 
 func domainIs(domain *string, value string) bool {
