@@ -814,6 +814,83 @@ func TestTmdbOrderOrMax(t *testing.T) {
 	}
 }
 
+func TestTmdbSearchSeriesCachesResults(t *testing.T) {
+	var calls atomic.Int32
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		tmdbWriteJSON(t, w, `{"results":[{"id":42,"name":"Example","title":null}]}`)
+	})
+	client := NewTmdbClient(tmdbTestKey())
+	first, err := client.SearchSeries(context.Background(), "Example")
+	if err != nil {
+		t.Fatalf("first SearchSeries: %v", err)
+	}
+	second, err := client.SearchSeries(context.Background(), "Example")
+	if err != nil {
+		t.Fatalf("second SearchSeries: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("HTTP calls = %d, want 1 (second lookup served from cache)", calls.Load())
+	}
+	if len(first) != 1 || len(second) != 1 || second[0].ID != 42 {
+		t.Fatalf("first=%+v second=%+v", first, second)
+	}
+}
+
+func TestTmdbSearchMovieCachesResultAndMiss(t *testing.T) {
+	var calls atomic.Int32
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Query().Get("query") == "Missing" {
+			tmdbWriteJSON(t, w, `{"results":[]}`)
+			return
+		}
+		tmdbWriteJSON(t, w, `{"results":[{"id":42,"title":"Example","name":null}]}`)
+	})
+	client := NewTmdbClient(tmdbTestKey())
+	year := int64(2020)
+	first, err := client.SearchMovie(context.Background(), "Example", &year)
+	if err != nil || first == nil || first.ID != 42 {
+		t.Fatalf("first SearchMovie = %+v, %v", first, err)
+	}
+	cached, err := client.SearchMovie(context.Background(), "Example", &year)
+	if err != nil || cached == nil || cached.ID != 42 {
+		t.Fatalf("cached SearchMovie = %+v, %v", cached, err)
+	}
+	if item, err := client.SearchMovie(context.Background(), "Missing", &year); err != nil || item != nil {
+		t.Fatalf("miss SearchMovie = %+v, %v", item, err)
+	}
+	if item, err := client.SearchMovie(context.Background(), "Missing", &year); err != nil || item != nil {
+		t.Fatalf("cached miss SearchMovie = %+v, %v", item, err)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("HTTP calls = %d, want 2 (result + miss cached)", calls.Load())
+	}
+}
+
+func TestTmdbSeasonCountsCaches(t *testing.T) {
+	var calls atomic.Int32
+	tmdbTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		tmdbWriteJSON(t, w, `{"seasons":[{"season_number":1,"episode_count":10},{"season_number":2,"episode_count":8}]}`)
+	})
+	client := NewTmdbClient(tmdbTestKey())
+	first, err := client.SeasonCounts(context.Background(), "1399")
+	if err != nil {
+		t.Fatalf("first SeasonCounts: %v", err)
+	}
+	second, err := client.SeasonCounts(context.Background(), "1399")
+	if err != nil {
+		t.Fatalf("second SeasonCounts: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("HTTP calls = %d, want 1 (cached)", calls.Load())
+	}
+	if first[1] != 10 || first[2] != 8 || second[1] != 10 || second[2] != 8 {
+		t.Fatalf("first=%v second=%v", first, second)
+	}
+}
+
 func ptr[T any](value T) *T {
 	return &value
 }

@@ -168,11 +168,9 @@ func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, fi
 		}
 	}
 	var replacedTitleValue any
-	var replacedScoreValue any
 	if s.db != nil {
-		if replacedName, replacedScore, ok := s.db.UpgradeReplacedInfo(hash); ok {
+		if replacedName, ok := s.db.UpgradeReplacedInfo(hash); ok {
 			replacedTitleValue = replacedName
-			replacedScoreValue = replacedScore
 		}
 	}
 	if err := s.notifier.NotifyEvent("torrent_completed", map[string]any{
@@ -188,7 +186,6 @@ func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, fi
 		"duration_seconds":  durationSeconds,
 		"average_speed_bps": averageSpeedBps,
 		"replaced_title":    replacedTitleValue,
-		"replaced_score":    replacedScoreValue,
 		"manual":            release == nil,
 	}); err != nil {
 		logging.Warn("archive completion notification failed", "hash", hash, "title", title, "error", err)
@@ -282,6 +279,10 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 					if (inRamdisk || inTemp) && !SamePath(source, *processed) {
 						_ = os.RemoveAll(source)
 					}
+					// Already finalized on disk, but the caller (manual archive from
+					// the UI/trash modal) still expects a completion notification.
+					size, _ := SizeOfPath(*processed)
+					notifyArchivedTorrent(s, hash, release, *processed, size, targetTorrent.Name)
 					removalName, removalState, _ := manualTorrentRemovalInfo(s, hash)
 					removed, err := s.activeEngine().Remove(hash, false)
 					if err == nil && removed {

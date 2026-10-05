@@ -1680,12 +1680,10 @@ func trashOrRemove(path string, cfg *Config) error {
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(path)
 	}
-	trash := cfg.ResolveTrashPath()
-	if strings.TrimSpace(trash) != "" {
-		_, err := MoveToTrash(path, trash)
-		return err
-	}
-	return fmt.Errorf("trash_path is required when cleanup_action is move")
+	// ResolveTrashPath always yields a usable directory (configured trash_path
+	// or <data>/trash); MoveToTrash creates it when missing.
+	_, err := MoveToTrash(path, cfg.ResolveTrashPath())
+	return err
 }
 
 // safeComponent replaces the characters that cannot appear in a file name.

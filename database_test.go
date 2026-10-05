@@ -1864,3 +1864,79 @@ func TestProviderBackoffEscalatesAndRecovers(t *testing.T) {
 	}
 	assertEqual(t, len(statuses), 0)
 }
+
+func TestCheckMovieScoredMatchesYearWithinTolerance(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO movies(name,year,title,quality_score) VALUES ('Example',2020,'Example',100)"); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{
+		Title:   "Example",
+		Kind:    "movie",
+		Year:    int64Ptr(2021),
+		Magnet:  "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Quality: models.Quality{Resolution: "1080p"},
+	}
+	approved, action, err := db.CheckMovieScored(&release, 200, 50)
+	if err != nil {
+		t.Fatalf("CheckMovieScored: %v", err)
+	}
+	if !approved || action != "upgrade" {
+		t.Fatalf("approved=%v action=%q, want upgrade within ±1 year", approved, action)
+	}
+}
+
+func TestCheckMovieScoredIgnoresYearOutsideTolerance(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO movies(name,year,title,quality_score) VALUES ('Example',2020,'Example',100)"); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{
+		Title:   "Example",
+		Kind:    "movie",
+		Year:    int64Ptr(2023),
+		Magnet:  "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Quality: models.Quality{Resolution: "1080p"},
+	}
+	approved, action, err := db.CheckMovieScored(&release, 200, 50)
+	if err != nil {
+		t.Fatalf("CheckMovieScored: %v", err)
+	}
+	if !approved || action != "approved" {
+		t.Fatalf("approved=%v action=%q, want a new approved download", approved, action)
+	}
+	var score int64
+	if err := db.db.QueryRow("SELECT quality_score FROM movies WHERE name='Example' AND year=2020").Scan(&score); err != nil {
+		t.Fatal(err)
+	}
+	if score != 100 {
+		t.Fatalf("existing 2020 score = %d, want 100 (untouched)", score)
+	}
+}
+
+func TestCheckMovieScoredPrefersExactYear(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO movies(name,year,title,quality_score) VALUES ('Example',2020,'Example',100),('Example',2021,'Example',150)"); err != nil {
+		t.Fatal(err)
+	}
+	release := models.Release{
+		Title:   "Example",
+		Kind:    "movie",
+		Year:    int64Ptr(2021),
+		Magnet:  "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+		Quality: models.Quality{Resolution: "1080p"},
+	}
+	if _, action, err := db.CheckMovieScored(&release, 200, 50); err != nil || action != "upgrade" {
+		t.Fatalf("action=%q err=%v, want upgrade", action, err)
+	}
+	var score2020, score2021 int64
+	if err := db.db.QueryRow("SELECT quality_score FROM movies WHERE name='Example' AND year=2020").Scan(&score2020); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.db.QueryRow("SELECT quality_score FROM movies WHERE name='Example' AND year=2021").Scan(&score2021); err != nil {
+		t.Fatal(err)
+	}
+	if score2021 != 200 || score2020 != 100 {
+		t.Fatalf("scores 2020=%d 2021=%d, want 100/200 (exact year replaced)", score2020, score2021)
+	}
+}

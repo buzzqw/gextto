@@ -4292,25 +4292,29 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	return true, nil
 }
 
-// UpgradeReplacedInfo returns information about previous releases replaced by
-// this upgrade, if an upgrade backup was recorded.
-func (d *Database) UpgradeReplacedInfo(hash string) (string, int64, bool) {
+// UpgradeReplacedInfo returns the name of the previous release replaced by this
+// upgrade, if an upgrade backup was recorded. It returns false when there is no
+// usable backup entry.
+func (d *Database) UpgradeReplacedInfo(hash string) (string, bool) {
 	normalized := strings.ToLower(hash)
 	var payload sql.NullString
 	err := d.db.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", normalized).Scan(&payload)
 	if err != nil || !payload.Valid || payload.String == "" {
-		return "", 0, false
+		return "", false
 	}
 	backups, err := decodeUpgradeBackups(payload.String)
 	if err != nil || len(backups) == 0 {
-		return "", 0, false
+		return "", false
 	}
 	first := backups[0]
 	name := first.Title
 	if first.ArchivePath != nil && *first.ArchivePath != "" {
 		name = filepath.Base(*first.ArchivePath)
 	}
-	return name, first.QualityScore, true
+	if strings.TrimSpace(name) == "" {
+		return "", false
+	}
+	return name, true
 }
 
 // SaveCycle stores one cycle history entry.

@@ -1086,10 +1086,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						}
 					}
 					var replacedTitleValue any
-					var replacedScoreValue any
-					if replacedName, replacedScore, ok := db.UpgradeReplacedInfo(event.Hash); ok {
+					if replacedName, ok := db.UpgradeReplacedInfo(event.Hash); ok {
 						replacedTitleValue = replacedName
-						replacedScoreValue = replacedScore
 					}
 					if err := notifier.NotifyEvent("torrent_completed", map[string]any{
 						"hash":              event.Hash,
@@ -1104,7 +1102,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						"duration_seconds":  durationSeconds,
 						"average_speed_bps": averageSpeedBps,
 						"replaced_title":    replacedTitleValue,
-						"replaced_score":    replacedScoreValue,
 					}); err != nil {
 						logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
 					} else {

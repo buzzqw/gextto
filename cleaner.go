@@ -72,7 +72,7 @@ func IndexArchive(seriesName, archivePath string, settings map[string]string) mo
 			}
 		}
 		if !matched {
-			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
 			if ok && SeriesNamesMatch(normalized, idSeries) {
 				season = idSeason
 				episode = idEpisode
@@ -224,11 +224,9 @@ func handleDuplicate(file string, cfg *Config) error {
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(file)
 	}
-	trash := cfg.ResolveTrashPath()
-	if strings.TrimSpace(trash) == "" {
-		return fmt.Errorf("trash_path is required when cleanup_action is move")
-	}
-	_, err := MoveToTrash(file, trash)
+	// ResolveTrashPath always yields a usable directory (configured trash_path
+	// or <data>/trash); MoveToTrash creates it when missing.
+	_, err := MoveToTrash(file, cfg.ResolveTrashPath())
 	return err
 }
 
@@ -475,7 +473,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 			}
 		}
 		if !epMatched {
-			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
 			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
 				epMatched = true
 			}
@@ -599,7 +597,7 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 			}
 		}
 		if !matched {
-			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
 			if ok && SeriesNamesMatch(normalized, idSeries) {
 				season = idSeason
 				episode = idEpisode
@@ -748,7 +746,7 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 			}
 		}
 		if !epMatched {
-			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
 			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
 				epMatched = true
 			}
@@ -1036,7 +1034,7 @@ func cleanerEpisodeMatches(pattern *regexp.Regexp, captures []string, season, ep
 // archived file. When the file name itself lacks the series title (common in
 // season subfolders like "Stagione 01/S01E02.mkv" or "Stagione 01/02 - Titolo.mkv"),
 // it falls back to inspecting the ancestor directories.
-func extractEpisodeIdentityFromPath(filePath, fileName, archivePath string) (series string, season int64, episode int64, ok bool) {
+func extractEpisodeIdentityFromPath(filePath, fileName string) (series string, season int64, episode int64, ok bool) {
 	primaryPattern, err := utils.CachedRegex(`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})(?:[ ._-]|$)`)
 	if err == nil {
 		if captures := primaryPattern.FindStringSubmatch(fileName); captures != nil {
