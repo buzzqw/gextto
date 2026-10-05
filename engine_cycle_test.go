@@ -380,3 +380,35 @@ func TestScrapeAllRunsTitleSearchWhenForced(t *testing.T) {
 		t.Fatalf("expected 2 releases (feed + indexer), got %d: %+v", len(releases), releases)
 	}
 }
+
+// TestDownloadPathFreeSpaceFloorUsesRamdiskBudget pins the fix for the
+// regression where the global `min_free_space_gb` floor was applied to the RAM
+// disk. A small tmpfs can never satisfy a floor sized for the primary download
+// volume, so every download routed there was silently skipped. The RAM disk
+// must be measured against its own budget instead.
+func TestDownloadPathFreeSpaceFloorUsesRamdiskBudget(t *testing.T) {
+	state := newCycleState(t)
+	cfg := *state.cfg
+	ramdisk := t.TempDir()
+	other := t.TempDir()
+	cfg.Settings = map[string]string{
+		"min_free_space_gb":            "250",
+		"libtorrent_ramdisk_dir":       ramdisk,
+		"libtorrent_ramdisk_enabled":   "yes",
+		"libtorrent_ramdisk_margin_gb": "0.5",
+	}
+	global := uint64(250) * 1024 * 1024 * 1024
+
+	if got := downloadPathFreeSpaceFloor(&cfg, ramdisk, &global); got == nil || *got != cfg.RamdiskMarginBytes() {
+		t.Fatalf("ramdisk floor = %v, want margin %d", got, cfg.RamdiskMarginBytes())
+	}
+
+	cfg.Settings["libtorrent_ramdisk_min_free_bytes"] = "1048576"
+	if got := downloadPathFreeSpaceFloor(&cfg, ramdisk, &global); got == nil || *got != 1048576 {
+		t.Fatalf("ramdisk explicit floor = %v, want 1048576", got)
+	}
+
+	if got := downloadPathFreeSpaceFloor(&cfg, other, &global); got == nil || *got != global {
+		t.Fatalf("primary volume floor = %v, want %d", got, global)
+	}
+}

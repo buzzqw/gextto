@@ -947,23 +947,25 @@ func RunCycleDomain(
 			// The global guard measures the default download volume; a tag rule,
 			// the RAM-disk overflow or the RAM disk itself can redirect the
 			// download to another filesystem, so verify the chosen path too.
+			// When no explicit path is forced, mirror the engine fallback so the
+			// volume actually used is the one being checked.
 			checkPath := ""
 			if preferredPath != nil {
 				checkPath = *preferredPath
-			} else if ramdisk := cfg.RamdiskDir(); ramdisk != nil && ReleaseFitsRamdisk(&release, cfg) {
-				checkPath = *ramdisk
+			} else {
+				checkPath = preferredDownloadPath(cfg)
 			}
-			if minFreeBytes != nil && checkPath != "" {
+			if floor := downloadPathFreeSpaceFloor(cfg, checkPath, minFreeBytes); floor != nil && checkPath != "" {
 				free := FreeSpaceBytes(checkPath)
 				if free == nil {
 					stats.Error("min_free_space_unavailable")
 					logging.Warn("cycle: cannot determine free space for chosen download path, download skipped", "path", checkPath)
 					continue
 				}
-				if *free < *minFreeBytes {
+				if *free < *floor {
 					stats.Error("min_free_space")
-					logging.Warn("cycle: free space below min_free_space_gb for chosen download path, download skipped",
-						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*minFreeBytes))
+					logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
+						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
 					continue
 				}
 			}
@@ -1332,6 +1334,25 @@ func cycleCancelled(ctx context.Context) bool {
 	}
 	logging.Info("cycle interrupted: daemon is shutting down")
 	return true
+}
+
+// downloadPathFreeSpaceFloor returns the minimum free space to require on a
+// download target. The RAM disk is a small tmpfs with its own dedicated budget
+// (`libtorrent_ramdisk_min_free_bytes`, falling back to
+// `libtorrent_ramdisk_margin_gb`), so it must not be measured against the
+// global `min_free_space_gb` floor, which is meant for the primary download
+// volume: a 6 GB tmpfs can never satisfy a floor sized for a multi-TB volume,
+// which would silently block every download routed there. `global` is the
+// already-parsed global floor (nil when disabled).
+func downloadPathFreeSpaceFloor(cfg *Config, path string, global *uint64) *uint64 {
+	if ramdisk := cfg.RamdiskDir(); ramdisk != nil && path == *ramdisk {
+		margin := cfg.RamdiskMinFreeBytes()
+		if margin == 0 {
+			margin = cfg.RamdiskMarginBytes()
+		}
+		return &margin
+	}
+	return global
 }
 
 func domainIs(domain *string, value string) bool {
