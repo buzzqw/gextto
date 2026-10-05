@@ -13,6 +13,7 @@ type uiSettingsTab struct{ ID, Label string }
 var uiScoreSettingDefs = []uiSettingDef{
 	{Key: "score_res_2160p", Label: "2160p", Tab: "scores"}, {Key: "score_res_1080p", Label: "1080p", Tab: "scores"},
 	{Key: "score_res_720p", Label: "720p", Tab: "scores"}, {Key: "score_res_576p", Label: "576p", Tab: "scores"},
+	{Key: "score_res_480p", Label: "480p", Tab: "scores"}, {Key: "score_res_360p", Label: "360p", Tab: "scores"},
 	{Key: "score_source_bluray", Label: "BluRay", Tab: "scores"}, {Key: "score_source_remux", Label: "Remux", Tab: "scores"},
 	{Key: "score_source_webdl", Label: "WEB-DL", Tab: "scores"}, {Key: "score_source_webrip", Label: "WEBRip", Tab: "scores"},
 	{Key: "score_source_hdtv", Label: "HDTV", Tab: "scores"}, {Key: "score_source_dvdrip", Label: "DVDRip", Tab: "scores"},
@@ -34,11 +35,17 @@ var uiScoreSettingKeys = func() map[string]bool {
 	return keys
 }()
 
-// These aliases remain honored by the scorer for old installations, but are
-// deliberately not editable: parsing normalizes them to the canonical keys.
+// Score keys that are deliberately not editable in the Punteggi tab.
+//
+// The aliases (x265/hevc/x264/avc/eac3) are folded into one canonical key per
+// parsed token. The *_unknown/_mult keys are legacy or orphan values the scorer
+// never reads: showing them would offer a control that does nothing.
 var uiDeprecatedScoreSettingKeys = map[string]bool{
 	"score_codec_x265": true, "score_codec_hevc": true, "score_codec_x264": true,
 	"score_codec_avc": true, "score_audio_eac3": true,
+	"score_res_mult": true, "score_res_unknown": true,
+	"score_codec_unknown": true, "score_audio_unknown": true,
+	"score_source_unknown": true,
 }
 
 var uiSettingsTabs = []uiSettingsTab{

@@ -481,6 +481,13 @@ func ParseQuality(title string) models.Quality {
 	// --- Sorgente ---
 	source := "unknown"
 	switch {
+	// REMUX must win over the generic BluRay match below: the two co-occur in
+	// the same title ("...BluRay.REMUX..."), and the parser used to never emit
+	// this source, which made score_source_remux and the whole remux upgrade
+	// path (Quality.IsRemux, UpgradeReason, incumbentWins) unreachable. Italian
+	// releases are almost always tagged "BDRemux", which contains "remux".
+	case strings.Contains(low, "remux"):
+		source = "remux"
 	case strings.Contains(low, "bluray") || strings.Contains(low, "bdrip") || strings.Contains(low, "brrip"):
 		source = "bluray"
 	// WEBRip must be checked before the generic "web" catch-all: otherwise

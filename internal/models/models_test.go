@@ -132,13 +132,27 @@ func TestScoreSettingsDoNotApplyDTSModifierToDTSHD(t *testing.T) {
 	}
 }
 
-func TestScoreSettingsUseLegacyAliasesOnlyAsFallback(t *testing.T) {
-	quality := Quality{Codec: "h265", Audio: "ddp"}
-	if got, want := quality.ScoreWithSettings(map[string]string{"score_codec_x265": "500", "score_audio_eac3": "90"}), int64(590); got != want {
-		t.Fatalf("legacy aliases score = %d, want %d", got, want)
+func TestScoreSettingsUseOneKeyPerToken(t *testing.T) {
+	// Legacy alias keys (x265, eac3, ...) are no longer read: each parsed token
+	// has exactly one configurable key.
+	h265 := Quality{Codec: "h265", Audio: "ddp"}
+	if got, want := h265.ScoreWithSettings(map[string]string{"score_codec_h265": "500"}), int64(580); got != want {
+		t.Fatalf("canonical codec score = %d, want %d", got, want)
 	}
-	if got, want := quality.ScoreWithSettings(map[string]string{"score_codec_h265": "300", "score_codec_x265": "500"}), int64(380); got != want {
-		t.Fatalf("canonical codec did not take precedence: %d, want %d", got, want)
+	if got, want := h265.ScoreWithSettings(map[string]string{"score_codec_x265": "999"}), h265.Score(); got != want {
+		t.Fatalf("legacy codec alias affected the score: %d != %d", got, want)
+	}
+	if got, want := h265.ScoreWithSettings(map[string]string{"score_audio_eac3": "999"}), h265.Score(); got != want {
+		t.Fatalf("legacy audio alias affected the score: %d != %d", got, want)
+	}
+	// AC3 and 5.1 are distinct tokens with their own key.
+	ac3 := Quality{Audio: "ac3"}
+	if got, want := ac3.ScoreWithSettings(map[string]string{"score_audio_ac3": "111"}), int64(111); got != want {
+		t.Fatalf("ac3 score = %d, want %d", got, want)
+	}
+	fiveOne := Quality{Audio: "5.1"}
+	if got, want := fiveOne.ScoreWithSettings(map[string]string{"score_audio_5.1": "77"}), int64(77); got != want {
+		t.Fatalf("5.1 score = %d, want %d", got, want)
 	}
 }
 
@@ -149,13 +163,14 @@ func TestUnknownGroupDoesNotBehaveAsGlobalGroup(t *testing.T) {
 	}
 }
 
-func TestDolbyVisionUsesOnlyItsDedicatedBonus(t *testing.T) {
+func TestDolbyVisionAndHdrAreAdditive(t *testing.T) {
+	// A Dolby Vision release carries HDR="DV": both bonuses apply.
 	quality := Quality{HDR: "DV", IsDV: true}
-	if got, want := quality.Score(), int64(300); got != want {
-		t.Fatalf("Dolby Vision base score = %d, want %d", got, want)
+	if got, want := quality.Score(), int64(400); got != want {
+		t.Fatalf("Dolby Vision + HDR base score = %d, want %d", got, want)
 	}
-	if got, want := quality.ScoreWithSettings(map[string]string{"score_bonus_hdr": "999"}), int64(300); got != want {
-		t.Fatalf("HDR override affected Dolby Vision: got %d, want %d", got, want)
+	if got, want := quality.ScoreWithSettings(map[string]string{"score_bonus_hdr": "150"}), int64(450); got != want {
+		t.Fatalf("HDR override score = %d, want %d", got, want)
 	}
 }
 

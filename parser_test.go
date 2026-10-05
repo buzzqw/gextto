@@ -119,6 +119,46 @@ func TestParsesRenamedBracketQualityTagsWithoutFalseLanguageMatches(t *testing.T
 	}
 }
 
+func TestParsesRemuxAsSource(t *testing.T) {
+	// REMUX is an Italian-common tag ("BDRemux") that the parser used to map to
+	// "unknown" (or "bluray" when the title also said BluRay), leaving the
+	// score_source_remux weight and the whole remux upgrade path dead.
+	for _, title := range []string{
+		"Movie.2024.2160p.UHD.BluRay.REMUX.DV.HDR10.ITA.ENG.DTS-HD.x265-GROUP",
+		"Spider-Man.2002.4K.HDR.DV.2160p.BDRemux Ita Eng x265-NAHOM",
+		"Movie 2024 2160p BD-REMUX iTA ENG",
+		"Movie.2024.2160p.REMUX.ita",
+	} {
+		quality := ParseQuality(title)
+		if quality.Source != "remux" {
+			t.Fatalf("%s: source = %q, want remux", title, quality.Source)
+		}
+		if !quality.IsRemux() {
+			t.Fatalf("%s: IsRemux() = false, want true", title)
+		}
+	}
+	// A plain BluRay stays bluray, and "BDMux" is not a remux.
+	if got := ParseQuality("Movie.2024.2160p.BluRay.ITA.x264").Source; got != "bluray" {
+		t.Fatalf("plain bluray source = %q, want bluray", got)
+	}
+	if got := ParseQuality("Movie.2024.2160p.BDMux.ITA.x264").Source; got != "unknown" {
+		t.Fatalf("bdmux source = %q, want unknown", got)
+	}
+}
+
+func TestRemuxUpgradeReasonReachableFromParsedTitles(t *testing.T) {
+	// A parsed REMUX must be able to replace a lower-ranked source (WEB-DL) via
+	// the dedicated remux reason, not only through the generic score delta.
+	old := ParseQuality("Movie.2024.2160p.WEB-DL.ITA.x265.DTS-HD")
+	remux := ParseQuality("Movie.2024.2160p.BluRay.REMUX.ITA.x265.DTS-HD")
+	if old.Source != "webdl" || remux.Source != "remux" {
+		t.Fatalf("sources = %q / %q, want webdl / remux", old.Source, remux.Source)
+	}
+	if got := remux.UpgradeReason(&old, remux.Score(), old.Score(), 200); got != "remux" {
+		t.Fatalf("upgrade reason = %q, want remux", got)
+	}
+}
+
 func TestRejectsMagnetTruncatedTitles(t *testing.T) {
 	// BTDigg a volte usa un magnet troncato come testo del link: non è un
 	// titolo valido e non deve produrre una release.

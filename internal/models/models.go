@@ -47,6 +47,8 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 		resolution = 400
 	case "576p":
 		resolution = 80
+	case "480p":
+		resolution = 40
 	case "360p":
 		resolution = 20
 	}
@@ -55,7 +57,10 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 	case "bluray":
 		source = 300
 	case "remux":
-		source = 280
+		// A REMUX is a lossless copy of the disc, so it must rank above a
+		// BluRay re-encode. It used to be 280 (< bluray), a leftover that never
+		// mattered while ParseQuality could not emit this source.
+		source = 400
 	case "webdl":
 		source = 200
 	case "webrip":
@@ -90,9 +95,10 @@ func (q *Quality) ScoreBreakdown() []ScoreBreakdownItem {
 		audio = 10
 	}
 	hdr := int64(0)
-	// Dolby Vision has its own score component. Counting it again as generic
-	// HDR makes the two separately configurable UI modifiers inseparable.
-	if q.HDR != "" && !q.IsDV {
+	// HDR is additive with Dolby Vision. The parser tags a DV release with
+	// HDR="DV", so a Dolby Vision release gets both the HDR and the DV bonus
+	// unless the operator zeroes one of the two keys in the Punteggi tab.
+	if q.HDR != "" {
 		hdr = 100
 	}
 	dv := int64(0)
@@ -264,6 +270,7 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 		def int64
 	}{
 		{"2160p", 2000}, {"1080p", 1000}, {"720p", 400}, {"576p", 80},
+		{"480p", 40}, {"360p", 20},
 	} {
 		adjust(item.def, q.Resolution == item.res, "score_res_"+item.res)
 	}
@@ -271,16 +278,19 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 		src string
 		def int64
 	}{
-		{"bluray", 300}, {"remux", 280}, {"webdl", 200}, {"webrip", 150},
+		{"bluray", 300}, {"remux", 400}, {"webdl", 200}, {"webrip", 150},
 		{"hdtv", 50}, {"dvdrip", 20},
 	} {
 		adjust(item.def, q.Source == item.src, "score_source_"+item.src)
 	}
-	adjust(200, q.Codec == "h265" || q.Codec == "x265" || q.Codec == "hevc", "score_codec_h265", "score_codec_x265", "score_codec_hevc")
-	adjust(50, q.Codec == "h264" || q.Codec == "x264" || q.Codec == "avc", "score_codec_h264", "score_codec_x264", "score_codec_avc")
+	// One configurable key per parsed token. The parser normalizes the codec to
+	// h265/h264, so x265/hevc/x264/avc are accepted spellings of the same token
+	// but they no longer have their own keys.
+	adjust(200, q.Codec == "h265" || q.Codec == "x265" || q.Codec == "hevc", "score_codec_h265")
+	adjust(50, q.Codec == "h264" || q.Codec == "x264" || q.Codec == "avc", "score_codec_h264")
 
-	// Audio is a single parsed category. Exact matching keeps DTS and DTS-HD
-	// independent; aliases retain the behavior of old stored configurations.
+	// Audio is a single parsed token. Each audio value has exactly one key;
+	// DTS/DTS-HD and AC3/5.1 stay independent (eac3 normalizes to ddp).
 	switch {
 	case strings.Contains(q.Audio, "truehd"):
 		adjust(150, true, "score_audio_truehd")
@@ -289,16 +299,20 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	case strings.Contains(q.Audio, "dts"):
 		adjust(100, true, "score_audio_dts")
 	case strings.Contains(q.Audio, "ddp") || strings.Contains(q.Audio, "eac3"):
-		adjust(80, true, "score_audio_ddp", "score_audio_eac3")
-	case strings.Contains(q.Audio, "ac3") || strings.Contains(q.Audio, "5.1"):
-		adjust(50, true, "score_audio_ac3", "score_audio_5.1")
+		adjust(80, true, "score_audio_ddp")
+	case strings.Contains(q.Audio, "ac3"):
+		adjust(50, true, "score_audio_ac3")
+	case strings.Contains(q.Audio, "5.1"):
+		adjust(50, true, "score_audio_5.1")
 	case strings.Contains(q.Audio, "aac"):
 		adjust(30, true, "score_audio_aac")
 	case strings.Contains(q.Audio, "mp3"):
 		adjust(10, true, "score_audio_mp3")
 	}
+	// HDR and Dolby Vision are additive; a DV release carries HDR="DV", so it
+	// receives both bonuses.
 	adjust(300, q.IsDV, "score_bonus_dv")
-	adjust(100, q.HDR != "" && !q.IsDV, "score_bonus_hdr")
+	adjust(100, q.HDR != "", "score_bonus_hdr")
 	adjust(75, q.IsProper, "score_bonus_proper")
 	adjust(100, q.IsRepack, "score_bonus_repack")
 	adjust(100, q.IsReal, "score_bonus_real")
