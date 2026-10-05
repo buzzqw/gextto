@@ -1259,51 +1259,48 @@ func tev_associateExistingPostSeedStorage(torrents TorrentSession, db *Database,
 	return true, nil
 }
 
-// RecoverCompletedArchives repairs a completed torrent whose storage was
-// already associated with its archive before the completion record was saved.
-// This is primarily for recovery after a daemon restart between reset_save_path
-// and the next completion pass.
-func RecoverCompletedArchives(cfg *Config, torrents TorrentSession, db *Database) {
-	for _, torrent := range torrents.List() {
-		status, err := db.TorrentStatus(torrent.Hash)
-		if err != nil || status == nil || *status != "completed" {
-			continue
-		}
-		processed, err := db.TorrentProcessed(torrent.Hash)
-		if err != nil || processed == nil || strings.TrimSpace(*processed) != "" {
-			continue
-		}
-		meta, err := db.TorrentMeta(torrent.Hash)
-		if err != nil || meta == nil {
-			continue
-		}
-		destination, ok := ConfiguredDestinationFor(&meta.Release, cfg)
-		if !ok || !SamePath(torrent.SavePath, destination) {
-			continue
-		}
-		target := CompletionPath(&models.TorrentEvent{
-			Hash:     torrent.Hash,
-			Name:     torrent.Name,
-			SavePath: torrent.SavePath,
-		})
-		size, err := SizeOfPath(target)
-		if err != nil || torrent.TotalSize <= 0 || size < torrent.TotalSize {
-			continue
-		}
-		if torrent.Progress < 99.99 {
-			if checked, checkErr := torrents.ForceRecheck(torrent.Hash); checkErr != nil || !checked {
-				logging.Debug("existing archive recheck could not be started", "error", checkErr)
-			}
-		}
-		if err := db.MarkTorrentCompleted(torrent.Hash, target, size); err != nil {
-			logging.Warn("existing archive completion could not be recorded", "error", err)
-			continue
-		}
-		// This recovery can legitimately race the normal post-seed
-		// storage_moved alert. It is useful for diagnostics after an interrupted
-		// move, but redundant in the operator log after "MOVING TO NAS".
-		logging.Debug("recovered existing archive completion record", "path", target)
+// bg_torrentNeedsArchiveImport reports whether a completed single has already
+// been moved into its archive destination but the import phase (rename,
+// MediaInfo probe and completion notification) never ran. That happens when the
+// end-of-seed storage move reached the archive after its `storage_moved` alert
+// was lost (restart) or before the event was consumed. Such a torrent must be
+// finalized through the normal storage_moved path instead of being marked
+// complete with the raw archive path: the latter used to skip the rename and the
+// completion notification (Marshals regression).
+func bg_torrentNeedsArchiveImport(cfg *Config, db *Database, torrent *models.TorrentView) bool {
+	if cfg == nil || db == nil || torrent == nil {
+		return false
 	}
+	if !torrent.HasMetadata || torrent.TotalSize <= 0 {
+		return false
+	}
+	status, err := db.TorrentStatus(torrent.Hash)
+	if err != nil || status == nil || *status != "completed" {
+		return false
+	}
+	processed, err := db.TorrentProcessed(torrent.Hash)
+	if err != nil || (processed != nil && strings.TrimSpace(*processed) != "") {
+		return false
+	}
+	meta, err := db.TorrentMeta(torrent.Hash)
+	if err != nil || meta == nil {
+		return false
+	}
+	destination, ok := ConfiguredDestinationFor(&meta.Release, cfg)
+	if !ok || strings.TrimSpace(destination) == "" || !SamePath(torrent.SavePath, destination) {
+		return false
+	}
+	target := CompletionPath(&models.TorrentEvent{
+		Kind:     "storage_moved",
+		Hash:     torrent.Hash,
+		Name:     torrent.Name,
+		SavePath: torrent.SavePath,
+	})
+	size, sizeErr := SizeOfPath(target)
+	if sizeErr != nil || size < torrent.TotalSize {
+		return false
+	}
+	return true
 }
 
 // tev_ramdiskRelocation implements `ramdisk_relocation`. It returns the reason and

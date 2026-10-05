@@ -817,7 +817,6 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastRamdiskCheck = now
 		}
 		RetryStorageMoves(torrents, moveRequests, postSeedMoves, storageMoveRetries)
-		RecoverCompletedArchives(cfg, torrents, db)
 		torrentEvents := torrents.PollEvents()
 		eventHashes := map[string]struct{}{}
 		for _, event := range torrentEvents {
@@ -828,20 +827,51 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		// Recreate the event from the persisted torrent status so postprocess and
 		// notifications are not silently skipped.
 		for _, torrent := range torrents.List() {
-			if !torrent.HasMetadata || torrent.Progress < 99.99 {
+			if !torrent.HasMetadata {
 				continue
 			}
 			hash := strings.ToLower(torrent.Hash)
 			if _, ok := eventHashes[hash]; ok {
 				continue
 			}
+			_, inMoves := moveRequests[hash]
+			_, inRetries := storageMoveRetries[hash]
+			_, inPostSeed := postSeedMoves[hash]
+			if inMoves || inRetries || inPostSeed {
+				continue
+			}
+			// A completed single whose end-of-seed move already reached the
+			// archive but whose import never ran (lost storage_moved alert, or a
+			// restart) is finalized through the normal storage_moved path. Marking
+			// the raw archive path complete here would skip the rename, the
+			// MediaInfo probe and the completion notification.
+			if bg_torrentNeedsArchiveImport(cfg, db, &torrent) {
+				if torrent.Progress < 99.99 {
+					if checked, checkErr := torrents.ForceRecheck(hash); checkErr != nil || !checked {
+						logging.Debug("existing archive recheck could not be started", "error", checkErr)
+					}
+					continue
+				}
+				logging.Debug("recovering completed torrent without completion event",
+					"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath,
+					"progress", torrent.Progress, "kind", "storage_moved")
+				torrentEvents = append(torrentEvents, models.TorrentEvent{
+					Kind:     "storage_moved",
+					Hash:     hash,
+					Name:     torrent.Name,
+					SavePath: torrent.SavePath,
+				})
+				eventHashes[hash] = struct{}{}
+				continue
+			}
+			if torrent.Progress < 99.99 {
+				continue
+			}
 			pending := false
 			if meta, err := db.TorrentMeta(hash); err == nil && meta != nil {
 				if status, err := db.TorrentStatus(hash); err == nil && status != nil {
 					if *status != "completed" && *status != "error" && *status != "removed" {
-						_, inMoves := moveRequests[hash]
-						_, inRetries := storageMoveRetries[hash]
-						pending = !inMoves && !inRetries
+						pending = true
 					}
 				}
 			}

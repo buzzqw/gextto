@@ -177,6 +177,45 @@ func TestSeedingCompletionAlreadyRecorded(t *testing.T) {
 	}
 }
 
+// TestBgTorrentNeedsArchiveImport pins the Marshals regression: after the
+// end-of-seed relocation the row is "completed" with an empty processed path, so
+// the archive import (rename, MediaInfo, completion notification) must still
+// run instead of being treated as already archived.
+func TestBgTorrentNeedsArchiveImport(t *testing.T) {
+	db, cfg, view, source, processed := seedTestSetup(t)
+	library := filepath.Dir(processed)
+	cfg.ArchiveRoot = &library
+
+	// Deferred state after the post-seed move: the completion marker is set but
+	// no processed path was recorded, and the payload now lives in the archive.
+	if _, err := db.db.Exec("UPDATE torrent_meta SET processed_path='' WHERE hash=?", seedTestHash); err != nil {
+		t.Fatal(err)
+	}
+	moved := filepath.Join(library, filepath.Base(source))
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(moved, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	view.HasMetadata = true
+	view.SavePath = library
+	view.TotalSize = int64(len(data))
+	view.TotalDone = int64(len(data))
+
+	if !bg_torrentNeedsArchiveImport(cfg, db, &view) {
+		t.Fatal("a completed single moved to the archive must still need its import")
+	}
+	// Once a processed path is recorded the import has run and must not repeat.
+	if err := db.MarkTorrentCompleted(seedTestHash, moved, int64(len(data))); err != nil {
+		t.Fatal(err)
+	}
+	if bg_torrentNeedsArchiveImport(cfg, db, &view) {
+		t.Fatal("a recorded archive copy must not be re-imported")
+	}
+}
+
 // TestDetachCompletedArchivedSinglesHonorsAutoRemove makes sure the recovery
 // pass does not remove kept completed singles behind the user's back.
 func TestDetachCompletedArchivedSinglesHonorsAutoRemove(t *testing.T) {
