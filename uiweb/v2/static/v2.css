@@ -414,8 +414,14 @@ html, body {
   font-size: 0.85rem;
   margin-left: 4px;
 }
-.htmx-request .archive-indicator,
-.htmx-request.archive-indicator {
+/* The "Ricerca web in corso…" spinner belongs to the archive table only and
+   must be shown only when the user ticked "Cerca anche nel web" (input "web"),
+   never for a plain local search. It stays display:none the rest of the time. */
+.archive-indicator {
+  display: none;
+}
+form:has(.archive-web-check input[type="checkbox"]:checked) .htmx-request .archive-indicator,
+form:has(.archive-web-check input[type="checkbox"]:checked) .htmx-request.archive-indicator {
   display: inline-block;
 }
 /* Busy feedback for user actions only. Auto-polling forms and buttons

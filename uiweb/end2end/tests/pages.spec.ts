@@ -218,3 +218,31 @@ test.describe("mobile", () => {
     expect(metrics.contentPaddingBottom).toBeGreaterThanOrEqual(metrics.sidebarHeight);
   });
 });
+
+test("la ricerca archivio mostra l'indicatore web solo se richiesto", async ({ page }) => {
+  // Slow down the archive table request so the spinner would stay visible while
+  // it is in flight, which is exactly the window the user sees.
+  await page.route("**/table?*", async (route) => {
+    if (!route.request().url().includes("view=archive")) {
+      await route.continue();
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await route.continue();
+  });
+
+  await page.goto("/?view=archive");
+  const indicator = page.locator(".archive-indicator");
+  const indicatorShown = () =>
+    indicator.evaluate((element) => getComputedStyle(element).display !== "none");
+
+  await page.fill('input[name="q"]', "matrix");
+  await page.getByRole("button", { name: "Cerca" }).click();
+  await page.waitForTimeout(300);
+  expect(await indicatorShown(), "local search must not advertise a web query").toBe(false);
+
+  await page.check('input[name="web"]');
+  await page.getByRole("button", { name: "Cerca" }).click();
+  await page.waitForTimeout(300);
+  expect(await indicatorShown(), "web search must show its indicator").toBe(true);
+});
