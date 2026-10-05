@@ -836,7 +836,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		} else if label == "" {
 			label = "Pausa"
 		}
-		attrs := `hx-post="/table/library" hx-vals='{"view":"` + view + `","scope":"` + scope + `","name":"` + templateEscapeJSAttr(name) + `","mode":"` + mode + `"}' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
+		attrs := `hx-post="/table/library" hx-vals='{"view":"` + view + `","scope":"` + scope + `","name":"` + templateEscapeJSAttr(name) + `","mode":"` + mode + `"}' hx-include="#v2-table-panel-` + view + ` form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
 		if confirm != "" {
 			attrs += ` hx-confirm="` + stdhtml.EscapeString(confirm) + `"`
 		}
@@ -846,7 +846,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		season := v2String(item["season"])
 		episode := v2String(item["episode"])
 		vals := `{"view":"` + view + `","series":"` + templateEscapeJSAttr(series) + `","season":"` + templateEscapeJSAttr(season) + `","episode":"` + templateEscapeJSAttr(episode) + `"}`
-		return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" hx-post="/table/gap-search" hx-vals='` + vals + `' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML">` + stdhtml.EscapeString(action.Label) + `</button>`
+		return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" hx-post="/table/gap-search" hx-vals='` + vals + `' hx-include="#v2-table-panel-` + view + ` form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "comic-edit":
 		id := v2String(item["id"])
 		return `<button class="btn sm" type="button" hx-get="/comics/edit?id=` + url.QueryEscape(id) + `" hx-target="#v2-modal" hx-swap="innerHTML" title="Modifica il fumetto monitorato">` + stdhtml.EscapeString(action.Label) + `</button>`
@@ -881,7 +881,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		body = "{}"
 	}
 	vals := `{"view":"` + view + `","path":"` + templateEscapeJSAttr(path) + `","method":"` + stdhtml.EscapeString(action.Method) + `","body":"` + templateEscapeJSAttr(body) + `"}`
-	attrs := `hx-post="/table/action" hx-vals='` + vals + `' hx-include="closest .panel form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
+	attrs := `hx-post="/table/action" hx-vals='` + vals + `' hx-include="#v2-table-panel-` + view + ` form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
 	if action.Confirm != "" {
 		attrs += ` hx-confirm="` + stdhtml.EscapeString(action.Confirm) + `"`
 	}
@@ -1078,8 +1078,11 @@ func V2TableGapSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // templateEscapeJSAttr escapes a value for use inside a single-quoted
-// hx-vals JSON attribute.
+// hx-vals JSON attribute. Backslash and double quote are escaped for the JSON
+// string, while the apostrophe becomes the HTML entity &#39;: a backslash does
+// not escape a quote in HTML, so `\'` would terminate the attribute and drop
+// the whole hx-vals payload (for example a title containing "l'Agente").
 func templateEscapeJSAttr(value string) string {
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, `'`, `\'`, "<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
+	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, `'`, `&#39;`, "<", `\u003c`, ">", `\u003e`, "&", `\u0026`)
 	return replacer.Replace(value)
 }

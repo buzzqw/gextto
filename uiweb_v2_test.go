@@ -625,7 +625,7 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 		Path:   "/api/archive/batch-download",
 		Body:   `{"items":[{"title":"{title}","magnet":"{magnet}","source":"{source}"}]}`,
 	}, uiTableSpec{})
-	if !strings.Contains(archiveAction, `hx-include="closest .panel form.toolbar"`) {
+	if !strings.Contains(archiveAction, `hx-include="#v2-table-panel-archive form.toolbar"`) {
 		t.Fatalf("archiveAction missing toolbar hx-include: %s", archiveAction)
 	}
 	if !strings.Contains(archiveAction, `\"title\":\"Minions 2026\"`) {
@@ -1079,5 +1079,67 @@ func TestUITorrentRatioFallsBackToDownloadedBytes(t *testing.T) {
 	}
 	if got := uiTorrentRatio(400, 100, 0, 1000); got != 4 {
 		t.Fatalf("ratio with all-time download = %v, want 4", got)
+	}
+}
+
+// TestV2TableRowActionHxValsStaysParseable guards the attribute escaping: a
+// title containing an apostrophe must not truncate the single-quoted hx-vals
+// attribute (which would drop view/path/body and break the row action).
+func TestV2TableRowActionHxValsStaysParseable(t *testing.T) {
+	item := map[string]any{
+		"title":  "Udemy - l'Agente & Co <test>",
+		"magnet": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40),
+	}
+	action := uiAction{Label: "Scarica", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}","magnet":"{magnet}"}]}`}
+	rendered := string(v2RenderActions("archive-t0", item, []uiAction{action}, uiTableSpec{}))
+
+	const attr = "hx-vals='"
+	start := strings.Index(rendered, attr)
+	if start < 0 {
+		t.Fatalf("hx-vals attribute missing: %s", rendered)
+	}
+	rest := rendered[start+len(attr):]
+	end := strings.IndexByte(rest, '\'')
+	if end < 0 {
+		t.Fatalf("hx-vals attribute is not closed: %s", rendered)
+	}
+	value := rest[:end]
+	if !strings.Contains(value, "&#39;") {
+		t.Fatalf("apostrophe must be an HTML entity, not a raw quote: %s", value)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(value), &payload); err != nil {
+		t.Fatalf("hx-vals is not valid JSON: %v\n%s", err, value)
+	}
+	if payload["path"] != "/api/archive/batch-download" {
+		t.Fatalf("hx-vals path = %v, want the action path", payload["path"])
+	}
+}
+
+// TestV2TableRowActionsPreserveToolbarSearch locks the row actions to include
+// the table toolbar form. Without it a row action (e.g. "Scarica" in the
+// archive) re-renders the table without the current query and the user's search
+// disappears. "closest .panel form.toolbar" does not work: closest() cannot
+// match a descendant selector when the form is not an ancestor of the button.
+func TestV2TableRowActionsPreserveToolbarSearch(t *testing.T) {
+	const view = "archive-t0"
+	want := `hx-include="#v2-table-panel-` + view + ` form.toolbar"`
+	cases := []struct {
+		name   string
+		item   map[string]any
+		action uiAction
+	}{
+		{"generic", map[string]any{"title": "Example", "magnet": "magnet:?xt=urn:btih:" + strings.Repeat("a", 40)}, uiAction{Label: "Scarica", Method: "POST", Path: "/api/archive/batch-download", Body: `{"items":[{"title":"{title}"}]}`}},
+		{"library", map[string]any{"name": "Example", "enabled": true}, uiAction{Label: "Pausa", Kind: "library-toggle", Method: "POST"}},
+		{"gap", map[string]any{"series": "Show", "season": 1, "episode": 2}, uiAction{Label: "Cerca", Kind: "gap-search", Method: "POST"}},
+	}
+	for _, tc := range cases {
+		rendered := string(v2RenderActions(view, tc.item, []uiAction{tc.action}, uiTableSpec{}))
+		if !strings.Contains(rendered, want) {
+			t.Errorf("%s action is missing %q: %s", tc.name, want, rendered)
+		}
+		if strings.Contains(rendered, "closest .panel form.toolbar") {
+			t.Errorf("%s action still uses the broken closest selector: %s", tc.name, rendered)
+		}
 	}
 }
