@@ -243,9 +243,22 @@ func MoveToTrash(source, trash string) (string, error) {
 	if err := os.MkdirAll(trash, 0o755); err != nil {
 		return "", err
 	}
+	// A trash folder equal to or inside the source makes the cross-device copy
+	// fallback recurse into itself until the disk is full. Refuse it up front.
+	if SamePath(source, trash) || pathWithin(trash, source) {
+		return "", fmt.Errorf("trash path %q is inside the source %q", trash, source)
+	}
 	target := duplicateTarget(trash, source)
-	if err := os.Rename(source, target); err == nil {
+	renameErr := os.Rename(source, target)
+	if renameErr == nil {
+		touchTrashEntry(target)
 		return target, nil
+	}
+	// Only a cross-device rename needs the copy fallback. Any other failure
+	// (permissions, invalid argument, target missing) must be reported, not
+	// turned into a copy that can misbehave.
+	if !errors.Is(renameErr, syscall.EXDEV) {
+		return "", renameErr
 	}
 	// Copy into a hidden sibling first. The final rename makes the complete
 	// trash entry visible atomically, so an interrupted cross-filesystem copy
@@ -266,7 +279,22 @@ func MoveToTrash(source, trash string) (string, error) {
 	if err := removeAfterCopy(source); err != nil {
 		return "", err
 	}
+	touchTrashEntry(target)
 	return target, nil
+}
+
+// touchTrashEntry refreshes the modification time of a trash entry and its
+// contents, so retention counts from the moment the entry entered the trash
+// instead of the original file's mtime.
+func touchTrashEntry(target string) {
+	now := time.Now()
+	_ = filepath.Walk(target, func(path string, _ os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		_ = os.Chtimes(path, now, now)
+		return nil
+	})
 }
 
 // removeAfterCopy retries the specific ENOTEMPTY race that can happen when a
@@ -1054,6 +1082,7 @@ func SweepStaleTempFiles(cfg *Config) int {
 			}
 			name := info.Name()
 			isStaleTemp := (strings.HasPrefix(name, ".") && strings.Contains(name, ".gextto-copy-")) ||
+				(strings.HasPrefix(name, ".") && strings.Contains(name, ".gextto-trash-")) ||
 				strings.HasSuffix(name, ".gextto-part")
 			if isStaleTemp && now.Sub(info.ModTime()) > minAge {
 				if remErr := os.Remove(path); remErr == nil {

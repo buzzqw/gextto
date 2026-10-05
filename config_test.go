@@ -889,3 +889,42 @@ func TestLoadConfigPartialFileKeepsDefaults(t *testing.T) {
 		t.Fatal("listen default was wiped by a partial JSON file")
 	}
 }
+
+func TestValidatePathSettingRejectsDangerousPaths(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.DataDir = "/var/lib/gextto"
+	cfg.StateDir = "/var/lib/gextto/state"
+	cfg.LibtorrentDir = "/var/lib/gextto/downloads"
+
+	for _, bad := range []string{"/", "/var", "/var/lib", "/var/lib/gextto", "relative/path"} {
+		if err := validatePathSetting("trash_path", bad, &cfg); err == nil {
+			t.Fatalf("validatePathSetting accepted unsafe trash_path %q", bad)
+		}
+	}
+	if err := validatePathSetting("trash_path", "/mnt/nas/trash", &cfg); err != nil {
+		t.Fatalf("valid trash_path rejected: %v", err)
+	}
+	if err := validatePathSetting("archive_root", "", &cfg); err != nil {
+		t.Fatalf("empty path must be allowed: %v", err)
+	}
+	if safeTrashRoot(&cfg, "/") {
+		t.Fatal("safeTrashRoot accepted the filesystem root")
+	}
+	if safeTrashRoot(&cfg, "/var/lib/gextto") {
+		t.Fatal("safeTrashRoot accepted the data directory")
+	}
+	if !safeTrashRoot(&cfg, "/var/lib/gextto/trash") {
+		t.Fatal("safeTrashRoot rejected the default trash subfolder")
+	}
+}
+
+func TestTrashRetentionRejectsNegative(t *testing.T) {
+	if err := validateBackendSetting("trash_retention_days", "-1"); err == nil {
+		t.Fatal("negative trash_retention_days must be rejected")
+	}
+	for _, value := range []string{"0", "7"} {
+		if err := validateBackendSetting("trash_retention_days", value); err != nil {
+			t.Fatalf("valid retention %q rejected: %v", value, err)
+		}
+	}
+}

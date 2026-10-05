@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/rules"
@@ -137,7 +138,7 @@ func activeReason(db *Database, release *models.Release, hash *string) (*string,
 		if release.Series != nil && release.Season != nil && release.Episode != nil {
 			var active bool
 			if err := db.db.QueryRow(
-				"SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND episode=?3 AND status NOT IN ('completed','error','removed'))",
+				"SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND (episode=?3 OR episode IS NULL) AND status NOT IN ('completed','error','removed'))",
 				*release.Series, *release.Season, *release.Episode,
 			).Scan(&active); err != nil {
 				return nil, err
@@ -165,10 +166,11 @@ func archiveComparison(
 		var oldScore int64
 		var downloadedAt sql.NullString
 		var metadataJSON string
+		var mediaInfoJSON string
 		err := db.db.QueryRow(
-			"SELECT COALESCE(m.title,''), m.quality_score, m.downloaded_at, COALESCE(t.metadata_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.name=?1 AND m.year IS ?2 AND m.removed_at IS NULL",
+			"SELECT COALESCE(m.title,''), m.quality_score, m.downloaded_at, COALESCE(t.metadata_json,''), COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.name=?1 AND m.year IS ?2 AND m.removed_at IS NULL",
 			release.Title, release.Year,
-		).Scan(&title, &oldScore, &downloadedAt, &metadataJSON)
+		).Scan(&title, &oldScore, &downloadedAt, &metadataJSON, &mediaInfoJSON)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -180,6 +182,7 @@ func archiveComparison(
 		if err := json.Unmarshal([]byte(metadataJSON), &metadata); err == nil {
 			oldQuality = metadata.Release.Quality
 		}
+		enrichQualityWithMediaInfo(mediaInfoJSON, &oldQuality)
 		var upgradeReason any
 		if value := release.Quality.UpgradeReason(&oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff); value != "" {
 			upgradeReason = value
@@ -283,6 +286,8 @@ func ExplainWithArchive(
 	}
 	series, movie := decisionReleaseMatch(cfg, release)
 	target := targetFor(release)
+	forbidUpgrade := (series != nil && series.DisableUpgrades) ||
+		(movie != nil && movie.DisableUpgrades)
 	// The orchestrator canonicalises the title before computing the score and
 	// comparing it with the DB. The explanation must do the same, otherwise a
 	// manual search with the original title would not see the movie already
@@ -482,6 +487,18 @@ func ExplainWithArchive(
 		))
 	}
 
+	// A later episode already archived makes the cycle skip this older one
+	// unless it fills a gap or is a valid upgrade. Surface it explicitly instead
+	// of leaving it only in the generic note below.
+	if series != nil && !release.IsPack && release.Season != nil && release.Episode != nil {
+		if rank, rankErr := db.LaterArchivedMaxResolutionRank(series.Name, *release.Season, *release.Episode); rankErr == nil && rank != nil {
+			steps = append(steps, decisionStep(
+				"smart episode",
+				"info",
+				"Un episodio successivo è già archiviato: verrà scaricato solo se è una lacuna o un upgrade valido.",
+			))
+		}
+	}
 	// These checks are deliberately informative: the endpoint receives one
 	// release and not the complete cycle context (gap set, other candidates,
 	// free space and pending-delay state). They must not be presented as a
@@ -492,21 +509,28 @@ func ExplainWithArchive(
 		"La scelta finale può inoltre dipendere da gap filling, smart episode, ritardi, spazio libero e confronto con gli altri candidati del ciclo.",
 	))
 
-	forbidUpgrade := (series != nil && series.DisableUpgrades) ||
-		(movie != nil && movie.DisableUpgrades)
 	comparison, err := archiveComparison(db, cfg, &evaluated, score, forbidUpgrade, disk)
 	if err != nil {
 		return nil, err
 	}
 	if comparison == nil {
-		steps = append(steps, decisionStep(
-			"confronto archivio",
-			"pass",
-			"Nessun file esistente da sostituire: è un primo download.",
-		))
+		if release.IsPack {
+			steps = append(steps, decisionStep(
+				"confronto archivio",
+				"info",
+				"Season pack: la scelta viene valutata episodio per episodio rispetto all'archivio.",
+			))
+		} else {
+			steps = append(steps, decisionStep(
+				"confronto archivio",
+				"pass",
+				"Nessun file esistente da sostituire: è un primo download.",
+			))
+		}
 	} else {
 		upgradeReason, hasUpgradeReason := comparison["upgrade_reason"].(string)
-		if forbidUpgrade {
+		downloaded, _ := comparison["downloaded"].(bool)
+		if forbidUpgrade && downloaded {
 			detail := "Gli upgrade sono disabilitati per questo titolo."
 			steps = append(steps, decisionStep("confronto archivio", "fail", detail))
 			setFailure(detail)
@@ -523,12 +547,39 @@ func ExplainWithArchive(
 		}
 	}
 
+	// The verdict is not rebuilt here: it comes from the same approval engine
+	// the automatic cycle uses, run in dry-run mode (no placeholder, torrent or
+	// upgrade is written). The steps above are only the human-readable detail.
 	decision := "eligible"
-	if firstFailure != nil {
-		decision = "rejected"
-	}
 	reason := "La release supera i controlli read-only."
-	if firstFailure != nil {
+	if (series != nil || movie != nil) && hash != nil {
+		approvalContext := &models.ApprovalContext{
+			Archive:       indexFromDisk(disk, release),
+			ForbidUpgrade: forbidUpgrade,
+			DryRun:        true,
+		}
+		var approved bool
+		var realReason string
+		if series != nil {
+			approved, realReason, err = db.CheckSeriesScored(&evaluated, score, cfg.UpgradeMinScoreDiff, approvalContext)
+		} else {
+			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, forbidUpgrade, true)
+		}
+		if err != nil {
+			// An incomplete release (for example a pack without a season) must
+			// not make the explanation fail: fall back to the read-only steps.
+			if firstFailure != nil {
+				decision = "rejected"
+				reason = *firstFailure
+			}
+		} else {
+			if !approved {
+				decision = "rejected"
+			}
+			reason = decisionReasonText(realReason)
+		}
+	} else if firstFailure != nil {
+		decision = "rejected"
 		reason = *firstFailure
 	}
 	return &DecisionTrace{
@@ -541,4 +592,42 @@ func ExplainWithArchive(
 		Steps:           steps,
 		Comparison:      comparison,
 	}, nil
+}
+
+// indexFromDisk builds a single-entry archive index from the best file found on
+// disk, so the real approval engine receives the same disk context the
+// explanation already computed.
+func indexFromDisk(disk *models.ArchiveQuality, release *models.Release) *models.ArchiveQualityIndex {
+	index := &models.ArchiveQualityIndex{Best: map[[2]int64]models.ArchiveQuality{}}
+	if disk != nil && release.Season != nil && release.Episode != nil {
+		index.Best[[2]int64{*release.Season, *release.Episode}] = *disk
+	}
+	return index
+}
+
+// decisionReasonText turns the approval reason code into a readable sentence.
+func decisionReasonText(reason string) string {
+	switch reason {
+	case "approved", "gap_filled", "gap_fill":
+		return "La release supera i controlli di approvazione."
+	case "upgrade":
+		return "Upgrade riconosciuto rispetto al file esistente."
+	case "restored":
+		return "La release ripristina un download rimosso."
+	case "duplicate":
+		return "Esiste già un file uguale o migliore: nessun download."
+	case "upgrades_disabled":
+		return "Gli upgrade sono disabilitati per questo titolo."
+	case "active_episode", "active_pack":
+		return "Un download per questo titolo è già attivo."
+	case "blocklisted":
+		return "L'hash è presente nella blocklist."
+	case "smart_episode":
+		return "Esiste un episodio successivo archiviato e questa non è una lacuna."
+	default:
+		if strings.TrimSpace(reason) == "" {
+			return "La release è stata rifiutata."
+		}
+		return reason
+	}
 }

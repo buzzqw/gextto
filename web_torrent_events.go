@@ -885,6 +885,25 @@ func tev_needsInfiniteSeedResume(torrent *models.TorrentView) bool {
 		!torrent.AutoManaged
 }
 
+// tev_seedsForever reports whether a torrent's seed policy never ends: an
+// explicit per-torrent zero, or the absence of any global limit. A move that is
+// deferred until "end of seed" would then never happen, so the caller should
+// import the file immediately instead.
+func tev_seedsForever(cfg *Config, torrents TorrentSession, hash string) bool {
+	globalSet := cfg != nil && (cfg.Libtorrent.SeedRatio > 0.0 ||
+		cfg.Libtorrent.SeedTimeDays > 0 || cfg.Libtorrent.SeedTimeMinutes > 0)
+	for _, torrent := range torrents.List() {
+		if !strings.EqualFold(torrent.Hash, hash) {
+			continue
+		}
+		if torrent.SeedRatio >= 0.0 || torrent.SeedDays >= 0 {
+			return torrent.SeedRatio == 0.0 || torrent.SeedDays == 0
+		}
+		return !globalSet
+	}
+	return !globalSet
+}
+
 // tev_effectiveDownloadForRatio implements `effective_download_for_ratio`.
 func tev_effectiveDownloadForRatio(torrent *models.TorrentView) float64 {
 	if torrent.AllTimeDownload > 0 {
@@ -1025,7 +1044,8 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			// completed) and to clear them manually with "Pulisci completati".
 			continue
 		}
-		if archiveFolder && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
+		trashConfigured := cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete"
+		if archiveFolder && trashConfigured {
 			removed, err := torrents.Remove(torrent.Hash, false)
 			if err != nil {
 				logging.Warn("seeded archived folder removal failed",
@@ -1049,6 +1069,14 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 			// Copy mode keeps the download source; move mode already moved it
 			// into the library at the end of the seed.
 			deleteFiles = false
+		}
+		if archiveFolder && cfg.CleanupAction != "delete" {
+			// The library copy is in place but no usable trash destination is
+			// configured: never delete the only other copy. Remove the torrent
+			// from the session and keep the files.
+			deleteFiles = false
+			logging.Warn("seeded archived folder has no trash destination; keeping the source files",
+				"hash", torrent.Hash, "name", torrent.Name, "source", source)
 		}
 		removed, err := torrents.Remove(torrent.Hash, deleteFiles)
 		if err != nil {
@@ -1757,7 +1785,7 @@ func tev_discardCompletedSource(cfg *Config, db *Database, torrents TorrentSessi
 		return
 	}
 	tev_writeRejectionMarker(source, reason)
-	if cfg.TrashPath != nil {
+	if cfg.TrashPath != nil && cfg.CleanupAction != "delete" {
 		target, err := MoveToTrash(source, *cfg.TrashPath)
 		if err != nil {
 			logging.Error("could not move rejected completed download to trash",
@@ -2371,7 +2399,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		}
 		normalizeReleaseSeries(cfg, &release)
 		archiveDestination, hasArchiveDestination := ConfiguredDestinationFor(&release, cfg)
-		destination, hasDestination := DestinationFor(&release, cfg)
+		destination, _ := DestinationFor(&release, cfg)
 		current := event.SavePath
 		if release.Kind == "series" && !release.IsPack {
 			if sourceInfo, sourceErr := os.Stat(source); sourceErr == nil {
@@ -2387,10 +2415,10 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 						"hash", event.Hash, "name", event.Name, "path", source)
 					return true, nil
 				}
-				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) {
-					// Folder episodes (and single files in copy mode) are imported
-					// by copying the video to the library while the source stays
-					// in the download folder for seeding.
+				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForever(cfg, torrents, event.Hash) {
+					// Folder episodes, single files in copy mode, and any torrent
+					// configured to seed forever are imported by copying the video
+					// while the source stays in the download folder for seeding.
 					return tev_completeEpisodeFolderWithArchive(cfg, db, torrents, &event, &release, archiveDestination, tmdb)
 				}
 				// Move mode: keep the source in the download folder so the torrent
@@ -2609,12 +2637,12 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				logging.HumanBytesI64(size), destination))
 			return true, nil
 		}
-		if !hasDestination {
-			return tev_completeTorrent(cfg, db, torrents, &event, &release, tmdb)
-		}
 		if SamePath(current, destination) {
 			return tev_completeTorrent(cfg, db, torrents, &event, &release, tmdb)
 		}
+		// Movies are always relocated to the configured destination (or to the
+		// default download volume when no archive is set); unlike episodes they
+		// do not have a separate copy-mode deferral.
 		if release.Kind == "movie" && hasArchiveDestination && settingsBool(cfg, "move_episodes", false) {
 			// Move mode: keep the movie in the download folder so the torrent can
 			// seed; the move and rename into the library happen at the end of the

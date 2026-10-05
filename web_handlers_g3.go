@@ -118,6 +118,10 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if cfg.TrashPath != nil {
 		trashPath = *cfg.TrashPath
 	}
+	if !safeTrashRoot(cfg, trashPath) {
+		jsonError(w, http.StatusConflict, "trash_path non valido: svuotamento rifiutato")
+		return
+	}
 	var input CleanTrashInput
 	if !gh3DecodeOptionalJSON(w, r, &input) {
 		return
@@ -128,7 +132,8 @@ func CleanTrash(w http.ResponseWriter, r *http.Request, s *AppState) {
 			retentionDays = parsed
 		}
 		if retentionDays < 0 {
-			retentionDays = 0
+			jsonError(w, http.StatusBadRequest, "trash_retention_days non può essere negativo")
+			return
 		}
 	}
 	files, byteCount, err := gh3RemoveTrashContents(trashPath, retentionDays)
@@ -194,14 +199,18 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if s.cfg.DryRun {
+	cfg := latestConfig(s)
+	if cfg.DryRun {
 		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "dry-run does not delete trash"})
 		return
 	}
-	cfg := latestConfig(s)
-	root := cfg.DataDir + "/trash"
+	root := filepath.Join(cfg.DataDir, "trash")
 	if cfg.TrashPath != nil {
 		root = *cfg.TrashPath
+	}
+	if !safeTrashRoot(cfg, root) {
+		jsonError(w, http.StatusConflict, "trash_path non valido: eliminazione rifiutata")
+		return
 	}
 	var names []string
 	if input.All {
@@ -927,6 +936,12 @@ func gh3RemoveTrashContents(root string, olderThanDays int64) (int, uint64, erro
 			return files, byteCount, err
 		}
 		if linkInfo.Mode()&os.ModeSymlink != 0 {
+			// Remove the link itself, not its target, so a trash full of
+			// symlinks can still be emptied.
+			files++
+			if err := os.Remove(path); err != nil {
+				return files, byteCount, err
+			}
 			continue
 		}
 		if linkInfo.IsDir() {

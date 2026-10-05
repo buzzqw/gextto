@@ -995,7 +995,10 @@ func ScanSeriesArchive(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		requestedPath = input.Path
 	}
-	path := series.ArchivePath
+	path := ""
+	if resolved := cfg.ResolveArchivePath(series); resolved != nil {
+		path = *resolved
+	}
 	if requestedPath != nil && strings.TrimSpace(*requestedPath) != "" {
 		path = *requestedPath
 	}

@@ -260,6 +260,60 @@ func TestCycleCandidatesCountsOnlySurvivingReleases(t *testing.T) {
 	}
 }
 
+// TestDryRunCycleIsInnocuous locks in the guarantee that a dry-run cycle may
+// collect and score candidates (and log what would happen) but must not write
+// any placeholder, torrent or feed-seen row to the database.
+func TestDryRunCycleIsInnocuous(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `<rss><channel>
+<item><title>Monitored.Show.S01E01.1080p.WEB-DL</title><link>magnet:?xt=urn:btih:0123456789012345678901234567890123456789</link></item>
+</channel></rss>`)
+	}))
+	defer server.Close()
+
+	state := newCycleState(t)
+	cfg := *state.cfg
+	cfg.Series = []SeriesConfig{{Name: "Monitored Show", Enabled: true}}
+	cfg.FeedURLs = []string{server.URL}
+	cfg.Indexers = nil
+	cfg.WebsearchEngines = nil
+	cfg.DryRun = true
+
+	domain := "series"
+	stats, err := RunCycleDomain(
+		context.Background(),
+		&cfg,
+		state.engine,
+		state.db,
+		state.archive,
+		state.comics,
+		state.notifier,
+		state.activeEngine(),
+		&domain,
+	)
+	if err != nil {
+		t.Fatalf("RunCycleDomain: %v", err)
+	}
+	if stats == nil || stats.Scraped < 1 {
+		t.Fatalf("dry-run did not scrape the feed: %+v", stats)
+	}
+	for _, query := range []string{
+		"SELECT COUNT(*) FROM episodes",
+		"SELECT COUNT(*) FROM movies",
+		"SELECT COUNT(*) FROM torrent_meta",
+		"SELECT COUNT(*) FROM movie_feed_seen",
+		"SELECT COUNT(*) FROM series_feed_seen",
+	} {
+		var count int64
+		if err := state.db.db.QueryRow(query).Scan(&count); err != nil {
+			t.Fatalf("%s: %v", query, err)
+		}
+		if count != 0 {
+			t.Fatalf("dry-run persisted state: %s = %d, want 0", query, count)
+		}
+	}
+}
+
 func TestScrapeAllSkipsTitleSearchWhenFeedsConfigured(t *testing.T) {
 	var indexerCalls atomic.Int32
 	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

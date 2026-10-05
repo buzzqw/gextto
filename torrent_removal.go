@@ -67,11 +67,6 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 	}
 
 	deleteFiles := requestedDeleteFiles
-	if !deleteFiles && s.db != nil && targetTorrent != nil {
-		if gh1_torrentFilesAreDisposable(s.db, hash) && tev_completedSourceDisposable(s.db, hash, targetTorrent.SavePath) {
-			deleteFiles = true
-		}
-	}
 
 	engineDeleteFiles := deleteFiles
 	if targetTorrent != nil {
@@ -454,7 +449,7 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 				return false, fmt.Errorf("spostamento del file nella destinazione non riuscito: %w", err)
 			}
 			if sourceInfo.IsDir() {
-				ApplySidecars(source, target, cfg)
+				ApplySidecarsTo(video, target, cfg)
 				inRamdisk := false
 				if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
 					inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)

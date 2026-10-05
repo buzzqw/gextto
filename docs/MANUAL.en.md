@@ -356,7 +356,11 @@ the torrent is still seeding.
 
 Trash must be configured under *Configuration → Paths*. Without a NAS
 destination, Gextto does not treat the Download directory as an archive and does
-not move the folder to Trash automatically.
+not move the folder to Trash automatically. The automatic move of the source
+folder to Trash happens only with a NAS destination, a valid **Trash**
+destination and automatic removal of completed torrents enabled; when Trash is
+not configured the source files are never deleted automatically (only the entry
+is removed from the torrent session).
 
 ## 4. Series
 
@@ -734,9 +738,11 @@ arguments if the command may be recorded in system logs.
   on the server. Gextto recursively scans video files, detects series and movies
   from their names, compares titles with TMDB/TVDB and shows a rename proposal
   with alternative matches when available.
-- **Trash cleanup** from the **Maintenance** toolbar is forced: it removes the
-  selected trash content immediately. Cleanup started from the **Trash** panel
-  respects the configured retention period.
+- **Trash cleanup** — both **Clean trash** in *Maintenance* and **Empty trash**
+  in the **Trash** panel are forced manual actions: they remove the content
+  immediately. `trash_retention_days` (0 = delete everything) only applies to
+  non-forced cleanups requested through the API
+  (`/api/maintenance/clean-trash` with `force=false`).
 - **Video duplicates** — *Preview duplicates* and *Clean duplicates* find video
   files clearly inferior (strictly lower resolution) left next to the best
   version in the same folder, e.g. an old 480p next to the new 1080p, and move

@@ -925,6 +925,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if context == nil {
 		context = &models.ApprovalContext{}
 	}
+	dryRun := context.DryRun
 	live := context.Live
 	archive := context.Archive
 	// Protezione download attivi (parità col client live del legacy): mai
@@ -949,12 +950,16 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	if release.Series != nil {
 		seriesName = *release.Series
 	}
-	if _, err := d.db.Exec("INSERT OR IGNORE INTO series(name) VALUES (?1)", seriesName); err != nil {
-		return false, "", err
+	if !dryRun {
+		if _, err := d.db.Exec("INSERT OR IGNORE INTO series(name) VALUES (?1)", seriesName); err != nil {
+			return false, "", err
+		}
 	}
 	var sid int64
 	if err := d.db.QueryRow("SELECT id FROM series WHERE name = ?1", seriesName).Scan(&sid); err != nil {
-		return false, "", err
+		if !dryRun {
+			return false, "", err
+		}
 	}
 	// A library file can be removed or moved outside Gextto. Do not let its old
 	// database row make the episode look permanently downloaded: reset only on
@@ -964,8 +969,10 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	err = d.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&persistedArchivePath)
 	if err == nil && strings.TrimSpace(persistedArchivePath) != "" {
 		if _, statErr := os.Stat(persistedArchivePath); errors.Is(statErr, os.ErrNotExist) {
-			if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
-				return false, "", updateErr
+			if !dryRun {
+				if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
+					return false, "", updateErr
+				}
 			}
 			missingArchivedFile = true
 			logging.Warn("archive file missing; episode made eligible for recovery", "series", seriesName, "season", season, "episode", episode, "path", persistedArchivePath)
@@ -1071,6 +1078,10 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		if !manual && !missingArchivedFile && release.Quality.UpgradeReason(&oldQuality, score, dbScore, minScoreDiff) == "" {
 			return false, "duplicate", nil
 		}
+		if dryRun {
+			// Upgrade recognised, but do not write the backup/update rows.
+			return true, "upgrade", nil
+		}
 		previous, err := d.loadSeriesUpgradeBackup(d.db, dbID, seriesName)
 		if err != nil {
 			return false, "", err
@@ -1115,6 +1126,10 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	var episodeHash any
 	if !hashTakenElsewhere {
 		episodeHash = hash
+	}
+	if dryRun {
+		// First download recognised, but do not create the placeholder row.
+		return true, "approved", nil
 	}
 	if _, err := d.db.Exec("INSERT INTO episodes(series_id,season,episode,title,quality_score,magnet_hash,magnet_link) VALUES (?1,?2,?3,?4,?5,?6,?7)", sid, season, episode, release.Title, score, episodeHash, release.Magnet); err != nil {
 		return false, "", err
@@ -1443,10 +1458,6 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			}
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return false, "", err
-	}
-	committed = true
 	approved := inserted+upgraded > 0
 	reason := "duplicate"
 	if approved {
@@ -1456,6 +1467,14 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			reason = "approved"
 		}
 	}
+	if context.DryRun {
+		// The deferred rollback discards every insert/update performed above.
+		return approved, reason, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return false, "", err
+	}
+	committed = true
 	return approved, reason, nil
 }
 
@@ -1472,6 +1491,13 @@ func (d *Database) CheckMovieScored(release *models.Release, score, minScoreDiff
 // CheckMovieScoredWith refuses to replace a real imported movie when
 // `forbidUpgrade` is set.
 func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScoreDiff int64, forbidUpgrade bool) (bool, string, error) {
+	return d.checkMovieScoredWith(release, score, minScoreDiff, forbidUpgrade, false)
+}
+
+// checkMovieScoredWith is CheckMovieScoredWith with an explicit dry-run switch:
+// in dry-run the decision is computed but no movie row is created, restored or
+// upgraded.
+func (d *Database) checkMovieScoredWith(release *models.Release, score, minScoreDiff int64, forbidUpgrade bool, dryRun bool) (bool, string, error) {
 	hash, err := magnetHashOrError(release.Magnet)
 	if err != nil {
 		return false, "", err
@@ -1493,6 +1519,9 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 	var removedID int64
 	removedErr := d.db.QueryRow("SELECT id FROM movies WHERE magnet_hash=?1 AND removed_at IS NOT NULL", hash).Scan(&removedID)
 	if removedErr == nil {
+		if dryRun {
+			return true, "restored", nil
+		}
 		if _, err := d.db.Exec("UPDATE movies SET name=?1,year=?2,title=?1,quality_score=?3,magnet_link=?4,downloaded_at=NULL,removed_at=NULL WHERE id=?5", release.Title, release.Year, score, release.Magnet, removedID); err != nil {
 			return false, "", err
 		}
@@ -1532,6 +1561,9 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 		if !upgrade {
 			return false, "duplicate", nil
 		}
+		if dryRun {
+			return true, "upgrade", nil
+		}
 		previous, err := d.loadMovieUpgradeBackup(id)
 		if err != nil {
 			return false, "", err
@@ -1558,6 +1590,9 @@ func (d *Database) CheckMovieScoredWith(release *models.Release, score, minScore
 		}
 		upgradeCommitted = true
 		return true, "upgrade", nil
+	}
+	if dryRun {
+		return true, "approved", nil
 	}
 	if _, err := d.db.Exec("INSERT INTO movies(name,year,title,quality_score,magnet_hash,magnet_link,downloaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)", release.Title, release.Year, release.Title, score, hash, release.Magnet, nil); err != nil {
 		return false, "", err

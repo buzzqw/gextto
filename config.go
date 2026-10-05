@@ -1855,8 +1855,8 @@ func (c *Config) ReleaseDeniedReason(release *models.Release) string {
 		return "title matches a content filter"
 	}
 	if c.MaxReleaseAgeDays > 0 {
-		days := int64(time.Now().UTC().Sub(release.DiscoveredAt).Hours() / 24)
-		if days > c.MaxReleaseAgeDays {
+		maxAge := time.Duration(c.MaxReleaseAgeDays) * 24 * time.Hour
+		if time.Now().UTC().Sub(release.DiscoveredAt) > maxAge {
 			return "older than max_release_age_days"
 		}
 	}
@@ -2124,8 +2124,15 @@ func (c *Config) loadConfigDB() error {
 		c.RenameTemplate = value
 	}
 	c.ArchiveRoot = configPathSetting(mapValue(c.Settings, "archive_root"))
-	if value := configPathSetting(mapValue(c.Settings, "trash_path")); value != nil {
-		c.TrashPath = value
+	if _, present := c.Settings["trash_path"]; present {
+		// Honour an explicit value, including clearing it: an empty setting
+		// disables the trash instead of silently keeping the previous path.
+		c.TrashPath = configPathSetting(mapValue(c.Settings, "trash_path"))
+	}
+	// A present-but-empty trash path would otherwise reach os.MkdirAll("") and
+	// abort startup. Treat it as "not configured".
+	if c.TrashPath != nil && strings.TrimSpace(*c.TrashPath) == "" {
+		c.TrashPath = nil
 	}
 	c.NotifyTelegram = configBoolSetting(mapValue(c.Settings, "notify_telegram"))
 	if value, ok := c.Settings["telegram_bot_token"]; ok && value != "" {
@@ -2758,8 +2765,10 @@ func (c *Config) PrepareDirs() error {
 		}
 	}
 	if c.TrashPath != nil {
-		if err := os.MkdirAll(*c.TrashPath, 0o755); err != nil {
-			return err
+		if trimmed := strings.TrimSpace(*c.TrashPath); trimmed != "" {
+			if err := os.MkdirAll(trimmed, 0o755); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -364,3 +364,24 @@ func TestRemoveSeededCompletedRecognizesArchivedNasCopy(t *testing.T) {
 		t.Fatalf("library copy must stay: %v", err)
 	}
 }
+
+func TestTeVeSeedsForever(t *testing.T) {
+	session := &stubTorrentSession{list: []models.TorrentView{{Hash: seedTestHash, SeedRatio: 0.0, SeedDays: -1}}}
+	cfg := DefaultConfig()
+	if !tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("per-torrent ratio 0 must mean infinite seed")
+	}
+	session.list[0].SeedRatio = 2.0
+	if tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("finite per-torrent limit must not be infinite")
+	}
+	session.list[0].SeedRatio = -1.0
+	session.list[0].SeedDays = -1
+	if !tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("no per-torrent and no global limit must mean infinite seed")
+	}
+	cfg.Libtorrent.SeedRatio = 1.5
+	if tev_seedsForever(&cfg, session, seedTestHash) {
+		t.Fatal("global ratio limit must make the policy finite")
+	}
+}

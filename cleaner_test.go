@@ -460,3 +460,73 @@ func TestSweepStaleTempFiles(t *testing.T) {
 		t.Errorf("regular file %s should have been preserved", regularFile)
 	}
 }
+
+func TestMoveToTrashRefusesTrashInsideSource(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "show")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "episode.mkv"), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	trash := filepath.Join(source, "trash")
+	if _, err := MoveToTrash(source, trash); err == nil {
+		t.Fatal("MoveToTrash accepted a trash folder inside the source")
+	}
+	if _, err := os.Stat(filepath.Join(source, "episode.mkv")); err != nil {
+		t.Fatalf("source was modified despite the refusal: %v", err)
+	}
+}
+
+func TestMoveToTrashRefreshesEntryMtime(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "old.mkv")
+	if err := os.WriteFile(source, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	if err := os.Chtimes(source, old, old); err != nil {
+		t.Fatal(err)
+	}
+	target, err := MoveToTrash(source, filepath.Join(root, "trash"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(info.ModTime()) > time.Hour {
+		t.Fatalf("trash entry mtime was not refreshed: %v", info.ModTime())
+	}
+}
+
+func TestRemoveTrashContentsRemovesSymlinks(t *testing.T) {
+	root := t.TempDir()
+	kept := filepath.Join(root, "target.txt")
+	if err := os.WriteFile(kept, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(trash, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(trash, "link")
+	if err := os.Symlink(kept, link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	files, _, err := gh3RemoveTrashContents(trash, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files != 1 {
+		t.Fatalf("files = %d, want 1", files)
+	}
+	if _, err := os.Lstat(link); !os.IsNotExist(err) {
+		t.Fatalf("symlink was not removed: %v", err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Fatalf("symlink target must be preserved: %v", err)
+	}
+}

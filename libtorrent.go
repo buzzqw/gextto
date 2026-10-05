@@ -459,10 +459,10 @@ func fileExists(path string) bool {
 // RamdiskUncommittedBytes is the number of bytes still to be written on the RAM
 // disk by torrents other than excludeHash.
 func (c *LibtorrentClient) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {
-	c.torrentsMu.RLock()
-	defer c.torrentsMu.RUnlock()
+	// Read the live session snapshot: a map of only the torrents added in this
+	// process would ignore everything restored from fastresume after a restart.
 	var total uint64
-	for _, torrent := range c.torrents {
+	for _, torrent := range c.List() {
 		if strings.EqualFold(torrent.Hash, excludeHash) {
 			continue
 		}
@@ -476,6 +476,15 @@ func (c *LibtorrentClient) RamdiskUncommittedBytes(ramdisk string, excludeHash s
 		total += uint64(remaining)
 	}
 	return total
+}
+
+// SessionHealthy reports whether the embedded session holds a real, usable
+// snapshot. It is false in dry-run or when no native session exists (libtorrent
+// disabled or another backend selected). Callers must treat an empty snapshot
+// from an unhealthy session as "unknown", never as "every torrent vanished":
+// reconciliation against an empty list would otherwise wipe the tracked queue.
+func (c *LibtorrentClient) SessionHealthy() bool {
+	return c.session != nil && !c.DryRun
 }
 
 // NewLibtorrentClient creates the native session (unless dry-run) and restores

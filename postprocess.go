@@ -757,6 +757,13 @@ func StagePackFile(
 	if _, err := os.Stat(target); err == nil {
 		return target, true, nil
 	}
+	// A preallocated-but-never-written or truncated pack file has the right
+	// size but is not a real video: never import it into the library.
+	if err := validateCompletedFile(file.Path); err != nil {
+		logging.Warn("season pack file failed integrity validation; skipping",
+			"file", file.Path, "error", err.Error())
+		return "", false, nil
+	}
 	if err := ValidateDestinationFrom(source, destination); err != nil {
 		return "", false, err
 	}
@@ -1536,6 +1543,87 @@ func ApplySidecars(source, target string, cfg *Config) {
 	}
 }
 
+// ApplySidecarsTo moves the sidecars of source into the directory of target,
+// renaming them after the target stem. Used when the video moves to a different
+// directory (manual archive): RenameSidecars would only rename them in place in
+// the source folder, leaving the archived video without subtitles/NFO.
+func ApplySidecarsTo(source, target string, cfg *Config) {
+	sidecars, err := MoveSidecarsToTarget(source, target, cfg)
+	if err != nil {
+		logging.Warn("move sidecar failed", "error", err)
+		return
+	}
+	for _, pair := range sidecars {
+		if pair[1] == "" {
+			logging.Debug("move sidecar: duplicate moved to trash", "from", pair[0])
+		} else {
+			logging.Debug("move sidecar", "from", pair[0], "to", pair[1])
+		}
+	}
+}
+
+// MoveSidecarsToTarget moves the sidecar files sitting next to source into the
+// directory of target, renamed after the target stem.
+func MoveSidecarsToTarget(source, target string, cfg *Config) ([][2]string, error) {
+	sourceDir := filepath.Dir(source)
+	targetDir := filepath.Dir(target)
+	sourceStem := fileStem(source)
+	targetStem := fileStem(target)
+	if sourceStem == "" || targetStem == "" {
+		return [][2]string{}, nil
+	}
+	sidecarExts := map[string]bool{
+		"jpg": true, "jpeg": true, "png": true, "webp": true, "srt": true, "sub": true,
+		"ass": true, "ssa": true, "vtt": true, "idx": true, "sup": true, "smi": true,
+		"nfo": true, "txt": true,
+	}
+	entries, err := os.ReadDir(sourceDir)
+	if err != nil {
+		return [][2]string{}, nil
+	}
+	moved := [][2]string{}
+	for _, entry := range entries {
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		path := filepath.Join(sourceDir, entry.Name())
+		if SamePath(path, source) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		name := entry.Name()
+		extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
+		if !sidecarExts[extension] {
+			continue
+		}
+		remainder, ok := strings.CutPrefix(name, sourceStem)
+		if !ok {
+			// A sidecar named only by the episode marker (e.g. "Show.S01E01.ita.srt"):
+			// keep its extension and let the target name lead.
+			remainder = "." + extension
+		}
+		newPath := filepath.Join(targetDir, targetStem+remainder)
+		if SamePath(path, newPath) {
+			continue
+		}
+		if _, statErr := os.Stat(newPath); statErr == nil {
+			if err := trashOrRemove(path, cfg); err != nil {
+				return moved, err
+			}
+			moved = append(moved, [2]string{path, ""})
+			continue
+		}
+		if err := moveAcrossDevices(path, newPath); err != nil {
+			return moved, err
+		}
+		moved = append(moved, [2]string{path, newPath})
+	}
+	return moved, nil
+}
+
 // DiscardSidecars moves the sidecars of a discarded duplicate video to the
 // trash (implementation of `discard_sidecars`).
 func DiscardSidecars(source string, cfg *Config) (int, error) {
@@ -1577,16 +1665,17 @@ func DiscardSidecars(source string, cfg *Config) (int, error) {
 }
 
 // trashOrRemove removes a sidecar according to the cleanup action (implementation of
-// `trash_or_remove`).
+// `trash_or_remove`). When the action is "move" the trash folder must be
+// configured: refusing is safer than deleting a file the user asked to keep.
 func trashOrRemove(path string, cfg *Config) error {
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(path)
 	}
-	if cfg.TrashPath != nil {
+	if cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
 		_, err := MoveToTrash(path, *cfg.TrashPath)
 		return err
 	}
-	return os.Remove(path)
+	return fmt.Errorf("trash_path is required when cleanup_action is move")
 }
 
 // safeComponent replaces the characters that cannot appear in a file name.

@@ -35,6 +35,7 @@ func TestUpgradeReasonPortsLegacyRules(t *testing.T) {
 		{"webrip to webdl", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac"}, "source"},
 		{"hdr", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac", HDR: "HDR10"}, "hdr"},
 		{"repack", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac", IsRepack: true}, "repack"},
+		{"proper", Quality{Resolution: "1080p", Source: "webdl", Codec: "h264", Audio: "aac", IsProper: true}, "proper"},
 	}
 	for _, tc := range cases {
 		old := base

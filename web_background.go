@@ -288,6 +288,15 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		})
 	}
 
+	// Effective archive folder: a per-series `archive_path` when set, otherwise
+	// the auto-detected subfolder of the global `archive_root`. Using the raw
+	// `series.ArchivePath` here made scanning and cleanup silently no-op for
+	// every series configured only through `archive_root`.
+	resolvedArchive := ""
+	if resolved := cfg.ResolveArchivePath(series); resolved != nil {
+		resolvedArchive = *resolved
+	}
+
 	// The database may not know about files copied manually or by an older
 	// post-processing run. Scan the series archive as well, so those files are
 	// renamed and, when an existing episode is better, moved to trash.
@@ -305,7 +314,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	// only from the original title in the DB.
 	if sourceOnly {
 		// no archive scan
-	} else if files, err := VideoFiles(series.ArchivePath); err == nil {
+	} else if files, err := VideoFiles(resolvedArchive); err == nil {
 		nameIndex := bg_archiveEpisodePattern.SubexpIndex("name")
 		seasonIndex := bg_archiveEpisodePattern.SubexpIndex("s")
 		nsIndex := bg_archiveEpisodePattern.SubexpIndex("ns")
@@ -373,7 +382,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			}
 			score := cfg.ReleaseScore(&release)
 			if execute {
-				discarded, err := DiscardIfInferior(cfg, series.Name, season, episodeNumber, score, file, series.ArchivePath)
+				discarded, err := DiscardIfInferior(cfg, series.Name, season, episodeNumber, score, file, resolvedArchive)
 				if err != nil {
 					logging.Warn("archive duplicate check failed", "file", file, "error", err)
 					continue
@@ -437,7 +446,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	duplicatesRemoved := 0
 	if execute && cfg.CleanupUpgrades && !sourceOnly {
 		protected := bg_protectedTorrentPaths(s.activeEngine())
-		if removed, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, series.ArchivePath, protected); err == nil {
+		if removed, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, resolvedArchive, protected); err == nil {
 			duplicatesRemoved = removed
 		} else {
 			logging.Warn("duplicate cleanup failed", "series", series.Name, "error", err)

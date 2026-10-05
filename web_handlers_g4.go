@@ -1208,13 +1208,14 @@ func ScanAllArchives(w http.ResponseWriter, r *http.Request, s *AppState) {
 	targets := []scanTarget{}
 	for index := range cfg.Series {
 		series := &cfg.Series[index]
-		if !series.Enabled || strings.TrimSpace(series.ArchivePath) == "" {
+		resolved := cfg.ResolveArchivePath(series)
+		if !series.Enabled || resolved == nil || strings.TrimSpace(*resolved) == "" {
 			continue
 		}
 		if gh4_archiveImportBusyContains(series.Name) {
 			continue
 		}
-		targets = append(targets, scanTarget{name: series.Name, path: series.ArchivePath})
+		targets = append(targets, scanTarget{name: series.Name, path: *resolved})
 	}
 
 	job, created := s.jobs.Create("scan-archives", "scan-archives")

@@ -162,7 +162,11 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 			if err != nil {
 				redacted := utils.RedactURLSecrets(err.Error())
 				logging.SourceFail("web", engine, redacted)
-				set_engine_cooldown(engine, redacted)
+				// A cancelled or expired parent context is not the engine's
+				// fault: never put a healthy engine in cooldown for it.
+				if ctx.Err() == nil {
+					set_engine_cooldown(engine, redacted)
+				}
 				logging.Debug("web engine search failed", "engine", engine, "query", query, "error", redacted)
 				resultsChannel <- outcome{failure: engine}
 				return

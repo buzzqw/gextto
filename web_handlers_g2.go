@@ -342,10 +342,11 @@ func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 	removed := 0
 	for index := range cfg.Series {
 		series := &cfg.Series[index]
-		if strings.TrimSpace(series.ArchivePath) == "" {
+		resolved := cfg.ResolveArchivePath(series)
+		if resolved == nil || strings.TrimSpace(*resolved) == "" {
 			continue
 		}
-		directory := series.ArchivePath
+		directory := *resolved
 		if execute {
 			count, err := CleanupInferiorDuplicatesInDir(cfg, series.Name, directory, protected)
 			if err != nil {

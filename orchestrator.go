@@ -146,7 +146,9 @@ func RunCycleDomain(
 	// when public web engines are slow. Archive candidates are already local and
 	// are therefore evaluated and started first; the normal cycle still runs
 	// afterwards to discover new releases and to cover gaps not in the archive.
-	if !domainIs(domain, "movies") {
+	// Dry-run must be a true no-op: never start the archive-gap priority pass,
+	// because it approves releases and writes placeholders/torrent rows.
+	if !domainIs(domain, "movies") && !cfg.DryRun {
 		if err := prioritizeArchiveGapDownloads(ctx, cfg, db, archive, notifier, torrents, stats); err != nil {
 			if cycleCancelled(ctx) {
 				return stats, nil
@@ -208,13 +210,15 @@ func RunCycleDomain(
 		}
 		releases = kept
 	}
-	if err := archive.SaveBatch(releases, cfg); err != nil {
-		return nil, err
-	}
-	// "Seen from feed": record every collected release, including unmonitored
-	// titles, so it remains available for archive browsing.
-	if err := db.RecordSeenBatch(releases, cfg); err != nil {
-		logging.Debug("feed seen recording failed", "error", err)
+	if !cfg.DryRun {
+		if err := archive.SaveBatch(releases, cfg); err != nil {
+			return nil, err
+		}
+		// "Seen from feed": record every collected release, including unmonitored
+		// titles, so it remains available for archive browsing.
+		if err := db.RecordSeenBatch(releases, cfg); err != nil {
+			logging.Debug("feed seen recording failed", "error", err)
+		}
 	}
 
 	var archiveQueries []string
@@ -804,9 +808,11 @@ func RunCycleDomain(
 				// The feed was persisted before selection. Replace its
 				// short-lived Jackett URL with the stable magnet so a later
 				// archive search can use it without re-downloading an already
-				// expired link.
-				if err := archive.CanonicalizeTorrentURL(*release.TorrentURL, release.Magnet); err != nil {
-					logging.Warn("could not canonicalize archived torrent URL", "error", err)
+				// expired link. Skipped in dry-run: it rewrites the archive DB.
+				if !cfg.DryRun {
+					if err := archive.CanonicalizeTorrentURL(*release.TorrentURL, release.Magnet); err != nil {
+						logging.Warn("could not canonicalize archived torrent URL", "error", err)
+					}
 				}
 				if path != "" {
 					torrentFile = &path
@@ -906,13 +912,14 @@ func RunCycleDomain(
 			Live:          liveDownloads,
 			ForbidUpgrade: forbidUpgrade,
 			GapEpisode:    isGap,
+			DryRun:        cfg.DryRun,
 		}
 		var approved bool
 		var approvalReason string
 		if release.Kind == "series" {
 			approved, approvalReason, err = db.CheckSeriesScored(&release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext)
 		} else {
-			approved, approvalReason, err = db.CheckMovieScoredWith(&release, releaseScore, cfg.UpgradeMinScoreDiff, forbidUpgrade)
+			approved, approvalReason, err = db.checkMovieScoredWith(&release, releaseScore, cfg.UpgradeMinScoreDiff, forbidUpgrade, cfg.DryRun)
 		}
 		if err != nil {
 			return nil, err
@@ -937,6 +944,29 @@ func RunCycleDomain(
 					preferredPath = &dir
 				}
 			}
+			// The global guard measures the default download volume; a tag rule,
+			// the RAM-disk overflow or the RAM disk itself can redirect the
+			// download to another filesystem, so verify the chosen path too.
+			checkPath := ""
+			if preferredPath != nil {
+				checkPath = *preferredPath
+			} else if ramdisk := cfg.RamdiskDir(); ramdisk != nil && ReleaseFitsRamdisk(&release, cfg) {
+				checkPath = *ramdisk
+			}
+			if minFreeBytes != nil && checkPath != "" {
+				free := FreeSpaceBytes(checkPath)
+				if free == nil {
+					stats.Error("min_free_space_unavailable")
+					logging.Warn("cycle: cannot determine free space for chosen download path, download skipped", "path", checkPath)
+					continue
+				}
+				if *free < *minFreeBytes {
+					stats.Error("min_free_space")
+					logging.Warn("cycle: free space below min_free_space_gb for chosen download path, download skipped",
+						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*minFreeBytes))
+					continue
+				}
+			}
 			added := false
 			if torrentFile != nil && *torrentFile != "" {
 				added, err = torrents.AddFileWithPath(*torrentFile, cfg, preferredPath)
@@ -944,8 +974,10 @@ func RunCycleDomain(
 				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 			}
 			if err != nil {
-				if rollbackErr := db.RollbackRelease(&release); rollbackErr != nil {
-					logging.Warn("release rollback failed", "error", rollbackErr)
+				if !cfg.DryRun {
+					if rollbackErr := db.RollbackRelease(&release); rollbackErr != nil {
+						logging.Warn("release rollback failed", "error", rollbackErr)
+					}
 				}
 				// A single release refused by the engine must not abort the whole
 				// cycle: the placeholder is already rolled back, so record the
@@ -955,8 +987,10 @@ func RunCycleDomain(
 				continue
 			}
 			if !added {
-				if err := db.RollbackRelease(&release); err != nil {
-					return nil, err
+				if !cfg.DryRun {
+					if err := db.RollbackRelease(&release); err != nil {
+						return nil, err
+					}
 				}
 				stats.Error("torrent_rejected")
 				continue
@@ -974,13 +1008,19 @@ func RunCycleDomain(
 			} else {
 				newDetails = append(newDetails, startedDetail)
 			}
-			if err := db.RegisterTorrentScored(&release, score); err != nil {
-				return nil, err
+			if !cfg.DryRun {
+				if err := db.RegisterTorrentScored(&release, score); err != nil {
+					return nil, err
+				}
+				if hash, ok := utils.MagnetHash(release.Magnet); ok {
+					_ = db.SetTorrentReason(hash, decisionReason)
+				}
 			}
-			if hash, ok := utils.MagnetHash(release.Magnet); ok {
-				_ = db.SetTorrentReason(hash, decisionReason)
+			logMessage := "📥 download started"
+			if cfg.DryRun {
+				logMessage = "🧪 dry-run: download would start"
 			}
-			logging.Info("📥 download started",
+			logging.Info(logMessage,
 				"target", releaseTarget(&release),
 				"title", release.Title,
 				"source", release.Source,
@@ -989,7 +1029,7 @@ func RunCycleDomain(
 				"reason", decisionReason,
 				"approval_reason", approvalReason,
 				"gap_episodes", episodesLabel(gapEpisodes))
-			if isReadyPending {
+			if isReadyPending && !cfg.DryRun {
 				if release.Series != nil && release.Season != nil && release.Episode != nil {
 					if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
 						return nil, err

@@ -111,7 +111,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_port_min":                          "Porta minima della sessione libtorrent (richiede il riavvio del servizio).",
 	"libtorrent_port_max":                          "Porta massima della sessione libtorrent (richiede il riavvio del servizio).",
 	"min_free_space_gb":                            "Spazio libero minimo (GB) sulla cartella download: sotto questa soglia il ciclo non avvia download.",
-	"trash_retention_days":                         "La pulizia del trash elimina solo i file più vecchi di N giorni; 0 elimina tutto il contenuto del trash.",
+	"trash_retention_days":                         "Giorni di conservazione per le pulizie non forzate; 0 elimina tutto il contenuto del cestino. Le azioni manuali della UI svuotano sempre subito il cestino.",
 	"archive_cleanup_enabled":                      "Abilita la pulizia automatica dell'archivio secondo età massima e numero minimo da conservare.",
 	"archive_max_age_days":                         "Età massima delle release in archivio, in giorni (0 = nessun limite).",
 	"archive_keep_min":                             "Numero minimo di release recenti da conservare sempre in archivio.",

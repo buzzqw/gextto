@@ -1087,6 +1087,10 @@ func SaveSettingHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := validatePathSetting(input.Key, value, latestConfig(s)); err != nil {
+		jsonError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := saveConfigSetting(s.cfg.DataDir, input.Key, value); err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return

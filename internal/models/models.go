@@ -212,6 +212,11 @@ func (q *Quality) UpgradeReason(old *Quality, newScore, oldScore, minScoreDiff i
 	if q.IsRepack && !old.IsRepack && newRes >= oldRes && q.SourceRank() >= old.SourceRank() {
 		return "repack"
 	}
+	// A PROPER re-release fixes a defective release; treat it like a repack so
+	// it is not rejected only because its score delta is below the threshold.
+	if q.IsProper && !old.IsProper && newRes >= oldRes && q.SourceRank() >= old.SourceRank() {
+		return "proper"
+	}
 	if old.Source == "unknown" && q.Source != "unknown" && q.sameNonSourceQuality(old) {
 		return ""
 	}
@@ -356,6 +361,9 @@ type ApprovalContext struct {
 	Live          *LiveDownloads
 	ForbidUpgrade bool
 	GapEpisode    bool
+	// DryRun evaluates the decision without writing placeholders, torrent rows
+	// or upgrades to the database. Used by the automatic cycle in dry-run mode.
+	DryRun bool
 }
 
 // Release is a candidate release discovered from a source.

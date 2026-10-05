@@ -959,3 +959,34 @@ func TestEnrichTagsWithProbe(t *testing.T) {
 	assertStringPointer(t, enriched.HDR, "HDR10")
 	assertStringPointer(t, enriched.Languages, "IT+EN")
 }
+
+func TestMoveSidecarsToTargetMovesSubtitles(t *testing.T) {
+	download := t.TempDir()
+	archive := t.TempDir()
+	video := filepath.Join(download, "Show.S01E01.1080p.mkv")
+	if err := os.WriteFile(video, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(download, "Show.S01E01.1080p.ita.srt")
+	if err := os.WriteFile(sub, []byte("sub"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(archive, "Show - S01E01 - Titolo.mkv")
+	cfg := DefaultConfig()
+	cfg.TrashPath = nil
+	cfg.CleanupAction = "delete"
+
+	moved, err := MoveSidecarsToTarget(video, target, &cfg)
+	if err != nil {
+		t.Fatalf("MoveSidecarsToTarget: %v", err)
+	}
+	if len(moved) != 1 {
+		t.Fatalf("moved = %v, want 1 entry", moved)
+	}
+	if _, err := os.Stat(filepath.Join(archive, "Show - S01E01 - Titolo.ita.srt")); err != nil {
+		t.Fatalf("sidecar not moved next to the archived video: %v", err)
+	}
+	if _, err := os.Stat(sub); !os.IsNotExist(err) {
+		t.Fatalf("source sidecar still present: %v", err)
+	}
+}

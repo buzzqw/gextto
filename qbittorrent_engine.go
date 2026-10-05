@@ -446,7 +446,7 @@ func (e *qbittorrentEngine) sync() error {
 		if view.Hash == "" {
 			continue
 		}
-		if _, stalled := e.stalled[view.Hash]; stalled && view.State == "downloading" {
+		if _, stalled := e.stalled[view.Hash]; stalled && (view.State == "downloading" || view.State == "paused") {
 			view.State = "stalled"
 			view.Stalled = true
 		}
@@ -615,7 +615,7 @@ func (e *qbittorrentEngine) AdjustQueue(cfg *Config, _ int64) {
 			continue
 		}
 		switch view.State {
-		case "downloading", "downloading_metadata", "stalled":
+		case "downloading", "downloading_metadata":
 			downloading = append(downloading, candidate{view.Hash, view.QueuePosition, view.Name})
 		case "paused":
 			if _, ok := e.policyPaused[view.Hash]; ok {
@@ -879,7 +879,7 @@ func (e *qbittorrentEngine) Pause(hash string) (bool, error) {
 
 func (e *qbittorrentEngine) Resume(hash string) (bool, error) {
 	hash = strings.ToLower(strings.TrimSpace(hash))
-	if view, ok := e.cachedState(hash); ok && view.State != "paused" {
+	if view, ok := e.cachedState(hash); ok && view.State != "paused" && view.State != "stalled" {
 		return true, nil
 	}
 	ctx, cancel := e.requestContext()
@@ -905,7 +905,7 @@ func (e *qbittorrentEngine) Restart(hash string) (bool, error) {
 	if err := e.client.Reannounce(ctx, hash); err != nil {
 		return false, err
 	}
-	if view, ok := e.cachedState(hash); ok && view.State == "paused" {
+	if view, ok := e.cachedState(hash); ok && (view.State == "paused" || view.State == "stalled") {
 		if err := e.client.Resume(ctx, hash); err != nil {
 			return false, err
 		}
@@ -995,6 +995,12 @@ func (e *qbittorrentEngine) MoveStorage(hash, destination string) (bool, error) 
 
 func (e *qbittorrentEngine) MarkStalled(hash string) (bool, error) {
 	hash = strings.ToLower(strings.TrimSpace(hash))
+	// Park the torrent in the backend too: a dead stall must not keep occupying
+	// an active download slot (parity with the embedded engine).
+	paused, err := e.Pause(hash)
+	if err != nil {
+		return false, err
+	}
 	e.mu.Lock()
 	e.stalled[hash] = struct{}{}
 	if view, ok := e.cache[hash]; ok {
@@ -1003,7 +1009,7 @@ func (e *qbittorrentEngine) MarkStalled(hash string) (bool, error) {
 		e.cache[hash] = view
 	}
 	e.mu.Unlock()
-	return true, nil
+	return paused, nil
 }
 
 func (e *qbittorrentEngine) ClearStalled(hash string) {
@@ -1379,6 +1385,16 @@ func (e *qbittorrentEngine) AddWithOptions(magnet string, cfg *Config, preferred
 	ctx, cancel := e.requestContext()
 	defer cancel()
 	e.ensureCategory(ctx)
+	// Do not report a phantom start when the torrent is already in the session:
+	// the embedded backend returns false in the same case, and the caller uses
+	// that to avoid registering a download that never started.
+	if known, ok := utils.MagnetHash(magnet); ok {
+		for _, existing := range e.List() {
+			if strings.EqualFold(existing.Hash, known) {
+				return false, nil
+			}
+		}
+	}
 	addOpts := e.addOptions(options)
 	addOpts.SavePath = savePath
 	hash, err := e.client.AddMagnet(ctx, magnet, addOpts)

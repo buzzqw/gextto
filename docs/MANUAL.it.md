@@ -358,7 +358,11 @@ viene mai spostata o eliminata mentre il torrent sta ancora facendo seeding.
 
 Il Cestino deve essere configurato in *Configurazione → Percorsi*. Se non c'è una
 destinazione NAS, Gextto non tratta la cartella Download come archivio e non la
-sposta automaticamente nel Cestino.
+sposta automaticamente nel Cestino. Lo spostamento automatico della cartella
+sorgente nel Cestino avviene solo con NAS configurato, con una destinazione
+**Cestino** valida e con la rimozione automatica dei completati attiva; se il
+Cestino non è configurato i file sorgente non vengono mai cancellati
+automaticamente (viene rimossa solo la voce dalla sessione torrent).
 
 ## 4. Serie TV
 
@@ -754,9 +758,11 @@ token o password negli argomenti se il comando finisce nei log del sistema.
   sceglierla dal server. Gextto analizza ricorsivamente i file video, riconosce
   serie e film dal nome, confronta i titoli con TMDB/TVDB e mostra una proposta
   di rinomina con eventuali alternative.
-- **Pulizia cestino** dalla toolbar **Manutenzione** — è forzata e rimuove subito
-  il contenuto selezionato. La pulizia avviata dal pannello **Trash** rispetta
-  invece il periodo di retention configurato.
+- **Pulizia cestino** — sia **Pulisci trash** in *Manutenzione* sia **Svuota
+  cestino** nel pannello **Trash** sono azioni manuali forzate: rimuovono subito
+  il contenuto. `trash_retention_days` (0 = elimina tutto) si applica solo alle
+  pulizie non forzate richieste via API (`/api/maintenance/clean-trash` con
+  `force=false`).
 - **Duplicati video** — *Anteprima duplicati* e *Pulisci duplicati* trovano i
   file video chiaramente inferiori (risoluzione strettamente più bassa) rimasti
   accanto alla versione migliore nella stessa cartella — es. il vecchio 480p
