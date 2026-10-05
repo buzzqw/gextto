@@ -966,7 +966,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		// before being dropped from the session. A bare Remove would leave the
 		// file unchecked and under the wrong name.
 		if !gh6_archivedCopyFinalized(s.db, torrent.Name, torrent.Hash) {
-			logging.Info("completed torrent not finalized yet; running archive import before removal",
+			logging.Debug("completed download still needs archiving; finalizing it before cleanup",
 				"hash", torrent.Hash, "name", torrent.Name)
 			if ok, err := ArchiveAndRemoveTorrent(s, cfg, torrent.Hash); err != nil {
 				logging.Warn("completed torrent finalization failed",

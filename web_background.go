@@ -1095,7 +1095,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						} else if err := db.SetMediaInfo(&release, &info); err != nil {
 							logging.Warn("could not save MediaInfo for completed file", "title", release.Title, "path", probePath, "error", err)
 						} else {
-							logging.Info("🔬 MediaInfo stored for the completed file",
+							logging.Debug("saved media details for completed file",
 								"title", release.Title, "path", probePath, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
 						}
 					}

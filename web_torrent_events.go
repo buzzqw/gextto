@@ -2065,7 +2065,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
 		return false, fmt.Errorf("integrity validation failed: %w", err)
 	}
-	logging.Info("completed file passed integrity validation", "name", event.Name, "path", path)
+	logging.Debug("completed file passed integrity check", "name", event.Name, "path", path)
 	size, err := SizeOfPath(path)
 	if err != nil {
 		return false, err
@@ -2185,7 +2185,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// Download completion is logged when the payload first reaches 100%. This
 	// later handler records the separate archive/import phase (often after a
 	// seed period), so the two lifecycle messages retain their real order.
-	logging.Info(fmt.Sprintf("📁 Archive import complete — «%s» · %s · saved to %s%s",
+	logging.Info(fmt.Sprintf("📁 Archived — «%s» · %s · saved to %s%s",
 		release.Title,
 		logging.HumanBytesI64(size),
 		processedPath,
