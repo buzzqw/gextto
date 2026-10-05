@@ -29,6 +29,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -1452,11 +1453,25 @@ func v2ParseFloat(value string, fallback float64) float64 {
 func V2DownloadsRemoveModal(w http.ResponseWriter, r *http.Request, s *AppState) {
 	hash := r.FormValue("hash")
 	name := hash
+	onRamdisk := false
 	if torrent, ok := v2FindTorrent(s, hash); ok {
 		name = torrent.Name
+		onRamdisk = v2TorrentOnRamdisk(torrent.SavePath, latestConfig(s))
 	}
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_remove_modal", map[string]any{"Hash": hash, "Name": name}, dict, eng)
+	v2Render(w, http.StatusOK, "v2_remove_modal", map[string]any{"Hash": hash, "Name": name, "OnRamdisk": onRamdisk}, dict, eng)
+}
+
+// v2TorrentOnRamdisk reports whether a torrent's payload resides in the
+// configured RAM-disk tree. filepath.Rel avoids false positives such as
+// /mnt/ramdisk-old matching /mnt/ramdisk.
+func v2TorrentOnRamdisk(savePath string, cfg *Config) bool {
+	if cfg == nil || cfg.RamdiskDir() == nil || strings.TrimSpace(savePath) == "" {
+		return false
+	}
+	root := filepath.Clean(*cfg.RamdiskDir())
+	relative, err := filepath.Rel(root, filepath.Clean(savePath))
+	return err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 // V2DownloadsRemove removes a torrent and swaps the table back in, clearing the

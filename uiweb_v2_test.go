@@ -391,6 +391,17 @@ func TestV2DetailAndRemoveFragmentsRender(t *testing.T) {
 	}
 }
 
+func TestV2TorrentOnRamdisk(t *testing.T) {
+	ramdisk := t.TempDir()
+	cfg := &Config{Settings: map[string]string{"libtorrent_ramdisk_dir": ramdisk}}
+	if !v2TorrentOnRamdisk(filepath.Join(ramdisk, "payload"), cfg) {
+		t.Fatal("RAM disk payload not detected")
+	}
+	if v2TorrentOnRamdisk(ramdisk+"-other", cfg) {
+		t.Fatal("path sharing a RAM disk prefix must not match")
+	}
+}
+
 func TestV2SettingsPagesAndSave(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))
