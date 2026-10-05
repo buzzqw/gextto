@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
@@ -47,6 +48,40 @@ func newTestDB(t *testing.T) *Database {
 	}
 	t.Cleanup(func() { _ = db.db.Close() })
 	return db
+}
+
+func TestStallWatchPersistence(t *testing.T) {
+	db := newTestDB(t)
+	stalledAt := time.Date(2026, time.October, 5, 10, 0, 0, 0, time.UTC)
+	want := StallWatch{
+		lastProgressAt:    stalledAt.Add(-time.Hour),
+		lastDone:          12345,
+		stalledSince:      &stalledAt,
+		nextRetryAt:       stalledAt.Add(time.Hour),
+		nextRetryNoticeAt: stalledAt.Add(3 * time.Hour),
+		retryNoticeStep:   2,
+	}
+	if err := db.SaveStallWatch("ABC123", want); err != nil {
+		t.Fatalf("save stall watch: %v", err)
+	}
+	watches, err := db.LoadStallWatches()
+	if err != nil {
+		t.Fatalf("load stall watches: %v", err)
+	}
+	got, ok := watches["abc123"]
+	if !ok {
+		t.Fatal("saved stall watch was not restored")
+	}
+	if got.lastDone != want.lastDone || got.retryNoticeStep != want.retryNoticeStep || got.stalledSince == nil || !got.stalledSince.Equal(stalledAt) || !got.nextRetryAt.Equal(want.nextRetryAt) || !got.nextRetryNoticeAt.Equal(want.nextRetryNoticeAt) {
+		t.Fatalf("restored stall watch = %#v, want %#v", got, want)
+	}
+	if err := db.DeleteStallWatch("abc123"); err != nil {
+		t.Fatalf("delete stall watch: %v", err)
+	}
+	watches, err = db.LoadStallWatches()
+	if err != nil || len(watches) != 0 {
+		t.Fatalf("watches after delete = %#v, %v", watches, err)
+	}
 }
 
 func TestMarkTorrentCompletedUnarchivedIsIdempotent(t *testing.T) {

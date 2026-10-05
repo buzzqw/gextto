@@ -616,9 +616,14 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 	live := map[string]struct{}{}
 	for _, torrent := range torrents.List() {
 		live[torrent.Hash] = struct{}{}
-		if (torrent.State != "downloading" && torrent.State != "stalled") || torrent.Progress >= 100.0 {
+		_, wasStalled := watch[torrent.Hash]
+		// A parked stalled torrent is deliberately paused. Continue monitoring it
+		// when its state was restored from the database after a daemon restart;
+		// unrelated user-paused torrents never enter watch and remain untouched.
+		if (torrent.State != "downloading" && torrent.State != "stalled" && !(torrent.State == "paused" && wasStalled)) || torrent.Progress >= 100.0 {
 			torrents.ClearStalled(torrent.Hash)
 			delete(watch, torrent.Hash)
+			_ = db.DeleteStallWatch(torrent.Hash)
 			continue
 		}
 		entry, ok := watch[torrent.Hash]
@@ -652,6 +657,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			entry.nextRetryAt = now
 			watch[torrent.Hash] = entry
 			torrents.ClearStalled(torrent.Hash)
+			_ = db.DeleteStallWatch(torrent.Hash)
 			continue
 		}
 		entry.lastProgressAt = progressAt
@@ -711,6 +717,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			})
 			delete(watch, torrent.Hash)
 			torrents.ClearStalled(torrent.Hash)
+			_ = db.DeleteStallWatch(torrent.Hash)
 			continue
 		}
 		if !now.Before(entry.nextRetryAt) {
@@ -739,10 +746,14 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			}
 		}
 		watch[torrent.Hash] = entry
+		if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
+			logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+		}
 	}
 	for hash := range watch {
 		if _, ok := live[hash]; !ok {
 			delete(watch, hash)
+			_ = db.DeleteStallWatch(hash)
 		}
 	}
 }

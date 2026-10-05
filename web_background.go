@@ -549,6 +549,12 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	metadataFirstSeen := map[string]time.Time{}
 	metadataLastWarning := map[string]time.Time{}
 	stallWaitStart := map[string]StallWatch{}
+	if restored, err := db.LoadStallWatches(); err != nil {
+		logging.Warn("could not restore stalled torrent retry state", "error", err)
+	} else if len(restored) > 0 {
+		stallWaitStart = restored
+		logging.Info("restored stalled torrent retry state", "torrents", len(restored))
+	}
 	// Periodic RAM-disk reconciliation: the metadata event fires once, so a
 	// missed event (restart/race) used to leave an oversized torrent on the
 	// tmpfs forever. `ramdiskAttempts` rate-limits retries per hash.

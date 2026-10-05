@@ -664,6 +664,21 @@ const databaseProviderSchema = `CREATE TABLE IF NOT EXISTS provider_status (
                 PRIMARY KEY(provider, kind)
             );`
 
+// databaseStallWatchSchema persists the retry and notification schedule for a
+// stalled download. Keeping it outside torrent_meta preserves a user's normal
+// paused state: only torrents explicitly parked by the stall monitor appear
+// here and are resumed/reannounced after a daemon restart.
+const databaseStallWatchSchema = `CREATE TABLE IF NOT EXISTS stalled_torrents (
+                hash TEXT PRIMARY KEY,
+                last_progress_at TEXT NOT NULL,
+                last_done INTEGER NOT NULL DEFAULT 0,
+                stalled_since TEXT NOT NULL,
+                next_retry_at TEXT NOT NULL,
+                next_notice_at TEXT,
+                notice_step INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );`
+
 // databaseFeedSeenSchema mirrors the "seen in feed" tables and indexes.
 const databaseFeedSeenSchema = `CREATE TABLE IF NOT EXISTS movie_feed_seen (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -789,6 +804,9 @@ func (d *Database) migrate() error {
 	}
 	// Escalating provider backoff (feeds, indexers).
 	if _, err := d.db.Exec(databaseProviderSchema); err != nil {
+		return err
+	}
+	if _, err := d.db.Exec(databaseStallWatchSchema); err != nil {
 		return err
 	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
@@ -3344,6 +3362,80 @@ func (d *Database) TorrentStatus(hash string) (*string, error) {
 		return nil, err
 	}
 	return &status, nil
+}
+
+// LoadStallWatches restores torrents deliberately parked by the stalled
+// download monitor. Normal user-paused torrents are not represented here.
+func (d *Database) LoadStallWatches() (map[string]StallWatch, error) {
+	watches := map[string]StallWatch{}
+	if d == nil || d.db == nil {
+		return watches, nil
+	}
+	rows, err := d.db.Query(`SELECT hash, last_progress_at, last_done, stalled_since,
+		next_retry_at, COALESCE(next_notice_at, ''), notice_step FROM stalled_torrents`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hash, lastProgress, stalledSince, nextRetry, nextNotice string
+		var lastDone int64
+		var step uint8
+		if err := rows.Scan(&hash, &lastProgress, &lastDone, &stalledSince, &nextRetry, &nextNotice, &step); err != nil {
+			return nil, err
+		}
+		parse := func(value string) (time.Time, error) { return time.Parse(time.RFC3339Nano, value) }
+		progressAt, err := parse(lastProgress)
+		if err != nil {
+			continue
+		}
+		stalledAt, err := parse(stalledSince)
+		if err != nil {
+			continue
+		}
+		retryAt, err := parse(nextRetry)
+		if err != nil {
+			continue
+		}
+		entry := StallWatch{lastProgressAt: progressAt, lastDone: lastDone, stalledSince: &stalledAt, nextRetryAt: retryAt, retryNoticeStep: step}
+		if nextNotice != "" {
+			if noticeAt, err := parse(nextNotice); err == nil {
+				entry.nextRetryNoticeAt = noticeAt
+			}
+		}
+		watches[strings.ToLower(hash)] = entry
+	}
+	return watches, rows.Err()
+}
+
+// SaveStallWatch atomically records a stalled torrent's retry state.
+func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
+	if d == nil || d.db == nil || entry.stalledSince == nil {
+		return nil
+	}
+	nextNotice := ""
+	if !entry.nextRetryNoticeAt.IsZero() {
+		nextNotice = entry.nextRetryNoticeAt.UTC().Format(time.RFC3339Nano)
+	}
+	_, err := d.db.Exec(`INSERT INTO stalled_torrents(hash,last_progress_at,last_done,stalled_since,next_retry_at,next_notice_at,notice_step,updated_at)
+		VALUES(?1,?2,?3,?4,?5,?6,?7,?8)
+		ON CONFLICT(hash) DO UPDATE SET last_progress_at=excluded.last_progress_at,last_done=excluded.last_done,
+		stalled_since=excluded.stalled_since,next_retry_at=excluded.next_retry_at,next_notice_at=excluded.next_notice_at,
+		notice_step=excluded.notice_step,updated_at=excluded.updated_at`,
+		strings.ToLower(hash), entry.lastProgressAt.UTC().Format(time.RFC3339Nano), entry.lastDone,
+		entry.stalledSince.UTC().Format(time.RFC3339Nano), entry.nextRetryAt.UTC().Format(time.RFC3339Nano),
+		nextNotice, entry.retryNoticeStep, nowSQLite())
+	return err
+}
+
+// DeleteStallWatch forgets monitor state once progress resumes, completion is
+// reached, or the torrent leaves the session.
+func (d *Database) DeleteStallWatch(hash string) error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	_, err := d.db.Exec("DELETE FROM stalled_torrents WHERE hash=?1", strings.ToLower(hash))
+	return err
 }
 
 // TorrentMeta returns the release associated with a torrent hash, restoring it
