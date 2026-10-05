@@ -418,9 +418,13 @@ html, body {
 .htmx-request.archive-indicator {
   display: inline-block;
 }
-button.htmx-request,
-form.htmx-request button[type="submit"],
-.btn.htmx-request {
+/* Busy feedback for user actions only. Auto-polling forms and buttons
+   (hx-trigger containing "every") must not dim the interface on each
+   background refresh: that produced a visible "blink" on Log, Downloads
+   and the Dashboard filter. */
+button.htmx-request:not([hx-trigger*="every"]),
+form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
+.btn.htmx-request:not([hx-trigger*="every"]) {
   opacity: 0.6;
   cursor: wait;
 }
