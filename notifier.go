@@ -581,8 +581,13 @@ func formatEvent(event string, data map[string]any) string {
 				messages.Pick("⏳ Sarà archiviato a fine seed", "⏳ Will be archived when seeding ends"),
 			)
 		}
+		replacedTitle := text("replaced_title")
+		var upgradeNote string
+		if replacedTitle != "" {
+			upgradeNote = fmt.Sprintf("\n\n♻️ %s: «%s»", messages.Pick("Sostituisce versione inferiore", "Replaces inferior version"), replacedTitle)
+		}
 		return fmt.Sprintf(
-			"%s\n\n%s %s\n\n💾 %s%s\n%s: %s",
+			"%s\n\n%s %s\n\n💾 %s%s\n%s: %s%s",
 			messages.Pick("✅ DOWNLOAD COMPLETATO", "✅ DOWNLOAD COMPLETE"),
 			mediaIcon,
 			seriesEpisode(),
@@ -590,6 +595,7 @@ func formatEvent(event string, data map[string]any) string {
 			stats,
 			messages.Pick("📂 Archiviato in", "📂 Archived to"),
 			text("path"),
+			upgradeNote,
 		)
 	case "season_pack_completed":
 		season, _ := jsonInt(mapLookup(data, "season"))

@@ -100,7 +100,7 @@ var uiSettingTooltipText = map[string]string{
 	"default_language":                             "Lingua preferita di default per serie e film (es. ita, eng).",
 	"blacklist":                                    "Parole vietate, una per riga: le release che le contengono vengono scartate.",
 	"archive_root":                                 "Cartella di archivio predefinita per i contenuti senza percorso dedicato.",
-	"trash_path":                                   "Cartella dove vengono spostati i file sostituiti/duplicati.",
+	"trash_path":                                   "Cartella dove vengono spostati i file sostituiti/duplicati (se lasciata vuota usa la sottocartella trash nella cartella dati).",
 	"libtorrent_dir":                               "Cartella di download predefinita per tutti i motori.",
 	"libtorrent_temp_dir":                          "Cartella temporanea per i download in corso.",
 	"libtorrent_ramdisk_dir":                       "RAM disk da usare per i download in corso, se disponibile.",

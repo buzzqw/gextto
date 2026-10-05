@@ -990,3 +990,14 @@ func TestMoveSidecarsToTargetMovesSubtitles(t *testing.T) {
 		t.Fatalf("source sidecar still present: %v", err)
 	}
 }
+
+func TestValidateDestinationWritability(t *testing.T) {
+	dir := t.TempDir()
+	validSubdir := filepath.Join(dir, "valid_archive")
+	if err := ValidateDestination(validSubdir); err != nil {
+		t.Fatalf("ValidateDestination failed on writable directory: %v", err)
+	}
+	if err := ValidateDestination(""); err == nil {
+		t.Fatalf("ValidateDestination should fail on empty string")
+	}
+}

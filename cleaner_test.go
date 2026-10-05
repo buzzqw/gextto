@@ -52,6 +52,27 @@ func TestIndexArchiveKeepsBestFilePerEpisode(t *testing.T) {
 	}
 }
 
+func TestIndexArchiveRecognizesSeasonSubfolderEpisodes(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "Example")
+	seasonDir := filepath.Join(archive, "Stagione 01")
+	if err := os.MkdirAll(seasonDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// Files that don't repeat the series title at the beginning
+	cleanerWrite(t, filepath.Join(seasonDir, "S01E01 - [1080p][IT].mkv"), "hd")
+	cleanerWrite(t, filepath.Join(seasonDir, "02 - Titolo - [720p][IT].mkv"), "hd2")
+
+	index := IndexArchive("Example", archive, map[string]string{})
+	best1, ok1 := index.BestFor(1, 1)
+	assertTrue(t, ok1, "S01E01 riconosciuto da sottocartella")
+	assertEqual(t, best1.Quality.Resolution, "1080p")
+
+	best2, ok2 := index.BestFor(1, 2)
+	assertTrue(t, ok2, "02 - Titolo riconosciuto da sottocartella Stagione 01")
+	assertEqual(t, best2.Quality.Resolution, "720p")
+}
+
 func TestMovesOnlyLowerQualityMatchingEpisodeToTrash(t *testing.T) {
 	root := t.TempDir()
 	archive := filepath.Join(root, "archive")
@@ -314,6 +335,25 @@ func TestPrefersLanguageAtSameResolution(t *testing.T) {
 		t.Fatalf("find senza lingua: %v", err)
 	}
 	assertEqual(t, len(without), 0)
+}
+
+func TestFindInferiorDuplicatesInDirRecognizesSubfolders(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "Example")
+	seasonDir := filepath.Join(archive, "Stagione 01")
+	if err := os.MkdirAll(seasonDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// Two files for episode 1 in season subfolder: 1080p and 720p without series title in filename
+	cleanerWrite(t, filepath.Join(seasonDir, "S01E01 - [1080p][IT].mkv"), "hd")
+	cleanerWrite(t, filepath.Join(seasonDir, "S01E01 - [720p][IT].mkv"), "sd")
+
+	candidates, err := FindInferiorDuplicatesInDir("Example", archive, map[string]struct{}{}, "ita")
+	if err != nil {
+		t.Fatalf("find: %v", err)
+	}
+	assertEqual(t, len(candidates), 1)
+	assertTrue(t, strings.Contains(candidates[0].Path, "720p"), "il candidato inferiore deve essere il 720p")
 }
 
 func TestDiscardsNewReleaseWithoutPreferredLanguage(t *testing.T) {

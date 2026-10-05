@@ -51,28 +51,35 @@ func IndexArchive(seriesName, archivePath string, settings map[string]string) mo
 		if !ok {
 			continue
 		}
+		season := int64(0)
+		episode := int64(0)
+		matched := false
 		captures := pattern.FindStringSubmatch(name)
-		if captures == nil {
-			continue
+		if captures != nil {
+			fileSeries := cleanerCapture(pattern, captures, "name")
+			if fileSeries != "" && SeriesNamesMatch(normalized, fileSeries) {
+				seasonRaw := cleanerCapture(pattern, captures, "s", "ns")
+				episodeRaw := cleanerCapture(pattern, captures, "e")
+				if seasonRaw != "" && episodeRaw != "" {
+					s, errS := strconv.ParseInt(seasonRaw, 10, 64)
+					e, errE := strconv.ParseInt(episodeRaw, 10, 64)
+					if errS == nil && errE == nil {
+						season = s
+						episode = e
+						matched = true
+					}
+				}
+			}
 		}
-		fileSeries := cleanerCapture(pattern, captures, "name")
-		if fileSeries == "" || !SeriesNamesMatch(normalized, fileSeries) {
-			continue
+		if !matched {
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			if ok && SeriesNamesMatch(normalized, idSeries) {
+				season = idSeason
+				episode = idEpisode
+				matched = true
+			}
 		}
-		seasonRaw := cleanerCapture(pattern, captures, "s", "ns")
-		if seasonRaw == "" {
-			continue
-		}
-		season, err := strconv.ParseInt(seasonRaw, 10, 64)
-		if err != nil {
-			continue
-		}
-		episodeRaw := cleanerCapture(pattern, captures, "e")
-		if episodeRaw == "" {
-			continue
-		}
-		episode, err := strconv.ParseInt(episodeRaw, 10, 64)
-		if err != nil {
+		if !matched {
 			continue
 		}
 		quality := ParseQuality(name)
@@ -217,10 +224,11 @@ func handleDuplicate(file string, cfg *Config) error {
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(file)
 	}
-	if cfg.TrashPath == nil {
+	trash := cfg.ResolveTrashPath()
+	if strings.TrimSpace(trash) == "" {
 		return fmt.Errorf("trash_path is required when cleanup_action is move")
 	}
-	_, err := MoveToTrash(file, *cfg.TrashPath)
+	_, err := MoveToTrash(file, trash)
 	return err
 }
 
@@ -457,14 +465,22 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 			continue
 		}
 		captures := pattern.FindStringSubmatch(name)
-		if captures == nil {
-			continue
+		epMatched := false
+		if captures != nil {
+			if cleanerEpisodeMatches(pattern, captures, season, episode) {
+				fileSeries := cleanerCapture(pattern, captures, "name")
+				if SeriesNamesMatch(normalized, fileSeries) {
+					epMatched = true
+				}
+			}
 		}
-		if !cleanerEpisodeMatches(pattern, captures, season, episode) {
-			continue
+		if !epMatched {
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
+				epMatched = true
+			}
 		}
-		fileSeries := cleanerCapture(pattern, captures, "name")
-		if !SeriesNamesMatch(normalized, fileSeries) {
+		if !epMatched {
 			continue
 		}
 		oldQuality := ParseQuality(name)
@@ -562,28 +578,35 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 		if !ok {
 			continue
 		}
+		season := int64(0)
+		episode := int64(0)
+		matched := false
 		captures := pattern.FindStringSubmatch(name)
-		if captures == nil {
-			continue
+		if captures != nil {
+			fileSeries := cleanerCapture(pattern, captures, "name")
+			if fileSeries != "" && SeriesNamesMatch(normalized, fileSeries) {
+				seasonRaw := cleanerCapture(pattern, captures, "s", "ns")
+				episodeRaw := cleanerCapture(pattern, captures, "e")
+				if seasonRaw != "" && episodeRaw != "" {
+					s, errS := strconv.ParseInt(seasonRaw, 10, 64)
+					e, errE := strconv.ParseInt(episodeRaw, 10, 64)
+					if errS == nil && errE == nil {
+						season = s
+						episode = e
+						matched = true
+					}
+				}
+			}
 		}
-		fileSeries := cleanerCapture(pattern, captures, "name")
-		if fileSeries == "" || !SeriesNamesMatch(normalized, fileSeries) {
-			continue
+		if !matched {
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			if ok && SeriesNamesMatch(normalized, idSeries) {
+				season = idSeason
+				episode = idEpisode
+				matched = true
+			}
 		}
-		seasonRaw := cleanerCapture(pattern, captures, "s", "ns")
-		if seasonRaw == "" {
-			continue
-		}
-		season, err := strconv.ParseInt(seasonRaw, 10, 64)
-		if err != nil {
-			continue
-		}
-		episodeRaw := cleanerCapture(pattern, captures, "e")
-		if episodeRaw == "" {
-			continue
-		}
-		episode, err := strconv.ParseInt(episodeRaw, 10, 64)
-		if err != nil {
+		if !matched {
 			continue
 		}
 		quality := ParseQuality(name)
@@ -715,14 +738,22 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 			continue
 		}
 		captures := pattern.FindStringSubmatch(name)
-		if captures == nil {
-			continue
+		epMatched := false
+		if captures != nil {
+			if cleanerEpisodeMatches(pattern, captures, season, episode) {
+				fileSeries := cleanerCapture(pattern, captures, "name")
+				if SeriesNamesMatch(normalized, fileSeries) {
+					epMatched = true
+				}
+			}
 		}
-		if !cleanerEpisodeMatches(pattern, captures, season, episode) {
-			continue
+		if !epMatched {
+			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name, archivePath)
+			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
+				epMatched = true
+			}
 		}
-		fileSeries := cleanerCapture(pattern, captures, "name")
-		if !SeriesNamesMatch(normalized, fileSeries) {
+		if !epMatched {
 			continue
 		}
 		oldQuality := ParseQuality(name)
@@ -999,6 +1030,69 @@ func cleanerEpisodeMatches(pattern *regexp.Regexp, captures []string, season, ep
 		return false
 	}
 	return true
+}
+
+// extractEpisodeIdentityFromPath extracts the series, season and episode of an
+// archived file. When the file name itself lacks the series title (common in
+// season subfolders like "Stagione 01/S01E02.mkv" or "Stagione 01/02 - Titolo.mkv"),
+// it falls back to inspecting the ancestor directories.
+func extractEpisodeIdentityFromPath(filePath, fileName, archivePath string) (series string, season int64, episode int64, ok bool) {
+	primaryPattern, err := utils.CachedRegex(`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})(?:[ ._-]|$)`)
+	if err == nil {
+		if captures := primaryPattern.FindStringSubmatch(fileName); captures != nil {
+			sName := cleanerCapture(primaryPattern, captures, "name")
+			sRaw := cleanerCapture(primaryPattern, captures, "s", "ns")
+			eRaw := cleanerCapture(primaryPattern, captures, "e")
+			if sName != "" && sRaw != "" && eRaw != "" {
+				sVal, errS := strconv.ParseInt(sRaw, 10, 64)
+				eVal, errE := strconv.ParseInt(eRaw, 10, 64)
+				if errS == nil && errE == nil {
+					return sName, sVal, eVal, true
+				}
+			}
+		}
+	}
+	sePattern, err := utils.CachedRegex(`(?i)(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`)
+	if err == nil {
+		if captures := sePattern.FindStringSubmatch(fileName); captures != nil {
+			sRaw := cleanerCapture(sePattern, captures, "s", "ns")
+			eRaw := cleanerCapture(sePattern, captures, "e")
+			if sRaw != "" && eRaw != "" {
+				sVal, errS := strconv.ParseInt(sRaw, 10, 64)
+				eVal, errE := strconv.ParseInt(eRaw, 10, 64)
+				if errS == nil && errE == nil {
+					parentDir := filepath.Dir(filePath)
+					parentName := filepath.Base(parentDir)
+					seasonFolderPattern, _ := utils.CachedRegex(`(?i)^(?:season|stagione|s)\s*0*(\d{1,2})$`)
+					if seasonFolderPattern != nil && seasonFolderPattern.MatchString(parentName) {
+						grandParent := filepath.Dir(parentDir)
+						return filepath.Base(grandParent), sVal, eVal, true
+					}
+					return parentName, sVal, eVal, true
+				}
+			}
+		}
+	}
+	seasonFolderPattern, err := utils.CachedRegex(`(?i)^(?:season|stagione|s)\s*0*(\d{1,2})$`)
+	if err == nil {
+		parentDir := filepath.Dir(filePath)
+		parentName := filepath.Base(parentDir)
+		matchSeason := seasonFolderPattern.FindStringSubmatch(parentName)
+		if matchSeason != nil {
+			if sVal, errS := strconv.ParseInt(matchSeason[1], 10, 64); errS == nil {
+				bareEpPattern, _ := utils.CachedRegex(`(?i)^(?:e(?:pisode)?[ ._-]?)?0*(\d{1,4})(?:[ ._-]|$)`)
+				if bareEpPattern != nil {
+					if matchEp := bareEpPattern.FindStringSubmatch(fileName); matchEp != nil {
+						if eVal, errE := strconv.ParseInt(matchEp[1], 10, 64); errE == nil {
+							grandParent := filepath.Dir(parentDir)
+							return filepath.Base(grandParent), sVal, eVal, true
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", 0, 0, false
 }
 
 // cleanerContainsAllWords reports whether value contains every word.

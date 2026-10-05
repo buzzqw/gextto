@@ -284,6 +284,13 @@ func (t *TmdbClient) SearchSeries(ctx context.Context, name string) ([]TmdbItem,
 	if t.key == nil {
 		return []TmdbItem{}, nil
 	}
+	cacheKey := "search_tv:" + strings.ToLower(strings.TrimSpace(name))
+	if cached, ok := t.cacheGet(cacheKey); ok && cached != nil {
+		var items []TmdbItem
+		if err := json.Unmarshal([]byte(*cached), &items); err == nil {
+			return items, nil
+		}
+	}
 	var result SearchResult
 	err := t.getJSON(ctx, tmdbAPIBaseURL+"/search/tv", [][2]string{
 		{"query", name},
@@ -291,6 +298,10 @@ func (t *TmdbClient) SearchSeries(ctx context.Context, name string) ([]TmdbItem,
 	}, &result)
 	if err != nil {
 		return nil, err
+	}
+	if data, err := json.Marshal(result.Results); err == nil {
+		s := string(data)
+		t.cacheSet(cacheKey, &s)
 	}
 	return result.Results, nil
 }
@@ -376,6 +387,20 @@ func (t *TmdbClient) SearchMovie(ctx context.Context, name string, year *int64) 
 	if t.key == nil {
 		return nil, nil
 	}
+	y := int64(0)
+	if year != nil {
+		y = *year
+	}
+	cacheKey := fmt.Sprintf("search_movie:%s:%d", strings.ToLower(strings.TrimSpace(name)), y)
+	if cached, ok := t.cacheGet(cacheKey); ok {
+		if cached == nil {
+			return nil, nil
+		}
+		var item TmdbItem
+		if err := json.Unmarshal([]byte(*cached), &item); err == nil {
+			return &item, nil
+		}
+	}
 	params := [][2]string{
 		{"query", name},
 		{"language", t.language},
@@ -388,9 +413,15 @@ func (t *TmdbClient) SearchMovie(ctx context.Context, name string, year *int64) 
 		return nil, err
 	}
 	if len(result.Results) == 0 {
+		t.cacheSet(cacheKey, nil)
 		return nil, nil
 	}
-	return &result.Results[0], nil
+	item := &result.Results[0]
+	if data, err := json.Marshal(item); err == nil {
+		s := string(data)
+		t.cacheSet(cacheKey, &s)
+	}
+	return item, nil
 }
 
 // MovieDetails mirrors `movie_details`.
@@ -583,6 +614,13 @@ func (t *TmdbClient) SeasonCounts(ctx context.Context, tmdbID string) (map[int64
 	if err != nil {
 		return map[int64]int64{}, nil
 	}
+	cacheKey := fmt.Sprintf("season_counts:%d", id)
+	if cached, ok := t.cacheGet(cacheKey); ok && cached != nil {
+		var counts map[int64]int64
+		if err := json.Unmarshal([]byte(*cached), &counts); err == nil {
+			return counts, nil
+		}
+	}
 	var details seriesDetails
 	rawURL := fmt.Sprintf("%s/tv/%d", tmdbAPIBaseURL, id)
 	if err := t.getJSON(ctx, rawURL, [][2]string{{"language", t.language}}, &details); err != nil {
@@ -593,6 +631,10 @@ func (t *TmdbClient) SeasonCounts(ctx context.Context, tmdbID string) (map[int64
 		if season.SeasonNumber != nil && season.EpisodeCount != nil {
 			counts[*season.SeasonNumber] = *season.EpisodeCount
 		}
+	}
+	if data, err := json.Marshal(counts); err == nil {
+		s := string(data)
+		t.cacheSet(cacheKey, &s)
 	}
 	return counts, nil
 }

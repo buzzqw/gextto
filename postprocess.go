@@ -333,7 +333,8 @@ func CompletionPath(event *models.TorrentEvent) string {
 }
 
 // ValidateDestination creates the post-processing destination (implementation of
-// `validate_destination`).
+// `validate_destination`). It also verifies that the target directory is writable,
+// catching read-only mounts, network timeouts or disconnected NAS shares.
 func ValidateDestination(destination string) error {
 	if destination == "" {
 		return errors.New("empty post-processing destination")
@@ -344,6 +345,14 @@ func ValidateDestination(destination string) error {
 	if err := os.MkdirAll(destination, 0o755); err != nil {
 		return err
 	}
+	// Verify directory writability with a temporary probe to catch read-only mounts or hung NAS.
+	probe := filepath.Join(destination, fmt.Sprintf(".gextto-probe-%s", randomToken()))
+	f, err := os.OpenFile(probe, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("destination directory not writable: %w", err)
+	}
+	_ = f.Close()
+	_ = os.Remove(probe)
 	return nil
 }
 
@@ -1671,8 +1680,9 @@ func trashOrRemove(path string, cfg *Config) error {
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(path)
 	}
-	if cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" {
-		_, err := MoveToTrash(path, *cfg.TrashPath)
+	trash := cfg.ResolveTrashPath()
+	if strings.TrimSpace(trash) != "" {
+		_, err := MoveToTrash(path, trash)
 		return err
 	}
 	return fmt.Errorf("trash_path is required when cleanup_action is move")

@@ -1533,7 +1533,9 @@ func (d *Database) checkMovieScoredWith(release *models.Release, score, minScore
 	var id, existingScore int64
 	var metadataJSON, existingMedia string
 	var downloadedAt sql.NullString
-	rowErr := d.db.QueryRow("SELECT m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND m.year IS ?2", release.Title, release.Year).Scan(&id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia)
+	// Match exact year if null/same, or allow +/- 1 year tolerance to align with disk cleanup logic
+	query := "SELECT m.id,m.quality_score,COALESCE(t.metadata_json,''),m.downloaded_at,COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
+	rowErr := d.db.QueryRow(query, release.Title, release.Year).Scan(&id, &existingScore, &metadataJSON, &downloadedAt, &existingMedia)
 	if rowErr != nil && !errors.Is(rowErr, sql.ErrNoRows) {
 		return false, "", rowErr
 	}
@@ -4288,6 +4290,27 @@ func (d *Database) RestoreUpgrade(hash string) (bool, error) {
 	}
 	committed = true
 	return true, nil
+}
+
+// UpgradeReplacedInfo returns information about previous releases replaced by
+// this upgrade, if an upgrade backup was recorded.
+func (d *Database) UpgradeReplacedInfo(hash string) (string, int64, bool) {
+	normalized := strings.ToLower(hash)
+	var payload sql.NullString
+	err := d.db.QueryRow("SELECT payload_json FROM upgrade_backup WHERE new_hash=?1", normalized).Scan(&payload)
+	if err != nil || !payload.Valid || payload.String == "" {
+		return "", 0, false
+	}
+	backups, err := decodeUpgradeBackups(payload.String)
+	if err != nil || len(backups) == 0 {
+		return "", 0, false
+	}
+	first := backups[0]
+	name := first.Title
+	if first.ArchivePath != nil && *first.ArchivePath != "" {
+		name = filepath.Base(*first.ArchivePath)
+	}
+	return name, first.QualityScore, true
 }
 
 // SaveCycle stores one cycle history entry.

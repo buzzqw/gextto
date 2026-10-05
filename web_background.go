@@ -838,6 +838,21 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			_, inRetries := storageMoveRetries[hash]
 			_, inPostSeed := postSeedMoves[hash]
 			if inMoves || inRetries || inPostSeed {
+				if meta, metaErr := db.TorrentMeta(hash); metaErr == nil && meta != nil {
+					if dest, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && SamePath(torrent.SavePath, dest) {
+						delete(moveRequests, hash)
+						delete(storageMoveRetries, hash)
+						delete(postSeedMoves, hash)
+						inMoves, inRetries, inPostSeed = false, false, false
+					}
+				}
+				if inMoves || inRetries || inPostSeed {
+					continue
+				}
+			}
+			// In-progress downloads that are actively downloading (<99.99% and State "downloading" or "queued")
+			// cannot possibly need completion recovery; skip immediately to avoid redundant SQLite queries.
+			if torrent.Progress < 99.99 && (torrent.State == "downloading" || torrent.State == "queued") {
 				continue
 			}
 			// A completed single whose end-of-seed move already reached the
@@ -846,7 +861,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			// the raw archive path complete here would skip the rename, the
 			// MediaInfo probe and the completion notification.
 			if bg_torrentNeedsArchiveImport(cfg, db, &torrent) {
-				if torrent.Progress < 99.99 {
+				status, _ := db.TorrentStatus(hash)
+				isCompletedDB := status != nil && *status == "completed"
+				if !isCompletedDB && torrent.Progress < 99.99 {
 					if checked, checkErr := torrents.ForceRecheck(hash); checkErr != nil || !checked {
 						logging.Debug("existing archive recheck could not be started", "error", checkErr)
 					}
@@ -1068,6 +1085,12 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 							episodeValue = *completionMeta.Release.Episode
 						}
 					}
+					var replacedTitleValue any
+					var replacedScoreValue any
+					if replacedName, replacedScore, ok := db.UpgradeReplacedInfo(event.Hash); ok {
+						replacedTitleValue = replacedName
+						replacedScoreValue = replacedScore
+					}
 					if err := notifier.NotifyEvent("torrent_completed", map[string]any{
 						"hash":              event.Hash,
 						"name":              event.Name,
@@ -1080,6 +1103,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 						"size_bytes":        sizeBytes,
 						"duration_seconds":  durationSeconds,
 						"average_speed_bps": averageSpeedBps,
+						"replaced_title":    replacedTitleValue,
+						"replaced_score":    replacedScoreValue,
 					}); err != nil {
 						logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
 					} else {

@@ -1271,6 +1271,15 @@ func (c *Config) ResolveArchivePath(series *SeriesConfig) *string {
 	return &candidates[0]
 }
 
+// ResolveTrashPath returns the configured trash directory or a safe default
+// under DataDir ("trash") when no path was explicitly configured.
+func (c *Config) ResolveTrashPath() string {
+	if c.TrashPath != nil && strings.TrimSpace(*c.TrashPath) != "" {
+		return *c.TrashPath
+	}
+	return filepath.Join(c.DataDir, "trash")
+}
+
 // seasonAllowed parses a season specification like `1,3-4,7+` or `*`.
 func seasonAllowed(specification string, season int64) bool {
 	specification = strings.TrimSpace(specification)

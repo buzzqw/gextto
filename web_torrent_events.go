@@ -1296,8 +1296,15 @@ func bg_torrentNeedsArchiveImport(cfg *Config, db *Database, torrent *models.Tor
 		Name:     torrent.Name,
 		SavePath: torrent.SavePath,
 	})
-	size, sizeErr := SizeOfPath(target)
-	if sizeErr != nil || size < torrent.TotalSize {
+	info, statErr := os.Stat(target)
+	if statErr != nil {
+		return false
+	}
+	if info.IsDir() {
+		if !tevDirectoryHasRegularFile(target) {
+			return false
+		}
+	} else if info.Size() <= 0 {
 		return false
 	}
 	return true
@@ -2753,7 +2760,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				break
 			}
 		}
-		done := current != nil && current.Progress >= 99.99 && current.TotalSize > 0 && current.TotalDone >= current.TotalSize
+		isCompletedDB := false
+		if st, _ := db.TorrentStatus(event.Hash); st != nil && *st == "completed" {
+			isCompletedDB = true
+		}
+		done := isCompletedDB || (current != nil && current.Progress >= 99.99 && current.TotalSize > 0 && current.TotalDone >= current.TotalSize)
 		if !done {
 			delete(moveRequests, event.Hash)
 			// libtorrent pauses a torrent while it moves its data and does not

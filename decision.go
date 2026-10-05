@@ -167,10 +167,8 @@ func archiveComparison(
 		var downloadedAt sql.NullString
 		var metadataJSON string
 		var mediaInfoJSON string
-		err := db.db.QueryRow(
-			"SELECT COALESCE(m.title,''), m.quality_score, m.downloaded_at, COALESCE(t.metadata_json,''), COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.name=?1 AND m.year IS ?2 AND m.removed_at IS NULL",
-			release.Title, release.Year,
-		).Scan(&title, &oldScore, &downloadedAt, &metadataJSON, &mediaInfoJSON)
+		query := "SELECT COALESCE(m.title,''), m.quality_score, m.downloaded_at, COALESCE(t.metadata_json,''), COALESCE(m.media_info_json,'') FROM movies m LEFT JOIN torrent_meta t ON lower(t.hash)=lower(m.magnet_hash) WHERE m.removed_at IS NULL AND m.name=?1 AND (m.year IS ?2 OR (?2 IS NOT NULL AND m.year IS NOT NULL AND abs(m.year - ?2) <= 1)) ORDER BY (m.year IS ?2) DESC, m.id DESC LIMIT 1"
+		err := db.db.QueryRow(query, release.Title, release.Year).Scan(&title, &oldScore, &downloadedAt, &metadataJSON, &mediaInfoJSON)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
