@@ -300,8 +300,8 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		TmdbURL:         tmdbURL(series.TmdbID, "tv"),
 		TvdbURL:         tvdbURL(series.TvdbID, "series"),
 	}
-	// The v2 interface is served both at / and at /v2. Load the metadata for
-	// both paths so the official root UI also renders poster, genres and cast.
+	// The v2 interface is served at /. Load the metadata so the root UI
+	// renders poster, genres and cast.
 	uiSeriesMetadataFrom(s, series.Name, &detail)
 	return detail, true
 }

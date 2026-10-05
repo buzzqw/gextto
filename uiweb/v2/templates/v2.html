@@ -20,10 +20,10 @@
     } catch (error) { /* storage may be unavailable */ }
   }());
 </script>
-<link rel="stylesheet" href="/v2/static/gextto-ui.css">
-<link rel="stylesheet" href="/v2/static/v2.css">
-<script src="/v2/static/htmx.min.js" defer></script>
-<script src="/v2/static/v2-core.js" defer></script>
+<link rel="stylesheet" href="/static/gextto-ui.css">
+<link rel="stylesheet" href="/static/v2.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/v2-core.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#v2-page">Vai al contenuto</a>
@@ -55,7 +55,7 @@
       </div>
       <div class="top-actions">
         {{template "v2_live_top_metrics" .Chrome}}
-        <form method="post" action="/v2/language" class="lang-form">
+        <form method="post" action="/language" class="lang-form">
           <select class="lang-select" name="lang" aria-label="Lingua dell'interfaccia" title="Lingua dell'interfaccia" onchange="this.form.submit()">
             <option value="it"{{if eq .Chrome.Lang "it"}} selected{{end}}>Italiano</option>
             <option value="en"{{if eq .Chrome.Lang "en"}} selected{{end}}>English</option>
@@ -117,7 +117,7 @@
 </html>{{end}}
 
 {{define "v2_live_top_metrics"}}
-<div id="v2-live-top-metrics" class="top-live-metrics" hx-get="/v2/partial/chrome" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="v2-live-top-metrics" class="top-live-metrics" hx-get="/partial/chrome" hx-trigger="every 5s" hx-swap="outerHTML">
   <div class="top-metric" title="CPU del processo Gextto"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
   <div class="top-metric" title="RAM residente del processo Gextto"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
   <div class="top-metric top-metric-rate" title="Velocità di download"><span class="top-metric-label">↓ Download</span><strong>{{.Download}}</strong></div>
@@ -129,14 +129,14 @@
 {{end}}
 
 {{define "v2_live_status"}}
-<div id="v2-live-status" class="top-live-status" hx-get="/v2/partial/chrome?status=1" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="v2-live-status" class="top-live-status" hx-get="/partial/chrome?status=1" hx-trigger="every 5s" hx-swap="outerHTML">
   <span class="system-pill" title="Stato del servizio"><span class="pulse"></span>{{.Status}}</span>
   <time class="current-time" datetime="{{.CurrentTime}}" aria-label="Ora attuale" title="Ora attuale">{{.CurrentTime}}</time>
 </div>
 {{end}}
 
 {{define "v2_live_mobile_metrics"}}
-<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/v2/partial/chrome?mobile=1" hx-trigger="every 5s" hx-swap="outerHTML">
+<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/partial/chrome?mobile=1" hx-trigger="every 5s" hx-swap="outerHTML">
   <div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
   <div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
   <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Download}}</strong></div>
@@ -186,11 +186,11 @@
       <div class="panel-head"><h3>Azioni rapide</h3></div>
       <div class="panel-body">
         <div class="toolbar dashboard-quick-actions">
-          <button class="btn primary" hx-post="/v2/run-cycle" hx-vals='{"domain":"full"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Avvia ciclo (tutto)</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"series"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Serie TV</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"movies"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Film</button>
-          <button class="btn" hx-post="/v2/run-cycle" hx-vals='{"domain":"comics"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Fumetti</button>
-          <form method="post" action="/v2/dashboard/backup" hx-post="/v2/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
+          <button class="btn primary" hx-post="/run-cycle" hx-vals='{"domain":"full"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Avvia ciclo (tutto)</button>
+          <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"series"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Serie TV</button>
+          <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"movies"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Film</button>
+          <button class="btn" hx-post="/run-cycle" hx-vals='{"domain":"comics"}' hx-target="#v2-toast-region" hx-swap="innerHTML">Fumetti</button>
+          <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
           <button class="btn" type="button" onclick="window.location.reload()" title="Ricarica i dati mostrati">Aggiorna</button>
           <a class="btn" href="/?view=downloads">Vai a Scarico</a>
         </div>
@@ -270,7 +270,7 @@
   </div>
   <div class="panel dashboard-feed-panel">
     <div class="panel-head"><h3>Ultimi trovati nelle sorgenti</h3><small class="muted">Caricamento su richiesta</small></div>
-    <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/v2/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
+    <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
   </div>
   {{template "v2_dashboard_calendar" .Calendar}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
@@ -308,7 +308,7 @@
 
 {{define "v2_dashboard_feed"}}
 {{if .Error}}<p class="alert">{{.Error}}</p>
-{{else if .Rows}}<table class="data-table"><thead><tr><th>Monitorato</th><th>Tipo</th><th>Release</th><th>Fonte</th><th>Azioni</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{.Name}}</td><td>{{if eq .Kind "movie"}}Film{{else}}Serie TV{{end}}</td><td class="truncate" title="{{.Title}}">{{.Title}}</td><td>{{.Source}}</td><td><form hx-post="/v2/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">Accoda</button></form></td></tr>{{end}}</tbody></table>
+{{else if .Rows}}<table class="data-table"><thead><tr><th>Monitorato</th><th>Tipo</th><th>Release</th><th>Fonte</th><th>Azioni</th></tr></thead><tbody>{{range .Rows}}<tr><td>{{.Name}}</td><td>{{if eq .Kind "movie"}}Film{{else}}Serie TV{{end}}</td><td class="truncate" title="{{.Title}}">{{.Title}}</td><td>{{.Source}}</td><td><form hx-post="/dashboard/feed/add" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="magnet" value="{{.Magnet}}"><input type="hidden" name="source" value="{{.Source}}"><button class="btn sm primary" type="submit">Accoda</button></form></td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">Nessuna release trovata.</p>{{end}}
 {{end}}
 {{define "v2_dashboard_feed_result"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
@@ -323,7 +323,7 @@
   <div class="panel">
     <div class="panel-head"><h3>Aggiungi torrent</h3><small class="muted">Magnet, URL .torrent o file locale</small></div>
     <div class="panel-body">
-      <form class="torrent-add-form" method="post" action="/v2/downloads/add" enctype="multipart/form-data">
+      <form class="torrent-add-form" method="post" action="/downloads/add" enctype="multipart/form-data">
         <div class="torrent-add-main">
           <label class="field"><span>Magnet o URL .torrent</span><input class="input" name="magnet" placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" title="Incolla un link magnet oppure l'URL diretto di un file .torrent" /></label>
           <label class="field"><span>Percorso (opzionale)</span><input class="input" name="save_path" placeholder="cartella predefinita" title="Cartella in cui salvare il torrent; se vuoto usa quella predefinita" /></label>
@@ -354,8 +354,8 @@
 
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
-  <form id="v2-torrent-form" method="post" action="/v2/downloads/table"
-        hx-post="/v2/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
+  <form id="v2-torrent-form" method="post" action="/downloads/table"
+        hx-post="/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     <label class="mobile-torrent-sort"><span>Ordina per</span><select id="v2-sort" class="input compact" name="sort" aria-label="Ordina i torrent" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></label>
     <input type="hidden" name="dir" value="{{.Dir}}">
@@ -366,8 +366,8 @@
        <button class="btn sm" type="submit" name="refresh" value="1" title="Ricarica l'elenco dei torrent e lo stato dei download">Aggiorna</button>
        <button class="btn sm{{if .Auto}} primary{{end}}" type="submit" name="auto" value="{{if .Auto}}0{{else}}1{{end}}" title="{{if .Auto}}Disattiva l'aggiornamento automatico ogni 5 secondi{{else}}Attiva l'aggiornamento automatico ogni 5 secondi{{end}}">Auto: {{if .Auto}}on{{else}}off{{end}}</button>
        <label class="field inline-field" title="Mostra solo i torrent associati al tag selezionato"><span>Tag</span><select id="v2-tag-filter" class="input" name="tag_filter" aria-label="Filtra per tag"><option value="">Tutti i tag</option><option value="__none__"{{if eq .TagFilter "__none__"}} selected{{end}}>Senza tag</option>{{range .TagOptions}}<option value="{{.}}"{{if eq $.TagFilter .}} selected{{end}}>{{.}}</option>{{end}}</select></label>
-       <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
-      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/v2/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
+       <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
+      <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
       <span class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
     <div class="toolbar download-temp-toolbar">
       {{if .TempActive}}
@@ -380,8 +380,8 @@
        <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL KiB/s</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" hx-preserve="true" /></label>
        <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL KiB/s</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" hx-preserve="true" /></label>
        <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>minuti</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" hx-preserve="true" /></label>
-       <button class="btn sm primary" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato (o 0 per mantenerli fino a rimozione)">Applica</button>
-       <button class="btn sm danger" type="button" onclick="var d=document.getElementById('v2-temp-dl'),u=document.getElementById('v2-temp-ul'),m=document.getElementById('v2-temp-minutes');if(d)d.value='0';if(u)u.value='0';if(m)m.value='0';" hx-post="/v2/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il limite temporaneo e ripristina i limiti normali">Rimuovi</button>
+       <button class="btn sm primary" type="button" hx-post="/downloads/settings" hx-vals='{"op":"temp_apply"}' hx-include="#v2-temp-dl,#v2-temp-ul,#v2-temp-minutes" hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Applica temporaneamente i limiti DL/UL per il numero di minuti indicato (o 0 per mantenerli fino a rimozione)">Applica</button>
+       <button class="btn sm danger" type="button" onclick="var d=document.getElementById('v2-temp-dl'),u=document.getElementById('v2-temp-ul'),m=document.getElementById('v2-temp-minutes');if(d)d.value='0';if(u)u.value='0';if(m)m.value='0';" hx-post="/downloads/settings" hx-vals='{"op":"temp_clear"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il limite temporaneo e ripristina i limiti normali">Rimuovi</button>
     </div>
      <div class="toolbar download-bulk-toolbar">
        <label class="check" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
@@ -389,7 +389,7 @@
        <button class="btn sm" type="submit" name="bulk" value="pause" title="Metti in pausa i torrent selezionati">Pausa</button>
        <button class="btn sm" type="submit" name="bulk" value="resume" title="Riprendi i torrent selezionati">Riprendi</button>
        <button class="btn sm" type="submit" name="bulk" value="recheck" title="Forza la verifica dei dati dei torrent selezionati">Recheck</button>
-        <button class="btn sm" type="button" hx-post="/v2/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
+        <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"unpin"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" title="Rimuove il pin globale sul torrent">Sblocca pin</button>
         <label class="field inline-field" title="Scegli il tag da assegnare o rimuovere sui torrent selezionati"><span>Tag</span><select class="input" name="tag" aria-label="Tag da assegnare ai torrent selezionati"><option value="">— rimuovi il tag —</option>{{range .TagOptions}}<option value="{{.}}">{{.}}</option>{{end}}<option value="__new__">➕ Nuovo tag…</option></select></label>
         <button class="btn sm" type="submit" name="bulk" value="tag" title="Assegna il tag scelto ai torrent selezionati">Assegna tag</button>
         <button class="btn sm" type="submit" name="bulk" value="untag" title="Rimuove il tag dai torrent selezionati">Rimuovi tag</button>
@@ -433,8 +433,8 @@
               {{else}}<button class="btn sm icon-action" type="submit" name="row_action" value="pause:{{.Hash}}" title="Pausa" aria-label="Pausa"><span aria-hidden="true">⏸</span></button>{{end}}
               <button class="btn sm icon-action" type="submit" name="row_action" value="recheck:{{.Hash}}" title="Verifica dati" aria-label="Verifica dati"><span aria-hidden="true">⟳</span></button>
               <button class="btn sm icon-action" type="submit" name="row_action" value="reannounce:{{.Hash}}" title="Riannuncia ai tracker" aria-label="Riannuncia"><span aria-hidden="true">↻</span></button>
-              <button class="btn sm icon-action" type="button" hx-get="/v2/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
-              <button class="btn sm icon-action danger" type="button" hx-get="/v2/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
+              <button class="btn sm icon-action" type="button" hx-get="/downloads/detail?hash={{.Hash}}&tab=general" hx-target="#v2-modal" hx-swap="innerHTML" title="Dettagli" aria-label="Dettagli"><span aria-hidden="true">ⓘ</span></button>
+              <button class="btn sm icon-action danger" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi" aria-label="Rimuovi"><span aria-hidden="true">🗑️</span></button>
             </td>
           </tr>
           {{end}}
@@ -450,7 +450,7 @@
             <td class="row-actions">
                   {{if eq .Status "downloading"}}<button class="btn sm icon-action" type="submit" name="http_action" value="pause:{{.ID}}" title="Metti in pausa il download HTTP" aria-label="Metti in pausa il download HTTP"><span aria-hidden="true">⏸</span></button>{{end}}
                {{if eq .Status "paused"}}<button class="btn sm icon-action" type="submit" name="http_action" value="resume:{{.ID}}" title="Riprendi il download HTTP" aria-label="Riprendi il download HTTP"><span aria-hidden="true">▶</span></button>{{end}}
-               <button class="btn sm icon-action" type="button" hx-get="/v2/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
+               <button class="btn sm icon-action" type="button" hx-get="/downloads/http-detail?id={{.ID}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Mostra i dettagli del download HTTP" aria-label="Mostra i dettagli del download HTTP"><span aria-hidden="true">ⓘ</span></button>
                 <button class="btn sm icon-action danger" type="submit" name="http_action" value="remove:{{.ID}}" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-http-download-{{.ID}}')?.remove()" title="Rimuovi il download HTTP" aria-label="Rimuovi il download HTTP"><span aria-hidden="true">🗑️</span></button>
             </td>
           </tr>
@@ -467,10 +467,10 @@
 <div class="overlay" style="display:block">
   <div class="modal torrent-modal" role="dialog" aria-modal="true" aria-labelledby="v2-detail-title">
     <div class="modal-head"><h3 id="v2-detail-title">{{.Name}}</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del torrent">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del torrent">Chiudi</button></div>
     <div class="modal-body">
       <div class="toolbar" role="tablist" aria-label="Sezioni dettagli torrent">
-        {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/v2/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
+        {{range .Tabs}}<button class="btn sm{{if .Active}} primary{{end}}" type="button" role="tab" aria-selected="{{if .Active}}true{{else}}false{{end}}" data-v2-detail-tab="{{.ID}}" hx-get="/downloads/detail/panel?hash={{$.Hash}}&tab={{.ID}}" hx-target="#v2-detail-panel" hx-swap="innerHTML" title="Mostra la sezione {{.Label}} del dettaglio torrent">{{.Label}}</button>{{end}}
       </div>
       <div id="v2-detail-panel" role="tabpanel">{{template "v2_detail_panel" .}}</div>
     </div>
@@ -490,18 +490,18 @@
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding"))}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin")}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "mark_failed" "Body" "{}" "Label" "Segna come fallito" "Class" "danger" "Confirm" "Segnare questo torrent come fallito?")}}
-      <button class="btn sm" type="button" hx-get="/v2/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi il torrent e scegli se mantenere o eliminare i file">Rimuovi</button>
+      <button class="btn sm" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi il torrent e scegli se mantenere o eliminare i file">Rimuovi</button>
     </div>
     <div class="toolbar detail-links">
       <a class="btn sm" href="/api/torrents/{{.Hash}}/magnet" target="_blank" rel="noopener" title="Apri il link magnet del torrent">Magnet</a>
       <button class="btn sm" type="button" data-v2-copy="{{.Magnet}}"{{if not .Magnet}} disabled{{end}} title="Copia il link magnet negli appunti">Copia magnet</button>
       <a class="btn sm" href="/api/torrents/{{.Hash}}/export.torrent" download title="Scarica il file .torrent">Esporta .torrent</a>
     </div>
-    <form class="toolbar detail-tag-form" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <form class="toolbar detail-tag-form" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
       <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="tag" />
       <input class="input" name="tag" placeholder="tag del torrent" aria-label="Tag del torrent" title="Inserisci il tag da assegnare al torrent" /><button class="btn sm" type="submit" title="Salva il tag del torrent">Salva tag</button>
     </form>
-    <form class="form-grid detail-web-seeds" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    <form class="form-grid detail-web-seeds" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
       <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="web-seeds" />
       <label class="field span-full"><span>Web seed (URL separati da spazio)</span><input class="input" name="urls" placeholder="https://example/file.zip" title="Inserisci uno o più URL di web seed separati da spazi" /></label>
       <div class="form-actions"><button class="btn sm" type="submit" name="remove" value="false" title="Aggiunge gli URL indicati ai web seed del torrent">Aggiungi</button><button class="btn sm danger" type="submit" name="remove" value="true" title="Rimuove gli URL indicati dai web seed del torrent">Rimuovi</button></div>
@@ -509,20 +509,20 @@
   </div></div>
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">URL</th><th scope="col">Tier</th><th scope="col">Stato</th><th scope="col">Fails</th><th scope="col">Seed/Peer</th></tr></thead><tbody>{{range .Trackers}}<tr><td class="truncate" title="{{.URL}}">{{.URL}}</td><td>{{.Tier}}</td><td>{{if .Message}}{{.Message}}{{else if .Verified}}verificato{{else}}non verificato{{end}}</td><td>{{.Fails}}</td><td>{{.ScrapeComplete}}/{{.ScrapeIncomplete}}</td></tr>{{end}}</tbody></table></div>{{else}}<p class="muted">Nessun tracker.</p>{{end}}
-  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="trackers" /><input type="hidden" name="op" value="trackers" />
      <label class="field span-full"><span>Modifica tracker (tier|URL per riga)</span><textarea class="input" name="trackers" rows="4" placeholder="0|https://tracker.example/announce" title="Un tracker per riga nel formato tier|URL; il tier è normalmente 0">{{range .Trackers}}{{.Tier}}|{{.URL}}
 {{end}}</textarea></label>
      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva l'elenco dei tracker nel formato tier|URL, uno per riga">Salva tracker</button></div>
   </form>
 {{else if eq .Tab "files"}}
-   {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col" title="Priorità con cui il client scarica il file">Priorità</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}" title="Cambia la priorità di {{$file.Path}}; il salvataggio avviene subito"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option><option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option></select></form></td></tr>{{end}}</tbody></table></div>
+   {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col" title="Priorità con cui il client scarica il file">Priorità</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}" title="Cambia la priorità di {{$file.Path}}; il salvataggio avviene subito"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option><option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option></select></form></td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun file.</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th><th scope="col">Seed</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{.Client}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
 {{else if eq .Tab "limits"}}
-  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />
     <label class="field"><span>Download (KiB/s)</span><input class="input" type="number" name="download_limit" value="{{kib .Torrent.DownloadLimit}}" title="-1 globale, 0 illimitato" /></label>
     <label class="field"><span>Upload (KiB/s)</span><input class="input" type="number" name="upload_limit" value="{{kib .Torrent.UploadLimit}}" title="-1 globale, 0 illimitato" /></label>
@@ -533,7 +533,7 @@
      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva i limiti specifici di questo torrent">Salva limiti</button></div>
   </form>
 {{else if eq .Tab "storage"}}
-  <form class="form-grid" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+  <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="storage" /><input type="hidden" name="op" value="storage" />
      <label class="field span-full"><span>Nuovo percorso di storage</span><input class="input" name="path" value="{{.Torrent.SavePath}}" required title="Cartella in cui spostare i dati del torrent" /></label>
      <div class="form-actions"><button class="btn sm primary" type="submit" title="Sposta i dati del torrent nel nuovo percorso">Sposta storage</button></div>
@@ -548,7 +548,7 @@
 {{end}}
 
 {{define "v2_detail_action"}}
-<form method="post" action="/v2/downloads/detail/action" hx-post="/v2/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
+<form method="post" action="/downloads/detail/action" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML" style="display:inline">
   <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="{{.Tab}}" /><input type="hidden" name="op" value="{{.Op}}" /><input type="hidden" name="body" value="{{.Body}}" />
   <button class="btn sm {{.Class}}" type="submit" title="{{.Label}}"{{if .Confirm}} hx-confirm="{{.Confirm}}"{{end}}>{{.Label}}</button>
 </form>
@@ -558,20 +558,20 @@
 <div class="overlay" style="display:block">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-remove-title">
     <div class="modal-head"><h3 id="v2-remove-title">Rimuovi torrent</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la finestra di rimozione">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi la finestra di rimozione">Chiudi</button></div>
      <div class="modal-body">
        <p class="muted">{{.Name}}</p>
        {{if .OnRamdisk}}<p class="muted">I file nel RAM disk verrebbero rimossi automaticamente se il torrent diventasse orfano.</p>{{end}}
        <div class="remove-options">
          {{if .OnRamdisk}}
-         <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
          {{else}}
-         <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
-         <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"session"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ma mantiene tutti i file">Solo torrent <small class="muted">— mantieni i file</small></button>
+         <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"archive"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Toglie il torrent dal seed, applica rinomina e controlli di qualità, e sposta i file nella cartella NAS o cartella di download predefinita" data-v2-toast-title="Archiviazione" data-v2-toast-message="Archiviazione e spostamento su NAS in corso...">Sposta su NAS / Archivia <small class="muted">— togli dal seed, rinomina e sposta</small></button>
          {{end}}
-         <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
-        <button class="btn" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
-        <button class="btn danger" hx-post="/v2/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>
+         <button class="btn danger" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent dalla sessione ed elimina i file">Torrent + dati <small class="muted">— elimina i file</small></button>
+        <button class="btn" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, mantiene i file e lo aggiunge alla blocklist">Torrent + blocklist</button>
+        <button class="btn danger" hx-post="/downloads/remove" hx-vals='{"hash":"{{.Hash}}","mode":"files_blocklist"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" hx-on::before-request="document.getElementById('v2-torrent-{{.Hash}}')?.remove();this.closest('.overlay')?.remove()" title="Rimuove il torrent, elimina i file e lo aggiunge alla blocklist">Torrent + file + blocklist</button>
       </div>
     </div>
   </div>
@@ -594,12 +594,12 @@
         <span class="settings-search-icon" aria-hidden="true">⌕</span>
         <span class="sr-only">Cerca impostazioni</span>
         <input type="search" class="input settings-search" name="q" aria-label="Cerca nelle impostazioni" placeholder="Cerca per nome o chiave…" autocomplete="off"
-               hx-get="/v2/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
+               hx-get="/settings/search" hx-target="#v2-settings-search" hx-swap="innerHTML" hx-trigger="input changed delay:250ms" />
       </label>
       <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
     </div>
     <div class="chip-row">
-      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&tab={{.ID}}" hx-get="/v2/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
+      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
     </div>
   </div>
   {{template "v2_settings_body" .}}
@@ -637,7 +637,7 @@
     {{if .ScoreNotice}}<p class="{{if .ScoreError}}error{{else}}muted{{end}}" role="status">{{.ScoreNotice}}</p>{{end}}
     <div class="settings-rows">
       {{range .ScoreGroups}}
-      <form class="setting-row v2-score-group-row" method="post" action="/v2/settings/score-groups" hx-post="/v2/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
+      <form class="setting-row v2-score-group-row" method="post" action="/settings/score-groups" hx-post="/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
         <input type="hidden" name="name" value="{{.Name}}" />
         <div class="setting-info"><strong class="setting-label">{{.Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
         <div class="setting-control"><input class="input" type="number" name="score" value="{{.Score}}" aria-label="Punteggio gruppo {{.Name}}" /></div>
@@ -645,7 +645,7 @@
       </form>
       {{else}}<p class="muted">Nessun gruppo personalizzato configurato.</p>{{end}}
     </div>
-    <form class="form-actions v2-score-group-add" method="post" action="/v2/settings/score-groups" hx-post="/v2/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
+    <form class="form-actions v2-score-group-add" method="post" action="/settings/score-groups" hx-post="/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
       <input type="hidden" name="op" value="add" />
       <label class="field"><span>Nuovo gruppo</span><input class="input" name="name" placeholder="es. TBK" required maxlength="64" pattern="[A-Za-z0-9]+" /></label>
       <label class="field"><span>Punteggio</span><input class="input" type="number" name="score" value="0" required /></label>
@@ -659,7 +659,7 @@
 {{if .ShowFeeds}}
 <div class="card editor-card">
   <h3>Feed RSS</h3>
-  <form method="post" action="/v2/settings/feed" hx-post="/v2/settings/feed" hx-swap="none">
+  <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none">
     <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9">{{.Feeds}}</textarea></label>
     <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button></div>
   </form>
@@ -687,7 +687,7 @@
 <section class="v2-content-filter-section" id="v2-content-filter-section">
   <div class="v2-content-tools-heading"><h4>Filtri contenuto esclusi</h4>{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</div>
   {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-  <form id="v2-content-filter-form" method="post" action="/v2/settings/checkbox" hx-post="/v2/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML">
+  <form id="v2-content-filter-form" method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML">
     <input type="hidden" name="key" value="{{.Key}}" />
     <div class="toolbar checkbox-row">
       {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
@@ -702,12 +702,12 @@
   <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</small></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form method="post" action="/v2/settings/checkbox" hx-post="/v2/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML">
+    <form method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML">
       <input type="hidden" name="key" value="{{.Key}}" />
       <div class="toolbar checkbox-row">
          {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
       </div>
-      {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/v2/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">Salva</button></div>{{end}}
+      {{if .Custom}}<div class="form-actions v2-checkbox-custom-actions"><input class="input" name="custom" placeholder="{{.CustomPlaceholder}}" /><button class="btn sm primary" type="submit">Salva</button></div>{{else}}<div class="form-actions">{{if .TestKind}}<input class="input" id="v2-test-query-{{.Key}}" name="q" value="{{.TestQuery}}" placeholder="Termine di prova" /><button class="btn sm" type="button" hx-get="/settings/source-test" hx-include="#v2-test-query-{{.Key}}" hx-vals='{"kind":"{{.TestKind}}"}' hx-target="#v2-source-test-{{.Key}}" hx-swap="innerHTML">{{if .TestLabel}}{{.TestLabel}}{{else}}Testa selezionati{{end}}</button><span id="v2-source-test-{{.Key}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm primary" type="submit">Salva</button></div>{{end}}
     </form>
   </div>
 </div>
@@ -717,7 +717,7 @@
 <section class="v2-content-archive-cleanup">
   <div class="v2-content-tools-heading"><h4>Pulisci i risultati già archiviati</h4><small class="muted">Ricerca nel catalogo</small></div>
     <p class="hint">I filtri selezionati sopra impediscono di archiviare nuove release corrispondenti. Non cancellano retroattivamente le voci esistenti: qui puoi trovarle e rimuoverle singolarmente, selezionate o tutte insieme. La ricerca usa gli stessi filtri attivi; modificali e salvali sopra per cambiare i contenuti da trovare.</p>
-     <form method="get" action="/v2/settings/content-archive" hx-get="/v2/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
+     <form method="get" action="/settings/content-archive" hx-get="/settings/content-archive" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
        {{range .Options}}{{if .Selected}}<input type="hidden" name="filter" value="{{.Value}}" />{{end}}{{end}}
        <div class="toolbar">
          <input class="input" type="search" name="q" placeholder="Parole nel titolo, es. adult o xxx" />
@@ -734,7 +734,7 @@
   {{if or .Query .Filters}}
     {{if .Total}}
     <p class="muted">{{.Total}} risultati{{if .Query}} per “{{.Query}}”{{end}}{{if .Filters}} corrispondenti ai pre-filtri selezionati{{end}}. Mostro i primi {{len .Items}}.</p>
-    <form method="post" action="/v2/settings/content-archive/delete" hx-post="/v2/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
+    <form method="post" action="/settings/content-archive/delete" hx-post="/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
       <input type="hidden" name="q" value="{{.Query}}" />
       {{range .Filters}}<input type="hidden" name="filter" value="{{.}}" />{{end}}
       <div class="table-wrap"><table class="table">
@@ -765,14 +765,14 @@
 <div class="card editor-card">
   <h3>{{.Title}}</h3>
   {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-  <form method="post" action="/v2/settings/editor-save" hx-post="/v2/settings/editor-save" hx-swap="none">
+  <form method="post" action="/settings/editor-save" hx-post="/settings/editor-save" hx-swap="none">
     <input type="hidden" name="editor" value="{{.Key}}" />
     <input type="hidden" name="redirect" value="{{.Redirect}}" />
     <div id="v2-editor-{{.Key}}-rows">
       {{range .Rows}}{{template "v2_list_row" (dict "Editor" $ "Row" .)}}{{end}}
     </div>
     <div class="form-actions">
-       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/v2/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" title="Aggiungi una nuova riga">Aggiungi riga</button>
+       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" title="Aggiungi una nuova riga">Aggiungi riga</button>
        <button class="btn sm primary" type="submit" title="Salva le righe di questa sezione">Salva</button>
     </div>
   </form>
@@ -790,7 +790,7 @@
     {{else}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" />{{end}}
   </label>
   {{end}}
-  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/v2/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/v2/empty" hx-target="closest .list-row" hx-swap="outerHTML" title="Rimuovi questa riga">Rimuovi</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" title="Rimuovi questa riga">Rimuovi</button></div>
 </div>
 {{end}}
 
@@ -798,13 +798,13 @@
 <div class="panel settings-panel" id="v2-rename-editor">
   <div class="panel-head"><h3>Composizione del nome</h3>{{if .Status}}<small class="muted">{{.Status}}</small>{{end}}</div>
   <div class="panel-body">
-    <form method="post" action="/v2/settings/rename-save" hx-post="/v2/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form">
-      <label class="field" title="Scegli il formato predefinito per il nome"><span>Formato</span><select class="input" name="format" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
-      <label class="field" title="Template usato per comporre il nome personalizzato"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/v2/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
+    <form method="post" action="/settings/rename-save" hx-post="/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form">
+      <label class="field" title="Scegli il formato predefinito per il nome"><span>Formato</span><select class="input" name="format" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
+      <label class="field" title="Template usato per comporre il nome personalizzato"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
       <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva la composizione del nome">Salva rinomina</button></div>
     </form>
     <div class="field" style="margin-top:12px"><span>Pezzi del nome (clicca per aggiungere)</span>
-      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/v2/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" title="Aggiungi il token {{.Label}} al template">{{.Label}}</button>{{end}}</div>
+      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" title="Aggiungi il token {{.Label}} al template">{{.Label}}</button>{{end}}</div>
     </div>
     <div class="field" style="margin-top:12px"><span>Anteprima</span>{{template "v2_rename_preview_code" .}}</div>
   </div>
@@ -817,17 +817,17 @@
 <div class="card editor-card">
   <h3>Traduzioni</h3>
   <div class="toolbar">
-    <select class="input" name="lang" aria-label="Lingua delle traduzioni" hx-get="/v2/settings/i18n" hx-target="#v2-i18n-table" hx-swap="outerHTML">
+    <select class="input" name="lang" aria-label="Lingua delle traduzioni" hx-get="/settings/i18n" hx-target="#v2-i18n-table" hx-swap="outerHTML">
       {{range .Languages}}<option value="{{.}}"{{if eq . $.Language}} selected{{end}}>{{.}}</option>{{end}}
     </select>
     <a class="btn sm" href="/api/i18n/export/{{.Language}}" target="_blank" rel="noopener" title="Scarica le traduzioni in YAML">Esporta YAML</a>
-    <form method="post" action="/v2/settings/i18n/delete" hx-post="/v2/settings/i18n/delete" hx-swap="none" style="display:inline">
+    <form method="post" action="/settings/i18n/delete" hx-post="/settings/i18n/delete" hx-swap="none" style="display:inline">
       <input type="hidden" name="lang" value="{{.Language}}" />
       <button class="btn sm danger" type="submit" hx-confirm="Eliminare tutte le traduzioni di questa lingua?">Elimina lingua</button>
     </form>
   </div>
   {{template "v2_i18n_table" .}}
-  <form method="post" action="/v2/settings/i18n/import" hx-post="/v2/settings/i18n/import" hx-swap="none">
+  <form method="post" action="/settings/i18n/import" hx-post="/settings/i18n/import" hx-swap="none">
     <input type="hidden" name="lang" value="{{.Language}}" />
     <label class="field"><span>Importa YAML</span><textarea class="input" name="yaml" rows="4"></textarea></label>
     <div class="form-actions"><button class="btn sm primary" type="submit">Importa</button></div>
@@ -843,7 +843,7 @@
   <tbody>{{range .Rows}}<tr>
     <td class="i18n-key"><code>{{.Key}}</code></td>
     <td class="i18n-value">
-      <form class="i18n-value-form" hx-post="/v2/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
+      <form class="i18n-value-form" hx-post="/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
         <input type="hidden" name="lang" value="{{$.Language}}" />
         <input type="hidden" name="key" value="{{.Key}}" />
         <input class="input" name="value" value="{{.Value}}" aria-label="Traduzione per {{.Key}}" />
@@ -855,8 +855,8 @@
 {{end}}
 
 {{define "v2_setting_field"}}
-<form class="setting-row" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/v2/settings/save"
-      hx-post="/v2/settings/save" hx-target="this" hx-swap="outerHTML">
+<form class="setting-row" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/settings/save"
+      hx-post="/settings/save" hx-target="this" hx-swap="outerHTML">
   <input type="hidden" name="key" value="{{.Key}}">
   <div class="setting-info">
     <label class="setting-label" for="input-{{.Key}}" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}">{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
@@ -888,7 +888,7 @@
 {{define "v2_settings_search"}}
 {{if .Matches}}
 <table class="data-table"><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
-<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}" hx-get="/v2/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
+<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}" hx-get="/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">Nessuna impostazione corrisponde a «{{.Query}}».</p>{{end}}
 {{end}}
 
@@ -925,19 +925,19 @@
      mentre la pagina e' aperta; Disco dati ogni ora. All'ingresso nella pagina
      tutti i riquadri sono resi freschi dal render completo. */}}
 {{define "v2_health_tile_status"}}
-<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/v2/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
+<div class="metric{{if ne .Health.Status "ok"}} amber{{end}}" id="v2-health-tile-status" hx-get="/partial/health/tile?name=status" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Stato</span><strong>{{.Health.Status}}</strong>{{if .StatusReason}}<small class="muted">{{.StatusReason}}</small>{{end}}</div>
 {{end}}
 
 {{define "v2_health_tile_memory"}}
-<div class="metric" id="v2-health-tile-memory" hx-get="/v2/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted">su {{bytesU .Health.MemoryTotalBytes}}</small></div>
+<div class="metric" id="v2-health-tile-memory" hx-get="/partial/health/tile?name=memory" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Memoria processo</span><strong>{{bytesU .Health.ResidentBytes}}</strong><small class="muted">su {{bytesU .Health.MemoryTotalBytes}}</small></div>
 {{end}}
 
 {{define "v2_health_tile_disk"}}
-<div class="metric" id="v2-health-tile-disk" hx-get="/v2/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
+<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
 {{end}}
 
 {{define "v2_health_tile_uptime"}}
-<div class="metric" id="v2-health-tile-uptime" hx-get="/v2/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
+<div class="metric" id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -949,7 +949,7 @@
   <div class="panel">
     <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span id="v2-logs-count">{{.Count}}</span> righe · auto ogni 5 s</small></div>
     <div class="panel-body">
-      <form class="toolbar logs-toolbar" hx-get="/v2/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
+      <form class="toolbar logs-toolbar" hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
             hx-trigger="submit, input changed delay:300ms, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
          <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
          <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
@@ -1021,7 +1021,7 @@
   {{$has := false}}
   {{range .Groups}}{{if .Items}}{{$has = true}}<div class="field comic-link-group"><span>{{.Label}}</span><div class="toolbar">
     {{range $i, $item := .Items}}
-    <form hx-post="/v2/comics/download" hx-target="this" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/comics/download" hx-target="this" hx-swap="outerHTML" style="display:inline">
       <input type="hidden" name="url" value="{{$item}}" />
       <input type="hidden" name="method" value="{{.Method}}" />
       <input type="hidden" name="title" value="Comic {{.Label}} {{$i | addOne}}" />
@@ -1036,12 +1036,12 @@
 
 {{define "v2_comics_explore_results"}}
 {{if .Error}}<p class="alert">{{.Error}}</p>
-{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}}</td><td>{{.Date}}</td><td class="row-actions"><form hx-post="/v2/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">Scarica</button></form><button class="btn sm" type="button" hx-get="/v2/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">Seleziona</button></td></tr>{{end}}</tbody></table></div>
+{{else if .Items}}<div class="table-wrap"><table class="data-table"><thead><tr><th>Risultato GetComics</th><th>Data</th><th>Azioni</th></tr></thead><tbody>{{range .Items}}<tr><td>{{if .URL}}<a href="{{.URL}}" target="_blank" rel="noopener">{{.Title}}</a>{{else}}{{.Title}}{{end}}</td><td>{{.Date}}</td><td class="row-actions"><form hx-post="/comics/explore/download" hx-target="this" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="url" value="{{.URL}}"><input type="hidden" name="title" value="{{.Title}}"><button class="btn sm primary" type="submit">Scarica</button></form><button class="btn sm" type="button" hx-get="/comics/explore/select?title={{.Title | urlquery}}&amp;url={{.URL | urlquery}}&amp;tag_url={{.TagURL | urlquery}}&amp;cover_url={{.CoverURL | urlquery}}&amp;publisher={{.Publisher | urlquery}}&amp;description={{.Description | urlquery}}&amp;date={{.Date | urlquery}}" hx-target="#v2-form-output-comics-comics" hx-swap="afterend">Seleziona</button></td></tr>{{end}}</tbody></table></div>
 {{else}}<p class="muted">Nessun risultato su GetComics.</p>{{end}}
 {{end}}
 
 {{define "v2_comics_explore_select"}}
-<div class="card editor-card" id="v2-comics-explore-selection"><h3>Fumetto selezionato</h3><p class="muted">{{.Title}}</p><form class="form-grid" hx-post="/v2/comics/explore/add" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="tag_url" value="{{.TagURL}}"><input type="hidden" name="post_url" value="{{.URL}}"><input type="hidden" name="cover_url" value="{{.CoverURL}}"><input type="hidden" name="publisher" value="{{.Publisher}}"><input type="hidden" name="description" value="{{.Description}}"><input type="hidden" name="from_date" value="{{.Date}}"><label class="field span-full"><span>Percorso archivio (opzionale)</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita"></label><div class="form-actions"><button class="btn sm primary" type="submit">Aggiungi fumetto selezionato</button><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-comics-explore-selection" hx-swap="outerHTML">Annulla</button></div></form></div>
+<div class="card editor-card" id="v2-comics-explore-selection"><h3>Fumetto selezionato</h3><p class="muted">{{.Title}}</p><form class="form-grid" hx-post="/comics/explore/add" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="title" value="{{.Title}}"><input type="hidden" name="tag_url" value="{{.TagURL}}"><input type="hidden" name="post_url" value="{{.URL}}"><input type="hidden" name="cover_url" value="{{.CoverURL}}"><input type="hidden" name="publisher" value="{{.Publisher}}"><input type="hidden" name="description" value="{{.Description}}"><input type="hidden" name="from_date" value="{{.Date}}"><label class="field span-full"><span>Percorso archivio (opzionale)</span><input class="input" name="save_path" placeholder="cartella fumetti predefinita"></label><div class="form-actions"><button class="btn sm primary" type="submit">Aggiungi fumetto selezionato</button><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-comics-explore-selection" hx-swap="outerHTML">Annulla</button></div></form></div>
 {{end}}
 
 {{define "v2_comics_explore_action"}}{{if .Error}}<span class="badge err">{{.Message}}</span>{{else}}<span class="badge ok">{{.Message}}</span>{{end}}{{end}}
@@ -1052,9 +1052,9 @@
 <div class="overlay" style="display:block">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-comic-edit-title">
     <div class="modal-head"><h3 id="v2-comic-edit-title">Modifica fumetto monitorato</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">
-      <form class="form-grid" method="post" action="/v2/comics/save" hx-post="/v2/comics/save" hx-swap="none">
+      <form class="form-grid" method="post" action="/comics/save" hx-post="/comics/save" hx-swap="none">
         <label class="field"><span>Titolo</span><input class="input" name="title" value="{{.Title}}" readonly /></label>
         <label class="field"><span>Data inizio</span><input class="input" type="date" name="from_date" value="{{.FromDate}}" /></label>
         <label class="field span-full"><span>Percorso archivio</span><input class="input" name="save_path" value="{{.SavePath}}" placeholder="cartella fumetti predefinita" /></label>
@@ -1076,7 +1076,7 @@
     <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} voci</small></div>
     <div class="panel-body">
       {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/v2/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="submit{{if ne .BaseView "archive"}}, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
+      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="submit{{if ne .BaseView "archive"}}, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
         {{if .Manual}}<input type="hidden" name="load" value="1" />{{end}}
         <input type="hidden" name="sort" value="{{.Sort}}" />
         <input type="hidden" name="dir" value="{{.Dir}}" />
@@ -1103,7 +1103,7 @@
 {{end}}
 
 {{define "v2_table_footer_form"}}
-<form class="form-grid table-footer-form" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
+<form class="form-grid table-footer-form" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">
   <input type="hidden" name="view" value="{{.FooterView}}" />
   <input type="hidden" name="path" value="{{.FooterForm.Path}}" />
   <input type="hidden" name="wrap" value="{{.FooterForm.Wrap}}" />
@@ -1117,7 +1117,7 @@
   <div class="table-wrap" tabindex="0" role="region" aria-label="{{.Title}}">
     <table class="data-table {{.Class}}">
       <caption class="sr-only">{{.Title}}</caption>
-      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/v2/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
+      <thead><tr>{{range .Columns}}<th scope="col"{{if .Sortable}} class="th-sort"{{end}}>{{if .Sortable}}<button class="table-sort-button" type="button" hx-get="/table?view={{$.View}}&amp;sort={{.Key}}&amp;dir={{if and (eq $.Sort .Key) (eq $.Dir "asc")}}desc{{else}}asc{{end}}{{if $.Query}}&amp;q={{$.Query}}{{end}}{{if $.FilterQuery}}&amp;f={{$.FilterQuery}}{{end}}{{if $.WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{$.View}}" hx-swap="outerHTML">{{.Label}}{{arrow $.Sort $.Dir .Key}}</button>{{else}}{{.Label}}{{end}}</th>{{end}}{{if .HasActions}}<th scope="col">Azioni</th>{{end}}</tr></thead>
       <tbody>
         {{if .Rows}}{{range .Rows}}<tr>{{range .Cells}}<td>{{.HTML}}</td>{{end}}{{if $.HasActions}}<td class="row-actions">{{.Actions}}</td>{{end}}</tr>{{end}}
         {{else}}<tr><td class="muted" colspan="{{.Colspan}}">{{.Empty}}</td></tr>{{end}}
@@ -1126,9 +1126,9 @@
   </div>
   {{if gt .Pages 1}}
   <div class="table-pagination">
-    <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
+    <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
     <span class="page-label">Pagina {{.Page}} di {{.Pages}} · {{.Total}} voci</span>
-    <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/v2/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
+    <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
   </div>
   {{end}}
 </div>
@@ -1187,13 +1187,13 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" {{if .FormRender}}hx-target="#v2-form-output-{{.View}}-{{.FormRender}}" hx-swap="innerHTML"{{else}}hx-swap="none"{{end}}>
+    <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" {{if .FormRender}}hx-target="#v2-form-output-{{.View}}-{{.FormRender}}" hx-swap="innerHTML"{{else}}hx-swap="none"{{end}}>
       <input type="hidden" name="view" value="{{.View}}">
       <input type="hidden" name="path" value="{{.FormPath}}">
       <input type="hidden" name="wrap" value="{{.FormWrap}}">
       {{if .FormRender}}<input type="hidden" name="render" value="{{.FormRender}}">{{end}}
       {{range .Fields}}{{template "v2_form_field" .}}{{end}}
-      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/v2/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/v2/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
+      <div class="form-actions">{{if .FormSubmit}}<button class="btn primary" type="submit">{{.FormSubmit}}</button>{{end}}{{if .TestFTP}}<button class="btn" type="button" hx-post="/section/test-ftp" hx-include="closest form" hx-target="#v2-ftp-test-result" hx-swap="innerHTML">Test FTP</button><small id="v2-ftp-test-result" class="muted" aria-live="polite"></small>{{end}}{{if .ManualAdd}}<button class="btn" type="button" hx-get="/tmdb/manual?kind={{.ManualAdd}}&amp;redirect=/?view={{if eq .ManualAdd "movie"}}movies{{else}}series{{end}}" hx-include="closest form" hx-target="#v2-modal" hx-swap="innerHTML">Aggiungi manualmente</button>{{end}}</div>
     </form>
     {{if .FormRender}}<div id="v2-form-output-{{.View}}-{{.FormRender}}" class="form-output" aria-live="polite"></div>{{end}}
   </div>
@@ -1220,7 +1220,7 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form class="toolbar" hx-post="/v2/comics/links" hx-target="#v2-comics-links-output" hx-swap="innerHTML">
+    <form class="toolbar" hx-post="/comics/links" hx-target="#v2-comics-links-output" hx-swap="innerHTML">
       <input class="input" type="url" name="url" placeholder="https://getcomics.org/..." aria-label="URL del post GetComics" required />
       <button class="btn sm primary" type="submit">Trova link</button>
     </form>
@@ -1239,7 +1239,7 @@
 <div class="panel">
   <div class="panel-head"><h3>Verifica sorgenti</h3></div>
   <div class="panel-body">
-    <form class="toolbar" hx-get="/v2/partial/sources-check" hx-target="#v2-sources-check-output" hx-swap="innerHTML">
+    <form class="toolbar" hx-get="/partial/sources-check" hx-target="#v2-sources-check-output" hx-swap="innerHTML">
       <input class="input" type="search" name="q" placeholder="Termine di prova (es. ita 1080p)" aria-label="Termine di prova" />
       <button class="btn sm primary" type="submit">Verifica indexer e sorgenti</button>
     </form>
@@ -1252,8 +1252,8 @@
   <div class="panel-body">
     <p class="hint">Gli elementi nel cestino non occupano la libreria; eliminali singolarmente o svuota tutto.</p>
     <div class="toolbar">
-      <button class="btn sm primary" type="button" hx-get="/v2/partial/trash" hx-target="#v2-trash-output" hx-swap="innerHTML">Apri cestino</button>
-      <form method="post" action="/v2/trash/delete" hx-post="/v2/trash/delete" hx-swap="none" style="display:inline">
+      <button class="btn sm primary" type="button" hx-get="/partial/trash" hx-target="#v2-trash-output" hx-swap="innerHTML">Apri cestino</button>
+      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" style="display:inline">
         <input type="hidden" name="all" value="1" />
         <button class="btn sm danger" type="submit" hx-confirm="Eliminare tutti gli elementi del cestino?">Svuota cestino</button>
       </form>
@@ -1296,11 +1296,11 @@
   <div class="panel-head"><h3>{{.Title}}</h3></div>
   <div class="panel-body">
     <div class="toolbar">
-      <form hx-post="/v2/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" style="display:inline">
+      <form hx-post="/oauth/start" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML" style="display:inline">
         <input type="hidden" name="path" value="{{.OAuth.StartPath}}" />
         <button class="btn sm primary" type="submit" title="Avvia il collegamento con il provider e mostra il codice da confermare">Avvia accesso</button>
       </form>
-      <form class="oauth-poll-form" hx-post="/v2/oauth/poll" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML">
+      <form class="oauth-poll-form" hx-post="/oauth/poll" hx-target="#v2-oauth-output-simkl" hx-swap="innerHTML">
         <input type="hidden" name="path" value="{{.OAuth.PollPath}}" />
         <input class="input" name="code" aria-label="Codice o PIN di accesso" placeholder="codice" />
         <button class="btn sm" type="submit" title="Conferma il codice/PIN inserito">Conferma</button>
@@ -1321,11 +1321,11 @@
   <div class="panel-body">
     <p class="hint">Confronta le risoluzioni archiviate: l'anteprima non elimina nulla, la pulizia sposta le copie inferiori nel cestino.</p>
     <div class="toolbar">
-      <form hx-post="/v2/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="execute" value="0" />
         <button class="btn sm" type="submit" data-v2-toast-title="Duplicati video" data-v2-toast-message="Analisi avviata: i risultati arriveranno qui tra poco.">Anteprima duplicati</button>
       </form>
-      <form hx-post="/v2/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/maintenance/duplicates" hx-target="#v2-duplicates-panel" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="execute" value="1" />
         <button class="btn sm danger" type="submit" hx-confirm="Spostare nel cestino le copie inferiori?" data-v2-toast-title="Duplicati video" data-v2-toast-message="Pulizia avviata: i risultati arriveranno qui tra poco.">Pulisci duplicati</button>
       </form>
@@ -1356,19 +1356,19 @@
       <tbody>{{range .Files}}<tr><td class="truncate" title="{{.Path}}">{{.Name}}</td><td class="numeric">{{bytes .SizeBytes}}</td><td>{{if .Exists}}<span class="badge ok">presente</span>{{else}}<span class="badge">assente</span>{{end}}</td></tr>{{end}}</tbody>
     </table></div>
     <div class="toolbar" style="margin-top:10px">
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">
         <input type="hidden" name="action" value="vacuum" />
         <button class="btn sm" type="submit" title="Compatta tutti i database e libera spazio" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="VACUUM avviato: compattazione di tutti i database in corso...">VACUUM</button>
       </form>
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">
         <input type="hidden" name="action" value="analyze" />
         <button class="btn sm" type="submit" title="Aggiorna le statistiche del query planner su tutti i database" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="ANALYZE avviato: ottimizzazione delle statistiche SQLite su tutti i database in corso...">ANALYZE</button>
       </form>
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">
         <input type="hidden" name="action" value="refresh" />
         <button class="btn sm" type="submit" data-v2-toast-title="Ottimizzazione database" data-v2-toast-message="Aggiornamento dimensioni di tutti i database in corso...">Aggiorna dimensioni</button>
       </form>
-      <form hx-post="/v2/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Manutenzione database" data-v2-toast-message="Verifica di integrità e indici in corso...">
+      <form hx-post="/maintenance/db" hx-target="#v2-db-panel" hx-swap="outerHTML" style="display:inline" data-v2-toast-title="Manutenzione database" data-v2-toast-message="Verifica di integrità e indici in corso...">
         <input type="hidden" name="action" value="check" />
         <button class="btn sm" type="submit" title="Controlla integrità, chiavi esterne e indici di tutti i database" data-v2-toast-title="Manutenzione database" data-v2-toast-message="Verifica di integrità e indici in corso...">Verifica integrità e indici</button>
       </form>
@@ -1386,7 +1386,7 @@
     {{if .Problem}}<p class="alert">{{.Problem}}</p>{{end}}
     <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile: Gextto la configura con soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
     <div class="toolbar">
-      <form hx-post="/v2/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline"><button class="btn sm" type="submit">Aggiorna</button></form>
+      <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline"><button class="btn sm" type="submit">Aggiorna</button></form>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
     </div>
     {{if .Paths}}
@@ -1399,7 +1399,7 @@
         <td class="row-actions">
           {{if .Configured}}<span class="badge ok">in uso</span>
           {{else if .Writable}}
-          <form hx-post="/v2/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline">
+          <form hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML" style="display:inline">
             <input type="hidden" name="action" value="select" /><input type="hidden" name="path" value="{{.Path}}" />
             <button class="btn sm primary" type="submit">Usa questo percorso</button>
           </form>
@@ -1408,7 +1408,7 @@
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">Nessun tmpfs/ramfs scrivibile trovato.</p>{{end}}
-    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/v2/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" title="Crea una sottocartella dedicata">Crea {{.CreatePath}}</button></form>{{end}}
+    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" title="Crea una sottocartella dedicata">Crea {{.CreatePath}}</button></form>{{end}}
     {{if .Warning}}<p class="muted"><small>{{.Warning}}</small></p>{{end}}
   </div>
 </div>
@@ -1419,13 +1419,13 @@
   <div class="panel-head"><h3>Rinomina contenuto cartella</h3>{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
   <div class="panel-body">
     <p class="hint">Scansiona una cartella di serie o film: Gextto confronta i nomi con TMDB/TVDB e propone le rinomine. La scansione non modifica nulla; vengono applicate solo le righe accettate.</p>
-    <form class="toolbar" hx-post="/v2/maintenance/folder-rename/scan" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
+    <form class="toolbar" hx-post="/maintenance/folder-rename/scan" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
       <input class="input" type="text" name="path" value="{{.Path}}" placeholder="/percorso/alla/cartella" autocomplete="off" aria-label="Cartella" />
       <button class="btn sm primary" type="submit">Scansiona e proponi</button>
     </form>
     {{if .Error}}<p class="alert">{{.Message}}</p>{{end}}
     {{if .Scanned}}{{if .Items}}
-    <form hx-post="/v2/maintenance/folder-rename/apply" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
+    <form hx-post="/maintenance/folder-rename/apply" hx-target="#v2-folder-rename-panel" hx-swap="outerHTML">
       <input type="hidden" name="path" value="{{.Path}}" />
       <input type="hidden" name="scan" value="{{.ScanJSON}}" />
       <div class="table-wrap"><table class="data-table folder-rename-table">
@@ -1451,7 +1451,7 @@
 {{define "v2_rename_progress_panel"}}
 <div class="panel">
   <div class="panel-head"><h3>Progresso rinomina</h3></div>
-  <div class="panel-body" hx-get="/v2/partial/rename-progress" hx-trigger="load, every 2s" hx-swap="innerHTML">{{template "v2_rename_progress" .}}</div>
+  <div class="panel-body" hx-get="/partial/rename-progress" hx-trigger="load, every 2s" hx-swap="innerHTML">{{template "v2_rename_progress" .}}</div>
 </div>
 {{end}}
 
@@ -1461,7 +1461,7 @@
 {{end}}
 
 {{define "v2_jobs"}}
-<div class="panel" id="v2-jobs-panel" hx-get="/v2/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
+<div class="panel" id="v2-jobs-panel" hx-get="/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
   <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} in corso · {{len .Jobs}} recenti</small></div>
   <div class="panel-body">
     {{if .Jobs}}
@@ -1473,7 +1473,7 @@
         <td><span class="badge {{.StateClass}}">{{.StateLabel}}</span></td>
         <td style="min-width:140px"><div class="progress"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
         <td class="truncate">{{if .Error}}{{.Error}}{{else}}{{.Message}}{{end}}</td>
-        <td class="row-actions">{{if not .Done}}<form hx-post="/v2/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
+        <td class="row-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">Nessuna operazione in background.</p>{{end}}
@@ -1485,7 +1485,7 @@
 
 {{define "v2_http_download_detail"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-http-title">
-   <div class="modal-head"><h3 id="v2-http-title">{{.Title}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del download HTTP">Chiudi</button></div>
+   <div class="modal-head"><h3 id="v2-http-title">{{.Title}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML" title="Chiudi i dettagli del download HTTP">Chiudi</button></div>
   <div class="modal-body"><div class="stat-grid"><div class="row"><span>Metodo</span><strong>{{.Method}}</strong></div><div class="row"><span>Stato</span><strong>{{.Status}}</strong></div><div class="row"><span>Progresso</span><strong>{{printf "%.1f" .Progress}}%</strong></div><div class="row"><span>Scaricato</span><strong>{{bytesU .DownloadedBytes}}</strong></div><div class="row"><span>Velocità</span><strong>{{rate .SpeedBytes}}</strong></div><div class="row"><span>ETA</span><strong>{{if .ETASeconds}}{{.ETASeconds}} s{{else}}—{{end}}</strong></div></div>
     {{if .URL}}<p class="muted"><strong>URL:</strong> <code>{{.URL}}</code></p>{{end}}{{if .Destination}}<p class="muted"><strong>Destinazione:</strong> <code>{{.Destination}}</code></p>{{end}}{{if .Temporary}}<p class="muted"><strong>Temporaneo:</strong> <code>{{.Temporary}}</code></p>{{end}}{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
   </div>
@@ -1521,7 +1521,7 @@
        <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
       {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
       {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
-       {{else}}<form hx-get="/v2/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
+       {{else}}<form hx-get="/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">
          <button class="btn sm primary" type="submit">Aggiungi alla libreria</button>
        </form>{{end}}
     </div>
@@ -1570,8 +1570,8 @@
 
 {{define "v2_tmdb_manual"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
-  <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
-  <div class="modal-body"><form class="form-grid" method="post" action="/v2/tmdb/add" hx-post="/v2/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
+  <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+  <div class="modal-body"><form class="form-grid" method="post" action="/tmdb/add" hx-post="/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
     <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
     <label class="field"><span>TMDB ID</span><input class="input" name="tmdb_id" value="{{.TmdbID}}" required></label><label class="field"><span>TVDB ID</span><input class="input" name="tvdb_id" value="{{.TvdbID}}"></label>
@@ -1585,7 +1585,7 @@
 {{end}}
 
 {{define "v2_button"}}
-<form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
+<form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
   <input type="hidden" name="view" value="{{.View}}">
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
@@ -1602,30 +1602,30 @@
 <div class="view">
   <div class="panel">
     <div class="panel-head"><h3>Calendario TMDB</h3><small class="muted">Prossime uscite</small></div>
-    <div class="panel-body" hx-get="/v2/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+    <div class="panel-body" hx-get="/tmdb/calendar" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
   <div class="panel">
     <div class="panel-head"><h3>Di tendenza su TMDB</h3><small class="muted">Serie TV e film</small></div>
     <div class="panel-body">
       <div class="toolbar"><strong class="muted">Tipo</strong>
-         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
-         <form hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm primary" data-v2-discover-kind="series" type="submit">Serie TV</button></form>
+         <form hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="movie" data-v2-discover-kind-input /><input type="hidden" name="mode" value="trending" /><input type="hidden" name="window" value="week" /><button class="btn sm" data-v2-discover-kind="movie" type="submit">Film</button></form>
       </div>
       <div class="toolbar" style="margin-top:8px"><strong class="muted">Elenco</strong>
-          <form class="v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">Tendenza settimana</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
-         <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/v2/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
+          <form class="v2-discover-choice" data-v2-discover-choice="trending:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm active" type="submit" name="mode" value="trending" aria-pressed="true">Tendenza settimana</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="trending:day" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="day" /><button class="btn sm" type="submit" name="mode" value="trending">Tendenza oggi</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="popular:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="popular">Popolari</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="top_rated:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="top_rated">Più votati</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="now_playing:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="now_playing">In programmazione</button></form>
+         <form class="v2-discover-choice" data-v2-discover-choice="upcoming:week" hx-post="/tmdb/discover" hx-target="#v2-tmdb-results" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="kind" value="series" data-v2-discover-kind-input /><input type="hidden" name="window" value="week" /><button class="btn sm" type="submit" name="mode" value="upcoming">Prossime uscite</button></form>
       </div>
-      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/v2/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+      <div id="v2-tmdb-results" class="tmdb-results" aria-live="polite" hx-post="/tmdb/discover" hx-vals='{"kind":"series","mode":"trending","window":"week"}' hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
     </div>
   </div>
   <div class="panel">
     <div class="panel-head"><h3>Esplora TMDB (ricerca)</h3></div>
     <div class="panel-body">
-      <form class="toolbar" hx-post="/v2/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
+      <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
          <select class="input" name="kind" data-v2-discover-select aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
         <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
         <button class="btn primary" type="submit">Cerca su TMDB</button>
@@ -1635,7 +1635,7 @@
   <div class="panel">
     <div class="panel-head"><h3>Ricerca release</h3><small class="muted">Feed, indexer e motori web (fino a 90 s)</small></div>
     <div class="panel-body">
-      <form class="search-row" method="post" action="/v2/search" hx-post="/v2/search" hx-target="#v2-search-results" hx-swap="outerHTML">
+      <form class="search-row" method="post" action="/search" hx-post="/search" hx-target="#v2-search-results" hx-swap="outerHTML">
         <input type="search" name="q" value="{{.Query}}" aria-label="Cerca una release" placeholder="Cerca una release…" />
         <button class="btn primary" type="submit">Cerca</button>
       </form>
@@ -1658,12 +1658,12 @@
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td class="numeric">{{.Seeders}}</td>
     <td class="row-actions">
-      <form method="post" action="/v2/search/add" hx-post="/v2/search/add" hx-swap="none" style="display:inline">
+      <form method="post" action="/search/add" hx-post="/search/add" hx-swap="none" style="display:inline">
         <input type="hidden" name="release" value="{{.ReleaseJSON}}" />
         <input type="hidden" name="redirect" value="{{$.Redirect}}" />
         <button class="btn sm primary" type="submit">Aggiungi</button>
       </form>
-      <form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
+      <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline">
         <input type="hidden" name="release" value="{{.ExplainJSON}}" />
         <button class="btn sm" type="submit">Perché non questo?</button>
       </form>
@@ -1678,7 +1678,7 @@
 <div class="overlay" style="display:block">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-explain-title">
     <div class="modal-head"><h3 id="v2-explain-title">Perché non questo?</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">
       {{if .Error}}<p class="alert">{{.Error}}</p>{{else}}
       <p><span class="badge {{if or (eq .Trace.Decision "approved") (eq .Trace.Decision "accept")}}ok{{else if eq .Trace.Decision "rejected"}}err{{else}}warn{{end}}">{{.Trace.Decision}}</span></p>
@@ -1700,7 +1700,7 @@
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/search-missing" .PathName) "Method" "POST" "Body" "{}" "Label" "Cerca mancanti" "Class" "primary" "Title" "Cerca le release per gli episodi mancanti")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/scan-archive" .PathName) "Method" "POST" "Body" "{}" "Label" "Scansiona archivio" "Class" "" "Title" "Scansiona l'archivio per questa serie")}}
     {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" .PathName) "Path" (printf "/api/series/%s/metadata" .PathName) "Method" "POST" "Body" "{}" "Label" "Aggiorna da TMDB" "Class" "" "Title" "Aggiorna i metadati TMDB")}}
-    <button class="btn sm" type="button" hx-get="/v2/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
+    <button class="btn sm" type="button" hx-get="/series/rename-preview?series={{.PathName | urlquery}}" hx-target="#v2-rename-preview" hx-swap="innerHTML" title="Mostra le rinomine proposte senza toccare i file">Anteprima rinomina</button>
   </div>
   <div id="v2-rename-preview"></div>
 
@@ -1733,7 +1733,7 @@
            <div class="season-toggles">
              <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
              {{range .SeasonButtons}}
-             <form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
+             <form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
                <input type="hidden" name="redirect" value="/?view=series&amp;series={{$.PathName}}" />
                <input type="hidden" name="path" value="/api/series/{{$.PathName}}/toggle-season" />
                <input type="hidden" name="method" value="POST" />
@@ -1770,11 +1770,11 @@
               <td class="numeric">{{.QualityScore}}</td>
               <td class="numeric">{{bytes .SizeBytes}}</td>
               <td class="row-actions">
-                <button class="btn sm icon-action" type="button" hx-post="/v2/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
+                <button class="btn sm icon-action" type="button" hx-post="/series/episode-search?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Cerca manualmente questa puntata" aria-label="Cerca S{{.Season}}E{{.Episode}}"><span aria-hidden="true">🔍</span></button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .ForcePath "Method" "POST" "Body" "{}" "Label" "⚡" "Class" "icon-action" "Title" "Forza il download")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
-                <button class="btn sm icon-action" type="button" hx-get="/v2/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti in archivio locale (nessuna ricerca online)" aria-label="Sorgenti in archivio S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
+                <button class="btn sm icon-action" type="button" hx-get="/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti in archivio locale (nessuna ricerca online)" aria-label="Sorgenti in archivio S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
               </td>
             </tr>
@@ -1791,7 +1791,7 @@
   <div class="panel">
     <div class="panel-head"><h3>Modifica serie</h3></div>
     <div class="panel-body">
-      <form class="form-grid" method="post" action="/v2/series/save" hx-post="/v2/series/save" hx-swap="none">
+      <form class="form-grid" method="post" action="/series/save" hx-post="/series/save" hx-swap="none">
         <input type="hidden" name="name" value="{{.Name}}" />
         <label class="field"><span>Nome</span><input class="input" value="{{.Name}}" readonly /></label>
         <label class="field"><span>Stagioni</span><input class="input" name="seasons" value="{{.Seasons}}" placeholder="* oppure 1-5" /></label>
@@ -1810,7 +1810,7 @@
 {{end}}
 
 {{define "v2_action_btn"}}
-<form method="post" action="/v2/section/action" hx-post="/v2/section/action" hx-swap="none" style="display:inline">
+<form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
   <input type="hidden" name="redirect" value="{{.Redirect}}" />
   <input type="hidden" name="path" value="{{.Path}}" />
   <input type="hidden" name="method" value="{{.Method}}" />
@@ -1836,7 +1836,7 @@
       {{if .Poster}}<img class="detail-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{end}}{{if .Overview}}<p>{{.Overview}}</p>{{end}}
       <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}{{if .ReleaseDate}}<span class="badge">uscita {{.ReleaseDate}}</span>{{end}}</div>
       {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
-      <form class="form-grid" method="post" action="/v2/section/form" hx-post="/v2/section/form" hx-swap="none">
+      <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">
         <input type="hidden" name="view" value="movies" />
         <input type="hidden" name="redirect" value="/?view=movies&amp;movie={{.ID}}" />
         <input type="hidden" name="path" value="/api/movies/{{.ID}}" />
@@ -1866,7 +1866,7 @@
         <td title="{{.Source}}">{{sourceLabel .Source}}</td>
         <td class="row-actions">
            {{template "v2_action_btn" (dict "Redirect" (printf "/?view=movies&movie=%d" $.ID) "Path" "/api/archive/batch-download" "Method" "POST" "Body" .Body "Label" "Scarica" "Class" "primary" "Title" "Aggiungi questa release ai download")}}
-           <form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="{{.ExplainBody}}" /><button class="btn sm" type="submit">Perché non questo?</button></form>
+           <form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="{{.ExplainBody}}" /><button class="btn sm" type="submit">Perché non questo?</button></form>
            {{if .Magnet}}<a class="btn sm" href="{{.Magnet}}" title="Apri il link magnet">Magnet</a>{{end}}
         </td>
       </tr>{{end}}</tbody>
@@ -1904,7 +1904,7 @@
 <div class="overlay" style="display:block">
   <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
     <div class="modal-head"><h3 id="v2-sources-title">Sorgenti {{.Label}}</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">{{template "v2_sources_rows" .}}</div>
   </div>
 </div>
@@ -1914,7 +1914,7 @@
 <div class="overlay" style="display:block">
   <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
     <div class="modal-head"><h3 id="v2-sources-title">Cerca {{.Label}}</h3>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">
       <h4>Archivio</h4>
       {{if .Results}}{{template "v2_sources_rows" .}}{{else}}<p class="muted">Nessuna release in archivio per questa puntata.</p>{{end}}
@@ -1942,9 +1942,9 @@
     </table></div>
     {{end}}
     <div class="toolbar" style="margin-top:10px">
-      <form hx-post="/v2/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><button class="btn sm primary" type="submit" {{if not .Items}}disabled{{end}}>Esegui rinomina</button></form>
-      <form hx-post="/v2/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="force" value="1" /><button class="btn sm danger" type="submit" hx-confirm="Forzare la rinomina? Verranno toccati anche i file già corretti.">Forza rinomina</button></form>
-      <button class="btn sm" type="button" hx-get="/v2/empty" hx-target="#v2-rename-preview" hx-swap="innerHTML">Chiudi</button>
+      <form hx-post="/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><button class="btn sm primary" type="submit" {{if not .Items}}disabled{{end}}>Esegui rinomina</button></form>
+      <form hx-post="/series/rename-execute" hx-target="#v2-rename-preview" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="series" value="{{.Series}}" /><input type="hidden" name="force" value="1" /><button class="btn sm danger" type="submit" hx-confirm="Forzare la rinomina? Verranno toccati anche i file già corretti.">Forza rinomina</button></form>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-rename-preview" hx-swap="innerHTML">Chiudi</button>
     </div>
   </div>
 </div>
@@ -1960,7 +1960,7 @@
     <td class="numeric">{{bytes .SizeBytes}}</td>
     <td>{{if .IsDir}}cartella{{else}}file{{end}}</td>
     <td class="row-actions">
-      <form method="post" action="/v2/trash/delete" hx-post="/v2/trash/delete" hx-swap="none" style="display:inline">
+      <form method="post" action="/trash/delete" hx-post="/trash/delete" hx-swap="none" style="display:inline">
         <input type="hidden" name="name" value="{{.Name}}" />
         <button class="btn sm danger" type="submit" hx-confirm="Eliminare questo elemento dal cestino?">Elimina</button>
       </form>

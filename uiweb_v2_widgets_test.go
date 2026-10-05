@@ -21,7 +21,7 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/v2?view=maintenance", nil)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
 	if code != http.StatusOK {
 		t.Fatalf("maintenance page -> %d", code)
 	}
@@ -37,7 +37,7 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 		t.Fatal("maintenance page still shows unmigrated placeholders")
 	}
 
-	code, body = v2Request(t, server, http.MethodGet, "/v2?view=integrations", nil)
+	code, body = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
 	if code != http.StatusOK {
 		t.Fatalf("integrations page -> %d", code)
 	}
@@ -59,7 +59,7 @@ func TestV2DownloadsUploadAndTags(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/v2?view=downloads", nil)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=downloads", nil)
 	if code != http.StatusOK {
 		t.Fatalf("downloads page -> %d", code)
 	}
@@ -70,12 +70,12 @@ func TestV2DownloadsUploadAndTags(t *testing.T) {
 	}
 
 	// No torrent and no file: the endpoint explains what is missing.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/downloads/add", url.Values{}); code != http.StatusOK || !strings.Contains(body, "inserisci un magnet") {
+	if code, body := v2Request(t, server, http.MethodPost, "/downloads/add", url.Values{}); code != http.StatusOK || !strings.Contains(body, "inserisci un magnet") {
 		t.Fatalf("empty add -> %d: %s", code, body)
 	}
 
 	// A bulk tag action reuses the classic torrent tag API.
-	if code, _ := v2Request(t, server, http.MethodPost, "/v2/downloads/table", url.Values{"bulk": {"tag"}, "tag": {"test"}, "hash": {"deadbeef"}}); code != http.StatusOK {
+	if code, _ := v2Request(t, server, http.MethodPost, "/downloads/table", url.Values{"bulk": {"tag"}, "tag": {"test"}, "hash": {"deadbeef"}}); code != http.StatusOK {
 		t.Fatalf("tag bulk action -> %d", code)
 	}
 }
@@ -85,27 +85,27 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/duplicates", url.Values{"execute": {"0"}}); code != http.StatusOK || !strings.Contains(body, "Anteprima duplicati") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/duplicates", url.Values{"execute": {"0"}}); code != http.StatusOK || !strings.Contains(body, "Anteprima duplicati") {
 		t.Fatalf("duplicates preview -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/db", url.Values{"action": {"refresh"}}); code != http.StatusOK || !strings.Contains(body, "Ottimizzazione database") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/db", url.Values{"action": {"refresh"}}); code != http.StatusOK || !strings.Contains(body, "Ottimizzazione database") {
 		t.Fatalf("db refresh -> %d", code)
 	} else if strings.Contains(body, "presente") && strings.Contains(body, "<td class=\"numeric\">0 B</td>") {
 		t.Fatalf("db refresh returned 0 B for present database files: %s", body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/db", url.Values{"action": {"check"}}); code != http.StatusOK || !strings.Contains(body, "integrità e indici validi") || !strings.Contains(body, "Serie e download") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/db", url.Values{"action": {"check"}}); code != http.StatusOK || !strings.Contains(body, "integrità e indici validi") || !strings.Contains(body, "Serie e download") {
 		t.Fatalf("db integrity check -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/ramdisk", url.Values{}); code != http.StatusOK || !strings.Contains(body, "RAM disk") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/ramdisk", url.Values{}); code != http.StatusOK || !strings.Contains(body, "RAM disk") {
 		t.Fatalf("ramdisk refresh -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/folder-rename/scan", url.Values{"path": {""}}); code != http.StatusOK || !strings.Contains(body, "Rinomina contenuto cartella") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/folder-rename/scan", url.Values{"path": {""}}); code != http.StatusOK || !strings.Contains(body, "Rinomina contenuto cartella") {
 		t.Fatalf("folder rename scan -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/partial/rename-progress", nil); code != http.StatusOK || !strings.Contains(body, "Nessuna rinomina") {
+	if code, body := v2Request(t, server, http.MethodGet, "/partial/rename-progress", nil); code != http.StatusOK || !strings.Contains(body, "Nessuna rinomina") {
 		t.Fatalf("rename progress -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, "Operazioni in background") {
+	if code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, "Operazioni in background") {
 		t.Fatalf("jobs partial -> %d", code)
 	}
 }
@@ -116,13 +116,13 @@ func TestV2OAuthAndTranslationKey(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// A forged path outside /api must never be forwarded.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/oauth/start", url.Values{"path": {"http://evil.example/x"}}); code != http.StatusOK || !strings.Contains(body, "endpoint non valido") {
+	if code, body := v2Request(t, server, http.MethodPost, "/oauth/start", url.Values{"path": {"http://evil.example/x"}}); code != http.StatusOK || !strings.Contains(body, "endpoint non valido") {
 		t.Fatalf("oauth forged path -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/oauth/poll", url.Values{"path": {"/api/simkl/auth/poll"}, "code": {"123456"}}); code != http.StatusOK {
+	if code, body := v2Request(t, server, http.MethodPost, "/oauth/poll", url.Values{"path": {"/api/simkl/auth/poll"}, "code": {"123456"}}); code != http.StatusOK {
 		t.Fatalf("oauth poll -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/settings/i18n/set", url.Values{"lang": {"en"}, "key": {"Chiave"}, "value": {"Key"}}); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
+	if code, body := v2Request(t, server, http.MethodPost, "/settings/i18n/set", url.Values{"lang": {"en"}, "key": {"Chiave"}, "value": {"Key"}}); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") {
 		t.Fatalf("i18n set -> %d", code)
 	}
 	if items, err := state.i18n.List("en"); err != nil {
@@ -168,7 +168,7 @@ func TestV2SeriesRenamePreviewPanel(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodGet, "/v2/series/rename-preview?series=Test%20Show", nil)
+	code, body := v2Request(t, server, http.MethodGet, "/series/rename-preview?series=Test%20Show", nil)
 	if code != http.StatusOK || !strings.Contains(body, "Anteprima rinomina") {
 		t.Fatalf("rename preview -> %d", code)
 	}
@@ -176,7 +176,7 @@ func TestV2SeriesRenamePreviewPanel(t *testing.T) {
 		t.Fatalf("rename preview missing series name")
 	}
 	// The execute endpoint re-renders the same panel.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/series/rename-execute", url.Values{"series": {"Test Show"}}); code != http.StatusOK || !strings.Contains(body, "Anteprima rinomina") {
+	if code, body := v2Request(t, server, http.MethodPost, "/series/rename-execute", url.Values{"series": {"Test Show"}}); code != http.StatusOK || !strings.Contains(body, "Anteprima rinomina") {
 		t.Fatalf("rename execute -> %d", code)
 	}
 }
@@ -186,11 +186,11 @@ func TestV2RenameCompositionPreview(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, body := v2Request(t, server, http.MethodPost, "/v2/settings/rename-preview", url.Values{"format": {"custom"}, "template": {"{Serie} - {Stagione}{Episodio} [{Risoluzione}]"}})
+	code, body := v2Request(t, server, http.MethodPost, "/settings/rename-preview", url.Values{"format": {"custom"}, "template": {"{Serie} - {Stagione}{Episodio} [{Risoluzione}]"}})
 	if code != http.StatusOK || !strings.Contains(body, "Nome Serie - S01E02 [1080p].mkv") {
 		t.Fatalf("rename preview -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "v2-rename-preview-code") {
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "v2-rename-preview-code") {
 		t.Fatalf("rename tab preview -> %d", code)
 	}
 }
@@ -201,32 +201,32 @@ func TestV2TmdbExploreEndpoints(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// No TMDB key in the hermetic state: the calendar fragment reports it.
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/tmdb/calendar", nil); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
+	if code, body := v2Request(t, server, http.MethodGet, "/tmdb/calendar", nil); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
 		t.Fatalf("tmdb calendar -> %d: %s", code, body)
 	}
 	// An empty search prompt does not call TMDB.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/tmdb/search", url.Values{"kind": {"series"}, "query": {""}}); code != http.StatusOK || !strings.Contains(body, "Inserisci un titolo") {
+	if code, body := v2Request(t, server, http.MethodPost, "/tmdb/search", url.Values{"kind": {"series"}, "query": {""}}); code != http.StatusOK || !strings.Contains(body, "Inserisci un titolo") {
 		t.Fatalf("tmdb empty search -> %d", code)
 	}
 	// A forged add without an id is rejected but rendered as a fragment.
-	if code, _ := v2Request(t, server, http.MethodPost, "/v2/tmdb/add", url.Values{"kind": {"series"}, "name": {"X"}}); code != http.StatusOK {
+	if code, _ := v2Request(t, server, http.MethodPost, "/tmdb/add", url.Values{"kind": {"series"}, "name": {"X"}}); code != http.StatusOK {
 		t.Fatalf("tmdb add -> %d", code)
 	}
 	// The list-page TMDB form uses the same server-rendered result fragment.
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/section/form", url.Values{
+	if code, body := v2Request(t, server, http.MethodPost, "/section/form", url.Values{
 		"view": {"series"}, "path": {"/api/tmdb/search"}, "render": {"tmdb"},
 		"kind": {"series"}, "query": {"Example"},
 	}); code != http.StatusOK || !strings.Contains(body, "TMDB API key") {
 		t.Fatalf("tmdb section form -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2/tmdb/manual?kind=series&query=Titolo+da+cercare&redirect=%2Fv2%3Fview%3Dseries", nil); code != http.StatusOK ||
+	if code, body := v2Request(t, server, http.MethodGet, "/tmdb/manual?kind=series&query=Titolo+da+cercare&redirect=%2Fv2%3Fview%3Dseries", nil); code != http.StatusOK ||
 		!strings.Contains(body, `name="quality"`) || !strings.Contains(body, `name="language"`) ||
 		!strings.Contains(body, `name="subtitle"`) || !strings.Contains(body, `data-preset-for="subtitle"`) ||
 		!strings.Contains(body, `name="archive_path"`) || !strings.Contains(body, `data-v2-browse-for="archive_path"`) ||
 		!strings.Contains(body, `hx-target="#v2-tmdb-add-result"`) || !strings.Contains(body, `value="Titolo da cercare"`) {
 		t.Fatalf("tmdb manual form -> %d: %s", code, body)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/v2?view=series", nil); code != http.StatusOK || !strings.Contains(body, `id="v2-modal"`) {
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=series", nil); code != http.StatusOK || !strings.Contains(body, `id="v2-modal"`) {
 		t.Fatalf("series add modal target -> %d", code)
 	}
 }
@@ -251,7 +251,7 @@ func TestV2DuplicatesPreviewFeedbackAndRanks(t *testing.T) {
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
-	code, page := v2Request(t, server, http.MethodGet, "/v2?view=maintenance", nil)
+	code, page := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
 	if code != http.StatusOK {
 		t.Fatalf("maintenance -> %d", code)
 	}
@@ -265,7 +265,7 @@ func TestV2DuplicatesPreviewFeedbackAndRanks(t *testing.T) {
 		}
 	}
 
-	if code, body := v2Request(t, server, http.MethodPost, "/v2/maintenance/duplicates", url.Values{"execute": {"0"}}); code != http.StatusOK || !strings.Contains(body, "Nessun duplicato inferiore trovato") {
+	if code, body := v2Request(t, server, http.MethodPost, "/maintenance/duplicates", url.Values{"execute": {"0"}}); code != http.StatusOK || !strings.Contains(body, "Nessun duplicato inferiore trovato") {
 		t.Fatalf("preview with no results -> %d: %s", code, body)
 	}
 }

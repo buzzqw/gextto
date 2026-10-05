@@ -24,8 +24,8 @@ compact layout with a scrollable top navigation, the dashboard metrics in two
 columns, full-width dialogs and tables that scroll horizontally inside their
 panel. Every action stays reachable by touch.
 
-The official UI is served at `http://<host>:5000/`; `/v2` remains a technical
-alias and the old `/ui` route no longer exists. The **Downloads** page refreshes
+The official UI is served at `http://<host>:5000/`; the old `/v2` prefix
+redirects to the root and the old `/ui` route no longer exists. The **Downloads** page refreshes
 the session automatically every 5 seconds; the **Auto: on/off** button can disable
 or re-enable polling. CPU/RAM tiles and the transfer rates in the top bar use the
 same 5-second refresh.

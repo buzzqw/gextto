@@ -10,8 +10,9 @@ import (
 )
 
 // TestAPIDocumentationMatchesRouter prevents the integration route table from
-// silently drifting when a handler is added or removed. Server-rendered /ui
-// v2 routes are intentionally internal and are not part of docs/API.md.
+// silently drifting when a handler is added or removed. Server-rendered UI
+// routes are registered with v2Handle and are not part of RegisteredRoutes(), so
+// they never appear in docs/API.md.
 func TestAPIDocumentationMatchesRouter(t *testing.T) {
 	if _, err := os.Stat("docs/API.md"); err != nil {
 		t.Skip("API documentation is unavailable outside the source tree")
@@ -37,9 +38,6 @@ func TestAPIDocumentationMatchesRouter(t *testing.T) {
 	for _, route := range RegisteredRoutes() {
 		if route == "GET /{$}" {
 			got["GET /"] = struct{}{}
-			continue
-		}
-		if strings.Contains(route, " /v2") {
 			continue
 		}
 		got[route] = struct{}{}

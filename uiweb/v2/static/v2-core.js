@@ -382,8 +382,8 @@
         add.disabled = true;
         var form = new URLSearchParams();
         form.set("release", JSON.stringify(release));
-        form.set("redirect", "/v2?view=dashboard");
-        fetch("/v2/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
+        form.set("redirect", "/?view=dashboard");
+        fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
           .then(function (response) { if (!response.ok) throw new Error("Impossibile accodare la release"); add.textContent = "Accodata"; })
           .catch(function (error) { add.disabled = false; add.textContent = error.message; });
       });
@@ -683,7 +683,7 @@
 
   document.addEventListener("htmx:configRequest", function (event) {
     var path = event.detail && event.detail.path;
-    if (!path || path.indexOf("/v2/partial/logs") === -1) return;
+    if (!path || path.indexOf("/partial/logs") === -1) return;
     var trig = event.detail && event.detail.triggeringEvent;
     var isPolling = !trig || trig.type === "hx:poll:trigger";
     if (isPolling && !canPollLogs()) {

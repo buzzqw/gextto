@@ -24,8 +24,8 @@ compatto, con navigazione in alto scorrevole, metriche della dashboard su due
 colonne, finestre a tutta larghezza e tabelle che scorrono orizzontalmente
 dentro il loro pannello. Ogni azione resta raggiungibile col tocco.
 
-La UI ufficiale si apre su `http://<host>:5000/`; `/v2` resta un alias tecnico e
-la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
+La UI ufficiale si apre su `http://<host>:5000/`; il vecchio prefisso `/v2`
+reindirizza alla radice e la vecchia route `/ui` non esiste più. La pagina **Scarico** aggiorna
 automaticamente la sessione ogni 5 secondi; il pulsante **Auto: on/off** consente
 di disattivare o riattivare il polling. Anche i tile CPU/RAM e le velocità nella
 barra superiore vengono aggiornati ogni 5 secondi.

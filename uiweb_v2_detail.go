@@ -239,7 +239,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 		}
 	}
 	view.Results = v2DedupSources(view.Results)
-	view.OnlineURL = "/v2/series/episode-search-online?series=" + url.QueryEscape(series) +
+	view.OnlineURL = "/series/episode-search-online?series=" + url.QueryEscape(series) +
 		"&season=" + url.QueryEscape(season) + "&episode=" + url.QueryEscape(episode)
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_episode_search_modal", view, dict, eng)

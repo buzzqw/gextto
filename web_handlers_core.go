@@ -86,12 +86,12 @@ func (w *noCacheWriter) Flush() {
 // Unwrap lets http.ResponseController reach the underlying writer.
 func (w *noCacheWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
-// UiNoCache disables browser caching for the UI shell (`/`) and its assets
-// (`/v2/*`), mirroring `ui_no_cache`.
+// UiNoCache disables browser caching for every server-rendered UI route — the
+// shell (`/`), its HTMX fragments and the static assets (`/static/*`). The JSON
+// and streaming API under `/api` keeps its own cache semantics.
 func UiNoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if path != "/" && !strings.HasPrefix(path, "/v2") {
+		if strings.HasPrefix(r.URL.Path, "/api") {
 			next.ServeHTTP(w, r)
 			return
 		}

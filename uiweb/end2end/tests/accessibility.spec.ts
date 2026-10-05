@@ -55,7 +55,7 @@ test.describe("accessibilità automatizzata", () => {
   });
 
   test("il polling non perde il focus sul controllo del torrent", async ({ page }) => {
-    await page.route("**/v2/downloads/table", async (route) => {
+    await page.route("**/downloads/table", async (route) => {
       await route.fulfill({
         contentType: "text/html; charset=utf-8",
         body: `<div class="view" data-torrents-slot>
@@ -71,7 +71,7 @@ test.describe("accessibilità automatizzata", () => {
   });
 
   test("la ricerca release è utilizzabile da tastiera", async ({ page }) => {
-    await page.route("**/v2/search", async (route) => {
+    await page.route("**/search", async (route) => {
       await route.fulfill({
         contentType: "text/html; charset=utf-8",
         body: `<div id="v2-search-results"><p>Risultati per test</p><table class="data-table"><tbody><tr><td>Test release</td></tr></tbody></table></div>`,

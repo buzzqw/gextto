@@ -890,7 +890,7 @@ func V2DownloadsAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 				query.Set("msg_err", "1")
 			}
 		}
-		http.Redirect(w, r, "/v2?"+query.Encode(), http.StatusSeeOther)
+		http.Redirect(w, r, "/?"+query.Encode(), http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)
@@ -1228,7 +1228,7 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		result["Error"] = true
 	} else {
 		result["Message"] = "aggiunto"
-		if redirect := strings.TrimSpace(r.FormValue("redirect")); r.Header.Get("HX-Request") != "" && strings.HasPrefix(redirect, "/v2") {
+		if redirect := safeInternalRedirect(r.FormValue("redirect"), ""); r.Header.Get("HX-Request") != "" && redirect != "" {
 			w.Header().Set("HX-Redirect", redirect)
 			w.WriteHeader(http.StatusNoContent)
 			return

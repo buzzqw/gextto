@@ -9,7 +9,7 @@ import "net/http"
 // cache-control middleware.
 func Router(s *AppState) *http.ServeMux {
 	mux := http.NewServeMux()
-	// Interfaccia principale: la v2 è servita alla radice; /v2 resta un alias tecnico.
+	// Interfaccia principale: la v2 è servita alla radice; il vecchio prefisso /v2 reindirizza qui.
 	handle(s, mux, "GET /{$}", V2Page)
 	handle(s, mux, "GET /magnet", MagnetHandler)
 	handle(s, mux, "GET /favicon.ico", Favicon)

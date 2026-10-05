@@ -344,7 +344,7 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	body := v2TranslateHTML(buffer.String(), dict, eng)
-	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/v2/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend">Aggiungi riga</button>`,
+	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend">Aggiungi riga</button>`,
 		canonicalKey, canonicalKey, index+1, viewName, tabName, canonicalKey)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)

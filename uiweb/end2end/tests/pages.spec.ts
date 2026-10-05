@@ -27,7 +27,7 @@ test("salute e configurazione sono raggiungibili", async ({ page }) => {
 });
 
 test("una singola impostazione può essere salvata", async ({ page }) => {
-  await page.route("**/v2/settings/save", async (route) => {
+  await page.route("**/settings/save", async (route) => {
     const key = new URL(route.request().url()).searchParams.get("key") || "refresh_interval";
     await route.fulfill({
       contentType: "text/html; charset=utf-8",
@@ -75,7 +75,7 @@ test("scarico espone aggiunta torrent e registrazione magnet", async ({ page }) 
 });
 
 test("la selezione torrent aggiorna il riepilogo delle azioni", async ({ page }) => {
-  await page.route("**/v2/downloads/table", async (route) => {
+  await page.route("**/downloads/table", async (route) => {
     await route.fulfill({
       contentType: "text/html; charset=utf-8",
       body: `<div id="v2-torrents-wrap"><form id="v2-torrent-form">

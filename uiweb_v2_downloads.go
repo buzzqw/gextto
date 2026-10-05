@@ -86,7 +86,7 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if r.Header.Get("HX-Request") == "" {
 		query := url.Values{"view": {"downloads"}, "msg": {message}}
-		http.Redirect(w, r, "/v2?"+query.Encode(), http.StatusSeeOther)
+		http.Redirect(w, r, "/?"+query.Encode(), http.StatusSeeOther)
 		return
 	}
 	dict, eng := v2Dictionaries(s)

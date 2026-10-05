@@ -9,11 +9,12 @@ L'interfaccia ufficiale usa *SSR + HTMX* e non dipende più dal vecchio client
 
 La v2:
 
-- è l'interfaccia ufficiale su **`/`**; **`/v2`** resta un alias tecnico;
+- è l'interfaccia ufficiale su **`/`**; il vecchio prefisso **`/v2`** reindirizza
+  alla radice (301, query preservata);
 - riusa le stesse API JSON, gli stessi view-model Go (`uiDashboardDataFrom`,
   `uiTorrentsDataFrom`, `uiSettingsPageFrom`, `uiSeriesDetailFrom`,
   `uiMovieDetailFrom`, `uiTableSpecFor`, …) e lo stesso CSS di base
-  (`/v2/static/gextto-ui.css`), quindi dati e look restano coerenti;
+  (`/static/gextto-ui.css`), quindi dati e look restano coerenti;
 - non duplica l'accesso ai dati: le tabelle sono renderizzate dal server
   chiamando internamente gli handler delle API esistenti;
 - traduce l'HTML lato server con lo stesso meccanismo di localizzazione.
@@ -55,10 +56,11 @@ Punti chiave:
   tocca `<script>`/`<style>`. Con lingua italiana l'HTML esce invariato.
 - **JS minimale**: HTMX fa richieste e swap; `v2-core.js` copre solo preferenze
   (tema/font in `localStorage`) e comportamento accessibile dei modali.
-- **Route isolate**: `/v2` è registrato con `v2Handle`, che non entra nella
-  tabella delle route API: `docs/API.md` e il test di parità restano invariati.
-  La UI ufficiale è alla radice `/`; i frammenti HTMX interni sono sotto `/v2`
-  e la vecchia route `/ui` è stata rimossa.
+- **Route isolate**: i frammenti HTMX e le azioni sono registrati alla radice
+  con `v2Handle`, che non entra nella tabella delle route API: `docs/API.md` e il
+  test di parità restano invariati. La UI ufficiale è alla radice `/`, i suoi
+  asset vivono sotto `/static` e il vecchio prefisso `/v2` reindirizza; la vecchia
+  route `/ui` è stata rimossa.
 
 ## 3. Copertura
 
@@ -90,7 +92,7 @@ vanno a capo correttamente, adattamento mobile delle azioni in alto.
 
 ## 4. Residui consapevoli
 
-Dopo questa tornata la scansione live delle 16 voci `/v2?view=…` non mostra
+Dopo questa tornata la scansione live delle 16 voci `/?view=…` non mostra
 segnaposto di pagina. Restano però i seguenti flussi esplicitamente non ancora
 portati:
 
@@ -124,7 +126,7 @@ portati:
 - `scripts/check-ui-settings-index.sh` → OK (149 impostazioni, 12 tab).
 - `scripts/installer-selftest.sh` → tutti i check passati.
 - `go vet .` pulito; `gofmt -l` pulito.
-- Verifica live sul daemon con dati reali: 16/16 voci `/v2?view=…` → 200 e
+- Verifica live sul daemon con dati reali: 16/16 voci `/?view=…` → 200 e
   **0 segnaposto non migrati**; integrazioni con Simkl;
   manutenzione con duplicati/db/ramdisk/rinomina/progresso/job; scarico con
   upload e tag; Esplora con calendario, tendenze e ricerca TMDB reali; anteprima
@@ -167,7 +169,8 @@ Costo di rendering server ~1–3 ms per pagina: trascurabile su LAN. La traduzio
 
 **Correttezza**
 
-- Le route UI non alterano il contratto API; `/` e `/v2` usano lo stesso handler.
+- Le route UI non alterano il contratto API; `/` usa gli handler v2 e `/v2` è
+  solo un redirect alla radice.
 - Le azioni generiche accettano solo path `/api/…` (test su path forgiato → non
   inoltrato).
 - Il salvataggio impostazioni replica i vincoli già usati dalle API
@@ -183,7 +186,8 @@ gofmt e suite completa sono verdi.
 
 ## 9. Promozione a UI di default
 
-La promozione è stata eseguita: `/` usa `V2Page` e `/v2` resta alias tecnico.
+La promozione è stata eseguita: `/` usa `V2Page` e il vecchio prefisso `/v2`
+reindirizza alla radice.
 
 ## 10. Rimozione della UI classica
 

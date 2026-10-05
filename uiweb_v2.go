@@ -5,16 +5,17 @@ package gextto
 //
 // It is the official server-rendered interface:
 //
-//   - the public shell lives at /, while the technical /v2 alias and all
-//     fragment/action routes are registered by registerV2Routes(s, mux);
+//   - the shell lives at / and every fragment/action route is registered at
+//     the root by registerV2Routes(s, mux); the legacy /v2 prefix permanent-
+//     redirects to the same path without it;
 //   - templates and static files are embedded from uiweb/v2;
 //   - it reuses the existing Go view-models (uiDashboardDataFrom,
 //     uiTorrentsDataFrom, uiSettingsPageFrom, ...) and the shared CSS, so the
 //     data and the look come from the same source as the classic UI;
 //   - the JSON APIs are untouched (the TUI and external clients keep working).
 //
-// The v2 handlers are the official UI at "/"; /v2 remains their explicit
-// technical alias during stabilization.
+// The v2 handlers are the official UI at "/"; the /v2 prefix is kept only as a
+// permanent redirect for compatibility.
 //
 // Unknown views answer with v2_unavailable instead of pretending the feature
 // exists.
@@ -113,120 +114,141 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// The v2 handlers call the existing JSON APIs through this router so the
 	// list pages reuse the same data access as the classic UI.
 	v2Routers.Store(s, mux)
-	mux.Handle("GET /v2/static/", UiNoCache(http.StripPrefix("/v2/static/", http.FileServer(http.FS(v2StaticFSRoot())))))
-	v2Handle(s, mux, "GET /v2", V2Page)
-	v2Handle(s, mux, "GET /v2/", V2Page)
-	v2Handle(s, mux, "GET /v2/empty", V2Empty)
-	v2Handle(s, mux, "POST /v2/language", V2SetLanguage)
-	v2Handle(s, mux, "POST /v2/run-cycle", V2RunCycle)
-	v2Handle(s, mux, "POST /v2/dashboard/backup", V2DashboardBackup)
-	v2Handle(s, mux, "POST /v2/dashboard/search", V2DashboardSearch)
-	v2Handle(s, mux, "GET /v2/dashboard/feed", V2DashboardFeed)
-	v2Handle(s, mux, "POST /v2/dashboard/feed/add", V2DashboardFeedAdd)
+	mux.Handle("GET /static/", UiNoCache(http.StripPrefix("/static/", http.FileServer(http.FS(v2StaticFSRoot())))))
+	// Legacy /v2 prefix: permanent redirect that strips it (query preserved), so
+	// old bookmarks and already-loaded pages keep working.
+	v2Handle(s, mux, "/v2", v2LegacyRedirect)
+	v2Handle(s, mux, "/v2/", v2LegacyRedirect)
+	v2Handle(s, mux, "GET /empty", V2Empty)
+	v2Handle(s, mux, "POST /language", V2SetLanguage)
+	v2Handle(s, mux, "POST /run-cycle", V2RunCycle)
+	v2Handle(s, mux, "POST /dashboard/backup", V2DashboardBackup)
+	v2Handle(s, mux, "POST /dashboard/search", V2DashboardSearch)
+	v2Handle(s, mux, "GET /dashboard/feed", V2DashboardFeed)
+	v2Handle(s, mux, "POST /dashboard/feed/add", V2DashboardFeedAdd)
 
 	// Scarico.
-	v2Handle(s, mux, "POST /v2/downloads/table", V2DownloadsTable)
-	v2Handle(s, mux, "POST /v2/downloads/settings", V2DownloadsSettings)
-	v2Handle(s, mux, "GET /v2/downloads/http-detail", V2HTTPDownloadDetail)
-	v2Handle(s, mux, "GET /v2/downloads/detail", V2DownloadsDetail)
-	v2Handle(s, mux, "GET /v2/downloads/detail/panel", V2DownloadsDetailPanel)
-	v2Handle(s, mux, "POST /v2/downloads/detail/action", V2DownloadsDetailAction)
-	v2Handle(s, mux, "GET /v2/downloads/remove", V2DownloadsRemoveModal)
-	v2Handle(s, mux, "POST /v2/downloads/remove", V2DownloadsRemove)
+	v2Handle(s, mux, "POST /downloads/table", V2DownloadsTable)
+	v2Handle(s, mux, "POST /downloads/settings", V2DownloadsSettings)
+	v2Handle(s, mux, "GET /downloads/http-detail", V2HTTPDownloadDetail)
+	v2Handle(s, mux, "GET /downloads/detail", V2DownloadsDetail)
+	v2Handle(s, mux, "GET /downloads/detail/panel", V2DownloadsDetailPanel)
+	v2Handle(s, mux, "POST /downloads/detail/action", V2DownloadsDetailAction)
+	v2Handle(s, mux, "GET /downloads/remove", V2DownloadsRemoveModal)
+	v2Handle(s, mux, "POST /downloads/remove", V2DownloadsRemove)
 
 	// Configurazione.
-	v2Handle(s, mux, "GET /v2/settings/body", V2SettingsBody)
-	v2Handle(s, mux, "GET /v2/settings/search", V2SettingsSearch)
-	v2Handle(s, mux, "POST /v2/settings/save", V2SettingsSave)
-	v2Handle(s, mux, "POST /v2/settings/score-groups", V2SettingsScoreGroup)
-	v2Handle(s, mux, "POST /v2/settings/feed", V2SettingsFeed)
-	v2Handle(s, mux, "POST /v2/settings/checkbox", V2SettingsCheckbox)
-	v2Handle(s, mux, "GET /v2/settings/editor-row", V2SettingsEditorRow)
-	v2Handle(s, mux, "POST /v2/settings/editor-save", V2SettingsEditorSave)
-	v2Handle(s, mux, "POST /v2/settings/editor-test", V2SettingsEditorTest)
-	v2Handle(s, mux, "GET /v2/settings/source-test", V2SettingsSourceTest)
-	v2Handle(s, mux, "POST /v2/settings/rename-token", V2SettingsRenameToken)
-	v2Handle(s, mux, "POST /v2/settings/rename-preview", V2SettingsRenamePreview)
-	v2Handle(s, mux, "POST /v2/settings/rename-save", V2SettingsRenameSave)
-	v2Handle(s, mux, "GET /v2/settings/i18n", V2SettingsI18nTable)
-	v2Handle(s, mux, "POST /v2/settings/i18n/import", V2SettingsI18nImport)
-	v2Handle(s, mux, "POST /v2/settings/i18n/delete", V2SettingsI18nDelete)
-	v2Handle(s, mux, "GET /v2/settings/content-archive", V2SettingsContentArchiveSearch)
-	v2Handle(s, mux, "POST /v2/settings/content-archive/delete", V2SettingsContentArchiveDelete)
+	v2Handle(s, mux, "GET /settings/body", V2SettingsBody)
+	v2Handle(s, mux, "GET /settings/search", V2SettingsSearch)
+	v2Handle(s, mux, "POST /settings/save", V2SettingsSave)
+	v2Handle(s, mux, "POST /settings/score-groups", V2SettingsScoreGroup)
+	v2Handle(s, mux, "POST /settings/feed", V2SettingsFeed)
+	v2Handle(s, mux, "POST /settings/checkbox", V2SettingsCheckbox)
+	v2Handle(s, mux, "GET /settings/editor-row", V2SettingsEditorRow)
+	v2Handle(s, mux, "POST /settings/editor-save", V2SettingsEditorSave)
+	v2Handle(s, mux, "POST /settings/editor-test", V2SettingsEditorTest)
+	v2Handle(s, mux, "GET /settings/source-test", V2SettingsSourceTest)
+	v2Handle(s, mux, "POST /settings/rename-token", V2SettingsRenameToken)
+	v2Handle(s, mux, "POST /settings/rename-preview", V2SettingsRenamePreview)
+	v2Handle(s, mux, "POST /settings/rename-save", V2SettingsRenameSave)
+	v2Handle(s, mux, "GET /settings/i18n", V2SettingsI18nTable)
+	v2Handle(s, mux, "POST /settings/i18n/import", V2SettingsI18nImport)
+	v2Handle(s, mux, "POST /settings/i18n/delete", V2SettingsI18nDelete)
+	v2Handle(s, mux, "GET /settings/content-archive", V2SettingsContentArchiveSearch)
+	v2Handle(s, mux, "POST /settings/content-archive/delete", V2SettingsContentArchiveDelete)
 
 	// Log (frammento aggiornabile).
-	v2Handle(s, mux, "GET /v2/partial/logs", V2LogsPartial)
-	v2Handle(s, mux, "GET /v2/partial/chrome", V2ChromePartial)
+	v2Handle(s, mux, "GET /partial/logs", V2LogsPartial)
+	v2Handle(s, mux, "GET /partial/chrome", V2ChromePartial)
 	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
-	v2Handle(s, mux, "GET /v2/partial/health/tile", V2HealthTilePartial)
+	v2Handle(s, mux, "GET /partial/health/tile", V2HealthTilePartial)
 
 	// Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist, Fumetti).
-	v2Handle(s, mux, "GET /v2/table", V2Table)
-	v2Handle(s, mux, "POST /v2/table/action", V2TableAction)
-	v2Handle(s, mux, "POST /v2/table/library", V2TableLibrary)
-	v2Handle(s, mux, "POST /v2/table/gap-search", V2TableGapSearch)
+	v2Handle(s, mux, "GET /table", V2Table)
+	v2Handle(s, mux, "POST /table/action", V2TableAction)
+	v2Handle(s, mux, "POST /table/library", V2TableLibrary)
+	v2Handle(s, mux, "POST /table/gap-search", V2TableGapSearch)
 
 	// Pannelli (Manutenzione, Integrazioni).
-	v2Handle(s, mux, "POST /v2/section/action", V2SectionAction)
-	v2Handle(s, mux, "POST /v2/section/form", V2SectionForm)
-	v2Handle(s, mux, "POST /v2/section/test-ftp", V2SectionTestFTP)
+	v2Handle(s, mux, "POST /section/action", V2SectionAction)
+	v2Handle(s, mux, "POST /section/form", V2SectionForm)
+	v2Handle(s, mux, "POST /section/test-ftp", V2SectionTestFTP)
 
 	// Esplora (ricerca release).
-	v2Handle(s, mux, "POST /v2/search", V2Search)
-	v2Handle(s, mux, "POST /v2/search/add", V2SearchAdd)
-	v2Handle(s, mux, "POST /v2/search/explain", V2SearchExplain)
+	v2Handle(s, mux, "POST /search", V2Search)
+	v2Handle(s, mux, "POST /search/add", V2SearchAdd)
+	v2Handle(s, mux, "POST /search/explain", V2SearchExplain)
 
 	// Esplora TMDB (calendario, tendenze, ricerca).
-	v2Handle(s, mux, "GET /v2/tmdb/calendar", V2TmdbCalendar)
-	v2Handle(s, mux, "POST /v2/tmdb/discover", V2TmdbDiscover)
-	v2Handle(s, mux, "POST /v2/tmdb/search", V2TmdbSearch)
-	v2Handle(s, mux, "POST /v2/tmdb/add", V2TmdbAdd)
-	v2Handle(s, mux, "GET /v2/tmdb/manual", V2TmdbManual)
+	v2Handle(s, mux, "GET /tmdb/calendar", V2TmdbCalendar)
+	v2Handle(s, mux, "POST /tmdb/discover", V2TmdbDiscover)
+	v2Handle(s, mux, "POST /tmdb/search", V2TmdbSearch)
+	v2Handle(s, mux, "POST /tmdb/add", V2TmdbAdd)
+	v2Handle(s, mux, "GET /tmdb/manual", V2TmdbManual)
 
 	// Fumetti: link finder, download diretto e modifica della libreria.
-	v2Handle(s, mux, "POST /v2/comics/links", V2ComicsLinks)
-	v2Handle(s, mux, "POST /v2/comics/download", V2ComicsDownload)
-	v2Handle(s, mux, "POST /v2/comics/weekly/force", V2ComicsWeeklyForce)
-	v2Handle(s, mux, "POST /v2/comics/explore/download", V2ComicsExploreDownload)
-	v2Handle(s, mux, "GET /v2/comics/explore/select", V2ComicsExploreSelect)
-	v2Handle(s, mux, "POST /v2/comics/explore/add", V2ComicsExploreAdd)
-	v2Handle(s, mux, "GET /v2/comics/edit", V2ComicsEdit)
-	v2Handle(s, mux, "POST /v2/comics/save", V2ComicsSave)
+	v2Handle(s, mux, "POST /comics/links", V2ComicsLinks)
+	v2Handle(s, mux, "POST /comics/download", V2ComicsDownload)
+	v2Handle(s, mux, "POST /comics/weekly/force", V2ComicsWeeklyForce)
+	v2Handle(s, mux, "POST /comics/explore/download", V2ComicsExploreDownload)
+	v2Handle(s, mux, "GET /comics/explore/select", V2ComicsExploreSelect)
+	v2Handle(s, mux, "POST /comics/explore/add", V2ComicsExploreAdd)
+	v2Handle(s, mux, "GET /comics/edit", V2ComicsEdit)
+	v2Handle(s, mux, "POST /comics/save", V2ComicsSave)
 
 	// Dettagli Serie/Film.
-	v2Handle(s, mux, "POST /v2/series/save", V2SeriesSave)
-	v2Handle(s, mux, "GET /v2/series/sources", V2SeriesSources)
-	v2Handle(s, mux, "POST /v2/series/episode-search", V2SeriesEpisodeSearch)
-	v2Handle(s, mux, "GET /v2/series/episode-search-online", V2SeriesEpisodeSearchOnline)
-	v2Handle(s, mux, "GET /v2/series/rename-preview", V2SeriesRenamePreview)
-	v2Handle(s, mux, "POST /v2/series/rename-execute", V2SeriesRenameExecute)
+	v2Handle(s, mux, "POST /series/save", V2SeriesSave)
+	v2Handle(s, mux, "GET /series/sources", V2SeriesSources)
+	v2Handle(s, mux, "POST /series/episode-search", V2SeriesEpisodeSearch)
+	v2Handle(s, mux, "GET /series/episode-search-online", V2SeriesEpisodeSearchOnline)
+	v2Handle(s, mux, "GET /series/rename-preview", V2SeriesRenamePreview)
+	v2Handle(s, mux, "POST /series/rename-execute", V2SeriesRenameExecute)
 
 	// Manutenzione: cestino e verifica sorgenti.
-	v2Handle(s, mux, "GET /v2/partial/trash", V2TrashList)
-	v2Handle(s, mux, "POST /v2/trash/delete", V2TrashDelete)
-	v2Handle(s, mux, "GET /v2/partial/sources-check", V2SourcesCheck)
+	v2Handle(s, mux, "GET /partial/trash", V2TrashList)
+	v2Handle(s, mux, "POST /trash/delete", V2TrashDelete)
+	v2Handle(s, mux, "GET /partial/sources-check", V2SourcesCheck)
 
 	// Manutenzione: widget dedicati (duplicati, database, RAM disk, rinomina).
-	v2Handle(s, mux, "POST /v2/maintenance/duplicates", V2Duplicates)
-	v2Handle(s, mux, "POST /v2/maintenance/db", V2DBMaintenance)
-	v2Handle(s, mux, "POST /v2/maintenance/ramdisk", V2Ramdisk)
-	v2Handle(s, mux, "POST /v2/maintenance/folder-rename/scan", V2FolderRenameScan)
-	v2Handle(s, mux, "POST /v2/maintenance/folder-rename/apply", V2FolderRenameApply)
-	v2Handle(s, mux, "GET /v2/partial/rename-progress", V2RenameProgress)
+	v2Handle(s, mux, "POST /maintenance/duplicates", V2Duplicates)
+	v2Handle(s, mux, "POST /maintenance/db", V2DBMaintenance)
+	v2Handle(s, mux, "POST /maintenance/ramdisk", V2Ramdisk)
+	v2Handle(s, mux, "POST /maintenance/folder-rename/scan", V2FolderRenameScan)
+	v2Handle(s, mux, "POST /maintenance/folder-rename/apply", V2FolderRenameApply)
+	v2Handle(s, mux, "GET /partial/rename-progress", V2RenameProgress)
 
 	// OAuth / PIN (Simkl).
-	v2Handle(s, mux, "POST /v2/oauth/start", V2OAuthStart)
-	v2Handle(s, mux, "POST /v2/oauth/poll", V2OAuthPoll)
+	v2Handle(s, mux, "POST /oauth/start", V2OAuthStart)
+	v2Handle(s, mux, "POST /oauth/poll", V2OAuthPoll)
 
 	// Job in background (progresso e annullamento).
-	v2Handle(s, mux, "GET /v2/partial/jobs", V2JobsPartial)
-	v2Handle(s, mux, "POST /v2/jobs/cancel", V2JobCancel)
+	v2Handle(s, mux, "GET /partial/jobs", V2JobsPartial)
+	v2Handle(s, mux, "POST /jobs/cancel", V2JobCancel)
 
 	// Aggiunta torrent (magnet/URL o file .torrent).
-	v2Handle(s, mux, "POST /v2/downloads/add", V2DownloadsAdd)
+	v2Handle(s, mux, "POST /downloads/add", V2DownloadsAdd)
 
 	// Traduzioni: modifica per chiave.
-	v2Handle(s, mux, "POST /v2/settings/i18n/set", V2SettingsI18nSet)
+	v2Handle(s, mux, "POST /settings/i18n/set", V2SettingsI18nSet)
+}
+
+// v2LegacyRedirect keeps the old /v2 prefix working: it strips it and redirects
+// to the equivalent root path, preserving the query string. GET/HEAD get a
+// permanent redirect; other methods (e.g. a stale open page posting a form) use
+// a temporary redirect that preserves the method and body.
+func v2LegacyRedirect(w http.ResponseWriter, r *http.Request, s *AppState) {
+	target := strings.TrimPrefix(r.URL.Path, "/v2")
+	if target == "" {
+		target = "/"
+	}
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	status := http.StatusMovedPermanently
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		status = http.StatusTemporaryRedirect
+	}
+	http.Redirect(w, r, target, status)
 }
 
 // ---------------------------------------------------------------------------
@@ -602,7 +624,7 @@ func V2SetLanguage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	target := r.Header.Get("Referer")
 	if target == "" {
-		target = "/v2"
+		target = "/"
 	}
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
@@ -1406,21 +1428,9 @@ func v2ParseInt32(value string, fallback int32) int32 {
 
 // safeV2Redirect validates that a redirect target is a safe relative path
 // within the /v2 tree, guarding against open-redirect attacks.
-func safeV2Redirect(raw, fallback string) string {
-	cleaned := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
-	if !strings.HasPrefix(cleaned, "/v2") {
-		return fallback
-	}
-	parsed, err := url.Parse(cleaned)
-	if err != nil || parsed.Hostname() != "" || parsed.Scheme != "" {
-		return fallback
-	}
-	return cleaned
-}
-
 // safeInternalRedirect accepts any same-site path ("/...") while rejecting
-// protocol-relative ("//host") and absolute URLs, so an action can return to the
-// page it came from (for example a series detail) without opening a redirect.
+// protocol-relative ("//host"), absolute URLs and traversal segments, so an
+// action can return to the page it came from without opening a redirect.
 func safeInternalRedirect(raw, fallback string) string {
 	cleaned := strings.ReplaceAll(strings.TrimSpace(raw), "\\", "/")
 	if !strings.HasPrefix(cleaned, "/") || strings.HasPrefix(cleaned, "//") {
@@ -1429,6 +1439,13 @@ func safeInternalRedirect(raw, fallback string) string {
 	parsed, err := url.Parse(cleaned)
 	if err != nil || parsed.Hostname() != "" || parsed.Scheme != "" {
 		return fallback
+	}
+	// Browsers normalize "/..//host" to a protocol-relative URL, so a traversal
+	// segment would escape the site: refuse it.
+	for _, segment := range strings.Split(parsed.Path, "/") {
+		if segment == ".." {
+			return fallback
+		}
 	}
 	return cleaned
 }

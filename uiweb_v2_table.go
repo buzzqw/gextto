@@ -836,7 +836,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		} else if label == "" {
 			label = "Pausa"
 		}
-		attrs := `hx-post="/v2/table/library" hx-vals='{"view":"` + view + `","scope":"` + scope + `","name":"` + templateEscapeJSAttr(name) + `","mode":"` + mode + `"}' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
+		attrs := `hx-post="/table/library" hx-vals='{"view":"` + view + `","scope":"` + scope + `","name":"` + templateEscapeJSAttr(name) + `","mode":"` + mode + `"}' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
 		if confirm != "" {
 			attrs += ` hx-confirm="` + stdhtml.EscapeString(confirm) + `"`
 		}
@@ -846,10 +846,10 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		season := v2String(item["season"])
 		episode := v2String(item["episode"])
 		vals := `{"view":"` + view + `","series":"` + templateEscapeJSAttr(series) + `","season":"` + templateEscapeJSAttr(season) + `","episode":"` + templateEscapeJSAttr(episode) + `"}`
-		return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" hx-post="/v2/table/gap-search" hx-vals='` + vals + `' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML">` + stdhtml.EscapeString(action.Label) + `</button>`
+		return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" hx-post="/table/gap-search" hx-vals='` + vals + `' hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "comic-edit":
 		id := v2String(item["id"])
-		return `<button class="btn sm" type="button" hx-get="/v2/comics/edit?id=` + url.QueryEscape(id) + `" hx-target="#v2-modal" hx-swap="innerHTML" title="Modifica il fumetto monitorato">` + stdhtml.EscapeString(action.Label) + `</button>`
+		return `<button class="btn sm" type="button" hx-get="/comics/edit?id=` + url.QueryEscape(id) + `" hx-target="#v2-modal" hx-swap="innerHTML" title="Modifica il fumetto monitorato">` + stdhtml.EscapeString(action.Label) + `</button>`
 	case "release-explain":
 		release := item
 		if nested, ok := item["release"].(map[string]any); ok {
@@ -857,7 +857,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		}
 		encoded, _ := json.Marshal(release)
 		escapedJSON := strings.ReplaceAll(stdhtml.EscapeString(string(encoded)), `"`, "&#34;")
-		return `<form method="post" action="/v2/search/explain" hx-post="/v2/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="btn sm" type="submit">` + stdhtml.EscapeString(action.Label) + `</button></form>`
+		return `<form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="btn sm" type="submit">` + stdhtml.EscapeString(action.Label) + `</button></form>`
 	case "copy-magnet":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		disabled := ""
@@ -872,7 +872,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		if magnet == "" && torrent == "" {
 			disabled = " disabled"
 		}
-		return `<form hx-post="/v2/comics/weekly/force" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="date" value="` + stdhtml.EscapeString(v2String(item["pack_date"])) + `"><input type="hidden" name="magnet" value="` + stdhtml.EscapeString(magnet) + `"><input type="hidden" name="torrent" value="` + stdhtml.EscapeString(torrent) + `"><button class="btn sm" type="submit" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button></form>`
+		return `<form hx-post="/comics/weekly/force" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="date" value="` + stdhtml.EscapeString(v2String(item["pack_date"])) + `"><input type="hidden" name="magnet" value="` + stdhtml.EscapeString(magnet) + `"><input type="hidden" name="torrent" value="` + stdhtml.EscapeString(torrent) + `"><button class="btn sm" type="submit" title="Scarica di nuovo questo Weekly Pack"` + disabled + `>` + stdhtml.EscapeString(action.Label) + `</button></form>`
 	}
 
 	path := v2Substitute(action.Path, item, true)
@@ -881,7 +881,7 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		body = "{}"
 	}
 	vals := `{"view":"` + view + `","path":"` + templateEscapeJSAttr(path) + `","method":"` + stdhtml.EscapeString(action.Method) + `","body":"` + templateEscapeJSAttr(body) + `"}`
-	attrs := `hx-post="/v2/table/action" hx-vals='` + vals + `' hx-include="closest .panel form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
+	attrs := `hx-post="/table/action" hx-vals='` + vals + `' hx-include="closest .panel form.toolbar" hx-target="#v2-table-body-` + view + `" hx-swap="outerHTML"`
 	if action.Confirm != "" {
 		attrs += ` hx-confirm="` + stdhtml.EscapeString(action.Confirm) + `"`
 	}

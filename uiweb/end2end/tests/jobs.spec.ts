@@ -7,23 +7,23 @@ const jobsPanel = (state: string, includeCancel: boolean) => `
       <td>scan-archives</td><td><span class="badge">${state}</span></td>
       <td><div class="progress"><span style="width:25%"></span></div><small>25%</small></td>
       <td>Scansione archivi</td>
-      <td>${includeCancel ? '<form hx-post="/v2/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML"><input type="hidden" name="id" value="test-job" /><button type="submit">Annulla</button></form>' : ""}</td>
+      <td>${includeCancel ? '<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML"><input type="hidden" name="id" value="test-job" /><button type="submit">Annulla</button></form>' : ""}</td>
     </tr></tbody></table></div>
   </div>`;
 
 test("la sezione operazioni mostra stato e permette di annullare un job", async ({ page }) => {
   let canceled = false;
-  await page.route("**/v2/partial/jobs", async (route) => {
+  await page.route("**/partial/jobs", async (route) => {
     await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: jobsPanel("in corso", true) });
   });
-  await page.route("**/v2/jobs/cancel", async (route) => {
+  await page.route("**/jobs/cancel", async (route) => {
     canceled = true;
     await route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: jobsPanel("annullato", false) });
   });
 
   await page.goto("/?view=maintenance");
   const panel = await page.evaluate(async () => {
-    const response = await fetch("/v2/partial/jobs");
+    const response = await fetch("/partial/jobs");
     return response.text();
   });
   await page.evaluate((html) => {
