@@ -646,6 +646,18 @@ func CleanupInferiorDuplicatesInDir(cfg *Config, series, archivePath string, pro
 // an existing file of the same series/season/episode is better. When it returns
 // true the incoming file has been handled as a duplicate.
 func DiscardIfInferior(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string) (bool, error) {
+	return discardIfInferiorWithQuality(cfg, series, season, episode, newScore, newFile, archivePath, nil)
+}
+
+// DiscardIfInferiorWithQuality is DiscardIfInferior with the release quality
+// preserved across a display-name rename. In particular, normalized archive
+// filenames intentionally omit markers such as REPACK, but that marker remains
+// meaningful to the replacement policy.
+func DiscardIfInferiorWithQuality(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string, incoming *models.Quality) (bool, error) {
+	return discardIfInferiorWithQuality(cfg, series, season, episode, newScore, newFile, archivePath, incoming)
+}
+
+func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string, incoming *models.Quality) (bool, error) {
 	if !cfg.CleanupUpgrades || !localPath(archivePath) {
 		return false, nil
 	}
@@ -688,6 +700,13 @@ func DiscardIfInferior(cfg *Config, series string, season, episode, newScore int
 		oldQuality := ParseQuality(name)
 		oldScore := cfg.FileScore(file, "series", "")
 		newQuality := ParseQuality(newName)
+		if incoming != nil {
+			// A normalized archive name intentionally omits release markers and
+			// can also abbreviate source/audio information. Preserve all metadata
+			// learned before the rename, using the final filename where it is more
+			// specific and the original release as a fallback.
+			newQuality = MergeQuality(newQuality, *incoming)
+		}
 		if oldQuality.ResolutionRank() > 0 && oldQuality.ResolutionRank() == newQuality.ResolutionRank() {
 			switch languageMatchFor(name, preferred) {
 			case languagePreferred:

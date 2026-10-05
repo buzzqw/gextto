@@ -2093,7 +2093,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			}
 			if haveNewFile {
 				score := cfg.ReleaseScore(release)
-				value, err := DiscardIfInferior(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive)
+				value, err := DiscardIfInferiorWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality)
 				if err != nil {
 					return false, err
 				}

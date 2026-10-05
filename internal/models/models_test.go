@@ -113,7 +113,7 @@ func TestStandardBonusOverridesPreserveBaseScore(t *testing.T) {
 		"score_bonus_dv":     "300",
 		"score_bonus_hdr":    "100",
 		"score_bonus_proper": "75",
-		"score_bonus_repack": "50",
+		"score_bonus_repack": "100",
 		"score_bonus_real":   "100",
 	}
 	if got := quality.ScoreWithSettings(settings); got != quality.Score() {

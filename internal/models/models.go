@@ -295,7 +295,7 @@ func (q *Quality) ScoreWithSettings(settings map[string]string) int64 {
 	adjust(300, q.IsDV, "score_bonus_dv")
 	adjust(100, q.HDR != "" && !q.IsDV, "score_bonus_hdr")
 	adjust(75, q.IsProper, "score_bonus_proper")
-	adjust(50, q.IsRepack, "score_bonus_repack")
+	adjust(100, q.IsRepack, "score_bonus_repack")
 	adjust(100, q.IsReal, "score_bonus_real")
 	if group := strings.ToLower(strings.TrimSpace(q.Group)); group != "" && group != "unknown" {
 		groupKey := "score_group_" + group

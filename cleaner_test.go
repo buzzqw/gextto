@@ -182,6 +182,33 @@ func TestDiscardsNewEpisodeWhenExistingFileIsBetter(t *testing.T) {
 	assertTrue(t, cleanerFileExists(existing), "l'esistente resta")
 }
 
+func TestRepackQualitySurvivesNormalizedArchiveName(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// The normalized output name intentionally has no REPACK marker. The
+	// release metadata must still make it eligible to replace the base release.
+	existing := filepath.Join(archive, "Example.S01E01.2160p.WEB-DL.DDP5.1.DV.H.265.mkv")
+	newFile := filepath.Join(archive, "Example - S01E01 - Pilot - [2160p][h265][DV][EAC3].mkv")
+	cleanerWrite(t, existing, "old")
+	cleanerWrite(t, newFile, "new")
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	cfg.TrashPath = &trash
+	incoming := ParseQuality("Example.S01E01.2160p.WEB-DL.DDP5.1.DV.H.265.REPACK.mkv")
+	discarded, err := DiscardIfInferiorWithQuality(&cfg, "Example", 1, 1, 1, newFile, archive, &incoming)
+	if err != nil {
+		t.Fatalf("discard: %v", err)
+	}
+	if discarded {
+		t.Fatal("repack must not be discarded after its marker is removed by renaming")
+	}
+	assertTrue(t, cleanerFileExists(newFile), "repack remains available for replacement")
+}
+
 func TestFindsAndTrashesOnlyLowerResolutionDuplicates(t *testing.T) {
 	root := t.TempDir()
 	archive := filepath.Join(root, "archive")
