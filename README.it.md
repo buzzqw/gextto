@@ -5,116 +5,42 @@ cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, film e
 fumetti. L'interfaccia web è il piano di controllo; il demone continua a
 funzionare come servizio.
 
-> **English:** [README.md](README.md) · **Guida completa:**
-> [manuale italiano](docs/MANUAL.it.md)
+> **English:** [README.md](README.md) · **Manuale:**
+> [italiano](docs/MANUAL.it.md) · **Segnalazioni e proposte:**
+> [GitHub Issues](https://github.com/buzzqw/gextto/issues) ·
+> **Contribuire:** [guida sviluppatori](docs/DEVELOPERS.md)
 
-## In breve
+## Cosa offre Gextto
 
-- Un solo servizio gestisce ciclo di ricerca, database SQLite, coda torrent,
-  post-processing e archivio.
-- Il motore predefinito è libtorrent integrato. qBittorrent-nox è un'alternativa
-  opzionale, non un servizio aggiuntivo necessario.
-- La scelta delle release considera qualità, sorgente, codec, audio, HDR, lingue
-  e dimensione. `ffprobe` può aggiungere le caratteristiche del file archiviato.
-- UI web responsive e TUI mostrano salute, log, backup, manutenzione e
-  integrazioni con Simkl, Jellyfin e Plex.
+- **Un servizio e un piano di controllo:** il demone gestisce ricerche
+  programmate, trasferimenti torrent, post-processing e archivio. Libtorrent è
+  integrato e predefinito; qBittorrent-nox è un'alternativa opzionale.
+- **Serie TV, film e fumetti:** monitora i titoli, cerca nelle sorgenti
+  configurate e gestisce download e libreria da una UI web responsive o dalla TUI
+  terminale.
+- **Automazione attenta alla qualità:** valuta release per qualità, sorgente,
+  codec, audio, HDR, lingua e dimensione; protegge i file migliori già presenti e
+  spiega perché un candidato è stato scartato. `ffprobe` può arricchire le
+  decisioni sui file archiviati.
+- **Sorgenti e integrazioni flessibili:** RSS, indexer Torznab come Jackett e
+  Prowlarr, motori web e FlareSolverr opzionale; integrazioni con Simkl, Jellyfin
+  e Plex.
+- **Strumenti operativi inclusi:** controlli di salute, log, backup,
+  manutenzione, notifiche, percorsi NAS, gestione seeding e blocklist.
 
-### Motori torrent
+La UI è disponibile su `http://<host>:5000/` e supporta italiano, inglese,
+tedesco, francese, spagnolo e polacco. Il [manuale italiano](docs/MANUAL.it.md)
+e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le
+sezioni dell'interfaccia.
 
-Gextto supporta due motori di trasferimento: libtorrent integrato e l'adapter
-Web API di qBittorrent-nox.
+## Uso delle risorse
 
-## Interfaccia web e menu
-
-La UI web è un piano di controllo completo, non solo una pagina di stato. È
-responsive su desktop e mobile e il selettore di lingua supporta attualmente
-**Italiano, English, Deutsch, Français, Español e Polski**. Il manuale esteso è
-integrato in italiano e inglese; per le altre lingue la documentazione lunga usa
-il manuale inglese come fallback. Nella barra superiore sono disponibili anche
-ricerca impostazioni, metriche CPU/RAM e trasferimenti, tema, dimensione testo,
-aggiornamento e stato del servizio.
-
-Il menu a discesa **Font** include preset generici sicuri e, nei browser che
-supportano la Local Font Access API, può elencare le famiglie installate sul
-dispositivo dell'utente. La scelta viene applicata subito all'interfaccia e ai
-log e viene salvata localmente nel browser. I browser senza questa API mantengono
-i preset e il campo per inserire manualmente il nome della famiglia; per leggere
-i font installati può essere richiesta un'autorizzazione del browser.
-
-L'interfaccia web è disponibile su `http://<host>:5000/`. Il menu **Scarico**
-aggiorna automaticamente la sessione ogni 5 secondi, includendo progressione e
-velocità dei download HTTP dei fumetti; le metriche live nella barra superiore
-seguono lo stesso intervallo.
-
-| Voce | Funzioni |
-|---|---|
-| **Dashboard** | Avvio del ciclo completo o limitato a un dominio, prossimo ciclo, titoli configurati, spazio libero, torrent attivi, ultimi download, prossime uscite, risultati dei feed, grafici dischi/risorse e collegamenti rapidi. |
-| **Scarico** | Sessione torrent e HTTP completa: aggiunta magnet o `.torrent`, coda/progresso/ETA/peer/ratio, pausa/ripresa/recheck/rimozione, dettagli, tracker, priorità file, limiti, spostamento storage, seeding, download fumetti e storico. |
-| **Serie TV** | Libreria monitorata con stagioni, episodi, qualità/lingue/sottotitoli, alias, percorso NAS con sfoglia, ricerca mancanti, upgrade, ricerca manuale, scansione archivio, cast collegato a TVDB/TMDB e rinomina/riparazione controllata. |
-| **Film** | Libreria con identità titolo/anno, qualità, requisiti linguistici leggibili, esclusioni, ricerca immediata, migliori risultati, corrispondenze archivio, cast collegato a TMDB, decisioni upgrade, riscaricamento e modifica metadati. |
-| **Mancanti** | Vista orientata ai gap per episodi e stagioni mancanti, con filtri, ricerche e azioni consapevoli di forza, ignora, riattiva e riscarica. |
-| **Esplora** | Scoperta TMDB (tendenze, popolari, più votati, programmazione e prossime uscite), ricerca titoli, ricerca release e aggiunta alla libreria, con protezione dai duplicati già monitorati. |
-| **Archivio** | Ricerca full-text delle release archiviate, paginazione, dettagli sorgente/qualità, accodamento multiplo, copia magnet, eliminazione e spiegazione **Perché non questa?**; include anche i titoli visti nei feed. |
-| **Fumetti** | Fumetti monitorati tramite GetComics, scelta del post, gestione metadati/copertina/tag, estrazione link, weekly pack, download HTTP e storico con azioni. |
-| **Configurazione** | Daemon, sorgenti RSS/indexer/motori web/FlareSolverr, libtorrent, motore torrent, scoring, template di rinomina, acquisizione, notifiche, percorsi/NAS, retention avanzate e traduzioni. |
-| **Integrazioni** | Autenticazione/watchlist Simkl, aggiornamento libreria Jellyfin/Plex e hook per programmi esterni. |
-| **Manutenzione** | Backup, azioni di ripristino, pulizia cestino, scansioni archivio, backfill MediaInfo, ricalcolo scoring, pulizia duplicati, rinomina manuale cartelle, manutenzione database e riavvio servizio. |
-| **Salute** | Integrità database, percorsi e permessi, spazio libero, stato provider/backend, CPU/RAM e diagnostica del servizio. |
-| **Log** | Coda live e storico del log daemon con filtro, numero righe e controlli segui/aggiorna, per analizzare cicli, provider e vita dei torrent. |
-| **Blocklist** | Consultazione e gestione delle release bloccate per qualità, identità, provider o scelta utente, evitando che rientrino silenziosamente nei cicli. |
-| **Manuale** | Guida operativa integrata nella UI; segue la lingua selezionata, con versioni complete italiana e inglese e fallback inglese per le altre lingue. |
-| **Licenza** | Licenza EUPL-1.2 del progetto e note sulle dipendenze di terze parti incluse o opzionali. |
-
-La shell mobile mantiene sempre raggiungibili le pagine operative principali:
-Dashboard, Scarico, Serie TV, Film, Salute e Log; le altre pagine di scoperta e
-sistema restano disponibili dalla navigazione.
-
-## Efficienza delle risorse
-
-Gextto è stato ottimizzato per mantenere un uso delle risorse prevedibile e
-contenuto, soprattutto quando è inattivo o in attesa del ciclo programmato:
-
-- il demone è un singolo servizio e usa libtorrent integrato, senza richiedere
-  uno stack torrent separato;
-- feed, indexer, ricerche web e attività in background usano concorrenza limitata
-  invece di creare goroutine senza limite;
-- backoff dei provider, finestre di retry e cooldown impediscono che gli errori
-  ripetuti diventino raffiche di richieste, consumo CPU e traffico inutili;
-- coda torrent, profili di velocità, riconciliazione del RAM disk e database
-  vengono gestiti in modo incrementale, senza cicli di attesa attiva.
-
-Il risultato è un basso uso della CPU al di fuori delle ricerche e dei download
-attivi e un consumo di RAM contenuto per un servizio di automazione multimediale
-self-hosted. Il consumo effettivo dipende dal numero di titoli monitorati, dalle
-sorgenti configurate, dai torrent attivi, dalle scansioni dell'archivio e dalle
-integrazioni opzionali.
-
-### Misurazioni indicative
-
-Sono osservazioni di riferimento su un'installazione Linux x86_64 con libtorrent
-integrato, non benchmark indipendenti dall'hardware:
-
-- dopo il riavvio, con cinque torrent ripristinati e nessun download attivo, il
-  processo demone aveva un RSS di circa **75–85 MiB**. Il valore del cgroup
-  systemd può essere molto più alto perché include anche la cache del filesystem:
-  in un'osservazione era di circa **584 MiB**, di cui circa **525 MiB** di cache
-  file e solo circa **51 MiB** di memoria anonima;
-- in circa cinque minuti nello stesso stato prevalentemente inattivo, il tempo
-  CPU accumulato è stato di circa **7 secondi** (circa **2% di un core in media**);
-- durante un controllo successivo, con cinque torrent in sessione ma nessun
-  download attivo, il processo era intorno a **168 MiB RSS** e **15 MiB di heap
-  Go**; questo è un campione, non un valore di riposo garantito;
-- i cicli di ricerca/download possono avere picchi temporanei: systemd ha
-  registrato circa **2,1 GiB** come massimo di una precedente istanza del
-  servizio. Il processo è stato poi riavviato e il suo RSS è tornato molto più
-  basso. Il picco va quindi distinto dalla memoria residente stabile.
-
-Usa questi valori come esempi di dimensionamento, non come garanzie. Per il
-consumo residente effettivo del demone è più utile l'RSS del processo; il totale
-cgroup include anche la cache del filesystem, in gran parte recuperabile. Le
-variabili principali sono numero di torrent attivi, cache e connessioni
-libtorrent, concorrenza dei provider, scansioni `ffprobe`/archivio e dimensione
-del ciclo in corso.
+Gextto è progettato per restare leggero quando è inattivo: è un solo demone con
+libtorrent integrato, limita la concorrenza delle sorgenti e delle attività in
+background e usa il backoff per evitare tentativi continui verso provider in
+errore. Il consumo effettivo di CPU e RAM dipende da titoli monitorati, sorgenti,
+torrent attivi e scansioni dell'archivio; le misurazioni su una singola macchina
+sono indicative, non una garanzia.
 
 ## Installazione Linux
 
@@ -227,6 +153,19 @@ Se Gextto ti è utile e vuoi sostenere il suo sviluppo, puoi fare una donazione
 tramite PayPal. Grazie!
 
 [![Dona con PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
+
+## Uso corretto e fair use
+
+Gextto è uno strumento di automazione dei download: non ospita, indicizza né
+distribuisce contenuti protetti da copyright.
+
+- Si collega alle sorgenti configurate dall'utente (per esempio Jackett, Prowlarr
+o feed RSS pubblici); non include un indice incorporato.
+- L'utente è responsabile dei contenuti scaricati. Usa Gextto solo per contenuti
+  a cui hai diritto di accedere, come opere di pubblico dominio, con licenza
+  Creative Commons o media di tua proprietà.
+- L'integrazione torrent (libtorrent) è una tecnologia neutrale; il progetto non
+  incoraggia né facilita la pirateria.
 
 ## Licenza
 

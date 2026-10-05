@@ -5,112 +5,39 @@ finds, selects, downloads, verifies, names and archives TV series, movies and
 comics. Its web interface is the control plane; the daemon keeps running as a
 service.
 
-> **Italiano:** [README.it.md](README.it.md) · **Complete guide:**
-> [English manual](docs/MANUAL.en.md)
+> **Italiano:** [README.it.md](README.it.md) · **Manual:**
+> [English](docs/MANUAL.en.md) · **Issues:**
+> [bugs and feature requests](https://github.com/buzzqw/gextto/issues) ·
+> **Contribute:** [developer guide](docs/DEVELOPERS.md)
 
-## At a glance
+## What Gextto offers
 
-- One service owns the search cycle, SQLite databases, torrent queue,
-  post-processing and library archive.
-- The default transfer engine is embedded libtorrent. qBittorrent-nox is an
-  optional alternative, not an additional required service.
-- Release selection uses quality, source, codec, audio, HDR, language and size.
-  `ffprobe` can enrich those decisions with the properties of archived files.
-- The responsive web UI and terminal TUI expose health, logs, backups,
-  maintenance and integrations with Simkl, Jellyfin and Plex.
+- **One service, one control plane:** the daemon handles scheduled searches,
+  torrent transfers, post-processing and the library archive. Embedded libtorrent
+  is the default; qBittorrent-nox is an optional alternative.
+- **Series, movies and comics:** monitor titles, search configured sources and
+  manage downloads and archived media from one responsive web UI or the terminal
+  TUI.
+- **Quality-aware automation:** score releases by quality, source, codec, audio,
+  HDR, language and size; protect better existing files and explain rejected
+  candidates. `ffprobe` can enrich archived-file decisions.
+- **Flexible sources and integrations:** use RSS, Torznab indexers such as
+  Jackett and Prowlarr, web search and optional FlareSolverr; connect Simkl,
+  Jellyfin and Plex.
+- **Operational tools included:** health checks, logs, backups, maintenance,
+  notifications, NAS paths, seeding controls and a blocklist.
 
-### Torrent engines
+The UI is available at `http://<host>:5000/` and supports Italian, English,
+German, French, Spanish and Polish. The full [English manual](docs/MANUAL.en.md)
+and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the UI.
 
-Gextto supports two transfer engines: the integrated libtorrent engine and the
-qBittorrent-nox Web API adapter.
+## Resource footprint
 
-## Web interface and menu
-
-The web UI is a complete control plane, not only a status page. It is responsive
-on desktop and mobile, and the language selector currently supports **Italiano,
-English, Deutsch, Français, Español and Polski**. The long-form manual is
-bundled in Italian and English; the other UI languages use the English manual as
-their documentation fallback. The top bar also provides settings search, CPU/RAM
-and transfer metrics, theme/font controls, refresh and service status.
-
-The **Font** dropdown includes safe generic presets and, in browsers that support
-the Local Font Access API, can list the font families installed on the user's
-device. The choice is applied to the interface and logs immediately and is saved
-locally in that browser. Browsers without the API still support the presets and a
-manual font-family name; browser permission may be required to inspect installed
-fonts.
-
-The web interface is served at `http://<host>:5000/`. The **Downloads** page
-refreshes the session every 5 seconds, including progress and speed for comic HTTP
-downloads; the live transfer metrics in the top bar use the same interval.
-
-| Menu | What it provides |
-|---|---|
-| **Dashboard** | Cycle controls for all domains or one domain, next-cycle timing, configured-title and free-space metrics, active torrents, recent downloads, upcoming series releases, feed results, disk/resource charts and quick links. |
-| **Downloads** | Full torrent and HTTP session: add magnets or `.torrent` files, queue/progress/ETA/peer/ratio data, pause/resume/recheck/remove, per-torrent details, trackers, content priorities, limits, storage moves, seeding controls, comic downloads and history. |
-| **Series** | Monitored TV library with seasons, episodes, quality/language/subtitle rules, aliases, browseable NAS path, missing searches, upgrades, manual search, archive scan, TVDB/TMDB cast links and controlled rename/repair actions. |
-| **Movies** | Monitored movie library with title/year identity, quality and readable language requirements, exclusions, immediate search, best matches, archive matches, TMDB cast links, upgrade decisions, re-download and metadata editing. |
-| **Missing** | Gap-oriented view of missing episodes and seasons, with filters, candidate searches and actions to force, ignore, reactivate or re-download intentionally. |
-| **Explore** | TMDB discovery (trending, popular, top-rated, now-playing/upcoming), title lookup, release search and add-to-library actions, with duplicate protection for titles already monitored. |
-| **Archive** | Full-text archive/release search, pagination, source and quality details, bulk queueing, magnet copying/deletion and “why not this one?” explanations; also exposes feed-seen series and movies. |
-| **Comics** | GetComics-based monitored comics, post selection, metadata/cover/tag handling, link extraction, weekly packs, HTTP downloads and history actions. |
-| **Configuration** | Daemon mode, sources, RSS/indexers/web engines/FlareSolverr, libtorrent, torrent engine, scoring, rename templates, acquisition, notifications, paths/NAS, advanced retention and translations. |
-| **Integrations** | Simkl authentication/watchlists, Jellyfin/Plex library refresh and event hooks for external programs. |
-| **Maintenance** | Backups and restore-related actions, trash cleanup, archive scans, MediaInfo backfill, scoring recalculation, duplicate cleanup, manual folder rename, database maintenance and service restart. |
-| **Health** | Database integrity, paths and permissions, free space, provider/backend status, CPU/RAM and service diagnostics. |
-| **Logs** | Live and historical daemon log tail with filtering, line count and follow/refresh controls, useful for cycles, provider failures and torrent lifecycle events. |
-| **Blocklist** | Review and manage releases blocked by quality, identity, provider or user decisions, so rejected candidates do not return silently. |
-| **Manual** | The bundled operational guide, rendered inside the UI; it follows the selected language, with Italian and English full versions and English fallback for other languages. |
-| **License** | EUPL-1.2 project license and bundled/optional third-party notices. |
-
-The mobile shell keeps the most important operational pages reachable: Dashboard,
-Downloads, Series, Movies, Health and Logs remain immediately available, while
-the remaining discovery and system pages are available through the navigation.
-
-## Resource efficiency
-
-Gextto has been extensively optimized to keep its resource footprint predictable
-and modest, especially when idle or waiting for the next scheduled cycle:
-
-- the daemon is a single service and uses embedded libtorrent, without requiring
-  a separate torrent stack;
-- feed, indexer, web-search and background work use bounded concurrency rather
-  than unbounded goroutines;
-- provider backoff, retry windows and cooldowns prevent repeated failures from
-  turning into CPU- and network-heavy retry storms;
-- the torrent queue, speed policies, RAM-disk reconciliation and database work
-  are applied incrementally instead of busy-looping.
-
-This results in low CPU usage outside active searches and transfers and a
-contained RAM footprint for a self-hosted media automation service. Actual
-usage depends on the number of monitored titles, configured sources, active
-torrents, archive scans and optional integrations.
-
-### Indicative measurements
-
-These are reference observations from a Linux x86_64 installation using the
-embedded libtorrent engine, not hardware-independent benchmarks:
-
-- after restart, with five restored torrents and no active downloads, the daemon
-  process RSS was about **75–85 MiB**. The systemd cgroup value can be much
-  higher because it also accounts for filesystem cache: one observation showed
-  about **584 MiB** cgroup memory, including roughly **525 MiB** of file cache
-  and only about **51 MiB** of anonymous memory;
-- over roughly five minutes in that mostly idle state, accumulated CPU time was
-  about **7 seconds** (around **2% of one CPU core on average**);
-- with five torrents in session but no active download, a later sample showed
-  about **168 MiB RSS** and **15 MiB Go heap**; this is an observation, not a
-  guaranteed idle baseline;
-- search/download cycles can have temporary peaks: systemd recorded about
-  **2.1 GiB** as the peak of a previous service instance. The service was later
-  restarted and its RSS returned much lower, so distinguish the peak from its
-  steady resident footprint.
-
-Use these figures as sizing examples, not guarantees. For the daemon's actual
-resident footprint, prefer process RSS; cgroup totals also include reclaimable
-filesystem cache. The main variables are active torrent count, libtorrent cache
-and connections, concurrent providers, `ffprobe`/archive scans and the size of
-the current cycle.
+Gextto is designed to remain lightweight while idle: it is one daemon with
+embedded libtorrent, uses bounded concurrency for source and background work,
+and backs off failing providers instead of retrying continuously. Actual CPU and
+memory use depend on monitored titles, sources, active torrents and archive
+scans; treat any machine-specific measurement as indicative, not a guarantee.
 
 ## Install on Linux
 
