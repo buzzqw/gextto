@@ -1460,10 +1460,10 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		}
 		if updated > 0 {
 			probed++
-			logging.Debug("media info backfill: probed",
+			logging.Info("🔬 MediaInfo analyzed for archived file",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "resolution", info.Resolution(),
-				"hdr", info.HDR, "bit_depth", info.BitDepth)
+				"hdr", info.HDR, "bit_depth", info.BitDepth, "path", target.Path)
 		} else {
 			failed++
 			gh0_logMediaInfoFailure(target, "nessuna riga corrispondente nel database (episodio o film non trovato)", &failedItems)

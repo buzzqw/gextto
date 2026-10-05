@@ -184,10 +184,13 @@ func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, fi
 	}
 
 	if release != nil && s.db != nil && finalPath != "" {
-		if info := Probe(finalPath); info != nil {
-			_ = s.db.SetMediaInfo(release, info)
+		if info, probeErr := ProbeResult(finalPath); probeErr != nil {
+			logging.Warn("MediaInfo probe failed for archived file", "title", release.Title, "path", finalPath, "error", probeErr)
+		} else if err := s.db.SetMediaInfo(release, &info); err != nil {
+			logging.Warn("could not save MediaInfo for archived file", "title", release.Title, "path", finalPath, "error", err)
+		} else {
 			logging.Info("🔬 MediaInfo stored for the completed file",
-				"title", release.Title, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
+				"title", release.Title, "path", finalPath, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
 		}
 	}
 }
@@ -235,34 +238,48 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 	}
 
-	// Check if already completed and archived on disk
+	// Check if already completed and archived on disk. A post-seed relocation
+	// can drop the completed file straight into the archive folder under its
+	// original torrent name when the import step was interrupted (for example by
+	// a restart). That copy was never renamed nor quality-checked, so it must not
+	// take the "already archived" shortcut: fall through to the full
+	// finalization, which renames it and runs the quality checks on the file
+	// already in place.
 	if s.db != nil {
 		if processed, err := s.db.TorrentProcessed(hash); err == nil && processed != nil && strings.TrimSpace(*processed) != "" {
 			if _, statErr := os.Stat(*processed); statErr == nil {
-				source := CompletionPath(&models.TorrentEvent{
-					Kind:     "torrent_finished",
-					Hash:     targetTorrent.Hash,
-					Name:     targetTorrent.Name,
-					SavePath: targetTorrent.SavePath,
-				})
-				inRamdisk := false
-				if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
-					inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)
+				finalized := true
+				if release != nil && !release.IsPack && strings.EqualFold(filepath.Base(filepath.Clean(*processed)), filepath.Base(strings.TrimSpace(targetTorrent.Name))) {
+					finalized = false
+					logging.Info("archived copy still carries the torrent name; running rename and quality checks",
+						"hash", hash, "name", targetTorrent.Name, "path", *processed)
 				}
-				inTemp := cfg.LibtorrentTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.LibtorrentTempDir)
-				if (inRamdisk || inTemp) && !SamePath(source, *processed) {
-					_ = os.RemoveAll(source)
+				if finalized {
+					source := CompletionPath(&models.TorrentEvent{
+						Kind:     "torrent_finished",
+						Hash:     targetTorrent.Hash,
+						Name:     targetTorrent.Name,
+						SavePath: targetTorrent.SavePath,
+					})
+					inRamdisk := false
+					if ramdisk := cfg.RamdiskDir(); ramdisk != nil {
+						inRamdisk = PathOnRamdisk(targetTorrent.SavePath, *ramdisk)
+					}
+					inTemp := cfg.LibtorrentTempDir != nil && SamePath(targetTorrent.SavePath, *cfg.LibtorrentTempDir)
+					if (inRamdisk || inTemp) && !SamePath(source, *processed) {
+						_ = os.RemoveAll(source)
+					}
+					size, _ := SizeOfPath(*processed)
+					notifyArchivedTorrent(s, hash, release, *processed, size, targetTorrent.Name)
+					removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
+					removed, err := s.activeEngine().Remove(hash, false)
+					if err == nil && removed {
+						logManualTorrentRemoval(hash, false, removalName, removalState, removalHasMetadata)
+					}
+					_ = s.db.MarkTorrentRemoved(hash)
+					_ = s.db.ForgetRemovedTorrent(hash)
+					return true, nil
 				}
-				size, _ := SizeOfPath(*processed)
-				notifyArchivedTorrent(s, hash, release, *processed, size, targetTorrent.Name)
-				removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
-				removed, err := s.activeEngine().Remove(hash, false)
-				if err == nil && removed {
-					logManualTorrentRemoval(hash, false, removalName, removalState, removalHasMetadata)
-				}
-				_ = s.db.MarkTorrentRemoved(hash)
-				_ = s.db.ForgetRemovedTorrent(hash)
-				return true, nil
 			}
 		}
 	}

@@ -1051,10 +1051,13 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					if completionMeta != nil {
 						probePath := processed
 						release := completionMeta.Release
-						if info := Probe(probePath); info != nil {
-							_ = db.SetMediaInfo(&release, info)
+						if info, probeErr := ProbeResult(probePath); probeErr != nil {
+							logging.Warn("MediaInfo probe failed for completed file", "title", release.Title, "path", probePath, "error", probeErr)
+						} else if err := db.SetMediaInfo(&release, &info); err != nil {
+							logging.Warn("could not save MediaInfo for completed file", "title", release.Title, "path", probePath, "error", err)
+						} else {
 							logging.Info("🔬 MediaInfo stored for the completed file",
-								"title", release.Title, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
+								"title", release.Title, "path", probePath, "resolution", info.Resolution(), "hdr", info.HDR, "bit_depth", info.BitDepth)
 						}
 					}
 				}

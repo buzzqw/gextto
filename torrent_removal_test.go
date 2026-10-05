@@ -268,6 +268,103 @@ func TestArchiveAndRemoveTorrentEpisodeMovesAndRenames(t *testing.T) {
 	}
 }
 
+// TestArchiveAndRemoveTorrentFinalizesUnrenamedArchivedCopy reproduces a
+// post-seed relocation whose import step never ran: the file already sits in
+// the archive folder under its original torrent name and the DB records that
+// path as processed. ArchiveAndRemoveTorrent must not treat it as fully
+// archived: it has to run the rename (and quality checks) on the file in place.
+func TestArchiveAndRemoveTorrentFinalizesUnrenamedArchivedCopy(t *testing.T) {
+	root := t.TempDir()
+	archiveDir := filepath.Join(root, "archive", "TestShow")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	mkvHeader := []byte{0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x86, 0x81, 0x01, 0x42, 0xF7, 0x81, 0x01, 0x42, 0xF2, 0x81}
+	torrentName := "TestShow.S01E01.1080p.mkv"
+	archived := filepath.Join(archiveDir, torrentName)
+	if err := os.WriteFile(archived, mkvHeader, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := OpenDatabase(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	sName := "TestShow"
+	s1 := int64(1)
+	e1 := int64(1)
+	hash := "aaaabbbbccccddddeeeeffff0000111122223333"
+	rel := models.Release{
+		Kind:      "series",
+		Series:    &sName,
+		Season:    &s1,
+		Episode:   &e1,
+		Title:     "TestShow.S01E01.1080p",
+		Quality:   ParseQuality("TestShow.S01E01.1080p"),
+		SizeBytes: int64(len(mkvHeader)),
+		Magnet:    "magnet:?xt=urn:btih:" + hash,
+	}
+	if err := db.RegisterTorrentScored(&rel, 1000); err != nil {
+		t.Fatal(err)
+	}
+	// The relocation recorded the un-renamed file as the processed copy.
+	if _, err := db.db.Exec("UPDATE torrent_meta SET processed_path=?1 WHERE hash=?2", archived, hash); err != nil {
+		t.Fatal(err)
+	}
+
+	engine := &mockTorrentEngine{
+		torrents: []models.TorrentView{
+			{
+				Hash:      hash,
+				Name:      torrentName,
+				SavePath:  archiveDir,
+				State:     "paused",
+				Progress:  100.0,
+				TotalSize: int64(len(mkvHeader)),
+				TotalDone: int64(len(mkvHeader)),
+			},
+		},
+		removed: map[string]bool{},
+		paused:  map[string]bool{},
+	}
+	s := &AppState{torrent_engine: engine, db: db}
+
+	cfg := DefaultConfig()
+	cfg.LibtorrentDir = archiveDir
+	cfg.RenameEpisodes = true
+	cfg.Series = append(cfg.Series, SeriesConfig{Name: "TestShow", Enabled: true, ArchivePath: archiveDir})
+
+	if finalized := gh6_archivedCopyFinalized(s.db, torrentName, hash); finalized {
+		t.Fatal("an un-renamed archived copy must not be considered finalized")
+	}
+
+	ok, err := ArchiveAndRemoveTorrent(s, &cfg, hash)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected ArchiveAndRemoveTorrent to succeed")
+	}
+
+	entries, err := os.ReadDir(archiveDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 file in archiveDir, got %v", entries)
+	}
+	if entries[0].Name() == torrentName {
+		t.Errorf("file was not renamed: still %q", entries[0].Name())
+	}
+	processed, err := db.TorrentProcessed(hash)
+	if err != nil || processed == nil || *processed == archived {
+		t.Errorf("processed path not updated to the renamed file: %v (err %v)", processed, err)
+	}
+}
+
 func TestArchiveAndRemoveTorrentIncompleteFails(t *testing.T) {
 	root := t.TempDir()
 	downloadDir := filepath.Join(root, "downloads")

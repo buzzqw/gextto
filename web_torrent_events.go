@@ -2040,6 +2040,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			"name", event.Name, "path", path, "error", err.Error(), "quarantined", quarantined)
 		return false, fmt.Errorf("integrity validation failed: %w", err)
 	}
+	logging.Info("completed file passed integrity validation", "name", event.Name, "path", path)
 	size, err := SizeOfPath(path)
 	if err != nil {
 		return false, err

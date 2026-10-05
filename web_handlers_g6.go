@@ -856,6 +856,28 @@ func RamdiskView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
+// gh6_archivedCopyFinalized reports whether the DB points at an archived copy
+// that already went through renaming and quality checks. A post-seed relocation
+// can leave the file in the archive folder under its original torrent name when
+// the import step never ran, so that copy must be finalized instead of removed.
+func gh6_archivedCopyFinalized(db *Database, torrentName, hash string) bool {
+	if db == nil {
+		return false
+	}
+	processed, err := db.TorrentProcessed(hash)
+	if err != nil || processed == nil || strings.TrimSpace(*processed) == "" {
+		return false
+	}
+	if _, statErr := os.Stat(*processed); statErr != nil {
+		return false
+	}
+	name := strings.TrimSpace(torrentName)
+	if name == "" {
+		return true
+	}
+	return !strings.EqualFold(filepath.Base(filepath.Clean(*processed)), filepath.Base(name))
+}
+
 // RemoveCompletedTorrents implements `remove_completed_torrents`.
 func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var input RemoveCompletedInput
@@ -938,6 +960,26 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			skipped++
 			continue
 		}
+		// A completed torrent whose archive import never ran (post-seed move
+		// interrupted, or the file still carries the torrent name) is finalized
+		// here: moved into the library, renamed, quality-checked and deduplicated
+		// before being dropped from the session. A bare Remove would leave the
+		// file unchecked and under the wrong name.
+		if !gh6_archivedCopyFinalized(s.db, torrent.Name, torrent.Hash) {
+			logging.Info("completed torrent not finalized yet; running archive import before removal",
+				"hash", torrent.Hash, "name", torrent.Name)
+			if ok, err := ArchiveAndRemoveTorrent(s, cfg, torrent.Hash); err != nil {
+				logging.Warn("completed torrent finalization failed",
+					"hash", torrent.Hash, "name", torrent.Name, "error", err)
+				skipped++
+				continue
+			} else if !ok {
+				skipped++
+				continue
+			}
+			removed = append(removed, torrent.Hash)
+			continue
+		}
 		deleteFiles := input.DeleteFiles || gh6_torrentFilesAreDisposable(s.db, torrent.Hash)
 		source := CompletionPath(&models.TorrentEvent{
 			Kind:     "torrent_finished",
@@ -974,6 +1016,7 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			skipped++
 		}
 	}
+	logging.Info("completed torrents cleanup finished", "removed", len(removed), "skipped", skipped)
 	jsonResponse(w, map[string]any{
 		"ok":      true,
 		"success": true,
