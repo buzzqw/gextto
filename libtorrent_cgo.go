@@ -19,7 +19,10 @@ void gextto_trim_memory(void);
 */
 import "C"
 
-import "unsafe"
+import (
+	"strings"
+	"unsafe"
+)
 
 // goStringFromBytes reads a NUL-terminated string out of a fixed-size C buffer.
 func goStringFromBytes(buffer []byte) string {
@@ -316,6 +319,21 @@ func cgoLtMoveStorage(session unsafe.Pointer, hash, destination string) (int32, 
 	moved := C.gextto_lt_move_storage(sess, chash, cdestination,
 		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
 	return int32(moved), goStringFromBytes(error)
+}
+
+// cgoLtMovingStorage returns how many torrents are moving their files and
+// their names; count is -1 on error.
+func cgoLtMovingStorage(session unsafe.Pointer) (int32, []string, string) {
+	sess := (*C.gextto_lt_session)(session)
+	names := make([]byte, 8192)
+	error := errorBuffer()
+	count := C.gextto_lt_moving_storage(sess, (*C.char)(unsafe.Pointer(&names[0])), C.size_t(len(names)),
+		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
+	var list []string
+	if joined := goStringFromBytes(names); joined != "" {
+		list = strings.Split(joined, "\n")
+	}
+	return int32(count), list, goStringFromBytes(error)
 }
 
 func cgoLtAssociateStorage(session unsafe.Pointer, hash, destination string) (int32, string) {

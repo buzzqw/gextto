@@ -2323,6 +2323,10 @@ func (c *LibtorrentClient) SessionStats() (map[string]int64, error) {
 }
 
 func (c *LibtorrentClient) Shutdown(cfg *Config) error {
+	// A torrent whose files libtorrent is moving (to the library after
+	// seeding, off the RAM disk) must finish first: destroying the session
+	// mid-move leaves partial files in the destination.
+	c.waitForStorageMoves()
 	// Refuse new session calls and wait for the running ones, then for every
 	// in-flight List(), before destroying the handle: a late cgo call on a
 	// destroyed session aborts the process.
@@ -2352,6 +2356,45 @@ func (c *LibtorrentClient) Shutdown(cfg *Config) error {
 	c.session = nil
 	logging.Info("⏹️ Torrent engine stopped cleanly; downloads will resume where they left off")
 	return nil
+}
+
+// movingStorage returns the names of the torrents libtorrent is moving; ok is
+// false when the session cannot be asked.
+func (c *LibtorrentClient) movingStorage() (names []string, ok bool) {
+	if !c.enterSession() {
+		return nil, false
+	}
+	defer c.exitSession()
+	count, names, message := cgoLtMovingStorage(c.session)
+	if count < 0 {
+		logging.Warn("libtorrent shutdown: cannot tell whether files are being moved", "error", message)
+		return nil, false
+	}
+	return names, true
+}
+
+// waitForStorageMoves blocks, with no time limit, until libtorrent is not
+// moving any torrent's files, saying every shutdownNoticeInterval what it is
+// waiting for.
+func (c *LibtorrentClient) waitForStorageMoves() {
+	var lastNotice time.Time
+	waited := false
+	for {
+		names, ok := c.movingStorage()
+		if !ok || len(names) == 0 {
+			if waited {
+				logging.Info("✅ File moves finished; stopping")
+			}
+			return
+		}
+		waited = true
+		if time.Since(lastNotice) >= shutdownNoticeInterval {
+			logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d %s to finish moving %s files so nothing is left half-moved: %s",
+				len(names), pluralWord(len(names), "download", "downloads"), pluralWord(len(names), "its", "their"), quotedList(names, 3)))
+			lastNotice = time.Now()
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 // sessionDrainTimeout bounds how long Shutdown waits for in-flight session

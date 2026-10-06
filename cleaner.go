@@ -375,6 +375,7 @@ func copyRecursive(source, target string) error {
 // cleanerCopyFile copies the contents of source into target, preserving the
 // source mode ( `fs::copy`).
 func cleanerCopyFile(source, target string, mode os.FileMode) error {
+	defer beginFileOperation(target)()
 	reader, err := os.Open(source)
 	if err != nil {
 		return err

@@ -354,10 +354,13 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 		if !ok {
 			continue
 		}
-		name := tev_torrentDisplayName(torrents, hash)
-		if retry.inFlight && now.Before(retry.nextAttempt) {
+		// Both an in-flight move and a failed one wait for nextAttempt: without
+		// the second check a move that keeps failing (destination already
+		// occupied) was re-issued on every worker tick, several times a second.
+		if now.Before(retry.nextAttempt) {
 			continue
 		}
+		name := tev_torrentDisplayName(torrents, hash)
 		if retry.inFlight {
 			logging.Debug("storage move still in flight after wait; checking the move again",
 				"hash", hash, "name", name, "destination", retry.destination)

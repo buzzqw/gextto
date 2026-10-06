@@ -124,6 +124,7 @@ func moveDirAcrossDevices(source, target string) error {
 		return nil
 	}
 	if errors.Is(err, syscall.EXDEV) {
+		defer beginFileOperation(source)()
 		if err := copyTree(source, target); err != nil {
 			return err
 		}

@@ -83,7 +83,7 @@ Environment=GEXTTO_LOG=info
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-TimeoutStopSec=90
+TimeoutStopSec=infinity
 
 [Install]
 WantedBy=multi-user.target

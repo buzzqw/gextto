@@ -114,18 +114,21 @@ func (s *AppState) SleepBackground(d time.Duration) bool {
 	}
 }
 
-// workerStopTimeout bounds how long shutdown waits for the background workers.
-// Some work cannot be interrupted midway (a season pack being copied to the
-// library); without a bound, systemd killed the daemon after TimeoutStopSec and
-// the torrent resume data was never saved. Together with sessionDrainTimeout
-// and the resume save it stays below the unit's 90 s stop timeout.
+// workerStopTimeout bounds how long shutdown waits for background work that
+// is not a file operation (a stuck network call, a slow scan). It never cuts a
+// copy or move of media files: those are always waited for, however long they
+// take (see mediaFileOps), and the service unit has no stop timeout.
 var workerStopTimeout = 45 * time.Second
 
-// stopBackgroundWorkers signals every worker to stop and waits for them, up to
-// workerStopTimeout. Continuing after the timeout is safe: the libtorrent
-// client refuses new native calls once its shutdown starts (enterSession), and
-// library copies are atomic, so an interrupted import leaves only a hidden
-// temporary file and is completed by the recovery scan after the next start.
+// shutdownNoticeInterval is how often a long shutdown wait says what it is
+// waiting for, so a stop that takes minutes is visibly progressing.
+var shutdownNoticeInterval = 15 * time.Second
+
+// stopBackgroundWorkers signals every worker to stop and waits for them.
+// Copies and moves of media files in progress are always awaited to the end;
+// other work gets workerStopTimeout. Before giving up on that other work the
+// file registry is closed, so a worker cannot start a new copy that the exit
+// would cut halfway.
 func stopBackgroundWorkers(state *AppState) {
 	state.bgStopOnce.Do(func() {
 		if state.bgCancel != nil {
@@ -142,12 +145,54 @@ func stopBackgroundWorkers(state *AppState) {
 		}
 		close(done)
 	}()
-	select {
-	case <-done:
-	case <-time.After(workerStopTimeout):
-		logging.Warn(fmt.Sprintf("⚠️ Some work was still running after %s (for example a copy to the library); Gextto stops anyway and finishes it after the next start",
-			logDuration(workerStopTimeout)))
+	started := time.Now()
+	var lastNotice time.Time
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			mediaFileOps.closeIfIdle()
+			return
+		case <-ticker.C:
+		}
+		if names := mediaFileOps.runningNames(); len(names) > 0 {
+			if time.Since(lastNotice) >= shutdownNoticeInterval {
+				logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d file %s to finish copying so nothing is left half-copied: %s",
+					len(names), pluralWord(len(names), "copy", "copies"), quotedList(names, 3)))
+				lastNotice = time.Now()
+			}
+			continue
+		}
+		if time.Since(started) >= workerStopTimeout && mediaFileOps.closeIfIdle() {
+			logging.Warn(fmt.Sprintf("⚠️ Some background work was still running after %s; no file is being copied, so Gextto stops anyway",
+				logDuration(workerStopTimeout)))
+			return
+		}
 	}
+}
+
+// quotedList renders up to limit names as «a», «b» and N more.
+func quotedList(names []string, limit int) string {
+	shown := names
+	if len(shown) > limit {
+		shown = shown[:limit]
+	}
+	parts := make([]string, 0, len(shown)+1)
+	for _, name := range shown {
+		parts = append(parts, "«"+name+"»")
+	}
+	if extra := len(names) - len(shown); extra > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", extra))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func pluralWord(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
 }
 
 func shutdownServers(servers ...*http.Server) {

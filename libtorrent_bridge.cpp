@@ -38,6 +38,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <cstdio>
 #include <unordered_set>
 #include <vector>
 
@@ -1048,6 +1049,34 @@ int gextto_lt_move_storage(gextto_lt_session* session, const char* hash, const c
         set_error(error, error_size, exception.what());
     }
     return 0;
+}
+
+int gextto_lt_moving_storage(gextto_lt_session* session, char* names, size_t names_size, char* error, size_t error_size) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    if (session == nullptr || names == nullptr || names_size == 0) {
+        set_error(error, error_size, "invalid moving storage parameters");
+        return -1;
+    }
+    names[0] = '\0';
+    try {
+        int count = 0;
+        std::string joined;
+        for (auto const& handle : session->session.get_torrents()) {
+            if (!handle.is_valid()) continue;
+            auto const status = handle.status(lt::torrent_handle::query_name);
+            if (!status.moving_storage) continue;
+            ++count;
+            if (!joined.empty()) joined += '\n';
+            joined += status.name;
+        }
+        std::snprintf(names, names_size, "%s", joined.c_str());
+        return count;
+    } catch (const std::exception& exception) {
+        set_error(error, error_size, exception.what());
+    } catch (...) {
+        set_error(error, error_size, "unknown moving storage error");
+    }
+    return -1;
 }
 
 int gextto_lt_associate_storage(gextto_lt_session* session, const char* hash, const char* destination, char* error, size_t error_size) {

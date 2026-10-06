@@ -647,6 +647,7 @@ func randomToken() string {
 func copyFileAtomically(source, target string) error {
 	source = filepath.Clean(source)
 	target = filepath.Clean(target)
+	defer beginFileOperation(target)()
 	parent := filepath.Dir(target)
 	if parent == "" {
 		return fmt.Errorf("target has no parent: %s", target)
@@ -777,6 +778,7 @@ func StagePackFile(
 		return "", false, err
 	}
 	temporary := filepath.Join(destination, name+".gextto-part")
+	defer beginFileOperation(file.Path)()
 	_ = os.Remove(temporary)
 	input, err := os.Open(file.Path)
 	if err != nil {
