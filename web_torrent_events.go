@@ -597,6 +597,9 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 	stallAfterMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_after_min", 60.0)
 	retryMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_retry_min", 60.0)
 	giveupMinutes := tev_configuredStallGiveupMinutes(cfg)
+	// A dead swarm (zero seeders) is very unlikely to revive, so it gets its own
+	// shorter give-up window; when it expires the gap is retried immediately.
+	deadSwarmGiveupMinutes := tev_settingFloatOr(cfg, "libtorrent_dead_swarm_giveup_min", 4320.0)
 	if stallAfterMinutes <= 0 {
 		clear(watch)
 		return
@@ -692,10 +695,22 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			entry.nextRetryAt = now.Add(retryTimeout)
 			tev_scheduleNextStallRetryNotice(&entry, now)
 		}
-		if hasGiveup && now.Sub(stalledSince) >= giveupTimeout {
+		entryGiveup := giveupTimeout
+		entryGiveupMinutes := giveupMinutes
+		hasEntryGiveup := hasGiveup
+		if deadSwarmGiveupMinutes > 0 {
+			if code, _, _ := DiagnoseTorrent(&torrent); code == "dead_swarm" {
+				entryGiveup = time.Duration(deadSwarmGiveupMinutes * 60.0 * float64(time.Second))
+				entryGiveupMinutes = deadSwarmGiveupMinutes
+				hasEntryGiveup = true
+			}
+		}
+		if hasEntryGiveup && now.Sub(stalledSince) >= entryGiveup {
+			var metadata *models.TorrentMeta
 			failedTitle := ""
-			if metadata, err := db.TorrentMeta(torrent.Hash); err == nil && metadata != nil {
-				failedTitle = metadata.Release.Title
+			if value, err := db.TorrentMeta(torrent.Hash); err == nil && value != nil {
+				metadata = value
+				failedTitle = value.Release.Title
 			}
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
 			_ = db.MarkTorrentError(torrent.Hash, "stalled download")
@@ -704,10 +719,16 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				"name", torrent.Name,
 				"title", failedTitle,
 				"progress", torrent.Progress,
-				"giveup_minutes", giveupMinutes,
+				"giveup_minutes", entryGiveupMinutes,
 			)
 			if tev_removeFailedTorrent(torrents, torrent.Hash) {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
+			}
+			// 2b: after a dead-swarm give-up, retry an alternative release on the
+			// next cycle instead of waiting for the gap-search throttle to expire.
+			if metadata != nil && metadata.Release.Series != nil &&
+				metadata.Release.Season != nil && metadata.Release.Episode != nil {
+				_ = db.ClearGapSearched(*metadata.Release.Series, *metadata.Release.Season, *metadata.Release.Episode)
 			}
 			_ = notifier.NotifyEvent("download_failed", map[string]any{
 				"hash":             torrent.Hash,
@@ -1257,6 +1278,27 @@ func tev_associateExistingPostSeedStorage(torrents TorrentSession, db *Database,
 		return false, err
 	}
 	return true, nil
+}
+
+// tev_storageMoveAlreadySatisfied reports whether a reported storage-move
+// failure is moot because the payload already sits in `destination`. It is true
+// when libtorrent already updated the save path, or when the complete payload
+// is present there (the archive import won the race). In the second case it
+// also re-associates the storage, because a move that libtorrent reports as
+// failed must not be retried onto the existing copy.
+func tev_storageMoveAlreadySatisfied(torrents TorrentSession, db *Database, hash, destination string) bool {
+	for _, item := range torrents.List() {
+		if !strings.EqualFold(item.Hash, hash) {
+			continue
+		}
+		torrent := item
+		if SamePath(torrent.SavePath, destination) {
+			return true
+		}
+		associated, err := tev_associateExistingPostSeedStorage(torrents, db, &torrent, destination)
+		return err == nil && associated
+	}
+	return false
 }
 
 // bg_torrentNeedsArchiveImport reports whether a completed single has already
@@ -2717,8 +2759,6 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		if !wasPostSeedMove {
 			wasPostSeedMove = statusAtFailure != nil && *statusAtFailure == "completed"
 		}
-		logging.Warn("storage move failed (destination may already exist); torrent kept in place",
-			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
 		// Unknown move failures belong to RAM-disk/manual relocation, not to
 		// completion import. Never guess the archive destination for a
 		// still-downloading torrent.
@@ -2733,6 +2773,20 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				destination = &value
 			}
 		}
+		// A move that fails once the payload is already in the destination is
+		// not a real failure: the post-seed relocation and the archive import
+		// race, so libtorrent refuses to overwrite the archived copy. Treat it
+		// as done instead of warning and scheduling a retry that can only fail
+		// again. The rename itself already ran on storage_moved.
+		if destination != nil && tev_storageMoveAlreadySatisfied(torrents, db, event.Hash, *destination) {
+			logging.Debug("storage move already satisfied; not retrying",
+				"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
+			delete(retries, strings.ToLower(event.Hash))
+			delete(postSeedMoves, event.Hash)
+			return false, nil
+		}
+		logging.Warn("storage move failed (destination may already exist); torrent kept in place",
+			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
 		if destination != nil {
 			tev_scheduleStorageMoveRetry(retries, event.Hash, *destination, wasPostSeedMove, time.Now())
 			if wasPostSeedMove {

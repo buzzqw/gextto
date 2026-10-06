@@ -624,6 +624,14 @@ func TestTorrentMetadataRoundTripsAndCompletionUpdatesNormalizedState(t *testing
 		t.Fatal(err)
 	}
 	assertTrue(t, searched, "appena cercato")
+	if err := db.ClearGapSearched("Example", 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	searched, err = db.GapRecentlySearched("Example", 1, 2, 23)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertTrue(t, !searched, "throttle cleared after ClearGapSearched")
 	if err := db.RegisterTorrent(&release); err != nil {
 		t.Fatal(err)
 	}

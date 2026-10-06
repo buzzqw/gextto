@@ -83,6 +83,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_stall_after_min", Label: "Considera stalled dopo (minuti)", Tab: "seeding"},
 	{Key: "libtorrent_stall_retry_min", Label: "Retry stalled (minuti)", Tab: "seeding"},
 	{Key: "libtorrent_stall_giveup_min", Label: "Rimozione stalled (minuti, 0 = disattivata)", Tab: "seeding"},
+	{Key: "libtorrent_dead_swarm_giveup_min", Label: "Rimozione dead swarm (minuti, 0 = disattivata)", Tab: "seeding"},
 	{Key: "libtorrent_sequential", Label: "Download sequenziale", Tab: "libtorrent"},
 	{Key: "libtorrent_active_downloads", Label: "Download attivi", Tab: "libtorrent"},
 	{Key: "libtorrent_active_seeds", Label: "Seed attivi", Tab: "libtorrent"},

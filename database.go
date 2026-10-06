@@ -3260,6 +3260,14 @@ func (d *Database) MarkGapSearched(seriesName string, season, episode int64) err
 	return err
 }
 
+// ClearGapSearched forgets the last online search of a gap so the next cycle
+// retries it immediately. Used when a dead-swarm download is abandoned and an
+// alternative release must be sought without waiting for the throttle.
+func (d *Database) ClearGapSearched(seriesName string, season, episode int64) error {
+	_, err := d.db.Exec("DELETE FROM gap_search_log WHERE series_name=?1 AND season=?2 AND episode=?3", seriesName, season, episode)
+	return err
+}
+
 // SetTorrentTag sets the tag of a torrent, creating the row when it is a
 // manually added torrent.
 func (d *Database) SetTorrentTag(hash, tag string) error {
