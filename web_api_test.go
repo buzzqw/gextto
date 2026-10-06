@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -87,6 +88,7 @@ func newTestAppState(t *testing.T) *AppState {
 	torrents := &LibtorrentClient{
 		DryRun:   true,
 		torrents: make(map[string]models.TorrentView),
+		removed:  make(map[string]time.Time),
 	}
 
 	state := NewAppState(

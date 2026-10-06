@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 func TestLibtorrentVersion(t *testing.T) {
@@ -159,5 +161,52 @@ func TestRecheckGuardPersists(t *testing.T) {
 	}
 	if reloaded.recentlyRechecked("ABC123", 0) {
 		t.Fatal("zero window should never match")
+	}
+}
+
+func TestLibtorrentRemoveInvalidatesCacheAndExcludesTorrent(t *testing.T) {
+	dir := t.TempDir()
+	client := &LibtorrentClient{
+		torrents: map[string]models.TorrentView{
+			"hash1": {Hash: "hash1", Name: "Torrent 1"},
+			"hash2": {Hash: "hash2", Name: "Torrent 2"},
+		},
+		removed:  make(map[string]time.Time),
+		stateDir: dir,
+		DryRun:   true,
+	}
+
+	// 1. Initial list warms cache
+	list := client.List()
+	if len(list) != 2 {
+		t.Fatalf("expected 2 torrents, got %d", len(list))
+	}
+	client.listMu.Lock()
+	if !client.listValid {
+		client.listMu.Unlock()
+		t.Fatal("expected list cache to be valid after List()")
+	}
+	client.listMu.Unlock()
+
+	// 2. Remove hash1
+	ok, err := client.Remove("hash1", false)
+	if err != nil || !ok {
+		t.Fatalf("expected successful remove, got ok=%v, err=%v", ok, err)
+	}
+
+	if !client.isRecentlyRemoved("hash1") {
+		t.Fatal("expected hash1 to be marked as recently removed")
+	}
+
+	// 3. List should immediately NOT contain hash1, even within the 500ms window
+	listAfter := client.List()
+	if len(listAfter) != 1 || listAfter[0].Hash != "hash2" {
+		t.Fatalf("expected only hash2 in list after remove, got %#v", listAfter)
+	}
+
+	// 4. unmarkRemoved allows it again
+	client.unmarkRemoved("hash1")
+	if client.isRecentlyRemoved("hash1") {
+		t.Fatal("expected hash1 to not be recently removed after unmark")
 	}
 }

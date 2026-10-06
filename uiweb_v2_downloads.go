@@ -42,18 +42,18 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	raw, status := v2InternalJSON(s, http.MethodPost, path, nil, body)
 	message := "Impostazione salvata"
+	var clearReply struct {
+		Removed int      `json:"removed"`
+		Skipped int      `json:"skipped"`
+		Items   []string `json:"items"`
+	}
 	if status >= 400 {
 		message = v2JSONError(raw)
 	} else if op == "clear_completed" {
-		var reply struct {
-			Removed int      `json:"removed"`
-			Skipped int      `json:"skipped"`
-			Items   []string `json:"items"`
-		}
-		if err := json.Unmarshal(raw, &reply); err == nil {
-			if reply.Removed > 0 {
-				names := make([]string, 0, len(reply.Items))
-				for _, hash := range reply.Items {
+		if err := json.Unmarshal(raw, &clearReply); err == nil {
+			if clearReply.Removed > 0 {
+				names := make([]string, 0, len(clearReply.Items))
+				for _, hash := range clearReply.Items {
 					name := torrentNames[strings.ToLower(strings.TrimSpace(hash))]
 					if name == "" {
 						name = hash
@@ -61,13 +61,13 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 					names = append(names, name)
 				}
 				list := strings.Join(names, " · ")
-				if reply.Removed == 1 {
+				if clearReply.Removed == 1 {
 					message = "1 torrent completato rimosso dalla sessione: " + list
 				} else {
-					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione: %s", reply.Removed, list)
+					message = fmt.Sprintf("%d torrent completati rimossi dalla sessione: %s", clearReply.Removed, list)
 				}
-			} else if reply.Skipped > 0 {
-				message = fmt.Sprintf("Nessun torrent rimosso (%d ancora in seed)", reply.Skipped)
+			} else if clearReply.Skipped > 0 {
+				message = fmt.Sprintf("Nessun torrent rimosso (%d ancora in seed)", clearReply.Skipped)
 			} else {
 				message = "Nessun torrent completato da rimuovere"
 			}
@@ -91,6 +91,20 @@ func V2DownloadsSettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	view := v2TorrentsViewFrom(s, r, message, status >= 400)
+	if op == "clear_completed" && len(clearReply.Items) > 0 {
+		removedMap := make(map[string]struct{}, len(clearReply.Items))
+		for _, item := range clearReply.Items {
+			removedMap[strings.ToLower(strings.TrimSpace(item))] = struct{}{}
+		}
+		filteredRows := make([]uiTorrentRow, 0, len(view.Rows))
+		for _, row := range view.Rows {
+			if _, ok := removedMap[strings.ToLower(strings.TrimSpace(row.Hash))]; !ok {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+		view.Rows = filteredRows
+		view.Count = len(view.Rows)
+	}
 	if op == "clear_completed" || op == "temp_apply" || op == "temp_clear" {
 		title := "Limiti di velocità"
 		if op == "clear_completed" {

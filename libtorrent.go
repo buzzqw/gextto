@@ -222,6 +222,9 @@ type LibtorrentClient struct {
 	listItems []models.TorrentView
 	listValid bool
 
+	removedMu sync.RWMutex
+	removed   map[string]time.Time
+
 	// recheckMu guards the persisted per-torrent re-check times.
 	recheckMu sync.Mutex
 
@@ -543,6 +546,7 @@ func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
 		stalled:          make(map[string]struct{}),
 		firstLastPending: make(map[string]struct{}),
 		stopAtMetadata:   make(map[string]struct{}),
+		removed:          make(map[string]time.Time),
 		session:          session,
 		configDB:         filepath.Join(cfg.DataDir, "gextto_config.db"),
 		stateDir:         cfg.StateDir,
@@ -1001,6 +1005,8 @@ func (c *LibtorrentClient) AddWithOptions(magnet string, cfg *Config, preferredP
 		Stalled:         false,
 	}
 	c.torrentsMu.Unlock()
+	c.unmarkRemoved(hash)
+	c.invalidateListCache()
 	return true, nil
 }
 
@@ -1033,6 +1039,8 @@ func (c *LibtorrentClient) AddTorrentFileEx(torrentPath, savePath string, option
 	if err := c.saveTorrentMetadata(hash, ""); err != nil {
 		logging.Debug("cannot persist added torrent metadata", "hash", hash, "error", err)
 	}
+	c.unmarkRemoved(hash)
+	c.invalidateListCache()
 	return &hash, nil
 }
 
@@ -1289,6 +1297,76 @@ func (c *LibtorrentClient) List() []models.TorrentView {
 	return out
 }
 
+func (c *LibtorrentClient) markRemoved(hash string) {
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	if normalized == "" {
+		return
+	}
+	c.removedMu.Lock()
+	if c.removed == nil {
+		c.removed = make(map[string]time.Time)
+	}
+	c.removed[normalized] = time.Now()
+	c.removedMu.Unlock()
+
+	c.listMu.Lock()
+	c.listValid = false
+	if len(c.listItems) > 0 {
+		filtered := make([]models.TorrentView, 0, len(c.listItems))
+		for _, item := range c.listItems {
+			if strings.ToLower(strings.TrimSpace(item.Hash)) != normalized {
+				filtered = append(filtered, item)
+			}
+		}
+		c.listItems = filtered
+	}
+	c.listMu.Unlock()
+}
+
+func (c *LibtorrentClient) isRecentlyRemoved(hash string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	if normalized == "" {
+		return false
+	}
+	c.removedMu.RLock()
+	if c.removed == nil {
+		c.removedMu.RUnlock()
+		return false
+	}
+	at, ok := c.removed[normalized]
+	c.removedMu.RUnlock()
+	if !ok {
+		return false
+	}
+	if time.Since(at) > 30*time.Second {
+		c.removedMu.Lock()
+		if c.removed != nil {
+			delete(c.removed, normalized)
+		}
+		c.removedMu.Unlock()
+		return false
+	}
+	return true
+}
+
+func (c *LibtorrentClient) unmarkRemoved(hash string) {
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	if normalized == "" {
+		return
+	}
+	c.removedMu.Lock()
+	if c.removed != nil {
+		delete(c.removed, normalized)
+	}
+	c.removedMu.Unlock()
+}
+
+func (c *LibtorrentClient) invalidateListCache() {
+	c.listMu.Lock()
+	c.listValid = false
+	c.listMu.Unlock()
+}
+
 // listUncached builds a fresh torrent snapshot.
 func (c *LibtorrentClient) listUncached() []models.TorrentView {
 	c.sessionMu.RLock()
@@ -1298,6 +1376,9 @@ func (c *LibtorrentClient) listUncached() []models.TorrentView {
 		c.torrentsMu.RLock()
 		result := make([]models.TorrentView, 0, len(c.torrents))
 		for _, torrent := range c.torrents {
+			if c.isRecentlyRemoved(torrent.Hash) {
+				continue
+			}
 			result = append(result, torrent)
 		}
 		c.torrentsMu.RUnlock()
@@ -1314,6 +1395,9 @@ func (c *LibtorrentClient) listUncached() []models.TorrentView {
 	result := make([]models.TorrentView, 0, len(statuses))
 	for _, status := range statuses {
 		hash := strings.ToLower(status.Hash)
+		if c.isRecentlyRemoved(hash) {
+			continue
+		}
 		c.stalledMu.RLock()
 		_, stalled := c.stalled[hash]
 		c.stalledMu.RUnlock()
@@ -1474,6 +1558,8 @@ func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
 			kind = "resume_save_failed"
 		case 12:
 			kind = "torrent_removed"
+			c.unmarkRemoved(hash)
+			c.invalidateListCache()
 		case 13:
 			kind = "portmap_error"
 		case 14:
@@ -1821,6 +1907,7 @@ func (c *LibtorrentClient) controlPaused(hash string, paused bool) (bool, error)
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
 	}
+	c.invalidateListCache()
 	return true, nil
 }
 
@@ -2450,14 +2537,17 @@ func (c *LibtorrentClient) drainSession(timeout time.Duration) {
 
 // Remove removes a torrent, optionally deleting its files and resume data.
 func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	c.markRemoved(normalized)
 	if c.enterSession() {
 		defer c.exitSession()
-		ok, errMessage := cgoLtRemove(c.session, strings.ToLower(hash), boolToInt32(deleteFiles))
+		ok, errMessage := cgoLtRemove(c.session, normalized, boolToInt32(deleteFiles))
 		if ok == 0 {
+			c.unmarkRemoved(normalized)
+			c.invalidateListCache()
 			return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
 		}
 	}
-	normalized := strings.ToLower(hash)
 	c.ClearStalled(normalized)
 	c.torrentsMu.RLock()
 	name := "unnamed torrent"
@@ -2476,6 +2566,11 @@ func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
 	_, existed := c.torrents[normalized]
 	delete(c.torrents, normalized)
 	c.torrentsMu.Unlock()
+	if !existed && c.session == nil {
+		c.unmarkRemoved(normalized)
+		c.invalidateListCache()
+		return false, nil
+	}
 	return existed || c.session != nil, nil
 }
 
