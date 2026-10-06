@@ -321,19 +321,22 @@ func cgoLtMoveStorage(session unsafe.Pointer, hash, destination string) (int32, 
 	return int32(moved), goStringFromBytes(error)
 }
 
-// cgoLtMovingStorage returns how many torrents are moving their files and
-// their names; count is -1 on error.
-func cgoLtMovingStorage(session unsafe.Pointer) (int32, []string, string) {
+// cgoLtMovingStorage returns how many torrents are moving their files, as a
+// map hash -> name; count is -1 on error.
+func cgoLtMovingStorage(session unsafe.Pointer) (int32, map[string]string, string) {
 	sess := (*C.gextto_lt_session)(session)
-	names := make([]byte, 8192)
+	names := make([]byte, 16384)
 	error := errorBuffer()
 	count := C.gextto_lt_moving_storage(sess, (*C.char)(unsafe.Pointer(&names[0])), C.size_t(len(names)),
 		(*C.char)(unsafe.Pointer(&error[0])), C.size_t(len(error)))
-	var list []string
-	if joined := goStringFromBytes(names); joined != "" {
-		list = strings.Split(joined, "\n")
+	moving := map[string]string{}
+	for _, line := range strings.Split(goStringFromBytes(names), "\n") {
+		hash, name, found := strings.Cut(line, "\t")
+		if found && hash != "" {
+			moving[strings.ToLower(hash)] = name
+		}
 	}
-	return int32(count), list, goStringFromBytes(error)
+	return int32(count), moving, goStringFromBytes(error)
 }
 
 func cgoLtAssociateStorage(session unsafe.Pointer, hash, destination string) (int32, string) {

@@ -1067,7 +1067,7 @@ int gextto_lt_moving_storage(gextto_lt_session* session, char* names, size_t nam
             if (!status.moving_storage) continue;
             ++count;
             if (!joined.empty()) joined += '\n';
-            joined += status.name;
+            joined += hex_hash(handle) + "\t" + status.name;
         }
         std::snprintf(names, names_size, "%s", joined.c_str());
         return count;

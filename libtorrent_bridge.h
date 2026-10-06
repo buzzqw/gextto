@@ -140,8 +140,8 @@ size_t gextto_lt_trackers(struct gextto_lt_session* session, const char* hash,
     struct gextto_lt_tracker* output, size_t capacity, char* error, size_t error_size);
 size_t gextto_lt_files(struct gextto_lt_session* session, const char* hash,
     struct gextto_lt_file* output, size_t capacity, char* error, size_t error_size);
-/* Writes the names of the torrents whose files libtorrent is moving (one per
-   line) into names and returns how many there are; -1 on error. Shutdown waits
+/* Writes "hash<TAB>name" of each torrent whose files libtorrent is moving (one
+   per line) into names and returns how many there are; -1 on error. Shutdown waits
    for this to reach zero so a move is never interrupted halfway. */
 int gextto_lt_moving_storage(struct gextto_lt_session* session, char* names, size_t names_size,
                              char* error, size_t error_size);

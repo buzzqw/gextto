@@ -114,3 +114,54 @@ func TestRetryStorageMovesHonoursBackoffAfterFailure(t *testing.T) {
 		t.Fatalf("the move should be retried once the backoff expired: %v", session.moved)
 	}
 }
+
+type movingStubSession struct {
+	stubTorrentSession
+	moving map[string]string
+}
+
+func (s *movingStubSession) MovingStorage() (map[string]string, bool) { return s.moving, true }
+
+func TestRetryStorageMovesWaitsWhileLibtorrentIsStillCopying(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "downloads")
+	destination := filepath.Join(dir, "library")
+	for _, path := range []string{source, destination} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := &movingStubSession{
+		stubTorrentSession: stubTorrentSession{list: []models.TorrentView{{Hash: seedTestHash, Name: "Show.S01", SavePath: source}}},
+		moving:             map[string]string{seedTestHash: "Show.S01"},
+	}
+	retries := map[string]StorageMoveRetry{
+		seedTestHash: {destination: destination, postSeed: true, inFlight: true, nextAttempt: time.Now().Add(-time.Second)},
+	}
+	RetryStorageMoves(session, map[string]struct{}{}, map[string]struct{}{}, retries)
+	if len(session.moved) != 0 {
+		t.Fatalf("a move libtorrent is still copying must not be re-issued: %v", session.moved)
+	}
+	entry := retries[seedTestHash]
+	if !entry.inFlight || !entry.nextAttempt.After(time.Now()) || entry.attempts != 0 {
+		t.Fatalf("the in-flight move should just be checked again later: %+v", entry)
+	}
+	// Once libtorrent is done and the torrent still is not there, it is retried.
+	session.moving = map[string]string{}
+	entry.nextAttempt = time.Now().Add(-time.Second)
+	retries[seedTestHash] = entry
+	RetryStorageMoves(session, map[string]struct{}{}, map[string]struct{}{}, retries)
+	if session.moved[seedTestHash] != destination {
+		t.Fatalf("a finished-but-not-applied move should be retried: %v", session.moved)
+	}
+}
+
+func TestManualMoveAllowsConfiguredSeriesArchive(t *testing.T) {
+	cfg := &Config{Series: []SeriesConfig{{Name: "Wolf Like Me", ArchivePath: "/nas/SerieTV/Wolf.Like.Me"}}}
+	if !gh7_isConfiguredArchive(cfg, nil, seedTestHash, "/nas/SerieTV/Wolf.Like.Me") {
+		t.Fatal("the archive of a configured series should be an allowed destination")
+	}
+	if gh7_isConfiguredArchive(cfg, nil, seedTestHash, "/etc") {
+		t.Fatal("an unrelated folder must not be allowed")
+	}
+}

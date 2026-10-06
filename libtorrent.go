@@ -1703,6 +1703,9 @@ func (c *LibtorrentClient) AssociateStorage(hash, destination string) (bool, err
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent associate storage failed: %s", message)
 	}
+	// reset_save_path emits no storage_moved alert: save the new location now
+	// so an unclean stop cannot bring the torrent back to its old path.
+	cgoLtRequestResumeSave(c.session, c.stateDir)
 	return true, nil
 }
 
@@ -2358,19 +2361,19 @@ func (c *LibtorrentClient) Shutdown(cfg *Config) error {
 	return nil
 }
 
-// movingStorage returns the names of the torrents libtorrent is moving; ok is
-// false when the session cannot be asked.
-func (c *LibtorrentClient) movingStorage() (names []string, ok bool) {
+// MovingStorage returns the torrents libtorrent is moving right now, as hash
+// -> name; ok is false when the session cannot be asked.
+func (c *LibtorrentClient) MovingStorage() (moving map[string]string, ok bool) {
 	if !c.enterSession() {
 		return nil, false
 	}
 	defer c.exitSession()
-	count, names, message := cgoLtMovingStorage(c.session)
+	count, moving, message := cgoLtMovingStorage(c.session)
 	if count < 0 {
-		logging.Warn("libtorrent shutdown: cannot tell whether files are being moved", "error", message)
+		logging.Warn("libtorrent: cannot tell whether files are being moved", "error", message)
 		return nil, false
 	}
-	return names, true
+	return moving, true
 }
 
 // waitForStorageMoves blocks, with no time limit, until libtorrent is not
@@ -2380,14 +2383,19 @@ func (c *LibtorrentClient) waitForStorageMoves() {
 	var lastNotice time.Time
 	waited := false
 	for {
-		names, ok := c.movingStorage()
-		if !ok || len(names) == 0 {
+		moving, ok := c.MovingStorage()
+		if !ok || len(moving) == 0 {
 			if waited {
 				logging.Info("✅ File moves finished; stopping")
 			}
 			return
 		}
 		waited = true
+		names := make([]string, 0, len(moving))
+		for _, name := range moving {
+			names = append(names, name)
+		}
+		sort.Strings(names)
 		if time.Since(lastNotice) >= shutdownNoticeInterval {
 			logging.Info(fmt.Sprintf("⏳ Stopping: waiting for %d %s to finish moving %s files so nothing is left half-moved: %s",
 				len(names), pluralWord(len(names), "download", "downloads"), pluralWord(len(names), "its", "their"), quotedList(names, 3)))

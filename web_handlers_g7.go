@@ -967,7 +967,8 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	destination := strings.TrimSpace(input.Path)
 	allowed := gh7_path_starts_with(destination, cfg.LibtorrentDir) ||
 		(cfg.LibtorrentTempDir != nil && gh7_path_starts_with(destination, *cfg.LibtorrentTempDir)) ||
-		(cfg.ArchiveRoot != nil && gh7_path_starts_with(destination, *cfg.ArchiveRoot))
+		(cfg.ArchiveRoot != nil && gh7_path_starts_with(destination, *cfg.ArchiveRoot)) ||
+		gh7_isConfiguredArchive(cfg, s.db, hash, destination)
 	if !allowed {
 		jsonError(w, http.StatusForbidden, "storage path must be inside a configured Gextto directory")
 		return
@@ -1019,6 +1020,27 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"hash", hash, "name", name, "destination", destination)
 	}
 	gh7_torrent_action(w, result, err)
+}
+
+// gh7_isConfiguredArchive reports whether destination is inside a library
+// folder Gextto itself would use: the archive of a configured series, or the
+// destination configured for this torrent's release (tag rules, series
+// archive). Post-seed moves go there, so a manual move must be allowed too.
+func gh7_isConfiguredArchive(cfg *Config, db *Database, hash, destination string) bool {
+	for index := range cfg.Series {
+		if archive := strings.TrimSpace(cfg.Series[index].ArchivePath); archive != "" && gh7_path_starts_with(destination, archive) {
+			return true
+		}
+	}
+	if db == nil {
+		return false
+	}
+	meta, err := db.TorrentMeta(hash)
+	if err != nil || meta == nil {
+		return false
+	}
+	configured, ok := ConfiguredDestinationFor(&meta.Release, cfg)
+	return ok && strings.TrimSpace(configured) != "" && gh7_path_starts_with(destination, configured)
 }
 
 // NetworkInterfacesView handles GET /api/network/interfaces.

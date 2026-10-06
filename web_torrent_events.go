@@ -342,9 +342,30 @@ func tev_scheduleStorageMoveRetry(retries map[string]StorageMoveRetry, hash, des
 	retries[key] = entry
 }
 
+// storageMoveReporter is implemented by engines that can say which torrents
+// are still moving their files (the embedded libtorrent).
+type storageMoveReporter interface {
+	MovingStorage() (map[string]string, bool)
+}
+
 // RetryStorageMoves implements `retry_storage_moves`.
 func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}, postSeedMoves map[string]struct{}, retries map[string]StorageMoveRetry) {
 	now := time.Now()
+	// Asked once per tick, and only when an in-flight move reached its check.
+	var moving map[string]string
+	movingKnown := false
+	stillMoving := func(hash string) bool {
+		if !movingKnown {
+			movingKnown = true
+			if reporter, ok := torrents.(storageMoveReporter); ok {
+				if current, ok := reporter.MovingStorage(); ok {
+					moving = current
+				}
+			}
+		}
+		_, found := moving[strings.ToLower(hash)]
+		return found
+	}
 	hashes := make([]string, 0, len(retries))
 	for hash := range retries {
 		hashes = append(hashes, hash)
@@ -361,6 +382,18 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 			continue
 		}
 		name := tev_torrentDisplayName(torrents, hash)
+		// A big move to a NAS can take longer than the in-flight wait. While
+		// libtorrent is still copying, re-issuing the move would only fail
+		// ("destination exists") and be reported as an error: check again later.
+		if retry.inFlight && stillMoving(hash) {
+			if entry, ok := retries[hash]; ok {
+				entry.nextAttempt = now.Add(time.Minute)
+				retries[hash] = entry
+			}
+			logging.Debug("storage move still copying; waiting for it to finish",
+				"hash", hash, "name", name, "destination", retry.destination)
+			continue
+		}
 		if retry.inFlight {
 			logging.Debug("storage move still in flight after wait; checking the move again",
 				"hash", hash, "name", name, "destination", retry.destination)
@@ -2842,8 +2875,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			delete(postSeedMoves, event.Hash)
 			return false, nil
 		}
-		logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to the library (a file with the same name may already be there); it stays where it is and will be retried", event.Name),
-			"folder", event.SavePath)
+		logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to the library; it stays where it is and will be retried", event.Name),
+			"folder", event.SavePath, "error", strings.TrimSpace(event.Message))
 		if destination != nil {
 			tev_scheduleStorageMoveRetry(retries, event.Hash, *destination, wasPostSeedMove, time.Now())
 			if wasPostSeedMove {
@@ -2854,6 +2887,13 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	case "storage_moved":
 		logging.Debug("torrent storage move completed",
 			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
+		// Save the new location now instead of at the next periodic save: if
+		// Gextto stopped uncleanly in between, libtorrent would restore the
+		// torrent at its old path, recreate empty files there and download
+		// again what is already in the library.
+		if saver, ok := torrents.(interface{ RequestResumeSave() int }); ok {
+			saver.RequestResumeSave()
+		}
 		delete(postSeedMoves, event.Hash)
 		delete(retries, strings.ToLower(event.Hash))
 		// A post-seeding relocation happens after the release was already
