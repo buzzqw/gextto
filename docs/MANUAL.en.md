@@ -423,6 +423,9 @@ From **Search missing** or an episode detail:
 Gextto normally avoids downloading older episodes when later episodes already
 exist, unless this is a recognised gap or a genuine upgrade. A season pack can
 fill several episodes, but archive comparison still happens episode by episode.
+When the same cycle offers a single episode and a pack containing it with the
+same score, Gextto picks the release covering more episodes (at equal score a
+REMUX is still preferred).
 
 ## 5. Movies
 
@@ -535,7 +538,8 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
   bypass), housekeeping interval, **Watched folders** (Gextto scans the chosen
   directories, waits for two stable observations, and adds copied `.torrent`/
   `.magnet` files; import failures retry with backoff until they succeed, then
-  files are removed or renamed `.imported`), **Sources in backoff**
+  files are removed or renamed `.imported`; the recursive scan goes at most 8
+  levels deep), **Sources in backoff**
   with level, deadline, last error and per-source reset, and the automatic
   **MediaInfo backfill** (configurable files-per-run and interval), plus a
   Maintenance button for an immediate scan.
@@ -683,6 +687,11 @@ If the NAS is not mounted, do not temporarily replace the path with a local root
 without understanding the effect: files may be archived in the wrong place. Fix
 the mount and let the download wait instead.
 
+An unmounted NAS does not erase history: when an archived file cannot be found,
+Gextto marks the episode for recovery only if the file's folder still exists or
+the mounted path is not empty. An empty mount point is treated as a missing
+volume, and the episode data is left intact.
+
 Release sanity checks are **automatic** and not configurable: hardcoded
 subtitles (`HC`) and absurd sizes (a per-resolution floor derived from a real
 archive) are refused. Rejections are routine and are logged at `DEBUG` with the
@@ -710,7 +719,11 @@ The complete list of fields and actions is in [Appendix B](#appendix-b-reference
   `torrent_error`, …). Fields accept placeholders such as `{title}`, `{hash}`,
   `{path}`, `{series}`, `{episode}`; the same values are exported as `GEXTTO_*`
   environment variables. Programs run without a shell and use a 60-second
-  default timeout (maximum 24 hours; `0` also means the default).
+  default timeout (maximum 24 hours; `0` also means the default). Each
+  placeholder becomes a single argument even when its value contains spaces: a
+  title such as `The Office` arrives whole, not split in two. When the timeout
+  expires, every child process started by the program is stopped too; at most 4
+  hooks run at the same time, the others wait their turn.
 
 ### Connecting an external service
 
@@ -873,6 +886,12 @@ an HTTP test with delivery of a real event. For SMTP, check host, port, TLS,
 user and sender: a reachable server may still reject the sender or require a
 different authentication method.
 
+Event notifications are sent in the background: a slow or unreachable provider
+does not slow down downloads, seeding or archiving, and a delivery error is
+written to the log. The test from the UI instead waits for the answer and shows
+the error at once. An SMTP delivery that stops responding is abandoned after 30
+seconds.
+
 ## 12. Quick reference
 
 ### Which action to use
@@ -930,7 +949,11 @@ different authentication method.
   cannot identify their content.
 - **A download is complete but not in the library** — inspect the log for move,
   permission and free-space errors; do not delete the source until the archived
-  path is visible in history.
+  path is visible in history. Temporary errors (NAS unreachable, disk briefly
+  full, timeouts, database busy) are retried automatically after 1, 2, 4, 8, 16
+  and 32 minutes: only after the last attempt does the torrent go into error. A
+  move to the archive interrupted by a Gextto restart resumes on its own about
+  a minute after start-up.
 - **FTP backup fails** — use *Test FTP*: it reports the failing step (connection,
   login, remote path, upload, delete) and logs it.
 - **Logs** — see `data/gextto.log` (rotated at 5 MB) or the in-app log viewer.
@@ -1197,7 +1220,7 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 | Enabled | Enables or disables the hook. |
 | Events | Events that trigger the hook (empty = all). |
 | Program | Executable to run (without a shell). |
-| Arguments | Arguments with placeholders `{title}`, `{hash}`, `{path}`, `{series}`, `{episode}`; the same values are exposed as `GEXTTO_*` variables. |
+| Arguments | Arguments with placeholders `{title}`, `{hash}`, `{path}`, `{series}`, `{episode}`; each placeholder stays a single argument even with spaces. The same values are exposed as `GEXTTO_*` variables. |
 | Timeout (s) | Timeout in seconds (default 60, maximum 24 hours; `0` = default). |
 
 ### Browser handlers and source check

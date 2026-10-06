@@ -425,7 +425,9 @@ Da **Cerca mancanti** o dalla scheda episodio:
 Gextto evita normalmente di riscaricare episodi vecchi quando possiede episodi
 successivi, a meno che si tratti di un buco riconosciuto o di un upgrade reale.
 Un season pack può riempire più episodi, ma il confronto con l’archivio resta
-episodio per episodio.
+episodio per episodio. Quando nello stesso ciclo ci sono un episodio singolo e
+un pack che lo contiene con lo stesso punteggio, Gextto sceglie la release che
+copre più episodi (a parità di punteggio un REMUX resta comunque preferito).
 
 ## 5. Film
 
@@ -545,7 +547,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   controlla le cartelle indicate e aggiunge i file `.torrent`/`.magnet` copiati,
   aspettando due rilevazioni stabili prima di leggerli e ritentando gli errori con
   backoff fino alla riuscita; li rimuove (o li rinomina `.imported`) dopo
-  l'aggiunta; **Sorgenti in
+  l'aggiunta; la scansione ricorsiva scende al massimo di 8 livelli; **Sorgenti in
   backoff**, con livello, scadenza, ultimo errore e reset per singola sorgente;
   e il **backfill MediaInfo** automatico (file per volta e intervallo
   configurabili), oltre al pulsante in Manutenzione per una scansione immediata.
@@ -698,6 +700,11 @@ Se il NAS non è montato, non sostituire temporaneamente il percorso con la root
 locale senza aver capito l'effetto: potresti archiviare file nel posto sbagliato.
 Meglio correggere il mount e lasciare il download in attesa.
 
+Un NAS smontato non cancella lo storico: quando un file archiviato non si trova,
+Gextto segna l'episodio come da recuperare solo se la cartella del file esiste
+ancora o se il percorso montato non è vuoto. Un mount point vuoto viene trattato
+come volume assente, e i dati dell'episodio restano intatti.
+
 I controlli di sanità delle release sono **automatici** e non configurabili:
 sottotitoli hardcoded (`HC`) e dimensioni assurde (una soglia per risoluzione
 derivata da un archivio reale) vengono rifiutati. Gli scarti sono eventi
@@ -730,7 +737,11 @@ L'elenco completo dei campi e delle azioni è nell'[Appendice B](#appendice-b-ri
   `torrent_error`, …). I campi accettano segnaposto come `{title}`, `{hash}`,
   `{path}`, `{series}`, `{episode}`; gli stessi valori sono esposti come variabili
   d'ambiente `GEXTTO_*`. I programmi sono eseguiti senza shell e con timeout di
-  default pari a 60 secondi (massimo 24 ore; anche `0` usa il default).
+  default pari a 60 secondi (massimo 24 ore; anche `0` usa il default). Ogni
+  segnaposto diventa un solo argomento anche se il valore contiene spazi: un
+  titolo come `The Office` arriva intero, non spezzato in due. Allo scadere del
+  timeout viene terminato anche ogni processo figlio lanciato dal programma; al
+  massimo 4 hook girano contemporaneamente, gli altri attendono il proprio turno.
 
 ### Collegare un servizio esterno
 
@@ -902,6 +913,12 @@ HTTP con la consegna dell'evento reale. Per SMTP controlla host, porta, TLS,
 utente e mittente: un server raggiungibile può comunque rifiutare il mittente o
 richiedere autenticazione diversa.
 
+Le notifiche degli eventi partono in background: un provider lento o
+irraggiungibile non rallenta download, seeding e archiviazione, e un eventuale
+errore di consegna compare nel log. Il test dalla UI invece attende la risposta
+e mostra subito l'errore. Una consegna SMTP che non risponde viene interrotta
+dopo 30 secondi.
+
 ## 12. Riferimento rapido
 
 ### Quando usare quale azione
@@ -961,7 +978,12 @@ richiedere autenticazione diversa.
   che non permettono di identificare il contenuto.
 - **Il download è completo ma non compare nella libreria** — guarda il log per
   spostamento, permessi e spazio; non cancellare la sorgente finché il percorso
-  archiviato non è visibile nella cronologia.
+  archiviato non è visibile nella cronologia. Gli errori temporanei (NAS non
+  raggiungibile, disco momentaneamente pieno, timeout, database occupato) vengono
+  ritentati da soli dopo 1, 2, 4, 8, 16 e 32 minuti: solo dopo l'ultimo
+  tentativo il torrent passa in errore. Uno spostamento verso l'archivio
+  interrotto da un riavvio di Gextto riprende da solo circa un minuto dopo
+  l'avvio.
 - **Il backup FTP fallisce** — usa *Test FTP*: indica il passo che fallisce
   (connessione, login, percorso remoto, upload, rimozione) e lo registra nel log.
 - **Log** — vedi `data/gextto.log` (rotazione a 5 MB) o il viewer nella UI.
@@ -1228,7 +1250,7 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 | Attivo | Abilita o disabilita l'hook. |
 | Eventi | Eventi che attivano l'hook (vuoto = tutti). |
 | Programma | Eseguibile da lanciare (senza shell). |
-| Argomenti | Argomenti con segnaposto `{title}`, `{hash}`, `{path}`, `{series}`, `{episode}`; gli stessi valori sono variabili `GEXTTO_*`. |
+| Argomenti | Argomenti con segnaposto `{title}`, `{hash}`, `{path}`, `{series}`, `{episode}`; ogni segnaposto resta un solo argomento anche con spazi. Gli stessi valori sono variabili `GEXTTO_*`. |
 | Timeout (s) | Timeout in secondi (default 60, massimo 24 ore; `0` = default). |
 
 ### Handler del browser e verifica sorgenti

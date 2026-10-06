@@ -24,6 +24,12 @@ service.
 - **Flexible sources and integrations:** use RSS, Torznab indexers such as
   Jackett and Prowlarr, web search and optional FlareSolverr; connect Simkl,
   Jellyfin and Plex.
+- **Careful with your library:** an existing file is replaced only by a real
+  upgrade, and the replaced file goes to the Trash (when configured). An
+  unmounted NAS is recognised and never mistaken for deleted files; temporary
+  errors (NAS unreachable, disk briefly full, timeouts) are retried
+  automatically; a move to the archive interrupted by a restart resumes on its
+  own.
 - **Operational tools included:** health checks, logs, backups, maintenance,
   notifications, NAS paths, seeding controls and a blocklist.
 
@@ -57,23 +63,6 @@ It installs the program in `/opt/gextto`, stores service data in
 > in front of it. Read the [security policy](docs/SECURITY.md) before exposing
 > it remotely.
 
-### Updating, uninstalling, dry-run
-
-Re-running the installer updates an existing installation: it replaces the
-binary, restarts the service and, if the new version fails to start, rolls back
-to the previous one.
-
-```bash
-sudo bash install.sh --help       # all options
-sudo bash install.sh --dry-run    # print what would happen, change nothing
-sudo bash install.sh --uninstall  # stop and remove the program (keeps data)
-sudo bash install.sh --uninstall --purge   # also remove the data directory
-```
-
-Environment overrides (`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, …) stay
-supported. `GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs from
-a local payload (offline or CI).
-
 ### Install from source
 
 Source builds require Go 1.26+, a C++17 compiler and libtorrent-rasterbar
@@ -93,6 +82,55 @@ version with:
 ./bin/gexttod --version
 ```
 
+## First safe run
+
+1. Open `http://<server>:5000` and complete setup.
+2. Configure storage paths, one source, and TMDB/TVDB credentials if needed.
+3. Keep **dry-run** enabled; add one test title and run a manual search or
+   cycle.
+4. Check **Health** and **Logs**, including filesystem permissions and source
+   results.
+5. Enable active mode only after the outcome is correct.
+
+The detailed setup checklist, NAS guidance and troubleshooting are in the
+[user manual](docs/MANUAL.en.md).
+
+## Update and uninstall
+
+For an official installation, run the installer again. It verifies the release
+checksum when published, replaces the binary atomically, restarts the service
+and, if the new version fails to start, rolls back to the previous one. Data and
+configuration are left untouched.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
+```
+
+The installer also accepts these options:
+
+```bash
+sudo bash install.sh --help       # all options
+sudo bash install.sh --dry-run    # print what would happen, change nothing
+sudo bash install.sh --uninstall  # stop and remove the program (keeps data)
+sudo bash install.sh --uninstall --purge   # also remove the data directory
+```
+
+Environment overrides (`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, …) stay
+supported. `GEXTTO_LOCAL_ARCHIVE=/path/gextto-linux-x86_64.tar.gz` installs from
+a local payload (offline or CI).
+
+For a source checkout:
+
+```bash
+git pull --ff-only
+./scripts/update.sh
+curl -fsS http://127.0.0.1:5000/api/health
+```
+
+The source update script runs the versioned build, restarts the detected
+service and leaves the data directory and configuration untouched. Use
+`./scripts/update.sh --no-restart` when the restart must be performed manually.
+
 ## Accessibility
 
 The web UI includes keyboard navigation, accessible names for controls, focus
@@ -111,41 +149,6 @@ tests. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
 See the [accessibility analysis](docs/accessibility-analysis.md) for scope and known
 limitations.
-
-## First safe run
-
-1. Open `http://<server>:5000` and complete setup.
-2. Configure storage paths, one source, and TMDB/TVDB credentials if needed.
-3. Keep **dry-run** enabled; add one test title and run a manual search or
-   cycle.
-4. Check **Health** and **Logs**, including filesystem permissions and source
-   results.
-5. Enable active mode only after the outcome is correct.
-
-The detailed setup checklist, NAS guidance and troubleshooting are in the
-[user manual](docs/MANUAL.en.md).
-
-## Update
-
-For an official installation, run the installer again. It verifies the release
-checksum when published and replaces the payload atomically; data and
-configuration are left untouched.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
-```
-
-For a source checkout:
-
-```bash
-git pull --ff-only
-./scripts/update.sh
-curl -fsS http://127.0.0.1:5000/api/health
-```
-
-The source update script runs the versioned build, restarts the detected
-service and leaves the data directory and configuration untouched. Use
-`./scripts/update.sh --no-restart` when the restart must be performed manually.
 
 ## Documentation
 

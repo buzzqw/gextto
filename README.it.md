@@ -25,6 +25,12 @@ funzionare come servizio.
 - **Sorgenti e integrazioni flessibili:** RSS, indexer Torznab come Jackett e
   Prowlarr, motori web e FlareSolverr opzionale; integrazioni con Simkl, Jellyfin
   e Plex.
+- **Attenzione alla libreria:** un file esistente viene sostituito solo da un
+  vero upgrade, e il file sostituito finisce nel Cestino (se configurato). Un
+  NAS smontato viene riconosciuto e mai scambiato per file cancellati; gli
+  errori temporanei (NAS irraggiungibile, disco momentaneamente pieno, timeout)
+  vengono ritentati in automatico; uno spostamento verso l'archivio interrotto
+  da un riavvio riprende da solo.
 - **Strumenti operativi inclusi:** controlli di salute, log, backup,
   manutenzione, notifiche, percorsi NAS, gestione seeding e blocklist.
 
@@ -78,6 +84,55 @@ di libtorrent collegata con:
 ./bin/gexttod --version
 ```
 
+## Primo avvio sicuro
+
+1. Apri `http://<server>:5000` e completa il setup.
+2. Configura percorsi, una sorgente e, se necessarie, credenziali TMDB/TVDB.
+3. Mantieni il **dry-run**, aggiungi un titolo di prova ed esegui una ricerca o
+   un ciclo.
+4. Controlla **Salute** e **Log**, inclusi permessi filesystem e risultati della
+   sorgente.
+5. Abilita la modalità attiva solo quando l'esito è corretto.
+
+Checklist, configurazione NAS e diagnostica sono nel
+[manuale utente](docs/MANUAL.it.md).
+
+## Aggiornamento e disinstallazione
+
+Per l'installazione ufficiale ripeti l'installer. Se disponibile verifica il
+checksum della release, sostituisce il binario in modo atomico, riavvia il
+servizio e, se la nuova versione non parte, torna alla precedente. Dati e
+configurazione restano intatti.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
+```
+
+L'installer accetta anche queste opzioni:
+
+```bash
+sudo bash install.sh --help       # tutte le opzioni
+sudo bash install.sh --dry-run    # mostra cosa farebbe, senza modificare nulla
+sudo bash install.sh --uninstall  # ferma e rimuove il programma (i dati restano)
+sudo bash install.sh --uninstall --purge   # rimuove anche la directory dati
+```
+
+Le variabili d'ambiente (`GEXTTO_DATA_DIR`, `GEXTTO_PORT`, `GEXTTO_USER`, …)
+restano supportate. `GEXTTO_LOCAL_ARCHIVE=/percorso/gextto-linux-x86_64.tar.gz`
+installa da un pacchetto locale (offline o CI).
+
+Da un checkout sorgente:
+
+```bash
+git pull --ff-only
+./scripts/update.sh
+curl -fsS http://127.0.0.1:5000/api/health
+```
+
+Lo script di aggiornamento esegue la build versionata, riavvia il servizio
+rilevato e lascia intatti dati e configurazione. Usa
+`./scripts/update.sh --no-restart` se vuoi riavviare manualmente.
+
 ## Accessibilità
 
 La UI web include navigazione da tastiera, nomi accessibili per i controlli,
@@ -96,41 +151,6 @@ accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
 Consulta l'[analisi di accessibilità](docs/accessibility-analysis.md) per ambito e
 limitazioni note.
-
-## Primo avvio sicuro
-
-1. Apri `http://<server>:5000` e completa il setup.
-2. Configura percorsi, una sorgente e, se necessarie, credenziali TMDB/TVDB.
-3. Mantieni il **dry-run**, aggiungi un titolo di prova ed esegui una ricerca o
-   un ciclo.
-4. Controlla **Salute** e **Log**, inclusi permessi filesystem e risultati della
-   sorgente.
-5. Abilita la modalità attiva solo quando l'esito è corretto.
-
-Checklist, configurazione NAS e diagnostica sono nel
-[manuale utente](docs/MANUAL.it.md).
-
-## Aggiornamento
-
-Per l'installazione ufficiale ripeti l'installer. Se disponibile, verifica il
-checksum della release e sostituisce il payload in modo atomico, senza toccare
-dati e configurazione.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
-```
-
-Da un checkout sorgente:
-
-```bash
-git pull --ff-only
-./scripts/update.sh
-curl -fsS http://127.0.0.1:5000/api/health
-```
-
-Lo script di aggiornamento esegue la build versionata, riavvia il servizio
-rilevato e lascia intatti dati e configurazione. Usa
-`./scripts/update.sh --no-restart` se vuoi riavviare manualmente.
 
 ## Documentazione
 
@@ -159,13 +179,14 @@ tramite PayPal. Grazie!
 Gextto è uno strumento di automazione dei download: non ospita, indicizza né
 distribuisce contenuti protetti da copyright.
 
-- Si collega alle sorgenti configurate dall'utente (per esempio Jackett, Prowlarr
-o feed RSS pubblici); non include un indice incorporato.
+- Si collega alle sorgenti configurate dall'utente (per esempio Jackett,
+  Prowlarr o feed RSS pubblici); non include un indice incorporato.
 - L'utente è responsabile dei contenuti scaricati. Usa Gextto solo per contenuti
   a cui hai diritto di accedere, come opere di pubblico dominio, con licenza
   Creative Commons o media di tua proprietà.
 - L'integrazione torrent (libtorrent) è una tecnologia neutrale; il progetto non
   incoraggia né facilita la pirateria.
+- Il progetto è distribuito con licenza open source **EUPL 1.2**.
 
 ## Licenza
 
