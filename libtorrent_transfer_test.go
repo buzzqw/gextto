@@ -495,3 +495,72 @@ func TestLibtorrentFastresumeSurvivesRestart(t *testing.T) {
 		t.Fatalf("progress was not persisted: %.1f%% before restart, %.1f%% after", observed, restoredProgress)
 	}
 }
+
+// TestLibtorrentPeriodicResumeSurvivesCrash reproduces the loss seen after a
+// forced kill: a torrent added from a .torrent file (no metadata copy in the
+// state directory) used to be persisted only by a clean shutdown. With the
+// periodic save its resume file, info dictionary included, is written while the
+// session runs, so a new session started without a clean shutdown restores it.
+func TestLibtorrentPeriodicResumeSurvivesCrash(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real crash-restore test in short mode")
+	}
+	const total = 1 << 20
+	payload := make([]byte, total)
+	if _, err := rand.Read(payload); err != nil {
+		t.Fatalf("random payload: %v", err)
+	}
+	torrentBytes, infoHash := buildTorrentBytes(t, "crash.bin", payload, 16384, "http://127.0.0.1:1/announce")
+	torrentPath := filepath.Join(t.TempDir(), "crash.torrent")
+	if err := os.WriteFile(torrentPath, torrentBytes, 0o644); err != nil {
+		t.Fatalf("write torrent: %v", err)
+	}
+	data := t.TempDir()
+	downloads := filepath.Join(data, "downloads")
+	if err := os.MkdirAll(downloads, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	firstCfg := transferTestConfig(t, data, freeTCPPort(t))
+	first, err := NewLibtorrentClient(&firstCfg)
+	if err != nil {
+		t.Fatalf("first session: %v", err)
+	}
+	// Shut it down only at the end, after the "crashed" state was used: the
+	// restore below must not depend on it.
+	throwaway := firstCfg
+	throwaway.StateDir = t.TempDir()
+	defer first.Shutdown(&throwaway)
+	if hash, err := first.AddTorrentFile(torrentPath, downloads); err != nil || hash == nil {
+		t.Fatalf("add torrent: %v", err)
+	}
+	resumeFile := filepath.Join(firstCfg.StateDir, infoHash+".fastresume")
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		first.RequestResumeSave()
+		first.PollEvents()
+		if info, err := os.Stat(resumeFile); err == nil && info.Size() > 0 {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if _, err := os.Stat(resumeFile); err != nil {
+		t.Fatalf("periodic save wrote no resume file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(firstCfg.StateDir, infoHash+".torrent")); err == nil {
+		t.Log("a .torrent copy exists too; the test still checks the resume file alone")
+	}
+
+	secondCfg := transferTestConfig(t, data, freeTCPPort(t))
+	second, err := NewLibtorrentClient(&secondCfg)
+	if err != nil {
+		t.Fatalf("second session: %v", err)
+	}
+	defer second.Shutdown(&throwaway)
+	restored := findTorrent(second, infoHash)
+	if restored == nil {
+		t.Fatal("torrent lost after an unclean stop despite the periodic save")
+	}
+	if restored.TotalSize != total {
+		t.Fatalf("restored torrent has no metadata: size %d, want %d", restored.TotalSize, total)
+	}
+}

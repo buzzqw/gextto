@@ -12,14 +12,14 @@ func TestFormatScheduledCycleTime(t *testing.T) {
 	location := time.FixedZone("local", 2*60*60)
 	now := time.Date(2026, time.October, 4, 11, 40, 0, 0, location)
 
-	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 4, 14, 52, 0, 0, location)); got != "14.52" {
-		t.Fatalf("same-day schedule = %q, want 14.52", got)
+	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 4, 14, 52, 0, 0, location)); got != "at 14:52" {
+		t.Fatalf("same-day schedule = %q, want at 14:52", got)
 	}
-	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 5, 2, 52, 0, 0, location)); got != "domani 02.52" {
-		t.Fatalf("next-day schedule = %q, want domani 02.52", got)
+	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 5, 2, 52, 0, 0, location)); got != "tomorrow at 02:52" {
+		t.Fatalf("next-day schedule = %q, want tomorrow at 02:52", got)
 	}
-	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 6, 2, 52, 0, 0, location)); got != "06/10 02.52" {
-		t.Fatalf("later schedule = %q, want 06/10 02.52", got)
+	if got := formatScheduledCycleTime(now, time.Date(2026, time.October, 6, 2, 52, 0, 0, location)); got != "on 06/10 at 02:52" {
+		t.Fatalf("later schedule = %q, want on 06/10 at 02:52", got)
 	}
 }
 

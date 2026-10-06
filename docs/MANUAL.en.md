@@ -317,9 +317,10 @@ reannounced on the next retry. The values are under *Configuration → libtorren
 - **Stalled retry** — 60 minutes by default;
 - **Stalled removal** — 20160 minutes (14 days) by default, `0` = never.
 
-Peers without byte progress do not reset the timer. Look for `DOWNLOAD STALLED`,
-`stalled torrent resumed and reannounced`, and, only after the final limit,
-`DOWNLOAD FAILED — stalled` in the logs.
+Peers without byte progress do not reset the timer. In the log, look for lines
+with `is stuck at`, which also give the reason, then `is still stuck` at each
+retry and `is downloading again` when it recovers; `Gave up on` appears only
+after the final limit.
 
 ### States and recommended actions
 
@@ -953,7 +954,10 @@ seconds.
   full, timeouts, database busy) are retried automatically after 1, 2, 4, 8, 16
   and 32 minutes: only after the last attempt does the torrent go into error. A
   move to the archive interrupted by a Gextto restart resumes on its own about
-  a minute after start-up.
+  a minute after start-up. Download progress is saved every 2 minutes: after
+  an unclean stop (crash, power loss) downloads resume where they were, and any
+  the engine still lost are added back at start-up, reusing the data already
+  downloaded.
 - **FTP backup fails** — use *Test FTP*: it reports the failing step (connection,
   login, remote path, upload, delete) and logs it.
 - **Logs** — see `data/gextto.log` (rotated at 5 MB) or the in-app log viewer.

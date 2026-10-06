@@ -481,7 +481,7 @@ type gh0_dbActionResult struct {
 func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
 	var result gh0_dbActionResult
 	start := time.Now()
-	logging.Info("db maintenance action started", "action", action)
+	logging.Debug("db maintenance action started", "action", action)
 	configPath := filepath.Join(s.cfg.DataDir, "gextto_config.db")
 	configSize := func(path string) int64 {
 		conn, err := OpenConfigDB(path)
@@ -522,7 +522,10 @@ func gh0_runDbAction(s *AppState, action string) (gh0_dbActionResult, error) {
 	}
 
 	result.AfterSize, result.AfterRows = collect()
-	logging.Info("db maintenance action finished",
+	if reclaimed := result.BeforeSize - result.AfterSize; reclaimed > 0 {
+		logging.Info(fmt.Sprintf("🧹 Databases compacted: %s freed", logging.HumanBytesI64(int64(reclaimed))))
+	}
+	logging.Debug("db maintenance action finished",
 		"action", action,
 		"duration", time.Since(start).String(),
 		"before_bytes", result.BeforeSize,
@@ -1463,7 +1466,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		}
 		if updated > 0 {
 			probed++
-			logging.Info("🔬 MediaInfo analyzed for archived file",
+			logging.Debug("MediaInfo analyzed for archived file",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "resolution", info.Resolution(),
 				"hdr", info.HDR, "bit_depth", info.BitDepth, "path", target.Path)

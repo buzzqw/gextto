@@ -387,6 +387,7 @@ type torrentEngineEmbeddedExtras interface {
 	EnsureAutoManaged() int
 	EnforceDeferredOptions(torrents []models.TorrentView)
 	recentlyRechecked(hash string, window time.Duration) bool
+	RequestResumeSave() int
 }
 
 // requireEmbedded returns the embedded libtorrent client when it is the active

@@ -197,7 +197,7 @@ func tev_removeFailedTorrent(torrents TorrentSession, hash string) bool {
 		return false
 	}
 	if removed {
-		logging.Info("failed download removed from the session", "name", name)
+		logging.Info(fmt.Sprintf("🧹 Failed download removed from the list: «%s»", name))
 	} else {
 		logging.Debug("failed torrent already removed", "hash", hash, "name", name)
 	}
@@ -375,8 +375,7 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 				entry.nextAttempt = now.Add(tev_storageMoveBackoff(tev_maxStorageMoveRetries))
 				retries[hash] = entry
 			}
-			logging.Warn("storage move retry limit reached; cooling down before another attempt",
-				"hash", hash, "name", name, "destination", retry.destination)
+			logging.Warn(fmt.Sprintf("⚠️ «%s» still cannot be moved to %s after several attempts; trying again later", name, retry.destination))
 			continue
 		}
 		var torrent models.TorrentView
@@ -479,8 +478,7 @@ func DetachErrorTorrents(torrents TorrentSession, db *Database, startupHashes ma
 			continue
 		}
 		_ = db.MarkTorrentRemovedAt(torrent.Hash)
-		logging.Info("🧹 leftover failed torrent removed after restart (files kept)",
-			"hash", torrent.Hash, "name", torrent.Name)
+		logging.Info(fmt.Sprintf("🧹 Failed download «%s» removed from the list after the restart (its files are kept)", torrent.Name))
 	}
 }
 
@@ -653,12 +651,9 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			entry.lastDone = lastDone
 			if hadProgress {
 				if entry.stalledSince != nil {
-					logging.Info("▶️ stalled torrent made byte progress; resuming normal monitoring",
-						"hash", torrent.Hash,
-						"name", torrent.Name,
-						"recovered_bytes", recoveredBytes,
-						"progress", torrent.Progress,
-					)
+					logging.Info(fmt.Sprintf("▶️ «%s» is downloading again (%s)", torrent.Name, logPercent(torrent.Progress)))
+					logging.Debug("stalled torrent made byte progress",
+						"hash", torrent.Hash, "recovered_bytes", recoveredBytes, "progress", torrent.Progress)
 				}
 				entry.stalledSince = nil
 				entry.nextRetryNoticeAt = time.Time{}
@@ -688,7 +683,10 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		}
 		if firstStall {
 			code, reason, hint := DiagnoseTorrent(&torrent)
-			logging.Warn("⏸️ DOWNLOAD STALLED — excluded from active slots; retaining for periodic retry",
+			logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried every %s",
+				torrent.Name, logPercent(torrent.Progress), stallReasonForLog(code, &torrent),
+				logDuration(time.Duration(retryValue*float64(time.Minute)))))
+			logging.Debug("download stalled",
 				"hash", torrent.Hash,
 				"name", torrent.Name,
 				"progress", torrent.Progress,
@@ -723,13 +721,10 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			}
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
 			_ = db.MarkTorrentError(torrent.Hash, "stalled download")
-			logging.Warn("❌ DOWNLOAD FAILED — stalled beyond the configured retry window",
-				"hash", torrent.Hash,
-				"name", torrent.Name,
-				"title", failedTitle,
-				"progress", torrent.Progress,
-				"giveup_minutes", entryGiveupMinutes,
-			)
+			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: stuck at %s for %s. It is removed and the next search will look for another version",
+				torrent.Name, logPercent(torrent.Progress),
+				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute)))),
+				"title", failedTitle)
 			if tev_removeFailedTorrent(torrents, torrent.Hash) {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
 			}
@@ -758,8 +753,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 			} else if value {
 				if tev_stallRetryNoticeDue(&entry, now) {
-					logging.Info("🔁 stalled torrent reannounced; still awaiting byte progress",
-						"hash", torrent.Hash, "name", torrent.Name, "retry_minutes", retryMinutes)
+					logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again", torrent.Name))
 					tev_scheduleNextStallRetryNotice(&entry, now)
 				}
 				restarted = true
@@ -856,8 +850,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			}
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
 			_ = db.MarkTorrentError(torrent.Hash, "metadata timeout")
-			logging.Warn("❌ DOWNLOAD FAILED — no metadata (dead magnet) within the give-up window",
-				"hash", torrent.Hash, "name", torrent.Name, "giveup_minutes", giveupMinutes)
+			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: in %s nobody provided its list of files (the link is probably dead). It is removed",
+				torrent.Name, logDuration(time.Duration(giveupMinutes*float64(time.Minute)))))
 			if tev_removeFailedTorrent(torrents, torrent.Hash) {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
 			}
@@ -879,11 +873,8 @@ func MonitorMetadata(cfg *Config, torrents TorrentSession, db *Database, notifie
 			} else if value {
 				previousWarning := lastWarning[torrent.Hash]
 				if tev_metadataRetryWarningDue(previousWarning, now) {
-					logging.Warn("torrent metadata still unavailable; reannouncing",
-						"hash", torrent.Hash,
-						"name", torrent.Name,
-						"elapsed_minutes", int(now.Sub(started).Minutes()),
-						"retry_minutes", int(tev_metadataRetryInterval/time.Minute))
+					logging.Warn(fmt.Sprintf("⏳ «%s»: after %s nobody has provided its list of files yet; still trying",
+						torrent.Name, logDuration(now.Sub(started))))
 					lastWarning[torrent.Hash] = now
 				} else {
 					logging.Debug("torrent metadata retry still pending",
@@ -1138,10 +1129,10 @@ func RemoveSeededCompleted(cfg *Config, torrents TorrentSession, db *Database, p
 					archiveFiles = tev_archivedFileNames(files)
 				}
 			}
-			logging.Info(fmt.Sprintf("🗑️ Season pack seeded — source removed: «%s» · copy kept on NAS: %s · folder name: «%s» · files: %s",
-				torrent.Name, archivePath, archiveName, archiveFiles))
+			logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: download copy removed, the library copy stays in %s", torrent.Name, archivePath))
+			logging.Debug("season pack seeded", "folder", archiveName, "files", archiveFiles)
 		} else {
-			logging.Info(fmt.Sprintf("🗑️ Seeding done — removed from the session: «%s»", torrent.Name))
+			logging.Info(fmt.Sprintf("🗑️ Seeding finished for «%s»: removed from the download list", torrent.Name))
 		}
 	}
 }
@@ -1240,13 +1231,9 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 		logging.Debug("post-seeding relocation was not applied", "hash", torrent.Hash, "name", torrent.Name)
 		return false
 	}
-	logging.Info("📁 MOVING TO NAS — post-seeding relocation",
-		"hash", torrent.Hash,
-		"name", torrent.Name,
-		"from", current,
-		"to", destination,
-		"size", logging.HumanBytesI64(torrent.TotalSize),
-	)
+	logging.Info(fmt.Sprintf("📁 Seeding finished for «%s»: moving it to the library (%s) in %s",
+		torrent.Name, logging.HumanBytesI64(torrent.TotalSize), destination))
+	logging.Debug("post-seeding relocation", "hash", torrent.Hash, "from", current)
 	postSeedMoves[torrent.Hash] = struct{}{}
 	storageMoveRetries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
 		destination: destination,
@@ -1437,7 +1424,7 @@ func tev_enforceRamdiskCapacity(cfg *Config, torrents TorrentSession, event *mod
 		logging.Warn("RAM disk relocation failed",
 			"hash", event.Hash, "name", event.Name, "error", err.Error())
 	} else if moved {
-		logging.Info(fmt.Sprintf("«%s» does not fit on the RAM disk, moving to disk (%s) → %s", event.Name, reason, destination))
+		logging.Info(fmt.Sprintf("💾 «%s» moved from the RAM disk to %s: %s", event.Name, destination, reason))
 	} else {
 		logging.Warn("RAM disk relocation was not applied",
 			"hash", event.Hash, "name", event.Name, "reason", reason)
@@ -1635,8 +1622,7 @@ func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]
 			logging.Warn("RAM disk reconciliation failed",
 				"hash", hash, "name", torrent.Name, "error", err.Error())
 		} else if value {
-			logging.Info(fmt.Sprintf("🔁 RAM disk reconciliation: moving a torrent to disk (%s) → %s", reason, destination),
-				"name", torrent.Name)
+			logging.Info(fmt.Sprintf("💾 «%s» moved from the RAM disk to %s: %s", torrent.Name, destination, reason))
 		} else {
 			logging.Warn("RAM disk reconciliation: relocation not applied",
 				"hash", hash, "name", torrent.Name, "reason", reason)
@@ -1678,7 +1664,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 			logging.Debug("resume for infinite seeding failed",
 				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 		} else if value {
-			logging.Info(fmt.Sprintf("seeding resumed (infinite) — «%s»", torrent.Name))
+			logging.Info(fmt.Sprintf("🔁 «%s» is sharing again (set to seed without limits)", torrent.Name))
 		}
 	}
 	for _, torrent := range torrents.List() {
@@ -1745,7 +1731,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 				} else if ratioReached {
 					reason = "ratio reached"
 				}
-				logging.Info(fmt.Sprintf("⏸️ Seeding done (%s) — pausing «%s»", reason, torrent.Name))
+				logging.Info(fmt.Sprintf("⏸️ Seeding finished for «%s» (%s)", torrent.Name, reason))
 			} else {
 				logging.Warn("torrent seed limit could not be applied in current mode",
 					"hash", torrent.Hash, "name", torrent.Name)
@@ -1980,8 +1966,8 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		return false, err
 	}
 	if processed && sourceHandled {
-		logging.Info("single episode copied to archive; source kept for seeding",
-			"hash", event.Hash, "name", event.Name, "source", source, "archive", target)
+		logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
+			"library_file", target)
 	}
 	return processed, nil
 }
@@ -2105,7 +2091,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 				"hash", event.Hash, "name", event.Name, "path", path)
 			return false, fmt.Errorf("completed torrent file not found: %s", path)
 		}
-		logging.Info("completed file already renamed — using the archived file",
+		logging.Debug("completed file already renamed — using the archived file",
 			"name", event.Name, "title", release.Title, "path", resolved)
 		path = resolved
 		recoveredExisting = true
@@ -2265,8 +2251,8 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	// Download completion is logged when the payload first reaches 100%. This
 	// later handler records the separate archive/import phase (often after a
 	// seed period), so the two lifecycle messages retain their real order.
-	logging.Info(fmt.Sprintf("📁 Archived — «%s» · %s · saved to %s%s",
-		release.Title,
+	logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s",
+		logTarget(release),
 		logging.HumanBytesI64(size),
 		processedPath,
 		suffix,
@@ -2314,13 +2300,12 @@ func tev_logDownloadComplete(db *Database, event *models.TorrentEvent, release *
 			averageSpeed = dividend / seconds
 		}
 	}
-	logging.Info(fmt.Sprintf("🎉 Download complete — «%s» · %s · downloaded in %s at %s · retained for seeding in %s; archive relocation will happen when seeding ends",
-		release.Title,
+	logging.Info(fmt.Sprintf("🎉 %s downloaded (%s in %s, %s on average). It stays in the download folder while it is shared, then moves to the library",
+		logTarget(release),
 		logging.HumanBytesI64(size),
-		logging.HumanDuration(durationSeconds),
+		logDuration(time.Duration(durationSeconds)*time.Second),
 		logging.HumanRate(averageSpeed),
-		path,
-	))
+	), "folder", path)
 }
 
 // ---------------------------------------------------------------------------
@@ -2345,9 +2330,32 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		logging.Debug("libtorrent tracker error",
 			"hash", event.Hash, "name", event.Name, "message", event.Message)
 		return false, nil
-	case "torrent_error", "file_error", "hash_failed", "metadata_failed", "resume_save_failed":
-		logging.Warn("libtorrent reported an error",
-			"kind", event.Kind, "hash", event.Hash, "name", event.Name, "message", event.Message)
+	case "hash_failed":
+		// A damaged piece is discarded and downloaded again automatically:
+		// routine, and alarming if reported one by one. Only a torrent that
+		// keeps receiving damaged data is worth the user's attention.
+		failures, alert := recordHashFailure(event.Hash)
+		logging.Debug("piece failed its hash check; it will be downloaded again",
+			"name", event.Name, "failures", failures, "message", event.Message)
+		if alert {
+			logging.Warn(fmt.Sprintf("⚠️ «%s» keeps receiving damaged data (%d pieces so far). Gextto downloads them again automatically, but if it never finishes, remove it and choose another version",
+				event.Name, failures))
+			_ = notifier.NotifyEvent("torrent_error", map[string]any{
+				"hash":    event.Hash,
+				"kind":    event.Kind,
+				"name":    event.Name,
+				"error":   fmt.Sprintf("%d damaged pieces", failures),
+				"message": event.Message,
+			})
+		}
+		return false, nil
+	case "resume_save_failed":
+		// The progress is saved again at the next periodic save and on a
+		// clean shutdown (which reports its own failure): not worth a warning.
+		logging.Debug("torrent resume data could not be saved", "name", event.Name, "message", event.Message)
+		return false, nil
+	case "torrent_error", "file_error", "metadata_failed":
+		logging.Warn(fmt.Sprintf("⚠️ Problem with «%s»: %s", event.Name, torrentErrorText(event.Kind, event.Message)))
 		_ = notifier.NotifyEvent("torrent_error", map[string]any{
 			"hash":    event.Hash,
 			"kind":    event.Kind,
@@ -2357,7 +2365,12 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		})
 		return false, nil
 	case "portmap_error", "session_error":
-		logging.Warn("libtorrent session error", "kind", event.Kind, "message", event.Message)
+		if event.Kind == "portmap_error" {
+			logging.Warn("⚠️ The router did not open the listening port automatically (UPnP/NAT-PMP); downloads work but may find fewer users",
+				"detail", event.Message)
+		} else {
+			logging.Warn("⚠️ Torrent engine problem: " + event.Message)
+		}
 		return false, nil
 	}
 	metadata, err := db.TorrentMeta(event.Hash)
@@ -2488,8 +2501,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					if err := db.MarkReleaseCompleted(&release, source, size); err != nil {
 						return false, err
 					}
-					logging.Info("single episode completed; no archive destination, kept in downloads for seeding",
-						"hash", event.Hash, "name", event.Name, "path", source)
+					logging.Info(fmt.Sprintf("🎉 «%s» downloaded; no library folder is set for it, so it stays in %s", event.Name, source))
 					return true, nil
 				}
 				if sourceInfo.IsDir() || !settingsBool(cfg, "move_episodes", false) || tev_seedsForever(cfg, torrents, event.Hash) {
@@ -2569,8 +2581,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				if err := db.MarkPackCompleted(&release, entries, source, size); err != nil {
 					return false, err
 				}
-				logging.Info("season pack completed; no archive destination, kept in downloads",
-					"hash", event.Hash, "name", event.Name, "path", source, "episodes", len(entries))
+				logging.Info(fmt.Sprintf("🎉 «%s» downloaded (%s); no library folder is set for it, so it stays in %s",
+					event.Name, countLabel(len(entries), "episode", "episodes"), source))
 				return true, nil
 			}
 			// Serialize against the periodic/manual rename repair for this
@@ -2652,8 +2664,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 					"path":    item.Path,
 				})
 			}
-			logging.Info(fmt.Sprintf("🎉 Season pack complete — «%s» · %d episodes · %s · archived to %s",
-				release.Title, len(episodes), logging.HumanBytesI64(size), destination))
+			logging.Info(fmt.Sprintf("🎉 %s complete: %s (%s) added to the library in %s",
+				logTarget(&release), countLabel(len(episodes), "episode", "episodes"), logging.HumanBytesI64(size), destination))
 			// Detail per file: which episodes were kept and which were discarded.
 			// The Python original logged this per file; the Rust port only kept
 			// the counts, which made a rejected episode impossible to trace.
@@ -2676,7 +2688,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			if cfg.CleanupAction == "delete" {
 				cleanupLabel = "deleted"
 			}
-			logging.Info(fmt.Sprintf("📦 Season pack detail — kept %d: %s · upgrades %d: %s · %s: %d file(s) · discarded %d: %s",
+			logging.Debug(fmt.Sprintf("season pack detail — kept %d: %s · upgrades %d: %s · %s: %d file(s) · discarded %d: %s",
 				len(keptDetail), tev_packFileNames(keptDetail),
 				len(upgradedDetail), tev_packFileNames(upgradedDetail), cleanupLabel, trashCount,
 				len(discardedDetail), tev_packFileNames(discardedDetail)))
@@ -2710,7 +2722,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			// A pack is copied into the library, never moved out of its torrent
 			// storage here: libtorrent must retain the exact original tree to
 			// seed and verify it.
-			logging.Info(fmt.Sprintf("📁 Season pack copied to NAS, source kept for seeding · %s · %s",
+			logging.Debug(fmt.Sprintf("season pack copied to NAS, source kept for seeding · %s · %s",
 				logging.HumanBytesI64(size), destination))
 			return true, nil
 		}
@@ -2733,8 +2745,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 				return false, err
 			}
 			tev_notifySeeding(db, notifier, &event, &release, source, size)
-			logging.Info("movie completed; kept in downloads for seeding, will be archived at the end of the seed",
-				"path", source)
+			logging.Info(fmt.Sprintf("🎉 %s downloaded. It stays in the download folder while it is shared, then moves to the library", logTarget(&release)),
+				"folder", source)
 			return false, nil
 		}
 		if _, exists := moveRequests[event.Hash]; exists {
@@ -2816,8 +2828,8 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			delete(postSeedMoves, event.Hash)
 			return false, nil
 		}
-		logging.Warn("storage move failed (destination may already exist); torrent kept in place",
-			"hash", event.Hash, "name", event.Name, "save_path", event.SavePath)
+		logging.Warn(fmt.Sprintf("⚠️ Could not move «%s» to the library (a file with the same name may already be there); it stays where it is and will be retried", event.Name),
+			"folder", event.SavePath)
 		if destination != nil {
 			tev_scheduleStorageMoveRetry(retries, event.Hash, *destination, wasPostSeedMove, time.Now())
 			if wasPostSeedMove {

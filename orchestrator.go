@@ -70,7 +70,7 @@ func RunCycleDomain(
 		mode = *domain
 	}
 	logging.Info(cycleDivider)
-	logging.Info(fmt.Sprintf("🔄 CYCLE STARTED (mode: %s)", mode))
+	logging.Info(fmt.Sprintf("🔄 Search started (%s)", cycleModeLabel(mode)))
 	if cycleCancelled(ctx) {
 		return stats, nil
 	}
@@ -107,7 +107,7 @@ func RunCycleDomain(
 		if count, err := db.ReconcileMissingTorrents(liveHashes); err != nil {
 			logging.Warn("torrent reconciliation failed", "error", err)
 		} else if count > 0 {
-			logging.Info("torrents reconciled: marked missing from session", "count", count)
+			logging.Info(fmt.Sprintf("🧹 %s no longer in the torrent engine; marked as removed", countLabel(int64(count), "download was", "downloads were")))
 		}
 	}
 	// A known missing episode must not wait for the broad title sweep below.
@@ -165,7 +165,7 @@ func RunCycleDomain(
 		}
 	}
 	if len(blockedHashes) > 0 {
-		logging.Info("blocked releases removed from this cycle", "count", len(blockedHashes))
+		logging.Debug("blocked releases removed from this cycle", "count", len(blockedHashes))
 		var kept []models.Release
 		for i := range releases {
 			hash, ok := utils.MagnetHash(releases[i].Magnet)
@@ -255,8 +255,8 @@ func RunCycleDomain(
 			}
 		}
 	}
-	logging.Info(fmt.Sprintf(
-		"🔎 Archive: matched %d releases from archive across %d monitored targets",
+	logging.Debug(fmt.Sprintf(
+		"archive: matched %d releases from archive across %d monitored targets",
 		archiveMatches,
 		len(archiveQueries),
 	))
@@ -393,15 +393,14 @@ func RunCycleDomain(
 		}
 	}
 	isDeep := saturatingSub(deepNow, lastDeep) >= saturatingMul(deepIntervalHours, 3600)
-	deepLabel := "archive pass"
+	deepLabel := "in the local release archive"
 	if isDeep {
-		deepLabel = fmt.Sprintf("deep pass, up to %d online searches", deepMaxPerCycle)
+		deepLabel = fmt.Sprintf("in the local release archive, plus up to %d online searches", deepMaxPerCycle)
 	}
-	logging.Info(fmt.Sprintf(
-		"🔎 Gap fill: %d missing episode(s) to check · %s",
-		len(archiveGaps),
-		deepLabel,
-	))
+	if len(archiveGaps) > 0 {
+		logging.Info(fmt.Sprintf("🧩 Looking for %s %s",
+			countLabel(int64(len(archiveGaps)), "missing episode", "missing episodes"), deepLabel))
+	}
 
 	// Phase 1 (every cycle, free): local archive search only.
 	type liveCandidate struct {
@@ -482,8 +481,8 @@ func RunCycleDomain(
 			Episode: gap.Episode,
 		})
 	}
-	logging.Info(fmt.Sprintf(
-		"🔎 Gap fill: %d found in the archive, %d to look up online",
+	logging.Debug(fmt.Sprintf(
+		"gap fill: %d found in the archive, %d to look up online",
 		archiveHits,
 		len(liveCandidates),
 	))
@@ -648,7 +647,7 @@ func RunCycleDomain(
 		}
 	}
 	stats.Candidates = len(best)
-	logging.Info(fmt.Sprintf("🎯 CANDIDATES — %d release(s) survived the filters", len(best)))
+	logging.Info(fmt.Sprintf("🎯 %s match your titles and filters; choosing what to download", countLabel(int64(len(best)), "release", "releases")))
 	for i := range best {
 		release := &best[i]
 		logging.Debug("candidate ready for evaluation",
@@ -672,16 +671,14 @@ func RunCycleDomain(
 	if minFreeBytes != nil {
 		free := FreeSpaceBytes(cfg.LibtorrentDir)
 		if free == nil {
-			logging.Warn("cycle: cannot determine free space, downloads skipped",
-				"path", cfg.LibtorrentDir,
-				"minimum", logging.HumanBytes(*minFreeBytes))
+			logging.Warn("⚠️ No downloads this time: cannot read the free space of the download folder",
+				"folder", cfg.LibtorrentDir)
 			stats.Error("min_free_space_unavailable")
 			return finishCycleWithoutDownloads(db, stats)
 		}
 		if *free < *minFreeBytes {
-			logging.Warn("cycle: free space below min_free_space_gb, downloads skipped",
-				"free", logging.HumanBytes(*free),
-				"minimum", logging.HumanBytes(*minFreeBytes))
+			logging.Warn(fmt.Sprintf("⚠️ No downloads this time: only %s free on the download disk (minimum %s)",
+				logging.HumanBytes(*free), logging.HumanBytes(*minFreeBytes)))
 			stats.Error("min_free_space")
 			return finishCycleWithoutDownloads(db, stats)
 		}
@@ -704,8 +701,6 @@ func RunCycleDomain(
 
 	upgrades := 0
 	newItems := 0
-	var newDetails []string
-	var upgradeDetails []string
 	if cycleCancelled(ctx) {
 		return stats, nil
 	}
@@ -775,9 +770,8 @@ func RunCycleDomain(
 					delayMinutes = saturatingMul(series.Timeframe, 60)
 				}
 				if delayMinutes > 0 && !bypassDelay {
-					logging.Info("queued for delay",
-						"target", releaseTarget(&release),
-						"delay_minutes", delayMinutes)
+					logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
+						logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
 					if err := db.QueuePendingScored(&release, delayMinutes, releaseScore); err != nil {
 						return nil, err
 					}
@@ -788,9 +782,8 @@ func RunCycleDomain(
 		if release.Kind == "movie" && !isReadyPending {
 			delayMinutes := cfg.DelayMinutes("movie")
 			if delayMinutes > 0 && !bypassDelay {
-				logging.Info("movie queued for delay",
-					"target", releaseTarget(&release),
-					"delay_minutes", delayMinutes)
+				logging.Info(fmt.Sprintf("⏳ %s: waiting %s before downloading, in case a better version appears",
+					logTarget(&release), logDuration(time.Duration(delayMinutes)*time.Minute)))
 				if err := db.QueuePendingMovieScored(&release, delayMinutes, releaseScore); err != nil {
 					return nil, err
 				}
@@ -886,7 +879,7 @@ func RunCycleDomain(
 				free := FreeSpaceBytes(checkPath)
 				if free == nil {
 					stats.Error("min_free_space_unavailable")
-					logging.Warn("cycle: cannot determine free space for chosen download path, download skipped", "path", checkPath)
+					logging.Warn(fmt.Sprintf("⚠️ %s not downloaded: cannot read the free space of its download folder", logTarget(&release)), "folder", checkPath)
 					continue
 				}
 				if *free < *floor {
@@ -907,7 +900,7 @@ func RunCycleDomain(
 				// cycle: nothing was written yet, so record the failure and
 				// continue with the remaining candidates.
 				stats.Error("add_failed")
-				logging.Warn("release add failed; continuing the cycle", "target", releaseTarget(&release), "error", err)
+				logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(&release)), "error", err)
 				continue
 			}
 			if !added {
@@ -918,25 +911,12 @@ func RunCycleDomain(
 				committed, commitReason, commitErr := commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
 				if commitErr != nil || !committed {
 					stats.Error("approval_commit_failed")
-					logging.Warn("release approval could not be recorded; download withdrawn",
-						"target", releaseTarget(&release), "reason", commitReason, "error", commitErr)
+					logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
+						"reason", commitReason, "error", commitErr)
 					withdrawAddedTorrent(torrents, &release)
 					continue
 				}
 				approvalReason = commitReason
-			}
-			startedDetail := fmt.Sprintf("%s [%s]: %s · qualità: %s · score: %d",
-				releaseTarget(&release), release.Source, release.Title,
-				releaseQualityLabel(&release), score)
-			if len(gapEpisodes) > 0 {
-				startedDetail = fmt.Sprintf("%s · episodi %s · [%s]: %s · qualità: %s · score: %d",
-					releaseTarget(&release), episodesLabel(gapEpisodes), release.Source,
-					release.Title, releaseQualityLabel(&release), score)
-			}
-			if approvalReason == "upgrade" {
-				upgradeDetails = append(upgradeDetails, startedDetail)
-			} else {
-				newDetails = append(newDetails, startedDetail)
 			}
 			if !cfg.DryRun {
 				if err := db.RegisterTorrentScored(&release, score); err != nil {
@@ -944,29 +924,33 @@ func RunCycleDomain(
 					// it would be treated as a foreign torrent and never archived.
 					// Undo the add and the approval, then go on with the cycle.
 					stats.Error("register_failed")
-					logging.Warn("release registration failed; download withdrawn",
-						"target", releaseTarget(&release), "error", err)
+					logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
+						"error", err)
 					withdrawAddedTorrent(torrents, &release)
 					rollbackReleasePlaceholder(cfg, db, &release)
-					if len(newDetails) > 0 && newDetails[len(newDetails)-1] == startedDetail {
-						newDetails = newDetails[:len(newDetails)-1]
-					} else if len(upgradeDetails) > 0 && upgradeDetails[len(upgradeDetails)-1] == startedDetail {
-						upgradeDetails = upgradeDetails[:len(upgradeDetails)-1]
-					}
 					continue
 				}
 				if hash, ok := utils.MagnetHash(release.Magnet); ok {
 					_ = db.SetTorrentReason(hash, decisionReason)
 				}
 			}
-			logMessage := "📥 download started"
-			if cfg.DryRun {
-				logMessage = "🧪 dry-run: download would start"
+			why := "new"
+			switch {
+			case fromArchive || len(gapEpisodes) > 0:
+				why = "fills a missing episode"
+				if approvalReason == "upgrade" {
+					why = "fills a missing episode, better quality"
+				}
+			case approvalReason == "upgrade":
+				why = "better version than the one you have"
 			}
-			logging.Info(logMessage,
+			logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
+			if cfg.DryRun {
+				logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
+			}
+			logging.Info(logMessage, "release", release.Title, "from", release.Source)
+			logging.Debug("download decision",
 				"target", releaseTarget(&release),
-				"title", release.Title,
-				"source", release.Source,
 				"quality", releaseQualityLabel(&release),
 				"score", score,
 				"reason", decisionReason,
@@ -1030,9 +1014,10 @@ func RunCycleDomain(
 					"reason", decisionReason,
 					"approval_reason", approvalReason)
 			} else {
-				logging.Info("⏭️ download skipped",
+				logging.Info(fmt.Sprintf("⏭️ Skipped %s: %s", logTarget(&release), skipReasonText(approvalReason)),
+					"release", release.Title)
+				logging.Debug("download skipped",
 					"target", releaseTarget(&release),
-					"kind", release.Kind,
 					"source", release.Source,
 					"score", score,
 					"reason", decisionReason,
@@ -1052,26 +1037,7 @@ func RunCycleDomain(
 	if elapsed < 0 {
 		elapsed = 0
 	}
-	logging.Info(fmt.Sprintf(
-		"📊 CYCLE REPORT — duration %s — scraped: %d | candidates: %d | downloads started: %d (upgrade: %d · new: %d) | gaps filled: %d | errors: %d",
-		humanDuration(elapsed),
-		stats.Scraped,
-		stats.Candidates,
-		stats.DownloadsStarted,
-		upgrades,
-		newItems,
-		stats.GapsFilled,
-		stats.Errors,
-	))
-	if len(newDetails) > 0 {
-		logging.Info("🆕 NEW DOWNLOADS — " + strings.Join(newDetails, " · "))
-	}
-	if len(upgradeDetails) > 0 {
-		logging.Info("⬆️ UPGRADES — " + strings.Join(upgradeDetails, " · "))
-	}
-	if len(newDetails) == 0 && len(upgradeDetails) == 0 {
-		logging.Info("📦 CYCLE DOWNLOADS — no downloads started")
-	}
+	logging.Info(cycleReportText(logDuration(time.Duration(elapsed)*time.Second), stats, upgrades, newItems))
 	logging.Info(cycleDivider)
 	return stats, nil
 }
@@ -1157,7 +1123,7 @@ func prioritizeArchiveGapDownloads(
 		}
 	}
 	if len(candidates) == 0 {
-		logging.Info("priority gap pass: no archive candidates")
+		logging.Debug("priority gap pass: no archive candidates")
 		return nil
 	}
 
@@ -1168,7 +1134,8 @@ func prioritizeArchiveGapDownloads(
 			live.Episodes[*key] = struct{}{}
 		}
 	}
-	logging.Info("priority gap pass: archive candidates ready", "count", len(candidates))
+	logging.Info(fmt.Sprintf("🧩 %s can be downloaded right away from the local release archive",
+		countLabel(int64(len(candidates)), "missing episode", "missing episodes")))
 	started := 0
 	for hash, candidate := range candidates {
 		if cycleCancelled(ctx) {
@@ -1200,7 +1167,7 @@ func prioritizeArchiveGapDownloads(
 		added, err := torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 		if err != nil {
 			stats.Error("add_failed")
-			logging.Warn("priority gap add failed", "target", releaseTarget(&release), "error", err)
+			logging.Warn(fmt.Sprintf("⚠️ Could not start the download of %s; moving on", logTarget(&release)), "error", err)
 			continue
 		}
 		if !added {
@@ -1209,8 +1176,8 @@ func prioritizeArchiveGapDownloads(
 		}
 		if committed, commitReason, commitErr := commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades); commitErr != nil || !committed {
 			stats.Error("approval_commit_failed")
-			logging.Warn("priority gap approval could not be recorded; download withdrawn",
-				"target", releaseTarget(&release), "reason", commitReason, "error", commitErr)
+			logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
+				"reason", commitReason, "error", commitErr)
 			withdrawAddedTorrent(torrents, &release)
 			continue
 		}
@@ -1218,8 +1185,8 @@ func prioritizeArchiveGapDownloads(
 			// Same rule as the main loop: an unregistered torrent must not stay in
 			// the engine, and one failure must not abort the cycle.
 			stats.Error("register_failed")
-			logging.Warn("priority gap registration failed; download withdrawn",
-				"target", releaseTarget(&release), "error", err)
+			logging.Warn(fmt.Sprintf("⚠️ %s withdrawn: it could not be recorded in the database", logTarget(&release)),
+				"error", err)
 			withdrawAddedTorrent(torrents, &release)
 			_ = db.RollbackRelease(&release)
 			continue
@@ -1232,7 +1199,8 @@ func prioritizeArchiveGapDownloads(
 		stats.DownloadsStarted++
 		stats.GapsFilled++
 		started++
-		logging.Info("✅ priority gap download started", "target", releaseTarget(&release), "source", release.Source, "score", candidate.score)
+		logging.Info(fmt.Sprintf("📥 Downloading %s — fills a missing episode (%s)", logTarget(&release), friendlyQuality(release.Quality)),
+			"release", release.Title, "from", release.Source)
 		if err := notifier.NotifyEvent("download_started", map[string]any{
 			"title": release.Title, "kind": release.Kind, "series": release.Series, "season": release.Season,
 			"episode": release.Episode, "source": release.Source, "magnet_hash": hash,
@@ -1241,7 +1209,7 @@ func prioritizeArchiveGapDownloads(
 			logging.Warn("download notification failed", "error", err)
 		}
 	}
-	logging.Info("priority gap pass completed", "started", started, "candidates", len(candidates))
+	logging.Debug("priority gap pass completed", "started", started, "candidates", len(candidates))
 	return nil
 }
 
@@ -1286,7 +1254,7 @@ func cycleCancelled(ctx context.Context) bool {
 	if ctx == nil || ctx.Err() == nil {
 		return false
 	}
-	logging.Info("cycle interrupted: daemon is shutting down")
+	logging.Info("⏹️ Search interrupted: Gextto is shutting down")
 	return true
 }
 
@@ -1868,10 +1836,10 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 		if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(retryTs, 10)); err != nil {
 			logging.Warn("could not record the comics check time", "error", err)
 		}
-		logging.Warn("comics cycle failed; it will be retried in about an hour", "error", runErr)
+		logging.Warn("⚠️ Comics check failed; it will be retried in about an hour", "error", runErr)
 		return
 	}
-	logging.Info("comics cycle completed", "downloaded", downloaded)
+	logging.Info(fmt.Sprintf("📚 Comics checked: %s downloaded", countLabel(int64(downloaded), "comic", "comics")))
 	if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(nowTs, 10)); err != nil {
 		logging.Warn("could not record the comics check time", "error", err)
 	}
@@ -1884,9 +1852,8 @@ func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*model
 	if err := db.SaveCycle(stats); err != nil {
 		return nil, err
 	}
-	logging.Info(fmt.Sprintf(
-		"📊 CYCLE REPORT — scraped: %d | candidates: %d | downloads skipped (free space) | errors: %d",
-		stats.Scraped, stats.Candidates, stats.Errors))
+	logging.Info(fmt.Sprintf("📊 Search finished: %s checked, %s matched your titles, but nothing was downloaded because of disk space%s",
+		countLabel(stats.Scraped, "release", "releases"), logCount(stats.Candidates), cycleErrorsSuffix(stats.Errors)))
 	logging.Info(cycleDivider)
 	return stats, nil
 }

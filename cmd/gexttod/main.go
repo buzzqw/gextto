@@ -161,9 +161,9 @@ func runDaemon(dryRun bool, configOption *string) error {
 			if info, statErr := os.Stat(filepath.Join(cfg.DataDir, check.name)); statErr == nil {
 				size = info.Size()
 			}
-			logging.Info("integrity check: ok", "database", check.name, "rows", check.rowCount(), "size", logging.HumanBytesI64(size))
+			logging.Debug("integrity check: ok", "database", check.name, "rows", check.rowCount(), "size", logging.HumanBytesI64(size))
 		default:
-			logging.Error("integrity check: problems found", "database", check.name, "detail", joinRows(rows))
+			logging.Error("Database damaged: "+check.name+" failed its integrity check. Restore it from a backup (Maintenance → Backup)", "detail", joinRows(rows))
 		}
 	}
 

@@ -114,10 +114,18 @@ func (s *AppState) SleepBackground(d time.Duration) bool {
 	}
 }
 
-// stopBackgroundWorkers signals every worker to stop and waits for all of them.
-// The native torrent session is destroyed immediately after this function
-// returns, so continuing after an arbitrary timeout would permit a late
-// List()/Add() against a closed CGo handle.
+// workerStopTimeout bounds how long shutdown waits for the background workers.
+// Some work cannot be interrupted midway (a season pack being copied to the
+// library); without a bound, systemd killed the daemon after TimeoutStopSec and
+// the torrent resume data was never saved. Together with sessionDrainTimeout
+// and the resume save it stays below the unit's 90 s stop timeout.
+var workerStopTimeout = 45 * time.Second
+
+// stopBackgroundWorkers signals every worker to stop and waits for them, up to
+// workerStopTimeout. Continuing after the timeout is safe: the libtorrent
+// client refuses new native calls once its shutdown starts (enterSession), and
+// library copies are atomic, so an interrupted import leaves only a hidden
+// temporary file and is completed by the recovery scan after the next start.
 func stopBackgroundWorkers(state *AppState) {
 	state.bgStopOnce.Do(func() {
 		if state.bgCancel != nil {
@@ -125,10 +133,20 @@ func stopBackgroundWorkers(state *AppState) {
 		}
 		close(state.bgStop)
 	})
-	state.bgWG.Wait()
-	if state.jobs != nil {
-		// Cancel and wait for any operation still tracked by the job manager.
-		state.jobs.Close()
+	done := make(chan struct{})
+	go func() {
+		state.bgWG.Wait()
+		if state.jobs != nil {
+			// Cancel and wait for any operation still tracked by the job manager.
+			state.jobs.Close()
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(workerStopTimeout):
+		logging.Warn(fmt.Sprintf("⚠️ Some work was still running after %s (for example a copy to the library); Gextto stops anyway and finishes it after the next start",
+			logDuration(workerStopTimeout)))
 	}
 }
 
@@ -189,17 +207,18 @@ func Serve(state *AppState) error {
 		return fmt.Errorf("bind engine listener %s: %w", engineAddr, err)
 	}
 
-	mode := "stand-by (downloads paused)"
+	mode := "downloads are paused (stand-by)"
 	if state.cfg.DryRun {
-		mode = "dry-run (no real downloads)"
+		mode = "test mode: nothing is really downloaded (dry-run)"
 	} else if state.cfg.Active {
-		mode = "active (downloads enabled)"
+		mode = "downloads are enabled"
 	}
-	logging.Info(fmt.Sprintf(
-		"🚀 Gextto started · UI http://%s · engine http://%s · libtorrent %s · %s",
-		webAddr, engineAddr, LibtorrentVersion(), mode,
-	))
+	logging.Info(fmt.Sprintf("🚀 Gextto started — web interface at http://%s · %s", webAddr, mode))
+	logging.Debug("startup details", "engine_api", "http://"+engineAddr, "libtorrent", LibtorrentVersion())
 
+	// Before the workers: the first cycle marks downloads missing from the
+	// session as lost, so add back those an unclean stop dropped.
+	restoreMissingTorrents(latestConfig(state), state.db, state.activeEngine())
 	startBackgroundWorkers(state)
 
 	// Cancel request contexts before closing the native torrent session. This is

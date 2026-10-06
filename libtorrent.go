@@ -337,7 +337,7 @@ func RamdiskFits(thresholdBytes, marginBytes, freeBytes, uncommittedBytes, total
 func RamdiskFitsRemaining(thresholdBytes, marginBytes, freeBytes, uncommittedBytes, totalSize, remainingBytes uint64) error {
 	gib := 1024.0 * 1024.0 * 1024.0
 	if thresholdBytes > 0 && totalSize > thresholdBytes {
-		return fmt.Errorf("file too large for the RAM disk: %.2f GB > threshold %.2f GB",
+		return fmt.Errorf("it is too big for the RAM disk (%.1f GB, limit %.1f GB)",
 			float64(totalSize)/gib, float64(thresholdBytes)/gib)
 	}
 	effectiveFree := uint64(0)
@@ -349,8 +349,8 @@ func RamdiskFitsRemaining(thresholdBytes, marginBytes, freeBytes, uncommittedByt
 		required = math.MaxUint64
 	}
 	if effectiveFree < required {
-		return fmt.Errorf("insufficient RAM disk space (free %.2f GB, reserved by other downloads %.2f GB, remaining to write %.2f GB, margin %.2f GB)",
-			float64(freeBytes)/gib, float64(uncommittedBytes)/gib, float64(remainingBytes)/gib, float64(marginBytes)/gib)
+		return fmt.Errorf("there is not enough room left on the RAM disk (%.1f GB free, %.1f GB already reserved by other downloads, %.1f GB still to download)",
+			float64(freeBytes)/gib, float64(uncommittedBytes)/gib, float64(remainingBytes)/gib)
 	}
 	return nil
 }
@@ -738,7 +738,7 @@ func (c *LibtorrentClient) RecheckRestoredAtZero() int {
 		}
 	}
 	if checked > 0 {
-		logging.Info("verifying restored paused torrents to recover progress", "checked", checked)
+		logging.Info(fmt.Sprintf("🔎 Checking the data of %d paused %s to recover their progress", checked, plural(int64(checked), "download", "downloads")))
 	}
 	return checked
 }
@@ -842,7 +842,7 @@ func (c *LibtorrentClient) applyExtendedSettings(cfg *Config) error {
 		}
 		return "unlimited"
 	}
-	logging.Info(fmt.Sprintf("🧠 libtorrent memory: cache %s, max connections %d, I/O threads %d, base bandwidth %s down / %s up",
+	logging.Debug(fmt.Sprintf("🧠 libtorrent memory: cache %s, max connections %d, I/O threads %d, base bandwidth %s down / %s up",
 		cacheLabel, lt.ConnectionsLimit, lt.AioThreads, limitLabel(lt.DownloadLimitKib), limitLabel(lt.UploadLimitKib)))
 	var lines []string
 	addInt := func(key string, value int64) {
@@ -1612,7 +1612,20 @@ func (c *LibtorrentClient) copyTorrentFileNamed(hash, source, displayName string
 		logging.Warn("cannot copy torrent file", "hash", hash, "target", target, "error", err)
 		return
 	}
-	logging.Info("torrent file copied", "hash", hash, "path", target)
+	logging.Debug("torrent file copied", "hash", hash, "path", target)
+}
+
+// RequestResumeSave asks libtorrent to save the resume data of the torrents
+// changed since the last save. The files are written while events are polled,
+// so a crash or a forced kill no longer loses the downloads added or advanced
+// since the start (before, resume data was saved only on a clean shutdown).
+// Returns the number of torrents asked to save, or -1 on error.
+func (c *LibtorrentClient) RequestResumeSave() int {
+	if c.DryRun || c.stateDir == "" || !c.enterSession() {
+		return 0
+	}
+	defer c.exitSession()
+	return int(cgoLtRequestResumeSave(c.session, c.stateDir))
 }
 
 // PromoteMetadata promotes metadata-only torrents out of the queue.
@@ -2111,7 +2124,7 @@ func (c *LibtorrentClient) restore(stateDir string) error {
 		logging.Warn("some fastresume files were not restored", "warning", warning)
 	}
 	if restored > 0 {
-		logging.Info(fmt.Sprintf("♻️ libtorrent state restored: %d torrent(s) resume where they left off", restored))
+		logging.Info(fmt.Sprintf("♻️ %d %s restored from the previous session", restored, plural(int64(restored), "download", "downloads")))
 	}
 	return nil
 }
@@ -2329,20 +2342,20 @@ func (c *LibtorrentClient) Shutdown(cfg *Config) error {
 		c.session = nil
 		return fmt.Errorf("libtorrent fastresume shutdown failed: %s", errMessage)
 	}
-	logging.Info("libtorrent shutdown: resume data saved")
+	logging.Debug("libtorrent shutdown: resume data saved")
 	// Close the session explicitly: the destructor drains libtorrent's disk
 	// queue and flushes buffered pieces to the files. Without it the saved
 	// bitfield can be ahead of the bytes actually on disk, so a restart
 	// re-checks, discards them and re-downloads.
 	cgoLtDestroy(c.session)
 	c.session = nil
-	logging.Info("libtorrent session closed cleanly (buffered pieces flushed)")
+	logging.Info("⏹️ Torrent engine stopped cleanly; downloads will resume where they left off")
 	return nil
 }
 
 // sessionDrainTimeout bounds how long Shutdown waits for in-flight session
 // calls. A native call stuck past it must not hang the daemon's exit.
-const sessionDrainTimeout = 30 * time.Second
+const sessionDrainTimeout = 15 * time.Second
 
 // enterSession reserves the native session for one call. It returns false when
 // there is no session or Shutdown has started; the caller then behaves as if

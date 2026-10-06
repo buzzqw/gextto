@@ -319,9 +319,10 @@ libtorrent*:
 - **Retry stalled** — default 60 minuti;
 - **Rimozione stalled** — default 20160 minuti (14 giorni), `0` = mai.
 
-La presenza di peer senza aumento dei byte non resetta il timer. Nel log cerca
-`DOWNLOAD STALLED`, `stalled torrent resumed and reannounced` e, solo dopo il
-limite finale, `DOWNLOAD FAILED — stalled`.
+La presenza di peer senza aumento dei byte non resetta il timer. Nel log (in
+inglese) cerca le righe `is stuck at`, che indicano anche il motivo, poi
+`is still stuck` a ogni nuovo tentativo e `is downloading again` quando
+riparte; solo dopo il limite finale compare `Gave up on`.
 
 ### Stati e azioni consigliate
 
@@ -983,7 +984,10 @@ dopo 30 secondi.
   ritentati da soli dopo 1, 2, 4, 8, 16 e 32 minuti: solo dopo l'ultimo
   tentativo il torrent passa in errore. Uno spostamento verso l'archivio
   interrotto da un riavvio di Gextto riprende da solo circa un minuto dopo
-  l'avvio.
+  l'avvio. Lo stato dei download viene salvato ogni 2 minuti: dopo uno stop
+  brusco (crash, mancanza di corrente) i download ripartono da dove erano, e
+  quelli che il motore avesse comunque perso vengono riaggiunti all'avvio
+  riusando i dati già scaricati.
 - **Il backup FTP fallisce** — usa *Test FTP*: indica il passo che fallisce
   (connessione, login, percorso remoto, upload, rimozione) e lo registra nel log.
 - **Log** — vedi `data/gextto.log` (rotazione a 5 MB) o il viewer nella UI.

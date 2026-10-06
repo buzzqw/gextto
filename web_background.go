@@ -163,7 +163,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		}
 		defer release()
 	} else if bg_archiveImportBusyContains(series.Name) {
-		logging.Info("rename skipped: archive import in progress", "series", series.Name)
+		logging.Debug("rename skipped: archive import in progress", "series", series.Name)
 		return 200, map[string]any{
 			"ok":      true,
 			"skipped": true,
@@ -605,6 +605,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	lastRamdiskCheck := time.Now().Add(-120 * time.Second)
 	lastMetadataPromotion := time.Now().Add(-30 * time.Second)
 	lastDynamicAdjustment := time.Now().Add(-90 * time.Second)
+	lastResumeSave := time.Now()
 	var lastQueueActive *int
 	lastSpeedPolicy := time.Now().Add(-60 * time.Second)
 	var lastSpeed *bg_speedPair
@@ -677,7 +678,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			if torrent.State == "checking_files" {
 				if last, ok := lastCheckLog[key]; !ok || now.Sub(last) >= 60*time.Second {
 					lastCheckLog[key] = now
-					logging.Info(fmt.Sprintf("🔎 integrity check in progress — «%s» · %d%%", torrent.Name, int(torrent.Progress)))
+					logging.Info(fmt.Sprintf("🔎 Checking the downloaded data of «%s» (%s)", torrent.Name, logPercent(torrent.Progress)))
 				}
 			} else {
 				delete(lastCheckLog, key)
@@ -728,6 +729,14 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 			lastConfigReload = now
 		}
+		if extras != nil && now.Sub(lastResumeSave) >= resumeSaveInterval {
+			if requested := extras.RequestResumeSave(); requested < 0 {
+				logging.Debug("periodic resume save request failed")
+			} else if requested > 0 {
+				logging.Debug("periodic resume save requested", "torrents", requested)
+			}
+			lastResumeSave = now
+		}
 		if now.Sub(lastMetadataPromotion) >= 30*time.Second {
 			// Torrents without metadata that were just promoted lose
 			// `auto_managed`; when metadata arrives it must be re-armed, even if
@@ -769,7 +778,11 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					rateKib += torrent.DownloadRate
 				}
 				rateKib /= 1024
-				logging.Info(fmt.Sprintf("📊 Queue: %d active downloads, %d queued · %d KB/s of %d KB/s available", active, queued, rateKib, effectiveDownloadKib))
+				speed := fmt.Sprintf("speed %d KB/s", rateKib)
+				if effectiveDownloadKib > 0 {
+					speed += fmt.Sprintf(" (limit %d KB/s)", effectiveDownloadKib)
+				}
+				logging.Info(fmt.Sprintf("📊 Downloads: %d active, %d waiting or paused · %s", active, queued, speed))
 				value := active
 				lastQueueActive = &value
 			}
@@ -785,7 +798,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
 				logging.Debug("speed policy apply failed", "error", err)
 			} else if changed {
-				source := "base limits"
+				source := "standard limit"
 				nowTs := now.Unix()
 				tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
 				tempEnabled := false
@@ -793,11 +806,11 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					tempEnabled = settingTruthy(value)
 				}
 				if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
-					source = "temporary override"
+					source = "temporary limit"
 				} else if _, _, ok := bg_scheduledSpeedLimits(cfg); ok {
-					source = "schedule"
+					source = "scheduled limit"
 				}
-				logging.Info(fmt.Sprintf("🚦 Speed limits applied (%s): %d KB/s down · %d KB/s up", source, downloadKib, uploadKib))
+				logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s)", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), source))
 			}
 			lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib}
 			lastSpeedPolicy = now
@@ -1251,6 +1264,10 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	}
 }
 
+// resumeSaveInterval is how often the torrent progress is saved while running,
+// so an unclean stop loses at most this much download state.
+const resumeSaveInterval = 2 * time.Minute
+
 // completionRecoveryInterval is how often the worker looks for completed
 // torrents whose completion event was lost. Transient completion retries
 // (completionRetries, first backoff one minute) also go through this scan.
@@ -1675,7 +1692,12 @@ func housekeepingWorker(state *AppState) {
 		}
 		if enabled {
 			if report, ok := gh0_runHousekeeping(state); ok && report != nil {
-				logging.Info("🧹 housekeeping completed",
+				removed := report.OldCyclesRemoved + report.StaleTorrentsRemoved + report.SeenRemoved +
+					report.GapLogsRemoved + report.StaleProvidersRemoved
+				if removed > 0 {
+					logging.Info(fmt.Sprintf("🧹 Routine cleanup: removed %s", countLabel(removed, "old record", "old records")))
+				}
+				logging.Debug("housekeeping completed",
 					"cycles", report.OldCyclesRemoved,
 					"torrents", report.StaleTorrentsRemoved,
 					"seen", report.SeenRemoved,
@@ -1862,13 +1884,13 @@ func formatScheduledCycleTime(now, due time.Time) string {
 	location := due.Location()
 	now = now.In(location)
 	if now.Year() == due.Year() && now.Month() == due.Month() && now.Day() == due.Day() {
-		return due.Format("15.04")
+		return "at " + due.Format("15:04")
 	}
 	tomorrow := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location)
 	if due.Year() == tomorrow.Year() && due.Month() == tomorrow.Month() && due.Day() == tomorrow.Day() {
-		return "domani " + due.Format("15.04")
+		return "tomorrow at " + due.Format("15:04")
 	}
-	return due.Format("02/01 15.04")
+	return "on " + due.Format("02/01 at 15:04")
 }
 
 func cycleWorker(state *AppState) {
@@ -1907,9 +1929,9 @@ func cycleWorker(state *AppState) {
 				if lastAt, ok := state.db.LastCycleAt(); ok {
 					due := lastAt.Add(durationFromSeconds(refresh))
 					if remaining := time.Until(due); remaining > 0 {
-						logging.Info(fmt.Sprintf("scheduled cycle postponed after restart; next cycle will start in %s, at %s",
-							remaining.Round(time.Second), formatScheduledCycleTime(time.Now(), due.Local())),
-							"configured_interval", durationFromSeconds(refresh).String())
+						logging.Info(fmt.Sprintf("⏰ Next search %s (in %s; searches run every %s)",
+							formatScheduledCycleTime(time.Now(), due.Local()), logDuration(remaining),
+							logDuration(durationFromSeconds(refresh))))
 						for {
 							remaining = time.Until(due)
 							if remaining <= 0 {

@@ -286,7 +286,7 @@ func TestFeedSourceNamesAndBreakdown(t *testing.T) {
 		{Kind: "indexer", Name: "Ignored", Stats: logging.SourceStat{OK: 1}},
 	}
 	breakdown := sourceBreakdown(stats)
-	for _, fragment := range []string{"ExtTo: 100", "Knaben: 5 (1 error)", "Down: error"} {
+	for _, fragment := range []string{"ExtTo 100", "Knaben 5 (1 feed failed)", "Down unavailable"} {
 		if !containsSubstring(breakdown, fragment) {
 			t.Fatalf("breakdown %q missing %q", breakdown, fragment)
 		}

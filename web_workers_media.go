@@ -90,8 +90,10 @@ func mediaInfoBackfillWorker(state *AppState) {
 					candidates := bwm_reportCount(report, "candidates")
 					if candidates > 0 {
 						missingFiles, _ := report["missing_files"].([]string)
-						logging.Info(
-							"🔬 MediaInfo backfill: esito analisi file archiviati",
+						logging.Info(fmt.Sprintf("🔬 Read the technical details (resolution, HDR, audio) of %s in the library",
+							countLabel(bwm_reportCount(report, "probed"), "file", "files")))
+						logging.Debug(
+							"MediaInfo backfill report",
 							"candidates", candidates,
 							"analyzed", bwm_reportCount(report, "probed"),
 							"failed", bwm_reportCount(report, "failed"),
@@ -257,7 +259,7 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		}
 	}
 	logging.Info(
-		"scheduled backup completed",
+		"💾 Scheduled backup saved",
 		"path", steps.path,
 		"ftp_uploaded", steps.ftpUploaded,
 		"ftp_host", steps.ftpHost,

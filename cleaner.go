@@ -234,12 +234,13 @@ func handleDuplicate(file string, cfg *Config) error {
 // removed because a better release replaced it, so the reason is visible in the
 // log instead of only a bare count.
 func logInferiorFileReplaced(cfg *Config, file, replacement string) {
-	action := "moved to trash"
+	action := "is in the trash"
 	if cfg.CleanupAction == "delete" {
-		action = "deleted"
+		action = "was deleted"
 	}
-	logging.Info(fmt.Sprintf("🗑️ previous file %s (inferior quality) — replaced by «%s»", action, filepath.Base(replacement)),
-		"file", file, "replacement", replacement)
+	logging.Info(fmt.Sprintf("🗑️ Replaced with a better version: «%s»; the old file «%s» %s",
+		filepath.Base(replacement), filepath.Base(file), action))
+	logging.Debug("inferior file replaced", "file", file, "replacement", replacement)
 }
 
 // MoveToTrash moves a file or directory to the trash with a unique name; it

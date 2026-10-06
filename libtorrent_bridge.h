@@ -179,6 +179,10 @@ size_t gextto_lt_restore(struct gextto_lt_session* session, const char* state_di
     size_t error_size);
 int gextto_lt_save_resume(struct gextto_lt_session* session, const char* state_dir, char* error,
     size_t error_size);
+// Asks libtorrent to save the resume data of the torrents changed since the last
+// save; the answers are written to state_dir while events are polled. Returns
+// the number of requests, or -1 on error.
+int gextto_lt_request_resume_save(struct gextto_lt_session* session, const char* state_dir);
 
 // Per-torrent controls that libtorrent exposes but were not wired before.
 int gextto_lt_set_max_connections(struct gextto_lt_session* session, const char* hash, int max_connections,

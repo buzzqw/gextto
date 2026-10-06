@@ -496,6 +496,12 @@ func cgoLtSaveResume(session unsafe.Pointer, stateDir string) (int32, string) {
 	return int32(saved), goStringFromBytes(error)
 }
 
+func cgoLtRequestResumeSave(session unsafe.Pointer, stateDir string) int32 {
+	cStateDir := C.CString(stateDir)
+	defer C.free(unsafe.Pointer(cStateDir))
+	return int32(C.gextto_lt_request_resume_save((*C.gextto_lt_session)(session), cStateDir))
+}
+
 func cgoLtSetMaxConnections(session unsafe.Pointer, hash string, value int32) (int32, string) {
 	sess := (*C.gextto_lt_session)(session)
 	chash := C.CString(hash)

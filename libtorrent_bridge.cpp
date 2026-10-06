@@ -89,6 +89,11 @@ struct gextto_lt_session {
     bool sequential_enabled = false;
     // Hash del torrent "pinned": volutamente fuori dall'auto-gestione.
     std::string pinned_hash;
+    // Directory where periodic resume saves are written (set by
+    // gextto_lt_request_resume_save). The save_resume_data_alert answers are
+    // written by collect_events, inside the normal alert flow, so no lifecycle
+    // event is lost.
+    std::string periodic_resume_dir;
     lt::session session;
     std::deque<gextto_lt_event> events;
     std::unordered_map<std::string, std::chrono::steady_clock::time_point> active_since;
@@ -164,10 +169,28 @@ static lt::torrent_handle find_torrent(gextto_lt_session* session, const char* h
     return {};
 }
 
+static bool write_atomic(const std::filesystem::path& path, const std::vector<char>& content, std::string& error);
+
 static void collect_events(gextto_lt_session* session) {
     std::vector<lt::alert*> alerts;
     session->session.pop_alerts(&alerts);
     for (auto* alert : alerts) {
+        // Answer to a periodic resume save: persist it so a crash or a forced
+        // kill does not lose downloads added or progressed since the start.
+        // A torrent removed meanwhile has an invalid handle and is skipped,
+        // so it is never resurrected at the next start.
+        if (auto* saved = lt::alert_cast<lt::save_resume_data_alert>(alert)) {
+            if (!session->periodic_resume_dir.empty() && saved->handle.is_valid()) {
+                try {
+                    auto content = lt::write_resume_data_buf(saved->params);
+                    std::string write_error;
+                    write_atomic(std::filesystem::path(session->periodic_resume_dir) / (hex_hash(saved->handle) + ".fastresume"),
+                        content, write_error);
+                } catch (...) {
+                }
+            }
+            continue;
+        }
         // Session counters are not lifecycle events: snapshot them and move on.
         if (auto* stats = lt::alert_cast<lt::session_stats_alert>(alert)) {
             const auto metrics = lt::session_stats_metrics();
@@ -1368,6 +1391,26 @@ int gextto_lt_set_limits(gextto_lt_session* session, const char* hash, int downl
         set_error(error, error_size, exception.what());
     }
     return 0;
+}
+
+int gextto_lt_request_resume_save(gextto_lt_session* session, const char* state_dir) {
+    std::lock_guard<std::recursive_mutex> lock(LIBTORRENT_API_MUTEX);
+    if (session == nullptr || state_dir == nullptr) return -1;
+    try {
+        std::filesystem::create_directories(std::filesystem::path(state_dir));
+        session->periodic_resume_dir = state_dir;
+        int requested = 0;
+        for (const auto& handle : session->session.get_torrents()) {
+            if (!handle.is_valid() || !handle.need_save_resume_data()) continue;
+            // Include the info dictionary: a torrent added from a .torrent file
+            // has no other copy of its metadata in the state directory.
+            handle.save_resume_data(lt::torrent_handle::save_info_dict);
+            ++requested;
+        }
+        return requested;
+    } catch (...) {
+        return -1;
+    }
 }
 
 size_t gextto_lt_restore(gextto_lt_session* session, const char* state_dir, char* error, size_t error_size) {

@@ -840,7 +840,7 @@ func sweepStaleFlareSolverrSessions(ctx context.Context, client *http.Client, en
 		}
 	}
 	if len(pending) > 0 {
-		logging.Info("destroyed stale FlareSolverr sessions", "count", len(pending))
+		logging.Debug("destroyed stale FlareSolverr sessions", "count", len(pending))
 	}
 	return len(pending)
 }
@@ -980,7 +980,7 @@ func flaresolverr_or(ctx context.Context, client *http.Client, flaresolverr, raw
 		logging.Debug("FlareSolverr request failed", "feed_url", rawURL, "flaresolverr", flaresolverr, "error", err.Error())
 		return "", err
 	}
-	logging.Info("FlareSolverr solved the challenge; parsing the retrieved feed",
+	logging.Debug("FlareSolverr solved the challenge; parsing the retrieved feed",
 		"feed_url", rawURL, "response_bytes", len(body))
 	return body, nil
 }
@@ -1068,7 +1068,7 @@ func fetch_body_direct(ctx context.Context, client *http.Client, rawURL string, 
 	}
 	if status == 429 {
 		penalize_host(rawURL, 2*time.Second)
-		logging.Warn("host rate limited the request (429)", "feed_url", rawURL)
+		logging.Warn("⚠️ A feed site asked to slow down (too many requests); it will be read again later", "feed_url", rawURL)
 		return fetchAttempt{kind: fetchAttemptTransient, value: fmt.Sprintf("HTTP %d", status)}
 	}
 	if status >= 500 {

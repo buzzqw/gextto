@@ -282,6 +282,11 @@ func TestFormatEventSeedingNotification(t *testing.T) {
 }
 
 func TestFormatEventManualTorrentCompletion(t *testing.T) {
+	// The expected strings are Italian: do not depend on the language another
+	// test left behind (the shuffled run caught it).
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+	messages.SetLanguage("it")
 	message := formatEvent("torrent_completed", map[string]any{
 		"title":      "Minions.&.Monsters.2026.iTA-ENG.WEBDL.2160p.HEVC.HDR.x265-CYBER.mkv",
 		"path":       "/downloads/Minions.&.Monsters.mkv",

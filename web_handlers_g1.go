@@ -718,7 +718,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		})
 		return
 	}
-	logging.Info("manual cycle requested", "domain", gh1_domainLabel(domain), "queued", running)
+	logging.Info(fmt.Sprintf("▶️ Search requested from the interface (%s)", cycleModeLabel(gh1_domainLabel(domain))))
 	taskDomain := domain
 	// Cancelled on shutdown so a manual cycle releases the torrent engine
 	// before the native session is destroyed.
@@ -731,7 +731,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		defer s.manualCyclePending.Store(false)
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
-		logging.Info("manual cycle started", "domain", gh1_domainLabel(taskDomain))
+		logging.Debug("manual cycle started", "domain", gh1_domainLabel(taskDomain))
 		now := time.Now().UTC()
 		s.last_cycle.Set(models.CycleStats{LastStartedAt: &now, ErrorDetails: map[string]int{}})
 		notifier := FromConfig(&cfg).Async()

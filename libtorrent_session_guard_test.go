@@ -65,3 +65,25 @@ func TestSessionGuardWithoutSession(t *testing.T) {
 		t.Fatal("enterSession accepted a call without a session")
 	}
 }
+
+// A worker stuck in uninterruptible work (a library copy) must not block the
+// shutdown past workerStopTimeout: systemd would kill the daemon before the
+// torrent resume data is saved.
+func TestStopBackgroundWorkersDoesNotWaitForever(t *testing.T) {
+	previous := workerStopTimeout
+	workerStopTimeout = 100 * time.Millisecond
+	defer func() { workerStopTimeout = previous }()
+	state := &AppState{bgStop: make(chan struct{})}
+	release := make(chan struct{})
+	defer close(release)
+	state.bgWG.Add(1)
+	go func() {
+		defer state.bgWG.Done()
+		<-release
+	}()
+	start := time.Now()
+	stopBackgroundWorkers(state)
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("shutdown waited %s for a stuck worker", elapsed)
+	}
+}

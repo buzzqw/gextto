@@ -42,7 +42,12 @@ func manualTorrentRemovalInfo(s *AppState, hash string) (name, state string, has
 // logManualTorrentRemoval records user removals even when the engine has not
 // received torrent metadata yet, which is otherwise easy to miss in the log.
 func logManualTorrentRemoval(hash string, deleteFiles bool, name, state string, hasMetadata bool) {
-	logging.Info("torrent removed by user", "hash", hash, "name", name, "state", state, "metadata_available", hasMetadata, "delete_files", deleteFiles)
+	files := "its files are kept"
+	if deleteFiles {
+		files = "its files were deleted"
+	}
+	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the download list; %s", name, files))
+	logging.Debug("torrent removed by user", "hash", hash, "state", state, "metadata_available", hasMetadata)
 }
 
 // logAutomaticTorrentRemoval records a removal that gextto performed on its own

@@ -154,10 +154,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	// Each cycle reports only its own sources: drop anything accumulated since
 	// the previous drain (e.g. manual searches from the UI).
 	_ = logging.TakeSourceStats()
-	logging.Info(fmt.Sprintf(
-		"🔎 Step 1/2: scanning %d sources (HTML/RSS feeds)",
-		len(cfg.FeedURLs),
-	))
+	logging.Info(fmt.Sprintf("🔎 Reading %s…", countLabel(int64(len(cfg.FeedURLs)), "feed", "feeds")))
 
 	// Feed fan-out, bounded by `feedConcurrency`, scheduled in config order.
 	feedResults := make([][]models.Release, len(cfg.FeedURLs))
@@ -185,20 +182,16 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	if breakdown == "" {
 		breakdown = "none"
 	}
-	logging.Info(fmt.Sprintf(
-		"🌐 Sources: %d releases from %d feeds — %s",
-		feedsReleases,
-		len(cfg.FeedURLs),
-		breakdown,
-	))
+	logging.Info(fmt.Sprintf("🌐 Feeds read: %s found (%s)",
+		countLabel(int64(feedsReleases), "release", "releases"), breakdown))
 	// Persist the detail-page cache right after the feed phase: the indexer
 	// searches below can take minutes, and a restart would otherwise throw away
 	// every magnet resolved in this cycle.
 	cache.Save()
 
 	if !cfg.ShouldSearchTitlesInCycle() {
-		logging.Info(fmt.Sprintf(
-			"🔎 Step 2/2: online title search skipped (%d feeds provide releases for the local archive)",
+		logging.Debug(fmt.Sprintf(
+			"online title search skipped (%d feeds provide releases for the local archive)",
 			len(cfg.FeedURLs),
 		))
 	} else {
@@ -247,10 +240,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			}
 		}
 		targetsTotal := len(targets)
-		logging.Info(fmt.Sprintf(
-			"🔎 Step 2/2: searching %d series/movies (Torznab indexers)",
-			targetsTotal,
-		))
+		logging.Info(fmt.Sprintf("🔎 Searching the indexers for %s…", countLabel(int64(targetsTotal), "title", "titles")))
 
 		// Title search fan-out, bounded by `queryConcurrency`.
 		type searchResult struct {
@@ -405,12 +395,9 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			}
 			all = append(all, result.Items...)
 		}
-		logging.Info(fmt.Sprintf(
-			"🔎 Step 2/2 complete: %d targets analyzed · %d targets returned compatible releases · %d compatible releases total",
-			targetsDone,
-			targetsWithHits,
-			step2Usable,
-		))
+		logging.Info(fmt.Sprintf("🔎 Indexer search done: suitable releases for %d of %s (%s in total)",
+			targetsWithHits, countLabel(int64(targetsDone), "title", "titles"),
+			countLabel(int64(step2Usable), "release", "releases")))
 		engineFailures := TakeEngineFailures()
 		if len(engineFailures) > 0 {
 			detail := make([]string, 0, len(engineFailures))
@@ -452,7 +439,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		kept = append(kept, release)
 	}
 	all = kept
-	logging.Info(fmt.Sprintf("✅ Scraping: %d unique releases after filters", len(all)))
+	logging.Debug(fmt.Sprintf("scraping: %d unique releases after filters", len(all)))
 	sourceStats := append([]logging.SourceStatEntry{}, feedStats...)
 	sourceStats = append(sourceStats, logging.TakeSourceStats()...)
 	providerFailures := map[string]int{}
@@ -465,7 +452,16 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		failedSources[entry.Kind]++
 	}
 	if len(providerFailures) > 0 {
-		logging.Warn("provider failures in cycle",
+		var failed []string
+		for _, kind := range []struct{ key, singular, pluralForm string }{
+			{"feed", "feed", "feeds"}, {"indexer", "indexer", "indexers"}, {"web", "search engine", "search engines"},
+		} {
+			if count := failedSources[kind.key]; count > 0 {
+				failed = append(failed, countLabel(count, kind.singular, kind.pluralForm))
+			}
+		}
+		logging.Warn("⚠️ Some sources did not answer in this search: " + strings.Join(failed, ", "))
+		logging.Debug("provider failures in cycle",
 			"feed_failures", providerFailures["feed"],
 			"feed_sources", failedSources["feed"],
 			"indexer_failures", providerFailures["indexer"],
@@ -815,14 +811,15 @@ func sourceBreakdown(stats []logging.SourceStatEntry) string {
 		stat := entry.Stats
 		switch {
 		case stat.Fail > 0 && stat.OK == 0:
-			parts = append(parts, entry.Name+": error")
+			parts = append(parts, entry.Name+" unavailable")
 		case stat.Fail > 0:
-			parts = append(parts, fmt.Sprintf("%s: %d (%d error)", entry.Name, stat.Results, stat.Fail))
+			parts = append(parts, fmt.Sprintf("%s %s (%s failed)", entry.Name, logCount(int64(stat.Results)),
+				countLabel(int64(stat.Fail), "feed", "feeds")))
 		default:
-			parts = append(parts, fmt.Sprintf("%s: %d", entry.Name, stat.Results))
+			parts = append(parts, entry.Name+" "+logCount(int64(stat.Results)))
 		}
 	}
-	return strings.Join(parts, " | ")
+	return strings.Join(parts, " · ")
 }
 
 // feedSourceName maps a feed URL to the stable provider name used by the
