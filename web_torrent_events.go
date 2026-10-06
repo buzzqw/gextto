@@ -46,6 +46,10 @@ type StallWatch struct {
 	// separate backoff so a dead swarm does not dominate the daemon log.
 	nextRetryNoticeAt time.Time
 	retryNoticeStep   uint8
+	// probeUntil is set while a parked torrent is resumed for a retry; when it
+	// passes without byte progress the torrent is parked again. It is not
+	// persisted: after a restart a parked torrent is simply parked again.
+	probeUntil time.Time
 }
 
 // StorageMoveRetry is one pending/ongoing asynchronous storage move (implementation of
@@ -598,6 +602,10 @@ func tev_stallExpired(lastProgressAt *time.Time, lastDone *int64, now time.Time,
 	return now.Sub(*lastProgressAt) >= timeout
 }
 
+// tev_stallProbeWindow is how long a parked torrent stays resumed after each
+// retry, waiting for a seeder to answer the reannounce.
+const tev_stallProbeWindow = 10 * time.Minute
+
 var tev_stallRetryNoticeIntervals = [...]time.Duration{
 	time.Hour,
 	3 * time.Hour,
@@ -649,75 +657,58 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 	if hasGiveup {
 		giveupTimeout = time.Duration(giveupMinutes * 60.0 * float64(time.Second))
 	}
+	probeTimeout := tev_stallProbeWindow
+	if probeTimeout > retryTimeout/2 {
+		probeTimeout = retryTimeout / 2
+	}
 	now := time.Now()
 	live := map[string]struct{}{}
 	for _, torrent := range torrents.List() {
 		live[torrent.Hash] = struct{}{}
-		_, wasStalled := watch[torrent.Hash]
-		// A parked stalled torrent is deliberately paused. Continue monitoring it
-		// when its state was restored from the database after a daemon restart;
-		// unrelated user-paused torrents never enter watch and remain untouched.
-		if (torrent.State != "downloading" && torrent.State != "stalled" && !(torrent.State == "paused" && wasStalled)) || torrent.Progress >= 100.0 {
-			if wasStalled {
+		entry, watched := watch[torrent.Hash]
+		parked := watched && entry.stalledSince != nil
+		finished := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
+		// A parked torrent shows up as stalled, paused, downloading (during a
+		// probe) or checking (after a restart): none of these ends the stall, so
+		// its clock and give-up deadline survive. A torrent that is not parked
+		// is timed only while it is really downloading; user-paused torrents
+		// never enter watch.
+		if finished || (!parked && torrent.State != "downloading" && torrent.State != "stalled") {
+			if watched {
 				torrents.ClearStalled(torrent.Hash)
 				// Only a stalled entry was ever persisted: do not issue a DELETE for
 				// every seeding/paused torrent at every tick.
-				if stallWatchPersisted(watch[torrent.Hash]) {
+				if parked {
 					_ = db.DeleteStallWatch(torrent.Hash)
 				}
 				delete(watch, torrent.Hash)
 			}
 			continue
 		}
-		entry, ok := watch[torrent.Hash]
-		persisted := ok && stallWatchPersisted(entry)
-		if !ok {
-			entry = StallWatch{
-				lastProgressAt: now,
-				lastDone:       torrent.TotalDone,
-				nextRetryAt:    now,
-			}
+		if parked && torrent.State != "downloading" && torrent.State != "stalled" && torrent.State != "paused" {
+			continue
 		}
-		progressAt := entry.lastProgressAt
-		lastDone := entry.lastDone
-		hadProgress := torrent.TotalDone > entry.lastDone
-		recoveredBytes := torrent.TotalDone - entry.lastDone
-		if !tev_stallExpired(&progressAt, &lastDone, now, torrent.TotalDone, stallTimeout) {
+		if !parked {
+			if !watched {
+				entry = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone}
+			}
+			progressAt := entry.lastProgressAt
+			lastDone := entry.lastDone
+			expired := tev_stallExpired(&progressAt, &lastDone, now, torrent.TotalDone, stallTimeout)
 			entry.lastProgressAt = progressAt
 			entry.lastDone = lastDone
-			if hadProgress {
-				if entry.stalledSince != nil {
-					logging.Info(fmt.Sprintf("▶️ «%s» is downloading again (%s)", torrent.Name, logPercent(torrent.Progress)))
-					logging.Debug("stalled torrent made byte progress",
-						"hash", torrent.Hash, "recovered_bytes", recoveredBytes, "progress", torrent.Progress)
-				}
-				entry.stalledSince = nil
-				entry.nextRetryNoticeAt = time.Time{}
-				entry.retryNoticeStep = 0
+			if !expired {
+				watch[torrent.Hash] = entry
+				continue
 			}
-			entry.nextRetryAt = now
-			watch[torrent.Hash] = entry
-			if persisted {
-				torrents.ClearStalled(torrent.Hash)
-				_ = db.DeleteStallWatch(torrent.Hash)
+			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
+				logging.Debug("could not park stalled torrent",
+					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+				watch[torrent.Hash] = entry
+				continue
 			}
-			continue
-		}
-		entry.lastProgressAt = progressAt
-		entry.lastDone = lastDone
-		firstStall := entry.stalledSince == nil
-		if entry.stalledSince == nil {
 			stamp := now
 			entry.stalledSince = &stamp
-		}
-		stalledSince := *entry.stalledSince
-		if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
-			logging.Debug("could not park stalled torrent",
-				"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
-			watch[torrent.Hash] = entry
-			continue
-		}
-		if firstStall {
 			code, reason, hint := DiagnoseTorrent(&torrent)
 			logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried every %s",
 				torrent.Name, logPercent(torrent.Progress), stallReasonForLog(code, &torrent),
@@ -737,7 +728,30 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			)
 			entry.nextRetryAt = now.Add(retryTimeout)
 			tev_scheduleNextStallRetryNotice(&entry, now)
+			watch[torrent.Hash] = entry
+			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
+				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+			}
+			continue
 		}
+
+		probing := !entry.probeUntil.IsZero()
+		if torrent.TotalDone > entry.lastDone {
+			// Only bytes received during a probe prove the swarm is back: while
+			// parked the torrent is paused, so a higher count there comes from a
+			// data check and merely moves the baseline.
+			if probing {
+				logging.Info(fmt.Sprintf("▶️ «%s» is downloading again (%s)", torrent.Name, logPercent(torrent.Progress)))
+				logging.Debug("stalled torrent made byte progress",
+					"hash", torrent.Hash, "recovered_bytes", torrent.TotalDone-entry.lastDone, "progress", torrent.Progress)
+				torrents.ClearStalled(torrent.Hash)
+				_ = db.DeleteStallWatch(torrent.Hash)
+				watch[torrent.Hash] = StallWatch{lastProgressAt: now, lastDone: torrent.TotalDone}
+				continue
+			}
+			entry.lastDone = torrent.TotalDone
+		}
+		stalledSince := *entry.stalledSince
 		entryGiveup := giveupTimeout
 		entryGiveupMinutes := giveupMinutes
 		hasEntryGiveup := hasGiveup
@@ -781,28 +795,41 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			_ = db.DeleteStallWatch(torrent.Hash)
 			continue
 		}
-		if !now.Before(entry.nextRetryAt) {
-			restarted := false
+		switch {
+		case probing && !now.Before(entry.probeUntil):
+			// The probe brought no bytes: park it again until the next retry.
+			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
+				logging.Debug("could not park stalled torrent after its retry",
+					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+			} else {
+				entry.probeUntil = time.Time{}
+			}
+		case probing:
+			// Still probing: give the swarm time to answer the reannounce.
+		case !now.Before(entry.nextRetryAt):
 			value, err := torrents.Restart(torrent.Hash)
 			if err != nil {
 				logging.Debug("stalled torrent restart failed",
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
+				entry.nextRetryAt = now.Add(15 * time.Second)
 			} else if value {
 				if tev_stallRetryNoticeDue(&entry, now) {
 					logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again", torrent.Name))
 					tev_scheduleNextStallRetryNotice(&entry, now)
 				}
-				restarted = true
+				entry.probeUntil = now.Add(probeTimeout)
+				entry.nextRetryAt = now.Add(retryTimeout)
 			} else {
 				logging.Debug("stalled torrent restart unavailable in current mode",
 					"hash", torrent.Hash, "name", torrent.Name)
-			}
-			if restarted {
-				entry.lastProgressAt = now
-				entry.lastDone = torrent.TotalDone
-				entry.nextRetryAt = now.Add(retryTimeout)
-			} else {
 				entry.nextRetryAt = now.Add(15 * time.Second)
+			}
+		case torrent.State != "stalled":
+			// After a daemon restart a parked torrent comes back merely paused, or
+			// running if it was probing: park it again.
+			if _, err := torrents.MarkStalled(torrent.Hash); err != nil {
+				logging.Debug("could not park stalled torrent",
+					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 			}
 		}
 		watch[torrent.Hash] = entry
