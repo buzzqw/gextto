@@ -3467,15 +3467,21 @@ func (d *Database) LoadStallWatches() (map[string]StallWatch, error) {
 		if err != nil {
 			continue
 		}
-		stalledAt, err := parse(stalledSince)
-		if err != nil {
-			continue
+		entry := StallWatch{lastProgressAt: progressAt, lastDone: lastDone, retryNoticeStep: step, persisted: true}
+		// An empty stalled_since is an idle download not parked yet: only its
+		// progress clock was saved.
+		if stalledSince != "" {
+			stalledAt, err := parse(stalledSince)
+			if err != nil {
+				continue
+			}
+			retryAt, err := parse(nextRetry)
+			if err != nil {
+				continue
+			}
+			entry.stalledSince = &stalledAt
+			entry.nextRetryAt = retryAt
 		}
-		retryAt, err := parse(nextRetry)
-		if err != nil {
-			continue
-		}
-		entry := StallWatch{lastProgressAt: progressAt, lastDone: lastDone, stalledSince: &stalledAt, nextRetryAt: retryAt, retryNoticeStep: step}
 		if nextNotice != "" {
 			if noticeAt, err := parse(nextNotice); err == nil {
 				entry.nextRetryNoticeAt = noticeAt
@@ -3486,10 +3492,16 @@ func (d *Database) LoadStallWatches() (map[string]StallWatch, error) {
 	return watches, rows.Err()
 }
 
-// SaveStallWatch atomically records a stalled torrent's retry state.
+// SaveStallWatch atomically records a stalled torrent's retry state, or the
+// progress clock of a download idle long enough to be persisted (empty
+// stalled_since).
 func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
-	if d == nil || d.db == nil || entry.stalledSince == nil {
+	if d == nil || d.db == nil {
 		return nil
+	}
+	stalledSince := ""
+	if entry.stalledSince != nil {
+		stalledSince = entry.stalledSince.UTC().Format(time.RFC3339Nano)
 	}
 	nextNotice := ""
 	if !entry.nextRetryNoticeAt.IsZero() {
@@ -3501,7 +3513,7 @@ func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
 		stalled_since=excluded.stalled_since,next_retry_at=excluded.next_retry_at,next_notice_at=excluded.next_notice_at,
 		notice_step=excluded.notice_step,updated_at=excluded.updated_at`,
 		strings.ToLower(hash), entry.lastProgressAt.UTC().Format(time.RFC3339Nano), entry.lastDone,
-		entry.stalledSince.UTC().Format(time.RFC3339Nano), entry.nextRetryAt.UTC().Format(time.RFC3339Nano),
+		stalledSince, entry.nextRetryAt.UTC().Format(time.RFC3339Nano),
 		nextNotice, entry.retryNoticeStep, nowSQLite())
 	return err
 }

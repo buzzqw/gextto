@@ -50,6 +50,10 @@ type StallWatch struct {
 	// passes without byte progress the torrent is parked again. It is not
 	// persisted: after a restart a parked torrent is simply parked again.
 	probeUntil time.Time
+	// persisted reports whether the entry has a database row: parked torrents
+	// always do, downloads only once idle for tev_stallPersistAfter, so a
+	// restart does not reset the clock of a download that is already stuck.
+	persisted bool
 }
 
 // StorageMoveRetry is one pending/ongoing asynchronous storage move (implementation of
@@ -606,6 +610,10 @@ func tev_stallExpired(lastProgressAt *time.Time, lastDone *int64, now time.Time,
 // retry, waiting for a seeder to answer the reannounce.
 const tev_stallProbeWindow = 10 * time.Minute
 
+// tev_stallPersistAfter is how long a download must go without a byte before
+// its progress clock is saved, so it survives a restart.
+const tev_stallPersistAfter = 5 * time.Minute
+
 var tev_stallRetryNoticeIntervals = [...]time.Duration{
 	time.Hour,
 	3 * time.Hour,
@@ -668,24 +676,26 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		entry, watched := watch[torrent.Hash]
 		parked := watched && entry.stalledSince != nil
 		finished := torrent.Progress >= 100.0 || torrent.State == "finished" || torrent.State == "seeding"
-		// A parked torrent shows up as stalled, paused, downloading (during a
-		// probe) or checking (after a restart): none of these ends the stall, so
-		// its clock and give-up deadline survive. A torrent that is not parked
-		// is timed only while it is really downloading; user-paused torrents
-		// never enter watch.
-		if finished || (!parked && torrent.State != "downloading" && torrent.State != "stalled") {
+		// A data check or metadata fetch (typically right after a restart) is
+		// not a verdict: keep the clock as it is until the torrent settles.
+		transient := !finished && torrent.State != "downloading" && torrent.State != "stalled" && torrent.State != "paused"
+		if transient {
+			continue
+		}
+		// A parked torrent shows up as stalled, paused or downloading (during a
+		// probe): none of these ends the stall, so its clock and give-up
+		// deadline survive. A torrent that is not parked is timed only while it
+		// is really downloading; user-paused torrents never enter watch.
+		if finished || (!parked && torrent.State == "paused") {
 			if watched {
 				torrents.ClearStalled(torrent.Hash)
-				// Only a stalled entry was ever persisted: do not issue a DELETE for
-				// every seeding/paused torrent at every tick.
-				if parked {
+				// Only idle or stalled entries were persisted: do not issue a DELETE
+				// for every seeding/paused torrent at every tick.
+				if entry.persisted {
 					_ = db.DeleteStallWatch(torrent.Hash)
 				}
 				delete(watch, torrent.Hash)
 			}
-			continue
-		}
-		if parked && torrent.State != "downloading" && torrent.State != "stalled" && torrent.State != "paused" {
 			continue
 		}
 		if !parked {
@@ -698,6 +708,16 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			entry.lastProgressAt = progressAt
 			entry.lastDone = lastDone
 			if !expired {
+				idle := now.Sub(entry.lastProgressAt) >= tev_stallPersistAfter
+				switch {
+				case idle && !entry.persisted:
+					if err := db.SaveStallWatch(torrent.Hash, entry); err == nil {
+						entry.persisted = true
+					}
+				case !idle && entry.persisted:
+					_ = db.DeleteStallWatch(torrent.Hash)
+					entry.persisted = false
+				}
 				watch[torrent.Hash] = entry
 				continue
 			}
@@ -728,10 +748,12 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			)
 			entry.nextRetryAt = now.Add(retryTimeout)
 			tev_scheduleNextStallRetryNotice(&entry, now)
-			watch[torrent.Hash] = entry
 			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
 				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+			} else {
+				entry.persisted = true
 			}
+			watch[torrent.Hash] = entry
 			continue
 		}
 
@@ -832,10 +854,12 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 			}
 		}
-		watch[torrent.Hash] = entry
 		if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
 			logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+		} else {
+			entry.persisted = true
 		}
+		watch[torrent.Hash] = entry
 	}
 	for hash, entry := range watch {
 		if _, ok := live[hash]; !ok {
@@ -847,11 +871,9 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 	}
 }
 
-// stallWatchPersisted reports whether a monitor entry has a database row: rows
-// are written only once a torrent is declared stalled (and restored with
-// stalledSince set after a restart).
+// stallWatchPersisted reports whether a monitor entry has a database row.
 func stallWatchPersisted(entry StallWatch) bool {
-	return entry.stalledSince != nil
+	return entry.persisted
 }
 
 // ---------------------------------------------------------------------------

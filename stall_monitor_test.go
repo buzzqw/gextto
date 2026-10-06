@@ -147,3 +147,60 @@ func TestMonitorStalledGivesUpOnTheOriginalClock(t *testing.T) {
 		t.Fatalf("dead swarm past its give-up window was not removed: %v", session.removed)
 	}
 }
+
+func TestMonitorStalledIdleClockSurvivesRestart(t *testing.T) {
+	db := newTestDB(t)
+	cfg := &Config{Settings: map[string]string{"libtorrent_stall_after_min": "60"}}
+	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
+		{Hash: "fbi", Name: "FBI.S03", State: "downloading", Progress: 53, TotalDone: 1000, NumPeers: 4},
+	}}}
+	watch := map[string]StallWatch{}
+	MonitorStalled(cfg, session, db, nil, watch)
+
+	// Idle for 40 minutes: the clock is saved, the torrent not parked yet.
+	idleSince := time.Now().Add(-40 * time.Minute)
+	entry := watch["fbi"]
+	entry.lastProgressAt = idleSince
+	watch["fbi"] = entry
+	MonitorStalled(cfg, session, db, nil, watch)
+	if session.marks != 0 {
+		t.Fatal("parked before the stall window")
+	}
+
+	// Restart: the clock comes back from the database, survives the data
+	// check and keeps counting from the original moment.
+	restored, err := db.LoadStallWatches()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := restored["fbi"]; !ok || got.stalledSince != nil || !got.lastProgressAt.Equal(idleSince) {
+		t.Fatalf("idle clock not restored: %#v", restored)
+	}
+	session.setState("checking_resume_data")
+	MonitorStalled(cfg, session, db, nil, restored)
+	session.setState("downloading")
+	MonitorStalled(cfg, session, db, nil, restored)
+	if session.marks != 0 {
+		t.Fatal("parked before the stall window after the restart")
+	}
+	rewound := restored["fbi"]
+	rewound.lastProgressAt = time.Now().Add(-61 * time.Minute)
+	restored["fbi"] = rewound
+	MonitorStalled(cfg, session, db, nil, restored)
+	if session.marks != 1 {
+		t.Fatal("restored idle download not parked once its window elapsed")
+	}
+
+	// Progress clears the saved clock.
+	fresh := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
+		{Hash: "ok", Name: "Fine", State: "downloading", Progress: 10, TotalDone: 1},
+	}}}
+	okWatch := map[string]StallWatch{"ok": {lastProgressAt: time.Now().Add(-10 * time.Minute), lastDone: 1}}
+	MonitorStalled(cfg, fresh, db, nil, okWatch)
+	fresh.list[0].TotalDone = 500
+	MonitorStalled(cfg, fresh, db, nil, okWatch)
+	rows, _ := db.LoadStallWatches()
+	if _, ok := rows["ok"]; ok {
+		t.Fatal("a download that moved again kept its saved idle clock")
+	}
+}
