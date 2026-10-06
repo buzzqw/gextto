@@ -357,6 +357,18 @@ func TestFormatEventBackupNotification(t *testing.T) {
 	if !strings.Contains(msgEn, "FTP upload failed (ftp.bad.com): connection refused") {
 		t.Fatalf("missing ftp error: %q", msgEn)
 	}
+
+	// Cloud copy not configured: no line at all, never a "failed" one.
+	messages.SetLanguage("it")
+	msgNoCloud := formatEvent("backup_completed", map[string]any{
+		"path":         "/backups/backup.zip",
+		"cloud_error":  "",
+		"ftp_uploaded": true,
+		"ftp_host":     "192.168.1.119",
+	})
+	if strings.Contains(msgNoCloud, "cloud") || strings.Contains(msgNoCloud, "non riuscit") {
+		t.Fatalf("unconfigured cloud copy reported: %q", msgNoCloud)
+	}
 }
 
 func TestFormatEventMovieAndErrors(t *testing.T) {

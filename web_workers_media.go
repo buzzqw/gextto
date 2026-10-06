@@ -272,6 +272,8 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		"cloud_error", bwm_optionalString(steps.cloudError),
 		"telegram_uploaded", telegramUploaded,
 	)
+	// The notification gets an empty error for a step that was not configured
+	// (nil): the "none" placeholder would read as a failure.
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{
 		"path":              steps.path,
 		"size_bytes":        steps.sizeBytes,
@@ -279,10 +281,10 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		"ftp_uploaded":      steps.ftpUploaded,
 		"ftp_host":          steps.ftpHost,
 		"ftp_remote":        steps.ftpRemote,
-		"ftp_error":         bwm_optionalString(steps.ftpError),
+		"ftp_error":         bg_derefStr(steps.ftpError),
 		"cloud_copied":      steps.cloudCopied,
 		"cloud_destination": steps.cloudDestination,
-		"cloud_error":       bwm_optionalString(steps.cloudError),
+		"cloud_error":       bg_derefStr(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
 	})
 	return nil
