@@ -514,7 +514,10 @@ func hookEnvKey(key string) string {
 // be spawned or times out.
 func RunHook(hook EventHook, event string, payload map[string]any) (HookRun, error) {
 	vars := Variables(event, payload)
-	program := Expand(strings.TrimSpace(hook.Program), vars)
+	program := filepath.Clean(strings.TrimSpace(hook.Program))
+	if !filepath.IsAbs(program) {
+		return HookRun{}, fmt.Errorf("hook program must be an absolute path: %s", program)
+	}
 	// Split the configured template first, then expand each argument on its
 	// own: a value coming from a feed (a release title with spaces, quotes or a
 	// leading "--") must stay one argument and can never add new ones.

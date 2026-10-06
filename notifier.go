@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -437,6 +438,8 @@ func sanitizeEmailHeader(value string) string {
 }
 
 // buildEmailMessage renders a minimal text/plain MIME message.
+// The body is base64-encoded to guarantee that untrusted/event-derived content
+// cannot inject headers, MIME boundaries, or raw SMTP commands.
 func buildEmailMessage(from string, recipients []string, subject, body string) []byte {
 	from = sanitizeEmailHeader(from)
 	subject = sanitizeEmailHeader(subject)
@@ -451,8 +454,14 @@ func buildEmailMessage(from string, recipients []string, subject, body string) [
 	message.WriteString("Subject: " + subject + "\r\n")
 	message.WriteString("MIME-Version: 1.0\r\n")
 	message.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
+	message.WriteString("Content-Transfer-Encoding: base64\r\n")
 	message.WriteString("\r\n")
-	message.WriteString(body)
+	b64Body := base64.StdEncoding.EncodeToString([]byte(body))
+	for len(b64Body) > 76 {
+		message.WriteString(b64Body[:76] + "\r\n")
+		b64Body = b64Body[76:]
+	}
+	message.WriteString(b64Body + "\r\n")
 	return []byte(message.String())
 }
 

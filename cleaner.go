@@ -222,6 +222,7 @@ func duplicateTarget(trash, file string) string {
 
 // handleDuplicate removes a duplicate file according to the cleanup action.
 func handleDuplicate(file string, cfg *Config) error {
+	file = filepath.Clean(file)
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(file)
 	}
@@ -248,6 +249,8 @@ func logInferiorFileReplaced(cfg *Config, file, replacement string) {
 // falls back to a recursive copy + remove when the trash is on another
 // filesystem (a plain rename fails with EXDEV, typical with a NAS).
 func MoveToTrash(source, trash string) (string, error) {
+	source = filepath.Clean(source)
+	trash = filepath.Clean(trash)
 	if err := os.MkdirAll(trash, 0o755); err != nil {
 		return "", err
 	}
@@ -379,6 +382,8 @@ func copyRecursive(source, target string) error {
 // mostly holes, and copying it to a trash on another share (NFS 4.1 has no
 // SEEK_HOLE) used to write tens of gigabytes of zeros to the NAS.
 func cleanerCopyFile(source, target string, mode os.FileMode) error {
+	source = filepath.Clean(source)
+	target = filepath.Clean(target)
 	defer beginFileOperation(target)()
 	reader, err := os.Open(source)
 	if err != nil {

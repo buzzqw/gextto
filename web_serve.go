@@ -174,11 +174,18 @@ func stopBackgroundWorkers(state *AppState) {
 
 // quotedList renders up to limit names as «a», «b» and N more.
 func quotedList(names []string, limit int) string {
+	if limit < 0 {
+		limit = 0
+	}
 	shown := names
 	if len(shown) > limit {
 		shown = shown[:limit]
 	}
-	parts := make([]string, 0, len(shown)+1)
+	capSize := len(shown)
+	if capSize < len(names) && capSize < 1000 {
+		capSize++
+	}
+	parts := make([]string, 0, capSize)
 	for _, name := range shown {
 		parts = append(parts, "«"+name+"»")
 	}

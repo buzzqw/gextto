@@ -1352,11 +1352,12 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 		return videoPath, nil
 	}
 	root = filepath.Clean(root)
+	videoPath = filepath.Clean(videoPath)
 	dir := filepath.Clean(filepath.Dir(videoPath))
 	if SamePath(dir, root) || !pathWithin(dir, root) {
 		return videoPath, nil
 	}
-	target := filepath.Join(root, filepath.Base(videoPath))
+	target := filepath.Clean(filepath.Join(root, filepath.Base(videoPath)))
 	if SamePath(videoPath, target) {
 		return videoPath, nil
 	}
@@ -1378,17 +1379,20 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 // be fully flattened (unknown companion files kept it non-empty), so it is
 // still recognisable instead of keeping the raw torrent folder name.
 func renameLeftoverMovieFolder(dir, root, stem string) {
-	if strings.TrimSpace(stem) == "" {
+	stem = safeComponent(strings.TrimSpace(stem))
+	if stem == "" {
 		return
 	}
+	dir = filepath.Clean(dir)
+	root = filepath.Clean(root)
 	entries, err := os.ReadDir(dir)
 	if err != nil || len(entries) == 0 {
 		return
 	}
-	if !SamePath(filepath.Dir(filepath.Clean(dir)), filepath.Clean(root)) {
+	if !SamePath(filepath.Dir(dir), root) {
 		return
 	}
-	target := filepath.Join(root, stem)
+	target := filepath.Clean(filepath.Join(root, stem))
 	if _, err := os.Stat(target); err == nil {
 		return
 	}
@@ -1398,7 +1402,9 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 // moveMovieCompanions relocates the subtitles and artwork of a flattened movie
 // next to the video, renaming them so media servers still associate them.
 func moveMovieCompanions(oldDir, root, videoBase string) {
-	stem := strings.TrimSuffix(videoBase, filepath.Ext(videoBase))
+	oldDir = filepath.Clean(oldDir)
+	root = filepath.Clean(root)
+	stem := strings.TrimSuffix(filepath.Base(videoBase), filepath.Ext(videoBase))
 	entries, err := os.ReadDir(oldDir)
 	if err != nil {
 		return
@@ -1408,7 +1414,7 @@ func moveMovieCompanions(oldDir, root, videoBase string) {
 			continue
 		}
 		name := entry.Name()
-		source := filepath.Join(oldDir, name)
+		source := filepath.Clean(filepath.Join(oldDir, name))
 		ext := strings.ToLower(filepath.Ext(name))
 		var targetName string
 		switch {
@@ -1434,7 +1440,7 @@ func moveMovieCompanions(oldDir, root, videoBase string) {
 			}
 			targetName = stem + "-" + kind + filepath.Ext(name)
 		}
-		target := filepath.Join(root, targetName)
+		target := filepath.Clean(filepath.Join(root, targetName))
 		if _, statErr := os.Stat(target); statErr == nil {
 			continue
 		}
@@ -1853,6 +1859,7 @@ func DiscardSidecars(source string, cfg *Config) (int, error) {
 // `trash_or_remove`). When the action is "move" the trash folder must be
 // configured: refusing is safer than deleting a file the user asked to keep.
 func trashOrRemove(path string, cfg *Config) error {
+	path = filepath.Clean(path)
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(path)
 	}
