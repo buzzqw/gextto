@@ -1,8 +1,10 @@
 package gextto
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -106,5 +108,49 @@ func TestTrashOrphanedTempDataSafetyGuards(t *testing.T) {
 	cfg.Settings[tempOrphanMinAgeSetting] = "20"
 	if trashOrphanedTempData(cfg, &stubTorrentSession{list: known}, nil, time.Now()) != 1 || exists(orphan) {
 		t.Fatal("with a 20-day threshold the 30-day orphan should be moved")
+	}
+}
+
+func TestCleanerCopyFileKeepsSparseFilesSparse(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "partial.mkv")
+	file, err := os.Create(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const size = 64 << 20 // 64 MiB declared, 2 MiB of real data
+	data := bytes.Repeat([]byte{0xab}, 1<<20)
+	for _, offset := range []int64{0, 30 << 20} {
+		if _, err := file.WriteAt(data, offset); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A few non-zero bytes in an otherwise empty block, and a trailing hole.
+	if _, err := file.WriteAt([]byte("tail"), 40<<20+12345); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(size); err != nil {
+		t.Fatal(err)
+	}
+	file.Close()
+
+	target := filepath.Join(dir, "trash", "partial.mkv")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanerCopyFile(source, target, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	original, _ := os.ReadFile(source)
+	copied, _ := os.ReadFile(target)
+	if !bytes.Equal(original, copied) {
+		t.Fatal("the sparse copy changed the content")
+	}
+	var stat syscall.Stat_t
+	if err := syscall.Stat(target, &stat); err != nil {
+		t.Fatal(err)
+	}
+	if allocated := stat.Blocks * 512; allocated > 8<<20 {
+		t.Fatalf("the copy allocated %d bytes for 3 MiB of data: holes were written as zeros", allocated)
 	}
 }

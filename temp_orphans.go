@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -30,6 +31,24 @@ func tempOrphanMinAge(cfg *Config) time.Duration {
 		days = value
 	}
 	return time.Duration(days) * 24 * time.Hour
+}
+
+// diskUsage is the space path really occupies (allocated blocks), which for
+// an abandoned download full of holes is far less than its apparent size.
+func diskUsage(path string) int64 {
+	var total int64
+	_ = filepath.Walk(path, func(entry string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			total += stat.Blocks * 512
+		} else {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total
 }
 
 // newestModTime returns the most recent modification time inside path, so a
@@ -142,7 +161,7 @@ func trashOrphanedTempData(cfg *Config, torrents TorrentSession, db *Database, n
 		if err != nil || now.Sub(newest) < minAge {
 			continue
 		}
-		size, _ := SizeOfPath(path)
+		size := diskUsage(path)
 		finish := beginFileOperation(path)
 		target, err := MoveToTrash(path, trash)
 		finish()
@@ -152,7 +171,7 @@ func trashOrphanedTempData(cfg *Config, torrents TorrentSession, db *Database, n
 			continue
 		}
 		moved++
-		logging.Info(fmt.Sprintf("🧹 «%s» in the download temp folder belongs to no download and has not changed for %d days: moved to the trash (%s)",
+		logging.Info(fmt.Sprintf("🧹 «%s» in the download temp folder belongs to no download and has not changed for %d days: moved to the trash (%s on disk)",
 			name, int(now.Sub(newest).Hours()/24), logging.HumanBytesI64(size)), "trash", target)
 	}
 	return moved

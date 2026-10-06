@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -373,7 +374,10 @@ func copyRecursive(source, target string) error {
 }
 
 // cleanerCopyFile copies the contents of source into target, preserving the
-// source mode ( `fs::copy`).
+// source mode ( `fs::copy`). Runs of zeros are skipped with a seek instead of
+// written, so a sparse file stays sparse: a download abandoned at 20% is
+// mostly holes, and copying it to a trash on another share (NFS 4.1 has no
+// SEEK_HOLE) used to write tens of gigabytes of zeros to the NAS.
 func cleanerCopyFile(source, target string, mode os.FileMode) error {
 	defer beginFileOperation(target)()
 	reader, err := os.Open(source)
@@ -385,11 +389,45 @@ func cleanerCopyFile(source, target string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(writer, reader); err != nil {
+	if err := copySparse(writer, reader); err != nil {
 		writer.Close()
 		return err
 	}
 	return writer.Close()
+}
+
+// sparseBlock is the granularity of hole detection: big enough to be cheap,
+// small enough to catch the unfinished pieces of a torrent.
+const sparseBlock = 1 << 20
+
+// copySparse copies reader into writer, seeking over blocks made only of
+// zeros. The final Truncate gives the target its full size even when the
+// file ends with a hole.
+func copySparse(writer *os.File, reader io.Reader) error {
+	buffer := make([]byte, sparseBlock)
+	zeros := make([]byte, sparseBlock)
+	var size int64
+	for {
+		count, readErr := io.ReadFull(reader, buffer)
+		if count > 0 {
+			chunk := buffer[:count]
+			if bytes.Equal(chunk, zeros[:count]) {
+				if _, err := writer.Seek(int64(count), io.SeekCurrent); err != nil {
+					return err
+				}
+			} else if _, err := writer.Write(chunk); err != nil {
+				return err
+			}
+			size += int64(count)
+		}
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+			break
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+	return writer.Truncate(size)
 }
 
 // ResolveExistingTarget decides whether an incoming file must be discarded
