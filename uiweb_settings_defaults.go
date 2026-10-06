@@ -137,6 +137,7 @@ var uiSettingDefaults = map[string]string{
 	"tmdb_language":          "it-IT",
 	"default_language":       "ita",
 	"cleanup_upgrades":       "false",
+	"movies_flat_files":      "yes",
 	"cleanup_min_score_diff": "0",
 	"upgrade_min_score_diff": "200",
 

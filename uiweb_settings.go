@@ -150,6 +150,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "tmdb_language", Label: "Lingua TMDB (es. it-IT)", Tab: "rename"},
 	{Key: "default_language", Label: "Lingua predefinita (es. ita)", Tab: "rename"},
 	{Key: "cleanup_upgrades", Label: "Cleanup upgrade", Tab: "rename"},
+	{Key: "movies_flat_files", Label: "Film come file singoli (spiana le cartelle)", Tab: "rename"},
 	{Key: "cleanup_min_score_diff", Label: "Differenza minima score per cleanup", Tab: "rename"},
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "rename"},
 	{Key: "tmdb_api_key", Label: "TMDB API key", Tab: "rename"},

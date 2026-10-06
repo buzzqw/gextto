@@ -96,6 +96,7 @@ var uiSettingTooltipText = map[string]string{
 	"notify_webhook_secret":                        "Segreto HMAC per firmare le richieste al webhook.",
 	"rename_episodes":                              "Rinomina i file scaricati usando i metadati TMDB.",
 	"cleanup_upgrades":                             "Sostituisce versioni inferiori già archiviate con upgrade migliori.",
+	"movies_flat_files":                            "Se Sì, un film arrivato dentro una cartella torrent viene spostato nella cartella film come file singolo, portando con sé sottotitoli e artwork. Se No, resta nella sua cartella.",
 	"cleanup_action":                               "Cosa fare con i file sostituiti: sposta nel trash o elimina.",
 	"tmdb_language":                                "Lingua usata per i metadati TMDB (es. it-IT, en-US).",
 	"default_language":                             "Lingua preferita di default per serie e film (es. ita, eng).",

@@ -1294,6 +1294,158 @@ func RenameMovie(
 	return target, nil
 }
 
+// movieArtworkKinds maps the generic artwork names bundled in release folders
+// to the Jellyfin/Kodi sidecar suffix written next to the video.
+var movieArtworkKinds = map[string]string{
+	"poster":     "poster",
+	"folder":     "poster",
+	"cover":      "poster",
+	"backdrop":   "backdrop",
+	"fanart":     "backdrop",
+	"background": "backdrop",
+	"landscape":  "landscape",
+	"thumb":      "thumb",
+	"logo":       "logo",
+	"clearart":   "clearart",
+	"banner":     "banner",
+	"disc":       "disc",
+}
+
+// movieSubtitleExtensions are the external subtitle containers kept next to the
+// video when a movie folder is flattened.
+var movieSubtitleExtensions = map[string]bool{
+	".srt": true, ".ass": true, ".ssa": true, ".sub": true, ".vtt": true, ".sup": true,
+}
+
+// movieFlatFilesEnabled reports whether single-video movie folders are moved up
+// into the archive root as flat files. It is on by default; set
+// `movies_flat_files` to no/false/0 to keep the original torrent folder.
+func movieFlatFilesEnabled(cfg *Config) bool {
+	if cfg == nil {
+		return false
+	}
+	value, ok := cfg.Settings["movies_flat_files"]
+	if !ok {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "no", "false", "0", "off":
+		return false
+	default:
+		return true
+	}
+}
+
+// flattenMovieFolder moves a movie's single video — together with its external
+// subtitles and bundled artwork — from its torrent folder up to the archive
+// root, then removes the now-empty folder(s). It is a no-op when the feature is
+// disabled, the archive root is unknown, the video already sits in the root, or
+// the destination name is already taken (never clobber an existing movie).
+func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) (string, error) {
+	if !movieFlatFilesEnabled(cfg) || release == nil || strings.TrimSpace(videoPath) == "" {
+		return videoPath, nil
+	}
+	root, ok := ConfiguredDestinationFor(release, cfg)
+	if !ok || strings.TrimSpace(root) == "" {
+		return videoPath, nil
+	}
+	root = filepath.Clean(root)
+	dir := filepath.Clean(filepath.Dir(videoPath))
+	if SamePath(dir, root) || !pathWithin(dir, root) {
+		return videoPath, nil
+	}
+	target := filepath.Join(root, filepath.Base(videoPath))
+	if SamePath(videoPath, target) {
+		return videoPath, nil
+	}
+	if _, err := os.Stat(target); err == nil {
+		// An equally named movie is already archived: leave this one untouched
+		// rather than overwrite it.
+		return videoPath, nil
+	}
+	if err := moveAcrossDevices(videoPath, target); err != nil {
+		return videoPath, err
+	}
+	moveMovieCompanions(dir, root, filepath.Base(target))
+	removeEmptyDirsUpTo(dir, root)
+	return target, nil
+}
+
+// moveMovieCompanions relocates the subtitles and artwork of a flattened movie
+// next to the video, renaming them so media servers still associate them.
+func moveMovieCompanions(oldDir, root, videoBase string) {
+	stem := strings.TrimSuffix(videoBase, filepath.Ext(videoBase))
+	entries, err := os.ReadDir(oldDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		source := filepath.Join(oldDir, name)
+		ext := strings.ToLower(filepath.Ext(name))
+		var targetName string
+		switch {
+		case movieSubtitleExtensions[ext]:
+			base := strings.TrimSuffix(name, filepath.Ext(name))
+			lang := ""
+			if dot := strings.LastIndex(base, "."); dot >= 0 {
+				lang = strings.TrimSpace(base[dot+1:])
+			}
+			if lang != "" && len(lang) <= 8 {
+				targetName = stem + "." + lang + filepath.Ext(name)
+			} else {
+				targetName = stem + filepath.Ext(name)
+			}
+		case ext == ".nfo":
+			targetName = stem + ".nfo"
+		default:
+			kind := movieArtworkKind(name)
+			if kind == "" {
+				// Unknown companion: keep it in place so nothing is lost or
+				// silently clobbered in the shared root.
+				continue
+			}
+			targetName = stem + "-" + kind + filepath.Ext(name)
+		}
+		target := filepath.Join(root, targetName)
+		if _, statErr := os.Stat(target); statErr == nil {
+			continue
+		}
+		_ = moveAcrossDevices(source, target)
+	}
+}
+
+// movieArtworkKind returns the Jellyfin sidecar suffix for a bundled artwork
+// file, or "" when the name is not a recognised artwork kind.
+func movieArtworkKind(name string) string {
+	base := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(name, filepath.Ext(name))))
+	if kind, ok := movieArtworkKinds[base]; ok {
+		return kind
+	}
+	return ""
+}
+
+// removeEmptyDirsUpTo deletes `from` and its empty parents up to (excluding)
+// root, so a flattened folder leaves no empty shell behind.
+func removeEmptyDirsUpTo(from, root string) {
+	dir := filepath.Clean(from)
+	root = filepath.Clean(root)
+	for !SamePath(dir, root) && pathWithin(dir, root) {
+		entries, err := os.ReadDir(dir)
+		if err != nil || len(entries) != 0 {
+			return
+		}
+		parent := filepath.Dir(dir)
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = parent
+	}
+}
+
 // RestoreSourceToken restores the source token in a name that lost it,
 // inserting `[WEB-DL]`/`[HDTV]`… right before the first resolution tag (implementation of
 // `restore_source_token`).

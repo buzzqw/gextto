@@ -2206,6 +2206,19 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			}
 		}
 	}
+	// A movie that arrived inside a torrent folder is moved up into the archive
+	// root as a flat file (with its subtitles and artwork) unless the operator
+	// disabled `movies_flat_files`.
+	if release.Kind == "movie" && !discarded {
+		flat, flatErr := flattenMovieFolder(cfg, release, processedPath)
+		if flatErr != nil {
+			logging.Warn("movie folder flatten failed",
+				"name", event.Name, "path", processedPath, "error", flatErr.Error())
+		} else if !SamePath(flat, processedPath) {
+			processedPath = flat
+			renamedSet = true
+		}
+	}
 	if discarded {
 		restored, err := db.RestoreUpgrade(event.Hash)
 		if err != nil {

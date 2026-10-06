@@ -1001,3 +1001,92 @@ func TestValidateDestinationWritability(t *testing.T) {
 		t.Fatalf("ValidateDestination should fail on empty string")
 	}
 }
+
+func TestFlattenMovieFolderMovesVideoSubsAndArtwork(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "Spider-Man; Brand New Day (2026) .mkv 2160p DV HDR WEB-DL DDP 5.1 iTA H264 - FHC")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	videoName := "Spider-Man Brand New Day (2026) [2160p].mkv"
+	video := filepath.Join(folder, videoName)
+	for name, data := range map[string]string{
+		videoName:      "video",
+		"backdrop.jpg": "art",
+		"folder.jpg":   "art",
+		"logo.png":     "art",
+		"Spider-Man Brand New Day (2026) [2160p].ita.srt": "sub",
+	} {
+		if err := os.WriteFile(filepath.Join(folder, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	archiveRoot := root
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archiveRoot
+	cfg.Settings = map[string]string{"movies_flat_files": "yes"}
+	year := int64(2026)
+	release := &models.Release{Title: "Spider-Man Brand New Day", Year: &year, Kind: "movie"}
+
+	flat, err := flattenMovieFolder(&cfg, release, video)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stem := "Spider-Man Brand New Day (2026) [2160p]"
+	if want := filepath.Join(root, stem+".mkv"); flat != want {
+		t.Fatalf("flat = %q, want %q", flat, want)
+	}
+	for _, name := range []string{
+		stem + ".mkv",
+		stem + ".ita.srt",
+		stem + "-backdrop.jpg",
+		stem + "-poster.jpg",
+		stem + "-logo.png",
+	} {
+		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("expected %s at the archive root: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(folder); !os.IsNotExist(err) {
+		t.Fatalf("torrent folder should be removed, stat err = %v", err)
+	}
+}
+
+func TestFlattenMovieFolderDisabledAndAlreadyFlat(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "Release.Folder")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	video := filepath.Join(folder, "Movie (2026) [2160p].mkv")
+	if err := os.WriteFile(video, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archiveRoot := root
+	year := int64(2026)
+	release := &models.Release{Title: "Movie", Year: &year, Kind: "movie"}
+
+	// Disabled: nothing moves.
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archiveRoot
+	cfg.Settings = map[string]string{"movies_flat_files": "no"}
+	got, err := flattenMovieFolder(&cfg, release, video)
+	if err != nil || got != video {
+		t.Fatalf("disabled flatten = %q, %v; want unchanged", got, err)
+	}
+	if _, err := os.Stat(video); err != nil {
+		t.Fatalf("video should stay in its folder: %v", err)
+	}
+
+	// Already flat: no-op.
+	flatVideo := filepath.Join(root, "Flat Movie (2026) [2160p].mkv")
+	if err := os.WriteFile(flatVideo, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Settings["movies_flat_files"] = "yes"
+	got, err = flattenMovieFolder(&cfg, release, flatVideo)
+	if err != nil || got != flatVideo {
+		t.Fatalf("already-flat flatten = %q, %v; want unchanged", got, err)
+	}
+}
