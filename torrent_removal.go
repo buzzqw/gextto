@@ -41,9 +41,13 @@ func manualTorrentRemovalInfo(s *AppState, hash string) (name, state string, has
 
 // logManualTorrentRemoval records user removals even when the engine has not
 // received torrent metadata yet, which is otherwise easy to miss in the log.
-func logManualTorrentRemoval(hash string, deleteFiles bool, name, state string, hasMetadata bool) {
+// trashTarget is the trash location the files were moved to, empty when they
+// were kept or deleted outright.
+func logManualTorrentRemoval(hash string, deleteFiles bool, trashTarget, name, state string, hasMetadata bool) {
 	files := "its files are kept"
-	if deleteFiles {
+	if trashTarget != "" {
+		files = "its files were moved to the trash: " + trashTarget
+	} else if deleteFiles {
 		files = "its files were deleted"
 	}
 	logging.Info(fmt.Sprintf("🗑️ You removed «%s» from the download list; %s", name, files))
@@ -82,6 +86,7 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 	deleteFiles := requestedDeleteFiles
 
 	engineDeleteFiles := deleteFiles
+	trashTarget := ""
 	if targetTorrent != nil {
 		source := CompletionPath(&models.TorrentEvent{
 			Kind:     "torrent_finished",
@@ -98,7 +103,8 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 					logging.Error("could not move removed torrent source to trash",
 						"hash", hash, "source", source, "error", moveErr.Error())
 				} else {
-					logging.Info("removed torrent source moved to trash",
+					trashTarget = target
+					logging.Debug("removed torrent source moved to trash",
 						"hash", hash, "source", source, "trash", target)
 				}
 			}
@@ -109,7 +115,7 @@ func SafeRemoveTorrent(s *AppState, cfg *Config, hash string, requestedDeleteFil
 	removalName, removalState, removalHasMetadata := manualTorrentRemovalInfo(s, hash)
 	removed, err := s.activeEngine().Remove(hash, engineDeleteFiles)
 	if err == nil && removed {
-		logManualTorrentRemoval(hash, deleteFiles, removalName, removalState, removalHasMetadata)
+		logManualTorrentRemoval(hash, deleteFiles, trashTarget, removalName, removalState, removalHasMetadata)
 		if s.db != nil {
 			_ = s.db.MarkTorrentRemoved(hash)
 			_ = s.db.ForgetRemovedTorrent(hash)
