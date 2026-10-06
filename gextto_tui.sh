@@ -11,6 +11,8 @@
 # Variabili d'ambiente (se non passi --url):
 #   GEXTTO_URL        URL del daemon (default http://127.0.0.1:5000)
 #   GEXTTO_BINARY     percorso alternativo al binario gexttod
+#   GEXTTO_TUI_ASCII  1 = solo ASCII, 0 = UTF-8 (default: dalla locale)
+#   GEXTTO_TUI_ESCDELAY  attesa in ms per Esc/frecce su link lenti (default 100)
 #
 set -euo pipefail
 
@@ -24,7 +26,9 @@ if [[ ! -x "$BIN" ]]; then
 fi
 
 if [[ ! -t 0 || ! -t 1 ]]; then
-	echo "Attenzione: la TUI richiede un terminale interattivo (avviala da una shell/SSH)." >&2
+	echo "La TUI richiede un terminale interattivo." >&2
+	echo "Da remoto usa: ssh -t host $0" >&2
+	exit 1
 fi
 
 exec "$BIN" tui "$@"

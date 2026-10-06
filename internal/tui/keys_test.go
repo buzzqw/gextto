@@ -89,3 +89,99 @@ func TestKeyParserUTF8SplitAcrossReads(t *testing.T) {
 		t.Fatalf("completed rune should decode, got %+v", keys)
 	}
 }
+
+func TestKeyParserModifiedKeysDoNotLeak(t *testing.T) {
+	cases := []struct {
+		input string
+		want  KeyKind
+	}{
+		{"\x1b[1;5A", KeyUp},    // Ctrl+Up
+		{"\x1b[1;2B", KeyDown},  // Shift+Down
+		{"\x1b[1;3C", KeyRight}, // Alt+Right
+		{"\x1b[1;5H", KeyHome},
+		{"\x1b[5;5~", KeyPgUp}, // Ctrl+PgUp
+		{"\x1b[3;2~", KeyDelete},
+	}
+	for _, tc := range cases {
+		parser := &KeyParser{}
+		keys := parser.Feed([]byte(tc.input), false)
+		if len(keys) != 1 || keys[0].Kind != tc.want {
+			t.Errorf("Feed(%q) = %+v, want only kind %d", tc.input, keys, tc.want)
+		}
+	}
+	// F-keys, focus events and mouse reports are dropped entirely.
+	for _, input := range []string{"\x1b[15~", "\x1b[I", "\x1b[O", "\x1b[<0;10;5M", "\x1bOP"} {
+		parser := &KeyParser{}
+		if keys := parser.Feed([]byte(input), false); len(keys) != 0 {
+			t.Errorf("Feed(%q) should produce no key, got %+v", input, keys)
+		}
+	}
+}
+
+func TestKeyParserCtrlL(t *testing.T) {
+	parser := &KeyParser{}
+	keys := parser.Feed([]byte{0x0c}, false)
+	if len(keys) != 1 || keys[0].Kind != KeyCtrlL {
+		t.Fatalf("expected Ctrl-L, got %+v", keys)
+	}
+}
+
+func TestKeyParserBracketedPaste(t *testing.T) {
+	parser := &KeyParser{}
+	keys := parser.Feed([]byte("x\x1b[200~magnet:?xt=urn:btih:abc\x1b[201~y"), false)
+	if len(keys) != 3 || keys[0].Rune != 'x' || keys[1].Kind != KeyPaste || keys[1].Text != "magnet:?xt=urn:btih:abc" || keys[2].Rune != 'y' {
+		t.Fatalf("paste = %+v", keys)
+	}
+}
+
+func TestKeyParserPasteSplitAcrossReads(t *testing.T) {
+	parser := &KeyParser{}
+	chunks := []string{"\x1b[20", "0~hello ", "wor", "ld\x1b[2", "01~"}
+	var keys []Key
+	for _, chunk := range chunks {
+		keys = append(keys, parser.Feed([]byte(chunk), false)...)
+		if len(keys) == 0 && parser.Pending() && chunk != "\x1b[20" {
+			t.Fatalf("paste in progress must not count as a pending escape")
+		}
+	}
+	// A flush in the middle of a paste must not cut it.
+	if len(keys) != 1 || keys[0].Kind != KeyPaste || keys[0].Text != "hello world" {
+		t.Fatalf("split paste = %+v", keys)
+	}
+}
+
+func TestKeyParserPasteSurvivesFlush(t *testing.T) {
+	parser := &KeyParser{}
+	parser.Feed([]byte("\x1b[200~abc"), false)
+	if keys := parser.Feed(nil, true); len(keys) != 0 {
+		t.Fatalf("flush during paste emitted %+v", keys)
+	}
+	keys := parser.Feed([]byte("def\x1b[201~"), false)
+	if len(keys) != 1 || keys[0].Text != "abcdef" {
+		t.Fatalf("paste after flush = %+v", keys)
+	}
+}
+
+func TestKeyParserFlushDropsIncompleteSequence(t *testing.T) {
+	parser := &KeyParser{}
+	parser.Feed([]byte("\x1b[1;5"), false)
+	if !parser.Pending() {
+		t.Fatal("incomplete CSI should be pending")
+	}
+	if keys := parser.Feed(nil, true); len(keys) != 0 {
+		t.Fatalf("incomplete CSI should be dropped, got %+v", keys)
+	}
+	keys := parser.Feed([]byte("q"), false)
+	if len(keys) != 1 || keys[0].Rune != 'q' {
+		t.Fatalf("parser should recover, got %+v", keys)
+	}
+}
+
+func TestKeyParserDoubleEscape(t *testing.T) {
+	parser := &KeyParser{}
+	keys := parser.Feed([]byte("\x1b\x1b"), false)
+	keys = append(keys, parser.Feed(nil, true)...)
+	if len(keys) != 2 || keys[0].Kind != KeyEsc || keys[1].Kind != KeyEsc {
+		t.Fatalf("double Esc = %+v", keys)
+	}
+}

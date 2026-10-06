@@ -175,10 +175,14 @@ type confirm struct {
 	Action     Action
 }
 
-// Line is one rendered row with a semantic style.
+// Line is one rendered row with a semantic style. A Wrap line is broken
+// into several rows when it is wider than the terminal instead of being cut;
+// continuation rows start Indent cells in.
 type Line struct {
-	Text  string
-	Style Style
+	Text   string
+	Style  Style
+	Wrap   bool
+	Indent int
 }
 
 // Style is a semantic text style mapped to ANSI by the terminal renderer.
@@ -227,6 +231,9 @@ type Model struct {
 	MissingScroll     int
 	BlocklistSelected int
 	BlocklistScroll   int
+	// PageScroll scrolls the free-form Status and Health pages, which can be
+	// taller than a small SSH window once long values wrap.
+	PageScroll int
 
 	Status    *Status
 	Health    *Health
@@ -288,6 +295,8 @@ type Model struct {
 	Message string
 	Err     string
 	Loading bool
+	// Bandwidth is the footer meter of the TUI's own traffic.
+	Bandwidth string
 
 	Prompt  *prompt
 	Confirm *confirm
@@ -388,8 +397,12 @@ func (m *Model) SetHealthError(message string) { m.HealthErr = message }
 // a short in-memory history for the status sparkline.
 func (m *Model) SetMetrics(stats DashboardStats) {
 	m.Metrics = &stats
-	download, hasDownload := metricNumber(stats.TorrentStats, "dl_info_speed", "download_rate", "download_speed")
-	upload, hasUpload := metricNumber(stats.TorrentStats, "up_info_speed", "upload_rate", "upload_speed")
+	m.sampleTransfer()
+}
+
+// sampleTransfer appends one point to the status trend sparkline.
+func (m *Model) sampleTransfer() {
+	download, hasDownload, upload, hasUpload := m.transferRates()
 	download += m.httpDownloadRate()
 	if download > 0 {
 		hasDownload = true
@@ -401,6 +414,24 @@ func (m *Model) SetMetrics(stats DashboardStats) {
 	if len(m.TransferHistory) > 60 {
 		m.TransferHistory = m.TransferHistory[len(m.TransferHistory)-60:]
 	}
+}
+
+// transferRates returns the aggregate torrent rates. The integrated backend
+// does not report them in /api/stats, so they fall back to the sum over the
+// torrent list (which the Status tab polls anyway).
+func (m *Model) transferRates() (download float64, hasDownload bool, upload float64, hasUpload bool) {
+	if m.Metrics != nil {
+		download, hasDownload = metricNumber(m.Metrics.TorrentStats, "dl_info_speed", "download_rate", "download_speed")
+		upload, hasUpload = metricNumber(m.Metrics.TorrentStats, "up_info_speed", "upload_rate", "upload_speed")
+	}
+	if !hasDownload && !hasUpload && len(m.Torrents) > 0 {
+		for _, torrent := range m.Torrents {
+			download += float64(torrent.DownloadRate)
+			upload += float64(torrent.UploadRate)
+		}
+		hasDownload, hasUpload = true, true
+	}
+	return download, hasDownload, upload, hasUpload
 }
 
 func (m *Model) httpDownloadRate() float64 {
@@ -699,10 +730,10 @@ func (m *Model) VisibleDownloads() []DownloadRow {
 
 func downloadRowFields(row DownloadRow) (name, state, id string) {
 	if row.Torrent != nil {
-		return row.Torrent.Name, row.Torrent.State, row.Torrent.Hash
+		return Sanitize(row.Torrent.Name), row.Torrent.State, row.Torrent.Hash
 	}
 	if row.HTTP != nil {
-		return row.HTTP.Title, row.HTTP.Status, row.HTTP.ID
+		return Sanitize(row.HTTP.Title), row.HTTP.Status, row.HTTP.ID
 	}
 	return "", "", ""
 }

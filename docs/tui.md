@@ -24,9 +24,14 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 
 ## Schede disponibili
 
-1. **Stato** — modalità (dry-run/attiva), torrent e download HTTP attivi,
-   prossimo ciclo, ultimo ciclo, elementi visti nei feed, velocità aggregate,
-   CPU/RAM e andamento del trasferimento.
+1. **Stato** — cruscotto: daemon (versione, modalità, uptime, PID, CPU/RAM),
+   sistema (CPU, carico, RAM, disco, cestino), ciclo (conto alla rovescia,
+   ultimo avvio e contatori), feed, download per stato, traffico con
+   andamento, consumi, una riga **Attenzione** con ciò che richiede un
+   intervento (torrent in errore, percorsi non scrivibili, disco quasi pieno,
+   ultimo errore), i trasferimenti in corso con barra e ETA e, ancorate in
+   fondo, le **ultime righe di log**. Se la finestra è bassa la parte alta
+   scorre con `↑↓`/`PgUp`/`PgDn`.
 2. **Download** — elenco unificato torrent + download HTTP dei fumetti con stato,
    progresso, byte, velocità e nome; filtro (`F`), ordinamento (`o`/`O`), dettagli
    torrent (`Invio`), pausa/ripresa e rimozione dei download HTTP.
@@ -51,11 +56,53 @@ download HTTP dei fumetti.
 | Download | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli torrent · `p` pausa/riprendi · `d`/`D` rimuovi (torrent con o senza file; HTTP dalla lista) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti · `o`/`O` ordina · `F` filtro |
 | Dettagli | `1` generale · `2` tracker · `3` file · `4` peer · `↑↓` scorri · `Esc`/`Invio` indietro |
 | Log | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filtro · `f` segui/ferma |
-| Salute | `x` svuota cestino (con conferma) |
+| Stato | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` scorri |
+| Salute | `↑↓`/`PgUp`/`PgDn` scorri · `x` svuota cestino (con conferma) |
+| Terminale | `Ctrl-L` ridisegna tutto · incolla un magnet/URL per aprire "aggiungi" già compilato |
 | Archivio | `↑↓` seleziona · `Invio` accoda · `/` filtro |
 | Mancanti | `↑↓` seleziona · `r` aggiorna |
 | Blocklist | `↑↓` seleziona · `d` rimuovi |
 | Libreria | `1` Serie TV · `2` Film · `3` Fumetti · `↑↓` seleziona · `s` filtra |
+
+Le conferme (rimozioni, cestino, pulizia) accettano solo `s`/`y`: `Invio` annulla e il
+testo incollato viene ignorato, così un `Invio` ripetuto su un link lento non può
+cancellare un torrent con i suoi file.
+
+## Uso via SSH
+
+La TUI è pensata per una sessione SSH:
+
+- **Banda.** Ogni frame invia solo le righe cambiate, e di una riga solo la parte
+  finale che cambia; quando il log scorre è il terminale a far scorrere la
+  regione e arrivano solo le righe nuove. I frame sono aggiornamenti
+  sincronizzati (niente sfarfallio). Salute e statistiche si interrogano ogni
+  10 secondi invece che a ogni aggiornamento. In basso a destra la TUI mostra la
+  banda che sta usando: `Term` è il traffico verso il terminale (cioè la
+  connessione SSH, ↓ verso di te, ↑ i tasti), `API` quello verso il daemon.
+- **A capo automatico.** Log, dettagli, salute e cruscotto vanno a capo invece di
+  essere tagliati; negli elenchi la riga selezionata mostra il titolo intero.
+  Le larghezze sono calcolate in colonne, quindi titoli con ideogrammi o emoji
+  non rompono l'impaginazione.
+- **Testo sicuro.** Sequenze di escape e caratteri di controllo presenti in nomi
+  di torrent, titoli dei feed o log vengono rimossi prima di arrivare al
+  terminale.
+- **Incolla.** Il bracketed paste è attivo: un magnet incollato arriva intero nel
+  campo, e fuori da un campo apre "aggiungi" invece di eseguire comandi.
+- **Copia (`y`).** Usa OSC52, che copia negli appunti del computer da cui ti
+  colleghi. In tmux serve `set -g set-clipboard on` (o `allow-passthrough on`);
+  la TUI invia la sequenza anche nella forma passthrough di tmux e GNU screen.
+- **Locale.** Con una locale non UTF-8 (es. `LANG=C`, frequente se SSH non
+  inoltra `LC_*`) la TUI disegna solo in ASCII. Si forza con
+  `GEXTTO_TUI_ASCII=1` o `GEXTTO_TUI_ASCII=0`.
+- **Link lenti.** Se le frecce diventano lettere, alza l'attesa per le sequenze
+  di escape: `GEXTTO_TUI_ESCDELAY=250` (millisecondi, default 100).
+- **Disconnessione.** Se la connessione cade (SIGHUP o terminale chiuso) la TUI
+  esce da sola. Un ridimensionamento della finestra ridisegna subito.
+- Senza terminale interattivo la TUI si ferma con un messaggio: da remoto usa
+  `ssh -t host /opt/gextto/gexttod tui`.
+
+Altre variabili: `NO_COLOR` (o `TERM=dumb`) disattiva i colori,
+`GEXTTO_TUI_THEME=high-contrast` attiva il tema ad alto contrasto.
 
 ## Architettura
 
@@ -64,10 +111,14 @@ download HTTP dei fumetti.
 - `i18n.go` — catalogo bilingue IT/EN, `Translator`, risoluzione della lingua.
 - `client.go` — client HTTP tipizzato di tutte le API del daemon.
 - `format.go` — formattazione di byte, durate, numeri opzionali.
+- `text.go` — larghezza in colonne, pulizia dei caratteri di controllo, a capo,
+  fallback ASCII.
+- `bandwidth.go` — misura della banda usata dalla TUI (piè di pagina).
 - `model.go` / `update.go` / `render.go` — stato puro, transizioni da tasti e
   rendering in righe con stile semantico (testabili senza terminale).
-- `keys.go` — decodifica del flusso di byte in tasti (sequenze ANSI, UTF-8).
-- `term.go` — raw mode e schermo alternato (`golang.org/x/sys/unix`).
+- `keys.go` — decodifica del flusso di byte in tasti (sequenze CSI complete di
+  modificatori, bracketed paste, UTF-8).
+- `term.go` — raw mode, schermo alternato e renderer incrementale.
 - `run.go` — ciclo principale: polling, stream SSE, esecuzione azioni.
 
 La TUI parla **solo** con l'API HTTP del daemon e non tocca mai i database.

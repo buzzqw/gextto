@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -29,6 +30,7 @@ func (m *Model) Render(width, height int) Screen {
 		contentHeight = 1
 	}
 	var content []Line
+	pageScroll := false
 	switch {
 	case m.Overlay == OverlayHelp:
 		content = m.renderHelp(width)
@@ -58,6 +60,11 @@ func (m *Model) Render(width, height int) Screen {
 		content = m.renderLibrary(width, contentHeight)
 	default:
 		content = m.renderHealth(width)
+		pageScroll = true
+	}
+	content = expandLines(content, width)
+	if pageScroll {
+		content = m.pageWindow(content, contentHeight)
 	}
 	for index := 0; index < contentHeight; index++ {
 		if index < len(content) {
@@ -71,8 +78,7 @@ func (m *Model) Render(width, height int) Screen {
 	if m.Confirm != nil {
 		lines = append(lines, Line{Text: m.truncate(m.ConfirmMessage(), width), Style: StyleWarn})
 	} else if m.Prompt != nil {
-		label := m.PromptLabel()
-		lines = append(lines, Line{Text: m.truncate(label+m.Prompt.Buffer, width), Style: StyleSelected})
+		lines = append(lines, Line{Text: m.promptLine(width), Style: StyleSelected})
 		screen.CursorVisible = true
 	} else {
 		message := m.Message
@@ -97,7 +103,7 @@ func (m *Model) Render(width, height int) Screen {
 			}
 			message += m.Tr.T("msg.loading")
 		}
-		lines = append(lines, Line{Text: m.truncate(message, width), Style: footerStyle})
+		lines = append(lines, Line{Text: m.footerWithMeter(message, width), Style: footerStyle})
 	}
 	for len(lines) > height {
 		lines = lines[:height]
@@ -108,10 +114,7 @@ func (m *Model) Render(width, height int) Screen {
 	screen.Lines = lines
 	if screen.CursorVisible {
 		screen.CursorRow = len(lines) - 1
-		screen.CursorCol = len([]rune(m.PromptLabel())) + m.Prompt.Cursor
-		if screen.CursorCol >= width {
-			screen.CursorCol = width - 1
-		}
+		screen.CursorCol = min(m.promptCursorColumn(width), width-1)
 	}
 	return screen
 }
@@ -198,51 +201,168 @@ func (m *Model) tabsLine(width int) string {
 }
 
 func (m *Model) hints() string {
-	hints := m.Tr.T("hint.global")
+	// The view-specific keys come first: on an 80-column SSH window the tail
+	// of this line is cut, and the global keys are also listed in the help.
+	hints := ""
 	switch {
 	case m.Overlay == OverlaySettings:
-		hints += " · " + m.Tr.T("hint.settings")
+		hints = m.Tr.T("hint.settings")
 	case m.Detail != nil:
-		hints += " · " + m.Tr.T("hint.details")
+		hints = m.Tr.T("hint.details")
 	case m.ArchiveDetail != nil:
-		hints += " · " + m.Tr.T("hint.archivedetail")
+		hints = m.Tr.T("hint.archivedetail")
+	case m.Tab == TabStatus:
+		hints = m.Tr.T("hint.status")
 	case m.Tab == TabTorrents:
-		hints += " · " + m.Tr.T("hint.torrents")
+		hints = m.Tr.T("hint.torrents")
 	case m.Tab == TabLogs:
-		hints += " · " + m.Tr.T("hint.logs")
+		hints = m.Tr.T("hint.logs")
 	case m.Tab == TabHealth:
-		hints += " · " + m.Tr.T("hint.health")
+		hints = m.Tr.T("hint.health")
 	case m.Tab == TabArchive:
-		hints += " · " + m.Tr.T("hint.archive")
+		hints = m.Tr.T("hint.archive")
 	case m.Tab == TabMissing:
-		hints += " · " + m.Tr.T("hint.missing")
+		hints = m.Tr.T("hint.missing")
 	case m.Tab == TabBlocklist:
-		hints += " · " + m.Tr.T("hint.blocklist")
+		hints = m.Tr.T("hint.blocklist")
 	case m.Tab == TabLibrary:
-		hints += " · " + m.Tr.T("hint.library")
+		hints = m.Tr.T("hint.library")
 	}
-	return hints
+	if hints == "" {
+		return m.Tr.T("hint.global")
+	}
+	return hints + " · " + m.Tr.T("hint.global")
 }
 
+// statusLabelWidth is the label column of the Status page; wrapped values
+// continue under the value column.
+const statusLabelWidth = 12
+
+// renderStatus builds the dashboard: daemon, system, cycle, feeds, downloads,
+// traffic, problems and the active transfers, with the latest log lines kept
+// at the bottom. The upper part scrolls when the window is too short.
 func (m *Model) renderStatus(width, contentHeight int) []Line {
 	if m.Status == nil {
-		return []Line{{Text: m.Tr.T("msg.loading"), Style: StyleMuted}}
+		lines := []Line{{Text: m.Tr.T("msg.loading"), Style: StyleMuted}}
+		if m.Err != "" {
+			lines = append(lines, Line{Text: m.Tr.Format("status.offline", m.Err), Style: StyleErr, Wrap: true, Indent: 2})
+		}
+		return lines
 	}
+	top := expandLines(m.statusInfoLines(width), width)
+
+	logBlock := m.statusLogLines(width, contentHeight)
+	room := contentHeight - len(logBlock)
+	if room < 3 {
+		logBlock, room = nil, contentHeight
+	}
+	window := m.pageWindow(top, room)
+	if len(logBlock) > 0 {
+		// Pin the log block to the bottom so it does not jump around while
+		// the rows above come and go.
+		for len(window) < room {
+			window = append(window, Line{})
+		}
+	}
+	return append(window, logBlock...)
+}
+
+func (m *Model) statusRow(label, value string, style Style) Line {
+	return Line{Text: PadRight(label+":", statusLabelWidth) + value, Style: style, Wrap: true, Indent: statusLabelWidth}
+}
+
+func (m *Model) statusInfoLines(width int) []Line {
 	status := m.Status
-	mode := m.Tr.T("mode.standby")
+	tr := m.Tr
+	lines := []Line{}
+
+	// Daemon: version, mode, uptime and own resources.
+	mode := tr.T("mode.standby")
 	switch {
 	case status.DryRun:
-		mode = m.Tr.T("mode.dryrun")
+		mode = tr.T("mode.dryrun")
 	case status.Active:
-		mode = m.Tr.T("mode.active")
+		mode = tr.T("mode.active")
 	}
-	lines := []Line{
-		{Text: fmt.Sprintf("%s: %s", m.Tr.T("label.mode"), mode), Style: StyleNormal},
-		{Text: fmt.Sprintf("%s: %d (%d %s, %d %s, %d %s)", m.Tr.T("label.torrents"),
-			status.TorrentStats.Count, status.TorrentStats.Downloading, m.Tr.T("label.downloading"),
-			status.TorrentStats.Queued, m.Tr.T("label.queued"),
-			status.TorrentStats.Seeding, m.Tr.T("label.seeding")), Style: StyleNormal},
-		{Text: fmt.Sprintf("%s: %d", m.Tr.T("label.stalled"), status.TorrentStats.Stalled), Style: StyleMuted},
+	daemon := []string{}
+	if status.Version != "" {
+		daemon = append(daemon, "v"+status.Version)
+	}
+	daemon = append(daemon, mode)
+	health := m.Health
+	if health != nil {
+		if health.ProcessUptimeSeconds > 0 {
+			daemon = append(daemon, tr.Format("status.uptime", HumanDuration(float64(health.ProcessUptimeSeconds))))
+		}
+		if health.ProcessID > 0 {
+			daemon = append(daemon, tr.Format("status.pid", health.ProcessID))
+		}
+		daemon = append(daemon, tr.T("label.cpu")+" "+OptionalNumber(floatPointerValue(health.ProcessCPUPercent), "%", 1))
+		if health.ResidentBytes > 0 {
+			daemon = append(daemon, tr.T("label.ram")+" "+HumanBytes(float64(health.ResidentBytes)))
+		}
+	}
+	modeStyle := StyleNormal
+	if status.DryRun {
+		modeStyle = StyleWarn
+	}
+	lines = append(lines, m.statusRow(tr.T("status.daemon"), strings.Join(daemon, " · "), modeStyle))
+
+	// System: CPU, load, memory, main disk, trash.
+	diskUsed := -1.0
+	if health != nil {
+		system := []string{tr.T("label.cpu") + " " + OptionalNumber(floatPointerValue(health.CPUPercent), "%", 1)}
+		if health.LoadAverage != nil {
+			system = append(system, tr.Format("status.load", *health.LoadAverage))
+		}
+		if health.MemoryTotalBytes > 0 {
+			system = append(system, tr.Format("status.ramfree", HumanBytes(float64(health.MemoryAvailableBytes)), HumanBytes(float64(health.MemoryTotalBytes))))
+		}
+		if health.DiskTotalBytes > 0 {
+			diskUsed = (1 - float64(health.DiskFreeBytes)/float64(health.DiskTotalBytes)) * 100
+			system = append(system, tr.Format("status.disk", HumanBytes(float64(health.DiskFreeBytes)), HumanBytes(float64(health.DiskTotalBytes)), diskUsed))
+		}
+		if health.TrashFileCount > 0 {
+			system = append(system, tr.Format("status.trash", health.TrashFileCount, HumanBytes(float64(health.TrashBytes))))
+		}
+		lines = append(lines, m.statusRow(tr.T("status.system"), strings.Join(system, " · "), StyleMuted))
+	}
+
+	// Cycle: countdown, last run and its counters.
+	cycle := status.LastCycle
+	cycleParts := []string{}
+	if status.NextCycleAt != nil {
+		if remaining := nextCycleSeconds(*status.NextCycleAt); remaining >= 0 {
+			cycleParts = append(cycleParts, tr.Format("status.next", HumanDuration(float64(remaining))))
+		} else if *status.NextCycleAt != "" {
+			cycleParts = append(cycleParts, tr.T("status.running"))
+		}
+	}
+	if cycle.LastStartedAt != nil {
+		if started, err := time.Parse(time.RFC3339, *cycle.LastStartedAt); err == nil {
+			cycleParts = append(cycleParts, tr.Format("status.laststart", started.Local().Format("02/01 15:04"), HumanDuration(time.Since(started).Seconds())))
+		}
+	}
+	cycleParts = append(cycleParts, fmt.Sprintf("%s %d · %s %d · %s %d · %s %d · %s %d",
+		tr.T("label.scraped"), cycle.Scraped,
+		tr.T("label.candidates"), cycle.Candidates,
+		tr.T("label.downloads"), cycle.DownloadsStarted,
+		tr.T("label.gaps"), cycle.GapsFilled,
+		tr.T("label.errors"), cycle.Errors))
+	lines = append(lines, m.statusRow(tr.T("status.cycle"), strings.Join(cycleParts, " · "), StyleNormal))
+	lines = append(lines, m.statusRow(tr.T("status.feeds"), fmt.Sprintf("%s %d · %s %d · %s %d",
+		tr.T("label.groups"), status.Seen.Groups,
+		tr.T("label.movies"), status.Seen.Movies,
+		tr.T("label.series"), status.Seen.Series), StyleMuted))
+
+	// Downloads: counts by state.
+	stats := status.TorrentStats
+	downloads := fmt.Sprintf("%s: %d %s · %d %s · %d %s", tr.Format("status.torrentcount", stats.Count),
+		stats.Downloading, tr.T("label.downloading"),
+		stats.Queued, tr.T("label.queued"),
+		stats.Seeding, tr.T("label.seeding"))
+	if stats.Stalled > 0 {
+		downloads += " · " + tr.Format("status.stalled", stats.Stalled)
 	}
 	httpActive := 0
 	for _, item := range m.HTTPDownloads {
@@ -251,45 +371,211 @@ func (m *Model) renderStatus(width, contentHeight int) []Line {
 		}
 	}
 	if httpActive > 0 {
-		lines = append(lines, Line{Text: fmt.Sprintf("%s: %d", m.Tr.T("label.http"), httpActive), Style: StyleNormal})
+		downloads += fmt.Sprintf(" · %s %d", tr.T("label.http"), httpActive)
 	}
-	if m.Metrics != nil {
-		lines = append(lines, m.renderMetricLines(width)...)
+	lines = append(lines, m.statusRow(tr.T("status.downloads"), downloads, StyleNormal))
+
+	// Traffic and consumption.
+	lines = append(lines, m.renderMetricLines(width)...)
+
+	// Attention: everything that needs a look, or an explicit "all good".
+	problems, severity := m.statusProblems(diskUsed)
+	if len(problems) == 0 {
+		lines = append(lines, m.statusRow(tr.T("status.attention"), tr.T("status.allgood"), StyleOK))
+	} else {
+		lines = append(lines, m.statusRow(tr.T("status.attention"), strings.Join(problems, " · "), severity))
 	}
-	if m.Health != nil {
-		lines = append(lines, Line{Text: fmt.Sprintf("%s: %s %s · %s %s", m.Tr.T("label.system"), m.Tr.T("label.cpu"), OptionalNumber(floatPointerValue(m.Health.CPUPercent), "%", 1), m.Tr.T("label.ram"), HumanBytes(float64(m.Health.ResidentBytes))), Style: StyleMuted})
+
+	// Active transfers, fastest first.
+	lines = append(lines, Line{Text: tr.T("status.active") + ":", Style: StyleHeader})
+	active := m.statusActiveLines(width)
+	if len(active) == 0 {
+		lines = append(lines, Line{Text: "  " + tr.T("status.noactive"), Style: StyleMuted})
 	}
-	if status.NextCycleAt != nil {
-		if remaining := nextCycleSeconds(*status.NextCycleAt); remaining >= 0 {
-			lines = append(lines, Line{Text: fmt.Sprintf("%s: %s", m.Tr.T("label.nextcycle"), HumanDuration(float64(remaining))), Style: StyleNormal})
+	lines = append(lines, active...)
+	return lines
+}
+
+// statusProblems lists the conditions worth attention and their severity.
+func (m *Model) statusProblems(diskUsed float64) ([]string, Style) {
+	tr := m.Tr
+	problems := []string{}
+	severity := StyleWarn
+	if m.DaemonKnown && !m.DaemonConnected && m.Err != "" {
+		problems = append(problems, tr.Format("status.offline", m.Err))
+		severity = StyleErr
+	}
+	errored := 0
+	for _, torrent := range m.Torrents {
+		if strings.EqualFold(torrent.State, "error") || strings.TrimSpace(torrent.Error) != "" {
+			errored++
 		}
 	}
-	cycle := status.LastCycle
-	lines = append(lines,
-		Line{Text: fmt.Sprintf("%s: %s %d | %s %d | %s %d | %s %d | %s %d",
-			m.Tr.T("label.lastcycle"),
-			m.Tr.T("label.scraped"), cycle.Scraped,
-			m.Tr.T("label.candidates"), cycle.Candidates,
-			m.Tr.T("label.downloads"), cycle.DownloadsStarted,
-			m.Tr.T("label.gaps"), cycle.GapsFilled,
-			m.Tr.T("label.errors"), cycle.Errors), Style: StyleNormal},
-		Line{Text: fmt.Sprintf("%s: %s %d · %s %d · %s %d",
-			m.Tr.T("label.seen"),
-			m.Tr.T("label.groups"), status.Seen.Groups,
-			m.Tr.T("label.movies"), status.Seen.Movies,
-			m.Tr.T("label.series"), status.Seen.Series), Style: StyleMuted},
-	)
-	if contentHeight > 0 && len(lines) > contentHeight {
-		lines = lines[:contentHeight]
+	for _, item := range m.HTTPDownloads {
+		if strings.EqualFold(item.Status, "error") {
+			errored++
+		}
+	}
+	if errored > 0 {
+		problems = append(problems, tr.Format("status.torrenterrs", errored))
+		severity = StyleErr
+	}
+	if m.Status.LastCycle.Errors > 0 {
+		problems = append(problems, tr.Format("status.cycleerrors", m.Status.LastCycle.Errors))
+	}
+	if health := m.Health; health != nil {
+		if health.Status != "" && !strings.EqualFold(health.Status, "ok") {
+			problems = append(problems, tr.Format("status.health", strings.ToUpper(health.Status)))
+		}
+		bad := 0
+		for _, path := range health.Paths {
+			if !path.Exists || !path.Writable {
+				bad++
+			}
+		}
+		if bad > 0 {
+			problems = append(problems, tr.Format("status.badpaths", bad))
+			severity = StyleErr
+		}
+		if diskUsed >= 90 {
+			problems = append(problems, tr.Format("status.diskfull", diskUsed))
+		}
+		if count := len(health.LastErrors); count > 0 {
+			problems = append(problems, tr.Format("status.lasterror", health.LastErrors[count-1]))
+		}
+	}
+	return problems, severity
+}
+
+// statusActiveLines shows up to five running transfers with a progress bar.
+func (m *Model) statusActiveLines(width int) []Line {
+	type activeRow struct {
+		name     string
+		state    string
+		progress float64
+		rate     float64
+		eta      float64
+	}
+	rows := []activeRow{}
+	for _, torrent := range m.Torrents {
+		state := strings.ToLower(torrent.State)
+		if torrent.IsSeeding || state == "seeding" || state == "finished" || state == "paused" || torrent.Progress >= 100 {
+			continue
+		}
+		eta := -1.0
+		if torrent.DownloadRate > 0 && torrent.TotalSize > torrent.TotalDone {
+			eta = float64(torrent.TotalSize-torrent.TotalDone) / float64(torrent.DownloadRate)
+		}
+		rows = append(rows, activeRow{torrent.Name, torrent.State, torrent.Progress, float64(torrent.DownloadRate), eta})
+	}
+	for _, item := range m.HTTPDownloads {
+		state := strings.ToLower(item.Status)
+		if state == "completed" || state == "error" || state == "paused" {
+			continue
+		}
+		eta := -1.0
+		if item.ETASeconds != nil {
+			eta = float64(*item.ETASeconds)
+		}
+		rows = append(rows, activeRow{firstNonEmpty(item.Title, item.ID), item.Status, item.Progress, float64(item.SpeedBytes), eta})
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i].rate != rows[j].rate {
+			return rows[i].rate > rows[j].rate
+		}
+		return rows[i].progress > rows[j].progress
+	})
+	if len(rows) > 5 {
+		rows = rows[:5]
+	}
+	barWidth := 10
+	if width < 60 {
+		barWidth = 6
+	}
+	lines := make([]Line, 0, len(rows))
+	for _, row := range rows {
+		eta := "-"
+		if row.eta >= 0 {
+			eta = HumanDuration(row.eta)
+		}
+		prefix := fmt.Sprintf("  %s %s %s %s ", progressBar(row.progress, barWidth), PadLeft(fmt.Sprintf("%.0f%%", row.progress), 4),
+			PadLeft(HumanRate(row.rate), 11), PadRight(m.Tr.Format("status.eta", eta), 10))
+		lines = append(lines, Line{Text: prefix + Sanitize(row.name), Style: torrentStyle(row.state), Wrap: true, Indent: min(StringWidth(prefix), width/2)})
 	}
 	return lines
 }
 
+// progressBar draws a fixed-width bar; ASCII terminals get '#' and '.'.
+func progressBar(percent float64, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	filled := int(percent/100*float64(width) + 0.5)
+	filled = min(max(filled, 0), width)
+	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "]"
+}
+
+// statusLogLines returns the pinned "recent log" block: a separator and the
+// last four log lines, wrapped, never taller than half of the content area.
+func (m *Model) statusLogLines(width, contentHeight int) []Line {
+	entries := 4
+	switch {
+	case contentHeight < 10:
+		return nil
+	case contentHeight < 16:
+		entries = 2
+	}
+	title := " " + m.Tr.T("status.recentlogs") + " "
+	rule := max(0, width-StringWidth(title)-2)
+	header := Line{Text: "──" + title + strings.Repeat("─", rule), Style: StyleMuted}
+	if len(m.Logs) == 0 {
+		return []Line{header, {Text: "  " + m.Tr.T("status.nologs"), Style: StyleMuted}}
+	}
+	// Whole entries only, newest last: an entry that does not fit is left
+	// out rather than shown from the middle. The newest one is always shown,
+	// cut with an ellipsis if it alone is taller than the block.
+	budget := max(entries, contentHeight/2-1)
+	body := []Line{}
+	for index := len(m.Logs) - 1; index >= max(0, len(m.Logs)-entries); index-- {
+		entry := m.Logs[index]
+		rows := expandLines([]Line{{Text: entry, Style: logStyle(entry), Wrap: true, Indent: 2}}, width)
+		if len(body)+len(rows) > budget {
+			if len(body) == 0 {
+				rows = rows[:budget]
+				rows[budget-1].Text = Shorten(rows[budget-1].Text+" …", width)
+				body = rows
+			}
+			break
+		}
+		body = append(rows, body...)
+	}
+	return append([]Line{header}, body...)
+}
+
+// logStyle colours a log line by its level.
+func logStyle(line string) Style {
+	switch {
+	case strings.Contains(line, "ERROR"):
+		return StyleErr
+	case strings.Contains(line, "WARN"):
+		return StyleWarn
+	default:
+		return StyleNormal
+	}
+}
+
 func (m *Model) renderMetricLines(width int) []Line {
-	metrics := m.Metrics.TorrentStats
-	download, hasDownload := metricNumber(metrics, "dl_info_speed", "download_rate", "download_speed")
-	upload, hasUpload := metricNumber(metrics, "up_info_speed", "upload_rate", "upload_speed")
-	peers, hasPeers := metricNumber(metrics, "active_peers", "num_connections", "num_incoming_connections")
+	download, hasDownload, upload, hasUpload := m.transferRates()
+	peers, hasPeers := 0.0, false
+	if m.Metrics != nil {
+		peers, hasPeers = metricNumber(m.Metrics.TorrentStats, "active_peers", "num_connections", "num_incoming_connections")
+	}
+	if !hasPeers && len(m.Torrents) > 0 {
+		for _, torrent := range m.Torrents {
+			peers += float64(torrent.NumPeers)
+		}
+		hasPeers = true
+	}
 
 	httpRate := 0.0
 	httpActive := 0
@@ -316,43 +602,39 @@ func (m *Model) renderMetricLines(width int) []Line {
 	if httpActive > 0 {
 		transfer = append(transfer, "HTTP "+fmt.Sprintf("%d", httpActive))
 	}
-	lines := make([]Line, 0, 2)
-	if len(transfer) > 0 {
-		if width < 72 {
-			for _, value := range transfer {
-				lines = append(lines, Line{Text: value, Style: StyleNormal})
-			}
-		} else {
-			lines = append(lines, Line{Text: m.Tr.T("label.transfer") + ": " + strings.Join(transfer, " · "), Style: StyleNormal})
-		}
+	graphWidth := 24
+	if width < 72 {
+		graphWidth = 12
 	}
 	if len(m.TransferHistory) > 1 {
-		graphWidth := 24
-		if width < 72 {
-			graphWidth = 12
-		}
 		downloads := make([]float64, 0, len(m.TransferHistory))
 		uploads := make([]float64, 0, len(m.TransferHistory))
 		for _, sample := range m.TransferHistory {
 			downloads = append(downloads, sample.Download)
 			uploads = append(uploads, sample.Upload)
 		}
-		lines = append(lines, Line{Text: fmt.Sprintf("%s: ↓%s ↑%s", m.Tr.T("label.trend"), sparkline(downloads, graphWidth), sparkline(uploads, graphWidth)), Style: StyleMuted})
+		transfer = append(transfer, fmt.Sprintf("%s ↓%s ↑%s", strings.ToLower(m.Tr.T("label.trend")), sparkline(downloads, graphWidth), sparkline(uploads, graphWidth)))
+	}
+	lines := make([]Line, 0, 2)
+	if len(transfer) > 0 {
+		lines = append(lines, m.statusRow(m.Tr.T("status.transfer"), strings.Join(transfer, " · "), StyleNormal))
+	}
+	if m.Metrics == nil {
+		return lines
 	}
 	if consumption := m.Metrics.Consumption; consumption != nil {
-		value := fmt.Sprintf("%s: 7d %s · 30d %s · %s %s",
-			m.Tr.T("label.consumption"),
+		value := fmt.Sprintf("7d %s · 30d %s · %s %s",
 			HumanBytes(float64(consumption.Last7DaysBytes)),
 			HumanBytes(float64(consumption.Last30DaysBytes)),
 			m.Tr.T("label.total"), HumanBytes(float64(consumption.TotalBytes)))
-		lines = append(lines, Line{Text: value, Style: StyleMuted})
 		if len(consumption.Daily7d) > 1 {
 			daily := make([]float64, 0, len(consumption.Daily7d))
 			for _, item := range consumption.Daily7d {
 				daily = append(daily, float64(item.Bytes))
 			}
-			lines = append(lines, Line{Text: m.Tr.T("label.consumption7d") + ": " + sparkline(daily, min(24, max(8, width-28))), Style: StyleMuted})
+			value += " · 7d " + sparkline(daily, min(24, max(8, width-28)))
 		}
+		lines = append(lines, m.statusRow(m.Tr.T("status.consumption"), value, StyleMuted))
 	}
 	return lines
 }
@@ -426,55 +708,58 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		lines = append(lines, Line{Text: m.Tr.T("msg.emptytorrents"), Style: StyleMuted})
 		return lines
 	}
+	m.Selected = min(max(m.Selected, 0), len(items)-1)
+	window := func(visibleItems int) (int, int) {
+		start, end := catalogWindow(m.Selected, m.TorrentScroll, len(items), visibleItems)
+		m.TorrentScroll = start
+		return start, end
+	}
+	marker := func(index int) string {
+		if index == m.Selected {
+			return ">"
+		}
+		return " "
+	}
+	rowStyle := func(index int, state string) Style {
+		if index == m.Selected {
+			return StyleSelected
+		}
+		return torrentStyle(state)
+	}
+	compactRow := func(index int, item DownloadRow) string {
+		name, _, _ := downloadRowFields(item)
+		return fmt.Sprintf("%s %s %.1f%% %s", marker(index), downloadStateLabel(m.Tr, item), downloadRowProgress(item), name)
+	}
 	if width < 50 {
-		visibleItems := max(1, contentHeight-1)
-		maxScroll := max(0, len(items)-visibleItems)
-		start := min(max(m.TorrentScroll, 0), maxScroll)
-		if m.Selected < start {
-			start = m.Selected
-		}
-		if m.Selected >= start+visibleItems {
-			start = m.Selected - visibleItems + 1
-		}
-		m.TorrentScroll = min(max(start, 0), maxScroll)
-		end := min(len(items), m.TorrentScroll+visibleItems)
-		for index, item := range items[m.TorrentScroll:end] {
-			index += m.TorrentScroll
-			name, state, _ := downloadRowFields(item)
-			style := torrentStyle(state)
-			marker := " "
+		budget := max(1, contentHeight-1)
+		expanded := selectedRows(compactRow(m.Selected, items[m.Selected]), width, 2, budget-2)
+		start, end := window(budget - (len(expanded) - 1))
+		for index := start; index < end; index++ {
+			_, state, _ := downloadRowFields(items[index])
 			if index == m.Selected {
-				style = StyleSelected
-				marker = ">"
+				for _, row := range expanded {
+					lines = append(lines, Line{Text: row, Style: StyleSelected})
+				}
+				continue
 			}
-			lines = append(lines, Line{Text: fmt.Sprintf("%s %s %.1f%% %s", marker, downloadStateLabel(m.Tr, item), downloadRowProgress(item), name), Style: style})
+			lines = append(lines, Line{Text: compactRow(index, items[index]), Style: rowStyle(index, state)})
 		}
 		return lines
 	}
 	if width < 74 {
-		visibleItems := max(1, (contentHeight-1)/2)
-		maxScroll := max(0, len(items)-visibleItems)
-		start := min(max(m.TorrentScroll, 0), maxScroll)
-		if m.Selected < start {
-			start = m.Selected
-		}
-		if m.Selected >= start+visibleItems {
-			start = m.Selected - visibleItems + 1
-		}
-		m.TorrentScroll = min(max(start, 0), maxScroll)
-		end := min(len(items), m.TorrentScroll+visibleItems)
-		selected := m.Selected - m.TorrentScroll
-		for index, item := range items[m.TorrentScroll:end] {
-			marker := " "
-			if index == selected {
-				marker = ">"
+		budget := max(2, contentHeight-1)
+		expanded := selectedRows(compactRow(m.Selected, items[m.Selected]), width, 2, budget-4)
+		start, end := window(max(1, (budget-(len(expanded)-1))/2))
+		for index := start; index < end; index++ {
+			item := items[index]
+			_, state, id := downloadRowFields(item)
+			if index == m.Selected {
+				for _, row := range expanded {
+					lines = append(lines, Line{Text: row, Style: StyleSelected})
+				}
+			} else {
+				lines = append(lines, Line{Text: compactRow(index, item), Style: rowStyle(index, state)})
 			}
-			name, state, id := downloadRowFields(item)
-			style := torrentStyle(state)
-			if index == selected {
-				style = StyleSelected
-			}
-			lines = append(lines, Line{Text: fmt.Sprintf("%s %s %.1f%% %s", marker, downloadStateLabel(m.Tr, item), downloadRowProgress(item), name), Style: style})
 			lines = append(lines, Line{Text: "   " + Shorten(id, 12) + " · " + downloadDetailLine(m.Tr, item), Style: StyleMuted})
 		}
 		return lines
@@ -485,33 +770,35 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		PadLeft(m.Tr.T("label.progress"), 6), PadLeft(m.Tr.T("label.done"), 10),
 		PadLeft(m.Tr.T("label.down"), 11), PadLeft(m.Tr.T("label.up"), 11), m.Tr.T("label.name"))
 	lines = append(lines, Line{Text: header, Style: StyleHeader})
-	visibleItems := max(1, contentHeight-len(lines))
-	maxScroll := max(0, len(items)-visibleItems)
-	start := min(max(m.TorrentScroll, 0), maxScroll)
-	if m.Selected < start {
-		start = m.Selected
-	}
-	if m.Selected >= start+visibleItems {
-		start = m.Selected - visibleItems + 1
-	}
-	m.TorrentScroll = min(max(start, 0), maxScroll)
-	end := min(len(items), m.TorrentScroll+visibleItems)
-	for index, item := range items[m.TorrentScroll:end] {
-		index += m.TorrentScroll
-		_, state, _ := downloadRowFields(item)
-		style := torrentStyle(state)
-		marker := " "
-		if index == m.Selected {
-			style = StyleSelected
-			marker = ">"
-		}
-		name, _, id := downloadRowFields(item)
+	tableRow := func(index int, item DownloadRow) string {
+		_, _, id := downloadRowFields(item)
 		done, down, up := downloadRowValues(item)
-		row := fmt.Sprintf("%s %s %s %s %s %s %s  %s",
-			marker, PadRight(Shorten(id, 9), 9), PadRight(downloadStateLabel(m.Tr, item), 14),
+		return fmt.Sprintf("%s %s %s %s %s %s %s  ",
+			marker(index), PadRight(Shorten(id, 9), 9), PadRight(downloadStateLabel(m.Tr, item), 14),
 			PadLeft(fmt.Sprintf("%.1f%%", downloadRowProgress(item)), 6), PadLeft(HumanBytes(float64(done)), 10),
-			PadLeft(HumanRate(down), 11), PadLeft(HumanRate(up), 11), Shorten(name, nameWidth))
-		lines = append(lines, Line{Text: row, Style: style})
+			PadLeft(HumanRate(down), 11), PadLeft(HumanRate(up), 11))
+	}
+	budget := max(1, contentHeight-len(lines))
+	selectedName, _, _ := downloadRowFields(items[m.Selected])
+	nameRows := selectedRows(selectedName, nameWidth, 0, budget-2)
+	start, end := window(budget - (len(nameRows) - 1))
+	for index := start; index < end; index++ {
+		item := items[index]
+		name, state, _ := downloadRowFields(item)
+		prefix := tableRow(index, item)
+		if index != m.Selected {
+			lines = append(lines, Line{Text: prefix + Shorten(name, nameWidth), Style: rowStyle(index, state)})
+			continue
+		}
+		// The selected name continues under the name column.
+		indent := strings.Repeat(" ", StringWidth(prefix))
+		for row, text := range nameRows {
+			if row == 0 {
+				lines = append(lines, Line{Text: prefix + text, Style: StyleSelected})
+			} else {
+				lines = append(lines, Line{Text: indent + text, Style: StyleSelected})
+			}
+		}
 	}
 	return lines
 }
@@ -575,21 +862,30 @@ func (m *Model) renderLogs(width, contentHeight int) []Line {
 	}
 	out := []Line{{Text: header, Style: StyleHeader}}
 	visible := max(1, contentHeight-1)
-	maxScroll := max(0, len(lines)-visible)
-	m.LogScroll = min(max(m.LogScroll, 0), maxScroll)
-	end := len(lines) - m.LogScroll
-	start := max(0, end-visible)
-	for _, line := range lines[start:end] {
-		style := StyleNormal
-		switch {
-		case strings.Contains(line, "ERROR"):
-			style = StyleErr
-		case strings.Contains(line, "WARN"):
-			style = StyleWarn
-		}
-		out = append(out, Line{Text: line, Style: style})
+	if len(lines) == 0 {
+		return out
 	}
-	return out
+	// Long lines wrap, so the window is measured in screen rows: walk back
+	// from the newest visible entry until the rows are full. LogScroll still
+	// counts entries, so following and scrolling keep their meaning.
+	wrapped := func(entry string) []Line {
+		return expandLines([]Line{{Text: entry, Style: logStyle(entry), Wrap: true, Indent: 2}}, width)
+	}
+	firstPage, rows := 0, 0
+	for firstPage < len(lines) && rows < visible {
+		rows += len(wrapped(lines[firstPage]))
+		firstPage++
+	}
+	m.LogScroll = min(max(m.LogScroll, 0), max(0, len(lines)-firstPage))
+	end := len(lines) - m.LogScroll
+	window := []Line{}
+	for index := end - 1; index >= 0 && len(window) < visible; index-- {
+		window = append(wrapped(lines[index]), window...)
+	}
+	if len(window) > visible {
+		window = window[len(window)-visible:]
+	}
+	return append(out, window...)
 }
 
 func catalogWindow(selected, scroll, length, visible int) (int, int) {
@@ -604,6 +900,41 @@ func catalogWindow(selected, scroll, length, visible int) (int, int) {
 	}
 	start = min(max(start, 0), maxScroll)
 	return start, min(length, start+visible)
+}
+
+// selectedRows wraps the highlighted entry so its full title is readable,
+// keeping at most maxExtra continuation rows. The other entries stay cut to
+// one row each, so scrolling still moves by entries.
+func selectedRows(text string, width, indent, maxExtra int) []string {
+	rows := WrapText(Sanitize(text), width, indent)
+	if extra := min(max(maxExtra, 0), 3); len(rows) > extra+1 {
+		rows = rows[:extra+1]
+		rows[extra] = Shorten(rows[extra]+" …", width)
+	}
+	return rows
+}
+
+// catalogRows renders a selectable list with the selected entry expanded.
+func catalogRows(texts []string, selected int, scroll *int, height, width int) []Line {
+	if len(texts) == 0 {
+		return nil
+	}
+	height = max(1, height)
+	selected = min(max(selected, 0), len(texts)-1)
+	expanded := selectedRows("> "+texts[selected], width, 4, height-2)
+	start, end := catalogWindow(selected, *scroll, len(texts), height-(len(expanded)-1))
+	*scroll = start
+	lines := make([]Line, 0, end-start+len(expanded))
+	for index := start; index < end; index++ {
+		if index == selected {
+			for _, row := range expanded {
+				lines = append(lines, Line{Text: row, Style: StyleSelected})
+			}
+			continue
+		}
+		lines = append(lines, Line{Text: "  " + texts[index], Style: StyleNormal})
+	}
+	return lines
 }
 
 func (m *Model) renderArchive(width, contentHeight int) []Line {
@@ -624,19 +955,11 @@ func (m *Model) renderArchive(width, contentHeight int) []Line {
 	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptyarchive"), Style: StyleMuted})
 	}
-	start, end := catalogWindow(m.ArchiveSelected, m.ArchiveScroll, len(items), contentHeight-1)
-	m.ArchiveScroll = start
-	for index, entry := range items[start:end] {
-		index += start
-		style := StyleNormal
-		marker := " "
-		if index == m.ArchiveSelected {
-			style = StyleSelected
-			marker = ">"
-		}
-		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · %s · %s", marker, entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-")), Style: style})
+	texts := make([]string, len(items))
+	for index, entry := range items {
+		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, entry.Source, firstNonEmpty(entry.AddedAt, "-"))
 	}
-	return lines
+	return append(lines, catalogRows(texts, m.ArchiveSelected, &m.ArchiveScroll, contentHeight-1, width)...)
 }
 
 func (m *Model) renderArchiveDetail(width int) []Line {
@@ -652,11 +975,10 @@ func (m *Model) renderArchiveDetail(width int) []Line {
 		{m.Tr.T("label.added"), firstNonEmpty(entry.AddedAt, "-")},
 		{m.Tr.T("label.magnet"), firstNonEmpty(entry.Magnet, "-")},
 	}
-	lines := []Line{{Text: entry.Title, Style: StyleHeader}}
+	lines := []Line{{Text: entry.Title, Style: StyleHeader, Wrap: true}}
 	start := min(m.ArchiveDetailScroll, max(0, len(rows)-1))
-	valueWidth := max(1, width-23)
 	for _, row := range rows[start:] {
-		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + Shorten(row[1], valueWidth), Style: StyleNormal})
+		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + row[1], Style: StyleNormal, Wrap: true, Indent: 21})
 	}
 	return lines
 }
@@ -666,20 +988,11 @@ func (m *Model) renderMissing(width, contentHeight int) []Line {
 	if len(m.Missing) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptymissing"), Style: StyleMuted})
 	}
-	start, end := catalogWindow(m.MissingSelected, m.MissingScroll, len(m.Missing), contentHeight-1)
-	m.MissingScroll = start
-	for index, gap := range m.Missing[start:end] {
-		index += start
-		style := StyleNormal
-		marker := " "
-		if index == m.MissingSelected {
-			style = StyleSelected
-			marker = ">"
-		}
-		airDate := firstNonEmpty(gap.AirDate, "-")
-		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · S%02dE%02d · %s", marker, gap.Series, gap.Season, gap.Episode, airDate), Style: style})
+	texts := make([]string, len(m.Missing))
+	for index, gap := range m.Missing {
+		texts[index] = fmt.Sprintf("%s · S%02dE%02d · %s", gap.Series, gap.Season, gap.Episode, firstNonEmpty(gap.AirDate, "-"))
 	}
-	return lines
+	return append(lines, catalogRows(texts, m.MissingSelected, &m.MissingScroll, contentHeight-1, width)...)
 }
 
 func (m *Model) renderBlocklist(width, contentHeight int) []Line {
@@ -687,20 +1000,11 @@ func (m *Model) renderBlocklist(width, contentHeight int) []Line {
 	if len(m.Blocklist) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptyblocklist"), Style: StyleMuted})
 	}
-	start, end := catalogWindow(m.BlocklistSelected, m.BlocklistScroll, len(m.Blocklist), contentHeight-1)
-	m.BlocklistScroll = start
-	for index, entry := range m.Blocklist[start:end] {
-		index += start
-		style := StyleNormal
-		marker := " "
-		if index == m.BlocklistSelected {
-			style = StyleSelected
-			marker = ">"
-		}
-		reason := firstNonEmpty(entry.Reason, "-")
-		lines = append(lines, Line{Text: fmt.Sprintf("%s %s · %s · %s", marker, entry.Title, reason, entry.CreatedAt), Style: style})
+	texts := make([]string, len(m.Blocklist))
+	for index, entry := range m.Blocklist {
+		texts[index] = fmt.Sprintf("%s · %s · %s", entry.Title, firstNonEmpty(entry.Reason, "-"), entry.CreatedAt)
 	}
-	return lines
+	return append(lines, catalogRows(texts, m.BlocklistSelected, &m.BlocklistScroll, contentHeight-1, width)...)
 }
 
 func (m *Model) renderLibrary(width, contentHeight int) []Line {
@@ -720,22 +1024,15 @@ func (m *Model) renderLibrary(width, contentHeight int) []Line {
 	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptylibrary"), Style: StyleMuted})
 	}
-	start, end := catalogWindow(m.LibrarySelected, m.LibraryScroll, len(items), contentHeight-len(lines))
-	m.LibraryScroll = start
-	for index, item := range items[start:end] {
-		index += start
-		style := StyleNormal
-		marker := " "
-		if index == m.LibrarySelected {
-			style, marker = StyleSelected, ">"
-		}
+	texts := make([]string, len(items))
+	for index, item := range items {
 		state := m.Tr.T("label.disabled")
 		if item.Enabled {
 			state = m.Tr.T("label.enabled")
 		}
-		lines = append(lines, Line{Text: fmt.Sprintf("%s %-4s %s · %s", marker, state, Shorten(item.Name, max(12, width-38)), firstNonEmpty(item.Meta, "-")), Style: style})
+		texts[index] = fmt.Sprintf("%s %s · %s", PadRight(state, 4), item.Name, firstNonEmpty(item.Meta, "-"))
 	}
-	return lines
+	return append(lines, catalogRows(texts, m.LibrarySelected, &m.LibraryScroll, contentHeight-len(lines), width)...)
 }
 
 func (m *Model) renderHealth(width int) []Line {
@@ -755,7 +1052,7 @@ func (m *Model) renderHealth(width int) []Line {
 	if m.HealthErr != "" {
 		label += " (" + m.Tr.T("msg.refreshed") + ": " + m.HealthErr + ")"
 	}
-	lines := []Line{{Text: label, Style: style}}
+	lines := []Line{{Text: label, Style: style, Wrap: true, Indent: 2}}
 	lines = append(lines,
 		Line{Text: fmt.Sprintf("%s: PID %d · %s %s · %s %s · %s %s", m.Tr.T("label.daemon"),
 			health.ProcessID, m.Tr.T("label.uptime"), HumanDuration(float64(health.ProcessUptimeSeconds)),
@@ -776,7 +1073,7 @@ func (m *Model) renderHealth(width int) []Line {
 				state = "OK"
 				pathStyle = StyleOK
 			}
-			lines = append(lines, Line{Text: fmt.Sprintf("%-4s %s %s", state, PadRight(path.Label, 14), path.Path), Style: pathStyle})
+			lines = append(lines, Line{Text: fmt.Sprintf("%-4s %s %s", state, PadRight(path.Label, 14), path.Path), Style: pathStyle, Wrap: true, Indent: 20})
 		}
 	}
 	if len(health.Disks) > 0 {
@@ -787,17 +1084,17 @@ func (m *Model) renderHealth(width int) []Line {
 				used = (1 - float64(disk.FreeBytes)/float64(disk.TotalBytes)) * 100
 			}
 			lines = append(lines, Line{Text: fmt.Sprintf("%s %s free / %s · %.0f%% %s",
-				PadRight(disk.Mount, 18), HumanBytes(float64(disk.FreeBytes)), HumanBytes(float64(disk.TotalBytes)), used, m.Tr.T("label.used")), Style: StyleNormal})
+				PadRight(disk.Mount, 18), HumanBytes(float64(disk.FreeBytes)), HumanBytes(float64(disk.TotalBytes)), used, m.Tr.T("label.used")), Style: StyleNormal, Wrap: true, Indent: 19})
 		}
 	}
 	if health.Ramdisk != nil {
 		lines = append(lines, Line{Text: fmt.Sprintf("%s: %s · %s free / %s", m.Tr.T("label.ramdisk"),
-			health.Ramdisk.Path, HumanBytes(float64(health.Ramdisk.FreeBytes)), HumanBytes(float64(health.Ramdisk.TotalBytes))), Style: StyleNormal})
+			health.Ramdisk.Path, HumanBytes(float64(health.Ramdisk.FreeBytes)), HumanBytes(float64(health.Ramdisk.TotalBytes))), Style: StyleNormal, Wrap: true, Indent: 2})
 	}
 	if len(health.LastErrors) > 0 {
 		lines = append(lines, Line{Text: m.Tr.T("label.recenterror"), Style: StyleErr})
 		for _, message := range health.LastErrors {
-			lines = append(lines, Line{Text: message, Style: StyleErr})
+			lines = append(lines, Line{Text: message, Style: StyleErr, Wrap: true, Indent: 2})
 		}
 	}
 	return lines
@@ -822,10 +1119,10 @@ func (m *Model) renderDetail(width int) []Line {
 		for _, item := range m.DetailItems {
 			switch m.DetailView {
 			case DetailTrackers:
-				rendered = append(rendered, Line{Text: fmt.Sprintf("tier %s  %s", OptionalNumber(item["tier"], "", 0), stringValue(item["url"])), Style: StyleNormal})
+				rendered = append(rendered, Line{Text: fmt.Sprintf("tier %s  %s", OptionalNumber(item["tier"], "", 0), stringValue(item["url"])), Style: StyleNormal, Wrap: true, Indent: 4})
 			case DetailFiles:
 				rendered = append(rendered, Line{Text: fmt.Sprintf("%s / %s  %s",
-					HumanBytes(numberValue(item["downloaded"])), HumanBytes(numberValue(item["size"])), stringValue(item["path"])), Style: StyleNormal})
+					HumanBytes(numberValue(item["downloaded"])), HumanBytes(numberValue(item["size"])), stringValue(item["path"])), Style: StyleNormal, Wrap: true, Indent: 4})
 			default:
 				seed := ""
 				if truthy(item["seed"]) {
@@ -879,7 +1176,7 @@ func (m *Model) renderDetail(width int) []Line {
 		{m.Tr.T("label.savepath"), firstNonEmpty(torrent.SavePath, "-")},
 		{m.Tr.T("label.magnet"), firstNonEmpty(m.Detail.Magnet, "-")},
 	}
-	lines := []Line{{Text: torrent.Name, Style: StyleHeader}}
+	lines := []Line{{Text: torrent.Name, Style: StyleHeader, Wrap: true}}
 	start := min(m.DetailScroll, max(0, len(rows)-1))
 	for _, row := range rows[start:] {
 		lines = append(lines, Line{Text: PadRight(row[0]+":", 20) + " " + row[1], Style: StyleNormal})
@@ -890,7 +1187,7 @@ func (m *Model) renderDetail(width int) []Line {
 func (m *Model) renderHelp(width int) []Line {
 	keys := []string{
 		"help.title", "", "help.global", "help.global2", "help.torrents", "help.torrents2",
-		"help.torrents3", "help.torrents4", "help.details", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "",
+		"help.torrents3", "help.torrents4", "help.details", "help.status", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "help.terminal", "help.bandwidth", "",
 		"help.close",
 	}
 	lines := make([]Line, 0, len(keys))
@@ -903,7 +1200,7 @@ func (m *Model) renderHelp(width int) []Line {
 		if key == "help.title" {
 			style = StyleHeader
 		}
-		for _, wrapped := range wrapText(m.Tr.T(key), width) {
+		for _, wrapped := range WrapText(m.Tr.T(key), width, 10) {
 			lines = append(lines, Line{Text: wrapped, Style: style})
 		}
 	}
@@ -916,32 +1213,11 @@ func (m *Model) renderSearch(width, contentHeight int) []Line {
 		lines = append(lines, Line{Text: m.Tr.T("msg.nosearch"), Style: StyleMuted})
 		return lines
 	}
-	visible := max(1, contentHeight-1)
-	maxScroll := max(0, len(m.SearchResults)-visible)
-	start := min(max(m.SearchScroll, 0), maxScroll)
-	if m.SearchSelected < start {
-		start = m.SearchSelected
+	texts := make([]string, len(m.SearchResults))
+	for index, result := range m.SearchResults {
+		texts[index] = fmt.Sprintf("%s · %s · %s", stringValue(result["title"]), stringValue(result["source"]), qualityLabel(result["quality"]))
 	}
-	if m.SearchSelected >= start+visible {
-		start = m.SearchSelected - visible + 1
-	}
-	m.SearchScroll = min(max(start, 0), maxScroll)
-	end := min(len(m.SearchResults), m.SearchScroll+visible)
-	for index, result := range m.SearchResults[m.SearchScroll:end] {
-		index += m.SearchScroll
-		style := StyleNormal
-		marker := " "
-		if index == m.SearchSelected {
-			style = StyleSelected
-			marker = ">"
-		}
-		title := stringValue(result["title"])
-		source := stringValue(result["source"])
-		quality := qualityLabel(result["quality"])
-		line := fmt.Sprintf("%s %s · %s · %s", marker, title, source, quality)
-		lines = append(lines, Line{Text: line, Style: style})
-	}
-	return lines
+	return append(lines, catalogRows(texts, m.SearchSelected, &m.SearchScroll, contentHeight-1, width)...)
 }
 
 func (m *Model) renderEvents(width, contentHeight int) []Line {
@@ -958,7 +1234,7 @@ func (m *Model) renderEvents(width, contentHeight int) []Line {
 		if event.SavePath != "" {
 			line += " · " + event.SavePath
 		}
-		lines = append(lines, Line{Text: line, Style: StyleNormal})
+		lines = append(lines, Line{Text: line, Style: StyleNormal, Wrap: true, Indent: 23})
 	}
 	return lines
 }
@@ -1048,37 +1324,94 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func wrapText(value string, width int) []string {
-	if width <= 0 {
-		return []string{value}
-	}
-	words := strings.Fields(value)
-	if len(words) == 0 {
-		return []string{""}
-	}
-	lines := []string{}
-	current := ""
-	for _, word := range words {
-		if current == "" {
-			current = word
-			continue
-		}
-		if len(current)+1+len(word) <= width {
-			current += " " + word
-		} else {
-			lines = append(lines, current)
-			current = word
-		}
-	}
-	if current != "" {
-		lines = append(lines, current)
-	}
-	return lines
-}
-
 func (m *Model) truncate(value string, width int) string {
 	if width <= 0 {
 		return ""
 	}
-	return Shorten(value, width)
+	return Shorten(Sanitize(value), width)
+}
+
+// expandLines breaks Wrap lines into terminal-wide rows. Text is sanitized
+// first so the width is measured on what the terminal will really show.
+func expandLines(lines []Line, width int) []Line {
+	expanded := make([]Line, 0, len(lines))
+	for _, line := range lines {
+		if !line.Wrap {
+			expanded = append(expanded, line)
+			continue
+		}
+		for _, row := range WrapText(Sanitize(line.Text), width, line.Indent) {
+			expanded = append(expanded, Line{Text: row, Style: line.Style})
+		}
+	}
+	return expanded
+}
+
+// footerWithMeter right-aligns the bandwidth meter when the message leaves
+// room for it; the message always wins.
+func (m *Model) footerWithMeter(message string, width int) string {
+	message = m.truncate(message, width)
+	meter := Sanitize(m.Bandwidth)
+	if meter == "" {
+		return message
+	}
+	gap := width - StringWidth(message) - StringWidth(meter)
+	if gap < 2 {
+		return message
+	}
+	return message + strings.Repeat(" ", gap) + meter
+}
+
+// pageWindow shows the part of a free-form page selected by PageScroll and
+// says how much is left below, since a small SSH window may not fit it all.
+func (m *Model) pageWindow(lines []Line, height int) []Line {
+	if height <= 0 || len(lines) <= height {
+		m.PageScroll = 0
+		return lines
+	}
+	m.PageScroll = min(max(m.PageScroll, 0), len(lines)-height)
+	start, end := m.PageScroll, m.PageScroll+height
+	if end >= len(lines) {
+		return lines[start:]
+	}
+	end--
+	window := append([]Line(nil), lines[start:end]...)
+	return append(window, Line{Text: m.Tr.Format("status.more", len(lines)-end), Style: StyleMuted})
+}
+
+// promptLine renders the active prompt. A buffer longer than the screen (a
+// pasted magnet easily is) scrolls horizontally so the cursor stays visible.
+func (m *Model) promptLine(width int) string {
+	label := Sanitize(m.PromptLabel())
+	buffer := []rune(Sanitize(m.Prompt.Buffer))
+	start := m.promptStart(width)
+	text := label + string(buffer[start:])
+	if start > 0 {
+		text = label + "…" + string(buffer[start+1:])
+	}
+	return Shorten(text, width)
+}
+
+func (m *Model) promptCursorColumn(width int) int {
+	label := Sanitize(m.PromptLabel())
+	buffer := []rune(Sanitize(m.Prompt.Buffer))
+	cursor := min(max(m.Prompt.Cursor, 0), len(buffer))
+	start := m.promptStart(width)
+	return StringWidth(label) + StringWidth(string(buffer[start:cursor]))
+}
+
+// promptStart is the first buffer rune shown so that the cursor fits.
+func (m *Model) promptStart(width int) int {
+	label := Sanitize(m.PromptLabel())
+	buffer := []rune(Sanitize(m.Prompt.Buffer))
+	cursor := min(max(m.Prompt.Cursor, 0), len(buffer))
+	room := width - StringWidth(label) - 1
+	if room < 4 {
+		return 0
+	}
+	start := 0
+	for StringWidth(string(buffer[start:cursor])) > room && start < cursor {
+		start++
+	}
+	return start
 }

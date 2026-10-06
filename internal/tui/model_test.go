@@ -568,7 +568,7 @@ func TestDaemonStateAndStatusMetrics(t *testing.T) {
 	})
 	m.SetDaemonState(true, "")
 	screen := m.Render(100, 20)
-	if !lineContains(screen, "ONLINE") || !lineContains(screen, "Transfer") || !lineContains(screen, "Consumption") || !lineContains(screen, "Trend") || !lineContains(screen, "2.0 KB/s") {
+	if !lineContains(screen, "ONLINE") || !lineContains(screen, "Traffic") || !lineContains(screen, "Usage") || !lineContains(screen, "trend") || !lineContains(screen, "2.0 KB/s") {
 		t.Fatalf("status metrics missing: %+v", firstLines(screen, 12))
 	}
 	m.SetDaemonState(false, "connection refused")

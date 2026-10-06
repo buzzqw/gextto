@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -274,16 +275,74 @@ func (e *APIError) Error() string {
 
 // Client talks to a running gextto daemon over HTTP.
 type Client struct {
-	base string
-	http *http.Client
+	base    string
+	http    *http.Client
+	traffic *trafficCounter
 }
 
 // NewClient builds a client for base (e.g. http://127.0.0.1:5000).
 func NewClient(base string) *Client {
+	traffic := &trafficCounter{}
 	return &Client{
-		base: strings.TrimRight(strings.TrimSpace(base), "/"),
-		http: &http.Client{Timeout: 30 * time.Second},
+		base:    strings.TrimRight(strings.TrimSpace(base), "/"),
+		http:    &http.Client{Timeout: 30 * time.Second, Transport: &countingTransport{base: http.DefaultTransport, counter: traffic}},
+		traffic: traffic,
 	}
+}
+
+// Traffic returns the bytes sent to and received from the daemon so far
+// (request and response headers are estimated, bodies are exact).
+func (c *Client) Traffic() (sent, received int64) {
+	return c.traffic.sent.Load(), c.traffic.received.Load()
+}
+
+// trafficCounter accumulates API traffic for the footer bandwidth meter.
+type trafficCounter struct {
+	sent     atomic.Int64
+	received atomic.Int64
+}
+
+// countingTransport counts the bytes of every request and response,
+// including long-lived SSE streams, as they are read.
+type countingTransport struct {
+	base    http.RoundTripper
+	counter *trafficCounter
+}
+
+func (t *countingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	sent := int64(len(request.Method) + len(request.URL.RequestURI()) + 12 + headerSize(request.Header))
+	if request.ContentLength > 0 {
+		sent += request.ContentLength
+	}
+	t.counter.sent.Add(sent)
+	response, err := t.base.RoundTrip(request)
+	if err != nil {
+		return nil, err
+	}
+	t.counter.received.Add(int64(len(response.Status) + 11 + headerSize(response.Header)))
+	response.Body = &countingBody{ReadCloser: response.Body, counter: &t.counter.received}
+	return response, nil
+}
+
+func headerSize(header http.Header) int {
+	size := 2
+	for key, values := range header {
+		for _, value := range values {
+			size += len(key) + len(value) + 4
+		}
+	}
+	return size
+}
+
+type countingBody struct {
+	io.ReadCloser
+	counter *atomic.Int64
+}
+
+func (b *countingBody) Read(buffer []byte) (int, error) {
+	count, err := b.ReadCloser.Read(buffer)
+	b.counter.Add(int64(count))
+	return count, err
 }
 
 func (c *Client) do(request *http.Request) (*http.Response, error) {

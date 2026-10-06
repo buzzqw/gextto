@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -71,26 +72,48 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	cancelProbe()
 	model := NewModel(NewTranslator(ResolveLang(opts.Lang, os.Getenv("GEXTTO_LANG"), daemonLang)))
-	model.ColorsEnabled = os.Getenv("NO_COLOR") == ""
+	model.ColorsEnabled = os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
 	model.HighContrast = strings.EqualFold(strings.TrimSpace(os.Getenv("GEXTTO_TUI_THEME")), "high-contrast")
+	ascii := asciiMode(os.Getenv)
+	escDelay := escapeDelay(os.Getenv("GEXTTO_TUI_ESCDELAY"))
 
+	if _, err := unix.IoctlGetTermios(int(in.Fd()), unix.TCGETS); err != nil {
+		return fmt.Errorf("%s", model.Tr.T("msg.notty"))
+	}
 	term := newTerminal(in, out)
 	if err := term.enter(); err != nil {
 		return fmt.Errorf("terminale: %w", err)
 	}
 	defer term.leave()
+	screen := newFrameRenderer(out, ascii)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	signalCtx, stopSignals := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
+	// SIGHUP arrives when the SSH connection drops: leave cleanly instead of
+	// lingering as an orphan that keeps polling the daemon.
+	signalCtx, stopSignals := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	defer stopSignals()
+	resizeCh := make(chan os.Signal, 1)
+	signal.Notify(resizeCh, syscall.SIGWINCH)
+	defer signal.Stop(resizeCh)
+
+	// A panic in a background goroutine would kill the process with the
+	// terminal still in raw mode on the alternate screen, which over SSH
+	// leaves a session that needs a blind `reset`. Restore it first.
+	guard := func() {
+		if recovered := recover(); recovered != nil {
+			term.leave()
+			fmt.Fprintf(os.Stderr, "gextto tui: panic: %v\n%s", recovered, debug.Stack())
+			os.Exit(2)
+		}
+	}
 
 	inputCh := make(chan []byte, 32)
-	go readInput(ctx, in, inputCh)
+	go func() { defer guard(); readInput(ctx, in, inputCh) }()
 
 	streamCh := make(chan streamEvent, 256)
-	go readStream(ctx, client, streamCh)
-	go readNotifications(ctx, client, streamCh)
+	go func() { defer guard(); readStream(ctx, client, streamCh) }()
+	go func() { defer guard(); readNotifications(ctx, client, streamCh) }()
 
 	// Refreshes run in a goroutine so a slow or unreachable daemon never blocks
 	// the keyboard: the interface always reacts to q / Ctrl-C.
@@ -98,13 +121,31 @@ func Run(ctx context.Context, opts Options) error {
 	actionCh := make(chan actionResult, 4)
 	var fetching int32
 	var acting int32
+	var lastSlow time.Time
 	requestRefresh := func() {
 		if !atomic.CompareAndSwapInt32(&fetching, 0, 1) {
 			return
 		}
+		// Read the model here, on the main goroutine: the fetch below runs
+		// concurrently with key handling that changes these fields.
+		_, terminalHeight := term.size()
+		// Health and dashboard statistics change slowly: poll them every
+		// slowRefresh instead of every cycle (r and tab switches force it).
+		slow := time.Since(lastSlow) >= slowRefresh
+		if slow {
+			lastSlow = time.Now()
+		}
+		request := fetchRequest{
+			includeSlow:  slow,
+			includeLogs:  (model.Tab == TabLogs || model.Tab == TabStatus) && !model.LogStreamConnected,
+			tab:          model.Tab,
+			archiveQuery: model.ArchiveFilter,
+			archivePage:  model.ArchivePage,
+			logLimit:     logLimitForHeight(terminalHeight),
+		}
 		go func() {
-			_, terminalHeight := term.size()
-			result := fetchModel(ctx, client, model.Tab == TabLogs && !model.LogStreamConnected, model.Tab, model.ArchiveFilter, model.ArchivePage, logLimitForHeight(terminalHeight))
+			defer guard()
+			result := fetchModel(ctx, client, request)
 			atomic.StoreInt32(&fetching, 0)
 			select {
 			case refreshCh <- result:
@@ -115,9 +156,14 @@ func Run(ctx context.Context, opts Options) error {
 
 	parser := &KeyParser{}
 	requestRefresh()
+	var termOut, termIn int64
 	startAction := func(action Action) bool {
+		if action.Kind == ActionRefresh {
+			lastSlow = time.Time{}
+		}
 		if action.Kind == ActionCopy {
-			if err := writeOSC52(out, action.Text); err != nil {
+			counted := &countingWriter{Writer: out, count: &termOut}
+			if err := writeOSC52(counted, action.Text, os.Getenv); err != nil {
 				model.SetMessage(model.Tr.Format("msg.copyfailed", err))
 			} else {
 				model.SetMessage(model.Tr.T("msg.copied"))
@@ -126,45 +172,81 @@ func Run(ctx context.Context, opts Options) error {
 		}
 		return startActionAsync(ctx, client, model, action, requestRefresh, actionCh, &acting)
 	}
+	draw := func() {
+		width, height := term.size()
+		termOut += int64(screen.draw(model.Render(width, height), width, height))
+	}
+	meter := &bandwidthMeter{}
+	updateMeter := func() bool {
+		apiOut, apiIn := client.Traffic()
+		rates := meter.sample(time.Now(), [trafficKinds]int64{termOut, termIn, apiIn, apiOut})
+		text := formatBandwidth(model.Tr, rates)
+		if text == model.Bandwidth {
+			return false
+		}
+		model.Bandwidth = text
+		return true
+	}
+	updateMeter()
+	handleKeys := func(keys []Key) bool {
+		for _, key := range keys {
+			if key.Kind == KeyCtrlL {
+				screen.invalidate()
+				continue
+			}
+			if startAction(model.Update(key)) {
+				return true
+			}
+		}
+		return false
+	}
 
 	ticker := time.NewTicker(refresh)
 	defer ticker.Stop()
-	// KeyParser needs a short timeout to distinguish an incomplete escape
-	// sequence from a standalone key. It must not also drive screen redraws:
-	// doing so made the log flash continuously even while it was idle.
-	keyFlush := time.NewTicker(50 * time.Millisecond)
+	// An incomplete escape sequence is flushed only after escDelay of silence
+	// on the input, measured from the last byte received: a fixed ticker could
+	// fire right after an ESC whose "[A" is still crossing the network, and
+	// turn an arrow key into Esc followed by the commands '[' and 'A'.
+	keyFlush := time.NewTicker(25 * time.Millisecond)
 	defer keyFlush.Stop()
+	lastInput := time.Now()
 	// Coalesce bursts of SSE log events into at most ten frames per second.
 	frame := time.NewTicker(100 * time.Millisecond)
 	defer frame.Stop()
-	// The next-cycle countdown is the only time-based content on screen.
+	// Countdowns and notification expiry are the only time-based content.
 	clock := time.NewTicker(time.Second)
 	defer clock.Stop()
 
 	quit := false
-	dirty := true
-	width, height := term.size()
-	renderANSIConvert(out, model.Render(width, height))
-	dirty = false
+	dirty := false
+	ticks := 0
+	draw()
 	for !quit {
 		select {
 		case <-signalCtx.Done():
 			quit = true
-		case data := <-inputCh:
-			for _, key := range parser.Feed(data, false) {
-				dirty = true
-				if startAction(model.Update(key)) {
-					quit = true
-					break
-				}
+		case <-resizeCh:
+			screen.invalidate()
+			draw()
+			dirty = false
+		case data, ok := <-inputCh:
+			if !ok {
+				// The terminal went away (SSH dropped, pty closed).
+				quit = true
+				break
 			}
+			lastInput = time.Now()
+			termIn += int64(len(data))
+			quit = handleKeys(parser.Feed(data, false))
+			// Draw keystrokes at once: waiting for the frame ticker would add
+			// up to 100 ms on top of the network round trip.
+			draw()
+			dirty = false
 		case <-keyFlush.C:
-			for _, key := range parser.Feed(nil, true) {
-				dirty = true
-				if startAction(model.Update(key)) {
-					quit = true
-					break
-				}
+			if parser.Pending() && time.Since(lastInput) >= escDelay {
+				quit = handleKeys(parser.Feed(nil, true))
+				draw()
+				dirty = false
 			}
 		case result := <-refreshCh:
 			model.applyRefresh(result)
@@ -183,10 +265,13 @@ func Run(ctx context.Context, opts Options) error {
 			requestRefresh()
 		case <-clock.C:
 			dirty = true
+			ticks++
+			if ticks%2 == 0 {
+				updateMeter()
+			}
 		case <-frame.C:
 			if dirty {
-				width, height := term.size()
-				renderANSIConvert(out, model.Render(width, height))
+				draw()
 				dirty = false
 			}
 		}
@@ -204,9 +289,36 @@ func Run(ctx context.Context, opts Options) error {
 	return nil
 }
 
+// asciiMode reports whether to draw with ASCII only: GEXTTO_TUI_ASCII forces
+// it either way, otherwise a non-UTF-8 locale (common over SSH when LANG/LC_*
+// are not forwarded) or the Linux console switch it on.
+func asciiMode(getenv func(string) string) bool {
+	switch strings.ToLower(strings.TrimSpace(getenv("GEXTTO_TUI_ASCII"))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return !LocaleIsUTF8(getenv)
+}
+
+// escapeDelay parses GEXTTO_TUI_ESCDELAY (milliseconds). The default suits
+// SSH; raise it on very slow links where arrows turn into stray letters.
+func escapeDelay(value string) time.Duration {
+	const fallback = 100 * time.Millisecond
+	millis, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || millis < 10 || millis > 2000 {
+		return fallback
+	}
+	return time.Duration(millis) * time.Millisecond
+}
+
+// readInput forwards terminal input and closes ch when the terminal is gone,
+// so the main loop can quit instead of spinning on a dead descriptor.
 func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
+	defer close(ch)
 	fd := int(in.Fd())
-	buffer := make([]byte, 256)
+	buffer := make([]byte, 4096)
 	for {
 		select {
 		case <-ctx.Done():
@@ -226,6 +338,9 @@ func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
 		if ready == 0 {
 			continue
 		}
+		if pollFDs[0].Revents&(unix.POLLHUP|unix.POLLERR|unix.POLLNVAL) != 0 && pollFDs[0].Revents&unix.POLLIN == 0 {
+			return
+		}
 		count, readErr := unix.Read(fd, buffer)
 		if count > 0 {
 			data := make([]byte, count)
@@ -235,10 +350,13 @@ func readInput(ctx context.Context, in *os.File, ch chan<- []byte) {
 			case <-ctx.Done():
 				return
 			}
+			continue
 		}
-		if readErr != nil && readErr != unix.EAGAIN && readErr != unix.EINTR {
-			return
+		if readErr == unix.EAGAIN || readErr == unix.EINTR {
+			continue
 		}
+		// count == 0 without error is end of file; anything else is fatal.
+		return
 	}
 }
 
@@ -361,7 +479,22 @@ type refreshResult struct {
 
 // fetchModel polls the daemon with a short timeout. It is safe to call from a
 // goroutine because it never touches the model.
-func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, archiveQuery string, archivePage, logLimit int) refreshResult {
+// slowRefresh is how often slowly changing data (health, statistics) is
+// polled on the Status tab.
+const slowRefresh = 10 * time.Second
+
+// fetchRequest is a snapshot of the model fields a background poll needs.
+type fetchRequest struct {
+	includeSlow  bool
+	includeLogs  bool
+	tab          Tab
+	archiveQuery string
+	archivePage  int
+	logLimit     int
+}
+
+func fetchModel(ctx context.Context, client *Client, request fetchRequest) refreshResult {
+	includeLogs, tab, archiveQuery, archivePage, logLimit := request.includeLogs, request.tab, request.archiveQuery, request.archivePage, request.logLimit
 	callCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 
@@ -371,7 +504,7 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 	} else if ctx.Err() == nil {
 		result.statusErr = err.Error()
 	}
-	if tab == TabStatus {
+	if tab == TabStatus && request.includeSlow {
 		if stats, err := client.Stats(callCtx); err == nil {
 			result.metrics = &stats
 			result.hasMetrics = true
@@ -390,7 +523,7 @@ func fetchModel(ctx context.Context, client *Client, includeLogs bool, tab Tab, 
 			result.hasHTTP = true
 		}
 	}
-	if tab == TabLogs && includeLogs {
+	if includeLogs {
 		if logs, err := client.Logs(callCtx, logLimit); err == nil {
 			result.logs = logs
 			result.hasLogs = true
@@ -463,6 +596,8 @@ func (m *Model) applyRefresh(result refreshResult) {
 	}
 	if result.hasMetrics && result.metrics != nil {
 		m.SetMetrics(*result.metrics)
+	} else if result.hasTorrents {
+		m.sampleTransfer()
 	}
 	if result.hasSeries {
 		m.SetLibrary(result.series)
@@ -857,4 +992,16 @@ func applyActionResult(model *Model, result actionResult, refresh func()) {
 	if result.refresh {
 		refresh()
 	}
+}
+
+// countingWriter counts bytes written to the terminal outside the renderer.
+type countingWriter struct {
+	io.Writer
+	count *int64
+}
+
+func (w *countingWriter) Write(data []byte) (int, error) {
+	written, err := w.Writer.Write(data)
+	*w.count += int64(written)
+	return written, err
 }

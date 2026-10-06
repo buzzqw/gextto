@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
-	"unicode/utf8"
 )
 
 // HumanBytes renders a byte count with binary units, matching the web UI.
@@ -50,41 +48,6 @@ func HumanDuration(seconds float64) string {
 	default:
 		return fmt.Sprintf("%dm", minutes)
 	}
-}
-
-// Shorten truncates a string to width runes, adding an ellipsis when needed.
-func Shorten(value string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if utf8.RuneCountInString(value) <= width {
-		return value
-	}
-	if width == 1 {
-		return "…"
-	}
-	runes := []rune(value)
-	return string(runes[:width-1]) + "…"
-}
-
-// PadRight pads a string with spaces to width runes (truncating if longer).
-func PadRight(value string, width int) string {
-	value = Shorten(value, width)
-	padding := width - utf8.RuneCountInString(value)
-	if padding <= 0 {
-		return value
-	}
-	return value + strings.Repeat(" ", padding)
-}
-
-// PadLeft pads a string on the left to width runes.
-func PadLeft(value string, width int) string {
-	value = Shorten(value, width)
-	padding := width - utf8.RuneCountInString(value)
-	if padding <= 0 {
-		return value
-	}
-	return strings.Repeat(" ", padding) + value
 }
 
 // toFloat extracts a float from the values encoding/json produces.

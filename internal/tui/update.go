@@ -9,6 +9,9 @@ import (
 
 // Update applies a key press and returns the action the runner must execute.
 func (m *Model) Update(k Key) Action {
+	if k.Kind == KeyPaste {
+		return m.updatePaste(k.Text)
+	}
 	if m.Prompt != nil {
 		return m.updatePrompt(k)
 	}
@@ -120,10 +123,13 @@ func (m *Model) Update(k Key) Action {
 		return m.updateTorrents(k)
 	case TabLogs:
 		return m.updateLogs(k)
+	case TabStatus:
+		m.scrollPage(k.Kind)
 	case TabHealth:
 		if k.Kind == KeyRune && k.Rune == 'x' {
 			m.Confirm = &confirm{MessageKey: "prompt.cleantrash", Action: Action{Kind: ActionCleanTrash}}
 		}
+		m.scrollPage(k.Kind)
 	case TabArchive:
 		return m.updateArchive(k)
 	case TabMissing:
@@ -276,11 +282,12 @@ func (m *Model) submitPrompt() Action {
 }
 
 func (m *Model) updateConfirm(k Key) Action {
+	// Only an explicit y/s confirms: Enter is excluded because it is also
+	// what opens and submits things, so an auto-repeated or doubled Enter
+	// (easy over a laggy SSH link) must never delete a torrent and its files.
 	yes := false
 	switch k.Kind {
-	case KeyEnter:
-		yes = true
-	case KeyEsc:
+	case KeyEsc, KeyEnter:
 		yes = false
 	case KeyRune:
 		lowered := unicode.ToLower(k.Rune)
@@ -544,7 +551,26 @@ func (m *Model) updateSettings(k Key) Action {
 	return Action{}
 }
 
+// scrollPage moves the Status/Health page; Render clamps the bottom end.
+func (m *Model) scrollPage(kind KeyKind) {
+	switch kind {
+	case KeyUp:
+		m.PageScroll = max(0, m.PageScroll-1)
+	case KeyDown:
+		m.PageScroll++
+	case KeyPgUp:
+		m.PageScroll = max(0, m.PageScroll-10)
+	case KeyPgDn:
+		m.PageScroll += 10
+	case KeyHome:
+		m.PageScroll = 0
+	case KeyEnd:
+		m.PageScroll = 1 << 20
+	}
+}
+
 func (m *Model) loadTabAction() Action {
+	m.PageScroll = 0
 	switch m.Tab {
 	case TabArchive:
 		return Action{Kind: ActionLoadArchive, Text: m.ArchiveFilter, Page: m.ArchivePage}
@@ -687,6 +713,45 @@ func (m *Model) updateLibrary(k Key) Action {
 		m.LibrarySelected = moveSelection(m.LibrarySelected, len(m.VisibleLibrary()), k.Kind)
 	}
 	return Action{}
+}
+
+// updatePaste handles a bracketed paste. In a text prompt the text is
+// inserted as typed; elsewhere a pasted magnet or URL opens the "add" prompt
+// pre-filled. A paste is never interpreted as a sequence of commands, and it
+// never answers a confirmation.
+func (m *Model) updatePaste(text string) Action {
+	if m.Prompt != nil {
+		m.insertPromptText(singleLine(text))
+		return Action{}
+	}
+	if m.Confirm != nil {
+		return Action{}
+	}
+	value := strings.TrimSpace(singleLine(text))
+	if strings.HasPrefix(value, "magnet:") || strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://") {
+		m.Overlay = OverlayNone
+		m.Prompt = newPrompt(PromptMagnet, value)
+		return Action{}
+	}
+	if value != "" {
+		m.Message = m.Tr.T("msg.pasteignored")
+	}
+	return Action{}
+}
+
+// singleLine joins pasted lines with spaces and drops control characters.
+func singleLine(text string) string {
+	text = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
+	return Sanitize(text)
+}
+
+func (m *Model) insertPromptText(text string) {
+	buffer := []rune(m.Prompt.Buffer)
+	cursor := min(max(m.Prompt.Cursor, 0), len(buffer))
+	inserted := []rune(text)
+	buffer = append(buffer[:cursor], append(inserted, buffer[cursor:]...)...)
+	m.Prompt.Buffer = string(buffer)
+	m.Prompt.Cursor = cursor + len(inserted)
 }
 
 // PromptLabel returns the localized label of the active prompt.
