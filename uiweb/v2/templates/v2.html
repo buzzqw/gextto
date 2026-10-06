@@ -174,7 +174,7 @@
     <div class="metric mint"><span class="metric-sub">Serie TV configurate</span><strong>{{.SeriesConfigured}}</strong></div>
     <div class="metric blue"><span class="metric-sub">Film configurati</span><strong>{{.MoviesConfigured}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong></div>
-    <div class="metric mint"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Seeding}} in seed</small></div>
+    <div class="metric mint"><span class="metric-sub">Torrent in sessione</span><strong>{{.Torrents}}</strong><small class="muted">{{.Downloading}} in scarico · {{.Idle}} fermi a 0 B/s · {{.Seeding}} in seed</small></div>
     <div class="metric blue"><span class="metric-sub">Magnet in archivio</span><strong>{{.ArchiveTotal}}</strong></div>
     <div class="metric"><span class="metric-sub">Visti nei feed</span><strong>{{.SeenGroups}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Cestino</span><strong>{{bytesU .TrashBytes}}</strong></div>
@@ -228,6 +228,7 @@
       <div class="panel-body">
         <div class="row"><span>Velocità</span><strong>{{rate .DownloadRate}} ↓ · {{rate .UploadRate}} ↑</strong></div>
         <div class="row"><span>In scarico</span><strong>{{.Downloading}}</strong></div>
+        <div class="row"><span>Fermi a 0 B/s</span><strong>{{.Idle}}</strong></div>
         <div class="row"><span>In seed</span><strong>{{.Seeding}}</strong></div>
         <div class="row"><span>In pausa</span><strong>{{.Paused}}</strong></div>
         <div class="row"><span>In errore</span><strong>{{.Errors}}</strong></div>

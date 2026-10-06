@@ -481,3 +481,29 @@ func TestEmojiLogLinesNeverOverflow(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusCountsOnlyTransferringTorrentsAsActive(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.SetStatus(Status{Active: true, TorrentStats: TorrentStats{Count: 4, Downloading: 3}})
+	m.SetTorrents([]Torrent{
+		{Hash: "a", Name: "Scarica.Davvero", State: "downloading", Progress: 40, DownloadRate: 2048},
+		{Hash: "b", Name: "Solo.Upload", State: "seeding", Progress: 100, UploadRate: 4096},
+		{Hash: "c", Name: "Bloccato.FBI", State: "downloading", Progress: 74},
+		{Hash: "d", Name: "In.Coda", State: "paused", Progress: 10},
+	})
+	screen := m.Render(120, 40)
+	for _, needle := range []string{"2 attivi", "1 fermi a 0 B/s", "1 in coda/pausa", "Scarica.Davvero", "Solo.Upload", "Bloccati:", "Bloccato.FBI (74%)"} {
+		if !lineContains(screen, needle) {
+			t.Errorf("status should contain %q: %q", needle, firstLines(screen, 40))
+		}
+	}
+	for _, line := range screen.Lines {
+		if strings.Contains(line.Text, "[") && strings.Contains(line.Text, "Bloccato.FBI") {
+			t.Fatalf("a torrent at 0 B/s must not be listed among the active transfers: %q", line.Text)
+		}
+	}
+	m.Tab = TabTorrents
+	if screen := m.Render(120, 20); !lineContains(screen, m.Tr.T("state.idle")) {
+		t.Fatalf("the downloads list should mark the stuck torrent: %q", firstLines(screen, 10))
+	}
+}

@@ -2492,9 +2492,17 @@ func (c *LibtorrentClient) Stats() map[string]any {
 	seeding := 0
 	queued := 0
 	metadataPending := 0
+	transferring := 0
+	idle := 0
 	for _, torrent := range list {
 		if torrent.State == "downloading" {
 			downloading++
+		}
+		switch {
+		case TorrentTransferring(torrent):
+			transferring++
+		case TorrentIdle(torrent):
+			idle++
 		}
 		if torrent.Stalled {
 			stalled++
@@ -2517,6 +2525,8 @@ func (c *LibtorrentClient) Stats() map[string]any {
 		"seeding":          seeding,
 		"queued":           queued,
 		"metadata_pending": metadataPending,
+		"transferring":     transferring,
+		"idle":             idle,
 		"integrated":       c.session != nil,
 		"dry_run":          c.DryRun,
 	}

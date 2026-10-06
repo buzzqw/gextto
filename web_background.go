@@ -792,10 +792,18 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			}
 			if lastQueueActive == nil || *lastQueueActive != active {
 				queued := 0
+				transferring := 0
+				idle := 0
 				var rateKib uint64
 				for _, torrent := range snapshot {
 					if torrent.State == "paused" {
 						queued++
+					}
+					switch {
+					case TorrentTransferring(torrent):
+						transferring++
+					case TorrentIdle(torrent):
+						idle++
 					}
 					rateKib += torrent.DownloadRate
 				}
@@ -804,7 +812,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				if effectiveDownloadKib > 0 {
 					speed += fmt.Sprintf(" (limit %d KB/s)", effectiveDownloadKib)
 				}
-				logging.Info(fmt.Sprintf("📊 Downloads: %d active, %d waiting or paused · %s", active, queued, speed))
+				// "Active" means really transferring: a download stuck at 0 B/s
+				// is counted apart, not as active.
+				logging.Info(fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed))
 				value := active
 				lastQueueActive = &value
 			}

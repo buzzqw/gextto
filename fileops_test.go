@@ -165,3 +165,26 @@ func TestManualMoveAllowsConfiguredSeriesArchive(t *testing.T) {
 		t.Fatal("an unrelated folder must not be allowed")
 	}
 }
+
+func TestTorrentTransferringAndIdle(t *testing.T) {
+	cases := []struct {
+		view         models.TorrentView
+		transferring bool
+		idle         bool
+	}{
+		{models.TorrentView{State: "downloading", Progress: 40, DownloadRate: 1}, true, false},
+		{models.TorrentView{State: "seeding", Progress: 100, UploadRate: 1}, true, false},
+		{models.TorrentView{State: "downloading", Progress: 74}, false, true},
+		{models.TorrentView{State: "checking_files", Progress: 27}, false, true},
+		{models.TorrentView{State: "paused", Progress: 10}, false, false},
+		{models.TorrentView{State: "seeding", Progress: 100}, false, false},
+	}
+	for _, tc := range cases {
+		if got := TorrentTransferring(tc.view); got != tc.transferring {
+			t.Errorf("TorrentTransferring(%+v) = %v", tc.view, got)
+		}
+		if got := TorrentIdle(tc.view); got != tc.idle {
+			t.Errorf("TorrentIdle(%+v) = %v", tc.view, got)
+		}
+	}
+}

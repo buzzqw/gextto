@@ -426,3 +426,23 @@ func torrentNotFoundError(err error) bool {
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "torrent not found")
 }
+
+// TorrentTransferring reports whether a torrent is really moving data right
+// now (downloading or uploading). Only these count as "active": a torrent in
+// the downloading state at 0 B/s both ways is waiting, not working.
+func TorrentTransferring(torrent models.TorrentView) bool {
+	return torrent.DownloadRate > 0 || torrent.UploadRate > 0
+}
+
+// TorrentIdle reports whether an unfinished, not paused torrent is stuck at
+// 0 B/s both ways (no peer has the missing pieces, a recheck, a stall).
+func TorrentIdle(torrent models.TorrentView) bool {
+	if TorrentTransferring(torrent) || torrent.Progress >= 100 {
+		return false
+	}
+	switch torrent.State {
+	case "downloading", "downloading_metadata", "stalled", "checking_files", "checking_resume_data":
+		return true
+	}
+	return false
+}

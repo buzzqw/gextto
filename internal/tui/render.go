@@ -355,18 +355,36 @@ func (m *Model) statusInfoLines(width int) []Line {
 		tr.T("label.movies"), status.Seen.Movies,
 		tr.T("label.series"), status.Seen.Series), StyleMuted))
 
-	// Downloads: counts by state.
+	// Downloads: active means really transferring (either direction); an
+	// unfinished torrent at 0 B/s is counted as stuck, not as active.
 	stats := status.TorrentStats
-	downloads := fmt.Sprintf("%s: %d %s · %d %s · %d %s", tr.Format("status.torrentcount", stats.Count),
-		stats.Downloading, tr.T("label.downloading"),
-		stats.Queued, tr.T("label.queued"),
-		stats.Seeding, tr.T("label.seeding"))
-	if stats.Stalled > 0 {
-		downloads += " · " + tr.Format("status.stalled", stats.Stalled)
+	var downloads string
+	if len(m.Torrents) > 0 {
+		transferring, idle, waiting, done := 0, 0, 0, 0
+		for _, torrent := range m.Torrents {
+			switch {
+			case torrentTransferring(torrent):
+				transferring++
+			case torrentIdle(torrent):
+				idle++
+			case torrent.Progress >= 100:
+				done++
+			default:
+				waiting++
+			}
+		}
+		downloads = fmt.Sprintf("%s: %s · %s · %s · %s", tr.Format("status.torrentcount", len(m.Torrents)),
+			tr.Format("status.transferring", transferring), tr.Format("status.idle", idle),
+			tr.Format("status.waiting", waiting), tr.Format("status.done", done))
+	} else {
+		downloads = fmt.Sprintf("%s: %d %s · %d %s · %d %s", tr.Format("status.torrentcount", stats.Count),
+			stats.Downloading, tr.T("label.downloading"),
+			stats.Queued, tr.T("label.queued"),
+			stats.Seeding, tr.T("label.seeding"))
 	}
 	httpActive := 0
 	for _, item := range m.HTTPDownloads {
-		if item.Status != "completed" && item.Status != "error" {
+		if item.SpeedBytes > 0 {
 			httpActive++
 		}
 	}
@@ -393,6 +411,16 @@ func (m *Model) statusInfoLines(width int) []Line {
 		lines = append(lines, Line{Text: "  " + tr.T("status.noactive"), Style: StyleMuted})
 	}
 	lines = append(lines, active...)
+	idleNames := []string{}
+	for _, torrent := range m.Torrents {
+		if torrentIdle(torrent) {
+			idleNames = append(idleNames, fmt.Sprintf("%s (%.0f%%)", Sanitize(torrent.Name), torrent.Progress))
+		}
+	}
+	if len(idleNames) > 0 {
+		sort.Strings(idleNames)
+		lines = append(lines, m.statusRow(tr.T("status.idlelist"), strings.Join(idleNames, " · "), StyleWarn))
+	}
 	return lines
 }
 
@@ -454,34 +482,33 @@ func (m *Model) statusActiveLines(width int) []Line {
 		state    string
 		progress float64
 		rate     float64
+		upload   float64
 		eta      float64
 	}
 	rows := []activeRow{}
 	for _, torrent := range m.Torrents {
-		state := strings.ToLower(torrent.State)
-		if torrent.IsSeeding || state == "seeding" || state == "finished" || state == "paused" || torrent.Progress >= 100 {
+		if !torrentTransferring(torrent) {
 			continue
 		}
 		eta := -1.0
 		if torrent.DownloadRate > 0 && torrent.TotalSize > torrent.TotalDone {
 			eta = float64(torrent.TotalSize-torrent.TotalDone) / float64(torrent.DownloadRate)
 		}
-		rows = append(rows, activeRow{torrent.Name, torrent.State, torrent.Progress, float64(torrent.DownloadRate), eta})
+		rows = append(rows, activeRow{torrent.Name, torrent.State, torrent.Progress, float64(torrent.DownloadRate), float64(torrent.UploadRate), eta})
 	}
 	for _, item := range m.HTTPDownloads {
-		state := strings.ToLower(item.Status)
-		if state == "completed" || state == "error" || state == "paused" {
+		if item.SpeedBytes == 0 {
 			continue
 		}
 		eta := -1.0
 		if item.ETASeconds != nil {
 			eta = float64(*item.ETASeconds)
 		}
-		rows = append(rows, activeRow{firstNonEmpty(item.Title, item.ID), item.Status, item.Progress, float64(item.SpeedBytes), eta})
+		rows = append(rows, activeRow{firstNonEmpty(item.Title, item.ID), item.Status, item.Progress, float64(item.SpeedBytes), 0, eta})
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i].rate != rows[j].rate {
-			return rows[i].rate > rows[j].rate
+		if rows[i].rate+rows[i].upload != rows[j].rate+rows[j].upload {
+			return rows[i].rate+rows[i].upload > rows[j].rate+rows[j].upload
 		}
 		return rows[i].progress > rows[j].progress
 	})
@@ -498,8 +525,8 @@ func (m *Model) statusActiveLines(width int) []Line {
 		if row.eta >= 0 {
 			eta = HumanDuration(row.eta)
 		}
-		prefix := fmt.Sprintf("  %s %s %s %s ", progressBar(row.progress, barWidth), PadLeft(fmt.Sprintf("%.0f%%", row.progress), 4),
-			PadLeft(HumanRate(row.rate), 11), PadRight(m.Tr.Format("status.eta", eta), 10))
+		prefix := fmt.Sprintf("  %s %s ↓%s ↑%s %s ", progressBar(row.progress, barWidth), PadLeft(fmt.Sprintf("%.0f%%", row.progress), 4),
+			PadLeft(HumanRate(row.rate), 10), PadLeft(HumanRate(row.upload), 10), PadRight(m.Tr.Format("status.eta", eta), 10))
 		lines = append(lines, Line{Text: prefix + Sanitize(row.name), Style: torrentStyle(row.state), Wrap: true, Indent: min(StringWidth(prefix), width/2)})
 	}
 	return lines
@@ -720,11 +747,11 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		}
 		return " "
 	}
-	rowStyle := func(index int, state string) Style {
+	rowStyle := func(index int, _ string) Style {
 		if index == m.Selected {
 			return StyleSelected
 		}
-		return torrentStyle(state)
+		return downloadRowStyle(items[index])
 	}
 	compactRow := func(index int, item DownloadRow) string {
 		name, _, _ := downloadRowFields(item)
@@ -805,9 +832,39 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 
 func downloadStateLabel(tr *Translator, row DownloadRow) string {
 	if row.Torrent != nil {
+		if torrentIdle(*row.Torrent) {
+			return tr.T("state.idle")
+		}
 		return tr.StateLabel(row.Torrent.State)
 	}
 	return tr.StateLabel(row.HTTP.Status)
+}
+
+// torrentTransferring and torrentIdle mirror the daemon's definitions: only a
+// torrent moving data (either direction) is active; an unfinished one at
+// 0 B/s both ways is stuck, whatever its state says.
+func torrentTransferring(torrent Torrent) bool {
+	return torrent.DownloadRate > 0 || torrent.UploadRate > 0
+}
+
+func torrentIdle(torrent Torrent) bool {
+	if torrentTransferring(torrent) || torrent.Progress >= 100 {
+		return false
+	}
+	switch strings.ToLower(torrent.State) {
+	case "downloading", "downloading_metadata", "stalled", "checking_files", "checking_resume_data":
+		return true
+	}
+	return false
+}
+
+// rowStyle colours a list row; a stuck download is highlighted as a warning.
+func downloadRowStyle(row DownloadRow) Style {
+	if row.Torrent != nil && torrentIdle(*row.Torrent) {
+		return StyleWarn
+	}
+	_, state, _ := downloadRowFields(row)
+	return torrentStyle(state)
 }
 
 func downloadRowValues(row DownloadRow) (done uint64, down, up float64) {

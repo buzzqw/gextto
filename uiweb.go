@@ -61,6 +61,7 @@ type uiDashboardData struct {
 	LibtorrentVersion string
 	Torrents          int
 	Downloading       int
+	Idle              int
 	Seeding           int
 	Paused            int
 	Errors            int
@@ -281,7 +282,12 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	for _, view := range views {
 		switch view.State {
 		case "downloading", "downloading_metadata", "stalled":
-			data.Downloading++
+			// Only a download that is moving data counts as in progress.
+			if TorrentTransferring(view) {
+				data.Downloading++
+			} else {
+				data.Idle++
+			}
 		case "seeding", "finished":
 			data.Seeding++
 		case "paused", "queued":

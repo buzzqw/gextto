@@ -532,6 +532,7 @@ eng:
   "Verifica file": "Check files"
   "Metadata": "Metadata"
   "In scarico": "Downloading"
+  "Fermi a 0 B/s": "Stuck at 0 B/s"
   "Completato": "Completed"
   "In seed": "Seeding"
   "Ripristino": "Restoring"

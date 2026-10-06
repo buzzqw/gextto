@@ -1510,6 +1510,7 @@ pol:
   In pausa: Wstrzymano
   In programmazione: W programowaniu
   In scarico: Rozładunek
+  "Fermi a 0 B/s": "Zatrzymane na 0 B/s"
   In seed: W nasionach
   Incolla il Client ID: Wklej identyfikator klienta
   Incolla il Client Secret: Wklej klucz tajny klienta
