@@ -1358,6 +1358,9 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 		return videoPath, nil
 	}
 	target := filepath.Clean(filepath.Join(root, filepath.Base(videoPath)))
+	if strings.Contains(target, "..") {
+		return videoPath, fmt.Errorf("invalid movie destination path: %s", target)
+	}
 	if SamePath(videoPath, target) {
 		return videoPath, nil
 	}
@@ -1385,6 +1388,9 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 	}
 	dir = filepath.Clean(dir)
 	root = filepath.Clean(root)
+	if strings.Contains(dir, "..") || strings.Contains(root, "..") {
+		return
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil || len(entries) == 0 {
 		return
@@ -1393,6 +1399,9 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 		return
 	}
 	target := filepath.Clean(filepath.Join(root, stem))
+	if strings.Contains(target, "..") {
+		return
+	}
 	if _, err := os.Stat(target); err == nil {
 		return
 	}
@@ -1404,6 +1413,9 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 func moveMovieCompanions(oldDir, root, videoBase string) {
 	oldDir = filepath.Clean(oldDir)
 	root = filepath.Clean(root)
+	if strings.Contains(oldDir, "..") || strings.Contains(root, "..") {
+		return
+	}
 	stem := strings.TrimSuffix(filepath.Base(videoBase), filepath.Ext(videoBase))
 	entries, err := os.ReadDir(oldDir)
 	if err != nil {
@@ -1441,6 +1453,9 @@ func moveMovieCompanions(oldDir, root, videoBase string) {
 			targetName = stem + "-" + kind + filepath.Ext(name)
 		}
 		target := filepath.Clean(filepath.Join(root, targetName))
+		if strings.Contains(target, "..") {
+			continue
+		}
 		if _, statErr := os.Stat(target); statErr == nil {
 			continue
 		}
@@ -1463,7 +1478,13 @@ func movieArtworkKind(name string) string {
 func removeEmptyDirsUpTo(from, root string) {
 	dir := filepath.Clean(from)
 	root = filepath.Clean(root)
+	if strings.Contains(dir, "..") || strings.Contains(root, "..") {
+		return
+	}
 	for !SamePath(dir, root) && pathWithin(dir, root) {
+		if strings.Contains(dir, "..") {
+			return
+		}
 		entries, err := os.ReadDir(dir)
 		if err != nil || len(entries) != 0 {
 			return
@@ -1860,6 +1881,9 @@ func DiscardSidecars(source string, cfg *Config) (int, error) {
 // configured: refusing is safer than deleting a file the user asked to keep.
 func trashOrRemove(path string, cfg *Config) error {
 	path = filepath.Clean(path)
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("invalid path: %s", path)
+	}
 	if cfg.CleanupAction == "delete" {
 		return os.Remove(path)
 	}

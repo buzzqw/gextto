@@ -1494,7 +1494,11 @@ func v2TorrentOnRamdisk(savePath string, cfg *Config) bool {
 // V2DownloadsRemove removes a torrent and swaps the table back in, clearing the
 // modal with an out-of-band swap.
 func V2DownloadsRemove(w http.ResponseWriter, r *http.Request, s *AppState) {
-	hash := r.FormValue("hash")
+	hash := strings.ToLower(strings.TrimSpace(r.FormValue("hash")))
+	if !isHexString(hash) || strings.Contains(hash, "..") {
+		http.Error(w, "invalid torrent hash", http.StatusBadRequest)
+		return
+	}
 	mode := r.FormValue("mode")
 	blocklist := mode == "blocklist" || mode == "files_blocklist"
 	deleteFiles := mode == "files" || mode == "files_blocklist"
