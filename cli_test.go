@@ -72,14 +72,6 @@ func TestParsesUpdateOptions(t *testing.T) {
 	}
 }
 
-func TestParsesImportSubcommand(t *testing.T) {
-	got := Parse(strings.Fields("import --from-copy /srv/extto --data-dir /srv/data"))
-	want := Command{Kind: CommandImport, Source: "/srv/extto", DataDir: "/srv/data"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("import = %#v, want %#v", got, want)
-	}
-}
-
 func TestParsesTuiSubcommand(t *testing.T) {
 	got := Parse(strings.Fields("tui --url http://host:5000 --lang en"))
 	want := Command{Kind: CommandTUI, TUIURL: "http://host:5000", TUILang: "en"}
@@ -102,7 +94,6 @@ func TestUsageMentionsEverySwitchesAndDefaults(t *testing.T) {
 		"gexttod 0.1.0 — Gextto (gextto): self-contained Go daemon for media acquisition and archiving",
 		"    gexttod [OPTIONS]",
 		"    gexttod tui [--url <url>] [--lang it|en]",
-		"    gexttod import --from-copy <dir> [--data-dir <dir>]",
 		"    gexttod --update [OPTIONS]",
 		"    -h, --help            Show this help and exit",
 		"    -V, --version         Show the installed version and exit",

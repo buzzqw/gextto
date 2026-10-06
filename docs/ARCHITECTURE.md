@@ -75,7 +75,6 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 | `sqlite.go` | apertura di un DB SQLite con pragma condivisi. |
 | `archive.go` | catalogo durevole delle release archiviate. |
 | `migrate.go` | migrazione della directory dati. |
-| `importer.go` | import da un'installazione legacy `extto`. |
 | `backup.go` | backup dei database (manuale e schedulato). |
 | `library_alias.go` | helper di persistenza della libreria. |
 | `web_inputs_extra.go` | struct di input delle API web. |

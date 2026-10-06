@@ -1390,30 +1390,6 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
-// SetupImport implements `setup_import`.
-func SetupImport(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if SetupComplete(s.cfg) {
-		jsonError(w, http.StatusConflict, "setup already completed")
-		return
-	}
-	source := s.cfg.ImportSourceDir
-	if !gh6_fileExists(filepath.Join(source, "extto_series.db")) {
-		jsonError(w, http.StatusBadRequest, "copy extto_series.db, extto_archive.db, extto_config.db and comics.db into import-source first")
-		return
-	}
-	report, err := ImportExtto(source, s.cfg.DataDir)
-	if err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := CompleteSetup(s.cfg); err != nil {
-		jsonError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	TouchConfigGeneration()
-	jsonResponse(w, map[string]any{"ok": true, "report": report})
-}
-
 // SimklWatchlist implements `simkl_watchlist`.
 func SimklWatchlist(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)

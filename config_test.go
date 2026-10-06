@@ -51,16 +51,12 @@ func TestPrepareDirsDoesNotCreateTheImportSource(t *testing.T) {
 	cfg.LibtorrentTempDir = &temp
 	trash := filepath.Join(cfg.DataDir, "trash")
 	cfg.TrashPath = &trash
-	cfg.ImportSourceDir = filepath.Join(root, "external-legacy")
 
 	if err := cfg.PrepareDirs(); err != nil {
 		t.Fatal(err)
 	}
 	if info, err := os.Stat(cfg.DataDir); err != nil || !info.IsDir() {
 		t.Fatal("data dir was not created")
-	}
-	if _, err := os.Stat(cfg.ImportSourceDir); err == nil {
-		t.Fatal("import source dir must not be created")
 	}
 }
 

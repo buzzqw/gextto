@@ -286,7 +286,6 @@ type Config struct {
 	DataDir             string             `json:"data_dir"`
 	Listen              string             `json:"listen"`
 	EngineListen        string             `json:"engine_listen"`
-	ImportSourceDir     string             `json:"import_source_dir"`
 	RefreshSecs         uint64             `json:"refresh_secs"`
 	Active              bool               `json:"active"`
 	DryRun              bool               `json:"dry_run"`
@@ -753,10 +752,6 @@ func DefaultConfig() Config {
 	if !ok {
 		engineListen = constants.DefaultEngineListen
 	}
-	importSource, ok := os.LookupEnv("GEXTTO_IMPORT_SOURCE")
-	if !ok {
-		importSource = dataDir
-	}
 	libtorrentTempDir := filepath.Join(dataDir, "incomplete")
 	trashPath := filepath.Join(dataDir, "trash")
 	return Config{
@@ -781,7 +776,6 @@ func DefaultConfig() Config {
 		CleanupAction:       "move",
 		Listen:              listen,
 		EngineListen:        engineListen,
-		ImportSourceDir:     importSource,
 		Active:              false,
 		DryRun:              true,
 		DataDir:             dataDir,
@@ -2384,7 +2378,7 @@ func LoadConfig(path string) (Config, error) {
 			return Config{}, fmt.Errorf("parse %s: %w", path, err)
 		}
 	}
-	roots := []string{filepath.Dir(path), cfg.DataDir, cfg.ImportSourceDir}
+	roots := []string{filepath.Dir(path), cfg.DataDir}
 	if _, err := MigrateLegacyFiles(cfg.DataDir, roots); err != nil {
 		return Config{}, err
 	}

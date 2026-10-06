@@ -36,8 +36,6 @@ type CommandKind int
 const (
 	// CommandServe runs the daemon (default command).
 	CommandServe CommandKind = iota
-	// CommandImport imports data from a legacy `Extto` installation.
-	CommandImport
 	// CommandVersion prints the installed version and exits.
 	CommandVersion
 	// CommandHelp prints usage and exits.
@@ -59,10 +57,6 @@ type Command struct {
 	DryRun bool
 	Config *string
 
-	// Import fields.
-	Source  string
-	DataDir string
-
 	// Migrate fields.
 	From string
 	To   string
@@ -82,10 +76,6 @@ func DefaultCommand() Command {
 
 // Parse parses the process arguments, excluding `argv[0]`.
 func Parse(args []string) Command {
-	// `import` is a sub-command and owns the rest of the line.
-	if len(args) > 0 && args[0] == "import" {
-		return parseImport(args[1:])
-	}
 	if len(args) > 0 && args[0] == "migrate" {
 		return parseMigrate(args[1:])
 	}
@@ -123,34 +113,6 @@ func Parse(args []string) Command {
 		}
 	}
 	return Command{Kind: CommandServe, DryRun: dryRun, Config: config}
-}
-
-func parseImport(args []string) Command {
-	source := "/path/to/legacy"
-	if value, ok := os.LookupEnv("GEXTTO_IMPORT_SOURCE"); ok {
-		source = value
-	}
-	dataDir := "data"
-	for index := 0; index < len(args); index++ {
-		value := args[index]
-		switch {
-		case value == "--from-copy":
-			if index+1 < len(args) {
-				source = args[index+1]
-				index++
-			}
-		case value == "--data-dir":
-			if index+1 < len(args) {
-				dataDir = args[index+1]
-				index++
-			}
-		case strings.HasPrefix(value, "--from-copy="):
-			source = value[len("--from-copy="):]
-		case strings.HasPrefix(value, "--data-dir="):
-			dataDir = value[len("--data-dir="):]
-		}
-	}
-	return Command{Kind: CommandImport, Source: source, DataDir: dataDir}
 }
 
 func parseMigrate(args []string) Command {
@@ -261,7 +223,6 @@ func Usage() string {
 USAGE:
     %s [OPTIONS]
     %s tui [--url <url>] [--lang it|en]
-    %s import --from-copy <dir> [--data-dir <dir>]
     %s migrate --from <dir> [--to <dir>]
     %s --update [OPTIONS]
 
@@ -289,7 +250,7 @@ UPDATE OPTIONS:
     --no-restart          Do not restart the service after updating
 `,
 		constants.AppName, constants.Version, appAbout,
-		constants.AppName, constants.AppName, constants.AppName, constants.AppName, constants.AppName,
+		constants.AppName, constants.AppName, constants.AppName, constants.AppName,
 		DefaultRepo,
 	)
 }

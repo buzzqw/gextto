@@ -33,15 +33,6 @@ func main() {
 			os.Exit(1)
 		}
 		return
-	case gextto.CommandImport:
-		report, err := gextto.ImportExtto(command.Source, command.DataDir)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "import failed:", err)
-			os.Exit(1)
-		}
-		encoded, _ := json.MarshalIndent(report, "", "  ")
-		fmt.Println(string(encoded))
-		return
 	case gextto.CommandMigrate:
 		report, err := gextto.MigrateDataDir(command.From, command.To)
 		encoded, _ := json.MarshalIndent(report, "", "  ")

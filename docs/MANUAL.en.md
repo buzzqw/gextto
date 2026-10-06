@@ -1249,7 +1249,6 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 | Update MediaInfo | Analyses with `ffprobe` the archived files that have no MediaInfo. |
 | Rename all | Renames every archived file using the configured format. |
 | Housekeeping | Cleans technical data and history without touching the library. |
-| Import setup | Imports an existing setup configuration (extto). |
 | Restart service | Restarts the Gextto daemon. |
 
 ### Rename folder content

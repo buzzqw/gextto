@@ -203,7 +203,6 @@ Per verifiche operative usa prima
 | POST | `/api/set-speed-limits` |
 | GET | `/api/setup` |
 | POST | `/api/setup/complete` |
-| POST | `/api/setup/import` |
 | POST | `/api/simkl/auth/poll` |
 | POST | `/api/simkl/auth/revoke` |
 | POST | `/api/simkl/auth/start` |

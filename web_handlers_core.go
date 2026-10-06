@@ -393,7 +393,6 @@ func SetupStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	jsonResponse(w, map[string]any{
 		"completed":      completed,
-		"import_source":  s.cfg.ImportSourceDir,
 		"auto_completed": autoCompleted,
 	})
 }

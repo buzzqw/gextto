@@ -1279,7 +1279,6 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 | Aggiorna MediaInfo | Analizza con `ffprobe` i file archiviati senza MediaInfo. |
 | Rinomina tutto | Rinomina tutti i file archiviati secondo il formato configurato. |
 | Housekeeping | Pulizia dei dati tecnici e dello storico, senza toccare la libreria. |
-| Importa setup | Importa una configurazione di setup esistente (extto). |
 | Riavvia servizio | Riavvia il daemon Gextto. |
 
 ### Rinomina contenuto cartella

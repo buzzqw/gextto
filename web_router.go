@@ -173,7 +173,6 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/system/stats", SystemStats)
 	handle(s, mux, "GET /api/system/lt_mem_suggest", LtMemSuggest)
 	handle(s, mux, "GET /api/setup", SetupStatus)
-	handle(s, mux, "POST /api/setup/import", SetupImport)
 	handle(s, mux, "POST /api/setup/complete", SetupCompleteExisting)
 	handle(s, mux, "GET /api/torrents", Torrents)
 	handle(s, mux, "GET /api/torrents/stats", TorrentStats)
