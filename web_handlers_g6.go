@@ -900,8 +900,17 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		globalTime = &value
 	}
 	removed := []string{}
+	removedNames := []string{}
 	skipped := 0
+	// Skips caused by an error (finalization or engine removal failed), as
+	// opposed to the routine ones (seed limit not reached, move in progress,
+	// archive pending): only these are worth surfacing in the summary log.
+	failed := []string{}
 	for _, torrent := range s.activeEngine().List() {
+		label := strings.TrimSpace(torrent.Name)
+		if label == "" {
+			label = "unnamed torrent"
+		}
 		status, _ := s.db.TorrentStatus(torrent.Hash)
 		processed, _ := s.db.TorrentProcessed(torrent.Hash)
 		isArchived := processed != nil && strings.TrimSpace(*processed) != ""
@@ -972,12 +981,15 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 				logging.Warn("completed torrent finalization failed",
 					"hash", torrent.Hash, "name", torrent.Name, "error", err)
 				skipped++
+				failed = append(failed, label+" (archiviazione non riuscita: "+err.Error()+")")
 				continue
 			} else if !ok {
 				skipped++
+				failed = append(failed, label+" (archiviazione non completata)")
 				continue
 			}
 			removed = append(removed, torrent.Hash)
+			removedNames = append(removedNames, label)
 			continue
 		}
 		deleteFiles := input.DeleteFiles || gh6_torrentFilesAreDisposable(s.db, torrent.Hash)
@@ -1007,16 +1019,29 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		ok, err := s.activeEngine().Remove(torrent.Hash, deleteFiles)
 		if err != nil {
 			logging.Warn("completed torrent removal failed", "hash", torrent.Hash, "name", torrent.Name, "error", err)
+			skipped++
+			failed = append(failed, label+" (rimozione non riuscita: "+err.Error()+")")
 			continue
 		}
 		if ok {
 			_ = s.db.MarkTorrentRemoved(torrent.Hash)
 			removed = append(removed, torrent.Hash)
+			removedNames = append(removedNames, label)
 		} else {
 			skipped++
+			failed = append(failed, label+" (rimozione rifiutata dal motore torrent)")
 		}
 	}
-	logging.Info("completed torrents cleanup finished", "removed", len(removed), "skipped", skipped)
+	summary := []any{"removed", len(removed)}
+	if len(removedNames) > 0 {
+		summary = append(summary, "torrents", strings.Join(removedNames, ", "))
+	}
+	logging.Info("completed torrents cleanup finished", summary...)
+	if len(failed) > 0 {
+		logging.Warn("completed torrents cleanup: some torrents could not be removed",
+			"failed", len(failed), "details", strings.Join(failed, "; "))
+	}
+	logging.Debug("completed torrents cleanup skipped torrents", "skipped", skipped, "with_errors", len(failed))
 	jsonResponse(w, map[string]any{
 		"ok":      true,
 		"success": true,
