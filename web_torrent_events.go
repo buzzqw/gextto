@@ -2456,20 +2456,14 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 	case "hash_failed":
 		// A damaged piece is discarded and downloaded again automatically:
 		// routine, and alarming if reported one by one. Only a torrent that
-		// keeps receiving damaged data is worth the user's attention.
+		// keeps receiving damaged data is worth a warning in the log; it is
+		// self-healing, so it never sends a Telegram/e-mail notification.
 		failures, alert := recordHashFailure(event.Hash)
 		logging.Debug("piece failed its hash check; it will be downloaded again",
 			"name", event.Name, "failures", failures, "message", event.Message)
 		if alert {
 			logging.Warn(fmt.Sprintf("⚠️ «%s» keeps receiving damaged data (%d pieces so far). Gextto downloads them again automatically, but if it never finishes, remove it and choose another version",
 				event.Name, failures))
-			_ = notifier.NotifyEvent("torrent_error", map[string]any{
-				"hash":    event.Hash,
-				"kind":    event.Kind,
-				"name":    event.Name,
-				"error":   fmt.Sprintf("%d damaged pieces", failures),
-				"message": event.Message,
-			})
 		}
 		return false, nil
 	case "resume_save_failed":
