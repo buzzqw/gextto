@@ -370,6 +370,10 @@ deu:
   A−: A−
   Backfill MediaInfo automatico: Automatisches MediaInfo-Backfill
   Backfill MediaInfo — file per volta: Backfill MediaInfo – Datei für Datei
+  "Sposta nel cestino i dati orfani della cartella temporanea": "Verwaiste Daten im temporären Ordner in den Papierkorb verschieben"
+  "Dati orfani — fermi da almeno (giorni)": "Verwaiste Daten — unverändert seit mindestens (Tagen)"
+  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.": "Verschiebt alle 30 Minuten Dateien und Ordner im temporären Download-Ordner in den Papierkorb, die zu keinem Torrent in der Liste gehören und sich seit mindestens der angegebenen Anzahl Tage nicht geändert haben. Es wird nichts gelöscht: Sie bleiben im Papierkorb, bis Sie ihn leeren."
+  "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.": "Wie viele Tage ein Element im temporären Ordner ohne Torrent in der Liste unverändert bleiben muss, bevor es in den Papierkorb verschoben wird."
   Backfill MediaInfo — intervallo (minuti): Backfill MediaInfo – Intervall (Minuten)
   Backoff sorgenti azzerato: Quell-Backoff gelöscht
   Backup: Backups

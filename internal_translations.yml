@@ -194,6 +194,10 @@ eng:
   "Backfill MediaInfo automatico": "Automatic MediaInfo backfill"
   "Backfill MediaInfo — intervallo (minuti)": "MediaInfo backfill — interval (minutes)"
   "Backfill MediaInfo — file per volta": "MediaInfo backfill — files per run"
+  "Sposta nel cestino i dati orfani della cartella temporanea": "Move orphaned data in the temp folder to the trash"
+  "Dati orfani — fermi da almeno (giorni)": "Orphaned data — idle for at least (days)"
+  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.": "Every 30 minutes, moves to the trash the files and folders in the download temp folder that belong to no listed torrent and have not changed for at least the given number of days. Nothing is deleted: they stay in the trash until you empty it."
+  "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.": "How many days an item in the temp folder must stay untouched, with no listed torrent, before it is moved to the trash."
 
   # UI strings added by the current dashboard and torrent/settings views
   "Aggiorna da TMDB/TVDB": "Refresh from TMDB/TVDB"

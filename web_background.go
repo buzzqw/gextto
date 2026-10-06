@@ -1683,6 +1683,7 @@ func tempCleanupWorker(state *AppState) {
 	cfg := latestConfig(state)
 	bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
 	SweepStaleTempFiles(cfg)
+	trashOrphanedTempData(cfg, state.activeEngine(), state.db, time.Now())
 
 	for {
 		if !state.SleepBackground(cleanupPeriod) {
@@ -1691,6 +1692,7 @@ func tempCleanupWorker(state *AppState) {
 		cfg := latestConfig(state)
 		bg_cleanupEmptyTempDirs(cfg, state.activeEngine())
 		SweepStaleTempFiles(cfg)
+		trashOrphanedTempData(cfg, state.activeEngine(), state.db, time.Now())
 	}
 }
 

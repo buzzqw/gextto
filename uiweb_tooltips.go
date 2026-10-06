@@ -75,6 +75,8 @@ var uiSettingTooltipText = map[string]string{
 	"delay_bypass_score":                           "Se una release raggiunge almeno questo punteggio, ignora il delay configurato.",
 	"housekeeping_enabled":                         "Attiva la pulizia periodica dei dati tecnici e dello storico.",
 	"housekeeping_interval_hours":                  "Intervallo tra due housekeeping automatici, in ore.",
+	"temp_orphan_cleanup_enabled":                  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.",
+	"temp_orphan_min_age_days":                     "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.",
 	"housekeeping_retain_cycles":                   "Numero di statistiche dei cicli di ricerca da conservare.",
 	"housekeeping_seen_days":                       "Elimina le righe storiche delle release viste nei feed più vecchie di N giorni.",
 	"housekeeping_history_days":                    "Elimina dallo Storico download le righe dei torrent rimossi più vecchie di N giorni.",

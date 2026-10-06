@@ -167,6 +167,8 @@ var uiSettingDefaults = map[string]string{
 	"media_info_backfill_enabled":          "true",
 	"media_info_backfill_interval_minutes": "60",
 	"media_info_backfill_batch":            "10",
+	"temp_orphan_cleanup_enabled":          "true",
+	"temp_orphan_min_age_days":             "7",
 
 	// --- Notifiche ----------------------------------------------------------
 	"notify_telegram": "false",

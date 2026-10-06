@@ -369,6 +369,10 @@ fra:
   A−: A−
   Backfill MediaInfo automatico: Backfill MediaInfo automatique
   Backfill MediaInfo — file per volta: Backfill MediaInfo — fichier par fichier
+  "Sposta nel cestino i dati orfani della cartella temporanea": "Déplacer vers la corbeille les données orphelines du dossier temporaire"
+  "Dati orfani — fermi da almeno (giorni)": "Données orphelines — inchangées depuis au moins (jours)"
+  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.": "Toutes les 30 minutes, déplace vers la corbeille les fichiers et dossiers du dossier temporaire des téléchargements qui n'appartiennent à aucun torrent de la liste et n'ont pas changé depuis au moins le nombre de jours indiqué. Rien n'est supprimé : ils restent dans la corbeille jusqu'à ce que vous la vidiez."
+  "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.": "Nombre de jours pendant lesquels un élément du dossier temporaire doit rester inchangé, sans torrent dans la liste, avant d'être déplacé vers la corbeille."
   Backfill MediaInfo — intervallo (minuti): Backfill MediaInfo — intervalle (minutes)
   Backoff sorgenti azzerato: Backoff sources réinitialisé
   Backup: Sauvegarde

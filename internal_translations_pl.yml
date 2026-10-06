@@ -360,6 +360,10 @@ pol:
   A−: A-
   Backfill MediaInfo automatico: Automatyczne uzupełnianie MediaInfo
   Backfill MediaInfo — file per volta: Uzupełnij MediaInfo — plik pojedynczo
+  "Sposta nel cestino i dati orfani della cartella temporanea": "Przenoś do kosza osierocone dane z folderu tymczasowego"
+  "Dati orfani — fermi da almeno (giorni)": "Osierocone dane — bez zmian od co najmniej (dni)"
+  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.": "Co 30 minut przenosi do kosza pliki i foldery z tymczasowego folderu pobierania, które nie należą do żadnego torrenta na liście i nie zmieniły się od co najmniej podanej liczby dni. Nic nie jest usuwane: pozostają w koszu, dopóki go nie opróżnisz."
+  "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.": "Ile dni element folderu tymczasowego musi pozostać bez zmian, bez torrenta na liście, zanim zostanie przeniesiony do kosza."
   Backfill MediaInfo — intervallo (minuti): Uzupełnianie MediaInfo — interwał (minuty)
   Backoff sorgenti azzerato: Wycofanie źródła usunięte
   Backup: Kopie zapasowe

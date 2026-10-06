@@ -999,6 +999,8 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"media_info_backfill_enabled":          settingsOr(cfg, "media_info_backfill_enabled", "true"),
 		"media_info_backfill_interval_minutes": settingsOr(cfg, "media_info_backfill_interval_minutes", "60"),
 		"media_info_backfill_batch":            settingsOr(cfg, "media_info_backfill_batch", "10"),
+		"temp_orphan_cleanup_enabled":          settingsOr(cfg, "temp_orphan_cleanup_enabled", "true"),
+		"temp_orphan_min_age_days":             settingsOr(cfg, "temp_orphan_min_age_days", "7"),
 		"feed_max_pages":                       strconv.Itoa(cfg.FeedMaxPages()),
 		"cleanup_upgrades":                     cfg.CleanupUpgrades,
 		"cleanup_action":                       cfg.CleanupAction,

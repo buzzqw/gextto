@@ -178,6 +178,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "media_info_backfill_enabled", Label: "Backfill MediaInfo automatico", Tab: "acquisition"},
 	{Key: "media_info_backfill_interval_minutes", Label: "Backfill MediaInfo — intervallo (minuti)", Tab: "acquisition"},
 	{Key: "media_info_backfill_batch", Label: "Backfill MediaInfo — file per volta", Tab: "acquisition"},
+	{Key: "temp_orphan_cleanup_enabled", Label: "Sposta nel cestino i dati orfani della cartella temporanea", Tab: "acquisition"},
+	{Key: "temp_orphan_min_age_days", Label: "Dati orfani — fermi da almeno (giorni)", Tab: "acquisition"},
 	{Key: "notify_telegram", Label: "Telegram attivo", Tab: "notify"},
 	{Key: "telegram_bot_token", Label: "Telegram bot token", Tab: "notify"},
 	{Key: "telegram_chat_id", Label: "Telegram chat ID", Tab: "notify"},

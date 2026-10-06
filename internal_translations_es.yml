@@ -361,6 +361,10 @@ spa:
   A−: A-
   Backfill MediaInfo automatico: Relleno automático de MediaInfo
   Backfill MediaInfo — file per volta: 'Rellenar MediaInfo: archivo a la vez'
+  "Sposta nel cestino i dati orfani della cartella temporanea": "Mover a la papelera los datos huérfanos de la carpeta temporal"
+  "Dati orfani — fermi da almeno (giorni)": "Datos huérfanos — sin cambios desde al menos (días)"
+  "Ogni 30 minuti sposta nel cestino file e cartelle della cartella temporanea dei download che non appartengono a nessun torrent in lista e non sono cambiati da almeno il numero di giorni indicato. Non cancella nulla: restano nel cestino finché non lo svuoti.": "Cada 30 minutos mueve a la papelera los archivos y carpetas de la carpeta temporal de descargas que no pertenecen a ningún torrent de la lista y no han cambiado durante al menos el número de días indicado. No se borra nada: permanecen en la papelera hasta que la vacíes."
+  "Da quanti giorni un elemento della cartella temporanea deve essere fermo, senza torrent in lista, per essere spostato nel cestino.": "Cuántos días debe permanecer sin cambios un elemento de la carpeta temporal, sin torrent en la lista, antes de moverlo a la papelera."
   Backfill MediaInfo — intervallo (minuti): Backfill MediaInfo — intervalo (minutos)
   Backoff sorgenti azzerato: Retraso de fuente borrado
   Backup: Copias de seguridad
