@@ -253,11 +253,17 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		return err
 	}
 	telegramUploaded := false
+	telegramParts := 0
+	telegramError := ""
 	if sendTelegram {
 		caption := fmt.Sprintf("Gextto backup: %s", filepath.Base(steps.path))
-		uploaded, uploadErr := notifier.NotifyBackupDocument(steps.path, caption)
-		if uploadErr == nil {
-			telegramUploaded = uploaded
+		parts, uploadErr := notifier.NotifyBackupDocument(steps.path, caption)
+		telegramParts = parts
+		if uploadErr != nil {
+			telegramError = uploadErr.Error()
+			logging.Warn("backup Telegram upload failed", "parts_sent", parts, "error", uploadErr)
+		} else {
+			telegramUploaded = parts > 0
 		}
 	}
 	logging.Info(
@@ -286,6 +292,8 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 		"cloud_destination": steps.cloudDestination,
 		"cloud_error":       bg_derefStr(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
+		"telegram_parts":    telegramParts,
+		"telegram_error":    telegramError,
 	})
 	return nil
 }

@@ -8,7 +8,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -303,6 +306,65 @@ func TestFormatEventManualTorrentCompletion(t *testing.T) {
 	}
 }
 
+type recordingTransport struct {
+	mu    sync.Mutex
+	names []string
+	sizes []int
+}
+
+func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		return nil, err
+	}
+	file, header, err := r.FormFile("document")
+	if err != nil {
+		return nil, err
+	}
+	content, _ := io.ReadAll(file)
+	rt.mu.Lock()
+	rt.names = append(rt.names, header.Filename)
+	rt.sizes = append(rt.sizes, len(content))
+	rt.mu.Unlock()
+	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"ok":true}`)), Header: http.Header{}}, nil
+}
+
+func TestNotifyBackupDocumentSplitsLargeArchives(t *testing.T) {
+	previous := telegramBackupPartSize
+	telegramBackupPartSize = 10
+	t.Cleanup(func() { telegramBackupPartSize = previous })
+
+	path := filepath.Join(t.TempDir(), "gextto-backup.zip")
+	if err := os.WriteFile(path, []byte("0123456789abcdefghij-tail"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	token, chat := "token", "chat"
+	transport := &recordingTransport{}
+	n := &Notifier{telegramBotToken: &token, telegramChatID: &chat, client: &http.Client{Transport: transport}}
+	parts, err := n.NotifyBackupDocument(path, "Gextto backup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parts != 3 {
+		t.Fatalf("parts = %d, want 3", parts)
+	}
+	wantNames := []string{"gextto-backup.zip.001", "gextto-backup.zip.002", "gextto-backup.zip.003"}
+	wantSizes := []int{10, 10, 5}
+	for i := range wantNames {
+		if transport.names[i] != wantNames[i] || transport.sizes[i] != wantSizes[i] {
+			t.Fatalf("part %d = %s (%d bytes), want %s (%d bytes)", i+1, transport.names[i], transport.sizes[i], wantNames[i], wantSizes[i])
+		}
+	}
+
+	small := filepath.Join(t.TempDir(), "small.zip")
+	if err := os.WriteFile(small, []byte("tiny"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	transport.names, transport.sizes = nil, nil
+	if parts, err := n.NotifyBackupDocument(small, "Gextto backup"); err != nil || parts != 1 || transport.names[0] != "small.zip" {
+		t.Fatalf("small backup: parts=%d err=%v names=%v", parts, err, transport.names)
+	}
+}
+
 func TestFormatEventBackupNotification(t *testing.T) {
 	previous := messages.Language()
 	t.Cleanup(func() { messages.SetLanguage(previous) })
@@ -356,6 +418,24 @@ func TestFormatEventBackupNotification(t *testing.T) {
 	}
 	if !strings.Contains(msgEn, "FTP upload failed (ftp.bad.com): connection refused") {
 		t.Fatalf("missing ftp error: %q", msgEn)
+	}
+
+	messages.SetLanguage("it")
+	msgParts := formatEvent("backup_completed", map[string]any{
+		"path":              "/backups/gextto-backup.zip",
+		"telegram_uploaded": true,
+		"telegram_parts":    4,
+	})
+	if !strings.Contains(msgParts, "Inviato su Telegram in 4 parti; per ricomporlo: cat gextto-backup.zip.0* > gextto-backup.zip") {
+		t.Fatalf("missing split instructions: %q", msgParts)
+	}
+	msgTgErr := formatEvent("backup_completed", map[string]any{
+		"path":           "/backups/gextto-backup.zip",
+		"telegram_parts": 2,
+		"telegram_error": "parte 3/4: HTTP 413",
+	})
+	if !strings.Contains(msgTgErr, "Invio Telegram non riuscito (parti inviate: 2): parte 3/4: HTTP 413") {
+		t.Fatalf("missing telegram error: %q", msgTgErr)
 	}
 
 	// Cloud copy not configured: no line at all, never a "failed" one.

@@ -464,7 +464,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "backup_ftp_password", Label: "FTP password", Kind: "password", Hint: "Password del server FTP. Per sicurezza non viene mostrata; lascia vuoto per mantenere quella già salvata."},
 				{Name: "backup_ftp_path", Label: "FTP percorso", Value: settingsOr(cfg, "backup_ftp_path", ""), Hint: "Cartella remota del server FTP in cui caricare il file ZIP. Lascia vuoto per usare la cartella predefinita."},
 				{Name: "backup_cloud_dir", Label: "Cartella cloud", Value: settingsOr(cfg, "backup_cloud_dir", ""), Hint: "Percorso locale di una cartella già montata o sincronizzata da un servizio cloud, per esempio /mnt/cloud/gextto. Gextto copia qui il file ZIP; non inserire un URL."},
-				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Hint: "Invia una copia su Telegram usando il bot configurato nelle notifiche. Lascia No per non inviarla.", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
+				{Name: "backup_send_telegram", Kind: "select", Label: "Invia su Telegram", Hint: "Invia una copia su Telegram usando il bot configurato nelle notifiche. Oltre 45 MB viene divisa in parti (.001, .002…): ricomponila con cat nome.zip.0* > nome.zip. Lascia No per non inviarla.", Options: []uiFormOption{{Value: "true", Label: "Sì", Selected: settingsBool(cfg, "backup_send_telegram", false)}, {Value: "false", Label: "No", Selected: !settingsBool(cfg, "backup_send_telegram", false)}}},
 			},
 		})),
 		group("Backup", sectionTable(uiTableSpec{

@@ -363,11 +363,13 @@ func BackupSendTelegram(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	sent, err := notifier.NotifyBackupDocument(path, "Gextto backup")
+	parts, err := notifier.NotifyBackupDocument(path, "Gextto backup: "+filepath.Base(path))
+	response := map[string]any{"ok": true, "path": path, "sent": err == nil && parts > 0, "parts": parts}
 	if err != nil {
-		sent = false
+		logging.Warn("backup Telegram upload failed", "parts_sent", parts, "error", err)
+		response["error"] = err.Error()
 	}
-	jsonStatus(w, http.StatusOK, map[string]any{"ok": true, "path": path, "sent": sent})
+	jsonStatus(w, http.StatusOK, response)
 }
 
 func CheckPorts(w http.ResponseWriter, r *http.Request, s *AppState) {

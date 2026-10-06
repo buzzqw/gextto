@@ -159,61 +159,124 @@ func (n *Notifier) NotifyComicComplete(title, path string, sizeBytes uint64, met
 	})
 }
 
-// NotifyBackupDocument uploads a backup archive to Telegram. It returns false
-// (without an error) when Telegram is unavailable or the file is too large.
-func (n *Notifier) NotifyBackupDocument(path, caption string) (bool, error) {
+// telegramBackupPartSize is the size of each piece a backup is split into for
+// Telegram: the Bot API refuses uploads above 50 MB, so stay well below it.
+// A variable only so tests can use small pieces.
+var telegramBackupPartSize int64 = 45 * 1024 * 1024
+
+// telegramBackupMaxParts caps how many pieces one backup may be sent in
+// (about 1.8 GB): beyond that Telegram is not a sensible destination.
+const telegramBackupMaxParts = 40
+
+// telegramBackupPartCount is how many pieces a backup of this size is sent in.
+func telegramBackupPartCount(size int64) int {
+	if size <= telegramBackupPartSize {
+		return 1
+	}
+	return int((size + telegramBackupPartSize - 1) / telegramBackupPartSize)
+}
+
+// telegramBackupPartName names piece index (1-based) of total: the archive
+// name itself when it fits in one piece, otherwise name.001, name.002, ...
+// which `cat name.0* > name` joins back into the original zip.
+func telegramBackupPartName(filename string, index, total int) string {
+	if total <= 1 {
+		return filename
+	}
+	return fmt.Sprintf("%s.%03d", filename, index)
+}
+
+// NotifyBackupDocument uploads a backup archive to Telegram, split into
+// pieces below the Bot API upload limit when it is larger. It returns how many
+// pieces were sent (0 without an error when Telegram is not configured).
+func (n *Notifier) NotifyBackupDocument(path, caption string) (int, error) {
 	if n.telegramBotToken == nil || n.telegramChatID == nil {
-		return false, nil
+		return 0, nil
 	}
 	// `notify_telegram` gates the *notification* messages; uploading a backup
 	// is an explicit action driven by `backup_send_telegram` (or a manual
 	// click), so it only needs the Telegram credentials, not that switch.
 	info, err := os.Stat(path)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	if info.Size() > 49*1024*1024 {
-		return false, nil
+	total := telegramBackupPartCount(info.Size())
+	if total > telegramBackupMaxParts {
+		return 0, fmt.Errorf("backup too large for Telegram (%s, more than %d parts)", formatBytes(info.Size()), telegramBackupMaxParts)
 	}
-	n.throttleTelegram()
 	filename := filepath.Base(path)
 	if filename == "" || filename == "." || filename == string(filepath.Separator) {
 		filename = "gextto-backup.zip"
 	}
-	content, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return 0, err
 	}
+	defer file.Close()
+	buffer := make([]byte, telegramBackupPartSize)
+	for index := 1; index <= total; index++ {
+		read, err := io.ReadFull(file, buffer)
+		// The last piece is shorter (ErrUnexpectedEOF); an empty file is EOF.
+		if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+			return index - 1, err
+		}
+		partCaption := caption
+		if total > 1 {
+			partCaption = fmt.Sprintf("%s — %s %d/%d", caption, messages.Pick("parte", "part"), index, total)
+		}
+		partName := telegramBackupPartName(filename, index, total)
+		sendErr := n.sendTelegramDocument(partName, partCaption, buffer[:read])
+		for attempt := 0; sendErr != nil && attempt < 2; attempt++ {
+			time.Sleep(time.Duration(uint64(2)<<uint(attempt)) * time.Second)
+			sendErr = n.sendTelegramDocument(partName, partCaption, buffer[:read])
+		}
+		if sendErr != nil {
+			if total > 1 {
+				return index - 1, fmt.Errorf("%s %d/%d: %w", messages.Pick("parte", "part"), index, total, sendErr)
+			}
+			return 0, sendErr
+		}
+	}
+	return total, nil
+}
+
+// sendTelegramDocument uploads one file to the configured chat.
+func (n *Notifier) sendTelegramDocument(filename, caption string, content []byte) error {
+	n.throttleTelegram()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	_ = writer.WriteField("chat_id", *n.telegramChatID)
 	_ = writer.WriteField("caption", caption)
 	part, err := writer.CreateFormFile("document", filename)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if _, err := part.Write(content); err != nil {
-		return false, err
+		return err
 	}
 	if err := writer.Close(); err != nil {
-		return false, err
+		return err
 	}
 	rawURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendDocument", *n.telegramBotToken)
 	request, err := http.NewRequest(http.MethodPost, rawURL, &body)
 	if err != nil {
-		return false, err
+		return err
 	}
 	request.Header.Set("Content-Type", writer.FormDataContentType())
-	response, err := n.httpClient().Do(request)
+	// A 45 MB piece takes minutes on a slow uplink: the default 90 s client
+	// timeout would cut it off.
+	client := *n.httpClient()
+	client.Timeout = 15 * time.Minute
+	response, err := client.Do(request)
 	if err != nil {
-		return false, redactRequestError(err)
+		return redactRequestError(err)
 	}
 	defer response.Body.Close()
 	_, _ = io.Copy(io.Discard, response.Body)
 	if response.StatusCode >= 400 {
-		return false, fmt.Errorf("HTTP %d", response.StatusCode)
+		return fmt.Errorf("HTTP %d", response.StatusCode)
 	}
-	return true, nil
+	return nil
 }
 
 // NotifyEvent formats and delivers one event to every enabled channel and
@@ -876,8 +939,22 @@ func formatEvent(event string, data map[string]any) string {
 			lines = append(lines, fmt.Sprintf("⚠️ %s (%s): %s", messages.Pick("Caricamento FTP non riuscito", "FTP upload failed"), dest, ftpErr))
 		}
 
+		tgParts, _ := jsonInt(mapLookup(data, "telegram_parts"))
 		if tgUploaded, _ := mapLookup(data, "telegram_uploaded").(bool); tgUploaded {
-			lines = append(lines, fmt.Sprintf("📱 %s", messages.Pick("Inviato anche come allegato Telegram", "Also sent as a Telegram document")))
+			if tgParts > 1 {
+				baseName := filepath.Base(path)
+				lines = append(lines, fmt.Sprintf("📱 %s %d %s: cat %s.0* > %s",
+					messages.Pick("Inviato su Telegram in", "Sent to Telegram in"), tgParts,
+					messages.Pick("parti; per ricomporlo", "parts; to rebuild it"), baseName, baseName))
+			} else {
+				lines = append(lines, fmt.Sprintf("📱 %s", messages.Pick("Inviato anche come allegato Telegram", "Also sent as a Telegram document")))
+			}
+		} else if tgErr := text("telegram_error"); tgErr != "" {
+			sent := ""
+			if tgParts > 0 {
+				sent = fmt.Sprintf(" (%s %d)", messages.Pick("parti inviate:", "parts sent:"), tgParts)
+			}
+			lines = append(lines, fmt.Sprintf("⚠️ %s%s: %s", messages.Pick("Invio Telegram non riuscito", "Telegram upload failed"), sent, tgErr))
 		}
 
 		return strings.Join(lines, "\n")

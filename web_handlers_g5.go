@@ -438,11 +438,19 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 
 	telegramUploaded := false
+	telegramParts := 0
+	telegramError := ""
 	if sendTelegram {
 		caption := "Gextto backup: " + filepath.Base(steps.path)
-		uploaded, uploadErr := notifier.NotifyBackupDocument(steps.path, caption)
-		telegramUploaded = uploadErr == nil && uploaded
-		logging.Info("backup Telegram send completed", "uploaded", telegramUploaded)
+		parts, uploadErr := notifier.NotifyBackupDocument(steps.path, caption)
+		telegramParts = parts
+		telegramUploaded = uploadErr == nil && parts > 0
+		if uploadErr != nil {
+			telegramError = uploadErr.Error()
+			logging.Warn("backup Telegram upload failed", "parts_sent", parts, "error", uploadErr)
+		} else {
+			logging.Debug("backup Telegram send completed", "uploaded", telegramUploaded, "parts", parts)
+		}
 	}
 	logging.Info(
 		"backup completed",
@@ -469,6 +477,8 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"cloud_destination": steps.cloudDestination,
 		"cloud_error":       bg_derefStr(steps.cloudError),
 		"telegram_uploaded": telegramUploaded,
+		"telegram_parts":    telegramParts,
+		"telegram_error":    telegramError,
 	})
 	jsonResponse(w, map[string]any{
 		"ok":                true,
