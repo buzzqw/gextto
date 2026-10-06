@@ -77,8 +77,9 @@ La TUI è pensata per una sessione SSH:
   regione e arrivano solo le righe nuove. I frame sono aggiornamenti
   sincronizzati (niente sfarfallio). Salute e statistiche si interrogano ogni
   10 secondi invece che a ogni aggiornamento. In basso a destra la TUI mostra la
-  banda che sta usando: `Term` è il traffico verso il terminale (cioè la
-  connessione SSH, ↓ verso di te, ↑ i tasti), `API` quello verso il daemon.
+  banda che sta usando, per esempio `TUI ↓7.2KB/s ↑230B/s · 1.5 req/s`:
+  ↓ è ciò che riceve (risposte del daemon e tasti), ↑ ciò che invia (schermo e
+  richieste), `req/s` le richieste al daemon al secondo.
 - **A capo automatico.** Log, dettagli, salute e cruscotto vanno a capo invece di
   essere tagliati; negli elenchi la riga selezionata mostra il titolo intero.
   Le larghezze sono calcolate in colonne, quindi titoli con ideogrammi o emoji

@@ -291,15 +291,17 @@ func NewClient(base string) *Client {
 }
 
 // Traffic returns the bytes sent to and received from the daemon so far
-// (request and response headers are estimated, bodies are exact).
-func (c *Client) Traffic() (sent, received int64) {
-	return c.traffic.sent.Load(), c.traffic.received.Load()
+// (request and response headers are estimated, bodies are exact) and the
+// number of requests made.
+func (c *Client) Traffic() (sent, received, requests int64) {
+	return c.traffic.sent.Load(), c.traffic.received.Load(), c.traffic.requests.Load()
 }
 
 // trafficCounter accumulates API traffic for the footer bandwidth meter.
 type trafficCounter struct {
 	sent     atomic.Int64
 	received atomic.Int64
+	requests atomic.Int64
 }
 
 // countingTransport counts the bytes of every request and response,
@@ -315,6 +317,7 @@ func (t *countingTransport) RoundTrip(request *http.Request) (*http.Response, er
 		sent += request.ContentLength
 	}
 	t.counter.sent.Add(sent)
+	t.counter.requests.Add(1)
 	response, err := t.base.RoundTrip(request)
 	if err != nil {
 		return nil, err

@@ -399,12 +399,11 @@ func TestBandwidthMeter(t *testing.T) {
 	meter := &bandwidthMeter{}
 	start := time.Unix(1000, 0)
 	meter.sample(start, [trafficKinds]int64{})
-	rates := meter.sample(start.Add(2*time.Second), [trafficKinds]int64{4096, 20, 8192, 0})
-	text := formatBandwidth(NewTranslator("en"), rates)
-	if text != "Term ↓1.0K ↑5B · API ↓2.0K ↑0B /s" {
+	rates := meter.sample(start.Add(2*time.Second), [trafficKinds]int64{4096, 20, 6})
+	if text := formatBandwidth(rates); text != "TUI ↓1.0KB/s ↑5B/s · 1.5 req/s" {
 		t.Fatalf("meter = %q", text)
 	}
-	if compactBytes(15*1024) != "15K" || compactBytes(3.5*1024*1024) != "3.5M" {
+	if compactBytes(15*1024) != "15KB" || compactBytes(3.5*1024*1024) != "3.5MB" {
 		t.Fatalf("compactBytes = %q %q", compactBytes(15*1024), compactBytes(3.5*1024*1024))
 	}
 }
@@ -412,7 +411,7 @@ func TestBandwidthMeter(t *testing.T) {
 func TestFooterShowsBandwidthWhenRoom(t *testing.T) {
 	m := NewModel(NewTranslator("en"))
 	m.SetStatus(Status{Active: true})
-	m.Bandwidth = "Term ↓1.0K ↑5B · API ↓2.0K ↑0B /s"
+	m.Bandwidth = "TUI ↓1.0KB/s ↑5B/s · 1.5 req/s"
 	screen := m.Render(100, 20)
 	footer := screen.Lines[len(screen.Lines)-1].Text
 	if !strings.HasSuffix(footer, m.Bandwidth) || StringWidth(footer) != 100 {
@@ -420,7 +419,7 @@ func TestFooterShowsBandwidthWhenRoom(t *testing.T) {
 	}
 	m.Message = strings.Repeat("long message ", 10)
 	screen = m.Render(60, 20)
-	if footer := screen.Lines[len(screen.Lines)-1].Text; strings.Contains(footer, "API") {
+	if footer := screen.Lines[len(screen.Lines)-1].Text; strings.Contains(footer, "req/s") {
 		t.Fatalf("the message should win over the meter: %q", footer)
 	}
 }
@@ -434,9 +433,9 @@ func TestClientCountsTraffic(t *testing.T) {
 	if _, err := client.Status(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	sent, received := client.Traffic()
-	if sent <= 0 || received < 1000 {
-		t.Fatalf("traffic sent=%d received=%d", sent, received)
+	sent, received, requests := client.Traffic()
+	if sent <= 0 || received < 1000 || requests != 1 {
+		t.Fatalf("traffic sent=%d received=%d requests=%d", sent, received, requests)
 	}
 }
 

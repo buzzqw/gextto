@@ -178,9 +178,9 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	meter := &bandwidthMeter{}
 	updateMeter := func() bool {
-		apiOut, apiIn := client.Traffic()
-		rates := meter.sample(time.Now(), [trafficKinds]int64{termOut, termIn, apiIn, apiOut})
-		text := formatBandwidth(model.Tr, rates)
+		apiOut, apiIn, requests := client.Traffic()
+		rates := meter.sample(time.Now(), [trafficKinds]int64{apiIn + termIn, apiOut + termOut, requests})
+		text := formatBandwidth(rates)
 		if text == model.Bandwidth {
 			return false
 		}

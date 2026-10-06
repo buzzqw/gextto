@@ -125,7 +125,6 @@ var catalog = map[string][2]string{
 	"hint.health":   {"↑↓ scorri · x svuota cestino", "↑↓ scroll · x empty trash"},
 	"hint.status":   {"↑↓ scorri · 3 log completo", "↑↓ scroll · 3 full log"},
 
-	"label.bwterm":        {"Term", "Term"},
 	"status.daemon":       {"Daemon", "Daemon"},
 	"status.system":       {"Sistema", "System"},
 	"status.cycle":        {"Ciclo", "Cycle"},
@@ -287,7 +286,7 @@ var catalog = map[string][2]string{
 	"help.health":    {"Salute:   ↑↓/PgUp/PgDn scorri · x svuota cestino (con conferma)", "Health:   ↑↓/PgUp/PgDn scroll · x empty trash (confirmation required)"},
 	"help.status":    {"Stato:    ↑↓/PgUp/PgDn scorri · le ultime righe di log restano in fondo", "Status:   ↑↓/PgUp/PgDn scroll · the latest log lines stay at the bottom"},
 	"help.terminal":  {"Terminale: Ctrl-L ridisegna · incolla un magnet per aggiungerlo · conferme solo con s/y", "Terminal: Ctrl-L redraw · paste a magnet to add it · confirm only with y"},
-	"help.bandwidth": {"Banda:    in basso a destra il traffico della TUI: Term = terminale/SSH, API = daemon", "Bandwidth: bottom right shows the TUI's own traffic: Term = terminal/SSH, API = daemon"},
+	"help.bandwidth": {"Banda:    in basso a destra la banda usata dalla TUI (↓ ricevuti, ↑ inviati) e le richieste al daemon al secondo", "Bandwidth: bottom right shows the bandwidth the TUI uses (↓ received, ↑ sent) and daemon requests per second"},
 	"help.settings":  {"Impostazioni: g apre il pannello · ↑↓ seleziona · Invio modifica · c colori · h contrasto", "Settings: g opens panel · ↑↓ select · Enter edit · c colors · h contrast"},
 	"help.archive":   {"Archivio: ↑↓ seleziona · PgUp/PgDn pagina · Invio accoda · d dettagli · o/O ordina · s cerca", "Archive: ↑↓ select · PgUp/PgDn page · Enter queue · d details · o/O sort · s search"},
 	"help.missing":   {"Mancanti: ↑↓ seleziona · r aggiorna", "Missing: ↑↓ select · r refresh"},
