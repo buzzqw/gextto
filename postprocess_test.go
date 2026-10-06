@@ -1090,3 +1090,40 @@ func TestFlattenMovieFolderDisabledAndAlreadyFlat(t *testing.T) {
 		t.Fatalf("already-flat flatten = %q, %v; want unchanged", got, err)
 	}
 }
+
+func TestFlattenMovieFolderRenamesLeftoverFolder(t *testing.T) {
+	root := t.TempDir()
+	folder := filepath.Join(root, "Ugly.Torrent.Folder.Name")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	video := filepath.Join(folder, "Clean Movie (2026) [2160p].mkv")
+	if err := os.WriteFile(video, []byte("video"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// An unknown companion cannot be relocated, so the folder survives.
+	if err := os.WriteFile(filepath.Join(folder, "notes.txt"), []byte("extra"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	archiveRoot := root
+	cfg := DefaultConfig()
+	cfg.ArchiveRoot = &archiveRoot
+	cfg.Settings = map[string]string{"movies_flat_files": "yes"}
+	year := int64(2026)
+	release := &models.Release{Title: "Clean Movie", Year: &year, Kind: "movie"}
+
+	flat, err := flattenMovieFolder(&cfg, release, video)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stem := "Clean Movie (2026) [2160p]"
+	if want := filepath.Join(root, stem+".mkv"); flat != want {
+		t.Fatalf("flat = %q, want %q", flat, want)
+	}
+	if _, err := os.Stat(folder); !os.IsNotExist(err) {
+		t.Fatalf("raw torrent folder should be gone, stat err = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, stem, "notes.txt")); err != nil {
+		t.Fatalf("unknown companion should survive in the renamed folder: %v", err)
+	}
+}

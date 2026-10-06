@@ -1368,7 +1368,29 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 	}
 	moveMovieCompanions(dir, root, filepath.Base(target))
 	removeEmptyDirsUpTo(dir, root)
+	renameLeftoverMovieFolder(dir, root, strings.TrimSuffix(filepath.Base(target), filepath.Ext(target)))
 	return target, nil
+}
+
+// renameLeftoverMovieFolder gives a clean name to a movie folder that could not
+// be fully flattened (unknown companion files kept it non-empty), so it is
+// still recognisable instead of keeping the raw torrent folder name.
+func renameLeftoverMovieFolder(dir, root, stem string) {
+	if strings.TrimSpace(stem) == "" {
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) == 0 {
+		return
+	}
+	if !SamePath(filepath.Dir(filepath.Clean(dir)), filepath.Clean(root)) {
+		return
+	}
+	target := filepath.Join(root, stem)
+	if _, err := os.Stat(target); err == nil {
+		return
+	}
+	_ = os.Rename(dir, target)
 }
 
 // moveMovieCompanions relocates the subtitles and artwork of a flattened movie
