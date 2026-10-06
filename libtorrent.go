@@ -738,7 +738,8 @@ func (c *LibtorrentClient) RecheckRestoredAtZero() int {
 		}
 	}
 	if checked > 0 {
-		logging.Info(fmt.Sprintf("🔎 Checking the data of %d paused %s to recover their progress", checked, plural(int64(checked), "download", "downloads")))
+		logging.Info(fmt.Sprintf("🔎 Checking the data of %s to recover %s progress",
+			countLabel(checked, "paused download", "paused downloads"), plural(checked, "its", "their")))
 	}
 	return checked
 }

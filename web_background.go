@@ -621,7 +621,10 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	var lastConfigGen uint64
 	lastFingerprint := ""
 	// Visibility for long integrity checks (multi-gigabyte packs on the NAS).
-	lastCheckLog := map[string]time.Time{}
+	// Torrents being re-checked: when the check started and when its progress
+	// was last logged (at DEBUG; INFO gets only the start and a summary).
+	type dataCheck struct{ started, lastLog time.Time }
+	checking := map[string]dataCheck{}
 	// One-time startup reconciliation. libtorrent's save_resume_data can record
 	// a bitfield ahead of the bytes actually flushed to disk (its disk cache is
 	// not drained on every shutdown). A torrent that reads as complete but was
@@ -671,17 +674,36 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			extras, _ = torrents.(torrentEngineEmbeddedExtras)
 			logging.Info("torrent event worker switched backend", "backend", torrents.Name())
 		}
-		// Surface the progress of a long re-check so the UI is not silent for
-		// minutes while a large pack is verified on the NAS.
+		// A long re-check (a large pack on the NAS) gets one line when it starts
+		// and one summary when it ends; the per-minute progress is DEBUG.
+		present := map[string]struct{}{}
 		for _, torrent := range torrents.List() {
 			key := strings.ToLower(torrent.Hash)
+			present[key] = struct{}{}
+			check, wasChecking := checking[key]
 			if torrent.State == "checking_files" {
-				if last, ok := lastCheckLog[key]; !ok || now.Sub(last) >= 60*time.Second {
-					lastCheckLog[key] = now
-					logging.Info(fmt.Sprintf("🔎 Checking the downloaded data of «%s» (%s)", torrent.Name, logPercent(torrent.Progress)))
+				if !wasChecking {
+					checking[key] = dataCheck{started: now, lastLog: now}
+					logging.Info(fmt.Sprintf("🔎 Checking the data already downloaded for «%s»…", torrent.Name))
+				} else if now.Sub(check.lastLog) >= 60*time.Second {
+					check.lastLog = now
+					checking[key] = check
+					logging.Debug("data check in progress", "name", torrent.Name, "progress", logPercent(torrent.Progress))
 				}
-			} else {
-				delete(lastCheckLog, key)
+				continue
+			}
+			if wasChecking {
+				delete(checking, key)
+				result := "the data is complete"
+				if torrent.Progress < 99.99 {
+					result = logPercent(torrent.Progress) + " was already downloaded, the rest will be downloaded"
+				}
+				logging.Info(fmt.Sprintf("✅ «%s» checked in %s: %s", torrent.Name, logDuration(now.Sub(check.started)), result))
+			}
+		}
+		for key := range checking {
+			if _, ok := present[key]; !ok {
+				delete(checking, key)
 			}
 		}
 		if now.Sub(lastConfigReload) >= 5*time.Second {
