@@ -1347,19 +1347,17 @@ func expandLines(lines []Line, width int) []Line {
 	return expanded
 }
 
-// footerWithMeter right-aligns the bandwidth meter when the message leaves
-// room for it; the message always wins.
+// footerWithMeter keeps the bandwidth meter at the right of the footer and
+// shortens the message to make room. Only on very narrow windows, where the
+// message would be left with fewer than 20 cells, does the meter give way.
 func (m *Model) footerWithMeter(message string, width int) string {
-	message = m.truncate(message, width)
 	meter := Sanitize(m.Bandwidth)
-	if meter == "" {
-		return message
+	room := width - StringWidth(meter) - 2
+	if meter == "" || room < 20 {
+		return m.truncate(message, width)
 	}
-	gap := width - StringWidth(message) - StringWidth(meter)
-	if gap < 2 {
-		return message
-	}
-	return message + strings.Repeat(" ", gap) + meter
+	message = m.truncate(message, room)
+	return message + strings.Repeat(" ", width-StringWidth(message)-StringWidth(meter)) + meter
 }
 
 // pageWindow shows the part of a free-form page selected by PageScroll and

@@ -39,6 +39,11 @@ func Sanitize(value string) string {
 			builder.WriteRune('?')
 		case unicode.IsControl(r), r == 0x2028, r == 0x2029:
 			// drop C0/C1 controls and Unicode line separators
+		case r == 0xfe0e || r == 0xfe0f:
+			// Variation selectors: "⚠️" is U+26A0 + U+FE0F, which some
+			// terminals draw two cells wide and others one. Without the
+			// selector every terminal draws the one-cell text form, so the
+			// width computed here matches the screen.
 		default:
 			builder.WriteString(value[index : index+size])
 		}
@@ -49,7 +54,7 @@ func Sanitize(value string) string {
 
 func needsSanitize(value string) bool {
 	for _, r := range value {
-		if r < 0x20 || (r >= 0x7f && r <= 0x9f) || r == utf8.RuneError || r == 0x2028 || r == 0x2029 {
+		if r < 0x20 || (r >= 0x7f && r <= 0x9f) || r == utf8.RuneError || r == 0x2028 || r == 0x2029 || r == 0xfe0e || r == 0xfe0f {
 			return true
 		}
 	}

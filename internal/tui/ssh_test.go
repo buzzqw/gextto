@@ -418,9 +418,14 @@ func TestFooterShowsBandwidthWhenRoom(t *testing.T) {
 		t.Fatalf("footer = %q", footer)
 	}
 	m.Message = strings.Repeat("long message ", 10)
-	screen = m.Render(60, 20)
+	screen = m.Render(80, 20)
+	footer = screen.Lines[len(screen.Lines)-1].Text
+	if !strings.HasSuffix(footer, m.Bandwidth) || !strings.Contains(footer, "long message") || StringWidth(footer) != 80 {
+		t.Fatalf("a long message should be shortened, keeping the meter: %q", footer)
+	}
+	screen = m.Render(40, 20)
 	if footer := screen.Lines[len(screen.Lines)-1].Text; strings.Contains(footer, "req/s") {
-		t.Fatalf("the message should win over the meter: %q", footer)
+		t.Fatalf("on a narrow window the message should win: %q", footer)
 	}
 }
 
@@ -449,5 +454,30 @@ func TestStatusLogBlockShowsWholeEntries(t *testing.T) {
 	}
 	if !lineContains(screen, "new entry") {
 		t.Fatalf("the newest entry must be shown: %q", firstLines(screen, 14))
+	}
+}
+
+func TestEmojiLogLinesNeverOverflow(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.SetStatus(Status{Active: true})
+	m.Bandwidth = "TUI ↓13KB/s ↑311B/s · 1.6 req/s"
+	lines := []string{}
+	for index := 0; index < 30; index++ {
+		lines = append(lines, "2026-10-06 13:24:11  WARN ⏸️ «FBI Stagione 3» is stuck at 9%: nobody ⚠️ ♻️ 🗑️ currently sharing it has the complete file")
+	}
+	m.SetLogs(lines)
+	for _, tab := range []Tab{TabStatus, TabLogs} {
+		m.Tab = tab
+		for _, width := range []int{40, 80, 110} {
+			screen := m.Render(width, 24)
+			for _, line := range screen.Lines {
+				if StringWidth(Sanitize(line.Text)) > width || strings.ContainsRune(Sanitize(line.Text), 0xfe0f) {
+					t.Fatalf("tab %d width %d: row would overflow: %q", tab, width, line.Text)
+				}
+			}
+			if footer := screen.Lines[len(screen.Lines)-1].Text; width >= 80 && !strings.Contains(footer, "req/s") {
+				t.Fatalf("footer lost at width %d: %q", width, footer)
+			}
+		}
 	}
 }

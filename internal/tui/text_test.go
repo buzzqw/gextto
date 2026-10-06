@@ -21,6 +21,7 @@ func TestSanitizeRemovesTerminalSequences(t *testing.T) {
 		{"c1\u009b31mx", "c1x"},
 		{"àè 日本", "àè 日本"},
 		{"bad\xffbyte", "bad?byte"},
+		{"WARN ⚠️ stuck ⏸️ ♻️", "WARN ⚠ stuck ⏸ ♻"},
 	}
 	for _, tc := range cases {
 		if got := Sanitize(tc.input); got != tc.want {

@@ -44,7 +44,10 @@ func (t *terminal) enter() error {
 	t.active = true
 	// Alternate screen buffer, hide cursor, clear, bracketed paste on (so a
 	// pasted magnet arrives as one block instead of a stream of commands).
-	_, _ = io.WriteString(t.out, "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H\x1b[?2004h")
+	// Autowrap goes off too: if a row were ever one cell wider than computed
+	// (an odd emoji), the terminal clips it instead of wrapping and pushing
+	// every row below it, footer included, out of place.
+	_, _ = io.WriteString(t.out, "\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H\x1b[?2004h\x1b[?7l")
 	return nil
 }
 
@@ -52,7 +55,7 @@ func (t *terminal) leave() {
 	if !t.active {
 		return
 	}
-	_, _ = io.WriteString(t.out, "\x1b[?2004l\x1b[0m\x1b[?25h\x1b[?1049l")
+	_, _ = io.WriteString(t.out, "\x1b[?7h\x1b[?2004l\x1b[0m\x1b[?25h\x1b[?1049l")
 	if t.original != nil {
 		_ = unix.IoctlSetTermios(int(t.in.Fd()), unix.TCSETS, t.original)
 	}
