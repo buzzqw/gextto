@@ -544,6 +544,22 @@ func TestLibraryViewsAndNotificationTransitions(t *testing.T) {
 	if !strings.Contains(strings.ToLower(m.Notification), "completato") && !strings.Contains(strings.ToLower(m.Notification), "completed") {
 		t.Fatalf("completion notification = %q", m.Notification)
 	}
+
+	// Esc with filter clears filter
+	m.Update(kindKey(KeyEsc))
+	if m.LibraryFilter != "" || m.Tab != TabLibrary {
+		t.Fatalf("Esc should clear filter first: filter=%q tab=%v", m.LibraryFilter, m.Tab)
+	}
+	// Esc without filter returns to TabStatus
+	if action := m.Update(kindKey(KeyEsc)); m.Tab != TabStatus || action.Kind != ActionRefresh {
+		t.Fatalf("Esc should return to TabStatus: tab=%v action=%+v", m.Tab, action)
+	}
+
+	// Switch back to TabLibrary, test numeric key 4 (TabHealth) works from library
+	m.Tab = TabLibrary
+	if action := m.Update(runeKey('4')); m.Tab != TabHealth {
+		t.Fatalf("4 from TabLibrary should switch to TabHealth: tab=%v action=%+v", m.Tab, action)
+	}
 }
 
 func TestRenderError(t *testing.T) {

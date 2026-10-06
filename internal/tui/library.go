@@ -407,6 +407,14 @@ func (m *Model) updateLibrary(k Key) Action {
 		if movie := m.SelectedMovie(); movie != nil {
 			return Action{Kind: ActionMovieSearch, ID: movie.ID, Domain: movie.Name}
 		}
+	case k.Kind == KeyEsc:
+		if m.LibraryFilter != "" {
+			m.LibraryFilter = ""
+			m.LibrarySelected, m.LibraryScroll = 0, 0
+			return Action{}
+		}
+		m.Tab = TabStatus
+		return m.loadTabAction()
 	}
 	return Action{}
 }
