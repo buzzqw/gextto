@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -153,6 +154,16 @@ func formatValue(value any) string {
 	case error:
 		return v.Error()
 	default:
+		// Call sites routinely pass pointer fields (e.g. *int64 season, episode
+		// and year). fmt.Sprint would render the memory address, so dereference
+		// one level and print the pointed-to value; a nil pointer becomes empty.
+		rv := reflect.ValueOf(value)
+		if rv.Kind() == reflect.Ptr {
+			if rv.IsNil() {
+				return ""
+			}
+			return fmt.Sprint(rv.Elem().Interface())
+		}
 		return fmt.Sprint(v)
 	}
 }

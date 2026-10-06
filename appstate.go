@@ -87,5 +87,15 @@ func NewAppState(
 			}
 		}
 	}
+	// A scoring-weight change invalidates the stored quality scores: recompute
+	// them now, before the first cycle, so an edited weight cannot look like an
+	// upgrade and re-download the library. Runs only when the weights changed.
+	if !cfg.DryRun {
+		if updated, err := db.SyncScoresWithSettings(cfg); err != nil {
+			logging.Warn("stored score refresh failed", "error", err)
+		} else if updated > 0 {
+			logging.Info("stored quality scores refreshed after a scoring change", "updated", updated)
+		}
+	}
 	return state
 }

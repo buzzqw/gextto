@@ -1304,6 +1304,48 @@ func TestRescoreNormalizesBaseScoresWithSettings(t *testing.T) {
 	assertEqual(t, score(3), int64(500))
 }
 
+func TestSyncScoresWithSettingsOnlyRescoresOnWeightChange(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(id,name) VALUES (1,'Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec("INSERT INTO episodes(id,series_id,season,episode,title,quality_score,downloaded_at) VALUES (1,1,1,1,'Show.S01E01.1080p.WEB-DL.H.265',0,datetime('now'))"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := DefaultConfig()
+	cfg.DataDir = t.TempDir()
+	cfg.Settings = map[string]string{"score_res_1080p": "1500"}
+
+	score := func() int64 {
+		var value int64
+		if err := db.db.QueryRow("SELECT quality_score FROM episodes WHERE id=1").Scan(&value); err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+
+	updated, err := db.SyncScoresWithSettings(&cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated == 0 {
+		t.Fatal("first call must rescore")
+	}
+	assertEqual(t, score(), int64(1900))
+
+	// Same weights: the fingerprint matches, so nothing is rewritten.
+	if updated, err = db.SyncScoresWithSettings(&cfg); err != nil || updated != 0 {
+		t.Fatalf("second call = %d, %v; want 0, nil", updated, err)
+	}
+
+	// A weight change invalidates the stored scores and must trigger a rescore.
+	cfg.Settings["score_res_1080p"] = "2000"
+	if updated, err = db.SyncScoresWithSettings(&cfg); err != nil || updated == 0 {
+		t.Fatalf("third call = %d, %v; want a rescore", updated, err)
+	}
+	assertEqual(t, score(), int64(2400))
+}
+
 func TestHistorySearchFiltersAcrossNameTagAndPath(t *testing.T) {
 	db := newTestDB(t)
 	insert := func(hash, name, tag, path string) {

@@ -1,7 +1,9 @@
 package gextto
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -841,6 +843,28 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 // settings map rather than the complete runtime configuration.
 func ScoreQuality(quality *models.Quality, settings map[string]string) int64 {
 	return quality.ScoreWithSettings(settings)
+}
+
+// ScoreWeightsFingerprint is a stable hash of every score-* setting. The daemon
+// compares it across restarts to detect a scoring change: stored quality scores
+// are then recomputed so a weight edit cannot masquerade as an upgrade and
+// trigger pointless re-downloads.
+func (c *Config) ScoreWeightsFingerprint() string {
+	keys := make([]string, 0, len(c.Settings))
+	for key := range c.Settings {
+		if strings.HasPrefix(strings.ToLower(key), "score_") {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	hash := sha256.New()
+	for _, key := range keys {
+		hash.Write([]byte(key))
+		hash.Write([]byte("="))
+		hash.Write([]byte(c.Settings[key]))
+		hash.Write([]byte("\n"))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // TmdbLanguage returns the BCP-47 language used for TMDB API calls (e.g.

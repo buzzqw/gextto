@@ -4381,6 +4381,32 @@ func (d *Database) LastCycleAt() (time.Time, bool) {
 }
 
 // Rescore recomputes every stored quality score with the configured weights.
+// SyncScoresWithSettings recomputes the stored quality scores with the current
+// scoring weights, but only when those weights changed since the last run. A
+// weight change (for example a higher Dolby Vision bonus) otherwise leaves every
+// archived release with a stale score, so the next cycle sees an artificial
+// improvement and re-downloads content that already has the right quality.
+func (d *Database) SyncScoresWithSettings(cfg *Config) (int, error) {
+	if d == nil || cfg == nil {
+		return 0, nil
+	}
+	fingerprint := cfg.ScoreWeightsFingerprint()
+	if strings.TrimSpace(cfg.Settings["_score_weights_fingerprint"]) == fingerprint {
+		return 0, nil
+	}
+	updated, err := d.Rescore(cfg)
+	if err != nil {
+		return updated, err
+	}
+	if err := saveConfigSetting(cfg.DataDir, "_score_weights_fingerprint", fingerprint); err != nil {
+		return updated, err
+	}
+	// Keep the in-memory config aligned so a second call in the same process is
+	// a no-op instead of rescoring the whole library again.
+	cfg.Settings["_score_weights_fingerprint"] = fingerprint
+	return updated, nil
+}
+
 func (d *Database) Rescore(cfg *Config) (int, error) {
 	type metadataRow struct {
 		Hash string

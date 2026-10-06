@@ -109,6 +109,27 @@ func TestReadableFormatterLayout(t *testing.T) {
 	}
 }
 
+func TestReadableFormatterDereferencesPointerFields(t *testing.T) {
+	dir := t.TempDir()
+	closeLog := Init(dir, "pointers.log", 1<<20, 2)
+	defer closeLog()
+	SetLevel("debug")
+	season := int64(5)
+	Info("mediainfo", "season", &season, "episode", (*int64)(nil), "year", (*int64)(nil))
+
+	data, err := os.ReadFile(FilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "season: 5") {
+		t.Fatalf("pointer value was not dereferenced: %q", text)
+	}
+	if strings.Contains(text, "0x") {
+		t.Fatalf("pointer address leaked into log: %q", text)
+	}
+}
+
 func TestReadableFormatterDoesNotExposeTorrentHashes(t *testing.T) {
 	dir := t.TempDir()
 	closeLog := Init(dir, "redacted.log", 1<<20, 2)
