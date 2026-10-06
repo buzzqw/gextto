@@ -81,6 +81,33 @@ func TestHashFailuresAlertOnceAfterThreshold(t *testing.T) {
 	}
 }
 
+func TestTorrentErrorNoticeOncePerCooldown(t *testing.T) {
+	hash := "1111111111111111111111111111111111111111"
+	now := time.Now()
+	if !recordTorrentErrorNotice(hash, "file_error", now) {
+		t.Fatal("first error must be reported")
+	}
+	if recordTorrentErrorNotice(hash, "file_error", now.Add(time.Second)) {
+		t.Fatal("a repeated error in the same burst must not be reported again")
+	}
+	if !recordTorrentErrorNotice(hash, "torrent_error", now.Add(time.Second)) {
+		t.Fatal("a different kind of error must be reported")
+	}
+	if !recordTorrentErrorNotice(hash, "file_error", now.Add(torrentErrorNoticeCooldown+time.Second)) {
+		t.Fatal("the error must be reported again after the cooldown")
+	}
+}
+
+func TestComicPendingNoticeOncePerPost(t *testing.T) {
+	url := "https://example.invalid/comic-pending-test"
+	if !firstComicPendingNotice(url) {
+		t.Fatal("first sighting must notify")
+	}
+	if firstComicPendingNotice(url) {
+		t.Fatal("the next cycles must not notify again")
+	}
+}
+
 func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
 	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0)
 	want := "🔬 Read the real quality (resolution, HDR, audio) of 3 library files: Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04. Future upgrades will be compared with what is actually on disk"

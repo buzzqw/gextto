@@ -291,10 +291,8 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 					if (inRamdisk || inTemp) && !SamePath(source, *processed) {
 						_ = os.RemoveAll(source)
 					}
-					// Already finalized on disk, but the caller (manual archive from
-					// the UI/trash modal) still expects a completion notification.
-					size, _ := SizeOfPath(*processed)
-					notifyArchivedTorrent(s, hash, release, *processed, size, targetTorrent.Name)
+					// Already finalized on disk: its completion was announced when
+					// the archive copy was made, so only the session entry goes.
 					removalName, removalState, _ := manualTorrentRemovalInfo(s, hash)
 					removed, err := s.activeEngine().Remove(hash, false)
 					if err == nil && removed {
@@ -547,10 +545,18 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 	}
 	size, _ := SizeOfPath(target)
+	// A foreign torrent was already announced ("added manually") when it
+	// finished downloading; moving it to the archive is not a new completion.
+	alreadyAnnounced := false
 	if s.db != nil {
+		if status, err := s.db.TorrentStatus(hash); err == nil && status != nil && *status == "completed" {
+			alreadyAnnounced = true
+		}
 		_ = s.db.MarkTorrentCompleted(hash, target, size)
 	}
-	notifyArchivedTorrent(s, hash, nil, target, size, targetTorrent.Name)
+	if !alreadyAnnounced {
+		notifyArchivedTorrent(s, hash, nil, target, size, targetTorrent.Name)
+	}
 	removed, rErr := s.activeEngine().Remove(hash, false)
 	if rErr == nil && removed {
 		logAutomaticTorrentRemoval(hash, removalName, removalState)

@@ -306,6 +306,37 @@ func recordHashFailure(hash string) (int, bool) {
 	return count, count == hashFailureAlertThreshold
 }
 
+// torrentErrorNoticeCooldown is how long a torrent/file error is reported only
+// once for the same torrent: libtorrent posts one alert per failed disk job,
+// so a single problem (disk full, missing folder) arrives as a burst, and again
+// after every resume or restart.
+const torrentErrorNoticeCooldown = 6 * time.Hour
+
+var torrentErrorNotices = struct {
+	sync.Mutex
+	last map[string]time.Time
+}{last: map[string]time.Time{}}
+
+// recordTorrentErrorNotice reports whether a torrent error of this kind should
+// be logged as a warning and notified now (false while a previous one for the
+// same torrent is still within the cooldown).
+func recordTorrentErrorNotice(hash, kind string, now time.Time) bool {
+	if strings.TrimSpace(hash) == "" {
+		return true
+	}
+	key := strings.ToLower(hash) + "|" + kind
+	torrentErrorNotices.Lock()
+	defer torrentErrorNotices.Unlock()
+	if last, ok := torrentErrorNotices.last[key]; ok && now.Sub(last) < torrentErrorNoticeCooldown {
+		return false
+	}
+	if len(torrentErrorNotices.last) > 1000 {
+		torrentErrorNotices.last = map[string]time.Time{}
+	}
+	torrentErrorNotices.last[key] = now
+	return true
+}
+
 // mediaInfoBackfillText summarises a MediaInfo backfill run: which library
 // files had their real quality read, and why that matters. Empty when there
 // is nothing worth telling.

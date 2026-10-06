@@ -2472,6 +2472,11 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		logging.Debug("torrent resume data could not be saved", "name", event.Name, "message", event.Message)
 		return false, nil
 	case "torrent_error", "file_error", "metadata_failed":
+		if !recordTorrentErrorNotice(event.Hash, event.Kind, time.Now()) {
+			logging.Debug("repeated torrent error; already reported",
+				"name", event.Name, "kind", event.Kind, "message", event.Message)
+			return false, nil
+		}
 		logging.Warn(fmt.Sprintf("⚠️ Problem with «%s»: %s", event.Name, torrentErrorText(event.Kind, event.Message)))
 		_ = notifier.NotifyEvent("torrent_error", map[string]any{
 			"hash":    event.Hash,

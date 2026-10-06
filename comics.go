@@ -1824,8 +1824,12 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					}
 				}
 			} else {
-				logging.Info("comics post found but has no Download Now or torrent link yet; leaving it pending", "post", post.URL, "title", post.Title)
-				_ = notifier.NotifyEvent("comic_pending", map[string]any{"title": post.Title, "post_url": post.URL, "kind": "comic"})
+				if firstComicPendingNotice(post.URL) {
+					logging.Info("comics post found but has no Download Now or torrent link yet; leaving it pending", "post", post.URL, "title", post.Title)
+					_ = notifier.NotifyEvent("comic_pending", map[string]any{"title": post.Title, "post_url": post.URL, "kind": "comic"})
+				} else {
+					logging.Debug("comics post still pending", "post", post.URL, "title", post.Title)
+				}
 				continue
 			}
 			if resultErr != nil {
@@ -1850,8 +1854,12 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 			if info, statErr := os.Stat(result.path); statErr == nil {
 				size = uint64(info.Size())
 			}
-			if err := notifier.NotifyComicComplete(post.Title, result.path, size, result.method); err != nil {
-				logging.Warn("comic notification failed", "error", err)
+			// A torrent comic was only queued (comic_queued above): its
+			// "downloaded" notification comes when the torrent finishes.
+			if result.method != "torrent" {
+				if err := notifier.NotifyComicComplete(post.Title, result.path, size, result.method); err != nil {
+					logging.Warn("comic notification failed", "error", err)
+				}
 			}
 		}
 		if err := db.MarkChecked(comic.ID); err != nil {
@@ -1915,12 +1923,16 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					if _, err := db.UpsertWeeklyLinks(date, "", ""); err != nil {
 						return downloaded, err
 					}
-					logging.Info("comics: weekly pack found without Download Now or torrent link yet", "date", date)
-					_ = notifier.NotifyEvent("comic_pending", map[string]any{
-						"title":    fmt.Sprintf("Weekly Pack %s", date),
-						"post_url": post.URL,
-						"kind":     "weekly",
-					})
+					if firstComicPendingNotice(post.URL) {
+						logging.Info("comics: weekly pack found without Download Now or torrent link yet", "date", date)
+						_ = notifier.NotifyEvent("comic_pending", map[string]any{
+							"title":    fmt.Sprintf("Weekly Pack %s", date),
+							"post_url": post.URL,
+							"kind":     "weekly",
+						})
+					} else {
+						logging.Debug("comics: weekly pack still pending", "date", date)
+					}
 					continue
 				}
 				eligible, err := db.UpsertWeeklyLinks(date, magnet, torrentURL)
@@ -3128,4 +3140,26 @@ func hasComicFileExtension(path string) bool {
 		}
 	}
 	return false
+}
+
+var comicPendingNotices = struct {
+	sync.Mutex
+	seen map[string]struct{}
+}{seen: map[string]struct{}{}}
+
+// firstComicPendingNotice reports whether a post still waiting for its
+// download link is seen for the first time: the check runs every cycle, so
+// the "pending" notification and log line are sent only once per post.
+func firstComicPendingNotice(postURL string) bool {
+	key := strings.TrimSpace(postURL)
+	comicPendingNotices.Lock()
+	defer comicPendingNotices.Unlock()
+	if _, seen := comicPendingNotices.seen[key]; seen {
+		return false
+	}
+	if len(comicPendingNotices.seen) > 1000 {
+		comicPendingNotices.seen = map[string]struct{}{}
+	}
+	comicPendingNotices.seen[key] = struct{}{}
+	return true
 }
