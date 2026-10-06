@@ -679,6 +679,21 @@ const databaseStallWatchSchema = `CREATE TABLE IF NOT EXISTS stalled_torrents (
                 updated_at TEXT NOT NULL
             );`
 
+// databaseTorrentMoveSchema persists the storage moves the torrent event worker
+// is still responsible for: the retry schedule (destination, post-seed flag,
+// attempts) and the post-seed protection that keeps the seed cleanup from
+// removing a source while it is being archived. Without it a restart lost
+// both, and the worker had to guess the state again from the save path.
+const databaseTorrentMoveSchema = `CREATE TABLE IF NOT EXISTS torrent_moves (
+                hash TEXT PRIMARY KEY,
+                has_retry INTEGER NOT NULL DEFAULT 0,
+                destination TEXT NOT NULL DEFAULT '',
+                retry_post_seed INTEGER NOT NULL DEFAULT 0,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                post_seed_protected INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            );`
+
 // databaseFeedSeenSchema mirrors the "seen in feed" tables and indexes.
 const databaseFeedSeenSchema = `CREATE TABLE IF NOT EXISTS movie_feed_seen (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -807,6 +822,9 @@ func (d *Database) migrate() error {
 		return err
 	}
 	if _, err := d.db.Exec(databaseStallWatchSchema); err != nil {
+		return err
+	}
+	if _, err := d.db.Exec(databaseTorrentMoveSchema); err != nil {
 		return err
 	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
@@ -968,7 +986,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	var persistedArchivePath string
 	err = d.db.QueryRow("SELECT COALESCE(archive_path,'') FROM episodes WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode).Scan(&persistedArchivePath)
 	if err == nil && strings.TrimSpace(persistedArchivePath) != "" {
-		if _, statErr := os.Stat(persistedArchivePath); errors.Is(statErr, os.ErrNotExist) {
+		if _, statErr := os.Stat(persistedArchivePath); errors.Is(statErr, os.ErrNotExist) && archiveFileConfirmedMissing(persistedArchivePath) {
 			if !dryRun {
 				if _, updateErr := d.db.Exec("UPDATE episodes SET downloaded_at=NULL,archive_path=NULL,size_bytes=0,media_info_json='' WHERE series_id=?1 AND season=?2 AND episode=?3", sid, season, episode); updateErr != nil {
 					return false, "", updateErr
@@ -3473,6 +3491,75 @@ func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
 	return err
 }
 
+// TorrentMoveState is the persisted storage-move state of one torrent.
+type TorrentMoveState struct {
+	Retry         *StorageMoveRetry
+	PostSeedGuard bool
+}
+
+// LoadTorrentMoves restores the storage-move state saved by SaveTorrentMove.
+// The in-flight flag and the next attempt time are not stored: after a restart
+// no move is running, and the caller decides when to check them again.
+func (d *Database) LoadTorrentMoves() (map[string]TorrentMoveState, error) {
+	moves := map[string]TorrentMoveState{}
+	if d == nil || d.db == nil {
+		return moves, nil
+	}
+	rows, err := d.db.Query(`SELECT hash, has_retry, destination, retry_post_seed, attempts, post_seed_protected FROM torrent_moves`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hash, destination string
+		var hasRetry, retryPostSeed, protected bool
+		var attempts int64
+		if err := rows.Scan(&hash, &hasRetry, &destination, &retryPostSeed, &attempts, &protected); err != nil {
+			return nil, err
+		}
+		state := TorrentMoveState{PostSeedGuard: protected}
+		if hasRetry && strings.TrimSpace(destination) != "" {
+			if attempts < 0 {
+				attempts = 0
+			}
+			if attempts > int64(tev_maxStorageMoveRetries) {
+				attempts = int64(tev_maxStorageMoveRetries)
+			}
+			state.Retry = &StorageMoveRetry{destination: destination, postSeed: retryPostSeed, attempts: uint8(attempts)}
+		}
+		moves[strings.ToLower(hash)] = state
+	}
+	return moves, rows.Err()
+}
+
+// SaveTorrentMove records the storage-move state of a torrent, or deletes its
+// row when there is nothing left to remember.
+func (d *Database) SaveTorrentMove(hash string, state TorrentMoveState) error {
+	if d == nil || d.db == nil {
+		return nil
+	}
+	if state.Retry == nil && !state.PostSeedGuard {
+		_, err := d.db.Exec("DELETE FROM torrent_moves WHERE hash=?1", strings.ToLower(hash))
+		return err
+	}
+	var destination string
+	var retryPostSeed bool
+	var attempts uint8
+	if state.Retry != nil {
+		destination = state.Retry.destination
+		retryPostSeed = state.Retry.postSeed
+		attempts = state.Retry.attempts
+	}
+	_, err := d.db.Exec(`INSERT INTO torrent_moves(hash,has_retry,destination,retry_post_seed,attempts,post_seed_protected,updated_at)
+		VALUES(?1,?2,?3,?4,?5,?6,?7)
+		ON CONFLICT(hash) DO UPDATE SET has_retry=excluded.has_retry,destination=excluded.destination,
+		retry_post_seed=excluded.retry_post_seed,attempts=excluded.attempts,
+		post_seed_protected=excluded.post_seed_protected,updated_at=excluded.updated_at`,
+		strings.ToLower(hash), boolToInt(state.Retry != nil), destination, boolToInt(retryPostSeed),
+		int64(attempts), boolToInt(state.PostSeedGuard), nowSQLite())
+	return err
+}
+
 // DeleteStallWatch forgets monitor state once progress resumes, completion is
 // reached, or the torrent leaves the session.
 func (d *Database) DeleteStallWatch(hash string) error {
@@ -5362,4 +5449,41 @@ func (d *Database) SeriesFeedForEpisode(season, episode int64, limit int) ([][3]
 		results = append(results, [3]string{title, magnet, source})
 	}
 	return results, rows.Err()
+}
+
+// archiveFileConfirmedMissing tells a file that was really deleted from one
+// that merely sits on an archive volume that is not available. An unmounted NAS
+// leaves an empty mount-point directory, so `stat` answers ENOENT for every
+// archived file and the whole history would be reset.
+//
+// The file counts as deleted when its own directory still exists (the folder
+// structure is there, so the volume is mounted), or, when that directory is gone
+// too, when the nearest existing ancestor is readable and not empty. An empty or
+// unreadable ancestor (or only the filesystem root) means "volume unavailable"
+// and the database row is preserved.
+func archiveFileConfirmedMissing(path string) bool {
+	dir := filepath.Dir(filepath.Clean(path))
+	if info, err := os.Stat(dir); err == nil {
+		return info.IsDir() && filepath.Dir(dir) != dir
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	for {
+		dir = filepath.Dir(dir)
+		// The filesystem root always exists and is never evidence of a deletion.
+		if filepath.Dir(dir) == dir {
+			return false
+		}
+		info, err := os.Stat(dir)
+		if err == nil && info.IsDir() {
+			entries, readErr := os.ReadDir(dir)
+			if readErr != nil {
+				return false
+			}
+			return len(entries) > 0
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+	}
 }

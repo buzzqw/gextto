@@ -167,6 +167,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		feedWG.Add(1)
 		feedSem <- struct{}{}
 		go func(index int, rawURL string) {
+			defer recoverGoroutine("feed scrape")
 			defer feedWG.Done()
 			defer func() { <-feedSem }()
 			feedResults[index] = e.scrapeFeed(ctx, cfg, rawURL, maxPages, maxAgeDays, oldRatio)
@@ -264,6 +265,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 		progressDone := make(chan struct{})
 		if targetsTotal > 0 {
 			go func() {
+				defer recoverGoroutine("title search progress")
 				ticker := time.NewTicker(searchProgressInterval)
 				defer ticker.Stop()
 				for {
@@ -290,6 +292,7 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 			searchWG.Add(1)
 			searchSem <- struct{}{}
 			go func(index int, query string, ids [][2]string, searchType string) {
+				defer recoverGoroutine("title search")
 				defer searchWG.Done()
 				defer func() { <-searchSem }()
 				defer searchesCompleted.Add(1)
@@ -673,6 +676,7 @@ func searchOneWithDBType(
 	for worker := 0; worker < workers; worker++ {
 		indexerWG.Add(1)
 		go func() {
+			defer recoverGoroutine("indexer search")
 			defer indexerWG.Done()
 			for index := range jobs {
 				indexer := indexers[index]
@@ -698,6 +702,7 @@ func searchOneWithDBType(
 	if includeWeb && len(cfg.WebsearchEngines) > 0 {
 		webWG.Add(1)
 		go func() {
+			defer recoverGoroutine("web search")
 			defer webWG.Done()
 			webResults = SearchWithTimeout(ctx, cfg, query, webTimeout)
 			logging.Debug("web search completed", "query", query, "results", len(webResults))

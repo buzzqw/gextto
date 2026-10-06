@@ -201,9 +201,18 @@ type LibtorrentClient struct {
 	// not call into a handle that was already destroyed (boost aborts the
 	// process with "invalid session handle used").
 	sessionMu sync.RWMutex
-	session   unsafe.Pointer
-	configDB  string
-	stateDir  string
+	// sessionUse counts the calls into the native session that are in flight
+	// outside List (Add, Remove, MoveStorage, queue and limit changes...).
+	// Shutdown first closes it to new calls, then waits for the running ones,
+	// so no cgo call can reach a destroyed handle. A counter rather than an
+	// RLock: these methods call each other, and a nested RLock deadlocks as
+	// soon as Shutdown waits for the write lock.
+	sessionUse     sync.Mutex
+	sessionActive  int
+	sessionClosing bool
+	session        unsafe.Pointer
+	configDB       string
+	stateDir       string
 
 	// listCache memoises the torrent snapshot for a very short TTL so several
 	// reads in the same worker tick (and concurrent UI polls) share one
@@ -598,9 +607,10 @@ func limitBytesFromKib(kib int64) int32 {
 // relocated or externally truncated file would otherwise be treated as present
 // and could be archived as a broken copy.
 func (c *LibtorrentClient) RecheckRestoredSuspicious() int {
-	if c.session == nil {
+	if !c.enterSession() {
 		return 0
 	}
+	defer c.exitSession()
 	checked := 0
 	for _, torrent := range c.List() {
 		if !torrent.HasMetadata || torrent.Progress < 99.99 {
@@ -705,9 +715,10 @@ func (c *LibtorrentClient) markRechecked(hash string) {
 const recheckGuardWindow = 12 * time.Hour
 
 func (c *LibtorrentClient) RecheckRestoredAtZero() int {
-	if c.session == nil {
+	if !c.enterSession() {
 		return 0
 	}
+	defer c.exitSession()
 	checked := 0
 	for _, torrent := range c.List() {
 		state := strings.ToLower(torrent.State)
@@ -735,9 +746,10 @@ func (c *LibtorrentClient) RecheckRestoredAtZero() int {
 // ApplySettings re-applies the extended libtorrent settings to the running
 // session.
 func (c *LibtorrentClient) ApplySettings(cfg *Config) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	if err := c.applyExtendedSettings(cfg); err != nil {
 		return false, err
 	}
@@ -747,9 +759,10 @@ func (c *LibtorrentClient) ApplySettings(cfg *Config) (bool, error) {
 // LoadIPFilter loads a local ipfilter file into the live session, returning the
 // number of rules.
 func (c *LibtorrentClient) LoadIPFilter(path string) (int, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return 0, nil
 	}
+	defer c.exitSession()
 	loaded, rules, errMessage := cgoLtLoadIPFilter(c.session, path)
 	if loaded == 0 {
 		return 0, fmt.Errorf("libtorrent ip filter not applied: %s", errMessage)
@@ -764,9 +777,10 @@ func (c *LibtorrentClient) LoadIPFilter(path string) (int, error) {
 // SetGlobalSpeedLimits applies global download/upload rate limits (KiB/s,
 // 0 = unlimited) to the live session.
 func (c *LibtorrentClient) SetGlobalSpeedLimits(downloadKib, uploadKib int64) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	dl := saturatingMulInt64(ltMaxInt64(downloadKib, 0), 1024)
 	ul := saturatingMulInt64(ltMaxInt64(uploadKib, 0), 1024)
 	payload := fmt.Sprintf("i:download_rate_limit=%d\ni:upload_rate_limit=%d", dl, ul)
@@ -813,9 +827,10 @@ func saturatingMulInt64(a, b int64) int64 {
 }
 
 func (c *LibtorrentClient) applyExtendedSettings(cfg *Config) error {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil
 	}
+	defer c.exitSession()
 	lt := &cfg.Libtorrent
 	cacheLabel := "auto"
 	if lt.CacheSize > 0 {
@@ -931,7 +946,8 @@ func (c *LibtorrentClient) AddWithOptions(magnet string, cfg *Config, preferredP
 		return false, nil
 	}
 	savePath := resolveSavePath(preferredPath, cfg)
-	if c.session != nil {
+	if c.enterSession() {
+		defer c.exitSession()
 		if err := os.MkdirAll(savePath, 0o755); err != nil {
 			return false, err
 		}
@@ -990,9 +1006,10 @@ func (c *LibtorrentClient) AddWithOptions(magnet string, cfg *Config, preferredP
 // AddTorrentFile adds a `.torrent` file, returning its infohash. A nil hash
 // means no native session is available (the `Ok(None)` case).
 func (c *LibtorrentClient) AddTorrentFile(torrentPath, savePath string) (*string, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, nil
 	}
+	defer c.exitSession()
 	added, hash, errMessage := cgoLtAddFile(c.session, torrentPath, savePath)
 	if added == 0 {
 		return nil, fmt.Errorf("libtorrent torrent-file add failed: %s", errMessage)
@@ -1002,9 +1019,10 @@ func (c *LibtorrentClient) AddTorrentFile(torrentPath, savePath string) (*string
 
 // AddTorrentFileEx is AddTorrentFile with AddOptions applied at add time.
 func (c *LibtorrentClient) AddTorrentFileEx(torrentPath, savePath string, options AddOptions) (*string, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, nil
 	}
+	defer c.exitSession()
 	added, hash, errMessage := cgoLtAddFileEx(c.session, torrentPath, savePath, options.Flags())
 	if added == 0 {
 		return nil, fmt.Errorf("libtorrent torrent-file add failed: %s", errMessage)
@@ -1113,9 +1131,10 @@ func (c *LibtorrentClient) EnforceDeferredOptions(torrents []models.TorrentView)
 
 // SetTorrentSequential toggles per-torrent sequential download.
 func (c *LibtorrentClient) SetTorrentSequential(hash string, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetTorrentSequential(c.session, strings.ToLower(hash), boolToInt32(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent sequential failed: %s", errMessage)
@@ -1125,9 +1144,10 @@ func (c *LibtorrentClient) SetTorrentSequential(hash string, enabled bool) (bool
 
 // QueueTop moves a torrent to the top of the queue.
 func (c *LibtorrentClient) QueueTop(hash string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtQueueTop(c.session, strings.ToLower(hash))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent queue top failed: %s", errMessage)
@@ -1137,9 +1157,10 @@ func (c *LibtorrentClient) QueueTop(hash string) (bool, error) {
 
 // SetFirstLast prioritises the first and last piece of every file.
 func (c *LibtorrentClient) SetFirstLast(hash string, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetFirstLast(c.session, strings.ToLower(hash), boolToInt32(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent first/last failed: %s", errMessage)
@@ -1149,9 +1170,10 @@ func (c *LibtorrentClient) SetFirstLast(hash string, enabled bool) (bool, error)
 
 // SetFilePriorities sets the per-file download priority (0 skipped … 7 max).
 func (c *LibtorrentClient) SetFilePriorities(hash string, priorities []int32) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetFilePriorities(c.session, strings.ToLower(hash), priorities)
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent file priorities failed: %s", errMessage)
@@ -1161,9 +1183,10 @@ func (c *LibtorrentClient) SetFilePriorities(hash string, priorities []int32) (b
 
 // WebSeeds adds or removes HTTP/FTP web seeds (one URL per line in urls).
 func (c *LibtorrentClient) WebSeeds(hash, urls string, remove bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtAddWebSeeds(c.session, strings.ToLower(hash), urls, boolToInt32(remove))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent web seed failed: %s", errMessage)
@@ -1173,9 +1196,10 @@ func (c *LibtorrentClient) WebSeeds(hash, urls string, remove bool) (bool, error
 
 // SetTrackers replaces the tracker list.
 func (c *LibtorrentClient) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	parts := make([]string, 0, len(trackers))
 	for _, tracker := range trackers {
 		parts = append(parts, fmt.Sprintf("%d|%s", tracker.Tier, strings.TrimSpace(tracker.URL)))
@@ -1190,9 +1214,10 @@ func (c *LibtorrentClient) SetTrackers(hash string, trackers []TrackerEntry) (bo
 
 // SetSuperSeeding enables/disables libtorrent super seeding on a torrent.
 func (c *LibtorrentClient) SetSuperSeeding(hash string, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetSuperSeeding(c.session, strings.ToLower(hash), boolToInt32(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent super seeding failed: %s", errMessage)
@@ -1413,9 +1438,10 @@ func DiagnoseTorrent(torrent *models.TorrentView) (code, reason, hint string) {
 
 // PollEvents drains the pending lifecycle events.
 func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil
 	}
+	defer c.exitSession()
 	native := cgoLtEvents(c.session)
 	result := make([]models.TorrentEvent, 0, len(native))
 	for _, event := range native {
@@ -1469,9 +1495,10 @@ func (c *LibtorrentClient) PollEvents() []models.TorrentEvent {
 }
 
 func (c *LibtorrentClient) saveTorrentMetadata(hash, displayName string) error {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil
 	}
+	defer c.exitSession()
 	if err := os.MkdirAll(c.stateDir, 0o755); err != nil {
 		return err
 	}
@@ -1590,7 +1617,8 @@ func (c *LibtorrentClient) copyTorrentFileNamed(hash, source, displayName string
 
 // PromoteMetadata promotes metadata-only torrents out of the queue.
 func (c *LibtorrentClient) PromoteMetadata() {
-	if c.session != nil {
+	if c.enterSession() {
+		defer c.exitSession()
 		cgoLtPromoteMetadata(c.session)
 	}
 }
@@ -1598,7 +1626,8 @@ func (c *LibtorrentClient) PromoteMetadata() {
 // EnsureAutoManaged re-arms the queue's auto-management on torrents that have
 // metadata and are not paused.
 func (c *LibtorrentClient) EnsureAutoManaged() int {
-	if c.session != nil {
+	if c.enterSession() {
+		defer c.exitSession()
 		return cgoLtEnsureAutoManaged(c.session)
 	}
 	return 0
@@ -1607,9 +1636,10 @@ func (c *LibtorrentClient) EnsureAutoManaged() int {
 // AdjustQueue applies the dynamic queue policy for the effective global
 // download limit.
 func (c *LibtorrentClient) AdjustQueue(cfg *Config, effectiveDownloadKib int64) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return
 	}
+	defer c.exitSession()
 	toBytes := func(kib int64) int32 {
 		value := saturatingMulInt64(kib, 1024)
 		if value < 0 {
@@ -1637,9 +1667,10 @@ func (c *LibtorrentClient) AdjustQueue(cfg *Config, effectiveDownloadKib int64) 
 
 // MoveStorage moves a torrent's data to destination.
 func (c *LibtorrentClient) MoveStorage(hash, destination string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	moved, errMessage := cgoLtMoveStorage(c.session, strings.ToLower(hash), destination)
 	if moved == 0 {
 		return false, fmt.Errorf("libtorrent move storage failed: %s", errMessage)
@@ -1650,9 +1681,10 @@ func (c *LibtorrentClient) MoveStorage(hash, destination string) (bool, error) {
 // AssociateStorage changes a torrent's save path without moving files and
 // re-checks it there. Used when the destination already contains the data.
 func (c *LibtorrentClient) AssociateStorage(hash, destination string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtAssociateStorage(c.session, strings.ToLower(hash), destination)
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent associate storage failed: %s", message)
@@ -1663,9 +1695,10 @@ func (c *LibtorrentClient) AssociateStorage(hash, destination string) (bool, err
 // Peers returns the peers of a torrent. The boolean is false when no session is
 // available (the `Ok(None)` case).
 func (c *LibtorrentClient) Peers(hash string) ([]models.PeerView, bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, false, nil
 	}
+	defer c.exitSession()
 	count, native, errMessage := cgoLtPeers(c.session, strings.ToLower(hash))
 	if count == 0 && errMessage != "" {
 		return nil, false, fmt.Errorf("libtorrent peer query failed: %s", errMessage)
@@ -1700,9 +1733,10 @@ func (c *LibtorrentClient) Peers(hash string) ([]models.PeerView, bool, error) {
 
 // Trackers returns the trackers of a torrent.
 func (c *LibtorrentClient) Trackers(hash string) ([]models.TrackerView, bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, false, nil
 	}
+	defer c.exitSession()
 	count, native, errMessage := cgoLtTrackers(c.session, strings.ToLower(hash))
 	if count == 0 && errMessage != "" {
 		return nil, false, fmt.Errorf("libtorrent tracker query failed: %s", errMessage)
@@ -1726,9 +1760,10 @@ func (c *LibtorrentClient) Trackers(hash string) ([]models.TrackerView, bool, er
 
 // Files returns the files of a torrent.
 func (c *LibtorrentClient) Files(hash string) ([]models.FileView, bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, false, nil
 	}
+	defer c.exitSession()
 	count, native, errMessage := cgoLtFiles(c.session, strings.ToLower(hash))
 	if count == 0 && errMessage != "" {
 		return nil, false, fmt.Errorf("libtorrent file query failed: %s", errMessage)
@@ -1761,9 +1796,10 @@ func (c *LibtorrentClient) Resume(hash string) (bool, error) {
 }
 
 func (c *LibtorrentClient) controlPaused(hash string, paused bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetPaused(c.session, strings.ToLower(hash), boolToInt32(paused))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
@@ -1806,9 +1842,10 @@ func (c *LibtorrentClient) Restart(hash string) (bool, error) {
 
 // SetPin pins or unpins a torrent from the auto-managed queue.
 func (c *LibtorrentClient) SetPin(hash string, pinned bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetPin(c.session, strings.ToLower(hash), boolToInt32(pinned))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent pin failed: %s", errMessage)
@@ -1818,9 +1855,10 @@ func (c *LibtorrentClient) SetPin(hash string, pinned bool) (bool, error) {
 
 // SetSequential toggles sequential download for the whole session.
 func (c *LibtorrentClient) SetSequential(enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtSetSequential(c.session, boolToInt32(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent sequential failed: %s", errMessage)
@@ -1830,9 +1868,10 @@ func (c *LibtorrentClient) SetSequential(enabled bool) (bool, error) {
 
 // ForceRecheck forces a full hash check of a torrent.
 func (c *LibtorrentClient) ForceRecheck(hash string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtForceRecheck(c.session, strings.ToLower(hash))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent recheck failed: %s", errMessage)
@@ -1843,9 +1882,10 @@ func (c *LibtorrentClient) ForceRecheck(hash string) (bool, error) {
 
 // Reannounce forces a tracker announce.
 func (c *LibtorrentClient) Reannounce(hash string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, errMessage := cgoLtReannounce(c.session, strings.ToLower(hash))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent reannounce failed: %s", errMessage)
@@ -2023,9 +2063,10 @@ func (c *LibtorrentClient) applyStoredConnLimits(hash string) {
 
 // SetLimits sets per-torrent byte limits and persists the seed stop rule.
 func (c *LibtorrentClient) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	if downloadLimit < -1 || uploadLimit < -1 || downloadLimit > math.MaxInt32 || uploadLimit > math.MaxInt32 {
 		return false, fmt.Errorf("limits must be between -1 and %d bytes/s", int64(math.MaxInt32))
 	}
@@ -2061,9 +2102,10 @@ func (c *LibtorrentClient) SetLimits(hash string, downloadLimit, uploadLimit int
 }
 
 func (c *LibtorrentClient) restore(stateDir string) error {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil
 	}
+	defer c.exitSession()
 	restored, warning := cgoLtRestore(c.session, stateDir)
 	if warning != "" {
 		logging.Warn("some fastresume files were not restored", "warning", warning)
@@ -2159,9 +2201,10 @@ func ltBool(value bool) int32 {
 // SetMaxConnections caps the concurrent connections for one torrent
 // (0 = libtorrent default).
 func (c *LibtorrentClient) SetMaxConnections(hash string, value int) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtSetMaxConnections(c.session, hash, int32(value))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent set max connections failed: %s", message)
@@ -2171,9 +2214,10 @@ func (c *LibtorrentClient) SetMaxConnections(hash string, value int) (bool, erro
 
 // SetMaxUploads caps the concurrently unchoked peers for one torrent.
 func (c *LibtorrentClient) SetMaxUploads(hash string, value int) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtSetMaxUploads(c.session, hash, int32(value))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent set max uploads failed: %s", message)
@@ -2184,9 +2228,10 @@ func (c *LibtorrentClient) SetMaxUploads(hash string, value int) (bool, error) {
 // SetUploadMode blocks data download while keeping the torrent in the session
 // (useful to seed a torrent whose files are already present).
 func (c *LibtorrentClient) SetUploadMode(hash string, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtSetUploadMode(c.session, hash, ltBool(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent set upload mode failed: %s", message)
@@ -2196,9 +2241,10 @@ func (c *LibtorrentClient) SetUploadMode(hash string, enabled bool) (bool, error
 
 // SetShareMode seeds from files already on disk without rechecking them.
 func (c *LibtorrentClient) SetShareMode(hash string, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtSetShareMode(c.session, hash, ltBool(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent set share mode failed: %s", message)
@@ -2208,9 +2254,10 @@ func (c *LibtorrentClient) SetShareMode(hash string, enabled bool) (bool, error)
 
 // SetTorrentFlag toggles one per-torrent libtorrent flag (see TorrentFlag*).
 func (c *LibtorrentClient) SetTorrentFlag(hash string, flag int, enabled bool) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtSetTorrentFlag(c.session, hash, int32(flag), ltBool(enabled))
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent set torrent flag failed: %s", message)
@@ -2220,9 +2267,10 @@ func (c *LibtorrentClient) SetTorrentFlag(hash string, flag int, enabled bool) (
 
 // ScrapeTracker requests fresh swarm counts from the trackers of a torrent.
 func (c *LibtorrentClient) ScrapeTracker(hash string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtScrapeTracker(c.session, hash)
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent scrape failed: %s", message)
@@ -2232,9 +2280,10 @@ func (c *LibtorrentClient) ScrapeTracker(hash string) (bool, error) {
 
 // ForceDhtAnnounce announces a torrent to the DHT immediately.
 func (c *LibtorrentClient) ForceDhtAnnounce(hash string) (bool, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return false, nil
 	}
+	defer c.exitSession()
 	ok, message := cgoLtForceDhtAnnounce(c.session, hash)
 	if ok == 0 {
 		return false, fmt.Errorf("libtorrent dht announce failed: %s", message)
@@ -2244,9 +2293,10 @@ func (c *LibtorrentClient) ForceDhtAnnounce(hash string) (bool, error) {
 
 // SessionStats returns libtorrent's session counters as name -> value.
 func (c *LibtorrentClient) SessionStats() (map[string]int64, error) {
-	if c.session == nil {
+	if !c.enterSession() {
 		return nil, nil
 	}
+	defer c.exitSession()
 	ok, output, message := cgoLtSessionStats(c.session)
 	if ok == 0 {
 		return nil, fmt.Errorf("libtorrent session stats unavailable: %s", message)
@@ -2259,8 +2309,10 @@ func (c *LibtorrentClient) SessionStats() (map[string]int64, error) {
 }
 
 func (c *LibtorrentClient) Shutdown(cfg *Config) error {
-	// Wait for every in-flight List() to finish before destroying the handle:
-	// a late cgo call on a destroyed session aborts the process.
+	// Refuse new session calls and wait for the running ones, then for every
+	// in-flight List(), before destroying the handle: a late cgo call on a
+	// destroyed session aborts the process.
+	c.drainSession(sessionDrainTimeout)
 	c.sessionMu.Lock()
 	defer c.sessionMu.Unlock()
 	if c.session == nil {
@@ -2288,9 +2340,53 @@ func (c *LibtorrentClient) Shutdown(cfg *Config) error {
 	return nil
 }
 
+// sessionDrainTimeout bounds how long Shutdown waits for in-flight session
+// calls. A native call stuck past it must not hang the daemon's exit.
+const sessionDrainTimeout = 30 * time.Second
+
+// enterSession reserves the native session for one call. It returns false when
+// there is no session or Shutdown has started; the caller then behaves as if
+// the session were absent. Every true result must be paired with exitSession.
+func (c *LibtorrentClient) enterSession() bool {
+	c.sessionUse.Lock()
+	defer c.sessionUse.Unlock()
+	if c.sessionClosing || c.session == nil {
+		return false
+	}
+	c.sessionActive++
+	return true
+}
+
+// exitSession releases a reservation taken by enterSession.
+func (c *LibtorrentClient) exitSession() {
+	c.sessionUse.Lock()
+	c.sessionActive--
+	c.sessionUse.Unlock()
+}
+
+// drainSession closes the session to new calls and waits, up to timeout, for
+// the calls already running.
+func (c *LibtorrentClient) drainSession(timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	c.sessionUse.Lock()
+	c.sessionClosing = true
+	for c.sessionActive > 0 {
+		if time.Now().After(deadline) {
+			logging.Warn("libtorrent shutdown: session calls still running; closing anyway",
+				"active", c.sessionActive)
+			break
+		}
+		c.sessionUse.Unlock()
+		time.Sleep(20 * time.Millisecond)
+		c.sessionUse.Lock()
+	}
+	c.sessionUse.Unlock()
+}
+
 // Remove removes a torrent, optionally deleting its files and resume data.
 func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
-	if c.session != nil {
+	if c.enterSession() {
+		defer c.exitSession()
 		ok, errMessage := cgoLtRemove(c.session, strings.ToLower(hash), boolToInt32(deleteFiles))
 		if ok == 0 {
 			return false, fmt.Errorf("libtorrent action failed: %s", errMessage)
@@ -2322,7 +2418,8 @@ func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
 func (c *LibtorrentClient) Stats() map[string]any {
 	list := c.List()
 	nativeCount := uint32(0)
-	if c.session != nil {
+	if c.enterSession() {
+		defer c.exitSession()
 		nativeCount = cgoLtTorrentCount(c.session)
 	}
 	downloading := 0

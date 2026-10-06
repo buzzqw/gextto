@@ -21,6 +21,7 @@ func requestServiceActionLater(action string) {
 		verb = "stop"
 	}
 	go func() {
+		defer recoverGoroutine("service restart")
 		time.Sleep(1500 * time.Millisecond)
 		if scope, scopeName := gh6_serviceScope("gextto.service"); scopeName == "user" {
 			if err := exec.Command("systemctl", append(append([]string{}, scope...), verb, "gextto.service")...).Run(); err != nil {

@@ -329,12 +329,13 @@ func TestRemembersCloudflareSessionFromFlareSolverrSolution(t *testing.T) {
 }
 
 func TestDetailCacheAvoidsNetworkFetch(t *testing.T) {
-	cache.Set("Cached Movie 2024", "magnet:?xt=urn:btih:0123456789012345678901234567890123456789")
 	detail, err := url.Parse("http://127.0.0.1:1/never")
 	if err != nil {
 		t.Fatalf("url.Parse: %v", err)
 	}
 	pending := []rssDetailLink{{title: "Cached Movie 2024", url: detail}}
+	// The cache is keyed by the detail page, not by the title.
+	cache.Set(detailCacheKey(pending[0]), "magnet:?xt=urn:btih:0123456789012345678901234567890123456789")
 	var output []models.Release
 	old := fetch_detail_magnets(context.Background(), defaultHTTPClient, pending, "ExtTo - X", nil, &output, nil)
 	if old != 0 {
@@ -396,7 +397,8 @@ func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
 	}))
 	defer server.Close()
 
-	releases, err := FetchFeed(context.Background(), server.URL+"/?ref=ext.to", nil, 4, 0, 0)
+	// The site parser is chosen from host and path, never from the query.
+	releases, err := FetchFeed(context.Background(), server.URL+"/ext.to/browse/", nil, 4, 0, 0)
 	if err != nil {
 		t.Fatalf("FetchFeed: %v", err)
 	}
@@ -405,5 +407,63 @@ func TestFetchFeedStopsWhenAPageAddsNoNewHash(t *testing.T) {
 	}
 	if requests != 2 {
 		t.Fatalf("requests = %d, want 2 (first page + one repeated page)", requests)
+	}
+}
+
+func TestDetailCacheDoesNotShareMagnetsBetweenSameTitles(t *testing.T) {
+	first, _ := url.Parse("http://127.0.0.1:1/detail/1")
+	second, _ := url.Parse("http://127.0.0.1:1/detail/2")
+	cache.Set(detailCacheKey(rssDetailLink{title: "Same Title 2024", url: first}),
+		"magnet:?xt=urn:btih:0123456789012345678901234567890123456789")
+	if _, ok := cache.Get(detailCacheKey(rssDetailLink{title: "Same Title 2024", url: second})); ok {
+		t.Fatal("another release with the same title must not reuse the cached magnet")
+	}
+}
+
+func TestFeedKindIgnoresQueryString(t *testing.T) {
+	if got := feedKindSubject("https://example.org/search?q=corsaro&apikey=extto"); strings.Contains(got, "corsaro") || strings.Contains(got, "extto") {
+		t.Fatalf("query string leaked into the parser choice: %q", got)
+	}
+	if got := feedKindSubject("https://extto.org/browse/?filter=x"); !strings.Contains(got, "extto") {
+		t.Fatalf("host lost: %q", got)
+	}
+}
+
+// ext.to numbers its pages from 1: `page=1` is the same listing as the bare
+// URL, so the second page must be requested as `page=2`.
+func TestFetchFeedExtToPagesStartAtOne(t *testing.T) {
+	listing := func(hashes ...string) string {
+		body := "<html><body>"
+		for i, hash := range hashes {
+			body += fmt.Sprintf(`<a class="torrent-title-link" href="magnet:?xt=urn:btih:%s">T%d</a>`, hash, i)
+		}
+		return body + "</body></html>"
+	}
+	first := listing("0123456789012345678901234567890123456789", "1123456789012345678901234567890123456789")
+	second := listing("2123456789012345678901234567890123456789", "3123456789012345678901234567890123456789")
+	var requested []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		requested = append(requested, page)
+		switch page {
+		case "", "1":
+			_, _ = fmt.Fprint(w, first)
+		case "2":
+			_, _ = fmt.Fprint(w, second)
+		default:
+			_, _ = fmt.Fprint(w, "<html><body></body></html>")
+		}
+	}))
+	defer server.Close()
+
+	releases, err := FetchFeed(context.Background(), server.URL+"/ext.to/browse/?filter=u=x", nil, 3, 0, 0)
+	if err != nil {
+		t.Fatalf("FetchFeed: %v", err)
+	}
+	if len(releases) != 4 {
+		t.Fatalf("releases = %d, want 4 (pages 1 and 2); requested pages %q", len(releases), requested)
+	}
+	if len(requested) < 2 || requested[1] != "2" {
+		t.Fatalf("requested pages = %q, want the second request to be page=2", requested)
 	}
 }

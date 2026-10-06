@@ -1,6 +1,9 @@
 package cache
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestStoresReadsAndEvicts(t *testing.T) {
 	Set("cache-test-title", "magnet:?xt=urn:btih:abc")
@@ -28,4 +31,23 @@ func pad(value int) string {
 		value /= 10
 	}
 	return out
+}
+
+func TestEvictionKeepsNewestEntries(t *testing.T) {
+	mu.Lock()
+	state = store{data: map[string]string{}, seq: map[string]uint64{}}
+	mu.Unlock()
+	for i := 0; i <= maxEntries; i++ {
+		Set(fmt.Sprintf("k%d", i), "v")
+	}
+	if Len() != evictTo {
+		t.Fatalf("len = %d, want %d", Len(), evictTo)
+	}
+	last := fmt.Sprintf("k%d", maxEntries)
+	if _, ok := Get(last); !ok {
+		t.Fatal("the entry just added was evicted")
+	}
+	if _, ok := Get("k0"); ok {
+		t.Fatal("the oldest entry survived the eviction")
+	}
 }

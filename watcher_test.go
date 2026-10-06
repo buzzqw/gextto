@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -177,8 +178,8 @@ func TestWatcherIsCandidate(t *testing.T) {
 		"torrent":         false,
 	}
 	for name, want := range cases {
-		if got := is_candidate(filepath.Join("/tmp", name)); got != want {
-			t.Fatalf("is_candidate(%q) = %v, want %v", name, got, want)
+		if got := watchedCandidate(filepath.Join("/tmp", name)); got != want {
+			t.Fatalf("watchedCandidate(%q) = %v, want %v", name, got, want)
 		}
 	}
 }
@@ -254,5 +255,26 @@ func mustWriteFile(t *testing.T, path, data string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func TestScanFolderStopsAtMaxDepth(t *testing.T) {
+	root := t.TempDir()
+	dir := root
+	for i := 0; i <= watchedMaxDepth+1; i++ {
+		dir = filepath.Join(dir, fmt.Sprintf("d%d", i))
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "deep.torrent"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "d0", "shallow.torrent"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := ScanFolder(WatchedFolder{Path: root, Enabled: true, Recursive: true})
+	if len(got) != 1 || filepath.Base(got[0]) != "shallow.torrent" {
+		t.Fatalf("ScanFolder = %v, want only shallow.torrent", got)
 	}
 }

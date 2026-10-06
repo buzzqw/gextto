@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -151,6 +152,15 @@ func searchWithTimeoutRaw(ctx context.Context, cfg *Config, query string, timeou
 		}
 		active++
 		go func(engine string) {
+			// The collector waits for one outcome per engine: a panic must still
+			// deliver one (the channel is buffered for every engine).
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Error("web engine search panicked; recovered",
+						"engine", engine, "panic", fmt.Sprint(r), "stack", string(debug.Stack()))
+					resultsChannel <- outcome{failure: engine}
+				}
+			}()
 			select {
 			case webEngineLimiter <- struct{}{}:
 			case <-ctx.Done():

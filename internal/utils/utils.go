@@ -425,8 +425,11 @@ func RedactURLSecrets(input string) string {
 		output = output[:valueStart] + "[redacted]" + output[valueEnd:]
 		searchFrom = valueStart + len("[redacted]")
 	}
-	return output
+	// Telegram bot tokens travel in the path: /bot<id>:<secret>/method.
+	return telegramBotTokenRe.ReplaceAllString(output, "/bot[redacted]")
 }
+
+var telegramBotTokenRe = regexp.MustCompile(`/bot[0-9]+:[A-Za-z0-9_-]+`)
 
 // EnsureDir creates a directory tree.
 func EnsureDir(path string) error {

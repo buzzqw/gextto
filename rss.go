@@ -1163,7 +1163,7 @@ func fetch_body(ctx context.Context, client *http.Client, rawURL string, flareso
 // FetchFeed downloads a feed/listing and parses it. ext.to / Corsaro /
 // TorrentGalaxy are HTML listings, not RSS.
 func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPages int, maxAgeDays int64, oldRatio float64) ([]models.Release, error) {
-	lower := strings.ToLower(rawURL)
+	lower := feedKindSubject(rawURL)
 	kind := ""
 	switch {
 	case strings.Contains(lower, "ext.to") || strings.Contains(lower, "extto"):
@@ -1213,7 +1213,7 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 			if strings.Contains(rawURL, "?") {
 				separator = "&"
 			}
-			pageURL = fmt.Sprintf("%s%spage=%d", rawURL, separator, page)
+			pageURL = fmt.Sprintf("%s%spage=%d", rawURL, separator, listingPageNumber(kind, page))
 		}
 		var pageBody string
 		if page == 0 {
@@ -1221,13 +1221,24 @@ func FetchFeed(ctx context.Context, rawURL string, flaresolverr *string, maxPage
 		} else {
 			fetched, err := fetch_body(ctx, defaultHTTPClient, pageURL, flaresolverr)
 			if err != nil {
+				logging.Debug("listing page unavailable; keeping the pages already read",
+					"feed_url", utils.RedactURLSecrets(rawURL), "page", page,
+					"error", utils.RedactURLSecrets(err.Error()))
 				break
 			}
 			pageBody = fetched
 		}
 		items, old, total, err := fetch_traditional_listing(ctx, defaultHTTPClient, pageURL, pageBody, kind, label, flaresolverr, cutoff)
 		if err != nil {
-			return nil, err
+			if page == 0 {
+				return nil, err
+			}
+			// A later page that cannot be parsed must not discard the releases
+			// already collected from the previous pages.
+			logging.Debug("listing page could not be parsed; keeping the pages already read",
+				"feed_url", utils.RedactURLSecrets(rawURL), "page", page,
+				"error", utils.RedactURLSecrets(err.Error()))
+			break
 		}
 		if len(items) == 0 && total == 0 {
 			break
@@ -1381,7 +1392,10 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 	old := 0
 	var misses []rssDetailLink
 	for _, item := range pending {
-		if magnet, ok := cache.Get(item.title); ok && !is_placeholder_magnet(magnet) {
+		// Keyed by the detail page, not the title: two releases with the same
+		// title (another uploader, a repack, another site) must never share a
+		// magnet.
+		if magnet, ok := cache.Get(detailCacheKey(item)); ok && !is_placeholder_magnet(magnet) {
 			// Una civetta in cache non vale: la si risolve di nuovo dal dettaglio.
 			push_release(output, item.title, magnet, label)
 		} else {
@@ -1393,6 +1407,7 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 	}
 	type fetchedDetail struct {
 		title string
+		key   string
 		body  string
 		ok    bool
 	}
@@ -1400,19 +1415,21 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 	semaphore := make(chan struct{}, 6)
 	var wait sync.WaitGroup
 	go func() {
+		defer recoverGoroutine("detail fetch producer")
 		for _, item := range misses {
 			item := item
 			wait.Add(1)
 			semaphore <- struct{}{}
 			go func() {
+				defer recoverGoroutine("detail fetch")
 				defer wait.Done()
 				defer func() { <-semaphore }()
 				body, err := fetch_body(ctx, client, item.url.String(), flaresolverr)
 				if err != nil {
-					results <- fetchedDetail{title: item.title}
+					results <- fetchedDetail{title: item.title, key: detailCacheKey(item)}
 					return
 				}
-				results <- fetchedDetail{title: item.title, body: body, ok: true}
+				results <- fetchedDetail{title: item.title, key: detailCacheKey(item), body: body, ok: true}
 			}()
 		}
 		wait.Wait()
@@ -1433,7 +1450,7 @@ func fetch_detail_magnets(ctx context.Context, client *http.Client, pending []rs
 		if cutoff != nil && discoveredAt.Before(*cutoff) {
 			old++
 		} else {
-			cache.Set(result.title, magnet)
+			cache.Set(result.key, magnet)
 			push_release_at(output, result.title, magnet, label, discoveredAt)
 		}
 	}
@@ -1817,6 +1834,7 @@ func resolveProwlarrMagnets(ctx context.Context, items []map[string]any) {
 	for worker := 0; worker < workers; worker++ {
 		workersWG.Add(1)
 		go func() {
+			defer recoverGoroutine("prowlarr magnet resolution")
 			defer workersWG.Done()
 			for candidate := range jobs {
 				request, err := http.NewRequestWithContext(ctx, http.MethodGet, candidate.url, nil)
@@ -2430,4 +2448,40 @@ func htmlText(node *html.Node) string {
 	}
 	walk(node)
 	return builder.String()
+}
+
+// detailCacheKey identifies a release for the magnet cache: its detail page URL
+// (unique per release), falling back to the title only when no URL is known.
+func detailCacheKey(item rssDetailLink) string {
+	if item.url != nil {
+		if value := item.url.String(); value != "" {
+			return "url:" + value
+		}
+	}
+	return item.title
+}
+
+// listingPageNumber is the `page=` value for the listing page with 0-based
+// index (index 0 is the feed URL itself). ext.to numbers its pages from 1 and
+// serves page 1 for `page=1`, the same listing as the bare URL: asking for
+// `page=index` re-read page 1, the "no new infohash" early-stop fired, and the
+// crawl never went past the first page (verified on extto.org, 2026-10-06).
+// Corsaro keeps the historical numbering (not verified).
+func listingPageNumber(kind string, index int) int {
+	if kind == "ExtTo" {
+		return index + 1
+	}
+	return index
+}
+
+// feedKindSubject is the part of a feed URL used to pick the site-specific
+// parser: host and path only. The query string carries search terms and API
+// keys, so a search for "corsaro" on another site must not select the
+// Corsaro parser.
+func feedKindSubject(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return strings.ToLower(rawURL)
+	}
+	return strings.ToLower(parsed.Host + parsed.Path)
 }

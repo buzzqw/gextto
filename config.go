@@ -1087,8 +1087,16 @@ func configBoolSetting(value *string) bool {
 	if value == nil {
 		return false
 	}
-	switch *value {
-	case "yes", "true", "1", "True", "TRUE":
+	return settingTruthy(*value)
+}
+
+// settingTruthy is the single reading of a yes/no setting: "yes", "true", "1"
+// or "on", ignoring case and surrounding spaces. Before, each setting had its
+// own variant (some case-sensitive, some accepting "on"), so the same stored
+// value could be on for one feature and off for another.
+func settingTruthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "yes", "true", "1", "on":
 		return true
 	default:
 		return false

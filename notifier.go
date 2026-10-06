@@ -5,13 +5,17 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/smtp"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/messages"
 )
 
@@ -42,6 +47,9 @@ type Notifier struct {
 	// External event hooks (see hooks.go). Reloadable at runtime when the user
 	// edits them in the UI.
 	hooks *eventHookStore
+	// async makes NotifyEvent enqueue the delivery instead of performing it
+	// (see Async).
+	async bool
 }
 
 // telegramMessage is the Telegram `sendMessage` JSON body.
@@ -197,7 +205,7 @@ func (n *Notifier) NotifyBackupDocument(path, caption string) (bool, error) {
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	response, err := n.httpClient().Do(request)
 	if err != nil {
-		return false, err
+		return false, redactRequestError(err)
 	}
 	defer response.Body.Close()
 	_, _ = io.Copy(io.Discard, response.Body)
@@ -210,6 +218,15 @@ func (n *Notifier) NotifyBackupDocument(path, caption string) (bool, error) {
 // NotifyEvent formats and delivers one event to every enabled channel and
 // dispatches the external hooks.
 func (n *Notifier) NotifyEvent(event string, data map[string]any) error {
+	if n.async {
+		n.enqueue(event, data)
+		return nil
+	}
+	return n.deliverEvent(event, data)
+}
+
+// deliverEvent sends one event to every enabled channel, synchronously.
+func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 	// External hooks run on a detached goroutine so they never delay the
 	// notification delivery or the caller.
 	hooks := n.EventHooks()
@@ -235,10 +252,9 @@ func (n *Notifier) NotifyEvent(event string, data map[string]any) error {
 				if result == nil {
 					break
 				}
+				// Back off before retrying (1 s, then 2 s), like the webhook.
+				time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * time.Second)
 				result = send()
-				if result != nil {
-					time.Sleep(time.Duration(uint64(1)<<uint(attempt)) * time.Second)
-				}
 			}
 			if result != nil {
 				firstError = result
@@ -294,7 +310,7 @@ func (n *Notifier) httpClient() *http.Client {
 func (n *Notifier) postJSON(rawURL string, headers map[string]string, payload []byte) error {
 	_, status, err := HTTPPostJSON(context.Background(), rawURL, headers, payload)
 	if err != nil {
-		return err
+		return redactRequestError(err)
 	}
 	if status >= 400 {
 		return fmt.Errorf("HTTP %d", status)
@@ -348,7 +364,63 @@ func (n *Notifier) sendEmail(event, subject, body string) error {
 	message := buildEmailMessage(from, recipients, subject, body)
 	address := fmt.Sprintf("%s:%d", host, port)
 	auth := smtp.PlainAuth("", from, password, host)
-	return smtp.SendMail(address, auth, from, recipients, message)
+	return sendMailWithTimeout(address, host, auth, from, recipients, message, smtpTimeout)
+}
+
+// smtpTimeout bounds a whole SMTP delivery. Notifications are sent from the
+// torrent event worker: an unreachable or silent mail server must not freeze
+// stall monitoring, seed policy and post-processing.
+const smtpTimeout = 30 * time.Second
+
+// sendMailWithTimeout is smtp.SendMail (same STARTTLS and AUTH behaviour) with a
+// deadline on the connection and on the whole exchange: the standard function
+// dials without a timeout and can block forever.
+func sendMailWithTimeout(address, host string, auth smtp.Auth, from string, to []string, message []byte, timeout time.Duration) error {
+	conn, err := net.DialTimeout("tcp", address, timeout)
+	if err != nil {
+		return err
+	}
+	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	defer client.Close()
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			return err
+		}
+	}
+	if auth != nil {
+		if ok, _ := client.Extension("AUTH"); ok {
+			if err := client.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range to {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(message); err != nil {
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
 }
 
 // sanitizeEmailHeader strips CR/LF and NUL so a configured or event-derived
@@ -868,5 +940,82 @@ func formatDuration(seconds int64) string {
 		return fmt.Sprintf("%dm %ds", minutes, secs)
 	default:
 		return fmt.Sprintf("%ds", secs)
+	}
+}
+
+// redactRequestError hides the URL of a failed notification request. net/http
+// errors embed the full URL, and notification URLs carry secrets in the path
+// (the Telegram bot token, Discord/Slack webhook tokens) that the query-string
+// redaction does not cover. Only the scheme and host are kept.
+func redactRequestError(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+	target := "request"
+	if parsed, parseErr := url.Parse(urlErr.URL); parseErr == nil && parsed.Host != "" {
+		target = parsed.Scheme + "://" + parsed.Host
+	}
+	return fmt.Errorf("%s %s: %w", urlErr.Op, target, urlErr.Err)
+}
+
+// Async returns a copy of the notifier whose NotifyEvent only enqueues the
+// event and returns at once. The background workers (torrent events, cycle) use
+// it: a slow or unreachable Telegram, webhook or SMTP server must not stall
+// stall monitoring, seed policy or post-processing. Delivery errors are logged
+// by the delivery goroutine. Interactive callers (the "test notification"
+// button) keep the synchronous notifier so they can report the error.
+func (n *Notifier) Async() *Notifier {
+	if n == nil {
+		return nil
+	}
+	copied := *n
+	copied.async = true
+	return &copied
+}
+
+type queuedNotification struct {
+	notifier *Notifier
+	event    string
+	data     map[string]any
+}
+
+// notificationQueueSize bounds the pending notifications. When it is full new
+// events are dropped with a warning rather than blocking a worker.
+const notificationQueueSize = 256
+
+var (
+	notificationQueue     = make(chan queuedNotification, notificationQueueSize)
+	notificationQueueOnce sync.Once
+)
+
+func (n *Notifier) enqueue(event string, data map[string]any) {
+	notificationQueueOnce.Do(func() {
+		// A single delivery goroutine keeps events in order and honours the
+		// Telegram throttle; safeGoLoop restarts it after a panic.
+		go safeGoLoop("notification delivery", nil, deliverQueuedNotifications)
+	})
+	synchronous := *n
+	synchronous.async = false
+	// The payload is copied so a caller mutating its map later cannot race
+	// with the delivery.
+	owned, _ := cloneJSON(data).(map[string]any)
+	if owned == nil {
+		owned = data
+	}
+	select {
+	case notificationQueue <- queuedNotification{notifier: &synchronous, event: event, data: owned}:
+	default:
+		logging.Warn("notification queue full; event dropped", "event", event)
+	}
+}
+
+func deliverQueuedNotifications() {
+	for item := range notificationQueue {
+		if err := item.notifier.deliverEvent(item.event, item.data); err != nil {
+			logging.Warn("notification delivery failed", "event", item.event, "error", err)
+		} else {
+			logging.Debug("notification delivered", "event", item.event)
+		}
 	}
 }

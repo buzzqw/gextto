@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -862,9 +863,14 @@ func installHTTPControl(id string, client *http.Client, rawURL, targetDir, title
 // GetComics client.
 // ---------------------------------------------------------------------------
 
+// comicsHTTPStallTimeout aborts a direct download that receives no data for
+// this long (a variable so tests can shorten it).
+var comicsHTTPStallTimeout = 2 * time.Minute
+
 const (
 	comicsUserAgent            = "gextto/0.1 comics"
 	comicsHTTPDownloadTimeout  = 1800 * time.Second
+	comicsMegaTimeout          = 2 * time.Hour
 	comicsHTTPDownloadAttempts = 3
 	// Torrent metainfo files are normally small.  The bound prevents an HTTP
 	// comic download from being read back in full merely to distinguish it from
@@ -1290,6 +1296,14 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), comicsHTTPDownloadTimeout)
 	defer cancel()
+	// Abort a transfer that stops sending data instead of waiting for the whole
+	// download timeout: the comics cycle runs before series and movies.
+	var stalled atomic.Bool
+	watchdog := time.AfterFunc(comicsHTTPStallTimeout, func() {
+		stalled.Store(true)
+		cancel()
+	})
+	defer watchdog.Stop()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return comicHTTPCompleted, "", err
@@ -1364,6 +1378,7 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 	for {
 		read, readErr := response.Body.Read(buffer)
 		if read > 0 {
+			watchdog.Reset(comicsHTTPStallTimeout)
 			if control.cancelled.Load() {
 				_ = file.Sync()
 				_ = file.Close()
@@ -1409,6 +1424,9 @@ func downloadHTTPOnce(client *http.Client, id, rawURL, targetDir, title string, 
 				break
 			}
 			_ = file.Close()
+			if stalled.Load() {
+				return comicHTTPCompleted, "", fmt.Errorf("comic download stalled: no data for %s", comicsHTTPStallTimeout)
+			}
 			return comicHTTPCompleted, "", readErr
 		}
 	}
@@ -1555,8 +1573,24 @@ func downloadMegaInner(executable, rawURL, targetDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	command := exec.Command(executable, "--path", targetDir, rawURL)
+	// Bounded run: a hung megadl would otherwise block the comics cycle (and
+	// therefore the series/movies cycle after it) forever. The whole process
+	// group is killed on timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), comicsMegaTimeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, executable, "--path", targetDir, rawURL)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Cancel = func() error {
+		if command.Process == nil {
+			return nil
+		}
+		return syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+	}
+	command.WaitDelay = 5 * time.Second
 	if err := command.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("Mega downloader timed out after %s", comicsMegaTimeout)
+		}
 		return "", fmt.Errorf("Mega downloader exited with error: %w", err)
 	}
 	entries, err := os.ReadDir(targetDir)
@@ -1594,7 +1628,10 @@ func firstComicString(values []string) string {
 
 // RunComicsCycle implements `comics::run_cycle` (renamed to avoid the
 // collision with the orchestrator's own run cycle).
-func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, defaultRoot string, torrents TorrentEngine, mainDB *Database, cfg *Config) (int, error) {
+func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, notifier *Notifier, defaultRoot string, torrents TorrentEngine, mainDB *Database, cfg *Config) (int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if err := db.PruneConfiguredHistory(); err != nil {
 		return 0, err
 	}
@@ -1605,6 +1642,11 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 	downloaded := 0
 	logging.Info("comics cycle: checking monitored titles", "monitored", len(monitored))
 	for _, comic := range monitored {
+		// Stop between titles when the daemon shuts down.
+		if ctx.Err() != nil {
+			logging.Info("comics cycle interrupted", "downloaded", downloaded)
+			return downloaded, nil
+		}
 		logging.Info("comics: checking title", "comic", comic.Title, "tag", comic.TagURL)
 		// A numbered monitor identifies one exact issue: its publication date
 		// may be older than the generic monitoring start date, so that date
@@ -1692,6 +1734,10 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 		logging.Info("comics: candidate posts", "comic", comic.Title, "posts", len(keys))
 		queued := 0
 		for _, key := range keys {
+			if ctx.Err() != nil {
+				logging.Info("comics cycle interrupted", "downloaded", downloaded)
+				return downloaded, nil
+			}
 			post := merged[key]
 			alreadySent, err := db.AlreadySent(post.URL)
 			if err != nil {
@@ -1817,7 +1863,7 @@ func RunComicsCycle(db *ComicsDb, client *GetComicsClient, notifier *Notifier, d
 	if err != nil {
 		return downloaded, err
 	}
-	if weeklyEnabled == "yes" && !cfg.DryRun {
+	if settingTruthy(weeklyEnabled) && !cfg.DryRun {
 		weeklyFromDate, err := db.Setting("weekly_from_date", "")
 		if err != nil {
 			return downloaded, err

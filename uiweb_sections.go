@@ -346,7 +346,7 @@ func uiPanelsPageFor(view string, s *AppState) (uiPanelsPage, bool) {
 		historyLimit := int64(100)
 		if s.comics != nil {
 			if value, err := s.comics.Setting("weekly_enabled", "no"); err == nil {
-				weeklyEnabled = value == "yes" || value == "true" || value == "1"
+				weeklyEnabled = settingTruthy(value)
 			}
 			if value, err := s.comics.Setting("weekly_from_date", ""); err == nil {
 				weeklyFromDate = strings.TrimSpace(value)

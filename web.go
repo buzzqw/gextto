@@ -419,7 +419,14 @@ type RenameProgress struct {
 
 var (
 	archiveImportBusyMu sync.Mutex
-	archiveImportBusy   = map[string]struct{}{}
+	// archiveImportBusy counts the imports in progress per series: two imports of
+	// the same series may overlap, and the first one to finish must not clear
+	// the marker of the other.
+	archiveImportBusy = map[string]int{}
+	// archiveRenameBusy marks the series whose archive is being renamed.
+	archiveRenameBusy = map[string]struct{}{}
+	// archiveImportCond wakes imports waiting for a rename of their series.
+	archiveImportCond = sync.NewCond(&archiveImportBusyMu)
 )
 
 // ArchiveImportGuard is an RAII marker for "this series is being imported right
@@ -429,14 +436,23 @@ type ArchiveImportGuard struct {
 }
 
 // AcquireArchiveImport marks the trimmed series name as busy and returns the
-// guard. A nil or empty series yields a no-op guard.
+// guard. When a rename of the same series is running it waits for it to finish,
+// so files are never renamed while they are being copied. Imports never wait
+// for each other (nested acquisitions are safe). A nil or empty series yields
+// a no-op guard.
 func AcquireArchiveImport(series *string) *ArchiveImportGuard {
 	guard := &ArchiveImportGuard{}
 	if series != nil {
 		name := strings.TrimSpace(*series)
 		if name != "" {
 			archiveImportBusyMu.Lock()
-			archiveImportBusy[name] = struct{}{}
+			for {
+				if _, renaming := archiveRenameBusy[name]; !renaming {
+					break
+				}
+				archiveImportCond.Wait()
+			}
+			archiveImportBusy[name]++
 			archiveImportBusyMu.Unlock()
 			guard.series = &name
 		}
@@ -451,7 +467,11 @@ func (g *ArchiveImportGuard) Release() {
 		return
 	}
 	archiveImportBusyMu.Lock()
-	delete(archiveImportBusy, *g.series)
+	if archiveImportBusy[*g.series] <= 1 {
+		delete(archiveImportBusy, *g.series)
+	} else {
+		archiveImportBusy[*g.series]--
+	}
 	archiveImportBusyMu.Unlock()
 	g.series = nil
 }
@@ -461,8 +481,33 @@ func (g *ArchiveImportGuard) Release() {
 func ArchiveImportBusyContains(name string) bool {
 	archiveImportBusyMu.Lock()
 	defer archiveImportBusyMu.Unlock()
-	_, ok := archiveImportBusy[strings.TrimSpace(name)]
-	return ok
+	return archiveImportBusy[strings.TrimSpace(name)] > 0
+}
+
+// TryAcquireArchiveRename reserves the archive of a series for a rename. It
+// never waits: it fails when an import or another rename of the same series is
+// in progress, and the caller skips the rename. The returned function releases
+// the reservation and wakes the imports waiting for it.
+func TryAcquireArchiveRename(series string) (func(), string, bool) {
+	name := strings.TrimSpace(series)
+	archiveImportBusyMu.Lock()
+	defer archiveImportBusyMu.Unlock()
+	if archiveImportBusy[name] > 0 {
+		return func() {}, "archive import in progress", false
+	}
+	if _, renaming := archiveRenameBusy[name]; renaming {
+		return func() {}, "rename already in progress", false
+	}
+	archiveRenameBusy[name] = struct{}{}
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			archiveImportBusyMu.Lock()
+			delete(archiveRenameBusy, name)
+			archiveImportBusyMu.Unlock()
+			archiveImportCond.Broadcast()
+		})
+	}, "", true
 }
 
 // ---------------------------------------------------------------------------

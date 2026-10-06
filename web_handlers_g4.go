@@ -93,7 +93,7 @@ type gh4_SpeedLimitsInput struct {
 
 // gh4_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
 func gh4_truthy(value string) bool {
-	return value == "yes" || value == "true" || value == "1"
+	return settingTruthy(value)
 }
 
 // ---------------------------------------------------------------------------
@@ -472,6 +472,7 @@ func gh4_addParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	go func() {
+		defer recoverGoroutine("g4 background")
 		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:

@@ -428,7 +428,7 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cloudDir := gh5_backupCloudDir(cfg)
 	sendTelegram := false
 	if value, ok := cfg.Settings["backup_send_telegram"]; ok {
-		sendTelegram = value == "yes" || value == "true" || value == "1"
+		sendTelegram = settingTruthy(value)
 	}
 
 	steps, err := gh5_runBackupSteps(dataDir, root, retain, ftp, cloudDir)
@@ -1212,6 +1212,7 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// can be controlled directly without the root helper.
 	if scope, scopeName := gh6_serviceScope("gextto.service"); scopeName == "user" {
 		go func() {
+			defer recoverGoroutine("g5 background")
 			time.Sleep(800 * time.Millisecond)
 			_ = exec.Command("systemctl", append(append([]string{}, scope...), verb, "gextto.service")...).Run()
 		}()
@@ -1235,6 +1236,7 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	go func() {
+		defer recoverGoroutine("g5 background")
 		time.Sleep(800 * time.Millisecond)
 		_ = exec.Command("sudo", "-n", restartHelper, verb).Run()
 	}()

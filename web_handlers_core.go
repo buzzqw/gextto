@@ -741,7 +741,7 @@ func settingsOr(cfg *Config, key string, fallback string) string {
 
 func settingsBool(cfg *Config, key string, fallback bool) bool {
 	if value, ok := cfg.Settings[key]; ok {
-		return value == "yes" || value == "true" || value == "1"
+		return settingTruthy(value)
 	}
 	return fallback
 }

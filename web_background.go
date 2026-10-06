@@ -15,13 +15,17 @@ package gextto
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -144,7 +148,21 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 	}
 	// Never rename a series whose archive is currently being written by a
 	// torrent import: the repair would move files that are still being copied.
-	if bg_archiveImportBusyContains(series.Name) {
+	// An executing rename also reserves the series, so an import that starts
+	// meanwhile waits for it and two renames of the same series never overlap
+	// (the periodic repair runs outside the cycle lock).
+	if execute {
+		release, reason, ok := TryAcquireArchiveRename(series.Name)
+		if !ok {
+			logging.Info("rename skipped: "+reason, "series", series.Name)
+			return 200, map[string]any{
+				"ok":      true,
+				"skipped": true,
+				"reason":  reason,
+			}
+		}
+		defer release()
+	} else if bg_archiveImportBusyContains(series.Name) {
 		logging.Info("rename skipped: archive import in progress", "series", series.Name)
 		return 200, map[string]any{
 			"ok":      true,
@@ -548,12 +566,28 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	// Optional libtorrent-only hooks: nil for any other backend.
 	extras, _ := torrents.(torrentEngineEmbeddedExtras)
 	moveRequests := map[string]struct{}{}
+	// Hashes whose final "completed" notification was already sent by this
+	// worker: a later storage_moved/torrent_finished for the same torrent must not
+	// announce it again.
+	completionNotified := map[string]struct{}{}
+	// Completion attempts that failed with a transient error (NAS unavailable,
+	// I/O timeout, disk momentarily full, database busy) and wait for a retry.
+	completionRetries := map[string]completionRetry{}
+	// Completed torrents whose last recovery check found nothing to do: they are
+	// not queried again for settledRecheckInterval (each check costs several
+	// SQLite queries, at every 750 ms tick, for every seeding torrent).
+	settledTorrents := map[string]settledTorrent{}
 	storageMoveRetries := map[string]StorageMoveRetry{}
 	seedCopyWarnings := map[string]time.Time{}
 	// Storage moves are asynchronous. Keep post-seeding moves protected until
 	// their success/failure alert arrives, otherwise the seed cleanup can remove
 	// the source while libtorrent is still copying it.
 	postSeedMoves := map[string]struct{}{}
+	// Storage moves survive a restart: the retry schedule and the post-seed
+	// protection are saved in the database and restored here.
+	persistedMoves := restoreTorrentMoves(db, storageMoveRetries, postSeedMoves, time.Now())
+	// Zero time: the first tick runs the completion recovery scan at once.
+	var lastRecoveryScan time.Time
 	metadataWaitStart := map[string]time.Time{}
 	metadataFirstSeen := map[string]time.Time{}
 	metadataLastWarning := map[string]time.Time{}
@@ -578,7 +612,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	var lastPin *string
 	var lastSequential *bool
 	cfg := fallback
-	notifier := FromConfig(cfg)
+	notifier := FromConfig(cfg).Async()
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	lastConfigReload := time.Now().Add(-5 * time.Second)
 	lastConfigForce := time.Now()
@@ -675,7 +709,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					}
 					cfg = &loaded
 				} else {
-					cfg = fallback
+					// Keep the last valid configuration: falling back to the startup
+					// one would silently revert paths, seed policy and limits.
+					logging.Warn("configuration reload failed; keeping the last valid configuration", "error", err)
 				}
 				// Rebuild the notifier/TMDB client only when the relevant config
 				// changed: they used to be rebuilt (with new HTTP clients) every 5s.
@@ -685,7 +721,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					bg_jsonString(cfg.Settings),
 				)
 				if fingerprint != lastFingerprint {
-					notifier = FromConfig(cfg)
+					notifier = FromConfig(cfg).Async()
 					tmdb = NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 					lastFingerprint = fingerprint
 				}
@@ -754,8 +790,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
 				tempEnabled := false
 				if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
-					lowered := strings.ToLower(value)
-					tempEnabled = lowered == "1" || lowered == "true" || lowered == "yes"
+					tempEnabled = settingTruthy(value)
 				}
 				if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
 					source = "temporary override"
@@ -800,8 +835,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		}
 		sequential := false
 		if value, ok := cfg.Settings["libtorrent_sequential"]; ok {
-			lowered := strings.ToLower(value)
-			sequential = lowered == "true" || lowered == "yes" || lowered == "1"
+			sequential = settingTruthy(value)
 		}
 		if lastSequential == nil || *lastSequential != sequential {
 			if _, err := torrents.SetSequential(sequential); err != nil {
@@ -821,87 +855,119 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		eventHashes := map[string]struct{}{}
 		for _, event := range torrentEvents {
 			eventHashes[strings.ToLower(event.Hash)] = struct{}{}
+			delete(settledTorrents, strings.ToLower(event.Hash))
+		}
+		// Forget torrents that left the session.
+		if len(settledTorrents) > 0 {
+			present := map[string]struct{}{}
+			for _, torrent := range torrents.List() {
+				present[strings.ToLower(torrent.Hash)] = struct{}{}
+			}
+			for hash := range settledTorrents {
+				if _, ok := present[hash]; !ok {
+					delete(settledTorrents, hash)
+				}
+			}
 		}
 		// A torrent may reach 100% while Gextto is restarting or while its
 		// completion event is already gone from libtorrent's alert queue.
 		// Recreate the event from the persisted torrent status so postprocess and
-		// notifications are not silently skipped.
-		for _, torrent := range torrents.List() {
-			if !torrent.HasMetadata {
-				continue
-			}
-			hash := strings.ToLower(torrent.Hash)
-			if _, ok := eventHashes[hash]; ok {
-				continue
-			}
-			_, inMoves := moveRequests[hash]
-			_, inRetries := storageMoveRetries[hash]
-			_, inPostSeed := postSeedMoves[hash]
-			if inMoves || inRetries || inPostSeed {
-				if meta, metaErr := db.TorrentMeta(hash); metaErr == nil && meta != nil {
-					if dest, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && SamePath(torrent.SavePath, dest) {
-						delete(moveRequests, hash)
-						delete(storageMoveRetries, hash)
-						delete(postSeedMoves, hash)
-						inMoves, inRetries, inPostSeed = false, false, false
-					}
+		// notifications are not silently skipped. Events are the primary signal:
+		// this scan is only a safety net, so it runs at start-up and then every
+		// completionRecoveryInterval instead of at every tick.
+		if now.Sub(lastRecoveryScan) >= completionRecoveryInterval {
+			lastRecoveryScan = now
+			for _, torrent := range torrents.List() {
+				if !torrent.HasMetadata {
+					continue
 				}
+				hash := strings.ToLower(torrent.Hash)
+				if _, ok := eventHashes[hash]; ok {
+					continue
+				}
+				if settled, ok := settledTorrents[hash]; ok {
+					if now.Before(settled.until) && settled.savePath == torrent.SavePath {
+						continue
+					}
+					delete(settledTorrents, hash)
+				}
+				// A completion that failed transiently is retried on its own backoff,
+				// not at every tick.
+				if retry, waiting := completionRetries[hash]; waiting && now.Before(retry.next) {
+					continue
+				}
+				_, inMoves := moveRequests[hash]
+				_, inRetries := storageMoveRetries[hash]
+				_, inPostSeed := postSeedMoves[hash]
 				if inMoves || inRetries || inPostSeed {
-					continue
-				}
-			}
-			// In-progress downloads that are actively downloading (<99.99% and State "downloading" or "queued")
-			// cannot possibly need completion recovery; skip immediately to avoid redundant SQLite queries.
-			if torrent.Progress < 99.99 && (torrent.State == "downloading" || torrent.State == "queued") {
-				continue
-			}
-			// A completed single whose end-of-seed move already reached the
-			// archive but whose import never ran (lost storage_moved alert, or a
-			// restart) is finalized through the normal storage_moved path. Marking
-			// the raw archive path complete here would skip the rename, the
-			// MediaInfo probe and the completion notification.
-			if bg_torrentNeedsArchiveImport(cfg, db, &torrent) {
-				status, _ := db.TorrentStatus(hash)
-				isCompletedDB := status != nil && *status == "completed"
-				if !isCompletedDB && torrent.Progress < 99.99 {
-					if checked, checkErr := torrents.ForceRecheck(hash); checkErr != nil || !checked {
-						logging.Debug("existing archive recheck could not be started", "error", checkErr)
+					if meta, metaErr := db.TorrentMeta(hash); metaErr == nil && meta != nil {
+						if dest, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && SamePath(torrent.SavePath, dest) {
+							delete(moveRequests, hash)
+							delete(storageMoveRetries, hash)
+							delete(postSeedMoves, hash)
+							inMoves, inRetries, inPostSeed = false, false, false
+						}
 					}
-					continue
-				}
-				logging.Debug("recovering completed torrent without completion event",
-					"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath,
-					"progress", torrent.Progress, "kind", "storage_moved")
-				torrentEvents = append(torrentEvents, models.TorrentEvent{
-					Kind:     "storage_moved",
-					Hash:     hash,
-					Name:     torrent.Name,
-					SavePath: torrent.SavePath,
-				})
-				eventHashes[hash] = struct{}{}
-				continue
-			}
-			if torrent.Progress < 99.99 {
-				continue
-			}
-			pending := false
-			if meta, err := db.TorrentMeta(hash); err == nil && meta != nil {
-				if status, err := db.TorrentStatus(hash); err == nil && status != nil {
-					if *status != "completed" && *status != "error" && *status != "removed" {
-						pending = true
+					if inMoves || inRetries || inPostSeed {
+						continue
 					}
 				}
-			}
-			if pending {
-				logging.Debug("recovering completed torrent without completion event",
-					"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath, "progress", torrent.Progress)
-				torrentEvents = append(torrentEvents, models.TorrentEvent{
-					Kind:     "torrent_finished",
-					Hash:     hash,
-					Name:     torrent.Name,
-					SavePath: torrent.SavePath,
-				})
-				eventHashes[hash] = struct{}{}
+				// In-progress downloads that are actively downloading (<99.99% and State "downloading" or "queued")
+				// cannot possibly need completion recovery; skip immediately to avoid redundant SQLite queries.
+				if torrent.Progress < 99.99 && (torrent.State == "downloading" || torrent.State == "queued") {
+					continue
+				}
+				// A completed single whose end-of-seed move already reached the
+				// archive but whose import never ran (lost storage_moved alert, or a
+				// restart) is finalized through the normal storage_moved path. Marking
+				// the raw archive path complete here would skip the rename, the
+				// MediaInfo probe and the completion notification.
+				if bg_torrentNeedsArchiveImport(cfg, db, &torrent) {
+					status, _ := db.TorrentStatus(hash)
+					isCompletedDB := status != nil && *status == "completed"
+					if !isCompletedDB && torrent.Progress < 99.99 {
+						if checked, checkErr := torrents.ForceRecheck(hash); checkErr != nil || !checked {
+							logging.Debug("existing archive recheck could not be started", "error", checkErr)
+						}
+						continue
+					}
+					logging.Debug("recovering completed torrent without completion event",
+						"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath,
+						"progress", torrent.Progress, "kind", "storage_moved")
+					torrentEvents = append(torrentEvents, models.TorrentEvent{
+						Kind:     "storage_moved",
+						Hash:     hash,
+						Name:     torrent.Name,
+						SavePath: torrent.SavePath,
+					})
+					eventHashes[hash] = struct{}{}
+					continue
+				}
+				if torrent.Progress < 99.99 {
+					continue
+				}
+				pending := false
+				if meta, err := db.TorrentMeta(hash); err == nil && meta != nil {
+					if status, err := db.TorrentStatus(hash); err == nil && status != nil {
+						if *status != "completed" && *status != "error" && *status != "removed" {
+							pending = true
+						}
+					}
+				}
+				if !pending {
+					settledTorrents[hash] = settledTorrent{savePath: torrent.SavePath, until: now.Add(settledRecheckInterval)}
+				}
+				if pending {
+					logging.Debug("recovering completed torrent without completion event",
+						"hash", hash, "name", torrent.Name, "save_path", torrent.SavePath, "progress", torrent.Progress)
+					torrentEvents = append(torrentEvents, models.TorrentEvent{
+						Kind:     "torrent_finished",
+						Hash:     hash,
+						Name:     torrent.Name,
+						SavePath: torrent.SavePath,
+					})
+					eventHashes[hash] = struct{}{}
+				}
 			}
 		}
 		completionSeen := false
@@ -984,14 +1050,48 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				eventLog.Push(publicEvent)
 				continue
 			}
+			// A torrent already archived (completed with a recorded archive copy)
+			// has been announced before: a repeated completion event, or a
+			// re-process of a missing copy, must not notify a second time.
+			alreadyAnnounced := false
+			if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
+				if _, sent := completionNotified[strings.ToLower(hash)]; sent {
+					alreadyAnnounced = true
+				} else if status, statusErr := db.TorrentStatus(hash); statusErr == nil && status != nil && *status == "completed" {
+					if archived, archivedErr := db.TorrentProcessed(hash); archivedErr == nil && archived != nil && strings.TrimSpace(*archived) != "" {
+						alreadyAnnounced = true
+					}
+				}
+			}
 			processed, handleErr := HandleTorrentEvent(cfg, torrents, db, moveRequests, postSeedMoves, storageMoveRetries, event, tmdb, notifier)
+			isCompletion := event.Kind == "torrent_finished" || event.Kind == "storage_moved"
+			if handleErr != nil && isCompletion && isTransientCompletionError(handleErr) {
+				key := strings.ToLower(hash)
+				retry := completionRetries[key]
+				if retry.attempts < completionRetryMaxAttempts {
+					retry.attempts++
+					retry.next = now.Add(completionRetryDelay(retry.attempts))
+					completionRetries[key] = retry
+					logging.Warn("torrent completion failed with a transient error; will retry",
+						"hash", hash, "name", event.Name, "attempt", retry.attempts,
+						"max_attempts", completionRetryMaxAttempts,
+						"retry_in", completionRetryDelay(retry.attempts).String(), "error", handleErr)
+					eventLog.Push(publicEvent)
+					continue
+				}
+				logging.Warn("torrent completion still failing after retries; giving up",
+					"hash", hash, "name", event.Name, "attempts", retry.attempts)
+			}
+			if isCompletion {
+				delete(completionRetries, strings.ToLower(hash))
+			}
 			if handleErr != nil {
 				restored, _ := db.RestoreUpgrade(hash)
 				_ = db.MarkTorrentError(hash, handleErr.Error())
 				// Completion errors are terminal for the persisted state; detach
 				// the torrent so it cannot remain active forever. Keep its source
 				// files in place for manual inspection.
-				if event.Kind == "torrent_finished" || event.Kind == "storage_moved" {
+				if isCompletion {
 					if removed, err := torrents.Remove(hash, false); err != nil {
 						logging.Warn("failed to detach torrent after completion error",
 							"hash", hash, "name", event.Name, "error", err)
@@ -1010,7 +1110,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				processed = false
 			}
 			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				RefreshMediaLibraries(cfg)
+				requestMediaLibraryRefresh(cfg)
 			}
 			// A completed single episode/movie is moved into the archive and
 			// renamed, so the file is no longer at the path libtorrent tracks. It
@@ -1089,23 +1189,28 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					if replacedName, ok := db.UpgradeReplacedInfo(event.Hash); ok {
 						replacedTitleValue = replacedName
 					}
-					if err := notifier.NotifyEvent("torrent_completed", map[string]any{
-						"hash":              event.Hash,
-						"name":              event.Name,
-						"title":             title,
-						"kind":              kindValue,
-						"series":            seriesValue,
-						"season":            seasonValue,
-						"episode":           episodeValue,
-						"path":              processed,
-						"size_bytes":        sizeBytes,
-						"duration_seconds":  durationSeconds,
-						"average_speed_bps": averageSpeedBps,
-						"replaced_title":    replacedTitleValue,
-					}); err != nil {
-						logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
+					if alreadyAnnounced {
+						logging.Debug("completion already announced; notification skipped", "hash", event.Hash, "kind", event.Kind)
 					} else {
-						logging.Debug("completion notification sent", "hash", event.Hash, "event", "torrent_completed", "title", title)
+						completionNotified[strings.ToLower(event.Hash)] = struct{}{}
+						if err := notifier.NotifyEvent("torrent_completed", map[string]any{
+							"hash":              event.Hash,
+							"name":              event.Name,
+							"title":             title,
+							"kind":              kindValue,
+							"series":            seriesValue,
+							"season":            seasonValue,
+							"episode":           episodeValue,
+							"path":              processed,
+							"size_bytes":        sizeBytes,
+							"duration_seconds":  durationSeconds,
+							"average_speed_bps": averageSpeedBps,
+							"replaced_title":    replacedTitleValue,
+						}); err != nil {
+							logging.Warn("completion notification failed", "hash", event.Hash, "event", "torrent_completed", "title", title, "error", err)
+						} else {
+							logging.Debug("completion notification sent", "hash", event.Hash, "event", "torrent_completed", "title", title)
+						}
 					}
 					// Ground-truth media inspection of the placed file. A missing
 					// ffprobe just leaves the filename-derived quality in place.
@@ -1142,6 +1247,113 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		// very low seed limit a just-finished torrent could otherwise be removed
 		// before its `torrent_finished` event is post-processed and archived.
 		EnforceSeedPolicy(cfg, torrents, db, postSeedMoves, storageMoveRetries, seedCopyWarnings)
+		syncTorrentMoves(db, persistedMoves, storageMoveRetries, postSeedMoves)
+	}
+}
+
+// completionRecoveryInterval is how often the worker looks for completed
+// torrents whose completion event was lost. Transient completion retries
+// (completionRetries, first backoff one minute) also go through this scan.
+const completionRecoveryInterval = 30 * time.Second
+
+// torrentMoveRestoreGrace is how long a restored storage move waits before it
+// is checked again: the engine may still be loading its torrents right after a
+// start, and a move whose torrent is not listed yet would be dropped.
+const torrentMoveRestoreGrace = 60 * time.Second
+
+// persistedMove is the saved part of a torrent's storage-move state, used to
+// write only what changed since the last tick.
+type persistedMove struct {
+	hasRetry    bool
+	destination string
+	postSeed    bool
+	attempts    uint8
+	guard       bool
+}
+
+// restoreTorrentMoves loads the saved storage moves into the worker maps and
+// returns what is persisted. No move is running after a restart, so every
+// restored retry is marked in flight with a short grace: RetryStorageMoves then
+// clears it if the torrent already sits in its destination, or issues the move
+// again. A post-seed protection without its retry is stale and is dropped.
+func restoreTorrentMoves(db *Database, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}, now time.Time) map[string]persistedMove {
+	persisted := map[string]persistedMove{}
+	saved, err := db.LoadTorrentMoves()
+	if err != nil {
+		logging.Warn("could not restore pending storage moves", "error", err)
+		return persisted
+	}
+	for hash, state := range saved {
+		entry := persistedMove{guard: state.PostSeedGuard}
+		if state.Retry != nil {
+			entry.hasRetry = true
+			entry.destination = state.Retry.destination
+			entry.postSeed = state.Retry.postSeed
+			entry.attempts = state.Retry.attempts
+		}
+		persisted[hash] = entry
+		if state.Retry == nil {
+			continue
+		}
+		retry := *state.Retry
+		retry.inFlight = true
+		retry.nextAttempt = now.Add(torrentMoveRestoreGrace)
+		retries[hash] = retry
+		if state.PostSeedGuard {
+			postSeedMoves[hash] = struct{}{}
+		}
+	}
+	if len(saved) > 0 {
+		logging.Info("restored pending storage moves", "torrents", len(saved))
+	}
+	return persisted
+}
+
+// syncTorrentMoves writes the storage-move state that changed since the last
+// call. The worker maps stay the working copy; the database only mirrors them.
+func syncTorrentMoves(db *Database, persisted map[string]persistedMove, retries map[string]StorageMoveRetry, postSeedMoves map[string]struct{}) {
+	current := make(map[string]persistedMove, len(retries)+len(postSeedMoves))
+	for hash, retry := range retries {
+		key := strings.ToLower(hash)
+		entry := current[key]
+		entry.hasRetry = true
+		entry.destination = retry.destination
+		entry.postSeed = retry.postSeed
+		entry.attempts = retry.attempts
+		current[key] = entry
+	}
+	for hash := range postSeedMoves {
+		key := strings.ToLower(hash)
+		entry := current[key]
+		entry.guard = true
+		current[key] = entry
+	}
+	save := func(hash string, entry persistedMove) bool {
+		state := TorrentMoveState{PostSeedGuard: entry.guard}
+		if entry.hasRetry {
+			state.Retry = &StorageMoveRetry{destination: entry.destination, postSeed: entry.postSeed, attempts: entry.attempts}
+		}
+		if err := db.SaveTorrentMove(hash, state); err != nil {
+			logging.Warn("could not save storage move state", "hash", hash, "error", err)
+			return false
+		}
+		return true
+	}
+	for hash, entry := range current {
+		if previous, ok := persisted[hash]; ok && previous == entry {
+			continue
+		}
+		if save(hash, entry) {
+			persisted[hash] = entry
+		}
+	}
+	for hash := range persisted {
+		if _, ok := current[hash]; ok {
+			continue
+		}
+		if save(hash, persistedMove{}) {
+			delete(persisted, hash)
+		}
 	}
 }
 
@@ -1157,8 +1369,7 @@ type bg_speedPair struct {
 func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 	enabled := false
 	if value, ok := cfg.Settings["libtorrent_sched_enabled"]; ok {
-		lowered := strings.ToLower(value)
-		enabled = lowered == "yes" || lowered == "true" || lowered == "1"
+		enabled = settingTruthy(value)
 	}
 	if !enabled {
 		return 0, 0, false
@@ -1209,8 +1420,7 @@ func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
 	tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
 	tempEnabled := false
 	if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
-		lowered := strings.ToLower(value)
-		tempEnabled = lowered == "1" || lowered == "true" || lowered == "yes"
+		tempEnabled = settingTruthy(value)
 	}
 	// An active temporary limit is an explicit user override and takes precedence
 	// over both the bandwidth schedule and the base limits.
@@ -1294,13 +1504,8 @@ func optimizeWorker(state *AppState) {
 		if !state.SleepBackground(optimizePeriod) {
 			return
 		}
-		enabled := false
-		if cfg, err := LoadConfig(state.config_path); err == nil {
-			if value, ok := cfg.Settings["libtorrent_auto_optimize"]; ok {
-				lowered := strings.ToLower(strings.TrimSpace(value))
-				enabled = lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on"
-			}
-		}
+		// Read-only use: the shared cached configuration is enough.
+		enabled := settingTruthy(latestConfig(state).Settings["libtorrent_auto_optimize"])
 		if !enabled {
 			continue
 		}
@@ -1466,7 +1671,7 @@ func housekeepingWorker(state *AppState) {
 		cfg := latestConfig(state)
 		enabled := true
 		if value, ok := cfg.Settings["housekeeping_enabled"]; ok {
-			enabled = value == "yes" || value == "true" || value == "1"
+			enabled = settingTruthy(value)
 		}
 		if enabled {
 			if report, ok := gh0_runHousekeeping(state); ok && report != nil {
@@ -1525,6 +1730,7 @@ type bg_watchedFailure struct {
 func watchedFoldersWorker(state *AppState) {
 	const period = 15 * time.Second
 	processed := map[bg_watchedKey]struct{}{}
+	oversizedWatched := map[string]struct{}{}
 	observed := map[string]bg_watchedSignature{}
 	failures := map[string]bg_watchedFailure{}
 	for {
@@ -1547,6 +1753,16 @@ func watchedFoldersWorker(state *AppState) {
 					continue
 				}
 				pathKey := path
+				// A .torrent/.magnet is a few kilobytes: never load an oversized
+				// file dropped by mistake into memory.
+				if info.Size() > maxWatchedFileBytes {
+					if _, warned := oversizedWatched[pathKey]; !warned {
+						oversizedWatched[pathKey] = struct{}{}
+						logging.Warn("watched folder file too large; ignored",
+							"path", pathKey, "size", info.Size(), "max", maxWatchedFileBytes)
+					}
+					continue
+				}
 				length := uint64(info.Size())
 				modified := uint64(0)
 				if nanos := info.ModTime().UnixNano(); nanos > 0 {
@@ -1726,7 +1942,7 @@ func cycleWorker(state *AppState) {
 			// Publish the start time immediately (see the manual path).
 			startedAt := time.Now().UTC()
 			state.last_cycle.Set(models.CycleStats{LastStartedAt: &startedAt})
-			notifier := FromConfig(&cfg)
+			notifier := FromConfig(&cfg).Async()
 			stats, runErr := RunCycle(
 				ctx,
 				&cfg,
@@ -1764,7 +1980,11 @@ func cycleWorker(state *AppState) {
 						}
 						done := state.trackOperation()
 						go func(names []string) {
+							defer recoverGoroutine("archive rename repair")
 							defer done()
+							// Deferred so a panic cannot leave the repair marked as
+							// running forever.
+							defer renameRepairRunning.Store(false)
 							var renamed, discarded, duplicates, errs int64
 							for _, name := range names {
 								_, value := seriesRenameApply(state, name, true, false, false)
@@ -1783,9 +2003,11 @@ func cycleWorker(state *AppState) {
 							} else {
 								logging.Debug(fmt.Sprintf("🗂 Archive rename repair: %d series checked, nothing to change", len(names)))
 							}
-							renameRepairRunning.Store(false)
 						}(names)
 					}
+				} else if !cfg.DebugEnabled() {
+					// The check below stats every archived file (often on NFS) only
+					// to print a debug line: skip it unless diagnostics are on.
 				} else if files, err := state.db.ArchivedEpisodeFiles(); err == nil {
 					missing := 0
 					for _, file := range files {
@@ -1809,3 +2031,113 @@ func cycleWorker(state *AppState) {
 		}
 	}
 }
+
+// completionRetry tracks the transient failures of one torrent's completion.
+type completionRetry struct {
+	attempts int
+	next     time.Time
+}
+
+// completionRetryMaxAttempts bounds the automatic retries of a completion that
+// fails with a transient error; afterwards the failure becomes terminal.
+const completionRetryMaxAttempts = 6
+
+// completionRetryDelay is the wait before attempt n+1: 1, 2, 4, 8, 16, 32 minutes.
+func completionRetryDelay(attempt int) time.Duration {
+	if attempt < 1 {
+		attempt = 1
+	}
+	if attempt > 6 {
+		attempt = 6
+	}
+	return time.Duration(1<<(attempt-1)) * time.Minute
+}
+
+// isTransientCompletionError reports errors that can disappear on their own:
+// an unavailable or slow volume, a timeout, a momentarily full disk or a busy
+// database. Identity mismatches and missing sources stay terminal.
+func isTransientCompletionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+	for _, errno := range []syscall.Errno{
+		syscall.EIO, syscall.ENOSPC, syscall.EBUSY, syscall.EAGAIN, syscall.ETIMEDOUT,
+		syscall.ESTALE, syscall.ENOTCONN, syscall.EHOSTDOWN, syscall.EHOSTUNREACH,
+		syscall.ENETDOWN, syscall.ENETUNREACH, syscall.ECONNRESET, syscall.ECONNREFUSED,
+		syscall.EINTR, syscall.EDQUOT,
+	} {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "database is locked") || strings.Contains(message, "sqlite_busy")
+}
+
+var (
+	mediaRefreshMu      sync.Mutex
+	mediaRefreshRunning bool
+	mediaRefreshPending *Config
+)
+
+// requestMediaLibraryRefresh asks Jellyfin/Plex to rescan without blocking the
+// torrent event worker (each request can take up to 20 seconds). Requests that
+// arrive while a refresh runs are coalesced into a single follow-up refresh, so
+// a burst of completions (a season pack) does not queue one scan per file.
+func requestMediaLibraryRefresh(cfg *Config) {
+	mediaRefreshMu.Lock()
+	if mediaRefreshRunning {
+		mediaRefreshPending = cfg
+		mediaRefreshMu.Unlock()
+		return
+	}
+	mediaRefreshRunning = true
+	mediaRefreshMu.Unlock()
+	go func(current *Config) {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Error("media library refresh panicked; recovered", "panic", fmt.Sprint(r))
+				mediaRefreshMu.Lock()
+				mediaRefreshRunning = false
+				mediaRefreshPending = nil
+				mediaRefreshMu.Unlock()
+			}
+		}()
+		for {
+			RefreshMediaLibraries(current)
+			// Clear the running flag under the same lock that checks for a
+			// pending request, so a request arriving now is never lost.
+			mediaRefreshMu.Lock()
+			if mediaRefreshPending == nil {
+				mediaRefreshRunning = false
+				mediaRefreshMu.Unlock()
+				return
+			}
+			current = mediaRefreshPending
+			mediaRefreshPending = nil
+			mediaRefreshMu.Unlock()
+		}
+	}(cfg)
+}
+
+// settledTorrent remembers a completed torrent that needs no recovery.
+type settledTorrent struct {
+	savePath string
+	until    time.Time
+}
+
+// settledRecheckInterval is how long a settled torrent is skipped by the
+// completion-recovery scan. A storage move (new save path) or any event for the
+// torrent ends the skip at once.
+const settledRecheckInterval = 60 * time.Second
+
+// maxWatchedFileBytes bounds the .torrent/.magnet files read from watched
+// folders (large multi-file torrents stay well below this).
+const maxWatchedFileBytes = 32 << 20

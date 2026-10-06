@@ -1146,6 +1146,7 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 	}
 	title := release.Title
 	go func() {
+		defer recoverGoroutine("g3 background")
 		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:

@@ -71,7 +71,7 @@ func gh2_settingsValue(value any) (string, bool) {
 
 // gh2_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
 func gh2_truthy(value string) bool {
-	return value == "yes" || value == "true" || value == "1"
+	return settingTruthy(value)
 }
 
 // gh2_isJSONNull reports whether a flattened setting value is absent or JSON
@@ -217,7 +217,7 @@ func gh2_storedSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, e
 				continue
 			}
 			if gh2_releaseMatchesSeriesEpisode(release, series, season, episode) {
-				results = append(results, gh2_episodeSource{Release: *release, Origin: "Feed RSS"})
+				results = append(results, gh2_episodeSource{Release: *release, Origin: episodeOriginFeed})
 			}
 		}
 	}
@@ -228,7 +228,7 @@ func gh2_storedSeriesEpisodeSources(s *AppState, series *SeriesConfig, season, e
 				continue
 			}
 			if gh2_releaseMatchesSeriesEpisode(release, series, season, episode) {
-				results = append(results, gh2_episodeSource{Release: *release, Origin: "Archivio"})
+				results = append(results, gh2_episodeSource{Release: *release, Origin: episodeOriginArchive})
 			}
 		}
 	}
@@ -957,6 +957,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 			wg.Add(1)
 			sem <- struct{}{}
 			go func(index int, season, episode int64) {
+				defer recoverGoroutine("search missing episode")
 				defer wg.Done()
 				defer func() { <-sem }()
 				liveReleases[index] = s.engine.SearchSeriesEpisode(r.Context(), cfg, series, season, episode, true)
@@ -970,7 +971,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 		episodeResults := gh2_storedSeriesEpisodeSources(s, series, season, episode)
 		for releaseIndex := range liveReleases[index] {
 			if gh2_releaseMatchesSeriesEpisode(&liveReleases[index][releaseIndex], series, season, episode) {
-				episodeResults = append(episodeResults, gh2_episodeSource{Release: liveReleases[index][releaseIndex], Origin: "Indexer / web"})
+				episodeResults = append(episodeResults, gh2_episodeSource{Release: liveReleases[index][releaseIndex], Origin: episodeOriginIndexer})
 			}
 		}
 		for _, result := range gh2_finalizeEpisodeSearchResults(episodeResults, cfg, series) {

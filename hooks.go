@@ -515,7 +515,13 @@ func hookEnvKey(key string) string {
 func RunHook(hook EventHook, event string, payload map[string]any) (HookRun, error) {
 	vars := Variables(event, payload)
 	program := Expand(strings.TrimSpace(hook.Program), vars)
-	args := SplitArgs(Expand(hook.Args, vars))
+	// Split the configured template first, then expand each argument on its
+	// own: a value coming from a feed (a release title with spaces, quotes or a
+	// leading "--") must stay one argument and can never add new ones.
+	args := SplitArgs(hook.Args)
+	for index := range args {
+		args[index] = Expand(args[index], vars)
+	}
 	// `0` was the JSON default in older configurations. Treat it as the
 	// documented default too, so upgrading does not silently turn hooks into
 	// one-second processes.
@@ -535,6 +541,17 @@ func RunHook(hook EventHook, event string, payload map[string]any) (HookRun, err
 	defer cancel()
 	cmd := exec.CommandContext(ctx, program, args...)
 	cmd.Env = runHookEnv(vars)
+	// On timeout kill the whole process group, not only the direct child, and
+	// stop waiting for output pipes still held by a grandchild: without this
+	// the timeout does not actually end the run.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	cmd.WaitDelay = hookWaitDelay
 
 	var stderrBuffer bytes.Buffer
 	cmd.Stderr = &stderrBuffer
@@ -676,11 +693,14 @@ func Dispatch(hooks []EventHook, event string, payload map[string]any) {
 	}
 	owned, _ := cloneJSON(payload).(map[string]any)
 	go func() {
+		defer recoverGoroutine("event hook dispatch")
 		for _, hook := range selected {
 			if !HookMatchesEvent(hook, event) {
 				continue
 			}
+			hookSlots <- struct{}{}
 			run, err := RunHook(hook, event, owned)
+			<-hookSlots
 			if err != nil {
 				logging.Warn("🪝 event hook could not run",
 					"hook", hook.Name, "program", hook.Program, "event", event, "error", err)
@@ -697,3 +717,12 @@ func Dispatch(hooks []EventHook, event string, payload map[string]any) {
 		}
 	}()
 }
+
+// hookWaitDelay is how long a timed-out hook may keep its output pipes open
+// after it was killed.
+const hookWaitDelay = 5 * time.Second
+
+// hookSlots caps the hook processes running at the same time: a burst of
+// events (a season pack completing, a cycle starting many downloads) must not
+// fork an unbounded number of processes.
+var hookSlots = make(chan struct{}, 4)

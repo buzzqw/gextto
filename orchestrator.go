@@ -75,45 +75,14 @@ func RunCycleDomain(
 		return stats, nil
 	}
 
-	comicsIntervalValue, err := comics.Setting("comics_check_interval", "604800")
-	if err != nil {
-		return nil, err
+	// The comics settings live in their own database: read them only when this
+	// cycle can run comics, and never let a comics database problem abort a
+	// series/movies cycle.
+	if !domainIs(domain, "series") && !domainIs(domain, "movies") {
+		runComicsIfDue(ctx, cfg, db, comics, notifier, torrents, stats, domain != nil && *domain == "comics")
 	}
-	comicsInterval, parseErr := strconv.ParseInt(strings.TrimSpace(comicsIntervalValue), 10, 64)
-	if parseErr != nil {
-		comicsInterval = 604800
-	}
-	if comicsInterval < 0 {
-		comicsInterval = 0
-	}
-	lastComicsValue, err := comics.Setting("last_comics_check_ts", "0")
-	if err != nil {
-		return nil, err
-	}
-	lastComicsCheck, parseErr := strconv.ParseInt(strings.TrimSpace(lastComicsValue), 10, 64)
-	if parseErr != nil {
-		lastComicsCheck = 0
-	}
-	nowTs := time.Now().UTC().Unix()
-	// An explicitly requested comics cycle must start immediately instead of
-	// waiting for the automatic interval; otherwise the Comics button appears
-	// to do nothing when the next scheduled check is not due yet.
-	comicsRequested := domain != nil && *domain == "comics"
 	if cycleCancelled(ctx) {
 		return stats, nil
-	}
-	if !domainIs(domain, "series") && !domainIs(domain, "movies") &&
-		(comicsRequested || comicsInterval == 0 || saturatingSub(nowTs, lastComicsCheck) >= comicsInterval) {
-		downloaded, runErr := RunComicsCycle(comics, NewGetComicsClient(), notifier, cfg.LibtorrentDir, torrents, db, cfg)
-		if runErr != nil {
-			stats.Error("comics")
-			logging.Warn("comics cycle failed", "error", runErr)
-		} else {
-			logging.Info("comics cycle completed", "downloaded", downloaded)
-		}
-		if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(nowTs, 10)); err != nil {
-			return nil, err
-		}
 	}
 	if domainIs(domain, "comics") {
 		if err := db.SaveCycle(stats); err != nil {
@@ -217,7 +186,7 @@ func RunCycleDomain(
 		// "Seen from feed": record every collected release, including unmonitored
 		// titles, so it remains available for archive browsing.
 		if err := db.RecordSeenBatch(releases, cfg); err != nil {
-			logging.Debug("feed seen recording failed", "error", err)
+			logging.Warn("feed seen recording failed", "error", err)
 		}
 	}
 
@@ -347,7 +316,7 @@ func RunCycleDomain(
 
 	gapFilling := true
 	if value, ok := cfg.Settings["gap_filling"]; ok {
-		gapFilling = value == "yes" || value == "true" || value == "1"
+		gapFilling = settingTruthy(value)
 	}
 	var archiveGaps []SeriesGap
 	if domainIs(domain, "movies") || !gapFilling {
@@ -404,6 +373,18 @@ func RunCycleDomain(
 			deepMaxPerCycle = parsed
 		}
 	}
+	// How long a gap searched online is left alone (`gap_research_hours`,
+	// default 23). Never shorter than the deep interval, or every deep pass
+	// would search the same gaps again.
+	gapResearchHours := int64(23)
+	if value, ok := cfg.Settings["gap_research_hours"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil && parsed > 0 {
+			gapResearchHours = parsed
+		}
+	}
+	if gapResearchHours < deepIntervalHours {
+		gapResearchHours = deepIntervalHours
+	}
 	deepNow := time.Now().UTC().Unix()
 	lastDeep := int64(0)
 	if value, ok := cfg.Settings["last_deep_gap_fill_ts"]; ok {
@@ -412,9 +393,6 @@ func RunCycleDomain(
 		}
 	}
 	isDeep := saturatingSub(deepNow, lastDeep) >= saturatingMul(deepIntervalHours, 3600)
-	if isDeep {
-		_ = SaveSetting(cfg.DataDir, "last_deep_gap_fill_ts", strconv.FormatInt(deepNow, 10))
-	}
 	deepLabel := "archive pass"
 	if isDeep {
 		deepLabel = fmt.Sprintf("deep pass, up to %d online searches", deepMaxPerCycle)
@@ -492,7 +470,7 @@ func RunCycleDomain(
 		if gapLimit > 0 && livePerSeries[gap.Series] >= gapLimit {
 			continue
 		}
-		if recentlySearched, err := db.GapRecentlySearched(gap.Series, gap.Season, gap.Episode, 23); err != nil {
+		if recentlySearched, err := db.GapRecentlySearched(gap.Series, gap.Season, gap.Episode, gapResearchHours); err != nil {
 			return nil, err
 		} else if recentlySearched {
 			continue
@@ -519,6 +497,7 @@ func RunCycleDomain(
 			gapWG.Add(1)
 			gapSem <- struct{}{}
 			go func(index int, candidate liveCandidate) {
+				defer recoverGoroutine("gap-fill live search")
 				defer gapWG.Done()
 				defer func() { <-gapSem }()
 				query := fmt.Sprintf("%s S%02dE%02d", candidate.Series.Name, candidate.Season, candidate.Episode)
@@ -561,9 +540,22 @@ func RunCycleDomain(
 			}(i, candidate)
 		}
 		gapWG.Wait()
+		// A cancelled cycle returns empty searches: do not record those gaps as
+		// searched, or they would be skipped for the next 23 hours.
+		searchesValid := !cycleCancelled(ctx)
 		for i := range liveCandidates {
 			releases = append(releases, foundResults[i]...)
-			_ = db.MarkGapSearched(liveCandidates[i].Series.Name, liveCandidates[i].Season, liveCandidates[i].Episode)
+			if searchesValid {
+				_ = db.MarkGapSearched(liveCandidates[i].Series.Name, liveCandidates[i].Season, liveCandidates[i].Episode)
+			}
+		}
+	}
+	// Record the deep pass only once it actually ran: saving the timestamp
+	// before the searches lost the pass for gap_deep_interval_hours whenever the
+	// cycle was cancelled or failed in between.
+	if isDeep && !cycleCancelled(ctx) {
+		if err := SaveSetting(cfg.DataDir, "last_deep_gap_fill_ts", strconv.FormatInt(deepNow, 10)); err != nil {
+			logging.Warn("could not record the deep gap pass time", "error", err)
 		}
 	}
 	if domainIs(domain, "series") {
@@ -626,34 +618,8 @@ func RunCycleDomain(
 		}
 		score := cfg.ReleaseScore(&release)
 		if release.Kind == "series" {
-			seriesName := ""
-			if release.Series != nil {
-				seriesName = *release.Series
-			}
-			season := int64(0)
-			if release.Season != nil {
-				season = *release.Season
-			}
-			rangeSet := episodeSet(&release)
-			complete := hasCompleteRange(&release)
-			superseded := false
-			for j := range best {
-				old := &best[j]
-				if old.Kind != "series" || old.Series == nil || *old.Series != seriesName ||
-					old.Season == nil || *old.Season != season {
-					continue
-				}
-				oldRange := episodeSet(old)
-				oldComplete := hasCompleteRange(old)
-				condition := ((complete && oldComplete) ||
-					(!complete && oldComplete && incumbentWins(&release, score, old, cfg)) ||
-					(!complete && !oldComplete && intSetSuperset(oldRange, rangeSet))) &&
-					incumbentWins(&release, score, old, cfg)
-				if condition {
-					superseded = true
-					break
-				}
-			}
+			var superseded bool
+			best, superseded = mergeSeriesCandidate(best, release, score, cfg.ReleaseScore)
 			if superseded {
 				// Rejected because the selection already contains an equal or
 				// better release: routine deduplication, not an INFO event.
@@ -662,41 +628,6 @@ func RunCycleDomain(
 					"score", score,
 					"reason", "superseded by an equal or better release already selected")
 				continue
-			}
-			var filtered []models.Release
-			for j := range best {
-				old := &best[j]
-				if old.Kind != "series" || old.Series == nil || *old.Series != seriesName ||
-					old.Season == nil || *old.Season != season {
-					filtered = append(filtered, *old)
-					continue
-				}
-				oldRange := episodeSet(old)
-				oldComplete := hasCompleteRange(old)
-				remove := (complete || (len(rangeSet) > 1 && intSetSuperset(rangeSet, oldRange))) &&
-					!incumbentWins(&release, score, old, cfg) &&
-					(!oldComplete || complete)
-				if !remove {
-					filtered = append(filtered, *old)
-				}
-			}
-			best = filtered
-			index := -1
-			for j := range best {
-				old := &best[j]
-				if old.Kind == "series" && old.Series != nil && *old.Series == seriesName &&
-					old.Season != nil && *old.Season == season &&
-					slices.Equal(old.EpisodeRange, release.EpisodeRange) {
-					index = j
-					break
-				}
-			}
-			if index >= 0 {
-				if !incumbentWins(&release, score, &best[index], cfg) {
-					best[index] = release
-				}
-			} else {
-				best = append(best, release)
 			}
 		} else {
 			index := -1
@@ -745,14 +676,14 @@ func RunCycleDomain(
 				"path", cfg.LibtorrentDir,
 				"minimum", logging.HumanBytes(*minFreeBytes))
 			stats.Error("min_free_space_unavailable")
-			return stats, nil
+			return finishCycleWithoutDownloads(db, stats)
 		}
 		if *free < *minFreeBytes {
 			logging.Warn("cycle: free space below min_free_space_gb, downloads skipped",
 				"free", logging.HumanBytes(*free),
 				"minimum", logging.HumanBytes(*minFreeBytes))
 			stats.Error("min_free_space")
-			return stats, nil
+			return finishCycleWithoutDownloads(db, stats)
 		}
 	}
 
@@ -914,13 +845,9 @@ func RunCycleDomain(
 			GapEpisode:    isGap,
 			DryRun:        cfg.DryRun,
 		}
-		var approved bool
-		var approvalReason string
-		if release.Kind == "series" {
-			approved, approvalReason, err = db.CheckSeriesScored(&release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext)
-		} else {
-			approved, approvalReason, err = db.checkMovieScoredWith(&release, releaseScore, cfg.UpgradeMinScoreDiff, forbidUpgrade, cfg.DryRun)
-		}
+		// Decide only: nothing is written until the torrent is in the engine
+		// (see commitReleaseApproval).
+		approved, approvalReason, err := evaluateReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade, true)
 		if err != nil {
 			return nil, err
 		}
@@ -960,16 +887,12 @@ func RunCycleDomain(
 				if free == nil {
 					stats.Error("min_free_space_unavailable")
 					logging.Warn("cycle: cannot determine free space for chosen download path, download skipped", "path", checkPath)
-					// Approval already wrote the episode/movie placeholder: undo it
-					// so the release stays eligible for a later cycle.
-					rollbackReleasePlaceholder(cfg, db, &release)
 					continue
 				}
 				if *free < *floor {
 					stats.Error("min_free_space")
 					logging.Warn("cycle: free space below minimum for chosen download path, download skipped",
 						"path", checkPath, "free", logging.HumanBytes(*free), "minimum", logging.HumanBytes(*floor))
-					rollbackReleasePlaceholder(cfg, db, &release)
 					continue
 				}
 			}
@@ -980,22 +903,27 @@ func RunCycleDomain(
 				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 			}
 			if err != nil {
-				rollbackReleasePlaceholder(cfg, db, &release)
 				// A single release refused by the engine must not abort the whole
-				// cycle: the placeholder is already rolled back, so record the
-				// failure and continue with the remaining candidates.
+				// cycle: nothing was written yet, so record the failure and
+				// continue with the remaining candidates.
 				stats.Error("add_failed")
 				logging.Warn("release add failed; continuing the cycle", "target", releaseTarget(&release), "error", err)
 				continue
 			}
 			if !added {
-				if !cfg.DryRun {
-					if err := db.RollbackRelease(&release); err != nil {
-						return nil, err
-					}
-				}
 				stats.Error("torrent_rejected")
 				continue
+			}
+			if !cfg.DryRun {
+				committed, commitReason, commitErr := commitReleaseApproval(db, &release, releaseScore, cfg.UpgradeMinScoreDiff, approvalContext, forbidUpgrade)
+				if commitErr != nil || !committed {
+					stats.Error("approval_commit_failed")
+					logging.Warn("release approval could not be recorded; download withdrawn",
+						"target", releaseTarget(&release), "reason", commitReason, "error", commitErr)
+					withdrawAddedTorrent(torrents, &release)
+					continue
+				}
+				approvalReason = commitReason
 			}
 			startedDetail := fmt.Sprintf("%s [%s]: %s · qualità: %s · score: %d",
 				releaseTarget(&release), release.Source, release.Title,
@@ -1012,7 +940,20 @@ func RunCycleDomain(
 			}
 			if !cfg.DryRun {
 				if err := db.RegisterTorrentScored(&release, score); err != nil {
-					return nil, err
+					// The torrent is already in the engine: without its database row
+					// it would be treated as a foreign torrent and never archived.
+					// Undo the add and the approval, then go on with the cycle.
+					stats.Error("register_failed")
+					logging.Warn("release registration failed; download withdrawn",
+						"target", releaseTarget(&release), "error", err)
+					withdrawAddedTorrent(torrents, &release)
+					rollbackReleasePlaceholder(cfg, db, &release)
+					if len(newDetails) > 0 && newDetails[len(newDetails)-1] == startedDetail {
+						newDetails = newDetails[:len(newDetails)-1]
+					} else if len(upgradeDetails) > 0 && upgradeDetails[len(upgradeDetails)-1] == startedDetail {
+						upgradeDetails = upgradeDetails[:len(upgradeDetails)-1]
+					}
+					continue
 				}
 				if hash, ok := utils.MagnetHash(release.Magnet); ok {
 					_ = db.SetTorrentReason(hash, decisionReason)
@@ -1032,13 +973,15 @@ func RunCycleDomain(
 				"approval_reason", approvalReason,
 				"gap_episodes", episodesLabel(gapEpisodes))
 			if isReadyPending && !cfg.DryRun {
+				// The download is registered: a stale pending row is harmless (the
+				// active hash blocks a second start), so never abort the cycle here.
 				if release.Series != nil && release.Season != nil && release.Episode != nil {
 					if err := db.RemovePending(*release.Series, *release.Season, *release.Episode); err != nil {
-						return nil, err
+						logging.Warn("could not clear the delayed release", "target", releaseTarget(&release), "error", err)
 					}
 				} else if release.Kind == "movie" {
 					if err := db.RemovePendingMovie(release.Title, release.Year); err != nil {
-						return nil, err
+						logging.Warn("could not clear the delayed movie", "target", releaseTarget(&release), "error", err)
 					}
 				}
 			}
@@ -1148,7 +1091,7 @@ func prioritizeArchiveGapDownloads(
 ) error {
 	gapFilling := true
 	if value, ok := cfg.Settings["gap_filling"]; ok {
-		gapFilling = value == "yes" || value == "true" || value == "1"
+		gapFilling = settingTruthy(value)
 	}
 	if !gapFilling {
 		return nil
@@ -1236,12 +1179,13 @@ func prioritizeArchiveGapDownloads(
 		if series == nil {
 			continue
 		}
-		approved, reason, err := db.CheckSeriesScored(&release, candidate.score, cfg.UpgradeMinScoreDiff, &models.ApprovalContext{
+		approvalContext := &models.ApprovalContext{
 			Archive:       &models.ArchiveQualityIndex{},
 			Live:          live,
 			ForbidUpgrade: series.DisableUpgrades,
 			GapEpisode:    true,
-		})
+		}
+		approved, reason, err := evaluateReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
 		if err != nil {
 			return err
 		}
@@ -1255,20 +1199,30 @@ func prioritizeArchiveGapDownloads(
 		}
 		added, err := torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 		if err != nil {
-			_ = db.RollbackRelease(&release)
 			stats.Error("add_failed")
 			logging.Warn("priority gap add failed", "target", releaseTarget(&release), "error", err)
 			continue
 		}
 		if !added {
-			if err := db.RollbackRelease(&release); err != nil {
-				return err
-			}
 			stats.Error("torrent_rejected")
 			continue
 		}
+		if committed, commitReason, commitErr := commitReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades); commitErr != nil || !committed {
+			stats.Error("approval_commit_failed")
+			logging.Warn("priority gap approval could not be recorded; download withdrawn",
+				"target", releaseTarget(&release), "reason", commitReason, "error", commitErr)
+			withdrawAddedTorrent(torrents, &release)
+			continue
+		}
 		if err := db.RegisterTorrentScored(&release, candidate.score); err != nil {
-			return err
+			// Same rule as the main loop: an unregistered torrent must not stay in
+			// the engine, and one failure must not abort the cycle.
+			stats.Error("register_failed")
+			logging.Warn("priority gap registration failed; download withdrawn",
+				"target", releaseTarget(&release), "error", err)
+			withdrawAddedTorrent(torrents, &release)
+			_ = db.RollbackRelease(&release)
+			continue
 		}
 		_ = db.SetTorrentReason(hash, "gap_filled")
 		live.Hashes[hash] = struct{}{}
@@ -1355,9 +1309,48 @@ func downloadPathFreeSpaceFloor(cfg *Config, path string, global *uint64) *uint6
 	return global
 }
 
-// rollbackReleasePlaceholder undoes the episode/movie placeholder that
-// approval writes before the torrent is handed to the engine. It is called
-// whenever a release is not started after all (space guard, engine refusal),
+// evaluateReleaseApproval decides whether a release should be downloaded. With
+// dryRun it only reads: no series row, episode/movie placeholder or upgrade
+// backup is written. The acquisition loops call it this way, start the torrent,
+// and only then record the approval with commitReleaseApproval, so a release
+// that is never started (space guard, engine refusal) leaves nothing to undo.
+func evaluateReleaseApproval(db *Database, release *models.Release, score, minScoreDiff int64, approvalContext *models.ApprovalContext, forbidUpgrade, dryRun bool) (bool, string, error) {
+	if release.Kind == "series" {
+		evaluation := models.ApprovalContext{}
+		if approvalContext != nil {
+			evaluation = *approvalContext
+		}
+		evaluation.DryRun = dryRun
+		return db.CheckSeriesScored(release, score, minScoreDiff, &evaluation)
+	}
+	return db.checkMovieScoredWith(release, score, minScoreDiff, forbidUpgrade, dryRun)
+}
+
+// commitReleaseApproval records the approval of a release whose torrent is
+// already in the engine: it runs the same decision again, this time writing the
+// placeholder rows and the upgrade backup. It must run before
+// RegisterTorrentScored, whose active torrent_meta row would otherwise make the
+// release look like an already active episode. A release that is no longer
+// approved (the database changed in between) is reported with ok=false.
+func commitReleaseApproval(db *Database, release *models.Release, score, minScoreDiff int64, approvalContext *models.ApprovalContext, forbidUpgrade bool) (bool, string, error) {
+	return evaluateReleaseApproval(db, release, score, minScoreDiff, approvalContext, forbidUpgrade, false)
+}
+
+// withdrawAddedTorrent removes a torrent that was just added to the engine but
+// could not be recorded in the database. Without its rows it would be treated
+// as a foreign torrent and never archived.
+func withdrawAddedTorrent(torrents TorrentEngine, release *models.Release) {
+	hash, ok := utils.MagnetHash(release.Magnet)
+	if !ok {
+		return
+	}
+	if _, err := torrents.Remove(hash, true); err != nil {
+		logging.Warn("could not withdraw the unrecorded torrent", "hash", hash, "error", err)
+	}
+}
+
+// rollbackReleasePlaceholder undoes the episode/movie placeholder written by
+// commitReleaseApproval when the torrent registration that follows it fails,
 // so the release stays eligible for a later cycle instead of looking like an
 // already-downloaded duplicate. Dry runs write no placeholder, so it is a
 // no-op there.
@@ -1595,6 +1588,76 @@ func promoteTorrentURLMagnet(release *models.Release) bool {
 	return true
 }
 
+// mergeSeriesCandidate adds a series release to the candidate selection.
+// Within one series and season:
+//   - the candidate is dropped (superseded=true) when a selected release covers
+//     its episodes and is at least as good;
+//   - selected releases that the candidate covers and that are not strictly
+//     better than it are removed;
+//   - a selected release with the same episode range is replaced when the
+//     candidate is not worse.
+//
+// "Covers" means a complete season pack, or a superset of the episodes. At equal
+// quality the release covering more wins in both directions, so the selection
+// does not depend on the order in which releases arrive (before, an episode
+// seen before a same-score season pack kept both, the reverse order only the
+// pack). scoreOf must be the same policy-aware score used for score.
+func mergeSeriesCandidate(best []models.Release, release models.Release, score int64, scoreOf func(*models.Release) int64) ([]models.Release, bool) {
+	seriesName := ""
+	if release.Series != nil {
+		seriesName = *release.Series
+	}
+	season := int64(0)
+	if release.Season != nil {
+		season = *release.Season
+	}
+	sameSeason := func(old *models.Release) bool {
+		return old.Kind == "series" && old.Series != nil && *old.Series == seriesName &&
+			old.Season != nil && *old.Season == season
+	}
+	rangeSet := episodeSet(&release)
+	complete := hasCompleteRange(&release)
+	for j := range best {
+		old := &best[j]
+		if !sameSeason(old) {
+			continue
+		}
+		oldCovers := hasCompleteRange(old) || (!complete && intSetSuperset(episodeSet(old), rangeSet))
+		if oldCovers && !releaseStrictlyBetter(&release, score, old, scoreOf(old)) {
+			return best, true
+		}
+	}
+	filtered := best[:0:0]
+	for j := range best {
+		old := &best[j]
+		if sameSeason(old) {
+			oldComplete := hasCompleteRange(old)
+			candidateCovers := complete || (!oldComplete && len(rangeSet) > 1 && intSetSuperset(rangeSet, episodeSet(old)))
+			if candidateCovers && !releaseStrictlyBetter(old, scoreOf(old), &release, score) {
+				continue
+			}
+		}
+		filtered = append(filtered, *old)
+	}
+	best = filtered
+	for j := range best {
+		old := &best[j]
+		if sameSeason(old) && slices.Equal(old.EpisodeRange, release.EpisodeRange) {
+			if releaseStrictlyBetter(&release, score, old, scoreOf(old)) {
+				best[j] = release
+			}
+			return best, false
+		}
+	}
+	return append(best, release), false
+}
+
+// releaseStrictlyBetter reports whether a must replace b: a higher score, or at
+// equal score a REMUX against a non-REMUX. It is the negation of incumbentWins.
+func releaseStrictlyBetter(a *models.Release, aScore int64, b *models.Release, bScore int64) bool {
+	return aScore > bScore || (aScore == bScore && a.Quality.IsRemux() && !b.Quality.IsRemux())
+}
+
 // incumbentWins is true when `incumbent` must not be replaced by `candidate`:
 // at equal scores a REMUX (full-resolution version) wins, especially when it is
 // the remux of an episode that was already selected or downloaded.
@@ -1755,3 +1818,75 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 //	comics.RunComicsCycle(comics *ComicsDb, client *GetComicsClient,
 // notifier *Notifier, defaultRoot string, torrents *LibtorrentClient,
 // mainDB *Database, cfg *Config) (int, error)
+
+// comicsFailureRetrySecs is the delay before a failed comics cycle is retried.
+const comicsFailureRetrySecs = 3600
+
+// runComicsIfDue runs the comics cycle when it is due (or explicitly requested)
+// and records the full check time only after a successful run: a failed check
+// is retried after about an hour instead of waiting for the whole interval
+// (seven days by default). Errors are counted in stats, never returned.
+func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *ComicsDb, notifier *Notifier, torrents TorrentEngine, stats *models.CycleStats, requested bool) {
+	if comics == nil || cycleCancelled(ctx) {
+		return
+	}
+	comicsInterval := int64(604800)
+	if value, err := comics.Setting("comics_check_interval", "604800"); err != nil {
+		logging.Warn("comics settings unavailable; comics cycle skipped", "error", err)
+		stats.Error("comics")
+		return
+	} else if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(value), 10, 64); parseErr == nil {
+		comicsInterval = parsed
+	}
+	if comicsInterval < 0 {
+		comicsInterval = 0
+	}
+	lastComicsCheck := int64(0)
+	if value, err := comics.Setting("last_comics_check_ts", "0"); err != nil {
+		logging.Warn("comics settings unavailable; comics cycle skipped", "error", err)
+		stats.Error("comics")
+		return
+	} else if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(value), 10, 64); parseErr == nil {
+		lastComicsCheck = parsed
+	}
+	nowTs := time.Now().UTC().Unix()
+	// An explicitly requested comics cycle must start immediately instead of
+	// waiting for the automatic interval; otherwise the Comics button appears
+	// to do nothing when the next scheduled check is not due yet.
+	if !requested && comicsInterval != 0 && saturatingSub(nowTs, lastComicsCheck) < comicsInterval {
+		return
+	}
+	downloaded, runErr := RunComicsCycle(ctx, comics, NewGetComicsClient(), notifier, cfg.LibtorrentDir, torrents, db, cfg)
+	if runErr != nil {
+		stats.Error("comics")
+		// Retry in an hour instead of after the whole interval, without
+		// re-running the (synchronous) comics cycle at every scheduled cycle.
+		retryTs := nowTs
+		if comicsInterval > comicsFailureRetrySecs {
+			retryTs = saturatingSub(nowTs, comicsInterval-comicsFailureRetrySecs)
+		}
+		if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(retryTs, 10)); err != nil {
+			logging.Warn("could not record the comics check time", "error", err)
+		}
+		logging.Warn("comics cycle failed; it will be retried in about an hour", "error", runErr)
+		return
+	}
+	logging.Info("comics cycle completed", "downloaded", downloaded)
+	if err := comics.SetSetting("last_comics_check_ts", strconv.FormatInt(nowTs, 10)); err != nil {
+		logging.Warn("could not record the comics check time", "error", err)
+	}
+}
+
+// finishCycleWithoutDownloads ends a cycle that may not start downloads (for
+// example because the download disk is full). The stats are still persisted, so
+// the UI and /api/cycles show why nothing was downloaded.
+func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*models.CycleStats, error) {
+	if err := db.SaveCycle(stats); err != nil {
+		return nil, err
+	}
+	logging.Info(fmt.Sprintf(
+		"📊 CYCLE REPORT — scraped: %d | candidates: %d | downloads skipped (free space) | errors: %d",
+		stats.Scraped, stats.Candidates, stats.Errors))
+	logging.Info(cycleDivider)
+	return stats, nil
+}

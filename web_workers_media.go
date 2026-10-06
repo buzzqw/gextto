@@ -168,7 +168,7 @@ func flareSolverrSweeperWorker(state *AppState) {
 
 // bwm_truthy ports the `matches!(value, "yes" | "true" | "1")` setting check.
 func bwm_truthy(value string) bool {
-	return value == "yes" || value == "true" || value == "1"
+	return settingTruthy(value)
 }
 
 // bwm_optionalString renders a nullable error string as the tracing

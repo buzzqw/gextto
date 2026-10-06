@@ -1,13 +1,15 @@
-// Package cache is the persistent title -> magnet cache (legacy SmartCache,
-// corsaro_cache.json). Scrapers consult it before visiting a detail page, so a
-// release already seen in a previous cycle costs no HTTP request. The file is
-// written atomically and evicts the oldest half past maxEntries.
+// Package cache is the persistent detail-page -> magnet cache (legacy
+// SmartCache, corsaro_cache.json). Scrapers consult it before visiting a
+// detail page, so a release already seen in a previous cycle costs no HTTP
+// request. The file is written atomically and evicts the oldest half past
+// maxEntries.
 package cache
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/buzzqw/gextto/internal/utils"
@@ -22,11 +24,16 @@ type store struct {
 	path  string
 	data  map[string]string
 	dirty bool
+	// seq records the insertion order of keys set in this process, so eviction
+	// drops the oldest entries and never the one just added. Entries loaded
+	// from disk have sequence 0 and are therefore evicted first.
+	seq  map[string]uint64
+	next uint64
 }
 
 var (
 	mu    sync.Mutex
-	state = store{data: map[string]string{}}
+	state = store{data: map[string]string{}, seq: map[string]uint64{}}
 )
 
 // Init loads the on-disk cache from the gextto data directory. Safe to call
@@ -40,6 +47,7 @@ func Init(dataDir string) {
 	mu.Lock()
 	state.path = path
 	state.data = data
+	state.seq = map[string]uint64{}
 	state.dirty = false
 	mu.Unlock()
 }
@@ -57,21 +65,26 @@ func Set(key, value string) {
 	mu.Lock()
 	defer mu.Unlock()
 	state.data[key] = value
+	state.next++
+	state.seq[key] = state.next
 	state.dirty = true
 	if len(state.data) > maxEntries {
-		// Drop down to a bounded half. Go maps do not preserve insertion order,
-		// so the retained subset is arbitrary but bounded (legacy keeps the
-		// newest half).
+		// Keep the evictTo most recently set entries.
+		keys := make([]string, 0, len(state.data))
+		for k := range state.data {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool { return state.seq[keys[i]] > state.seq[keys[j]] })
 		kept := make(map[string]string, evictTo)
-		count := 0
-		for k, v := range state.data {
-			if count >= evictTo {
-				break
+		keptSeq := make(map[string]uint64, evictTo)
+		for _, k := range keys[:evictTo] {
+			kept[k] = state.data[k]
+			if order, ok := state.seq[k]; ok {
+				keptSeq[k] = order
 			}
-			kept[k] = v
-			count++
 		}
 		state.data = kept
+		state.seq = keptSeq
 	}
 }
 

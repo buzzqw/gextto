@@ -26,6 +26,14 @@ import (
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
+// Episode source origins. They are shown in the UI and returned by the API, and
+// the code also compares them, so every use goes through these constants.
+const (
+	episodeOriginFeed    = "Feed RSS"
+	episodeOriginArchive = "Archivio"
+	episodeOriginIndexer = "Indexer / web"
+)
+
 const gh7_external_search_timeout = 12 * time.Second
 
 const gh7_handler_magnet = `#!/bin/bash
@@ -256,7 +264,7 @@ func gh7_stored_series_episode_sources(s *AppState, series SeriesConfig, season,
 			for _, row := range rows {
 				if release := ParseRelease(row[0], row[1], row[2]); release != nil {
 					if gh7_release_matches_series_episode(release, series, season, episode) {
-						results = append(results, gh7_episode_result{Release: *release, Origin: "Feed RSS"})
+						results = append(results, gh7_episode_result{Release: *release, Origin: episodeOriginFeed})
 					}
 				}
 			}
@@ -268,7 +276,7 @@ func gh7_stored_series_episode_sources(s *AppState, series SeriesConfig, season,
 			for _, row := range rows {
 				if release := ParseRelease(row[0], row[1], row[2]); release != nil {
 					if gh7_release_matches_series_episode(release, series, season, episode) {
-						results = append(results, gh7_episode_result{Release: *release, Origin: "Archivio"})
+						results = append(results, gh7_episode_result{Release: *release, Origin: episodeOriginArchive})
 					}
 				}
 			}
@@ -314,7 +322,7 @@ func gh7_search_series_episode_sources(ctx context.Context, s *AppState, cfg *Co
 	if s.engine != nil {
 		for _, release := range s.engine.SearchSeriesEpisode(ctx, cfg, &series, season, episode, true) {
 			if gh7_release_matches_series_episode(&release, series, season, episode) {
-				results = append(results, gh7_episode_result{Release: release, Origin: "Indexer / web"})
+				results = append(results, gh7_episode_result{Release: release, Origin: episodeOriginIndexer})
 			}
 		}
 	}
@@ -724,7 +732,7 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 				}
 				if s.db != nil {
 					if err := s.db.RecordSeenBatch(results, cfg); err != nil {
-						logging.Debug("archive web search seen recording failed", "error", err)
+						logging.Warn("archive web search seen recording failed", "error", err)
 					}
 				}
 				logging.Info("archive web search completed", "query", term, "results", len(results))
@@ -788,7 +796,11 @@ func ComicCycle(w http.ResponseWriter, r *http.Request, s *AppState) {
 		s.cycle_lock.Lock()
 		defer s.cycle_lock.Unlock()
 	}
-	count, err := RunComicsCycle(s.comics, client, s.notifier, defaultRoot, s.activeEngine(), s.db, cfg)
+	// Bound to the daemon lifetime, not to the HTTP request: closing the page
+	// must not abort a comics cycle halfway.
+	ctx, cancel := s.BackgroundContext()
+	defer cancel()
+	count, err := RunComicsCycle(ctx, s.comics, client, s.notifier, defaultRoot, s.activeEngine(), s.db, cfg)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1135,13 +1147,13 @@ func SearchEpisode(w http.ResponseWriter, r *http.Request, s *AppState) {
 		}
 		if s.db != nil {
 			if err := s.db.RecordSeenBatch(releases, cfg); err != nil {
-				logging.Debug("episode search seen recording failed", "error", err)
+				logging.Warn("episode search seen recording failed", "error", err)
 			}
 		}
 	}
 	feedMatches := 0
 	for _, result := range results {
-		if result.Origin == "Feed RSS" {
+		if result.Origin == episodeOriginFeed {
 			feedMatches++
 		}
 	}

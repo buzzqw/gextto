@@ -452,7 +452,7 @@ func ComicWeeklySettings(w http.ResponseWriter, r *http.Request, s *AppState) {
 	historyLimit := s.comics.HistoryLimit()
 	jsonStatus(w, http.StatusOK, map[string]any{
 		"ok":               true,
-		"weekly_enabled":   enabledValue == "yes" || enabledValue == "true" || enabledValue == "1",
+		"weekly_enabled":   settingTruthy(enabledValue),
 		"weekly_from_date": fromDate,
 		"history_limit":    historyLimit,
 	})
@@ -725,6 +725,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cycleCtx, cancelCycle := s.BackgroundContext()
 	done := s.trackOperation()
 	go func() {
+		defer recoverGoroutine("g1 background")
 		defer done()
 		defer cancelCycle()
 		defer s.manualCyclePending.Store(false)
@@ -733,7 +734,7 @@ func RunNow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		logging.Info("manual cycle started", "domain", gh1_domainLabel(taskDomain))
 		now := time.Now().UTC()
 		s.last_cycle.Set(models.CycleStats{LastStartedAt: &now, ErrorDetails: map[string]int{}})
-		notifier := FromConfig(&cfg)
+		notifier := FromConfig(&cfg).Async()
 		stats, runErr := RunCycleDomain(
 			cycleCtx,
 			&cfg,
@@ -1041,6 +1042,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 	for i := 0; i < workerCount; i++ {
 		wait.Add(1)
 		go func() {
+			defer recoverGoroutine("g1 background")
 			defer wait.Done()
 			for task := range jobs {
 				results <- task()

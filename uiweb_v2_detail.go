@@ -175,11 +175,11 @@ func v2SourceKey(link, title string) string {
 func v2SourcePreferred(candidate, current v2SourceRow) bool {
 	rank := func(origin string) int {
 		switch {
-		case strings.EqualFold(origin, "Indexer / web"):
+		case strings.EqualFold(origin, episodeOriginIndexer):
 			return 3
-		case strings.EqualFold(origin, "Archivio"):
+		case strings.EqualFold(origin, episodeOriginArchive):
 			return 2
-		case strings.EqualFold(origin, "Feed RSS"):
+		case strings.EqualFold(origin, episodeOriginFeed):
 			return 1
 		default:
 			return 0
@@ -215,7 +215,7 @@ func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 	all := v2EpisodeResultsView(s, r.FormValue("series"), r.FormValue("season"), r.FormValue("episode"), false)
 	view := v2SourcesView{Label: all.Label, Hint: "Nessuna release in archivio per questa puntata. Usa 🔍 per cercare online.", Redirect: all.Redirect}
 	for _, row := range all.Results {
-		if strings.EqualFold(row.Origin, "Archivio") {
+		if strings.EqualFold(row.Origin, episodeOriginArchive) {
 			view.Results = append(view.Results, row)
 		}
 	}
@@ -234,7 +234,7 @@ func V2SeriesEpisodeSearch(w http.ResponseWriter, r *http.Request, s *AppState) 
 	stored := v2EpisodeResultsView(s, series, season, episode, false)
 	view := v2SourcesView{Label: stored.Label, Redirect: stored.Redirect}
 	for _, row := range stored.Results {
-		if strings.EqualFold(row.Origin, "Archivio") {
+		if strings.EqualFold(row.Origin, episodeOriginArchive) {
 			view.Results = append(view.Results, row)
 		}
 	}
@@ -253,12 +253,12 @@ func V2SeriesEpisodeSearchOnline(w http.ResponseWriter, r *http.Request, s *AppS
 	// A release already shown in the archive section must not reappear here.
 	archived := map[string]bool{}
 	for _, row := range all.Results {
-		if strings.EqualFold(row.Origin, "Archivio") {
+		if strings.EqualFold(row.Origin, episodeOriginArchive) {
 			archived[row.Key] = true
 		}
 	}
 	for _, row := range all.Results {
-		if strings.EqualFold(row.Origin, "Archivio") || archived[row.Key] {
+		if strings.EqualFold(row.Origin, episodeOriginArchive) || archived[row.Key] {
 			continue
 		}
 		view.Results = append(view.Results, row)

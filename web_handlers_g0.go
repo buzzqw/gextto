@@ -641,6 +641,7 @@ func RecentDownloads(w http.ResponseWriter, r *http.Request, s *AppState) {
 	for index := range items {
 		wg.Add(1)
 		go func(position int, item RecentDownload) {
+			defer recoverGoroutine("recent downloads")
 			defer wg.Done()
 			value := gh0_toMap(item)
 			var poster *string
@@ -812,6 +813,7 @@ func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 	for index := range enabled {
 		wg.Add(1)
 		go func(position int, series SeriesConfig) {
+			defer recoverGoroutine("series list")
 			defer wg.Done()
 			var tmdbID *string
 			if strings.TrimSpace(series.TmdbID) == "" {
@@ -1200,6 +1202,7 @@ func gh0_addParsedRelease(ctx context.Context, s *AppState, release models.Relea
 	engine := s.activeEngine()
 	cfg := s.cfg
 	go func() {
+		defer recoverGoroutine("g0 background")
 		added, err := engine.Add(source, cfg)
 		if err != nil {
 			logging.Error("manual torrent add failed", "title", title, "error", err)

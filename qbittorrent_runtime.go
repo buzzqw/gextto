@@ -726,6 +726,7 @@ func startManagedQbittorrent(cfg *Config, settings qbittorrentSettings) (*manage
 	}
 	process := &managedQbittorrentProcess{cmd: command, logFile: logFile, done: make(chan error, 1)}
 	go func() {
+		defer recoverGoroutine("qbittorrent process wait")
 		err := command.Wait()
 		_ = logFile.Close()
 		process.done <- err

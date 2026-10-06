@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -346,7 +347,7 @@ func leetFold(value string) string {
 // release coi torrent già attivi nella sessione.
 func ParseEpisodeKey(name string) *models.LiveEpisodeKey {
 	pattern, err := utils.CachedRegex(
-		`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,2})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`,
+		`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<s>\d{1,4})e|(?P<ns>\d{1,2})x)(?P<e>\d{1,4})`,
 	)
 	if err != nil {
 		return nil
@@ -468,9 +469,9 @@ func ParseQuality(title string) models.Quality {
 		resolution = "2160p"
 	case strings.Contains(low, "1080p") || strings.Contains(low, "fullhd"):
 		resolution = "1080p"
-	case strings.Contains(low, "720p") || strings.Contains(low, "hd"):
+	case strings.Contains(low, "720p") || hdWordRe.MatchString(low):
 		resolution = "720p"
-	case strings.Contains(low, "576p") || strings.Contains(low, "pal"):
+	case strings.Contains(low, "576p") || palWordRe.MatchString(low):
 		resolution = "576p"
 	case strings.Contains(low, "480p") || strings.Contains(low, "ntsc"):
 		resolution = "480p"
@@ -551,7 +552,7 @@ func ParseQuality(title string) models.Quality {
 		audio = "ddp"
 	case strings.Contains(low, "ac3") || strings.Contains(low, "dd5.1"):
 		audio = "ac3"
-	case strings.Contains(low, "5.1"):
+	case audio51Re.MatchString(low):
 		audio = "5.1"
 	case strings.Contains(low, "mp3"):
 		audio = "mp3"
@@ -567,6 +568,10 @@ func ParseQuality(title string) models.Quality {
 			group = groups[1]
 		} else if groups[2] != "" {
 			group = groups[2]
+		}
+		// The tail of a hyphenated tag ("WEB-DL", "Blu-Ray") is not a release group.
+		if (group == "dl" && strings.HasSuffix(low, "web-dl")) || (group == "ray" && strings.HasSuffix(low, "blu-ray")) {
+			group = "unknown"
 		}
 	}
 
@@ -765,17 +770,25 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	}
 	// Ordine di riconoscimento come legacy: range, multi-episodio concatenato,
 	// SxxExx singolo, NxNN, data (YYYY-MM-DD), stagione completa.
-	rangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,2})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`)
-	multiRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,2})((?:e\d{1,4}){2,})(?:[ ._-]|$)`)
-	standardRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,2})e(\d{1,4})(?:[ ._-]|$)`)
+	rangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`)
+	multiRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})((?:e\d{1,4}){2,})(?:[ ._-]|$)`)
+	standardRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})(?:[ ._-]|$)`)
 	nxRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})(?:[ ._-]|$)`)
+	itaRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+stagione[ ._-]*(\d{1,2})[ ._-]+(?:episodio|puntata|ep\.?)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
 	dateRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ ._-]|$)`)
-	seasonPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:s|season[ ._-]?)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`)
+	seasonPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`)
 	seriesName := func(capture []string) *string {
 		if capture == nil || capture[1] == "" {
 			return nil
 		}
 		value := strings.TrimSpace(strings.ReplaceAll(capture[1], ".", " "))
+		// A resolution tag placed before SxxExx ("Show.2160p.S02E10") is not part
+		// of the series name.
+		value = trailingResolutionRe.ReplaceAllString(value, "")
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return nil
+		}
 		return &value
 	}
 	episodeTokenRe := utils.MustCachedRegex(`(?i)e(\d{1,4})`)
@@ -857,6 +870,19 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 				episodeRange = []int64{episodeValue}
 			}
 		}
+	} else if capture := itaRe.FindStringSubmatch(title); capture != nil {
+		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
+		if err != nil {
+			return nil
+		}
+		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
+		if err != nil {
+			return nil
+		}
+		series = seriesName(capture)
+		season = &seasonValue
+		episode = &episodeValue
+		episodeRange = []int64{episodeValue}
 	} else if capture := dateRe.FindStringSubmatch(title); capture != nil {
 		year, err := strconv.ParseInt(capture[2], 10, 64)
 		if err != nil {
@@ -894,12 +920,7 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	if season != nil {
 		kind = "series"
 	}
-	var year *int64
-	if capture := utils.MustCachedRegex(`\b(19\d{2}|20\d{2})\b`).FindStringSubmatch(title); capture != nil && capture[1] != "" {
-		if value, err := strconv.ParseInt(capture[1], 10, 64); err == nil {
-			year = &value
-		}
-	}
+	year := releaseYear(title)
 	// E00 is a real special/recap episode, not a complete-season pack. Only
 	// titles matched by seasonPackRe use the {0} range as a pack sentinel.
 	isPack := len(episodeRange) > 1 || seasonPack
@@ -981,3 +1002,48 @@ func int64SlicesEqual(a, b []int64) bool {
 	}
 	return true
 }
+
+// trailingResolutionRe matches resolution tags left at the end of a series name.
+var trailingResolutionRe = regexp.MustCompile(`(?i)(?:[ ]+(?:480p|576p|720p|1080p|1080i|2160p|4320p|4k|uhd))+$`)
+
+var (
+	yearTokenRe      = regexp.MustCompile(`\b(19\d{2}|20\d{2})\b`)
+	firstTechTokenRe = regexp.MustCompile(`(?i)\b(480p|576p|720p|1080p|1080i|2160p|4320p|4k|uhd|bluray|bdrip|web[ ._-]?dl|webrip|hdtv|dvdrip|remux)\b`)
+)
+
+// releaseYear picks the release year of a title. A number that is part of the
+// title ("1917", "2001: A Space Odyssey", "Wonder Woman 1984") must not win over
+// the real year that follows it, so the last year token before the first
+// technical tag (resolution, source) is used.
+func releaseYear(title string) *int64 {
+	scope := title
+	if loc := firstTechTokenRe.FindStringIndex(title); loc != nil {
+		scope = title[:loc[0]]
+	}
+	matches := yearTokenRe.FindAllStringSubmatch(scope, -1)
+	if len(matches) == 0 {
+		// No year before the technical tags: accept the first one anywhere.
+		matches = yearTokenRe.FindAllStringSubmatch(title, 1)
+		if len(matches) == 0 {
+			return nil
+		}
+		value, err := strconv.ParseInt(matches[0][1], 10, 64)
+		if err != nil {
+			return nil
+		}
+		return &value
+	}
+	value, err := strconv.ParseInt(matches[len(matches)-1][1], 10, 64)
+	if err != nil {
+		return nil
+	}
+	return &value
+}
+
+var (
+	// "5.1" must stand alone: it also appears across digits in "x265.10bit" or
+	// "2024.05.12".
+	audio51Re = regexp.MustCompile(`(?:^|[^0-9])5\.1(?:[^0-9]|$)`)
+	hdWordRe  = regexp.MustCompile(`(?:^|[^a-z0-9-])hd(?:[^a-z0-9-]|$)|hdtv`)
+	palWordRe = regexp.MustCompile(`\bpal\b`)
+)

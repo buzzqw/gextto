@@ -97,9 +97,9 @@ func ValidateWatchedFolders(folders []WatchedFolder) string {
 	return ""
 }
 
-// is_candidate reports whether a path names a `.torrent`/`.magnet` file worth
+// watchedCandidate reports whether a path names a `.torrent`/`.magnet` file worth
 // importing, skipping hidden and partial files.
-func is_candidate(path string) bool {
+func watchedCandidate(path string) bool {
 	name := filepath.Base(path)
 	if strings.HasPrefix(name, ".") {
 		return false
@@ -111,8 +111,14 @@ func is_candidate(path string) bool {
 	return strings.HasSuffix(lower, ".torrent") || strings.HasSuffix(lower, ".magnet")
 }
 
-// visit walks a directory collecting candidate files.
-func visit(dir string, recursive bool, out *[]string) {
+// watchedMaxDepth bounds the recursive scan of a watched folder: a folder
+// pointed at a large tree by mistake must not be walked in full every 15 s.
+const watchedMaxDepth = 8
+
+// watchedVisit walks a directory collecting candidate files, descending at most
+// depth more levels. Symlinked directories are not followed (DirEntry does not
+// resolve them), so a link loop cannot recurse forever.
+func watchedVisit(dir string, recursive bool, depth int, out *[]string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -120,12 +126,12 @@ func visit(dir string, recursive bool, out *[]string) {
 	for _, entry := range entries {
 		path := filepath.Join(dir, entry.Name())
 		if entry.IsDir() {
-			if recursive {
-				visit(path, recursive, out)
+			if recursive && depth > 0 {
+				watchedVisit(path, recursive, depth-1, out)
 			}
 			continue
 		}
-		if is_candidate(path) {
+		if watchedCandidate(path) {
 			*out = append(*out, path)
 		}
 	}
@@ -143,7 +149,7 @@ func ScanFolder(folder WatchedFolder) []string {
 		return []string{}
 	}
 	out := []string{}
-	visit(root, folder.Recursive, &out)
+	watchedVisit(root, folder.Recursive, watchedMaxDepth, &out)
 	sort.Strings(out)
 	return out
 }

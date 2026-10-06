@@ -624,12 +624,19 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		// when its state was restored from the database after a daemon restart;
 		// unrelated user-paused torrents never enter watch and remain untouched.
 		if (torrent.State != "downloading" && torrent.State != "stalled" && !(torrent.State == "paused" && wasStalled)) || torrent.Progress >= 100.0 {
-			torrents.ClearStalled(torrent.Hash)
-			delete(watch, torrent.Hash)
-			_ = db.DeleteStallWatch(torrent.Hash)
+			if wasStalled {
+				torrents.ClearStalled(torrent.Hash)
+				// Only a stalled entry was ever persisted: do not issue a DELETE for
+				// every seeding/paused torrent at every tick.
+				if stallWatchPersisted(watch[torrent.Hash]) {
+					_ = db.DeleteStallWatch(torrent.Hash)
+				}
+				delete(watch, torrent.Hash)
+			}
 			continue
 		}
 		entry, ok := watch[torrent.Hash]
+		persisted := ok && stallWatchPersisted(entry)
 		if !ok {
 			entry = StallWatch{
 				lastProgressAt: now,
@@ -659,8 +666,10 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			}
 			entry.nextRetryAt = now
 			watch[torrent.Hash] = entry
-			torrents.ClearStalled(torrent.Hash)
-			_ = db.DeleteStallWatch(torrent.Hash)
+			if persisted {
+				torrents.ClearStalled(torrent.Hash)
+				_ = db.DeleteStallWatch(torrent.Hash)
+			}
 			continue
 		}
 		entry.lastProgressAt = progressAt
@@ -771,12 +780,21 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
 		}
 	}
-	for hash := range watch {
+	for hash, entry := range watch {
 		if _, ok := live[hash]; !ok {
 			delete(watch, hash)
-			_ = db.DeleteStallWatch(hash)
+			if stallWatchPersisted(entry) {
+				_ = db.DeleteStallWatch(hash)
+			}
 		}
 	}
+}
+
+// stallWatchPersisted reports whether a monitor entry has a database row: rows
+// are written only once a torrent is declared stalled (and restored with
+// stalledSince set after a restart).
+func stallWatchPersisted(entry StallWatch) bool {
+	return entry.stalledSince != nil
 }
 
 // ---------------------------------------------------------------------------
