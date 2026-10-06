@@ -95,3 +95,13 @@ func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
 		t.Fatal("an empty run must not log")
 	}
 }
+
+func TestSeedFinishedIsAnnouncedOnce(t *testing.T) {
+	reason := "seed time reached"
+	if got := seedFinishedLead("FBI.S07E11.mkv", &reason); got != "«FBI.S07E11.mkv» has finished seeding (seed time reached)" {
+		t.Fatalf("first lead = %q", got)
+	}
+	if got := seedFinishedLead("FBI.S07E11.mkv", &reason); got != "«FBI.S07E11.mkv»" {
+		t.Fatalf("second lead = %q, the end of seeding must be announced once", got)
+	}
+}

@@ -342,3 +342,15 @@ func mediaInfoBackfillText(names []string, failed, missing int) string {
 	}
 	return text
 }
+
+// seedFinishedLead opens a line about a torrent whose seeding may have just
+// ended: "«X» has finished seeding (ratio reached)" the first time, «X»
+// otherwise. It clears *reason so the end of seeding is announced once.
+func seedFinishedLead(name string, reason *string) string {
+	if reason == nil || *reason == "" {
+		return "«" + name + "»"
+	}
+	lead := fmt.Sprintf("«%s» has finished seeding (%s)", name, *reason)
+	*reason = ""
+	return lead
+}

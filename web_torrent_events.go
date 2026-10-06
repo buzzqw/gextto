@@ -1163,7 +1163,9 @@ func tev_clearEmptyDestination(destination, name string) {
 }
 
 // tev_postSeedRelocate implements `post_seed_relocate`.
-func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry) bool {
+// seedReason, when not empty, is why seeding just ended: the relocation line
+// then also announces it (one line instead of two) and clears it.
+func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, torrent *models.TorrentView, postSeedMoves map[string]struct{}, storageMoveRetries map[string]StorageMoveRetry, seedReason *string) bool {
 	if retry, ok := storageMoveRetries[strings.ToLower(torrent.Hash)]; ok && retry.postSeed {
 		return true
 	}
@@ -1208,8 +1210,7 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 				"hash", torrent.Hash, "name", torrent.Name, "destination", destination, "error", err.Error())
 			return false
 		}
-		logging.Info("📁 existing post-seed archive associated",
-			"destination", destination, "size", logging.HumanBytesI64(torrent.TotalSize))
+		logging.Info(fmt.Sprintf("📁 %s: its library copy is already in %s", seedFinishedLead(torrent.Name, seedReason), destination))
 		postSeedMoves[torrent.Hash] = struct{}{}
 		storageMoveRetries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
 			destination: destination,
@@ -1231,8 +1232,8 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 		logging.Debug("post-seeding relocation was not applied", "hash", torrent.Hash, "name", torrent.Name)
 		return false
 	}
-	logging.Info(fmt.Sprintf("📁 Seeding finished for «%s»: moving it to the library (%s) in %s",
-		torrent.Name, logging.HumanBytesI64(torrent.TotalSize), destination))
+	logging.Info(fmt.Sprintf("📁 %s: moving it to the library in %s (%s)",
+		seedFinishedLead(torrent.Name, seedReason), destination, logging.HumanBytesI64(torrent.TotalSize)))
 	logging.Debug("post-seeding relocation", "hash", torrent.Hash, "from", current)
 	postSeedMoves[torrent.Hash] = struct{}{}
 	storageMoveRetries[strings.ToLower(torrent.Hash)] = StorageMoveRetry{
@@ -1711,6 +1712,9 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 			continue
 		}
 		stopped := torrent.State == "paused" && !torrent.AutoManaged
+		// Announced together with the move to the library when one follows,
+		// otherwise on its own below.
+		seedReason := ""
 		if !stopped {
 			value, err := torrents.Pause(torrent.Hash)
 			if err != nil {
@@ -1731,7 +1735,7 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 				} else if ratioReached {
 					reason = "ratio reached"
 				}
-				logging.Info(fmt.Sprintf("⏸️ Seeding finished for «%s» (%s)", torrent.Name, reason))
+				seedReason = reason
 			} else {
 				logging.Warn("torrent seed limit could not be applied in current mode",
 					"hash", torrent.Hash, "name", torrent.Name)
@@ -1740,7 +1744,10 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 		if !stopped {
 			continue
 		}
-		if tev_postSeedRelocate(cfg, torrents, db, &torrent, postSeedMoves, retries) {
+		if tev_postSeedRelocate(cfg, torrents, db, &torrent, postSeedMoves, retries, &seedReason) {
+			if seedReason != "" {
+				logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)))
+			}
 			continue
 		}
 		// Archive at the end of the seed: a completed torrent that kept its
@@ -1765,14 +1772,18 @@ func EnforceSeedPolicy(cfg *Config, torrents TorrentSession, db *Database, postS
 									nextAttempt: time.Now().Add(600 * time.Second),
 									inFlight:    true,
 								}
-								logging.Debug("📁 MOVING TO NAS — completed download archived at the end of the seed",
-									"hash", torrent.Hash, "name", torrent.Name, "from", torrent.SavePath, "to", dest)
+								logging.Info(fmt.Sprintf("📁 %s: moving it to the library in %s (%s)",
+									seedFinishedLead(torrent.Name, &seedReason), dest, logging.HumanBytesI64(torrent.TotalSize)))
+								logging.Debug("post-seed archive move", "hash", torrent.Hash, "from", torrent.SavePath)
 								continue
 							}
 						}
 					}
 				}
 			}
+		}
+		if seedReason != "" {
+			logging.Info(fmt.Sprintf("⏸️ %s", seedFinishedLead(torrent.Name, &seedReason)))
 		}
 		if cfg.Libtorrent.AutoRemoveCompleted {
 			if !tev_completedSourceDisposable(db, torrent.Hash, torrent.SavePath) {
