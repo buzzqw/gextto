@@ -305,3 +305,40 @@ func recordHashFailure(hash string) (int, bool) {
 	count := hashFailures.counts[key]
 	return count, count == hashFailureAlertThreshold
 }
+
+// mediaInfoBackfillText summarises a MediaInfo backfill run: which library
+// files had their real quality read, and why that matters. Empty when there
+// is nothing worth telling.
+func mediaInfoBackfillText(names []string, failed, missing int) string {
+	if len(names) == 0 && failed == 0 && missing == 0 {
+		return ""
+	}
+	var text string
+	if len(names) > 0 {
+		const shown = 4
+		listed := names
+		more := ""
+		if len(listed) > shown {
+			more = fmt.Sprintf(" and %d more", len(listed)-shown)
+			listed = listed[:shown]
+		}
+		text = fmt.Sprintf("🔬 Read the real quality (resolution, HDR, audio) of %s: %s%s. Future upgrades will be compared with what is actually on disk",
+			countLabel(len(names), "library file", "library files"), strings.Join(listed, ", "), more)
+	} else {
+		text = "🔬 Library quality check"
+	}
+	var problems []string
+	if failed > 0 {
+		problems = append(problems, countLabel(failed, "file could not be read", "files could not be read"))
+	}
+	if missing > 0 {
+		problems = append(problems, countLabel(missing, "file is no longer on disk", "files are no longer on disk"))
+	}
+	if len(problems) > 0 {
+		if len(names) == 0 {
+			return text + ": " + strings.Join(problems, ", ")
+		}
+		text += "; " + strings.Join(problems, ", ")
+	}
+	return text
+}

@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -77,5 +78,20 @@ func TestHashFailuresAlertOnceAfterThreshold(t *testing.T) {
 	}
 	if _, alert := recordHashFailure("another-hash"); alert {
 		t.Fatal("a single damaged piece must not alert")
+	}
+}
+
+func TestMediaInfoBackfillTextNamesTheFiles(t *testing.T) {
+	got := mediaInfoBackfillText([]string{"Wolf Like Me S01E01", "Wolf Like Me S01E02", "Silo S03E04"}, 0, 0)
+	want := "🔬 Read the real quality (resolution, HDR, audio) of 3 library files: Wolf Like Me S01E01, Wolf Like Me S01E02, Silo S03E04. Future upgrades will be compared with what is actually on disk"
+	if got != want {
+		t.Fatalf("got %q", got)
+	}
+	got = mediaInfoBackfillText([]string{"A", "B", "C", "D", "E", "F"}, 1, 2)
+	if !strings.Contains(got, "A, B, C, D and 2 more") || !strings.Contains(got, "1 file could not be read, 2 files are no longer on disk") {
+		t.Fatalf("got %q", got)
+	}
+	if mediaInfoBackfillText(nil, 0, 0) != "" {
+		t.Fatal("an empty run must not log")
 	}
 }

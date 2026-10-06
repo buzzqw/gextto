@@ -160,6 +160,21 @@ type MediaInfoBackfillTarget struct {
 	Path    string `json:"path"`
 }
 
+// displayName names the library item for a person: "Show S01E02" or
+// "Movie (2024)".
+func (t MediaInfoBackfillTarget) displayName() string {
+	if t.Kind == "movie" {
+		if t.Year != nil && *t.Year > 0 {
+			return fmt.Sprintf("%s (%d)", t.Name, *t.Year)
+		}
+		return t.Name
+	}
+	if t.Season != nil && t.Episode != nil {
+		return fmt.Sprintf("%s S%02dE%02d", t.Series, *t.Season, *t.Episode)
+	}
+	return t.Series
+}
+
 // HousekeepingReport is the serialisable result of `housekeeping`.
 type HousekeepingReport struct {
 	OldCyclesRemoved      int `json:"old_cycles_removed"`

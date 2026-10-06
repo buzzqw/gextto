@@ -1416,6 +1416,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 	failedItems := []any{}
 	missingItems := []any{}
 	missingFiles := []string{}
+	probedNames := []string{}
 	for index, target := range targets {
 		if ctx != nil && ctx.Err() != nil {
 			break
@@ -1466,6 +1467,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		}
 		if updated > 0 {
 			probed++
+			probedNames = append(probedNames, target.displayName())
 			logging.Debug("MediaInfo analyzed for archived file",
 				"kind", target.Kind, "series", target.Series, "season", target.Season,
 				"episode", target.Episode, "name", target.Name, "resolution", info.Resolution(),
@@ -1487,6 +1489,7 @@ func gh0_runMediaInfoBackfill(ctx context.Context, s *AppState, limit int, onPro
 		"failed_items":  failedItems,
 		"missing_items": missingItems,
 		"missing_files": missingFiles,
+		"probed_names":  probedNames,
 	}, nil
 }
 

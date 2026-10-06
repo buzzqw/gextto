@@ -90,8 +90,10 @@ func mediaInfoBackfillWorker(state *AppState) {
 					candidates := bwm_reportCount(report, "candidates")
 					if candidates > 0 {
 						missingFiles, _ := report["missing_files"].([]string)
-						logging.Info(fmt.Sprintf("🔬 Read the technical details (resolution, HDR, audio) of %s in the library",
-							countLabel(bwm_reportCount(report, "probed"), "file", "files")))
+						probedNames, _ := report["probed_names"].([]string)
+						if text := mediaInfoBackfillText(probedNames, int(bwm_reportCount(report, "failed")), int(bwm_reportCount(report, "skipped"))); text != "" {
+							logging.Info(text)
+						}
 						logging.Debug(
 							"MediaInfo backfill report",
 							"candidates", candidates,
