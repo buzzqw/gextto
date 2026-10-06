@@ -259,6 +259,9 @@ func TestClientWritesEndpoints(t *testing.T) {
 	if err := client.SetSpeedLimits(ctx, 100, 50); err != nil {
 		t.Fatalf("SetSpeedLimits: %v", err)
 	}
+	if err := client.SetTempLimits(ctx, 500, 0, 30, false); err != nil {
+		t.Fatalf("SetTempLimits: %v", err)
+	}
 	if err := client.PauseHTTPDownload(ctx, "http-1"); err != nil {
 		t.Fatalf("PauseHTTPDownload: %v", err)
 	}
@@ -288,6 +291,7 @@ func TestClientWritesEndpoints(t *testing.T) {
 		"POST /api/torrents/abc/no_rename":         `"value":true`,
 		"POST /api/torrents/remove_completed":      `"delete_files":false`,
 		"POST /api/set-speed-limits":               `"download_kib":100`,
+		"POST /api/torrents/temp-limits":           `"minutes":30`,
 		"POST /api/comics/downloads/http-1/pause":  "",
 		"POST /api/comics/downloads/http-1/resume": "",
 		"POST /api/comics/downloads/http-1/remove": `"delete_files":false`,
@@ -342,5 +346,89 @@ func TestClientAPIError(t *testing.T) {
 	apiErr, ok := err.(*APIError)
 	if !ok || apiErr.Status != 400 || !strings.Contains(apiErr.Detail, "boom") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLibraryClientRequests(t *testing.T) {
+	client, recorded := newTestClient(t, func(w http.ResponseWriter, r *http.Request, body string) {
+		switch {
+		case r.URL.Path == "/api/config/library":
+			writeJSON(t, w, map[string]any{"series": []any{map[string]any{"name": "Show", "episodes_total": 3, "episodes_downloaded": 1}}, "movies": []any{map[string]any{"id": 7, "name": "Film", "language_requirements": "ita"}}})
+		case strings.HasSuffix(r.URL.Path, "/rename-preview"):
+			writeJSON(t, w, map[string]any{"items": []any{map[string]any{"to": "a"}, map[string]any{"error": "x"}}})
+		case strings.HasSuffix(r.URL.Path, "/sources"), strings.HasSuffix(r.URL.Path, "/search"):
+			writeJSON(t, w, map[string]any{"results": []any{map[string]any{"release": map[string]any{"title": "Show S01E02"}, "score": 5}}})
+		default:
+			writeJSON(t, w, map[string]any{"ok": true})
+		}
+	})
+	ctx := context.Background()
+	series, movies, err := client.Library(ctx)
+	if err != nil || len(series) != 1 || series[0].EpisodesTotal != 3 || len(movies) != 1 || movies[0].LanguageRequirements != "ita" {
+		t.Fatalf("Library = %+v %+v %v", series, movies, err)
+	}
+	if err := client.UpdateSeries(ctx, "Lo Show", map[string]any{"enabled": false}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteSeries(ctx, "Lo Show"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ToggleSeason(ctx, "Show", 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := client.SeriesRename(ctx, "Show", false); err != nil || count != 1 {
+		t.Fatalf("SeriesRename = %d %v", count, err)
+	}
+	if items, err := client.EpisodeSources(ctx, "Show", 1, 2); err != nil || len(items) != 1 || items[0]["title"] != "Show S01E02" {
+		t.Fatalf("EpisodeSources = %+v %v", items, err)
+	}
+	if _, err := client.SearchEpisode(ctx, "Show", 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.IgnoreEpisode(ctx, "Show", 1, 2, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.RedownloadEpisode(ctx, "Show", 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.UpdateMovie(ctx, MovieConfig{ID: 7, Name: "Film", LanguageRequirements: "ita"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.DeleteMovie(ctx, 7); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.TmdbSearch(ctx, "movie", "film"); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.TmdbAdd(ctx, map[string]any{"kind": "series", "name": "Show", "tmdb_id": "42"}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"POST /api/series/Lo%20Show":             `"enabled":false`,
+		"DELETE /api/series/Lo%20Show":           "",
+		"POST /api/series/Show/toggle-season":    `"season":2`,
+		"POST /api/series/Show/rename-preview":   "",
+		"GET /api/episodes/Show/1/2/sources":     "",
+		"POST /api/episodes/Show/1/2/search":     "",
+		"POST /api/episodes/Show/1/2/ignore":     `"ignored":true`,
+		"POST /api/episodes/Show/1/2/redownload": "",
+		"POST /api/movies/7":                     `"language_requirements":"ita"`,
+		"DELETE /api/movies/7":                   "",
+		"POST /api/tmdb/search":                  `"kind":"movie"`,
+		"POST /api/tmdb/add":                     `"tmdb_id":"42"`,
+	}
+	seen := map[string]bool{}
+	for _, request := range *recorded {
+		key := request.method + " " + request.path
+		seen[key] = true
+		if needle, ok := want[key]; ok && needle != "" && !strings.Contains(request.body, needle) {
+			t.Errorf("%s body %s does not contain %s", key, request.body, needle)
+		}
+	}
+	for key := range want {
+		if !seen[key] {
+			t.Errorf("request %s not sent; sent %+v", key, *recorded)
+		}
 	}
 }

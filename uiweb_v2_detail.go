@@ -40,37 +40,24 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 		redirect = "/?view=series&series=" + url.QueryEscape(name)
 	}
 	if name != "" {
-		if raw, status := v2InternalJSON(s, http.MethodGet, "/api/config/library", nil, nil); status < 400 {
-			var library struct {
-				Series []map[string]any `json:"series"`
-				Movies []map[string]any `json:"movies"`
-			}
-			if json.Unmarshal(raw, &library) == nil {
-				updated := make([]map[string]any, 0, len(library.Series))
-				for _, item := range library.Series {
-					if v2String(item["name"]) == name {
-						item["seasons"] = r.FormValue("seasons")
-						item["quality"] = r.FormValue("quality")
-						item["language"] = r.FormValue("language")
-						item["subtitle"] = r.FormValue("subtitle")
-						item["tvdb_id"] = strings.TrimSpace(r.FormValue("tvdb_id"))
-						item["archive_path"] = r.FormValue("archive_path")
-						item["exclude"] = r.FormValue("exclude")
-						aliases := []string{}
-						for _, part := range strings.Split(r.FormValue("aliases"), ",") {
-							if trimmed := strings.TrimSpace(part); trimmed != "" {
-								aliases = append(aliases, trimmed)
-							}
-						}
-						item["aliases"] = aliases
-					}
-					updated = append(updated, item)
-				}
-				if body, err := json.Marshal(updated); err == nil {
-					v2InternalJSON(s, http.MethodPost, "/api/config/series", nil, body)
-				}
+		aliases := []string{}
+		for _, part := range strings.Split(r.FormValue("aliases"), ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				aliases = append(aliases, trimmed)
 			}
 		}
+		// Only the edited fields: the per-series endpoint keeps everything else.
+		body, _ := json.Marshal(map[string]any{
+			"seasons":      r.FormValue("seasons"),
+			"quality":      r.FormValue("quality"),
+			"language":     r.FormValue("language"),
+			"subtitle":     r.FormValue("subtitle"),
+			"tvdb_id":      r.FormValue("tvdb_id"),
+			"archive_path": r.FormValue("archive_path"),
+			"exclude":      r.FormValue("exclude"),
+			"aliases":      aliases,
+		})
+		v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(name), nil, body)
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, redirect, http.StatusSeeOther)

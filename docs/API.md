@@ -187,6 +187,8 @@ Per verifiche operative usa prima
 | GET | `/api/series/seen` |
 | GET | `/api/series/seen/grouped` |
 | GET | `/api/series/{name}` |
+| POST | `/api/series/{name}` |
+| DELETE | `/api/series/{name}` |
 | GET | `/api/series/{name}/episodes` |
 | GET | `/api/series/{name}/info` |
 | POST | `/api/series/{name}/metadata` |
@@ -252,6 +254,7 @@ Per verifiche operative usa prima
 | POST | `/api/torrents/sequential` |
 | POST | `/api/torrents/set_limits` |
 | GET | `/api/torrents/stats` |
+| GET | `/api/torrents/temp-limits` |
 | POST | `/api/torrents/temp-limits` |
 | POST | `/api/torrents/unpin` |
 | DELETE | `/api/torrents/{hash}` |

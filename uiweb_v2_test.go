@@ -1143,3 +1143,39 @@ func TestV2TableRowActionsPreserveToolbarSearch(t *testing.T) {
 		}
 	}
 }
+
+// TestV2LibraryEditsKeepFieldsOutsideTheListView guards against rewriting the
+// library from /api/config/library, which does not carry tvdb_id or
+// disable_upgrades and reports computed ignored seasons.
+func TestV2LibraryEditsKeepFieldsOutsideTheListView(t *testing.T) {
+	state := newTestAppState(t)
+	series := SeriesConfig{Name: "Test Show", Seasons: "2+", Quality: "1080p", Language: "ita", TvdbID: "77", DisableUpgrades: true, Enabled: true}
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{series}, []MovieConfig{{ID: 7, Name: "Test Movie", Enabled: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.db.SaveSeriesMetadata("Test Show", [][2]int64{{1, 10}, {2, 10}}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	check := func(step string, enabled bool) {
+		t.Helper()
+		got := latestConfig(state).Series[0]
+		if got.TvdbID != "77" || !got.DisableUpgrades || len(got.IgnoredSeasons) != 0 || got.Enabled != enabled {
+			t.Fatalf("%s: series = %+v", step, got)
+		}
+	}
+	v2Request(t, server, http.MethodPost, "/table/library", url.Values{"view": {"series"}, "scope": {"series"}, "name": {"Test Show"}, "mode": {"toggle"}})
+	check("series toggle", false)
+	v2Request(t, server, http.MethodPost, "/table/library", url.Values{"view": {"movies"}, "scope": {"movies"}, "name": {"Test Movie"}, "mode": {"toggle"}})
+	check("movie toggle", false)
+	if movie := latestConfig(state).Movies[0]; movie.Enabled {
+		t.Fatalf("movie toggle not applied: %+v", movie)
+	}
+	v2Request(t, server, http.MethodPost, "/series/save", url.Values{"name": {"Test Show"}, "seasons": {"2+"}, "quality": {"720p"}, "language": {"ita"}, "tvdb_id": {"77"}})
+	check("series save", false)
+	if got := latestConfig(state).Series[0].Quality; got != "720p" {
+		t.Fatalf("series save quality = %q", got)
+	}
+}

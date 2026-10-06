@@ -143,6 +143,13 @@ func Run(ctx context.Context, opts Options) error {
 			archivePage:  model.ArchivePage,
 			logLimit:     logLimitForHeight(terminalHeight),
 		}
+		if model.SeriesView != nil {
+			request.seriesName = model.SeriesView.Name
+		}
+		if model.Maintenance != nil {
+			copy := *model.Maintenance
+			request.maintenance = &copy
+		}
 		go func() {
 			defer guard()
 			result := fetchModel(ctx, client, request)
@@ -158,7 +165,9 @@ func Run(ctx context.Context, opts Options) error {
 	requestRefresh()
 	var termOut, termIn int64
 	startAction := func(action Action) bool {
-		if action.Kind == ActionRefresh {
+		if action.Kind == ActionRefresh || action.Kind == ActionLoadSeries || action.Kind == ActionLoadMovie {
+			// Also reload the library list behind a detail opened from
+			// another tab.
 			lastSlow = time.Time{}
 		}
 		if action.Kind == ActionCopy {
@@ -471,10 +480,15 @@ type refreshResult struct {
 	hasHTTP       bool
 	series        []SeriesLibraryItem
 	hasSeries     bool
-	movies        []MovieLibraryItem
+	movies        []MovieConfig
 	hasMovies     bool
 	comics        []ComicLibraryItem
+	seriesDetail  *SeriesDetail
 	hasComics     bool
+	speedPolicy   *SpeedPolicy
+	maintenance   *MaintenanceData
+	torrentTags   map[string]string
+	tagCatalog    []string
 }
 
 // fetchModel polls the daemon with a short timeout. It is safe to call from a
@@ -486,6 +500,8 @@ const slowRefresh = 10 * time.Second
 // fetchRequest is a snapshot of the model fields a background poll needs.
 type fetchRequest struct {
 	includeSlow  bool
+	seriesName   string
+	maintenance  *MaintenanceData
 	includeLogs  bool
 	tab          Tab
 	archiveQuery string
@@ -523,6 +539,15 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 			result.hasHTTP = true
 		}
 	}
+	if tab == TabTorrents && request.includeSlow {
+		if policy, err := client.SpeedPolicy(callCtx); err == nil {
+			result.speedPolicy = &policy
+		}
+		if tags, err := client.TorrentTags(callCtx); err == nil {
+			catalog, _ := client.DownloadTags(callCtx)
+			result.torrentTags, result.tagCatalog = tags, catalog
+		}
+	}
 	if includeLogs {
 		if logs, err := client.Logs(callCtx, logLimit); err == nil {
 			result.logs = logs
@@ -549,15 +574,26 @@ func fetchModel(ctx context.Context, client *Client, request fetchRequest) refre
 			result.hasBlocklist = true
 		}
 	case TabLibrary:
-		if series, err := client.Series(callCtx); err == nil {
-			result.series, result.hasSeries = series, true
+		// The library (with per-series episode counts) changes slowly and is
+		// costly for the daemon: poll it with the slow data, and reload the
+		// open series detail with it. Actions reload what they change.
+		if request.includeSlow {
+			if series, movies, err := client.Library(callCtx); err == nil {
+				result.series, result.hasSeries = series, true
+				result.movies, result.hasMovies = movies, true
+			}
+			if comics, err := client.Comics(callCtx); err == nil {
+				result.comics, result.hasComics = comics, true
+			}
+			if request.seriesName != "" {
+				if detail, err := client.SeriesDetail(callCtx, request.seriesName); err == nil {
+					result.seriesDetail = &detail
+				}
+			}
 		}
-		if movies, err := client.Movies(callCtx); err == nil {
-			result.movies, result.hasMovies = movies, true
-		}
-		if comics, err := client.Comics(callCtx); err == nil {
-			result.comics, result.hasComics = comics, true
-		}
+	}
+	if tab == TabMaintenance {
+		result.maintenance = fetchMaintenance(callCtx, client, request.includeSlow, request.maintenance)
 	}
 	if tab == TabHealth {
 		if health, err := client.Health(callCtx); err == nil {
@@ -599,14 +635,14 @@ func (m *Model) applyRefresh(result refreshResult) {
 	} else if result.hasTorrents {
 		m.sampleTransfer()
 	}
-	if result.hasSeries {
-		m.SetLibrary(result.series)
-	}
-	if result.hasMovies {
-		m.SetLibrary(result.movies)
+	if result.hasSeries && result.hasMovies {
+		m.SetLibraryData(result.series, result.movies)
 	}
 	if result.hasComics {
 		m.SetLibrary(result.comics)
+	}
+	if result.seriesDetail != nil {
+		m.SetSeriesDetail(*result.seriesDetail)
 	}
 	if result.hasLogs && !m.LogStreamConnected {
 		m.SetLogs(result.logs)
@@ -621,6 +657,15 @@ func (m *Model) applyRefresh(result refreshResult) {
 	if result.hasMissing {
 		m.Missing = result.missing
 		m.MissingSelected = min(m.MissingSelected, max(0, len(m.Missing)-1))
+	}
+	if result.speedPolicy != nil {
+		m.SetSpeedPolicy(*result.speedPolicy)
+	}
+	if result.maintenance != nil {
+		m.Maintenance = result.maintenance
+	}
+	if result.torrentTags != nil {
+		m.SetTorrentTags(result.torrentTags, result.tagCatalog)
 	}
 	if result.hasBlocklist {
 		m.Blocklist = result.blocklist
@@ -827,13 +872,33 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		if err := client.SetSpeedLimits(callCtx, action.DL, action.UL); err != nil {
 			return fail("msg.actionfailed", "limits", err)
 		}
+		policy, policyErr := client.SpeedPolicy(callCtx)
 		result.apply = func(m *Model) {
 			if m.Config != nil {
 				m.Config.DownloadLimitKib = action.DL
 				m.Config.UploadLimitKib = action.UL
 			}
+			if policyErr == nil {
+				m.SetSpeedPolicy(policy)
+			}
 		}
 		result.message = tr.Format("msg.limits", action.DL, action.UL)
+	case ActionSetTempLimits, ActionClearTempLimits:
+		clear := action.Kind == ActionClearTempLimits
+		if err := client.SetTempLimits(callCtx, action.DL, action.UL, action.Minutes, clear); err != nil {
+			return fail("msg.actionfailed", "temp-limits", err)
+		}
+		if policy, err := client.SpeedPolicy(callCtx); err == nil {
+			result.apply = func(m *Model) { m.SetSpeedPolicy(policy) }
+		}
+		switch {
+		case clear:
+			result.message = tr.T("msg.tempcleared")
+		case action.Minutes > 0:
+			result.message = tr.Format("msg.tempset", kibLabel(tr, action.DL), kibLabel(tr, action.UL), action.Minutes)
+		default:
+			result.message = tr.Format("msg.tempsetkeep", kibLabel(tr, action.DL), kibLabel(tr, action.UL))
+		}
 	case ActionLoadConfig:
 		config, err := client.Config(callCtx)
 		if err != nil {
@@ -975,6 +1040,14 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		}
 		result.message = tr.T("msg.blocklistremoved")
 		result.refresh = true
+	default:
+		if torrentResult, handled := performTorrentAction(callCtx, client, tr, action); handled {
+			return torrentResult
+		}
+		if maintResult, handled := performMaintenanceAction(callCtx, client, tr, action); handled {
+			return maintResult
+		}
+		return performLibraryAction(callCtx, client, tr, action)
 	}
 	return result
 }

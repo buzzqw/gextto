@@ -44,6 +44,7 @@ type Torrent struct {
 	Error           string   `json:"error"`
 	DownloadLimit   int64    `json:"download_limit"`
 	UploadLimit     int64    `json:"upload_limit"`
+	SuperSeeding    bool     `json:"super_seeding"`
 }
 
 // ComicDownload mirrors one live HTTP/MEGA comic download.
@@ -70,6 +71,11 @@ type SeriesLibraryItem struct {
 	ArchivePath string   `json:"archive_path"`
 	Enabled     bool     `json:"enabled"`
 	Aliases     []string `json:"aliases"`
+	// Present only in /api/config/library.
+	EpisodesTotal      int64   `json:"episodes_total"`
+	EpisodesDownloaded int64   `json:"episodes_downloaded"`
+	LastDownloadedAt   *string `json:"last_downloaded_at"`
+	TmdbStatus         string  `json:"tmdb_status"`
 }
 
 // MovieLibraryItem is the compact row returned by /api/movies.
@@ -171,6 +177,23 @@ type ConfigSnapshot struct {
 		DownloadLimitKib int64 `json:"download_limit_kib"`
 		UploadLimitKib   int64 `json:"upload_limit_kib"`
 	} `json:"libtorrent"`
+}
+
+// SpeedPolicy mirrors GET /api/torrents/temp-limits: the global limits in
+// force and where they come from ("temp", "schedule" or "base").
+type SpeedPolicy struct {
+	Source           string `json:"source"`
+	DownloadKib      int64  `json:"download_kib"`
+	UploadKib        int64  `json:"upload_kib"`
+	TempActive       bool   `json:"temp_active"`
+	TempDownloadKib  int64  `json:"temp_download_kib"`
+	TempUploadKib    int64  `json:"temp_upload_kib"`
+	TempRemainingSec int64  `json:"temp_remaining_sec"`
+	SchedActive      bool   `json:"sched_active"`
+	BaseDownloadKib  int64  `json:"base_download_kib"`
+	BaseUploadKib    int64  `json:"base_upload_kib"`
+	// AutoRemoveCompleted is not a limit, but the same downloads panel.
+	AutoRemoveCompleted bool `json:"auto_remove_completed"`
 }
 
 // PathCheck is one health path entry.
@@ -707,6 +730,20 @@ func (c *Client) RemoveCompleted(ctx context.Context, deleteFiles bool) (map[str
 func (c *Client) SetSpeedLimits(ctx context.Context, downloadKib, uploadKib int64) error {
 	return c.postJSON(ctx, "/api/set-speed-limits",
 		map[string]any{"download_kib": downloadKib, "upload_kib": uploadKib}, nil)
+}
+
+// SpeedPolicy fetches the global speed limits in force.
+func (c *Client) SpeedPolicy(ctx context.Context) (SpeedPolicy, error) {
+	var policy SpeedPolicy
+	err := c.get(ctx, "/api/torrents/temp-limits", &policy)
+	return policy, err
+}
+
+// SetTempLimits applies temporary KiB/s limits for the given minutes (0 keeps
+// them until removed); clear removes them and restores the normal limits.
+func (c *Client) SetTempLimits(ctx context.Context, downloadKib, uploadKib, minutes int64, clear bool) error {
+	return c.postJSON(ctx, "/api/torrents/temp-limits",
+		map[string]any{"download_kib": downloadKib, "upload_kib": uploadKib, "minutes": minutes, "clear": clear}, nil)
 }
 
 // CleanTrash empties the trash.

@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 )
 
-const tabCount = 8
+const tabCount = 9
 
 // Render produces a frame for the given terminal size. It is pure: the same
 // state always renders the same lines, which makes the layout testable.
@@ -40,8 +40,14 @@ func (m *Model) Render(width, height int) Screen {
 		content = m.renderEvents(width, contentHeight)
 	case m.Overlay == OverlaySettings:
 		content = m.renderSettings(width, contentHeight)
+	case m.Overlay == OverlayHistory:
+		content = m.renderHistory(width, contentHeight)
+	case m.Overlay == OverlayMaintenance:
+		content = m.renderMaintenanceReport(width, contentHeight)
+	case m.Form != nil:
+		content = m.renderForm(width, contentHeight)
 	case m.Detail != nil:
-		content = m.renderDetail(width)
+		content = m.renderDetail(width, contentHeight)
 	case m.ArchiveDetail != nil:
 		content = m.renderArchiveDetail(width)
 	case m.Tab == TabStatus:
@@ -56,8 +62,14 @@ func (m *Model) Render(width, height int) Screen {
 		content = m.renderMissing(width, contentHeight)
 	case m.Tab == TabBlocklist:
 		content = m.renderBlocklist(width, contentHeight)
+	case m.Tab == TabLibrary && m.SeriesView != nil:
+		content = m.renderSeriesView(width, contentHeight)
+	case m.Tab == TabLibrary && m.MovieView != nil:
+		content = m.renderMovieView(width, contentHeight)
 	case m.Tab == TabLibrary:
 		content = m.renderLibrary(width, contentHeight)
+	case m.Tab == TabMaintenance:
+		content = m.renderMaintenance(width, contentHeight)
 	default:
 		content = m.renderHealth(width)
 		pageScroll = true
@@ -172,7 +184,7 @@ func nextCycleSeconds(value string) int64 {
 }
 
 func (m *Model) tabsLine(width int) string {
-	labels := []string{m.Tr.T("tab.status"), m.Tr.T("tab.torrents"), m.Tr.T("tab.logs"), m.Tr.T("tab.health"), m.Tr.T("tab.archive"), m.Tr.T("tab.missing"), m.Tr.T("tab.blocklist"), m.Tr.T("tab.library")}
+	labels := []string{m.Tr.T("tab.status"), m.Tr.T("tab.torrents"), m.Tr.T("tab.logs"), m.Tr.T("tab.health"), m.Tr.T("tab.archive"), m.Tr.T("tab.missing"), m.Tr.T("tab.blocklist"), m.Tr.T("tab.library"), m.Tr.T("tab.maintenance")}
 	parts := make([]string, 0, tabCount)
 	for index, label := range labels {
 		if Tab(index) == m.Tab {
@@ -181,7 +193,10 @@ func (m *Model) tabsLine(width int) string {
 			parts = append(parts, fmt.Sprintf(" %d:%s ", index+1, label))
 		}
 	}
-	full := "  " + strings.Join(parts, " ") + "  (" + m.Tr.T("hint.tabs") + ")"
+	full := "  " + strings.Join(parts, " ")
+	if withHint := full + "  (" + m.Tr.T("hint.tabs") + ")"; utf8.RuneCountInString(withHint) <= width {
+		return withHint
+	}
 	if utf8.RuneCountInString(full) <= width {
 		return full
 	}
@@ -207,12 +222,28 @@ func (m *Model) hints() string {
 	switch {
 	case m.Overlay == OverlaySettings:
 		hints = m.Tr.T("hint.settings")
+	case m.Overlay == OverlayHistory:
+		hints = m.Tr.T("hint.history")
+	case m.Overlay == OverlayMaintenance:
+		hints = m.Tr.T("hint.report")
+	case m.Overlay == OverlaySearch && m.SearchKind != SearchReleases:
+		hints = m.Tr.T("hint.tmdb")
+	case m.Overlay == OverlaySearch:
+		hints = m.Tr.T("hint.search")
+	case m.Form != nil:
+		hints = m.Tr.T("hint.form")
+	case m.Detail != nil && m.DetailView == DetailFiles:
+		hints = m.Tr.T("hint.detailfiles")
+	case m.Detail != nil && m.DetailView == DetailTrackers:
+		hints = m.Tr.T("hint.detailtrackers")
 	case m.Detail != nil:
 		hints = m.Tr.T("hint.details")
 	case m.ArchiveDetail != nil:
 		hints = m.Tr.T("hint.archivedetail")
 	case m.Tab == TabStatus:
 		hints = m.Tr.T("hint.status")
+	case m.Tab == TabTorrents && len(m.MarkedHashes()) > 0:
+		hints = m.Tr.T("hint.torrentsmarked")
 	case m.Tab == TabTorrents:
 		hints = m.Tr.T("hint.torrents")
 	case m.Tab == TabLogs:
@@ -225,8 +256,16 @@ func (m *Model) hints() string {
 		hints = m.Tr.T("hint.missing")
 	case m.Tab == TabBlocklist:
 		hints = m.Tr.T("hint.blocklist")
-	case m.Tab == TabLibrary:
+	case m.Tab == TabMaintenance:
+		hints = m.Tr.T("hint.maintenance")
+	case m.Tab == TabLibrary && m.SeriesView != nil:
+		hints = m.Tr.T("hint.series")
+	case m.Tab == TabLibrary && m.MovieView != nil:
+		hints = m.Tr.T("hint.movie")
+	case m.Tab == TabLibrary && m.Library == LibraryComics:
 		hints = m.Tr.T("hint.library")
+	case m.Tab == TabLibrary:
+		hints = m.Tr.T("hint.librarymanage")
 	}
 	if hints == "" {
 		return m.Tr.T("hint.global")
@@ -726,9 +765,18 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 	if len(items) > 0 {
 		title = fmt.Sprintf("%s: %d/%d", m.Tr.T("tab.torrents"), m.Selected+1, len(items))
 	}
+	if marked := len(m.MarkedHashes()); marked > 0 {
+		title += "  · " + m.Tr.Format("label.marked", marked)
+	}
 	title += fmt.Sprintf("  · %s %s%s", m.Tr.T("label.sort"), sortName, direction)
 	if m.Filter != "" {
 		title += fmt.Sprintf("  · %s '%s'", m.Tr.T("label.filter"), m.Filter)
+	}
+	if policy := m.speedPolicyLabel(); policy != "" {
+		title += "  · " + policy
+	}
+	if m.SpeedPolicy != nil && m.SpeedPolicy.AutoRemoveCompleted {
+		title += "  · " + m.Tr.T("label.autoremove")
 	}
 	lines := []Line{{Text: title, Style: StyleHeader}}
 	if len(items) == 0 {
@@ -741,11 +789,16 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		m.TorrentScroll = start
 		return start, end
 	}
+	// Two cells: the cursor, then the bulk mark.
 	marker := func(index int) string {
+		cursor, mark := " ", " "
 		if index == m.Selected {
-			return ">"
+			cursor = ">"
 		}
-		return " "
+		if row := items[index]; row.Torrent != nil && m.Marked[row.Torrent.Hash] {
+			mark = "*"
+		}
+		return cursor + mark
 	}
 	rowStyle := func(index int, _ string) Style {
 		if index == m.Selected {
@@ -754,7 +807,7 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		return downloadRowStyle(items[index])
 	}
 	compactRow := func(index int, item DownloadRow) string {
-		name, _, _ := downloadRowFields(item)
+		name := m.rowName(item)
 		return fmt.Sprintf("%s %s %.1f%% %s", marker(index), downloadStateLabel(m.Tr, item), downloadRowProgress(item), name)
 	}
 	if width < 50 {
@@ -792,7 +845,7 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		return lines
 	}
 	nameWidth := max(10, width-72)
-	header := fmt.Sprintf("  %s %s %s %s %s %s  %s",
+	header := fmt.Sprintf("   %s %s %s %s %s %s  %s",
 		PadRight(m.Tr.T("label.hash"), 9), PadRight(m.Tr.T("label.state"), 14),
 		PadLeft(m.Tr.T("label.progress"), 6), PadLeft(m.Tr.T("label.done"), 10),
 		PadLeft(m.Tr.T("label.down"), 11), PadLeft(m.Tr.T("label.up"), 11), m.Tr.T("label.name"))
@@ -806,12 +859,13 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 			PadLeft(HumanRate(down), 11), PadLeft(HumanRate(up), 11))
 	}
 	budget := max(1, contentHeight-len(lines))
-	selectedName, _, _ := downloadRowFields(items[m.Selected])
+	selectedName := m.rowName(items[m.Selected])
 	nameRows := selectedRows(selectedName, nameWidth, 0, budget-2)
 	start, end := window(budget - (len(nameRows) - 1))
 	for index := start; index < end; index++ {
 		item := items[index]
-		name, state, _ := downloadRowFields(item)
+		_, state, _ := downloadRowFields(item)
+		name := m.rowName(item)
 		prefix := tableRow(index, item)
 		if index != m.Selected {
 			lines = append(lines, Line{Text: prefix + Shorten(name, nameWidth), Style: rowStyle(index, state)})
@@ -828,6 +882,45 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		}
 	}
 	return lines
+}
+
+// rowName is the displayed name, prefixed by the download tag.
+func (m *Model) rowName(row DownloadRow) string {
+	name, _, _ := downloadRowFields(row)
+	if row.Torrent != nil {
+		if tag := m.TorrentTags[row.Torrent.Hash]; tag != "" {
+			return "#" + tag + " " + name
+		}
+	}
+	return name
+}
+
+// speedPolicyLabel describes the global limits in force, like the badge
+// above the web download list.
+func (m *Model) speedPolicyLabel() string {
+	policy := m.SpeedPolicy
+	if policy == nil {
+		return ""
+	}
+	if minutes, active := m.TempLimitMinutes(); active {
+		down, up := kibLabel(m.Tr, policy.TempDownloadKib), kibLabel(m.Tr, policy.TempUploadKib)
+		if minutes == 0 {
+			return m.Tr.Format("policy.tempkeep", down, up)
+		}
+		return m.Tr.Format("policy.temp", down, up, minutes)
+	}
+	if policy.SchedActive && policy.Source == "schedule" {
+		return m.Tr.Format("policy.sched", kibLabel(m.Tr, policy.DownloadKib), kibLabel(m.Tr, policy.UploadKib))
+	}
+	return m.Tr.Format("policy.base", kibLabel(m.Tr, policy.BaseDownloadKib), kibLabel(m.Tr, policy.BaseUploadKib))
+}
+
+// kibLabel shows a KiB/s limit, with 0 meaning no limit.
+func kibLabel(tr *Translator, kib int64) string {
+	if kib <= 0 {
+		return tr.T("label.unlimited")
+	}
+	return fmt.Sprintf("%d KiB/s", kib)
 }
 
 func downloadStateLabel(tr *Translator, row DownloadRow) string {
@@ -973,6 +1066,11 @@ func selectedRows(text string, width, indent, maxExtra int) []string {
 
 // catalogRows renders a selectable list with the selected entry expanded.
 func catalogRows(texts []string, selected int, scroll *int, height, width int) []Line {
+	return styledRows(texts, nil, selected, scroll, height, width)
+}
+
+// styledRows is catalogRows with a style for each entry that is not selected.
+func styledRows(texts []string, styles []Style, selected int, scroll *int, height, width int) []Line {
 	if len(texts) == 0 {
 		return nil
 	}
@@ -989,7 +1087,11 @@ func catalogRows(texts []string, selected int, scroll *int, height, width int) [
 			}
 			continue
 		}
-		lines = append(lines, Line{Text: "  " + texts[index], Style: StyleNormal})
+		style := StyleNormal
+		if index < len(styles) {
+			style = styles[index]
+		}
+		lines = append(lines, Line{Text: "  " + texts[index], Style: style})
 	}
 	return lines
 }
@@ -1077,7 +1179,27 @@ func (m *Model) renderLibrary(width, contentHeight int) []Line {
 	if m.LibraryFilter != "" {
 		title += " · " + m.Tr.T("label.filter") + " '" + m.LibraryFilter + "'"
 	}
-	lines := []Line{{Text: title, Style: StyleHeader}, {Text: m.Tr.T("library.switch"), Style: StyleMuted}}
+	// A sub-tab bar: inside the library the digits pick series, movies or
+	// comics, not the main tabs, and this must be visible.
+	kinds := []struct {
+		kind  LibraryKind
+		label string
+		count int
+	}{
+		{LibrarySeries, m.Tr.T("library.series"), len(m.Series)},
+		{LibraryMovies, m.Tr.T("library.movies"), len(m.Movies)},
+		{LibraryComics, m.Tr.T("library.comics"), len(m.Comics)},
+	}
+	bar := make([]string, len(kinds))
+	for index, item := range kinds {
+		label := fmt.Sprintf("%d %s (%d)", index+1, item.label, item.count)
+		if item.kind == m.Library {
+			bar[index] = "[" + label + "]"
+		} else {
+			bar[index] = " " + label + " "
+		}
+	}
+	lines := []Line{{Text: strings.Join(bar, "  ") + "   " + m.Tr.T("library.switch"), Style: StyleSelected}, {Text: title, Style: StyleHeader}}
 	if len(items) == 0 {
 		return append(lines, Line{Text: m.Tr.T("msg.emptylibrary"), Style: StyleMuted})
 	}
@@ -1164,11 +1286,14 @@ func floatPointerValue(value *float64) any {
 	return *value
 }
 
-func (m *Model) renderDetail(width int) []Line {
+func (m *Model) renderDetail(width, contentHeight int) []Line {
 	if m.Detail == nil {
 		return nil
 	}
 	torrent := m.Detail.Torrent
+	if m.DetailView == DetailFiles || m.DetailView == DetailTrackers {
+		return m.renderDetailSelectable(width, contentHeight)
+	}
 	if m.DetailView != DetailGeneral {
 		labels := map[DetailView]string{DetailTrackers: m.Tr.T("label.trackers"), DetailFiles: m.Tr.T("label.files"), DetailPeers: m.Tr.T("label.peers")}
 		lines := []Line{{Text: fmt.Sprintf("%s: %d", labels[m.DetailView], len(m.DetailItems)), Style: StyleHeader}}
@@ -1223,6 +1348,9 @@ func (m *Model) renderDetail(width int) []Line {
 		{m.Tr.T("label.peersseeds"), fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
 		{m.Tr.T("label.queuepos"), fmt.Sprintf("%d", torrent.QueuePosition)},
 		{m.Tr.T("label.seedlimit"), seedLimit},
+		{m.Tr.T("label.torrentlimits"), kibLabel(m.Tr, torrent.DownloadLimit/1024) + " ↓ · " + kibLabel(m.Tr, torrent.UploadLimit/1024) + " ↑"},
+		{m.Tr.T("label.tag"), firstNonEmpty(m.TorrentTags[torrent.Hash], "-")},
+		{m.Tr.T("label.superseeding"), boolLabel(torrent.SuperSeeding)},
 		{m.Tr.T("label.metadata"), metadata},
 		{m.Tr.T("label.version2"), torrent.TorrentVersion},
 		{m.Tr.T("label.automanaged"), boolLabel(torrent.AutoManaged)},
@@ -1241,10 +1369,62 @@ func (m *Model) renderDetail(width int) []Line {
 	return lines
 }
 
+// renderDetailSelectable lists the files or trackers of the open torrent
+// with a cursor, so a file priority or a tracker can be changed.
+func (m *Model) renderDetailSelectable(width, contentHeight int) []Line {
+	label := m.Tr.T("label.files")
+	if m.DetailView == DetailTrackers {
+		label = m.Tr.T("label.trackers")
+	}
+	lines := []Line{{Text: fmt.Sprintf("%s · %s: %d", Shorten(m.Detail.Torrent.Name, max(10, width/2)), label, len(m.DetailItems)), Style: StyleHeader}}
+	if len(m.DetailItems) == 0 {
+		return append(lines, Line{Text: m.Tr.T("msg.loading"), Style: StyleMuted})
+	}
+	texts := make([]string, len(m.DetailItems))
+	styles := make([]Style, len(m.DetailItems))
+	for index, item := range m.DetailItems {
+		styles[index] = StyleNormal
+		if m.DetailView == DetailTrackers {
+			texts[index] = joinNonEmpty(fmt.Sprintf("tier %s", OptionalNumber(item["tier"], "", 0)), stringValue(item["url"]), stringValue(item["message"]))
+			if numberValue(item["fails"]) > 0 {
+				styles[index] = StyleWarn
+			}
+			continue
+		}
+		priority := int(numberValue(item["priority"]))
+		if priority == 0 {
+			styles[index] = StyleMuted
+		}
+		size := numberValue(item["size"])
+		percent := 0.0
+		if size > 0 {
+			percent = numberValue(item["downloaded"]) * 100 / size
+		}
+		texts[index] = fmt.Sprintf("%-8s %5.1f%% %9s  %s", m.priorityLabel(priority), percent, HumanBytes(size), stringValue(item["path"]))
+	}
+	return append(lines, styledRows(texts, styles, m.DetailSelected, &m.DetailScroll, contentHeight-1, width)...)
+}
+
+// priorityLabel names a libtorrent file priority (0 skip … 7 top).
+func (m *Model) priorityLabel(priority int) string {
+	switch {
+	case priority <= 0:
+		return m.Tr.T("priority.skip")
+	case priority < 4:
+		return m.Tr.T("priority.low")
+	case priority == 4:
+		return m.Tr.T("priority.normal")
+	case priority < 7:
+		return m.Tr.T("priority.high")
+	default:
+		return m.Tr.T("priority.top")
+	}
+}
+
 func (m *Model) renderHelp(width int) []Line {
 	keys := []string{
 		"help.title", "", "help.global", "help.global2", "help.torrents", "help.torrents2",
-		"help.torrents3", "help.torrents4", "help.details", "help.status", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "help.terminal", "help.bandwidth", "",
+		"help.torrents3", "help.torrents4", "help.details", "help.status", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "help.series", "help.movie", "help.form", "help.terminal", "help.bandwidth", "",
 		"help.close",
 	}
 	lines := make([]Line, 0, len(keys))
@@ -1272,7 +1452,21 @@ func (m *Model) renderSearch(width, contentHeight int) []Line {
 	}
 	texts := make([]string, len(m.SearchResults))
 	for index, result := range m.SearchResults {
-		texts[index] = fmt.Sprintf("%s · %s · %s", stringValue(result["title"]), stringValue(result["source"]), qualityLabel(result["quality"]))
+		if m.SearchKind != SearchReleases {
+			texts[index] = m.tmdbResultText(result)
+			continue
+		}
+		parts := []string{stringValue(result["title"]), stringValue(result["source"]), qualityLabel(result["quality"])}
+		if _, ok := result["score"]; ok {
+			parts = append(parts, m.Tr.Format("label.score", int64(numberValue(result["score"]))))
+		}
+		if size := numberValue(result["size_bytes"]); size > 0 {
+			parts = append(parts, HumanBytes(size))
+		}
+		if seeders := numberValue(result["seeders"]); seeders > 0 {
+			parts = append(parts, m.Tr.Format("label.seeders", int64(seeders)))
+		}
+		texts[index] = joinNonEmpty(parts...)
 	}
 	return append(lines, catalogRows(texts, m.SearchSelected, &m.SearchScroll, contentHeight-1, width)...)
 }

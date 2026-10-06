@@ -451,3 +451,87 @@ func TestWebApiUnknownRoute404(t *testing.T) {
 		t.Fatalf("unknown route status = %d, want 404", status)
 	}
 }
+
+func TestTempLimitsReportTheSpeedPolicyInForce(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	read := func() map[string]any {
+		t.Helper()
+		code, _, body := webGet(t, server, "/api/torrents/temp-limits")
+		if code != http.StatusOK {
+			t.Fatalf("GET temp-limits -> %d: %s", code, body)
+		}
+		var policy map[string]any
+		if err := json.Unmarshal(body, &policy); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return policy
+	}
+	if policy := read(); policy["source"] != "base" || policy["temp_active"] != false {
+		t.Fatalf("initial policy = %v", policy)
+	}
+
+	if code, body := webPostJSON(t, server, "/api/torrents/temp-limits", `{"download_kib":500,"upload_kib":100,"minutes":30}`); code != http.StatusOK {
+		t.Fatalf("POST temp-limits -> %d: %s", code, body)
+	}
+	policy := read()
+	if policy["source"] != "temp" || policy["temp_active"] != true || policy["download_kib"] != 500.0 || policy["upload_kib"] != 100.0 {
+		t.Fatalf("temporary policy = %v", policy)
+	}
+	if remaining := policy["temp_remaining_sec"].(float64); remaining <= 1700 || remaining > 1800 {
+		t.Fatalf("temp_remaining_sec = %v", remaining)
+	}
+
+	if code, body := webPostJSON(t, server, "/api/torrents/temp-limits", `{"clear":true}`); code != http.StatusOK {
+		t.Fatalf("POST clear -> %d: %s", code, body)
+	}
+	if policy := read(); policy["source"] != "base" || policy["temp_active"] != false {
+		t.Fatalf("cleared policy = %v", policy)
+	}
+}
+
+func TestUpdateAndDeleteSeriesChangeOnlyTheGivenFields(t *testing.T) {
+	state := newTestAppState(t)
+	original := SeriesConfig{Name: "Show", Seasons: "1+", Quality: "1080p", Language: "ita", TvdbID: "77", TmdbID: "11", DisableUpgrades: true, Enabled: true, IgnoredSeasons: []int64{2}}
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{original, {Name: "Other", Seasons: "1+", Enabled: true}}, []MovieConfig{{ID: 7, Name: "Film"}}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	if code, body := webPostJSON(t, server, "/api/series/Show", `{"enabled":false,"quality":" 720p ","aliases":["Lo Show",""]}`); code != http.StatusOK {
+		t.Fatalf("POST series -> %d: %s", code, body)
+	}
+	cfg := latestConfig(state)
+	got := cfg.Series[0]
+	if got.Enabled || got.Quality != "720p" || len(got.Aliases) != 1 || got.Aliases[0] != "Lo Show" {
+		t.Fatalf("changed fields not applied: %+v", got)
+	}
+	if got.TvdbID != "77" || got.TmdbID != "11" || !got.DisableUpgrades || got.Language != "ita" || len(got.IgnoredSeasons) != 1 || got.IgnoredSeasons[0] != 2 {
+		t.Fatalf("untouched fields were lost: %+v", got)
+	}
+	if len(cfg.Movies) != 1 {
+		t.Fatalf("movies must be kept: %+v", cfg.Movies)
+	}
+	if code, _ := webPostJSON(t, server, "/api/series/Show", `{"seasons":"  "}`); code != http.StatusBadRequest {
+		t.Fatalf("empty seasons -> %d, want 400", code)
+	}
+	if code, _ := webPostJSON(t, server, "/api/series/Missing", `{"enabled":true}`); code != http.StatusNotFound {
+		t.Fatalf("unknown series -> %d, want 404", code)
+	}
+
+	request, _ := http.NewRequest(http.MethodDelete, server.URL+"/api/series/Lo%20Show", nil)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("DELETE by alias -> %d", response.StatusCode)
+	}
+	if cfg := latestConfig(state); len(cfg.Series) != 1 || cfg.Series[0].Name != "Other" {
+		t.Fatalf("series after delete: %+v", cfg.Series)
+	}
+}

@@ -35,13 +35,27 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 2. **Download** — elenco unificato torrent + download HTTP dei fumetti con stato,
    progresso, byte, velocità e nome; filtro (`F`), ordinamento (`o`/`O`), dettagli
    torrent (`Invio`), pausa/ripresa e rimozione dei download HTTP.
+   L'intestazione mostra i limiti di banda in vigore (base, programmati o
+   temporanei con i minuti rimasti). `T` imposta un limite temporaneo come nella
+   web: `DL UL [minuti]` in KiB/s, dove `0` è illimitato e senza minuti (o con
+   `0`) il limite resta finché non lo rimuovi; `off` lo rimuove e ripristina i
+   limiti normali. La durata massima è 1440 minuti.
 3. **Log** — ultime righe, filtro (`/`), segui (`f`), stream SSE live.
 4. **Salute** — CPU/RAM/disco, percorsi, dischi, RAM disk, ultimi errori.
 5. **Archivio** — archivio delle release, filtro e accodamento diretto.
-6. **Mancanti** — episodi mancanti della libreria monitorata.
+6. **Mancanti** — episodi mancanti della libreria monitorata: `Invio` apre la
+   serie sull'episodio, `s` lo cerca sugli indexer, `i` lo ignora.
 7. **Blocklist** — release bloccate, con rimozione interattiva.
-8. **Libreria** — viste compatte per Serie TV, Film e Fumetti monitorati, con
-   stato attivo, metadati essenziali e filtro testuale.
+8. **Libreria** — Serie TV, Film e Fumetti monitorati. Serie e film si
+   gestiscono da qui: aggiunta cercando su TMDB, modifica dei requisiti con un
+   modulo a campi, pausa ed eliminazione. Il dettaglio di una serie mostra una
+   stagione alla volta con lo stato di ogni episodio (✓ presente, ✗ mancante,
+   ↓ in download, `·` in uscita, `-` ignorato); da lì si attivano o
+   disattivano le stagioni, si cercano e accodano le release, si ignorano o
+   riscaricano episodi, si aggiornano i metadati e si rinominano i file. Il
+   dettaglio di un film mostra trama, storico e release già in archivio.
+   L'elenco si aggiorna ogni 10 secondi; le azioni ricaricano subito ciò che
+   cambiano. I fumetti restano in sola lettura.
 
 Completamenti, errori, stalli e archiviazioni arrivano come messaggio temporaneo
 nella barra inferiore. La TUI mostra anche gli stessi cambi di stato per i
@@ -53,16 +67,19 @@ download HTTP dei fumetti.
 | --- | --- |
 | Globali | `1`-`8`/`Tab` schede · `l` Libreria · `r` aggiorna · `?` aiuto · `q` esci |
 | Aggiunta | `a` magnet/URL · `t` file `.torrent` · `c` ciclo · `s` cerca · `e` eventi |
-| Download | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli torrent · `p` pausa/riprendi · `d`/`D` rimuovi (torrent con o senza file; HTTP dalla lista) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti · `o`/`O` ordina · `F` filtro |
+| Download | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `Invio` dettagli torrent · `p` pausa/riprendi · `d`/`D` rimuovi (torrent con o senza file; HTTP dalla lista) · `X` pulisci completati · `k` verifica · `R` riannuncia · `n` senza-rinomina · `i`/`u` pin/unpin · `L` limiti globali · `T` limite temporaneo · `o`/`O` ordina · `F` filtro |
 | Dettagli | `1` generale · `2` tracker · `3` file · `4` peer · `↑↓` scorri · `Esc`/`Invio` indietro |
 | Log | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` · `/` filtro · `f` segui/ferma |
 | Stato | `↑↓`/`PgUp`/`PgDn`/`Home`/`End` scorri |
 | Salute | `↑↓`/`PgUp`/`PgDn` scorri · `x` svuota cestino (con conferma) |
 | Terminale | `Ctrl-L` ridisegna tutto · incolla un magnet/URL per aprire "aggiungi" già compilato |
 | Archivio | `↑↓` seleziona · `Invio` accoda · `/` filtro |
-| Mancanti | `↑↓` seleziona · `r` aggiorna |
+| Mancanti | `↑↓` seleziona · `Invio` apri la serie · `s` cerca l'episodio · `i` ignora · `r` aggiorna |
 | Blocklist | `↑↓` seleziona · `d` rimuovi |
-| Libreria | `1` Serie TV · `2` Film · `3` Fumetti · `↑↓` seleziona · `s` filtra |
+| Libreria | `1` Serie TV · `2` Film · `3` Fumetti · `↑↓` seleziona · `s`/`/` filtra · `Invio` dettagli · `a` aggiungi da TMDB · `e` modifica · `p` pausa/riprendi · `d` elimina · `m` cerca (mancanti della serie / il film) |
+| Serie | `←→` stagione · `Spazio` attiva/disattiva la stagione · `↑↓` episodio · `Invio` sorgenti in archivio · `s` cerca online · `i` ignora · `R` riscarica · `y` copia magnet · `m` cerca mancanti · `M` metadati TMDB · `n` rinomina (anteprima + conferma) · `e` modifica · `p` pausa · `d` elimina · `Esc` indietro |
+| Film | `↑↓` release in archivio · `Invio` accoda · `s` cerca online · `y` copia magnet · `e` modifica · `R` riscarica · `p` pausa · `d` elimina · `Esc` indietro |
+| Moduli | `↑↓` campo · `Invio` modifica (sì/no: `Invio` o `Spazio`) · `s` salva · `Esc` annulla; `*` segna i campi cambiati |
 
 Le conferme (rimozioni, cestino, pulizia) accettano solo `s`/`y`: `Invio` annulla e il
 testo incollato viene ignorato, così un `Invio` ripetuto su un link lento non può

@@ -18,6 +18,12 @@ func (m *Model) Update(k Key) Action {
 	if m.Confirm != nil {
 		return m.updateConfirm(k)
 	}
+	if m.Form != nil && m.Overlay == OverlayNone {
+		if k.Kind == KeyCtrlC {
+			return Action{Kind: ActionQuit}
+		}
+		return m.updateForm(k)
+	}
 	switch m.Overlay {
 	case OverlayHelp:
 		switch {
@@ -53,6 +59,10 @@ func (m *Model) Update(k Key) Action {
 		return Action{}
 	case OverlaySettings:
 		return m.updateSettings(k)
+	case OverlayHistory:
+		return m.updateHistory(k)
+	case OverlayMaintenance:
+		return m.updateMaintenanceReport(k)
 	}
 
 	switch {
@@ -70,6 +80,9 @@ func (m *Model) Update(k Key) Action {
 	}
 	if m.ArchiveDetail != nil {
 		return m.updateArchiveDetail(k)
+	}
+	if action, handled := m.updateTabContext(k); handled {
+		return action
 	}
 
 	switch {
@@ -116,6 +129,9 @@ func (m *Model) Update(k Key) Action {
 	case k.Kind == KeyRune && k.Rune == '8' && m.Tab != TabLibrary:
 		m.Tab = TabLibrary
 		return m.loadTabAction()
+	case k.Kind == KeyRune && k.Rune == '9':
+		m.Tab = TabMaintenance
+		return m.loadTabAction()
 	}
 
 	switch m.Tab {
@@ -138,6 +154,8 @@ func (m *Model) Update(k Key) Action {
 		return m.updateBlocklist(k)
 	case TabLibrary:
 		return m.updateLibrary(k)
+	case TabMaintenance:
+		return m.updateMaintenance(k)
 	}
 	return Action{}
 }
@@ -250,6 +268,46 @@ func (m *Model) submitPrompt() Action {
 			return Action{}
 		}
 		return Action{Kind: ActionSetLimits, DL: dl, UL: ul}
+	case PromptTempLimits:
+		return m.submitTempLimits(value)
+	case PromptTmdbSeries, PromptTmdbMovie:
+		if value == "" {
+			return Action{}
+		}
+		kind := "series"
+		if active.Kind == PromptTmdbMovie {
+			kind = "movie"
+		}
+		return Action{Kind: ActionTmdbSearch, Domain: kind, Text: value}
+	case PromptFormField:
+		if m.Form != nil {
+			m.Form.Fields[m.Form.Selected].Value = strings.TrimSpace(active.Buffer)
+		}
+	case PromptTag:
+		return m.submitTag(value)
+	case PromptTorrentLimits:
+		return m.submitTorrentLimits(value)
+	case PromptMoveStorage:
+		if value != "" && m.Detail != nil && value != m.Detail.Torrent.SavePath {
+			return Action{Kind: ActionMoveStorage, Hash: m.Detail.Torrent.Hash, Text: value}
+		}
+	case PromptAddTracker:
+		return m.submitTracker(value)
+	case PromptFolderRename:
+		if value == "" {
+			return Action{}
+		}
+		m.lastFolder = value
+		return Action{Kind: ActionMaintenance, Domain: "folderscan", Text: value}
+	case PromptRamdisk:
+		if value == "" {
+			return Action{}
+		}
+		return Action{Kind: ActionMaintenance, Domain: "ramdisk", Text: value}
+	case PromptHistoryFilter:
+		m.HistoryFilter = value
+		m.HistorySelected, m.HistoryScroll = 0, 0
+		return Action{Kind: ActionLoadHistory, Text: value}
 	case PromptLogFilter:
 		m.LogFilter = value
 		m.LogScroll = 0
@@ -279,6 +337,55 @@ func (m *Model) submitPrompt() Action {
 		return Action{Kind: ActionSaveSetting, Domain: "refresh_interval", Text: strconv.FormatUint(seconds, 10)}
 	}
 	return Action{}
+}
+
+// maxTempLimitMinutes is the longest temporary limit the daemon accepts.
+const maxTempLimitMinutes = 24 * 60
+
+// submitTempLimits parses "DL UL [minutes]" (KiB/s, 0 = unlimited; no minutes
+// or 0 keeps the limit until removed) or "off" to remove the temporary limit.
+func (m *Model) submitTempLimits(value string) Action {
+	switch strings.ToLower(value) {
+	case "":
+		return Action{}
+	case "off", "-", "x", "no":
+		return Action{Kind: ActionClearTempLimits}
+	}
+	fields := strings.Fields(value)
+	if len(fields) != 2 && len(fields) != 3 {
+		m.Message = m.Tr.T("msg.tempinvalid")
+		return Action{}
+	}
+	numbers := make([]int64, 3)
+	for index, field := range fields {
+		number, err := strconv.ParseInt(field, 10, 64)
+		if err != nil || number < 0 {
+			m.Message = m.Tr.T("msg.tempinvalid")
+			return Action{}
+		}
+		numbers[index] = number
+	}
+	if numbers[2] > maxTempLimitMinutes {
+		m.Message = m.Tr.Format("msg.tempminutes", maxTempLimitMinutes)
+		return Action{}
+	}
+	return Action{Kind: ActionSetTempLimits, DL: numbers[0], UL: numbers[1], Minutes: numbers[2]}
+}
+
+// tempLimitsPrefill starts the prompt from the active temporary limit (with
+// the minutes left), or from the last one used when none is active.
+func (m *Model) tempLimitsPrefill() string {
+	policy := m.SpeedPolicy
+	if policy == nil {
+		return ""
+	}
+	if minutes, active := m.TempLimitMinutes(); active {
+		return fmt.Sprintf("%d %d %d", policy.TempDownloadKib, policy.TempUploadKib, minutes)
+	}
+	if policy.TempDownloadKib == 0 && policy.TempUploadKib == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d %d", policy.TempDownloadKib, policy.TempUploadKib)
 }
 
 func (m *Model) updateConfirm(k Key) Action {
@@ -326,7 +433,17 @@ func (m *Model) updateSearchOverlay(k Key) Action {
 			m.Message = m.Tr.T("msg.nosearch")
 			return Action{}
 		}
-		return Action{Kind: ActionQueueRelease, Release: m.SearchResults[m.SearchSelected]}
+		selected := m.SearchResults[m.SearchSelected]
+		if m.SearchKind != SearchReleases {
+			if truthy(selected["in_library"]) {
+				m.Message = m.Tr.T("msg.inlibrary")
+				return Action{}
+			}
+			m.Overlay = OverlayNone
+			m.Form = addForm(m.Tr, m.SearchKind, selected)
+			return Action{}
+		}
+		return Action{Kind: ActionQueueRelease, Release: selected}
 	case k.Kind == KeyRune && k.Rune == 'y':
 		if len(m.SearchResults) > 0 && m.SearchSelected >= 0 && m.SearchSelected < len(m.SearchResults) {
 			magnet := stringValue(m.SearchResults[m.SearchSelected]["magnet"])
@@ -339,6 +456,9 @@ func (m *Model) updateSearchOverlay(k Key) Action {
 }
 
 func (m *Model) updateDetail(k Key) Action {
+	if action, handled := m.updateDetailExtras(k); handled {
+		return action
+	}
 	switch {
 	case k.Kind == KeyEsc || k.Kind == KeyEnter:
 		m.Detail = nil
@@ -357,6 +477,7 @@ func (m *Model) updateDetail(k Key) Action {
 	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '4':
 		view := DetailView(k.Rune - '1')
 		m.DetailView = view
+		m.DetailSelected = 0
 		if view == DetailGeneral {
 			m.DetailScroll = 0
 			return Action{}
@@ -374,6 +495,9 @@ func (m *Model) updateDetail(k Key) Action {
 }
 
 func (m *Model) updateTorrents(k Key) Action {
+	if action, handled := m.updateTorrentExtras(k); handled {
+		return action
+	}
 	items := m.VisibleDownloads()
 	count := len(items)
 	page := 10
@@ -397,6 +521,29 @@ func (m *Model) updateTorrents(k Key) Action {
 	case k.Kind != KeyRune:
 		return Action{}
 	default:
+		// List-wide commands work whatever row is selected, HTTP ones too.
+		switch k.Rune {
+		case 'u':
+			return Action{Kind: ActionUnpin}
+		case 'X':
+			m.Confirm = &confirm{MessageKey: "prompt.cleancomp", Action: Action{Kind: ActionCleanCompleted}}
+			return Action{}
+		case 'L':
+			m.Prompt = newPrompt(PromptLimits, "")
+			return Action{}
+		case 'T':
+			m.Prompt = newPrompt(PromptTempLimits, m.tempLimitsPrefill())
+			return Action{}
+		case 'o':
+			m.Sort = SortMode((int(m.Sort) + 1) % 5)
+			return Action{}
+		case 'O':
+			m.SortDesc = !m.SortDesc
+			return Action{}
+		case 'F':
+			m.Prompt = newPrompt(PromptTorrentFilter, m.Filter)
+			return Action{}
+		}
 		row := m.SelectedDownload()
 		torrent := row.Torrent
 		if row.HTTP != nil {
@@ -451,18 +598,6 @@ func (m *Model) updateTorrents(k Key) Action {
 			if hash != "" {
 				return Action{Kind: ActionPin, Hash: hash}
 			}
-		case 'u':
-			return Action{Kind: ActionUnpin}
-		case 'X':
-			m.Confirm = &confirm{MessageKey: "prompt.cleancomp", Action: Action{Kind: ActionCleanCompleted}}
-		case 'L':
-			m.Prompt = newPrompt(PromptLimits, "")
-		case 'o':
-			m.Sort = SortMode((int(m.Sort) + 1) % 5)
-		case 'O':
-			m.SortDesc = !m.SortDesc
-		case 'F':
-			m.Prompt = newPrompt(PromptTorrentFilter, m.Filter)
 		case 'y':
 			if torrent != nil && torrent.Hash != "" {
 				return Action{Kind: ActionCopy, Text: torrent.Hash}
@@ -676,13 +811,6 @@ func (m *Model) updateArchiveDetail(k Key) Action {
 	return Action{}
 }
 
-func (m *Model) updateMissing(k Key) Action {
-	if k.Kind == KeyUp || k.Kind == KeyDown || k.Kind == KeyPgUp || k.Kind == KeyPgDn || k.Kind == KeyHome || k.Kind == KeyEnd {
-		m.MissingSelected = moveSelection(m.MissingSelected, len(m.Missing), k.Kind)
-	}
-	return Action{}
-}
-
 func (m *Model) updateBlocklist(k Key) Action {
 	switch {
 	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
@@ -692,25 +820,6 @@ func (m *Model) updateBlocklist(k Key) Action {
 			entry := m.Blocklist[m.BlocklistSelected]
 			m.Confirm = &confirm{MessageKey: "prompt.blocklistremove", Args: []any{Shorten(entry.Title, 45)}, Action: Action{Kind: ActionRemoveBlocklist, Hash: entry.Hash}}
 		}
-	}
-	return Action{}
-}
-
-func (m *Model) updateLibrary(k Key) Action {
-	switch {
-	case k.Kind == KeyRune && k.Rune == '1':
-		m.Library = LibrarySeries
-		m.LibrarySelected, m.LibraryScroll = 0, 0
-	case k.Kind == KeyRune && k.Rune == '2':
-		m.Library = LibraryMovies
-		m.LibrarySelected, m.LibraryScroll = 0, 0
-	case k.Kind == KeyRune && k.Rune == '3':
-		m.Library = LibraryComics
-		m.LibrarySelected, m.LibraryScroll = 0, 0
-	case k.Kind == KeyRune && k.Rune == 's':
-		m.Prompt = newPrompt(PromptSearch, m.LibraryFilter)
-	case k.Kind == KeyUp, k.Kind == KeyDown, k.Kind == KeyPgUp, k.Kind == KeyPgDn, k.Kind == KeyHome, k.Kind == KeyEnd:
-		m.LibrarySelected = moveSelection(m.LibrarySelected, len(m.VisibleLibrary()), k.Kind)
 	}
 	return Action{}
 }
@@ -780,6 +889,37 @@ func (m *Model) PromptLabel() string {
 		return m.Tr.T("prompt.language")
 	case PromptRefresh:
 		return m.Tr.T("prompt.refresh")
+	case PromptTempLimits:
+		return m.Tr.T("prompt.templimits")
+	case PromptTag:
+		known := strings.Join(m.TagCatalog, ", ")
+		if known == "" {
+			known = "-"
+		}
+		if count := len(m.MarkedHashes()); count > 0 && m.Detail == nil {
+			return m.Tr.Format("prompt.tagbulk", count, known)
+		}
+		return m.Tr.Format("prompt.tag", known)
+	case PromptTorrentLimits:
+		return m.Tr.T("prompt.torrentlimits")
+	case PromptMoveStorage:
+		return m.Tr.T("prompt.movestorage")
+	case PromptAddTracker:
+		return m.Tr.T("prompt.addtracker")
+	case PromptHistoryFilter:
+		return m.Tr.T("prompt.historyfilter")
+	case PromptFolderRename:
+		return m.Tr.T("prompt.folderrename")
+	case PromptRamdisk:
+		return m.Tr.T("prompt.ramdisk")
+	case PromptTmdbSeries:
+		return m.Tr.T("prompt.tmdbseries")
+	case PromptTmdbMovie:
+		return m.Tr.T("prompt.tmdbmovie")
+	case PromptFormField:
+		if m.Form != nil {
+			return m.Form.Fields[m.Form.Selected].Label + ": "
+		}
 	}
 	return ""
 }

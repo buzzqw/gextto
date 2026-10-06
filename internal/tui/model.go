@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ const (
 	TabMissing
 	TabBlocklist
 	TabLibrary
+	TabMaintenance
 )
 
 // LibraryKind selects the compact monitored-library view.
@@ -69,6 +71,8 @@ const (
 	OverlaySearch
 	OverlayEvents
 	OverlaySettings
+	OverlayHistory
+	OverlayMaintenance
 )
 
 // PromptKind identifies the active single-line input.
@@ -86,6 +90,17 @@ const (
 	PromptArchiveFilter
 	PromptLanguage
 	PromptRefresh
+	PromptTempLimits
+	PromptTmdbSeries
+	PromptTmdbMovie
+	PromptFormField
+	PromptTag
+	PromptTorrentLimits
+	PromptMoveStorage
+	PromptAddTracker
+	PromptHistoryFilter
+	PromptFolderRename
+	PromptRamdisk
 )
 
 // ActionKind identifies a side effect the runner must perform.
@@ -124,6 +139,40 @@ const (
 	ActionSetLanguage
 	ActionHTTPPauseToggle
 	ActionHTTPRemove
+	ActionSetTempLimits
+	ActionClearTempLimits
+	ActionLoadSeries
+	ActionLoadMovie
+	ActionSaveSeries
+	ActionDeleteSeries
+	ActionSaveMovie
+	ActionDeleteMovie
+	ActionAddToLibrary
+	ActionTmdbSearch
+	ActionToggleSeason
+	ActionSeriesSearchMissing
+	ActionSeriesMetadata
+	ActionRenamePreview
+	ActionRenameExecute
+	ActionEpisodeSources
+	ActionEpisodeSearch
+	ActionEpisodeIgnore
+	ActionEpisodeRedownload
+	ActionMovieSearch
+	ActionMovieRedownload
+	ActionBulk
+	ActionSetTag
+	ActionToggleAutoRemove
+	ActionLoadHistory
+	ActionTorrentLimits
+	ActionMoveStorage
+	ActionMarkFailed
+	ActionSuperSeeding
+	ActionFilePriorities
+	ActionSetTrackers
+	ActionCancelJob
+	ActionMaintenance
+	ActionFolderRenameApply
 )
 
 // Action is a request emitted by Update and executed against the daemon.
@@ -138,6 +187,19 @@ type Action struct {
 	Release     map[string]any
 	DetailKind  string
 	Page        int
+	Minutes     int64
+	// Library actions: Text is the series name, ID the movie id.
+	ID              int64
+	Season, Episode int64
+	Flag            bool
+	Fields          map[string]any
+	Movie           *MovieConfig
+	// Torrent actions.
+	Hashes     []string
+	Priorities []int32
+	Trackers   []TrackerEntry
+	Ratio      *float64
+	Days       *int64
 }
 
 // TUIConfig contains the small set of daemon settings editable from the TUI.
@@ -252,12 +314,30 @@ type Model struct {
 	NotificationUntil time.Time
 	HTTPStates        map[string]string
 
-	Torrents        []Torrent
-	HTTPDownloads   []ComicDownload
-	Series          []SeriesLibraryItem
-	Movies          []MovieLibraryItem
-	Comics          []ComicLibraryItem
-	Library         LibraryKind
+	Torrents      []Torrent
+	HTTPDownloads []ComicDownload
+	// Marked torrents (by hash) for the bulk actions.
+	Marked map[string]bool
+	// TorrentTags maps hashes to download tags; TagCatalog lists the tags.
+	TorrentTags     map[string]string
+	TagCatalog      []string
+	History         []HistoryItem
+	HistoryTotal    int
+	HistoryFilter   string
+	HistorySelected int
+	HistoryScroll   int
+	// SpeedPolicy is the global limit in force; SpeedPolicyAt is when it was
+	// fetched, so the temporary limit's countdown runs between polls.
+	SpeedPolicy   *SpeedPolicy
+	SpeedPolicyAt time.Time
+	Series        []SeriesLibraryItem
+	Movies        []MovieConfig
+	Comics        []ComicLibraryItem
+	Library       LibraryKind
+	SeriesView    *SeriesView
+	MovieView     *MovieView
+	// PendingEdit opens the series edit form once the detail is loaded.
+	PendingEdit     bool
 	LibrarySelected int
 	LibraryScroll   int
 	LibraryFilter   string
@@ -278,6 +358,8 @@ type Model struct {
 	DetailView   DetailView
 	DetailItems  []map[string]any
 	DetailScroll int
+	// DetailSelected is the highlighted tracker or file.
+	DetailSelected int
 
 	ArchiveDetail       *ArchiveEntry
 	ArchiveDetailScroll int
@@ -287,6 +369,7 @@ type Model struct {
 	EventScroll      int
 	EventStreamReady bool
 
+	SearchKind     SearchKind
 	SearchResults  []map[string]any
 	SearchQuery    string
 	SearchSelected int
@@ -300,6 +383,13 @@ type Model struct {
 
 	Prompt  *prompt
 	Confirm *confirm
+	Form    *Form
+
+	Maintenance   *MaintenanceData
+	MaintSelected int
+	MaintScroll   int
+	Report        *Report
+	lastFolder    string
 }
 
 // NewModel builds an empty model with the given translator.
@@ -329,6 +419,7 @@ func (m *Model) SetTorrents(torrents []Torrent) {
 		selectedHash = selected.Torrent.Hash
 	}
 	m.Torrents = torrents
+	m.pruneMarks()
 	visible := m.VisibleDownloads()
 	if selectedHash != "" {
 		for index, row := range visible {
@@ -379,12 +470,17 @@ func (m *Model) SetLibrary(items any) {
 	switch value := items.(type) {
 	case []SeriesLibraryItem:
 		m.Series = append([]SeriesLibraryItem(nil), value...)
+	case []MovieConfig:
+		m.Movies = append([]MovieConfig(nil), value...)
 	case []MovieLibraryItem:
-		m.Movies = append([]MovieLibraryItem(nil), value...)
+		m.Movies = make([]MovieConfig, 0, len(value))
+		for _, item := range value {
+			m.Movies = append(m.Movies, MovieConfig{ID: item.ID, Name: item.Name, Year: item.Year, Quality: item.Quality, Language: item.Language, LanguageRequirements: item.LanguageRequirements, Enabled: item.Enabled})
+		}
 	case []ComicLibraryItem:
 		m.Comics = append([]ComicLibraryItem(nil), value...)
 	}
-	m.LibrarySelected = min(m.LibrarySelected, max(0, len(m.VisibleLibrary())-1))
+	m.LibrarySelected = min(m.LibrarySelected, max(0, len(m.VisibleLibraryRows())-1))
 }
 
 // SetHealth replaces the health report.
@@ -440,6 +536,31 @@ func (m *Model) httpDownloadRate() float64 {
 		rate += float64(item.SpeedBytes)
 	}
 	return rate
+}
+
+// SetSpeedPolicy replaces the global speed limits in force.
+func (m *Model) SetSpeedPolicy(policy SpeedPolicy) {
+	m.SpeedPolicy = &policy
+	m.SpeedPolicyAt = time.Now()
+}
+
+// TempLimitMinutes returns the minutes left on the temporary limit, rounded
+// up, and false when it is not active. Zero minutes with true means it stays
+// until removed.
+func (m *Model) TempLimitMinutes() (int64, bool) {
+	policy := m.SpeedPolicy
+	if policy == nil || !policy.TempActive {
+		return 0, false
+	}
+	if policy.TempRemainingSec <= 0 {
+		return 0, true
+	}
+	left := policy.TempRemainingSec - int64(time.Since(m.SpeedPolicyAt).Seconds())
+	if left <= 0 {
+		// Expired since the last poll: the daemon restores the normal limits.
+		return 0, false
+	}
+	return (left + 59) / 60, true
 }
 
 // SetConfig replaces the daemon settings shown by the TUI settings panel.
@@ -567,6 +688,7 @@ func (m *Model) SetDetail(detail TorrentDetail) {
 func (m *Model) SetDetailItems(items []map[string]any) {
 	m.DetailItems = items
 	m.DetailScroll = 0
+	m.DetailSelected = min(m.DetailSelected, max(0, len(items)-1))
 }
 
 // SetArchiveDetail opens the selected archive entry details.
@@ -584,6 +706,12 @@ func (m *Model) SetEvents(events []Event) {
 
 // SetSearchResults opens the search overlay with results.
 func (m *Model) SetSearchResults(query string, results []map[string]any) {
+	m.SetPickerResults(SearchReleases, query, results)
+}
+
+// SetPickerResults opens the search overlay on releases or TMDB entries.
+func (m *Model) SetPickerResults(kind SearchKind, query string, results []map[string]any) {
+	m.SearchKind = kind
 	m.SearchQuery = query
 	m.SearchResults = results
 	m.SearchSelected = 0
@@ -697,7 +825,11 @@ func (m *Model) VisibleDownloads() []DownloadRow {
 		filtered := rows[:0]
 		for _, row := range rows {
 			name, state, id := downloadRowFields(row)
-			if strings.Contains(strings.ToLower(name), filter) || strings.Contains(strings.ToLower(state), filter) || strings.Contains(strings.ToLower(id), filter) {
+			tag := ""
+			if row.Torrent != nil {
+				tag = m.TorrentTags[row.Torrent.Hash]
+			}
+			if strings.Contains(strings.ToLower(name), filter) || strings.Contains(strings.ToLower(state), filter) || strings.Contains(strings.ToLower(id), filter) || strings.Contains(strings.ToLower(tag), filter) {
 				filtered = append(filtered, row)
 			}
 		}
@@ -773,33 +905,10 @@ func (m *Model) SelectedDownload() DownloadRow {
 	return items[m.Selected]
 }
 
-func (m *Model) VisibleLibrary() []string {
-	items := []string{}
-	filter := strings.ToLower(strings.TrimSpace(m.LibraryFilter))
-	add := func(name string) {
-		if filter == "" || strings.Contains(strings.ToLower(name), filter) {
-			items = append(items, name)
-		}
-	}
-	switch m.Library {
-	case LibraryMovies:
-		for _, item := range m.Movies {
-			add(item.Name)
-		}
-	case LibraryComics:
-		for _, item := range m.Comics {
-			add(item.Title)
-		}
-	default:
-		for _, item := range m.Series {
-			add(item.Name)
-		}
-	}
-	return items
-}
-
-// LibraryRow is the normalized display row for one monitored title.
+// LibraryRow is the normalized display row for one monitored title. Key
+// identifies it across reloads (series name, "movie:<id>", "comic:<id>").
 type LibraryRow struct {
+	Key     string
 	Name    string
 	Meta    string
 	Enabled bool
@@ -816,18 +925,37 @@ func (m *Model) VisibleLibraryRows() []LibraryRow {
 	switch m.Library {
 	case LibraryMovies:
 		for _, item := range m.Movies {
-			add(LibraryRow{Name: item.Name, Meta: strings.TrimSpace(strings.Join([]string{item.Year, item.Quality, item.Language}, " · ")), Enabled: item.Enabled})
+			add(LibraryRow{Key: movieKey(item.ID), Name: item.Name, Meta: joinNonEmpty(item.Year, item.Quality, item.Language), Enabled: item.Enabled})
 		}
 	case LibraryComics:
 		for _, item := range m.Comics {
-			add(LibraryRow{Name: item.Title, Meta: strings.TrimSpace(strings.Join([]string{item.Publisher, item.LatestDownloadedTitle}, " · ")), Enabled: item.Enabled})
+			add(LibraryRow{Key: fmt.Sprintf("comic:%d", item.ID), Name: item.Title, Meta: joinNonEmpty(item.Publisher, item.LatestDownloadedTitle), Enabled: item.Enabled})
 		}
 	default:
 		for _, item := range m.Series {
-			add(LibraryRow{Name: item.Name, Meta: strings.TrimSpace(strings.Join([]string{item.Seasons, item.Quality, item.Language}, " · ")), Enabled: item.Enabled})
+			episodes := ""
+			if item.EpisodesTotal > 0 {
+				episodes = m.Tr.Format("library.episodes", item.EpisodesDownloaded, item.EpisodesTotal)
+			}
+			last := ""
+			if item.LastDownloadedAt != nil && len(*item.LastDownloadedAt) >= 10 {
+				last = m.Tr.Format("library.last", (*item.LastDownloadedAt)[:10])
+			}
+			add(LibraryRow{Key: item.Name, Name: item.Name, Meta: joinNonEmpty(episodes, item.Seasons, item.Quality, item.Language, last), Enabled: item.Enabled})
 		}
 	}
 	return rows
+}
+
+// joinNonEmpty joins the non-blank values with " · ".
+func joinNonEmpty(values ...string) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return strings.Join(parts, " · ")
 }
 
 // FilteredLogs returns the log lines matching the active filter.

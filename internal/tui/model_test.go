@@ -658,3 +658,84 @@ func firstLines(screen Screen, count int) []string {
 	}
 	return lines
 }
+
+func TestTempLimitsPrompt(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetTorrents(sampleTorrents())
+
+	m.Update(runeKey('T'))
+	typeText(m, "500 100 30")
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionSetTempLimits || action.DL != 500 || action.UL != 100 || action.Minutes != 30 {
+		t.Fatalf("temp limits action = %+v", action)
+	}
+	// Without minutes the limit stays until removed.
+	m.Update(runeKey('T'))
+	typeText(m, "200 0")
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionSetTempLimits || action.DL != 200 || action.Minutes != 0 {
+		t.Fatalf("temp limits without minutes = %+v", action)
+	}
+	m.Update(runeKey('T'))
+	typeText(m, "off")
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionClearTempLimits {
+		t.Fatalf("off should clear the temporary limit, got %+v", action)
+	}
+	for _, input := range []string{"500", "1 2 3 4", "-1 0", "a b", "10 10 1441"} {
+		m.Update(runeKey('T'))
+		typeText(m, input)
+		if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionNone {
+			t.Fatalf("%q should not emit an action, got %+v", input, action)
+		}
+		if m.Message == "" {
+			t.Fatalf("%q should explain the format", input)
+		}
+		m.Message = ""
+	}
+}
+
+func TestTempLimitsPrefillAndHeader(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetTorrents(sampleTorrents())
+
+	m.SetSpeedPolicy(SpeedPolicy{Source: "base", BaseDownloadKib: 0, BaseUploadKib: 200})
+	if screen := m.Render(160, 20); !lineContains(screen, "limiti ↓illimitato ↑200 KiB/s") {
+		t.Fatalf("base limits missing from header: %+v", screen.Lines)
+	}
+	m.Update(runeKey('T'))
+	if m.Prompt.Buffer != "" {
+		t.Fatalf("no temporary limit used yet: prefill = %q", m.Prompt.Buffer)
+	}
+	m.Update(kindKey(KeyEsc))
+
+	m.SetSpeedPolicy(SpeedPolicy{Source: "temp", TempActive: true, TempDownloadKib: 500, TempUploadKib: 100, TempRemainingSec: 90})
+	if screen := m.Render(160, 20); !lineContains(screen, "limite temporaneo ↓500 KiB/s ↑100 KiB/s · ancora 2 min") {
+		t.Fatalf("temporary limit missing from header: %+v", screen.Lines)
+	}
+	m.Update(runeKey('T'))
+	if m.Prompt.Buffer != "500 100 2" {
+		t.Fatalf("prefill = %q", m.Prompt.Buffer)
+	}
+	m.Update(kindKey(KeyEsc))
+
+	m.SetSpeedPolicy(SpeedPolicy{Source: "temp", TempActive: true, TempDownloadKib: 500})
+	if screen := m.Render(160, 20); !lineContains(screen, "fino a rimozione") {
+		t.Fatalf("permanent temporary limit missing from header: %+v", screen.Lines)
+	}
+}
+
+func TestListCommandsWorkOnHTTPRows(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabTorrents
+	m.SetHTTPDownloads([]ComicDownload{{ID: "http-1", Title: "Comic HTTP", Status: "downloading"}})
+	m.Selected = 0
+	m.Update(runeKey('T'))
+	if m.Prompt == nil || m.Prompt.Kind != PromptTempLimits {
+		t.Fatalf("T should open the temporary limit prompt on an HTTP row")
+	}
+	m.Update(kindKey(KeyEsc))
+	m.Update(runeKey('X'))
+	if m.Confirm == nil {
+		t.Fatalf("X should ask to clean completed torrents on an HTTP row")
+	}
+}

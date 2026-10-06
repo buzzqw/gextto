@@ -23,6 +23,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // v2Routers maps an AppState to its router so v2 handlers can call the existing
@@ -1021,35 +1023,38 @@ func V2TableLibrary(w http.ResponseWriter, r *http.Request, s *AppState) {
 	name := r.FormValue("name")
 	mode := strings.TrimSpace(r.FormValue("mode"))
 
-	if raw, status := v2InternalJSON(s, http.MethodGet, "/api/config/library", nil, nil); status < 400 {
-		var library struct {
-			Series []map[string]any `json:"series"`
-			Movies []map[string]any `json:"movies"`
-		}
-		if json.Unmarshal(raw, &library) == nil {
-			list := library.Series
-			if scope == "movies" {
-				list = library.Movies
+	// Each change goes through the per-item endpoints: rewriting the whole
+	// library from /api/config/library would drop the fields that view does
+	// not carry (tvdb_id, disable_upgrades) and persist computed ignored seasons.
+	cfg := latestConfig(s)
+	if scope == "movies" {
+		for _, movie := range cfg.Movies {
+			if movie.Name != name {
+				continue
 			}
-			updated := make([]map[string]any, 0, len(list))
-			for _, entry := range list {
-				if v2String(entry["name"]) != name {
-					updated = append(updated, entry)
-					continue
-				}
-				if mode == "remove" {
-					continue
-				}
-				entry["enabled"] = !v2Truthy(entry["enabled"])
-				updated = append(updated, entry)
-			}
-			if scope == "movies" {
-				library.Movies = updated
+			path := "/api/movies/" + strconv.FormatInt(movie.ID, 10)
+			if mode == "remove" {
+				v2InternalJSON(s, http.MethodDelete, path, nil, nil)
 			} else {
-				library.Series = updated
+				movies := append([]MovieConfig(nil), cfg.Movies...)
+				for index := range movies {
+					if movies[index].ID == movie.ID {
+						movies[index].Enabled = !movies[index].Enabled
+					}
+				}
+				if err := SaveLibrary(s.cfg.DataDir, cfg.Series, movies); err != nil {
+					logging.Warn("library toggle failed", "movie", name, "error", err)
+				}
 			}
-			payload, _ := json.Marshal(map[string]any{"series": library.Series, "movies": library.Movies})
-			v2InternalJSON(s, http.MethodPost, "/api/config/library", nil, []byte(payload))
+			break
+		}
+	} else if series := gh3FindSeries(cfg, name); series != nil {
+		path := "/api/series/" + url.PathEscape(series.Name)
+		if mode == "remove" {
+			v2InternalJSON(s, http.MethodDelete, path, nil, nil)
+		} else {
+			body, _ := json.Marshal(map[string]any{"enabled": !series.Enabled})
+			v2InternalJSON(s, http.MethodPost, path, nil, body)
 		}
 	}
 	if spec, ok := v2SpecFor(s, view); ok {

@@ -1351,6 +1351,45 @@ func SetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
+// GetTempLimits reports the speed policy in force: the temporary limit (with
+// its expiry), the bandwidth schedule and the base limits, plus which one is
+// applied now. The TUI shows it on the downloads tab.
+func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	now := time.Now().Unix()
+	until := gh6_parseSettingInt(cfg, "libtorrent_temp_limit_until")
+	tempActive := gh6_truthySetting(cfg.Settings["libtorrent_temp_limit_enabled"]) && (until == 0 || until > now)
+	remaining := int64(0)
+	if tempActive && until > 0 {
+		remaining = until - now
+	}
+	schedDownload, schedUpload, schedActive := gh6_scheduledSpeedLimits(cfg)
+	download, upload := gh6_currentSpeedLimits(cfg)
+	source := "base"
+	if tempActive {
+		source = "temp"
+	} else if schedActive {
+		source = "schedule"
+	}
+	jsonResponse(w, map[string]any{
+		"source":             source,
+		"download_kib":       download,
+		"upload_kib":         upload,
+		"temp_active":        tempActive,
+		"temp_download_kib":  gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
+		"temp_upload_kib":    gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit"),
+		"temp_until":         until,
+		"temp_remaining_sec": remaining,
+		"sched_active":       schedActive,
+		"sched_download_kib": schedDownload,
+		"sched_upload_kib":   schedUpload,
+		"base_download_kib":  max(cfg.Libtorrent.DownloadLimitKib, 0),
+		"base_upload_kib":    max(cfg.Libtorrent.UploadLimitKib, 0),
+		// Shown next to the limits on the TUI downloads tab.
+		"auto_remove_completed": cfg.Libtorrent.AutoRemoveCompleted,
+	})
+}
+
 // SetupImport implements `setup_import`.
 func SetupImport(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if SetupComplete(s.cfg) {
