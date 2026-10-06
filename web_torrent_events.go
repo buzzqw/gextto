@@ -2125,6 +2125,33 @@ func tev_notifySeeding(db *Database, notifier *Notifier, event *models.TorrentEv
 	}
 }
 
+// tev_markReleaseCompleted records a completed release. A season pack is
+// recorded file by file: MarkReleaseCompleted would give every episode of the
+// season the pack folder as its archive path.
+func tev_markReleaseCompleted(cfg *Config, db *Database, release *models.Release, path string, size int64) error {
+	if release.Kind != "series" || !release.IsPack {
+		return db.MarkReleaseCompleted(release, path, size)
+	}
+	matching, err := MatchingPackFiles(path, release)
+	if err != nil {
+		return err
+	}
+	entries := make([]PackEpisode, 0, len(matching))
+	for _, file := range matching {
+		fileSize, err := SizeOfPath(file.Path)
+		if err != nil {
+			return err
+		}
+		entries = append(entries, PackEpisode{
+			Episode:   file.Episode,
+			Path:      file.Path,
+			SizeBytes: fileSize,
+			Score:     cfg.ReleaseScore(release),
+		})
+	}
+	return db.MarkPackCompleted(release, entries, path, size)
+}
+
 // tev_completeTorrentOptions controls whether the original torrent source must
 // remain available for seeding. Single episodes are imported by copying their
 // video to the library, so they use preserveSource=true.
@@ -2315,7 +2342,7 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			"hash", event.Hash, "name", event.Name, "title", release.Title)
 		return false, nil
 	}
-	if err := db.MarkReleaseCompleted(release, processedPath, size); err != nil {
+	if err := tev_markReleaseCompleted(cfg, db, release, processedPath, size); err != nil {
 		return false, err
 	}
 	suffix := " (kept original name)"
