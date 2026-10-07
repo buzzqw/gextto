@@ -548,3 +548,49 @@ func TestGxAutoSettingDrivesQueueAndCache(t *testing.T) {
 		t.Fatalf("disabling self-management must stop the dynamic queue: %v", policy)
 	}
 }
+
+// TestGxResolveSavePathUsesIncompleteDir checks that gx-torrent stages new
+// downloads in the same folder the embedded engine uses (temp/incomplete, or
+// the RAM disk), instead of dropping them straight into the final dir.
+func TestGxResolveSavePathUsesIncompleteDir(t *testing.T) {
+	temp := t.TempDir()
+	final := t.TempDir()
+	cfg := &Config{LibtorrentDir: final}
+	cfg.LibtorrentTempDir = &temp
+	engine := &gxTorrentEngine{cfg: cfg}
+	if got := engine.resolveSavePath(nil, cfg); got != temp {
+		t.Fatalf("nil preferredPath must use the temp/incomplete dir: got %q want %q", got, temp)
+	}
+	if preferred := final; engine.resolveSavePath(&preferred, cfg) != final {
+		t.Fatal("an explicit preferredPath must win")
+	}
+	noTemp := &Config{LibtorrentDir: final}
+	if got := engine.resolveSavePath(nil, noTemp); got != final {
+		t.Fatalf("without a temp dir the final dir is used: got %q", got)
+	}
+}
+
+// TestGxMirrorsPreexistingTorrentCopy checks that a .torrent which already sits
+// in the state dir (e.g. written by libtorrent before) is mirrored into the
+// operator's configured copy directory.
+func TestGxMirrorsPreexistingTorrentCopy(t *testing.T) {
+	state := t.TempDir()
+	copyDir := t.TempDir()
+	hash := "aa11bb22cc33dd44ee55ff660011223344556677"
+	content := []byte("d4:infod4:name1:xee")
+	if err := os.WriteFile(filepath.Join(state, hash+".torrent"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{Settings: map[string]string{"libtorrent_torrent_copy_dir": copyDir}}
+	engine := &gxTorrentEngine{cfg: cfg}
+	engine.settings.stateDir = state
+
+	engine.ensureTorrentFile(hash)
+	got, err := os.ReadFile(filepath.Join(copyDir, hash+".torrent"))
+	if err != nil {
+		t.Fatalf("torrent not mirrored into the configured copy dir: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Fatalf("mirrored copy differs from the source")
+	}
+}

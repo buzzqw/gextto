@@ -522,6 +522,13 @@ func (e *gxTorrentEngine) diffLocked(previous, current models.TorrentView) {
 func (e *gxTorrentEngine) ensureTorrentFile(hash string) {
 	target := filepath.Join(e.settings.stateDir, hash+".torrent")
 	if fileExists(target) {
+		// The Gextto-owned copy already exists (it may predate this engine, e.g.
+		// from libtorrent). Still mirror it into the operator's configured copy
+		// directory if that one is missing: Gextto's setting must hold for the
+		// active engine too.
+		if dir := e.torrentCopyDir(); dir != "" && !fileExists(filepath.Join(dir, hash+".torrent")) {
+			e.copyTorrentToConfiguredDir(hash, target)
+		}
 		return
 	}
 	var data []byte
@@ -1169,16 +1176,17 @@ func (e *gxTorrentEngine) TorrentFilePath(hash string) (string, bool) {
 // ---------------------------------------------------------------------------
 
 func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) string {
-	if preferredPath != nil && strings.TrimSpace(*preferredPath) != "" {
-		return strings.TrimSpace(*preferredPath)
+	// Delegate to the shared helper so gx-torrent stages downloads exactly like
+	// the embedded engine: an explicit valid path wins, otherwise the RAM disk,
+	// then the configured temp/incomplete dir, then the final download dir.
+	use := cfg
+	if use == nil {
+		use = e.cfg
 	}
-	if cfg != nil && strings.TrimSpace(cfg.LibtorrentDir) != "" {
-		return cfg.LibtorrentDir
+	if use == nil {
+		return ""
 	}
-	if e.cfg != nil {
-		return e.cfg.LibtorrentDir
-	}
-	return ""
+	return resolveSavePath(preferredPath, use)
 }
 
 // gxWarnUnsupportedOptions notes the add-time options rain cannot apply, so a
