@@ -77,6 +77,21 @@ func parsePortRange(value string) (uint16, uint16, error) {
 	return uint16(begin), uint16(end), nil
 }
 
+// parseBootstrapNodes splits a comma/semicolon/whitespace separated list of DHT
+// routers into addresses, dropping empty entries.
+func parseBootstrapNodes(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == ' ' || r == '\t'
+	})
+	var nodes []string
+	for _, field := range fields {
+		if node := strings.TrimSpace(field); node != "" {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
+}
+
 func envInt(key string, fallback int64) int64 {
 	if value, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(key)), 10, 64); err == nil {
 		return value
@@ -125,6 +140,7 @@ func main() {
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
 	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
+	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose rain logging")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -189,6 +205,7 @@ func main() {
 			NATPMP:            !*noNATPMP,
 			IPFilter:          *ipFilter,
 			IPFilterTrackers:  *ipFilterTrackers,
+			DHTBootstrap:      parseBootstrapNodes(*dhtBootstrap),
 		},
 		Debug:       *debug,
 		Tick:        3 * time.Second,

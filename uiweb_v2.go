@@ -1285,6 +1285,8 @@ type v2DetailCaps struct {
 	LimitsNote string
 	// TrackerNote is shown in the trackers tab.
 	TrackerNote string
+	// GeneralNote is shown in the general tab (data the engine cannot report).
+	GeneralNote string
 }
 
 func v2DetailCapsFor(backend string) v2DetailCaps {
@@ -1295,6 +1297,7 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
 			LimitsNote:  "Con gx-torrent i limiti di velocità e di connessioni sono solo globali (Configurazione → libtorrent); qui si impostano ratio e giorni di seed.",
 			TrackerNote: "gx-torrent può aggiungere tracker ma non toglierli: le righe cancellate restano.",
+			GeneralNote: "Con gx-torrent non sono disponibili: super-seeding, upload/share mode, copie distribuite, download sequenziale e prima/ultima parte.",
 		}
 	case BackendQbittorrent:
 		return v2DetailCaps{

@@ -241,8 +241,13 @@ install_files() {
   fi
 
   run install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
-  # Optional gx-torrent backend: Gextto starts it from here in managed mode.
-  [[ -f "$work/gx-torrent" ]] && run install -m 0755 "$work/gx-torrent" "$INSTALL_DIR/gx-torrent"
+  # gx-torrent is the default torrent engine: Gextto starts it from here in
+  # managed mode. Its absence would silently fall back to embedded libtorrent.
+  if [[ -f "$work/gx-torrent" ]]; then
+    run install -m 0755 "$work/gx-torrent" "$INSTALL_DIR/gx-torrent"
+  else
+    warn "gx-torrent is missing from the payload: Gextto will fall back to embedded libtorrent"
+  fi
   [[ -f "$work/run.sh" ]] && run install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
   [[ -f "$work/VERSION" ]] && run install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
 

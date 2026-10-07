@@ -48,12 +48,13 @@ sezioni dell'interfaccia.
 
 ## Uso delle risorse
 
-Gextto è progettato per restare leggero quando è inattivo: è un solo demone con
-libtorrent integrato, limita la concorrenza delle sorgenti e delle attività in
-background e usa il backoff per evitare tentativi continui verso provider in
-errore. Il consumo effettivo di CPU e RAM dipende da titoli monitorati, sorgenti,
-torrent attivi e scansioni dell'archivio; le misurazioni su una singola macchina
-sono indicative, non una garanzia.
+Gextto è progettato per restare leggero quando è inattivo: è un solo demone (più
+il piccolo processo `gx-torrent` sorvegliato quando quel motore è attivo), limita
+la concorrenza delle sorgenti e delle attività in background e usa il backoff per
+evitare tentativi continui verso provider in errore. Il consumo effettivo di CPU
+e RAM dipende da titoli monitorati, sorgenti, torrent attivi e scansioni
+dell'archivio; le misurazioni su una singola macchina sono indicative, non una
+garanzia.
 
 ## Installazione Linux
 
@@ -65,7 +66,10 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 ```
 
 Installa il programma in `/opt/gextto`, conserva i dati del servizio in
-`/var/lib/gextto` ed espone la UI sulla porta 5000.
+`/var/lib/gextto` ed espone la UI sulla porta 5000. Il motore torrent
+predefinito, `gx-torrent` (Go puro, senza libtorrent), viene installato accanto
+a `gexttod` e avviato in modalità gestita; libtorrent integrato resta come
+fallback automatico e alternativa selezionabile.
 
 > [!IMPORTANT]
 > Gextto è pensato per una rete fidata: per impostazione predefinita la UI web e
@@ -85,9 +89,11 @@ make build
 ```
 
 `make build` incrementa il numero della build locale e scrive il demone
-versionato in `bin/gexttod`. Per ricompilare senza incrementare il numero usa
-`make fast`. Verifica binario, versione del prodotto, numero di build e versione
-di libtorrent collegata con:
+versionato in `bin/gexttod`, insieme al motore `gx-torrent` in puro Go. Per
+ricompilare senza incrementare il numero usa `make fast`. Per compilare **solo**
+il demone `gx-torrent` (non servono C++ né libtorrent) usa `make gx-torrent`.
+Verifica binario, versione del prodotto, numero di build e versione di libtorrent
+collegata con:
 
 ```bash
 ./bin/gexttod --version

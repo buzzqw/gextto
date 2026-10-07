@@ -33,7 +33,10 @@ type NetworkOptions struct {
 	// Encryption: 0 disabled, 1 enabled (default), 2 forced.
 	Encryption int
 	DHT        bool
-	PEX        bool
+	// DHTBootstrap are the routers used to bootstrap the DHT (comma-separated
+	// from Gextto's libtorrent_dht_bootstrap_nodes); empty keeps rain's defaults.
+	DHTBootstrap []string
+	PEX          bool
 	// UTP adds uTP (UDP) next to TCP for peers; the UDP port is shared with
 	// the DHT. UTPOnly dials uTP alone (tests).
 	UTP     bool
@@ -134,6 +137,9 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	}
 	cfg.DHTHost = d.listenHost
 	cfg.DHTEnabled = n.DHT
+	if len(n.DHTBootstrap) > 0 {
+		cfg.DHTBootstrapNodes = n.DHTBootstrap
+	}
 	cfg.PEXEnabled = n.PEX
 	cfg.OutgoingInterface = n.OutgoingInterface
 	if n.OutgoingInterface != "" {

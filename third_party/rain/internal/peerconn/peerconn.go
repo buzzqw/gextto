@@ -3,6 +3,7 @@ package peerconn
 import (
 	"io"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/rain/internal/logger"
@@ -11,6 +12,30 @@ import (
 	"github.com/cenkalti/rain/internal/peerprotocol"
 	"github.com/juju/ratelimit"
 )
+
+// gextto fork: raw peer wire bytes, counted before the message layer so the
+// session can report protocol/encryption overhead as wire minus payload.
+var (
+	WireBytesRead    atomic.Int64
+	WireBytesWritten atomic.Int64
+)
+
+// countingConn counts the bytes exchanged on a peer connection.
+type countingConn struct {
+	net.Conn
+}
+
+func (c *countingConn) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	WireBytesRead.Add(int64(n))
+	return n, err
+}
+
+func (c *countingConn) Write(p []byte) (int, error) {
+	n, err := c.Conn.Write(p)
+	WireBytesWritten.Add(int64(n))
+	return n, err
+}
 
 // Conn is a peer connection that provides a channel for receiving messages and methods for sending messages.
 type Conn struct {
@@ -25,6 +50,7 @@ type Conn struct {
 
 // New returns a new PeerConn by wrapping a net.Conn.
 func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn int, fastEnabled bool, br, bw *ratelimit.Bucket) *Conn {
+	conn = &countingConn{Conn: conn}
 	return &Conn{
 		conn:     conn,
 		reader:   peerreader.New(conn, l, pieceTimeout, br),

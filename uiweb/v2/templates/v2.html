@@ -503,6 +503,7 @@
 <div>
 {{if eq .Tab "general"}}
   <div class="panel"><div class="panel-body"><div class="stat-grid">{{range .General}}<div class="row"><span>{{.Label}}</span><strong class="truncate" title="{{.Value}}">{{.Value}}</strong></div>{{end}}</div>
+    {{if .Caps.GeneralNote}}<p class="hint">{{.Caps.GeneralNote}}</p>{{end}}
     <div class="toolbar detail-actions">
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "no_rename" "Body" (printf `{"value":%t}` (not .NoRename)) "Label" (ternary .NoRename "Rinomina abilitata" "Non rinominare"))}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia")}}

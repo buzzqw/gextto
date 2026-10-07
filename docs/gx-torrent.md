@@ -4,9 +4,9 @@
 [`cenkalti/rain`](https://github.com/cenkalti/rain). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
 gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
-espone anche una pagina di sola consultazione apribile dal browser. Il
-motore integrato libtorrent resta selezionabile e fa da fallback automatico se
-gx-torrent non parte.
+espone anche una pagina web operativa apribile dal browser (per default su tutta
+la LAN). Il motore integrato libtorrent resta selezionabile e fa da fallback
+automatico se gx-torrent non parte.
 
 Usa una copia modificata di rain in `third_party/rain`. Le modifiche sono
 descritte in `third_party/rain/GEXTTO.md`: porta unica, interfaccia uscente,
@@ -41,8 +41,13 @@ Codice:
    - dati in `DATA_DIR/gx-torrent`;
    - log in `DATA_DIR/gx-torrent/gx-torrent.log`;
    - cartella di scarico predefinita uguale a quella di libtorrent;
-   - il demone viene riavviato se si chiude e fermato con SIGTERM all'uscita;
-   - dopo 3 crash in 10 minuti Gextto torna a libtorrent.
+   - il demone viene riavviato se si chiude e fermato con SIGTERM all'uscita,
+     con 45 secondi di grazia prima del `Kill()` (rain salva i resume data);
+   - dopo 6 avvii/arresti anomali in 10 minuti Gextto smette di riprovare e
+     torna a libtorrent. Uno spegnimento pulito (riavvio di Gextto o del
+     servizio, ad esempio per un aggiornamento) non conta: il budget considera
+     solo le uscite inattese e gli avvii falliti, e un demone che resta attivo
+     abbastanza a lungo lo azzera.
 
    Se sull'URL risponde già un gx-torrent (ad esempio un servizio systemd tuo),
    Gextto usa quello.
@@ -51,10 +56,11 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 
 | Chiave | Default | Note |
 |---|---|---|
-| `gxtorrent_url` | `http://127.0.0.1:8890` | in modalità gestita deve essere loopback |
-| `gxtorrent_listen` | vuoto | indirizzo di ascolto del demone gestito. Vuoto = loopback di `gxtorrent_url`; per esporre pagina e API alla LAN, es. `0.0.0.0:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token il demone parte in modalità non protetta) |
+| `gxtorrent_url` | `http://127.0.0.1:8890` | URL con cui Gextto raggiunge il demone |
+| `gxtorrent_listen` | `0.0.0.0:8890` | indirizzo di ascolto del demone gestito: la pagina e l'API sono aperte a tutta la LAN. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere). Per tenerlo solo su questo server usa `127.0.0.1:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure` e lo segnala nel log) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
 | `gxtorrent_managed` | `true` | avvio e sorveglianza da Gextto |
+| `gxtorrent_allowed_roots` | vuoto | elenco di cartelle assolute in cui il demone può salvare/spostare. Vuoto = qualunque percorso assoluto deciso da Gextto. Se lo imposti, includi anche download, temp e RAM disk, altrimenti gli spostamenti falliscono |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
@@ -67,26 +73,36 @@ Le impostazioni di coda e banda restano quelle della sezione *libtorrent*:
 
 Gextto le inoltra al demone.
 
-## Interfaccia web minimale
+## Interfaccia web
 
 All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
-demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina di sola
-consultazione** — riepilogo sessione (velocità, peer, porta, router, DHT,
-cifratura, cache) e tabella dei torrent (stato, progresso, rapporti, peer, ETA,
-cartella) — pensata per chi apre quell'indirizzo dal browser, come la Web UI di
-qBittorrent. Si aggiorna da sola ogni 5 secondi e **non modifica nulla**: aggiunta,
-pausa, rimozione restano in Gextto.
+demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
+operativa** — riepilogo sessione (velocità, peer, porta, router, DHT,
+cifratura, cache) e tabella dei torrent — pensata per chi apre quell'indirizzo
+dal browser, come la Web UI di qBittorrent. Si aggiorna da sola ogni 5 secondi
+senza ricaricare la pagina e permette le azioni comuni:
 
-Se è impostato `gxtorrent_token`, la pagina lo chiede al primo accesso
-(accetta anche `?token=…`) e lo ricorda in un cookie; l'API resta protetta come
-prima. In modalità gestita, senza token, la pagina è aperta su loopback.
+- aggiungere un magnet;
+- pausa/riprendi, riverifica, ri-annuncio, porta in cima alla coda;
+- **Pausa tutti / Riprendi tutti / Verifica tutti**;
+- rimuovere un torrent (con o senza i file);
+- caricare il filtro IP da URL o file.
 
-Per aprirla (e aprire l'API) a tutta la LAN imposta **`gxtorrent_listen`**,
-ad esempio `0.0.0.0:8890` o l'IP del server (`192.168.1.10:8890`). Gextto
-continua a parlare col demone su `gxtorrent_url` (loopback), quindi l'URL
-interno non cambia. Con un ascolto non loopback serve un `gxtorrent_token`:
-senza token il demone verrebbe avviato con `-insecure` (come il resto di Gextto
-su LAN fidata) e Gextto te lo segnala con un avviso nel log.
+Il comando definitivo resta comunque Gextto; la pagina è una comodità per
+l'operatore.
+
+**La pagina (e l'API) sono aperte a tutta la LAN** con il default
+`gxtorrent_listen = 0.0.0.0:8890`. Gextto continua a parlare col demone
+sull'URL configurato; la porta di `gxtorrent_listen` viene **allineata** a
+quella di `gxtorrent_url` per garantire che il demone resti raggiungibile. Per
+tenere pagina e API solo su questo server imposta `gxtorrent_listen =
+127.0.0.1:8890`.
+
+Un ascolto non loopback richiede `gxtorrent_token`: senza token Gextto avvia il
+demone con `-insecure` (coerente con la LAN fidata di default di Gextto) e lo
+segnala con un avviso nel log. Se è impostato `gxtorrent_token`, la pagina lo
+chiede al primo accesso (accetta anche `?token=…`) e lo ricorda in un cookie;
+l'API resta protetta come prima.
 
 ## Uso standalone
 
@@ -96,7 +112,7 @@ gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
            [-peer-ports 6881-6891] [-listen-interface IP|iface]
            [-outgoing-interface wg0] [-proxy socks5://host:porta]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-lsd]
-           [-no-upnp] [-no-natpmp]
+           [-no-upnp] [-no-natpmp] [-dht-bootstrap host:porta,...]
            [-ipfilter FILE] [-ipfilter-trackers=true] [-debug] [-version]
 ```
 
@@ -108,14 +124,17 @@ Ogni flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad esempio:
   `GX_TORRENT_OUTGOING_INTERFACE`;
 - `GX_TORRENT_PROXY`, `GX_TORRENT_ENCRYPTION`;
 - `GX_TORRENT_NO_DHT`, `GX_TORRENT_NO_PEX`, `GX_TORRENT_NO_UPNP`,
-  `GX_TORRENT_NO_NATPMP`;
+  `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
 - `GX_TORRENT_DEBUG`.
 
 Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
-*libtorrent* (porte, interfacce, cifratura, DHT, PEX, UPnP, NAT-PMP, filtro IP)
-e dall'impostazione `gxtorrent_proxy`. Il proxy viaggia nell'ambiente, non
-sulla riga di comando. Le modifiche valgono dal riavvio di gextto.
+*libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
+filtro IP, nodi bootstrap DHT) e dalle impostazioni `gxtorrent_proxy` e
+`gxtorrent_allowed_roots`. Il limite globale di connessioni
+(`libtorrent_connections_limit`) viene ripartito tra dial uscenti e accept
+entranti di rain. Proxy e token viaggiano nell'ambiente, non sulla riga di
+comando. Le modifiche valgono dal riavvio di gextto.
 
 Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
 `-insecure`). Il server RPC interno di rain è disattivato.
@@ -228,12 +247,12 @@ Con libtorrent mostra:
 - connessioni in entrata, job su disco, totali.
 
 Gli stessi dati sono in `GET /api/v1/stats` del demone e in
-`GET /api/libtorrent/session-stats` di gextto. Rispetto a libtorrent mancano
-alcuni contatori interni di basso livello:
+`GET /api/libtorrent/session-stats` di gextto. Rispetto a libtorrent:
 
-- overhead di protocollo;
-- tempi dei job su disco;
-- pezzi falliti per peer.
+- l'**overhead di protocollo** è disponibile (`protocol_overhead_bytes`: byte
+  scambiati sulle connessioni peer meno il payload, cifratura compresa);
+- **mancano** i tempi dei job su disco e i pezzi falliti per peer: rain non li
+  misura e non sono implementati.
 
 ## Cache disco e preallocazione
 
@@ -445,6 +464,7 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - super-seeding e upload mode;
 - rimozione di tracker (l'aggiunta funziona);
 - torrent solo v2 (vedi sopra);
+- IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 
 
 Gli slot di upload e le connessioni per torrent restano quelli predefiniti di

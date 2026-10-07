@@ -30,12 +30,17 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Test bundled rain fork
+        run: cd third_party/rain && go test ./...
+
       - name: Build and package
         env:
           GEXTTO_BUILD: ${{ github.run_number }}
         run: |
           scripts/build-daemon.sh
           scripts/package-linux.sh --label "${GITHUB_REF_NAME}"
+          tar -tzf gextto-linux-*.tar.gz | grep -qx './gx-torrent' \
+            || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3

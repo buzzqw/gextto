@@ -151,6 +151,10 @@ const DefaultTorrentBackend = BackendGxTorrent
 // capabilityLevels is the single source of truth for the parity matrix. It is
 // intentionally explicit: pretending a backend supports an operation it cannot
 // apply is worse than returning a clear "unavailable".
+//
+// categories/tags are Gextto-level (the torrent tag set in Scarico and the
+// "NAS per categoria" rules), not an engine feature: they work with every
+// backend, provided the UI/API path, so all of them report "full".
 var capabilityLevels = map[string]map[string]string{
 	BackendEmbedded: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
@@ -175,7 +179,7 @@ var capabilityLevels = map[string]map[string]string{
 		"recheck": "full", "move": "full", "limits": "partial", "files": "full", "peers": "full",
 		"trackers": "partial", "events": "full", "stats": "full", "sequential": "none",
 		"first_last": "none", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
-		"piece_diagnostics": "none", "categories": "none", "tags": "none", "sync": "full",
+		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"preferences": "partial", "super_seeding": "none", "upload_mode": "none",
 		"ip_filter": "full", "session_stats": "partial", "web_seeds": "none",
 	},

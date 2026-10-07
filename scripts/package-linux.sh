@@ -45,11 +45,19 @@ trap 'rm -rf "$STAGE"' EXIT
 
 cp "$BINARY" "$STAGE/gexttod"
 chmod +x "$STAGE/gexttod"
-# Optional gx-torrent backend, built next to gexttod by build-daemon.sh.
+# gx-torrent is the default torrent engine: the archive must ship it next to
+# gexttod or a fresh install would fall back to libtorrent. build-daemon.sh
+# builds it by default; refuse to package without it unless explicitly allowed.
 GX_BINARY="$(dirname "$BINARY")/gx-torrent"
 if [[ -x "$GX_BINARY" ]]; then
   cp "$GX_BINARY" "$STAGE/gx-torrent"
   chmod +x "$STAGE/gx-torrent"
+elif [[ "${GEXTTO_ALLOW_MISSING_GXTORRENT:-0}" == "1" ]]; then
+  echo "warning: gx-torrent not found next to $BINARY; the archive will only run with embedded libtorrent" >&2
+else
+  echo "error: gx-torrent binary not found at $GX_BINARY" >&2
+  echo "       build it with scripts/build-daemon.sh, or set GEXTTO_ALLOW_MISSING_GXTORRENT=1 to package without it" >&2
+  exit 1
 fi
 mkdir -p "$STAGE/lib"
 

@@ -44,6 +44,9 @@ jobs:
       - name: Test
         run: make test
 
+      - name: Test bundled rain fork
+        run: cd third_party/rain && go test ./...
+
       - name: Build
         env:
           GEXTTO_BUILD: ${{ github.run_number }}

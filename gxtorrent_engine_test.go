@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeGxDaemon is a scripted gx-torrent API.
@@ -339,6 +340,12 @@ func TestGxManagedListen(t *testing.T) {
 	if _, err := gxManagedListen(gxTorrentSettings{BaseURL: "http://192.168.1.10:8890"}); err == nil {
 		t.Fatal("a non-loopback URL without gxtorrent_listen must be refused")
 	}
+	// The listen port is aligned with gxtorrent_url: Gextto reaches the daemon
+	// there, so a mismatched port would make the managed daemon unreachable.
+	got, err = gxManagedListen(gxTorrentSettings{BaseURL: "http://127.0.0.1:8890", Listen: "0.0.0.0:9000"})
+	if err != nil || got != "0.0.0.0:8890" {
+		t.Fatalf("listen port must follow the URL port, got %q, %v", got, err)
+	}
 	if listenIsLoopback("0.0.0.0:8890") || listenIsLoopback("192.168.1.10:8890") || listenIsLoopback(":8890") {
 		t.Fatal("non-loopback addresses detected as loopback")
 	}
@@ -362,6 +369,98 @@ func TestV2DetailCapsPerEngine(t *testing.T) {
 	}
 	if v2SwarmLabel(-1, -1) != "n/d" || v2SwarmLabel(3, 7) != "3 / 7" {
 		t.Fatal("swarm label")
+	}
+}
+
+func TestGxCrashBudgetFallsBackAfterTheWindowBudgetIsSpent(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+	budget := gxCrashBudget{window: 10 * time.Minute, max: 3}
+	if budget.register(base) {
+		t.Fatal("first failure must not trigger the fallback")
+	}
+	if budget.register(base.Add(time.Minute)) {
+		t.Fatal("second failure must not trigger the fallback")
+	}
+	if !budget.register(base.Add(2 * time.Minute)) {
+		t.Fatal("third failure inside the window must fall back to libtorrent")
+	}
+	if budget.len() != 3 {
+		t.Fatalf("budget = %d, want 3", budget.len())
+	}
+}
+
+func TestGxCrashBudgetForgetsFailuresOutsideTheWindow(t *testing.T) {
+	base := time.Unix(1_700_000_000, 0)
+	budget := gxCrashBudget{window: 10 * time.Minute, max: 3}
+	budget.register(base)
+	budget.register(base.Add(time.Minute))
+	// A long healthy run (here: a gap longer than the window) earns back the
+	// previous failures instead of falling back.
+	if budget.register(base.Add(20 * time.Minute)) {
+		t.Fatal("failures outside the window must not count")
+	}
+	if budget.len() != 1 {
+		t.Fatalf("budget = %d, want 1", budget.len())
+	}
+}
+
+func TestGxManagedShutdownGrace(t *testing.T) {
+	if managedShutdownGrace != 45*time.Second {
+		t.Fatalf("managed shutdown grace = %s, want 45s", managedShutdownGrace)
+	}
+}
+
+func TestGxPeerLimitsSplitConnections(t *testing.T) {
+	dial, accept := gxPeerLimits(200)
+	if dial != 160 || accept != 40 {
+		t.Fatalf("gxPeerLimits(200) = %d/%d, want 160/40", dial, accept)
+	}
+	if dial, accept := gxPeerLimits(0); dial != 0 || accept != 0 {
+		t.Fatalf("no limit must leave rain's defaults, got %d/%d", dial, accept)
+	}
+	if dial, accept := gxPeerLimits(1); dial < 1 || accept < 1 {
+		t.Fatalf("gxPeerLimits(1) = %d/%d, want at least 1 each", dial, accept)
+	}
+}
+
+func TestGxTorrentVersionNormalizes(t *testing.T) {
+	for input, want := range map[string]string{"": "v1", "v1": "v1", "hybrid": "hybrid", "HYBRID": "hybrid", "junk": "v1"} {
+		if got := gxTorrentVersion(input); got != want {
+			t.Fatalf("gxTorrentVersion(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestGxProxyValidation(t *testing.T) {
+	for _, valid := range []string{"", "socks5://127.0.0.1:1080", "socks5h://user:pass@host:1080", "http://host:3128"} {
+		if err := validateGxProxyURL(valid); err != nil {
+			t.Fatalf("proxy %q must be accepted: %v", valid, err)
+		}
+	}
+	for _, invalid := range []string{"host:1080", "ftp://host:1080", "socks5://host", "socks5://:1080"} {
+		if err := validateGxProxyURL(invalid); err == nil {
+			t.Fatalf("proxy %q must be refused", invalid)
+		}
+	}
+}
+
+func TestGxAllowedRootsValidation(t *testing.T) {
+	for _, valid := range []string{"", "/srv/media", "/srv/media,/data", " /srv/media , /data "} {
+		if err := validateGxAllowedRoots(valid); err != nil {
+			t.Fatalf("allowed roots %q must be accepted: %v", valid, err)
+		}
+	}
+	if err := validateGxAllowedRoots("relative/path"); err == nil {
+		t.Fatal("a relative allowed root must be refused")
+	}
+}
+
+func TestGxManagedListenSettingDefaultsToLAN(t *testing.T) {
+	if got := gxManagedListenSetting(&Config{Settings: map[string]string{}}); got != "0.0.0.0:8890" {
+		t.Fatalf("default listen = %q, want 0.0.0.0:8890", got)
+	}
+	if got := gxManagedListenSetting(&Config{Settings: map[string]string{"gxtorrent_listen": "127.0.0.1:8890"}}); got != "127.0.0.1:8890" {
+		t.Fatalf("explicit listen = %q", got)
 	}
 }
 

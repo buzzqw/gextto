@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -57,6 +58,7 @@ type torrentMeta struct {
 	DoneBytes int64 `json:"done_bytes,omitempty"`
 	// FilePriorities: one entry per file, 0 = skip (empty = all wanted).
 	FilePriorities []int  `json:"file_priorities,omitempty"`
+	Version        string `json:"version,omitempty"`
 	Error          string `json:"error,omitempty"`
 }
 
@@ -686,6 +688,7 @@ type torrentInfo struct {
 	Probing        bool    `json:"probing"`
 	Slow           bool    `json:"slow"`
 	Private        bool    `json:"private"`
+	TorrentVersion string  `json:"torrent_version"`
 	Error          string  `json:"error,omitempty"`
 	AddedAt        int64   `json:"added_at"`
 	CompletedAt    int64   `json:"completed_at,omitempty"`
@@ -724,6 +727,22 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 	meta := d.metaLocked(t)
 	rt := d.runtimeLocked(t.ID())
 	moving := d.moving[t.ID()]
+	if meta.Version == "" && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
+		if data, err := t.Torrent(); err == nil && len(data) > 0 {
+			// rain handles v1 and the v1 side of hybrid torrents; the raw
+			// metainfo carries "meta version" only when a v2 layer is present.
+			if bytes.Contains(data, []byte("12:meta versioni2e")) {
+				meta.Version = "hybrid"
+			} else {
+				meta.Version = "v1"
+			}
+			d.dirty = true
+		}
+	}
+	torrentVersion := meta.Version
+	if torrentVersion == "" {
+		torrentVersion = "v1"
+	}
 	progress := 0.0
 	if stats.Bytes.Total > 0 {
 		progress = float64(stats.Bytes.Completed) * 100 / float64(stats.Bytes.Total)
@@ -766,6 +785,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		Probing:        !meta.ProbeUntil.IsZero(),
 		Slow:           rt.slow,
 		Private:        stats.Private,
+		TorrentVersion: torrentVersion,
 		Error:          meta.Error,
 		AddedAt:        meta.AddedAt.Unix(),
 	}
@@ -1367,6 +1387,11 @@ func (d *Daemon) stats() daemonStats {
 			"peers_outgoing_utp":       s.OutgoingUTP,
 			"peers_outgoing_tcp":       s.OutgoingTCP,
 			"peers_incoming_utp":       s.IncomingUTP,
+			"peer_wire_downloaded":     s.PeerWireDownloaded,
+			"peer_wire_uploaded":       s.PeerWireUploaded,
+		}
+		if overhead := (s.PeerWireDownloaded - s.BytesDownloaded) + (s.PeerWireUploaded - s.BytesUploaded); overhead > 0 {
+			out.Session["protocol_overhead_bytes"] = overhead
 		}
 		for key, value := range s.DHTStats {
 			out.Session["dht_"+key] = value

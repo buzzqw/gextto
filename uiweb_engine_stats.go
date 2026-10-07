@@ -147,9 +147,9 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 		logging.HumanRate(engineNum(session, "disk_read_rate")), logging.HumanRate(engineNum(session, "disk_write_rate")),
 		logging.HumanBytesI64(engineNum(session, "read_cache_bytes")), engineNum(session, "read_cache_hit_percent"),
 		logging.HumanBytesI64(engineNum(session, "write_cache_bytes"))), false)
-	add("Totali sessione", fmt.Sprintf("scaricati %s · inviati %s · peer connessi %d",
+	add("Totali sessione", fmt.Sprintf("scaricati %s · inviati %s · overhead protocollo %s · peer connessi %d",
 		logging.HumanBytesI64(engineNum(session, "bytes_downloaded")), logging.HumanBytesI64(engineNum(session, "bytes_uploaded")),
-		engineNum(stats, "peers")), false)
+		logging.HumanBytesI64(engineNum(session, "protocol_overhead_bytes")), engineNum(stats, "peers")), false)
 	return out
 }
 

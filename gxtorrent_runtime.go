@@ -45,17 +45,12 @@ func gxTorrentBinary() (string, error) {
 }
 
 // gxManagedListen returns the address the managed daemon must listen on.
-// `gxtorrent_listen` wins (e.g. "0.0.0.0:8890" to expose the read-only page on
-// the LAN); when it is empty the daemon listens on the loopback address of
-// `gxtorrent_url`, so only Gextto reaches it.
+// `gxtorrent_listen` chooses the interface (e.g. "0.0.0.0:8890" to expose the
+// web page and the API on the LAN); its port is always aligned with the port of
+// `gxtorrent_url`, because Gextto reaches the daemon there, so a mismatched
+// port would make the managed daemon unreachable. When `gxtorrent_listen` is
+// empty the daemon listens on the loopback address of `gxtorrent_url`.
 func gxManagedListen(settings gxTorrentSettings) (string, error) {
-	if listen := strings.TrimSpace(settings.Listen); listen != "" {
-		host, port, err := net.SplitHostPort(listen)
-		if err != nil || strings.TrimSpace(port) == "" {
-			return "", fmt.Errorf("gxtorrent_listen must be host:port, got %q", listen)
-		}
-		return net.JoinHostPort(host, port), nil
-	}
 	parsed, err := url.Parse(settings.BaseURL)
 	if err != nil || parsed.Hostname() == "" {
 		return "", errors.New("gxtorrent_url is not valid for a managed daemon")
@@ -63,16 +58,28 @@ func gxManagedListen(settings gxTorrentSettings) (string, error) {
 	if parsed.Scheme != "http" {
 		return "", errors.New("the managed gx-torrent speaks plain HTTP on loopback: use an http:// URL")
 	}
+	urlPort := parsed.Port()
+	if urlPort == "" {
+		urlPort = "80"
+	}
+	if listen := strings.TrimSpace(settings.Listen); listen != "" {
+		host, port, splitErr := net.SplitHostPort(listen)
+		if splitErr != nil || strings.TrimSpace(port) == "" {
+			return "", fmt.Errorf("gxtorrent_listen must be host:port, got %q", listen)
+		}
+		if port != urlPort {
+			logging.Warn("gxtorrent_listen porta diversa da gxtorrent_url: uso la porta dell'URL per restare raggiungibile",
+				"listen_port", port, "url_port", urlPort)
+			port = urlPort
+		}
+		return net.JoinHostPort(strings.TrimSpace(host), port), nil
+	}
 	host := parsed.Hostname()
 	ip := net.ParseIP(host)
 	if !strings.EqualFold(host, "localhost") && (ip == nil || !ip.IsLoopback()) {
 		return "", errors.New("the managed gx-torrent must listen on localhost/loopback (set gxtorrent_listen to expose it on the LAN)")
 	}
-	port := parsed.Port()
-	if port == "" {
-		port = "80"
-	}
-	return net.JoinHostPort(host, port), nil
+	return net.JoinHostPort(host, urlPort), nil
 }
 
 // listenIsLoopback reports whether an address is reachable only from this host.
@@ -165,8 +172,14 @@ func (p *gxManagedProcess) wait() error {
 	return err
 }
 
+// managedShutdownGrace is how long the managed daemon gets to exit after
+// SIGTERM. rain flushes its resume data and closes the storage cleanly on a
+// graceful stop, so a move or a verify in progress is not truncated; only after
+// this window is the process killed.
+const managedShutdownGrace = 45 * time.Second
+
 // Close asks the daemon to stop (SIGTERM) and waits for it so rain can save
-// its resume data; it is killed after 20 seconds.
+// its resume data; it is killed after managedShutdownGrace.
 func (p *gxManagedProcess) Close() error {
 	if p == nil {
 		return nil
@@ -184,23 +197,54 @@ func (p *gxManagedProcess) Close() error {
 	}
 	select {
 	case <-p.done:
-	case <-time.After(20 * time.Second):
+	case <-time.After(managedShutdownGrace):
 		_ = p.cmd.Process.Kill()
 	}
 	return nil
 }
 
-// superviseManagedProcess restarts the managed daemon after an unexpected
-// exit. After three crashes in ten minutes Gextto switches back to the
-// embedded libtorrent engine and restarts the service.
+// gxCrashBudget records the failed life cycles of the managed daemon and
+// decides when Gextto must stop restarting it. Only events inside the window
+// count, so a daemon that stays up long enough earns back its retries. It is a
+// pure helper so the policy is unit-testable without spawning processes.
+type gxCrashBudget struct {
+	window time.Duration
+	max    int
+	events []time.Time
+}
+
+// register adds one failure and reports whether the restart budget is spent.
+func (b *gxCrashBudget) register(now time.Time) bool {
+	b.events = append(b.events, now)
+	kept := b.events[:0]
+	for _, at := range b.events {
+		if now.Sub(at) <= b.window {
+			kept = append(kept, at)
+		}
+	}
+	b.events = kept
+	return len(b.events) >= b.max
+}
+
+// len reports how many failures are currently inside the window.
+func (b *gxCrashBudget) len() int { return len(b.events) }
+
+// superviseManagedProcess restarts the managed daemon after an unexpected exit
+// or a failed start. It gives up (and hands the transfers back to embedded
+// libtorrent, saving the setting and restarting the service) once the crash
+// budget is exhausted: the daemon is not recovering on its own.
 func (e *gxTorrentEngine) superviseManagedProcess() {
 	defer recoverGoroutine("gx-torrent supervisor")
-	const (
-		crashWindow  = 10 * time.Minute
-		maxCrashes   = 3
-		restartPause = 5 * time.Second
-	)
-	var crashes []time.Time
+	const restartPause = 5 * time.Second
+	budget := gxCrashBudget{window: 10 * time.Minute, max: 6}
+	fallbackToLibtorrent := func() {
+		logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
+			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
+		if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
+			logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
+		}
+		requestServiceActionLater("restart")
+	}
 	for {
 		e.processMu.Lock()
 		process := e.process
@@ -220,23 +264,9 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		if err != nil {
 			exit = err.Error()
 		}
-		now := time.Now()
-		logging.Error("gx-torrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", len(crashes)+1)
-		crashes = append(crashes, now)
-		kept := crashes[:0]
-		for _, at := range crashes {
-			if now.Sub(at) <= crashWindow {
-				kept = append(kept, at)
-			}
-		}
-		crashes = kept
-		if len(crashes) >= maxCrashes {
-			logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
-				"crashes", len(crashes), "window_minutes", int(crashWindow.Minutes()))
-			if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
-				logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
-			}
-			requestServiceActionLater("restart")
+		logging.Error("gx-torrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", budget.len()+1)
+		if budget.register(time.Now()) {
+			fallbackToLibtorrent()
 			return
 		}
 		select {
@@ -244,10 +274,26 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			return
 		case <-time.After(restartPause):
 		}
-		restarted, startErr := startManagedGxTorrent(e.cfg, e.settings)
-		if startErr != nil {
-			logging.Error("riavvio di gx-torrent gestito non riuscito", "error", startErr)
-			continue
+		// Keep retrying the start without re-waiting on the old, already
+		// reaped process: a daemon that cannot even be started is a failed
+		// recovery too, and counts toward the fallback.
+		var restarted *gxManagedProcess
+		for {
+			var startErr error
+			restarted, startErr = startManagedGxTorrent(e.cfg, e.settings)
+			if startErr == nil {
+				break
+			}
+			logging.Error("riavvio di gx-torrent gestito non riuscito", "error", startErr, "restarts_in_window", budget.len()+1)
+			if budget.register(time.Now()) {
+				fallbackToLibtorrent()
+				return
+			}
+			select {
+			case <-e.supervisorStop:
+				return
+			case <-time.After(restartPause):
+			}
 		}
 		e.processMu.Lock()
 		e.process = restarted
@@ -257,16 +303,39 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			_ = restarted.Close()
 			return
 		}
-		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", len(crashes))
+		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", budget.len())
 	}
 }
 
 // gxListenInterface splits libtorrent's listen_interfaces ("0.0.0.0:6881-6891",
-// "wg0:6881", first entry only) into host and port range.
+// "wg0:6881", "[::]:6881") into host and port range. rain binds a single host,
+// so the first specific interface wins; wildcard entries and the SSL suffix are
+// dropped. Multiple entries no longer discard a usable host behind the first.
 func gxListenInterface(value string) (host, ports string) {
-	entry := strings.TrimSpace(strings.Split(value, ",")[0])
-	if entry == "" {
-		return "", ""
+	for _, raw := range strings.Split(value, ",") {
+		entry := strings.TrimSpace(raw)
+		if entry == "" || entry == "::" || entry == "*" || entry == "0.0.0.0" {
+			continue
+		}
+		entryHost, entryPorts := splitListenEntry(entry)
+		if host == "" && entryHost != "" && entryHost != "0.0.0.0" && entryHost != "::" {
+			host = entryHost
+		}
+		if ports == "" && entryPorts != "" {
+			ports = entryPorts
+		}
+	}
+	return host, ports
+}
+
+// splitListenEntry parses one `host:port` (IPv6 in brackets) listen entry.
+func splitListenEntry(entry string) (host, ports string) {
+	if strings.HasPrefix(entry, "[") {
+		if end := strings.Index(entry, "]"); end >= 0 {
+			host = entry[1:end]
+			ports = strings.TrimPrefix(entry[end+1:], ":")
+			return host, strings.TrimSuffix(ports, "s")
+		}
 	}
 	colon := strings.LastIndex(entry, ":")
 	if colon < 0 {
@@ -274,9 +343,6 @@ func gxListenInterface(value string) (host, ports string) {
 	}
 	host = strings.Trim(entry[:colon], "[]")
 	ports = strings.TrimSpace(entry[colon+1:])
-	if host == "0.0.0.0" || host == "::" || host == "*" {
-		host = ""
-	}
 	return host, strings.TrimSuffix(ports, "s")
 }
 
@@ -329,6 +395,12 @@ func gxNetworkArgs(cfg *Config) []string {
 		args = append(args, "-ipfilter", path)
 	}
 	args = append(args, fmt.Sprintf("-ipfilter-trackers=%t", lt.ApplyIpFilter))
+	if bootstrap := strings.TrimSpace(lt.DhtBootstrapNodes); bootstrap != "" && lt.Dht {
+		args = append(args, "-dht-bootstrap", bootstrap)
+	}
+	if roots := strings.TrimSpace(cfg.Settings["gxtorrent_allowed_roots"]); roots != "" {
+		args = append(args, "-allowed-roots", roots)
+	}
 	return args
 }
 
@@ -361,11 +433,8 @@ func gxEnsureIPFilter(cfg *Config) {
 		return
 	}
 	path := filepath.Join(cfg.DataDir, "ipfilter.dat")
-	autoupdate := settingsBool(cfg, "libtorrent_ipfilter_autoupdate", true)
-	if info, err := os.Stat(path); err == nil {
-		if !autoupdate || time.Since(info.ModTime()) < 24*time.Hour {
-			return
-		}
+	if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < 24*time.Hour {
+		return
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		logging.Warn("cannot create the data directory for the IP filter", "error", err)

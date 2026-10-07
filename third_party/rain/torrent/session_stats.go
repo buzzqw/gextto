@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"github.com/cenkalti/rain/internal/netx"
+	"github.com/cenkalti/rain/internal/peerconn"
 	"github.com/nictuku/dht"
 	"strconv"
 	"time"
@@ -79,6 +80,10 @@ type SessionStats struct {
 	BytesDownloaded int64
 	// Number of bytes uploaded to peers.
 	BytesUploaded int64
+	// gextto fork: raw peer wire bytes, protocol framing and encryption
+	// included (payload bytes are BytesDownloaded/BytesUploaded).
+	PeerWireDownloaded int64
+	PeerWireUploaded   int64
 	// Number of bytes read from disk.
 	BytesRead int64
 	// Number of bytes written to disk.
@@ -93,6 +98,8 @@ func (s *Session) Stats() SessionStats {
 	out.IncomingUTP = netx.IncomingUTP.Load()
 	out.UTP = s.utpSocket != nil
 	out.DHT = s.config.DHTEnabled
+	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()
+	out.PeerWireUploaded = peerconn.WireBytesWritten.Load()
 	if s.config.DHTEnabled {
 		out.DHTStats = dht.Stats()
 	}

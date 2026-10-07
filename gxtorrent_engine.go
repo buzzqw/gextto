@@ -82,13 +82,27 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 	return gxTorrentSettings{
 		BaseURL:      baseURL,
 		Token:        strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
-		Listen:       strings.TrimSpace(cfg.Settings["gxtorrent_listen"]),
+		Listen:       gxManagedListenSetting(cfg),
 		Timeout:      timeout,
 		PollInterval: poll,
 		Managed:      settingsBool(cfg, "gxtorrent_managed", true),
 		stateDir:     cfg.StateDir,
 		dataDir:      cfg.DataDir,
 	}, nil
+}
+
+// gxManagedListenSetting returns the configured listen address for the managed
+// daemon. The gx-torrent web page and API are meant to be reachable on the
+// whole LAN, so the default is 0.0.0.0:8890; set an explicit loopback address
+// to keep the page on this host only.
+func gxManagedListenSetting(cfg *Config) string {
+	if cfg == nil {
+		return "0.0.0.0:8890"
+	}
+	if listen := strings.TrimSpace(cfg.Settings["gxtorrent_listen"]); listen != "" {
+		return listen
+	}
+	return "0.0.0.0:8890"
 }
 
 // gxTorrentEngine is a TorrentEngine backed by the gx-torrent daemon.
@@ -286,6 +300,7 @@ type gxTorrentItem struct {
 	Error          string  `json:"error"`
 	CompletedAt    int64   `json:"completed_at"`
 	CurrentTracker string  `json:"current_tracker"`
+	TorrentVersion string  `json:"torrent_version"`
 }
 
 func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.TorrentView {
@@ -316,7 +331,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		SeedDays:          item.SeedDays,
 		HasMetadata:       item.HasMetadata,
 		AutoManaged:       item.AutoManaged,
-		TorrentVersion:    "v1",
+		TorrentVersion:    gxTorrentVersion(item.TorrentVersion),
 		TotalSize:         item.TotalSize,
 		TotalDone:         item.TotalDone,
 		IsSeeding:         item.State == "seeding",
@@ -329,6 +344,17 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 	}
 	view.Diagnosis, _, _ = DiagnoseTorrent(&view)
 	return view
+}
+
+// gxTorrentVersion normalizes the daemon's torrent version. rain handles v1 and
+// the v1 side of hybrid (v1+v2) torrents; an unknown report falls back to v1.
+func gxTorrentVersion(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "hybrid", "v2":
+		return "hybrid"
+	default:
+		return "v1"
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -470,6 +496,31 @@ func (e *gxTorrentEngine) ensureTorrentFile(hash string) {
 		return
 	}
 	_ = os.Rename(tmp, target)
+	e.copyTorrentToConfiguredDir(hash, target)
+}
+
+// torrentCopyDir is the optional folder Gextto keeps the `.torrent` copies in
+// (libtorrent_torrent_copy_dir); empty means none.
+func (e *gxTorrentEngine) torrentCopyDir() string {
+	if e.cfg == nil {
+		return ""
+	}
+	if dir := e.cfg.LibtorrentTorrentCopyDir(); dir != nil {
+		return strings.TrimSpace(*dir)
+	}
+	return ""
+}
+
+// copyTorrentToConfiguredDir mirrors a `.torrent` copy into the operator's
+// configured folder, so gx-torrent behaves like the embedded engine there.
+func (e *gxTorrentEngine) copyTorrentToConfiguredDir(hash, source string) {
+	dir := e.torrentCopyDir()
+	if dir == "" || !fileExists(source) {
+		return
+	}
+	if err := copyFileAtomically(source, filepath.Join(dir, hash+".torrent")); err != nil {
+		logging.Debug("cannot copy gx-torrent .torrent to the configured directory", "error", err.Error())
+	}
 }
 
 // List returns the last snapshot, refreshing it first.
@@ -571,7 +622,7 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		return int(value)
 	}
 	lt := cfg.Libtorrent
-	return map[string]any{
+	policy := map[string]any{
 		"active_downloads": clamp(lt.ActiveDownloads),
 		"active_seeds":     clamp(lt.ActiveSeeds),
 		"active_limit":     clamp(lt.ActiveLimit),
@@ -583,6 +634,32 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
 		"preallocate":      cfg.LibtorrentPreallocate(),
 	}
+	// rain has no single "connections limit": map the global libtorrent limit
+	// onto its outgoing dial and incoming accept budgets, keeping rain's own
+	// 4:1 ratio so the total matches what the user configured.
+	if dial, accept := gxPeerLimits(lt.ConnectionsLimit); dial > 0 {
+		policy["max_peer_dial"] = dial
+		policy["max_peer_accept"] = accept
+	}
+	return policy
+}
+
+// gxPeerLimits splits a global connections limit into rain's outgoing dial and
+// incoming accept budgets (rain defaults are 80 and 20). Zero means unlimited
+// and leaves rain's defaults in place.
+func gxPeerLimits(connectionsLimit int64) (dial, accept int) {
+	if connectionsLimit <= 0 {
+		return 0, 0
+	}
+	dial = int(connectionsLimit * 4 / 5)
+	if dial < 1 {
+		dial = 1
+	}
+	accept = int(connectionsLimit) - dial
+	if accept < 1 {
+		accept = 1
+	}
+	return dial, accept
 }
 
 // gxCacheMB converts libtorrent_cache_size (16 KiB blocks, -1 automatic)
@@ -1029,7 +1106,7 @@ func (e *gxTorrentEngine) TorrentFilePath(hash string) (string, bool) {
 	if hash == "" {
 		return "", false
 	}
-	for _, dir := range []string{e.settings.stateDir, e.settings.dataDir} {
+	for _, dir := range []string{e.settings.stateDir, e.settings.dataDir, e.torrentCopyDir()} {
 		if dir == "" {
 			continue
 		}
@@ -1056,6 +1133,26 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 		return e.cfg.LibtorrentDir
 	}
 	return ""
+}
+
+// gxWarnUnsupportedOptions notes the add-time options rain cannot apply, so a
+// caller does not believe they were honored. rain has no sequential download,
+// first/last-piece priority, seed mode or per-torrent limits.
+func gxWarnUnsupportedOptions(options AddOptions) {
+	var unsupported []string
+	if options.Sequential {
+		unsupported = append(unsupported, "sequential")
+	}
+	if options.FirstLast {
+		unsupported = append(unsupported, "first_last")
+	}
+	if options.SeedMode {
+		unsupported = append(unsupported, "seed_mode")
+	}
+	if len(unsupported) > 0 {
+		logging.Warn("gx-torrent non supporta queste opzioni di aggiunta: verranno ignorate",
+			"options", strings.Join(unsupported, ","))
+	}
 }
 
 func gxAddForm(savePath string, options AddOptions) url.Values {
@@ -1092,6 +1189,7 @@ func (e *gxTorrentEngine) AddWithOptions(magnet string, cfg *Config, preferredPa
 	if strings.TrimSpace(magnet) == "" {
 		return false, nil
 	}
+	gxWarnUnsupportedOptions(options)
 	form := gxAddForm(e.resolveSavePath(preferredPath, cfg), options)
 	form.Set("magnet", magnet)
 	var result struct {
@@ -1126,6 +1224,7 @@ func (e *gxTorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Con
 	if err != nil {
 		return nil, fmt.Errorf("torrent file not readable: %w", err)
 	}
+	gxWarnUnsupportedOptions(options)
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	for key, values := range gxAddForm(e.resolveSavePath(preferredPath, cfg), options) {
@@ -1165,16 +1264,24 @@ func (e *gxTorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Con
 	return &hash, nil
 }
 
+// persistTorrentCopy keeps a Gextto-owned copy of the .torrent for export,
+// migration and the configured copy directory.
 func (e *gxTorrentEngine) persistTorrentCopy(hash, source string) {
 	dir := e.settings.stateDir
-	if dir == "" {
-		return
+	if dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			logging.Debug("cannot create gx-torrent state directory", "error", err.Error())
+		} else {
+			target := filepath.Join(dir, hash+".torrent")
+			if err := copyFileAtomically(source, target); err != nil {
+				logging.Debug("cannot persist gx-torrent .torrent copy", "hash", hash, "error", err.Error())
+			} else {
+				e.copyTorrentToConfiguredDir(hash, target)
+			}
+		}
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return
-	}
-	if err := copyFileAtomically(source, filepath.Join(dir, hash+".torrent")); err != nil {
-		logging.Debug("cannot persist gx-torrent .torrent copy", "hash", hash, "error", err.Error())
+	if copyDir := e.torrentCopyDir(); copyDir != "" && dir == "" {
+		_ = copyFileAtomically(source, filepath.Join(copyDir, hash+".torrent"))
 	}
 }
 

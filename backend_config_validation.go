@@ -36,6 +36,10 @@ func validateBackendSetting(key, value string) error {
 		if _, port, err := net.SplitHostPort(raw); err != nil || strings.TrimSpace(port) == "" {
 			return fmt.Errorf("gxtorrent_listen must be host:port (e.g. 0.0.0.0:8890)")
 		}
+	case "gxtorrent_proxy":
+		return validateGxProxyURL(raw)
+	case "gxtorrent_allowed_roots":
+		return validateGxAllowedRoots(raw)
 	case "qbittorrent_request_timeout_secs", "gxtorrent_request_timeout_secs":
 		if raw == "" {
 			return nil
@@ -67,6 +71,40 @@ func validateBackendSetting(key, value string) error {
 			return fmt.Errorf("trash_retention_days must be zero or a positive number of days")
 		}
 		return nil
+	}
+	return nil
+}
+
+// validateGxProxyURL accepts the proxy forms rain supports:
+// socks5://[user:pass@]host:port and http://host:port. Empty clears it.
+func validateGxProxyURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Hostname() == "" || parsed.Port() == "" {
+		return fmt.Errorf("gxtorrent_proxy must be socks5://host:port or http://host:port")
+	}
+	switch parsed.Scheme {
+	case "socks5", "socks5h", "http", "https":
+		return nil
+	default:
+		return fmt.Errorf("gxtorrent_proxy scheme must be socks5, socks5h, http or https")
+	}
+}
+
+// validateGxAllowedRoots accepts a comma-separated list of absolute paths the
+// daemon may save into. Empty clears it. A relative path is rejected here so it
+// cannot make the daemon refuse to start.
+func validateGxAllowedRoots(raw string) error {
+	for _, entry := range strings.Split(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if !filepath.IsAbs(entry) {
+			return fmt.Errorf("gxtorrent_allowed_roots entries must be absolute paths, got %q", entry)
+		}
 	}
 	return nil
 }

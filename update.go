@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/logging"
 )
 
 // DefaultRepo is the repository used when none is configured.
@@ -472,7 +473,7 @@ func updateInstallRelease(root, installDir string) error {
 	}
 	updateRemovePath(backup)
 
-	// The optional gx-torrent daemon may be running (managed mode): install it
+	// The gx-torrent daemon may be running (managed mode): install it
 	// through a rename so the running executable is never overwritten in place.
 	if source := filepath.Join(root, "gx-torrent"); updateIsFile(source) {
 		destination := filepath.Join(installDir, "gx-torrent")
@@ -486,6 +487,8 @@ func updateInstallRelease(root, installDir string) error {
 		if err := os.Rename(staged, destination); err != nil {
 			return fmt.Errorf("cannot install gx-torrent: %w", err)
 		}
+	} else {
+		logging.Warn("gx-torrent is missing from the update payload: Gextto will fall back to embedded libtorrent")
 	}
 
 	// Keep the launcher and the release notes alongside the payload when shipped.

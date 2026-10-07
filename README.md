@@ -46,11 +46,12 @@ and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the U
 
 ## Resource footprint
 
-Gextto is designed to remain lightweight while idle: it is one daemon with
-embedded libtorrent, uses bounded concurrency for source and background work,
-and backs off failing providers instead of retrying continuously. Actual CPU and
-memory use depend on monitored titles, sources, active torrents and archive
-scans; treat any machine-specific measurement as indicative, not a guarantee.
+Gextto is designed to remain lightweight while idle: it is one daemon (plus the
+small supervised `gx-torrent` process when that engine is active), uses bounded
+concurrency for source and background work, and backs off failing providers
+instead of retrying continuously. Actual CPU and memory use depend on monitored
+titles, sources, active torrents and archive scans; treat any machine-specific
+measurement as indicative, not a guarantee.
 
 ## Install on Linux
 
@@ -62,7 +63,10 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 ```
 
 It installs the program in `/opt/gextto`, stores service data in
-`/var/lib/gextto`, and exposes the UI on port 5000.
+`/var/lib/gextto`, and exposes the UI on port 5000. The default torrent engine,
+`gx-torrent` (pure Go, no libtorrent needed), is installed next to `gexttod` and
+started in managed mode; embedded libtorrent stays as the automatic fallback and
+selectable alternative.
 
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: by default the web UI and the API are
@@ -82,9 +86,11 @@ make build
 ```
 
 `make build` increments the local build number and writes the versioned daemon
-to `bin/gexttod`. To rebuild without incrementing the number, use `make fast`.
-Verify the exact binary, product version, build number and linked libtorrent
-version with:
+to `bin/gexttod`, plus the pure-Go `gx-torrent` engine next to it. To rebuild
+without incrementing the number, use `make fast`. To build **only** the
+`gx-torrent` daemon (no C++/libtorrent needed), use `make gx-torrent`. Verify
+the exact binary, product version, build number and linked libtorrent version
+with:
 
 ```bash
 ./bin/gexttod --version

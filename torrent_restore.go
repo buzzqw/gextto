@@ -96,7 +96,11 @@ func restoreMissingTorrents(cfg *Config, db *Database, engine TorrentEngine) int
 	if cfg == nil || db == nil || engine == nil || cfg.DryRun {
 		return 0
 	}
-	if _, embedded := engine.(embeddedEngine); !embedded {
+	switch engine.(type) {
+	case embeddedEngine, *gxTorrentEngine:
+		// Both persist their own torrents (resume files / daemon state), but a
+		// lost session is still recovered from Gextto's database.
+	default:
 		// External clients (qBittorrent) keep their own torrents across restarts.
 		return 0
 	}
