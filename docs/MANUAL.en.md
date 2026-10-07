@@ -614,7 +614,7 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
-### Torrent engine (embedded, qBittorrent-nox)
+### Torrent engine (gx-torrent, embedded libtorrent, qBittorrent-nox)
 
 Gextto always keeps its own database, queue, scoring, post-processing, renaming
 and archive; only the transfer plane is pluggable, chosen in
@@ -622,7 +622,19 @@ and archive; only the transfer plane is pluggable, chosen in
 time, so switching is a controlled migration, not two clients working on the
 same data.
 
-- **Embedded libtorrent** (default) — the bundled in-process session; every
+- **gx-torrent** (default) — a pure-Go BitTorrent daemon, started and supervised
+  by Gextto in a separate process; it needs no `libtorrent-rasterbar`. Set the
+  **Web API URL**, the **listen address** (default `0.0.0.0:8890`: web page and
+  API open on the whole LAN; use `127.0.0.1:8890` to keep them on this host),
+  **token**, **proxy** and **allowed roots**. At that address it also serves an
+  **operational web page** (add magnet, pause/resume, verify, reannounce, queue,
+  remove, IP filter). The **disk cache is automatic** (1/32 read, 1/16 write of
+  the RAM) and Gextto re-asserts it every 15 minutes; the **IP filter** refreshes
+  at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
+  in 10 minutes) Gextto falls back to libtorrent by itself. It does not support
+  **v2-only** torrents, sequential download, per-torrent rate/connection limits,
+  manual web seeds or tracker removal.
+- **Embedded libtorrent** — the bundled in-process session; every
   *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
@@ -639,21 +651,24 @@ If the saved configuration selects a backend that is no longer supported,
 Gextto falls back to the embedded engine and logs a warning.
 
 The configuration tile shows the active engine, its status and a
-reachability/path test, so you can validate a backend before switching.
-Whichever engine is active, the **Downloads** screen and every automation stay
-the same.
+reachability/path test, so you can validate a backend before switching. The
+**Health → Torrent engine** panel summarises the active engine (queue, speed,
+port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache). Whichever engine
+is active, the **Downloads** screen and every automation stay the same.
 
 ### Performance: RAM and CPU
 
-The daemon's own logic is negligible; with libtorrent active almost all the cost
-is the engine while it has torrents in the session. If you use an external engine
-(qBittorrent-nox), that cost lives in its own process instead. To lower RAM and
-CPU:
+The daemon's own logic is negligible; the transfer cost is almost entirely the
+engine while it has torrents in the session. With **embedded libtorrent** it
+lives in Gextto's own process; with an external engine (**gx-torrent** or
+**qBittorrent-nox**) it lives in its own process. To lower RAM and CPU:
 
-- **RAM** — the values that matter are the **disk cache** (`cache_size`, 16 KiB
-  blocks) and `max_queued_disk_bytes`. The **Optimise** button (or *continuous
-  optimisation*) sizes them to the host RAM; the values suggested by
-  `/api/system/lt_mem_suggest` work too. The daemon returns memory to the OS
+- **RAM** — with libtorrent the values that matter are the **disk cache**
+  (`cache_size`, 16 KiB blocks) and `max_queued_disk_bytes`; the **Optimise**
+  button (or *continuous optimisation*) sizes them to the host RAM. With
+  **gx-torrent** the cache is automatic (1/32 read, 1/16 write of the RAM) and
+  Gextto re-asserts it every 15 minutes, so there is nothing to tune. The values
+  suggested by `/api/system/lt_mem_suggest` work too. The daemon returns memory to the OS
   (`malloc_trim`) after completions, after every cycle and every 15 minutes, so
   the RSS does not stay at the download peak.
 - **CPU** — enable the **dynamic queue** and *Do not count slow torrents in
@@ -1097,7 +1112,15 @@ Each tab collects the editable settings. The *What it does* column mirrors the d
 
 | Setting | What it does |
 |---|---|
-| Torrent engine | Active torrent engine (built-in libtorrent or qBittorrent-nox). |
+| Torrent engine | Active torrent engine (gx-torrent, built-in libtorrent or qBittorrent-nox). |
+| gx-torrent — Web API URL | gx-torrent API URL (e.g. http://127.0.0.1:8890); Gextto drives the daemon there. |
+| gx-torrent — listen address (LAN) | Listen address of the managed daemon: web page and API open on the whole LAN (default `0.0.0.0:8890`; use `127.0.0.1:8890` to keep them on this host). The port is aligned with the URL. |
+| gx-torrent — request timeout (seconds) | Timeout in seconds for HTTP requests to gx-torrent. |
+| gx-torrent — polling interval (ms) | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). |
+| gx-torrent — started and supervised by Gextto | Gextto starts, restarts and stops the gx-torrent daemon; after 6 abnormal starts in 10 minutes it falls back to libtorrent by itself. |
+| gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
+| gx-torrent — allowed roots | Comma-separated absolute folders gx-torrent may save into; empty = any absolute path chosen by Gextto. If set, include downloads, temp and RAM disk too. |
+| gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
 | qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |
 | qBittorrent-nox — username | qBittorrent-nox Web UI username. |
 | qBittorrent-nox — password | qBittorrent-nox Web UI password (not shown). |
@@ -1107,7 +1130,7 @@ Each tab collects the editable settings. The *What it does* column mirrors the d
 | qBittorrent-nox — polling interval (ms) | Interval in milliseconds between torrent status reads. |
 | qBittorrent-nox — path mappings | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
 | qBittorrent-nox — downloaded and updated by Gextto | Gextto downloads the latest qBittorrent-nox release itself, installs it in the application folder (next to gexttod), starts/stops it with the service and updates it (with backup and rollback). The engine in use is still chosen in “Torrent engine”: this option does not change it. |
-| Tab actions | Install/Optimize qBittorrent-nox, qBittorrent-nox status, Apply engine and Test connection. |
+| Tab actions | Refresh IP filter, Install/Optimize qBittorrent-nox, qBittorrent-nox status, Apply engine and Test connection. |
 
 ### Scores
 

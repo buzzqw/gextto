@@ -629,7 +629,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
-### Motore torrent (integrato, qBittorrent-nox)
+### Motore torrent (gx-torrent, libtorrent integrato, qBittorrent-nox)
 
 Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
 archivio; è sostituibile solo il piano di trasferimento, scelto in
@@ -637,7 +637,21 @@ archivio; è sostituibile solo il piano di trasferimento, scelto in
 quindi il passaggio è una migrazione controllata, non due client sugli stessi
 dati.
 
-- **libtorrent integrato** (default) — la sessione inclusa, nello stesso processo;
+- **gx-torrent** (predefinito) — demone BitTorrent in Go puro, avviato e
+  sorvegliato da Gextto in un processo separato; non richiede
+  `libtorrent-rasterbar`. Imposta **URL Web API**, **indirizzo di ascolto**
+  (predefinito `0.0.0.0:8890`: pagina web e API aperte su tutta la LAN; usa
+  `127.0.0.1:8890` per tenerle solo sul server), **token**, **proxy** e
+  **cartelle consentite**. All'indirizzo configurato apre anche una **pagina
+  web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
+  rimozione, filtro IP). La **cache disco è automatica** (1/32 in lettura, 1/16
+  in scrittura della RAM) e Gextto la riasserisce ogni 15 minuti; il **filtro
+  IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
+  riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
+  libtorrent. Non supporta torrent **solo-v2**, download sequenziale, limiti di
+  velocità/connessioni per singolo torrent, web seed manuali né rimozione
+  tracker.
+- **libtorrent integrato** — la sessione inclusa, nello stesso processo;
   valgono tutte le voci *libtorrent*.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
   Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
@@ -654,22 +668,27 @@ Se la configurazione salvata seleziona un backend non più supportato, Gextto
 torna al motore integrato e registra un avviso nel log.
 
 Il riquadro di configurazione mostra il motore attivo, il suo stato e un test di
-raggiungibilità/percorsi, così puoi validare un backend prima di passare. Quale
+raggiungibilità/percorsi, così puoi validare un backend prima di passare. Il
+pannello **Salute → Motore torrent** riassume lo stato del motore attivo (coda,
+velocità, porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache). Quale
 che sia il motore attivo, la schermata **Scarico** e tutte le automazioni restano
 identiche.
 
 ### Prestazioni: RAM e CPU
 
-La logica del daemon è trascurabile; con libtorrent attivo il costo è quasi tutto
-del motore finché ha torrent in sessione. Se usi un motore esterno
-(qBittorrent-nox), quel costo vive nel suo processo. Per ridurre RAM e CPU:
+La logica del daemon è trascurabile; il costo del trasferimento è quasi tutto
+del motore finché ha torrent in sessione. Con **libtorrent integrato** vive nello
+stesso processo di Gextto; con un motore esterno (**gx-torrent** o
+**qBittorrent-nox**) vive nel suo processo. Per ridurre RAM e CPU:
 
-- **RAM** — i valori che contano sono la **cache disco** (`cache_size`, blocchi
-  da 16 KiB) e `max_queued_disk_bytes`. Il pulsante **Ottimizza** (o
-  *Ottimizzazione continua*) li dimensiona in base alla RAM; puoi anche usare i
-  valori suggeriti da `/api/system/lt_mem_suggest`. Il daemon libera la memoria
-  al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e ogni 15
-  minuti, così l'RSS non resta al picco del download.
+- **RAM** — con libtorrent i valori che contano sono la **cache disco**
+  (`cache_size`, blocchi da 16 KiB) e `max_queued_disk_bytes`; il pulsante
+  **Ottimizza** (o *Ottimizzazione continua*) li dimensiona in base alla RAM.
+  Con **gx-torrent** la cache è automatica (1/32 in lettura, 1/16 in scrittura
+  della RAM) e Gextto la riasserisce ogni 15 minuti: non serve intervenire. Puoi
+  anche usare i valori suggeriti da `/api/system/lt_mem_suggest`. Il daemon libera
+  la memoria al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e
+  ogni 15 minuti, così l'RSS non resta al picco del download.
 - **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli
   slot attivi*: i torrent a 0 B/s non occupano slot e quelli **stalled** vengono
   messi in pausa e ritentati invece di girare a vuoto. Se la CPU è occupata,
@@ -1130,7 +1149,15 @@ Ogni tab raccoglie le impostazioni modificabili. La colonna *Cosa fa* riprende l
 
 | Impostazione | Cosa fa |
 |---|---|
-| Motore torrent | Motore torrent attivo (libtorrent integrato o qBittorrent-nox). |
+| Motore torrent | Motore torrent attivo (gx-torrent, libtorrent integrato o qBittorrent-nox). |
+| gx-torrent — URL Web API | URL dell'API di gx-torrent (es. http://127.0.0.1:8890). Gextto lo usa per pilotare il demone. |
+| gx-torrent — indirizzo di ascolto (LAN) | Indirizzo di ascolto del demone gestito: pagina web e API aperte su tutta la LAN (predefinito `0.0.0.0:8890`; per tenerle solo sul server, `127.0.0.1:8890`). La porta viene allineata a quella dell'URL. |
+| gx-torrent — timeout richieste (secondi) | Timeout in secondi delle richieste HTTP verso gx-torrent. |
+| gx-torrent — intervallo polling (ms) | Intervallo minimo in millisecondi tra due letture dello stato dei torrent (la coda la gestisce il demone). |
+| gx-torrent — avviato e sorvegliato da Gextto | Gextto avvia, riavvia e ferma il demone gx-torrent; dopo 6 avvii anomali in 10 minuti torna da solo a libtorrent. |
+| gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP e web seed; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
+| gx-torrent — cartelle consentite | Elenco di cartelle assolute in cui gx-torrent può salvare/spostare; vuoto = qualunque percorso assoluto deciso da Gextto. Se lo imposti, includi anche download, temp e RAM disk. |
+| gx-torrent — token di accesso (pagina e API in LAN) | Nella scheda **Accesso**: segreto condiviso richiesto dalla pagina e dall'API; obbligatorio se il demone ascolta in rete (non visualizzato). |
 | qBittorrent-nox — URL Web API | URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080). |
 | qBittorrent-nox — utente | Utente dell'interfaccia Web di qBittorrent-nox. |
 | qBittorrent-nox — password | Password dell'interfaccia Web di qBittorrent-nox (non visualizzata). |
@@ -1140,7 +1167,7 @@ Ogni tab raccoglie le impostazioni modificabili. La colonna *Cosa fa* riprende l
 | qBittorrent-nox — intervallo polling (ms) | Intervallo in millisecondi tra due letture dello stato dei torrent. |
 | qBittorrent-nox — mappatura percorsi | Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto). |
 | qBittorrent-nox — scaricato e aggiornato da Gextto | Gextto scarica da sé l'ultima release di qBittorrent-nox, la installa nella cartella dell'applicazione (accanto a gexttod), la avvia e la ferma con il servizio e la aggiorna (con backup e rollback). Il motore in uso però si sceglie dalla voce «Motore torrent»: questa opzione non lo cambia. |
-| Azioni del tab | Installa/Ottimizza qBittorrent-nox, Stato qBittorrent-nox, Applica motore e Test connessione. |
+| Azioni del tab | Aggiorna IP filter, Installa/Ottimizza qBittorrent-nox, Stato qBittorrent-nox, Applica motore e Test connessione. |
 
 ### Punteggi
 

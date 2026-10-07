@@ -44,6 +44,19 @@ The UI is available at `http://<host>:5000/` and supports Italian, English,
 German, French, Spanish and Polish. The full [English manual](docs/MANUAL.en.md)
 and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the UI.
 
+## Torrent engines
+
+Gextto keeps the control plane (queue, scoring, post-processing, archiving) and
+swaps only the transfer engine in *Configuration → Torrent engine*. One engine
+runs at a time, so switching is a controlled migration, never two clients on the
+same data.
+
+| Engine | Where it runs | Strengths | Trade-offs — pick it when |
+|---|---|---|---|
+| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page reachable on the LAN; a crash stays in its process; disk cache sized from the RAM automatically; falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); no sequential/first-last download, per-torrent rate/connection limits, manual web seeds or tracker removal | you want a self-contained engine with minimal C/C++ dependencies |
+| **libtorrent** (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full feature set: sequential, per-torrent limits, super-seeding, web seeds, piece diagnostics; every advanced knob | Gextto and the engine share one process; needs the libtorrent library | you need every advanced control or maximum compatibility |
+| **qBittorrent-nox** | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; supports sequential and its own limits | Needs path mappings when the two processes see different paths; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
+
 ## Resource footprint
 
 Gextto is designed to remain lightweight while idle: it is one daemon (plus the
