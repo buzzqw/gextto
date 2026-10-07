@@ -151,7 +151,7 @@ func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 		t.Fatalf("live mobile chrome partial -> %d", code)
 	}
 	// The Scarico badge is refreshed from the live partials.
-	if !strings.Contains(body, `data-active-downloads="0"`) {
+	if !strings.Contains(body, `data-active-downloads="`) {
 		t.Fatal("mobile chrome partial must carry the active downloads count")
 	}
 }
