@@ -27,8 +27,14 @@ type NetworkOptions struct {
 	Encryption int
 	DHT        bool
 	PEX        bool
-	UPnP       bool
-	NATPMP     bool
+	// UTP adds uTP (UDP) next to TCP for peers; the UDP port is shared with
+	// the DHT. UTPOnly dials uTP alone (tests).
+	UTP     bool
+	UTPOnly bool
+	// LSD finds peers on the local network (BEP 14 multicast).
+	LSD    bool
+	UPnP   bool
+	NATPMP bool
 	// IPFilter is a local file (CIDR, ranges, P2P or eMule format).
 	IPFilter string
 	// IPFilterTrackers applies the filter to trackers too.
@@ -129,6 +135,15 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 			cfg.DHTHost = ip.String()
 		} else {
 			cfg.DHTEnabled = false
+		}
+	}
+	cfg.UTP = n.UTP && d.peerPort > 0 && n.Proxy == ""
+	cfg.UTPOnly = n.UTPOnly
+	if n.OutgoingInterface != "" {
+		// uTP shares the DHT socket, bound to the VPN address: without it,
+		// UDP must not leave by another route.
+		if _, err := resolveInterface(n.OutgoingInterface); err != nil {
+			cfg.UTP = false
 		}
 	}
 	cfg.Proxy = n.Proxy

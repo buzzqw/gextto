@@ -7,6 +7,7 @@ package torrent
 // torrent from the info hash and hands it the ready connection.
 
 import (
+	"github.com/cenkalti/rain/internal/netx"
 	"net"
 	"time"
 
@@ -35,7 +36,44 @@ func (s *Session) startSharedListener() error {
 	s.listener = listener
 	s.log.Info("Listening peers on tcp://" + listener.Addr().String())
 	go s.acceptShared(listener)
+	if s.utpSocket != nil {
+		s.log.Info("Listening peers on utp://" + s.utpSocket.Addr().String())
+		go s.acceptUTP()
+	}
 	return nil
+}
+
+// acceptUTP routes incoming uTP peers like the TCP ones.
+func (s *Session) acceptUTP() {
+	slots := make(chan struct{}, maxRoutedHandshakes)
+	for {
+		raw, err := s.utpSocket.Accept()
+		if err != nil {
+			select {
+			case <-s.closeC:
+			default:
+				s.log.Errorln("uTP listener stopped:", err)
+			}
+			return
+		}
+		conn := netx.TrackUTP(&netx.UTPConn{Conn: raw})
+		netx.IncomingUTP.Add(1)
+		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
+		if !ok || (s.config.BlocklistEnabledForIncomingConnections && s.blocklist != nil && s.blocklist.Blocked(addr.IP)) {
+			conn.Close()
+			continue
+		}
+		select {
+		case slots <- struct{}{}:
+		default:
+			conn.Close()
+			continue
+		}
+		go func() {
+			defer func() { <-slots }()
+			s.routeIncoming(conn)
+		}()
+	}
 }
 
 func (s *Session) acceptShared(listener *net.TCPListener) {

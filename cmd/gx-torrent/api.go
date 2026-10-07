@@ -254,6 +254,7 @@ type peerInfo struct {
 	UploadRate   int    `json:"upload_rate"`
 	Incoming     bool   `json:"incoming"`
 	Encrypted    bool   `json:"encrypted"`
+	UTP          bool   `json:"utp"`
 }
 
 type trackerInfo struct {
@@ -304,6 +305,7 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 				UploadRate:   peer.UploadSpeed,
 				Incoming:     peer.Source == torrent.SourceIncoming,
 				Encrypted:    peer.EncryptedStream,
+				UTP:          peer.UTP,
 			})
 		}
 		writeJSON(w, http.StatusOK, out)

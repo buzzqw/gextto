@@ -39,7 +39,7 @@ func Dial(
 
 	// First connection
 	log.Debug("Connecting to peer...")
-	conn, err = netx.DialContext(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
+	conn, err = netx.DialPeer(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
 	if err != nil {
 		return
 	}
@@ -97,7 +97,7 @@ func Dial(
 			// Close current connection and try again without encryption
 			conn.Close()
 			log.Debug("Connecting again without encryption...")
-			conn, err = netx.DialContext(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
+			conn, err = netx.DialPeer(ctx, net.Dialer{Timeout: dialTimeout}, addr.Network(), addr.String())
 			if err != nil {
 				return
 			}

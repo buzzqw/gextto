@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/proxy"
@@ -190,4 +191,153 @@ func HTTPTransport() *http.Transport {
 			return DialContext(ctx, net.Dialer{}, network, addr)
 		},
 	}
+}
+
+// utpDial is the uTP dialer of the session (nil = TCP only); utpOnly skips
+// TCP for outgoing peers.
+var (
+	utpDial func(ctx context.Context, addr string) (net.Conn, error)
+	utpOnly bool
+)
+
+// Outgoing and incoming peer connections by transport.
+var (
+	OutgoingUTP atomic.Int64
+	OutgoingTCP atomic.Int64
+	IncomingUTP atomic.Int64
+)
+
+// SetUTPDialer enables uTP for peer connections (nil disables it). With only
+// set, outgoing peers use uTP alone.
+func SetUTPDialer(dial func(ctx context.Context, addr string) (net.Conn, error), only bool) {
+	mu.Lock()
+	utpDial = dial
+	utpOnly = only && dial != nil
+	mu.Unlock()
+}
+
+// DialPeer connects to a peer. With uTP enabled (and no proxy) uTP and TCP
+// are tried at the same time and the first connection wins, so peers that
+// speak only one of the two are reached without waiting for a timeout.
+func DialPeer(ctx context.Context, base net.Dialer, network, addr string) (net.Conn, error) {
+	mu.RLock()
+	dialUTP := utpDial
+	only := utpOnly
+	proxied := current.Proxy != nil
+	mu.RUnlock()
+	if dialUTP == nil || proxied {
+		conn, err := DialContext(ctx, base, network, addr)
+		if err == nil {
+			OutgoingTCP.Add(1)
+		}
+		return conn, err
+	}
+	if only {
+		conn, err := dialUTP(ctx, addr)
+		if err != nil {
+			return nil, err
+		}
+		OutgoingUTP.Add(1)
+		return TrackUTP(&UTPConn{Conn: conn}), nil
+	}
+	if base.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, base.Timeout)
+		defer cancel()
+	}
+	raceCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type result struct {
+		conn net.Conn
+		err  error
+	}
+	results := make(chan result, 2)
+	go func() {
+		conn, err := dialUTP(raceCtx, addr)
+		if err == nil {
+			conn = TrackUTP(&UTPConn{Conn: conn})
+		}
+		results <- result{conn, err}
+	}()
+	go func() {
+		conn, err := DialContext(raceCtx, base, network, addr)
+		results <- result{conn, err}
+	}()
+	var firstErr error
+	for i := 0; i < 2; i++ {
+		r := <-results
+		if r.err == nil {
+			if IsUTP(r.conn) {
+				OutgoingUTP.Add(1)
+			} else {
+				OutgoingTCP.Add(1)
+			}
+			cancel()
+			if i == 0 {
+				// Close the loser if it connects anyway.
+				go func() {
+					if other := <-results; other.err == nil {
+						other.conn.Close()
+					}
+				}()
+			}
+			return r.conn, nil
+		}
+		if firstErr == nil {
+			firstErr = r.err
+		}
+	}
+	return nil, firstErr
+}
+
+// UTPConn presents a uTP connection with TCP addresses: the rest of rain
+// keys peers by *net.TCPAddr.
+type UTPConn struct {
+	net.Conn
+}
+
+func tcpAddrOf(addr net.Addr) net.Addr {
+	if addr == nil {
+		return nil
+	}
+	if udp, ok := addr.(*net.UDPAddr); ok {
+		return &net.TCPAddr{IP: udp.IP, Port: udp.Port, Zone: udp.Zone}
+	}
+	if resolved, err := net.ResolveTCPAddr("tcp", addr.String()); err == nil {
+		return resolved
+	}
+	return addr
+}
+
+// RemoteAddr returns the peer address as *net.TCPAddr.
+func (c *UTPConn) RemoteAddr() net.Addr { return tcpAddrOf(c.Conn.RemoteAddr()) }
+
+// LocalAddr returns the local address as *net.TCPAddr.
+func (c *UTPConn) LocalAddr() net.Addr { return tcpAddrOf(c.Conn.LocalAddr()) }
+
+// IsUTP reports whether a connection runs over uTP.
+func IsUTP(conn net.Conn) bool {
+	_, ok := conn.(*UTPConn)
+	return ok
+}
+
+// utpPeers records the remote addresses of open uTP connections, so peer
+// listings can tell the transport after encryption wrapped the connection.
+var utpPeers sync.Map
+
+func TrackUTP(c *UTPConn) *UTPConn {
+	utpPeers.Store(c.RemoteAddr().String(), struct{}{})
+	return c
+}
+
+// Close closes the connection and forgets its address.
+func (c *UTPConn) Close() error {
+	utpPeers.Delete(c.RemoteAddr().String())
+	return c.Conn.Close()
+}
+
+// IsUTPAddr reports whether the peer at addr is connected over uTP.
+func IsUTPAddr(addr string) bool {
+	_, ok := utpPeers.Load(addr)
+	return ok
 }

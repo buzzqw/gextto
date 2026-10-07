@@ -934,6 +934,7 @@
       <div class="panel-body">{{range .Health.Disks}}<div class="row"><span>{{.Mount}} <small class="muted">{{.Filesystem}}</small></span><span class="muted">{{bytesU .FreeBytes}} / {{bytesU .TotalBytes}}</span></div>{{end}}</div>
     </div>
   </div>
+  {{template "v2_health_engine" .Engine}}
   {{if .Health.LastErrors}}
   <div class="panel"><div class="panel-head"><h3>Ultimi errori</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}</div></div>
   {{end}}
@@ -954,6 +955,17 @@
 
 {{define "v2_health_tile_disk"}}
 <div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
+{{end}}
+
+{{/* Motore torrent: stato del motore attivo, aggiornato ogni 15 s. */}}
+{{define "v2_health_engine"}}
+<div class="panel" id="v2-health-engine" hx-get="/partial/health/tile?name=engine" hx-trigger="every 15s" hx-swap="outerHTML">
+  <div class="panel-head"><h3>Motore torrent</h3>{{if .Backend}}<small class="muted">{{.Backend}}</small>{{end}}</div>
+  <div class="panel-body">
+    {{if .Error}}<div class="row"><span class="hl-err">{{.Error}}</span></div>{{end}}
+    {{range .Rows}}<div class="row"><span>{{.Label}}</span><span class="{{if .Warn}}hl-err{{else}}muted{{end}}"{{if .Detail}} title="{{.Detail}}"{{end}}>{{.Value}}</span></div>{{end}}
+  </div>
+</div>
 {{end}}
 
 {{define "v2_health_tile_uptime"}}

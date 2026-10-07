@@ -280,6 +280,18 @@ rain è ora una copia modificata in `third_party/rain` (MIT, `replace` in
   - torrent preesistenti migrati sulla porta unica;
   - messaggio chiaro senza router UPnP.
 
+### 3.9 uTP, LSD, statistiche in Salute (07/10)
+- **uTP**: socket UDP sulla porta unica condiviso con il DHT (anche
+  `nictuku/dht` ora è in `third_party/dht`); in uscita uTP e TCP in parallelo.
+- **LSD**: multicast BEP 14 nel demone.
+- **Pagina Salute**: pannello "Motore torrent" per gx-torrent, libtorrent e
+  qBittorrent.
+- **Test reali** passati:
+  - trasferimento solo uTP con il DHT sullo stesso socket;
+  - scoperta via LSD con multicast vero.
+- **Bug di chiusura risolto**: il DHT restava bloccato sul socket uTP
+  condiviso.
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso

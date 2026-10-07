@@ -94,6 +94,8 @@ type Daemon struct {
 	listenHost    string
 	peerPort      int
 	mapper        *portMapper
+	lsd           *lsdService
+	lsdError      string
 	ipFilterPath  string
 	ipFilterRules int
 
@@ -141,6 +143,21 @@ func newDaemon(opts Options) (*Daemon, error) {
 	if d.peerPort > 0 {
 		d.mapper = newPortMapper(d.peerPort, opts.Network.UPnP, opts.Network.NATPMP)
 		d.mapper.start()
+	}
+	n := opts.Network
+	if n.LSD && d.peerPort > 0 && n.Proxy == "" && n.OutgoingInterface == "" {
+		// LSD takes d.mu itself: start it after this function returns.
+		go func() {
+			lsd, err := newLSD(d, d.peerPort)
+			d.mu.Lock()
+			defer d.mu.Unlock()
+			if err != nil {
+				d.lsdError = err.Error()
+				logf("local peer discovery (LSD) unavailable: %v", err)
+				return
+			}
+			d.lsd = lsd
+		}()
 	}
 	return d, nil
 }
@@ -314,6 +331,11 @@ func (d *Daemon) reconcileLocked() {
 
 func (d *Daemon) close() {
 	d.mapper.close()
+	d.mu.Lock()
+	lsd := d.lsd
+	d.lsd = nil
+	d.mu.Unlock()
+	lsd.close()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.saveLocked()
@@ -1228,6 +1250,8 @@ type daemonStats struct {
 	Encryption      int           `json:"encryption"`
 	Proxy           bool          `json:"proxy"`
 	DHT             bool          `json:"dht"`
+	UTP             bool          `json:"utp"`
+	LSD             lsdStatus     `json:"lsd"`
 	// Session holds rain's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
 }
@@ -1251,6 +1275,10 @@ func (d *Daemon) stats() daemonStats {
 		Encryption:      d.opts.Network.Encryption,
 		Proxy:           d.opts.Network.Proxy != "",
 		DHT:             d.opts.Network.DHT && d.opts.Network.Proxy == "",
+		LSD:             d.lsd.status(),
+	}
+	if out.LSD.Error == "" && d.lsdError != "" {
+		out.LSD.Error = d.lsdError
 	}
 	var downloaded, uploaded int64
 	for _, view := range views {
@@ -1285,6 +1313,8 @@ func (d *Daemon) stats() daemonStats {
 		s := d.session.Stats()
 		out.Peers = s.Peers
 		out.PortsAvailable = s.PortsAvailable
+		out.UTP = s.UTP
+		out.DHT = s.DHT
 		out.Session = map[string]int64{
 			"uptime_seconds":           int64(s.Uptime.Seconds()),
 			"torrents":                 int64(s.Torrents),
@@ -1310,7 +1340,14 @@ func (d *Daemon) stats() daemonStats {
 			"bytes_uploaded":           s.BytesUploaded,
 			"bytes_read":               s.BytesRead,
 			"bytes_written":            s.BytesWritten,
+			"peers_outgoing_utp":       s.OutgoingUTP,
+			"peers_outgoing_tcp":       s.OutgoingTCP,
+			"peers_incoming_utp":       s.IncomingUTP,
 		}
+		for key, value := range s.DHTStats {
+			out.Session["dht_"+key] = value
+		}
+		out.Session["lsd_peers_found"] = out.LSD.PeersFound
 	}
 	return out
 }

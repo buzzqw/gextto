@@ -1,6 +1,8 @@
 package torrent
 
 import (
+	"github.com/cenkalti/rain/internal/netx"
+	"github.com/nictuku/dht"
 	"strconv"
 	"time"
 
@@ -10,6 +12,14 @@ import (
 
 // SessionStats contains statistics about Session.
 type SessionStats struct {
+	// gextto fork: peer connections by transport since start.
+	OutgoingUTP, OutgoingTCP, IncomingUTP int64
+	// UTP and DHT report whether they are active.
+	UTP bool
+	DHT bool
+	// DHTStats are the DHT counters (nodes, peers found, traffic).
+	DHTStats map[string]int64
+
 	// Time elapsed after creation of the Session object.
 	Uptime time.Duration
 	// Number of torrents in Session.
@@ -77,6 +87,19 @@ type SessionStats struct {
 
 // Stats returns current statistics about the Session.
 func (s *Session) Stats() SessionStats {
+	out := s.baseStats()
+	out.OutgoingUTP = netx.OutgoingUTP.Load()
+	out.OutgoingTCP = netx.OutgoingTCP.Load()
+	out.IncomingUTP = netx.IncomingUTP.Load()
+	out.UTP = s.utpSocket != nil
+	out.DHT = s.config.DHTEnabled
+	if s.config.DHTEnabled {
+		out.DHTStats = dht.Stats()
+	}
+	return out
+}
+
+func (s *Session) baseStats() SessionStats {
 	return SessionStats{
 		Uptime:         time.Duration(s.metrics.Uptime.Value()) * time.Second,
 		Torrents:       int(s.metrics.Torrents.Value()),

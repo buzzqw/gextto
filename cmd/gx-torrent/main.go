@@ -119,6 +119,8 @@ func main() {
 	encryption := flag.Int("encryption", int(envInt("GX_TORRENT_ENCRYPTION", 1)), "0 disabled, 1 enabled, 2 forced")
 	noDHT := flag.Bool("no-dht", envBool("GX_TORRENT_NO_DHT", false), "disable DHT")
 	noPEX := flag.Bool("no-pex", envBool("GX_TORRENT_NO_PEX", false), "disable peer exchange")
+	noUTP := flag.Bool("no-utp", envBool("GX_TORRENT_NO_UTP", false), "disable uTP (peers over TCP only)")
+	noLSD := flag.Bool("no-lsd", envBool("GX_TORRENT_NO_LSD", false), "disable local service discovery")
 	noUPnP := flag.Bool("no-upnp", envBool("GX_TORRENT_NO_UPNP", false), "do not open the port on the router with UPnP")
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
 	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
@@ -181,6 +183,8 @@ func main() {
 			Encryption:        *encryption,
 			DHT:               !*noDHT,
 			PEX:               !*noPEX,
+			UTP:               !*noUTP,
+			LSD:               !*noLSD,
 			UPnP:              !*noUPnP,
 			NATPMP:            !*noNATPMP,
 			IPFilter:          *ipFilter,

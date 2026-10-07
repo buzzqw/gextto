@@ -289,11 +289,13 @@ func TestGxNetworkArgs(t *testing.T) {
 	cfg.Libtorrent.Encryption = 2
 	cfg.Libtorrent.Dht = true
 	cfg.Libtorrent.Pex = false
+	cfg.Libtorrent.Utp = true
+	cfg.Libtorrent.Lsd = false
 	cfg.Libtorrent.Upnp = false
 	cfg.Libtorrent.Natpmp = true
 	cfg.Libtorrent.ApplyIpFilter = true
 	got := strings.Join(gxNetworkArgs(cfg), " ")
-	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-upnp -ipfilter-trackers=true"
+	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-lsd -no-upnp -ipfilter-trackers=true"
 	if got != want {
 		t.Fatalf("got  %q\nwant %q", got, want)
 	}

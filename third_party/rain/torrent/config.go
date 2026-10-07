@@ -71,6 +71,12 @@ type Config struct {
 	// ListenPort, when non-zero, is the single TCP port shared by all
 	// torrents (gextto fork). Zero keeps upstream's port per torrent.
 	ListenPort uint16
+	// UTP accepts and dials peers over uTP too (gextto fork). It needs
+	// ListenPort: the UDP port is shared with the DHT.
+	UTP bool
+	// UTPOnly dials peers over uTP alone (tests); by default uTP and TCP are
+	// tried together and the first to connect wins.
+	UTPOnly bool
 	// OutgoingInterface binds every outgoing connection to an interface name
 	// or local IPv4 (gextto fork, VPN killswitch): when it has no address,
 	// nothing is sent.

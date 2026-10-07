@@ -238,6 +238,11 @@ type Peer struct {
 	EncryptedStream    bool
 	DownloadSpeed      int
 	UploadSpeed        int
+	// UTP is set for peers connected over uTP (gextto fork).
+	UTP bool
+	// Progress (0-1) and Seed come from the peer's bitfield (gextto fork).
+	Progress float64
+	Seed     bool
 }
 
 // PeerSource indicates that how the peer is found.

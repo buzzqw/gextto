@@ -14,6 +14,11 @@ require (
 )
 
 require (
+	github.com/anacrolix/missinggo v1.3.0 // indirect
+	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
+	github.com/anacrolix/missinggo/v2 v2.5.1 // indirect
+	github.com/anacrolix/sync v0.4.0 // indirect
+	github.com/anacrolix/utp v0.2.0 // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
@@ -22,6 +27,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/huandu/xstrings v1.3.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/jackpal/bencode-go v1.0.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.1.0 // indirect
@@ -54,3 +60,5 @@ require (
 )
 
 replace github.com/cenkalti/rain => ./third_party/rain
+
+replace github.com/nictuku/dht => ./third_party/dht

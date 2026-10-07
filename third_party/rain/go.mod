@@ -3,6 +3,7 @@ module github.com/cenkalti/rain
 go 1.26.0
 
 require (
+	github.com/anacrolix/utp v0.2.0
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/cenkalti/log v1.0.0
 	github.com/fatih/structs v1.1.0
@@ -21,13 +22,20 @@ require (
 )
 
 require (
+	github.com/anacrolix/missinggo v1.3.0 // indirect
+	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
+	github.com/anacrolix/missinggo/v2 v2.5.1 // indirect
+	github.com/anacrolix/sync v0.4.0 // indirect
+	github.com/huandu/xstrings v1.3.1 // indirect
+)
+
+require (
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jackpal/bencode-go v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
@@ -39,6 +47,7 @@ require (
 	github.com/youtube/vitess v3.0.0-rc.3+incompatible // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/net v0.59.0
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	lukechampine.com/blake3 v1.1.6 // indirect
 )
+
+replace github.com/nictuku/dht => ../dht

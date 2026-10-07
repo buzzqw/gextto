@@ -725,3 +725,102 @@ func TestIPFilterLoaded(t *testing.T) {
 		t.Fatalf("rules lost after a session restart: %d", got)
 	}
 }
+
+// uTP: the leecher dials over uTP only; the seeder accepts it on the shared
+// UDP port, which also carries the DHT.
+func TestUTPTransfer(t *testing.T) {
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43100, PortEnd: 43199, Encryption: 1, UTP: true, DHT: true})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43200, PortEnd: 43299, Encryption: 1, UTP: true, UTPOnly: true,
+		OutgoingInterface: "127.0.0.2"})
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "over-utp.bin", 500_000)
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+	dst := filepath.Join(t.TempDir(), "dst")
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "leecher running", func() bool { return stateOf(leecher, hash) == "downloading" })
+	before := leecher.session.Stats().OutgoingUTP
+	leecher.mu.Lock()
+	handle, _ := leecher.findLocked(hash)
+	leecher.mu.Unlock()
+	if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "download over uTP", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+	if leecher.session.Stats().OutgoingUTP <= before {
+		t.Fatal("the peer connection was not made over uTP")
+	}
+	if !sameFile(t, filepath.Join(src, "over-utp.bin"), filepath.Join(dst, "over-utp.bin")) {
+		t.Fatal("content differs")
+	}
+	if !seeder.session.Stats().UTP || !seeder.session.Stats().DHT {
+		t.Fatal("the seeder must run uTP and the DHT on the shared UDP port")
+	}
+	// A session restart (new speed limits) reopens the same UDP port.
+	seeder.mu.Lock()
+	seeder.restartSessionLocked()
+	ok := seeder.session != nil && seeder.session.Stats().UTP
+	seeder.mu.Unlock()
+	if !ok {
+		t.Fatal("uTP not available after a session restart")
+	}
+}
+
+func TestParseLSD(t *testing.T) {
+	msg := "BT-SEARCH * HTTP/1.1\r\nHost: 239.192.152.143:6771\r\nPort: 6881\r\nInfohash: 0123456789ABCDEF0123456789ABCDEF01234567\r\nInfohash: bad\r\ncookie: xyz\r\n\r\n\r\n"
+	port, hashes, cookie, ok := parseLSD([]byte(msg))
+	if !ok || port != 6881 || cookie != "xyz" || len(hashes) != 1 || hashes[0] != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("parse: %v %d %v %q", ok, port, hashes, cookie)
+	}
+	if _, _, _, ok := parseLSD([]byte("GET / HTTP/1.1\r\n\r\n")); ok {
+		t.Fatal("not an LSD message")
+	}
+}
+
+// The leecher finds the seeder only through LSD multicast announcements.
+func TestLSDDiscovery(t *testing.T) {
+	lsdTick = 200 * time.Millisecond
+	// On one machine the sender is this host's own address, which rain
+	// ignores as itself: dial loopback instead.
+	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
+	defer func() {
+		lsdTick = lsdTickDefault
+		lsdPeerHost = func(ip net.IP) string { return ip.String() }
+	}()
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43300, PortEnd: 43399, Encryption: 1, LSD: true})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43400, PortEnd: 43499, Encryption: 1, LSD: true})
+	waitFor(t, "LSD started", func() bool {
+		seeder.mu.Lock()
+		defer seeder.mu.Unlock()
+		return seeder.lsd != nil || seeder.lsdError != ""
+	})
+	if seeder.lsdError != "" {
+		t.Skipf("multicast not available here: %s", seeder.lsdError)
+	}
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "lan.bin", 200_000)
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+	dst := filepath.Join(t.TempDir(), "dst")
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "download from a peer found by LSD", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+	if leecher.stats().LSD.PeersFound == 0 {
+		t.Fatal("no peer counted as found by LSD")
+	}
+}

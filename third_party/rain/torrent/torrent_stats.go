@@ -1,6 +1,7 @@
 package torrent
 
 import (
+	"github.com/cenkalti/rain/internal/netx"
 	"time"
 
 	"github.com/cenkalti/rain/internal/mse"
@@ -275,6 +276,12 @@ func (t *torrent) getPeers() []Peer {
 			Source:             source,
 			DownloadSpeed:      pe.DownloadSpeed(),
 			UploadSpeed:        pe.UploadSpeed(),
+			UTP:                netx.IsUTPAddr(pe.Addr().String()),
+		}
+		if pe.Bitfield != nil && t.info != nil && t.info.NumPieces > 0 {
+			have := pe.Bitfield.Count()
+			p.Progress = float64(have) / float64(t.info.NumPieces)
+			p.Seed = have == t.info.NumPieces
 		}
 		peers = append(peers, p)
 	}

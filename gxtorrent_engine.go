@@ -840,6 +840,7 @@ func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 		UploadRate   int64  `json:"upload_rate"`
 		Incoming     bool   `json:"incoming"`
 		Encrypted    bool   `json:"encrypted"`
+		UTP          bool   `json:"utp"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/peers", nil, "", &peers); err != nil {
 		return nil, false, err
@@ -853,6 +854,7 @@ func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 			UploadRate:   uint64(maxInt64(0, peer.UploadRate)),
 			Incoming:     peer.Incoming,
 			Encrypted:    peer.Encrypted,
+			Utp:          peer.UTP,
 		})
 	}
 	return out, true, nil

@@ -69,7 +69,8 @@ gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
            [-download-dir DIR] [-token SEGRETO] [-allowed-roots /srv/media,/data]
            [-peer-ports 6881-6891] [-listen-interface IP|iface]
            [-outgoing-interface wg0] [-proxy socks5://host:porta]
-           [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-upnp] [-no-natpmp]
+           [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-lsd]
+           [-no-upnp] [-no-natpmp]
            [-ipfilter FILE] [-ipfilter-trackers=true] [-debug] [-version]
 ```
 
@@ -133,6 +134,22 @@ Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
   - Il pulsante "Aggiorna IP filter" di gextto funziona anche con gx-torrent:
     scarica la lista se è un URL e la ricarica nel demone.
 
+## uTP e LSD
+
+- **uTP** (`libtorrent_utp`, attivo di default) usa la stessa porta UDP dei
+  peer, condivisa con il DHT come in libtorrent.
+  - In uscita si tentano uTP e TCP insieme e vince il primo che si connette.
+  - In entrata l'handshake viene instradato come per TCP.
+  - La lista dei peer indica quali sono connessi in uTP.
+  - Con un proxy uTP è spento; con l'interfaccia uscente il socket UDP è
+    legato all'IP della VPN.
+- **LSD**, la scoperta in rete locale (BEP 14, `libtorrent_lsd`).
+  - Annunci multicast su 239.192.152.143:6771 ogni 5 minuti per ogni torrent
+    attivo non privato.
+  - I peer della LAN che annunciano gli stessi torrent vengono aggiunti.
+  - È spento con proxy o interfaccia uscente, per non annunciare i torrent
+    fuori dal tunnel.
+
 ## Selezione dei file
 
 Si possono scaricare solo alcuni file di un torrent: priorità 0 = escluso,
@@ -166,15 +183,30 @@ Il supporto completo a v2 richiederebbe in rain:
 
 ## Statistiche
 
-`GET /api/v1/stats` e `GET /api/libtorrent/session-stats` di gextto
-riportano i contatori di rain: cache di lettura e scrittura, letture e
-scritture su disco, velocità, byte totali, peer, regole del filtro IP. Rispetto
-a libtorrent mancano i contatori interni di basso livello, che gextto comunque
-non mostra nell'interfaccia:
+La pagina **Salute** di gextto ha un pannello "Motore torrent", aggiornato
+ogni 15 secondi, per tutti i motori.
+
+Con gx-torrent mostra:
+
+- versione e torrent per stato;
+- velocità e slot della coda;
+- porta e apertura sul router (in rosso se non riuscita);
+- DHT (nodi), uTP (connessioni uTP e TCP), LSD (peer trovati);
+- cifratura, proxy, regole del filtro IP;
+- disco e cache, totali della sessione.
+
+Con libtorrent mostra:
+
+- torrent per stato;
+- nodi DHT, peer TCP e uTP;
+- connessioni in entrata, job su disco, totali.
+
+Gli stessi dati sono in `GET /api/v1/stats` del demone e in
+`GET /api/libtorrent/session-stats` di gextto. Rispetto a libtorrent mancano
+alcuni contatori interni di basso livello:
 
 - overhead di protocollo;
-- nodi DHT;
-- code e tempi dei job su disco;
+- tempi dei job su disco;
 - pezzi falliti per peer.
 
 ## RAM disk
@@ -365,7 +397,6 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - super-seeding e upload mode;
 - rimozione di tracker (l'aggiunta funziona);
 - torrent solo v2 (vedi sopra);
-- uTP e scoperta dei peer in rete locale (LSD).
 
 Cache e preallocazione:
 
@@ -392,6 +423,8 @@ rain.
     - con selezione dei file e riattivazione di un file escluso;
     - via proxy SOCKS5 e HTTP;
     - con spostamento da RAM disk a metà download;
+    - solo in uTP, con il DHT sullo stesso socket UDP;
+    - con il peer trovato via LSD (multicast reale);
   - caricamento del filtro IP.
 - `go test ./internal/blocklist` in `third_party/rain` copre i formati del
   filtro IP.

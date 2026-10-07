@@ -282,6 +282,12 @@ func gxNetworkArgs(cfg *Config) []string {
 	if !lt.Pex {
 		args = append(args, "-no-pex")
 	}
+	if !lt.Utp {
+		args = append(args, "-no-utp")
+	}
+	if !lt.Lsd {
+		args = append(args, "-no-lsd")
+	}
 	if !lt.Upnp {
 		args = append(args, "-no-upnp")
 	}

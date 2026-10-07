@@ -5,12 +5,14 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"github.com/anacrolix/utp"
 	"github.com/cenkalti/rain/internal/netx"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -71,6 +73,7 @@ type Session struct {
 	mPorts         sync.RWMutex
 	availablePorts map[int]struct{}
 	listener       *net.TCPListener
+	utpSocket      *utp.Socket
 
 	mBlocklist         sync.RWMutex
 	blocklist          *blocklist.Blocklist
@@ -158,11 +161,42 @@ func NewSession(cfg Config) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	// gextto fork: one UDP socket for uTP and the DHT, like libtorrent.
+	var utpSocket *utp.Socket
+	netx.SetUTPDialer(nil, false)
+	if cfg.UTP && cfg.ListenPort > 0 && strings.TrimSpace(cfg.Proxy) == "" {
+		host := cfg.DHTHost
+		if host == "" {
+			host = cfg.Host
+		}
+		pc, perr := net.ListenPacket("udp4", net.JoinHostPort(host, strconv.Itoa(int(cfg.ListenPort))))
+		if perr != nil {
+			err = perr
+			return nil, err
+		}
+		utpSocket, err = utp.NewSocketFromPacketConn(pc)
+		if err != nil {
+			pc.Close()
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				netx.SetUTPDialer(nil, false)
+				utpSocket.Close()
+			}
+		}()
+		netx.SetUTPDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return utpSocket.DialContext(ctx, "udp", addr)
+		}, cfg.UTPOnly)
+	}
 	var dhtNode *dht.DHT
 	if cfg.DHTEnabled {
 		dhtConfig := dht.NewConfig()
 		dhtConfig.Address = cfg.DHTHost
 		dhtConfig.Port = int(cfg.DHTPort)
+		if utpSocket != nil {
+			dhtConfig.PacketConn = utpSocket
+		}
 		dhtConfig.DHTRouters = strings.Join(cfg.DHTBootstrapNodes, ",")
 		dhtConfig.SaveRoutingTable = false
 		dhtConfig.NumTargetPeers = 0
@@ -194,6 +228,7 @@ func NewSession(cfg Config) (*Session, error) {
 		torrents:           make(map[string]*Torrent),
 		torrentsByInfoHash: make(map[dht.InfoHash][]*Torrent),
 		availablePorts:     ports,
+		utpSocket:          utpSocket,
 		dht:                dhtNode,
 		pieceCache:         piececache.New(cfg.ReadCacheSize, cfg.ReadCacheTTL, cfg.ParallelReads),
 		ram:                resourcemanager.New[*peer.Peer](cfg.WriteCacheSize),
@@ -293,6 +328,16 @@ func (s *Session) Close() error {
 		s.listener.Close()
 	}
 
+	// gextto fork: the DHT reads from the shared uTP socket; close it first
+	// so the DHT reader returns and Stop can finish.
+	if s.utpSocket != nil {
+		netx.SetUTPDialer(nil, false)
+		// CloseNow: Close waits for open uTP connections, which are closed
+		// only later with the torrents.
+		// The DHT reader blocks in ReadFrom until a deadline passes.
+		_ = s.utpSocket.SetReadDeadline(time.Now())
+		s.utpSocket.CloseNow()
+	}
 	if s.config.DHTEnabled {
 		s.dht.Stop()
 	}

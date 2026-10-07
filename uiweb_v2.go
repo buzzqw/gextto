@@ -390,6 +390,7 @@ func v2DashboardCalendarFrom(s *AppState) []v2DashboardCalendarItem {
 type v2HealthView struct {
 	uiHealthData
 	PanelTables []v2TableData
+	Engine      uiEngineStats
 }
 
 type v2DownloadsView struct {
@@ -434,6 +435,7 @@ func v2HealthViewFrom(s *AppState, r *http.Request) v2HealthView {
 	return v2HealthView{
 		uiHealthData: base,
 		PanelTables:  v2SectionTables(s, r, base.Panels, []string{"health-sources", "health-providers"}),
+		Engine:       uiEngineStatsFrom(s),
 	}
 }
 
@@ -632,9 +634,12 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 func V2HealthTilePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var (
 		templateName string
-		data         uiHealthData
+		data         any
 	)
 	switch r.URL.Query().Get("name") {
+	case "engine":
+		templateName = "v2_health_engine"
+		data = uiEngineStatsFrom(s)
 	case "status":
 		templateName = "v2_health_tile_status"
 		data = uiHealthStatusTileFrom(s)
