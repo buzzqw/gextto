@@ -1175,7 +1175,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				processed = false
 			}
 			if processed && (event.Kind == "torrent_finished" || event.Kind == "storage_moved") {
-				requestMediaLibraryRefresh(cfg)
+				requestMediaLibraryRefresh(cfg, mediaRefreshFolder(db, hash))
 			}
 			// A completed single episode/movie is moved into the archive and
 			// renamed, so the file is no longer at the path libtorrent tracks. It
@@ -2169,23 +2169,54 @@ func isTransientCompletionError(err error) bool {
 var (
 	mediaRefreshMu      sync.Mutex
 	mediaRefreshRunning bool
-	mediaRefreshPending *Config
+	mediaRefreshPending *mediaRefreshRequest
 )
 
-// requestMediaLibraryRefresh asks Jellyfin/Plex to rescan without blocking the
-// torrent event worker (each request can take up to 20 seconds). Requests that
-// arrive while a refresh runs are coalesced into a single follow-up refresh, so
-// a burst of completions (a season pack) does not queue one scan per file.
-func requestMediaLibraryRefresh(cfg *Config) {
+// mediaRefreshRequest collects the folders to rescan; full asks for a whole
+// library refresh (a completion whose folder is not known).
+type mediaRefreshRequest struct {
+	cfg     *Config
+	folders []string
+	full    bool
+}
+
+func (r *mediaRefreshRequest) add(cfg *Config, folder string) {
+	r.cfg = cfg
+	if folder == "" {
+		r.full = true
+		return
+	}
+	r.folders = append(r.folders, folder)
+}
+
+func (r *mediaRefreshRequest) run() {
+	if r.full {
+		RefreshMediaLibraries(r.cfg)
+		return
+	}
+	RefreshMediaLibraries(r.cfg, r.folders...)
+}
+
+// requestMediaLibraryRefresh asks Jellyfin/Plex to rescan folder (the whole
+// library when folder is "") without blocking the torrent event worker (each
+// request can take up to 20 seconds). Requests that arrive while a refresh
+// runs are coalesced into a single follow-up refresh, so a burst of
+// completions (a season pack) does not queue one scan per file.
+func requestMediaLibraryRefresh(cfg *Config, folder string) {
 	mediaRefreshMu.Lock()
 	if mediaRefreshRunning {
-		mediaRefreshPending = cfg
+		if mediaRefreshPending == nil {
+			mediaRefreshPending = &mediaRefreshRequest{}
+		}
+		mediaRefreshPending.add(cfg, folder)
 		mediaRefreshMu.Unlock()
 		return
 	}
 	mediaRefreshRunning = true
 	mediaRefreshMu.Unlock()
-	go func(current *Config) {
+	first := &mediaRefreshRequest{}
+	first.add(cfg, folder)
+	go func(current *mediaRefreshRequest) {
 		defer func() {
 			if r := recover(); r != nil {
 				logging.Error("media library refresh panicked; recovered", "panic", fmt.Sprint(r))
@@ -2196,7 +2227,7 @@ func requestMediaLibraryRefresh(cfg *Config) {
 			}
 		}()
 		for {
-			RefreshMediaLibraries(current)
+			current.run()
 			// Clear the running flag under the same lock that checks for a
 			// pending request, so a request arriving now is never lost.
 			mediaRefreshMu.Lock()
@@ -2209,7 +2240,7 @@ func requestMediaLibraryRefresh(cfg *Config) {
 			mediaRefreshPending = nil
 			mediaRefreshMu.Unlock()
 		}
-	}(cfg)
+	}(first)
 }
 
 // settledTorrent remembers a completed torrent that needs no recovery.

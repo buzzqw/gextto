@@ -3863,3 +3863,5 @@ fra:
   SOCKS4: SOCKS4
   SOCKS5 (hostname): SOCKS5 (nom d'hôte)
   "Hardlink invece della copia durante il seed": "Lien physique au lieu d'une copie pendant le partage"
+  "Jellyfin — mappatura percorsi": "Jellyfin — correspondance des chemins"
+  "Plex — mappatura percorsi": "Plex — correspondance des chemins"

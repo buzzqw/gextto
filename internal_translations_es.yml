@@ -3816,3 +3816,5 @@ spa:
   SOCKS4: SOCKS4
   SOCKS5 (hostname): SOCKS5 (nombre de host)
   "Hardlink invece della copia durante il seed": "Enlace duro en lugar de copia durante el seeding"
+  "Jellyfin — mappatura percorsi": "Jellyfin — asignación de rutas"
+  "Plex — mappatura percorsi": "Plex — asignación de rutas"

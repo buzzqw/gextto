@@ -3810,3 +3810,5 @@ pol:
   SOCKS4: SOCKS4
   SOCKS5 (hostname): SOCKS5 (nazwa hosta)
   "Hardlink invece della copia durante il seed": "Twarde dowiązanie zamiast kopii podczas seedowania"
+  "Jellyfin — mappatura percorsi": "Jellyfin — mapowanie ścieżek"
+  "Plex — mappatura percorsi": "Plex — mapowanie ścieżek"

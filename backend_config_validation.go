@@ -38,7 +38,7 @@ func validateBackendSetting(key, value string) error {
 			return nil
 		}
 		return validateBackendInteger(key, raw, 250, 60000)
-	case "qbittorrent_path_mappings":
+	case "qbittorrent_path_mappings", "jellyfin_path_mappings", "plex_path_mappings":
 		_, err := ParsePathMappings(value)
 		return err
 	case "trash_retention_days":

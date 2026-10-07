@@ -1207,8 +1207,9 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 |---|---|
 | Jellyfin URL | Jellyfin server URL (e.g. `http://127.0.0.1:8096`). |
 | Jellyfin API key | API key generated in Jellyfin → Dashboard → API Keys. |
+| Jellyfin — path mapping | Only when Jellyfin sees the library under different paths (e.g. Docker): one line per folder, `gextto_path=jellyfin_path`. |
 | Test connection | Checks that Jellyfin responds. |
-| Refresh library | Asks Jellyfin to refresh its library. |
+| Refresh library | Asks Jellyfin to refresh the whole library. |
 
 ### Plex
 
@@ -1216,8 +1217,17 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 |---|---|
 | Plex URL | Plex server URL (e.g. `http://127.0.0.1:32400`). |
 | Plex token | `X-Plex-Token` used to access the library. |
+| Plex — path mapping | Only when Plex sees the library under different paths (e.g. Docker): one line per folder, `gextto_path=plex_path`. |
 | Test connection | Checks that Plex responds. |
-| Refresh library | Asks Plex to refresh its library. |
+| Refresh library | Asks Plex to refresh the whole library. |
+
+After each import Gextto asks Jellyfin and Plex to rescan **only the folder that
+changed** (the season or movie that just arrived), not the whole library: the NAS
+is spared a full scan per episode and the file shows up in seconds. For Plex the
+folder must be inside one of the folders of one of its libraries. When the
+targeted request is not possible (unknown path, server refusal) Gextto asks for
+the full refresh as before. When the server runs in Docker and sees the files
+under another path, fill in the path mapping.
 
 ### Torznab indexers
 

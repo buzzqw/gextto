@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -210,54 +209,6 @@ func tev_removeFailedTorrent(torrents TorrentSession, hash string) bool {
 		logging.Debug("failed torrent already removed", "hash", hash, "name", name)
 	}
 	return true
-}
-
-// ---------------------------------------------------------------------------
-// refresh_media_libraries
-// ---------------------------------------------------------------------------
-
-// RefreshMediaLibraries implements `refresh_media_libraries`.
-func RefreshMediaLibraries(cfg *Config) {
-	jellyfinURL := strings.TrimSpace(cfg.Settings["jellyfin_url"])
-	jellyfinKey := strings.TrimSpace(cfg.Settings["jellyfin_api_key"])
-	if jellyfinURL != "" && jellyfinKey != "" {
-		endpoint := strings.TrimRight(jellyfinURL, "/") + "/Library/Refresh"
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		headers := map[string]string{
-			"Authorization": fmt.Sprintf("MediaBrowser Token=\"%s\"", jellyfinKey),
-			"X-Emby-Token":  jellyfinKey,
-		}
-		response, err := HTTPRequest(ctx, http.MethodPost, endpoint, headers, nil, "")
-		if err != nil {
-			logging.Warn("Jellyfin library refresh failed", "error", utils.RedactURLSecrets(err.Error()))
-		} else {
-			if response.StatusCode >= 200 && response.StatusCode < 300 {
-				logging.Debug("Jellyfin library refresh requested")
-			} else {
-				logging.Warn("Jellyfin library refresh failed", "status", response.Status)
-			}
-			response.Body.Close()
-		}
-		cancel()
-	}
-	plexURL := strings.TrimSpace(cfg.Settings["plex_url"])
-	plexToken := strings.TrimSpace(cfg.Settings["plex_token"])
-	if plexURL != "" && plexToken != "" {
-		endpoint := strings.TrimRight(plexURL, "/") + "/library/sections/all/refresh"
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		response, err := HTTPGet(ctx, endpoint, map[string]string{"X-Plex-Token": plexToken})
-		if err != nil {
-			logging.Warn("Plex library refresh failed", "error", utils.RedactURLSecrets(err.Error()))
-		} else {
-			if response.StatusCode >= 200 && response.StatusCode < 300 {
-				logging.Info("Plex library refresh requested")
-			} else {
-				logging.Warn("Plex library refresh failed", "status", response.Status)
-			}
-			response.Body.Close()
-		}
-		cancel()
-	}
 }
 
 // ---------------------------------------------------------------------------

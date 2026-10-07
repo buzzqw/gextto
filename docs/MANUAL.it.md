@@ -1240,8 +1240,9 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 |---|---|
 | Jellyfin URL | URL del server Jellyfin (es. `http://127.0.0.1:8096`). |
 | Jellyfin API key | API key generata in Jellyfin → Dashboard → API Keys. |
+| Jellyfin — mappatura percorsi | Solo se Jellyfin vede la libreria con percorsi diversi (es. Docker): una riga per cartella, `percorso_gextto=percorso_jellyfin`. |
 | Test connessione | Verifica che Jellyfin risponda. |
-| Aggiorna libreria | Chiede a Jellyfin di aggiornare la libreria. |
+| Aggiorna libreria | Chiede a Jellyfin di aggiornare tutta la libreria. |
 
 ### Plex
 
@@ -1249,8 +1250,18 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 |---|---|
 | Plex URL | URL del server Plex (es. `http://127.0.0.1:32400`). |
 | Plex token | Token `X-Plex-Token` per accedere alla libreria. |
+| Plex — mappatura percorsi | Solo se Plex vede la libreria con percorsi diversi (es. Docker): una riga per cartella, `percorso_gextto=percorso_plex`. |
 | Test connessione | Verifica che Plex risponda. |
-| Aggiorna libreria | Chiede a Plex di aggiornare la libreria. |
+| Aggiorna libreria | Chiede a Plex di aggiornare tutta la libreria. |
+
+Dopo ogni importazione Gextto chiede a Jellyfin e Plex di rileggere **solo la
+cartella cambiata** (la stagione o il film appena arrivati), non tutta la
+libreria: sul NAS si evita una scansione completa per ogni episodio e il file
+compare in pochi secondi. Per Plex la cartella deve stare dentro una delle
+cartelle di una sua libreria. Se la richiesta mirata non è possibile (percorso
+non riconosciuto, server che la rifiuta) Gextto chiede l'aggiornamento completo
+come prima. Se il server gira in Docker e vede i file sotto un altro percorso,
+compila la mappatura percorsi.
 
 ### Indexer Torznab
 

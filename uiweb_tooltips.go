@@ -131,6 +131,8 @@ var uiSettingTooltipText = map[string]string{
 	"jellyfin_url":                                 "URL del server Jellyfin (es. http://127.0.0.1:8096).",
 	"jellyfin_api_key":                             "API key generata in Jellyfin → Dashboard → API Keys.",
 	"plex_url":                                     "URL del server Plex (es. http://127.0.0.1:32400).",
+	"jellyfin_path_mappings":                       "Solo se Jellyfin vede la libreria con percorsi diversi (es. Docker): una riga per cartella, percorso_gextto=percorso_jellyfin. Serve per chiedere a Jellyfin di aggiornare solo la cartella appena cambiata.",
+	"plex_path_mappings":                           "Solo se Plex vede la libreria con percorsi diversi (es. Docker): una riga per cartella, percorso_gextto=percorso_plex. Serve per chiedere a Plex di aggiornare solo la cartella appena cambiata.",
 	"plex_token":                                   "Token X-Plex-Token per accedere alla libreria Plex.",
 	"simkl_client_id":                              "Client ID dell'app Simkl.",
 	"simkl_calendar_days":                          "Quanti giorni avanti mostrare nel calendario Simkl.",

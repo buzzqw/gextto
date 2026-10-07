@@ -92,11 +92,13 @@ func uiSettingLabel(key string) string {
 		}
 	}
 	if label, ok := map[string]string{
-		"jellyfin_url":     "Jellyfin URL",
-		"jellyfin_api_key": "Jellyfin API key",
-		"plex_url":         "Plex URL",
-		"plex_token":       "Plex token",
-		"flaresolverr_url": "FlareSolverr URL",
+		"jellyfin_url":           "Jellyfin URL",
+		"jellyfin_api_key":       "Jellyfin API key",
+		"plex_url":               "Plex URL",
+		"plex_token":             "Plex token",
+		"jellyfin_path_mappings": "Jellyfin — mappatura percorsi",
+		"plex_path_mappings":     "Plex — mappatura percorsi",
+		"flaresolverr_url":       "FlareSolverr URL",
 	}[key]; ok {
 		return label
 	}
@@ -531,11 +533,11 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				}),
 			},
 		}),
-		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key"), []uiActionButton{
+		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key", "jellyfin_path_mappings"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}", Hint: "Verifica che Jellyfin risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}", Hint: "Chiede a Jellyfin di aggiornare la libreria."},
 		})),
-		group("Media server", sectionSettingsActions("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token"), []uiActionButton{
+		group("Media server", sectionSettingsActions("Plex", "URL del server e token X-Plex-Token.", uiSettingFields(cfg, "plex_url", "plex_token", "plex_path_mappings"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}", Hint: "Verifica che Plex risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}", Hint: "Chiede a Plex di aggiornare la libreria."},
 		})),
