@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,6 +71,12 @@ type uiShellChrome struct {
 	Torrents     int
 	Peers        int
 	Seeds        int
+	// Transferring and Stuck split the unfinished torrents for the phone
+	// status strip; Problems is logging.ProblemCount (the page compares it
+	// with the value seen last time to show only new warnings).
+	Transferring int
+	Stuck        int
+	Problems     uint64
 }
 
 func uiShellChromeFrom(s *AppState) uiShellChrome {
@@ -98,13 +105,27 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	chrome.RAM = logging.HumanBytesI64(saturatingInt64(health.ResidentBytes))
 
 	var downloadRate, uploadRate uint64
+	var parked map[string]StallWatch
+	if s.db != nil {
+		parked, _ = s.db.LoadStallWatches()
+	}
 	for _, view := range s.activeEngine().List() {
 		chrome.Torrents++
 		chrome.Peers += view.NumPeers
 		chrome.Seeds += view.NumSeeds
 		downloadRate += view.DownloadRate
 		uploadRate += view.UploadRate
+		switch {
+		case TorrentTransferring(view) && view.Progress < 100:
+			chrome.Transferring++
+		case TorrentIdle(view):
+			chrome.Stuck++
+		case view.Progress < 100 && parked[strings.ToLower(view.Hash)].stalledSince != nil:
+			// Set aside by the stall monitor: paused, but still stuck.
+			chrome.Stuck++
+		}
 	}
+	chrome.Problems = logging.ProblemCount()
 	for _, download := range HTTPDownloads() {
 		if download.Status == "downloading" {
 			downloadRate += download.SpeedBytes

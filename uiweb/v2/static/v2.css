@@ -1015,3 +1015,207 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 .v2-sources-modal .data-table td:nth-child(4) { width: 10%; }
 .v2-sources-modal .data-table th:nth-child(5),
 .v2-sources-modal .data-table td:nth-child(5) { width: 26%; }
+
+/* ================================================================
+   Phone layout — single source of truth for screens up to 560px
+   (status strip up to 700px). Placed last so it wins over the earlier
+   layered phone rules. Principle: the content first, one row of
+   navigation, secondary controls one tap away.
+   ================================================================ */
+
+/* Pieces that exist only on a phone. */
+.nav-prefs { display: none; }
+.downloads-tools-toggle { display: none; }
+.ptr-hint { display: none; }
+details.add-torrent-panel > summary { list-style: none; cursor: default; }
+details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
+.add-torrent-plus { display: none; }
+
+/* Status strip: what is happening, each item opens the page that explains it. */
+@media (max-width: 700px) {
+  .mobile-performance { padding: 6px 12px; }
+  .mobile-performance-head { display: none; }
+  .mobile-status-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mobile-status-strip::-webkit-scrollbar { display: none; }
+  .ms-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .ms-chip[hidden] { display: none; }
+  .ms-chip.warn { border-color: color-mix(in srgb, var(--warn) 55%, transparent); color: var(--warn); }
+}
+
+@media (max-width: 560px) {
+  /* --- Top bar: title, service state and a small refresh, on one row ---- */
+  .topbar.v2-topbar-sticky {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    padding-bottom: 8px;
+  }
+  .v2-topbar-sticky .topbar-title { flex: 1 1 auto; min-width: 0; }
+  .v2-topbar-sticky .topbar-title h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v2-topbar-sticky .top-actions {
+    display: flex;
+    flex: none;
+    width: auto;
+    gap: 6px;
+    overflow: visible;
+  }
+  .v2-topbar-sticky .top-actions > * { width: auto; }
+  .v2-topbar-sticky .top-live-metrics { display: none; }
+  .v2-topbar-sticky .top-live-status { display: none; } /* the strip shows the state */
+  .v2-topbar-sticky .btn-refresh { min-width: 40px; min-height: 40px; padding: 0 10px; }
+
+  /* --- Bottom navigation: one row, Log always at hand ------------------- */
+  .sidebar nav {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: minmax(50px, auto);
+  }
+  #app-sidebar .nav-item,
+  #app-sidebar .nav-more { min-height: 50px; font-size: 0.72rem; padding: 4px 0; letter-spacing: -0.01em; }
+  #app-sidebar .nav-more-indicator { display: none; }
+  /* "Dashboard" is the longest label: a touch smaller so it fits its column. */
+  #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.64rem; letter-spacing: -0.02em; }
+  #app-sidebar .nav-item.has-news { position: relative; }
+  #app-sidebar .nav-item.has-news::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 16px);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--warn);
+  }
+  .sidebar .system-group.open {
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-content: flex-start;
+  }
+  .sidebar .system-group.open .nav-item {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: flex-start;
+    min-width: 0;
+  }
+  .content { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+
+  /* Appearance controls live in "Altro" on a phone. */
+  .sidebar .system-group.open .nav-prefs {
+    display: flex;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    order: 99;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .nav-prefs .btn { min-height: 40px; width: auto; }
+  .nav-prefs .v2-theme-toggle { width: auto; min-width: 0; white-space: nowrap; }
+  .nav-prefs-lang { flex: 1 1 120px; }
+  .nav-prefs-lang select { width: 100%; min-height: 40px; }
+
+  /* --- Tables: a fade on the right edge says there is more to scroll ---- */
+  .table-wrap {
+    background:
+      linear-gradient(to right, var(--surface), var(--surface)) local,
+      linear-gradient(to left, var(--surface), var(--surface)) local right,
+      linear-gradient(to right, rgba(0, 0, 0, .28), transparent) scroll,
+      linear-gradient(to left, rgba(0, 0, 0, .28), transparent) scroll right;
+    background-repeat: no-repeat;
+    background-size: 24px 100%;
+  }
+
+  /* --- Dashboard: what is happening first, shortcuts after ------------- */
+  .dashboard-view { display: flex; flex-direction: column; }
+  .dashboard-view > .dashboard-actions-next-grid { order: 1; }
+  .dashboard-view > .dashboard-session-grid { order: 2; display: grid; grid-template-columns: 1fr; }
+  .dashboard-view > .dashboard-summary-grid { order: 3; }
+  .dashboard-view > .panel:not(.dashboard-search-panel):not(.dashboard-explore-panel):not(.dashboard-feed-panel) { order: 4; }
+  .dashboard-view > .dashboard-search-panel { order: 5; }
+  .dashboard-view > * { order: 6; }
+  .dashboard-view .dashboard-consumption-panel,
+  .dashboard-view .dashboard-explore-panel,
+  .dashboard-view > .dashboard-intro { display: none; } /* the strip shows DRY-RUN */
+
+  /* --- Scarico: the list first, adding a torrent one tap away ---------- */
+  .downloads-view { display: flex; flex-direction: column; }
+  .downloads-view > .downloads-flash { order: 0; }
+  .downloads-view > .session-panel { order: 1; }
+  .downloads-view > .add-torrent-panel { order: 2; }
+  .downloads-view.has-add-link > .add-torrent-panel { order: 0; } /* a shared link: add it first */
+  .downloads-view > * { order: 3; }
+  details.add-torrent-panel > summary { cursor: pointer; }
+  details.add-torrent-panel:not([open]) > summary { border-bottom: 0; }
+  .add-torrent-plus { display: inline; color: var(--accent); }
+  .session-panel .panel-head { display: flex; align-items: center; gap: 8px; }
+  .session-panel .session-panel-note { display: none; }
+  .downloads-tools-toggle { display: inline-flex; margin-left: auto; }
+  .downloads-view:not(.show-download-tools) .download-temp-toolbar,
+  .downloads-view:not(.show-download-tools) .download-global-toolbar > [name="refresh"],
+  .downloads-view:not(.show-download-tools) .download-global-toolbar > [name="auto"],
+  .downloads-view:not(.show-download-tools) .download-global-toolbar > [hx-vals*="clear_completed"],
+  .downloads-view:not(.show-download-tools) .download-global-toolbar > .check,
+  .downloads-view:not(.show-download-tools) .download-global-toolbar > span.muted { display: none; }
+  .downloads-view:not(.has-selection) .download-bulk-toolbar > :not(.check):not([data-v2-selected-count]) { display: none; }
+  .downloads-view.has-selection .download-bulk-toolbar {
+    position: sticky;
+    bottom: calc(60px + env(safe-area-inset-bottom));
+    z-index: 5;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+  }
+  .mobile-torrent-hint,
+  .download-bulk-toolbar .mobile-bulk-hint { display: none !important; }
+
+  /* --- Log: compact controls, lines readable without zooming ----------- */
+  .logs-toolbar { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+  .logs-toolbar > input[name="filter"] { grid-column: 1 / -1; }
+  .logs-toolbar > .logs-level { grid-column: 1; width: 100%; }
+  .logs-toolbar > [name="lines"] { grid-column: 2; }
+  .logs-toolbar > [data-v2-logs-follow],
+  .logs-toolbar > [data-v2-logs-copy] { width: 100%; }
+  .logs-toolbar > button[type="submit"] { display: none; } /* it refreshes every 5 s */
+  .logs-toolbar > select[name="log"] { grid-column: 1 / -1; min-width: 0; width: 100%; }
+  .log-view { font-size: 0.74rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+
+  /* --- Pull to refresh (installed app) --------------------------------- */
+  .ptr-hint:not([hidden]) {
+    display: block;
+    position: fixed;
+    top: calc(8px + env(safe-area-inset-top));
+    left: 50%;
+    z-index: 60;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .ptr-hint.ready { color: var(--accent); border-color: var(--accent); }
+}

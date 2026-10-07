@@ -145,18 +145,24 @@ test.describe("mobile", () => {
     expect(overflow).toBeLessThanOrEqual(2);
   });
 
-  test("prestazioni visibili in tile su mobile", async ({ page }) => {
+  test("la striscia di stato mostra servizio e velocità e porta alle pagine", async ({ page }) => {
     await page.goto("/");
-    const performance = page.locator(".mobile-performance");
-    await expect(performance).toBeVisible();
-    await expect(performance.locator(".mobile-performance-tile")).toHaveCount(4);
-    await expect(performance).toContainText("CPU");
-    await expect(performance).toContainText("RAM");
-    await expect(performance).toContainText("download");
-    await expect(performance).toContainText("upload");
-    await expect.poll(() => performance.locator(".mobile-performance-grid").evaluate((grid) =>
-      getComputedStyle(grid).gridTemplateColumns.split(" ").length
-    )).toBe(2);
+    const strip = page.locator(".mobile-status-strip");
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('a[href="/?view=health"]')).toBeVisible();
+    await expect(strip.locator('a[href="/?view=downloads"]').first()).toContainText("↓");
+    // A dry-run daemon says so in the strip.
+    await expect(strip).toContainText("DRY-RUN");
+    // CPU and RAM live in Salute, not on every page.
+    await expect(strip).not.toContainText("CPU");
+  });
+
+  test("un link condiviso apre Scarico con il modulo già compilato", async ({ page }) => {
+    const magnet = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&dn=Test";
+    await page.goto("/share?text=" + encodeURIComponent("guarda " + magnet));
+    await expect(page).toHaveURL(/view=downloads/);
+    await expect(page.locator('input[name="magnet"]')).toHaveValue(magnet);
+    await expect(page.locator("details.add-torrent-panel")).toHaveAttribute("open", "");
   });
 
   test("Scarico usa schede compatte e conserva l'ordinamento touch", async ({ page }) => {
@@ -185,19 +191,28 @@ test.describe("mobile", () => {
     await expect.poll(() => tabs.evaluate((element) => getComputedStyle(element).overflowX)).toBe("auto");
   });
 
-  test("mobile mostra salute e log e raccoglie il resto in Sistema", async ({ page }) => {
+  test("mobile tiene Log nella barra e raccoglie il resto in Altro", async ({ page }) => {
     await page.goto("/");
-    await expect(nav(page, "Salute")).toBeVisible();
     await expect(nav(page, "Log")).toBeVisible();
+    await expect(nav(page, "Salute")).toBeHidden();
     await expect(page.locator('aside .nav-mobile-hidden[href="/?view=archive"]')).toBeHidden();
 
     await page.locator("[data-mobile-system-toggle]").click();
+    await expect(nav(page, "Salute")).toBeVisible();
     await expect(nav(page, "Configurazione")).toBeVisible();
+    // The toggle stays in the bottom bar, and the appearance controls are here.
+    await expect(page.locator("[data-mobile-system-toggle]")).toBeVisible();
+    await expect(page.locator(".nav-prefs [data-theme-toggle]")).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
   });
 
-  test("la navigazione inferiore usa due righe leggibili senza coprire il contenuto", async ({ page }) => {
+  test("le pagine di sistema non aprono il menu da sole", async ({ page }) => {
+    await page.goto("/?view=settings");
+    await expect(page.locator("#app-system-menu")).not.toHaveClass(/\bopen\b/);
+  });
+
+  test("la navigazione inferiore usa una riga leggibile senza coprire il contenuto", async ({ page }) => {
     await page.goto("/");
     const metrics = await page.evaluate(() => {
       const nav = document.querySelector(".sidebar nav")!;
@@ -212,8 +227,8 @@ test.describe("mobile", () => {
         contentPaddingBottom: parseFloat(getComputedStyle(content).paddingBottom),
       };
     });
-    expect(metrics.rows).toBe(2);
-    expect(metrics.sidebarHeight).toBeGreaterThan(100);
+    expect(metrics.rows).toBe(1);
+    expect(metrics.sidebarHeight).toBeLessThan(90);
     expect(metrics.largestLabel).toBeGreaterThanOrEqual(12);
     expect(metrics.contentPaddingBottom).toBeGreaterThanOrEqual(metrics.sidebarHeight);
   });

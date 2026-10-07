@@ -12,6 +12,12 @@
 <meta name="application-name" content="Gextto EXpert Torrent Transfer Orchestrator">
 <title>Gextto · {{.Title}}</title>
 <link rel="icon" href="/favicon.ico">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0b1120">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <script>
   (function () {
     try {
@@ -36,12 +42,22 @@
     </div>
     <nav aria-label="Navigazione principale">
       {{range .Groups}}
+       {{/* The toggle sits outside the group: on a phone the open group is a
+            floating panel, and the button must stay in the bottom bar. */}}
+       {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>Altro</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
        <div{{if .System}} id="app-system-menu"{{end}} class="nav-group{{if .System}} system-group{{end}}{{if .Open}} open{{end}}">
-         {{if .System}}<button class="nav-more" type="button" data-mobile-system-toggle aria-expanded="{{if .Open}}true{{else}}false{{end}}" aria-controls="app-system-menu"><span class="nav-icon" aria-hidden="true">⋯</span><span>Sistema</span><span class="nav-more-indicator" aria-hidden="true">＋</span></button>{{end}}
         {{range .Items}}
          <a class="nav-item{{if .Active}} active{{end}}{{if .Optional}} nav-optional{{end}}{{if .MobileHidden}} nav-mobile-hidden{{end}}{{if .MobileAlways}} nav-mobile-always{{end}}" href="{{.Href}}" title="{{.Label}}"{{if .Active}} aria-current="page"{{end}} data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "dashboard"}}🏠{{else if eq .ID "downloads"}}⬇️{{else if eq .ID "series"}}📺{{else if eq .ID "movies"}}🎬{{else if eq .ID "logs"}}📋{{else if eq .ID "health"}}🩺{{else if eq .ID "settings"}}⚙️{{else if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "maintenance"}}🛠️{{else if eq .ID "gaps"}}⚠️{{else if eq .ID "integrations"}}🔌{{else if eq .ID "manual"}}📖{{else if eq .ID "license"}}📜{{else if eq .ID "blocklist"}}🚫{{else}}•{{end}}</span><span>{{.Label}}</span>{{if or (eq .ID "downloads") (eq .ID "series") (eq .ID "movies") (eq .ID "comics")}}<span class="nav-count"{{if not .Count}} hidden{{end}}>{{.Count}}</span>{{end}}</a>
          {{end}}
          {{if .System}}{{range $.Groups}}{{range .Items}}{{if .MobileHidden}}<a class="nav-item nav-mobile-system-extra" href="{{.Href}}" title="{{.Label}}" data-nav="{{.ID}}"><span class="nav-icon" aria-hidden="true">{{if eq .ID "search"}}🔎{{else if eq .ID "archive"}}📦{{else if eq .ID "comics"}}📚{{else if eq .ID "gaps"}}⚠️{{else}}•{{end}}</span><span>{{.Label}}</span></a>{{end}}{{end}}{{end}}{{end}}
+         {{if .System}}<div class="nav-prefs" aria-label="Aspetto">
+           <button class="btn sm v2-theme-toggle" type="button" data-theme-toggle title="Cambia tra tema chiaro e scuro">Tema chiaro</button>
+           <button class="btn sm" type="button" data-font="-5" title="Testo più piccolo">A−</button>
+           <button class="btn sm" type="button" data-font="+5" title="Testo più grande">A+</button>
+           <form method="post" action="/language" class="nav-prefs-lang"><select class="input compact" name="lang" aria-label="Lingua dell'interfaccia" onchange="this.form.submit()">
+             <option value="it"{{if eq $.Chrome.Lang "it"}} selected{{end}}>Italiano</option><option value="en"{{if eq $.Chrome.Lang "en"}} selected{{end}}>English</option><option value="de"{{if eq $.Chrome.Lang "de"}} selected{{end}}>Deutsch</option><option value="fr"{{if eq $.Chrome.Lang "fr"}} selected{{end}}>Français</option><option value="es"{{if eq $.Chrome.Lang "es"}} selected{{end}}>Español</option><option value="pl"{{if eq $.Chrome.Lang "pl"}} selected{{end}}>Polski</option>
+           </select></form>
+         </div>{{end}}
          {{if eq .Label "Panoramica"}}<a class="nav-item nav-search" href="/?view=settings" title="Cerca tra tutte le impostazioni e vai al campo"><span class="nav-icon" aria-hidden="true">🔍</span><span>Cerca impostazioni</span></a>{{end}}
       </div>
       {{end}}
@@ -136,11 +152,13 @@
 {{end}}
 
 {{define "v2_live_mobile_metrics"}}
-<div id="v2-live-mobile-metrics" class="mobile-performance-grid" hx-get="/partial/chrome?mobile=1" hx-trigger="every 5s" hx-swap="outerHTML">
-  <div class="mobile-performance-tile"><span class="top-metric-label">CPU{{if .CPUFrequency}} <small class="metric-frequency">{{.CPUFrequency}}</small>{{end}}</span><strong>{{.CPU}}</strong></div>
-  <div class="mobile-performance-tile"><span class="top-metric-label">RAM</span><strong>{{.RAM}}</strong></div>
-  <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di download</span><strong>{{.Download}}</strong></div>
-  <div class="mobile-performance-tile"><span class="top-metric-label">Velocità di upload</span><strong>{{.Upload}}</strong></div>
+<div id="v2-live-mobile-metrics" class="mobile-status-strip" hx-get="/partial/chrome?mobile=1" hx-trigger="every 5s" hx-swap="outerHTML" data-problems="{{.Problems}}">
+  <a class="ms-chip ms-state" href="/?view=health" title="Stato del servizio"><span class="pulse"></span>{{.Status}}</a>
+  {{if .DryRun}}<a class="ms-chip warn" href="/?view=settings" title="Modalità prova: non viene scaricato nulla">DRY-RUN</a>{{end}}
+  <a class="ms-chip" href="/?view=downloads" title="Velocità di download e upload">↓ {{.Download}} · ↑ {{.Upload}}</a>
+  {{if .Transferring}}<a class="ms-chip" href="/?view=downloads">⬇ {{.Transferring}} in download</a>{{end}}
+  {{if .Stuck}}<a class="ms-chip warn" href="/?view=downloads" title="Download fermi: apri Scarico per i dettagli">⏸ {{.Stuck}} bloccati</a>{{end}}
+  <a class="ms-chip warn" href="/?view=logs&amp;level=problems" data-ms-problems hidden>⚠ <span data-ms-problems-count>0</span> nuovi avvisi</a>
 </div>
 {{end}}
 
@@ -161,7 +179,7 @@
 {{/* ------------------------------------------------------------------ */}}
 
 {{define "v2_dashboard"}}
-<div class="view">
+<div class="view dashboard-view">
   <div class="dashboard-intro">
     <div>
       <span class="eyebrow">Panoramica</span>
@@ -198,7 +216,7 @@
     </div>
     <div class="panel dashboard-next-panel">
       <div class="panel-head"><h3><span>Prossima ricerca</span><span>automatica</span></h3><small class="muted">Serie TV, film e fumetti · riempimento gap</small></div>
-      <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{.NextCycle}}</strong></div><p class="muted dashboard-next-description">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
+      <div class="panel-body"><div class="row"><span>Prossima esecuzione</span><strong>{{if .NextCycle}}{{.NextCycle}}{{else}}non programmata{{end}}</strong></div><p class="muted dashboard-next-description">Gextto cerca automaticamente nuovi episodi, film e fumetti e completa gli episodi mancanti secondo l'intervallo configurato.</p></div>
     </div>
   </div>
   <div class="panel dashboard-search-panel">
@@ -319,14 +337,14 @@
 {{/* ------------------------------------------------------------------ */}}
 
 {{define "v2_downloads"}}
-<div class="view">
-  {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}}" role="status" aria-live="polite">{{.Flash}}</p>{{end}}
-  <div class="panel">
-    <div class="panel-head"><h3>Aggiungi torrent</h3><small class="muted">Magnet, URL .torrent o file locale</small></div>
+<div class="view downloads-view{{if .AddLink}} has-add-link{{end}}">
+  {{if .Flash}}<p class="{{if .FlashErr}}alert{{else}}muted{{end}} downloads-flash" role="status" aria-live="polite">{{.Flash}}</p>{{end}}
+  <details class="panel add-torrent-panel" data-mobile-collapse open>
+    <summary class="panel-head"><h3><span class="add-torrent-plus" aria-hidden="true">＋ </span>Aggiungi torrent</h3><small class="muted">Magnet, URL .torrent o file locale</small></summary>
     <div class="panel-body">
       <form class="torrent-add-form" method="post" action="/downloads/add" enctype="multipart/form-data">
         <div class="torrent-add-main">
-          <label class="field"><span>Magnet o URL .torrent</span><input class="input" name="magnet" placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" title="Incolla un link magnet oppure l'URL diretto di un file .torrent" /></label>
+          <label class="field"><span>Magnet o URL .torrent</span><input class="input" name="magnet" value="{{.AddLink}}" placeholder="magnet:?xt=urn:btih:… oppure https://…/file.torrent" title="Incolla un link magnet oppure l'URL diretto di un file .torrent" /></label>
           <label class="field"><span>Percorso (opzionale)</span><input class="input" name="save_path" placeholder="cartella predefinita" title="Cartella in cui salvare il torrent; se vuoto usa quella predefinita" /></label>
           <label class="field"><span>File .torrent</span><input class="input" type="file" name="torrent" accept=".torrent,application/x-bittorrent" title="Seleziona un file .torrent dal computer" /></label>
           <div class="torrent-add-action"><button class="btn primary" type="submit" title="Aggiunge il magnet, l'URL o il file .torrent alla sessione">Aggiungi</button></div>
@@ -343,9 +361,9 @@
         </div>
       </form>
     </div>
-  </div>
-  <div class="panel">
-    <div class="panel-head"><h3>Download in sessione</h3><small class="muted">Tabella e azioni renderizzate dal server via HTMX</small></div>
+  </details>
+  <div class="panel session-panel">
+    <div class="panel-head"><h3>Download in sessione</h3><small class="muted session-panel-note">Tabella e azioni renderizzate dal server via HTMX</small><button class="btn sm downloads-tools-toggle" type="button" data-downloads-tools aria-expanded="false" title="Mostra limiti di banda e pulizia">⚙ Opzioni</button></div>
     <div class="panel-body">{{template "v2_torrents_wrap" .}}</div>
   </div>
   <div id="v2-modal"></div>
@@ -953,6 +971,10 @@
       <form class="toolbar logs-toolbar" hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
             hx-trigger="submit, input changed delay:300ms, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
          <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+         <select class="input compact logs-level" name="level" aria-label="Livello" title="Mostra tutte le righe o solo avvisi ed errori">
+          <option value="">Tutte le righe</option>
+          <option value="problems"{{if .ProblemsOnly}} selected{{end}}>Solo avvisi ed errori</option>
+         </select>
          <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
           <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
           <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>

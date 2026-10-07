@@ -26,8 +26,9 @@
   function setTheme(mode) {
     doc.setAttribute("data-theme", mode);
     storageSet("gextto_theme", mode);
-    var button = document.querySelector("[data-theme-toggle]");
-    if (button) button.textContent = themeLabel();
+    // The toggle exists twice: in the top bar and, on phones, in "Altro".
+    var buttons = document.querySelectorAll("[data-theme-toggle]");
+    for (var i = 0; i < buttons.length; i++) buttons[i].textContent = themeLabel();
   }
   function toggleTheme() {
     setTheme(doc.getAttribute("data-theme") === "light" ? "dark" : "light");
@@ -89,8 +90,11 @@
     if (indicator) indicator.textContent = open ? "−" : "＋";
     if (backdrop) backdrop.hidden = !open;
   }
+  // On a phone the menu is a panel over the page: never open it by itself
+  // (the server marks it open on the pages it contains, for the sidebar).
+  function isPhone() { return window.matchMedia && window.matchMedia("(max-width: 560px)").matches; }
   var systemGroup = document.getElementById("app-system-menu");
-  if (systemGroup) setSystemMenu(systemGroup.classList.contains("open"));
+  if (systemGroup) setSystemMenu(systemGroup.classList.contains("open") && !isPhone());
 
   document.addEventListener("click", function (event) {
     if (event.target && event.target.id === "app-system-backdrop") {
@@ -208,6 +212,9 @@
 
   function updateTorrentSelection() {
     var selected = document.querySelectorAll("[data-v2-select]:checked");
+    // On a phone the bulk actions appear only while something is selected.
+    var downloadsView = document.querySelector(".downloads-view");
+    if (downloadsView) downloadsView.classList.toggle("has-selection", selected.length > 0);
     var label = document.querySelector("[data-v2-selected-count]");
     if (label) label.textContent = selected.length + " selezionati · Azioni:";
     var all = document.querySelector("[data-v2-select-all]");
@@ -707,6 +714,7 @@
 
   document.addEventListener("htmx:afterSwap", function (event) {
     if (!event.target) return;
+    updateProblemsChip();
     ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); return; }
     updateTorrentSelection();
@@ -914,5 +922,84 @@
     if (event.key === "Escape" && fontOverlay && !fontOverlay.hidden) { event.preventDefault(); closeFontPicker(); }
   });
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); });
+  // ------------------------------------------------------ phone helpers --
+  // New warnings: the status strip carries the daemon's WARN/ERROR count;
+  // the page remembers the count seen on the Log page and shows the rest.
+  function onLogsPage() { return /[?&]view=logs(&|$)/.test(window.location.search); }
+  function updateProblemsChip() {
+    var strip = document.getElementById("v2-live-mobile-metrics");
+    if (!strip) return;
+    var current = parseInt(strip.getAttribute("data-problems") || "0", 10) || 0;
+    var stored = storageGet("gextto_seen_problems");
+    var seen = stored === null ? current : (parseInt(stored, 10) || 0);
+    if (stored === null || onLogsPage()) { seen = current; storageSet("gextto_seen_problems", String(current)); }
+    // The counter restarts with the daemon: then everything counted is new.
+    var unseen = current >= seen ? current - seen : current;
+    var chip = strip.querySelector("[data-ms-problems]");
+    if (chip) {
+      chip.hidden = unseen === 0;
+      var count = chip.querySelector("[data-ms-problems-count]");
+      if (count) count.textContent = String(unseen);
+    }
+    var logNav = document.querySelector('#app-sidebar [data-nav="logs"]');
+    if (logNav) logNav.classList.toggle("has-news", unseen > 0);
+  }
+
+  // Panels marked data-mobile-collapse start closed on a phone, unless they
+  // already hold something to act on (a shared link in the add form).
+  function collapseOnPhone() {
+    if (!isPhone()) return;
+    var panels = document.querySelectorAll("details[data-mobile-collapse]");
+    for (var i = 0; i < panels.length; i++) {
+      var filled = panels[i].querySelector('input[name="magnet"]');
+      if (!(filled && filled.value)) panels[i].removeAttribute("open");
+    }
+  }
+
+  // Scarico: bandwidth limits and clean-up tools sit behind "Opzioni" on a
+  // phone. The class lives outside the auto-refreshed table, so it survives
+  // the 5-second swaps.
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest && event.target.closest("[data-downloads-tools]");
+    if (!toggle) return;
+    var view = toggle.closest(".downloads-view");
+    if (!view) return;
+    var open = !view.classList.contains("show-download-tools");
+    view.classList.toggle("show-download-tools", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  // Pull to refresh for the installed app, where the browser's own gesture
+  // is not available. In a normal browser tab the native gesture is used.
+  function initPullToRefresh() {
+    var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone;
+    if (!standalone || !("ontouchstart" in window)) return;
+    var startY = null, pulled = 0;
+    var hint = document.createElement("div");
+    hint.className = "ptr-hint";
+    hint.textContent = "↓ Rilascia per aggiornare";
+    hint.hidden = true;
+    document.body.appendChild(hint);
+    window.addEventListener("touchstart", function (event) {
+      startY = window.scrollY <= 0 && !activeDialog ? event.touches[0].clientY : null;
+      pulled = 0;
+    }, { passive: true });
+    window.addEventListener("touchmove", function (event) {
+      if (startY === null) return;
+      pulled = event.touches[0].clientY - startY;
+      hint.hidden = pulled < 30;
+      hint.classList.toggle("ready", pulled > 90);
+    }, { passive: true });
+    window.addEventListener("touchend", function () {
+      if (startY !== null && pulled > 90) window.location.reload();
+      startY = null;
+      hint.hidden = true;
+    });
+  }
+
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* optional */ }); });
+  }
+
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); collapseOnPhone(); initPullToRefresh(); });
 })();

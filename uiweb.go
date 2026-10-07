@@ -251,7 +251,7 @@ var uiNavGroups = []uiNavDefinition{
 		{ID: "settings", Label: "Configurazione"},
 		{ID: "integrations", Label: "Integrazioni"},
 		{ID: "maintenance", Label: "Manutenzione"},
-		{ID: "health", Label: "Salute", MobileAlways: true},
+		{ID: "health", Label: "Salute"},
 		{ID: "blocklist", Label: "Blocklist", Optional: true},
 		{ID: "manual", Label: "Manuale"},
 		{ID: "license", Label: "Licenza", Optional: true},

@@ -120,6 +120,9 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "/v2", v2LegacyRedirect)
 	v2Handle(s, mux, "/v2/", v2LegacyRedirect)
 	v2Handle(s, mux, "GET /empty", V2Empty)
+	v2Handle(s, mux, "GET /manifest.webmanifest", V2Manifest)
+	v2Handle(s, mux, "GET /sw.js", V2ServiceWorker)
+	v2Handle(s, mux, "GET /share", V2Share)
 	v2Handle(s, mux, "POST /language", V2SetLanguage)
 	v2Handle(s, mux, "POST /run-cycle", V2RunCycle)
 	v2Handle(s, mux, "POST /dashboard/backup", V2DashboardBackup)
@@ -392,6 +395,8 @@ type v2DownloadsView struct {
 	History  []v2TableData
 	Flash    string
 	FlashErr bool
+	// AddLink pre-fills the add form (a link shared from another app).
+	AddLink string
 }
 
 func v2SectionTables(s *AppState, r *http.Request, sections []uiPageSection, views []string) []v2TableData {
@@ -502,6 +507,7 @@ func v2DownloadsViewFrom(s *AppState, r *http.Request) v2DownloadsView {
 		History:        v2SectionTables(s, r, uiDownloadsPageFor(s).Panels, []string{"downloads-history"}),
 		Flash:          strings.TrimSpace(r.FormValue("msg")),
 		FlashErr:       r.FormValue("msg_err") == "1",
+		AddLink:        strings.TrimSpace(r.FormValue("add")),
 	}
 }
 
@@ -525,7 +531,7 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_health", v2HealthViewFrom(s, r)
 	case "logs":
 		linesNum, _ := strconv.Atoi(r.FormValue("lines"))
-		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"))
+		return "v2_logs", v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
 	case "manual":
 		return "v2_manual", uiManualDataFrom(s)
 	case "license":
@@ -1851,6 +1857,8 @@ type v2LogsView struct {
 	// the data directory (current first, then rotated backups).
 	Log      string
 	LogFiles []string
+	// ProblemsOnly keeps only the WARN and ERROR lines.
+	ProblemsOnly bool
 }
 
 var v2LogHighlight = []struct {
@@ -1875,7 +1883,14 @@ func v2HighlightLogLine(line string) template.HTML {
 	return template.HTML(escaped)
 }
 
-func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string) v2LogsView {
+// v2LogLineIsProblem reports whether a log line is a WARN or ERROR line
+// ("2026-10-07 04:21:19  WARN …").
+func v2LogLineIsProblem(line string) bool {
+	fields := strings.Fields(line)
+	return len(fields) >= 3 && (fields[2] == "WARN" || fields[2] == "ERROR")
+}
+
+func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string, problemsOnly ...bool) v2LogsView {
 	if linesNum <= 0 || linesNum > 5000 {
 		linesNum = 500
 	}
@@ -1887,9 +1902,13 @@ func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string) v2
 		Log:      selected,
 		LogFiles: coreLogFiles(s.cfg.DataDir),
 	}
+	view.ProblemsOnly = len(problemsOnly) > 0 && problemsOnly[0]
 	needle := strings.ToLower(filter)
 	for _, line := range raw {
 		if needle != "" && !strings.Contains(strings.ToLower(line), needle) {
+			continue
+		}
+		if view.ProblemsOnly && !v2LogLineIsProblem(line) {
 			continue
 		}
 		view.Lines = append(view.Lines, v2HighlightLogLine(line))
@@ -1902,7 +1921,7 @@ func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string) v2
 // also updates the line count out of band, since only the <pre> is swapped.
 func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	linesNum, _ := strconv.Atoi(r.FormValue("lines"))
-	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"))
+	view := v2LogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
 	dict, eng := v2Dictionaries(s)
 	var buffer bytes.Buffer
 	if err := v2Templates.ExecuteTemplate(&buffer, "v2_logs_view", view); err != nil {

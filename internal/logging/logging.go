@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -100,11 +101,21 @@ func Enabled(level Level) bool {
 	return level >= minLevel
 }
 
+// problemCount counts the WARN and ERROR lines written since start-up.
+var problemCount atomic.Uint64
+
+// ProblemCount is how many WARN and ERROR lines were logged since start-up;
+// a client compares it with the value it last showed to flag new problems.
+func ProblemCount() uint64 { return problemCount.Load() }
+
 func logf(level Level, message string, kv []any) {
 	logMu.Lock()
 	if level < minLevel {
 		logMu.Unlock()
 		return
+	}
+	if level >= LevelWarn {
+		problemCount.Add(1)
 	}
 	writer := logWriter
 	logMu.Unlock()
