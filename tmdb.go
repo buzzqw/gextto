@@ -438,6 +438,62 @@ func (t *TmdbClient) MovieDetails(ctx context.Context, tmdbID string) (*TmdbMovi
 	return &details, nil
 }
 
+// MovieReleaseDate returns the release date of a movie in country (an ISO
+// 3166-1 code such as "IT") and its kind: "digital", "physical" or
+// "theatrical", preferring the first that exists. Movies reach a country
+// months or years after the original release, so this is the date that
+// matters for a local audience. ok is false when TMDB has no date for country.
+func (t *TmdbClient) MovieReleaseDate(ctx context.Context, tmdbID, country string) (date, kind string, ok bool, err error) {
+	if t.key == nil {
+		return "", "", false, nil
+	}
+	id, parseErr := strconv.ParseInt(strings.TrimSpace(tmdbID), 10, 64)
+	if parseErr != nil {
+		return "", "", false, errors.New("invalid TMDB movie id")
+	}
+	var response struct {
+		Results []struct {
+			Country      string `json:"iso_3166_1"`
+			ReleaseDates []struct {
+				ReleaseDate string `json:"release_date"`
+				Type        int    `json:"type"`
+			} `json:"release_dates"`
+		} `json:"results"`
+	}
+	rawURL := fmt.Sprintf("%s/movie/%d/release_dates", tmdbAPIBaseURL, id)
+	if err := t.getJSON(ctx, rawURL, nil, &response); err != nil {
+		return "", "", false, err
+	}
+	// TMDB release types: 3 theatrical, 4 digital, 5 physical.
+	best := map[int]string{}
+	for _, result := range response.Results {
+		if !strings.EqualFold(result.Country, country) {
+			continue
+		}
+		for _, release := range result.ReleaseDates {
+			day := release.ReleaseDate
+			if len(day) >= 10 {
+				day = day[:10]
+			}
+			if day == "" {
+				continue
+			}
+			if current, seen := best[release.Type]; !seen || day < current {
+				best[release.Type] = day
+			}
+		}
+	}
+	for _, choice := range []struct {
+		kind  int
+		label string
+	}{{4, "digital"}, {5, "physical"}, {3, "theatrical"}} {
+		if day, found := best[choice.kind]; found {
+			return day, choice.label, true, nil
+		}
+	}
+	return "", "", false, nil
+}
+
 // MovieCredits mirrors `movie_credits`: top 12 cast members ordered by billing.
 func (t *TmdbClient) MovieCredits(ctx context.Context, tmdbID string) ([]CastMember, error) {
 	if t.key == nil {

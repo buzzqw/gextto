@@ -7,8 +7,13 @@ build in esecuzione.
 
 ## Prima di usare l'API
 
-- L'API non ha autenticazione integrata. Non esporla su Internet: usa loopback
-  oppure un reverse proxy con TLS e autenticazione.
+- Per impostazione predefinita l'API è aperta, come in una LAN fidata. Con
+  *Configurazione → Accesso → Richiedi l'accesso* attivo, chi non è in rete
+  locale deve mandare la chiave API nell'header `X-Api-Key` (o `?apikey=`
+  nell'indirizzo) oppure il cookie di sessione ottenuto da `/login`; senza
+  credenziali le route `/api/…` rispondono `401`. Per l'accesso da Internet usa
+  comunque HTTPS (reverse proxy con certificato o VPN).
+- `/login` e `/logout` esistono solo con l'accesso protetto attivo.
 - Le route che modificano configurazione, file, torrent o database usano di
   norma `POST`/`DELETE`; trattale come azioni amministrative e conserva backup.
 - I segnaposto tra parentesi graffe, ad esempio `{hash}`, fanno parte del
@@ -295,6 +300,7 @@ Per verifiche operative usa prima
 | POST | `/api/watched-folders` |
 | GET | `/favicon.ico` |
 | GET | `/feed.xml` |
+| GET | `/feed/calendar.ics` |
 | GET | `/magnet` |
 
-Total routes: 268
+Total routes: 269

@@ -3823,3 +3823,5 @@ spa:
   "Richiedi l'accesso (login)": "Exigir inicio de sesión"
   "Nessun login dalla rete locale": "Sin inicio de sesión desde la red local"
   "Chiave API (script, TUI, calendario)": "Clave API (scripts, TUI, calendario)"
+  "Calendario iCal": "Calendario iCal"
+  "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.": "Próximos episodios y estrenos de películas para Thunderbird, Google Calendar o el teléfono: copia la dirección del enlace y suscríbete al calendario. Con el acceso protegido, añade ?apikey=<clave> a la dirección."

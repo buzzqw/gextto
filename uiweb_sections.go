@@ -547,6 +547,13 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		}),
 		sectionSourcesCheck(),
 		sectionLinks(uiLinksSection{
+			Title: "Calendario iCal",
+			Hint:  "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.",
+			Links: []uiLinkItem{
+				{Label: "gextto.ics", Href: "/feed/calendar.ics"},
+			},
+		}),
+		sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
 			Links: []uiLinkItem{

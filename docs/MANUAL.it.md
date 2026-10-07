@@ -1286,6 +1286,22 @@ non riconosciuto, server che la rifiuta) Gextto chiede l'aggiornamento completo
 come prima. Se il server gira in Docker e vede i file sotto un altro percorso,
 compila la mappatura percorsi.
 
+### Calendario iCal
+
+`/feed/calendar.ics` è un calendario a cui iscriversi da Thunderbird, Google
+Calendar, Apple Calendar o dal telefono (link in *Integrazioni → Calendario
+iCal*). Le serie arrivano in italiano spesso mesi o anni dopo la prima messa in
+onda, quindi il calendario distingue tre cose:
+
+| Voce | Cosa indica |
+|---|---|
+| 📥 Serie S01E04 | episodio o film **arrivato in libreria**, nel giorno in cui Gextto l'ha scaricato (ultimi 30 giorni). È l'unica data che dice quando è davvero disponibile. |
+| 📺 Serie S02E03 · Titolo | **prima messa in onda originale** (TMDB) della stagione in corso, dall'ultima settimana ai prossimi due mesi. Non è la data della versione italiana; ✓ se l'episodio è già in libreria. |
+| 🎬 Film | uscita del film monitorato **in Italia** (TMDB: digitale, poi home video, poi cinema; il paese segue la lingua TMDB, es. `it-IT`). Se per l'Italia non c'è ancora una data compare quella originale, indicata come «(uscita originale)». |
+
+Serve la chiave TMDB; il calendario si aggiorna al massimo ogni 30 minuti. Con
+l'accesso protetto (vedi *Accesso*) aggiungi `?apikey=<chiave>` all'indirizzo.
+
 ### Indexer Torznab
 
 | Campo / azione | Cosa fa |

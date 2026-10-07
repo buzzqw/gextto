@@ -3870,3 +3870,5 @@ fra:
   "Richiedi l'accesso (login)": "Exiger une connexion"
   "Nessun login dalla rete locale": "Pas de connexion depuis le réseau local"
   "Chiave API (script, TUI, calendario)": "Clé API (scripts, TUI, calendrier)"
+  "Calendario iCal": "Calendrier iCal"
+  "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.": "Prochains épisodes et sorties de films pour Thunderbird, Google Agenda ou le téléphone : copiez l'adresse du lien et abonnez-vous au calendrier. Avec l'accès protégé, ajoutez ?apikey=<clé> à l'adresse."

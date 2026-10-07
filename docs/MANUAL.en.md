@@ -1251,6 +1251,22 @@ targeted request is not possible (unknown path, server refusal) Gextto asks for
 the full refresh as before. When the server runs in Docker and sees the files
 under another path, fill in the path mapping.
 
+### iCal calendar
+
+`/feed/calendar.ics` is a calendar to subscribe to from Thunderbird, Google
+Calendar, Apple Calendar or a phone (link under *Integrations → iCal calendar*).
+Gextto was born for an Italian audience, where series often arrive months or
+years after the original broadcast, so the calendar tells three things apart:
+
+| Entry | What it means |
+|---|---|
+| 📥 Series S01E04 | episode or movie that **arrived in the library**, on the day Gextto downloaded it (last 30 days). The only date that says when it is really available. |
+| 📺 Series S02E03 · Title | **original broadcast** (TMDB) of the current season, from the last week to the next two months. It is not the date of a localised release; ✓ when the episode is already in the library. |
+| 🎬 Movie | release of a monitored movie **in your country** (TMDB: digital, then home video, then cinema; the country follows the TMDB language, e.g. `it-IT`). When that country has no date yet the original one is shown, marked “(original release)”. |
+
+A TMDB key is required; the calendar is rebuilt at most every 30 minutes. With
+access control on (see *Access*) add `?apikey=<key>` to the address.
+
 ### Torznab indexers
 
 | Field / action | What it does |

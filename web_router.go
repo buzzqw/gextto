@@ -250,6 +250,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/plex/test", PlexTest)
 	handle(s, mux, "GET /api/feed/status", FeedStatus)
 	handle(s, mux, "GET /feed.xml", MagnetFeed)
+	handle(s, mux, "GET /feed/calendar.ics", CalendarICS)
 	handle(s, mux, "GET /api/feed.xml", MagnetFeed)
 	handle(s, mux, "GET /api/torrents/{hash}/peers", TorrentPeers)
 	handle(s, mux, "GET /api/torrents/{hash}/why", TorrentWhy)
