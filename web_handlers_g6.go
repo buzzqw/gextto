@@ -657,12 +657,9 @@ func CreateRamdisk(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	defaultPath := "/dev/shm/gextto"
-	requested := defaultPath
-	if input.Path != nil {
-		requested = *input.Path
-	}
-	if requested != defaultPath || filepath.Dir(requested) != "/dev/shm" {
+	// Only the fixed path is accepted; the request value is compared, never used.
+	const requested = "/dev/shm/gextto"
+	if input.Path != nil && *input.Path != requested {
 		jsonError(w, http.StatusBadRequest, "il RAM disk automatico può essere creato solo in /dev/shm/gextto")
 		return
 	}

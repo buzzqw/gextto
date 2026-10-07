@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -1234,11 +1235,25 @@ func (c *LibtorrentClient) SetSuperSeeding(hash string, enabled bool) (bool, err
 	return true, nil
 }
 
+// infoHashPattern matches a v1 (SHA-1, 40 hex) or v2 (SHA-256, 64 hex) infohash.
+var infoHashPattern = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+// stateFile returns `<stateDir>/<hash><ext>`. The hash comes from API callers,
+// so anything that is not a lowercase hex infohash is refused: a value such as
+// "../x" must not reach a path outside the state directory.
+func (c *LibtorrentClient) stateFile(hash, ext string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(hash))
+	if !infoHashPattern.MatchString(normalized) {
+		return "", false
+	}
+	return filepath.Join(c.stateDir, normalized+ext), true
+}
+
 // TorrentFilePath returns the path of the `.torrent` metadata saved on the
 // metadata-received event, if any.
 func (c *LibtorrentClient) TorrentFilePath(hash string) (string, bool) {
-	path := filepath.Join(c.stateDir, strings.ToLower(hash)+".torrent")
-	if fileExists(path) {
+	path, ok := c.stateFile(hash, ".torrent")
+	if ok && fileExists(path) {
 		return path, true
 	}
 	return "", false
@@ -1590,7 +1605,10 @@ func (c *LibtorrentClient) saveTorrentMetadata(hash, displayName string) error {
 		return err
 	}
 	normalized := strings.ToLower(hash)
-	path := filepath.Join(c.stateDir, normalized+".torrent")
+	path, ok := c.stateFile(normalized, ".torrent")
+	if !ok {
+		return fmt.Errorf("invalid torrent hash %q", hash)
+	}
 	saved, errMessage := cgoLtSaveTorrent(c.session, normalized, path)
 	if saved == 0 {
 		return fmt.Errorf("libtorrent metadata save failed: %s", errMessage)
@@ -2557,8 +2575,11 @@ func (c *LibtorrentClient) Remove(hash string, deleteFiles bool) (bool, error) {
 	c.torrentsMu.RUnlock()
 	// Remove resume data as well, otherwise libtorrent restores the torrent on
 	// restart and it reappears in Downloads, undoing the removal.
-	_ = os.Remove(filepath.Join(c.stateDir, normalized+".fastresume"))
-	_ = os.Remove(filepath.Join(c.stateDir, normalized+".torrent"))
+	for _, ext := range []string{".fastresume", ".torrent"} {
+		if path, ok := c.stateFile(normalized, ext); ok {
+			_ = os.Remove(path)
+		}
+	}
 	if err := c.clearSeedLimit(normalized); err != nil {
 		logging.Warn("could not clear removed torrent seed limits", "hash", normalized, "name", name, "error", err)
 	}
