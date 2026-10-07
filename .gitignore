@@ -53,3 +53,6 @@ gextto.json
 uiweb/end2end/node_modules/
 uiweb/end2end/test-results/
 uiweb/end2end/playwright-report/
+
+# root-level build artifact (go build ./cmd/gx-torrent writes here)
+/gx-torrent
