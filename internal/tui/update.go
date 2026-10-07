@@ -556,7 +556,8 @@ func (m *Model) updateTorrents(k Key) Action {
 		case 'O':
 			m.SortDesc = !m.SortDesc
 			return Action{}
-		case 'F':
+		case 'F', '/':
+			// '/' filters in every list (Log, Archive, Library, history).
 			m.Prompt = newPrompt(PromptTorrentFilter, m.Filter)
 			return Action{}
 		}
