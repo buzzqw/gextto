@@ -17,6 +17,10 @@ import (
 
 const testPieceLength = 16 * 1024
 
+func testPeer(n int) *peer.Peer {
+	return &peer.Peer{Bitfield: bitfield.New(uint32(n))}
+}
+
 // A skipped piece must never be handed out in sequential mode, even when it is
 // the lowest-index piece the peer has.
 func TestSequentialNeverPicksSkippedPieces(t *testing.T) {
@@ -25,8 +29,8 @@ func TestSequentialNeverPicksSkippedPieces(t *testing.T) {
 		{Index: 1, Length: testPieceLength},
 		{Index: 2, Length: testPieceLength},
 	}
-	pe := &peer.Peer{Bitfield: bitfield.New(uint32(len(pieces)))}
-	pp := New(pieces, 2, nil, true)
+	pe := testPeer(len(pieces))
+	pp := New(pieces, 2, nil, true, false)
 	for i := range pieces {
 		pp.HandleHave(pe, uint32(i))
 	}
@@ -46,8 +50,8 @@ func TestFileEdgeNeverPicksSkippedPieces(t *testing.T) {
 		},
 		{Index: 1, Length: testPieceLength},
 	}
-	pe := &peer.Peer{Bitfield: bitfield.New(uint32(len(pieces)))}
-	pp := New(pieces, 2, nil, true)
+	pe := testPeer(len(pieces))
+	pp := New(pieces, 2, nil, true, false)
 	for i := range pieces {
 		pp.HandleHave(pe, uint32(i))
 	}
@@ -56,5 +60,27 @@ func TestFileEdgeNeverPicksSkippedPieces(t *testing.T) {
 	got, _ := pp.PickFor(pe)
 	if got == nil || got.Index != 1 {
 		t.Fatalf("file edge picked %v, want piece 1", got)
+	}
+}
+
+// FirstLast (gextto fork) prioritises the ends of every file without changing
+// the rarest-first order of the remaining pieces.
+func TestFirstLastPicksFileEdgesFirst(t *testing.T) {
+	pieces := []piece.Piece{
+		{Index: 0, Length: testPieceLength, Data: filesection.Piece{{Name: "f", Offset: 0, Length: testPieceLength}}},
+		{Index: 1, Length: testPieceLength, Data: filesection.Piece{{Name: "f", Offset: testPieceLength, Length: testPieceLength}}},
+		{Index: 2, Length: testPieceLength, Data: filesection.Piece{{Name: "f", Offset: 2 * testPieceLength, Length: testPieceLength}}},
+	}
+	pe := testPeer(len(pieces))
+	pp := New(pieces, 2, nil, false, true)
+	for i := range pieces {
+		pp.HandleHave(pe, uint32(i))
+	}
+	// Head, then tail, then the middle (rarest-first).
+	for _, want := range []uint32{0, 2, 1} {
+		got, _ := pp.PickFor(pe)
+		if got == nil || got.Index != want {
+			t.Fatalf("first_last picked %v, want piece %d", got, want)
+		}
 	}
 }

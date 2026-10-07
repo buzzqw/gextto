@@ -516,6 +516,9 @@ func TestGxAddFormCarriesSequential(t *testing.T) {
 	if got := gxAddForm("/dl", AddOptions{}).Get("sequential"); got != "" {
 		t.Fatalf("sequential must be off by default, got %q", got)
 	}
+	if got := gxAddForm("/dl", AddOptions{FirstLast: true}).Get("first_last"); got != "1" {
+		t.Fatalf("first_last not sent to the daemon, got %q", got)
+	}
 }
 
 // TestGxEngineSetSequentialPushesConfig checks that SetSequential reaches the

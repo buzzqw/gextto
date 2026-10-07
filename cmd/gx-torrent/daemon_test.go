@@ -966,3 +966,18 @@ func TestDaemonSequentialOption(t *testing.T) {
 		t.Fatalf("global sequential default not applied: %+v", info)
 	}
 }
+
+// TestDaemonFirstLastOption checks the per-add "first_last" option, which
+// prioritises the ends of every file without forcing sequential order.
+func TestDaemonFirstLastOption(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 50_000)
+	hash, existing, err := d.add(addRequest{TorrentData: data, Destination: src, FirstLast: true, SeedRatio: -1, SeedDays: -1})
+	if err != nil || existing {
+		t.Fatalf("add: %v existing=%v", err, existing)
+	}
+	if info, _ := findInfo(d, hash); !info.FirstLast {
+		t.Fatalf("first_last not reported: %+v", info)
+	}
+}

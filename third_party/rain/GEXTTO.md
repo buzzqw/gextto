@@ -51,6 +51,11 @@ sopra la nuova base; i punti dove il nostro codice incontra quello nuovo sono:
   aggiunto in `myPiece.PickableBy` e in `pickSequential`, che altrimenti
   sceglierebbero pezzi di file esclusi. Guardato da
   `sequential_skip_test.go`.
+- **Prima/ultima parte indipendente dal sequenziale.** Upstream marca i bordi
+  dei file solo in modalità sequenziale. Il fork ha separato le due cose con un
+  flag `firstLast` (`AddTorrentOptions.FirstLast`, campo `torrent.firstLast`,
+  chiave resumer `first_last`, parametro extra di `piecepicker.New`), così
+  l'opzione "prima/ultima parte" funziona senza forzare l'ordine sequenziale.
 - **Preallocazione + provider di storage.** Upstream ha spostato la creazione
   dello storage in `torrent/session_storage.go`; il flag `Preallocate` ora è un
   campo del provider e viene applicato in `GetStorage`.

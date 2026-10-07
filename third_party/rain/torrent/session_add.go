@@ -36,6 +36,10 @@ type AddTorrentOptions struct {
 	// instead of rarest-first.
 	// Useful for streaming, at the cost of slower overall download and worse swarm health.
 	Sequential bool
+	// FirstLast downloads the pieces at both ends of every file first, then
+	// continues rarest-first (gextto fork). Useful for streaming without
+	// giving up the rarest-first ordering for the rest of the torrent.
+	FirstLast bool
 }
 
 // AddTorrent adds a new torrent to the session by reading .torrent metainfo from reader.
@@ -98,6 +102,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		opt.StopAfterMetadata,
 		false, // completeCmdRun
 		opt.Sequential,
+		opt.FirstLast,
 	)
 	if err != nil {
 		return nil, err
@@ -119,6 +124,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		StopAfterDownload: opt.StopAfterDownload,
 		StopAfterMetadata: opt.StopAfterMetadata,
 		Sequential:        opt.Sequential,
+		FirstLast:         opt.FirstLast,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {
@@ -214,6 +220,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		opt.StopAfterMetadata,
 		false, // completeCmdRun
 		opt.Sequential,
+		opt.FirstLast,
 	)
 	if err != nil {
 		return nil, err
@@ -234,6 +241,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		StopAfterDownload: opt.StopAfterDownload,
 		StopAfterMetadata: opt.StopAfterMetadata,
 		Sequential:        opt.Sequential,
+		FirstLast:         opt.FirstLast,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {

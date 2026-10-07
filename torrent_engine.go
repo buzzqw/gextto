@@ -177,8 +177,8 @@ var capabilityLevels = map[string]map[string]string{
 	BackendGxTorrent: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
 		"recheck": "full", "move": "full", "limits": "partial", "files": "full", "peers": "full",
-		"trackers": "partial", "events": "full", "stats": "full", "sequential": "none",
-		"first_last": "none", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
+		"trackers": "partial", "events": "full", "stats": "full", "sequential": "partial",
+		"first_last": "partial", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"preferences": "partial", "super_seeding": "none", "upload_mode": "none",
 		"ip_filter": "full", "session_stats": "partial", "web_seeds": "none",

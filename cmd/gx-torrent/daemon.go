@@ -62,6 +62,7 @@ type torrentMeta struct {
 	StopAtMetadata bool `json:"stop_at_metadata,omitempty"`
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
 	Sequential bool      `json:"sequential,omitempty"`
+	FirstLast  bool      `json:"first_last,omitempty"`
 	RotatedAt  time.Time `json:"rotated_at,omitzero"`
 	SeedRatio  float64   `json:"seed_ratio"`
 	SeedDays   int64     `json:"seed_days"`
@@ -698,6 +699,7 @@ type torrentInfo struct {
 	HasMetadata     bool    `json:"has_metadata"`
 	AutoManaged     bool    `json:"auto_managed"`
 	Sequential      bool    `json:"sequential"`
+	FirstLast       bool    `json:"first_last"`
 	Pinned          bool    `json:"pinned"`
 	Parked          bool    `json:"parked"`
 	Probing         bool    `json:"probing"`
@@ -804,6 +806,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		HasMetadata:     stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
 		AutoManaged:     !meta.UserPaused && !meta.Parked && !meta.Pinned,
 		Sequential:      meta.Sequential,
+		FirstLast:       meta.FirstLast,
 		Pinned:          meta.Pinned,
 		Parked:          meta.Parked,
 		Probing:         !meta.ProbeUntil.IsZero(),
@@ -898,8 +901,10 @@ type addRequest struct {
 	StopAtMetadata bool
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
 	Sequential bool
-	SeedRatio  float64
-	SeedDays   int64
+	// FirstLast downloads the ends of every file first (gextto fork).
+	FirstLast bool
+	SeedRatio float64
+	SeedDays  int64
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -941,7 +946,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, errors.New("session not available")
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential, FirstLast: req.FirstLast}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
 		t, err = d.session.AddURI(req.Magnet, opt)
@@ -975,6 +980,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		ID: id, Hash: hash, SavePath: dest, AddedAt: time.Now(), Pos: pos,
 		UserPaused: req.Paused, StopAtMetadata: req.StopAtMetadata && !isComplete(d.statsLocked(t)),
 		Sequential: req.Sequential || d.state.Config.Sequential,
+		FirstLast:  req.FirstLast,
 		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 	}
 	d.saveLocked()

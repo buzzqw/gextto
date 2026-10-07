@@ -45,6 +45,10 @@ type PiecePicker struct {
 
 	// Pick the next piece in sequential order instead of the rarest piece.
 	sequential bool
+
+	// Pick the pieces at both ends of every file first, then continue
+	// rarest-first (gextto fork). Independent of sequential order.
+	firstLast bool
 }
 
 type myPiece struct {
@@ -94,7 +98,9 @@ func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 
 // New returns a new PiecePicker.
 // If sequential is true, pieces are picked in sequential order instead of rarest-first.
-func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webseedsource.WebseedSource, sequential bool) *PiecePicker {
+// If firstLast is true, the pieces at both ends of every file are picked first
+// (gextto fork; sequential mode implies it).
+func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webseedsource.WebseedSource, sequential, firstLast bool) *PiecePicker {
 	ps := make([]myPiece, len(pieces))
 	for i := range pieces {
 		ps[i] = myPiece{Piece: &pieces[i]}
@@ -109,7 +115,7 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 	if maxWebseedPieces == 0 {
 		maxWebseedPieces = 1
 	}
-	if sequential {
+	if sequential || firstLast {
 		markFileEdges(ps)
 	}
 	return &PiecePicker{
@@ -120,6 +126,7 @@ func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webse
 		maxWebseedPieces:     maxWebseedPieces,
 		webseedSources:       webseedSources,
 		sequential:           sequential,
+		firstLast:            firstLast,
 	}
 }
 
@@ -303,7 +310,7 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 	// Pieces at file edges come before the allowed-fast pieces, which are spread over the
 	// torrent. While choked they are the only pieces we can request, so this applies only
 	// after the peer unchokes us.
-	if p.sequential && !pe.PeerChoking {
+	if (p.sequential || p.firstLast) && !pe.PeerChoking {
 		mp = p.pickFileEdge(pe)
 		if mp != nil {
 			return mp, false

@@ -140,6 +140,12 @@ esposta. Flusso completo per una nuova opzione per-torrent (esempio reale:
      assicurati che esista il tooltip (`uiweb_tooltips.go`).
 3. **Documenta**: `docs/gx-torrent.md` (opzione, API, configurazione, limiti) e
    `third_party/rain/GEXTTO.md` se cambia l'inventario delle patch.
+4. **Matrice capacità** (`torrent_engine.go`): aggiorna `capabilityLevels` per
+   gx-torrent e, se serve, `v2DetailCapsFor`. È questo che rende l'opzione
+   **visibile** in gextto: se lasci `"none"` (o `"partial"` sbagliato) l'UI
+   continua a nasconderla anche se il motore la supporta. Ricorda che le
+   opzioni legate alla creazione del picker sono `"partial"` (valgono solo per
+   i torrent aggiunti dopo).
 
 Ricorda il vincolo di rain: le scelte che dipendono dalla creazione del picker
 (come `sequential`) valgono **solo per i torrent aggiunti dopo**. Se serve su

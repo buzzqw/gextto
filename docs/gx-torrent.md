@@ -83,7 +83,8 @@ qBittorrent. Si aggiorna da sola ogni 5 secondi senza ricaricare la pagina.
 - **Riepilogo sessione**: stato torrent, velocità, totali, porta/router, DHT,
   uTP, cifratura, filtro IP, cache, spazio libero; barra di stato in basso.
 - **Aggiunta** da magnet, da URL a un `.torrent` (incolli l'indirizzo) o da file
-  locale caricato, con destinazione, pausa, "in cima alla coda" e limiti seed.
+  locale caricato, con destinazione, pausa, "in cima alla coda", download
+  sequenziale, prima/ultima parte e limiti seed.
 - **Tabella** con ricerca/filtro per nome, **filtro per stato** nella barra
   laterale, colonne ordinabili, selezione multipla e azioni di gruppo
   (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
@@ -225,16 +226,20 @@ fino a 8 MB): è la modalità pensata per lo streaming, così un player può
 iniziare mentre il download prosegue. È più lenta nel complesso e peggiora la
 salute dello sciame, quindi resta **opzionale e spenta di default**.
 
-- Si imposta al momento dell'aggiunta: dalla pagina web (casella
-  *sequential*), con `sequential=1` su `POST /api/v1/add`, oppure dal campo
-  `AddOptions.Sequential` di Gextto (impostazione *Download sequenziale*,
-  `libtorrent_sequential`).
+- Si imposta al momento dell'aggiunta: dalla pagina web (caselle
+  *sequential* e *first/last*), con `sequential=1` / `first_last=1` su
+  `POST /api/v1/add`, oppure dai campi `AddOptions.Sequential` /
+  `AddOptions.FirstLast` di Gextto (impostazione *Download sequenziale*,
+  `libtorrent_sequential`, e la casella prima/ultima parte).
+- `first_last` scarica per primi i bordi di ogni file e poi prosegue
+  **rarest-first**: è indipendente dall'ordine sequenziale e utile allo
+  streaming senza rinunciare alla salute dello sciame.
 - Il valore predefinito per i torrent aggiunti dopo si imposta con
   `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
-  l'impostazione.
+  l'impostazione. `first_last` non ha un default di sessione.
 - rain fissa l'ordine quando il torrent viene aggiunto: l'opzione vale per i
   torrent **nuovi**, non cambia quelli già in corso. Lo stato è persistito e
-  riportato in `GET /api/v1/torrents` (`sequential`).
+  riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).
 
 ## Torrent BitTorrent v2
 
@@ -454,7 +459,7 @@ token è impostato.
 | `GET /api/v1/health` | stato e versione |
 | `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
-| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
+| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |

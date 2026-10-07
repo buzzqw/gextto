@@ -253,6 +253,10 @@ type torrent struct {
 	// If true, pieces are downloaded in index order instead of rarest-first.
 	sequential bool
 
+	// If true, the pieces at both ends of every file are downloaded first
+	// (gextto fork).
+	firstLast bool
+
 	// True means that completeCmd has run before.
 	completeCmdRun bool
 
@@ -279,6 +283,7 @@ func newTorrent(
 	stopAfterMetadata bool,
 	completeCmdRun bool,
 	sequential bool,
+	firstLast bool,
 ) (*torrent, error) {
 	if len(infoHash) != 20 {
 		return nil, errors.New("invalid infoHash (must be 20 bytes)")
@@ -351,6 +356,7 @@ func newTorrent(
 		stopAfterMetadata:         stopAfterMetadata,
 		completeCmdRun:            completeCmdRun,
 		sequential:                sequential,
+		firstLast:                 firstLast,
 	}
 	if len(t.webseedSources) > s.config.WebseedMaxSources {
 		t.webseedSources = t.webseedSources[:10]

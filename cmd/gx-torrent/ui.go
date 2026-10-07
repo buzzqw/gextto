@@ -290,6 +290,7 @@ const uiPageTemplate = `<!doctype html>
       <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
       <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
+      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
       <button class="primary" type="submit">Add</button>
     </form>
     <form method="post" action="/ui/add-file" enctype="multipart/form-data">
@@ -298,6 +299,7 @@ const uiPageTemplate = `<!doctype html>
       <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
       <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
+      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
       <button type="submit">Add .torrent</button>
     </form>
     <form method="post" action="/ui/ipfilter">
@@ -768,6 +770,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
+		FirstLast:      formBool(r, "first_last"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	}
@@ -861,6 +864,7 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
+		FirstLast:      formBool(r, "first_last"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})

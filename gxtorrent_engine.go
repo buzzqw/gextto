@@ -1179,9 +1179,6 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 // first/last-piece priority, seed mode or per-torrent limits.
 func gxWarnUnsupportedOptions(options AddOptions) {
 	var unsupported []string
-	if options.FirstLast {
-		unsupported = append(unsupported, "first_last")
-	}
 	if options.SeedMode {
 		unsupported = append(unsupported, "seed_mode")
 	}
@@ -1207,6 +1204,9 @@ func gxAddForm(savePath string, options AddOptions) url.Values {
 	}
 	if options.Sequential {
 		form.Set("sequential", "1")
+	}
+	if options.FirstLast {
+		form.Set("first_last", "1")
 	}
 	if options.StopAtMetadata {
 		form.Set("stop_at_metadata", "1")
