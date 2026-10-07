@@ -531,9 +531,9 @@ manualmente il JSON se non stai usando direttamente l'API.
   reinvia/elimina/forza. I download HTTP diretti compaiono in **Download in
   sessione** con stato, byte, progressione, velocità e azioni pausa/riprendi.
   Nei file **CBZ** scaricati direttamente (HTTP o Mega) Gextto aggiunge un
-  `ComicInfo.xml` con serie, numero e anno ricavati dal titolo (es. «Poison Ivy
-  #41 (2025)»): Komga, Kavita e i lettori su tablet lo usano per raggruppare e
-  ordinare gli albi. Un file che ha già il suo `ComicInfo.xml` non viene
+  `ComicInfo.xml` con serie, numero e anno ricavati dal titolo (es.
+  «Poison Ivy #41 (2025)»): Komga, Kavita e i lettori su tablet lo usano per
+  raggruppare e ordinare gli albi. Un file che ha già il suo `ComicInfo.xml` non viene
   toccato; i fumetti scaricati via torrent restano identici, perché sono in
   seed, e i CBR (RAR) non si possono modificare.
 
