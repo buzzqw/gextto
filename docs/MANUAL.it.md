@@ -1154,7 +1154,6 @@ Ogni tab raccoglie le impostazioni modificabili. La colonna *Cosa fa* riprende l
 | gx-torrent — indirizzo di ascolto (LAN) | Indirizzo di ascolto del demone gestito: pagina web e API aperte su tutta la LAN (predefinito `0.0.0.0:8890`; per tenerle solo sul server, `127.0.0.1:8890`). La porta viene allineata a quella dell'URL. |
 | gx-torrent — timeout richieste (secondi) | Timeout in secondi delle richieste HTTP verso gx-torrent. |
 | gx-torrent — intervallo polling (ms) | Intervallo minimo in millisecondi tra due letture dello stato dei torrent (la coda la gestisce il demone). |
-| gx-torrent — avviato e sorvegliato da Gextto | Gextto avvia, riavvia e ferma il demone gx-torrent; dopo 6 avvii anomali in 10 minuti torna da solo a libtorrent. |
 | gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP e web seed; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
 | gx-torrent — token di accesso (pagina e API in LAN) | Nella scheda **Accesso**: segreto condiviso richiesto dalla pagina e dall'API; obbligatorio se il demone ascolta in rete (non visualizzato). |
 | qBittorrent-nox — URL Web API | URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080). |

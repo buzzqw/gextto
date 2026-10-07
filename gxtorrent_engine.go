@@ -85,9 +85,11 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 		Listen:       gxManagedListenSetting(cfg),
 		Timeout:      timeout,
 		PollInterval: poll,
-		Managed:      settingsBool(cfg, "gxtorrent_managed", true),
-		stateDir:     cfg.StateDir,
-		dataDir:      cfg.DataDir,
+		// Gextto always starts and supervises its own gx-torrent daemon. An
+		// external daemon already answering on the URL is used as-is.
+		Managed:  true,
+		stateDir: cfg.StateDir,
+		dataDir:  cfg.DataDir,
 	}, nil
 }
 

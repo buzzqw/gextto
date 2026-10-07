@@ -1119,7 +1119,6 @@ Each tab collects the editable settings. The *What it does* column mirrors the d
 | gx-torrent — listen address (LAN) | Listen address of the managed daemon: web page and API open on the whole LAN (default `0.0.0.0:8890`; use `127.0.0.1:8890` to keep them on this host). The port is aligned with the URL. |
 | gx-torrent — request timeout (seconds) | Timeout in seconds for HTTP requests to gx-torrent. |
 | gx-torrent — polling interval (ms) | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). |
-| gx-torrent — started and supervised by Gextto | Gextto starts, restarts and stops the gx-torrent daemon; after 6 abnormal starts in 10 minutes it falls back to libtorrent by itself. |
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
 | gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
 | qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |

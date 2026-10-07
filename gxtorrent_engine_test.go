@@ -84,7 +84,6 @@ func newTestGxEngine(t *testing.T, token string) (*gxTorrentEngine, *fakeGxDaemo
 		Settings: map[string]string{
 			"gxtorrent_url":              server.URL,
 			"gxtorrent_token":            token,
-			"gxtorrent_managed":          "false",
 			"gxtorrent_poll_interval_ms": "0",
 		},
 	}

@@ -150,7 +150,6 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gxtorrent_listen", Label: "gx-torrent — indirizzo di ascolto (LAN)", Tab: "backend"},
 	{Key: "gxtorrent_request_timeout_secs", Label: "gx-torrent — timeout richieste (secondi)", Tab: "backend"},
 	{Key: "gxtorrent_poll_interval_ms", Label: "gx-torrent — intervallo polling (ms)", Tab: "backend"},
-	{Key: "gxtorrent_managed", Label: "gx-torrent — avviato e sorvegliato da Gextto", Tab: "backend"},
 	{Key: "gxtorrent_proxy", Label: "gx-torrent — proxy (socks5:// o http://)", Tab: "backend"},
 	{Key: "rename_episodes", Label: "Rinomina episodi", Tab: "rename"},
 	{Key: "tvdb_language", Label: "Lingua TVDB (es. ita, eng)", Tab: "rename"},

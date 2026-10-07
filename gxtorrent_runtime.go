@@ -1,9 +1,10 @@
 package gextto
 
-// gxtorrent_runtime.go starts and supervises the gx-torrent daemon when
-// `gxtorrent_managed` is on: the binary installed next to gexttod (make and
+// gxtorrent_runtime.go starts and supervises the gx-torrent daemon when that
+// engine is active: the binary installed next to gexttod (make and
 // install.sh keep it there; the PATH is the fallback) runs with its state in
 // DATA_DIR/gx-torrent and the Gextto download directory as default save path.
+// An external daemon already answering on the URL is used as-is.
 
 import (
 	"context"
