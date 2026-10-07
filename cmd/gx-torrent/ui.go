@@ -137,8 +137,9 @@ var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
       <button class="primary" type="submit">Aggiungi</button>
     </form>
     <form method="post" action="/ui/ipfilter">
-      <input type="text" name="source" placeholder="Filtro IP: URL o file…" autocomplete="off">
-      <button type="submit">Carica filtro IP</button>
+      <span class="muted">Filtro IP</span>
+      <input type="text" name="source" placeholder="URL o file locale" autocomplete="off">
+      <button type="submit" title="Scarica (se URL) e applica subito il filtro IP">Carica filtro</button>
     </form>
     <form method="post" action="/ui/action"><input type="hidden" name="op" value="resume-all"><button type="submit">Riprendi tutti</button></form>
     <form method="post" action="/ui/action"><input type="hidden" name="op" value="pause-all"><button type="submit">Pausa tutti</button></form>
