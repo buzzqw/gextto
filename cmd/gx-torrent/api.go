@@ -42,9 +42,11 @@ func (d *Daemon) routes() http.Handler {
 	root.Handle("/api/", d.authenticate(api))
 	root.HandleFunc("GET /{$}", d.handleUI)
 	root.HandleFunc("GET /ui", d.handleUI)
+	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("POST /ui/action", d.handleUIAction)
 	root.HandleFunc("POST /ui/remove", d.handleUIRemove)
 	root.HandleFunc("POST /ui/add", d.handleUIAdd)
+	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
 	return root
 }
 
@@ -408,10 +410,19 @@ func magnetInfoHash(magnet string) (string, bool) {
 	return "", false
 }
 
-// handleIPFilter reloads the IP filter (form field path, default: the
-// configured file).
+// handleIPFilter reloads the IP filter. Form fields: `url` (downloaded and
+// decoded) or `path` (local file); with neither it reloads the configured file.
 func (d *Daemon) handleIPFilter(w http.ResponseWriter, r *http.Request) {
-	rules, err := d.loadIPFilter(strings.TrimSpace(r.FormValue("path")))
+	path := strings.TrimSpace(r.FormValue("path"))
+	if rawURL := strings.TrimSpace(r.FormValue("url")); rawURL != "" {
+		fetched, err := d.fetchIPFilterURL(rawURL)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		path = fetched
+	}
+	rules, err := d.loadIPFilter(path)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return

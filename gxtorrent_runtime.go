@@ -6,6 +6,7 @@ package gextto
 // DATA_DIR/gx-torrent and the Gextto download directory as default save path.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -116,6 +117,9 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 			args = append(args, "-download-dir", absolute)
 		}
 	}
+	// Make sure the configured IP filter is on disk before building the network
+	// arguments, so gxNetworkArgs passes it with -ipfilter.
+	gxEnsureIPFilter(cfg)
 	args = append(args, gxNetworkArgs(cfg)...)
 	command := exec.Command(binary, args...)
 	command.Dir = dataDir
@@ -342,4 +346,41 @@ func gxIPFilterPath(cfg *Config) string {
 		return ""
 	}
 	return target
+}
+
+// gxEnsureIPFilter makes sure the configured IP filter is stored locally before
+// the managed daemon starts, so it is passed with -ipfilter. A URL is downloaded
+// (gzip/zip decoded); a local path is left to gxIPFilterPath. An already fresh
+// file is reused so a restart does not re-download the list every time.
+func gxEnsureIPFilter(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+		return
+	}
+	path := filepath.Join(cfg.DataDir, "ipfilter.dat")
+	autoupdate := settingsBool(cfg, "libtorrent_ipfilter_autoupdate", true)
+	if info, err := os.Stat(path); err == nil {
+		if !autoupdate || time.Since(info.ModTime()) < 24*time.Hour {
+			return
+		}
+	}
+	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+		logging.Warn("cannot create the data directory for the IP filter", "error", err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	data, errMessage := gh7_fetch_ipfilter(ctx, target)
+	if errMessage != "" {
+		logging.Warn("IP filter download failed; keeping the previous list", "url", target, "error", errMessage)
+		return
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		logging.Warn("cannot store the IP filter", "path", path, "error", err)
+		return
+	}
+	logging.Info("IP filter updated", "path", path, "bytes", len(data))
 }

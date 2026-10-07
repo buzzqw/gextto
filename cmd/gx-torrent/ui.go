@@ -3,10 +3,15 @@ package main
 // ui.go serves a small web page on the daemon's own HTTP port
 // (http://127.0.0.1:8890/ by default). Gextto drives the daemon through the
 // REST API; this page is for a human who opens that address in a browser, like
-// qBittorrent's Web UI: a session summary, the torrent table and the common
-// actions (pause/resume, recheck, reannounce, queue top, add a magnet, remove).
-// It is served outside the API token middleware so a browser can reach it: when
-// a token is configured the page asks for it (and remembers it in a cookie).
+// qBittorrent's Web UI: a session summary, the torrent table, the common
+// actions (pause/resume, recheck, reannounce, queue top, add a magnet, remove)
+// and the IP filter (status and load from a URL or file). It is served outside
+// the API token middleware so a browser can reach it: when a token is
+// configured the page asks for it (and remembers it in a cookie).
+//
+// The live cards and table are refreshed with a small fetch of the "live"
+// fragment instead of a full page reload, so the forms keep their state and
+// there is no flicker.
 
 import (
 	"crypto/subtle"
@@ -36,15 +41,16 @@ type uiPageData struct {
 	DownloadRate string
 	UploadRate   string
 
-	PeerPort    int
-	Listen      string
-	Router      string
-	DHT         bool
-	Encryption  string
-	Proxy       bool
-	IPFilter    int
-	CacheReadMB int64
-	CacheWB     int64
+	PeerPort     int
+	Listen       string
+	Router       string
+	DHT          bool
+	Encryption   string
+	Proxy        bool
+	IPFilter     int
+	IPFilterPath string
+	CacheReadMB  int64
+	CacheWB      int64
 
 	Rows []uiTorrentRow
 }
@@ -65,16 +71,7 @@ type uiTorrentRow struct {
 	SavePath  string
 }
 
-var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
-	"percent": func(p float64) string { return fmt.Sprintf("%.1f", p) },
-}).Parse(`<!doctype html>
-<html lang="it">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="5">
-<title>gx-torrent</title>
-<style>
+const uiStyle = `
 :root{color-scheme:light dark}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1420;color:#e7ecf3}
@@ -88,7 +85,7 @@ main{padding:18px;max-width:1280px;margin:0 auto}
 .card span{color:#93a1b5;font-size:12px}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:10px;margin-bottom:14px}
 .toolbar form{display:flex;gap:6px;align-items:center;margin:0}
-.toolbar input[type=text]{min-width:260px}
+.toolbar input[type=text]{min-width:220px}
 table{width:100%;border-collapse:collapse;background:#161d2c;border:1px solid #243049;border-radius:10px;overflow:hidden}
 th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:13px;vertical-align:middle}
 th{color:#93a1b5;font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
@@ -114,7 +111,17 @@ button.danger{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
 .notice.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
 form.token{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
 form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
-</style>
+`
+
+var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
+	"percent": func(p float64) string { return fmt.Sprintf("%.1f", p) },
+}).Parse(`<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>` + uiStyle + `</style>
 </head>
 <body>
 <header>
@@ -129,11 +136,34 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
       <input type="text" name="magnet" placeholder="magnet:?xt=urn:btih:…" autocomplete="off">
       <button class="primary" type="submit">Aggiungi</button>
     </form>
+    <form method="post" action="/ui/ipfilter">
+      <input type="text" name="source" placeholder="Filtro IP: URL o file…" autocomplete="off">
+      <button type="submit">Carica filtro IP</button>
+    </form>
     <form method="post" action="/ui/action"><input type="hidden" name="op" value="resume-all"><button type="submit">Riprendi tutti</button></form>
     <form method="post" action="/ui/action"><input type="hidden" name="op" value="pause-all"><button type="submit">Pausa tutti</button></form>
     <form method="post" action="/ui/action"><input type="hidden" name="op" value="verify-all"><button type="submit">Verifica tutti</button></form>
   </div>
 
+  <div id="live">{{template "live" .}}</div>
+</main>
+<script>
+(function () {
+  async function refresh() {
+    try {
+      var r = await fetch("/ui/live", { cache: "no-store" });
+      if (!r.ok) return;
+      var el = document.getElementById("live");
+      if (el) el.innerHTML = await r.text();
+    } catch (e) {}
+  }
+  setInterval(refresh, 5000);
+})();
+</script>
+</body>
+</html>
+
+{{define "live"}}
   <div class="cards">
     <div class="card"><b>{{.Torrents}}</b><span>torrent</span></div>
     <div class="card"><b>{{.Down}}</b><span>in download</span></div>
@@ -144,7 +174,8 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
     <div class="card"><b>{{.UploadRate}}</b><span>↑ velocità</span></div>
     <div class="card"><b>{{.PeerPort}}</b><span>porta peer</span></div>
     <div class="card"><b>{{.Router}}</b><span>router</span></div>
-    <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>cifratura {{.Encryption}} · proxy {{if .Proxy}}on{{else}}off{{end}} · filtro IP {{.IPFilter}}</span></div>
+    <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>cifratura {{.Encryption}} · proxy {{if .Proxy}}on{{else}}off{{end}}</span></div>
+    <div class="card"><b>{{if .IPFilter}}{{.IPFilter}}{{else}}nessuno{{end}}</b><span>filtro IP{{if .IPFilterPath}} · {{.IPFilterPath}}{{end}}</span></div>
     <div class="card"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache lettura/scrittura</span></div>
   </div>
 
@@ -189,9 +220,7 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   {{else}}
   <p class="muted">Nessun torrent nella sessione.</p>
   {{end}}
-</main>
-</body>
-</html>`))
+{{end}}`))
 
 const uiTokenPage = `<!doctype html><html lang="it"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>gx-torrent</title>
@@ -225,6 +254,22 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 	if err := uiTemplate.Execute(w, page); err != nil {
 		return
 	}
+}
+
+// handleUILive renders only the cards and the table, for the page's periodic
+// partial refresh (no full reload, form state preserved).
+func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	page, err := d.uiPageData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = uiTemplate.ExecuteTemplate(w, "live", page)
 }
 
 // handleUIAction runs one of the per-torrent or bulk actions. It is the same
@@ -291,6 +336,36 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	_, _, err := d.add(addRequest{Magnet: magnet, Destination: d.opts.DownloadDir, SeedRatio: -1, SeedDays: -1})
 	d.uiDone(w, r, "Torrent aggiunto", err)
+}
+
+func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	source := strings.TrimSpace(r.FormValue("source"))
+	if source == "" {
+		d.uiDone(w, r, "", fmt.Errorf("indica un URL o un percorso file"))
+		return
+	}
+	path := source
+	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
+		fetched, err := d.fetchIPFilterURL(source)
+		if err != nil {
+			d.uiDone(w, r, "", fmt.Errorf("download: %w", err))
+			return
+		}
+		path = fetched
+	}
+	rules, err := d.loadIPFilter(path)
+	if err != nil {
+		d.uiDone(w, r, "", err)
+		return
+	}
+	d.uiDone(w, r, fmt.Sprintf("Filtro IP caricato: %d regole", rules), nil)
 }
 
 func (d *Daemon) uiEach(fn func(hash string) error) error {
@@ -403,6 +478,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		Encryption:   uiEncryption(stats.Encryption),
 		Proxy:        stats.Proxy,
 		IPFilter:     stats.IPFilterRules,
+		IPFilterPath: stats.IPFilterPath,
 		CacheReadMB:  stats.CacheReadMB,
 		CacheWB:      stats.CacheWriteMB,
 	}

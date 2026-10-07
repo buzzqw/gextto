@@ -3,10 +3,17 @@ package main
 // network.go: listening port, interfaces, proxy, encryption and IP filter.
 
 import (
+	"bytes"
+	"compress/gzip"
+	"context"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cenkalti/rain/torrent"
 )
@@ -203,4 +210,50 @@ func (d *Daemon) loadIPFilter(path string) (int, error) {
 		logf("IP filter loaded: %d rules from %s", rules, path)
 	}
 	return rules, err
+}
+
+// ipFilterFetchTimeout bounds the download of an IP filter list.
+const ipFilterFetchTimeout = 60 * time.Second
+
+// fetchIPFilterURL downloads an IP filter list (plain or gzip), stores it in the
+// daemon data directory and returns the local path. It lets the page load a
+// filter straight from a URL, like Gextto does.
+func (d *Daemon) fetchIPFilterURL(rawURL string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ipFilterFetchTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "gx-torrent")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return "", err
+	}
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		reader, gzErr := gzip.NewReader(bytes.NewReader(data))
+		if gzErr != nil {
+			return "", gzErr
+		}
+		defer reader.Close()
+		if data, err = io.ReadAll(io.LimitReader(reader, 256<<20)); err != nil {
+			return "", err
+		}
+	}
+	if err := os.MkdirAll(d.opts.DataDir, 0o755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(d.opts.DataDir, "ipfilter.dat")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }

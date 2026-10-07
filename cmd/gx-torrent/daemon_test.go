@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"crypto/sha1"
 	"fmt"
@@ -803,6 +804,37 @@ func TestIPFilterLoaded(t *testing.T) {
 	d.mu.Unlock()
 	if got := d.stats().IPFilterRules; got != 3 {
 		t.Fatalf("rules lost after a session restart: %d", got)
+	}
+}
+
+func TestIPFilterFromURL(t *testing.T) {
+	rules := "Bad:1.2.3.0-1.2.3.255\n10.0.0.0/8\n"
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write([]byte(rules)); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(buf.Bytes())
+	}))
+	defer server.Close()
+
+	d := newTestDaemon(t)
+	path, err := d.fetchIPFilterURL(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := d.loadIPFilter(path)
+	if err != nil || n != 2 {
+		t.Fatalf("load from url: n=%d err=%v", n, err)
+	}
+	stats := d.stats()
+	if stats.IPFilterRules != 2 || stats.IPFilterPath == "" {
+		t.Fatalf("stats = rules %d path %q", stats.IPFilterRules, stats.IPFilterPath)
 	}
 }
 

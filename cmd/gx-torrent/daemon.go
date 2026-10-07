@@ -1262,6 +1262,7 @@ type daemonStats struct {
 	ListenAddress   string        `json:"listen_address"`
 	PortMapping     portMapStatus `json:"port_mapping"`
 	IPFilterRules   int           `json:"ip_filter_rules"`
+	IPFilterPath    string        `json:"ip_filter_path,omitempty"`
 	Encryption      int           `json:"encryption"`
 	Proxy           bool          `json:"proxy"`
 	DHT             bool          `json:"dht"`
@@ -1291,6 +1292,7 @@ func (d *Daemon) stats() daemonStats {
 		ListenAddress:   d.listenHost,
 		PortMapping:     d.mapper.status(),
 		IPFilterRules:   d.ipFilterRules,
+		IPFilterPath:    d.ipFilterPath,
 		Encryption:      d.opts.Network.Encryption,
 		Proxy:           d.opts.Network.Proxy != "",
 		DHT:             d.opts.Network.DHT && d.opts.Network.Proxy == "",

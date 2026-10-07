@@ -35,6 +35,27 @@ func TestUIPageServes(t *testing.T) {
 	}
 }
 
+func TestUILiveFragment(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	resp, err := http.Get(server.URL + "/ui/live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /ui/live -> %d", resp.StatusCode)
+	}
+	buf := make([]byte, 8192)
+	n, _ := resp.Body.Read(buf)
+	body := string(buf[:n])
+	if !strings.Contains(body, "filtro IP") || strings.Contains(body, "<html") {
+		t.Fatalf("live fragment unexpected: %s", body)
+	}
+}
+
 func TestUIActions(t *testing.T) {
 	d := newTestDaemon(t)
 	server := httptest.NewServer(d.routes())
