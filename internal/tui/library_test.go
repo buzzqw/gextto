@@ -226,7 +226,7 @@ func TestAddSeriesFromTmdb(t *testing.T) {
 func TestMovieListAndDetailActions(t *testing.T) {
 	m := NewModel(NewTranslator("it"))
 	m.Tab = TabLibrary
-	m.Update(runeKey('2'))
+	m.Update(kindKey(KeyRight))
 	movie := MovieConfig{ID: 7, Name: "Film", Year: "2020", Quality: "1080p", Language: "ita", Enabled: true, TmdbID: "99", LanguageRequirements: "ita"}
 	m.SetLibraryData(nil, []MovieConfig{movie})
 	if action := m.Update(runeKey('p')); action.Kind != ActionSaveMovie || action.Movie.Enabled || action.Movie.LanguageRequirements != "ita" || action.Movie.TmdbID != "99" {

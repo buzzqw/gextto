@@ -527,8 +527,8 @@ func TestLibraryViewsAndNotificationTransitions(t *testing.T) {
 	m.SetLibrary([]SeriesLibraryItem{{Name: "Example", Seasons: "1-2", Quality: "1080p", Enabled: true}})
 	m.SetLibrary([]MovieLibraryItem{{Name: "Movie", Year: "2026", Quality: "4K", Enabled: true}})
 	m.SetLibrary([]ComicLibraryItem{{Title: "Comic", Publisher: "Publisher", Enabled: false}})
-	if action := m.Update(runeKey('2')); action.Kind != ActionNone || m.Library != LibraryMovies {
-		t.Fatalf("2 should switch library view: %+v kind=%v", action, m.Library)
+	if action := m.Update(kindKey(KeyRight)); action.Kind != ActionNone || m.Library != LibraryMovies {
+		t.Fatalf("→ should switch library view: %+v kind=%v", action, m.Library)
 	}
 	if len(m.VisibleLibraryRows()) != 1 || m.VisibleLibraryRows()[0].Name != "Movie" {
 		t.Fatalf("movie rows = %+v", m.VisibleLibraryRows())
@@ -753,5 +753,22 @@ func TestListCommandsWorkOnHTTPRows(t *testing.T) {
 	m.Update(runeKey('X'))
 	if m.Confirm == nil {
 		t.Fatalf("X should ask to clean completed torrents on an HTTP row")
+	}
+}
+
+func TestDigitsAlwaysSwitchTab(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabLibrary
+	m.Update(runeKey('3'))
+	if m.Tab != TabLogs {
+		t.Fatalf("3 from the library should open the log, tab = %v", m.Tab)
+	}
+	m.Update(runeKey('8'))
+	if m.Tab != TabLibrary {
+		t.Fatalf("8 should open the library, tab = %v", m.Tab)
+	}
+	m.Update(runeKey('9'))
+	if m.Tab != TabMaintenance {
+		t.Fatalf("9 should open maintenance, tab = %v", m.Tab)
 	}
 }

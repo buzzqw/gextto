@@ -358,15 +358,8 @@ func (m *Model) updateTabContext(k Key) (Action, bool) {
 // updateLibrary handles the remaining library list keys.
 func (m *Model) updateLibrary(k Key) Action {
 	switch {
-	case k.Kind == KeyRune && k.Rune == '1':
-		m.Library = LibrarySeries
-		m.LibrarySelected, m.LibraryScroll = 0, 0
-	case k.Kind == KeyRune && k.Rune == '2':
-		m.Library = LibraryMovies
-		m.LibrarySelected, m.LibraryScroll = 0, 0
-	case k.Kind == KeyRune && k.Rune == '3':
-		m.Library = LibraryComics
-		m.LibrarySelected, m.LibraryScroll = 0, 0
+	// The digits always switch tab, as everywhere else: series, movies and
+	// comics are chosen with ←→.
 	case k.Kind == KeyLeft || k.Kind == KeyRight:
 		step := 1
 		if k.Kind == KeyLeft {

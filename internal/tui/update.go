@@ -134,17 +134,8 @@ func (m *Model) Update(k Key) Action {
 	case k.Kind == KeyBackTab:
 		m.Tab = Tab((int(m.Tab) + tabCount - 1) % tabCount)
 		return m.loadTabAction()
-	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '3' && m.Tab != TabLibrary:
+	case k.Kind == KeyRune && k.Rune >= '1' && k.Rune <= '9':
 		m.Tab = Tab(k.Rune - '1')
-		return m.loadTabAction()
-	case k.Kind == KeyRune && k.Rune >= '4' && k.Rune <= '7':
-		m.Tab = Tab(k.Rune - '1')
-		return m.loadTabAction()
-	case k.Kind == KeyRune && k.Rune == '8' && m.Tab != TabLibrary:
-		m.Tab = TabLibrary
-		return m.loadTabAction()
-	case k.Kind == KeyRune && k.Rune == '9':
-		m.Tab = TabMaintenance
 		return m.loadTabAction()
 	}
 
