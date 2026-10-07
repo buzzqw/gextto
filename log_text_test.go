@@ -1,6 +1,9 @@
 package gextto
 
 import (
+	"errors"
+	"io"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -145,5 +148,15 @@ func TestBackupLogSummaryMentionsOnlyConfiguredSteps(t *testing.T) {
 	got = gh5_backupLogSummary(steps, false, 2, "part 3/4: HTTP 413")
 	if !strings.Contains(got, "cloud copy ✗") || !strings.Contains(got, "Telegram ✗") || strings.HasPrefix(got, "💾 Scheduled") {
 		t.Fatalf("summary with failures = %q", got)
+	}
+}
+
+func TestTorznabShortReasonDropsTheURL(t *testing.T) {
+	err := &url.Error{Op: "Get", URL: "http://192.168.1.161:9118/api?t=tvsearch&apikey=secret", Err: io.EOF}
+	if got := torznabShortReason(err); got != "connection closed by the indexer (EOF)" {
+		t.Fatalf("reason = %q", got)
+	}
+	if got := torznabShortReason(errors.New("dial tcp: connection refused")); got != "dial tcp: connection refused" {
+		t.Fatalf("reason = %q", got)
 	}
 }
