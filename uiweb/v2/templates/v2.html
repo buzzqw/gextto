@@ -388,6 +388,7 @@
        <button class="btn sm" type="button" hx-post="/downloads/settings" hx-vals='{"op":"clear_completed"}' hx-target="#v2-torrents-wrap" hx-swap="outerHTML" hx-disabled-elt="this" title="Rimuove dalla sessione i torrent completati che hanno raggiunto i limiti di seed">Pulisci completati</button>
       <label class="check" title="A fine seed il torrent completato viene tolto dalla sessione"><input type="checkbox" hx-post="/downloads/settings" hx-vals='js:{op:"auto_remove",value:(this.checked?"true":"false")}' hx-trigger="change" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"{{if .AutoRemoveCompleted}} checked{{end}} /> <span>Elimina completati dopo il seed</span></label>
       <span class="muted">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
+    </div>
     <div class="toolbar download-temp-toolbar">
       {{if .TempActive}}
         <span class="badge ok" title="Limite temporaneo attivo{{if .TempMinutes}} (ancora circa {{.TempMinutes}} min){{else}} (fino a rimozione manuale){{end}}">⚡ Limite temporaneo attivo{{if .TempMinutes}} ({{.TempMinutes}}m){{else}} (perm.){{end}}</span>
