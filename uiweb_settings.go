@@ -153,6 +153,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "movies_flat_files", Label: "Film come file singoli (spiana le cartelle)", Tab: "rename"},
 	{Key: "cleanup_min_score_diff", Label: "Differenza minima score per cleanup", Tab: "rename"},
 	{Key: "upgrade_min_score_diff", Label: "Differenza minima score per upgrade", Tab: "rename"},
+	{Key: "upgrade_until_score", Label: "Smetti di migliorare oltre questo punteggio (0 = mai)", Tab: "rename"},
 	{Key: "tmdb_api_key", Label: "TMDB API key", Tab: "rename"},
 	{Key: "tvdb_api_key", Label: "TVDB API key", Tab: "rename"},
 	{Key: "min_free_space_gb", Label: "Spazio libero minimo per scaricare (GB)", Tab: "advanced"},

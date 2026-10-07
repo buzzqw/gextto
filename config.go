@@ -319,6 +319,7 @@ type Config struct {
 	CleanupUpgrades     bool               `json:"cleanup_upgrades"`
 	CleanupMinScoreDiff int64              `json:"cleanup_min_score_diff"`
 	UpgradeMinScoreDiff int64              `json:"upgrade_min_score_diff"`
+	UpgradeUntilScore   int64              `json:"upgrade_until_score"`
 	CleanupAction       string             `json:"cleanup_action"`
 	LibtorrentEnabled   bool               `json:"libtorrent_enabled"`
 	Libtorrent          LibtorrentSettings `json:"libtorrent"`
@@ -2206,6 +2207,10 @@ func (c *Config) loadConfigDB() error {
 	c.UpgradeMinScoreDiff = numberSettingInt(c.Settings, "upgrade_min_score_diff", 200)
 	if c.UpgradeMinScoreDiff < 0 {
 		c.UpgradeMinScoreDiff = 0
+	}
+	c.UpgradeUntilScore = numberSettingInt(c.Settings, "upgrade_until_score", 0)
+	if c.UpgradeUntilScore < 0 {
+		c.UpgradeUntilScore = 0
 	}
 	if value, ok := c.Settings["cleanup_action"]; ok {
 		switch value {

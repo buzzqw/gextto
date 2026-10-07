@@ -182,7 +182,7 @@ func archiveComparison(
 		}
 		enrichQualityWithMediaInfo(mediaInfoJSON, &oldQuality)
 		var upgradeReason any
-		if value := release.Quality.UpgradeReason(&oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff); value != "" {
+		if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
 			upgradeReason = value
 		}
 		return map[string]any{
@@ -212,7 +212,7 @@ func archiveComparison(
 			return nil, nil
 		}
 		var upgradeReason any
-		if value := release.Quality.UpgradeReason(&disk.Quality, score, disk.Score, cfg.UpgradeMinScoreDiff); value != "" {
+		if value := upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
 			upgradeReason = value
 		}
 		return map[string]any{
@@ -239,7 +239,7 @@ func archiveComparison(
 		oldQuality = currentQuality(title)
 	}
 	var upgradeReason any
-	if value := release.Quality.UpgradeReason(&oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff); value != "" {
+	if value := upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore); value != "" {
 		upgradeReason = value
 	}
 	source := "database"
@@ -538,6 +538,10 @@ func ExplainWithArchive(
 				"pass",
 				fmt.Sprintf("Upgrade riconosciuto: %s.", upgradeReason),
 			))
+		} else if existingScore, _ := comparison["score"].(int64); downloaded && upgradeCutoffReached(existingScore, cfg.UpgradeUntilScore) {
+			detail := fmt.Sprintf("Il file presente ha già punteggio %d, oltre la soglia «smetti di migliorare» (%d): si accetta solo un REPACK o PROPER.", existingScore, cfg.UpgradeUntilScore)
+			steps = append(steps, decisionStep("confronto archivio", "fail", detail))
+			setFailure(detail)
 		} else {
 			detail := "Il file presente è uguale o migliore, oppure il miglioramento non supera la soglia configurata."
 			steps = append(steps, decisionStep("confronto archivio", "fail", detail))
@@ -552,16 +556,17 @@ func ExplainWithArchive(
 	reason := "La release supera i controlli read-only."
 	if (series != nil || movie != nil) && hash != nil {
 		approvalContext := &models.ApprovalContext{
-			Archive:       indexFromDisk(disk, release),
-			ForbidUpgrade: forbidUpgrade,
-			DryRun:        true,
+			Archive:           indexFromDisk(disk, release),
+			ForbidUpgrade:     forbidUpgrade,
+			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			DryRun:            true,
 		}
 		var approved bool
 		var realReason string
 		if series != nil {
 			approved, realReason, err = db.CheckSeriesScored(&evaluated, score, cfg.UpgradeMinScoreDiff, approvalContext)
 		} else {
-			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, forbidUpgrade, true)
+			approved, realReason, err = db.checkMovieScoredWith(&evaluated, score, cfg.UpgradeMinScoreDiff, cfg.UpgradeUntilScore, forbidUpgrade, true)
 		}
 		if err != nil {
 			// An incomplete release (for example a pack without a season) must

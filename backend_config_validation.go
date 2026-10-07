@@ -41,6 +41,15 @@ func validateBackendSetting(key, value string) error {
 	case "qbittorrent_path_mappings", "jellyfin_path_mappings", "plex_path_mappings":
 		_, err := ParsePathMappings(value)
 		return err
+	case "upgrade_until_score":
+		if raw == "" {
+			return nil
+		}
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 {
+			return fmt.Errorf("upgrade_until_score must be zero or a positive score")
+		}
+		return nil
 	case "trash_retention_days":
 		if raw == "" {
 			return nil

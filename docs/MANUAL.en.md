@@ -1099,6 +1099,7 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 | Upgrade cleanup | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
 | Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
+| Stop upgrading above this score (0 = never) | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. |
 | TMDB API key | TMDB API key for titles, posters and metadata. |
 | TVDB API key | TheTVDB v4 API key for series search and metadata. |
 | Rename format | Template editor with tokens and preview to compose file names. |

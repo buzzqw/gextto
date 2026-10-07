@@ -1132,6 +1132,7 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 | Cleanup upgrade | Sostituisce versioni inferiori già archiviate con upgrade migliori. |
 | Differenza minima score per cleanup | Differenza minima di punteggio per sostituire un file esistente con uno migliore (cleanup). |
 | Differenza minima score per upgrade | Differenza minima di punteggio per sostituire un file con un upgrade migliore. |
+| Smetti di migliorare oltre questo punteggio (0 = mai) | Tetto agli upgrade: quando il file in libreria ha almeno questo punteggio non viene più sostituito da release migliori; resta accettato solo un REPACK o PROPER, che corregge una release difettosa. Riferimenti con i punteggi predefiniti: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. Si somma alla differenza minima: la prima dice *di quanto* deve migliorare, questa *fino a dove*. Per fermare del tutto gli upgrade di un solo titolo c'è «Niente upgrade» nella sua scheda. «Perché non questa?» indica quando una release è scartata per questa soglia. |
 | TMDB API key | Chiave API TMDB per titoli, poster e metadati. |
 | TVDB API key | Chiave API v4 di TheTVDB per ricerca serie e metadati. |
 | Formato rinomina | Editor del template con token e anteprima per comporre il nome dei file. |

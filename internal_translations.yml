@@ -3178,3 +3178,4 @@ eng:
   "Hardlink invece della copia durante il seed": "Hardlink instead of copy while seeding"
   "Jellyfin — mappatura percorsi": "Jellyfin — path mapping"
   "Plex — mappatura percorsi": "Plex — path mapping"
+  "Smetti di migliorare oltre questo punteggio (0 = mai)": "Stop upgrading above this score (0 = never)"

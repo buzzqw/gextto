@@ -847,11 +847,12 @@ func RunCycleDomain(
 			}
 		}
 		approvalContext := &models.ApprovalContext{
-			Archive:       archiveIndex,
-			Live:          liveDownloads,
-			ForbidUpgrade: forbidUpgrade,
-			GapEpisode:    isGap,
-			DryRun:        cfg.DryRun,
+			Archive:           archiveIndex,
+			Live:              liveDownloads,
+			ForbidUpgrade:     forbidUpgrade,
+			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			GapEpisode:        isGap,
+			DryRun:            cfg.DryRun,
 		}
 		// Decide only: nothing is written until the torrent is in the engine
 		// (see commitReleaseApproval).
@@ -1170,10 +1171,11 @@ func prioritizeArchiveGapDownloads(
 			continue
 		}
 		approvalContext := &models.ApprovalContext{
-			Archive:       &models.ArchiveQualityIndex{},
-			Live:          live,
-			ForbidUpgrade: series.DisableUpgrades,
-			GapEpisode:    true,
+			Archive:           &models.ArchiveQualityIndex{},
+			Live:              live,
+			ForbidUpgrade:     series.DisableUpgrades,
+			UpgradeUntilScore: cfg.UpgradeUntilScore,
+			GapEpisode:        true,
 		}
 		approved, reason, err := evaluateReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
 		if err != nil {
@@ -1314,7 +1316,11 @@ func evaluateReleaseApproval(db *Database, release *models.Release, score, minSc
 		evaluation.DryRun = dryRun
 		return db.CheckSeriesScored(release, score, minScoreDiff, &evaluation)
 	}
-	return db.checkMovieScoredWith(release, score, minScoreDiff, forbidUpgrade, dryRun)
+	upgradeUntil := int64(0)
+	if approvalContext != nil {
+		upgradeUntil = approvalContext.UpgradeUntilScore
+	}
+	return db.checkMovieScoredWith(release, score, minScoreDiff, upgradeUntil, forbidUpgrade, dryRun)
 }
 
 // commitReleaseApproval records the approval of a release whose torrent is

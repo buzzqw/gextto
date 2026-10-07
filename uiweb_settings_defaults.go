@@ -140,6 +140,7 @@ var uiSettingDefaults = map[string]string{
 	"movies_flat_files":      "yes",
 	"cleanup_min_score_diff": "0",
 	"upgrade_min_score_diff": "200",
+	"upgrade_until_score":    "0",
 
 	// --- Avanzate -----------------------------------------------------------
 	"min_free_space_gb":          "0",

@@ -985,6 +985,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"rename_verify_interval":               settingsOr(cfg, "rename_verify_interval", "6"),
 		"cleanup_min_score_diff":               cfg.CleanupMinScoreDiff,
 		"upgrade_min_score_diff":               cfg.UpgradeMinScoreDiff,
+		"upgrade_until_score":                  cfg.UpgradeUntilScore,
 		"delay_torrent_minutes":                settingsOr(cfg, "delay_torrent_minutes", "0"),
 		"delay_movies_minutes":                 settingsOr(cfg, "delay_movies_minutes", "0"),
 		"delay_bypass_score":                   settingsOr(cfg, "delay_bypass_score", "0"),
