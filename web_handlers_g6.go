@@ -305,7 +305,7 @@ func gh6_seenEntries(w http.ResponseWriter, r *http.Request, s *AppState, kind s
 		jsonError(w, http.StatusBadRequest, "key required")
 		return
 	}
-	limit := int(queryInt(r, "limit", 500))
+	limit := queryIntVal(r, "limit", 500)
 	items, err := s.db.SeenByGroup(kind, strings.TrimSpace(group), limit)
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())

@@ -582,10 +582,10 @@ func boolToUint8(value bool) uint8 {
 
 func clampMin1(value int64) int32 {
 	if value < 1 {
-		value = 1
+		return 1
 	}
 	if value > math.MaxInt32 {
-		value = math.MaxInt32
+		return math.MaxInt32
 	}
 	return int32(value)
 }

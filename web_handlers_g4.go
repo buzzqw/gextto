@@ -169,7 +169,7 @@ func gh4_seenEntries(s *AppState, kind string, r *http.Request) (int, any) {
 	if strings.TrimSpace(group) == "" {
 		return http.StatusBadRequest, map[string]any{"ok": false, "error": "key required"}
 	}
-	limit := int(queryInt(r, "limit", 500))
+	limit := queryIntVal(r, "limit", 500)
 	items, err := s.db.SeenByGroup(kind, strings.TrimSpace(group), limit)
 	if err != nil {
 		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}

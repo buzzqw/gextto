@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -983,16 +984,20 @@ func gh3RemoveTrashContents(root string, olderThanDays int64) (int, uint64, erro
 
 // gh3SeenGrouped implements `seen_grouped`.
 func gh3SeenGrouped(state *AppState, kind string, r *http.Request) (int, any) {
-	limit := queryInt(r, "limit", 50)
+	limit := queryIntVal(r, "limit", 50)
 	if limit < 1 {
 		limit = 1
 	}
 	if limit > 200 {
 		limit = 200
 	}
-	page := queryInt(r, "page", 1)
+	page := queryIntVal(r, "page", 1)
 	if page < 1 {
 		page = 1
+	}
+	// Keep (page-1)*limit from overflowing on an absurd page number.
+	if page > math.MaxInt32/limit {
+		page = math.MaxInt32 / limit
 	}
 	offset := (page - 1) * limit
 	queryText := queryParam(r, "q")
@@ -1000,17 +1005,17 @@ func gh3SeenGrouped(state *AppState, kind string, r *http.Request) (int, any) {
 	var total int64
 	var err error
 	if kind == "series" {
-		grouped, aggregated, callErr := state.db.SeriesSeenGrouped(int(offset), int(limit), queryText)
+		grouped, aggregated, callErr := state.db.SeriesSeenGrouped(offset, limit, queryText)
 		groups, total, err = grouped, aggregated, callErr
 	} else {
-		grouped, aggregated, callErr := state.db.MoviesSeenGrouped(int(offset), int(limit), queryText)
+		grouped, aggregated, callErr := state.db.MoviesSeenGrouped(offset, limit, queryText)
 		groups, total, err = grouped, aggregated, callErr
 	}
 	if err != nil {
 		return http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()}
 	}
-	pages := total / limit
-	if total%limit != 0 {
+	pages := total / int64(limit)
+	if total%int64(limit) != 0 {
 		pages++
 	}
 	if pages < 1 {

@@ -926,7 +926,7 @@ func (c *Config) FeedMaxPages() int {
 		pages = 3
 	}
 	if pages > 10 {
-		pages = 10
+		return 10
 	}
 	return int(pages)
 }

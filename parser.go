@@ -884,15 +884,15 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		episode = &episodeValue
 		episodeRange = []int64{episodeValue}
 	} else if capture := dateRe.FindStringSubmatch(title); capture != nil {
-		year, err := strconv.ParseInt(capture[2], 10, 64)
+		year, err := strconv.ParseInt(capture[2], 10, 32)
 		if err != nil {
 			return nil
 		}
-		month, err := strconv.ParseInt(capture[3], 10, 64)
+		month, err := strconv.ParseInt(capture[3], 10, 32)
 		if err != nil {
 			return nil
 		}
-		day, err := strconv.ParseInt(capture[4], 10, 64)
+		day, err := strconv.ParseInt(capture[4], 10, 32)
 		if err != nil {
 			return nil
 		}

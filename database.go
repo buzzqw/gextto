@@ -4731,7 +4731,7 @@ func (d *Database) Housekeeping(params HousekeepingParams) (HousekeepingReport, 
 	}
 	now := time.Now().UTC()
 	cutoff := func(days int64) string {
-		return sqliteTimestamp(now.AddDate(0, 0, -int(maxInt64(days, 0))))
+		return sqliteTimestamp(now.AddDate(0, 0, -retentionDays(days, 0)))
 	}
 	report.OldCyclesRemoved = cleanup.OldCyclesRemoved
 	report.StaleTorrentsRemoved = cleanup.StaleTorrentsRemoved
@@ -5081,12 +5081,26 @@ func (d *Database) PruneSeenByIDs(movieIDs, seriesIDs []int64) (int, int, error)
 	return movies, series, nil
 }
 
+// maxRetentionDays caps a configured retention window (about a century) so the
+// int conversion handed to time.AddDate can never wrap.
+const maxRetentionDays = 36500
+
+// retentionDays converts a retention window in days to int, raised to minimum
+// and capped at maxRetentionDays.
+func retentionDays(days, minimum int64) int {
+	days = maxInt64(days, minimum)
+	if days > maxRetentionDays {
+		return maxRetentionDays
+	}
+	return int(days)
+}
+
 // PruneSeenOlderThan deletes the "seen" releases older than `days` days.
 func (d *Database) PruneSeenOlderThan(days int64) (int, error) {
 	if days <= 0 {
 		return 0, nil
 	}
-	cutoff := sqliteTimestamp(time.Now().UTC().AddDate(0, 0, -int(maxInt64(days, 1))))
+	cutoff := sqliteTimestamp(time.Now().UTC().AddDate(0, 0, -retentionDays(days, 1)))
 	removed := 0
 	if result, err := d.db.Exec("DELETE FROM movie_feed_seen WHERE found_at < ?1", cutoff); err != nil {
 		return removed, err

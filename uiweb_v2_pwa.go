@@ -75,11 +75,15 @@ func v2SharedLink(values ...string) string {
 // it opens Scarico with the shared link in the "add" field.
 func V2Share(w http.ResponseWriter, r *http.Request, s *AppState) {
 	link := v2SharedLink(r.FormValue("url"), r.FormValue("text"), r.FormValue("title"))
-	target := "/?view=downloads"
+	// The shared link only ever lands in the query string of a local path, so
+	// the redirect cannot leave the app.
+	query := url.Values{"view": {"downloads"}}
 	if link == "" {
-		target += "&msg_err=1&msg=" + url.QueryEscape("Nessun magnet o link .torrent nel contenuto condiviso.")
+		query.Set("msg_err", "1")
+		query.Set("msg", "Nessun magnet o link .torrent nel contenuto condiviso.")
 	} else {
-		target += "&add=" + url.QueryEscape(link) + "&msg=" + url.QueryEscape("Link ricevuto: controlla le opzioni e premi Aggiungi.")
+		query.Set("add", link)
+		query.Set("msg", "Link ricevuto: controlla le opzioni e premi Aggiungi.")
 	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	http.Redirect(w, r, (&url.URL{Path: "/", RawQuery: query.Encode()}).String(), http.StatusSeeOther)
 }

@@ -619,7 +619,7 @@ func sseFlush(w http.ResponseWriter) {
 // only the bytes appended since the previous tick.
 func LogsStream(w http.ResponseWriter, r *http.Request, s *AppState) {
 	path := filepath.Join(s.cfg.DataDir, "gextto.log")
-	limit := int(queryInt(r, "limit", 200))
+	limit := queryIntVal(r, "limit", 200)
 	if limit < 1 {
 		limit = 1
 	}

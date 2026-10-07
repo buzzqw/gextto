@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -754,11 +755,17 @@ func ArchiveEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
+// gh7_hostPattern accepts a host name, IPv4 or bracketed IPv6 address with an
+// optional port: nothing that could break out of the shell scripts.
+var gh7_hostPattern = regexp.MustCompile(`^(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::[0-9]{1,5})?$`)
+
 // BrowserHandlerDownload handles GET /api/browser-handlers/download.
 func BrowserHandlerDownload(w http.ResponseWriter, r *http.Request, s *AppState) {
-	host := r.Header.Get("Host")
-	if host == "" {
-		host = "127.0.0.1:5000"
+	// net/http moves the Host header into r.Host. Only a plain host[:port]
+	// is copied into the generated scripts, which the user runs locally.
+	host := "127.0.0.1:5000"
+	if gh7_hostPattern.MatchString(r.Host) {
+		host = r.Host
 	}
 	base := "http://" + host
 	requested := strings.TrimSpace(queryParam(r, "file"))
@@ -782,6 +789,7 @@ func BrowserHandlerDownload(w http.ResponseWriter, r *http.Request, s *AppState)
 	body := strings.ReplaceAll(template, "__GEXTTO_URL__", base)
 	w.Header().Set("Content-Type", mime+"; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", requested))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))

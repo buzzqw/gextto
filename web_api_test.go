@@ -157,6 +157,28 @@ func TestBrowserHandlerDownloadsUseGexttoEndpoints(t *testing.T) {
 	}
 }
 
+func TestBrowserHandlerDownloadUsesRequestHost(t *testing.T) {
+	for host, want := range map[string]string{
+		"nas.lan:5000":        "http://nas.lan:5000",
+		"[::1]:5000":          "http://[::1]:5000",
+		"evil\"; rm -rf ~; #": "http://127.0.0.1:5000",
+	} {
+		request := httptest.NewRequest(http.MethodGet, "/api/browser-handlers/download?file=install.sh", nil)
+		request.Host = host
+		recorder := httptest.NewRecorder()
+		BrowserHandlerDownload(recorder, request, nil)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("host %q -> %d", host, recorder.Code)
+		}
+		if body := recorder.Body.String(); !strings.Contains(body, want) || strings.Contains(body, "rm -rf") {
+			t.Errorf("host %q: script does not use %s", host, want)
+		}
+		if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("host %q: X-Content-Type-Options = %q", host, got)
+		}
+	}
+}
+
 // webPostJSON performs a POST with a JSON body and returns status and body.
 func webPostJSON(t *testing.T, server *httptest.Server, path, payload string) (int, []byte) {
 	t.Helper()

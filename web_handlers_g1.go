@@ -348,8 +348,8 @@ func BackupSendTelegram(w http.ResponseWriter, r *http.Request, s *AppState) {
 	root := filepath.Join(dataDir, "backups")
 	retain := 5
 	if value, ok := cfg.Settings["backup_retention"]; ok {
-		if parsed, err := strconv.ParseUint(value, 10, 64); err == nil {
-			retain = int(parsed)
+		if parsed, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
+			retain = parsed
 		}
 	}
 	if retain < 1 {

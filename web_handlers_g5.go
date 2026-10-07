@@ -257,8 +257,8 @@ func gh5_backupCloudDir(cfg *Config) *string {
 // gh5_backupRetention mirrors the web module `backup_retention`.
 func gh5_backupRetention(cfg *Config) int {
 	retain := 5
-	if parsed, err := strconv.ParseUint(cfg.Settings["backup_retention"], 10, 64); err == nil {
-		retain = int(parsed)
+	if parsed, err := strconv.Atoi(strings.TrimSpace(cfg.Settings["backup_retention"])); err == nil {
+		retain = parsed
 	}
 	if retain < 1 {
 		retain = 1
@@ -717,16 +717,20 @@ func MoviesSeenGroupedView(w http.ResponseWriter, r *http.Request, s *AppState) 
 }
 
 func gh5_seenGrouped(w http.ResponseWriter, r *http.Request, s *AppState, kind string) {
-	limit := queryInt(r, "limit", 50)
+	limit := queryIntVal(r, "limit", 50)
 	if limit < 1 {
 		limit = 1
 	}
 	if limit > 200 {
 		limit = 200
 	}
-	page := queryInt(r, "page", 1)
+	page := queryIntVal(r, "page", 1)
 	if page < 1 {
 		page = 1
+	}
+	// Keep (page-1)*limit from overflowing on an absurd page number.
+	if page > math.MaxInt32/limit {
+		page = math.MaxInt32 / limit
 	}
 	offset := (page - 1) * limit
 	queryText := queryParam(r, "q")
@@ -736,9 +740,9 @@ func gh5_seenGrouped(w http.ResponseWriter, r *http.Request, s *AppState, kind s
 		err    error
 	)
 	if kind == "series" {
-		groups, total, err = s.db.SeriesSeenGrouped(int(offset), int(limit), queryText)
+		groups, total, err = s.db.SeriesSeenGrouped(offset, limit, queryText)
 	} else {
-		groups, total, err = s.db.MoviesSeenGrouped(int(offset), int(limit), queryText)
+		groups, total, err = s.db.MoviesSeenGrouped(offset, limit, queryText)
 	}
 	if err != nil {
 		jsonError(w, http.StatusInternalServerError, err.Error())
@@ -746,7 +750,7 @@ func gh5_seenGrouped(w http.ResponseWriter, r *http.Request, s *AppState, kind s
 	}
 	pages := int64(1)
 	if limit > 0 {
-		pages = (total + limit - 1) / limit
+		pages = (total + int64(limit) - 1) / int64(limit)
 	}
 	if pages < 1 {
 		pages = 1
