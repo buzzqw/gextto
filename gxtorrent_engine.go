@@ -471,8 +471,16 @@ func (e *gxTorrentEngine) sync() error {
 	e.cache = next
 	var export []string
 	if e.settings.stateDir != "" {
+		copyDir := e.torrentCopyDir()
 		for hash, view := range next {
-			if view.HasMetadata && !fileExists(filepath.Join(e.settings.stateDir, hash+".torrent")) {
+			if !view.HasMetadata {
+				continue
+			}
+			stateMissing := !fileExists(filepath.Join(e.settings.stateDir, hash+".torrent"))
+			// Also re-export when only the operator's configured copy is
+			// missing (e.g. a .torrent left by libtorrent in the state dir).
+			copyMissing := copyDir != "" && !fileExists(filepath.Join(copyDir, hash+".torrent"))
+			if stateMissing || copyMissing {
 				export = append(export, hash)
 			}
 		}

@@ -503,7 +503,7 @@ func (c *LibtorrentClient) SessionHealthy() bool {
 // NewLibtorrentClient creates the native session (unless dry-run) and restores
 // any fastresume state.
 func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
-	// When another torrent backend (qBittorrent) is selected, the
+	// When another torrent backend (gx-torrent or qBittorrent) is selected, the
 	// embedded libtorrent session must NOT be created: two engines writing the
 	// same files is the single most dangerous failure mode in the plans. The
 	// client still exists (so libtorrent-only endpoints can report a clean
@@ -511,7 +511,9 @@ func NewLibtorrentClient(cfg *Config) (*LibtorrentClient, error) {
 	alternative := alternativeBackendActive(cfg)
 	dryRun := cfg.DryRun || !cfg.LibtorrentEnabled || alternative
 	if alternative && !cfg.DryRun && cfg.LibtorrentEnabled {
-		logging.Info("libtorrent session not started: another torrent backend is selected",
+		// Expected when another engine is active: a debug detail, not an INFO
+		// line next to the real "engine started" message.
+		logging.Debug("embedded libtorrent not started: another torrent backend is active",
 			"backend", TorrentBackendName(cfg))
 	}
 	var session unsafe.Pointer
