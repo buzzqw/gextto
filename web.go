@@ -215,6 +215,14 @@ func saveConfigSetting(dataDir string, key string, value string) error {
 	if err := sqlExec(conn, "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"); err != nil {
 		return err
 	}
+	if key == authPasswordSetting {
+		// The password is never stored in clear.
+		hashed, err := hashAuthPassword(value)
+		if err != nil {
+			return err
+		}
+		value = hashed
+	}
 	if err := sqlExec(conn, "INSERT INTO settings(key,value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", key, value); err != nil {
 		return err
 	}

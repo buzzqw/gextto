@@ -3813,3 +3813,7 @@ pol:
   "Jellyfin — mappatura percorsi": "Jellyfin — mapowanie ścieżek"
   "Plex — mappatura percorsi": "Plex — mapowanie ścieżek"
   "Smetti di migliorare oltre questo punteggio (0 = mai)": "Przestań ulepszać powyżej tego wyniku (0 = nigdy)"
+  "Accesso": "Dostęp"
+  "Richiedi l'accesso (login)": "Wymagaj logowania"
+  "Nessun login dalla rete locale": "Bez logowania z sieci lokalnej"
+  "Chiave API (script, TUI, calendario)": "Klucz API (skrypty, TUI, kalendarz)"

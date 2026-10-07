@@ -3866,3 +3866,7 @@ fra:
   "Jellyfin — mappatura percorsi": "Jellyfin — correspondance des chemins"
   "Plex — mappatura percorsi": "Plex — correspondance des chemins"
   "Smetti di migliorare oltre questo punteggio (0 = mai)": "Arrêter les améliorations au-delà de ce score (0 = jamais)"
+  "Accesso": "Accès"
+  "Richiedi l'accesso (login)": "Exiger une connexion"
+  "Nessun login dalla rete locale": "Pas de connexion depuis le réseau local"
+  "Chiave API (script, TUI, calendario)": "Clé API (scripts, TUI, calendrier)"

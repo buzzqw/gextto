@@ -151,6 +151,9 @@ var uiSettingDefaults = map[string]string{
 	"stop_on_old_page_threshold": "3",
 	"rename_verify_interval":     "6",
 	"move_episodes":              "false",
+	"auth_enabled":               "false",
+	"auth_local_bypass":          "true",
+	"auth_username":              "admin",
 	"hardlink_seeding":           "true",
 	"debug_enabled":              "false",
 

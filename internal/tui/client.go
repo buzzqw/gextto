@@ -314,8 +314,10 @@ type Client struct {
 func NewClient(base string) *Client {
 	traffic := &trafficCounter{}
 	return &Client{
-		base:    strings.TrimRight(strings.TrimSpace(base), "/"),
-		http:    &http.Client{Timeout: 30 * time.Second, Transport: &countingTransport{base: http.DefaultTransport, counter: traffic}},
+		base: strings.TrimRight(strings.TrimSpace(base), "/"),
+		http: &http.Client{Timeout: 30 * time.Second, Transport: &countingTransport{
+			base: http.DefaultTransport, counter: traffic, apiKey: strings.TrimSpace(os.Getenv("GEXTTO_API_KEY")),
+		}},
 		traffic: traffic,
 	}
 }
@@ -339,9 +341,16 @@ type trafficCounter struct {
 type countingTransport struct {
 	base    http.RoundTripper
 	counter *trafficCounter
+	// apiKey (GEXTTO_API_KEY) reaches a daemon whose access control asks
+	// for a login from outside the local network.
+	apiKey string
 }
 
 func (t *countingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if t.apiKey != "" && request.Header.Get("X-Api-Key") == "" {
+		request = request.Clone(request.Context())
+		request.Header.Set("X-Api-Key", t.apiKey)
+	}
 	sent := int64(len(request.Method) + len(request.URL.RequestURI()) + 12 + headerSize(request.Header))
 	if request.ContentLength > 0 {
 		sent += request.ContentLength

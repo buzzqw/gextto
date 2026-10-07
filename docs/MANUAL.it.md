@@ -1213,6 +1213,28 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 | Cartella temporanea | Cartella temporanea per i download in corso. |
 | Copia i file .torrent in | Copia qui i file .torrent dei download (vuoto = nessuna copia). |
 
+### Accesso
+
+Gextto è pensato per una LAN fidata: l'accesso è **libero per impostazione
+predefinita**. Se lo raggiungi da fuori casa (reverse proxy, port forwarding,
+VPN) puoi chiedere il login a chi non è in rete locale.
+
+| Impostazione | Cosa fa |
+|---|---|
+| Richiedi l'accesso (login) | Spento (predefinito): nessun controllo. Acceso: chi non è in rete locale deve fare il login o usare la chiave API. Finché non imposti una password o una chiave resta tutto aperto (e il log lo segnala). |
+| Nessun login dalla rete locale | Acceso (predefinito): da 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x e dagli indirizzi IPv6 locali non serve il login. Dietro un reverse proxy conta l'indirizzo reale del client inoltrato dal proxy (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), quindi chi arriva da Internet attraverso il proxy deve comunque autenticarsi. |
+| Utente | Nome utente per il login (predefinito `admin`). |
+| Password | Salvata solo come hash bcrypt; cambiarla chiude tutte le sessioni aperte. Lascia il campo vuoto per non modificarla. |
+| Chiave API (script, TUI, calendario) | Per gli accessi senza browser: header `X-Api-Key: <chiave>` oppure `?apikey=<chiave>` nell'indirizzo. La TUI la legge dalla variabile `GEXTTO_API_KEY`. |
+
+La sessione del browser dura 30 giorni; `/logout` la chiude. Dopo cinque
+password sbagliate dallo stesso indirizzo i tentativi vengono bloccati per un
+minuto e ogni errore è annotato nel log. Se resti chiuso fuori, avvia Gextto con
+la variabile d'ambiente `GEXTTO_AUTH_DISABLE=1`: il controllo è spento finché la
+variabile è presente e puoi correggere le impostazioni. Per l'accesso da fuori
+casa usa comunque HTTPS (reverse proxy con certificato o VPN), altrimenti la
+password viaggia in chiaro.
+
 ### Traduzioni
 
 | Impostazione | Cosa fa |

@@ -3179,3 +3179,7 @@ eng:
   "Jellyfin — mappatura percorsi": "Jellyfin — path mapping"
   "Plex — mappatura percorsi": "Plex — path mapping"
   "Smetti di migliorare oltre questo punteggio (0 = mai)": "Stop upgrading above this score (0 = never)"
+  "Accesso": "Access"
+  "Richiedi l'accesso (login)": "Require login"
+  "Nessun login dalla rete locale": "No login from the local network"
+  "Chiave API (script, TUI, calendario)": "API key (scripts, TUI, calendar)"

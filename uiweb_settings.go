@@ -60,6 +60,7 @@ var uiSettingsTabs = []uiSettingsTab{
 	{ID: "seeding", Label: "Seed e completamento"},
 	{ID: "notify", Label: "Notifiche"},
 	{ID: "paths", Label: "Percorsi"},
+	{ID: "access", Label: "Accesso"},
 	{ID: "i18n", Label: "Traduzioni"},
 }
 
@@ -163,6 +164,11 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "archive_keep_min", Label: "Archivio — mantieni almeno N voci", Tab: "advanced"},
 	{Key: "stop_on_old_page_threshold", Label: "Pagine feed da leggere", Tab: "advanced"},
 	{Key: "rename_verify_interval", Label: "Verifica rinomina (ore)", Tab: "advanced"},
+	{Key: "auth_enabled", Label: "Richiedi l'accesso (login)", Tab: "access"},
+	{Key: "auth_local_bypass", Label: "Nessun login dalla rete locale", Tab: "access"},
+	{Key: "auth_username", Label: "Utente", Tab: "access"},
+	{Key: "auth_password", Label: "Password", Tab: "access"},
+	{Key: "auth_api_key", Label: "Chiave API (script, TUI, calendario)", Tab: "access"},
 	{Key: "move_episodes", Label: "Sposta gli episodi/pack in archivio (non copiare)", Tab: "seeding"},
 	{Key: "hardlink_seeding", Label: "Hardlink invece della copia durante il seed", Tab: "seeding"},
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "advanced"},

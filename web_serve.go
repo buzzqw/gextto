@@ -280,7 +280,7 @@ func Serve(state *AppState) error {
 	requestCtx, cancelRequests := context.WithCancel(context.Background())
 	defer cancelRequests()
 
-	app := Router(state)
+	app := AuthMiddleware(state, Router(state))
 	// Timeouts defend against slowloris and idle-connection exhaustion. Write is
 	// intentionally unlimited: the log/notification SSE streams and long
 	// downloads must be able to stay open.

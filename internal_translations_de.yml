@@ -3870,3 +3870,7 @@ deu:
   "Jellyfin — mappatura percorsi": "Jellyfin — Pfadzuordnung"
   "Plex — mappatura percorsi": "Plex — Pfadzuordnung"
   "Smetti di migliorare oltre questo punteggio (0 = mai)": "Ab dieser Punktzahl nicht mehr verbessern (0 = nie)"
+  "Accesso": "Zugang"
+  "Richiedi l'accesso (login)": "Anmeldung verlangen"
+  "Nessun login dalla rete locale": "Keine Anmeldung aus dem lokalen Netz"
+  "Chiave API (script, TUI, calendario)": "API-Schlüssel (Skripte, TUI, Kalender)"

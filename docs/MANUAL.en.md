@@ -1180,6 +1180,27 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 | Temporary folder | Temporary folder for in-progress downloads. |
 | Copy .torrent files to | Copy the .torrent files of downloads here (empty = no copy). |
 
+### Access
+
+Gextto is meant for a trusted LAN: access is **open by default**. When you
+reach it from outside (reverse proxy, port forwarding, VPN) you can require a
+login from clients that are not on the local network.
+
+| Setting | What it does |
+|---|---|
+| Require login | Off (default): no checks. On: clients outside the local network must log in or use the API key. Until a password or a key is set everything stays open (and the log says so). |
+| No login from the local network | On (default): 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x and local IPv6 addresses need no login. Behind a reverse proxy the real client address forwarded by the proxy counts (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), so a client coming from the Internet through the proxy still has to log in. |
+| Username | Login username (default `admin`). |
+| Password | Stored only as a bcrypt hash; changing it closes every open session. Leave the field empty to keep it. |
+| API key (scripts, TUI, calendar) | For non-browser access: header `X-Api-Key: <key>` or `?apikey=<key>` in the URL. The TUI reads it from the `GEXTTO_API_KEY` variable. |
+
+A browser session lasts 30 days; `/logout` ends it. After five wrong passwords
+from the same address further attempts are blocked for a minute and each failure
+is logged. If you lock yourself out, start Gextto with the environment variable
+`GEXTTO_AUTH_DISABLE=1`: access control is off while the variable is set and you
+can fix the settings. For access from outside always use HTTPS (reverse proxy
+with a certificate, or a VPN), otherwise the password travels in clear text.
+
 ### Translations
 
 | Setting | What it does |

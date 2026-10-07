@@ -3819,3 +3819,7 @@ spa:
   "Jellyfin — mappatura percorsi": "Jellyfin — asignación de rutas"
   "Plex — mappatura percorsi": "Plex — asignación de rutas"
   "Smetti di migliorare oltre questo punteggio (0 = mai)": "Dejar de mejorar por encima de esta puntuación (0 = nunca)"
+  "Accesso": "Acceso"
+  "Richiedi l'accesso (login)": "Exigir inicio de sesión"
+  "Nessun login dalla rete locale": "Sin inicio de sesión desde la red local"
+  "Chiave API (script, TUI, calendario)": "Clave API (scripts, TUI, calendario)"
