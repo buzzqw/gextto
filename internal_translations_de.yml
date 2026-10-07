@@ -3876,3 +3876,5 @@ deu:
   "Chiave API (script, TUI, calendario)": "API-Schlüssel (Skripte, TUI, Kalender)"
   "Calendario iCal": "iCal-Kalender"
   "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.": "Kommende Episoden und Filmstarts für Thunderbird, Google Kalender oder das Telefon: Linkadresse kopieren und den Kalender abonnieren. Mit Zugangsschutz ?apikey=<Schlüssel> an die Adresse anhängen."
+  "Serie TV · messa in onda originale": "Serien · Erstausstrahlung"
+  "Data della prima messa in onda originale (TMDB): la versione italiana può arrivare molto più tardi.": "Datum der Erstausstrahlung (TMDB): eine lokalisierte Fassung kann viel später kommen."
