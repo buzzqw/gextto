@@ -842,3 +842,15 @@ func TestStalledTorrentIsExplained(t *testing.T) {
 		}
 	}
 }
+
+func TestCycleSummaryReadsLikeASentence(t *testing.T) {
+	tr := NewTranslator("it")
+	got := cycleSummary(tr, LastCycle{Scraped: 6406, Candidates: 183})
+	if got != "6.406 release controllate, 183 corrispondenti ai tuoi titoli, niente di nuovo" {
+		t.Fatalf("summary = %q", got)
+	}
+	got = cycleSummary(NewTranslator("en"), LastCycle{Scraped: 1200, Candidates: 3, DownloadsStarted: 2, GapsFilled: 1})
+	if got != "1,200 releases checked, 3 matching your titles, 2 downloads started (1 missing episode found)" {
+		t.Fatalf("summary = %q", got)
+	}
+}

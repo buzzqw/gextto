@@ -168,7 +168,7 @@ func TestStatusShowsRecentLogsAndDashboard(t *testing.T) {
 	m.SetTorrents([]Torrent{{Hash: "a", Name: "Serie S01E01", State: "downloading", Progress: 50, DownloadRate: 2048, TotalSize: 4096, TotalDone: 2048}})
 	m.SetLogs([]string{"log uno", "log due", "log tre", "log quattro", "log cinque"})
 	screen := m.Render(100, 30)
-	for _, needle := range []string{"v1.2.3", "PID 42", "carico 0.42", "prossimo tra", "ultimo avvio", "Serie S01E01", "ETA", "disco pieno al 95%", "Log recenti", "log due", "log cinque"} {
+	for _, needle := range []string{"v1.2.3", "PID 42", "carico 0.42", "prossimo tra", "ultima alle", "Serie S01E01", "ETA", "disco pieno al 95%", "Log recenti", "log due", "log cinque"} {
 		if !lineContains(screen, needle) {
 			t.Errorf("status should contain %q: %q", needle, firstLines(screen, 30))
 		}

@@ -317,6 +317,50 @@ func (m *Model) renderStatus(width, contentHeight int) []Line {
 	return append(window, logBlock...)
 }
 
+// cycleSummary reads the last search like a sentence: what was checked, what
+// matched and what came of it.
+func cycleSummary(tr *Translator, cycle LastCycle) string {
+	text := tr.Format("status.cyclechecked", groupDigits(tr, cycle.Scraped), groupDigits(tr, cycle.Candidates))
+	switch {
+	case cycle.DownloadsStarted == 1:
+		text += ", " + tr.T("status.onedownload")
+	case cycle.DownloadsStarted > 1:
+		text += ", " + tr.Format("status.ndownloads", cycle.DownloadsStarted)
+	default:
+		text += ", " + tr.T("status.nothingnew")
+	}
+	switch {
+	case cycle.GapsFilled == 1:
+		text += " (" + tr.T("status.onegapfilled") + ")"
+	case cycle.GapsFilled > 1:
+		text += " (" + tr.Format("status.gapsfilled", cycle.GapsFilled) + ")"
+	}
+	// Errors are reported in the "Attention" row.
+	return text
+}
+
+// groupDigits writes a count with thousands separators (1.234 / 1,234).
+func groupDigits(tr *Translator, value int64) string {
+	digits := fmt.Sprintf("%d", value)
+	negative := strings.HasPrefix(digits, "-")
+	digits = strings.TrimPrefix(digits, "-")
+	separator := "."
+	if tr.Lang() == LangEN {
+		separator = ","
+	}
+	var out strings.Builder
+	for index, digit := range digits {
+		if index > 0 && (len(digits)-index)%3 == 0 {
+			out.WriteString(separator)
+		}
+		out.WriteRune(digit)
+	}
+	if negative {
+		return "-" + out.String()
+	}
+	return out.String()
+}
+
 func (m *Model) statusRow(label, value string, style Style) Line {
 	return Line{Text: PadRight(label+":", statusLabelWidth) + value, Style: style, Wrap: true, Indent: statusLabelWidth}
 }
@@ -393,17 +437,18 @@ func (m *Model) statusInfoLines(width int) []Line {
 			cycleParts = append(cycleParts, tr.Format("status.laststart", started.Local().Format("02/01 15:04"), HumanDuration(time.Since(started).Seconds())))
 		}
 	}
-	cycleParts = append(cycleParts, fmt.Sprintf("%s %d · %s %d · %s %d · %s %d · %s %d",
-		tr.T("label.scraped"), cycle.Scraped,
-		tr.T("label.candidates"), cycle.Candidates,
-		tr.T("label.downloads"), cycle.DownloadsStarted,
-		tr.T("label.gaps"), cycle.GapsFilled,
-		tr.T("label.errors"), cycle.Errors))
-	lines = append(lines, m.statusRow(tr.T("status.cycle"), strings.Join(cycleParts, " · "), StyleNormal))
-	lines = append(lines, m.statusRow(tr.T("status.feeds"), fmt.Sprintf("%s %d · %s %d · %s %d",
-		tr.T("label.groups"), status.Seen.Groups,
-		tr.T("label.movies"), status.Seen.Movies,
-		tr.T("label.series"), status.Seen.Series), StyleMuted))
+	cycleStyle := StyleNormal
+	if cycle.LastStartedAt == nil {
+		cycleParts = append(cycleParts, tr.T("status.nocycle"))
+	} else {
+		cycleParts = append(cycleParts, cycleSummary(tr, cycle))
+		if cycle.Errors > 0 {
+			cycleStyle = StyleWarn
+		}
+	}
+	lines = append(lines, m.statusRow(tr.T("status.cycle"), strings.Join(cycleParts, " · "), cycleStyle))
+	lines = append(lines, m.statusRow(tr.T("status.feeds"), tr.Format("status.seen",
+		groupDigits(tr, status.Seen.Series), groupDigits(tr, status.Seen.Movies), groupDigits(tr, status.Seen.Groups)), StyleMuted))
 
 	// Downloads: active means really transferring (either direction); an
 	// unfinished torrent at 0 B/s is counted as stuck, not as active.
