@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,6 +31,7 @@ func (d *Daemon) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/torrents/{hash}/{what}", d.handleInspect)
 	mux.HandleFunc("POST /api/v1/torrents/{hash}/{action}", d.handleAction)
 	mux.HandleFunc("POST /api/v1/pins/clear", d.handleClearPins)
+	mux.HandleFunc("POST /api/v1/ipfilter", d.handleIPFilter)
 	mux.HandleFunc("GET /api/v1/config", d.handleGetConfig)
 	mux.HandleFunc("POST /api/v1/config", d.handleSetConfig)
 	return d.authenticate(mux)
@@ -211,6 +214,17 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			days = &value
 		}
 		err = d.setSeedLimits(hash, ratio, days)
+	case "file-priorities":
+		var priorities []int
+		for _, field := range strings.Split(r.FormValue("priorities"), ",") {
+			value, convErr := strconv.Atoi(strings.TrimSpace(field))
+			if convErr != nil {
+				writeError(w, http.StatusBadRequest, fmt.Errorf("invalid priority %q", field))
+				return
+			}
+			priorities = append(priorities, value)
+		}
+		err = d.setFilePriorities(hash, priorities)
 	case "trackers":
 		var urls []string
 		for _, line := range strings.Split(r.FormValue("urls"), "\n") {
@@ -230,6 +244,7 @@ type fileInfo struct {
 	Path       string `json:"path"`
 	Size       int64  `json:"size"`
 	Downloaded int64  `json:"downloaded"`
+	Priority   int    `json:"priority"`
 }
 
 type peerInfo struct {
@@ -260,6 +275,9 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.PathValue("what") {
 	case "files":
+		d.mu.Lock()
+		meta := d.metaLocked(t)
+		d.mu.Unlock()
 		files, err := t.Files()
 		if err != nil {
 			writeJSON(w, http.StatusOK, []fileInfo{})
@@ -273,7 +291,7 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 		}
 		out := make([]fileInfo, 0, len(files))
 		for index, file := range files {
-			out = append(out, fileInfo{Path: file.Path(), Size: file.Length(), Downloaded: done[index]})
+			out = append(out, fileInfo{Path: file.Path(), Size: file.Length(), Downloaded: done[index], Priority: filePriority(meta, index)})
 		}
 		writeJSON(w, http.StatusOK, out)
 	case "peers":
@@ -371,4 +389,31 @@ func magnetInfoHash(magnet string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// handleIPFilter reloads the IP filter (form field path, default: the
+// configured file).
+func (d *Daemon) handleIPFilter(w http.ResponseWriter, r *http.Request) {
+	rules, err := d.loadIPFilter(strings.TrimSpace(r.FormValue("path")))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rules": rules})
+}
+
+// errV2Only is returned for BitTorrent v2-only torrents: rain speaks v1 (and
+// the v1 side of hybrid torrents) only.
+var errV2Only = errors.New("v2_unsupported: BitTorrent v2-only torrent (no v1 info hash); hybrid and v1 torrents are supported")
+
+// magnetIsV2Only reports a magnet that carries only a v2 (btmh) hash.
+func magnetIsV2Only(magnet string) bool {
+	lower := strings.ToLower(magnet)
+	return strings.Contains(lower, "urn:btmh:") && !strings.Contains(lower, "urn:btih:")
+}
+
+// torrentIsV2Only reports a .torrent whose info has "meta version" 2 and no
+// v1 "pieces" (hybrids carry both).
+func torrentIsV2Only(data []byte) bool {
+	return bytes.Contains(data, []byte("12:meta versioni2e")) && !bytes.Contains(data, []byte("6:pieces"))
 }

@@ -58,21 +58,40 @@ func defaultDataDir() string {
 	return "gx-torrent-data"
 }
 
+// parsePortRange reads "6881" or "6881-6891". "0" keeps rain's own port per
+// torrent (no shared port).
 func parsePortRange(value string) (uint16, uint16, error) {
 	value = strings.TrimSpace(value)
-	if value == "" {
+	if value == "" || value == "0" {
 		return 0, 0, nil
 	}
 	left, right, found := strings.Cut(value, "-")
 	if !found {
-		return 0, 0, fmt.Errorf("port range must look like 20000-30000")
+		right = left
 	}
 	begin, err1 := strconv.ParseUint(strings.TrimSpace(left), 10, 16)
 	end, err2 := strconv.ParseUint(strings.TrimSpace(right), 10, 16)
-	if err1 != nil || err2 != nil || begin < 1024 || end <= begin {
+	if err1 != nil || err2 != nil || begin < 1 || end < begin {
 		return 0, 0, fmt.Errorf("invalid port range %q", value)
 	}
 	return uint16(begin), uint16(end), nil
+}
+
+func envInt(key string, fallback int64) int64 {
+	if value, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(key)), 10, 64); err == nil {
+		return value
+	}
+	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return fallback
 }
 
 func loopback(listen string) bool {
@@ -93,8 +112,17 @@ func main() {
 	downloadDir := flag.String("download-dir", envOr("GX_TORRENT_DOWNLOAD_DIR", ""), "default save path (default <data>/downloads)")
 	token := flag.String("token", envOr("GX_TORRENT_TOKEN", ""), "shared secret required in the X-Gx-Token header")
 	roots := flag.String("allowed-roots", envOr("GX_TORRENT_ALLOWED_ROOTS", ""), "comma-separated directories a save path must be inside (empty = any absolute path)")
-	ports := flag.String("peer-ports", envOr("GX_TORRENT_PEER_PORTS", ""), "peer port range, e.g. 50000-50100 (default 20000-30000)")
-	noDHT := flag.Bool("no-dht", os.Getenv("GX_TORRENT_NO_DHT") == "1", "disable DHT")
+	ports := flag.String("peer-ports", envOr("GX_TORRENT_PEER_PORTS", "6881-6891"), "the first free port of this range is the single peer port (TCP peers, UDP DHT); 0 = one port per torrent")
+	listenIface := flag.String("listen-interface", envOr("GX_TORRENT_LISTEN_INTERFACE", ""), "IP or interface name for incoming peers (default all)")
+	outIface := flag.String("outgoing-interface", envOr("GX_TORRENT_OUTGOING_INTERFACE", ""), "bind all outgoing traffic to this interface or IP (VPN killswitch)")
+	proxyURL := flag.String("proxy", envOr("GX_TORRENT_PROXY", ""), "socks5://[user:pass@]host:port or http://host:port (disables DHT and UDP trackers)")
+	encryption := flag.Int("encryption", int(envInt("GX_TORRENT_ENCRYPTION", 1)), "0 disabled, 1 enabled, 2 forced")
+	noDHT := flag.Bool("no-dht", envBool("GX_TORRENT_NO_DHT", false), "disable DHT")
+	noPEX := flag.Bool("no-pex", envBool("GX_TORRENT_NO_PEX", false), "disable peer exchange")
+	noUPnP := flag.Bool("no-upnp", envBool("GX_TORRENT_NO_UPNP", false), "do not open the port on the router with UPnP")
+	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
+	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
+	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose rain logging")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -144,12 +172,23 @@ func main() {
 		StatePath:    filepath.Join(data, "state.json"),
 		Token:        *token,
 		AllowedRoots: allowed,
-		PortBegin:    portBegin,
-		PortEnd:      portEnd,
-		DHT:          !*noDHT,
-		Debug:        *debug,
-		Tick:         3 * time.Second,
-		ProbeWindow:  15 * time.Minute,
+		Network: NetworkOptions{
+			PortBegin:         portBegin,
+			PortEnd:           portEnd,
+			ListenInterface:   *listenIface,
+			OutgoingInterface: *outIface,
+			Proxy:             *proxyURL,
+			Encryption:        *encryption,
+			DHT:               !*noDHT,
+			PEX:               !*noPEX,
+			UPnP:              !*noUPnP,
+			NATPMP:            !*noNATPMP,
+			IPFilter:          *ipFilter,
+			IPFilterTrackers:  *ipFilterTrackers,
+		},
+		Debug:       *debug,
+		Tick:        3 * time.Second,
+		ProbeWindow: 15 * time.Minute,
 	}
 	daemon, err := newDaemon(opts)
 	if err != nil {

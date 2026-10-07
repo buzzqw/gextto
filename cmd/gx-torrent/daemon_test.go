@@ -1,16 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -28,6 +32,12 @@ func bencode(value any) []byte {
 		case []byte:
 			fmt.Fprintf(&buf, "%d:", len(x))
 			buf.Write(x)
+		case []any:
+			buf.WriteByte('l')
+			for _, item := range x {
+				write(item)
+			}
+			buf.WriteByte('e')
 		case map[string]any:
 			keys := make([]string, 0, len(x))
 			for key := range x {
@@ -80,6 +90,11 @@ func makeTorrent(t *testing.T, dir, name string, size int) []byte {
 
 func newTestDaemon(t *testing.T) *Daemon {
 	t.Helper()
+	return newTestDaemonWith(t, NetworkOptions{PortBegin: 42000, PortEnd: 42100, Encryption: 1, PEX: true})
+}
+
+func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
+	t.Helper()
 	data := t.TempDir()
 	opts := Options{
 		Listen:      "127.0.0.1:0",
@@ -88,8 +103,8 @@ func newTestDaemon(t *testing.T) *Daemon {
 		DownloadDir: filepath.Join(data, "downloads"),
 		DBPath:      filepath.Join(data, "session.db"),
 		StatePath:   filepath.Join(data, "state.json"),
-		PortBegin:   42000,
-		PortEnd:     42100,
+		Network:     network,
+		Debug:       os.Getenv("GX_TEST_DEBUG") == "1",
 		Tick:        50 * time.Millisecond,
 		ProbeWindow: time.Minute,
 	}
@@ -333,5 +348,380 @@ func TestAPIRequiresToken(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("unknown settings must be rejected, got %d", resp.StatusCode)
+	}
+}
+
+// Two daemons on localhost: the leecher connects to the seeder's single
+// shared port; the session routes the connection by info hash (plain and
+// with forced MSE encryption) and the payload is transferred.
+func TestSharedPortTransfer(t *testing.T) {
+	for _, encryption := range []int{1, 2} {
+		t.Run(fmt.Sprintf("encryption=%d", encryption), func(t *testing.T) {
+			seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 42200, PortEnd: 42299, Encryption: encryption})
+			leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 42300, PortEnd: 42399, Encryption: encryption})
+			if seeder.peerPort == 0 || leecher.peerPort == 0 || seeder.peerPort == leecher.peerPort {
+				t.Fatalf("unexpected ports %d %d", seeder.peerPort, leecher.peerPort)
+			}
+			src := filepath.Join(t.TempDir(), "src")
+			data := makeTorrent(t, src, "movie.bin", 300_000)
+			// A second torrent on the seeder proves the routing picks the
+			// right one on the shared port.
+			other := filepath.Join(t.TempDir(), "other")
+			if _, _, err := seeder.add(addRequest{TorrentData: makeTorrent(t, other, "other.bin", 20_000), Destination: other}); err != nil {
+				t.Fatal(err)
+			}
+			hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+			dst := filepath.Join(t.TempDir(), "dst")
+			if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "leecher running", func() bool { return stateOf(leecher, hash) == "downloading" })
+			leecher.mu.Lock()
+			handle, _ := leecher.findLocked(hash)
+			leecher.mu.Unlock()
+			if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "download through the shared port", func() bool {
+				info, _ := findInfo(leecher, hash)
+				return info.Progress == 100
+			})
+			want, _ := os.ReadFile(filepath.Join(src, "movie.bin"))
+			got, err := os.ReadFile(filepath.Join(dst, "movie.bin"))
+			if err != nil || !bytes.Equal(want, got) {
+				t.Fatalf("payload differs after transfer: %v", err)
+			}
+		})
+	}
+}
+
+// makeMultiTorrent writes dir/name/<files> and returns the .torrent bytes.
+func makeMultiTorrent(t *testing.T, dir, name string, sizes []int) []byte {
+	t.Helper()
+	const pieceLength = 16384
+	var all []byte
+	var files []any
+	for i, size := range sizes {
+		payload := make([]byte, size)
+		if _, err := rand.Read(payload); err != nil {
+			t.Fatal(err)
+		}
+		file := fmt.Sprintf("part%d.bin", i)
+		if err := os.MkdirAll(filepath.Join(dir, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name, file), payload, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		all = append(all, payload...)
+		files = append(files, map[string]any{"length": size, "path": []any{file}})
+	}
+	var pieces []byte
+	for offset := 0; offset < len(all); offset += pieceLength {
+		sum := sha1.Sum(all[offset:min(offset+pieceLength, len(all))])
+		pieces = append(pieces, sum[:]...)
+	}
+	return bencode(map[string]any{"info": map[string]any{
+		"name": name, "files": files, "piece length": pieceLength, "pieces": pieces,
+	}})
+}
+
+func sameFile(t *testing.T, a, b string) bool {
+	t.Helper()
+	x, err1 := os.ReadFile(a)
+	y, err2 := os.ReadFile(b)
+	return err1 == nil && err2 == nil && bytes.Equal(x, y)
+}
+
+// The leecher skips the middle file: it gets the other two, nothing of the
+// skipped one lands in the save path, the torrent counts as complete. Then
+// the file is selected again and downloaded too.
+func TestFileSelection(t *testing.T) {
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 42400, PortEnd: 42499, Encryption: 1})
+	// The leecher sends from 127.0.0.2 (outgoing interface): on one machine
+	// the seeder would otherwise tell it "your IP is 127.0.0.1" and rain would
+	// then ignore 127.0.0.1 peers as itself.
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 42500, PortEnd: 42599, Encryption: 1, OutgoingInterface: "127.0.0.2"})
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeMultiTorrent(t, src, "Season", []int{50_000, 70_000, 40_000})
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+	dst := filepath.Join(t.TempDir(), "dst")
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst, Paused: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := leecher.setFilePriorities(hash, []int{4, 0, 4}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "selection applied", func() bool {
+		leecher.mu.Lock()
+		defer leecher.mu.Unlock()
+		return len(leecher.moving) == 0
+	})
+	if err := leecher.resume(hash); err != nil {
+		t.Fatal(err)
+	}
+	connect := func() {
+		waitFor(t, "leecher running", func() bool {
+			state := stateOf(leecher, hash)
+			return state == "downloading" || state == "seeding"
+		})
+		leecher.mu.Lock()
+		handle, _ := leecher.findLocked(hash)
+		leecher.mu.Unlock()
+		if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	connect()
+	waitFor(t, "selected files downloaded", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+	info, _ := findInfo(leecher, hash)
+	if info.TotalSize >= 160_000 || info.State != "seeding" {
+		t.Fatalf("progress must refer to the selected files: %+v", info)
+	}
+	for _, i := range []int{0, 2} {
+		name := fmt.Sprintf("part%d.bin", i)
+		if !sameFile(t, filepath.Join(src, "Season", name), filepath.Join(dst, "Season", name)) {
+			t.Fatalf("%s not downloaded correctly", name)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dst, "Season", "part1.bin")); !os.IsNotExist(err) {
+		t.Fatalf("the skipped file must not appear in the save path: %v", err)
+	}
+
+	// Select it again: it is downloaded and moved into the save path.
+	if err := leecher.setFilePriorities(hash, []int{4, 4, 4}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "selection applied again", func() bool {
+		leecher.mu.Lock()
+		defer leecher.mu.Unlock()
+		return len(leecher.moving) == 0
+	})
+	connect()
+	defer func() {
+		if t.Failed() {
+			info, _ := findInfo(leecher, hash)
+			t.Logf("leecher view: %+v", info)
+			leecher.mu.Lock()
+			handle, _ := leecher.findLocked(hash)
+			leecher.mu.Unlock()
+			st := handle.Stats()
+			t.Logf("rain: status=%v bytes=%+v pieces=%+v peers=%+v", st.Status, st.Bytes, st.Pieces, st.Peers)
+		}
+	}()
+	waitFor(t, "whole torrent downloaded", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100 && info.TotalSize == 160_000
+	})
+	if !sameFile(t, filepath.Join(src, "Season", "part1.bin"), filepath.Join(dst, "Season", "part1.bin")) {
+		t.Fatal("part1.bin not downloaded after re-selection")
+	}
+}
+
+// RAM disk flow: the download starts on a tmpfs and is moved to the disk
+// while it is still downloading (cross-filesystem copy); it must finish
+// there with the right content and leave nothing on the RAM disk.
+func TestRamdiskRelocationMidDownload(t *testing.T) {
+	if info, err := os.Stat("/dev/shm"); err != nil || !info.IsDir() {
+		t.Skip("no /dev/shm tmpfs")
+	}
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 42600, PortEnd: 42699, Encryption: 1})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 42700, PortEnd: 42799, Encryption: 1, OutgoingInterface: "127.0.0.2"})
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "big.bin", 8<<20)
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+	ramdisk, err := os.MkdirTemp("/dev/shm", "gxtest-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(ramdisk)
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: ramdisk}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "leecher running", func() bool { return stateOf(leecher, hash) == "downloading" })
+	leecher.mu.Lock()
+	handle, _ := leecher.findLocked(hash)
+	leecher.mu.Unlock()
+	if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "some data on the RAM disk", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.TotalDone > 0
+	})
+	disk := filepath.Join(t.TempDir(), "disk")
+	before, _ := findInfo(leecher, hash)
+	t.Logf("progress when the move starts: %.1f%%", before.Progress)
+	if err := leecher.move(hash, disk, false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "moved off the RAM disk", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.SavePath == disk && info.State != "moving"
+	})
+	// The move stopped the torrent: reconnect to the seeder.
+	waitFor(t, "running again", func() bool {
+		state := stateOf(leecher, hash)
+		return state == "downloading" || state == "seeding"
+	})
+	leecher.mu.Lock()
+	handle, _ = leecher.findLocked(hash)
+	leecher.mu.Unlock()
+	_ = handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort))
+	waitFor(t, "download finished on disk", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+	if !sameFile(t, filepath.Join(src, "big.bin"), filepath.Join(disk, "big.bin")) {
+		t.Fatal("content differs after the RAM disk relocation")
+	}
+	if _, err := os.Stat(filepath.Join(ramdisk, "big.bin")); !os.IsNotExist(err) {
+		t.Fatalf("the RAM disk copy must be gone: %v", err)
+	}
+}
+
+// testProxy is a minimal SOCKS5 (no auth) or HTTP CONNECT proxy that counts
+// the tunnels it opens.
+type testProxy struct {
+	listener net.Listener
+	tunnels  atomic.Int32
+}
+
+func startTestProxy(t *testing.T, kind string) *testProxy {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &testProxy{listener: listener}
+	t.Cleanup(func() { listener.Close() })
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go p.serve(conn, kind)
+		}
+	}()
+	return p
+}
+
+func (p *testProxy) serve(conn net.Conn, kind string) {
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+	var target string
+	if kind == "socks5" {
+		header := make([]byte, 2)
+		if _, err := io.ReadFull(reader, header); err != nil {
+			return
+		}
+		methods := make([]byte, header[1])
+		if _, err := io.ReadFull(reader, methods); err != nil {
+			return
+		}
+		conn.Write([]byte{5, 0})
+		request := make([]byte, 4)
+		if _, err := io.ReadFull(reader, request); err != nil || request[3] != 1 {
+			return
+		}
+		addr := make([]byte, 6)
+		if _, err := io.ReadFull(reader, addr); err != nil {
+			return
+		}
+		target = fmt.Sprintf("%d.%d.%d.%d:%d", addr[0], addr[1], addr[2], addr[3], int(addr[4])<<8|int(addr[5]))
+		conn.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0})
+	} else {
+		req, err := http.ReadRequest(reader)
+		if err != nil || req.Method != http.MethodConnect {
+			return
+		}
+		target = req.Host
+		conn.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+	}
+	upstream, err := net.Dial("tcp", target)
+	if err != nil {
+		return
+	}
+	defer upstream.Close()
+	p.tunnels.Add(1)
+	go io.Copy(upstream, reader)
+	io.Copy(conn, upstream)
+}
+
+func TestProxyTransfer(t *testing.T) {
+	for i, kind := range []string{"socks5", "http"} {
+		t.Run(kind, func(t *testing.T) {
+			proxy := startTestProxy(t, kind)
+			base := 42800 + i*100
+			seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: uint16(base), PortEnd: uint16(base + 49), Encryption: 1})
+			leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: uint16(base + 50), PortEnd: uint16(base + 99), Encryption: 1,
+				Proxy: kind + "://" + proxy.listener.Addr().String()})
+			src := filepath.Join(t.TempDir(), "src")
+			data := makeTorrent(t, src, "via-proxy.bin", 200_000)
+			hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+			if err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+			dst := filepath.Join(t.TempDir(), "dst")
+			if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "leecher running", func() bool { return stateOf(leecher, hash) == "downloading" })
+			leecher.mu.Lock()
+			handle, _ := leecher.findLocked(hash)
+			leecher.mu.Unlock()
+			if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+				t.Fatal(err)
+			}
+			waitFor(t, "download through the proxy", func() bool {
+				info, _ := findInfo(leecher, hash)
+				return info.Progress == 100
+			})
+			if proxy.tunnels.Load() == 0 {
+				t.Fatal("the peer connection did not go through the proxy")
+			}
+			if !sameFile(t, filepath.Join(src, "via-proxy.bin"), filepath.Join(dst, "via-proxy.bin")) {
+				t.Fatal("content differs")
+			}
+		})
+	}
+}
+
+func TestIPFilterLoaded(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ipfilter.dat")
+	rules := "Bad:1.2.3.0-1.2.3.255\n005.006.007.000 - 005.006.007.255 , 000 , emule\n10.0.0.0/8\n"
+	if err := os.WriteFile(path, []byte(rules), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 43000, PortEnd: 43099, Encryption: 1, IPFilter: path})
+	if got := d.stats().IPFilterRules; got != 3 {
+		t.Fatalf("expected 3 rules, got %d", got)
+	}
+	// Reloading keeps working after a session restart (new limits).
+	d.mu.Lock()
+	d.restartSessionLocked()
+	d.mu.Unlock()
+	if got := d.stats().IPFilterRules; got != 3 {
+		t.Fatalf("rules lost after a session restart: %d", got)
 	}
 }

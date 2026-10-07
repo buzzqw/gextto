@@ -246,6 +246,40 @@ Smoke test eseguito qui:
 Big Buck Bunny resta in `downloading_metadata`: il sandbox non raggiunge i
 peer (solo HTTPS).
 
+### 3.8 gx-torrent: rete, selezione file, v2 (07/10) — dettagli in `docs/gx-torrent.md`
+rain è ora una copia modificata in `third_party/rain` (MIT, `replace` in
+`go.mod`); le modifiche sono descritte in `third_party/rain/GEXTTO.md`.
+
+- **Porta unica** come libtorrent (prima libera di `libtorrent_port_min/max`
+  o di `libtorrent_listen_interfaces`), DHT sulla stessa porta UDP. Apertura
+  automatica sul router con UPnP/NAT-PMP, rinnovata ogni 20 minuti.
+- **Selezione dei file** (priorità 0 = escluso): i file esclusi restano in
+  `DATA/parts`; progresso e completamento contano solo i file scelti.
+- **Rete**:
+  - interfaccia in ascolto e interfaccia uscente (killswitch);
+  - proxy SOCKS5/HTTP (nuova impostazione `gxtorrent_proxy`);
+  - cifratura 0/1/2;
+  - filtro IP (P2P, eMule, CIDR, intervalli), con il pulsante di
+    aggiornamento di gextto che vale anche per gx-torrent.
+- **v2-only**: rifiutati in modo chiaro; gextto mette la release in blocklist
+  e usa la successiva.
+- **Statistiche**: `/api/libtorrent/session-stats` funziona anche con
+  gx-torrent (contatori di rain).
+- **Bug di rain corretti**:
+  - IP dei peer mai più contattati dopo un completamento;
+  - race sul logger globale.
+- **Test** con trasferimenti reali tra due demoni:
+  - porta unica, anche con cifratura forzata;
+  - selezione dei file;
+  - proxy SOCKS5 e HTTP;
+  - RAM disk spostato a metà download;
+  - filtro IP.
+- **Smoke test**:
+  - gextto avvia il demone con i flag di rete;
+  - porta 6881 scelta;
+  - torrent preesistenti migrati sulla porta unica;
+  - messaggio chiaro senza router UPnP.
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso
@@ -274,7 +308,12 @@ peer (solo HTTPS).
    proprietario; i controlli su quella parte li fa lui.
 4. Il titolo del merge `281f89a` contiene "Claude" (vedi 3.2).
 
-### Da verificare sul server reale (gx-torrent, 3.7)
+### Da verificare sul server reale (gx-torrent, 3.7 e 3.8)
+- Nel log del demone deve comparire «router port N opened with UPNP/NATPMP».
+  Altrimenti va aperta la porta a mano (TCP e UDP).
+- Con VPN: impostare l'interfaccia uscente (es. `wg0`); spegnendo la VPN il
+  traffico deve fermarsi.
+
 1. `make build`, poi in Configurazione → Motore torrent scegliere `gx-torrent`
    e riavviare. Il log deve dire «gx-torrent avviato da Gextto» e
    «Torrent engine: gx-torrent».

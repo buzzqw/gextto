@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -225,8 +226,11 @@ func TestGxEngineOperations(t *testing.T) {
 	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?seed_days=7&seed_ratio=2") {
 		t.Fatal("seed limits not sent")
 	}
-	if _, err := engine.SetFilePriorities("aa", []int32{1}); err == nil {
-		t.Fatal("file priorities must be reported as unsupported")
+	if ok, err := engine.SetFilePriorities("aa", []int32{4, 0, 7}); err != nil || !ok {
+		t.Fatalf("file priorities: %v %v", ok, err)
+	}
+	if !fake.seen("POST /api/v1/torrents/aa/file-priorities?priorities=4%2C0%2C7") {
+		t.Fatal("file priorities not sent")
 	}
 	fake.mu.Lock()
 	for _, token := range fake.tokens {
@@ -259,9 +263,42 @@ func TestGxEngineMoveEmitsStorageMoved(t *testing.T) {
 	}
 }
 
+func TestGxEngineV2Error(t *testing.T) {
+	err := error(gxAPIError{Status: 400, Message: "v2_unsupported: BitTorrent v2-only torrent"})
+	if !errors.Is(err, ErrTorrentV2Unsupported) {
+		t.Fatal("the v2 refusal must be recognizable")
+	}
+	if errors.Is(gxAPIError{Status: 400, Message: "other"}, ErrTorrentV2Unsupported) {
+		t.Fatal("other errors are not v2 refusals")
+	}
+}
+
 func TestTorrentBackendNameAcceptsGxTorrent(t *testing.T) {
 	cfg := &Config{Settings: map[string]string{"torrent_backend": "gx-torrent"}}
 	if got := TorrentBackendName(cfg); got != BackendGxTorrent {
 		t.Fatalf("gx-torrent must be selectable, got %q", got)
+	}
+}
+
+func TestGxNetworkArgs(t *testing.T) {
+	cfg := &Config{DataDir: t.TempDir()}
+	cfg.Libtorrent.PortMin = 6881
+	cfg.Libtorrent.PortMax = 6891
+	cfg.Libtorrent.ListenInterfaces = "wg0:51413"
+	cfg.Libtorrent.OutgoingInterface = "wg0"
+	cfg.Libtorrent.Encryption = 2
+	cfg.Libtorrent.Dht = true
+	cfg.Libtorrent.Pex = false
+	cfg.Libtorrent.Upnp = false
+	cfg.Libtorrent.Natpmp = true
+	cfg.Libtorrent.ApplyIpFilter = true
+	got := strings.Join(gxNetworkArgs(cfg), " ")
+	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-upnp -ipfilter-trackers=true"
+	if got != want {
+		t.Fatalf("got  %q\nwant %q", got, want)
+	}
+	cfg.Libtorrent.ListenInterfaces = "0.0.0.0:6881-6891"
+	if host, ports := gxListenInterface(cfg.Libtorrent.ListenInterfaces); host != "" || ports != "6881-6891" {
+		t.Fatalf("all interfaces: %q %q", host, ports)
 	}
 }

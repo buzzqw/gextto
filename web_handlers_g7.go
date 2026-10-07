@@ -913,8 +913,18 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // IpfilterUpdate handles POST /api/torrents/ipfilter_update.
 func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
-	client, err := s.requireEmbedded("ip_filter")
-	if err != nil {
+	// Any engine that can load a local filter file (embedded libtorrent,
+	// gx-torrent) is accepted.
+	var client interface {
+		LoadIPFilter(path string) (int, error)
+	}
+	if embedded, err := s.requireEmbedded("ip_filter"); err == nil {
+		client = embedded
+	} else if loader, ok := s.activeEngine().(interface {
+		LoadIPFilter(path string) (int, error)
+	}); ok {
+		client = loader
+	} else {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}

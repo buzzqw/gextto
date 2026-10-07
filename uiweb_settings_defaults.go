@@ -129,6 +129,7 @@ var uiSettingDefaults = map[string]string{
 	"gxtorrent_url":                    "http://127.0.0.1:8890",
 	"gxtorrent_token":                  "",
 	"gxtorrent_binary":                 "",
+	"gxtorrent_proxy":                  "",
 	"gxtorrent_request_timeout_secs":   "15",
 	"gxtorrent_poll_interval_ms":       "1500",
 	"gxtorrent_managed":                "true",

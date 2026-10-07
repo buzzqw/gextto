@@ -157,10 +157,21 @@ func (e *gxTorrentEngine) Capabilities() map[string]bool {
 // HTTP
 // ---------------------------------------------------------------------------
 
+// ErrTorrentV2Unsupported is returned when gx-torrent refuses a BitTorrent
+// v2-only torrent (rain handles v1 and hybrid torrents).
+var ErrTorrentV2Unsupported = errors.New("BitTorrent v2-only torrent: not supported by gx-torrent")
+
 // gxAPIError is a non-2xx answer from the daemon.
 type gxAPIError struct {
 	Status  int
 	Message string
+}
+
+func (e gxAPIError) Unwrap() error {
+	if strings.HasPrefix(e.Message, "v2_unsupported") {
+		return ErrTorrentV2Unsupported
+	}
+	return nil
 }
 
 func (e gxAPIError) Error() string {
@@ -809,13 +820,14 @@ func (e *gxTorrentEngine) Files(hash string) ([]models.FileView, bool, error) {
 		Path       string `json:"path"`
 		Size       int64  `json:"size"`
 		Downloaded int64  `json:"downloaded"`
+		Priority   int    `json:"priority"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/files", nil, "", &files); err != nil {
 		return nil, false, err
 	}
 	out := make([]models.FileView, 0, len(files))
 	for _, file := range files {
-		out = append(out, models.FileView{Path: file.Path, Size: file.Size, Downloaded: file.Downloaded, Priority: 4})
+		out = append(out, models.FileView{Path: file.Path, Size: file.Size, Downloaded: file.Downloaded, Priority: file.Priority})
 	}
 	return out, true, nil
 }
@@ -880,8 +892,22 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 // mutations
 // ---------------------------------------------------------------------------
 
+// SetFilePriorities selects the files to download (0 = skip). gx-torrent has
+// no priority levels: any value above 0 means "download". Skipped files stay
+// out of the save path; changing the selection briefly restarts the torrent.
 func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bool, error) {
-	return false, backendCapabilityError(BackendGxTorrent, "file_priorities")
+	if len(priorities) == 0 {
+		return false, nil
+	}
+	values := make([]string, len(priorities))
+	for i, priority := range priorities {
+		values[i] = strconv.Itoa(int(priority))
+	}
+	if err := e.action(hash, "file-priorities", url.Values{"priorities": {strings.Join(values, ",")}}); err != nil {
+		return false, err
+	}
+	e.refresh()
+	return true, nil
 }
 
 // SetTrackers adds the given trackers (rain cannot remove one).
@@ -1149,4 +1175,29 @@ func (e *gxTorrentEngine) Close() error {
 		return process.Close()
 	}
 	return nil
+}
+
+// LoadIPFilter makes the daemon reload a local IP filter file.
+func (e *gxTorrentEngine) LoadIPFilter(path string) (int, error) {
+	var result struct {
+		Rules int `json:"rules"`
+	}
+	form := url.Values{"path": {path}}
+	if err := e.do(http.MethodPost, "/api/v1/ipfilter", strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", &result); err != nil {
+		return 0, err
+	}
+	logging.Info("IP filter loaded", "rules", result.Rules, "path", path)
+	return result.Rules, nil
+}
+
+// SessionStats returns the daemon's session counters (GET
+// /api/libtorrent/session-stats). rain has fewer counters than libtorrent.
+func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
+	var stats struct {
+		Session map[string]int64 `json:"session"`
+	}
+	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &stats); err != nil {
+		return nil, err
+	}
+	return stats.Session, nil
 }

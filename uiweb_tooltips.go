@@ -164,6 +164,7 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_managed":                            "Se attivo (predefinito), Gextto avvia gx-torrent da sé (l'eseguibile accanto a gexttod, installato da make/install.sh), lo riavvia se si chiude e lo ferma all'uscita. Se all'avvio trova già un gx-torrent in ascolto sull'URL, usa quello. Disattivalo se lo gestisci tu (es. servizio systemd).",
 	"gxtorrent_token":                              "Segreto condiviso con gx-torrent (header X-Gx-Token). Facoltativo se gx-torrent ascolta solo su 127.0.0.1; obbligatorio se lo esponi in rete. Non visualizzato.",
 	"gxtorrent_binary":                             "Percorso dell'eseguibile gx-torrent per l'avvio gestito. Vuoto: quello accanto a gexttod, poi quello nel PATH.",
+	"gxtorrent_proxy":                              "Proxy per gx-torrent: socks5://utente:password@host:porta oppure http://host:porta. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti per non uscire fuori dal proxy. Non visualizzato.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

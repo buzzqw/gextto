@@ -21,14 +21,13 @@ type Options struct {
 	Listen       string
 	DataDir      string
 	LinkDir      string
+	PartsDir     string
 	DownloadDir  string
 	DBPath       string
 	StatePath    string
 	Token        string
 	AllowedRoots []string
-	PortBegin    uint16
-	PortEnd      uint16
-	DHT          bool
+	Network      NetworkOptions
 	Debug        bool
 	Tick         time.Duration
 	ProbeWindow  time.Duration
@@ -55,8 +54,10 @@ type torrentMeta struct {
 	SwarmPeers     int       `json:"swarm_peers"`
 	// DoneBytes is the last verified amount, reported while rain cannot
 	// compute it (a stopped torrent has no piece table).
-	DoneBytes int64  `json:"done_bytes,omitempty"`
-	Error     string `json:"error,omitempty"`
+	DoneBytes int64 `json:"done_bytes,omitempty"`
+	// FilePriorities: one entry per file, 0 = skip (empty = all wanted).
+	FilePriorities []int  `json:"file_priorities,omitempty"`
+	Error          string `json:"error,omitempty"`
 }
 
 type persistedState struct {
@@ -90,6 +91,17 @@ type Daemon struct {
 	dirty          bool
 	startedAt      time.Time
 
+	listenHost    string
+	peerPort      int
+	mapper        *portMapper
+	ipFilterPath  string
+	ipFilterRules int
+
+	// selection is read by rain from torrent goroutines: it has its own
+	// lock and must never wait for d.mu.
+	selMu     sync.RWMutex
+	selection map[string][]bool
+
 	wake chan struct{}
 }
 
@@ -99,14 +111,24 @@ func newDaemon(opts Options) (*Daemon, error) {
 			return nil, err
 		}
 	}
+	if opts.PartsDir == "" {
+		opts.PartsDir = filepath.Join(opts.DataDir, "parts")
+	}
 	d := &Daemon{
 		opts:      opts,
+		selection: map[string][]bool{},
 		runtime:   map[string]*runtimeInfo{},
 		moving:    map[string]bool{},
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
 	}
 	if err := d.loadState(); err != nil {
+		return nil, err
+	}
+	for id, meta := range d.state.Torrents {
+		d.setSelection(id, meta.FilePriorities)
+	}
+	if err := d.prepareNetwork(); err != nil {
 		return nil, err
 	}
 	d.mu.Lock()
@@ -116,6 +138,10 @@ func newDaemon(opts Options) (*Daemon, error) {
 	}
 	d.reconcileLocked()
 	d.saveLocked()
+	if d.peerPort > 0 {
+		d.mapper = newPortMapper(d.peerPort, opts.Network.UPnP, opts.Network.NATPMP)
+		d.mapper.start()
+	}
 	return d, nil
 }
 
@@ -188,11 +214,9 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.DataDirIncludesTorrentID = true
 	cfg.ResumeOnStartup = true
 	cfg.RPCEnabled = false
-	cfg.DHTEnabled = d.opts.DHT
-	if d.opts.PortBegin > 0 && d.opts.PortEnd > d.opts.PortBegin {
-		cfg.PortBegin = d.opts.PortBegin
-		cfg.PortEnd = d.opts.PortEnd
-	}
+	d.applyNetwork(&cfg)
+	cfg.FileSelection = d.selectionFor
+	cfg.PartsDir = d.opts.PartsDir
 	cfg.SpeedLimitDownload = d.state.Config.SpeedLimitDownload
 	cfg.SpeedLimitUpload = d.state.Config.SpeedLimitUpload
 	if d.state.Config.MaxPeerDial > 0 {
@@ -211,6 +235,16 @@ func (d *Daemon) openSessionLocked() error {
 		return err
 	}
 	d.session = session
+	if path := d.ipFilterPath; path != "" || d.opts.Network.IPFilter != "" {
+		if path == "" {
+			path = d.opts.Network.IPFilter
+		}
+		if rules, err := d.loadIPFilterLocked(path); err != nil {
+			logf("IP filter %s not loaded: %v", path, err)
+		} else {
+			logf("IP filter loaded: %d rules from %s", rules, path)
+		}
+	}
 	now := time.Now()
 	for id := range d.runtime {
 		delete(d.runtime, id)
@@ -279,6 +313,7 @@ func (d *Daemon) reconcileLocked() {
 }
 
 func (d *Daemon) close() {
+	d.mapper.close()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.saveLocked()
@@ -387,6 +422,12 @@ func (d *Daemon) statsLocked(t *torrent.Torrent) torrent.Stats {
 	}
 	stats.Bytes.Completed = done
 	stats.Bytes.Incomplete = total - done
+	// With a file selection, sizes and progress refer to the wanted files.
+	if stats.Bytes.Selected > 0 && stats.Bytes.Selected < total {
+		stats.Bytes.Total = stats.Bytes.Selected
+		stats.Bytes.Completed = stats.Bytes.SelectedCompleted
+		stats.Bytes.Incomplete = stats.Bytes.Selected - stats.Bytes.SelectedCompleted
+	}
 	return stats
 }
 
@@ -778,6 +819,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
+	if (req.Magnet != "" && magnetIsV2Only(req.Magnet)) || (req.Magnet == "" && torrentIsV2Only(req.TorrentData)) {
+		return "", false, errV2Only
+	}
 	if req.Magnet != "" {
 		if hash, ok := magnetInfoHash(req.Magnet); ok {
 			d.mu.Lock()
@@ -861,6 +905,8 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 	err := d.session.RemoveTorrent(id)
 	delete(d.state.Torrents, id)
 	delete(d.runtime, id)
+	d.setSelection(id, nil)
+	_ = os.RemoveAll(filepath.Join(d.opts.PartsDir, id))
 	d.saveLocked()
 	d.mu.Unlock()
 	d.poke()
@@ -1156,25 +1202,34 @@ func (d *Daemon) config() (QueueConfig, effectiveLimits, bool) {
 }
 
 type daemonStats struct {
-	Version         string  `json:"version"`
-	UptimeSeconds   int64   `json:"uptime_seconds"`
-	Torrents        int     `json:"torrents"`
-	Downloading     int     `json:"downloading"`
-	Seeding         int     `json:"seeding"`
-	Queued          int     `json:"queued"`
-	Stalled         int     `json:"stalled"`
-	Paused          int     `json:"paused"`
-	Slow            int     `json:"slow"`
-	Moving          int     `json:"moving"`
-	DownloadRate    int64   `json:"download_rate"`
-	UploadRate      int64   `json:"upload_rate"`
-	Peers           int     `json:"peers"`
-	PortsAvailable  int     `json:"ports_available"`
-	ActiveDownloads int     `json:"active_downloads"`
-	ActiveSeeds     int     `json:"active_seeds"`
-	ActiveLimit     int     `json:"active_limit"`
-	RestartPending  bool    `json:"restart_pending"`
-	Ratio           float64 `json:"ratio"`
+	Version         string        `json:"version"`
+	UptimeSeconds   int64         `json:"uptime_seconds"`
+	Torrents        int           `json:"torrents"`
+	Downloading     int           `json:"downloading"`
+	Seeding         int           `json:"seeding"`
+	Queued          int           `json:"queued"`
+	Stalled         int           `json:"stalled"`
+	Paused          int           `json:"paused"`
+	Slow            int           `json:"slow"`
+	Moving          int           `json:"moving"`
+	DownloadRate    int64         `json:"download_rate"`
+	UploadRate      int64         `json:"upload_rate"`
+	Peers           int           `json:"peers"`
+	PortsAvailable  int           `json:"ports_available"`
+	ActiveDownloads int           `json:"active_downloads"`
+	ActiveSeeds     int           `json:"active_seeds"`
+	ActiveLimit     int           `json:"active_limit"`
+	RestartPending  bool          `json:"restart_pending"`
+	Ratio           float64       `json:"ratio"`
+	PeerPort        int           `json:"peer_port"`
+	ListenAddress   string        `json:"listen_address"`
+	PortMapping     portMapStatus `json:"port_mapping"`
+	IPFilterRules   int           `json:"ip_filter_rules"`
+	Encryption      int           `json:"encryption"`
+	Proxy           bool          `json:"proxy"`
+	DHT             bool          `json:"dht"`
+	// Session holds rain's session counters (cache, disk, transfer).
+	Session map[string]int64 `json:"session"`
 }
 
 func (d *Daemon) stats() daemonStats {
@@ -1189,6 +1244,13 @@ func (d *Daemon) stats() daemonStats {
 		ActiveSeeds:     d.limits.Seeds,
 		ActiveLimit:     d.limits.Limit,
 		RestartPending:  d.restartPending,
+		PeerPort:        d.peerPort,
+		ListenAddress:   d.listenHost,
+		PortMapping:     d.mapper.status(),
+		IPFilterRules:   d.ipFilterRules,
+		Encryption:      d.opts.Network.Encryption,
+		Proxy:           d.opts.Network.Proxy != "",
+		DHT:             d.opts.Network.DHT && d.opts.Network.Proxy == "",
 	}
 	var downloaded, uploaded int64
 	for _, view := range views {
@@ -1223,6 +1285,32 @@ func (d *Daemon) stats() daemonStats {
 		s := d.session.Stats()
 		out.Peers = s.Peers
 		out.PortsAvailable = s.PortsAvailable
+		out.Session = map[string]int64{
+			"uptime_seconds":           int64(s.Uptime.Seconds()),
+			"torrents":                 int64(s.Torrents),
+			"peers":                    int64(s.Peers),
+			"blocklist_rules":          int64(s.BlockListRules),
+			"read_cache_objects":       int64(s.ReadCacheObjects),
+			"read_cache_bytes":         s.ReadCacheSize,
+			"read_cache_hit_percent":   int64(s.ReadCacheUtilization),
+			"reads_per_second":         int64(s.ReadsPerSecond),
+			"reads_active":             int64(s.ReadsActive),
+			"reads_pending":            int64(s.ReadsPending),
+			"write_cache_objects":      int64(s.WriteCacheObjects),
+			"write_cache_bytes":        s.WriteCacheSize,
+			"write_cache_pending_keys": int64(s.WriteCachePendingKeys),
+			"writes_per_second":        int64(s.WritesPerSecond),
+			"writes_active":            int64(s.WritesActive),
+			"writes_pending":           int64(s.WritesPending),
+			"download_rate":            int64(s.SpeedDownload),
+			"upload_rate":              int64(s.SpeedUpload),
+			"disk_read_rate":           int64(s.SpeedRead),
+			"disk_write_rate":          int64(s.SpeedWrite),
+			"bytes_downloaded":         s.BytesDownloaded,
+			"bytes_uploaded":           s.BytesUploaded,
+			"bytes_read":               s.BytesRead,
+			"bytes_written":            s.BytesWritten,
+		}
 	}
 	return out
 }

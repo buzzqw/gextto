@@ -89,12 +89,17 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 			args = append(args, "-download-dir", absolute)
 		}
 	}
+	args = append(args, gxNetworkArgs(cfg)...)
 	command := exec.Command(binary, args...)
 	command.Dir = dataDir
 	command.Env = os.Environ()
 	if settings.Token != "" {
 		// Passed through the environment, not argv, so it never shows in ps.
 		command.Env = append(command.Env, "GX_TORRENT_TOKEN="+settings.Token)
+	}
+	if proxy := strings.TrimSpace(cfg.Settings["gxtorrent_proxy"]); proxy != "" {
+		// May carry credentials: environment, not argv.
+		command.Env = append(command.Env, "GX_TORRENT_PROXY="+proxy)
 	}
 	logFile, err := os.OpenFile(filepath.Join(dataDir, "gx-torrent.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -223,4 +228,85 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		}
 		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", len(crashes))
 	}
+}
+
+// gxListenInterface splits libtorrent's listen_interfaces ("0.0.0.0:6881-6891",
+// "wg0:6881", first entry only) into host and port range.
+func gxListenInterface(value string) (host, ports string) {
+	entry := strings.TrimSpace(strings.Split(value, ",")[0])
+	if entry == "" {
+		return "", ""
+	}
+	colon := strings.LastIndex(entry, ":")
+	if colon < 0 {
+		return entry, ""
+	}
+	host = strings.Trim(entry[:colon], "[]")
+	ports = strings.TrimSpace(entry[colon+1:])
+	if host == "0.0.0.0" || host == "::" || host == "*" {
+		host = ""
+	}
+	return host, strings.TrimSuffix(ports, "s")
+}
+
+// gxNetworkArgs translates Gextto's libtorrent network settings into
+// gx-torrent flags.
+func gxNetworkArgs(cfg *Config) []string {
+	lt := cfg.Libtorrent
+	ports := ""
+	if lt.PortMin > 0 {
+		ports = fmt.Sprintf("%d-%d", lt.PortMin, max(lt.PortMin, lt.PortMax))
+	}
+	host, listenPorts := gxListenInterface(lt.ListenInterfaces)
+	if listenPorts != "" {
+		ports = listenPorts
+	}
+	var args []string
+	if ports != "" {
+		args = append(args, "-peer-ports", ports)
+	}
+	if host != "" {
+		args = append(args, "-listen-interface", host)
+	}
+	if iface := strings.TrimSpace(lt.OutgoingInterface); iface != "" {
+		args = append(args, "-outgoing-interface", iface)
+	}
+	encryption := lt.Encryption
+	if encryption < 0 || encryption > 2 {
+		encryption = 1
+	}
+	args = append(args, "-encryption", fmt.Sprint(encryption))
+	if !lt.Dht {
+		args = append(args, "-no-dht")
+	}
+	if !lt.Pex {
+		args = append(args, "-no-pex")
+	}
+	if !lt.Upnp {
+		args = append(args, "-no-upnp")
+	}
+	if !lt.Natpmp {
+		args = append(args, "-no-natpmp")
+	}
+	if path := gxIPFilterPath(cfg); path != "" {
+		args = append(args, "-ipfilter", path)
+	}
+	args = append(args, fmt.Sprintf("-ipfilter-trackers=%t", lt.ApplyIpFilter))
+	return args
+}
+
+// gxIPFilterPath is the local IP filter file: the configured path, or the
+// copy Gextto downloads from a configured URL.
+func gxIPFilterPath(cfg *Config) string {
+	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	if target == "" {
+		return ""
+	}
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		target = filepath.Join(cfg.DataDir, "ipfilter.dat")
+	}
+	if !fileExists(target) {
+		return ""
+	}
+	return target
 }

@@ -237,3 +237,18 @@ func TestMagnetInfoHash(t *testing.T) {
 		t.Fatal("not a magnet")
 	}
 }
+
+func TestV2OnlyDetection(t *testing.T) {
+	if !magnetIsV2Only("magnet:?xt=urn:btmh:1220abcd") {
+		t.Fatal("btmh-only magnet must be v2-only")
+	}
+	if magnetIsV2Only("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&xt=urn:btmh:1220abcd") {
+		t.Fatal("hybrid magnet is supported")
+	}
+	if !torrentIsV2Only([]byte("d4:infod9:file treed...e12:meta versioni2e4:name1:xee")) {
+		t.Fatal("v2-only torrent not detected")
+	}
+	if torrentIsV2Only([]byte("d4:infod12:meta versioni2e6:pieces20:....................ee")) {
+		t.Fatal("hybrid torrent is supported")
+	}
+}

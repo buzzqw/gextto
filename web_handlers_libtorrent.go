@@ -167,8 +167,15 @@ func TorrentWhy(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // LibtorrentSessionStats implements GET /api/libtorrent/session-stats.
 func LibtorrentSessionStats(w http.ResponseWriter, r *http.Request, s *AppState) {
-	client, err := s.requireEmbedded("session_stats")
-	if err != nil {
+	type sessionStatter interface {
+		SessionStats() (map[string]int64, error)
+	}
+	var client sessionStatter
+	if embedded, err := s.requireEmbedded("session_stats"); err == nil {
+		client = embedded
+	} else if statter, ok := s.activeEngine().(sessionStatter); ok {
+		client = statter
+	} else {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
