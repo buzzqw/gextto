@@ -164,6 +164,7 @@ var uiSettingTooltipText = map[string]string{
 	"gxtorrent_poll_interval_ms":                   "Intervallo minimo in millisecondi tra due letture dello stato dei torrent (250–60000, predefinito 1500). La coda è gestita da gx-torrent stesso, non dipende da questo valore.",
 	"gxtorrent_token":                              "Segreto condiviso con gx-torrent (header X-Gx-Token). Facoltativo se gx-torrent ascolta solo su 127.0.0.1; obbligatorio se lo esponi in rete. Non visualizzato.",
 	"gxtorrent_proxy":                              "Proxy per gx-torrent: socks5://utente:password@host:porta oppure http://host:porta. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti per non uscire fuori dal proxy. Non visualizzato.",
+	"gxtorrent_auto":                               "Attiva l'autogestione di gx-torrent: coda dinamica e cache adattiva (dimensionata su memoria disponibile, download/seed attivi e tipo di storage). Predefinito attivo. Disattivalo per fissare a mano cache e slot.",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

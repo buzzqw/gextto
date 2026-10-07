@@ -51,6 +51,9 @@ type QueueConfig struct {
 	// rarest-first. rain applies it when a torrent is added, so it affects new
 	// additions only.
 	Sequential bool `json:"sequential"`
+	// Auto enables gx-torrent's self-management: dynamic queue and adaptive
+	// cache. Default true; the user can disable it and set the values by hand.
+	Auto *bool `json:"auto"`
 }
 
 func defaultQueueConfig() QueueConfig {
@@ -66,8 +69,11 @@ func defaultQueueConfig() QueueConfig {
 		DynamicMax:      10,
 		CacheMB:         -1,
 		CacheTTLSecs:    300,
+		Auto:            boolPtr(true),
 	}
 }
+
+func boolPtr(v bool) *bool { return &v }
 
 // normalized clamps the configuration into a usable range.
 func (c QueueConfig) normalized() QueueConfig {
@@ -106,6 +112,9 @@ func (c QueueConfig) normalized() QueueConfig {
 	}
 	if c.CacheTTLSecs < 10 {
 		c.CacheTTLSecs = 300
+	}
+	if c.Auto == nil {
+		c.Auto = boolPtr(true)
 	}
 	return c
 }

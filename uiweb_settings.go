@@ -151,6 +151,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "gxtorrent_request_timeout_secs", Label: "gx-torrent — timeout richieste (secondi)", Tab: "backend"},
 	{Key: "gxtorrent_poll_interval_ms", Label: "gx-torrent — intervallo polling (ms)", Tab: "backend"},
 	{Key: "gxtorrent_proxy", Label: "gx-torrent — proxy (socks5:// o http://)", Tab: "backend"},
+	{Key: "gxtorrent_auto", Label: "gx-torrent — gestione automatica (cache e coda)", Tab: "backend"},
 	{Key: "rename_episodes", Label: "Rinomina episodi", Tab: "rename"},
 	{Key: "tvdb_language", Label: "Lingua TVDB (es. ita, eng)", Tab: "rename"},
 	{Key: "tmdb_language", Label: "Lingua TMDB (es. it-IT)", Tab: "rename"},

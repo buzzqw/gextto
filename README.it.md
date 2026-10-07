@@ -69,6 +69,21 @@ e RAM dipende da titoli monitorati, sorgenti, torrent attivi e scansioni
 dell'archivio; le misurazioni su una singola macchina sono indicative, non una
 garanzia.
 
+**Memoria del motore torrent, misurata.** Con 50 torrent reali e ~100 MB/s di
+download su una macchina da 16 GB, l'impronta del motore cambia molto:
+
+| Motore | Idle (torrent caricati) | Picco durante il trasferimento |
+|---|---:|---:|
+| **gx-torrent** | ~25 MB | ~100 MB |
+| **libtorrent integrato** (nel processo di Gextto) | ~0,5 GB | 3–5 GB |
+| **qBittorrent-nox** | ~40 MB | ~5 GB |
+
+libtorrent e qBittorrent tengono una grande cache disco in-process (GB di memoria
+anonima). gx-torrent dimensiona i buffer sulla memoria disponibile e lascia che
+sia la page cache del kernel (reclamabile) ad assorbire le scritture: la sua
+impronta resta nelle decine/centinaia di MB. I valori reali variano con torrent,
+peer e storage; su HDD/NFS Gextto dà a gx-torrent una cache più grande.
+
 ## Installazione Linux
 
 L'installer ufficiale è destinato a server Linux 64 bit con systemd. Eseguilo

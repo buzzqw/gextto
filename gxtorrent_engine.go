@@ -662,12 +662,17 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		return int(value)
 	}
 	lt := cfg.Libtorrent
+	// gx-torrent's own self-management: dynamic queue and adaptive cache, on by
+	// default. Disabling it makes the daemon use static slot limits and a static
+	// RAM-based cache; the manual per-value settings still apply.
+	auto := settingsBool(cfg, "gxtorrent_auto", true)
 	policy := map[string]any{
 		"active_downloads": clamp(lt.ActiveDownloads),
 		"active_seeds":     clamp(lt.ActiveSeeds),
 		"active_limit":     clamp(lt.ActiveLimit),
 		"dont_count_slow":  lt.DontCountSlowTorrents,
-		"dynamic_queue":    lt.DynamicQueue,
+		"dynamic_queue":    auto,
+		"auto":             auto,
 		"dynamic_min":      clamp(lt.DynamicQueueMin),
 		"dynamic_max":      clamp(lt.DynamicQueueMax),
 		"cache_mb":         gxCacheMB(lt.CacheSize),

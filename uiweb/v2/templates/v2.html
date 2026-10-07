@@ -654,6 +654,7 @@
   {{if and (not .Groups) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
   {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
   {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
+  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;e.scrollIntoView({block:'center',behavior:'smooth'});e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash')},2500);})();</script>{{end}}
 </div>
 {{end}}
 
@@ -929,7 +930,7 @@
 {{define "v2_settings_search"}}
 {{if .Matches}}
 <table class="data-table"><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
-<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}" hx-get="/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
+<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}#v2-setting-{{.Key}}" hx-get="/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">Nessuna impostazione corrisponde a «{{.Query}}».</p>{{end}}
 {{end}}
 

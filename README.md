@@ -66,6 +66,21 @@ instead of retrying continuously. Actual CPU and memory use depend on monitored
 titles, sources, active torrents and archive scans; treat any machine-specific
 measurement as indicative, not a guarantee.
 
+**Torrent engine memory, measured.** With 50 real torrents and ~100 MB/s of
+downloads on a 16 GB machine, the engine footprint differs sharply:
+
+| Engine | Idle (torrents loaded) | Peak while transferring |
+|---|---:|---:|
+| **gx-torrent** | ~25 MB | ~100 MB |
+| **embedded libtorrent** (in Gextto's process) | ~0.5 GB | 3–5 GB |
+| **qBittorrent-nox** | ~40 MB | ~5 GB |
+
+libtorrent and qBittorrent keep a large in-process disk cache (GBs of anonymous
+memory). gx-torrent sizes its buffers from available memory and lets the
+reclaimable OS page cache absorb the writes, so its own footprint stays in the
+tens/hundreds of MB. Actual numbers vary with torrents, peers and storage;
+on HDD/NFS Gextto gives gx-torrent a larger cache.
+
 ## Install on Linux
 
 The official installer targets 64-bit Linux systems with systemd. Run it as

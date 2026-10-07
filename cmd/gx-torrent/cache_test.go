@@ -113,3 +113,18 @@ func TestAdaptCacheFirstEvaluationApplies(t *testing.T) {
 		t.Fatal("must not recompute within the check interval")
 	}
 }
+
+func TestAdaptiveCacheDisabledUsesStatic(t *testing.T) {
+	off := false
+	read, write, reason := adaptiveCache(
+		QueueConfig{Auto: &off},
+		cacheInputs{ram: 16 << 30, available: 12 << 30, activeDownloads: 8, activeSeeds: 4, class: "network"},
+	)
+	if reason != "static" {
+		t.Fatalf("reason = %q, want static", reason)
+	}
+	wantRead, wantWrite, _ := cacheSizes(QueueConfig{}, 16<<30)
+	if read != wantRead || write != wantWrite {
+		t.Fatalf("static sizing mismatch: got %d/%d want %d/%d", read, write, wantRead, wantWrite)
+	}
+}

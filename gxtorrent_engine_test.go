@@ -532,3 +532,19 @@ func TestGxEngineSetSequentialPushesConfig(t *testing.T) {
 		t.Fatalf("unchanged sequential pushed again: %d", n)
 	}
 }
+
+// TestGxAutoSettingDrivesQueueAndCache checks the dedicated self-management
+// switch: on by default (dynamic queue + adaptive cache), and disabling it
+// turns the dynamic queue off and tells the daemon to use static sizing.
+func TestGxAutoSettingDrivesQueueAndCache(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{}}
+	policy := gxQueuePolicy(cfg)
+	if policy["auto"] != true || policy["dynamic_queue"] != true {
+		t.Fatalf("self-management must default to on: %v", policy)
+	}
+	cfg.Settings["gxtorrent_auto"] = "false"
+	policy = gxQueuePolicy(cfg)
+	if policy["auto"] != false || policy["dynamic_queue"] != false {
+		t.Fatalf("disabling self-management must stop the dynamic queue: %v", policy)
+	}
+}

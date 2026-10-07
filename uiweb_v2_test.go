@@ -487,6 +487,19 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "data-table") {
 		t.Fatalf("settings search -> %d", code)
 	}
+	// A search result must deep-link to the setting and the body must scroll to
+	// and flash it (the bug was: it opened the page but not the setting).
+	code, body = v2Request(t, server, http.MethodGet, "/settings/search?q=gxtorrent_auto", nil)
+	if code != http.StatusOK || !strings.Contains(body, "#v2-setting-gxtorrent_auto") {
+		t.Fatalf("search result must deep-link to the setting -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/settings/body?tab=backend&highlight=gxtorrent_auto", nil)
+	if code != http.StatusOK || !strings.Contains(body, `id="v2-setting-gxtorrent_auto"`) {
+		t.Fatalf("highlighted setting not rendered -> %d", code)
+	}
+	if !strings.Contains(body, "scrollIntoView") || !strings.Contains(body, "setting-flash") {
+		t.Fatalf("settings body must scroll to and flash the highlighted setting")
+	}
 	code, body = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"refresh_interval"}, "value": {"3600"}})
 	if code != http.StatusOK || !strings.Contains(body, "salvata") {
 		t.Fatalf("settings save -> %d: %s", code, body)

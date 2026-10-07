@@ -797,6 +797,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .setting-key { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .setting-status { min-width: 0; font-size: 0.78rem; text-align: right; }
 .setting-row:target { border-color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 10%, transparent); }
+.setting-flash { border-color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 14%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-2) 45%, transparent); }
 
 .settings-savebar {
   display: flex;

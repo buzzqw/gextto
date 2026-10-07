@@ -134,6 +134,7 @@ var uiSettingDefaults = map[string]string{
 	"gxtorrent_proxy":                  "",
 	"gxtorrent_request_timeout_secs":   "15",
 	"gxtorrent_poll_interval_ms":       "1500",
+	"gxtorrent_auto":                   "true",
 	"qbittorrent_username":             "admin",
 	"qbittorrent_request_timeout_secs": "15",
 	"qbittorrent_poll_interval_ms":     "1500",

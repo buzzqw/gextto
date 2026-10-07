@@ -106,6 +106,11 @@ func adaptiveCache(cfg QueueConfig, in cacheInputs) (read, write int64, reason s
 		size := cfg.CacheMB * mib
 		return size, size, "manual"
 	}
+	if cfg.Auto != nil && !*cfg.Auto {
+		// Self-management disabled: static sizing from the RAM.
+		read, write, _ := cacheSizes(QueueConfig{}, in.ram)
+		return read, write, "static"
+	}
 	avail := in.available
 	if avail <= 0 {
 		avail = in.ram

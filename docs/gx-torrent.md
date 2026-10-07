@@ -59,6 +59,7 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | `gxtorrent_url` | `http://127.0.0.1:8890` | URL con cui Gextto raggiunge il demone |
 | `gxtorrent_listen` | `0.0.0.0:8890` | indirizzo di ascolto del demone gestito: la pagina e l'API sono aperte a tutta la LAN. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere). Per tenerlo solo su questo server usa `127.0.0.1:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure` e lo segnala nel log) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
+| `gxtorrent_auto` | `true` | autogestione di gx-torrent: coda dinamica e cache adattiva. Disattivala per fissare a mano slot e cache |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
