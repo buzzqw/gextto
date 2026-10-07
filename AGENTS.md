@@ -43,6 +43,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `bin/gexttod` **e** `bin/gx-torrent`. Richiede CGO/libtorrent; i warning di
   deprecazione di libtorrent sono normali.
 - `make gx-torrent` — solo il demone (`CGO_ENABLED=0`).
+- Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
+  `gx-torrent` nella root (ora ignorato). Per il demone usa `make gx-torrent`
+  (produce `bin/gx-torrent`).
 - `make test` — `check-ui-settings-index` + `installer-selftest` + `go test ./...`.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
 - Test del fork (modulo annidato, non incluso in `./...`):
