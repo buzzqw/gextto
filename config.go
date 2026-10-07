@@ -58,6 +58,9 @@ type SeriesConfig struct {
 	Enabled          bool     `json:"enabled"`
 	IgnoredSeasons   []int64  `json:"ignored_seasons"`
 	SeasonSubfolders bool     `json:"season_subfolders"`
+	// Anime series number releases by absolute episode ("Title - 1071"):
+	// those numbers are mapped onto TMDB seasons.
+	Anime bool `json:"anime"`
 	// When true, a better release never replaces an archived file for this
 	// series. Default false (= upgrades allowed).
 	DisableUpgrades bool `json:"disable_upgrades"`

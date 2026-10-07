@@ -3874,3 +3874,7 @@ fra:
   "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.": "Prochains épisodes et sorties de films pour Thunderbird, Google Agenda ou le téléphone : copiez l'adresse du lien et abonnez-vous au calendrier. Avec l'accès protégé, ajoutez ?apikey=<clé> à l'adresse."
   "Serie TV · messa in onda originale": "Séries · diffusion originale"
   "Data della prima messa in onda originale (TMDB): la versione italiana può arrivare molto più tardi.": "Date de la diffusion originale (TMDB) : une version localisée peut arriver bien plus tard."
+  "Anime (numerazione assoluta)": "Anime (numérotation absolue)"
+  "Niente upgrade": "Pas de mises à niveau"
+  "Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto.": "Les sorties d'anime numérotent les épisodes depuis le début sans saisons (« Titre - 1071 ») : Gextto convertit le numéro en saison et épisode avec les données TMDB et recherche aussi le numéro absolu."
+  "Una release migliore non sostituisce più un file già archiviato di questa serie.": "Une meilleure sortie ne remplace plus un fichier déjà archivé de cette série."

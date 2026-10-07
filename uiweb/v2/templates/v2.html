@@ -1826,6 +1826,9 @@
         <label class="field span-full"><span>Alias</span><input class="input" name="aliases" value="{{.Aliases}}" placeholder="nomi alternativi separati da virgola" /></label>
          <label class="field span-full"><span>Percorso archivio (NAS)</span><span class="field-row"><input class="input" name="archive_path" value="{{.ArchivePath}}" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="archive_path" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
         <label class="field"><span>Escludi</span><input class="input" name="exclude" value="{{.Exclude}}" /></label>
+        <input type="hidden" name="flags" value="1" />
+        <label class="check" title="Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto."><input type="checkbox" name="anime" value="true"{{if .Anime}} checked{{end}} /> <span>Anime (numerazione assoluta)</span></label>
+        <label class="check" title="Una release migliore non sostituisce più un file già archiviato di questa serie."><input type="checkbox" name="disable_upgrades" value="true"{{if .DisableUpgrades}} checked{{end}} /> <span>Niente upgrade</span></label>
         <div class="form-actions"><button class="btn primary" type="submit">Salva serie</button></div>
       </form>
     </div>

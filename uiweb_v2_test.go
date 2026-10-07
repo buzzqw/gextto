@@ -1179,3 +1179,27 @@ func TestV2LibraryEditsKeepFieldsOutsideTheListView(t *testing.T) {
 		t.Fatalf("series save quality = %q", got)
 	}
 }
+
+func TestV2SeriesSaveAnimeAndUpgradeToggles(t *testing.T) {
+	state := newTestAppState(t)
+	if err := SaveLibrary(state.cfg.DataDir, []SeriesConfig{{Name: "One Piece", Seasons: "1+", Enabled: true}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	form := func(extra url.Values) url.Values {
+		values := url.Values{"name": {"One Piece"}, "seasons": {"1+"}, "flags": {"1"}}
+		for key, value := range extra {
+			values[key] = value
+		}
+		return values
+	}
+	v2Request(t, server, http.MethodPost, "/series/save", form(url.Values{"anime": {"true"}, "disable_upgrades": {"true"}}))
+	if got := latestConfig(state).Series[0]; !got.Anime || !got.DisableUpgrades {
+		t.Fatalf("checked boxes not saved: %+v", got)
+	}
+	v2Request(t, server, http.MethodPost, "/series/save", form(nil))
+	if got := latestConfig(state).Series[0]; got.Anime || got.DisableUpgrades {
+		t.Fatalf("unchecked boxes must turn the flags off: %+v", got)
+	}
+}

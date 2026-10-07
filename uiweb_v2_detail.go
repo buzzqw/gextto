@@ -47,7 +47,7 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 		// Only the edited fields: the per-series endpoint keeps everything else.
-		body, _ := json.Marshal(map[string]any{
+		fields := map[string]any{
 			"seasons":      r.FormValue("seasons"),
 			"quality":      r.FormValue("quality"),
 			"language":     r.FormValue("language"),
@@ -56,7 +56,14 @@ func V2SeriesSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"archive_path": r.FormValue("archive_path"),
 			"exclude":      r.FormValue("exclude"),
 			"aliases":      aliases,
-		})
+		}
+		// Checkboxes send nothing when unchecked: the "flags" marker says the
+		// form carried them, so an absent box means false.
+		if r.FormValue("flags") != "" {
+			fields["anime"] = r.FormValue("anime") == "true"
+			fields["disable_upgrades"] = r.FormValue("disable_upgrades") == "true"
+		}
+		body, _ := json.Marshal(fields)
 		v2InternalJSON(s, http.MethodPost, "/api/series/"+url.PathEscape(name), nil, body)
 	}
 	if r.Header.Get("HX-Request") == "" {

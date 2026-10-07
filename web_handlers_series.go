@@ -21,6 +21,7 @@ type SeriesUpdateInput struct {
 	Enabled          *bool     `json:"enabled"`
 	SeasonSubfolders *bool     `json:"season_subfolders"`
 	DisableUpgrades  *bool     `json:"disable_upgrades"`
+	Anime            *bool     `json:"anime"`
 	Timeframe        *int64    `json:"timeframe"`
 }
 
@@ -92,6 +93,9 @@ func UpdateSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if input.DisableUpgrades != nil {
 		series.DisableUpgrades = *input.DisableUpgrades
+	}
+	if input.Anime != nil {
+		series.Anime = *input.Anime
 	}
 	if input.Timeframe != nil {
 		series.Timeframe = max(*input.Timeframe, 0)

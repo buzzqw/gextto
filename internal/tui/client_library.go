@@ -24,6 +24,7 @@ type SeriesConfig struct {
 	IgnoredSeasons   []int64  `json:"ignored_seasons"`
 	SeasonSubfolders bool     `json:"season_subfolders"`
 	DisableUpgrades  bool     `json:"disable_upgrades"`
+	Anime            bool     `json:"anime"`
 }
 
 // Episode is one row of the series detail: downloaded, in progress or

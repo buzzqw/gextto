@@ -396,7 +396,13 @@ type Release struct {
 	Episode      *int64  `json:"episode"`
 	IsPack       bool    `json:"is_pack"`
 	EpisodeRange []int64 `json:"episode_range"`
-	Year         *int64  `json:"year"`
+	// AbsoluteEpisode/AbsoluteSeries hold an anime-style absolute number
+	// ("[Group] Title - 1071") when the title has no season. The release stays
+	// unclassified until it matches a series marked as anime, which turns the
+	// number into season and episode.
+	AbsoluteEpisode *int64  `json:"absolute_episode,omitempty"`
+	AbsoluteSeries  *string `json:"absolute_series,omitempty"`
+	Year            *int64  `json:"year"`
 	// TmdbID is supplied by Prowlarr's native search response. Unlike a title
 	// string, it identifies a movie unambiguously when the release name omits
 	// its year.

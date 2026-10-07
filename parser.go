@@ -920,27 +920,34 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	if season != nil {
 		kind = "series"
 	}
+	var absoluteSeries *string
+	var absoluteEpisode *int64
+	if season == nil {
+		absoluteSeries, absoluteEpisode = parseAbsoluteEpisode(title)
+	}
 	year := releaseYear(title)
 	// E00 is a real special/recap episode, not a complete-season pack. Only
 	// titles matched by seasonPackRe use the {0} range as a pack sentinel.
 	isPack := len(episodeRange) > 1 || seasonPack
 	return &models.Release{
-		Title:        title,
-		Magnet:       sanitizedMagnet,
-		TorrentURL:   normalizedURL,
-		Source:       source,
-		Quality:      ParseQuality(title),
-		Kind:         kind,
-		Series:       series,
-		Season:       season,
-		Episode:      episode,
-		IsPack:       isPack,
-		EpisodeRange: episodeRange,
-		Year:         year,
-		DiscoveredAt: discoveredAt,
-		SizeBytes:    0,
-		Seeders:      -1,
-		Peers:        -1,
+		Title:           title,
+		Magnet:          sanitizedMagnet,
+		TorrentURL:      normalizedURL,
+		Source:          source,
+		Quality:         ParseQuality(title),
+		Kind:            kind,
+		Series:          series,
+		Season:          season,
+		Episode:         episode,
+		IsPack:          isPack,
+		EpisodeRange:    episodeRange,
+		AbsoluteEpisode: absoluteEpisode,
+		AbsoluteSeries:  absoluteSeries,
+		Year:            year,
+		DiscoveredAt:    discoveredAt,
+		SizeBytes:       0,
+		Seeders:         -1,
+		Peers:           -1,
 	}
 }
 
@@ -1047,3 +1054,42 @@ var (
 	hdWordRe  = regexp.MustCompile(`(?:^|[^a-z0-9-])hd(?:[^a-z0-9-]|$)|hdtv`)
 	palWordRe = regexp.MustCompile(`\bpal\b`)
 )
+
+// Anime releases number episodes from the first one onwards, without seasons:
+// "[SubsPlease] One Piece - 1071 (1080p)", "One Piece Ep 1071 SUB ITA",
+// "One.Piece.1071.SUB.ITA".
+var (
+	absoluteGroupDashRe = regexp.MustCompile(`^\[[^\]]*\][ ._]*(.+?)[ ._]+-[ ._]+(\d{1,4})(?:v\d)?(?:[ ._]*[\[(]|[ ._]|$)`)
+	absoluteDashRe      = regexp.MustCompile(`^(.+?)[ ._]+-[ ._]+(\d{1,4})(?:v\d)?[ ._]*[\[(]`)
+	absoluteEpRe        = regexp.MustCompile(`(?i)^(.+?)[ ._-]+(?:ep|episodio|episode)\.?[ ._-]*(\d{1,4})(?:v\d)?(?:[ ._-]|$)`)
+	absoluteLangRe      = regexp.MustCompile(`(?i)^(.+?)[ ._-]+(\d{1,4})(?:v\d)?[ ._-]+(?:sub[ ._-]?ita|ita|eng|vostfr|multi)(?:[ ._-]|$)`)
+	leadingGroupRe      = regexp.MustCompile(`^\[[^\]]*\][ ._]*`)
+)
+
+// parseAbsoluteEpisode returns the series name and absolute episode number of
+// an anime-style title, or nil when the title does not look like one.
+func parseAbsoluteEpisode(title string) (*string, *int64) {
+	for index, pattern := range []*regexp.Regexp{absoluteGroupDashRe, absoluteDashRe, absoluteEpRe, absoluteLangRe} {
+		capture := pattern.FindStringSubmatch(title)
+		if capture == nil {
+			continue
+		}
+		number, err := strconv.ParseInt(capture[2], 10, 64)
+		if err != nil || number <= 0 {
+			continue
+		}
+		// "Title 2021 ITA" is a year, not episode 2021.
+		if index == 3 && len(capture[2]) == 4 && number >= 1900 && number <= 2099 {
+			continue
+		}
+		name := leadingGroupRe.ReplaceAllString(capture[1], "")
+		name = strings.NewReplacer(".", " ", "_", " ").Replace(name)
+		name = trailingResolutionRe.ReplaceAllString(strings.TrimSpace(name), "")
+		name = strings.TrimSpace(strings.TrimRight(strings.TrimSpace(name), "-"))
+		if name == "" {
+			continue
+		}
+		return &name, &number
+	}
+	return nil, nil
+}

@@ -572,6 +572,7 @@ func seriesEditForm(tr *Translator, series SeriesConfig) *Form {
 		textField(tr, "tmdb_id", series.TmdbID),
 		textField(tr, "tvdb_id", series.TvdbID),
 		boolField(tr, "season_subfolders", series.SeasonSubfolders),
+		boolField(tr, "anime", series.Anime),
 		boolField(tr, "disable_upgrades", series.DisableUpgrades),
 	}}
 }

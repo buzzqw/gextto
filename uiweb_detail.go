@@ -57,6 +57,8 @@ type uiSeriesDetail struct {
 	TvdbID          string
 	Aliases         string
 	Enabled         bool
+	Anime           bool
+	DisableUpgrades bool
 	Episodes        []uiEpisodeRow
 	SeasonGroups    []uiSeasonGroup
 	Gaps            int
@@ -289,6 +291,8 @@ func uiSeriesDetailFrom(s *AppState, r *http.Request) (uiSeriesDetail, bool) {
 		TvdbID:          series.TvdbID,
 		Aliases:         strings.Join(series.Aliases, ", "),
 		Enabled:         series.Enabled,
+		Anime:           series.Anime,
+		DisableUpgrades: series.DisableUpgrades,
 		Episodes:        rows,
 		SeasonGroups:    seasonGroups,
 		Gaps:            gaps,

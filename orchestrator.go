@@ -133,6 +133,9 @@ func RunCycleDomain(
 		}
 		return nil, err
 	}
+	// Anime numbered by absolute episode become season/episode releases
+	// before anything is filtered by kind.
+	releases = resolveAnimeReleases(ctx, cfg, releases)
 	if domainIs(domain, "series") {
 		releases = retainKind(releases, "series")
 	}
@@ -432,7 +435,7 @@ func RunCycleDomain(
 		}
 		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
 		found := false
-		if items, err := archive.Search(query); err == nil {
+		if items, err := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode); err == nil {
 			for _, item := range items {
 				hash, ok := utils.MagnetHash(item[1])
 				if !ok {
@@ -441,7 +444,7 @@ func RunCycleDomain(
 				if _, blocked := blocklistedHashes[hash]; blocked {
 					continue
 				}
-				release := ParseRelease(item[0], item[1], "archive:"+item[2])
+				release := parseArchiveRelease(ctx, cfg, series, item)
 				if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
 					continue
 				}
@@ -565,6 +568,9 @@ func RunCycleDomain(
 			logging.Warn("could not record the deep gap pass time", "error", err)
 		}
 	}
+	// Anime numbered by absolute episode become season/episode releases
+	// before anything is filtered by kind.
+	releases = resolveAnimeReleases(ctx, cfg, releases)
 	if domainIs(domain, "series") {
 		releases = retainKind(releases, "series")
 	}
@@ -1108,7 +1114,7 @@ func prioritizeArchiveGapDownloads(
 			continue
 		}
 		query := fmt.Sprintf("%s S%02dE%02d", gap.Series, gap.Season, gap.Episode)
-		items, searchErr := archive.Search(query)
+		items, searchErr := searchArchiveForEpisode(ctx, cfg, archive, series, query, gap.Season, gap.Episode)
 		if searchErr != nil {
 			return searchErr
 		}
@@ -1120,7 +1126,7 @@ func prioritizeArchiveGapDownloads(
 			if _, blocked := blocklisted[hash]; blocked {
 				continue
 			}
-			release := ParseRelease(item[0], item[1], "archive:"+item[2])
+			release := parseArchiveRelease(ctx, cfg, series, item)
 			if !releaseMatchesConfiguredEpisode(release, series, gap.Season, gap.Episode) {
 				continue
 			}

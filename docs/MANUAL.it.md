@@ -430,7 +430,19 @@ I campi più importanti sono:
 | Stagioni | decide quali stagioni sono monitorate; gli intervalli sono supportati |
 | Alias | aiuta a collegare titoli diversi alla stessa serie |
 | Esclusioni | parole nel titolo che devono bloccare la release |
-| Consenti aggiornamenti | abilita o blocca la sostituzione di file già archiviati |
+| Niente upgrade | una release migliore non sostituisce più i file già archiviati di questa serie |
+| Anime (numerazione assoluta) | per le serie le cui release numerano gli episodi senza stagioni, vedi sotto |
+
+**Anime.** Molte release anime numerano gli episodi dall'inizio, senza
+stagioni: `[SubsPlease] One Piece - 1071 (1080p)`, `One Piece Ep 1071 SUB ITA`,
+`One.Piece.1071.SUB.ITA`. Con **Anime (numerazione assoluta)** attivo Gextto
+riconosce questi titoli per la serie, converte il numero in stagione ed episodio
+secondo le stagioni di TMDB (episodio 30 con stagioni da 12, 12 e 24 = S03E06) e,
+cercando un episodio mancante, cerca anche il numero assoluto. Anche
+`Titolo S01E1071`, prodotto da alcuni indexer, viene letto come numero assoluto
+quando la stagione 1 ha meno episodi. Senza chiave TMDB il numero assoluto vale
+come episodio della stagione 1. L'opzione riguarda solo le serie marcate:
+per le altre i titoli con un numero non vengono mai interpretati così.
 
 Lascia le stagioni non ancora disponibili abilitate se vuoi che il calendario e
 la ricerca dei mancanti continuino a funzionare. Usa *Ignora* solo per episodi
