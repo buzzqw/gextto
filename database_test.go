@@ -54,12 +54,11 @@ func TestStallWatchPersistence(t *testing.T) {
 	db := newTestDB(t)
 	stalledAt := time.Date(2026, time.October, 5, 10, 0, 0, 0, time.UTC)
 	want := StallWatch{
-		lastProgressAt:    stalledAt.Add(-time.Hour),
-		lastDone:          12345,
-		stalledSince:      &stalledAt,
-		nextRetryAt:       stalledAt.Add(time.Hour),
-		nextRetryNoticeAt: stalledAt.Add(3 * time.Hour),
-		retryNoticeStep:   2,
+		lastProgressAt: stalledAt.Add(-time.Hour),
+		lastDone:       12345,
+		stalledSince:   &stalledAt,
+		nextRetryAt:    stalledAt.Add(time.Hour),
+		retryStep:      2,
 	}
 	if err := db.SaveStallWatch("ABC123", want); err != nil {
 		t.Fatalf("save stall watch: %v", err)
@@ -72,7 +71,7 @@ func TestStallWatchPersistence(t *testing.T) {
 	if !ok {
 		t.Fatal("saved stall watch was not restored")
 	}
-	if got.lastDone != want.lastDone || got.retryNoticeStep != want.retryNoticeStep || got.stalledSince == nil || !got.stalledSince.Equal(stalledAt) || !got.nextRetryAt.Equal(want.nextRetryAt) || !got.nextRetryNoticeAt.Equal(want.nextRetryNoticeAt) {
+	if got.lastDone != want.lastDone || got.retryStep != want.retryStep || got.stalledSince == nil || !got.stalledSince.Equal(stalledAt) || !got.nextRetryAt.Equal(want.nextRetryAt) {
 		t.Fatalf("restored stall watch = %#v, want %#v", got, want)
 	}
 	if err := db.DeleteStallWatch("abc123"); err != nil {

@@ -42,10 +42,10 @@ type StallWatch struct {
 	// download slot.
 	stalledSince *time.Time
 	nextRetryAt  time.Time
-	// Retry attempts remain frequent, but their informational log lines use a
-	// separate backoff so a dead swarm does not dominate the daemon log.
-	nextRetryNoticeAt time.Time
-	retryNoticeStep   uint8
+	// retryStep counts the retries scheduled so far: each one waits longer
+	// than the previous (see tev_stallRetryIntervals), so a dead swarm is not
+	// probed, and logged, every hour forever.
+	retryStep uint8
 	// probeUntil is set while a parked torrent is resumed for a retry; when it
 	// passes without byte progress the torrent is parked again. It is not
 	// persisted: after a restart a parked torrent is simply parked again.
@@ -614,7 +614,9 @@ const tev_stallProbeWindow = 10 * time.Minute
 // its progress clock is saved, so it survives a restart.
 const tev_stallPersistAfter = 5 * time.Minute
 
-var tev_stallRetryNoticeIntervals = [...]time.Duration{
+// tev_stallRetryIntervals is the wait before each retry of a parked torrent:
+// one hour, then three, six, twelve, and every 24 hours thereafter.
+var tev_stallRetryIntervals = [...]time.Duration{
 	time.Hour,
 	3 * time.Hour,
 	6 * time.Hour,
@@ -622,24 +624,31 @@ var tev_stallRetryNoticeIntervals = [...]time.Duration{
 	24 * time.Hour,
 }
 
-// tev_stallRetryNoticeDue reports whether this successful retry should be
-// reported. It deliberately does not control the retry itself: stalled
-// torrents must still be reannounced at the configured retry cadence.
-func tev_stallRetryNoticeDue(entry *StallWatch, now time.Time) bool {
-	return entry.nextRetryNoticeAt.IsZero() || !now.Before(entry.nextRetryNoticeAt)
+// tev_stallRetryDelay is the wait before retry number step (0-based). The
+// first one honours the configured retry interval (libtorrent_stall_retry_min);
+// the later ones follow the backoff, never shorter than that setting.
+func tev_stallRetryDelay(step uint8, base time.Duration) time.Duration {
+	if step == 0 {
+		return base
+	}
+	if step >= uint8(len(tev_stallRetryIntervals)) {
+		step = uint8(len(tev_stallRetryIntervals) - 1)
+	}
+	if delay := tev_stallRetryIntervals[step]; delay > base {
+		return delay
+	}
+	return base
 }
 
-// tev_scheduleNextStallRetryNotice advances the notification-only backoff:
-// one hour, then three, six, twelve, and every 24 hours thereafter.
-func tev_scheduleNextStallRetryNotice(entry *StallWatch, now time.Time) {
-	step := entry.retryNoticeStep
-	if step >= uint8(len(tev_stallRetryNoticeIntervals)) {
-		step = uint8(len(tev_stallRetryNoticeIntervals) - 1)
+// tev_scheduleStallRetry sets when a parked torrent is retried next and
+// advances the backoff.
+func tev_scheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration) time.Duration {
+	delay := tev_stallRetryDelay(entry.retryStep, base)
+	entry.nextRetryAt = now.Add(delay)
+	if entry.retryStep < uint8(len(tev_stallRetryIntervals)-1) {
+		entry.retryStep++
 	}
-	entry.nextRetryNoticeAt = now.Add(tev_stallRetryNoticeIntervals[step])
-	if entry.retryNoticeStep < uint8(len(tev_stallRetryNoticeIntervals)-1) {
-		entry.retryNoticeStep++
-	}
+	return delay
 }
 
 // MonitorStalled implements `monitor_stalled`.
@@ -730,9 +739,9 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			stamp := now
 			entry.stalledSince = &stamp
 			code, reason, hint := DiagnoseTorrent(&torrent)
-			logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried every %s",
+			logging.Warn(fmt.Sprintf("⏸️ «%s» is stuck at %s: %s. It is set aside so other downloads can proceed, and retried in %s, then less and less often (up to once a day)",
 				torrent.Name, logPercent(torrent.Progress), stallReasonForLog(code, &torrent),
-				logDuration(time.Duration(retryValue*float64(time.Minute)))))
+				logDuration(tev_stallRetryDelay(0, retryTimeout))))
 			logging.Debug("download stalled",
 				"hash", torrent.Hash,
 				"name", torrent.Name,
@@ -746,8 +755,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				"hint", hint,
 				"stall_after_minutes", stallAfterMinutes,
 			)
-			entry.nextRetryAt = now.Add(retryTimeout)
-			tev_scheduleNextStallRetryNotice(&entry, now)
+			tev_scheduleStallRetry(&entry, now, retryTimeout)
 			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
 				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
 			} else {
@@ -835,12 +843,10 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 				entry.nextRetryAt = now.Add(15 * time.Second)
 			} else if value {
-				if tev_stallRetryNoticeDue(&entry, now) {
-					logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again", torrent.Name))
-					tev_scheduleNextStallRetryNotice(&entry, now)
-				}
+				next := tev_scheduleStallRetry(&entry, now, retryTimeout)
+				logging.Info(fmt.Sprintf("🔁 «%s» is still stuck; looking for other users to download from again (next attempt in %s)",
+					torrent.Name, logDuration(next)))
 				entry.probeUntil = now.Add(probeTimeout)
-				entry.nextRetryAt = now.Add(retryTimeout)
 			} else {
 				logging.Debug("stalled torrent restart unavailable in current mode",
 					"hash", torrent.Hash, "name", torrent.Name)

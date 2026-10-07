@@ -132,3 +132,18 @@ func TestSeedFinishedIsAnnouncedOnce(t *testing.T) {
 		t.Fatalf("second lead = %q, the end of seeding must be announced once", got)
 	}
 }
+
+func TestBackupLogSummaryMentionsOnlyConfiguredSteps(t *testing.T) {
+	steps := gh5_backupSteps{path: "/data/backups/b.zip", sizeBytes: 186974379, ftpHost: "192.168.1.119", ftpUploaded: true}
+	got := gh5_backupLogSummary(steps, true, 0, "")
+	want := "💾 Scheduled backup saved (178.3 MB): /data/backups/b.zip · FTP 192.168.1.119 ✓"
+	if got != want {
+		t.Fatalf("summary =\n %q\nwant\n %q", got, want)
+	}
+	failed := "denied"
+	steps.cloudError = &failed
+	got = gh5_backupLogSummary(steps, false, 2, "part 3/4: HTTP 413")
+	if !strings.Contains(got, "cloud copy ✗") || !strings.Contains(got, "Telegram ✗") || strings.HasPrefix(got, "💾 Scheduled") {
+		t.Fatalf("summary with failures = %q", got)
+	}
+}
