@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -785,7 +786,93 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// enabled Prowlarr manager and show its live service state alongside saved
 	// provider failures.
 	items = append(items, gh5_prowlarrServiceStatuses(cfg)...)
+	// gx-torrent never leaves a backoff row: show whether the torrent engine is
+	// up, with a link to open its web page (on another port) in a new tab.
+	if extra := gh5_gxTorrentServiceStatus(r.FormValue("public_base"), s, r, cfg); extra != nil {
+		items = append(items, *extra)
+	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
+}
+
+// gh5_gxTorrentServiceStatus reports whether the active gx-torrent engine is up
+// and links to its web page. It is only added when gx-torrent is the active
+// engine.
+func gh5_gxTorrentServiceStatus(publicBase string, s *AppState, r *http.Request, cfg *Config) *models.ProviderStatus {
+	if s == nil || s.activeEngine().Name() != BackendGxTorrent {
+		return nil
+	}
+	entry := &models.ProviderStatus{
+		Provider: "gx-torrent",
+		Kind:     "servizio",
+		URL:      gh5_gxTorrentURL(publicBase, r, cfg),
+	}
+	up := false
+	if engine, ok := s.activeEngine().(*gxTorrentEngine); ok {
+		up = engine.SessionHealthy()
+	} else if settings, err := gxTorrentSettingsFromConfig(cfg); err == nil {
+		up = gxHealthCheck(settings)
+	}
+	if up {
+		entry.UserMessage = "Motore torrent gx-torrent attivo e raggiungibile."
+		entry.SuggestedAction = "Nessuna azione necessaria. Apri la sua pagina web dal link."
+	} else {
+		entry.Level = 1
+		entry.LastError = "gx-torrent non risponde"
+		entry.UserMessage = "Motore torrent gx-torrent non raggiungibile."
+		entry.SuggestedAction = "Il demone è avviato e sorvegliato da Gextto: controlla l'indirizzo gxtorrent_url e i log. Se non riparte, Gextto torna a libtorrent."
+	}
+	return entry
+}
+
+// gh5_gxTorrentURL builds the browser-facing URL of the gx-torrent web page:
+// the host (and scheme) the client used to reach Gextto, with the daemon's
+// listen port. It never returns the server-side loopback URL.
+func gh5_gxTorrentURL(publicBase string, r *http.Request, cfg *Config) string {
+	port := gh5_gxTorrentClientPort(cfg)
+	scheme, host := "http", ""
+	if base := strings.TrimSpace(publicBase); base != "" {
+		if parsed, err := url.Parse(base); err == nil && parsed.Hostname() != "" {
+			scheme = parsed.Scheme
+			host = parsed.Hostname()
+		}
+	}
+	if host == "" && r != nil {
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		value := strings.TrimSpace(r.Host)
+		if value == "" {
+			value = strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+		}
+		if name, _, err := net.SplitHostPort(value); err == nil {
+			host = name
+		} else {
+			host = value
+		}
+	}
+	if host == "" || port == "" {
+		return ""
+	}
+	return scheme + "://" + net.JoinHostPort(host, port) + "/"
+}
+
+// gh5_gxTorrentClientPort is the port clients use to reach the gx-torrent web
+// page: the listen port, then the URL port, then the 8890 default.
+func gh5_gxTorrentClientPort(cfg *Config) string {
+	if cfg == nil {
+		return "8890"
+	}
+	if listen := strings.TrimSpace(cfg.Settings["gxtorrent_listen"]); listen != "" {
+		if _, port, err := net.SplitHostPort(listen); err == nil && port != "" {
+			return port
+		}
+	}
+	if raw := strings.TrimSpace(cfg.Settings["gxtorrent_url"]); raw != "" {
+		if parsed, err := url.Parse(raw); err == nil && parsed.Port() != "" {
+			return parsed.Port()
+		}
+	}
+	return "8890"
 }
 
 // gh5_mirCrewServiceStatus probes the configured mircrew-indexer Torznab

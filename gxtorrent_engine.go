@@ -370,6 +370,30 @@ func gxTorrentVersion(value string) string {
 	}
 }
 
+// gxHealthCheck probes the daemon health endpoint once. It is used by the
+// Health page, so showing whether gx-torrent is up does not depend on the
+// adapter's poll state.
+func gxHealthCheck(settings gxTorrentSettings) bool {
+	timeout := settings.Timeout
+	if timeout <= 0 || timeout > 5*time.Second {
+		timeout = 5 * time.Second
+	}
+	client := &http.Client{Timeout: timeout}
+	req, err := http.NewRequest(http.MethodGet, settings.BaseURL+"/api/v1/health", nil)
+	if err != nil {
+		return false
+	}
+	if settings.Token != "" {
+		req.Header.Set("X-Gx-Token", settings.Token)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
 // ---------------------------------------------------------------------------
 // polling / reconciliation
 // ---------------------------------------------------------------------------

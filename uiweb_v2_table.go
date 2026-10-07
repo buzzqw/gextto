@@ -32,6 +32,30 @@ import (
 // network call and without re-implementing data access.
 var v2Routers sync.Map
 
+// v2PublicBase returns the scheme://host the browser used to reach Gextto, so a
+// table can build client-facing links (e.g. the gx-torrent web page on another
+// port) instead of server-side loopback URLs.
+func v2PublicBase(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); proto != "" {
+		scheme = proto
+	}
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return ""
+	}
+	return scheme + "://" + host
+}
+
 func v2InternalJSON(s *AppState, method, path string, query url.Values, jsonBody []byte) ([]byte, int) {
 	muxAny, ok := v2Routers.Load(s)
 	if !ok {
@@ -207,6 +231,13 @@ func v2TableDataFrom(s *AppState, r *http.Request, view string, spec uiTableSpec
 	web := r.FormValue("web") == "1" || strings.EqualFold(r.FormValue("web"), "true")
 	if web {
 		query.Set("web", "1")
+	}
+	// Some rows link to a service on another port (the gx-torrent web page).
+	// The internal dispatch loses the browser Host, so carry it along.
+	if spec.Endpoint == "/api/providers/status" {
+		if base := v2PublicBase(r); base != "" {
+			query.Set("public_base", base)
+		}
 	}
 
 	var columns []uiColumn
