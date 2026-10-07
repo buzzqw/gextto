@@ -3,8 +3,8 @@ package cachedpiece
 import (
 	"encoding/binary"
 
-	"github.com/cenkalti/rain/internal/piece"
-	"github.com/cenkalti/rain/internal/piececache"
+	"github.com/cenkalti/rain/v2/internal/piece"
+	"github.com/cenkalti/rain/v2/internal/piececache"
 )
 
 // CachedPiece is a wrapper around a piece.Piece object that is capable of reading the data from a picecache.Cache.
@@ -29,10 +29,7 @@ func New(pi *piece.Piece, cache *piececache.Cache, readSize int64, peerID [20]by
 func (c *CachedPiece) ReadAt(p []byte, off int64) (n int, err error) {
 	blk := uint32(off / c.readSize)
 	blkBegin := uint32(int64(blk) * c.readSize)
-	blkEnd := uint32(int64(blkBegin) + c.readSize)
-	if blkEnd > c.pi.Length {
-		blkEnd = c.pi.Length
-	}
+	blkEnd := min(uint32(int64(blkBegin)+c.readSize), c.pi.Length)
 
 	key := make([]byte, 20+4+4)
 	copy(key, c.peerID)

@@ -1,11 +1,12 @@
 package piecepicker
 
 import (
-	"math/rand"
-	"sort"
+	"cmp"
+	"math/rand/v2"
+	"slices"
 
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/webseedsource"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/webseedsource"
 )
 
 // WebseedDownloadSpec contains information for downloading torrent data from webseed sources.
@@ -49,19 +50,33 @@ func (p *PiecePicker) findPieceRangeForWebseed() *Range {
 	if len(gaps) == 0 {
 		return p.webseedStealsFromAnotherWebseed()
 	}
+	if p.sequential || p.firstLast {
+		// Download the piece at the end of a file before anything else. It is a single piece
+		// request, so it completes quickly, while the gap at the beginning may span many pieces.
+		for i := range p.pieces {
+			mp := &p.pieces[i]
+			if mp.FileTail && mp.AvailableForWebseed() {
+				return &Range{Begin: mp.Index, End: mp.Index + 1}
+			}
+		}
+		if p.sequential {
+			// findGaps returns gaps in ascending index order.
+			return &gaps[0]
+		}
+	}
 	gap := selectRandomLargestGap(gaps)
 	return &gap
 }
 
 func selectRandomLargestGap(gaps []Range) Range {
-	sort.Slice(gaps, func(i, j int) bool { return gaps[i].Len() > gaps[j].Len() })
+	slices.SortFunc(gaps, func(a, b Range) int { return cmp.Compare(b.Len(), a.Len()) })
 	length := gaps[0].Len()
 	for i := range gaps {
 		if gaps[i].Len() != length {
-			return gaps[rand.Intn(i)]
+			return gaps[rand.IntN(i)]
 		}
 	}
-	return gaps[rand.Intn(len(gaps))]
+	return gaps[rand.IntN(len(gaps))]
 }
 
 func (p *PiecePicker) getDownloadingSources() []*webseedsource.WebseedSource {
@@ -79,7 +94,7 @@ func (p *PiecePicker) webseedStealsFromAnotherWebseed() *Range {
 	if len(downloading) == 0 {
 		return nil
 	}
-	sort.Slice(downloading, func(i, j int) bool { return downloading[i].Remaining() > downloading[j].Remaining() })
+	slices.SortFunc(downloading, func(a, b *webseedsource.WebseedSource) int { return cmp.Compare(b.Remaining(), a.Remaining()) })
 	src := downloading[0]
 	r := &Range{
 		Begin: (src.Downloader.ReadCurrent() + src.Downloader.End + 1) / 2,
@@ -148,11 +163,14 @@ func (p *PiecePicker) pickLastPieceOfSmallestGap(pe *peer.Peer) *myPiece {
 	if len(gaps) == 0 {
 		return nil
 	}
-	sort.Slice(gaps, func(i, j int) bool { return gaps[i].Len() < gaps[j].Len() })
+	slices.SortFunc(gaps, func(a, b Range) int { return cmp.Compare(a.Len(), b.Len()) })
 	for _, gap := range gaps {
 		// Convert index to int because it goes below zero in loop.
 		for i := int(gap.End - 1); i >= int(gap.Begin); i-- {
 			mp := &p.pieces[i]
+			if mp.Requested.Len() > 0 {
+				continue
+			}
 			if !mp.Having.Has(pe) {
 				continue
 			}

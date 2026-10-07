@@ -1,7 +1,7 @@
 # gx-torrent: il motore torrent alternativo in puro Go
 
 `gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra la libreria
-[`cenkalti/rain`](https://github.com/cenkalti/rain). È il motore predefinito di
+[`cenkalti/rain`](https://github.com/cenkalti/rain) (base v2.4.2). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
 gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
 espone anche una pagina web operativa apribile dal browser (per default su tutta
@@ -36,8 +36,8 @@ Codice:
    sceglierlo. Per usare invece libtorrent integrato imposta *Motore torrent* su
    `embedded` e riavvia. Una configurazione che ha già salvato un motore resta
    com'era: il nuovo default vale solo per le installazioni nuove.
-3. Con **gx-torrent — avviato e sorvegliato da Gextto** attivo (predefinito),
-   Gextto avvia il demone da solo:
+3. Gextto **avvia sempre e sorveglia** il demone quando gx-torrent è il motore
+   attivo:
    - dati in `DATA_DIR/gx-torrent`;
    - log in `DATA_DIR/gx-torrent/gx-torrent.log`;
    - cartella di scarico predefinita uguale a quella di libtorrent;
@@ -59,8 +59,6 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | `gxtorrent_url` | `http://127.0.0.1:8890` | URL con cui Gextto raggiunge il demone |
 | `gxtorrent_listen` | `0.0.0.0:8890` | indirizzo di ascolto del demone gestito: la pagina e l'API sono aperte a tutta la LAN. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere). Per tenerlo solo su questo server usa `127.0.0.1:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure` e lo segnala nel log) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
-| `gxtorrent_managed` | `true` | avvio e sorveglianza da Gextto |
-| `gxtorrent_allowed_roots` | vuoto | elenco di cartelle assolute in cui il demone può salvare/spostare. Vuoto = qualunque percorso assoluto deciso da Gextto. Se lo imposti, includi anche download, temp e RAM disk, altrimenti gli spostamenti falliscono |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
@@ -83,7 +81,8 @@ qBittorrent. Si aggiorna da sola ogni 5 secondi senza ricaricare la pagina.
 - **Riepilogo sessione**: stato torrent, velocità, totali, porta/router, DHT,
   uTP, cifratura, filtro IP, cache, spazio libero; barra di stato in basso.
 - **Aggiunta** da magnet, da URL a un `.torrent` (incolli l'indirizzo) o da file
-  locale caricato, con destinazione, pausa, "in cima alla coda" e limiti seed.
+  locale caricato, con destinazione, pausa, "in cima alla coda", download
+  sequenziale, prima/ultima parte e limiti seed.
 - **Tabella** con ricerca/filtro per nome, **filtro per stato** nella barra
   laterale, colonne ordinabili, selezione multipla e azioni di gruppo
   (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
@@ -136,11 +135,15 @@ Ogni flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad esempio:
 
 Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
 *libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
-filtro IP, nodi bootstrap DHT) e dalle impostazioni `gxtorrent_proxy` e
-`gxtorrent_allowed_roots`. Il limite globale di connessioni
-(`libtorrent_connections_limit`) viene ripartito tra dial uscenti e accept
-entranti di rain. Proxy e token viaggiano nell'ambiente, non sulla riga di
-comando. Le modifiche valgono dal riavvio di gextto.
+filtro IP, nodi bootstrap DHT) e dall'impostazione `gxtorrent_proxy`. Il limite
+globale di connessioni (`libtorrent_connections_limit`) viene ripartito tra
+dial uscenti e accept entranti di rain. Proxy e token viaggiano nell'ambiente,
+non sulla riga di comando. Le modifiche valgono dal riavvio di gextto.
+
+In modalità gestita il demone **non ha restrizioni di percorso**: Gextto decide
+le destinazioni, le valida e le limita già con le proprie regole. Il flag
+`-allowed-roots` esiste solo per l'**uso standalone** del demone (vedi sotto) e
+Gextto non lo imposta mai.
 
 Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
 `-insecure`). Il server RPC interno di rain è disattivato.
@@ -216,6 +219,29 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   gextto riceve "completato" quando sono pronti quelli.
 - Cambiare la selezione ferma il torrent per un attimo, sposta i file
   interessati tra `parts` e destinazione e lo fa ripartire.
+
+## Download sequenziale (streaming)
+
+Con `sequential` il torrent scarica i pezzi in ordine di indice invece che
+"rarest-first", e per prima cosa i bordi di ogni file (primo e ultimo ~1%,
+fino a 8 MB): è la modalità pensata per lo streaming, così un player può
+iniziare mentre il download prosegue. È più lenta nel complesso e peggiora la
+salute dello sciame, quindi resta **opzionale e spenta di default**.
+
+- Si imposta al momento dell'aggiunta: dalla pagina web (caselle
+  *sequential* e *first/last*), con `sequential=1` / `first_last=1` su
+  `POST /api/v1/add`, oppure dai campi `AddOptions.Sequential` /
+  `AddOptions.FirstLast` di Gextto (impostazione *Download sequenziale*,
+  `libtorrent_sequential`, e la casella prima/ultima parte).
+- `first_last` scarica per primi i bordi di ogni file e poi prosegue
+  **rarest-first**: è indipendente dall'ordine sequenziale e utile allo
+  streaming senza rinunciare alla salute dello sciame.
+- Il valore predefinito per i torrent aggiunti dopo si imposta con
+  `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
+  l'impostazione. `first_last` non ha un default di sessione.
+- rain fissa l'ordine quando il torrent viene aggiunto: l'opzione vale per i
+  torrent **nuovi**, non cambia quelli già in corso. Lo stato è persistito e
+  riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).
 
 ## Torrent BitTorrent v2
 
@@ -306,8 +332,8 @@ rain salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
   destinazione intera né altri file;
 - una vecchia cartella reale al posto del symlink (layout precedente) viene
   spostata in `DATA/orphaned/<id>` prima della rimozione, mai cancellata;
-- le destinazioni devono essere percorsi assoluti, opzionalmente limitati da
-  `-allowed-roots`.
+- le destinazioni devono essere percorsi assoluti; il flag `-allowed-roots`
+  (solo uso standalone, Gextto non lo imposta) può limitarle.
 
 **Spostamento**:
 
@@ -435,7 +461,7 @@ token è impostato.
 | `GET /api/v1/health` | stato e versione |
 | `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
-| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
+| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
@@ -460,7 +486,8 @@ Chiavi accettate da `POST /api/v1/config`:
 - `dont_count_slow`, `slow_rate`, `slow_after_secs`, `slow_rotate_secs`;
 - `dynamic_queue`, `dynamic_min`, `dynamic_max`;
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
-- `max_peer_dial`, `max_peer_accept`.
+- `max_peer_dial`, `max_peer_accept`;
+- `sequential` (predefinito per i torrent aggiunti dopo).
 
 ## Limiti noti (rain)
 
@@ -468,7 +495,6 @@ Le operazioni che rain non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- download sequenziale e prima/ultima parte;
 - web seed aggiunti a mano;
 - limiti di velocità e connessioni per singolo torrent;
 - super-seeding e upload mode;
@@ -476,6 +502,11 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 
+Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
+dalla base v2.4.2 (vedi la sezione dedicata): rain scarica per primi i bordi di
+ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
+l'indice. Il fork rende la prima/ultima parte **indipendente** dall'ordine
+sequenziale.
 
 Gli slot di upload e le connessioni per torrent restano quelli predefiniti di
 rain.

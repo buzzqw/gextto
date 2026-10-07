@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/resolver"
-	"github.com/cenkalti/rain/internal/tracker"
-	"github.com/cenkalti/rain/internal/tracker/httptracker"
+	"github.com/cenkalti/backoff/v7"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/resolver"
+	"github.com/cenkalti/rain/v2/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/tracker/httptracker"
 )
 
 // Status of the announcer.
@@ -84,8 +84,6 @@ func NewPeriodicalAnnouncer(trk tracker.Tracker, numWant int, minInterval time.D
 			RandomizationFactor: 0.5,
 			Multiplier:          2,
 			MaxInterval:         30 * time.Minute,
-			MaxElapsedTime:      0, // never stop
-			Clock:               backoff.SystemClock,
 		},
 	}
 }

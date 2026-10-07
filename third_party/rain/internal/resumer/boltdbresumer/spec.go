@@ -25,6 +25,8 @@ type Spec struct {
 	StopAfterDownload bool
 	StopAfterMetadata bool
 	CompleteCmdRun    bool
+	Sequential        bool
+	FirstLast         bool
 	Version           int
 }
 
@@ -42,6 +44,8 @@ type jsonSpec struct {
 	StopAfterDownload bool
 	StopAfterMetadata bool
 	CompleteCmdRun    bool
+	Sequential        bool
+	FirstLast         bool
 	Version           int
 
 	// JSON unsafe types
@@ -67,6 +71,8 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		StopAfterDownload: s.StopAfterDownload,
 		StopAfterMetadata: s.StopAfterMetadata,
 		CompleteCmdRun:    s.CompleteCmdRun,
+		Sequential:        s.Sequential,
+		FirstLast:         s.FirstLast,
 		Version:           s.Version,
 
 		InfoHash:  base64.StdEncoding.EncodeToString(s.InfoHash),
@@ -110,6 +116,8 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 	s.StopAfterDownload = j.StopAfterDownload
 	s.StopAfterMetadata = j.StopAfterMetadata
 	s.CompleteCmdRun = j.CompleteCmdRun
+	s.Sequential = j.Sequential
+	s.FirstLast = j.FirstLast
 	s.Version = j.Version
 	return nil
 }

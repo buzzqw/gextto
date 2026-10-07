@@ -13,7 +13,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/cenkalti/rain/torrent"
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 func skipMask(priorities []int) []bool {

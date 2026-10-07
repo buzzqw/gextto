@@ -1,16 +1,18 @@
 package urldownloader
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/cenkalti/rain/internal/bufferpool"
-	"github.com/cenkalti/rain/internal/piece"
+	"github.com/cenkalti/rain/v2/internal/bufferpool"
+	"github.com/cenkalti/rain/v2/internal/ctxutil"
+	"github.com/cenkalti/rain/v2/internal/piece"
 	"github.com/juju/ratelimit"
 )
 
@@ -76,19 +78,47 @@ func (d *URLDownloader) ReadCurrent() uint32 {
 // Run the URLDownloader and download pieces.
 func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile bool, resultC chan *PieceResult, pool *bufferpool.Pool, readTimeout time.Duration) {
 	defer close(d.doneC)
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		select {
-		case <-d.doneC:
-		case <-d.closeC:
-		}
-		cancel()
-	}()
+	ctx, cancel := ctxutil.FromChan(d.closeC)
+	defer cancel()
 
 	jobs := createJobs(pieces, d.Begin, d.readEnd())
 
 	var n int // position in piece
 	buf := pool.Get(int(pieces[d.current].Length))
+
+	// completePiece sends the filled piece buffer as a result and prepares
+	// the buffer for the next piece. Returns true if this was the last piece.
+	completePiece := func() (done bool) {
+		index := d.current
+		done = d.current >= d.readEnd()-1
+		d.sendResult(resultC, &PieceResult{Downloader: d, Buffer: buf, Index: index, Done: done})
+		if done {
+			return true
+		}
+		d.incrCurrent()
+		// Allocate new buffer for next piece
+		n = 0
+		buf = pool.Get(int(pieces[d.current].Length))
+		return false
+	}
+
+	// processPadding advances the position in the piece buffer without making
+	// a request. Padding files do not exist on the server. Their bytes are
+	// always zero and the buffer comes zeroed from the pool.
+	processPadding := func(job downloadJob) bool {
+		var m int64 // position in padding
+		for m < job.Length {
+			skipSize := calcReadSize(buf, n, job, m)
+			n += int(skipSize)
+			m += skipSize
+			if n == len(buf.Data) { // piece completed
+				if completePiece() {
+					return true
+				}
+			}
+		}
+		return true
+	}
 
 	processJob := func(job downloadJob) bool {
 		u := d.getURL(job.Filename, multifile)
@@ -131,22 +161,20 @@ func (d *URLDownloader) Run(client *http.Client, pieces []piece.Piece, multifile
 			n += o
 			m += int64(o)
 			if n == len(buf.Data) { // piece completed
-				index := d.current
-				done := d.current >= d.readEnd()-1
-				d.sendResult(resultC, &PieceResult{Downloader: d, Buffer: buf, Index: index, Done: done})
-				if done {
+				if completePiece() {
 					return true
 				}
-				d.incrCurrent()
-				// Allocate new buffer for next piece
-				n = 0
-				buf = pool.Get(int(pieces[d.current].Length))
 			}
 		}
 		return true
 	}
 	for _, job := range jobs {
-		ok := processJob(job)
+		var ok bool
+		if job.Padding {
+			ok = processPadding(job)
+		} else {
+			ok = processJob(job)
+		}
 		if !ok {
 			buf.Release()
 			break
@@ -181,14 +209,27 @@ func (d *URLDownloader) getURL(filename string, multifile bool) string {
 	src := d.URL
 	if !multifile {
 		if src[len(src)-1] == '/' {
-			src += url.PathEscape(filename)
+			src += escapeFilePath(filename)
 		}
 		return src
 	}
 	if src[len(src)-1] != '/' {
 		src += "/"
 	}
-	return src + url.PathEscape(filename)
+	return src + escapeFilePath(filename)
+}
+
+// escapeFilePath escapes each segment of the file's relative path separately,
+// keeping separators as literal slashes in the URL as required by BEP 19.
+// Escaping the whole path with url.PathEscape would encode separators as %2F,
+// which is not equivalent to a slash (RFC 3986) and is rejected by some servers.
+// Paths are built with filepath.Join, so they are split on the OS path separator.
+func escapeFilePath(filename string) string {
+	parts := strings.Split(filename, string(filepath.Separator))
+	for i := range parts {
+		parts[i] = url.PathEscape(parts[i])
+	}
+	return strings.Join(parts, "/")
 }
 
 func (d *URLDownloader) sendResult(resultC chan *PieceResult, res *PieceResult) {

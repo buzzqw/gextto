@@ -1,13 +1,13 @@
 package torrent
 
 import (
-	"github.com/cenkalti/rain/internal/netx"
-	"github.com/cenkalti/rain/internal/peerconn"
+	"github.com/cenkalti/rain/v2/internal/netx"
+	"github.com/cenkalti/rain/v2/internal/peerconn"
 	"github.com/nictuku/dht"
 	"strconv"
 	"time"
 
-	"github.com/cenkalti/rain/internal/resumer/boltdbresumer"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
 	"go.etcd.io/bbolt"
 )
 

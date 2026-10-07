@@ -4,19 +4,19 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/cenkalti/rain/internal/netx"
+	"github.com/cenkalti/rain/v2/internal/netx"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/internal/magnet"
-	"github.com/cenkalti/rain/internal/metainfo"
-	"github.com/cenkalti/rain/internal/resumer"
-	"github.com/cenkalti/rain/internal/resumer/boltdbresumer"
-	"github.com/cenkalti/rain/internal/storage/filestorage"
-	"github.com/cenkalti/rain/internal/webseedsource"
+	"github.com/cenkalti/rain/v2/internal/magnet"
+	"github.com/cenkalti/rain/v2/internal/metainfo"
+	"github.com/cenkalti/rain/v2/internal/resumer"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
+	"github.com/cenkalti/rain/v2/internal/storage"
+	"github.com/cenkalti/rain/v2/internal/webseedsource"
 	"github.com/gofrs/uuid"
 	"github.com/nictuku/dht"
 )
@@ -32,6 +32,14 @@ type AddTorrentOptions struct {
 	StopAfterDownload bool
 	// Stop torrent after metadata is downloaded from magnet links.
 	StopAfterMetadata bool
+	// Download both ends of every file first, then the remaining pieces in index order,
+	// instead of rarest-first.
+	// Useful for streaming, at the cost of slower overall download and worse swarm health.
+	Sequential bool
+	// FirstLast downloads the pieces at both ends of every file first, then
+	// continues rarest-first (gextto fork). Useful for streaming without
+	// giving up the rarest-first ordering for the rest of the torrent.
+	FirstLast bool
 }
 
 // AddTorrent adds a new torrent to the session by reading .torrent metainfo from reader.
@@ -76,7 +84,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 			s.releasePort(port)
 		}
 	}()
-	t, err := newTorrent2(
+	t, err := newTorrent(
 		s,
 		id,
 		time.Now(),
@@ -93,6 +101,8 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		opt.StopAfterDownload,
 		opt.StopAfterMetadata,
 		false, // completeCmdRun
+		opt.Sequential,
+		opt.FirstLast,
 	)
 	if err != nil {
 		return nil, err
@@ -113,6 +123,8 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		AddedAt:           t.addedAt,
 		StopAfterDownload: opt.StopAfterDownload,
 		StopAfterMetadata: opt.StopAfterMetadata,
+		Sequential:        opt.Sequential,
+		FirstLast:         opt.FirstLast,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {
@@ -190,7 +202,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 			s.releasePort(port)
 		}
 	}()
-	t, err := newTorrent2(
+	t, err := newTorrent(
 		s,
 		id,
 		time.Now(),
@@ -207,6 +219,8 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		opt.StopAfterDownload,
 		opt.StopAfterMetadata,
 		false, // completeCmdRun
+		opt.Sequential,
+		opt.FirstLast,
 	)
 	if err != nil {
 		return nil, err
@@ -226,6 +240,8 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		AddedAt:           t.addedAt,
 		StopAfterDownload: opt.StopAfterDownload,
 		StopAfterMetadata: opt.StopAfterMetadata,
+		Sequential:        opt.Sequential,
+		FirstLast:         opt.FirstLast,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {
@@ -238,7 +254,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	return t2, err
 }
 
-func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto *filestorage.FileStorage, err error) {
+func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {
 	port, err = s.getPort()
 	if err != nil {
 		return
@@ -268,10 +284,7 @@ func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto *filesto
 		}
 		id = base64.RawURLEncoding.EncodeToString(u1[:])
 	}
-	sto, err = filestorage.New(s.getDataDir(id), s.config.FilePermissions)
-	if sto != nil {
-		sto.Preallocate = s.config.Preallocate
-	}
+	sto, err = s.storage.GetStorage(id)
 	if err != nil {
 		return
 	}

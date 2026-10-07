@@ -8,34 +8,34 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cenkalti/rain/internal/acceptor"
-	"github.com/cenkalti/rain/internal/addrlist"
-	"github.com/cenkalti/rain/internal/allocator"
-	"github.com/cenkalti/rain/internal/announcer"
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/blocklist"
-	"github.com/cenkalti/rain/internal/bufferpool"
-	"github.com/cenkalti/rain/internal/externalip"
-	"github.com/cenkalti/rain/internal/handshaker/incominghandshaker"
-	"github.com/cenkalti/rain/internal/handshaker/outgoinghandshaker"
-	"github.com/cenkalti/rain/internal/infodownloader"
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/metainfo"
-	"github.com/cenkalti/rain/internal/mse"
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/pexlist"
-	"github.com/cenkalti/rain/internal/piece"
-	"github.com/cenkalti/rain/internal/piecedownloader"
-	"github.com/cenkalti/rain/internal/piecepicker"
-	"github.com/cenkalti/rain/internal/piecewriter"
-	"github.com/cenkalti/rain/internal/resumer"
-	"github.com/cenkalti/rain/internal/storage"
-	"github.com/cenkalti/rain/internal/suspendchan"
-	"github.com/cenkalti/rain/internal/tracker"
-	"github.com/cenkalti/rain/internal/unchoker"
-	"github.com/cenkalti/rain/internal/urldownloader"
-	"github.com/cenkalti/rain/internal/verifier"
-	"github.com/cenkalti/rain/internal/webseedsource"
+	"github.com/cenkalti/rain/v2/internal/acceptor"
+	"github.com/cenkalti/rain/v2/internal/addrlist"
+	"github.com/cenkalti/rain/v2/internal/allocator"
+	"github.com/cenkalti/rain/v2/internal/announcer"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/blocklist"
+	"github.com/cenkalti/rain/v2/internal/bufferpool"
+	"github.com/cenkalti/rain/v2/internal/externalip"
+	"github.com/cenkalti/rain/v2/internal/handshaker/incominghandshaker"
+	"github.com/cenkalti/rain/v2/internal/handshaker/outgoinghandshaker"
+	"github.com/cenkalti/rain/v2/internal/infodownloader"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/metainfo"
+	"github.com/cenkalti/rain/v2/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/pexlist"
+	"github.com/cenkalti/rain/v2/internal/piece"
+	"github.com/cenkalti/rain/v2/internal/piecedownloader"
+	"github.com/cenkalti/rain/v2/internal/piecepicker"
+	"github.com/cenkalti/rain/v2/internal/piecewriter"
+	"github.com/cenkalti/rain/v2/internal/resumer"
+	"github.com/cenkalti/rain/v2/internal/storage"
+	"github.com/cenkalti/rain/v2/internal/suspendchan"
+	"github.com/cenkalti/rain/v2/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/unchoker"
+	"github.com/cenkalti/rain/v2/internal/urldownloader"
+	"github.com/cenkalti/rain/v2/internal/verifier"
+	"github.com/cenkalti/rain/v2/internal/webseedsource"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -142,19 +142,10 @@ type torrent struct {
 	// Close() blocks until doneC is closed.
 	doneC chan struct{}
 
-	// These are the channels for sending a message to run() loop.
-	statsCommandC        chan statsRequest        // Stats()
-	trackersCommandC     chan trackersRequest     // Trackers()
-	peersCommandC        chan peersRequest        // Peers()
-	webseedsCommandC     chan webseedsRequest     // Webseeds()
-	startCommandC        chan struct{}            // Start()
-	stopCommandC         chan struct{}            // Stop()
-	announceCommandC     chan struct{}            // Announce()
-	verifyCommandC       chan struct{}            // Verify()
-	notifyErrorCommandC  chan notifyErrorCommand  // NotifyError()
-	notifyListenCommandC chan notifyListenCommand // NotifyListen()
-	addPeersCommandC     chan []*net.TCPAddr      // AddPeers()
-	addTrackersCommandC  chan []tracker.Tracker   // AddTrackers()
+	// Commands from the public API arrive here as closures and run on the run()
+	// goroutine, which is the only goroutine allowed to touch torrent state.
+	// See torrent_commands.go for the senders.
+	commandC chan func()
 
 	// Trackers send announce responses to this channel.
 	addrsFromTrackers chan []*net.TCPAddr
@@ -259,15 +250,22 @@ type torrent struct {
 	// If true, the torrent is stopped automatically when all metadata pieces are downloaded.
 	stopAfterMetadata bool
 
+	// If true, pieces are downloaded in index order instead of rarest-first.
+	sequential bool
+
+	// If true, the pieces at both ends of every file are downloaded first
+	// (gextto fork).
+	firstLast bool
+
 	// True means that completeCmd has run before.
 	completeCmdRun bool
 
 	log logger.Logger
 }
 
-// newTorrent2 is a constructor for torrent struct.
+// newTorrent is a constructor for torrent struct.
 // loadExistingTorrents, addTorrentStopped and addMagnet ultimately calls this method.
-func newTorrent2(
+func newTorrent(
 	s *Session,
 	id string,
 	addedAt time.Time,
@@ -284,6 +282,8 @@ func newTorrent2(
 	stopAfterDownload bool,
 	stopAfterMetadata bool,
 	completeCmdRun bool,
+	sequential bool,
+	firstLast bool,
 ) (*torrent, error) {
 	if len(infoHash) != 20 {
 		return nil, errors.New("invalid infoHash (must be 20 bytes)")
@@ -320,18 +320,7 @@ func newTorrent2(
 		completeC:                 make(chan struct{}),
 		completeMetadataC:         make(chan struct{}),
 		closeC:                    make(chan struct{}),
-		startCommandC:             make(chan struct{}),
-		stopCommandC:              make(chan struct{}),
-		announceCommandC:          make(chan struct{}),
-		verifyCommandC:            make(chan struct{}),
-		statsCommandC:             make(chan statsRequest),
-		trackersCommandC:          make(chan trackersRequest),
-		peersCommandC:             make(chan peersRequest),
-		webseedsCommandC:          make(chan webseedsRequest),
-		notifyErrorCommandC:       make(chan notifyErrorCommand),
-		notifyListenCommandC:      make(chan notifyListenCommand),
-		addPeersCommandC:          make(chan []*net.TCPAddr),
-		addTrackersCommandC:       make(chan []tracker.Tracker),
+		commandC:                  make(chan func()),
 		addrsFromTrackers:         make(chan []*net.TCPAddr),
 		peerIDs:                   make(map[[20]byte]struct{}),
 		incomingConnC:             make(chan net.Conn),
@@ -348,7 +337,7 @@ func newTorrent2(
 		verifierResultC:           make(chan *verifier.Verifier),
 		connectedPeerIPs:          make(map[string]struct{}),
 		bannedPeerIPs:             make(map[string]struct{}),
-		announcersStoppedC:        make(chan struct{}),
+		announcersStoppedC:        make(chan struct{}, 1), // buffered so a detached stop announcer can finish
 		dhtPeersC:                 make(chan []*net.TCPAddr, 1),
 		externalIP:                externalip.FirstExternalIP(),
 		downloadSpeed:             metrics.NilMeter{},
@@ -366,6 +355,8 @@ func newTorrent2(
 		stopAfterDownload:         stopAfterDownload,
 		stopAfterMetadata:         stopAfterMetadata,
 		completeCmdRun:            completeCmdRun,
+		sequential:                sequential,
+		firstLast:                 firstLast,
 	}
 	if len(t.webseedSources) > s.config.WebseedMaxSources {
 		t.webseedSources = t.webseedSources[:10]

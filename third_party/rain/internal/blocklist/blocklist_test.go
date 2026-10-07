@@ -6,6 +6,9 @@ import (
 	"testing"
 )
 
+// TestFormats covers the extra blocklist formats added by the gextto fork:
+// name:range (P2P), "a.b.c.d - a.b.c.d , level , label" (eMule) and plain
+// dotted ranges, on top of upstream CIDR.
 func TestFormats(t *testing.T) {
 	rules := `# comment
 10.0.0.0/8

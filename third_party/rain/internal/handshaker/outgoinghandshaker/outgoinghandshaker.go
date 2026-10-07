@@ -1,14 +1,13 @@
 package outgoinghandshaker
 
 import (
-	"io"
 	"net"
 	"time"
 
-	"github.com/cenkalti/rain/internal/btconn"
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/mse"
-	"github.com/cenkalti/rain/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/btconn"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/peersource"
 )
 
 // OutgoingHandshaker does the BitTorrent handshake on an outgoing connection.
@@ -48,15 +47,7 @@ func (h *OutgoingHandshaker) Run(dialTimeout, handshakeTimeout time.Duration, pe
 
 	conn, cipher, peerExtensions, peerID, err := btconn.Dial(h.Addr, dialTimeout, handshakeTimeout, !disableOutgoingEncryption, forceOutgoingEncryption, ourExtensions, infoHash, peerID, h.closeC)
 	if err != nil {
-		if err == io.EOF {
-			log.Debug("peer has closed the connection: EOF")
-		} else if err == io.ErrUnexpectedEOF {
-			log.Debug("peer has closed the connection: Unexpected EOF")
-		} else if _, ok := err.(*net.OpError); ok {
-			log.Debugln("net operation error:", err)
-		} else if _, ok := err.(*btconn.HandshakeError); ok {
-			log.Debugln("protocol error:", err)
-		} else {
+		if !btconn.LogHandshakeError(log, err) {
 			log.Errorln("cannot complete outgoing handshake:", err)
 		}
 		h.Error = err

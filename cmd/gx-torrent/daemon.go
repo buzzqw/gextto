@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cenkalti/rain/torrent"
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 // diskFree returns the free (available to the user) and total bytes of the
@@ -59,12 +59,15 @@ type torrentMeta struct {
 	Pinned      bool      `json:"pinned,omitempty"`
 	ProbeUntil  time.Time `json:"probe_until,omitzero"`
 	// StopAtMetadata pauses a magnet as soon as its metadata arrives.
-	StopAtMetadata bool      `json:"stop_at_metadata,omitempty"`
-	RotatedAt      time.Time `json:"rotated_at,omitzero"`
-	SeedRatio      float64   `json:"seed_ratio"`
-	SeedDays       int64     `json:"seed_days"`
-	SwarmSeeds     int       `json:"swarm_seeds"`
-	SwarmPeers     int       `json:"swarm_peers"`
+	StopAtMetadata bool `json:"stop_at_metadata,omitempty"`
+	// Sequential downloads pieces in order (streaming) instead of rarest-first.
+	Sequential bool      `json:"sequential,omitempty"`
+	FirstLast  bool      `json:"first_last,omitempty"`
+	RotatedAt  time.Time `json:"rotated_at,omitzero"`
+	SeedRatio  float64   `json:"seed_ratio"`
+	SeedDays   int64     `json:"seed_days"`
+	SwarmSeeds int       `json:"swarm_seeds"`
+	SwarmPeers int       `json:"swarm_peers"`
 	// DoneBytes is the last verified amount, reported while rain cannot
 	// compute it (a stopped torrent has no piece table).
 	DoneBytes int64 `json:"done_bytes,omitempty"`
@@ -695,6 +698,8 @@ type torrentInfo struct {
 	SeedDays        int64   `json:"seed_days"`
 	HasMetadata     bool    `json:"has_metadata"`
 	AutoManaged     bool    `json:"auto_managed"`
+	Sequential      bool    `json:"sequential"`
+	FirstLast       bool    `json:"first_last"`
 	Pinned          bool    `json:"pinned"`
 	Parked          bool    `json:"parked"`
 	Probing         bool    `json:"probing"`
@@ -800,6 +805,8 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		SeedDays:        meta.SeedDays,
 		HasMetadata:     stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
 		AutoManaged:     !meta.UserPaused && !meta.Parked && !meta.Pinned,
+		Sequential:      meta.Sequential,
+		FirstLast:       meta.FirstLast,
 		Pinned:          meta.Pinned,
 		Parked:          meta.Parked,
 		Probing:         !meta.ProbeUntil.IsZero(),
@@ -892,8 +899,12 @@ type addRequest struct {
 	QueueTop    bool
 	// StopAtMetadata pauses the torrent as soon as its metadata arrives.
 	StopAtMetadata bool
-	SeedRatio      float64
-	SeedDays       int64
+	// Sequential downloads pieces in order (streaming) instead of rarest-first.
+	Sequential bool
+	// FirstLast downloads the ends of every file first (gextto fork).
+	FirstLast bool
+	SeedRatio float64
+	SeedDays  int64
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -935,7 +946,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, errors.New("session not available")
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential, FirstLast: req.FirstLast}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
 		t, err = d.session.AddURI(req.Magnet, opt)
@@ -951,7 +962,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	// duplicate only unlinks its symlink, never the payload.
 	for _, other := range d.session.ListTorrents() {
 		if other.ID() != id && other.InfoHash().String() == hash {
-			if err := d.session.RemoveTorrent(id); err != nil {
+			if err := d.session.RemoveTorrent(id, false); err != nil {
 				logf("cannot drop duplicate %s: %v", id, err)
 			}
 			return hash, true, nil
@@ -968,7 +979,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	d.state.Torrents[id] = &torrentMeta{
 		ID: id, Hash: hash, SavePath: dest, AddedAt: time.Now(), Pos: pos,
 		UserPaused: req.Paused, StopAtMetadata: req.StopAtMetadata && !isComplete(d.statsLocked(t)),
-		SeedRatio: req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		Sequential: req.Sequential || d.state.Config.Sequential,
+		FirstLast:  req.FirstLast,
+		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 	}
 	d.saveLocked()
 	d.poke()
@@ -991,7 +1004,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 	name := t.Stats().Name
 	savePath := meta.SavePath
 	d.protectLegacyDir(id)
-	err := d.session.RemoveTorrent(id)
+	err := d.session.RemoveTorrent(id, false)
 	delete(d.state.Torrents, id)
 	delete(d.runtime, id)
 	d.setSelection(id, nil)

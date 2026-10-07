@@ -47,6 +47,10 @@ type QueueConfig struct {
 	CacheMB      int64 `json:"cache_mb"`
 	CacheTTLSecs int64 `json:"cache_ttl_secs"`
 	Preallocate  bool  `json:"preallocate"`
+	// Sequential downloads new torrents in piece order (streaming) instead of
+	// rarest-first. rain applies it when a torrent is added, so it affects new
+	// additions only.
+	Sequential bool `json:"sequential"`
 }
 
 func defaultQueueConfig() QueueConfig {

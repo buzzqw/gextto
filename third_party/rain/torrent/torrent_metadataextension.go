@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cenkalti/rain/internal/bufferpool"
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/peerprotocol"
-	"github.com/cenkalti/rain/internal/resumer/boltdbresumer"
+	"github.com/cenkalti/rain/v2/internal/bufferpool"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/peerprotocol"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
 )
 
 func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.ExtensionMetadataMessage) {
@@ -66,6 +66,8 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 			break
 		}
 		if !id.Done() {
+			pe.Snubbed = false
+			delete(t.infoDownloadersSnubbed, pe)
 			id.RequestBlocks(t.maxAllowedRequests(pe))
 			pe.ResetSnubTimer()
 			break
@@ -84,7 +86,7 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 
 		info, err := t.session.parseInfo(id.Bytes, boltdbresumer.LatestVersion)
 		if err != nil {
-			t.stop(fmt.Errorf("cannot parse info bytes: %s", err))
+			t.stop(fmt.Errorf("cannot parse info bytes: %w", err))
 			break
 		}
 		if info.Private {
@@ -95,7 +97,7 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		t.piecePool = bufferpool.New(int(info.PieceLength))
 		err = t.session.resumer.WriteInfo(t.id, t.info.Bytes)
 		if err != nil {
-			t.stop(fmt.Errorf("cannot write resume info: %s", err))
+			t.stop(fmt.Errorf("cannot write resume info: %w", err))
 			break
 		}
 		select {

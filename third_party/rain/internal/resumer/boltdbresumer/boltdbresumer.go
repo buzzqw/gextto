@@ -34,6 +34,8 @@ var Keys = struct {
 	StopAfterDownload []byte
 	StopAfterMetadata []byte
 	CompleteCmdRun    []byte
+	Sequential        []byte
+	FirstLast         []byte
 	Version           []byte
 }{
 	InfoHash:          []byte("info_hash"),
@@ -54,6 +56,8 @@ var Keys = struct {
 	StopAfterDownload: []byte("stop_after_download"),
 	StopAfterMetadata: []byte("stop_after_metadata"),
 	CompleteCmdRun:    []byte("complete_cmd_run"),
+	Sequential:        []byte("sequential"),
+	FirstLast:         []byte("first_last"),
 	Version:           []byte("version"),
 }
 
@@ -119,51 +123,49 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.StopAfterDownload, []byte(strconv.FormatBool(spec.StopAfterDownload)))
 		_ = b.Put(Keys.StopAfterMetadata, []byte(strconv.FormatBool(spec.StopAfterMetadata)))
 		_ = b.Put(Keys.CompleteCmdRun, []byte(strconv.FormatBool(spec.CompleteCmdRun)))
+		_ = b.Put(Keys.Sequential, []byte(strconv.FormatBool(spec.Sequential)))
+		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
 		_ = b.Put(Keys.Version, []byte(strconv.Itoa(version)))
 		return nil
 	})
 }
 
-// WriteInfo writes only the info dict of a torrent.
-func (r *Resumer) WriteInfo(torrentID string, value []byte) error {
+// update runs fn on the sub-bucket of the torrent with torrentID.
+// It does nothing if the torrent is not in the database.
+func (r *Resumer) update(torrentID string, fn func(b *bbolt.Bucket) error) error {
 	return r.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
 		if b == nil {
 			return nil
 		}
+		return fn(b)
+	})
+}
+
+// WriteInfo writes only the info dict of a torrent.
+func (r *Resumer) WriteInfo(torrentID string, value []byte) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Info, value)
 	})
 }
 
 // WriteBitfield writes only bitfield of a torrent.
 func (r *Resumer) WriteBitfield(torrentID string, value []byte) error {
-	return r.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
-		if b == nil {
-			return nil
-		}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Bitfield, value)
 	})
 }
 
 // WriteStarted writes the start status of a torrent.
 func (r *Resumer) WriteStarted(torrentID string, value bool) error {
-	return r.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
-		if b == nil {
-			return nil
-		}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.Started, []byte(strconv.FormatBool(value)))
 	})
 }
 
 // HandleStopAfterDownload clears the start status and stop_after_download fields.
 func (r *Resumer) HandleStopAfterDownload(torrentID string) error {
-	return r.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
-		if b == nil {
-			return nil
-		}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		err := b.Put(Keys.Started, []byte(strconv.FormatBool(false)))
 		if err != nil {
 			return err
@@ -174,11 +176,7 @@ func (r *Resumer) HandleStopAfterDownload(torrentID string) error {
 
 // HandleStopAfterMetadata clears the start status and stop_after_metadata fields.
 func (r *Resumer) HandleStopAfterMetadata(torrentID string) error {
-	return r.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
-		if b == nil {
-			return nil
-		}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		err := b.Put(Keys.Started, []byte(strconv.FormatBool(false)))
 		if err != nil {
 			return err
@@ -189,11 +187,7 @@ func (r *Resumer) HandleStopAfterMetadata(torrentID string) error {
 
 // WriteCompleteCmdRun writes the start status of a torrent.
 func (r *Resumer) WriteCompleteCmdRun(torrentID string) error {
-	return r.db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(r.bucket).Bucket([]byte(torrentID))
-		if b == nil {
-			return nil
-		}
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.CompleteCmdRun, []byte(strconv.FormatBool(true)))
 	})
 }
@@ -354,6 +348,22 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		value = b.Get(Keys.CompleteCmdRun)
 		if value != nil {
 			spec.CompleteCmdRun, err = strconv.ParseBool(string(value))
+			if err != nil {
+				return err
+			}
+		}
+
+		value = b.Get(Keys.Sequential)
+		if value != nil {
+			spec.Sequential, err = strconv.ParseBool(string(value))
+			if err != nil {
+				return err
+			}
+		}
+
+		value = b.Get(Keys.FirstLast)
+		if value != nil {
+			spec.FirstLast, err = strconv.ParseBool(string(value))
 			if err != nil {
 				return err
 			}

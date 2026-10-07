@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/cachedpiece"
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/peerconn/peerwriter"
-	"github.com/cenkalti/rain/internal/peerprotocol"
-	"github.com/cenkalti/rain/internal/peersource"
-	"github.com/cenkalti/rain/internal/piecedownloader"
-	"github.com/cenkalti/rain/internal/piecewriter"
-	"github.com/cenkalti/rain/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/cachedpiece"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/peerconn/peerwriter"
+	"github.com/cenkalti/rain/v2/internal/peerprotocol"
+	"github.com/cenkalti/rain/v2/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/piecedownloader"
+	"github.com/cenkalti/rain/v2/internal/piecewriter"
+	"github.com/cenkalti/rain/v2/internal/tracker"
 )
 
 func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
@@ -239,8 +239,8 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			t.closePeer(pe)
 			break
 		}
-		if msg.Begin+msg.Length > t.pieces[msg.Index].Length {
-			pe.Logger().Errorln("invalid request length:", msg.Length)
+		if !validPieceRequest(msg.Begin, msg.Length, t.pieces[msg.Index].Length) {
+			pe.Logger().Errorln("invalid request begin:", msg.Begin, "length:", msg.Length)
 			t.closePeer(pe)
 			break
 		}
@@ -357,6 +357,14 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 	default:
 		t.crash(fmt.Sprintf("unhandled peer message type: %T", msg))
 	}
+}
+
+// validPieceRequest reports whether a peer's "request" message for a block of
+// the given piece length is in bounds. begin and length are attacker-controlled
+// uint32 values, so the sum is computed in uint64 to avoid an overflow that
+// would let a request with a large begin slip past the bounds check.
+func validPieceRequest(begin, length, pieceLength uint32) bool {
+	return length != 0 && uint64(begin)+uint64(length) <= uint64(pieceLength)
 }
 
 func (t *torrent) updateInterestedState(pe *peer.Peer) {

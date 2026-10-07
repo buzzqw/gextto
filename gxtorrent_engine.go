@@ -85,9 +85,11 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 		Listen:       gxManagedListenSetting(cfg),
 		Timeout:      timeout,
 		PollInterval: poll,
-		Managed:      settingsBool(cfg, "gxtorrent_managed", true),
-		stateDir:     cfg.StateDir,
-		dataDir:      cfg.DataDir,
+		// Gextto always starts and supervises its own gx-torrent daemon. An
+		// external daemon already answering on the URL is used as-is.
+		Managed:  true,
+		stateDir: cfg.StateDir,
+		dataDir:  cfg.DataDir,
 	}, nil
 }
 
@@ -116,18 +118,19 @@ type gxTorrentEngine struct {
 	supervisorStop chan struct{}
 	closed         bool
 
-	mu           sync.Mutex
-	syncMu       sync.Mutex
-	cache        map[string]models.TorrentView
-	previous     map[string]models.TorrentView
-	events       []models.TorrentEvent
-	pendingMoves map[string]string
-	lastSync     time.Time
-	lastAttempt  time.Time
-	lastErr      string
-	connected    bool
-	queuePushed  string
-	speedPushed  string
+	mu               sync.Mutex
+	syncMu           sync.Mutex
+	cache            map[string]models.TorrentView
+	previous         map[string]models.TorrentView
+	events           []models.TorrentEvent
+	pendingMoves     map[string]string
+	lastSync         time.Time
+	lastAttempt      time.Time
+	lastErr          string
+	connected        bool
+	queuePushed      string
+	sequentialPushed string
+	speedPushed      string
 }
 
 var _ TorrentEngine = (*gxTorrentEngine)(nil)
@@ -1128,13 +1131,14 @@ func (e *gxTorrentEngine) SetPin(hash string, pinned bool) (bool, error) {
 	return true, nil
 }
 
-// SetSequential: rain always downloads rarest-first. Turning it off is a
-// no-op success; turning it on is refused.
+// SetSequential enables or disables sequential download for torrents added
+// afterwards. rain fixes the piece order when a torrent is added, so already
+// running torrents are not changed.
 func (e *gxTorrentEngine) SetSequential(enabled bool) (bool, error) {
-	if !enabled {
-		return true, nil
+	if err := e.pushConfig(map[string]any{"sequential": enabled}, &e.sequentialPushed); err != nil {
+		return false, err
 	}
-	return false, backendCapabilityError(BackendGxTorrent, "sequential")
+	return true, nil
 }
 
 // TorrentFilePath returns the .torrent copy Gextto keeps for the hash.
@@ -1177,12 +1181,6 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 // first/last-piece priority, seed mode or per-torrent limits.
 func gxWarnUnsupportedOptions(options AddOptions) {
 	var unsupported []string
-	if options.Sequential {
-		unsupported = append(unsupported, "sequential")
-	}
-	if options.FirstLast {
-		unsupported = append(unsupported, "first_last")
-	}
 	if options.SeedMode {
 		unsupported = append(unsupported, "seed_mode")
 	}
@@ -1205,6 +1203,12 @@ func gxAddForm(savePath string, options AddOptions) url.Values {
 	}
 	if options.QueueTop {
 		form.Set("top", "1")
+	}
+	if options.Sequential {
+		form.Set("sequential", "1")
+	}
+	if options.FirstLast {
+		form.Set("first_last", "1")
 	}
 	if options.StopAtMetadata {
 		form.Set("stop_at_metadata", "1")

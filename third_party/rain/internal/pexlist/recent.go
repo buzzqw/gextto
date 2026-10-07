@@ -2,8 +2,9 @@ package pexlist
 
 import (
 	"net"
+	"slices"
 
-	"github.com/cenkalti/rain/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/tracker"
 )
 
 // MaxLength is the maximum number of items to keep in the RecentlySeen list.
@@ -32,12 +33,7 @@ func (l *RecentlySeen) Add(addr *net.TCPAddr) {
 }
 
 func (l *RecentlySeen) has(cp tracker.CompactPeer) bool {
-	for _, p := range l.peers {
-		if p == cp {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(l.peers, cp)
 }
 
 // Peers returns the addresses in the list.

@@ -3,10 +3,10 @@ package torrent
 import (
 	"errors"
 
-	"github.com/cenkalti/rain/internal/infodownloader"
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/piecedownloader"
-	"github.com/cenkalti/rain/internal/webseedsource"
+	"github.com/cenkalti/rain/v2/internal/infodownloader"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/piecedownloader"
+	"github.com/cenkalti/rain/v2/internal/webseedsource"
 )
 
 var errClosed = errors.New("torrent is closed")
@@ -15,9 +15,12 @@ func (t *torrent) close() {
 	// Stop if running.
 	t.stop(errClosed)
 
-	// Maybe we are in "Stopping" state. Close "stopped" event announcer.
-	if t.stoppedEventAnnouncer != nil {
-		t.stoppedEventAnnouncer.Close()
+	// Maybe we are in "Stopping" state. Leave the "stopped" event announcer running. Closing it
+	// cancels the announce in flight, so the trackers never learn how much we have uploaded since
+	// the last periodical announce. It stops by itself after TrackerStopTimeout.
+	// Session.Close waits for it before closing the tracker transports.
+	if a := t.stoppedEventAnnouncer; a != nil {
+		t.session.detachedAnnouncers.Go(func() { <-a.Done() })
 	}
 
 	t.downloadSpeed.Stop()
@@ -40,7 +43,7 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	delete(t.incomingPeers, pe)
 	delete(t.outgoingPeers, pe)
 	delete(t.peerIDs, pe.ID)
-	delete(t.connectedPeerIPs, pe.Conn.IP())
+	delete(t.connectedPeerIPs, pe.IP())
 	if t.piecePicker != nil {
 		t.piecePicker.HandleDisconnect(pe)
 	}

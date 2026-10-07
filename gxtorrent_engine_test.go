@@ -84,7 +84,6 @@ func newTestGxEngine(t *testing.T, token string) (*gxTorrentEngine, *fakeGxDaemo
 		Settings: map[string]string{
 			"gxtorrent_url":              server.URL,
 			"gxtorrent_token":            token,
-			"gxtorrent_managed":          "false",
 			"gxtorrent_poll_interval_ms": "0",
 		},
 	}
@@ -474,17 +473,6 @@ func TestGxEnsureIPFilterForcesAtBoot(t *testing.T) {
 	}
 }
 
-func TestGxAllowedRootsValidation(t *testing.T) {
-	for _, valid := range []string{"", "/srv/media", "/srv/media,/data", " /srv/media , /data "} {
-		if err := validateGxAllowedRoots(valid); err != nil {
-			t.Fatalf("allowed roots %q must be accepted: %v", valid, err)
-		}
-	}
-	if err := validateGxAllowedRoots("relative/path"); err == nil {
-		t.Fatal("a relative allowed root must be refused")
-	}
-}
-
 func TestGxManagedListenSettingDefaultsToLAN(t *testing.T) {
 	if got := gxManagedListenSetting(&Config{Settings: map[string]string{}}); got != "0.0.0.0:8890" {
 		t.Fatalf("default listen = %q, want 0.0.0.0:8890", got)
@@ -503,5 +491,44 @@ func TestGxCacheMB(t *testing.T) {
 	}
 	if gxCacheMB(1) != 1 {
 		t.Fatal("at least 1 MiB")
+	}
+}
+
+// TestGxAddFormCarriesSequential checks that the sequential add option reaches
+// the daemon. This is the streaming mode gx-torrent gained from rain v2.
+func TestGxAddFormCarriesSequential(t *testing.T) {
+	form := gxAddForm("/dl", AddOptions{Sequential: true})
+	if form.Get("sequential") != "1" {
+		t.Fatalf("sequential not sent to the daemon: %v", form)
+	}
+	if got := gxAddForm("/dl", AddOptions{}).Get("sequential"); got != "" {
+		t.Fatalf("sequential must be off by default, got %q", got)
+	}
+	if got := gxAddForm("/dl", AddOptions{FirstLast: true}).Get("first_last"); got != "1" {
+		t.Fatalf("first_last not sent to the daemon, got %q", got)
+	}
+}
+
+// TestGxEngineSetSequentialPushesConfig checks that SetSequential reaches the
+// daemon as a config patch, and that an unchanged value is not pushed twice.
+func TestGxEngineSetSequentialPushesConfig(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	if ok, err := engine.SetSequential(true); err != nil || !ok {
+		t.Fatalf("set sequential: ok=%v err=%v", ok, err)
+	}
+	fake.mu.Lock()
+	pushed := append([]string(nil), fake.configs...)
+	fake.mu.Unlock()
+	if len(pushed) != 1 || !strings.Contains(pushed[0], `"sequential":true`) {
+		t.Fatalf("config not pushed: %v", pushed)
+	}
+	if _, err := engine.SetSequential(true); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	n := len(fake.configs)
+	fake.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("unchanged sequential pushed again: %d", n)
 	}
 }

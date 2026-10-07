@@ -279,7 +279,7 @@ func (s *Stream) HandshakeIncoming(
 		return
 	}
 	req3 := hashInt("req3", S)
-	for i := 0; i < sha1.Size; i++ {
+	for i := range sha1.Size {
 		hashRead[i] ^= req3[i]
 	}
 	sKey := getSKey(hashRead)
@@ -397,23 +397,23 @@ func (s *Stream) updateCipher(selected CryptoMethod) {
 	}
 }
 
-func (s *Stream) readSync(key []byte, max int) error {
+func (s *Stream) readSync(key []byte, remaining int) error {
 	var readBuf bytes.Buffer
 	if _, err := io.CopyN(&readBuf, s.raw, int64(len(key))); err != nil {
 		return err
 	}
-	max -= len(key)
+	remaining -= len(key)
 	for {
 		if bytes.Equal(readBuf.Bytes(), key) {
 			return nil
 		}
-		if max <= 0 {
+		if remaining <= 0 {
 			return errors.New("sync point is not found")
 		}
 		if _, err := io.CopyN(&readBuf, s.raw, 1); err != nil {
 			return err
 		}
-		max--
+		remaining--
 		if _, err := io.CopyN(io.Discard, &readBuf, 1); err != nil {
 			return err
 		}
@@ -461,7 +461,7 @@ func hashes(S *big.Int, sKey []byte) (hashS, hashSKey []byte) { // nolint:gocrit
 	req1 := hashInt("req1", S)
 	req2 := HashSKey(sKey)
 	req3 := hashInt("req3", S)
-	for i := 0; i < sha1.Size; i++ {
+	for i := range sha1.Size {
 		req3[i] ^= req2[i]
 	}
 	return req1, req3

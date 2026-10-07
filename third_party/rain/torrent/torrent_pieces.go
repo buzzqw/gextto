@@ -3,7 +3,7 @@ package torrent
 import (
 	"time"
 
-	"github.com/cenkalti/rain/internal/handshaker/outgoinghandshaker"
+	"github.com/cenkalti/rain/v2/internal/handshaker/outgoinghandshaker"
 )
 
 func (t *torrent) writeBitfield() error {
@@ -29,9 +29,7 @@ func (t *torrent) checkCompletion() bool {
 		delete(t.connectedPeerIPs, h.Addr.IP.String())
 	}
 	t.outgoingHandshakers = make(map[*outgoinghandshaker.OutgoingHandshaker]struct{})
-	for _, src := range t.webseedSources {
-		t.closeWebseedDownloader(src)
-	}
+	t.stopWebseedDownloads()
 	for pe := range t.peers {
 		if !pe.PeerInterested {
 			t.closePeer(pe)
