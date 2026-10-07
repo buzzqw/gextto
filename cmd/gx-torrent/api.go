@@ -43,10 +43,19 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /{$}", d.handleUI)
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
+	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
+	root.HandleFunc("GET /ui/torrent-file", d.handleUITorrentFile)
 	root.HandleFunc("POST /ui/action", d.handleUIAction)
+	root.HandleFunc("POST /ui/bulk", d.handleUIBulk)
 	root.HandleFunc("POST /ui/remove", d.handleUIRemove)
 	root.HandleFunc("POST /ui/add", d.handleUIAdd)
+	root.HandleFunc("POST /ui/add-file", d.handleUIAddFile)
 	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
+	root.HandleFunc("POST /ui/file-priority", d.handleUIFilePriority)
+	root.HandleFunc("POST /ui/trackers", d.handleUITrackers)
+	root.HandleFunc("POST /ui/seed-limits", d.handleUISeedLimits)
+	root.HandleFunc("POST /ui/move", d.handleUIMove)
+	root.HandleFunc("POST /ui/pin", d.handleUIPin)
 	return root
 }
 
@@ -438,6 +447,41 @@ var errV2Only = errors.New("v2_unsupported: BitTorrent v2-only torrent (no v1 in
 func magnetIsV2Only(magnet string) bool {
 	lower := strings.ToLower(magnet)
 	return strings.Contains(lower, "urn:btmh:") && !strings.Contains(lower, "urn:btih:")
+}
+
+// normalizeMagnetForRain makes the v1 (btih) hash the first xt and drops any
+// btmh. rain's magnet parser reads only the first xt and rejects a v2
+// multihash, so a hybrid magnet that lists btmh before btih would otherwise be
+// refused even though its v1 side is downloadable.
+func normalizeMagnetForRain(magnet string) string {
+	parsed, err := url.Parse(strings.TrimSpace(magnet))
+	if err != nil || parsed.Scheme != "magnet" {
+		return magnet
+	}
+	query := parsed.Query()
+	v1 := ""
+	for _, xt := range query["xt"] {
+		if strings.HasPrefix(strings.ToLower(xt), "urn:btih:") {
+			v1 = xt
+			break
+		}
+	}
+	if v1 == "" {
+		// No v1 hash: leave it untouched (a v2-only magnet is rejected earlier).
+		return magnet
+	}
+	ordered := url.Values{}
+	ordered.Set("xt", v1)
+	for key, values := range query {
+		if key == "xt" {
+			continue
+		}
+		for _, value := range values {
+			ordered.Add(key, value)
+		}
+	}
+	parsed.RawQuery = ordered.Encode()
+	return parsed.String()
 }
 
 // torrentIsV2Only reports a .torrent whose info has "meta version" 2 and no

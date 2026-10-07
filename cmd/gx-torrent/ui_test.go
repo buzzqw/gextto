@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/sha1"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -125,6 +127,95 @@ func TestUIActionRejectsCrossOrigin(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("cross-origin POST -> %d, want 403", resp.StatusCode)
+	}
+}
+
+func TestUIAddRemoteTorrent(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	torrentBytes := makeTorrent(t, src, "payload.bin", 80_000)
+	fileServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-bittorrent")
+		_, _ = w.Write(torrentBytes)
+	}))
+	t.Cleanup(fileServer.Close)
+
+	// Add a torrent from a remote URL (paste a URL).
+	resp, err := http.PostForm(server.URL+"/ui/add", url.Values{
+		"source":      {fileServer.URL + "/payload.torrent"},
+		"destination": {src},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(d.list()) != 1 {
+		t.Fatalf("remote add: %d torrents, want 1", len(d.list()))
+	}
+}
+
+// makeTwoFileTorrent builds a .torrent with two files and one piece each, so a
+// file can be skipped while another stays wanted.
+func makeTwoFileTorrent(t *testing.T) []byte {
+	t.Helper()
+	a := make([]byte, 16384)
+	b := make([]byte, 16384)
+	_, _ = rand.Read(a)
+	_, _ = rand.Read(b)
+	sumA := sha1.Sum(a)
+	sumB := sha1.Sum(b)
+	pieces := append(sumA[:], sumB[:]...)
+	return bencode(map[string]any{
+		"info": map[string]any{
+			"name": "pack",
+			"files": []any{
+				map[string]any{"length": len(a), "path": []any{"a.bin"}},
+				map[string]any{"length": len(b), "path": []any{"b.bin"}},
+			},
+			"piece length": 16384,
+			"pieces":       pieces,
+		},
+	})
+}
+
+func TestUIFilePrioritySkipsOneFile(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTwoFileTorrent(t), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "metadata", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.HasMetadata
+	})
+
+	resp, err := http.PostForm(server.URL+"/ui/file-priority", url.Values{
+		"hash": {hash}, "index": {"0"}, "priority": {"0"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("file-priority -> %d", resp.StatusCode)
+	}
+
+	d.mu.Lock()
+	_, meta := d.findLocked(hash)
+	var priorities []int
+	if meta != nil {
+		priorities = append(priorities, meta.FilePriorities...)
+	}
+	d.mu.Unlock()
+	if len(priorities) != 2 || priorities[0] != 0 || priorities[1] <= 0 {
+		t.Fatalf("file priorities not applied: %v", priorities)
 	}
 }
 

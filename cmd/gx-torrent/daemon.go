@@ -871,6 +871,11 @@ type addRequest struct {
 // add registers a torrent stopped and lets the queue start it. A torrent
 // already in the session is reported with existing=true and left untouched.
 func (d *Daemon) add(req addRequest) (string, bool, error) {
+	if req.Magnet != "" {
+		// rain reads only the first xt: keep the v1 hash in front so a hybrid
+		// magnet whose btmh comes first is still downloadable.
+		req.Magnet = normalizeMagnetForRain(req.Magnet)
+	}
 	dest, err := d.validateDestination(req.Destination)
 	if err != nil {
 		return "", false, err
