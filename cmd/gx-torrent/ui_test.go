@@ -33,7 +33,7 @@ func TestUIPageServes(t *testing.T) {
 	buf := make([]byte, 16384)
 	n, _ := resp.Body.Read(buf)
 	body := string(buf[:n])
-	if !strings.Contains(body, "gx-torrent") || !strings.Contains(body, "Aggiungi") {
+	if !strings.Contains(body, "gx-torrent") || !strings.Contains(body, "Add") {
 		t.Fatalf("GET / body unexpected: %s", body)
 	}
 }
@@ -54,7 +54,7 @@ func TestUILiveFragment(t *testing.T) {
 	buf := make([]byte, 8192)
 	n, _ := resp.Body.Read(buf)
 	body := string(buf[:n])
-	if !strings.Contains(body, "filtro IP") || strings.Contains(body, "<html") {
+	if !strings.Contains(body, "IP filter") || strings.Contains(body, "<html") {
 		t.Fatalf("live fragment unexpected: %s", body)
 	}
 }
@@ -239,7 +239,7 @@ func TestUIDetailRendersGeneral(t *testing.T) {
 		t.Fatalf("detail -> %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	for _, want := range []string{"Dimensione pezzo", "Pezzi disponibili", "Copia magnet", "Sposta i dati in"} {
+	for _, want := range []string{"Piece size", "Available / total pieces", "Copy magnet", "Move data to"} {
 		if !strings.Contains(string(body), want) {
 			t.Fatalf("detail missing %q", want)
 		}

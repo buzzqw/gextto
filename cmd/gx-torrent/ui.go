@@ -193,23 +193,23 @@ type uiDetailData struct {
 const uiStyle = `
 :root{color-scheme:light dark}
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1420;color:#e7ecf3}
+body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1420;color:#e7ecf3}
 header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-header h1{font-size:18px;margin:0;font-weight:600}
+header h1{font-size:20px;margin:0;font-weight:600}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
-.muted{color:#93a1b5;font-size:13px}
+.muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
 .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.card{background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px 16px;min-width:130px}
-.card b{display:block;font-size:22px}
-.card span{color:#93a1b5;font-size:13px}
+.card{background:#161d2c;border:1px solid #243049;border-radius:10px;padding:14px 18px;min-width:140px}
+.card b{display:block;font-size:24px}
+.card span{color:#93a1b5;font-size:14px}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px;margin-bottom:12px}
 .toolbar form{display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap}
 .toolbar input[type=text],.toolbar input[type=search]{min-width:200px}
 .chk{display:flex;gap:4px;align-items:center;color:#93a1b5;font-size:12px}
 table{width:100%;border-collapse:collapse;background:#161d2c;border:1px solid #243049;border-radius:10px;overflow:hidden}
-th,td{padding:9px 12px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
-th{color:#93a1b5;font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #1f2839;font-size:15px;vertical-align:middle}
+th{color:#93a1b5;font-weight:500;font-size:13px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;white-space:nowrap}
 td.sel,th.sel{width:26px;text-align:center}
@@ -224,8 +224,8 @@ td.name,th.name{min-width:280px;max-width:640px;word-break:break-word}
 .bar i{display:block;height:100%;background:#3b82f6}
 .actions{white-space:nowrap;text-align:right}
 .actions form{display:inline-block;margin:0 2px 2px 0}
-input[type=text],input[type=search],input[type=password],input[type=number],select{padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
-button{padding:6px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;color:#dbe4f0;font-size:13px;cursor:pointer}
+input[type=text],input[type=search],input[type=password],input[type=number],select{padding:10px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit;font-size:16px}
+button{padding:8px 14px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;color:#dbe4f0;font-size:15px;cursor:pointer}
 button:hover{background:#243049}
 button.primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
 button.danger{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
@@ -241,21 +241,21 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 .detail-tabs button.on{background:#2563eb;border-color:#2563eb;color:#fff}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 18px;margin-bottom:12px}
 .stat-grid .row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #1f2839;padding:3px 0}
-.stat-grid .row span{color:#93a1b5;font-size:12px}
+.stat-grid .row span{color:#93a1b5;font-size:13px}
 .stat-grid .row strong{font-weight:500;text-align:right;word-break:break-word}
 .form-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;padding-top:10px;border-top:1px solid #1f2839}
-.form-grid label{display:flex;flex-direction:column;gap:3px;color:#93a1b5;font-size:12px}
+.form-grid label{display:flex;flex-direction:column;gap:3px;color:#93a1b5;font-size:13px}
 .layout{display:flex;gap:14px;align-items:flex-start}
 .sidebar{display:flex;flex-direction:column;gap:4px;min-width:180px;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:10px}
 .filter{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;color:#dbe4f0}
 .filter:hover{background:#243049}
 .filter.on{background:#2563eb;color:#fff}
 .content{flex:1;min-width:0}
-.statusbar{position:sticky;bottom:0;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#131a28;border:1px solid #243049;border-radius:10px;padding:10px 14px;font-size:13px;color:#93a1b5}
+.statusbar{position:sticky;bottom:0;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#131a28;border:1px solid #243049;border-radius:10px;padding:10px 14px;font-size:14px;color:#93a1b5}
 .statusbar b{color:#e7ecf3;font-weight:600}
 .toast{position:fixed;top:14px;right:14px;z-index:80;background:#14351f;border:1px solid #1f6b3a;color:#e7ecf3;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:420px;transition:opacity .4s}
 .toast.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
-.flag{font-size:11px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
+.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
 .flag.on{background:#14532d;color:#86efac}
 @media(max-width:760px){.layout{flex-direction:column}.sidebar{flex-direction:row;flex-wrap:wrap;min-width:0}}
 `
@@ -268,7 +268,7 @@ var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
 }).Parse(uiPageTemplate + uiLiveTemplate + uiDetailTemplate))
 
 const uiPageTemplate = `<!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -278,43 +278,43 @@ const uiPageTemplate = `<!doctype html>
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <span class="muted">v{{.Version}} · attivo da {{.Uptime}} · {{.Now}}</span>
+  <span class="muted">v{{.Version}} · up for {{.Uptime}} · {{.Now}}</span>
 </header>
 <main>
   {{if .Notice}}<div class="notice{{if .Error}} err{{end}}">{{.Notice}}</div>{{end}}
 
   <div class="toolbar">
     <form method="post" action="/ui/add">
-      <input type="text" name="source" placeholder="incolla magnet:… oppure https://…/file.torrent" autocomplete="off">
-      <input type="text" name="destination" placeholder="destinazione (vuoto = predefinita)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> pausa</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> in cima</label>
-      <button class="primary" type="submit">Aggiungi</button>
+      <input type="text" name="source" placeholder="paste magnet:… or https://…/file.torrent" autocomplete="off">
+      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
+      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
+      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <button class="primary" type="submit">Add</button>
     </form>
     <form method="post" action="/ui/add-file" enctype="multipart/form-data">
-      <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" required title="File .torrent da aggiungere">
-      <input type="text" name="destination" placeholder="destinazione (vuoto = predefinita)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> pausa</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> in cima</label>
-      <button type="submit">Aggiungi .torrent</button>
+      <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" required title=".torrent file to add">
+      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
+      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
+      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <button type="submit">Add .torrent</button>
     </form>
     <form method="post" action="/ui/ipfilter">
-      <span class="muted">Filtro IP</span>
-      <input type="text" name="source" placeholder="URL o file locale" autocomplete="off">
-      <button type="submit" title="Scarica (se URL) e applica subito il filtro IP">Carica filtro</button>
+      <span class="muted">IP filter</span>
+      <input type="text" name="source" placeholder="URL or local file" autocomplete="off">
+      <button type="submit" title="Download (if a URL) and apply the IP filter now">Load filter</button>
     </form>
-    <input type="search" id="filter" placeholder="Filtra torrent…" oninput="filterRows()" autocomplete="off">
+    <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off">
   </div>
 
   <div class="toolbar">
-    <span class="muted">Selezionati: <b id="selcount">0</b></span>
-    <button type="button" onclick="bulk('resume')">▶ Riprendi</button>
-    <button type="button" onclick="bulk('pause')">⏸ Pausa</button>
-    <button type="button" onclick="bulk('verify')">✓ Verifica</button>
-    <button type="button" onclick="bulk('reannounce')">↻ Ri-annuncia</button>
-    <button type="button" onclick="bulk('top')">⤒ In cima</button>
-    <button type="button" class="danger" onclick="bulk('remove')">✕ Rimuovi</button>
-    <button type="button" class="danger" onclick="bulk('remove-files')">✕ Rimuovi e cancella file</button>
+    <span class="muted">Selected: <b id="selcount">0</b></span>
+    <button type="button" onclick="bulk('resume')">▶ Resume</button>
+    <button type="button" onclick="bulk('pause')">⏸ Pause</button>
+    <button type="button" onclick="bulk('verify')">✓ Recheck</button>
+    <button type="button" onclick="bulk('reannounce')">↻ Reannounce</button>
+    <button type="button" onclick="bulk('top')">⤒ Top</button>
+    <button type="button" class="danger" onclick="bulk('remove')">✕ Remove</button>
+    <button type="button" class="danger" onclick="bulk('remove-files')">✕ Remove and delete files</button>
   </div>
 
   <div id="live">{{template "live" .}}</div>
@@ -336,10 +336,10 @@ function filterRows(){applyFilters();}
 function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
 function selectAll(box){document.querySelectorAll('.rowsel').forEach(function(c){c.checked=box.checked});updateSel();}
-function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Seleziona almeno un torrent',true);return;}if(op==='remove-files'&&!confirm('Rimuovere i torrent selezionati E cancellare i file? Irreversibile.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
+function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Select at least one torrent',true);return;}if(op==='remove-files'&&!confirm('Remove the selected torrents AND delete the files? Irreversible.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
 function sortTable(idx){var tb=document.querySelector('#live tbody');if(!tb)return;var rows=Array.prototype.slice.call(tb.querySelectorAll('tr'));var asc=tb.getAttribute('data-sort')!==String(idx);rows.sort(function(a,b){var av=a.children[idx].getAttribute('data-v')||a.children[idx].textContent;var bv=b.children[idx].getAttribute('data-v')||b.children[idx].textContent;var an=parseFloat(av),bn=parseFloat(bv);if(!isNaN(an)&&!isNaN(bn))return asc?an-bn:bn-an;return asc?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});rows.forEach(function(r){tb.appendChild(r)});tb.setAttribute('data-sort',asc?String(idx):'');}
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
-function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copiato',false);},function(){showToast('Copia non riuscita',true);});}else{showToast('Copia non disponibile',true);}}
+function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
 setInterval(function(){refresh(false)},5000);
 (function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
 </script>
@@ -349,55 +349,55 @@ setInterval(function(){refresh(false)},5000);
 const uiLiveTemplate = `{{define "live"}}
   <div class="cards">
     <div class="card"><b>{{.Torrents}}</b><span>torrent</span></div>
-    <div class="card"><b>{{.Down}}</b><span>in download</span></div>
-    <div class="card"><b>{{.Seeding}}</b><span>in seed</span></div>
-    <div class="card"><b>{{.Stalled}}</b><span>bloccati</span></div>
-    <div class="card"><b>{{.Paused}}</b><span>in pausa</span></div>
-    <div class="card"><b>{{.DownloadRate}}</b><span>↓ velocità</span></div>
-    <div class="card"><b>{{.UploadRate}}</b><span>↑ velocità</span></div>
-    <div class="card"><b>{{bytes .TotalDown}}</b><span>scaricati (sessione)</span></div>
-    <div class="card"><b>{{bytes .TotalUp}}</b><span>inviati (sessione)</span></div>
-    <div class="card"><b>{{.PeerPort}}</b><span>porta peer</span></div>
+    <div class="card"><b>{{.Down}}</b><span>downloading</span></div>
+    <div class="card"><b>{{.Seeding}}</b><span>seeding</span></div>
+    <div class="card"><b>{{.Stalled}}</b><span>stalled</span></div>
+    <div class="card"><b>{{.Paused}}</b><span>paused</span></div>
+    <div class="card"><b>{{.DownloadRate}}</b><span>↓ speed</span></div>
+    <div class="card"><b>{{.UploadRate}}</b><span>↑ speed</span></div>
+    <div class="card"><b>{{bytes .TotalDown}}</b><span>downloaded (session)</span></div>
+    <div class="card"><b>{{bytes .TotalUp}}</b><span>uploaded (session)</span></div>
+    <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
     <div class="card"><b>{{.Router}}</b><span>router</span></div>
-    <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>{{.DHTNodes}} nodi · uTP {{if .UTP}}on{{else}}off{{end}}</span></div>
-    <div class="card"><b>{{if .IPFilter}}{{.IPFilter}}{{else}}nessuno{{end}}</b><span>filtro IP{{if .IPFilterPath}} · {{.IPFilterPath}}{{end}}</span></div>
-    <div class="card"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache lettura/scrittura</span></div>
-    <div class="card"><b>{{bytes .DiskFree}}</b><span>spazio libero (di {{bytes .DiskTotal}})</span></div>
+    <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>{{.DHTNodes}} nodes · uTP {{if .UTP}}on{{else}}off{{end}}</span></div>
+    <div class="card"><b>{{if .IPFilter}}{{.IPFilter}}{{else}}nessuno{{end}}</b><span>IP filter{{if .IPFilterPath}} · {{.IPFilterPath}}{{end}}</span></div>
+    <div class="card"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>read/write cache</span></div>
+    <div class="card"><b>{{bytes .DiskFree}}</b><span>free space (of {{bytes .DiskTotal}})</span></div>
   </div>
 
   {{if .Rows}}
   <div class="layout">
     <aside class="sidebar">
-      <div class="muted">Filtri</div>
-      <button type="button" class="filter on" onclick="filterByState('all',this)">Tutti <b>{{.CountAll}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('downloading',this)">In download <b>{{.CountDown}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('seeding',this)">In seed <b>{{.CountSeeding}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('paused',this)">In pausa <b>{{.CountPaused}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('stalled',this)">Bloccati <b>{{.CountStalled}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('moving',this)">In spostamento <b>{{.CountMoving}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('error',this)">In errore <b>{{.CountError}}</b></button>
+      <div class="muted">Filters</div>
+      <button type="button" class="filter on" onclick="filterByState('all',this)">All <b>{{.CountAll}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('downloading',this)">Downloading <b>{{.CountDown}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('seeding',this)">Seeding <b>{{.CountSeeding}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('paused',this)">Paused <b>{{.CountPaused}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('stalled',this)">Stalled <b>{{.CountStalled}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('moving',this)">Moving <b>{{.CountMoving}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('error',this)">Error <b>{{.CountError}}</b></button>
     </aside>
     <div class="content">
     <table id="torrents">
     <thead><tr>
-      <th class="sel"><input type="checkbox" title="Seleziona tutti" onclick="selectAll(this)"></th>
-      <th class="name" onclick="sortTable(1)">Nome</th>
-      <th onclick="sortTable(2)">Stato</th>
-      <th onclick="sortTable(3)">Progresso</th>
-      <th class="num" onclick="sortTable(4)">Fatto / Dimensione</th>
+      <th class="sel"><input type="checkbox" title="Select all" onclick="selectAll(this)"></th>
+      <th class="name" onclick="sortTable(1)">Name</th>
+      <th onclick="sortTable(2)">State</th>
+      <th onclick="sortTable(3)">Progress</th>
+      <th class="num" onclick="sortTable(4)">Done / Size</th>
       <th class="num" onclick="sortTable(5)">↓</th>
       <th class="num" onclick="sortTable(6)">↑</th>
       <th class="num" onclick="sortTable(7)">Peer</th>
       <th class="num" onclick="sortTable(8)">Seed</th>
       <th class="num" onclick="sortTable(9)">Ratio</th>
       <th class="num" onclick="sortTable(10)">ETA</th>
-      <th class="actions">Azioni</th>
+      <th class="actions">Actions</th>
     </tr></thead>
     <tbody>
     {{range .Rows}}
       <tr data-name="{{.Name}}" data-state="{{.State}}">
         <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
-        <td class="name"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="Apri i dettagli del torrent">{{.Name}}</a><div class="muted">{{.SavePath}}</div></td>
+        <td class="name"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="Open torrent details">{{.Name}}</a><div class="muted">{{.SavePath}}</div></td>
         <td><span class="state s-{{.State}}">{{.State}}</span></td>
         <td data-v="{{.Progress}}"><div>{{.ProgressS}}</div><div class="bar"><i style="width:{{percent .Progress}}%"></i></div></td>
         <td class="num" data-v="{{.TotalDone}}">{{.DoneSize}}</td>
@@ -408,17 +408,17 @@ const uiLiveTemplate = `{{define "live"}}
         <td class="num" data-v="{{.RatioVal}}">{{.Ratio}}</td>
         <td class="num" data-v="{{.ETAVal}}">{{.ETA}}</td>
         <td class="actions">
-          <button type="button" onclick="openDetail('{{.Hash}}')" title="Dettagli: file, peer, tracker">⋯</button>
+          <button type="button" onclick="openDetail('{{.Hash}}')" title="Details: files, peers, trackers">⋯</button>
           {{if eq .State "paused"}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="resume"><button title="Riprendi">▶</button></form>
+          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="resume"><button title="Resume">▶</button></form>
           {{else}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="pause"><button title="Metti in pausa">⏸</button></form>
+          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="pause"><button title="Pause">⏸</button></form>
           {{end}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="verify"><button title="Riverifica i dati su disco">✓</button></form>
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="reannounce"><button title="Ri-annuncia ai tracker">↻</button></form>
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Porta in cima alla coda">⤒</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Rimuovere il torrent? I file restano su disco.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="0"><button title="Rimuovi dalla sessione (i file restano)">✕</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Rimuovere il torrent E CANCELLARE i file? irreversibile.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="1"><button class="danger" title="Rimuovi e cancella i file">✕ file</button></form>
+          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="verify"><button title="Recheck data on disk">✓</button></form>
+          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="reannounce"><button title="Reannounce to trackers">↻</button></form>
+          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Move to the top of the queue">⤒</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
         </td>
       </tr>
     {{end}}
@@ -427,28 +427,28 @@ const uiLiveTemplate = `{{define "live"}}
     </div>
   </div>
   {{else}}
-  <p class="muted">Nessun torrent nella sessione.</p>
+  <p class="muted">No torrents in the session.</p>
   {{end}}
 
   <div class="statusbar">
     <span>↓ <b>{{.DownloadRate}}</b></span>
     <span>↑ <b>{{.UploadRate}}</b></span>
-    <span>Totali <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
-    <span>Spazio libero <b>{{bytes .DiskFree}}</b></span>
-    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodi{{else}}spento{{end}}</b></span>
-    <span>Porta <b>{{if .PortOpen}}aperta ({{.Router}}){{else}}non aperta{{end}}</b></span>
-    <span>Cifratura <b>{{.Encryption}}</b></span>
+    <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
+    <span>Free space <b>{{bytes .DiskFree}}</b></span>
+    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodi{{else}}off{{end}}</b></span>
+    <span>Port <b>{{if .PortOpen}}open ({{.Router}}){{else}}not open{{end}}</b></span>
+    <span>Encryption <b>{{.Encryption}}</b></span>
   </div>
 {{end}}`
 
 const uiDetailTemplate = `{{define "detail"}}
 <div class="modal-head">
   <h3>{{.Name}}</h3>
-  <button type="button" onclick="closeDetail()">Chiudi</button>
+  <button type="button" onclick="closeDetail()">Close</button>
 </div>
 <div class="detail-tabs">
-  <button type="button" class="{{if eq .Tab "general"}}on{{end}}" onclick="openDetail('{{.Hash}}','general')">Generale</button>
-  <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">File ({{len .Files}})</button>
+  <button type="button" class="{{if eq .Tab "general"}}on{{end}}" onclick="openDetail('{{.Hash}}','general')">General</button>
+  <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">Files ({{len .Files}})</button>
   <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peer ({{len .Peers}})</button>
   <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Tracker ({{len .Trackers}})</button>
 </div>
@@ -456,50 +456,50 @@ const uiDetailTemplate = `{{define "detail"}}
 
 {{if eq .Tab "general"}}
   <div class="stat-grid">
-    <div class="row"><span>Stato</span><strong>{{.State}}</strong></div>
-    <div class="row"><span>Progresso</span><strong>{{percent .Progress}}%</strong></div>
-    <div class="row"><span>Dimensione</span><strong>{{bytes .TotalSize}}</strong></div>
-    <div class="row"><span>Scaricato</span><strong>{{bytes .TotalDone}}</strong></div>
-    <div class="row"><span>Download totale</span><strong>{{bytes .Downloaded}}</strong></div>
-    <div class="row"><span>Caricato</span><strong>{{bytes .Uploaded}}</strong></div>
+    <div class="row"><span>State</span><strong>{{.State}}</strong></div>
+    <div class="row"><span>Progress</span><strong>{{percent .Progress}}%</strong></div>
+    <div class="row"><span>Size</span><strong>{{bytes .TotalSize}}</strong></div>
+    <div class="row"><span>Done</span><strong>{{bytes .TotalDone}}</strong></div>
+    <div class="row"><span>Downloaded</span><strong>{{bytes .Downloaded}}</strong></div>
+    <div class="row"><span>Uploaded</span><strong>{{bytes .Uploaded}}</strong></div>
     <div class="row"><span>Ratio</span><strong>{{printf "%.2f" .Ratio}}</strong></div>
     <div class="row"><span>↓ / ↑</span><strong>{{rate .DownRate}} / {{rate .UpRate}}</strong></div>
     <div class="row"><span>Peer / Seed</span><strong>{{.NumPeers}} / {{.NumSeeds}}</strong></div>
-    <div class="row"><span>Sciame (seed / peer)</span><strong>{{.NumComplete}} / {{.NumIncomplete}}</strong></div>
+    <div class="row"><span>Swarm (seeds / peers)</span><strong>{{.NumComplete}} / {{.NumIncomplete}}</strong></div>
     <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
-    <div class="row"><span>Cartella</span><strong>{{.SavePath}}</strong></div>
-    <div class="row"><span>Ratio seed impostato</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} giorni)</strong></div>
-    <div class="row"><span>Pin</span><strong>{{if .Pinned}}sì{{else}}no{{end}}</strong></div>
-    <div class="row"><span>Privato</span><strong>{{if .Private}}sì{{else}}no{{end}}</strong></div>
+    <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
+    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} giorni)</strong></div>
+    <div class="row"><span>Pin</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
+    <div class="row"><span>Private</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
     <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
-    <div class="row"><span>Pezzi disponibili / totali</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
-    <div class="row"><span>Pezzi completati</span><strong>{{.PiecesHave}}</strong></div>
-    <div class="row"><span>Dimensione pezzo</span><strong>{{bytes .PieceLength}}</strong></div>
-    <div class="row"><span>Dati sprecati</span><strong>{{bytes .Wasted}}</strong></div>
-    <div class="row"><span>Allocato su disco</span><strong>{{bytes .Allocated}}</strong></div>
-    <div class="row"><span>Aggiunto</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Completato</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Available / total pieces</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
+    <div class="row"><span>Completed pieces</span><strong>{{.PiecesHave}}</strong></div>
+    <div class="row"><span>Piece size</span><strong>{{bytes .PieceLength}}</strong></div>
+    <div class="row"><span>Wasted</span><strong>{{bytes .Wasted}}</strong></div>
+    <div class="row"><span>Allocated on disk</span><strong>{{bytes .Allocated}}</strong></div>
+    <div class="row"><span>Added</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Completed</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
   </div>
   <div class="toolbar">
-    <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Togli pin{{else}}Pin (fuori coda){{end}}</button></form>
-    <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copia magnet</button>
-    <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Esporta .torrent</a>
+    <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Unpin{{else}}Pin (outside the queue){{end}}</button></form>
+    <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copy magnet</button>
+    <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Export .torrent</a>
   </div>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Ratio seed (-1 globale, 0 infinito)<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
-    <label>Giorni seed (-1 globale, 0 infinito)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
-    <button type="submit">Salva limiti seed</button>
+    <label>Seed ratio (-1 global, 0 unlimited)<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
+    <label>Seed days (-1 global, 0 unlimited)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
+    <button type="submit">Save seed limits</button>
   </form>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Sposta i dati in<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
-    <button type="submit">Sposta</button>
+    <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
+    <button type="submit">Move</button>
   </form>
 {{else if eq .Tab "files"}}
   {{if .Files}}
   <table>
-    <thead><tr><th>File</th><th class="num">Dimensione</th><th class="num">Scaricato</th><th>Priorità</th></tr></thead>
+    <thead><tr><th>File</th><th class="num">Size</th><th class="num">Done</th><th>Priority</th></tr></thead>
     <tbody>
     {{range .Files}}
       <tr>
@@ -508,33 +508,33 @@ const uiDetailTemplate = `{{define "detail"}}
         <td class="num">{{bytes .Done}}</td>
         <td><form method="post" action="/ui/file-priority" onchange="this.submit()">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
-          <select name="priority"><option value="0"{{if not .Wanted}} selected{{end}}>Salta</option><option value="4"{{if .Wanted}} selected{{end}}>Scarica</option></select>
+          <select name="priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
         </form></td>
       </tr>
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">Metadati non ancora disponibili.</p>{{end}}
+  {{else}}<p class="muted">Metadata not available yet.</p>{{end}}
 {{else if eq .Tab "peers"}}
   {{if .Peers}}
   <table>
-    <thead><tr><th>Peer</th><th>Client</th><th>Sorgente</th><th class="num">↓</th><th class="num">↑</th><th class="num">Prog.</th><th>Seed</th><th>Flag</th><th class="num">Da</th></tr></thead>
+    <thead><tr><th>Peer</th><th>Client</th><th>Source</th><th class="num">↓</th><th class="num">↑</th><th class="num">Prog.</th><th>Seed</th><th>Flag</th><th class="num">For</th></tr></thead>
     <tbody>
     {{range .Peers}}
       <tr><td>{{.Address}}</td><td class="name">{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
       <td>{{.Source}}</td>
       <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
-      <td class="num">{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td>
-      <td class="flags">{{if .Incoming}}<span class="flag">entrata</span>{{else}}<span class="flag">uscita</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">cifrata</span>{{end}}{{if .Handshake}}<span class="flag on">HS cifrato</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">ci choka</span>{{end}}{{if .PeerChoke}}<span class="flag">lo chokiamo</span>{{end}}{{if .ClientInt}}<span class="flag">interessato</span>{{end}}{{if .PeerInt}}<span class="flag">interessato a noi</span>{{end}}{{if .Downloading}}<span class="flag">scarica</span>{{end}}</td>
+      <td class="num">{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}yes{{else}}no{{end}}</td>
+      <td class="flags">{{if .Incoming}}<span class="flag">incoming</span>{{else}}<span class="flag">outgoing</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">encrypted</span>{{end}}{{if .Handshake}}<span class="flag on">encrypted HS</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">choking us</span>{{end}}{{if .PeerChoke}}<span class="flag">we choke</span>{{end}}{{if .ClientInt}}<span class="flag">interested</span>{{end}}{{if .PeerInt}}<span class="flag">interested in us</span>{{end}}{{if .Downloading}}<span class="flag">downloading</span>{{end}}</td>
       <td class="num">{{dur .Connected}}</td></tr>
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
+  {{else}}<p class="muted">No peers connected.</p>{{end}}
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table>
-    <thead><tr><th>URL</th><th>Stato</th><th>Messaggio</th><th class="num">Seed</th><th class="num">Peer</th><th class="num">Prossimo</th></tr></thead>
+    <thead><tr><th>URL</th><th>State</th><th>Messaggio</th><th class="num">Seed</th><th class="num">Peer</th><th class="num">Prossimo</th></tr></thead>
     <tbody>
     {{range .Trackers}}
       <tr><td class="name">{{.URL}}</td><td>{{.Status}}</td><td class="name">{{.Message}}</td>
@@ -543,26 +543,26 @@ const uiDetailTemplate = `{{define "detail"}}
     {{end}}
     </tbody>
   </table>
-  {{else}}<p class="muted">Nessun tracker.</p>{{end}}
+  {{else}}<p class="muted">No trackers.</p>{{end}}
   <form class="form-grid" method="post" action="/ui/trackers">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="trackers">
-    <label>Aggiungi tracker (uno per riga)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce"></textarea></label>
-    <button type="submit">Aggiungi tracker</button>
+    <label>Add trackers (one per line)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce"></textarea></label>
+    <button type="submit">Add trackers</button>
   </form>
 {{end}}
 {{end}}`
 
-const uiTokenPage = `<!doctype html><html lang="it"><head><meta charset="utf-8">
+const uiTokenPage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>gx-torrent</title>
-<style>body{margin:0;font:14px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+<style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
 form{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
 input,button{width:100%%;padding:8px;margin:8px 0;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 button{background:#2563eb;color:#fff;font-weight:600;border:0;cursor:pointer}.m{color:#93a1b5}</style></head>
 <body><form method="get" action="/">
 <h2 style="margin:0 0 6px">gx-torrent</h2>
-<p class="m">Questa istanza richiede il token configurato in Gextto.</p>
+<p class="m">This instance requires the token configured in Gextto.</p>
 <input type="password" name="token" placeholder="token" autofocus autocomplete="off">
-<button type="submit">Entra</button>
+<button type="submit">Sign in</button>
 </form></body></html>`
 
 // handleUI renders the page.
@@ -610,7 +610,7 @@ func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := d.uiDetailData(r.URL.Query().Get("hash"), r.URL.Query().Get("tab"))
 	if err != nil {
-		http.Error(w, "torrent non trovato", http.StatusNotFound)
+		http.Error(w, "torrent not found", http.StatusNotFound)
 		return
 	}
 	// Render to a buffer first: a template error must not leave a half-written
@@ -636,12 +636,12 @@ func (d *Daemon) handleUITorrentFile(w http.ResponseWriter, r *http.Request) {
 	t, _ := d.findLocked(hash)
 	d.mu.Unlock()
 	if t == nil {
-		http.Error(w, "torrent non trovato", http.StatusNotFound)
+		http.Error(w, "torrent not found", http.StatusNotFound)
 		return
 	}
 	data, err := t.Torrent()
 	if err != nil || len(data) == 0 {
-		http.Error(w, "metadati non disponibili", http.StatusNotFound)
+		http.Error(w, "metadata not available", http.StatusNotFound)
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-bittorrent")
@@ -680,7 +680,7 @@ func (d *Daemon) handleUIAction(w http.ResponseWriter, r *http.Request) {
 	case "verify-all":
 		err = d.uiEach(func(h string) error { return d.verify(h) })
 	default:
-		err = fmt.Errorf("azione sconosciuta: %s", op)
+		err = fmt.Errorf("unknown action: %s", op)
 	}
 	d.uiDone(w, r, uiActionMessage(op), err)
 }
@@ -697,7 +697,7 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 	op := strings.TrimSpace(r.FormValue("op"))
 	hashes := r.Form["hashes"]
 	if len(hashes) == 0 {
-		d.uiDone(w, r, "", fmt.Errorf("nessun torrent selezionato"))
+		d.uiDone(w, r, "", fmt.Errorf("no torrents selected"))
 		return
 	}
 	var firstErr error
@@ -719,7 +719,7 @@ func (d *Daemon) handleUIBulk(w http.ResponseWriter, r *http.Request) {
 		case "remove-files":
 			err = d.remove(hash, true)
 		default:
-			err = fmt.Errorf("azione sconosciuta: %s", op)
+			err = fmt.Errorf("unknown action: %s", op)
 		}
 		if err != nil && firstErr == nil {
 			firstErr = err
@@ -738,7 +738,7 @@ func (d *Daemon) handleUIRemove(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
 	err := d.remove(hash, formBool(r, "files"))
-	d.uiDone(w, r, "Torrent rimosso", err)
+	d.uiDone(w, r, "Torrent removed", err)
 }
 
 // handleUIAdd adds a torrent from a magnet or from an http(s) URL to a
@@ -757,7 +757,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		source = strings.TrimSpace(r.FormValue("magnet"))
 	}
 	if source == "" {
-		d.uiDone(w, r, "", fmt.Errorf("incolla un link magnet o un URL .torrent"))
+		d.uiDone(w, r, "", fmt.Errorf("paste a magnet link or a .torrent URL"))
 		return
 	}
 	req := addRequest{
@@ -785,11 +785,11 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		case len(data) > 0 && data[0] == 'd':
 			req.TorrentData = data
 		default:
-			d.uiDone(w, r, "", fmt.Errorf("l'URL non contiene un file .torrent"))
+			d.uiDone(w, r, "", fmt.Errorf("the URL does not contain a .torrent file"))
 			return
 		}
 	default:
-		d.uiDone(w, r, "", fmt.Errorf("incolla un link magnet o un URL .torrent"))
+		d.uiDone(w, r, "", fmt.Errorf("paste a magnet link or a .torrent URL"))
 		return
 	}
 	_, existing, err := d.add(req)
@@ -797,9 +797,9 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		d.uiDone(w, r, "", err)
 		return
 	}
-	msg := "Torrent aggiunto"
+	msg := "Torrent added"
 	if existing {
-		msg = "Torrent già presente"
+		msg = "Torrent already present"
 	}
 	d.uiDone(w, r, msg, nil)
 }
@@ -842,7 +842,7 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 	}
 	file, _, err := r.FormFile("torrent")
 	if err != nil {
-		d.uiDone(w, r, "", fmt.Errorf("file .torrent mancante"))
+		d.uiDone(w, r, "", fmt.Errorf("missing .torrent file"))
 		return
 	}
 	defer file.Close()
@@ -864,9 +864,9 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		d.uiDone(w, r, "", err)
 		return
 	}
-	msg := "Torrent aggiunto"
+	msg := "Torrent added"
 	if existing {
-		msg = "Torrent già presente"
+		msg = "Torrent already present"
 	}
 	d.uiDone(w, r, msg, nil)
 }
@@ -881,7 +881,7 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	source := strings.TrimSpace(r.FormValue("source"))
 	if source == "" {
-		d.uiDone(w, r, "", fmt.Errorf("indica un URL o un percorso file"))
+		d.uiDone(w, r, "", fmt.Errorf("provide a URL or a file path"))
 		return
 	}
 	path := source
@@ -898,7 +898,7 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 		d.uiDone(w, r, "", err)
 		return
 	}
-	d.uiDone(w, r, fmt.Sprintf("Filtro IP caricato: %d regole", rules), nil)
+	d.uiDone(w, r, fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
 }
 
 // handleUIFilePriority selects or skips one file of a torrent. rain has no
@@ -930,7 +930,7 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 
 	files, err := t.Files()
 	if err != nil {
-		d.uiDoneDetail(w, r, hash, "files", "", fmt.Errorf("metadati non disponibili"))
+		d.uiDoneDetail(w, r, hash, "files", "", fmt.Errorf("metadata not available"))
 		return
 	}
 	priorities := make([]int, len(files))
@@ -944,7 +944,7 @@ func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 		priorities[index] = priority
 	}
 	err = d.setFilePriorities(hash, priorities)
-	d.uiDoneDetail(w, r, hash, "files", "Priorità del file aggiornata", err)
+	d.uiDoneDetail(w, r, hash, "files", "File priority updated", err)
 }
 
 func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
@@ -963,11 +963,11 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(urls) == 0 {
-		d.uiDoneDetail(w, r, hash, "trackers", "", fmt.Errorf("nessun tracker da aggiungere"))
+		d.uiDoneDetail(w, r, hash, "trackers", "", fmt.Errorf("no trackers to add"))
 		return
 	}
 	err := d.addTrackers(hash, urls)
-	d.uiDoneDetail(w, r, hash, "trackers", fmt.Sprintf("%d tracker aggiunti", len(urls)), err)
+	d.uiDoneDetail(w, r, hash, "trackers", fmt.Sprintf("%d trackers added", len(urls)), err)
 }
 
 func (d *Daemon) handleUISeedLimits(w http.ResponseWriter, r *http.Request) {
@@ -982,7 +982,7 @@ func (d *Daemon) handleUISeedLimits(w http.ResponseWriter, r *http.Request) {
 	ratio := formFloat(r, "seed_ratio", -1)
 	days := formInt(r, "seed_days", -1)
 	err := d.setSeedLimits(hash, &ratio, &days)
-	d.uiDoneDetail(w, r, hash, "general", "Limiti di seed salvati", err)
+	d.uiDoneDetail(w, r, hash, "general", "Seed limits saved", err)
 }
 
 func (d *Daemon) handleUIMove(w http.ResponseWriter, r *http.Request) {
@@ -996,11 +996,11 @@ func (d *Daemon) handleUIMove(w http.ResponseWriter, r *http.Request) {
 	hash := strings.TrimSpace(r.FormValue("hash"))
 	destination := strings.TrimSpace(r.FormValue("destination"))
 	if destination == "" {
-		d.uiDoneDetail(w, r, hash, "general", "", fmt.Errorf("indica la destinazione"))
+		d.uiDoneDetail(w, r, hash, "general", "", fmt.Errorf("specify the destination"))
 		return
 	}
 	err := d.move(hash, destination, false)
-	d.uiDoneDetail(w, r, hash, "general", "Spostamento avviato", err)
+	d.uiDoneDetail(w, r, hash, "general", "Move started", err)
 }
 
 func (d *Daemon) handleUIPin(w http.ResponseWriter, r *http.Request) {
@@ -1013,7 +1013,7 @@ func (d *Daemon) handleUIPin(w http.ResponseWriter, r *http.Request) {
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
 	err := d.setPin(hash, formBool(r, "pinned"))
-	d.uiDoneDetail(w, r, hash, "general", "Pin aggiornato", err)
+	d.uiDoneDetail(w, r, hash, "general", "Pin updated", err)
 }
 
 func (d *Daemon) uiEach(fn func(hash string) error) error {
@@ -1029,21 +1029,21 @@ func (d *Daemon) uiEach(fn func(hash string) error) error {
 func uiActionMessage(op string) string {
 	switch op {
 	case "pause", "pause-all":
-		return "In pausa"
+		return "Paused"
 	case "resume", "resume-all":
-		return "Ripresi"
+		return "Resumed"
 	case "verify", "verify-all":
-		return "Verifica avviata"
+		return "Recheck started"
 	case "reannounce":
-		return "Ri-annuncio inviato"
+		return "Reannounce sent"
 	case "top":
-		return "Portato in cima alla coda"
+		return "Moved to the top of the queue"
 	case "remove":
-		return "rimossi (file conservati)"
+		return "removed (files kept)"
 	case "remove-files":
-		return "rimossi con i file"
+		return "removed with files"
 	}
-	return "Fatto"
+	return "Done"
 }
 
 // uiDone redirects back to the page with a short message. A redirect (instead of
@@ -1066,11 +1066,11 @@ func (d *Daemon) uiRedirect(w http.ResponseWriter, r *http.Request, extra url.Va
 	query := url.Values{}
 	if err != nil {
 		query.Set("ok", "0")
-		query.Set("msg", "Errore: "+err.Error())
+		query.Set("msg", "Error: "+err.Error())
 	} else {
 		query.Set("ok", "1")
 		if okMessage == "" {
-			okMessage = "Fatto"
+			okMessage = "Done"
 		}
 		query.Set("msg", okMessage)
 	}
@@ -1336,14 +1336,14 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		}
 	case "trackers":
 		for _, tracker := range trackers {
-			status := "non contattato"
+			status := "not contacted"
 			switch tracker.Status {
 			case torrent.Working:
-				status = "funziona"
+				status = "working"
 			case torrent.Contacting:
-				status = "contatto in corso"
+				status = "contacting"
 			case torrent.NotWorking:
-				status = "non funziona"
+				status = "not working"
 			}
 			message := tracker.Warning
 			if tracker.Error != nil {
@@ -1374,9 +1374,9 @@ func sourceName(source torrent.PeerSource) string {
 	case torrent.SourcePEX:
 		return "PEX"
 	case torrent.SourceIncoming:
-		return "in entrata"
+		return "incoming"
 	case torrent.SourceManual:
-		return "manuale"
+		return "manual"
 	default:
 		return "—"
 	}
@@ -1462,8 +1462,8 @@ func uiEncryption(level int) string {
 	case 0:
 		return "off"
 	case 2:
-		return "forzata"
+		return "forced"
 	default:
-		return "attiva"
+		return "on"
 	}
 }
