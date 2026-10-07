@@ -997,6 +997,18 @@ func MarkTorrentFailed(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if metadata != nil {
 		_ = s.db.Blocklist(&metadata.Release, "manual_failed")
+		// Like an automatic give-up: let the next cycle look for another
+		// version of these episodes now, not after the gap re-search delay.
+		release := metadata.Release
+		if release.Series != nil && release.Season != nil {
+			episodes := release.EpisodeRange
+			if len(episodes) == 0 && release.Episode != nil {
+				episodes = []int64{*release.Episode}
+			}
+			for _, episode := range episodes {
+				_ = s.db.ClearGapSearched(*release.Series, *release.Season, episode)
+			}
+		}
 	}
 	restored, _ := s.db.RestoreUpgrade(hash)
 	_ = s.db.MarkTorrentError(hash, "manual failure")

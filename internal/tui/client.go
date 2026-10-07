@@ -45,6 +45,13 @@ type Torrent struct {
 	DownloadLimit   int64    `json:"download_limit"`
 	UploadLimit     int64    `json:"upload_limit"`
 	SuperSeeding    bool     `json:"super_seeding"`
+	// Diagnosis is the daemon's short code for the torrent's situation
+	// (dead_swarm, no_connected_seed, stalled, no_peers, metadata, ...).
+	Diagnosis string `json:"diagnosis"`
+	// StalledSince and NextRetryAt (RFC 3339) are set while the stall monitor
+	// keeps the torrent set aside.
+	StalledSince string `json:"stalled_since"`
+	NextRetryAt  string `json:"next_retry_at"`
 }
 
 // ComicDownload mirrors one live HTTP/MEGA comic download.

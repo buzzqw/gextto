@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func runeKey(value rune) Key    { return Key{Kind: KeyRune, Rune: value} }
@@ -818,5 +819,26 @@ func TestTorrentRowETAAndRatio(t *testing.T) {
 	seeding := DownloadRow{Torrent: &Torrent{Progress: 100, TotalSize: 1000, AllTimeDownload: 1000, AllTimeUpload: 1250}}
 	if got := downloadRowETA(seeding); got != "r 1.25" {
 		t.Fatalf("ratio = %q", got)
+	}
+}
+
+func TestStalledTorrentIsExplained(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	since := time.Now().Add(-9 * time.Hour).UTC().Format(time.RFC3339)
+	next := time.Now().Add(2*time.Hour + 30*time.Minute).UTC().Format(time.RFC3339)
+	stuck := Torrent{Hash: "abc", Name: "FBI S02", State: "paused", Progress: 74, Diagnosis: "dead_swarm", StalledSince: since, NextRetryAt: next}
+	m.Torrents = []Torrent{stuck}
+	if got := m.stallRetryText(stuck); !strings.HasPrefix(got, "prossimo tentativo tra 2h") {
+		t.Fatalf("retry text = %q", got)
+	}
+	m.Detail = &TorrentDetail{Torrent: Torrent{Hash: "abc", Name: "FBI S02", State: "paused", Progress: 74}}
+	text := ""
+	for _, line := range m.renderDetail(120, 40) {
+		text += line.Text + "\n"
+	}
+	for _, want := range []string{"Bloccato da", "Prossimo tentativo", "nessuno di chi condivide ha il file completo"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("detail misses %q:\n%s", want, text)
+		}
 	}
 }

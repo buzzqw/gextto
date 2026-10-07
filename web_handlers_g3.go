@@ -1318,6 +1318,12 @@ func gh3DecorateTorrents(s *AppState, items []models.TorrentView) []map[string]a
 	if err != nil {
 		aux = map[string][3]string{}
 	}
+	// Stall state of the torrents set aside by the stall monitor, so a client
+	// can say since when a download is stuck and when it is tried again.
+	stalls, err := s.db.LoadStallWatches()
+	if err != nil {
+		stalls = map[string]StallWatch{}
+	}
 	decorated := make([]map[string]any, 0, len(items))
 	for i := range items {
 		item := items[i]
@@ -1332,6 +1338,12 @@ func gh3DecorateTorrents(s *AppState, items []models.TorrentView) []map[string]a
 		value["archived"] = archived
 		value["source"] = entry[1]
 		value["reason"] = entry[2]
+		if stall, ok := stalls[strings.ToLower(item.Hash)]; ok && stall.stalledSince != nil {
+			value["stalled_since"] = stall.stalledSince.UTC().Format(time.RFC3339)
+			if !stall.nextRetryAt.IsZero() {
+				value["next_retry_at"] = stall.nextRetryAt.UTC().Format(time.RFC3339)
+			}
+		}
 		if archived || item.State == "finished" {
 			value["progress"] = 100.0
 			if item.TotalSize > 0 && item.TotalDone < item.TotalSize {

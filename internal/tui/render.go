@@ -463,8 +463,12 @@ func (m *Model) statusInfoLines(width int) []Line {
 	lines = append(lines, active...)
 	idleNames := []string{}
 	for _, torrent := range m.Torrents {
-		if torrentIdle(torrent) {
-			idleNames = append(idleNames, fmt.Sprintf("%s (%.0f%%)", Sanitize(torrent.Name), torrent.Progress))
+		if torrentIdle(torrent) || (torrent.StalledSince != "" && !torrentTransferring(torrent) && torrent.Progress < 100) {
+			detail := fmt.Sprintf("%.0f%%", torrent.Progress)
+			if next := m.stallRetryText(torrent); next != "" {
+				detail += ", " + next
+			}
+			idleNames = append(idleNames, fmt.Sprintf("%s (%s)", Sanitize(torrent.Name), detail))
 		}
 	}
 	if len(idleNames) > 0 {
@@ -472,6 +476,44 @@ func (m *Model) statusInfoLines(width int) []Line {
 		lines = append(lines, m.statusRow(tr.T("status.idlelist"), strings.Join(idleNames, " · "), StyleWarn))
 	}
 	return lines
+}
+
+// stallRetryText says when a torrent set aside by the stall monitor is tried
+// again ("prossimo tentativo tra 2h 10m"); empty when it is not set aside.
+func (m *Model) stallRetryText(torrent Torrent) string {
+	if torrent.NextRetryAt == "" {
+		return ""
+	}
+	next, err := time.Parse(time.RFC3339, torrent.NextRetryAt)
+	if err != nil {
+		return ""
+	}
+	if wait := time.Until(next); wait > time.Minute {
+		return m.Tr.Format("stall.nextin", HumanDuration(wait.Seconds()))
+	}
+	return m.Tr.T("stall.nextsoon")
+}
+
+// stallSinceText is when a torrent was set aside, in local time, and how long
+// ago ("06/10 22:36, 9h 12m fa").
+func (m *Model) stallSinceText(torrent Torrent) string {
+	since, err := time.Parse(time.RFC3339, torrent.StalledSince)
+	if err != nil {
+		return ""
+	}
+	return m.Tr.Format("stall.since", since.Local().Format("02/01 15:04"), HumanDuration(time.Since(since).Seconds()))
+}
+
+// diagnosisText explains the daemon's diagnosis code in plain words.
+func (m *Model) diagnosisText(code string) string {
+	if code == "" {
+		return ""
+	}
+	key := "diag." + code
+	if text := m.Tr.T(key); text != key {
+		return text
+	}
+	return code
 }
 
 // statusProblems lists the conditions worth attention and their severity.
@@ -1411,6 +1453,27 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		{m.Tr.T("label.name"), torrent.Name},
 		{m.Tr.T("label.hash"), torrent.Hash},
 		{m.Tr.T("label.state"), m.Tr.StateLabel(torrent.State)},
+	}
+	// The detail endpoint returns the bare engine view: the stall state and the
+	// diagnosis come with the torrent list.
+	listed := torrent
+	for _, item := range m.Torrents {
+		if strings.EqualFold(item.Hash, torrent.Hash) {
+			listed = item
+			break
+		}
+	}
+	if why := m.diagnosisText(firstNonEmpty(listed.Diagnosis, torrent.Diagnosis)); why != "" && torrent.Progress < 100 {
+		rows = append(rows, [2]string{m.Tr.T("label.diagnosis"), why})
+	}
+	if since := m.stallSinceText(listed); since != "" {
+		rows = append(rows, [2]string{m.Tr.T("label.stalledsince"), since})
+		if next := m.stallRetryText(listed); next != "" {
+			rows = append(rows, [2]string{m.Tr.T("label.nextretry"), next})
+		}
+		rows = append(rows, [2]string{m.Tr.T("label.stallaction"), m.Tr.T("stall.action")})
+	}
+	rows = append(rows, [][2]string{
 		{m.Tr.T("label.progress"), fmt.Sprintf("%.1f%%", torrent.Progress)},
 		{m.Tr.T("label.size"), HumanBytes(float64(torrent.TotalSize))},
 		{m.Tr.T("label.downloaded"), HumanBytes(float64(torrent.TotalDone))},
@@ -1431,7 +1494,7 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		{m.Tr.T("label.reason"), firstNonEmpty(torrent.Reason, "-")},
 		{m.Tr.T("label.savepath"), firstNonEmpty(torrent.SavePath, "-")},
 		{m.Tr.T("label.magnet"), firstNonEmpty(m.Detail.Magnet, "-")},
-	}
+	}...)
 	lines := []Line{{Text: torrent.Name, Style: StyleHeader, Wrap: true}}
 	start := min(m.DetailScroll, max(0, len(rows)-1))
 	for _, row := range rows[start:] {
