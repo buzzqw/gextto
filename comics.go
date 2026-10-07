@@ -1216,6 +1216,7 @@ func handleHTTPOutcome(id string, control *httpControl, outcome comicHTTPOutcome
 			download.SpeedBytes = 0
 			download.ETASeconds = nil
 		})
+		tagDownloadedComic(path, control.title)
 		if control.onComplete != nil {
 			control.onComplete(path)
 		}
@@ -1783,6 +1784,9 @@ func RunComicsCycle(ctx context.Context, db *ComicsDb, client *GetComicsClient, 
 					resultErr = err
 				} else {
 					path, err := DownloadMega(executable, resolved, *target)
+					if err == nil {
+						tagDownloadedComic(path, post.Title)
+					}
 					result = comicQueuedDownload{path: path, method: "mega"}
 					resultErr = err
 				}

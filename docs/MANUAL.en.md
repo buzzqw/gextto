@@ -504,6 +504,12 @@ are using the API directly.
   weekly-pack settings and resend/delete/force history are also available. Direct
   HTTP downloads appear in **Downloads in session** with status, bytes, progress,
   speed and pause/resume actions.
+  In **CBZ** files downloaded directly (HTTP or Mega) Gextto adds a
+  `ComicInfo.xml` with series, issue number and year taken from the title (e.g.
+  “Poison Ivy #41 (2025)”): Komga, Kavita and tablet readers use it to group and
+  sort issues. A file that already has its own `ComicInfo.xml` is left alone;
+  comics downloaded by torrent stay identical because they are seeding, and CBR
+  (RAR) files cannot be modified.
 
 ## 7. Configuration
 

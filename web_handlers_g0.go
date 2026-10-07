@@ -978,6 +978,7 @@ func ComicDownloadHandler(w http.ResponseWriter, r *http.Request, s *AppState) {
 		} else if path, err := DownloadMega(executable, resolved, target); err != nil {
 			runErr = err
 		} else {
+			tagDownloadedComic(path, strings.TrimSpace(input.Title))
 			result = map[string]any{"path": path, "method": "mega"}
 		}
 	case "torrent", "torrents":
