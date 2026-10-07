@@ -1226,3 +1226,22 @@ func TestV2SeriesSaveAnimeAndUpgradeToggles(t *testing.T) {
 		t.Fatalf("unchecked boxes must turn the flags off: %+v", got)
 	}
 }
+
+// TestGxAutoMarksCacheAndQueueManaged checks that with gx-torrent active and
+// self-management on (the default), the cache and queue settings render as
+// "Auto" (managed) instead of editable values.
+func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
+	state := newTestAppState(t)
+	page := uiSettingsPageFrom(state, "libtorrent")
+	managed := map[string]bool{}
+	for _, g := range page.Groups {
+		for _, f := range g.Fields {
+			managed[f.Key] = f.Managed
+		}
+	}
+	for _, key := range []string{"libtorrent_cache_size", "libtorrent_active_downloads", "libtorrent_dynamic_queue"} {
+		if !managed[key] {
+			t.Fatalf("setting %q must be managed (Auto) with gx-torrent self-management on", key)
+		}
+	}
+}

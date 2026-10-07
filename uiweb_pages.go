@@ -365,6 +365,20 @@ type uiSearchEntry struct {
 	Terms string `json:"terms,omitempty"`
 }
 
+// gxAutoManagedKey lists the settings the gx-torrent daemon controls by itself
+// when self-management (gxtorrent_auto) is on: cache sizing and queue/slot
+// tuning. They render as "Auto" instead of an editable value.
+func gxAutoManagedKey(key string) bool {
+	switch key {
+	case "libtorrent_active_downloads", "libtorrent_active_seeds", "libtorrent_active_limit",
+		"libtorrent_dont_count_slow_torrents",
+		"libtorrent_dynamic_queue", "libtorrent_dynamic_queue_min", "libtorrent_dynamic_queue_max",
+		"libtorrent_cache_size", "libtorrent_cache_expiry":
+		return true
+	}
+	return false
+}
+
 // uiSettingsPageFrom builds one settings tab from the curated settings index
 // and the live values. Legacy or dedicated-page-only keys are intentionally not
 // copied into a catch-all tab. Only the active tab is rendered, which keeps the
@@ -392,6 +406,12 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		if !uiBackendAllows(uiSettingAllowedBackends(def.Key), activeBackend) {
 			field.Disabled = true
 			field.DisabledNote = "Non attivo con il motore «" + uiBackendLabel(activeBackend) + "»."
+		}
+		// With gx-torrent self-management on, the daemon owns the cache and the
+		// queue tuning: show those settings as "Auto" (managed) instead of
+		// editable. Turning gxtorrent_auto off makes them editable again.
+		if activeBackend == BackendGxTorrent && settingsBool(cfg, "gxtorrent_auto", true) && gxAutoManagedKey(def.Key) {
+			field.Managed = true
 		}
 		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], field)
 	}

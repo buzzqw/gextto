@@ -1004,8 +1004,9 @@
     <div class="panel-head"><h3>Log daemon</h3><small class="muted"><span id="v2-logs-count">{{.Count}}</span> righe · auto ogni 5 s</small></div>
     <div class="panel-body">
       <form class="toolbar logs-toolbar" hx-get="/partial/logs" hx-target="#v2-logs-view" hx-swap="outerHTML"
-            hx-trigger="submit, input changed delay:300ms, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
-         <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+            hx-trigger="submit, input changed delay:300ms from:#v2-log-filter, change, every 5s [window.gexttoCanPollLogs && window.gexttoCanPollLogs()]">
+         <input id="v2-log-filter" class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+         <button class="btn sm primary" type="submit" title="Filtra le righe del log">🔍 Filtra</button>
          <select class="input compact logs-level" name="level" aria-label="Livello" title="Mostra tutte le righe o solo avvisi ed errori">
           <option value="">Tutte le righe</option>
           <option value="problems"{{if .ProblemsOnly}} selected{{end}}>Solo avvisi ed errori</option>
