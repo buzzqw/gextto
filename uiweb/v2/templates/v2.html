@@ -654,7 +654,7 @@
   {{if and (not .Groups) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
   {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
   {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
-  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;e.scrollIntoView({block:'center',behavior:'smooth'});e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash')},2500);})();</script>{{end}}
+  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;try{if(location.hash!=='#v2-setting-{{.Highlight}}'){location.hash='#v2-setting-{{.Highlight}}';}}catch(_){}e.scrollIntoView({block:'center',behavior:'smooth'});var o=e.style.outline,oo=e.style.outlineOffset,tr=e.style.transition;e.style.transition='outline-color .2s ease';e.style.outline='3px solid var(--accent-2)';e.style.outlineOffset='2px';e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash');e.style.outline=o;e.style.outlineOffset=oo;e.style.transition=tr;},2500);})();</script>{{end}}
 </div>
 {{end}}
 
