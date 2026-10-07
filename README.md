@@ -16,20 +16,26 @@ service.
   torrent transfers, post-processing and the library archive. Embedded libtorrent
   is the default; qBittorrent-nox is an optional alternative.
 - **Series, movies and comics:** monitor titles, search configured sources and
-  manage downloads and archived media from one responsive web UI or the terminal
-  TUI.
+  manage downloads and archived media from one responsive web UI, installable on
+  a phone, or the terminal TUI. Anime numbered by absolute episode ("Title -
+  1071") are mapped to season and episode; CBZ comics get a `ComicInfo.xml` for
+  Komga, Kavita and readers.
 - **Quality-aware automation:** score releases by quality, source, codec, audio,
   HDR, language and size; protect better existing files and explain rejected
-  candidates. `ffprobe` can enrich archived-file decisions.
+  candidates. An optional ceiling stops upgrades once a file is good enough.
+  `ffprobe` can enrich archived-file decisions.
 - **Flexible sources and integrations:** use RSS, Torznab indexers such as
   Jackett and Prowlarr, web search and optional FlareSolverr; connect Simkl,
-  Jellyfin and Plex.
+  Jellyfin and Plex (refreshing only the folder that changed) and subscribe to an
+  iCal calendar of library arrivals, original broadcasts and local movie
+  releases.
 - **Careful with your library:** an existing file is replaced only by a real
   upgrade, and the replaced file goes to the Trash (when configured). An
   unmounted NAS is recognised and never mistaken for deleted files; temporary
   errors (NAS unreachable, disk briefly full, timeouts) are retried
   automatically; a move to the archive interrupted by a restart resumes on its
-  own.
+  own. While a file seeds it enters the library as a hardlink, without using the
+  space twice (when downloads and library share a filesystem).
 - **Operational tools included:** health checks, logs, backups, maintenance,
   notifications, NAS paths, seeding controls and a blocklist.
 
@@ -58,10 +64,11 @@ It installs the program in `/opt/gextto`, stores service data in
 `/var/lib/gextto`, and exposes the UI on port 5000.
 
 > [!IMPORTANT]
-> The web UI is an unauthenticated administrative interface. Keep it on a
-> trusted network, or put an authenticated HTTPS reverse proxy and firewall rules
-> in front of it. Read the [security policy](docs/SECURITY.md) before exposing
-> it remotely.
+> Gextto is meant for a trusted network: by default the web UI and the API are
+> open. If you reach it from outside, turn on the optional login
+> (*Configuration → Access*; the local network stays free) and still use HTTPS
+> through a reverse proxy or a VPN. Read the [security policy](docs/SECURITY.md)
+> before exposing it remotely.
 
 ### Install from source
 

@@ -9,9 +9,9 @@ dell'app segue la lingua selezionata nell'intestazione.
 
 > [!IMPORTANT]
 > Inizia in **dry-run**. Verifica percorsi, accesso alle sorgenti e un titolo di
-> prova prima di abilitare i download. La UI è amministrativa e senza
-> autenticazione: lasciala in una rete fidata o proteggila con firewall e
-> reverse proxy HTTPS autenticato.
+> prova prima di abilitare i download. La UI è amministrativa e per
+> impostazione predefinita è aperta: lasciala in una rete fidata oppure, per
+> l'accesso da fuori, attiva il login (*Configurazione → Accesso*) e usa HTTPS.
 
 ## Come usare questa guida
 
@@ -92,9 +92,10 @@ Se usi un NAS, prova prima a creare un file nella destinazione con lo stesso
 utente che esegue `gextto.service`. Un percorso visibile dalla shell dell'utente
 personale può non essere visibile al servizio systemd.
 
-**Sicurezza.** La porta web è un'interfaccia amministrativa senza autenticazione.
-Lasciala sul loopback oppure limita l'accesso con firewall/reverse proxy prima di
-esporla in rete. Nell'installazione standard, `/opt/gextto/gexttod --version`
+**Sicurezza.** La porta web è un'interfaccia amministrativa, aperta per
+impostazione predefinita. Lasciala sul loopback o sulla rete di casa; per
+l'accesso da fuori attiva il login facoltativo (vedi *Accesso*, la rete locale
+resta libera) dietro un reverse proxy HTTPS o una VPN. Nell'installazione standard, `/opt/gextto/gexttod --version`
 indica quale build è in esecuzione. Vedi
 [`SECURITY.md`](SECURITY.md) per il modello di rete completo.
 

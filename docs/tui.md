@@ -22,6 +22,10 @@ la directory che contiene `gexttod`.
 La lingua viene scelta in quest'ordine: `--lang`, `GEXTTO_LANG`, la lingua
 attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 
+Se il daemon ha l'accesso protetto attivo e la TUI gira fuori dalla rete
+locale, passa la chiave API con `GEXTTO_API_KEY=<chiave>`: viene inviata
+nell'header `X-Api-Key` di ogni richiesta. Dalla rete locale non serve.
+
 ## Schede disponibili
 
 1. **Stato** — cruscotto: daemon (versione, modalità, uptime, PID, CPU/RAM),
@@ -48,7 +52,8 @@ attiva del daemon (`/api/i18n/active`), altrimenti italiano.
 7. **Blocklist** — release bloccate, con rimozione interattiva.
 8. **Libreria** — Serie TV, Film e Fumetti monitorati. Serie e film si
    gestiscono da qui: aggiunta cercando su TMDB, modifica dei requisiti con un
-   modulo a campi, pausa ed eliminazione. Il dettaglio di una serie mostra una
+   modulo a campi (per le serie anche *Anime (numerazione assoluta)* e *Niente
+   upgrade*), pausa ed eliminazione. Il dettaglio di una serie mostra una
    stagione alla volta con lo stato di ogni episodio (✓ presente, ✗ mancante,
    ↓ in download, `·` in uscita, `-` ignorato); da lì si attivano o
    disattivano le stagioni, si cercano e accodano le release, si ignorano o

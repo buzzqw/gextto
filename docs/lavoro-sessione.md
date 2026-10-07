@@ -1,7 +1,8 @@
 # Documento di lavoro — passaggio di consegne tra sessioni
 
 Ultimo aggiornamento: 2026-10-07. Copre il lavoro dal 2026-10-06 sera (commit
-`d9e5d5e`) al 2026-10-07 mattina (commit `1ff0ba9`).
+`d9e5d5e`) al 2026-10-07 (commit `432ce98` e il commit `docs:` successivo):
+log e notifiche, TUI, web su telefono e le migliorie della sezione 3.6.
 
 Chi apre una nuova sessione su gextto deve leggere questo file **prima** di
 fare qualsiasi cosa: contiene le regole di lavoro concordate con il
@@ -37,9 +38,17 @@ Le regole su commit e PR sono anche in `CLAUDE.md`; qui c'è il contesto.
 4. **Niente force-push su `main`**: l'ambiente lo blocca, ed è comunque da
    evitare. Prima di pushare: `git fetch origin main` e controllare che non
    ci siano commit nuovi; se ci sono, `git pull` (merge) e rilanciare i test.
-5. **Lingua**: si risponde in italiano. Testi di interfaccia: italiano e
-   inglese (TUI: catalogo `internal/tui/i18n.go`; notifiche:
-   `messages.Pick(it, en)`; log del daemon: solo inglese).
+5. **Lingua**: si risponde in italiano. Testi di interfaccia: la UI web segue i
+   cataloghi `internal_translations*.yml` (en, de, fr, es, pl; chiave = testo
+   italiano; un test verifica che i cinque cataloghi abbiano le stesse chiavi):
+   **ogni testo nuovo va tradotto in tutte e cinque le lingue**. Fuori dai
+   template si traduce con `uiText(s, "testo italiano")`. TUI: catalogo
+   `internal/tui/i18n.go` (it/en); notifiche: `messages.Pick(it, en)`; log del
+   daemon: solo inglese.
+8. **Pubblico italiano**: Gextto nasce per il pubblico italiano, dove le serie
+   arrivano doppiate mesi o anni dopo la messa in onda originale. Non dare mai
+   per scontato che un episodio sia disponibile quando va in onda: le date TMDB
+   vanno presentate come "messa in onda originale".
 6. **Log**: devono essere leggibili da una persona (frasi, non dump di campi
    chiave=valore), senza doppioni né ripetizioni periodiche identiche. I
    dettagli tecnici vanno in DEBUG. Il proprietario però vuole vedere che il
@@ -94,7 +103,8 @@ usata con successo, senza sporcare il repo:
    `baseURL: http://127.0.0.1:15003`;
 3. avviare il daemon con `GEXTTO_LISTEN=127.0.0.1:15003
    GEXTTO_ENGINE_LISTEN=127.0.0.1:18892 ... --dry-run` e un data dir nuovo;
-4. `npx playwright test -c <config>`. Stato attuale: **36 test, tutti verdi**.
+4. `npx playwright test -c <config>`. Stato attuale: **36 test, tutti verdi**
+   (verificato anche dopo le migliorie 3.6).
 
 ### Insidie già incontrate
 - Modificare `internal/tui/i18n.go` con sostituzioni testuali: `gofmt`
@@ -104,6 +114,16 @@ usata con successo, senza sporcare il repo:
   cambiato dall'ultima esecuzione.
 - `git push origin --delete <branch>` e il force-push su `main` sono
   bloccati dall'ambiente; vanno fatti dal proprietario.
+- **Esito dei test**: `go test ... | grep ... && git commit` committa anche con
+  test rossi (conta l'uscita di `grep`/`head`). Salvare l'output su file e
+  controllare `$?` di `go test` prima di committare.
+- Il registro dei download HTTP dei fumetti è globale al processo: nei test non
+  dare per scontato che sia vuoto.
+- Nei manuali una riga che inizia con `#` (es. «#41» andato a capo) diventa un
+  titolo Markdown: lo scopre il test e2e del manuale.
+- Il manuale è incorporato nel binario: dopo averlo modificato ricompilare il
+  daemon prima dei test e2e.
+- Test e2e: 36 test, tutti verdi a fine sessione.
 
 ---
 
@@ -169,6 +189,21 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
 | `ee4d9ae` | Template Scarico: chiuso il `div.download-global-toolbar` rimasto aperto (lo storico finiva dentro il pannello sessione). Tutti i blocchi del template hanno tag bilanciati. |
 | `1ff0ba9` | Avvisi CodeQL: script dei browser handler con `r.Host` validato (prima puntavano sempre a 127.0.0.1:5000) e `nosniff`; redirect di `/share` costruito con `url.URL`; conversioni intere sicure (limiti, retention, paginazione, date). |
 
+### 3.6 Migliorie (07/10) — dettagli in `docs/proposte-migliorie.md`
+| Commit | Cosa |
+|---|---|
+| `20b28eb` | Hardlink in libreria dei file in seed (`hardlink.go`, `hardlink_seeding` attivo di default), ripiego sulla copia. |
+| `1bfaad4` | Jellyfin/Plex aggiornano solo la cartella cambiata (`media_refresh.go`), mappature percorsi per Docker. |
+| `95f6f97` | Soglia `upgrade_until_score` (`upgrade_until.go`). |
+| `7dae752` | Login facoltativo con rete locale esente (`auth.go`), chiave API, `GEXTTO_AUTH_DISABLE=1`. |
+| `e78bcc2`, `a919fcd` | Calendario `/feed/calendar.ics` (arrivi, messa in onda originale, uscite italiane dei film); Dashboard etichettata. |
+| `6a7f739` | `ComicInfo.xml` nei CBZ scaricati direttamente (`comicinfo.go`). |
+| `f4a9f8f` | Anime con numerazione assoluta (`anime.go`, casella nella scheda serie web/TUI; aggiunta anche «Niente upgrade» al web). |
+| `e815180` | Gli episodi già in download non sono più mancanti. |
+| `893bc94`, `42db4b2` | Badge dei download in corso su "Scarico", anche sul telefono. |
+| `698efbf` | Login, calendario e descrizioni delle nuove impostazioni tradotti nelle 6 lingue. |
+| `432ce98` + `docs:` | Manuali, README, SECURITY, ADVANCED, API, ARCHITECTURE, UI_V2, tui aggiornati. |
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso
@@ -197,11 +232,18 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
    proprietario; i controlli su quella parte li fa lui.
 4. Il titolo del merge `281f89a` contiene "Claude" (vedi 3.2).
 
-### Proposte di migliorie
-Raccolte in `docs/proposte-migliorie.md` (hardlink, aggiornamento mirato
-Jellyfin/Plex, soglia "upgrade until", autenticazione facoltativa, iCal,
-ComicInfo.xml, anime, più due proposte minori). In attesa dei commenti del
-proprietario punto per punto: non implementare nulla prima della risposta.
+### Da verificare sul server reale (migliorie 3.6)
+1. **Hardlink**: con download e libreria sullo stesso filesystem il log deve
+   dire «linked into the library (hardlink…)»; altrimenti compare una volta
+   «Hardlink not possible (…)». Controllare con `ls -li` che i due nomi abbiano
+   lo stesso inode e contatore 2.
+2. **Jellyfin/Plex**: dopo un import, nei log di Jellyfin/Plex deve comparire la
+   scansione della sola cartella; se servono, compilare le mappature percorsi.
+3. **Login da fuori**: provare dietro il reverse proxy reale che
+   `X-Forwarded-For` arrivi (altrimenti tutto risulta locale).
+4. **Anime**: marcare una serie anime vera e controllare nei log del ciclo che
+   le release «Titolo - NNN» vengano riconosciute.
+5. **Calendario**: iscriversi da Thunderbird/telefono (serve la chiave TMDB).
 
 ---
 
@@ -219,12 +261,23 @@ proprietario punto per punto: non implementare nulla prima della risposta.
 | TUI | `internal/tui/` (`render.go`, `update.go`, `i18n.go`, `model.go`, `client.go`) |
 | Web v2 | `uiweb/v2/templates/v2.html`, `uiweb/v2/static/{v2.css,v2-core.js}`, `uiweb_v2.go`, `uiweb_shell.go`, `uiweb_v2_pwa.go`, `uiweb.go` (menu) |
 | Logging | `internal/logging/logging.go` (`ProblemCount`) |
+| Hardlink | `hardlink.go` (`linkOrCopyFile`, `hardlinkAtomically`), chiamato da `tev_completeEpisodeFolderWithArchive` e `StagePackFile` |
+| Jellyfin/Plex | `media_refresh.go`, richieste raggruppate in `web_background.go` (`requestMediaLibraryRefresh`) |
+| Soglia upgrade | `upgrade_until.go` (`upgradeReasonUntil`), `database.go` (approvazioni), `decision.go` (spiegazione) |
+| Accesso | `auth.go` (`AuthMiddleware`, montato in `web_serve.go`), hash password in `saveConfigSetting` (`web.go`) |
+| Calendario | `calendar_ics.go`, `tmdb.go` (`MovieReleaseDate`) |
+| Fumetti | `comicinfo.go` (`tagDownloadedComic`, chiamato in `handleHTTPOutcome` e dopo Mega) |
+| Anime | `parser.go` (`parseAbsoluteEpisode`), `anime.go` (`resolveAnimeReleases`, ricerche assolute), `engine.go` (`SearchSeriesEpisode`) |
+| Mancanti | `database.go` (`ArchiveGaps`, `activeDownloadEpisodes`) |
+| Badge Scarico | `uiweb_shell.go` (`ActiveDownloads`, `uiNavCounts`), `v2-core.js` (`updateDownloadsBadge`) |
+| Traduzioni | `internal_translations*.yml`, `uiText` in `auth.go` |
 
 ---
 
 ## 6. Come riprendere
 
-1. Leggere questo file, `CLAUDE.md` e `docs/proposte-migliorie.md`.
+1. Leggere questo file, `CLAUDE.md` e `docs/proposte-migliorie.md` (stato delle
+   migliorie).
 2. Configurare git come al punto 1.2 e installare `libtorrent-rasterbar-dev`.
 3. `git pull origin main`, `go test ./...` per partire da uno stato verde.
 4. Chiedere al proprietario quali punti della sezione 4 affrontare, oppure

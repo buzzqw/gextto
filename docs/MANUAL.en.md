@@ -9,9 +9,9 @@ selected in its header.
 
 > [!IMPORTANT]
 > Start in **dry-run**. Verify paths, source access and one test title before
-> enabling active downloads. The UI is an unauthenticated administrative
-> interface: keep it trusted or protect it with a firewall and authenticated
-> HTTPS reverse proxy.
+> enabling active downloads. The UI is an administrative interface, open by
+> default: keep it on a trusted network or, for access from outside, turn on the
+> login (*Configuration → Access*) and use HTTPS.
 
 ## How to use this guide
 
@@ -91,9 +91,10 @@ If you use a NAS, first create a test file in the destination as the same user
 that runs `gextto.service`. A path visible to your shell user may not be visible
 to the systemd service user.
 
-**Security.** The web port is an unauthenticated administrative interface. Keep
-it on loopback, or restrict it with a firewall/reverse proxy before exposing it
-to a network. In the standard install, `/opt/gextto/gexttod --version` tells you
+**Security.** The web port is an administrative interface, open by default. Keep
+it on loopback or the home network; for access from outside turn on the optional
+login (see *Access*; the local network stays free) behind an HTTPS reverse proxy
+or a VPN. In the standard install, `/opt/gextto/gexttod --version` tells you
 which build is running.
 See [`SECURITY.md`](SECURITY.md) for the full network model.
 

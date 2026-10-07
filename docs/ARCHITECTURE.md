@@ -82,13 +82,17 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 ### Pipeline media (release → archivio)
 | File | Ruolo |
 |---|---|
-| `parser.go` | parsing dei nomi release e della qualità. |
+| `parser.go` | parsing dei nomi release e della qualità (anche il numero assoluto degli anime). |
+| `anime.go` | serie anime: numero assoluto ↔ stagione/episodio con i dati TMDB, ricerche per numero assoluto. |
+| `upgrade_until.go` | soglia «smetti di migliorare» (`upgrade_until_score`) applicata alle decisioni di upgrade. |
 | `decision.go` | spiegazione (sola lettura) delle decisioni su una release. |
 | `cleaner.go` | indice dell'archivio, rilevamento duplicati inferiori, pulizia. |
 | `postprocess.go` | post-processing: spostamento, rinomina, sidecar. |
+| `hardlink.go` | import in libreria come hardlink dei file in seed, con ritorno alla copia. |
 | `media_guard.go` | guardie sui file video (estensioni, protezione). |
 | `mediainfo.go` | ispezione reale dei file via `ffprobe`. |
 | `comics.go` | fumetti: scraper, DB, download HTTP, ciclo dedicato. |
+| `comicinfo.go` | scrittura di `ComicInfo.xml` nei CBZ scaricati direttamente. |
 
 ### Sorgenti, ricerca e metadati
 | File | Ruolo |
@@ -98,6 +102,8 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 | `indexer_health.go` | salute degli indexer (Prowlarr). |
 | `tmdb.go` / `tvdb.go` | metadati TMDB e TheTVDB. |
 | `integrations.go` | URL base delle integrazioni esterne. |
+| `media_refresh.go` | aggiornamento mirato (per cartella) di Jellyfin e Plex, con ripiego sull'aggiornamento completo. |
+| `calendar_ics.go` | calendario iCal `/feed/calendar.ics`: arrivi, messe in onda originali, uscite locali dei film. |
 
 ### Notifiche, hook, i18n
 | File | Ruolo |
@@ -121,6 +127,7 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 |---|---|
 | `web.go` | definizioni condivise: `AppState`, helper risposta/query, setup. |
 | `web_router.go` | costruzione del mux HTTP e tabella delle rotte. |
+| `auth.go` | accesso facoltativo: middleware davanti a tutte le rotte, esenzione rete locale, login, chiave API. |
 | `web_handlers_core.go` | handler core, streaming log, middleware. |
 | `web_handlers_g0.go` … `web_handlers_g7.go` | gruppi di handler portati dal progetto di riferimento. |
 | `web_handlers_compat.go` | endpoint di compatibilità/diagnostica. |

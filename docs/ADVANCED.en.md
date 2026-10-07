@@ -19,11 +19,30 @@ moving a library, use **Maintenance → Scan archives** before starting upgrades
 or missing-episode searches. The scan runs in the background: you can keep
 working and see the outcome when it finishes.
 
+**Hardlinks and space.** A file that keeps seeding enters the library as a
+hardlink only when the download folder and the library are on the same
+filesystem (same disk or same NAS share). With downloads on a local disk and the
+library on the NAS Gextto copies, and says so once in the log: to save space put
+the download folder on the same share as the library. When Jellyfin or Plex run
+in Docker and see the library under another path, fill in *Jellyfin/Plex — path
+mapping* (`gextto_path=server_path`) so they can refresh only the folder that
+changed.
+
 ## Network and security
 
-Gextto has no built-in user authentication. Bind it to `127.0.0.1:5000` when
-possible. For remote access, use a firewall and an authenticated HTTPS reverse
-proxy.
+Gextto is meant for a trusted LAN and is open by default. Bind it to
+`127.0.0.1:5000` or to the home network when possible. For access from outside:
+
+1. put an HTTPS reverse proxy (Caddy, nginx, Traefik) in front of it, or use a
+   VPN such as Tailscale or WireGuard;
+2. turn on *Configuration → Access → Require login* and set a password (and an
+   API key if scripts or a calendar need one);
+3. keep "No login from the local network" on: nothing changes on the LAN.
+
+The proxy must pass the client address in `X-Forwarded-For` (nginx:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`, Caddy does it by
+itself): Gextto uses it to tell Internet clients apart. If you lock yourself out,
+start the service with `GEXTTO_AUTH_DISABLE=1`.
 
 Do not expose the administrative port directly to the Internet. See
 [Security](SECURITY.md) for details.

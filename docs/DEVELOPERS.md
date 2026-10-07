@@ -89,6 +89,22 @@ When adding an API endpoint:
 Use the existing JSON helpers and keep destructive operations explicit and
 confirmable in the UI.
 
+Every route sits behind `AuthMiddleware` (`auth.go`). Access control is off by
+default; when it is on, only `/login`, `/logout`, `/static/`, the favicon, the
+manifest and the service worker are public, and local clients pass without a
+login unless the operator disabled that. A new public route needs an explicit
+entry in `authPublicPath`.
+
+### Interface texts and translations
+
+Templates and Go code write interface texts in Italian; the rendered HTML is
+translated with the bundled catalogs `internal_translations.yml` (English),
+`_de`, `_fr`, `_es` and `_pl`, whose keys are the Italian strings. Every new
+text needs an entry in all five catalogs (a test checks that they share the
+same keys). Texts built outside the templates use `uiText(s, "…")`. The TUI has
+its own Italian/English catalog in `internal/tui/i18n.go`; daemon log lines are
+English only.
+
 ## Database changes
 
 Database schema changes must be migration-safe for existing installations.

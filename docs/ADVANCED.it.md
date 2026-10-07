@@ -20,11 +20,31 @@ Dopo aver spostato una libreria usa **Manutenzione → Scansiona archivi** prima
 di avviare upgrade o ricerca episodi mancanti. La scansione gira in background:
 puoi proseguire, l'esito appare quando finisce.
 
+**Hardlink e spazio.** Un file che resta in seed entra in libreria come
+hardlink solo se la cartella dei download e la libreria stanno sullo stesso
+filesystem (stesso disco o stessa condivisione NAS). Con i download sul disco
+locale e la libreria sul NAS Gextto copia, e lo scrive una volta nel log: se vuoi
+risparmiare spazio metti la cartella dei download sulla stessa condivisione della
+libreria. Se Jellyfin o Plex girano in Docker e vedono la libreria sotto un altro
+percorso, compila *Jellyfin/Plex — mappatura percorsi* (`percorso_gextto=percorso_server`)
+perché possano aggiornare solo la cartella cambiata.
+
 ## Rete e sicurezza
 
-Gextto non include autenticazione utente. Quando possibile ascolta su
-`127.0.0.1:5000`; per accesso remoto usa firewall e reverse proxy HTTPS con
-autenticazione.
+Gextto è pensato per una LAN fidata e per impostazione predefinita è aperto.
+Quando possibile ascolta su `127.0.0.1:5000` o solo sulla rete di casa. Per
+l'accesso da fuori:
+
+1. metti davanti un reverse proxy HTTPS (Caddy, nginx, Traefik) o usa una VPN
+   come Tailscale o WireGuard;
+2. attiva *Configurazione → Accesso → Richiedi l'accesso* e imposta una
+   password (e, se ti serve per script o calendario, una chiave API);
+3. lascia attivo «Nessun login dalla rete locale»: dalla LAN non cambia nulla.
+
+Il proxy deve passare l'indirizzo del client in `X-Forwarded-For` (nginx:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`, Caddy lo fa da
+sé): Gextto lo usa per distinguere chi arriva da Internet. Se resti chiuso fuori,
+avvia il servizio con `GEXTTO_AUTH_DISABLE=1`.
 
 Non esporre direttamente la porta amministrativa su Internet. Per i dettagli
 vedi [Sicurezza](SECURITY.md).

@@ -16,6 +16,8 @@ specifiche.
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
+| [Proposte di migliorie](proposte-migliorie.md) | Migliorie proposte, decisioni prese e stato di ciascuna. |
+| [Lavoro di sessione](lavoro-sessione.md) | Passaggio di consegne tra sessioni di sviluppo: regole, stato, punti aperti. |
 
 > [!NOTE]
 > I percorsi, le porte e i comandi qui descritti sono esempi. Verifica sempre

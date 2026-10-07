@@ -23,17 +23,31 @@ delay before any public disclosure.
 
 ## Network exposure
 
-Gextto has **no built-in user management or authentication**. Treat the web port
-as an administrative interface.
+Gextto is meant for a trusted LAN and its access control is **off by default**:
+anyone who reaches the web port can use it. Treat the port as an administrative
+interface.
 
-- **Bind to loopback** (`127.0.0.1:5000`) and put a reverse proxy with
-  authentication and TLS in front of it when the UI must be reachable remotely.
-- **Restrict network access** with a firewall or reverse proxy when the UI must
-  be reachable from another machine. HTTPS and upstream authentication should
-  be provided by that proxy.
+- **Optional login** (*Configuration → Access*): when enabled, clients outside
+  the local network must log in (bcrypt password, signed 30-day session cookie;
+  a new password ends every session) or send the API key (`X-Api-Key` header or
+  `?apikey=`). Five wrong passwords from one address block further attempts for
+  a minute and every failure is logged. Access control stays open, with a
+  warning, until a password or a key is set; `GEXTTO_AUTH_DISABLE=1` turns it
+  off to recover from a lock-out.
+- **Local network exemption** (on by default): loopback, private (RFC 1918, IPv6
+  ULA) and link-local clients need no login. Behind a reverse proxy every
+  address in `X-Forwarded-For`, `X-Real-IP` and `Forwarded` must be local too, so
+  Internet clients that come through a proxy on the same host still have to
+  authenticate. Turn the exemption off if your LAN is not trusted.
+- **Use TLS for remote access**: Gextto serves plain HTTP. Put a reverse proxy
+  with a certificate (or a VPN) in front of it, otherwise passwords and keys
+  travel in clear text.
+- **Restrict network access** with a firewall when the UI must be reachable from
+  another machine.
 
 > [!WARNING]
-> Do not expose port 5000 directly to the public Internet.
+> Do not expose port 5000 directly to the public Internet, with or without the
+> login.
 
 ## What the daemon deliberately does
 
@@ -70,7 +84,9 @@ as an administrative interface.
   relying on an SSRF filter.
 - **The configuration API returns integration keys in cleartext.** `GET
   /api/config` includes indexer, TMDB and TVDB keys. Anyone who can call that
-  endpoint can read them; protect the port as described above.
+  endpoint can read them; protect the port as described above. The login
+  password is stored only as a bcrypt hash and is never returned; the API key
+  is stored as configured.
 - **Event hooks and integrations receive your data.** A webhook payload, a
   Telegram message or a hook script contains titles, paths and hashes. Review
   the destinations you configure.

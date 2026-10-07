@@ -16,21 +16,27 @@ funzionare come servizio.
   programmate, trasferimenti torrent, post-processing e archivio. Libtorrent è
   integrato e predefinito; qBittorrent-nox è un'alternativa opzionale.
 - **Serie TV, film e fumetti:** monitora i titoli, cerca nelle sorgenti
-  configurate e gestisce download e libreria da una UI web responsive o dalla TUI
-  terminale.
+  configurate e gestisce download e libreria da una UI web responsive, installabile
+  sul telefono, o dalla TUI terminale. Le serie anime numerate per episodio
+  assoluto («Titolo - 1071») vengono ricondotte a stagione ed episodio; nei
+  fumetti CBZ viene scritto un `ComicInfo.xml` per Komga, Kavita e i lettori.
 - **Automazione attenta alla qualità:** valuta release per qualità, sorgente,
   codec, audio, HDR, lingua e dimensione; protegge i file migliori già presenti e
-  spiega perché un candidato è stato scartato. `ffprobe` può arricchire le
+  spiega perché un candidato è stato scartato. Una soglia facoltativa ferma gli
+  upgrade quando il file è già abbastanza buono. `ffprobe` può arricchire le
   decisioni sui file archiviati.
 - **Sorgenti e integrazioni flessibili:** RSS, indexer Torznab come Jackett e
   Prowlarr, motori web e FlareSolverr opzionale; integrazioni con Simkl, Jellyfin
-  e Plex.
+  e Plex (che aggiornano solo la cartella cambiata) e un calendario iCal con gli
+  arrivi in libreria, le messe in onda originali e le uscite italiane dei film.
 - **Attenzione alla libreria:** un file esistente viene sostituito solo da un
   vero upgrade, e il file sostituito finisce nel Cestino (se configurato). Un
   NAS smontato viene riconosciuto e mai scambiato per file cancellati; gli
   errori temporanei (NAS irraggiungibile, disco momentaneamente pieno, timeout)
   vengono ritentati in automatico; uno spostamento verso l'archivio interrotto
-  da un riavvio riprende da solo.
+  da un riavvio riprende da solo. Mentre un file è in seed entra in libreria come
+  hardlink, senza occupare spazio due volte (se download e libreria stanno sullo
+  stesso filesystem).
 - **Strumenti operativi inclusi:** controlli di salute, log, backup,
   manutenzione, notifiche, percorsi NAS, gestione seeding e blocklist.
 
@@ -61,9 +67,11 @@ Installa il programma in `/opt/gextto`, conserva i dati del servizio in
 `/var/lib/gextto` ed espone la UI sulla porta 5000.
 
 > [!IMPORTANT]
-> La UI web è un'interfaccia amministrativa senza autenticazione. Mantienila in
-> una rete fidata oppure proteggila con firewall e reverse proxy HTTPS dotato di
-> autenticazione. Leggi prima la [politica di sicurezza](docs/SECURITY.md).
+> Gextto è pensato per una rete fidata: per impostazione predefinita la UI web e
+> l'API sono aperte. Se lo raggiungi da fuori casa attiva il login facoltativo
+> (*Configurazione → Accesso*, la rete locale resta libera) e usa comunque HTTPS
+> tramite reverse proxy o VPN. Leggi prima la
+> [politica di sicurezza](docs/SECURITY.md).
 
 ### Installazione dal sorgente
 

@@ -68,22 +68,27 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 
 | Menu | Stato | Note |
 | --- | --- | --- |
-| Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** |
+| Dashboard | ✅ | metriche, sessione, ultimo ciclo, consumo, ultimi download, **Prossime uscite** (etichettate come messa in onda originale) |
 | Scarico | ✅ | tabella torrent + HTTP, aggiornamento automatico ogni **5 s** già attivo, progressione/velocità HTTP, ordinamento/filtro server, azioni riga, blocco, dettaglio/rimozione modali, **limiti/storage**, **tracker/file priority/web seed**, **storico download**, **aggiunta magnet/URL/.torrent**, **tag in massa** |
-| Serie TV | ✅ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast con link TVDB/TMDB, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie con **Sfoglia** per il percorso NAS, azioni serie, **anteprima/esecuzione rinomina** |
+| Serie TV | ✅ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast con link TVDB/TMDB, stagioni on/off, episodi per stagione con azioni, sorgenti puntata, modifica serie con **Sfoglia** per il percorso NAS e le caselle **Anime (numerazione assoluta)** e **Niente upgrade**, azioni serie, **anteprima/esecuzione rinomina** |
 | Film | ✅ | form TMDB + elenco + **dettaglio**: hero poster/metadati/cast con link TMDB, modifica, requisiti linguistici mostrati in formato leggibile, azioni, corrispondenze archivio e storico |
 | Mancanti | ✅ | tabella gap + form di ricerca + Cerca/Ignora |
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
 | Fumetti | ✅ | tabella fumetti + **coda download HTTP**, esplorazione GetComics, link finder/download, weekly pack, storico e modifica |
 | Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
-| Integrazioni | ✅ | scheda Simkl (stato, PIN, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex/FlareSolverr, **editor indexer**, link |
+| Integrazioni | ✅ | scheda Simkl (stato, PIN, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex (con mappatura percorsi)/FlareSolverr, **editor indexer**, link al **calendario iCal**, link |
 | Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
 | Salute | ✅ | metriche, percorsi, dischi, errori, **sorgenti** (manuale) e **provider** |
 | Log | ✅ | filtro, limite righe, aggiornamento automatico ogni 5 s, **colorazione dei livelli lato server**, scroll automatico |
 | Blocklist | ✅ | tabella + rimozione |
 | Manuale | ✅ | render server-side (IT/EN) |
 | Licenza | ✅ | render server-side |
+
+La voce **Scarico** porta il numero dei download in corso (torrent non finiti e
+download HTTP attivi), aggiornato ogni 5 s con le metriche live; sul telefono è
+un piccolo contatore sull'icona. Con l'accesso protetto attivo, chi è fuori
+dalla rete locale passa da `/login` (pagina autonoma, tradotta come il resto).
 
 Interfaccia migliorata (solo in v2, tramite `v2.css`): barra superiore sticky,
 stato attivo della navigazione più chiaro, tabelle con hover/zebra e header
