@@ -213,7 +213,7 @@ th{color:#93a1b5;font-weight:500;font-size:12px;text-transform:uppercase;letter-
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;white-space:nowrap}
 td.sel,th.sel{width:26px;text-align:center}
-td.name,th.name{max-width:340px;word-break:break-word}
+td.name,th.name{min-width:280px;max-width:640px;word-break:break-word}
 .state{font-size:12px;padding:1px 8px;border-radius:999px;background:#243049;white-space:nowrap}
 .s-seeding{background:#14532d;color:#86efac}
 .s-downloading,.s-checking_files,.s-downloading_metadata{background:#172f4f;color:#93c5fd}
@@ -222,7 +222,7 @@ td.name,th.name{max-width:340px;word-break:break-word}
 .s-moving{background:#3b2a4a;color:#d8b4fe}
 .bar{height:7px;background:#243049;border-radius:99px;overflow:hidden;margin-top:3px;min-width:80px}
 .bar i{display:block;height:100%;background:#3b82f6}
-.actions{white-space:nowrap}
+.actions{white-space:nowrap;text-align:right}
 .actions form{display:inline-block;margin:0 2px 2px 0}
 input[type=text],input[type=search],input[type=password],input[type=number],select{padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 button{padding:6px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;color:#dbe4f0;font-size:13px;cursor:pointer}
@@ -391,7 +391,7 @@ const uiLiveTemplate = `{{define "live"}}
       <th class="num" onclick="sortTable(8)">Seed</th>
       <th class="num" onclick="sortTable(9)">Ratio</th>
       <th class="num" onclick="sortTable(10)">ETA</th>
-      <th>Azioni</th>
+      <th class="actions">Azioni</th>
     </tr></thead>
     <tbody>
     {{range .Rows}}
