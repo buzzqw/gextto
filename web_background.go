@@ -803,6 +803,15 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			idle := 0
 			var rateKib uint64
 			for _, torrent := range snapshot {
+				// A torrent parked by the stall monitor is stuck whatever its
+				// engine state: after a restart it comes back merely paused
+				// until the monitor parks it again, and must not be reported
+				// as waiting in between.
+				if entry, ok := stallWaitStart[torrent.Hash]; ok && entry.stalledSince != nil && !TorrentTransferring(torrent) && torrent.Progress < 100 {
+					idle++
+					rateKib += torrent.DownloadRate
+					continue
+				}
 				if torrent.State == "paused" {
 					queued++
 				}
