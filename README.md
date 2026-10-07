@@ -53,7 +53,7 @@ same data.
 
 | Engine | Where it runs | Strengths | Trade-offs — pick it when |
 |---|---|---|---|
-| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page reachable on the LAN; a crash stays in its process; **sequential and first/last download**; its read cache and write buffer are sized automatically from the RAM; falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); per-torrent rate/connection limits, manual web seeds or tracker removal | you want a self-contained engine with minimal C/C++ dependencies |
+| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page reachable on the LAN; a crash stays in its process; **sequential and first/last download**; a **small, adaptive memory footprint** (cache sized from available RAM, active downloads/seeds and the storage type); falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); per-torrent rate/connection limits, manual web seeds or tracker removal; no large in-process disk cache | you want a self-contained engine with minimal C/C++ dependencies |
 | **libtorrent** (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full feature set: sequential, per-torrent limits, super-seeding, web seeds, piece diagnostics; every advanced knob | Gextto and the engine share one process; needs the libtorrent library | you need every advanced control or maximum compatibility |
 | **qBittorrent-nox** | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; supports sequential and its own limits | Needs path mappings when the two processes see different paths; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
 
@@ -76,10 +76,12 @@ downloads on a 16 GB machine, the engine footprint differs sharply:
 | **qBittorrent-nox** | ~40 MB | ~5 GB |
 
 libtorrent and qBittorrent keep a large in-process disk cache (GBs of anonymous
-memory). gx-torrent sizes its buffers from available memory and lets the
-reclaimable OS page cache absorb the writes, so its own footprint stays in the
-tens/hundreds of MB. Actual numbers vary with torrents, peers and storage;
-on HDD/NFS Gextto gives gx-torrent a larger cache.
+memory). gx-torrent has **no large in-process write-back cache by design**: it
+writes pieces through and lets the reclaimable OS page cache do the coalescing,
+so its own footprint stays in the tens/hundreds of MB even under load; it does
+not hold data in RAM just to sit on it. Numbers vary with torrents, peers and
+storage; on HDD/NFS Gextto gives gx-torrent a larger buffer, used only when the
+writes fall behind the download.
 
 ## Install on Linux
 

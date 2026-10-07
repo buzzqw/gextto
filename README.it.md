@@ -55,7 +55,7 @@ controllata, mai due client sugli stessi dati.
 
 | Motore | Dove gira | Vantaggi | Svantaggi — quando sceglierlo |
 |---|---|---|---|
-| **gx-torrent** (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria raggiungibile in LAN; un crash resta nel suo processo; **download sequenziale e prima/ultima parte**; cache di lettura e buffer di scrittura dimensionati da soli sulla RAM; se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi (niente solo-v2); limiti di velocità/connessioni per singolo torrent, web seed manuali o rimozione tracker | vuoi un motore autonomo con dipendenze C/C++ minime |
+| **gx-torrent** (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria raggiungibile in LAN; un crash resta nel suo processo; **download sequenziale e prima/ultima parte**; **impronta di memoria piccola e adattiva** (cache dimensionata su RAM disponibile, download/seed attivi e tipo di storage); se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi (niente solo-v2); limiti di velocità/connessioni per singolo torrent, web seed manuali o rimozione tracker; nessuna grande cache disco in-process | vuoi un motore autonomo con dipendenze C/C++ minime |
 | **libtorrent** (integrato) | Stesso processo di Gextto (`libtorrent-rasterbar`) | Set completo: sequenziale, limiti per torrent, super-seeding, web seed, diagnostica pezzi; tutte le regolazioni avanzate | Gextto e il motore condividono un processo; richiede la libreria libtorrent | ti servono tutti i controlli avanzati o la massima compatibilità |
 | **qBittorrent-nox** | Demone esterno, pilotato via Web API | Riusa un qBittorrent esistente e il suo ecosistema/Web UI; supporta il sequenziale e i suoi limiti | Servono le mappature percorsi se i due processi vedono path diversi; un processo e una dipendenza in più | hai già qBittorrent-nox o preferisci la sua UI |
 
@@ -78,11 +78,14 @@ download su una macchina da 16 GB, l'impronta del motore cambia molto:
 | **libtorrent integrato** (nel processo di Gextto) | ~0,5 GB | 3–5 GB |
 | **qBittorrent-nox** | ~40 MB | ~5 GB |
 
-libtorrent e qBittorrent tengono una grande cache disco in-process (GB di memoria
-anonima). gx-torrent dimensiona i buffer sulla memoria disponibile e lascia che
-sia la page cache del kernel (reclamabile) ad assorbire le scritture: la sua
-impronta resta nelle decine/centinaia di MB. I valori reali variano con torrent,
-peer e storage; su HDD/NFS Gextto dà a gx-torrent una cache più grande.
+libtorrent e qBittorrent tengono una grande cache disco in-process (GB di
+memoria anonima). gx-torrent **non ha una grande cache write-back in-process, per
+scelta**: scrive i pezzi in streaming e lascia alla page cache del kernel
+(reclamabile) il compito di fondere le scritture, quindi la sua impronta resta
+nelle decine/centinaia di MB anche sotto carico; non tiene dati in RAM solo per
+occuparla. I valori variano con torrent, peer e storage; su HDD/NFS Gextto dà a
+gx-torrent un buffer più grande, usato solo quando le scritture restano
+indietro rispetto al download.
 
 ## Installazione Linux
 
