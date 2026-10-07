@@ -42,6 +42,9 @@ func (d *Daemon) routes() http.Handler {
 	root.Handle("/api/", d.authenticate(api))
 	root.HandleFunc("GET /{$}", d.handleUI)
 	root.HandleFunc("GET /ui", d.handleUI)
+	root.HandleFunc("POST /ui/action", d.handleUIAction)
+	root.HandleFunc("POST /ui/remove", d.handleUIRemove)
+	root.HandleFunc("POST /ui/add", d.handleUIAdd)
 	return root
 }
 

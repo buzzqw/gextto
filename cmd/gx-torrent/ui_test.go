@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,11 +27,83 @@ func TestUIPageServes(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 		t.Fatalf("GET / content type = %q", ct)
 	}
-	buf := make([]byte, 8192)
+	buf := make([]byte, 16384)
 	n, _ := resp.Body.Read(buf)
 	body := string(buf[:n])
-	if !strings.Contains(body, "gx-torrent") || !strings.Contains(body, "sola consultazione") {
+	if !strings.Contains(body, "gx-torrent") || !strings.Contains(body, "Aggiungi") {
 		t.Fatalf("GET / body unexpected: %s", body)
+	}
+}
+
+func TestUIActions(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	torrent := makeTorrent(t, src, "payload.bin", 80_000)
+	hash, _, err := d.add(addRequest{TorrentData: torrent, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.State == "seeding"
+	})
+
+	post := func(path string, values url.Values) int {
+		resp, err := http.PostForm(server.URL+path, values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if code := post("/ui/action", url.Values{"hash": {hash}, "op": {"pause"}}); code != http.StatusOK {
+		t.Fatalf("pause -> %d", code)
+	}
+	waitFor(t, "paused", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.State == "paused"
+	})
+
+	if code := post("/ui/action", url.Values{"hash": {hash}, "op": {"resume"}}); code != http.StatusOK {
+		t.Fatalf("resume -> %d", code)
+	}
+	waitFor(t, "resumed", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.State == "seeding"
+	})
+
+	// Removal keeps the payload.
+	payload := filepath.Join(src, "payload.bin")
+	if code := post("/ui/remove", url.Values{"hash": {hash}, "files": {"0"}}); code != http.StatusOK {
+		t.Fatalf("remove -> %d", code)
+	}
+	if _, err := os.Stat(payload); err != nil {
+		t.Fatalf("remove must keep the files: %v", err)
+	}
+	if _, ok := findInfo(d, hash); ok {
+		t.Fatal("torrent must be gone after remove")
+	}
+}
+
+func TestUIActionRejectsCrossOrigin(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	req, _ := http.NewRequest(http.MethodPost, server.URL+"/ui/action", strings.NewReader("op=pause-all"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://evil.example")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin POST -> %d, want 403", resp.StatusCode)
 	}
 }
 
