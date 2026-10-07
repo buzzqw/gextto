@@ -7,6 +7,7 @@ package gextto
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -336,6 +337,37 @@ func recordHashFailure(hash string) (int, bool) {
 	hashFailures.counts[key]++
 	count := hashFailures.counts[key]
 	return count, count == hashFailureAlertThreshold
+}
+
+// renameItemLogText describes one change made by the library check: an
+// episode renamed (old name → new name) or an inferior copy removed. Empty for
+// a failed item, which has its own warning.
+func renameItemLogText(series string, item map[string]any, cleanupAction string) string {
+	if _, failed := item["error"]; failed {
+		return ""
+	}
+	label := series
+	season, hasSeason := item["season"].(int64)
+	episode, hasEpisode := item["episode"].(int64)
+	if hasSeason && hasEpisode {
+		label = fmt.Sprintf("%s S%02dE%02d", series, season, episode)
+	}
+	from, _ := item["from"].(string)
+	if discarded, _ := item["discarded"].(bool); discarded {
+		action := "moved to the trash"
+		if cleanupAction == "delete" {
+			action = "deleted"
+		}
+		return fmt.Sprintf("🗑️ %s: «%s» %s — the library already has a better copy", label, filepath.Base(from), action)
+	}
+	to, _ := item["to"].(string)
+	if to == "" {
+		return ""
+	}
+	if filepath.Dir(from) != filepath.Dir(to) {
+		return fmt.Sprintf("✏️ %s renamed: «%s» → «%s» (moved to %s)", label, filepath.Base(from), filepath.Base(to), filepath.Dir(to))
+	}
+	return fmt.Sprintf("✏️ %s renamed: «%s» → «%s»", label, filepath.Base(from), filepath.Base(to))
 }
 
 // renameRepairReportText summarises a periodic library check (rename to the

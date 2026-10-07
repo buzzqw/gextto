@@ -197,3 +197,19 @@ func TestDedupeReleasesByHashKeepsFirstCopy(t *testing.T) {
 		t.Fatalf("deduped = %+v", got)
 	}
 }
+
+func TestRenameItemLogTextSaysWhatChanged(t *testing.T) {
+	renamed := map[string]any{"season": int64(2), "episode": int64(8), "from": "/lib/Agenzia/S02/agenzia.s02e08.1080p.mkv", "to": "/lib/Agenzia/S02/Agenzia S02E08 - Titolo.mkv", "executed": true}
+	want := "✏️ Agenzia S02E08 renamed: «agenzia.s02e08.1080p.mkv» → «Agenzia S02E08 - Titolo.mkv»"
+	if got := renameItemLogText("Agenzia", renamed, ""); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	discarded := map[string]any{"season": int64(1), "episode": int64(3), "from": "/lib/X/S01/x.720p.mkv", "discarded": true}
+	want = "🗑️ X S01E03: «x.720p.mkv» deleted — the library already has a better copy"
+	if got := renameItemLogText("X", discarded, "delete"); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if got := renameItemLogText("X", map[string]any{"from": "a", "error": "boom"}, ""); got != "" {
+		t.Fatalf("failed item must not log, got %q", got)
+	}
+}

@@ -289,7 +289,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			alreadyOk = append(alreadyOk, archivePath)
 			continue
 		}
-		logging.Info("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
+		logging.Debug("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
 		if execute {
 			// The renamed file has a new path: update the DB, otherwise the next
 			// preview no longer finds the file.
@@ -487,6 +487,17 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		}
 	}
 	renamedCount := len(items) - discardedCount - errorCount
+	if execute {
+		// Say what changed, file by file: a bare count does not let the user
+		// find the episode afterwards. Failures already have their own WARN.
+		for _, item := range items {
+			if entry, ok := item.(map[string]any); ok {
+				if text := renameItemLogText(series.Name, entry, cfg.CleanupAction); text != "" {
+					logging.Info(text)
+				}
+			}
+		}
+	}
 	note := ""
 	if force {
 		note = " [force]"
