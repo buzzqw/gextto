@@ -77,6 +77,9 @@ type uiShellChrome struct {
 	Transferring int
 	Stuck        int
 	Problems     uint64
+	// ActiveDownloads is the badge on "Scarico": unfinished torrents plus the
+	// direct HTTP downloads still running (seeding torrents are not counted).
+	ActiveDownloads int
 }
 
 func uiShellChromeFrom(s *AppState) uiShellChrome {
@@ -111,6 +114,9 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	}
 	for _, view := range s.activeEngine().List() {
 		chrome.Torrents++
+		if view.Progress < 100 {
+			chrome.ActiveDownloads++
+		}
 		chrome.Peers += view.NumPeers
 		chrome.Seeds += view.NumSeeds
 		downloadRate += view.DownloadRate
@@ -129,6 +135,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	for _, download := range HTTPDownloads() {
 		if download.Status == "downloading" {
 			downloadRate += download.SpeedBytes
+			chrome.ActiveDownloads++
 		}
 	}
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
@@ -158,14 +165,20 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 // uiNavCounts computes the badges shown next to the sidebar entries, matching
 // SidebarCount of the classic UI.
 func uiNavCounts(s *AppState, cfg *Config) map[string]int {
-	http := 0
+	active := 0
 	for _, download := range HTTPDownloads() {
 		if download.Status == "downloading" {
-			http++
+			active++
+		}
+	}
+	for _, view := range s.activeEngine().List() {
+		if view.Progress < 100 {
+			active++
 		}
 	}
 	counts := map[string]int{
-		"downloads": len(s.activeEngine().List()) + http,
+		// Downloads in progress, like the live badge (seeding is not counted).
+		"downloads": active,
 		"series":    len(cfg.Series),
 		"movies":    len(cfg.Movies),
 	}

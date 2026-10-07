@@ -150,6 +150,10 @@ func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, `id="v2-live-mobile-metrics"`) {
 		t.Fatalf("live mobile chrome partial -> %d", code)
 	}
+	// The Scarico badge is refreshed from the live partials.
+	if !strings.Contains(body, `data-active-downloads="0"`) {
+		t.Fatal("mobile chrome partial must carry the active downloads count")
+	}
 }
 
 func TestV2IsTheDefaultRootUI(t *testing.T) {

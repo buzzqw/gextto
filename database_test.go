@@ -2006,7 +2006,7 @@ func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
 	}{
 		{"1111111111111111111111111111111111111111", "downloading", 1, 2},
 		{"2222222222222222222222222222222222222222", "queued", 2, nil}, // season pack
-		{"3333333333333333333333333333333333333333", "error", 1, 3},   // failed: still missing
+		{"3333333333333333333333333333333333333333", "error", 1, 3},    // failed: still missing
 	} {
 		if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,series_name,season,episode,status,updated_at) VALUES (?1,'show',?2,?3,?4,datetime('now'))", row.hash, row.season, row.episode, row.status); err != nil {
 			t.Fatal(err)

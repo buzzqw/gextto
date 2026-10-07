@@ -1097,6 +1097,22 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   /* "Dashboard" is the longest label: a touch smaller so it fits its column. */
   #app-sidebar .nav-item[data-nav="dashboard"] { font-size: 0.64rem; letter-spacing: -0.02em; }
   #app-sidebar .nav-item.has-news { position: relative; }
+  /* Downloads in progress: a small counter on the Scarico icon. */
+  #app-sidebar .nav-item[data-nav="downloads"] { position: relative; }
+  #app-sidebar .nav-item[data-nav="downloads"] .nav-count {
+    display: inline-block;
+    position: absolute;
+    top: 2px;
+    left: calc(50% + 4px);
+    min-width: 16px;
+    margin: 0;
+    padding: 0 4px;
+    font-size: 0.62rem;
+    line-height: 16px;
+    background: var(--accent-action);
+    color: #04121f;
+  }
+  #app-sidebar .nav-item[data-nav="downloads"] .nav-count[hidden] { display: none; }
   #app-sidebar .nav-item.has-news::after {
     content: "";
     position: absolute;

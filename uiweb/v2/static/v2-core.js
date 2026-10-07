@@ -715,6 +715,7 @@
   document.addEventListener("htmx:afterSwap", function (event) {
     if (!event.target) return;
     updateProblemsChip();
+    updateDownloadsBadge();
     ensureTooltips(event.target);
     if (event.target.id === "v2-modal") { scanModal(); return; }
     updateTorrentSelection();
@@ -945,6 +946,18 @@
     if (logNav) logNav.classList.toggle("has-news", unseen > 0);
   }
 
+  // "Scarico" badge: downloads in progress, refreshed with the live metrics.
+  function updateDownloadsBadge() {
+    var source = document.getElementById("v2-live-mobile-metrics") || document.getElementById("v2-live-top-metrics");
+    if (!source || !source.hasAttribute("data-active-downloads")) return;
+    var active = parseInt(source.getAttribute("data-active-downloads") || "0", 10) || 0;
+    var badges = document.querySelectorAll('#app-sidebar [data-nav="downloads"] .nav-count');
+    for (var i = 0; i < badges.length; i++) {
+      badges[i].textContent = String(active);
+      badges[i].hidden = active === 0;
+    }
+  }
+
   // Panels marked data-mobile-collapse start closed on a phone, unless they
   // already hold something to act on (a shared link in the add form).
   function collapseOnPhone() {
@@ -1001,5 +1014,5 @@
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* optional */ }); });
   }
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); collapseOnPhone(); initPullToRefresh(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); initPullToRefresh(); });
 })();

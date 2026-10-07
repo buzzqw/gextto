@@ -3882,3 +3882,4 @@ deu:
   "Niente upgrade": "Keine Upgrades"
   "Le release degli anime numerano gli episodi dall'inizio senza stagioni («Titolo - 1071»): Gextto converte il numero in stagione ed episodio con i dati TMDB e cerca anche il numero assoluto.": "Anime-Releases nummerieren Episoden ab Beginn ohne Staffeln („Titel - 1071“): Gextto rechnet die Nummer mit TMDB-Daten in Staffel und Episode um und sucht auch nach der absoluten Nummer."
   "Una release migliore non sostituisce più un file già archiviato di questa serie.": "Ein besseres Release ersetzt keine bereits archivierte Datei dieser Serie mehr."
+  "Download in corso": "Laufende Downloads"
