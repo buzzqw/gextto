@@ -1068,14 +1068,18 @@ func (e *qbittorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) 
 	out := make([]models.PeerView, 0, len(peers))
 	for _, peer := range peers {
 		out = append(out, models.PeerView{
-			Address:       fmt.Sprintf("%s:%d", peer.IP, peer.Port),
-			Client:        peer.Client,
-			DownloadRate:  uint64(maxInt64(0, peer.DownSpeed)),
-			UploadRate:    uint64(maxInt64(0, peer.UpSpeed)),
-			Progress:      peer.Progress,
+			Address:      fmt.Sprintf("%s:%d", peer.IP, peer.Port),
+			Client:       peer.Client,
+			DownloadRate: uint64(maxInt64(0, peer.DownSpeed)),
+			UploadRate:   uint64(maxInt64(0, peer.UpSpeed)),
+			// qBittorrent reports 0-1; Gextto's views use percent like libtorrent.
+			Progress:      peer.Progress * 100,
 			Seed:          peer.Progress >= 1.0,
-			TotalDownload: 0,
-			TotalUpload:   0,
+			TotalDownload: peer.Downloaded,
+			TotalUpload:   peer.Uploaded,
+			Utp:           strings.Contains(strings.ToLower(peer.Connection), "tp") && !strings.EqualFold(peer.Connection, "BT"),
+			Encrypted:     strings.ContainsAny(peer.Flags, "Ee"),
+			Incoming:      strings.Contains(peer.Flags, "I"),
 		})
 	}
 	return out, true, nil
@@ -1157,7 +1161,49 @@ func (e *qbittorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (b
 	}
 	ctx, cancel := e.requestContext()
 	defer cancel()
-	if err := e.client.AddTrackers(ctx, hash, urls); err != nil {
+	// Replace the list like the embedded engine: remove the trackers that are
+	// no longer wanted (qBittorrent's own "** [DHT] **" rows are not
+	// trackers) and add the new ones.
+	current, err := e.client.Trackers(ctx, hash)
+	if err != nil {
+		return false, err
+	}
+	existing := map[string]struct{}{}
+	var stale []string
+	for _, tracker := range current {
+		value := strings.TrimSpace(tracker.URL)
+		if value == "" || strings.HasPrefix(value, "**") {
+			continue
+		}
+		existing[value] = struct{}{}
+		if _, keep := seen[value]; !keep {
+			stale = append(stale, value)
+		}
+	}
+	var added []string
+	for _, value := range urls {
+		if _, ok := existing[value]; !ok {
+			added = append(added, value)
+		}
+	}
+	if len(added) > 0 {
+		if err := e.client.AddTrackers(ctx, hash, added); err != nil {
+			return false, err
+		}
+	}
+	if len(stale) > 0 {
+		if err := e.client.RemoveTrackers(ctx, hash, stale); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// SetSuperSeeding toggles qBittorrent's super seeding for one torrent.
+func (e *qbittorrentEngine) SetSuperSeeding(hash string, enabled bool) (bool, error) {
+	ctx, cancel := e.requestContext()
+	defer cancel()
+	if err := e.client.SetSuperSeeding(ctx, enabled, strings.ToLower(strings.TrimSpace(hash))); err != nil {
 		return false, err
 	}
 	return true, nil

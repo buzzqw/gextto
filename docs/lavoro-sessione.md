@@ -292,6 +292,27 @@ rain è ora una copia modificata in `third_party/rain` (MIT, `replace` in
 - **Bug di chiusura risolto**: il DHT restava bloccato sul socket uTP
   condiviso.
 
+### 3.10 Dettaglio torrent con gx-torrent e qBittorrent (07/10)
+- **Scheda dettagli** (web):
+  - mostra solo i comandi che il motore supporta (super seeding, web seed,
+    limiti di velocità e connessioni per torrent), con una nota che spiega
+    cosa manca;
+  - per gx-torrent i file sono solo "Salta / Scarica";
+  - gli errori del motore compaiono nelle schede invece di liste vuote;
+  - nuove righe: sciame (seed/peer) e motore; nuova colonna "Connessione"
+    sui peer (uTP/TCP, cifrata, entrata/uscita).
+- **qBittorrent**:
+  - l'avanzamento dei peer era mostrato 100 volte più piccolo (0-1 invece
+    di percentuale);
+  - aggiunti tipo di connessione e flag dei peer;
+  - il super seeding ora funziona (era bloccato da un controllo solo
+    libtorrent);
+  - "Salva tracker" sostituisce l'elenco invece di aggiungere soltanto.
+- **gx-torrent**:
+  - avanzamento e seed dei peer dal bitfield;
+  - tracker corrente;
+  - seed connessi contati correttamente.
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso

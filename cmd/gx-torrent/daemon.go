@@ -74,6 +74,7 @@ type runtimeInfo struct {
 	lastTracker time.Time
 	slow        bool
 	numSeeds    int
+	tracker     string
 }
 
 // Daemon owns the rain session and the queue.
@@ -610,7 +611,7 @@ func nameOf(t *torrent.Torrent) string {
 func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *runtimeInfo, now time.Time) {
 	seeds := 0
 	for _, peer := range t.Peers() {
-		if peer.DownloadSpeed > 0 {
+		if peer.Seed || peer.DownloadSpeed > 0 {
 			seeds++
 		}
 	}
@@ -620,9 +621,13 @@ func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *r
 	}
 	rt.lastTracker = now
 	swarmSeeds, swarmPeers, working := -1, -1, false
+	rt.tracker = ""
 	for _, tracker := range t.Trackers() {
 		if tracker.Status != torrent.Working {
 			continue
+		}
+		if !working {
+			rt.tracker = tracker.URL
 		}
 		working = true
 		if tracker.Seeders > swarmSeeds {
@@ -659,6 +664,7 @@ type torrentInfo struct {
 	SeedingSeconds int64   `json:"seeding_seconds"`
 	ActiveSeconds  int64   `json:"active_seconds"`
 	ETASeconds     int64   `json:"eta_seconds"`
+	CurrentTracker string  `json:"current_tracker,omitempty"`
 	QueuePosition  int     `json:"queue_position"`
 	NumPeers       int     `json:"num_peers"`
 	NumSeeds       int     `json:"num_seeds"`
@@ -741,6 +747,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		QueuePosition:  pos,
 		NumPeers:       stats.Peers.Total,
 		NumSeeds:       rt.numSeeds,
+		CurrentTracker: rt.tracker,
 		NumComplete:    meta.SwarmSeeds,
 		NumIncomplete:  meta.SwarmPeers,
 		SeedRatio:      meta.SeedRatio,

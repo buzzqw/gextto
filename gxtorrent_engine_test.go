@@ -304,3 +304,21 @@ func TestGxNetworkArgs(t *testing.T) {
 		t.Fatalf("all interfaces: %q %q", host, ports)
 	}
 }
+
+func TestV2DetailCapsPerEngine(t *testing.T) {
+	gx := v2DetailCapsFor(BackendGxTorrent)
+	if gx.SuperSeeding || gx.WebSeeds || gx.RateLimits || gx.Connections || gx.FileLevels || gx.TrackerNote == "" {
+		t.Fatalf("gx-torrent must hide what it cannot do: %+v", gx)
+	}
+	qb := v2DetailCapsFor(BackendQbittorrent)
+	if !qb.SuperSeeding || qb.WebSeeds || !qb.RateLimits || qb.Connections || !qb.FileLevels {
+		t.Fatalf("qBittorrent capabilities: %+v", qb)
+	}
+	lt := v2DetailCapsFor(BackendEmbedded)
+	if !lt.SuperSeeding || !lt.WebSeeds || !lt.RateLimits || !lt.Connections || !lt.FileLevels {
+		t.Fatalf("libtorrent supports everything: %+v", lt)
+	}
+	if v2SwarmLabel(-1, -1) != "n/d" || v2SwarmLabel(3, 7) != "3 / 7" {
+		t.Fatal("swarm label")
+	}
+}

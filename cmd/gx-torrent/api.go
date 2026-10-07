@@ -248,13 +248,15 @@ type fileInfo struct {
 }
 
 type peerInfo struct {
-	Address      string `json:"address"`
-	Client       string `json:"client"`
-	DownloadRate int    `json:"download_rate"`
-	UploadRate   int    `json:"upload_rate"`
-	Incoming     bool   `json:"incoming"`
-	Encrypted    bool   `json:"encrypted"`
-	UTP          bool   `json:"utp"`
+	Address      string  `json:"address"`
+	Client       string  `json:"client"`
+	DownloadRate int     `json:"download_rate"`
+	UploadRate   int     `json:"upload_rate"`
+	Incoming     bool    `json:"incoming"`
+	Encrypted    bool    `json:"encrypted"`
+	UTP          bool    `json:"utp"`
+	Progress     float64 `json:"progress"`
+	Seed         bool    `json:"seed"`
 }
 
 type trackerInfo struct {
@@ -306,6 +308,8 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 				Incoming:     peer.Source == torrent.SourceIncoming,
 				Encrypted:    peer.EncryptedStream,
 				UTP:          peer.UTP,
+				Progress:     peer.Progress * 100,
+				Seed:         peer.Seed,
 			})
 		}
 		writeJSON(w, http.StatusOK, out)

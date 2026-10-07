@@ -1262,6 +1262,46 @@ type v2DetailView struct {
 	Files    []models.FileView
 	Peers    []models.PeerView
 	Error    string
+	// TabError explains why a tab is empty (engine unreachable, unsupported).
+	TabError string
+	Caps     v2DetailCaps
+}
+
+// v2DetailCaps tells the detail form which controls the active engine
+// supports, so it never offers an action that can only fail.
+type v2DetailCaps struct {
+	Backend      string
+	SuperSeeding bool
+	WebSeeds     bool
+	RateLimits   bool
+	Connections  bool
+	// FileLevels: priority levels; without it only skip/download.
+	FileLevels bool
+	// FileNote is shown above the file list.
+	FileNote string
+	// LimitsNote is shown in the limits tab.
+	LimitsNote string
+	// TrackerNote is shown in the trackers tab.
+	TrackerNote string
+}
+
+func v2DetailCapsFor(backend string) v2DetailCaps {
+	switch backend {
+	case BackendGxTorrent:
+		return v2DetailCaps{
+			Backend:     "gx-torrent",
+			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
+			LimitsNote:  "Con gx-torrent i limiti di velocità e di connessioni sono solo globali (Configurazione → libtorrent); qui si impostano ratio e giorni di seed.",
+			TrackerNote: "gx-torrent può aggiungere tracker ma non toglierli: le righe cancellate restano.",
+		}
+	case BackendQbittorrent:
+		return v2DetailCaps{
+			Backend: "qBittorrent-nox", SuperSeeding: true, RateLimits: true, FileLevels: true,
+			LimitsNote: "qBittorrent non ha connessioni e slot di upload per singolo torrent: si impostano solo globalmente.",
+		}
+	default:
+		return v2DetailCaps{Backend: "libtorrent", SuperSeeding: true, WebSeeds: true, RateLimits: true, Connections: true, FileLevels: true}
+	}
 }
 
 func v2FindTorrent(s *AppState, hash string) (models.TorrentView, bool) {
@@ -1274,7 +1314,7 @@ func v2FindTorrent(s *AppState, hash string) (models.TorrentView, bool) {
 }
 
 func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
-	view := v2DetailView{Hash: hash, Tab: tab}
+	view := v2DetailView{Hash: hash, Tab: tab, Caps: v2DetailCapsFor(s.activeEngine().Name())}
 	view.Tabs = []v2DetailTab{
 		{ID: "general", Label: "Generale"}, {ID: "trackers", Label: "Tracker"},
 		{ID: "files", Label: "Contenuto"}, {ID: "peers", Label: "Peers"},
@@ -1329,6 +1369,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Ratio", Value: fmt.Sprintf("%.2f", uiTorrentRatio(torrent.AllTimeUpload, torrent.AllTimeDownload, doneVal, torrent.TotalSize))},
 		{Label: "↓ / ↑", Value: logging.HumanRate(saturatingInt64(torrent.DownloadRate)) + " / " + logging.HumanRate(saturatingInt64(torrent.UploadRate))},
 		{Label: "Peer / Seed", Value: fmt.Sprintf("%d / %d", torrent.NumPeers, torrent.NumSeeds)},
+		{Label: "Sciame (seed / peer)", Value: v2SwarmLabel(torrent.NumComplete, torrent.NumIncomplete)},
 		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
 		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
 		{Label: "Versione torrent", Value: torrent.TorrentVersion},
@@ -1341,15 +1382,39 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if torrent.Error != "" {
 		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error})
 	}
+	view.General = append(view.General, v2KV{Label: "Motore", Value: view.Caps.Backend})
+	for index := range view.General {
+		if strings.TrimSpace(view.General[index].Value) == "" {
+			view.General[index].Value = "—"
+		}
+	}
+	var tabErr error
 	switch tab {
 	case "trackers":
-		view.Trackers, _, _ = s.activeEngine().Trackers(hash)
+		view.Trackers, _, tabErr = s.activeEngine().Trackers(hash)
 	case "files":
-		view.Files, _, _ = s.activeEngine().Files(hash)
+		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
-		view.Peers, _, _ = s.activeEngine().Peers(hash)
+		view.Peers, _, tabErr = s.activeEngine().Peers(hash)
+	}
+	if tabErr != nil {
+		view.TabError = "Il motore non ha risposto: " + tabErr.Error()
 	}
 	return view
+}
+
+// v2SwarmLabel shows the tracker scrape, "n/d" when no tracker answered.
+func v2SwarmLabel(seeds, peers int) string {
+	if seeds < 0 && peers < 0 {
+		return "n/d"
+	}
+	format := func(value int) string {
+		if value < 0 {
+			return "?"
+		}
+		return strconv.Itoa(value)
+	}
+	return format(seeds) + " / " + format(peers)
 }
 
 // V2DownloadsDetail renders the whole detail modal.

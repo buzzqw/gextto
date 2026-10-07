@@ -594,6 +594,12 @@ type Peer struct {
 	Progress  float64 `json:"progress"`
 	DownSpeed int64   `json:"dl_speed"`
 	UpSpeed   int64   `json:"up_speed"`
+	// Connection is "BT" or "μTP"; Flags holds qBittorrent's peer flags
+	// (E/e encrypted, I incoming, ...).
+	Connection string `json:"connection"`
+	Flags      string `json:"flags"`
+	Downloaded int64  `json:"downloaded"`
+	Uploaded   int64  `json:"uploaded"`
 }
 
 // Peers lists a torrent's connected peers.

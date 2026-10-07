@@ -131,7 +131,7 @@ func (f *fakeQB) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/api/v2/torrents/trackers":
 		_ = json.NewEncoder(w).Encode([]qbittorrent.Tracker{{URL: "udp://tracker", Status: 2, NumPeers: 4}})
 	case "/api/v2/sync/torrentPeers":
-		_, _ = w.Write([]byte(`{"peers":{"a":{"ip":"1.2.3.4","port":6881,"client":"qBit","progress":0.2,"dl_speed":10}}}`))
+		_, _ = w.Write([]byte(`{"peers":{"a":{"ip":"1.2.3.4","port":6881,"client":"qBit","progress":0.2,"dl_speed":10,"connection":"μTP","flags":"E I"}}}`))
 	case "/api/v2/transfer/info":
 		_, _ = w.Write([]byte(`{"dl_info_speed":100,"up_info_speed":50}`))
 	default:
@@ -306,6 +306,10 @@ func TestQbittorrentEngineInspection(t *testing.T) {
 	peers, ok, err := engine.Peers("abc")
 	if err != nil || !ok || len(peers) != 1 || peers[0].Address != "1.2.3.4:6881" {
 		t.Fatalf("Peers = %+v, %v, %v", peers, ok, err)
+	}
+	// Percent like libtorrent, and the connection details.
+	if peers[0].Progress != 20 || !peers[0].Utp || !peers[0].Encrypted || !peers[0].Incoming {
+		t.Fatalf("peer mapping = %+v", peers[0])
 	}
 	trackers, ok, err := engine.Trackers("abc")
 	if err != nil || !ok || len(trackers) != 1 || !trackers[0].Verified {

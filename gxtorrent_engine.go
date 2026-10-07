@@ -285,6 +285,7 @@ type gxTorrentItem struct {
 	Parked         bool    `json:"parked"`
 	Error          string  `json:"error"`
 	CompletedAt    int64   `json:"completed_at"`
+	CurrentTracker string  `json:"current_tracker"`
 }
 
 func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.TorrentView {
@@ -319,6 +320,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		TotalSize:         item.TotalSize,
 		TotalDone:         item.TotalDone,
 		IsSeeding:         item.State == "seeding",
+		CurrentTracker:    item.CurrentTracker,
 		Error:             strings.TrimSpace(item.Error),
 		Stalled:           item.State == "stalled",
 	}
@@ -834,13 +836,15 @@ func (e *gxTorrentEngine) Files(hash string) ([]models.FileView, bool, error) {
 
 func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 	var peers []struct {
-		Address      string `json:"address"`
-		Client       string `json:"client"`
-		DownloadRate int64  `json:"download_rate"`
-		UploadRate   int64  `json:"upload_rate"`
-		Incoming     bool   `json:"incoming"`
-		Encrypted    bool   `json:"encrypted"`
-		UTP          bool   `json:"utp"`
+		Address      string  `json:"address"`
+		Client       string  `json:"client"`
+		DownloadRate int64   `json:"download_rate"`
+		UploadRate   int64   `json:"upload_rate"`
+		Incoming     bool    `json:"incoming"`
+		Encrypted    bool    `json:"encrypted"`
+		UTP          bool    `json:"utp"`
+		Progress     float64 `json:"progress"`
+		Seed         bool    `json:"seed"`
 	}
 	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/peers", nil, "", &peers); err != nil {
 		return nil, false, err
@@ -855,6 +859,8 @@ func (e *gxTorrentEngine) Peers(hash string) ([]models.PeerView, bool, error) {
 			Incoming:     peer.Incoming,
 			Encrypted:    peer.Encrypted,
 			Utp:          peer.UTP,
+			Progress:     peer.Progress,
+			Seed:         peer.Seed,
 		})
 	}
 	return out, true, nil

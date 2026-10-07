@@ -1279,8 +1279,15 @@ func ServiceRestart(w http.ResponseWriter, r *http.Request, s *AppState) {
 
 // SetSuperSeeding implements `set_super_seeding`.
 func SetSuperSeeding(w http.ResponseWriter, r *http.Request, s *AppState) {
-	client, err := s.requireEmbedded("super_seeding")
-	if err != nil {
+	type superSeeder interface {
+		SetSuperSeeding(hash string, enabled bool) (bool, error)
+	}
+	var client superSeeder
+	if embedded, err := s.requireEmbedded("super_seeding"); err == nil {
+		client = embedded
+	} else if engine, ok := s.activeEngine().(superSeeder); ok {
+		client = engine
+	} else {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}

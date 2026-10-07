@@ -507,7 +507,7 @@
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "no_rename" "Body" (printf `{"value":%t}` (not .NoRename)) "Label" (ternary .NoRename "Rinomina abilitata" "Non rinominare"))}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "reannounce" "Body" "{}" "Label" "Annuncia")}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "restart" "Body" "{}" "Label" "Riavvia")}}
-      {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding"))}}
+      {{if .Caps.SuperSeeding}}{{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "super-seeding" "Body" (printf `{"enabled":%t}` (not .Torrent.SuperSeeding)) "Label" (ternary .Torrent.SuperSeeding "Disattiva super seeding" "Super seeding"))}}{{end}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "pin" "Body" "{}" "Label" "Pin")}}
       {{template "v2_detail_action" (dict "Hash" .Hash "Tab" "general" "Op" "mark_failed" "Body" "{}" "Label" "Segna come fallito" "Class" "danger" "Confirm" "Segnare questo torrent come fallito?")}}
       <button class="btn sm" type="button" hx-get="/downloads/remove?hash={{.Hash}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Rimuovi il torrent e scegli se mantenere o eliminare i file">Rimuovi</button>
@@ -521,13 +521,15 @@
       <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="tag" />
       <input class="input" name="tag" placeholder="tag del torrent" aria-label="Tag del torrent" title="Inserisci il tag da assegnare al torrent" /><button class="btn sm" type="submit" title="Salva il tag del torrent">Salva tag</button>
     </form>
-    <form class="form-grid detail-web-seeds" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
+    {{if .Caps.WebSeeds}}<form class="form-grid detail-web-seeds" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
       <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="general" /><input type="hidden" name="op" value="web-seeds" />
       <label class="field span-full"><span>Web seed (URL separati da spazio)</span><input class="input" name="urls" placeholder="https://example/file.zip" title="Inserisci uno o più URL di web seed separati da spazi" /></label>
       <div class="form-actions"><button class="btn sm" type="submit" name="remove" value="false" title="Aggiunge gli URL indicati ai web seed del torrent">Aggiungi</button><button class="btn sm danger" type="submit" name="remove" value="true" title="Rimuove gli URL indicati dai web seed del torrent">Rimuovi</button></div>
-    </form>
+    </form>{{end}}
   </div></div>
 {{else if eq .Tab "trackers"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .Caps.TrackerNote}}<p class="hint">{{.Caps.TrackerNote}}</p>{{end}}
   {{if .Trackers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">URL</th><th scope="col">Tier</th><th scope="col">Stato</th><th scope="col">Fails</th><th scope="col">Seed/Peer</th></tr></thead><tbody>{{range .Trackers}}<tr><td class="truncate" title="{{.URL}}">{{.URL}}</td><td>{{.Tier}}</td><td>{{if .Message}}{{.Message}}{{else if .Verified}}verificato{{else}}non verificato{{end}}</td><td>{{.Fails}}</td><td>{{.ScrapeComplete}}/{{.ScrapeIncomplete}}</td></tr>{{end}}</tbody></table></div>{{else}}<p class="muted">Nessun tracker.</p>{{end}}
   <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="trackers" /><input type="hidden" name="op" value="trackers" />
@@ -536,20 +538,24 @@
      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva l'elenco dei tracker nel formato tier|URL, uno per riga">Salva tracker</button></div>
   </form>
 {{else if eq .Tab "files"}}
-   {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col" title="Priorità con cui il client scarica il file">Priorità</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}" title="Cambia la priorità di {{$file.Path}}; il salvataggio avviene subito"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option><option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option></select></form></td></tr>{{end}}</tbody></table></div>
+   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+   {{if .Caps.FileNote}}<p class="hint">{{.Caps.FileNote}}</p>{{end}}
+   {{if .Files}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">File</th><th scope="col">Dimensione</th><th scope="col">Scaricato</th><th scope="col" title="Priorità con cui il client scarica il file">Priorità</th></tr></thead><tbody>{{range $index, $file := .Files}}<tr><td class="truncate" title="{{$file.Path}}">{{$file.Path}}</td><td>{{bytes $file.Size}}</td><td>{{bytes $file.Downloaded}}</td><td><form hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML"><input type="hidden" name="hash" value="{{$.Hash}}" /><input type="hidden" name="tab" value="files" /><input type="hidden" name="op" value="files-priority" /><input type="hidden" name="index" value="{{$index}}" /><select class="input compact" name="priority" hx-trigger="change" onchange="this.form.requestSubmit()" aria-label="Priorità di {{$file.Path}}" title="Cambia la priorità di {{$file.Path}}; il salvataggio avviene subito"><option value="0"{{if eq $file.Priority 0}} selected{{end}}>Salta</option>{{if $.Caps.FileLevels}}<option value="1"{{if eq $file.Priority 1}} selected{{end}}>Normale</option><option value="4"{{if eq $file.Priority 4}} selected{{end}}>Predefinita</option><option value="6"{{if eq $file.Priority 6}} selected{{end}}>Alta</option><option value="7"{{if eq $file.Priority 7}} selected{{end}}>Massima</option>{{else}}<option value="4"{{if ne $file.Priority 0}} selected{{end}}>Scarica</option>{{end}}</select></form></td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun file.</p>{{end}}
 {{else if eq .Tab "peers"}}
-  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th><th scope="col">Seed</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{.Client}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td></tr>{{end}}</tbody></table></div>
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th><th scope="col">Seed</th><th scope="col" title="Protocollo, cifratura e direzione della connessione">Connessione</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{if .Client}}{{.Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td><td>{{if .Utp}}uTP{{else}}TCP{{end}}{{if .Encrypted}} · cifrata{{end}}{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
 {{else if eq .Tab "limits"}}
   <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />
-    <label class="field"><span>Download (KiB/s)</span><input class="input" type="number" name="download_limit" value="{{kib .Torrent.DownloadLimit}}" title="-1 globale, 0 illimitato" /></label>
-    <label class="field"><span>Upload (KiB/s)</span><input class="input" type="number" name="upload_limit" value="{{kib .Torrent.UploadLimit}}" title="-1 globale, 0 illimitato" /></label>
+    {{if .Caps.LimitsNote}}<p class="hint span-full">{{.Caps.LimitsNote}}</p>{{end}}
+    {{if .Caps.RateLimits}}<label class="field"><span>Download (KiB/s)</span><input class="input" type="number" name="download_limit" value="{{kib .Torrent.DownloadLimit}}" title="-1 globale, 0 illimitato" /></label>
+    <label class="field"><span>Upload (KiB/s)</span><input class="input" type="number" name="upload_limit" value="{{kib .Torrent.UploadLimit}}" title="-1 globale, 0 illimitato" /></label>{{end}}
     <label class="field"><span>Ratio seed</span><input class="input" type="number" step="0.01" name="seed_ratio" value="{{.Torrent.SeedRatio}}" title="-1 globale, 0 illimitato" /></label>
     <label class="field"><span>Giorni seed</span><input class="input" type="number" name="seed_days" value="{{.Torrent.SeedDays}}" title="-1 globale, 0 illimitato" /></label>
-     <label class="field"><span>Connessioni massime</span><input class="input" type="number" name="max_connections" value="-1" title="Numero massimo di connessioni per questo torrent; -1 usa il valore globale" /></label>
-     <label class="field"><span>Upload massimi</span><input class="input" type="number" name="max_uploads" value="-1" title="Numero massimo di slot upload per questo torrent; -1 usa il valore globale" /></label>
+     {{if .Caps.Connections}}<label class="field"><span>Connessioni massime</span><input class="input" type="number" name="max_connections" value="-1" title="Numero massimo di connessioni per questo torrent; -1 usa il valore globale" /></label>
+     <label class="field"><span>Upload massimi</span><input class="input" type="number" name="max_uploads" value="-1" title="Numero massimo di slot upload per questo torrent; -1 usa il valore globale" /></label>{{end}}
      <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva i limiti specifici di questo torrent">Salva limiti</button></div>
   </form>
 {{else if eq .Tab "storage"}}
