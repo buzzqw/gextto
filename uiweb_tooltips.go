@@ -159,11 +159,11 @@ var uiSettingTooltipText = map[string]string{
 	"qbittorrent_path_mappings":                    "Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto).",
 	"qbittorrent_managed":                          "Gextto scarica da sé l'ultima release di qBittorrent-nox, la installa nella cartella dell'applicazione (accanto a gexttod), la avvia e la ferma con il servizio e la aggiorna (con backup e rollback). Il motore in uso però si sceglie dalla voce «Motore torrent»: questa opzione non lo cambia.",
 	"gxtorrent_url":                                "URL dell'interfaccia API di gx-torrent (es. http://127.0.0.1:8890).",
+	"gxtorrent_listen":                             "Di norma vuoto: gx-torrent ascolta solo su 127.0.0.1 e lo raggiunge Gextto. Per aprire la pagina di consultazione (e l'API) alla LAN metti es. 0.0.0.0:8890 oppure l'IP del server. Un ascolto non loopback richiede un token (gxtorrent_token); senza token Gextto avvia il demone in modalità non protetta.",
 	"gxtorrent_request_timeout_secs":               "Timeout in secondi delle richieste HTTP verso gx-torrent.",
 	"gxtorrent_poll_interval_ms":                   "Intervallo minimo in millisecondi tra due letture dello stato dei torrent (250–60000, predefinito 1500). La coda è gestita da gx-torrent stesso, non dipende da questo valore.",
 	"gxtorrent_managed":                            "Se attivo (predefinito), Gextto avvia gx-torrent da sé (l'eseguibile accanto a gexttod, installato da make/install.sh), lo riavvia se si chiude e lo ferma all'uscita. Se all'avvio trova già un gx-torrent in ascolto sull'URL, usa quello. Disattivalo se lo gestisci tu (es. servizio systemd).",
 	"gxtorrent_token":                              "Segreto condiviso con gx-torrent (header X-Gx-Token). Facoltativo se gx-torrent ascolta solo su 127.0.0.1; obbligatorio se lo esponi in rete. Non visualizzato.",
-	"gxtorrent_binary":                             "Percorso dell'eseguibile gx-torrent per l'avvio gestito. Vuoto: quello accanto a gexttod, poi quello nel PATH.",
 	"gxtorrent_proxy":                              "Proxy per gx-torrent: socks5://utente:password@host:porta oppure http://host:porta. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti per non uscire fuori dal proxy. Non visualizzato.",
 }
 

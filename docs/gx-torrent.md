@@ -52,9 +52,9 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | Chiave | Default | Note |
 |---|---|---|
 | `gxtorrent_url` | `http://127.0.0.1:8890` | in modalità gestita deve essere loopback |
+| `gxtorrent_listen` | vuoto | indirizzo di ascolto del demone gestito. Vuoto = loopback di `gxtorrent_url`; per esporre pagina e API alla LAN, es. `0.0.0.0:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token il demone parte in modalità non protetta) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
 | `gxtorrent_managed` | `true` | avvio e sorveglianza da Gextto |
-| `gxtorrent_binary` | vuoto | percorso dell'eseguibile; vuoto = accanto a gexttod, poi nel `PATH`. Di norma lascialo vuoto: serve solo per puntare a un eseguibile diverso, es. un `gx-torrent` avviato da un tuo servizio systemd |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
@@ -80,6 +80,13 @@ pausa, rimozione restano in Gextto.
 Se è impostato `gxtorrent_token`, la pagina lo chiede al primo accesso
 (accetta anche `?token=…`) e lo ricorda in un cookie; l'API resta protetta come
 prima. In modalità gestita, senza token, la pagina è aperta su loopback.
+
+Per aprirla (e aprire l'API) a tutta la LAN imposta **`gxtorrent_listen`**,
+ad esempio `0.0.0.0:8890` o l'IP del server (`192.168.1.10:8890`). Gextto
+continua a parlare col demone su `gxtorrent_url` (loopback), quindi l'URL
+interno non cambia. Con un ascolto non loopback serve un `gxtorrent_token`:
+senza token il demone verrebbe avviato con `-insecure` (come il resto di Gextto
+su LAN fidata) e Gextto te lo segnala con un avviso nel log.
 
 ## Uso standalone
 

@@ -671,6 +671,12 @@ func gh7_json_string(value map[string]any, key string) string {
 }
 
 func gh7_setting_key_allowed(key string) bool {
+	// gxtorrent_binary used to select a custom executable; it was removed so a
+	// wrong path cannot break the managed engine. The binary is always the one
+	// installed next to gexttod (or, as a fallback, the one in the PATH).
+	if key == "gxtorrent_binary" {
+		return false
+	}
 	for _, prefix := range []string{
 		"libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
 		"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",

@@ -2,6 +2,7 @@ package gextto
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"path/filepath"
 	"strconv"
@@ -27,6 +28,13 @@ func validateBackendSetting(key, value string) error {
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return fmt.Errorf("%s must be a complete http(s) URL", key)
+		}
+	case "gxtorrent_listen":
+		if raw == "" {
+			return nil
+		}
+		if _, port, err := net.SplitHostPort(raw); err != nil || strings.TrimSpace(port) == "" {
+			return fmt.Errorf("gxtorrent_listen must be host:port (e.g. 0.0.0.0:8890)")
 		}
 	case "qbittorrent_request_timeout_secs", "gxtorrent_request_timeout_secs":
 		if raw == "" {

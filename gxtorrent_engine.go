@@ -44,10 +44,10 @@ import (
 type gxTorrentSettings struct {
 	BaseURL      string
 	Token        string
+	Listen       string
 	Timeout      time.Duration
 	PollInterval time.Duration
 	Managed      bool
-	Binary       string
 	stateDir     string
 	dataDir      string
 }
@@ -82,10 +82,10 @@ func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {
 	return gxTorrentSettings{
 		BaseURL:      baseURL,
 		Token:        strings.TrimSpace(cfg.Settings["gxtorrent_token"]),
+		Listen:       strings.TrimSpace(cfg.Settings["gxtorrent_listen"]),
 		Timeout:      timeout,
 		PollInterval: poll,
 		Managed:      settingsBool(cfg, "gxtorrent_managed", true),
-		Binary:       strings.TrimSpace(cfg.Settings["gxtorrent_binary"]),
 		stateDir:     cfg.StateDir,
 		dataDir:      cfg.DataDir,
 	}, nil

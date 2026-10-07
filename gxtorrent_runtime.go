@@ -1,8 +1,8 @@
 package gextto
 
 // gxtorrent_runtime.go starts and supervises the gx-torrent daemon when
-// `gxtorrent_managed` is on: the binary installed next to gexttod (or the one
-// in `gxtorrent_binary`, or on PATH) runs with its state in
+// `gxtorrent_managed` is on: the binary installed next to gexttod (make and
+// install.sh keep it there; the PATH is the fallback) runs with its state in
 // DATA_DIR/gx-torrent and the Gextto download directory as default save path.
 
 import (
@@ -28,14 +28,9 @@ type gxManagedProcess struct {
 	done   chan error
 }
 
-// gxTorrentBinary finds the daemon executable.
-func gxTorrentBinary(settings gxTorrentSettings) (string, error) {
-	if settings.Binary != "" {
-		if fileExists(settings.Binary) {
-			return settings.Binary, nil
-		}
-		return "", fmt.Errorf("gxtorrent_binary %q not found", settings.Binary)
-	}
+// gxTorrentBinary finds the daemon executable: the one installed next to
+// gexttod (make and install.sh keep it there), then the PATH.
+func gxTorrentBinary() (string, error) {
 	if self, err := os.Executable(); err == nil {
 		candidate := filepath.Join(filepath.Dir(self), "gx-torrent")
 		if fileExists(candidate) {
@@ -45,13 +40,22 @@ func gxTorrentBinary(settings gxTorrentSettings) (string, error) {
 	if path, err := exec.LookPath("gx-torrent"); err == nil {
 		return path, nil
 	}
-	return "", errors.New("gx-torrent binary not found: build it with `make gx-torrent` (it is installed next to gexttod) or set gxtorrent_binary")
+	return "", errors.New("gx-torrent binary not found: build it with `make gx-torrent` (it is installed next to gexttod)")
 }
 
-// gxManagedListen derives the daemon's listen address from gxtorrent_url,
-// which must point at this machine.
-func gxManagedListen(baseURL string) (string, error) {
-	parsed, err := url.Parse(baseURL)
+// gxManagedListen returns the address the managed daemon must listen on.
+// `gxtorrent_listen` wins (e.g. "0.0.0.0:8890" to expose the read-only page on
+// the LAN); when it is empty the daemon listens on the loopback address of
+// `gxtorrent_url`, so only Gextto reaches it.
+func gxManagedListen(settings gxTorrentSettings) (string, error) {
+	if listen := strings.TrimSpace(settings.Listen); listen != "" {
+		host, port, err := net.SplitHostPort(listen)
+		if err != nil || strings.TrimSpace(port) == "" {
+			return "", fmt.Errorf("gxtorrent_listen must be host:port, got %q", listen)
+		}
+		return net.JoinHostPort(host, port), nil
+	}
+	parsed, err := url.Parse(settings.BaseURL)
 	if err != nil || parsed.Hostname() == "" {
 		return "", errors.New("gxtorrent_url is not valid for a managed daemon")
 	}
@@ -61,7 +65,7 @@ func gxManagedListen(baseURL string) (string, error) {
 	host := parsed.Hostname()
 	ip := net.ParseIP(host)
 	if !strings.EqualFold(host, "localhost") && (ip == nil || !ip.IsLoopback()) {
-		return "", errors.New("the managed gx-torrent must listen on localhost/loopback")
+		return "", errors.New("the managed gx-torrent must listen on localhost/loopback (set gxtorrent_listen to expose it on the LAN)")
 	}
 	port := parsed.Port()
 	if port == "" {
@@ -70,12 +74,27 @@ func gxManagedListen(baseURL string) (string, error) {
 	return net.JoinHostPort(host, port), nil
 }
 
+// listenIsLoopback reports whether an address is reachable only from this host.
+// An empty host (all interfaces) is not loopback.
+func listenIsLoopback(address string) bool {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return false
+	}
+	host = strings.TrimSpace(host)
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedProcess, error) {
-	binary, err := gxTorrentBinary(settings)
+	binary, err := gxTorrentBinary()
 	if err != nil {
 		return nil, err
 	}
-	listen, err := gxManagedListen(settings.BaseURL)
+	listen, err := gxManagedListen(settings)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +103,14 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 		return nil, err
 	}
 	args := []string{"-listen", listen, "-data", dataDir}
+	if !listenIsLoopback(listen) && settings.Token == "" {
+		// The daemon refuses a non-loopback listen without a token. Instead of
+		// failing to start we opt into its documented `-insecure` mode, matching
+		// Gextto's trusted-LAN default, and say so loudly: the REST API is then
+		// reachable on the whole network.
+		args = append(args, "-insecure")
+		logging.Warn("gx-torrent in ascolto sulla rete senza token: l'API è raggiungibile da chiunque sulla LAN — imposta gxtorrent_token per proteggerla", "listen", listen)
+	}
 	if dir := strings.TrimSpace(cfg.LibtorrentDir); dir != "" {
 		if absolute, absErr := filepath.Abs(dir); absErr == nil {
 			args = append(args, "-download-dir", absolute)

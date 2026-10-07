@@ -321,6 +321,32 @@ func TestGxNetworkArgs(t *testing.T) {
 	}
 }
 
+func TestGxManagedListen(t *testing.T) {
+	// Default: the daemon listens on the loopback of gxtorrent_url.
+	got, err := gxManagedListen(gxTorrentSettings{BaseURL: "http://127.0.0.1:8890"})
+	if err != nil || got != "127.0.0.1:8890" {
+		t.Fatalf("loopback listen = %q, %v", got, err)
+	}
+	// gxtorrent_listen overrides it, to expose the read-only page on the LAN.
+	got, err = gxManagedListen(gxTorrentSettings{BaseURL: "http://127.0.0.1:8890", Listen: "0.0.0.0:8890"})
+	if err != nil || got != "0.0.0.0:8890" {
+		t.Fatalf("listen override = %q, %v", got, err)
+	}
+	if _, err := gxManagedListen(gxTorrentSettings{Listen: "senza-porta"}); err == nil {
+		t.Fatal("a listen value without a port must be refused")
+	}
+	// A non-loopback URL is only allowed with an explicit listen address.
+	if _, err := gxManagedListen(gxTorrentSettings{BaseURL: "http://192.168.1.10:8890"}); err == nil {
+		t.Fatal("a non-loopback URL without gxtorrent_listen must be refused")
+	}
+	if listenIsLoopback("0.0.0.0:8890") || listenIsLoopback("192.168.1.10:8890") || listenIsLoopback(":8890") {
+		t.Fatal("non-loopback addresses detected as loopback")
+	}
+	if !listenIsLoopback("127.0.0.1:8890") || !listenIsLoopback("localhost:8890") || !listenIsLoopback("[::1]:8890") {
+		t.Fatal("loopback addresses not detected")
+	}
+}
+
 func TestV2DetailCapsPerEngine(t *testing.T) {
 	gx := v2DetailCapsFor(BackendGxTorrent)
 	if gx.SuperSeeding || gx.WebSeeds || gx.RateLimits || gx.Connections || gx.FileLevels || gx.TrackerNote == "" {
