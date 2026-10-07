@@ -38,8 +38,6 @@ func validateBackendSetting(key, value string) error {
 		}
 	case "gxtorrent_proxy":
 		return validateGxProxyURL(raw)
-	case "gxtorrent_allowed_roots":
-		return validateGxAllowedRoots(raw)
 	case "qbittorrent_request_timeout_secs", "gxtorrent_request_timeout_secs":
 		if raw == "" {
 			return nil
@@ -91,22 +89,6 @@ func validateGxProxyURL(raw string) error {
 	default:
 		return fmt.Errorf("gxtorrent_proxy scheme must be socks5, socks5h, http or https")
 	}
-}
-
-// validateGxAllowedRoots accepts a comma-separated list of absolute paths the
-// daemon may save into. Empty clears it. A relative path is rejected here so it
-// cannot make the daemon refuse to start.
-func validateGxAllowedRoots(raw string) error {
-	for _, entry := range strings.Split(raw, ",") {
-		entry = strings.TrimSpace(entry)
-		if entry == "" {
-			continue
-		}
-		if !filepath.IsAbs(entry) {
-			return fmt.Errorf("gxtorrent_allowed_roots entries must be absolute paths, got %q", entry)
-		}
-	}
-	return nil
 }
 
 func validateBackendInteger(key, raw string, min, max int64) error {

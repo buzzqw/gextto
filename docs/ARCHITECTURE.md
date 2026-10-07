@@ -117,7 +117,8 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 |---|---|
 | `torrent_engine.go` | contratto `TorrentEngine` tra Gextto e il motore. |
 | `torrent_engine_select.go` | scelta del backend da `torrent_backend` + preflight. |
-| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` | backend libtorrent (C++/cgo, default). |
+| `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | backend **gx-torrent** (Go puro, predefinito): adapter REST, avvio e sorveglianza del demone, che usa la copia di rain in `third_party/rain`. |
+| `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` | backend libtorrent (C++/cgo), fallback automatico. |
 | `qbittorrent_engine.go` + `qbittorrent_runtime.go` | backend qBittorrent. |
 | `torrent_migration.go` | preparazione della migrazione tra backend. |
 | `torrent_removal.go` | registrazione delle rimozioni manuali. |
@@ -165,7 +166,7 @@ Il **bridge C++** per libtorrent è la coppia nella root:
   spezzare l'enorme tabella di handler in file maneggiabili.
 - `uiweb_v2_*.go`: tutto ciò che riguarda la **UI v2** (SSR + HTMX). `uiweb_*.go`
   senza `_v2` è il livello condiviso/classico.
-- `libtorrent_*`, `qbittorrent_*`: i backend torrent.
+- `libtorrent_*`, `gxtorrent_*`, `qbittorrent_*`: i backend torrent.
 - `*_test.go`: test accanto al file che verificano.
 - Gli helper privati di un gruppo usano il prefisso del gruppo (`gh2_...`,
   `gh3_...`, `bg_...`) per evitare collisioni tra file dello stesso package.

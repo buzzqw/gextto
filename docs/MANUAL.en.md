@@ -626,14 +626,16 @@ same data.
   by Gextto in a separate process; it needs no `libtorrent-rasterbar`. Set the
   **Web API URL**, the **listen address** (default `0.0.0.0:8890`: web page and
   API open on the whole LAN; use `127.0.0.1:8890` to keep them on this host),
-  **token**, **proxy** and **allowed roots**. At that address it also serves an
+  **token** and **proxy**. At that address it also serves an
   **operational web page** (add magnet, pause/resume, verify, reannounce, queue,
   remove, IP filter). The **disk cache is automatic** (1/32 read, 1/16 write of
   the RAM) and Gextto re-asserts it every 15 minutes; the **IP filter** refreshes
   at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
-  in 10 minutes) Gextto falls back to libtorrent by itself. It does not support
-  **v2-only** torrents, sequential download, per-torrent rate/connection limits,
-  manual web seeds or tracker removal.
+  in 10 minutes) Gextto falls back to libtorrent by itself. It supports
+  **sequential download** and **first/last piece** priority (set when adding a
+  torrent; they apply to new torrents). It does not support **v2-only**
+  torrents, per-torrent rate/connection limits, manual web seeds or tracker
+  removal.
 - **Embedded libtorrent** — the bundled in-process session; every
   *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
@@ -1119,7 +1121,6 @@ Each tab collects the editable settings. The *What it does* column mirrors the d
 | gx-torrent — polling interval (ms) | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). |
 | gx-torrent — started and supervised by Gextto | Gextto starts, restarts and stops the gx-torrent daemon; after 6 abnormal starts in 10 minutes it falls back to libtorrent by itself. |
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
-| gx-torrent — allowed roots | Comma-separated absolute folders gx-torrent may save into; empty = any absolute path chosen by Gextto. If set, include downloads, temp and RAM disk too. |
 | gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
 | qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |
 | qBittorrent-nox — username | qBittorrent-nox Web UI username. |

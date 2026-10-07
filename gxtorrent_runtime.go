@@ -399,9 +399,6 @@ func gxNetworkArgs(cfg *Config) []string {
 	if bootstrap := strings.TrimSpace(lt.DhtBootstrapNodes); bootstrap != "" && lt.Dht {
 		args = append(args, "-dht-bootstrap", bootstrap)
 	}
-	if roots := strings.TrimSpace(cfg.Settings["gxtorrent_allowed_roots"]); roots != "" {
-		args = append(args, "-allowed-roots", roots)
-	}
 	return args
 }
 

@@ -130,7 +130,6 @@ var uiSettingDefaults = map[string]string{
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
 	"gxtorrent_url":                    "http://127.0.0.1:8890",
 	"gxtorrent_listen":                 "0.0.0.0:8890",
-	"gxtorrent_allowed_roots":          "",
 	"gxtorrent_token":                  "",
 	"gxtorrent_proxy":                  "",
 	"gxtorrent_request_timeout_secs":   "15",

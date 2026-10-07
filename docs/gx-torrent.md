@@ -60,7 +60,6 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | `gxtorrent_listen` | `0.0.0.0:8890` | indirizzo di ascolto del demone gestito: la pagina e l'API sono aperte a tutta la LAN. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere). Per tenerlo solo su questo server usa `127.0.0.1:8890`. Un ascolto non loopback richiede `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure` e lo segnala nel log) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
 | `gxtorrent_managed` | `true` | avvio e sorveglianza da Gextto |
-| `gxtorrent_allowed_roots` | vuoto | elenco di cartelle assolute in cui il demone può salvare/spostare. Vuoto = qualunque percorso assoluto deciso da Gextto. Se lo imposti, includi anche download, temp e RAM disk, altrimenti gli spostamenti falliscono |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
@@ -137,11 +136,15 @@ Ogni flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad esempio:
 
 Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
 *libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
-filtro IP, nodi bootstrap DHT) e dalle impostazioni `gxtorrent_proxy` e
-`gxtorrent_allowed_roots`. Il limite globale di connessioni
-(`libtorrent_connections_limit`) viene ripartito tra dial uscenti e accept
-entranti di rain. Proxy e token viaggiano nell'ambiente, non sulla riga di
-comando. Le modifiche valgono dal riavvio di gextto.
+filtro IP, nodi bootstrap DHT) e dall'impostazione `gxtorrent_proxy`. Il limite
+globale di connessioni (`libtorrent_connections_limit`) viene ripartito tra
+dial uscenti e accept entranti di rain. Proxy e token viaggiano nell'ambiente,
+non sulla riga di comando. Le modifiche valgono dal riavvio di gextto.
+
+In modalità gestita il demone **non ha restrizioni di percorso**: Gextto decide
+le destinazioni, le valida e le limita già con le proprie regole. Il flag
+`-allowed-roots` esiste solo per l'**uso standalone** del demone (vedi sotto) e
+Gextto non lo imposta mai.
 
 Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
 `-insecure`). Il server RPC interno di rain è disattivato.
@@ -330,8 +333,8 @@ rain salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
   destinazione intera né altri file;
 - una vecchia cartella reale al posto del symlink (layout precedente) viene
   spostata in `DATA/orphaned/<id>` prima della rimozione, mai cancellata;
-- le destinazioni devono essere percorsi assoluti, opzionalmente limitati da
-  `-allowed-roots`.
+- le destinazioni devono essere percorsi assoluti; il flag `-allowed-roots`
+  (solo uso standalone, Gextto non lo imposta) può limitarle.
 
 **Spostamento**:
 
@@ -500,10 +503,11 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 
-Il **download sequenziale** è supportato dalla base v2.4.2 (vedi sotto); la
-priorità "prima/ultima parte" dei file è inclusa nella modalità sequenziale:
-rain scarica per primi i bordi di ogni file (~1% della dimensione, fino a 8 MB),
-così i player trovano subito l'indice.
+Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
+dalla base v2.4.2 (vedi la sezione dedicata): rain scarica per primi i bordi di
+ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
+l'indice. Il fork rende la prima/ultima parte **indipendente** dall'ordine
+sequenziale.
 
 Gli slot di upload e le connessioni per torrent restano quelli predefiniti di
 rain.

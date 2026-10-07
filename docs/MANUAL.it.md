@@ -641,16 +641,16 @@ dati.
   sorvegliato da Gextto in un processo separato; non richiede
   `libtorrent-rasterbar`. Imposta **URL Web API**, **indirizzo di ascolto**
   (predefinito `0.0.0.0:8890`: pagina web e API aperte su tutta la LAN; usa
-  `127.0.0.1:8890` per tenerle solo sul server), **token**, **proxy** e
-  **cartelle consentite**. All'indirizzo configurato apre anche una **pagina
+  `127.0.0.1:8890` per tenerle solo sul server), **token** e **proxy**. All'indirizzo configurato apre anche una **pagina
   web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
   rimozione, filtro IP). La **cache disco è automatica** (1/32 in lettura, 1/16
   in scrittura della RAM) e Gextto la riasserisce ogni 15 minuti; il **filtro
   IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
-  libtorrent. Non supporta torrent **solo-v2**, download sequenziale, limiti di
-  velocità/connessioni per singolo torrent, web seed manuali né rimozione
-  tracker.
+  libtorrent. Supporta il **download sequenziale** e la **prima/ultima parte**
+  dei file (si impostano all'aggiunta; valgono per i torrent nuovi). Non
+  supporta torrent **solo-v2**, limiti di velocità/connessioni per singolo
+  torrent, web seed manuali né rimozione tracker.
 - **libtorrent integrato** — la sessione inclusa, nello stesso processo;
   valgono tutte le voci *libtorrent*.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
@@ -1156,7 +1156,6 @@ Ogni tab raccoglie le impostazioni modificabili. La colonna *Cosa fa* riprende l
 | gx-torrent — intervallo polling (ms) | Intervallo minimo in millisecondi tra due letture dello stato dei torrent (la coda la gestisce il demone). |
 | gx-torrent — avviato e sorvegliato da Gextto | Gextto avvia, riavvia e ferma il demone gx-torrent; dopo 6 avvii anomali in 10 minuti torna da solo a libtorrent. |
 | gx-torrent — proxy (socks5:// o http://) | Proxy per peer, tracker HTTP e web seed; con un proxy DHT e tracker UDP vengono spenti (non visualizzato). |
-| gx-torrent — cartelle consentite | Elenco di cartelle assolute in cui gx-torrent può salvare/spostare; vuoto = qualunque percorso assoluto deciso da Gextto. Se lo imposti, includi anche download, temp e RAM disk. |
 | gx-torrent — token di accesso (pagina e API in LAN) | Nella scheda **Accesso**: segreto condiviso richiesto dalla pagina e dall'API; obbligatorio se il demone ascolta in rete (non visualizzato). |
 | qBittorrent-nox — URL Web API | URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080). |
 | qBittorrent-nox — utente | Utente dell'interfaccia Web di qBittorrent-nox. |

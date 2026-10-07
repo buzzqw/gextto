@@ -474,17 +474,6 @@ func TestGxEnsureIPFilterForcesAtBoot(t *testing.T) {
 	}
 }
 
-func TestGxAllowedRootsValidation(t *testing.T) {
-	for _, valid := range []string{"", "/srv/media", "/srv/media,/data", " /srv/media , /data "} {
-		if err := validateGxAllowedRoots(valid); err != nil {
-			t.Fatalf("allowed roots %q must be accepted: %v", valid, err)
-		}
-	}
-	if err := validateGxAllowedRoots("relative/path"); err == nil {
-		t.Fatal("a relative allowed root must be refused")
-	}
-}
-
 func TestGxManagedListenSettingDefaultsToLAN(t *testing.T) {
 	if got := gxManagedListenSetting(&Config{Settings: map[string]string{}}); got != "0.0.0.0:8890" {
 		t.Fatalf("default listen = %q, want 0.0.0.0:8890", got)
