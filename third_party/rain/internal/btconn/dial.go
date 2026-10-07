@@ -2,13 +2,13 @@ package btconn
 
 import (
 	"bytes"
-	"context"
-	"github.com/cenkalti/rain/internal/netx"
 	"net"
 	"time"
 
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/ctxutil"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/netx"
 )
 
 // Dial new connection to the address. Does the BitTorrent protocol handshake.
@@ -28,14 +28,8 @@ func Dial(
 	done := make(chan struct{})
 	defer close(done)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		select {
-		case <-stopC:
-			cancel()
-		case <-done:
-		}
-	}()
+	ctx, cancel := ctxutil.FromChan(stopC)
+	defer cancel()
 
 	// First connection
 	log.Debug("Connecting to peer...")

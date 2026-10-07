@@ -1,8 +1,9 @@
 package unchoker
 
 import (
-	"math/rand"
-	"sort"
+	"cmp"
+	"math/rand/v2"
+	"slices"
 )
 
 // Unchoker implements an algorithm to select peers to unchoke based on their download speed.
@@ -65,12 +66,12 @@ func (u *Unchoker) candidatesUnchoke(allPeers []Peer) []Peer {
 }
 
 func (u *Unchoker) sortPeers(peers []Peer, completed bool) {
-	byUploadSpeed := func(i, j int) bool { return peers[i].UploadSpeed() > peers[j].UploadSpeed() }
-	byDownloadSpeed := func(i, j int) bool { return peers[i].DownloadSpeed() > peers[j].DownloadSpeed() }
+	byUploadSpeed := func(a, b Peer) int { return cmp.Compare(b.UploadSpeed(), a.UploadSpeed()) }
+	byDownloadSpeed := func(a, b Peer) int { return cmp.Compare(b.DownloadSpeed(), a.DownloadSpeed()) }
 	if completed {
-		sort.Slice(peers, byUploadSpeed)
+		slices.SortFunc(peers, byUploadSpeed)
 	} else {
-		sort.Slice(peers, byDownloadSpeed)
+		slices.SortFunc(peers, byDownloadSpeed)
 	}
 }
 
@@ -90,7 +91,7 @@ func (u *Unchoker) TickUnchoke(allPeers []Peer, torrentCompleted bool) {
 	peers = peers[i:]
 	if optimistic {
 		for i = 0; i < u.numOptimisticUnchoked && len(peers) > 0; i++ {
-			n := rand.Intn(len(peers)) // nolint: gosec
+			n := rand.IntN(len(peers)) // nolint: gosec
 			pe := peers[n]
 			u.optimisticUnchokePeer(pe)
 			peers[n], peers = peers[len(peers)-1], peers[:len(peers)-1]

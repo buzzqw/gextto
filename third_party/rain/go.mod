@@ -1,53 +1,52 @@
-module github.com/cenkalti/rain
+module github.com/cenkalti/rain/v2
 
 go 1.26.0
 
 require (
+	github.com/br0xen/boltbrowser v0.0.0-20260327130740-898a1e52a566
 	github.com/anacrolix/utp v0.2.0
-	github.com/cenkalti/backoff/v3 v3.2.2
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/cenkalti/log v1.0.0
 	github.com/fatih/structs v1.1.0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/google/btree v1.1.3
-	github.com/hokaccha/go-prettyjson v0.0.0-20210113012101-fb4e108d2519
+	github.com/hokaccha/go-prettyjson v0.0.0-20211117102719-0474bc63780f
+	github.com/jroimartin/gocui v0.5.0
 	github.com/juju/ratelimit v1.0.2
-	github.com/mitchellh/go-homedir v1.1.0
-	github.com/multiformats/go-multihash v0.2.3
 	github.com/nictuku/dht v0.0.0-20201226073453-fd1c1dd3d66a
+	github.com/otiai10/copy v1.14.1
 	github.com/powerman/rpc-codec v1.2.2
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
+	github.com/stretchr/testify v1.12.1
+	github.com/urfave/cli v1.22.17
 	github.com/zeebo/bencode v1.0.0
-	go.etcd.io/bbolt v1.3.11
+	go.etcd.io/bbolt v1.5.0
+	go.uber.org/goleak v1.3.0
+	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
-	github.com/anacrolix/missinggo v1.3.0 // indirect
-	github.com/anacrolix/missinggo/perf v1.0.0 // indirect
-	github.com/anacrolix/missinggo/v2 v2.5.1 // indirect
-	github.com/anacrolix/sync v0.4.0 // indirect
-	github.com/huandu/xstrings v1.3.1 // indirect
-)
-
-require (
+	github.com/br0xen/termbox-util v0.0.0-20200220160819-dc6d6950ba00 // indirect
+	github.com/clipperhouse/stringish v0.1.1 // indirect
+	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jackpal/bencode-go v1.0.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
-	github.com/minio/sha256-simd v1.0.0 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
-	github.com/multiformats/go-varint v0.0.6 // indirect
+	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/nictuku/nettools v0.0.0-20150117095333-8867a2107ad3 // indirect
-	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/nsf/termbox-go v1.1.1 // indirect
+	github.com/otiai10/mint v1.6.3 // indirect
+	github.com/rogpeppe/go-internal v1.8.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/youtube/vitess v3.0.0-rc.3+incompatible // indirect
-	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.59.0
-	lukechampine.com/blake3 v1.1.6 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
-
-replace github.com/nictuku/dht => ../dht

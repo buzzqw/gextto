@@ -1,9 +1,7 @@
 package webseedsource
 
 import (
-	"time"
-
-	"github.com/cenkalti/rain/internal/urldownloader"
+	"github.com/cenkalti/rain/v2/internal/urldownloader"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -13,7 +11,6 @@ type WebseedSource struct {
 	Disabled      bool
 	Downloader    *urldownloader.URLDownloader
 	LastError     error
-	DisabledAt    time.Time
 	DownloadSpeed metrics.Meter
 }
 

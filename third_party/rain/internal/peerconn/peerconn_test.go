@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/rain/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/logger"
 )
 
 // TestCountingConnTracksRawBytes proves the gextto fork counts the raw peer
@@ -25,7 +25,7 @@ func TestCountingConnTracksRawBytes(t *testing.T) {
 		_, _ = server.Write([]byte("pong"))
 	}()
 
-	c := New(client, logger.New("test"), time.Second, 1, false, nil, nil)
+	c := New(client, logger.New("test"), time.Second, 1, 1<<20, false, nil, nil)
 
 	writeBefore := WireBytesWritten.Load()
 	readBefore := WireBytesRead.Load()

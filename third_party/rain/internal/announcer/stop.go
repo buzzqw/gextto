@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/tracker"
 )
 
 // StopAnnouncer is used to send a stop event to the Tracker.
@@ -38,11 +38,19 @@ func (a *StopAnnouncer) Close() {
 	<-a.doneC
 }
 
+// Done returns a channel that is closed when the announcer has finished.
+func (a *StopAnnouncer) Done() <-chan struct{} {
+	return a.doneC
+}
+
 // Run the announcer.
 func (a *StopAnnouncer) Run() {
 	defer close(a.doneC)
 
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(a.timeout))
+	// Releases the goroutine below when announcing finishes before the deadline and nobody
+	// closes the announcer.
+	defer cancel()
 	go func() {
 		select {
 		case <-ctx.Done():

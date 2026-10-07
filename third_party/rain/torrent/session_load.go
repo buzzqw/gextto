@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/metainfo"
-	"github.com/cenkalti/rain/internal/resumer"
-	"github.com/cenkalti/rain/internal/resumer/boltdbresumer"
-	"github.com/cenkalti/rain/internal/storage/filestorage"
-	"github.com/cenkalti/rain/internal/webseedsource"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/metainfo"
+	"github.com/cenkalti/rain/v2/internal/resumer"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
+	"github.com/cenkalti/rain/v2/internal/webseedsource"
 	"go.etcd.io/bbolt"
 )
 
@@ -84,15 +83,14 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 			bf = bf3
 		}
 	}
-	sto, err := filestorage.New(s.getDataDir(id), s.config.FilePermissions)
+	sto, err := s.storage.GetStorage(id)
 	if err != nil {
 		return
 	}
-	sto.Preallocate = s.config.Preallocate
 	if s.sharedPort() {
 		spec.Port = int(s.config.ListenPort)
 	}
-	t, err := newTorrent2(
+	t, err := newTorrent(
 		s,
 		id,
 		spec.AddedAt,
@@ -114,6 +112,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		spec.StopAfterDownload,
 		spec.StopAfterMetadata,
 		spec.CompleteCmdRun,
+		spec.Sequential,
 	)
 	if err != nil {
 		return
@@ -189,6 +188,7 @@ func (s *Session) CompactDatabase(output string) error {
 			StopAfterDownload: t.torrent.stopAfterDownload,
 			StopAfterMetadata: t.torrent.stopAfterMetadata,
 			CompleteCmdRun:    t.torrent.completeCmdRun,
+			Sequential:        t.torrent.sequential,
 		}
 		err = res.Write(t.torrent.id, spec)
 		if err != nil {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cenkalti/rain/internal/blocklist/stree"
+	"github.com/cenkalti/rain/v2/internal/blocklist/stree"
 )
 
 var errNotIPv4Address = errors.New("address is not ipv4")

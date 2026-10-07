@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/torrent"
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 const maxTorrentFile = 32 << 20
@@ -147,6 +147,7 @@ func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {
 		Paused:         formBool(r, "paused"),
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
+		Sequential:     formBool(r, "sequential"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})
@@ -180,6 +181,7 @@ func (d *Daemon) handleAddFile(w http.ResponseWriter, r *http.Request) {
 		Paused:         formBool(r, "paused"),
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
+		Sequential:     formBool(r, "sequential"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})

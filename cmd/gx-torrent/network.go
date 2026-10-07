@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/torrent"
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 // NetworkOptions mirror Gextto's libtorrent network settings.

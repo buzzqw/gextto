@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"hash"
 
-	"github.com/cenkalti/rain/internal/allocator"
-	"github.com/cenkalti/rain/internal/filesection"
-	"github.com/cenkalti/rain/internal/metainfo"
+	"github.com/cenkalti/rain/v2/internal/allocator"
+	"github.com/cenkalti/rain/v2/internal/filesection"
+	"github.com/cenkalti/rain/v2/internal/metainfo"
 )
 
 // BlockSize is the size of smallest piece data that we are going to request from peers.
@@ -175,13 +175,6 @@ func (p *Piece) VerifyHash(buf []byte, h hash.Hash) bool {
 	_, _ = h.Write(buf)
 	sum := h.Sum(nil)
 	return bytes.Equal(sum, p.Hash)
-}
-
-func min[T int64 | uint32](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func divmod(a, b uint32) (uint32, uint32) { return a / b, a % b }

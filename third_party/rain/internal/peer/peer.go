@@ -5,19 +5,19 @@ import (
 	"net"
 	"time"
 
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/fast"
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/mse"
-	"github.com/cenkalti/rain/internal/peerconn"
-	"github.com/cenkalti/rain/internal/peerconn/peerreader"
-	"github.com/cenkalti/rain/internal/peerconn/peerwriter"
-	"github.com/cenkalti/rain/internal/peerprotocol"
-	"github.com/cenkalti/rain/internal/peersource"
-	"github.com/cenkalti/rain/internal/pexlist"
-	"github.com/cenkalti/rain/internal/piece"
-	"github.com/cenkalti/rain/internal/sliceset"
-	"github.com/cenkalti/rain/internal/stringutil"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/fast"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/peerconn"
+	"github.com/cenkalti/rain/v2/internal/peerconn/peerreader"
+	"github.com/cenkalti/rain/v2/internal/peerconn/peerwriter"
+	"github.com/cenkalti/rain/v2/internal/peerprotocol"
+	"github.com/cenkalti/rain/v2/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/pexlist"
+	"github.com/cenkalti/rain/v2/internal/piece"
+	"github.com/cenkalti/rain/v2/internal/sliceset"
+	"github.com/cenkalti/rain/v2/internal/stringutil"
 	"github.com/juju/ratelimit"
 	"github.com/rcrowley/go-metrics"
 )
@@ -84,7 +84,7 @@ type PieceMessage struct {
 }
 
 // New wraps the net.Conn and returns a new Peer.
-func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn int, br, bw *ratelimit.Bucket) *Peer {
+func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn, maxMsgSize int, br, bw *ratelimit.Bucket) *Peer {
 	bf, _ := bitfield.NewBytes(extensions[:], 64)
 	fastEnabled := bf.Test(61)
 	extensionsEnabled := bf.Test(43)
@@ -93,7 +93,7 @@ func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byt
 	t := time.NewTimer(math.MaxInt64)
 	t.Stop()
 	return &Peer{
-		Conn:              peerconn.New(conn, newPeerLogger(source, conn), pieceReadTimeout, maxRequestsIn, fastEnabled, br, bw),
+		Conn:              peerconn.New(conn, newPeerLogger(source, conn), pieceReadTimeout, maxRequestsIn, maxMsgSize, fastEnabled, br, bw),
 		Source:            source,
 		ConnectedAt:       time.Now(),
 		ID:                id,

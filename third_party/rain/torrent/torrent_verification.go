@@ -3,15 +3,17 @@ package torrent
 import (
 	"fmt"
 
-	"github.com/cenkalti/rain/internal/peerprotocol"
-	"github.com/cenkalti/rain/internal/verifier"
+	"github.com/cenkalti/rain/v2/internal/peerprotocol"
+	"github.com/cenkalti/rain/v2/internal/verifier"
 )
 
 func (t *torrent) handleVerifyCommand() {
 	t.log.Info("verifying")
 	t.doVerify = true
 	if t.status() == Stopped {
+		t.mBitfield.Lock()
 		t.bitfield = nil
+		t.mBitfield.Unlock()
 		t.start()
 	} else {
 		t.stop(nil)
@@ -25,7 +27,7 @@ func (t *torrent) handleVerificationDone(ve *verifier.Verifier) {
 	t.verifier = nil
 
 	if ve.Error != nil {
-		t.stop(fmt.Errorf("file verification error: %s", ve.Error))
+		t.stop(fmt.Errorf("file verification error: %w", ve.Error))
 		return
 	}
 

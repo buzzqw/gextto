@@ -3,10 +3,10 @@ package torrent
 import (
 	"fmt"
 
-	"github.com/cenkalti/rain/internal/allocator"
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/piece"
-	"github.com/cenkalti/rain/internal/piecepicker"
+	"github.com/cenkalti/rain/v2/internal/allocator"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/piece"
+	"github.com/cenkalti/rain/v2/internal/piecepicker"
 )
 
 func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
@@ -16,7 +16,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	t.allocator = nil
 
 	if al.Error != nil {
-		t.stop(fmt.Errorf("file allocation error: %s", al.Error))
+		t.stop(fmt.Errorf("file allocation error: %w", al.Error))
 		return
 	}
 
@@ -43,7 +43,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	if t.piecePicker != nil {
 		t.crash("piece picker exists")
 	}
-	t.piecePicker = piecepicker.New(t.pieces, t.session.config.EndgameMaxDuplicateDownloads, t.webseedSources)
+	t.piecePicker = piecepicker.New(t.pieces, t.session.config.EndgameMaxDuplicateDownloads, t.webseedSources, t.sequential)
 
 	for pe := range t.peers {
 		pe.Bitfield = bitfield.New(t.info.NumPieces)

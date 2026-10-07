@@ -1,21 +1,13 @@
 package torrent
 
 import (
-	"archive/tar"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"io"
-	"io/fs"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/internal/resumer/boltdbresumer"
-	"github.com/cenkalti/rain/internal/rpctypes"
+	"github.com/cenkalti/rain/v2/internal/rpctypes"
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
@@ -34,7 +26,7 @@ func (h *rpcHandler) ListTorrents(args *rpctypes.ListTorrentsRequest, reply *rpc
 	torrents := h.session.ListTorrents()
 	reply.Torrents = make([]rpctypes.Torrent, 0, len(torrents))
 	for _, t := range torrents {
-		reply.Torrents = append(reply.Torrents, newTorrent(t))
+		reply.Torrents = append(reply.Torrents, torrentToRPC(t))
 	}
 	return nil
 }
@@ -42,43 +34,43 @@ func (h *rpcHandler) ListTorrents(args *rpctypes.ListTorrentsRequest, reply *rpc
 func (h *rpcHandler) AddTorrent(args *rpctypes.AddTorrentRequest, reply *rpctypes.AddTorrentResponse) error {
 	r := base64.NewDecoder(base64.StdEncoding, strings.NewReader(args.Torrent))
 	opt := &AddTorrentOptions{
-		Stopped:           args.AddTorrentOptions.Stopped,
-		ID:                args.AddTorrentOptions.ID,
+		Stopped:           args.Stopped,
+		ID:                args.ID,
 		StopAfterDownload: args.StopAfterDownload,
 		StopAfterMetadata: args.StopAfterMetadata,
+		Sequential:        args.Sequential,
 	}
 	t, err := h.session.AddTorrent(r, opt)
-	var e *InputError
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*InputError](err); ok {
 		return jsonrpc2.NewError(2, e.Error())
 	}
 	if err != nil {
 		return err
 	}
-	reply.Torrent = newTorrent(t)
+	reply.Torrent = torrentToRPC(t)
 	return nil
 }
 
 func (h *rpcHandler) AddURI(args *rpctypes.AddURIRequest, reply *rpctypes.AddURIResponse) error {
 	opt := &AddTorrentOptions{
-		Stopped:           args.AddTorrentOptions.Stopped,
-		ID:                args.AddTorrentOptions.ID,
+		Stopped:           args.Stopped,
+		ID:                args.ID,
 		StopAfterDownload: args.StopAfterDownload,
 		StopAfterMetadata: args.StopAfterMetadata,
+		Sequential:        args.Sequential,
 	}
 	t, err := h.session.AddURI(args.URI, opt)
-	var e *InputError
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*InputError](err); ok {
 		return jsonrpc2.NewError(2, e.Error())
 	}
 	if err != nil {
 		return err
 	}
-	reply.Torrent = newTorrent(t)
+	reply.Torrent = torrentToRPC(t)
 	return nil
 }
 
-func newTorrent(t *Torrent) rpctypes.Torrent {
+func torrentToRPC(t *Torrent) rpctypes.Torrent {
 	return rpctypes.Torrent{
 		ID:       t.ID(),
 		Name:     t.Name(),
@@ -89,7 +81,7 @@ func newTorrent(t *Torrent) rpctypes.Torrent {
 }
 
 func (h *rpcHandler) RemoveTorrent(args *rpctypes.RemoveTorrentRequest, reply *rpctypes.RemoveTorrentResponse) error {
-	return h.session.RemoveTorrent(args.ID)
+	return h.session.RemoveTorrent(args.ID, args.KeepData)
 }
 
 func (h *rpcHandler) GetMagnet(args *rpctypes.GetMagnetRequest, reply *rpctypes.GetMagnetResponse) error {
@@ -184,6 +176,7 @@ func (h *rpcHandler) GetTorrentStats(args *rpctypes.GetTorrentStatsRequest, repl
 		},
 		Bytes: struct {
 			Total      int64
+			Padding    int64
 			Allocated  int64
 			Completed  int64
 			Incomplete int64
@@ -192,6 +185,7 @@ func (h *rpcHandler) GetTorrentStats(args *rpctypes.GetTorrentStatsRequest, repl
 			Wasted     int64
 		}{
 			Total:      s.Bytes.Total,
+			Padding:    s.Bytes.Padding,
 			Allocated:  s.Bytes.Allocated,
 			Completed:  s.Bytes.Completed,
 			Incomplete: s.Bytes.Incomplete,
@@ -323,7 +317,7 @@ func (h *rpcHandler) GetTorrentPeers(args *rpctypes.GetTorrentPeersRequest, repl
 		case SourceManual:
 			source = "MANUAL"
 		default:
-			panic("unhandled peer source")
+			source = "UNKNOWN"
 		}
 		reply.Peers[i] = rpctypes.Peer{
 			ID:                 hex.EncodeToString(p.ID[:]),
@@ -398,8 +392,8 @@ func (h *rpcHandler) GetTorrentFileStats(args *rpctypes.GetTorrentFileStatsReque
 	for i, s := range stats {
 		reply.FileStats[i] = rpctypes.FileStats{
 			File: rpctypes.File{
-				Path:   s.File.Path(),
-				Length: s.File.Length(),
+				Path:   s.Path(),
+				Length: s.Length(),
 			},
 			BytesCompleted: s.BytesCompleted,
 		}
@@ -470,154 +464,4 @@ func (h *rpcHandler) MoveTorrent(args *rpctypes.MoveTorrentRequest, reply *rpcty
 		return errTorrentNotFound
 	}
 	return t.Move(args.Target)
-}
-
-func (h *rpcHandler) handleMoveTorrent(w http.ResponseWriter, r *http.Request) {
-	port, err := h.session.getPort()
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var success bool
-	defer func() {
-		if !success {
-			h.session.releasePort(port)
-		}
-	}()
-
-	mr, err := r.MultipartReader()
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	// case "id":
-	p, err := mr.NextPart()
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if p.FormName() != "id" {
-		http.Error(w, "id expected in multipart form", http.StatusBadRequest)
-		return
-	}
-	b, err := io.ReadAll(p)
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	id := string(b)
-	if id == "" {
-		http.Error(w, "id required", http.StatusBadRequest)
-		return
-	}
-	if _, ok := h.session.torrents[id]; ok {
-		h.session.log.Warningln("duplicate torrent id, removing existing one:", id)
-		t, err := h.session.removeTorrentFromClient(id)
-		if err != nil {
-			h.session.log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		err = h.session.stopAndRemoveData(t)
-		if err != nil {
-			h.session.log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	// case "metadata":
-	p, err = mr.NextPart()
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if p.FormName() != "metadata" {
-		http.Error(w, "metadata expected in multipart form", http.StatusBadRequest)
-		return
-	}
-	var s boltdbresumer.Spec
-	err = json.NewDecoder(p).Decode(&s)
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	s.Port = port
-	spec := &s
-	// case "data":
-	p, err = mr.NextPart()
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if p.FormName() != "data" {
-		http.Error(w, "data expected in multipart form", http.StatusBadRequest)
-		return
-	}
-	err = readData(p, h.session.getDataDir(id), h.session.config.FilePermissions)
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = h.session.resumer.Write(id, spec)
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	t, started, err := h.session.loadExistingTorrent(id)
-	if err != nil {
-		h.session.log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if started {
-		err = t.Start()
-		if err != nil {
-			h.session.log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-	success = true
-}
-
-func readData(r io.Reader, dir string, perm fs.FileMode) error {
-	tr := tar.NewReader(r)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		name := filepath.Join(dir, hdr.Name)
-		err = os.MkdirAll(filepath.Dir(name), os.ModeDir|perm)
-		if err != nil {
-			return err
-		}
-		f, err := os.Create(name)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(f, tr) // nolint: gosec
-		if err != nil {
-			return err
-		}
-		err = f.Sync()
-		if err != nil {
-			return err
-		}
-		_ = f.Close()
-	}
-	return nil
 }

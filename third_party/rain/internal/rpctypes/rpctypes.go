@@ -114,6 +114,7 @@ type Stats struct {
 	}
 	Bytes struct {
 		Total      int64
+		Padding    int64
 		Allocated  int64
 		Completed  int64
 		Incomplete int64
@@ -195,6 +196,7 @@ type AddTorrentOptions struct {
 	Stopped           bool
 	StopAfterDownload bool
 	StopAfterMetadata bool
+	Sequential        bool
 }
 
 // AddTorrentRequest contains request arguments for Session.AddTorrent method.
@@ -221,7 +223,8 @@ type AddURIResponse struct {
 
 // RemoveTorrentRequest contains request arguments for Session.RemoveTorrent method.
 type RemoveTorrentRequest struct {
-	ID string
+	ID       string
+	KeepData bool
 }
 
 // RemoveTorrentResponse contains response arguments for Session.RemoveTorrent method.

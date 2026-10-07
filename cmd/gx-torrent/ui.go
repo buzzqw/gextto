@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/torrent"
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 type uiPageData struct {
@@ -289,6 +289,7 @@ const uiPageTemplate = `<!doctype html>
       <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
       <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
       <button class="primary" type="submit">Add</button>
     </form>
     <form method="post" action="/ui/add-file" enctype="multipart/form-data">
@@ -296,6 +297,7 @@ const uiPageTemplate = `<!doctype html>
       <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
       <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
       <button type="submit">Add .torrent</button>
     </form>
     <form method="post" action="/ui/ipfilter">
@@ -765,6 +767,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		Paused:         formBool(r, "paused"),
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
+		Sequential:     formBool(r, "sequential"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	}
@@ -857,6 +860,7 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		Paused:         formBool(r, "paused"),
 		QueueTop:       formBool(r, "top"),
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
+		Sequential:     formBool(r, "sequential"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})

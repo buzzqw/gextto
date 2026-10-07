@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/cenkalti/rain/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/logger"
 	"github.com/zeebo/bencode"
 )
 
@@ -29,6 +29,7 @@ type Info struct {
 	Name        string
 	Hash        [20]byte
 	Length      int64
+	Padding     int64
 	NumPieces   uint32
 	Bytes       []byte
 	Private     bool
@@ -122,6 +123,9 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	if multiFile {
 		for _, f := range ib.Files {
 			i.Length += f.Length
+			if f.isPadding() {
+				i.Padding += f.Length
+			}
 		}
 	} else {
 		i.Length = ib.Length
@@ -148,7 +152,7 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	// construct files
 	if multiFile {
 		i.Files = make([]File, len(ib.Files))
-		uniquePaths := make(map[string]interface{}, len(ib.Files))
+		uniquePaths := make(map[string]any, len(ib.Files))
 		for j, f := range ib.Files {
 			parts := make([]string, 0, len(f.Path)+1)
 			parts = append(parts, cleanName(i.Name))
@@ -156,17 +160,20 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 				parts = append(parts, cleanName(p))
 			}
 			joinedPath := filepath.Join(parts...)
-			if _, ok := uniquePaths[joinedPath]; ok {
-				return nil, fmt.Errorf("duplicate file name: %q", joinedPath)
-			} else {
+			isPadding := pad && f.isPadding()
+			// Padding files are never written to disk, so conflicting paths
+			// are harmless. BEP 47 even recommends that pad files share the
+			// same ".pad/<length>" path, so duplicates are common.
+			if !isPadding {
+				if _, ok := uniquePaths[joinedPath]; ok {
+					return nil, fmt.Errorf("duplicate file name: %q", joinedPath)
+				}
 				uniquePaths[joinedPath] = nil
 			}
 			i.Files[j] = File{
-				Path:   joinedPath,
-				Length: f.Length,
-			}
-			if pad {
-				i.Files[j].Padding = f.isPadding()
+				Path:    joinedPath,
+				Length:  f.Length,
+				Padding: isPadding,
 			}
 		}
 	} else {
@@ -179,23 +186,23 @@ func cleanName(s string) string {
 	return cleanNameN(s, 255)
 }
 
-func cleanNameN(s string, max int) string {
+func cleanNameN(s string, maxLen int) string {
 	s = strings.ToValidUTF8(s, string(unicode.ReplacementChar))
-	s = trimName(s, max)
+	s = trimName(s, maxLen)
 	s = strings.ToValidUTF8(s, "")
 	return replaceSeparator(s)
 }
 
 // trimName trims the file name that it won't exceed 255 characters while keeping the extension.
-func trimName(s string, max int) string {
-	if len(s) <= max {
+func trimName(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
 	ext := path.Ext(s)
-	if len(ext) > max {
-		return s[:max]
+	if len(ext) > maxLen {
+		return s[:maxLen]
 	}
-	return s[:max-len(ext)] + ext
+	return s[:maxLen-len(ext)] + ext
 }
 
 func replaceSeparator(s string) string {
@@ -221,7 +228,7 @@ func parsePrivateField(s bencode.RawMessage) bool {
 	if err != nil {
 		return true
 	}
-	return !(stringVal == "" || stringVal == "0")
+	return stringVal != "" && stringVal != "0"
 }
 
 // NewInfoBytes creates a new Info dictionary by reading and hashing the files on the disk.

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cenkalti/rain/internal/rpctypes"
+	"github.com/cenkalti/rain/v2/internal/rpctypes"
 	"github.com/powerman/rpc-codec/jsonrpc2"
 )
 
@@ -63,6 +63,7 @@ type AddTorrentOptions struct {
 	Stopped           bool
 	StopAfterDownload bool
 	StopAfterMetadata bool
+	Sequential        bool
 }
 
 // AddTorrent adds a new torrent by reading .torrent file.
@@ -73,10 +74,11 @@ func (c *Client) AddTorrent(f io.Reader, options *AddTorrentOptions) (*rpctypes.
 	}
 	args := rpctypes.AddTorrentRequest{Torrent: base64.StdEncoding.EncodeToString(b)}
 	if options != nil {
-		args.AddTorrentOptions.ID = options.ID
-		args.AddTorrentOptions.Stopped = options.Stopped
-		args.AddTorrentOptions.StopAfterDownload = options.StopAfterDownload
-		args.AddTorrentOptions.StopAfterMetadata = options.StopAfterMetadata
+		args.ID = options.ID
+		args.Stopped = options.Stopped
+		args.StopAfterDownload = options.StopAfterDownload
+		args.StopAfterMetadata = options.StopAfterMetadata
+		args.Sequential = options.Sequential
 	}
 	var reply rpctypes.AddTorrentResponse
 	return &reply.Torrent, c.client.Call("Session.AddTorrent", args, &reply)
@@ -86,18 +88,19 @@ func (c *Client) AddTorrent(f io.Reader, options *AddTorrentOptions) (*rpctypes.
 func (c *Client) AddURI(uri string, options *AddTorrentOptions) (*rpctypes.Torrent, error) {
 	args := rpctypes.AddURIRequest{URI: uri}
 	if options != nil {
-		args.AddTorrentOptions.ID = options.ID
-		args.AddTorrentOptions.Stopped = options.Stopped
-		args.AddTorrentOptions.StopAfterDownload = options.StopAfterDownload
-		args.AddTorrentOptions.StopAfterMetadata = options.StopAfterMetadata
+		args.ID = options.ID
+		args.Stopped = options.Stopped
+		args.StopAfterDownload = options.StopAfterDownload
+		args.StopAfterMetadata = options.StopAfterMetadata
+		args.Sequential = options.Sequential
 	}
 	var reply rpctypes.AddURIResponse
 	return &reply.Torrent, c.client.Call("Session.AddURI", args, &reply)
 }
 
 // RemoveTorrent removes a torrent from remote Session and deletes its data.
-func (c *Client) RemoveTorrent(id string) error {
-	args := rpctypes.RemoveTorrentRequest{ID: id}
+func (c *Client) RemoveTorrent(id string, keepData bool) error {
+	args := rpctypes.RemoveTorrentRequest{ID: id, KeepData: keepData}
 	var reply rpctypes.RemoveTorrentResponse
 	return c.client.Call("Session.RemoveTorrent", args, &reply)
 }
@@ -163,12 +166,14 @@ func (c *Client) GetTorrentWebseeds(id string) ([]rpctypes.Webseed, error) {
 	return reply.Webseeds, c.client.Call("Session.GetTorrentWebseeds", args, &reply)
 }
 
+// GetTorrentFiles returns the list of files in a torrent.
 func (c *Client) GetTorrentFiles(id string) ([]rpctypes.File, error) {
 	args := rpctypes.GetTorrentFilesRequest{ID: id}
 	var reply rpctypes.GetTorrentFilesResponse
 	return reply.Files, c.client.Call("Session.GetTorrentFiles", args, &reply)
 }
 
+// GetTorrentFileStats returns the per-file download stats of a torrent.
 func (c *Client) GetTorrentFileStats(id string) ([]rpctypes.FileStats, error) {
 	args := rpctypes.GetTorrentFileStatsRequest{ID: id}
 	var reply rpctypes.GetTorrentFileStatsResponse

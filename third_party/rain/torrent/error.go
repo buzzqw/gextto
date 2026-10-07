@@ -1,7 +1,7 @@
 package torrent
 
 import (
-	"github.com/cenkalti/rain/internal/announcer"
+	"github.com/cenkalti/rain/v2/internal/announcer"
 )
 
 // InputError is returned from Session.AddTorrent and Session.AddURI methods when there is problem with the input.
@@ -30,7 +30,7 @@ type AnnounceError struct {
 	err *announcer.AnnounceError
 }
 
-// Contains the humanized version of error.
+// Error returns the humanized version of the error.
 func (e *AnnounceError) Error() string {
 	return e.err.Message
 }

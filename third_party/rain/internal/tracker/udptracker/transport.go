@@ -7,16 +7,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github.com/cenkalti/rain/internal/netx"
+	"github.com/cenkalti/rain/v2/internal/netx"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
-	"github.com/cenkalti/rain/internal/blocklist"
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/resolver"
-	"github.com/cenkalti/rain/internal/tracker"
+	"github.com/cenkalti/backoff/v7"
+	"github.com/cenkalti/rain/v2/internal/blocklist"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/resolver"
+	"github.com/cenkalti/rain/v2/internal/tracker"
 	"github.com/zeebo/bencode"
 )
 

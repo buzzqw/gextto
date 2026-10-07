@@ -2,13 +2,13 @@ package addrlist
 
 import (
 	"net"
-	"sort"
+	"slices"
 	"time"
 
-	"github.com/cenkalti/rain/internal/blocklist"
-	"github.com/cenkalti/rain/internal/externalip"
-	"github.com/cenkalti/rain/internal/peerpriority"
-	"github.com/cenkalti/rain/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/blocklist"
+	"github.com/cenkalti/rain/v2/internal/externalip"
+	"github.com/cenkalti/rain/v2/internal/peerpriority"
+	"github.com/cenkalti/rain/v2/internal/peersource"
 	"github.com/google/btree"
 )
 
@@ -107,14 +107,16 @@ func (d *AddrList) Push(addrs []*net.TCPAddr, source peersource.Source) {
 		added++
 	}
 	d.filterNils()
-	sort.Sort(byTimestamp(d.peerByTime))
+	slices.SortFunc(d.peerByTime, func(a, b *peerAddr) int { return a.timestamp.Compare(b.timestamp) })
+	for i, p := range d.peerByTime {
+		p.index = i
+	}
 	d.countBySource[source] += added
 
 	delta := d.peerByPriority.Len() - d.maxItems
 	if delta > 0 {
 		d.removeExcessItems(delta)
 		d.filterNils()
-		d.countBySource[source] -= delta
 	}
 	if len(d.peerByTime) != d.peerByPriority.Len() {
 		panic("addr list data structures not in sync")
@@ -133,7 +135,8 @@ func (d *AddrList) filterNils() {
 }
 
 func (d *AddrList) removeExcessItems(delta int) {
-	for i := 0; i < delta; i++ {
+	for i := range delta {
+		d.countBySource[d.peerByTime[i].source]--
 		d.peerByPriority.Delete(d.peerByTime[i])
 		d.peerByTime[i] = nil
 	}

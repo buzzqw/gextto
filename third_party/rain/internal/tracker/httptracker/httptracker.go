@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/internal/logger"
-	"github.com/cenkalti/rain/internal/tracker"
+	"github.com/cenkalti/rain/v2/internal/logger"
+	"github.com/cenkalti/rain/v2/internal/tracker"
 	"github.com/zeebo/bencode"
 )
 
@@ -167,17 +167,8 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	}
 	t.log.Debugf("got %d peers", len(peers))
 
-	// Filter external IP
-	if len(response.ExternalIP) != 0 {
-		var filtered int
-		for i, p := range peers {
-			if !bytes.Equal(p.IP[:], response.ExternalIP) {
-				peers[i] = p
-				filtered++
-			}
-		}
-		peers = peers[:filtered]
-	}
+	// Remove our own address from the peer list.
+	peers = filterExternalIP(peers, response.ExternalIP)
 
 	return &tracker.AnnounceResponse{
 		Interval:       time.Duration(response.Interval) * time.Second,
@@ -189,6 +180,22 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	}, nil
 }
 
+// filterExternalIP returns peers with any entry matching the client's own
+// external IP (as reported by the tracker) removed, so the client does not try
+// to connect to itself. It filters in place, preserving order.
+func filterExternalIP(peers []*net.TCPAddr, externalIP []byte) []*net.TCPAddr {
+	if len(externalIP) == 0 {
+		return peers
+	}
+	kept := peers[:0]
+	for _, p := range peers {
+		if !bytes.Equal(p.IP[:], externalIP) {
+			kept = append(kept, p)
+		}
+	}
+	return kept
+}
+
 // percentEscape puts `%` before every byte.
 // Some trackers don't like the output of url.QueryEscape function because it may skip encoding safe characters.
 // This function escapes every byte explicitly.
@@ -196,7 +203,7 @@ func percentEscape(b [20]byte) string {
 	var sb strings.Builder
 	sb.Grow(60)
 	s := hex.EncodeToString(b[:])
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		sb.WriteRune('%')
 		sb.WriteByte(s[i*2])
 		sb.WriteByte(s[i*2+1])

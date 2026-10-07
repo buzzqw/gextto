@@ -7,13 +7,13 @@ package torrent
 // torrent from the info hash and hands it the ready connection.
 
 import (
-	"github.com/cenkalti/rain/internal/netx"
+	"github.com/cenkalti/rain/v2/internal/netx"
 	"net"
 	"time"
 
-	"github.com/cenkalti/rain/internal/btconn"
-	"github.com/cenkalti/rain/internal/handshaker/incominghandshaker"
-	"github.com/cenkalti/rain/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/btconn"
+	"github.com/cenkalti/rain/v2/internal/handshaker/incominghandshaker"
+	"github.com/cenkalti/rain/v2/internal/peersource"
 	"github.com/nictuku/dht"
 )
 

@@ -1,17 +1,17 @@
 package torrent
 
 import (
-	"context"
 	"net"
 	"strconv"
 
-	"github.com/cenkalti/rain/internal/bitfield"
-	"github.com/cenkalti/rain/internal/handshaker/outgoinghandshaker"
-	"github.com/cenkalti/rain/internal/mse"
-	"github.com/cenkalti/rain/internal/peer"
-	"github.com/cenkalti/rain/internal/peerprotocol"
-	"github.com/cenkalti/rain/internal/peersource"
-	"github.com/cenkalti/rain/internal/resolver"
+	"github.com/cenkalti/rain/v2/internal/bitfield"
+	"github.com/cenkalti/rain/v2/internal/ctxutil"
+	"github.com/cenkalti/rain/v2/internal/handshaker/outgoinghandshaker"
+	"github.com/cenkalti/rain/v2/internal/mse"
+	"github.com/cenkalti/rain/v2/internal/peer"
+	"github.com/cenkalti/rain/v2/internal/peerprotocol"
+	"github.com/cenkalti/rain/v2/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/resolver"
 )
 
 func (t *torrent) setNeedMorePeers(val bool) {
@@ -47,15 +47,8 @@ func (t *torrent) addPeerString(addr string) error {
 }
 
 func (t *torrent) resolveAndAddPeer(host string, port int) {
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		select {
-		case <-t.closeC:
-		case <-done:
-		}
-		cancel()
-	}()
+	ctx, cancel := ctxutil.FromChan(t.closeC)
+	defer cancel()
 	ip, err := resolver.ResolveIPv4(ctx, t.session.config.DNSResolveTimeout, host)
 	if err != nil {
 		return
@@ -134,13 +127,14 @@ func (t *torrent) startPeer(
 	if ok {
 		t.log.Debugf("peer with same id already connected. addr: %s id: %s", addr, peerID)
 		conn.Close()
+		delete(t.connectedPeerIPs, addr.IP.String())
 		t.pexDropPeer(addr)
 		t.dialAddresses()
 		return
 	}
 	t.peerIDs[peerID] = struct{}{}
 
-	pe := peer.New(conn, source, peerID, extensions, cipher, t.session.config.PieceReadTimeout, t.session.config.RequestTimeout, t.session.config.MaxRequestsIn, t.session.bucketDownload, t.session.bucketUpload)
+	pe := peer.New(conn, source, peerID, extensions, cipher, t.session.config.PieceReadTimeout, t.session.config.RequestTimeout, t.session.config.MaxRequestsIn, int(t.session.config.MaxMetadataSize), t.session.bucketDownload, t.session.bucketUpload)
 	t.peers[pe] = struct{}{}
 	peers[pe] = struct{}{}
 	if t.info != nil {

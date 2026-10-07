@@ -6,12 +6,13 @@ import (
 	"context"
 	"crypto/sha1"
 	"errors"
-	"github.com/cenkalti/rain/internal/netx"
+	"github.com/cenkalti/rain/v2/internal/netx"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/cenkalti/backoff/v3"
+	"github.com/cenkalti/backoff/v7"
+	"github.com/cenkalti/rain/v2/internal/ctxutil"
 	"go.etcd.io/bbolt"
 )
 
@@ -80,43 +81,23 @@ func (s *Session) getBlocklistTimestamp() (time.Time, error) {
 }
 
 func (s *Session) retryReloadBlocklist() {
-	bo := backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 0
+	ctx, cancel := ctxutil.FromChan(s.closeC)
+	defer cancel()
 
-	ticker := backoff.NewTicker(bo)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			err := s.reloadBlocklist()
-			if err != nil {
-				s.log.Errorln("cannot load blocklist:", err.Error())
-				continue
-			}
-			return
-		case <-s.closeC:
-			return
+	_, _ = backoff.Retry(ctx, func() (result struct{}, err error) {
+		err = s.reloadBlocklist(ctx)
+		if err != nil {
+			s.log.Errorln("cannot load blocklist:", err.Error())
 		}
-	}
+		return struct{}{}, err
+	}, backoff.WithMaxElapsedTime(0))
 }
 
-func (s *Session) reloadBlocklist() error {
-	req, err := http.NewRequest(http.MethodGet, s.config.BlocklistURL, nil)
+func (s *Session) reloadBlocklist(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.config.BlocklistURL, nil)
 	if err != nil {
 		return err
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		select {
-		case <-s.closeC:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	req = req.WithContext(ctx)
 
 	client := http.Client{
 		Timeout:   s.config.BlocklistUpdateTimeout,
