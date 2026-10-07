@@ -854,3 +854,22 @@ func TestCycleSummaryReadsLikeASentence(t *testing.T) {
 		t.Fatalf("summary = %q", got)
 	}
 }
+
+func TestUnseenProblemsUntilTheLogIsViewed(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabStatus
+	m.AppendLog("10:00  INFO fine")
+	m.AppendLog("10:01  WARN something")
+	m.AppendLog("10:02  ERROR broken")
+	if m.UnseenProblems != 2 {
+		t.Fatalf("unseen = %d, want 2", m.UnseenProblems)
+	}
+	if header := m.headerLine(200); !strings.Contains(header, "2 nuovi avvisi") {
+		t.Fatalf("header = %q", header)
+	}
+	m.Tab = TabLogs
+	m.headerLine(200)
+	if m.UnseenProblems != 0 {
+		t.Fatalf("viewing the log must clear the counter, got %d", m.UnseenProblems)
+	}
+}

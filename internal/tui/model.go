@@ -352,7 +352,10 @@ type Model struct {
 	Logs      []string
 	LogFilter string
 	// LogProblemsOnly keeps only WARN and ERROR lines in the log view.
-	LogProblemsOnly    bool
+	LogProblemsOnly bool
+	// UnseenProblems counts WARN/ERROR lines that arrived while the Log tab
+	// was not open; the header shows them until the log is viewed.
+	UnseenProblems     int
 	LogFollow          bool
 	LogScroll          int
 	LogStreamConnected bool
@@ -622,8 +625,22 @@ func (m *Model) SetDaemonState(connected bool, message string) {
 func (m *Model) SetLogs(lines []string) {
 	previous := m.Logs
 	m.Logs = append([]string(nil), lines...)
+	delta := logAppendDelta(previous, m.Logs)
 	if !m.LogFollow {
-		m.LogScroll += logAppendDelta(previous, m.Logs)
+		m.LogScroll += delta
+	}
+	// The first snapshot is history, not news.
+	if len(previous) > 0 {
+		for _, line := range m.Logs[max(0, len(m.Logs)-delta):] {
+			m.noteProblem(line)
+		}
+	}
+}
+
+// noteProblem counts a WARN/ERROR line the user has not seen yet.
+func (m *Model) noteProblem(line string) {
+	if m.Tab != TabLogs && logStyle(line) != StyleNormal {
+		m.UnseenProblems++
 	}
 }
 
@@ -664,6 +681,7 @@ func logAppendDelta(previous, current []string) int {
 // AppendLog appends a single log line, keeping the last 500.
 func (m *Model) AppendLog(line string) {
 	m.Logs = append(m.Logs, line)
+	m.noteProblem(line)
 	if !m.LogFollow {
 		// LogScroll is measured from the bottom. Keep the currently visible
 		// rows fixed while new entries arrive in the background.

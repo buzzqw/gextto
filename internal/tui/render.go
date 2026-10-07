@@ -171,6 +171,11 @@ func (m *Model) headerLine(width int) string {
 		}
 	}
 	next = " · " + connection + next
+	if m.Tab == TabLogs {
+		m.UnseenProblems = 0
+	} else if m.UnseenProblems > 0 {
+		next += " · " + m.Tr.Format("label.unseenproblems", m.UnseenProblems)
+	}
 	if !m.LogStreamConnected && m.StreamReconnect > 0 {
 		next += fmt.Sprintf(" · %s #%d", m.Tr.T("label.reconnect"), m.StreamReconnect)
 	}

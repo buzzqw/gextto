@@ -487,6 +487,7 @@ var catalog = map[string][2]string{
 	"label.stalledsince":     {"Bloccato da", "Stuck since"},
 	"label.nextretry":        {"Prossimo tentativo", "Next attempt"},
 	"label.stallaction":      {"Cosa fare", "What to do"},
+	"label.unseenproblems":   {"⚠ %d nuovi avvisi (3 Log)", "⚠ %d new warnings (3 Log)"},
 	"status.nocycle":         {"ancora nessuna ricerca", "no search yet"},
 	"status.cyclechecked":    {"%s release controllate, %s corrispondenti ai tuoi titoli", "%s releases checked, %s matching your titles"},
 	"status.onedownload":     {"1 download avviato", "1 download started"},
