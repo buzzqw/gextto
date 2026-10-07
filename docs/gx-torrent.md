@@ -290,27 +290,39 @@ Gli stessi dati sono in `GET /api/v1/stats` del demone e in
 
 ## Cache disco e preallocazione
 
-Le impostazioni libtorrent di gextto valgono anche per gx-torrent.
+Le impostazioni libtorrent di gextto valgono anche per gx-torrent, ma la cache
+di gx-torrent è **adattiva**: il demone la ricalcola dal carico reale invece di
+usare valori fissi.
 
-- **`libtorrent_cache_size` = -1** (predefinito): cache automatica, calcolata
-  dalla RAM del server.
-  - Lettura: 1/32 della RAM, tra 32 e 512 MB.
-  - Buffer di scrittura: 1/16 della RAM, tra 64 MB e 1 GB.
-  - Esempi: con 2 GB di RAM 64 MB e 128 MB; con 16 GB 512 MB e 1 GB.
-  - I valori fissi di rain (256 MB e 1 GB) erano troppo alti per un server
-    piccolo.
-- **`libtorrent_cache_size` > 0**: la dimensione indicata (blocchi da 16 KiB)
-  vale per lettura e scrittura.
+- **`libtorrent_cache_size` = -1** (predefinito): **cache adattiva**. Il demone
+  la ricalcola ogni 3 minuti da:
+  - **RAM disponibile** (`MemAvailable`, memoria reclamabile), non la RAM
+    totale: su un server occupato la cache si sgonfia da sola;
+  - **download attivi** (buffer di scrittura) e **seed attivi** (read cache);
+  - **classe dello storage** della cartella di scarico: su HDD o NFS i valori
+    raddoppiano (più coalescing, meno round-trip), su SSD/NVMe restano bassi.
+  - Tetti: scrittura 96 MB–1,5 GB, lettura 32–512 MB, mai oltre 1/4 della RAM e
+    1/8 della memoria disponibile.
+  - **Isteresi**: si riapplica solo se il target cambia di oltre il 25%, al
+    massimo una volta ogni 10 minuti, perché rain legge la cache solo alla
+    creazione della sessione (un cambio = riapertura sessione).
+  - rain non ha una cache write-back: il valore è un **tetto sui pezzi in volo**,
+    e la cache di scrittura/coalescing vera la fa il kernel. La policy serve
+    soprattutto a non sovra-dimensionare quando il carico è basso e a dare più
+    read cache durante il seed.
+- **`libtorrent_cache_size` > 0**: **override manuale**; la dimensione indicata
+  (blocchi da 16 KiB) vale per lettura e scrittura e la policy adattiva tace.
 - **`libtorrent_cache_expiry`**: dopo quanto scade un blocco in cache.
 - **`libtorrent_preallocate`**: i file nuovi vengono riservati per intero con
   `fallocate`; i file esclusi dalla selezione restano sparsi.
-- **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico
-  e la applica subito. L'auto-ottimizzazione di gx-torrent è **sempre attiva**:
-  ogni 15 minuti Gextto riasserisce cache e politica di coda, così la cache
-  resta dimensionata sulla RAM (1/32 lettura, 1/16 scrittura) senza intervento.
+- **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico e
+  la applica subito.
 - Un cambio di questi valori riapre la sessione del demone, come per i limiti
   di velocità.
-- Il pannello Salute mostra la cache effettiva.
+- Il pannello Salute e `GET /api/v1/stats` mostrano la cache effettiva, il
+  target scelto (`cache_read_mb`, `cache_write_mb`), il **motivo**
+  (`cache_reason`), la classe storage (`cache_storage`) e la memoria
+  disponibile (`mem_available_mb`).
 
 ## RAM disk
 

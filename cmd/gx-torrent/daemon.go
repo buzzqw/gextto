@@ -117,6 +117,15 @@ type Daemon struct {
 	ipFilterPath  string
 	ipFilterRules int
 
+	// Adaptive disk cache (see cache.go). rain reads the cache sizes when the
+	// session is created, so a retune reopens the session on a coarse cadence.
+	cacheRead      int64
+	cacheWrite     int64
+	cacheReason    string
+	cacheClass     string
+	cacheCheckedAt time.Time
+	cacheAppliedAt time.Time
+
 	// selection is read by rain from torrent goroutines: it has its own
 	// lock and must never wait for d.mu.
 	selMu     sync.RWMutex
@@ -502,6 +511,7 @@ func (d *Daemon) tick(now time.Time) {
 	items := make([]queueItem, 0, len(torrents))
 	var aggregate int64
 	queued := 0
+	activeDownloads, activeSeeds := 0, 0
 	for _, t := range torrents {
 		id := t.ID()
 		handles[id] = t
@@ -510,6 +520,13 @@ func (d *Daemon) tick(now time.Time) {
 		stats := d.statsLocked(t)
 		running := isRunning(stats.Status)
 		complete := isComplete(stats)
+		if running {
+			if complete {
+				activeSeeds++
+			} else {
+				activeDownloads++
+			}
+		}
 
 		if complete && meta.CompletedAt.IsZero() {
 			meta.CompletedAt = now
@@ -584,6 +601,7 @@ func (d *Daemon) tick(now time.Time) {
 	}
 
 	d.limits = d.dyn.limits(cfg, aggregate, queued, now)
+	d.adaptCacheLocked(now, activeDownloads, activeSeeds, aggregate)
 	plan := planQueue(items, d.limits, cfg, now)
 	for _, id := range plan.Rotate {
 		if meta, ok := d.state.Torrents[id]; ok {
@@ -1336,6 +1354,9 @@ type daemonStats struct {
 	CacheReadMB     int64         `json:"cache_read_mb"`
 	CacheWriteMB    int64         `json:"cache_write_mb"`
 	CacheAuto       bool          `json:"cache_auto"`
+	CacheReason     string        `json:"cache_reason,omitempty"`
+	CacheStorage    string        `json:"cache_storage,omitempty"`
+	MemAvailableMB  int64         `json:"mem_available_mb,omitempty"`
 	Preallocate     bool          `json:"preallocate"`
 	LSD             lsdStatus     `json:"lsd"`
 	DiskFreeBytes   int64         `json:"disk_free_bytes"`
@@ -1368,7 +1389,11 @@ func (d *Daemon) stats() daemonStats {
 		Preallocate:     d.state.Config.Preallocate,
 	}
 	read, write, auto := cacheSizes(d.state.Config, memoryTotal())
+	if d.cacheRead > 0 {
+		read, write = d.cacheRead, d.cacheWrite
+	}
 	out.CacheReadMB, out.CacheWriteMB, out.CacheAuto = read/mib, write/mib, auto
+	out.CacheReason, out.CacheStorage, out.MemAvailableMB = d.cacheReason, d.cacheClass, memoryAvailable()/mib
 	out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DownloadDir)
 	if out.DiskTotalBytes == 0 {
 		out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DataDir)

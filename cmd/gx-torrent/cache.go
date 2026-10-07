@@ -1,15 +1,24 @@
 package main
 
-// cache.go sizes rain's disk cache. Automatic mode follows the RAM of the
-// machine, like Gextto's "Ottimizza impostazioni" for libtorrent: rain's own
-// defaults (256 MiB read cache, up to 1 GiB write buffer) are too much on a
-// small box and too little on a big one.
+// cache.go sizes rain's disk cache. rain reads these values when the session is
+// created (piececache.New, resourcemanager.New), so they can only change by
+// reopening the session: Gextto pushes the manual value, the daemon retunes
+// itself on a coarse cadence (see adaptCacheLocked).
+//
+// rain's own defaults (256 MiB read cache, 1 GiB write buffer) are fixed and do
+// not consider the machine. Here the values follow the available RAM and the
+// live workload: a bigger write buffer when several torrents download at once
+// (more coalescing, less starving peers) and a bigger read cache while seeding
+// (reads served from RAM instead of disk). Both are caps: rain allocates piece
+// buffers on demand, so the process stays small when the load is light.
 
 import (
 	"bufio"
+	"fmt"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/cenkalti/rain/v2/torrent"
@@ -17,8 +26,34 @@ import (
 
 const mib = 1 << 20
 
+const (
+	cacheBudgetMin  = 128 << 20
+	cacheBudgetMax  = 2 << 30
+	cacheReadMin    = 32 << 20
+	cacheReadMax    = 512 << 20
+	cacheWriteMin   = 96 << 20
+	cacheWriteMax   = 1536 << 20
+	cacheCheckEvery = 3 * time.Minute  // how often the target is recomputed
+	cacheApplyEvery = 10 * time.Minute // minimum time between session reopenings
+)
+
 // memoryTotal reads MemTotal from /proc/meminfo (0 when unknown).
 func memoryTotal() int64 {
+	return meminfoKib("MemTotal:") * 1024
+}
+
+// memoryAvailable reads MemAvailable (reclaimable memory) or falls back to
+// MemFree. MemAvailable is the right signal: it accounts for the page cache
+// that can be dropped under pressure, so the cache grows only when memory is
+// genuinely free.
+func memoryAvailable() int64 {
+	if v := meminfoKib("MemAvailable:"); v > 0 {
+		return v * 1024
+	}
+	return meminfoKib("MemFree:") * 1024
+}
+
+func meminfoKib(key string) int64 {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
 		return 0
@@ -27,10 +62,10 @@ func memoryTotal() int64 {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
-		if len(fields) >= 2 && fields[0] == "MemTotal:" {
-			kib, err := strconv.ParseInt(fields[1], 10, 64)
-			if err == nil {
-				return kib * 1024
+		if len(fields) >= 2 && fields[0] == key {
+			var kib int64
+			if _, err := fmt.Sscanf(fields[1], "%d", &kib); err == nil {
+				return kib
 			}
 		}
 	}
@@ -41,24 +76,215 @@ func clamp64(value, low, high int64) int64 {
 	return max(low, min(value, high))
 }
 
-// cacheSizes returns the read cache and the write buffer in bytes.
+// cacheInputs are the live signals the adaptive policy reacts to.
+type cacheInputs struct {
+	ram             int64
+	available       int64
+	activeDownloads int
+	activeSeeds     int
+	downloadRate    int64
+	class           string // "ssd", "hdd", "network" or "unknown"
+}
+
+// cacheSizes is the static sizing: RAM/32 read (32..512 MiB) and RAM/16 write
+// (64 MiB..1 GiB). It is the fallback when the live signals are missing.
 func cacheSizes(cfg QueueConfig, ram int64) (read, write int64, auto bool) {
 	if cfg.CacheMB > 0 {
 		size := cfg.CacheMB * mib
 		return size, size, false
 	}
 	if ram <= 0 {
-		// Unknown RAM: conservative values.
 		return 64 * mib, 128 * mib, true
 	}
 	return clamp64(ram/32, 32*mib, 512*mib), clamp64(ram/16, 64*mib, 1024*mib), true
 }
 
-// applyCache fills rain's cache settings.
+// adaptiveCache returns the read cache and the write buffer for the current
+// workload. cfg.CacheMB > 0 is a manual override and wins.
+func adaptiveCache(cfg QueueConfig, in cacheInputs) (read, write int64, reason string) {
+	if cfg.CacheMB > 0 {
+		size := cfg.CacheMB * mib
+		return size, size, "manual"
+	}
+	avail := in.available
+	if avail <= 0 {
+		avail = in.ram
+	}
+	if avail <= 0 {
+		r, w, _ := cacheSizes(cfg, in.ram)
+		return r, w, "fallback"
+	}
+	// Budget from reclaimable memory, capped hard so we never fight the system.
+	budget := clamp64(avail/8, cacheBudgetMin, cacheBudgetMax)
+	if in.ram > 0 {
+		budget = min(budget, max(in.ram/4, cacheBudgetMin))
+	}
+	slow := in.class == "network" || in.class == "hdd"
+
+	// Write buffer: grows with concurrent downloads (more in-flight pieces to
+	// keep fed and to write back in order), doubled on slow storage.
+	downloads := max(in.activeDownloads, 1)
+	write = cacheWriteMin * int64(downloads)
+	if in.downloadRate > 25<<20 {
+		write += cacheWriteMin // a fast transfer benefits from more buffering
+	}
+	if slow {
+		write *= 2
+	}
+	write = clamp64(write, cacheWriteMin, min(cacheWriteMax, budget))
+
+	// Read cache: grows with active seeds (reads served from RAM), doubled on
+	// network storage where a disk read is a round-trip.
+	read = cacheReadMin + int64(in.activeSeeds)*(cacheReadMin/2)
+	if in.class == "network" {
+		read *= 2
+	}
+	read = clamp64(read, cacheReadMin, min(cacheReadMax, budget))
+
+	// Never reserve more than 1.5x the budget in total.
+	if limit := budget * 3 / 2; read+write > limit {
+		read = max(cacheReadMin, limit-write)
+	}
+	reason = fmt.Sprintf("auto:%s downloads=%d seeds=%d", in.class, in.activeDownloads, in.activeSeeds)
+	return read, write, reason
+}
+
+// storageClass classifies where downloads are written, so the policy can lean
+// larger on slow storage. Network filesystems are detected from statfs; local
+// disks from their rotational flag.
+func storageClass(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return "unknown"
+	}
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err == nil {
+		switch uint64(st.Type) {
+		case 0x6969, 0xFF534D42, 0xFE534D42: // NFS, CIFS/SMB, SMB2
+			return "network"
+		}
+	}
+	if majmin := mountMajorMinor(path); majmin != "" {
+		if rotationalDevice(majmin) {
+			return "hdd"
+		}
+		return "ssd"
+	}
+	return "unknown"
+}
+
+// mountMajorMinor returns the "major:minor" of the filesystem backing path.
+func mountMajorMinor(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	file, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	best, bestLen := "", -1
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 5 {
+			continue
+		}
+		mount := fields[4]
+		if abs == mount || strings.HasPrefix(abs, strings.TrimSuffix(mount, "/")+"/") {
+			if len(mount) > bestLen {
+				best, bestLen = fields[2], len(mount)
+			}
+		}
+	}
+	return best
+}
+
+// rotationalDevice reports whether the device "major:minor" sits on a spinning
+// disk. It resolves the partition symlink and reads the whole disk's flag.
+func rotationalDevice(majmin string) bool {
+	target, err := filepath.EvalSymlinks("/sys/dev/block/" + majmin)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(target, "/")
+	for i, p := range parts {
+		if p == "block" && i+1 < len(parts) {
+			data, err := os.ReadFile("/sys/block/" + parts[i+1] + "/queue/rotational")
+			return err == nil && strings.TrimSpace(string(data)) == "1"
+		}
+	}
+	return false
+}
+
+// applyCache fills rain's cache settings from the daemon's current target.
 func (d *Daemon) applyCache(cfg *torrent.Config) {
-	read, write, _ := cacheSizes(d.state.Config, memoryTotal())
-	cfg.ReadCacheSize = read
-	cfg.WriteCacheSize = write
+	if d.cacheRead <= 0 || d.cacheWrite <= 0 {
+		d.cacheClass = storageClass(d.downloadDir())
+		read, write, reason := adaptiveCache(d.state.Config, cacheInputs{
+			ram: memoryTotal(), available: memoryAvailable(), class: d.cacheClass,
+		})
+		d.cacheRead, d.cacheWrite, d.cacheReason = read, write, reason
+	}
+	cfg.ReadCacheSize = d.cacheRead
+	cfg.WriteCacheSize = d.cacheWrite
 	cfg.ReadCacheTTL = time.Duration(d.state.Config.CacheTTLSecs) * time.Second
 	cfg.Preallocate = d.state.Config.Preallocate
+}
+
+func (d *Daemon) downloadDir() string {
+	if d.opts.DownloadDir != "" {
+		return d.opts.DownloadDir
+	}
+	return d.opts.DataDir
+}
+
+// adaptCacheLocked recomputes the cache target from the live workload and
+// schedules a session reopen when it moved enough. rain can't retune at
+// runtime, so the cadence is coarse and hysteresis keeps it from thrashing.
+func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds int, downloadRate int64) {
+	if !d.cacheCheckedAt.IsZero() && now.Sub(d.cacheCheckedAt) < cacheCheckEvery {
+		return
+	}
+	d.cacheCheckedAt = now
+	class := storageClass(d.downloadDir())
+	read, write, reason := adaptiveCache(d.state.Config, cacheInputs{
+		ram:             memoryTotal(),
+		available:       memoryAvailable(),
+		activeDownloads: activeDownloads,
+		activeSeeds:     activeSeeds,
+		downloadRate:    downloadRate,
+		class:           class,
+	})
+	d.cacheClass = class
+	if d.cacheRead == 0 {
+		// First evaluation: apply on the next tick.
+		d.cacheRead, d.cacheWrite, d.cacheReason = read, write, reason
+		d.cacheAppliedAt = now
+		d.restartPending = true
+		return
+	}
+	if !cacheMoved(d.cacheRead, read) && !cacheMoved(d.cacheWrite, write) {
+		d.cacheReason = reason
+		return
+	}
+	if now.Sub(d.cacheAppliedAt) < cacheApplyEvery || len(d.moving) > 0 || d.restartPending {
+		return
+	}
+	d.cacheRead, d.cacheWrite, d.cacheReason = read, write, reason
+	d.cacheAppliedAt = now
+	d.restartPending = true
+	logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
+}
+
+// cacheMoved reports a change larger than 25%.
+func cacheMoved(current, target int64) bool {
+	if current <= 0 {
+		return true
+	}
+	delta := target - current
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta*4 > current
 }

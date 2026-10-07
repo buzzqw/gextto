@@ -643,8 +643,10 @@ dati.
   (predefinito `0.0.0.0:8890`: pagina web e API aperte su tutta la LAN; usa
   `127.0.0.1:8890` per tenerle solo sul server), **token** e **proxy**. All'indirizzo configurato apre anche una **pagina
   web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
-  rimozione, filtro IP). La **cache disco è automatica** (1/32 in lettura, 1/16
-  in scrittura della RAM) e Gextto la riasserisce ogni 15 minuti; il **filtro
+  rimozione, filtro IP). La **cache disco è adattiva**: il demone la ricalcola
+  ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
+  storage (più grande su HDD/NFS, piccola su SSD), con isteresi per non
+  riaprire inutilmente la sessione; il **filtro
   IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
   libtorrent. Supporta il **download sequenziale** e la **prima/ultima parte**
@@ -684,9 +686,10 @@ stesso processo di Gextto; con un motore esterno (**gx-torrent** o
 - **RAM** — con libtorrent i valori che contano sono la **cache disco**
   (`cache_size`, blocchi da 16 KiB) e `max_queued_disk_bytes`; il pulsante
   **Ottimizza** (o *Ottimizzazione continua*) li dimensiona in base alla RAM.
-  Con **gx-torrent** la cache è automatica (1/32 in lettura, 1/16 in scrittura
-  della RAM) e Gextto la riasserisce ogni 15 minuti: non serve intervenire. Puoi
-  anche usare i valori suggeriti da `/api/system/lt_mem_suggest`. Il daemon libera
+  Con **gx-torrent** la cache è **adattiva**: il demone la ricalcola da memoria
+  disponibile, download/seed attivi e tipo di storage (più grande su HDD/NFS,
+  piccola su SSD). Un valore di `libtorrent_cache_size` maggiore di zero è un
+  override manuale. Il daemon libera
   la memoria al sistema (`malloc_trim`) dopo i completamenti, dopo ogni ciclo e
   ogni 15 minuti, così l'RSS non resta al picco del download.
 - **CPU** — attiva la **coda dinamica** e *Non contare i torrent fermi negli

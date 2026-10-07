@@ -628,8 +628,10 @@ same data.
   API open on the whole LAN; use `127.0.0.1:8890` to keep them on this host),
   **token** and **proxy**. At that address it also serves an
   **operational web page** (add magnet, pause/resume, verify, reannounce, queue,
-  remove, IP filter). The **disk cache is automatic** (1/32 read, 1/16 write of
-  the RAM) and Gextto re-asserts it every 15 minutes; the **IP filter** refreshes
+  remove, IP filter). The **disk cache is adaptive**: the daemon recomputes it
+  every few minutes from available memory, active downloads/seeds and the
+  storage class (larger on HDD/NFS, small on SSD), with hysteresis so it does
+  not reopen the session needlessly; the **IP filter** refreshes
   at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
   in 10 minutes) Gextto falls back to libtorrent by itself. It supports
   **sequential download** and **first/last piece** priority (set when adding a
