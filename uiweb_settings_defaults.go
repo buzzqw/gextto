@@ -126,6 +126,12 @@ var uiSettingDefaults = map[string]string{
 	// --- Motore torrent (backend) ------------------------------------------
 	"torrent_backend":                  "embedded",
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
+	"gxtorrent_url":                    "http://127.0.0.1:8890",
+	"gxtorrent_category":               "Gextto",
+	"gxtorrent_tag":                    "Gextto",
+	"gxtorrent_request_timeout_secs":   "15",
+	"gxtorrent_poll_interval_ms":       "1500",
+	"gxtorrent_managed":                "false",
 	"qbittorrent_username":             "admin",
 	"qbittorrent_request_timeout_secs": "15",
 	"qbittorrent_poll_interval_ms":     "1500",

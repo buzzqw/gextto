@@ -35,6 +35,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	xhtml "golang.org/x/net/html"
 
@@ -163,6 +164,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Log (frammento aggiornabile).
 	v2Handle(s, mux, "GET /partial/logs", V2LogsPartial)
 	v2Handle(s, mux, "GET /partial/chrome", V2ChromePartial)
+	v2Handle(s, mux, "GET /partial/chrome/sse", V2ChromeSSE)
 	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
 	v2Handle(s, mux, "GET /partial/health/tile", V2HealthTilePartial)
 
@@ -298,7 +300,7 @@ func v2PageLabel(view string) string {
 }
 
 // v2NavGroups mirrors uiNavigation but points the links at /v2.
-func v2NavGroups(view string, counts map[string]int) []uiNavGroup {
+func v2NavGroups(view string, counts map[string]string) []uiNavGroup {
 	groups := make([]uiNavGroup, 0, len(uiNavGroups))
 	for index, group := range uiNavGroups {
 		out := uiNavGroup{Label: group.Label}
@@ -584,6 +586,44 @@ func V2ChromePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, templateName, uiShellChromeFrom(s), dict, eng)
+}
+
+func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	tick := time.NewTicker(5 * time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-tick.C:
+			chrome := uiShellChromeFrom(s)
+
+			var topBuf bytes.Buffer
+			v2Templates.ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
+			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(topBuf.String(), "\n", ""))
+
+			var mobBuf bytes.Buffer
+			v2Templates.ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
+			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(mobBuf.String(), "\n", ""))
+
+			var statBuf bytes.Buffer
+			v2Templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
+			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(statBuf.String(), "\n", ""))
+
+			flusher.Flush()
+		}
+	}
 }
 
 // V2HealthTilePartial refreshes a single Salute tile without reloading the page.

@@ -15,18 +15,18 @@ func validateBackendSetting(key, value string) error {
 	switch key {
 	case "torrent_backend":
 		switch raw {
-		case "", BackendEmbedded, BackendQbittorrent:
+		case "", BackendEmbedded, BackendQbittorrent, BackendGxTorrent:
 			return nil
 		default:
-			return fmt.Errorf("torrent_backend must be embedded or qbittorrent")
+			return fmt.Errorf("torrent_backend must be embedded, qbittorrent or gx-torrent")
 		}
-	case "qbittorrent_url":
+	case "qbittorrent_url", "gxtorrent_url":
 		if raw == "" {
 			return nil
 		}
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-			return fmt.Errorf("qbittorrent_url must be a complete http(s) URL")
+			return fmt.Errorf("%s must be a complete http(s) URL", key)
 		}
 	case "qbittorrent_request_timeout_secs":
 		if raw == "" {

@@ -148,7 +148,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_preallocate":                       "Riserva subito tutto lo spazio su disco prima di iniziare il download.",
 	"tmdb_api_key":                                 "Chiave API TMDB per titoli, poster e metadati.",
 	"libtorrent_torrent_copy_dir":                  "Copia qui i file .torrent dei download (vuoto = nessuna copia).",
-	"torrent_backend":                              "Motore torrent attivo (libtorrent integrato o qBittorrent-nox).",
+	"torrent_backend":                              "Motore torrent attivo (libtorrent integrato, qBittorrent-nox o gx-torrent).",
 	"qbittorrent_url":                              "URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080).",
 	"qbittorrent_username":                         "Utente dell'interfaccia Web di qBittorrent-nox.",
 	"qbittorrent_password":                         "Password dell'interfaccia Web di qBittorrent-nox (non visualizzata).",
@@ -158,6 +158,10 @@ var uiSettingTooltipText = map[string]string{
 	"qbittorrent_poll_interval_ms":                 "Intervallo in millisecondi tra due letture dello stato dei torrent.",
 	"qbittorrent_path_mappings":                    "Mappatura dei percorsi tra Gextto e qBittorrent-nox, una per riga (locale=remoto).",
 	"qbittorrent_managed":                          "Gextto scarica da sé l'ultima release di qBittorrent-nox, la installa nella cartella dell'applicazione (accanto a gexttod), la avvia e la ferma con il servizio e la aggiorna (con backup e rollback). Il motore in uso però si sceglie dalla voce «Motore torrent»: questa opzione non lo cambia.",
+	"gxtorrent_url":                                "URL dell'interfaccia API di gx-torrent (es. http://127.0.0.1:8890).",
+	"gxtorrent_request_timeout_secs":               "Timeout in secondi delle richieste HTTP verso gx-torrent.",
+	"gxtorrent_poll_interval_ms":                   "Intervallo in millisecondi tra due letture dello stato dei torrent.",
+	"gxtorrent_managed":                            "Se attivo, Gextto scarica da sé l'ultima release di gx-torrent e la installa nella cartella dell'applicazione (accanto a gexttod).",
 }
 
 // uiSettingTooltip returns the tooltip for a setting key. Score weights without

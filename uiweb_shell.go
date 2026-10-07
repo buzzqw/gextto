@@ -79,7 +79,7 @@ type uiShellChrome struct {
 	Problems     uint64
 	// ActiveDownloads is the badge on "Scarico": unfinished torrents plus the
 	// direct HTTP downloads still running (seeding torrents are not counted).
-	ActiveDownloads int
+	ActiveDownloads string
 }
 
 func uiShellChromeFrom(s *AppState) uiShellChrome {
@@ -112,10 +112,12 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	if s.db != nil {
 		parked, _ = s.db.LoadStallWatches()
 	}
+	var activeDl, totalDl int
 	for _, view := range s.activeEngine().List() {
 		chrome.Torrents++
+		totalDl++
 		if view.Progress < 100 {
-			chrome.ActiveDownloads++
+			activeDl++
 		}
 		chrome.Peers += view.NumPeers
 		chrome.Seeds += view.NumSeeds
@@ -133,11 +135,13 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	}
 	chrome.Problems = logging.ProblemCount()
 	for _, download := range HTTPDownloads() {
+		totalDl++
 		if download.Status == "downloading" {
 			downloadRate += download.SpeedBytes
-			chrome.ActiveDownloads++
+			activeDl++
 		}
 	}
+	chrome.ActiveDownloads = strconv.Itoa(activeDl) + "/" + strconv.Itoa(totalDl)
 	chrome.Download = logging.HumanRate(saturatingInt64(downloadRate))
 	chrome.Upload = logging.HumanRate(saturatingInt64(uploadRate))
 
@@ -164,27 +168,30 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 
 // uiNavCounts computes the badges shown next to the sidebar entries, matching
 // SidebarCount of the classic UI.
-func uiNavCounts(s *AppState, cfg *Config) map[string]int {
+func uiNavCounts(s *AppState, cfg *Config) map[string]string {
 	active := 0
+	total := 0
 	for _, download := range HTTPDownloads() {
+		total++
 		if download.Status == "downloading" {
 			active++
 		}
 	}
 	for _, view := range s.activeEngine().List() {
+		total++
 		if view.Progress < 100 {
 			active++
 		}
 	}
-	counts := map[string]int{
+	counts := map[string]string{
 		// Downloads in progress, like the live badge (seeding is not counted).
-		"downloads": active,
-		"series":    len(cfg.Series),
-		"movies":    len(cfg.Movies),
+		"downloads": strconv.Itoa(active) + "/" + strconv.Itoa(total),
+		"series":    strconv.Itoa(len(cfg.Series)),
+		"movies":    strconv.Itoa(len(cfg.Movies)),
 	}
 	if s.comics != nil {
 		if items, err := s.comics.ListMonitored(false); err == nil {
-			counts["comics"] = len(items)
+			counts["comics"] = strconv.Itoa(len(items))
 		}
 	}
 	return counts

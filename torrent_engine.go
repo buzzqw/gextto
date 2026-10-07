@@ -138,6 +138,7 @@ var _ TorrentEngine = embeddedEngine{}
 const (
 	BackendEmbedded    = "embedded"
 	BackendQbittorrent = "qbittorrent"
+	BackendGxTorrent   = "gx-torrent"
 )
 
 // capabilityLevels is the single source of truth for the parity matrix. It is
@@ -161,6 +162,15 @@ var capabilityLevels = map[string]map[string]string{
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"preferences": "partial", "super_seeding": "partial", "upload_mode": "none",
 		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
+	},
+	BackendGxTorrent: {
+		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
+		"recheck": "full", "move": "full", "limits": "none", "files": "full", "peers": "full",
+		"trackers": "full", "events": "none", "stats": "none", "sequential": "none",
+		"first_last": "none", "seed_policy": "none", "ramdisk": "none", "fastresume": "none",
+		"piece_diagnostics": "none", "categories": "none", "tags": "none", "sync": "none",
+		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
+		"ip_filter": "none", "session_stats": "none", "web_seeds": "none",
 	},
 }
 

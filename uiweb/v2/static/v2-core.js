@@ -950,11 +950,11 @@
   function updateDownloadsBadge() {
     var source = document.getElementById("v2-live-mobile-metrics") || document.getElementById("v2-live-top-metrics");
     if (!source || !source.hasAttribute("data-active-downloads")) return;
-    var active = parseInt(source.getAttribute("data-active-downloads") || "0", 10) || 0;
+    var badgeStr = source.getAttribute("data-active-downloads") || "";
     var badges = document.querySelectorAll('#app-sidebar [data-nav="downloads"] .nav-count');
     for (var i = 0; i < badges.length; i++) {
-      badges[i].textContent = String(active);
-      badges[i].hidden = active === 0;
+      badges[i].textContent = badgeStr;
+      badges[i].hidden = (badgeStr === "0/0" || badgeStr === "0" || badgeStr === "");
     }
   }
 
@@ -1009,10 +1009,29 @@
       hint.hidden = true;
     });
   }
+  function initLiveMetrics() {
+    if (!window.EventSource) return;
+    var es = new EventSource("/partial/chrome/sse");
+    es.addEventListener("chrome-top", function(e) {
+      var el = document.getElementById("v2-live-top-metrics");
+      if (el) el.outerHTML = e.data;
+      updateDownloadsBadge();
+    });
+    es.addEventListener("chrome-mobile", function(e) {
+      var el = document.getElementById("v2-live-mobile-metrics");
+      if (el) el.outerHTML = e.data;
+      updateDownloadsBadge();
+      updateProblemsChip();
+    });
+    es.addEventListener("chrome-status", function(e) {
+      var el = document.getElementById("v2-live-status");
+      if (el) el.outerHTML = e.data;
+    });
+  }
 
   if ("serviceWorker" in navigator && window.isSecureContext) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* optional */ }); });
   }
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); initPullToRefresh(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); initPullToRefresh(); initLiveMetrics(); });
 })();

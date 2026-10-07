@@ -35,6 +35,8 @@ func alternativeBackendActive(cfg *Config) bool {
 			return false
 		}
 		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
+	case BackendGxTorrent:
+		return true // Will add path mapping validation later if needed
 	default:
 		return false
 	}
@@ -66,6 +68,13 @@ func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
 			logging.Warn(note, "url", settings.Client.BaseURL)
 			return engine, note, nil
 		}
+		return engine, "", nil
+	case BackendGxTorrent:
+		engine, err := newGxTorrentEngine(cfg)
+		if err != nil {
+			return nil, "", err
+		}
+		// TODO: Add preflight check for gx-torrent
 		return engine, "", nil
 	default:
 		return nil, "", nil

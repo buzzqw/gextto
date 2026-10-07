@@ -43,7 +43,7 @@ type uiNavItem struct {
 	Optional     bool
 	MobileHidden bool
 	MobileAlways bool
-	Count        int
+	Count        string
 }
 
 type uiNavGroup struct {

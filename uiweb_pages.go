@@ -704,6 +704,8 @@ func uiSettingGroupTitle(tab, key string) string {
 		switch {
 		case strings.HasPrefix(lowered, "qbittorrent_"):
 			return "qBittorrent-nox"
+		case strings.HasPrefix(lowered, "gxtorrent_"):
+			return "gx-torrent"
 		default:
 			return "Motore torrent"
 		}
@@ -811,6 +813,8 @@ func uiSettingAllowedBackends(key string) []string {
 	switch {
 	case strings.HasPrefix(key, "qbittorrent_"):
 		return []string{BackendQbittorrent}
+	case strings.HasPrefix(key, "gxtorrent_"):
+		return []string{BackendGxTorrent}
 	case uiLibtorrentEngineOnlySettings[key]:
 		return []string{BackendEmbedded}
 	}
@@ -881,8 +885,9 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 	options := []uiFormOption{
 		{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded},
 		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
+		{Value: BackendGxTorrent, Label: "gx-torrent (demone alternativo)", Selected: value == BackendGxTorrent},
 	}
-	if value != BackendEmbedded && value != BackendQbittorrent {
+	if value != BackendEmbedded && value != BackendQbittorrent && value != BackendGxTorrent {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
 		for index := 1; index < len(options); index++ {
 			options[index].Selected = false
