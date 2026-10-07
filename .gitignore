@@ -48,7 +48,6 @@ gextto.json
 .claude/
 .direnv/
 .envrc
-CLAUDE.md
 
 # Browser test output
 uiweb/end2end/node_modules/
