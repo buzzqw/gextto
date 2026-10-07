@@ -487,7 +487,7 @@ func (e *gxTorrentEngine) sync() error {
 	}
 	e.mu.Unlock()
 	if reconnected {
-		logging.Info("gx-torrent connesso", "url", e.settings.BaseURL)
+		logging.Debug("gx-torrent connesso", "url", e.settings.BaseURL)
 		e.mu.Lock()
 		// Re-push the queue policy and the limits: a restarted daemon must not
 		// run with stale values.

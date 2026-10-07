@@ -266,7 +266,7 @@ func Serve(state *AppState) error {
 	} else if state.cfg.Active {
 		mode = "downloads are enabled"
 	}
-	logging.Info(fmt.Sprintf("🚀 Gextto started — web interface at http://%s · %s", webAddr, mode))
+	logging.Info(fmt.Sprintf("🚀 Gextto started — web interface at http://%s · %s · engine: %s", webAddr, mode, state.activeEngine().Name()))
 	logging.Debug("startup details", "engine_api", "http://"+engineAddr, "libtorrent", LibtorrentVersion())
 
 	// Before the workers: the first cycle marks downloads missing from the

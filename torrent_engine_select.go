@@ -224,6 +224,6 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 			"version", LibtorrentVersion())
 		return nil
 	}
-	logging.Info("Torrent engine: " + active)
+	logging.Debug("torrent engine selected", "engine", active)
 	return nil
 }

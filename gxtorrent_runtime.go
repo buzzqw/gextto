@@ -151,7 +151,7 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 		logFile.Close()
 		return nil, fmt.Errorf("avvio gx-torrent gestito: %w", err)
 	}
-	logging.Info("gx-torrent avviato da Gextto", "binary", binary, "listen", listen, "data", dataDir)
+	logging.Debug("gx-torrent avviato da Gextto", "binary", binary, "listen", listen, "data", dataDir)
 	process := &gxManagedProcess{cmd: command, done: make(chan error, 1)}
 	go func() {
 		defer recoverGoroutine("gx-torrent process wait")
