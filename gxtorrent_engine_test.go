@@ -280,6 +280,22 @@ func TestTorrentBackendNameAcceptsGxTorrent(t *testing.T) {
 	}
 }
 
+func TestUIEngineLabelsMatchBackend(t *testing.T) {
+	// The label must follow the engine: a gx-torrent install used to be shown
+	// as "libtorrent integrato" in the dashboard and in the "Non attivo con il
+	// motore «…»" notes.
+	cases := map[string]string{
+		BackendGxTorrent:   "gx-torrent",
+		BackendQbittorrent: "qBittorrent-nox",
+		BackendEmbedded:    "libtorrent integrato",
+	}
+	for backend, want := range cases {
+		if got := uiBackendLabel(backend); got != want {
+			t.Fatalf("uiBackendLabel(%q) = %q, want %q", backend, got, want)
+		}
+	}
+}
+
 func TestGxNetworkArgs(t *testing.T) {
 	cfg := &Config{DataDir: t.TempDir()}
 	cfg.Libtorrent.PortMin = 6881
