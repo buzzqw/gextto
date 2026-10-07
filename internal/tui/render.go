@@ -34,6 +34,11 @@ func (m *Model) Render(width, height int) Screen {
 	switch {
 	case m.Overlay == OverlayHelp:
 		content = m.renderHelp(width)
+		// The help is longer than a 24-row terminal: let it scroll.
+		if limit := max(0, len(content)-contentHeight); m.HelpScroll > limit {
+			m.HelpScroll = limit
+		}
+		content = content[m.HelpScroll:]
 	case m.Overlay == OverlaySearch:
 		content = m.renderSearch(width, contentHeight)
 	case m.Overlay == OverlayEvents:
@@ -220,6 +225,10 @@ func (m *Model) hints() string {
 	// of this line is cut, and the global keys are also listed in the help.
 	hints := ""
 	switch {
+	case m.Overlay == OverlayHelp:
+		hints = m.Tr.T("hint.help")
+	case m.Overlay == OverlayEvents:
+		hints = m.Tr.T("hint.events")
 	case m.Overlay == OverlaySettings:
 		hints = m.Tr.T("hint.settings")
 	case m.Overlay == OverlayHistory:
@@ -241,7 +250,9 @@ func (m *Model) hints() string {
 	case m.ArchiveDetail != nil:
 		hints = m.Tr.T("hint.archivedetail")
 	case m.Tab == TabStatus:
-		hints = m.Tr.T("hint.status")
+		// The home page also lists the global actions; elsewhere they are in
+		// the help, so the line keeps room for the keys of the current view.
+		hints = m.Tr.T("hint.status") + " · " + m.Tr.T("hint.actions")
 	case m.Tab == TabTorrents && len(m.MarkedHashes()) > 0:
 		hints = m.Tr.T("hint.torrentsmarked")
 	case m.Tab == TabTorrents:
@@ -1240,7 +1251,7 @@ func (m *Model) renderHealth(width int) []Line {
 		Line{Text: fmt.Sprintf("%s: %s %s / %s · %s %s", m.Tr.T("label.disks"),
 			HumanBytes(float64(health.DiskFreeBytes)), m.Tr.T("label.free"),
 			HumanBytes(float64(health.DiskTotalBytes)),
-			m.Tr.T("label.trash"), fmt.Sprintf("%d %s (%s)", health.TrashFileCount, m.Tr.T("label.files"), HumanBytes(float64(health.TrashBytes)))), Style: StyleNormal},
+			m.Tr.T("label.trash"), fmt.Sprintf("%d %s (%s)", health.TrashFileCount, strings.ToLower(m.Tr.T("label.files")), HumanBytes(float64(health.TrashBytes)))), Style: StyleNormal},
 	)
 	if len(health.Paths) > 0 {
 		lines = append(lines, Line{Text: m.Tr.T("label.paths"), Style: StyleHeader})
@@ -1252,7 +1263,7 @@ func (m *Model) renderHealth(width int) []Line {
 				state = "OK"
 				pathStyle = StyleOK
 			}
-			lines = append(lines, Line{Text: fmt.Sprintf("%-4s %s %s", state, PadRight(path.Label, 14), path.Path), Style: pathStyle, Wrap: true, Indent: 20})
+			lines = append(lines, Line{Text: fmt.Sprintf("%-4s %s %s", state, PadRight(m.pathLabel(path.Label), 14), path.Path), Style: pathStyle, Wrap: true, Indent: 20})
 		}
 	}
 	if len(health.Disks) > 0 {
@@ -1262,13 +1273,13 @@ func (m *Model) renderHealth(width int) []Line {
 			if disk.TotalBytes > 0 {
 				used = (1 - float64(disk.FreeBytes)/float64(disk.TotalBytes)) * 100
 			}
-			lines = append(lines, Line{Text: fmt.Sprintf("%s %s free / %s · %.0f%% %s",
-				PadRight(disk.Mount, 18), HumanBytes(float64(disk.FreeBytes)), HumanBytes(float64(disk.TotalBytes)), used, m.Tr.T("label.used")), Style: StyleNormal, Wrap: true, Indent: 19})
+			lines = append(lines, Line{Text: fmt.Sprintf("%s %s %s / %s · %.0f%% %s",
+				PadRight(disk.Mount, 18), HumanBytes(float64(disk.FreeBytes)), m.Tr.T("label.free"), HumanBytes(float64(disk.TotalBytes)), used, m.Tr.T("label.used")), Style: StyleNormal, Wrap: true, Indent: 19})
 		}
 	}
 	if health.Ramdisk != nil {
-		lines = append(lines, Line{Text: fmt.Sprintf("%s: %s · %s free / %s", m.Tr.T("label.ramdisk"),
-			health.Ramdisk.Path, HumanBytes(float64(health.Ramdisk.FreeBytes)), HumanBytes(float64(health.Ramdisk.TotalBytes))), Style: StyleNormal, Wrap: true, Indent: 2})
+		lines = append(lines, Line{Text: fmt.Sprintf("%s: %s · %s %s / %s", m.Tr.T("label.ramdisk"),
+			health.Ramdisk.Path, HumanBytes(float64(health.Ramdisk.FreeBytes)), m.Tr.T("label.free"), HumanBytes(float64(health.Ramdisk.TotalBytes))), Style: StyleNormal, Wrap: true, Indent: 2})
 	}
 	if len(health.LastErrors) > 0 {
 		lines = append(lines, Line{Text: m.Tr.T("label.recenterror"), Style: StyleErr})
@@ -1277,6 +1288,15 @@ func (m *Model) renderHealth(width int) []Line {
 		}
 	}
 	return lines
+}
+
+// pathLabel translates the daemon's path names (sent in English).
+func (m *Model) pathLabel(label string) string {
+	key := "path." + strings.ToLower(strings.TrimSpace(label))
+	if translated := m.Tr.T(key); translated != key {
+		return translated
+	}
+	return label
 }
 
 func floatPointerValue(value *float64) any {
@@ -1424,7 +1444,7 @@ func (m *Model) priorityLabel(priority int) string {
 func (m *Model) renderHelp(width int) []Line {
 	keys := []string{
 		"help.title", "", "help.global", "help.global2", "help.torrents", "help.torrents2",
-		"help.torrents3", "help.torrents4", "help.details", "help.status", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "help.series", "help.movie", "help.form", "help.terminal", "help.bandwidth", "",
+		"help.torrents3", "help.torrents4", "help.details", "help.status", "help.logs", "help.health", "help.settings", "help.archive", "help.missing", "help.blocklist", "help.library", "help.series", "help.movie", "help.maintenance", "help.form", "help.terminal", "help.bandwidth", "",
 		"help.close",
 	}
 	lines := make([]Line, 0, len(keys))
@@ -1497,9 +1517,9 @@ func (m *Model) renderSettings(width, contentHeight int) []Line {
 	}
 	config := m.Config
 	rows := []string{
-		fmt.Sprintf("%d  %s: %s", 1, m.Tr.T("settings.language"), firstNonEmpty(config.DefaultLanguage, "-")),
-		fmt.Sprintf("%d  %s: %ds", 2, m.Tr.T("settings.refresh"), config.RefreshSecs),
-		fmt.Sprintf("%d  %s: %d/%d KiB/s", 3, m.Tr.T("settings.limits"), config.DownloadLimitKib, config.UploadLimitKib),
+		fmt.Sprintf("%d  %s: %s", 1, m.Tr.T("settings.language"), m.Tr.T("settings.uilang")),
+		fmt.Sprintf("%d  %s: %s", 2, m.Tr.T("settings.refresh"), HumanDuration(float64(config.RefreshSecs))),
+		fmt.Sprintf("%d  %s: %s / %s", 3, m.Tr.T("settings.limits"), kibLabel(m.Tr, int64(config.DownloadLimitKib)), kibLabel(m.Tr, int64(config.UploadLimitKib))),
 		fmt.Sprintf("%d  %s: %s", 4, m.Tr.T("settings.dryrun"), boolWord(m.Tr, config.DryRun)),
 		fmt.Sprintf("%d  %s: %s", 5, m.Tr.T("settings.colors"), boolWord(m.Tr, m.ColorsEnabled)),
 		fmt.Sprintf("%d  %s: %s", 6, m.Tr.T("settings.contrast"), boolWord(m.Tr, m.HighContrast)),

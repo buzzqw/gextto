@@ -31,6 +31,16 @@ func (m *Model) Update(k Key) Action {
 			m.Overlay = OverlayNone
 		case k.Kind == KeyRune && (k.Rune == '?' || k.Rune == 'q'):
 			m.Overlay = OverlayNone
+		case k.Kind == KeyUp:
+			m.HelpScroll = max(0, m.HelpScroll-1)
+		case k.Kind == KeyDown:
+			m.HelpScroll++
+		case k.Kind == KeyPgUp:
+			m.HelpScroll = max(0, m.HelpScroll-10)
+		case k.Kind == KeyPgDn:
+			m.HelpScroll += 10
+		case k.Kind == KeyHome:
+			m.HelpScroll = 0
 		}
 		return Action{}
 	case OverlaySearch:
@@ -70,6 +80,7 @@ func (m *Model) Update(k Key) Action {
 		return Action{Kind: ActionQuit}
 	case k.Kind == KeyRune && k.Rune == '?':
 		m.Overlay = OverlayHelp
+		m.HelpScroll = 0
 		return Action{}
 	case k.Kind == KeyRune && k.Rune == 'q':
 		return Action{Kind: ActionQuit}

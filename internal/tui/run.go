@@ -953,9 +953,6 @@ func performAction(ctx context.Context, client *Client, tr *Translator, action A
 		}
 		result.apply = func(m *Model) {
 			m.Tr = NewTranslator(action.Text)
-			if m.Config != nil {
-				m.Config.DefaultLanguage = action.Text
-			}
 		}
 		result.message = tr.T("msg.languagesaved")
 		result.refresh = true

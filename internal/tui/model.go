@@ -296,6 +296,8 @@ type Model struct {
 	// PageScroll scrolls the free-form Status and Health pages, which can be
 	// taller than a small SSH window once long values wrap.
 	PageScroll int
+	// HelpScroll is the first visible line of the help overlay.
+	HelpScroll int
 
 	Status    *Status
 	Health    *Health
