@@ -230,7 +230,13 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.Database = d.opts.DBPath
 	cfg.DataDir = d.opts.LinkDir
 	cfg.DataDirIncludesTorrentID = true
-	cfg.ResumeOnStartup = true
+	// Torrents are loaded stopped and started by gx-torrent's own queue on the
+	// first tick. If rain resumed them itself (ResumeOnStartup), it would start a
+	// torrent that must stay parked/paused before reconcileLocked can stop it,
+	// and starting a torrent creates its destination files: a parked torrent
+	// whose payload was moved or removed would get zero-filled placeholders
+	// written at the old path. The queue is the single owner of start/stop.
+	cfg.ResumeOnStartup = false
 	cfg.RPCEnabled = false
 	d.applyNetwork(&cfg)
 	d.applyCache(&cfg)

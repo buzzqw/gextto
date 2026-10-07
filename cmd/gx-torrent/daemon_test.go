@@ -149,6 +149,86 @@ func stateOf(d *Daemon, hash string) string {
 	return info.State
 }
 
+// TestDaemonRestartKeepsExistingPayload locks in the guarantee that a payload
+// already on disk is never rewritten or truncated across a restart, even with
+// the "preallocate" optimization enabled (which on filesystems without
+// fallocate falls back to Truncate).
+func TestDaemonRestartKeepsExistingPayload(t *testing.T) {
+	data := t.TempDir()
+	src := filepath.Join(t.TempDir(), "src")
+	torrent := makeTorrent(t, src, "payload.bin", 200_000)
+	payloadPath := filepath.Join(src, "payload.bin")
+	before, err := os.ReadFile(payloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opts := Options{
+		Listen:      "127.0.0.1:0",
+		DataDir:     data,
+		LinkDir:     filepath.Join(data, "links"),
+		DownloadDir: filepath.Join(data, "downloads"),
+		DBPath:      filepath.Join(data, "session.db"),
+		StatePath:   filepath.Join(data, "state.json"),
+		Network:     NetworkOptions{PortBegin: 44000, PortEnd: 44100, Encryption: 1, PEX: true},
+		Tick:        50 * time.Millisecond,
+		ProbeWindow: time.Minute,
+	}
+	boot := func() (*Daemon, func()) {
+		d, err := newDaemon(opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d.mu.Lock()
+		d.state.Config.Preallocate = true
+		d.saveLocked()
+		d.mu.Unlock()
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() { d.run(stop); close(done) }()
+		return d, func() { close(stop); <-done; d.close() }
+	}
+
+	d1, stop1 := boot()
+	hash, _, err := d1.add(addRequest{TorrentData: torrent, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "first run to seed the existing payload", func() bool {
+		info, ok := findInfo(d1, hash)
+		return ok && info.State == "seeding" && info.Progress == 100
+	})
+	stop1()
+
+	d2, stop2 := boot()
+	defer stop2()
+	waitFor(t, "restart to reload the torrent", func() bool {
+		_, ok := findInfo(d2, hash)
+		return ok
+	})
+	after, err := os.ReadFile(payloadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatalf("the payload changed across a restart: %d bytes in, %d out", len(before), len(after))
+	}
+}
+
+// TestSessionConfigDoesNotAutoResume locks in that the queue, not rain, decides
+// which torrents start. If rain resumed torrents itself (ResumeOnStartup) it
+// would start a parked/paused torrent before reconcileLocked can stop it, and
+// starting a torrent creates its destination files: a parked torrent whose
+// payload was moved or removed would get zero-filled placeholders written at
+// the old path. The regression test below complements this by proving an
+// existing payload is never rewritten across a restart.
+func TestSessionConfigDoesNotAutoResume(t *testing.T) {
+	d := newTestDaemon(t)
+	if d.sessionConfig().ResumeOnStartup {
+		t.Fatal("ResumeOnStartup must be off: the queue owns start/stop")
+	}
+}
+
 func TestDaemonLifecycle(t *testing.T) {
 	d := newTestDaemon(t)
 	src := filepath.Join(t.TempDir(), "src")
