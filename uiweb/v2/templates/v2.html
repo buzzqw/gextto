@@ -652,6 +652,20 @@
   {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
   {{if and (not .Groups) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
   {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
+  {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
+</div>
+{{end}}
+
+{{define "v2_ipfilter_action"}}
+<div class="panel settings-panel" id="v2-ipfilter-panel">
+  <div class="panel-head"><h3>Filtro IP</h3><small class="muted">scarica e applica subito</small></div>
+  <div class="panel-body">
+    <div class="toolbar">
+      <span id="v2-ipfilter-status" class="muted" hx-get="/settings/ipfilter" hx-trigger="load" hx-swap="innerHTML">…</span>
+      <button class="btn sm primary" type="button" hx-post="/settings/ipfilter" hx-target="#v2-ipfilter-status" hx-swap="innerHTML" hx-disabled-elt="this" title="Scarica dall'URL configurato (o usa il file locale) e applica subito il filtro IP al motore attivo">Carica / aggiorna ora</button>
+    </div>
+    <p class="hint">L'URL o il file si impostano nei campi «IP filter» qui nella scheda; con un URL Gextto lo scarica e lo applica. Funziona anche con gx-torrent.</p>
+  </div>
 </div>
 {{end}}
 

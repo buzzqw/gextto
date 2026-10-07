@@ -917,49 +917,53 @@ func ExportMagnet(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, map[string]any{"ok": true, "magnet": magnet})
 }
 
-// IpfilterUpdate handles POST /api/torrents/ipfilter_update.
-func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
-	// Any engine that can load a local filter file (embedded libtorrent,
-	// gx-torrent) is accepted.
-	var client interface {
+// applyIPFilter downloads (when the configured value is a URL) and loads the IP
+// filter into the active engine, returning the number of rules.
+func applyIPFilter(ctx context.Context, s *AppState) (int, string, error) {
+	var loader interface {
 		LoadIPFilter(path string) (int, error)
 	}
 	if embedded, err := s.requireEmbedded("ip_filter"); err == nil {
-		client = embedded
-	} else if loader, ok := s.activeEngine().(interface {
+		loader = embedded
+	} else if active, ok := s.activeEngine().(interface {
 		LoadIPFilter(path string) (int, error)
 	}); ok {
-		client = loader
+		loader = active
 	} else {
-		jsonError(w, http.StatusConflict, err.Error())
-		return
+		return 0, "", err
 	}
 	cfg := latestConfig(s)
 	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
 	if target == "" {
-		jsonError(w, http.StatusBadRequest, "Nessun IP filter configurato")
-		return
+		return 0, "", fmt.Errorf("nessun IP filter configurato")
 	}
 	localPath := target
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		data, fetchErr := gh7_fetch_ipfilter(r.Context(), target)
+		data, fetchErr := gh7_fetch_ipfilter(ctx, target)
 		if fetchErr != "" {
-			jsonError(w, http.StatusBadGateway, fetchErr)
-			return
+			return 0, "", fmt.Errorf("%s", fetchErr)
 		}
 		path := filepath.Join(cfg.DataDir, "ipfilter.dat")
 		if err := os.WriteFile(path, data, 0o644); err != nil {
-			jsonError(w, http.StatusInternalServerError, err.Error())
-			return
+			return 0, "", err
 		}
 		localPath = path
 	}
-	rules, err := client.LoadIPFilter(localPath)
+	rules, err := loader.LoadIPFilter(localPath)
+	if err != nil {
+		return 0, "", err
+	}
+	return rules, localPath, nil
+}
+
+// IpfilterUpdate handles POST /api/torrents/ipfilter_update.
+func IpfilterUpdate(w http.ResponseWriter, r *http.Request, s *AppState) {
+	rules, path, err := applyIPFilter(r.Context(), s)
 	if err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	jsonResponse(w, map[string]any{"ok": true, "rules": rules, "path": localPath})
+	jsonResponse(w, map[string]any{"ok": true, "rules": rules, "path": path})
 }
 
 // MagnetFeed handles GET /feed.xml (and /api/feed.xml).

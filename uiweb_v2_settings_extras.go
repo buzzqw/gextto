@@ -11,8 +11,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -738,4 +741,44 @@ func V2SettingsContentArchiveDelete(w http.ResponseWriter, r *http.Request, s *A
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_content_archive_results", v2ContentArchiveResultsFrom(s, query, filters, notice, err != nil), dict, eng)
+}
+
+// V2SettingsIPFilterApply loads the configured IP filter (downloading the URL if
+// needed) and reports the result in place, from the Libtorrent settings tab.
+func V2SettingsIPFilterApply(w http.ResponseWriter, r *http.Request, s *AppState) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	rules, path, err := applyIPFilter(r.Context(), s)
+	if err != nil {
+		fmt.Fprintf(w, `<span class="muted">Filtro IP non applicato: %s</span>`, html.EscapeString(err.Error()))
+		return
+	}
+	fmt.Fprintf(w, `<span class="muted">Filtro IP attivo: %d regole · %s</span>`,
+		rules, html.EscapeString(path))
+}
+
+// V2SettingsIPFilterStatus reports the configured filter and whether it is
+// already on disk, shown when the Libtorrent tab opens.
+func V2SettingsIPFilterStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
+	cfg := latestConfig(s)
+	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	switch {
+	case target == "":
+		fmt.Fprint(w, `<span class="muted">Nessun filtro IP configurato: incolla un URL o un file qui sotto e premi «Carica / aggiorna ora».</span>`)
+	case strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://"):
+		local := filepath.Join(cfg.DataDir, "ipfilter.dat")
+		if info, statErr := os.Stat(local); statErr == nil {
+			fmt.Fprintf(w, `<span class="muted">URL configurato · file locale %s, aggiornato %s</span>`,
+				logging.HumanBytesI64(info.Size()), info.ModTime().Format("02/01 15:04"))
+		} else {
+			fmt.Fprint(w, `<span class="muted">URL configurato · file non ancora scaricato: premi «Carica / aggiorna ora».</span>`)
+		}
+	default:
+		if info, statErr := os.Stat(target); statErr == nil {
+			fmt.Fprintf(w, `<span class="muted">File locale %s (%s)</span>`,
+				html.EscapeString(target), logging.HumanBytesI64(info.Size()))
+		} else {
+			fmt.Fprintf(w, `<span class="muted">File configurato ma non trovato: %s</span>`, html.EscapeString(target))
+		}
+	}
 }

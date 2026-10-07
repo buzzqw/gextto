@@ -155,6 +155,8 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /settings/rename-token", V2SettingsRenameToken)
 	v2Handle(s, mux, "POST /settings/rename-preview", V2SettingsRenamePreview)
 	v2Handle(s, mux, "POST /settings/rename-save", V2SettingsRenameSave)
+	v2Handle(s, mux, "GET /settings/ipfilter", V2SettingsIPFilterStatus)
+	v2Handle(s, mux, "POST /settings/ipfilter", V2SettingsIPFilterApply)
 	v2Handle(s, mux, "GET /settings/i18n", V2SettingsI18nTable)
 	v2Handle(s, mux, "POST /settings/i18n/import", V2SettingsI18nImport)
 	v2Handle(s, mux, "POST /settings/i18n/delete", V2SettingsI18nDelete)

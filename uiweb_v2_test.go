@@ -465,6 +465,12 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "Auto (interfaccia predefinita)") || !strings.Contains(body, `name="value"`) {
 		t.Fatalf("outgoing interface select -> %d", code)
 	}
+	if !strings.Contains(body, "v2-ipfilter-panel") || !strings.Contains(body, "Carica / aggiorna ora") {
+		t.Fatalf("IP filter panel missing from the Libtorrent tab")
+	}
+	if code, status := v2Request(t, server, http.MethodGet, "/settings/ipfilter", nil); code != http.StatusOK || status == "" {
+		t.Fatalf("IP filter status -> %d", code)
+	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=settings&tab=paths", nil)
 	if code != http.StatusOK || !strings.Contains(body, `data-v2-browse-for="libtorrent_dir"`) {
 		t.Fatalf("path folder browser -> %d", code)
