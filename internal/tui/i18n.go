@@ -372,7 +372,7 @@ var catalog = map[string][2]string{
 	"settings.colors":             {"Colori", "Colors"},
 	"settings.contrast":           {"Alto contrasto", "High contrast"},
 
-	"prompt.cycle":           {"Ciclo [full/series/movies/comics] (full): ", "Cycle [full/series/movies/comics] (full): "},
+	"prompt.cycle":           {"Avvia ricerca — Invio tutto · s serie · f film · c fumetti: ", "Start search — Enter all · s series · m movies · c comics: "},
 	"prompt.search":          {"Cerca: ", "Search: "},
 	"prompt.magnet":          {"Magnet/URL: ", "Magnet/URL: "},
 	"prompt.file":            {"File .torrent: ", "File .torrent: "},

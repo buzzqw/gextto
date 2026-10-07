@@ -198,8 +198,7 @@ func TestLimitsAndCyclePrompts(t *testing.T) {
 	}
 	// Cycle prompt.
 	m.Update(runeKey('c'))
-	typeText(m, "series")
-	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionRunCycle || action.Domain != "series" {
+	if action := m.Update(runeKey('s')); action.Kind != ActionRunCycle || action.Domain != "series" {
 		t.Fatalf("cycle action = %+v", action)
 	}
 	m.Update(runeKey('c'))
@@ -770,5 +769,17 @@ func TestDigitsAlwaysSwitchTab(t *testing.T) {
 	m.Update(runeKey('9'))
 	if m.Tab != TabMaintenance {
 		t.Fatalf("9 should open maintenance, tab = %v", m.Tab)
+	}
+}
+
+func TestCyclePromptQuickChoice(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Update(runeKey('c'))
+	if action := m.Update(runeKey('f')); action.Kind != ActionRunCycle || action.Domain != "movies" || m.Prompt != nil {
+		t.Fatalf("f should start a movies cycle: %+v", action)
+	}
+	m.Update(runeKey('c'))
+	if action := m.Update(kindKey(KeyEnter)); action.Kind != ActionRunCycle || action.Domain != "full" {
+		t.Fatalf("Enter should start a full cycle: %+v", action)
 	}
 }

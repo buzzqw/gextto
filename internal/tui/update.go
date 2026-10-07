@@ -166,6 +166,14 @@ func (m *Model) Update(k Key) Action {
 }
 
 func (m *Model) updatePrompt(k Key) Action {
+	// The cycle prompt is a quick choice: one letter starts the cycle at once,
+	// Enter starts a full one. Any other text is validated on Enter.
+	if m.Prompt.Kind == PromptCycle && m.Prompt.Buffer == "" && k.Kind == KeyRune {
+		if domain := cycleDomainForKey(k.Rune); domain != "" {
+			m.Prompt = nil
+			return Action{Kind: ActionRunCycle, Domain: domain}
+		}
+	}
 	buffer := []rune(m.Prompt.Buffer)
 	if m.Prompt.Cursor < 0 || m.Prompt.Cursor > len(buffer) {
 		m.Prompt.Cursor = len(buffer)
@@ -244,6 +252,9 @@ func (m *Model) submitPrompt() Action {
 		domain := strings.ToLower(value)
 		if domain == "" {
 			domain = "full"
+		}
+		if len([]rune(domain)) == 1 {
+			domain = cycleDomainForKey([]rune(domain)[0])
 		}
 		if domain != "full" && domain != "series" && domain != "movies" && domain != "comics" {
 			m.Message = m.Tr.T("msg.cycleinvalid")
@@ -935,4 +946,20 @@ func (m *Model) ConfirmMessage() string {
 		return ""
 	}
 	return m.Tr.Format(m.Confirm.MessageKey, m.Confirm.Args...)
+}
+
+// cycleDomainForKey maps the quick-choice letters of the cycle prompt:
+// t/a all, s series, f/m movies (film), c comics.
+func cycleDomainForKey(r rune) string {
+	switch unicode.ToLower(r) {
+	case 't', 'a':
+		return "full"
+	case 's':
+		return "series"
+	case 'f', 'm':
+		return "movies"
+	case 'c':
+		return "comics"
+	}
+	return ""
 }
