@@ -630,7 +630,10 @@ func (m *Model) updateLogs(k Key) Action {
 	case KeyUp:
 		m.LogScroll = min(maxScroll, m.LogScroll+1)
 		m.LogFollow = false
-	case KeyDown, KeyPgDn:
+	case KeyDown:
+		m.LogScroll = max(0, m.LogScroll-1)
+		m.LogFollow = m.LogScroll == 0
+	case KeyPgDn:
 		m.LogScroll = max(0, m.LogScroll-10)
 		m.LogFollow = m.LogScroll == 0
 	case KeyPgUp:
@@ -651,6 +654,9 @@ func (m *Model) updateLogs(k Key) Action {
 			if m.LogFollow {
 				m.LogScroll = 0
 			}
+		case 'w':
+			m.LogProblemsOnly = !m.LogProblemsOnly
+			m.LogScroll = 0
 		}
 	}
 	return Action{}

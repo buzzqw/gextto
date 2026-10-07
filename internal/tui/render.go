@@ -1014,6 +1014,9 @@ func (m *Model) renderLogs(width, contentHeight int) []Line {
 	if m.LogFilter != "" {
 		header += fmt.Sprintf(" · %s '%s'", m.Tr.T("label.filter"), m.LogFilter)
 	}
+	if m.LogProblemsOnly {
+		header += " · " + m.Tr.T("label.problemsonly")
+	}
 	if m.LogFollow {
 		if m.LogStreamConnected {
 			header += " · " + m.Tr.T("label.live")

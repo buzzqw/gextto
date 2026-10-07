@@ -349,8 +349,10 @@ type Model struct {
 	Missing         []Gap
 	Blocklist       []BlocklistEntry
 
-	Logs               []string
-	LogFilter          string
+	Logs      []string
+	LogFilter string
+	// LogProblemsOnly keeps only WARN and ERROR lines in the log view.
+	LogProblemsOnly    bool
 	LogFollow          bool
 	LogScroll          int
 	LogStreamConnected bool
@@ -962,13 +964,16 @@ func joinNonEmpty(values ...string) string {
 
 // FilteredLogs returns the log lines matching the active filter.
 func (m *Model) FilteredLogs() []string {
-	if m.LogFilter == "" {
+	if m.LogFilter == "" && !m.LogProblemsOnly {
 		return m.Logs
 	}
 	needle := strings.ToLower(m.LogFilter)
 	filtered := make([]string, 0, len(m.Logs))
 	for _, line := range m.Logs {
-		if strings.Contains(strings.ToLower(line), needle) {
+		if m.LogProblemsOnly && logStyle(line) == StyleNormal {
+			continue
+		}
+		if needle == "" || strings.Contains(strings.ToLower(line), needle) {
 			filtered = append(filtered, line)
 		}
 	}

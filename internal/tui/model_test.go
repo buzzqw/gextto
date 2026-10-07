@@ -783,3 +783,22 @@ func TestCyclePromptQuickChoice(t *testing.T) {
 		t.Fatalf("Enter should start a full cycle: %+v", action)
 	}
 }
+
+func TestLogProblemsOnlyAndLineScroll(t *testing.T) {
+	m := NewModel(NewTranslator("it"))
+	m.Tab = TabLogs
+	m.Logs = []string{"10:00  INFO a", "10:01  WARN b", "10:02  ERROR c", "10:03  INFO d"}
+	m.Update(runeKey('w'))
+	if got := m.FilteredLogs(); len(got) != 2 || got[0] != "10:01  WARN b" {
+		t.Fatalf("problems only = %v", got)
+	}
+	m.Update(runeKey('w'))
+	if len(m.FilteredLogs()) != 4 {
+		t.Fatal("w must toggle the filter off")
+	}
+	m.LogScroll = 3
+	m.Update(kindKey(KeyDown))
+	if m.LogScroll != 2 {
+		t.Fatalf("↓ must scroll one line, LogScroll = %d", m.LogScroll)
+	}
+}
