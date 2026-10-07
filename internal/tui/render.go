@@ -843,7 +843,7 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 		start, end := window(max(1, (budget-(len(expanded)-1))/2))
 		for index := start; index < end; index++ {
 			item := items[index]
-			_, state, id := downloadRowFields(item)
+			_, state, _ := downloadRowFields(item)
 			if index == m.Selected {
 				for _, row := range expanded {
 					lines = append(lines, Line{Text: row, Style: StyleSelected})
@@ -851,23 +851,26 @@ func (m *Model) renderTorrents(width, contentHeight int) []Line {
 			} else {
 				lines = append(lines, Line{Text: compactRow(index, item), Style: rowStyle(index, state)})
 			}
-			lines = append(lines, Line{Text: "   " + Shorten(id, 12) + " · " + downloadDetailLine(m.Tr, item), Style: StyleMuted})
+			lines = append(lines, Line{Text: "   " + downloadDetailLine(m.Tr, item) + " · " + downloadRowETA(item) + " · " + downloadRowSwarm(item), Style: StyleMuted})
 		}
 		return lines
 	}
-	nameWidth := max(10, width-72)
-	header := fmt.Sprintf("   %s %s %s %s %s %s  %s",
-		PadRight(m.Tr.T("label.hash"), 9), PadRight(m.Tr.T("label.state"), 14),
-		PadLeft(m.Tr.T("label.progress"), 6), PadLeft(m.Tr.T("label.done"), 10),
-		PadLeft(m.Tr.T("label.down"), 11), PadLeft(m.Tr.T("label.up"), 11), m.Tr.T("label.name"))
+	// The info-hash says nothing to a person: the columns are the ones that
+	// answer "how big, how fast, when, from how many".
+	nameWidth := max(10, width-78)
+	header := fmt.Sprintf("   %s %s %s %s %s %s %s  %s",
+		PadRight(m.Tr.T("label.state"), 14),
+		PadLeft(m.Tr.T("label.progress"), 6), PadLeft(m.Tr.T("label.size"), 10),
+		PadLeft(m.Tr.T("label.down"), 10), PadLeft(m.Tr.T("label.up"), 10),
+		PadLeft(m.Tr.T("label.etaratio"), 9), PadLeft(m.Tr.T("label.seedspeers"), 9), m.Tr.T("label.name"))
 	lines = append(lines, Line{Text: header, Style: StyleHeader})
 	tableRow := func(index int, item DownloadRow) string {
-		_, _, id := downloadRowFields(item)
-		done, down, up := downloadRowValues(item)
-		return fmt.Sprintf("%s %s %s %s %s %s %s  ",
-			marker(index), PadRight(Shorten(id, 9), 9), PadRight(downloadStateLabel(m.Tr, item), 14),
-			PadLeft(fmt.Sprintf("%.1f%%", downloadRowProgress(item)), 6), PadLeft(HumanBytes(float64(done)), 10),
-			PadLeft(HumanRate(down), 11), PadLeft(HumanRate(up), 11))
+		_, down, up := downloadRowValues(item)
+		return fmt.Sprintf("%s %s %s %s %s %s %s %s  ",
+			marker(index), PadRight(downloadStateLabel(m.Tr, item), 14),
+			PadLeft(fmt.Sprintf("%.1f%%", downloadRowProgress(item)), 6), PadLeft(downloadRowSizeLabel(item), 10),
+			PadLeft(HumanRate(down), 10), PadLeft(HumanRate(up), 10),
+			PadLeft(downloadRowETA(item), 9), PadLeft(downloadRowSwarm(item), 9))
 	}
 	budget := max(1, contentHeight-len(lines))
 	selectedName := m.rowName(items[m.Selected])
@@ -969,6 +972,51 @@ func downloadRowStyle(row DownloadRow) Style {
 	}
 	_, state, _ := downloadRowFields(row)
 	return torrentStyle(state)
+}
+
+// downloadRowSizeLabel is the total size, or what is known of it.
+func downloadRowSizeLabel(row DownloadRow) string {
+	if size := downloadRowSize(row); size > 0 {
+		return HumanBytes(float64(size))
+	}
+	return "-"
+}
+
+// downloadRowETA is the time left while downloading, or the share ratio of a
+// complete torrent ("r 1.25").
+func downloadRowETA(row DownloadRow) string {
+	if row.HTTP != nil {
+		if row.HTTP.ETASeconds != nil {
+			return HumanDuration(float64(*row.HTTP.ETASeconds))
+		}
+		return "-"
+	}
+	torrent := row.Torrent
+	if torrent == nil {
+		return "-"
+	}
+	if torrent.Progress >= 100 {
+		base := torrent.AllTimeDownload
+		if base == 0 {
+			base = torrent.TotalSize
+		}
+		if base == 0 {
+			return "-"
+		}
+		return fmt.Sprintf("r %.2f", float64(torrent.AllTimeUpload)/float64(base))
+	}
+	if torrent.DownloadRate == 0 || torrent.TotalSize <= torrent.TotalDone {
+		return "∞"
+	}
+	return HumanDuration(float64(torrent.TotalSize-torrent.TotalDone) / float64(torrent.DownloadRate))
+}
+
+// downloadRowSwarm is "seeds/peers" connected to a torrent.
+func downloadRowSwarm(row DownloadRow) string {
+	if row.Torrent == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%d/%d", row.Torrent.NumSeeds, row.Torrent.NumPeers)
 }
 
 func downloadRowValues(row DownloadRow) (done uint64, down, up float64) {

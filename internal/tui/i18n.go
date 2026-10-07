@@ -481,6 +481,8 @@ var catalog = map[string][2]string{
 	"help.title":         {"Gextto TUI — comandi da tastiera", "Gextto TUI — keyboard help"},
 	"help.close":         {"Premi Esc, Invio o ? per chiudere", "Press Esc, Enter or ? to close"},
 	"label.problemsonly": {"solo avvisi/errori", "warnings/errors only"},
+	"label.etaratio":     {"tempo/ratio", "ETA/ratio"},
+	"label.seedspeers":   {"seed/peer", "seeds/peers"},
 	"hint.help":          {"↑↓/PgUp/PgDn scorri · Esc chiudi", "↑↓/PgUp/PgDn scroll · Esc close"},
 	"hint.events":        {"↑↓/PgUp/PgDn scorri · Home/End · r aggiorna · Esc chiudi", "↑↓/PgUp/PgDn scroll · Home/End · r refresh · Esc close"},
 	"settings.hint":      {"Invio modifica la voce selezionata · c colori · h contrasto · Esc chiude", "Enter edits the selected item · c colors · h contrast · Esc closes"},

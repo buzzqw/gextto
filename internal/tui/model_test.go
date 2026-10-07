@@ -802,3 +802,21 @@ func TestLogProblemsOnlyAndLineScroll(t *testing.T) {
 		t.Fatalf("↓ must scroll one line, LogScroll = %d", m.LogScroll)
 	}
 }
+
+func TestTorrentRowETAAndRatio(t *testing.T) {
+	downloading := DownloadRow{Torrent: &Torrent{Progress: 50, TotalSize: 1000, TotalDone: 500, DownloadRate: 10, NumSeeds: 3, NumPeers: 12}}
+	if got := downloadRowETA(downloading); got != HumanDuration(50) {
+		t.Fatalf("eta = %q", got)
+	}
+	if got := downloadRowSwarm(downloading); got != "3/12" {
+		t.Fatalf("swarm = %q", got)
+	}
+	stuck := DownloadRow{Torrent: &Torrent{Progress: 74, TotalSize: 1000, TotalDone: 740}}
+	if got := downloadRowETA(stuck); got != "∞" {
+		t.Fatalf("stuck eta = %q", got)
+	}
+	seeding := DownloadRow{Torrent: &Torrent{Progress: 100, TotalSize: 1000, AllTimeDownload: 1000, AllTimeUpload: 1250}}
+	if got := downloadRowETA(seeding); got != "r 1.25" {
+		t.Fatalf("ratio = %q", got)
+	}
+}
