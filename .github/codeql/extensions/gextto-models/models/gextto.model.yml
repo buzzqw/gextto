@@ -1,0 +1,18 @@
+# Path validators of gextto that CodeQL cannot recognise on its own. Each entry
+# describes code that really confines a path; it is not a blanket suppression.
+extensions:
+  - addsTo:
+      pack: codeql/go-all
+      extensible: barrierGuardModel
+    data:
+      # pathStartsWith(path, prefix): filepath.Rel-based containment check;
+      # true means path is prefix or lies below it.
+      - ["github.com/buzzqw/gextto", "", False, "pathStartsWith", "", "", "Argument[0]", "true", "path-injection", "manual"]
+      # folderRenameWithin(root, path): same containment check for the folder rename.
+      - ["github.com/buzzqw/gextto", "", False, "folderRenameWithin", "", "", "Argument[1]", "true", "path-injection", "manual"]
+  - addsTo:
+      pack: codeql/go-all
+      extensible: barrierModel
+    data:
+      # comicDownloadFilename keeps only [A-Za-z0-9._-] and spaces: never a separator.
+      - ["github.com/buzzqw/gextto", "", False, "comicDownloadFilename", "", "", "ReturnValue", "path-injection", "manual"]

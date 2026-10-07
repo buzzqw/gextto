@@ -40,5 +40,10 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
 
+      # The local model pack in .github/codeql/extensions teaches CodeQL the
+      # path validators of gextto (pathStartsWith, ...); the action does not
+      # load local model packs on its own.
       - name: Analyze
         uses: github/codeql-action/analyze@v4
+        env:
+          CODEQL_ACTION_EXTRA_OPTIONS: '{"database":{"run-queries":["--additional-packs=${{ github.workspace }}/.github/codeql/extensions","--model-packs=buzzqw/gextto-models"]}}'
