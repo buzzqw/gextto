@@ -257,7 +257,9 @@ func (m *Model) hints() string {
 	case m.Tab == TabStatus:
 		// The home page also lists the global actions; elsewhere they are in
 		// the help, so the line keeps room for the keys of the current view.
-		hints = m.Tr.T("hint.status") + " · " + m.Tr.T("hint.actions")
+		// "? help · q quit" go before the actions: on a narrow window the
+		// tail of the line is cut.
+		return m.Tr.T("hint.status") + " · " + m.Tr.T("hint.global") + " · " + m.Tr.T("hint.actions")
 	case m.Tab == TabTorrents && len(m.MarkedHashes()) > 0:
 		hints = m.Tr.T("hint.torrentsmarked")
 	case m.Tab == TabTorrents:
