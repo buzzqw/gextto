@@ -3,6 +3,7 @@ package gextto
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,5 +209,23 @@ func TestLibtorrentRemoveInvalidatesCacheAndExcludesTorrent(t *testing.T) {
 	client.unmarkRemoved("hash1")
 	if client.isRecentlyRemoved("hash1") {
 		t.Fatal("expected hash1 to not be recently removed after unmark")
+	}
+}
+
+func TestLibtorrentStateFileRejectsNonHashes(t *testing.T) {
+	dir := t.TempDir()
+	client := &LibtorrentClient{stateDir: dir}
+	v1 := "0123456789abcdef0123456789abcdef01234567"
+	if path, ok := client.stateFile(strings.ToUpper(v1), ".torrent"); !ok || path != filepath.Join(dir, v1+".torrent") {
+		t.Fatalf("v1 hash: got %q, %v", path, ok)
+	}
+	v2 := strings.Repeat("ab", 32)
+	if _, ok := client.stateFile(v2, ".fastresume"); !ok {
+		t.Fatal("v2 hash refused")
+	}
+	for _, hash := range []string{"", "../escape", "../../" + v1, v1 + "/x", "zz" + v1[2:], v1[:39]} {
+		if path, ok := client.stateFile(hash, ".torrent"); ok {
+			t.Errorf("stateFile(%q) accepted: %q", hash, path)
+		}
 	}
 }

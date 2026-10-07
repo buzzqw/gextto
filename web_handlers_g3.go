@@ -232,7 +232,7 @@ func DeleteTrashEntries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var byteCount uint64
 	errors := []string{}
 	for _, name := range names {
-		if strings.TrimSpace(name) == "" || !gh3SingleComponent(name) || name == "." || name == ".." {
+		if strings.TrimSpace(name) == "" || !gh3SingleComponent(name) || !filepath.IsLocal(name) {
 			errors = append(errors, name)
 			continue
 		}

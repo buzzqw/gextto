@@ -245,7 +245,7 @@ func AuthMiddleware(s *AppState, next http.Handler) http.Handler {
 			authLoginHandler(s, auth, w, r)
 			return
 		case "/logout":
-			http.SetCookie(w, &http.Cookie{Name: authCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteLaxMode})
+			http.SetCookie(w, &http.Cookie{Name: authCookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: requestIsHTTPS(r), SameSite: http.SameSiteLaxMode})
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -271,14 +271,25 @@ func AuthMiddleware(s *AppState, next http.Handler) http.Handler {
 
 // authSafeNext keeps the post-login redirect inside the application.
 func authSafeNext(next string) string {
-	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, "/\\") {
+	if !isLocalURL(next) {
 		return "/"
 	}
 	parsed, err := url.Parse(next)
-	if err != nil || parsed.Host != "" || parsed.Scheme != "" {
+	if err != nil {
 		return "/"
 	}
 	return parsed.RequestURI()
+}
+
+// isLocalURL reports whether next is a path on this host: it must start with a
+// single "/" (not "//" or "/\", which browsers treat as another host) and carry
+// neither a scheme nor a host.
+func isLocalURL(next string) bool {
+	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, "/\\") {
+		return false
+	}
+	parsed, err := url.Parse(next)
+	return err == nil && parsed.Host == "" && parsed.Scheme == ""
 }
 
 // authLoginAttempts slows down password guessing: after five failures from
@@ -327,18 +338,24 @@ func authLoginHandler(s *AppState, auth authSettings, w http.ResponseWriter, r *
 		return
 	}
 	expires := now.Add(authSessionLifetime)
-	secure := r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 	http.SetCookie(w, &http.Cookie{
 		Name:     authCookieName,
 		Value:    auth.sessionToken(expires),
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
-		Secure:   secure,
+		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 	logging.Info(fmt.Sprintf("🔑 Login to the web interface from %s", client))
 	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+// requestIsHTTPS reports whether the browser reached gextto over HTTPS, directly
+// or through a reverse proxy that sets X-Forwarded-Proto. The session cookie is
+// marked Secure only then, so plain-HTTP LAN access keeps working.
+func requestIsHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 // uiText translates an Italian interface string into the active interface

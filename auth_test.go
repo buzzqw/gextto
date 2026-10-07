@@ -177,3 +177,14 @@ func TestAuthSessionExpires(t *testing.T) {
 		t.Fatal("tampered token accepted")
 	}
 }
+
+func TestAuthLogoutCookieSecureBehindHTTPS(t *testing.T) {
+	_, handler := authTestServer(t, map[string]string{"auth_enabled": "true", "auth_password": "pw"})
+	got := authRequest(handler, http.MethodGet, "/logout", "198.51.100.7:1", func(r *http.Request) {
+		r.Header.Set("X-Forwarded-Proto", "https")
+	})
+	cookies := got.Result().Cookies()
+	if len(cookies) != 1 || !cookies[0].Secure || cookies[0].MaxAge >= 0 {
+		t.Fatalf("logout over HTTPS must expire a Secure cookie, got %+v", cookies)
+	}
+}
