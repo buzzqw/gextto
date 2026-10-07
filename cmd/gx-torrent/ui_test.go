@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha1"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -216,6 +217,32 @@ func TestUIFilePrioritySkipsOneFile(t *testing.T) {
 	d.mu.Unlock()
 	if len(priorities) != 2 || priorities[0] != 0 || priorities[1] <= 0 {
 		t.Fatalf("file priorities not applied: %v", priorities)
+	}
+}
+
+func TestUIDetailRendersGeneral(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 80_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.Get(server.URL + "/ui/detail?hash=" + hash + "&tab=general")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("detail -> %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	for _, want := range []string{"Dimensione pezzo", "Pezzi disponibili", "Copia magnet", "Sposta i dati in"} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("detail missing %q", want)
+		}
 	}
 }
 

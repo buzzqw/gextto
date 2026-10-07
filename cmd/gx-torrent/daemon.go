@@ -12,10 +12,22 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/cenkalti/rain/torrent"
 )
+
+// diskFree returns the free (available to the user) and total bytes of the
+// filesystem holding path. Zeroes when the path cannot be stat'ed.
+func diskFree(path string) (free, total int64) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(path, &st); err != nil {
+		return 0, 0
+	}
+	block := int64(st.Bsize)
+	return int64(st.Bavail) * block, int64(st.Blocks) * block
+}
 
 // Options is the daemon's process configuration (flags and environment).
 type Options struct {
@@ -658,40 +670,48 @@ func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *r
 // ---------------------------------------------------------------------------
 
 type torrentInfo struct {
-	Hash           string  `json:"hash"`
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	State          string  `json:"state"`
-	SavePath       string  `json:"save_path"`
-	Progress       float64 `json:"progress"`
-	TotalSize      int64   `json:"total_size"`
-	TotalDone      int64   `json:"total_done"`
-	DownloadRate   int64   `json:"download_rate"`
-	UploadRate     int64   `json:"upload_rate"`
-	Downloaded     int64   `json:"downloaded"`
-	Uploaded       int64   `json:"uploaded"`
-	SeedingSeconds int64   `json:"seeding_seconds"`
-	ActiveSeconds  int64   `json:"active_seconds"`
-	ETASeconds     int64   `json:"eta_seconds"`
-	CurrentTracker string  `json:"current_tracker,omitempty"`
-	QueuePosition  int     `json:"queue_position"`
-	NumPeers       int     `json:"num_peers"`
-	NumSeeds       int     `json:"num_seeds"`
-	NumComplete    int     `json:"num_complete"`
-	NumIncomplete  int     `json:"num_incomplete"`
-	SeedRatio      float64 `json:"seed_ratio"`
-	SeedDays       int64   `json:"seed_days"`
-	HasMetadata    bool    `json:"has_metadata"`
-	AutoManaged    bool    `json:"auto_managed"`
-	Pinned         bool    `json:"pinned"`
-	Parked         bool    `json:"parked"`
-	Probing        bool    `json:"probing"`
-	Slow           bool    `json:"slow"`
-	Private        bool    `json:"private"`
-	TorrentVersion string  `json:"torrent_version"`
-	Error          string  `json:"error,omitempty"`
-	AddedAt        int64   `json:"added_at"`
-	CompletedAt    int64   `json:"completed_at,omitempty"`
+	Hash            string  `json:"hash"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	State           string  `json:"state"`
+	SavePath        string  `json:"save_path"`
+	Progress        float64 `json:"progress"`
+	TotalSize       int64   `json:"total_size"`
+	TotalDone       int64   `json:"total_done"`
+	DownloadRate    int64   `json:"download_rate"`
+	UploadRate      int64   `json:"upload_rate"`
+	Downloaded      int64   `json:"downloaded"`
+	Uploaded        int64   `json:"uploaded"`
+	SeedingSeconds  int64   `json:"seeding_seconds"`
+	ActiveSeconds   int64   `json:"active_seconds"`
+	ETASeconds      int64   `json:"eta_seconds"`
+	CurrentTracker  string  `json:"current_tracker,omitempty"`
+	QueuePosition   int     `json:"queue_position"`
+	NumPeers        int     `json:"num_peers"`
+	NumSeeds        int     `json:"num_seeds"`
+	NumComplete     int     `json:"num_complete"`
+	NumIncomplete   int     `json:"num_incomplete"`
+	SeedRatio       float64 `json:"seed_ratio"`
+	SeedDays        int64   `json:"seed_days"`
+	HasMetadata     bool    `json:"has_metadata"`
+	AutoManaged     bool    `json:"auto_managed"`
+	Pinned          bool    `json:"pinned"`
+	Parked          bool    `json:"parked"`
+	Probing         bool    `json:"probing"`
+	Slow            bool    `json:"slow"`
+	Private         bool    `json:"private"`
+	TorrentVersion  string  `json:"torrent_version"`
+	PiecesTotal     uint32  `json:"pieces_total"`
+	PiecesHave      uint32  `json:"pieces_have"`
+	PiecesAvailable uint32  `json:"pieces_available"`
+	PiecesChecked   uint32  `json:"pieces_checked"`
+	PieceLength     uint32  `json:"piece_length"`
+	Wasted          int64   `json:"wasted"`
+	Allocated       int64   `json:"allocated"`
+	FileCount       int     `json:"file_count"`
+	Error           string  `json:"error,omitempty"`
+	AddedAt         int64   `json:"added_at"`
+	CompletedAt     int64   `json:"completed_at,omitempty"`
 }
 
 // stateFor maps rain's status and gx-torrent's flags onto Gextto's states.
@@ -756,38 +776,46 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		pos = -1
 	}
 	info := torrentInfo{
-		Hash:           t.InfoHash().String(),
-		ID:             t.ID(),
-		Name:           stats.Name,
-		State:          stateFor(meta, stats, moving),
-		SavePath:       meta.SavePath,
-		Progress:       progress,
-		TotalSize:      stats.Bytes.Total,
-		TotalDone:      stats.Bytes.Completed,
-		DownloadRate:   int64(stats.Speed.Download),
-		UploadRate:     int64(stats.Speed.Upload),
-		Downloaded:     stats.Bytes.Downloaded,
-		Uploaded:       stats.Bytes.Uploaded,
-		SeedingSeconds: int64(stats.SeededFor.Seconds()),
-		ETASeconds:     eta,
-		QueuePosition:  pos,
-		NumPeers:       stats.Peers.Total,
-		NumSeeds:       rt.numSeeds,
-		CurrentTracker: rt.tracker,
-		NumComplete:    meta.SwarmSeeds,
-		NumIncomplete:  meta.SwarmPeers,
-		SeedRatio:      meta.SeedRatio,
-		SeedDays:       meta.SeedDays,
-		HasMetadata:    stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
-		AutoManaged:    !meta.UserPaused && !meta.Parked && !meta.Pinned,
-		Pinned:         meta.Pinned,
-		Parked:         meta.Parked,
-		Probing:        !meta.ProbeUntil.IsZero(),
-		Slow:           rt.slow,
-		Private:        stats.Private,
-		TorrentVersion: torrentVersion,
-		Error:          meta.Error,
-		AddedAt:        meta.AddedAt.Unix(),
+		Hash:            t.InfoHash().String(),
+		ID:              t.ID(),
+		Name:            stats.Name,
+		State:           stateFor(meta, stats, moving),
+		SavePath:        meta.SavePath,
+		Progress:        progress,
+		TotalSize:       stats.Bytes.Total,
+		TotalDone:       stats.Bytes.Completed,
+		DownloadRate:    int64(stats.Speed.Download),
+		UploadRate:      int64(stats.Speed.Upload),
+		Downloaded:      stats.Bytes.Downloaded,
+		Uploaded:        stats.Bytes.Uploaded,
+		SeedingSeconds:  int64(stats.SeededFor.Seconds()),
+		ETASeconds:      eta,
+		QueuePosition:   pos,
+		NumPeers:        stats.Peers.Total,
+		NumSeeds:        rt.numSeeds,
+		CurrentTracker:  rt.tracker,
+		NumComplete:     meta.SwarmSeeds,
+		NumIncomplete:   meta.SwarmPeers,
+		SeedRatio:       meta.SeedRatio,
+		SeedDays:        meta.SeedDays,
+		HasMetadata:     stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
+		AutoManaged:     !meta.UserPaused && !meta.Parked && !meta.Pinned,
+		Pinned:          meta.Pinned,
+		Parked:          meta.Parked,
+		Probing:         !meta.ProbeUntil.IsZero(),
+		Slow:            rt.slow,
+		Private:         stats.Private,
+		TorrentVersion:  torrentVersion,
+		PiecesTotal:     stats.Pieces.Total,
+		PiecesHave:      stats.Pieces.Have,
+		PiecesAvailable: stats.Pieces.Available,
+		PiecesChecked:   stats.Pieces.Checked,
+		PieceLength:     stats.PieceLength,
+		Wasted:          stats.Bytes.Wasted,
+		Allocated:       stats.Bytes.Allocated,
+		FileCount:       stats.FileCount,
+		Error:           meta.Error,
+		AddedAt:         meta.AddedAt.Unix(),
 	}
 	if info.Error == "" && stats.Error != nil {
 		info.Error = stats.Error.Error()
@@ -1297,6 +1325,8 @@ type daemonStats struct {
 	CacheAuto       bool          `json:"cache_auto"`
 	Preallocate     bool          `json:"preallocate"`
 	LSD             lsdStatus     `json:"lsd"`
+	DiskFreeBytes   int64         `json:"disk_free_bytes"`
+	DiskTotalBytes  int64         `json:"disk_total_bytes"`
 	// Session holds rain's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
 }
@@ -1326,6 +1356,10 @@ func (d *Daemon) stats() daemonStats {
 	}
 	read, write, auto := cacheSizes(d.state.Config, memoryTotal())
 	out.CacheReadMB, out.CacheWriteMB, out.CacheAuto = read/mib, write/mib, auto
+	out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DownloadDir)
+	if out.DiskTotalBytes == 0 {
+		out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DataDir)
+	}
 	if out.LSD.Error == "" && d.lsdError != "" {
 		out.LSD.Error = d.lsdError
 	}

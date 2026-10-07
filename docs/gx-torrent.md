@@ -77,16 +77,22 @@ Gextto le inoltra al demone.
 
 All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
 demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
-operativa** — riepilogo sessione (velocità, peer, porta, router, DHT,
-cifratura, cache) e tabella dei torrent — pensata per chi apre quell'indirizzo
-dal browser, come la Web UI di qBittorrent. Si aggiorna da sola ogni 5 secondi
-senza ricaricare la pagina e permette le azioni comuni:
+operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
+qBittorrent. Si aggiorna da sola ogni 5 secondi senza ricaricare la pagina.
 
-- aggiungere un magnet;
-- pausa/riprendi, riverifica, ri-annuncio, porta in cima alla coda;
-- **Pausa tutti / Riprendi tutti / Verifica tutti**;
-- rimuovere un torrent (con o senza i file);
-- caricare il filtro IP da URL o file.
+- **Riepilogo sessione**: stato torrent, velocità, totali, porta/router, DHT,
+  uTP, cifratura, filtro IP, cache, spazio libero; barra di stato in basso.
+- **Aggiunta** da magnet, da URL a un `.torrent` (incolli l'indirizzo) o da file
+  locale caricato, con destinazione, pausa, "in cima alla coda" e limiti seed.
+- **Tabella** con ricerca/filtro per nome, **filtro per stato** nella barra
+  laterale, colonne ordinabili, selezione multipla e azioni di gruppo
+  (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
+- **Dettaglio per torrent** a schede: *Generale* (dati, pezzi, spazio,
+  date, copia magnet, esporta `.torrent`, pin, sposta, limiti seed), *File*
+  (scarica/salta), *Peer* (flag di connessione, trasporto, cifratura),
+  *Tracker* (stato, sciame, aggiunta).
+- **Filtro IP** da URL o file.
+- Scorciatoie: `/` per cercare, `Esc` per chiudere il dettaglio.
 
 Il comando definitivo resta comunque Gextto; la pagina è una comodità per
 l'operatore.

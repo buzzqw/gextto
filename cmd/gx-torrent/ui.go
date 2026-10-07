@@ -16,6 +16,7 @@ package main
 // flicker. The detail of one torrent is a fragment too, loaded into a modal.
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"fmt"
@@ -53,6 +54,7 @@ type uiPageData struct {
 	PeerPort     int
 	Listen       string
 	Router       string
+	PortOpen     bool
 	DHT          bool
 	DHTNodes     int64
 	UTP          bool
@@ -63,6 +65,16 @@ type uiPageData struct {
 	CacheReadMB  int64
 	CacheWB      int64
 	LSDPeers     int64
+	DiskFree     int64
+	DiskTotal    int64
+
+	CountAll     int
+	CountDown    int
+	CountSeeding int
+	CountPaused  int
+	CountStalled int
+	CountMoving  int
+	CountError   int
 
 	Rows []uiTorrentRow
 }
@@ -100,15 +112,25 @@ type uiFileRow struct {
 }
 
 type uiPeerRow struct {
-	Address   string
-	Client    string
-	Down      int64
-	Up        int64
-	Progress  float64
-	Seed      bool
-	Incoming  bool
-	Encrypted bool
-	UTP       bool
+	Address     string
+	Client      string
+	Down        int64
+	Up          int64
+	Progress    float64
+	Seed        bool
+	Incoming    bool
+	Encrypted   bool
+	UTP         bool
+	Source      string
+	Downloading bool
+	ClientInt   bool
+	ClientChoke bool
+	PeerInt     bool
+	PeerChoke   bool
+	Optimistic  bool
+	Snubbed     bool
+	Handshake   bool
+	Connected   int64
 }
 
 type uiTrackerRow struct {
@@ -147,6 +169,21 @@ type uiDetailData struct {
 	SeedDays  int64
 	Pinned    bool
 	Private   bool
+
+	PiecesTotal     uint32
+	PiecesHave      uint32
+	PiecesAvailable uint32
+	PiecesChecked   uint32
+	PieceLength     int64
+	Wasted          int64
+	Allocated       int64
+	FileCount       int
+	AddedAt         int64
+	CompletedAt     int64
+	AddedStr        string
+	CompletedStr    string
+	PiecesPercent   float64
+	Magnet          string
 
 	Files    []uiFileRow
 	Peers    []uiPeerRow
@@ -208,6 +245,19 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 .stat-grid .row strong{font-weight:500;text-align:right;word-break:break-word}
 .form-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;padding-top:10px;border-top:1px solid #1f2839}
 .form-grid label{display:flex;flex-direction:column;gap:3px;color:#93a1b5;font-size:12px}
+.layout{display:flex;gap:14px;align-items:flex-start}
+.sidebar{display:flex;flex-direction:column;gap:4px;min-width:160px;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:8px}
+.filter{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;color:#dbe4f0}
+.filter:hover{background:#243049}
+.filter.on{background:#2563eb;color:#fff}
+.content{flex:1;min-width:0}
+.statusbar{position:sticky;bottom:0;margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:#131a28;border:1px solid #243049;border-radius:10px;padding:8px 12px;font-size:12px;color:#93a1b5}
+.statusbar b{color:#e7ecf3;font-weight:600}
+.toast{position:fixed;top:14px;right:14px;z-index:80;background:#14351f;border:1px solid #1f6b3a;color:#e7ecf3;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:420px;transition:opacity .4s}
+.toast.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
+.flag{font-size:11px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
+.flag.on{background:#14532d;color:#86efac}
+@media(max-width:760px){.layout{flex-direction:column}.sidebar{flex-direction:row;flex-wrap:wrap;min-width:0}}
 `
 
 var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
@@ -278,14 +328,20 @@ const uiPageTemplate = `<!doctype html>
 function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;updateSel();filterRows();}});}
-function filterRows(){var q=(document.getElementById('filter').value||'').toLowerCase();document.querySelectorAll('#live tbody tr').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=(!q||n.indexOf(q)>=0)?'':'none';});}
+function refresh(force){if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;updateSel();applyFilters();}});}
+function rowState(tr){return tr.getAttribute('data-state')||'';}
+function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
+function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody tr').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
+function filterRows(){applyFilters();}
+function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
 function selectAll(box){document.querySelectorAll('.rowsel').forEach(function(c){c.checked=box.checked});updateSel();}
-function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){alert('Seleziona almeno un torrent');return;}if(op==='remove-files'&&!confirm('Rimuovere i torrent selezionati E cancellare i file? Irreversibile.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
+function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Seleziona almeno un torrent',true);return;}if(op==='remove-files'&&!confirm('Rimuovere i torrent selezionati E cancellare i file? Irreversibile.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
 function sortTable(idx){var tb=document.querySelector('#live tbody');if(!tb)return;var rows=Array.prototype.slice.call(tb.querySelectorAll('tr'));var asc=tb.getAttribute('data-sort')!==String(idx);rows.sort(function(a,b){var av=a.children[idx].getAttribute('data-v')||a.children[idx].textContent;var bv=b.children[idx].getAttribute('data-v')||b.children[idx].textContent;var an=parseFloat(av),bn=parseFloat(bv);if(!isNaN(an)&&!isNaN(bn))return asc?an-bn:bn-an;return asc?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});rows.forEach(function(r){tb.appendChild(r)});tb.setAttribute('data-sort',asc?String(idx):'');}
+function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
+function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copiato',false);},function(){showToast('Copia non riuscita',true);});}else{showToast('Copia non disponibile',true);}}
 setInterval(function(){refresh(false)},5000);
-(function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
+(function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
 </script>
 </body>
 </html>`
@@ -306,10 +362,23 @@ const uiLiveTemplate = `{{define "live"}}
     <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>{{.DHTNodes}} nodi · uTP {{if .UTP}}on{{else}}off{{end}}</span></div>
     <div class="card"><b>{{if .IPFilter}}{{.IPFilter}}{{else}}nessuno{{end}}</b><span>filtro IP{{if .IPFilterPath}} · {{.IPFilterPath}}{{end}}</span></div>
     <div class="card"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache lettura/scrittura</span></div>
+    <div class="card"><b>{{bytes .DiskFree}}</b><span>spazio libero (di {{bytes .DiskTotal}})</span></div>
   </div>
 
   {{if .Rows}}
-  <table id="torrents">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="muted">Filtri</div>
+      <button type="button" class="filter on" onclick="filterByState('all',this)">Tutti <b>{{.CountAll}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('downloading',this)">In download <b>{{.CountDown}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('seeding',this)">In seed <b>{{.CountSeeding}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('paused',this)">In pausa <b>{{.CountPaused}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('stalled',this)">Bloccati <b>{{.CountStalled}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('moving',this)">In spostamento <b>{{.CountMoving}}</b></button>
+      <button type="button" class="filter" onclick="filterByState('error',this)">In errore <b>{{.CountError}}</b></button>
+    </aside>
+    <div class="content">
+    <table id="torrents">
     <thead><tr>
       <th class="sel"><input type="checkbox" title="Seleziona tutti" onclick="selectAll(this)"></th>
       <th class="name" onclick="sortTable(1)">Nome</th>
@@ -326,7 +395,7 @@ const uiLiveTemplate = `{{define "live"}}
     </tr></thead>
     <tbody>
     {{range .Rows}}
-      <tr data-name="{{.Name}}">
+      <tr data-name="{{.Name}}" data-state="{{.State}}">
         <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
         <td class="name"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="Apri i dettagli del torrent">{{.Name}}</a><div class="muted">{{.SavePath}}</div></td>
         <td><span class="state s-{{.State}}">{{.State}}</span></td>
@@ -354,10 +423,22 @@ const uiLiveTemplate = `{{define "live"}}
       </tr>
     {{end}}
     </tbody>
-  </table>
+    </table>
+    </div>
+  </div>
   {{else}}
   <p class="muted">Nessun torrent nella sessione.</p>
   {{end}}
+
+  <div class="statusbar">
+    <span>↓ <b>{{.DownloadRate}}</b></span>
+    <span>↑ <b>{{.UploadRate}}</b></span>
+    <span>Totali <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
+    <span>Spazio libero <b>{{bytes .DiskFree}}</b></span>
+    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodi{{else}}spento{{end}}</b></span>
+    <span>Porta <b>{{if .PortOpen}}aperta ({{.Router}}){{else}}non aperta{{end}}</b></span>
+    <span>Cifratura <b>{{.Encryption}}</b></span>
+  </div>
 {{end}}`
 
 const uiDetailTemplate = `{{define "detail"}}
@@ -390,9 +471,18 @@ const uiDetailTemplate = `{{define "detail"}}
     <div class="row"><span>Ratio seed impostato</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} giorni)</strong></div>
     <div class="row"><span>Pin</span><strong>{{if .Pinned}}sì{{else}}no{{end}}</strong></div>
     <div class="row"><span>Privato</span><strong>{{if .Private}}sì{{else}}no{{end}}</strong></div>
+    <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
+    <div class="row"><span>Pezzi disponibili / totali</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
+    <div class="row"><span>Pezzi completati</span><strong>{{.PiecesHave}}</strong></div>
+    <div class="row"><span>Dimensione pezzo</span><strong>{{bytes .PieceLength}}</strong></div>
+    <div class="row"><span>Dati sprecati</span><strong>{{bytes .Wasted}}</strong></div>
+    <div class="row"><span>Allocato su disco</span><strong>{{bytes .Allocated}}</strong></div>
+    <div class="row"><span>Aggiunto</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
+    <div class="row"><span>Completato</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
   </div>
   <div class="toolbar">
     <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Togli pin{{else}}Pin (fuori coda){{end}}</button></form>
+    <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copia magnet</button>
     <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Esporta .torrent</a>
   </div>
   <form class="form-grid" method="post" action="/ui/seed-limits">
@@ -428,13 +518,15 @@ const uiDetailTemplate = `{{define "detail"}}
 {{else if eq .Tab "peers"}}
   {{if .Peers}}
   <table>
-    <thead><tr><th>Peer</th><th>Client</th><th class="num">↓</th><th class="num">↑</th><th class="num">Progresso</th><th>Seed</th><th>Connessione</th></tr></thead>
+    <thead><tr><th>Peer</th><th>Client</th><th>Sorgente</th><th class="num">↓</th><th class="num">↑</th><th class="num">Prog.</th><th>Seed</th><th>Flag</th><th class="num">Da</th></tr></thead>
     <tbody>
     {{range .Peers}}
       <tr><td>{{.Address}}</td><td class="name">{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
+      <td>{{.Source}}</td>
       <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
       <td class="num">{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td>
-      <td>{{if .UTP}}uTP{{else}}TCP{{end}}{{if .Encrypted}} · cifrata{{end}}{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</td></tr>
+      <td class="flags">{{if .Incoming}}<span class="flag">entrata</span>{{else}}<span class="flag">uscita</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">cifrata</span>{{end}}{{if .Handshake}}<span class="flag on">HS cifrato</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">ci choka</span>{{end}}{{if .PeerChoke}}<span class="flag">lo chokiamo</span>{{end}}{{if .ClientInt}}<span class="flag">interessato</span>{{end}}{{if .PeerInt}}<span class="flag">interessato a noi</span>{{end}}{{if .Downloading}}<span class="flag">scarica</span>{{end}}</td>
+      <td class="num">{{dur .Connected}}</td></tr>
     {{end}}
     </tbody>
   </table>
@@ -521,9 +613,16 @@ func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "torrent non trovato", http.StatusNotFound)
 		return
 	}
+	// Render to a buffer first: a template error must not leave a half-written
+	// fragment (the page would silently truncate).
+	var buf bytes.Buffer
+	if err := uiTemplate.ExecuteTemplate(&buf, "detail", data); err != nil {
+		http.Error(w, "rendering error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = uiTemplate.ExecuteTemplate(w, "detail", data)
+	_, _ = w.Write(buf.Bytes())
 }
 
 // handleUITorrentFile streams the .torrent of one torrent, so the page can offer
@@ -1058,9 +1157,12 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		CacheReadMB:  stats.CacheReadMB,
 		CacheWB:      stats.CacheWriteMB,
 		LSDPeers:     stats.LSD.PeersFound,
+		DiskFree:     stats.DiskFreeBytes,
+		DiskTotal:    stats.DiskTotalBytes,
 	}
 	switch {
 	case stats.PortMapping.Method != "":
+		page.PortOpen = true
 		page.Router = strings.ToUpper(stats.PortMapping.Method)
 		if stats.PortMapping.ExternalIP != "" {
 			page.Router += " " + stats.PortMapping.ExternalIP
@@ -1108,6 +1210,23 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		}
 		return page.Rows[i].Name < page.Rows[j].Name
 	})
+	page.CountAll = len(page.Rows)
+	for _, row := range page.Rows {
+		switch row.State {
+		case "downloading", "downloading_metadata", "checking_files":
+			page.CountDown++
+		case "seeding":
+			page.CountSeeding++
+		case "stalled":
+			page.CountStalled++
+		case "moving":
+			page.CountMoving++
+		case "error":
+			page.CountError++
+		case "paused":
+			page.CountPaused++
+		}
+	}
 	return page, nil
 }
 
@@ -1136,6 +1255,11 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	swarmSeeds := meta.SwarmSeeds
 	swarmPeers := meta.SwarmPeers
 	metaError := meta.Error
+	addedAt := meta.AddedAt.Unix()
+	completedAt := int64(0)
+	if !meta.CompletedAt.IsZero() {
+		completedAt = meta.CompletedAt.Unix()
+	}
 	d.mu.Unlock()
 
 	progress := 0.0
@@ -1157,8 +1281,22 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		DownRate: int64(stats.Speed.Download), UpRate: int64(stats.Speed.Upload), Ratio: ratio, ETA: eta,
 		NumPeers: stats.Peers.Total, NumSeeds: rt.numSeeds, NumComplete: swarmSeeds, NumIncomplete: swarmPeers,
 		SeedRatio: seedRatio, SeedDays: seedDays, Pinned: pinned, Private: stats.Private,
+		PiecesTotal: stats.Pieces.Total, PiecesHave: stats.Pieces.Have, PiecesAvailable: stats.Pieces.Available,
+		PiecesChecked: stats.Pieces.Checked, PieceLength: int64(stats.PieceLength),
+		Wasted: stats.Bytes.Wasted, Allocated: stats.Bytes.Allocated, FileCount: stats.FileCount,
+		AddedAt: addedAt, CompletedAt: completedAt,
+	}
+	if data.PiecesTotal > 0 {
+		data.PiecesPercent = float64(data.PiecesAvailable) * 100 / float64(data.PiecesTotal)
+	}
+	if addedAt > 0 {
+		data.AddedStr = time.Unix(addedAt, 0).Format("2006-01-02 15:04")
+	}
+	if completedAt > 0 {
+		data.CompletedStr = time.Unix(completedAt, 0).Format("2006-01-02 15:04")
 	}
 
+	trackers := t.Trackers()
 	switch tab {
 	case "files":
 		files, err := t.Files()
@@ -1188,10 +1326,16 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 				Down: int64(peer.DownloadSpeed), Up: int64(peer.UploadSpeed), Progress: peer.Progress * 100,
 				Seed: peer.Seed, Incoming: peer.Source == torrent.SourceIncoming,
 				Encrypted: peer.EncryptedStream, UTP: peer.UTP,
+				Source: sourceName(peer.Source), Downloading: peer.Downloading,
+				ClientInt: peer.ClientInterested, ClientChoke: peer.ClientChoking,
+				PeerInt: peer.PeerInterested, PeerChoke: peer.PeerChoking,
+				Optimistic: peer.OptimisticUnchoked, Snubbed: peer.Snubbed,
+				Handshake: peer.EncryptedHandshake,
+				Connected: int64(time.Since(peer.ConnectedAt).Seconds()),
 			})
 		}
 	case "trackers":
-		for _, tracker := range t.Trackers() {
+		for _, tracker := range trackers {
 			status := "non contattato"
 			switch tracker.Status {
 			case torrent.Working:
@@ -1215,7 +1359,46 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 			})
 		}
 	}
+	// Magnet link for the "copy magnet" button.
+	data.Magnet = magnetLink(data.Hash, data.Name, trackers)
 	return data, nil
+}
+
+// sourceName labels where a peer was discovered.
+func sourceName(source torrent.PeerSource) string {
+	switch source {
+	case torrent.SourceTracker:
+		return "tracker"
+	case torrent.SourceDHT:
+		return "DHT"
+	case torrent.SourcePEX:
+		return "PEX"
+	case torrent.SourceIncoming:
+		return "in entrata"
+	case torrent.SourceManual:
+		return "manuale"
+	default:
+		return "—"
+	}
+}
+
+// magnetLink rebuilds a magnet from the info hash, name and trackers.
+func magnetLink(hash, name string, trackers []torrent.Tracker) string {
+	var b strings.Builder
+	b.WriteString("magnet:?xt=urn:btih:")
+	b.WriteString(hash)
+	if strings.TrimSpace(name) != "" {
+		b.WriteString("&dn=")
+		b.WriteString(url.QueryEscape(name))
+	}
+	for _, tracker := range trackers {
+		if strings.TrimSpace(tracker.URL) == "" {
+			continue
+		}
+		b.WriteString("&tr=")
+		b.WriteString(url.QueryEscape(tracker.URL))
+	}
+	return b.String()
 }
 
 // filePriorityMeta reports one file's priority from a raw priority slice.
