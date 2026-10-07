@@ -1935,6 +1935,9 @@ func cycleWorker(state *AppState) {
 	lastRenameCheck := time.Now().Add(-6 * time.Hour)
 	// Guards against overlapping archive repairs (they can be slow on NFS).
 	var renameRepairRunning atomic.Bool
+	// lastRenameAllGood is when the "all episodes correctly named" line was
+	// last logged (unix seconds): at most once a day when nothing changes.
+	var lastRenameAllGood atomic.Int64
 	var lastInactiveLog *time.Time
 	firstRun := true
 	for {
@@ -2041,7 +2044,7 @@ func cycleWorker(state *AppState) {
 							// Deferred so a panic cannot leave the repair marked as
 							// running forever.
 							defer renameRepairRunning.Store(false)
-							var renamed, discarded, duplicates, errs int64
+							var renamed, discarded, duplicates, errs, correct int64
 							for _, name := range names {
 								_, value := seriesRenameApply(state, name, true, false, false)
 								values, ok := value.(map[string]any)
@@ -2052,10 +2055,16 @@ func cycleWorker(state *AppState) {
 								discarded += bg_countKey(values, "discarded_count")
 								duplicates += bg_countKey(values, "duplicates_removed")
 								errs += bg_countKey(values, "error_count")
+								correct += bg_countKey(values, "already_ok_count")
 							}
 							if renamed+discarded+duplicates+errs > 0 {
-								logging.Info(fmt.Sprintf("🗂 Archive rename repair: %d series checked · %d renamed · %d discarded · %d duplicates removed · %d errors",
-									len(names), renamed, discarded, duplicates, errs))
+								logging.Info(renameRepairReportText(len(names), correct, renamed, discarded, duplicates, errs))
+								lastRenameAllGood.Store(0)
+							} else if now := time.Now().Unix(); now-lastRenameAllGood.Load() >= 24*3600 {
+								// Nothing to do is still worth one line a day: it shows
+								// the library is being checked, not ignored.
+								logging.Info(renameRepairReportText(len(names), correct, 0, 0, 0, 0))
+								lastRenameAllGood.Store(now)
 							} else {
 								logging.Debug(fmt.Sprintf("🗂 Archive rename repair: %d series checked, nothing to change", len(names)))
 							}

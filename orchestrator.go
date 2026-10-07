@@ -222,7 +222,15 @@ func RunCycleDomain(
 			}
 		}
 	}
+	// The feed releases were just saved into the archive, so the archive
+	// queries below return them again: seed the set with the feed hashes so
+	// each release is evaluated (and counted) once.
 	archiveHashes := map[string]struct{}{}
+	for i := range releases {
+		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {
+			archiveHashes[hash] = struct{}{}
+		}
+	}
 	archiveMatches := 0
 	for _, query := range archiveQueries {
 		items, err := archive.Search(query)
@@ -563,6 +571,10 @@ func RunCycleDomain(
 	if domainIs(domain, "movies") {
 		releases = retainKind(releases, "movie")
 	}
+	// The gap and pending passes can add a release already collected from the
+	// feeds or the archive: keep the first copy, so the count is of distinct
+	// releases.
+	releases = dedupeReleasesByHash(releases)
 	stats.Scraped = len(releases)
 
 	var best []models.Release
@@ -700,6 +712,7 @@ func RunCycleDomain(
 	}
 
 	upgrades := 0
+	var skips cycleSkipCounts
 	newItems := 0
 	if cycleCancelled(ctx) {
 		return stats, nil
@@ -775,6 +788,7 @@ func RunCycleDomain(
 					if err := db.QueuePendingScored(&release, delayMinutes, releaseScore); err != nil {
 						return nil, err
 					}
+					skips.Waiting++
 					continue
 				}
 			}
@@ -787,6 +801,7 @@ func RunCycleDomain(
 				if err := db.QueuePendingMovieScored(&release, delayMinutes, releaseScore); err != nil {
 					return nil, err
 				}
+				skips.Waiting++
 				continue
 			}
 		}
@@ -1007,6 +1022,14 @@ func RunCycleDomain(
 			// "Already present / already active" rejections (duplicate or episode
 			// active in the session) are routine, so keep them at debug level to
 			// keep the cycle log readable.
+			switch approvalReason {
+			case "duplicate":
+				skips.InLibrary++
+			case "active_episode", "active_pack":
+				skips.Downloading++
+			default:
+				skips.Other++
+			}
 			if approvalReason == "duplicate" || approvalReason == "active_episode" {
 				logging.Debug("download skipped (already present or active)",
 					"target", releaseTarget(&release),
@@ -1037,7 +1060,7 @@ func RunCycleDomain(
 	if elapsed < 0 {
 		elapsed = 0
 	}
-	logging.Info(cycleReportText(logDuration(time.Duration(elapsed)*time.Second), stats, upgrades, newItems))
+	logging.Info(cycleReportText(logDuration(time.Duration(elapsed)*time.Second), stats, upgrades, newItems, skips))
 	logging.Info(cycleDivider)
 	return stats, nil
 }
@@ -1856,4 +1879,21 @@ func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*model
 		countLabel(stats.Scraped, "release", "releases"), logCount(stats.Candidates), cycleErrorsSuffix(stats.Errors)))
 	logging.Info(cycleDivider)
 	return stats, nil
+}
+
+// dedupeReleasesByHash drops releases whose info-hash already appeared earlier
+// in the list. Releases without a magnet hash (a .torrent link only) are kept.
+func dedupeReleasesByHash(releases []models.Release) []models.Release {
+	seen := make(map[string]struct{}, len(releases))
+	kept := releases[:0]
+	for i := range releases {
+		if hash, ok := utils.MagnetHash(releases[i].Magnet); ok {
+			if _, dup := seen[hash]; dup {
+				continue
+			}
+			seen[hash] = struct{}{}
+		}
+		kept = append(kept, releases[i])
+	}
+	return kept
 }

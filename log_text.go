@@ -231,8 +231,37 @@ func cycleModeLabel(mode string) string {
 }
 
 // cycleReportText is the closing summary of a search cycle.
-func cycleReportText(duration string, stats *models.CycleStats, upgrades, newItems int) string {
+// cycleSkipCounts says why the matched releases of a cycle were not
+// downloaded, for the end-of-cycle report.
+type cycleSkipCounts struct {
+	InLibrary   int // the library already has it in the same or better quality
+	Downloading int // already in the torrent session
+	Waiting     int // held by a delay profile, in case a better version appears
+	Other       int // skipped for another reason (each one has its own INFO line)
+}
+
+func (c cycleSkipCounts) text() string {
+	var parts []string
+	if c.InLibrary > 0 {
+		parts = append(parts, fmt.Sprintf("%s already in the library", logCount(c.InLibrary)))
+	}
+	if c.Downloading > 0 {
+		parts = append(parts, fmt.Sprintf("%s already downloading", logCount(c.Downloading)))
+	}
+	if c.Waiting > 0 {
+		parts = append(parts, fmt.Sprintf("%s waiting for a better version", logCount(c.Waiting)))
+	}
+	if c.Other > 0 {
+		parts = append(parts, fmt.Sprintf("%s skipped (see above)", logCount(c.Other)))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func cycleReportText(duration string, stats *models.CycleStats, upgrades, newItems int, skips cycleSkipCounts) string {
 	downloads := "nothing new to download"
+	if why := skips.text(); why != "" && stats.DownloadsStarted == 0 {
+		downloads += ": " + why
+	}
 	if stats.DownloadsStarted > 0 {
 		var kinds []string
 		if newItems > 0 {
@@ -248,6 +277,9 @@ func cycleReportText(duration string, stats *models.CycleStats, upgrades, newIte
 		downloads = countLabel(stats.DownloadsStarted, "download", "downloads") + " started"
 		if len(kinds) > 0 {
 			downloads += " (" + strings.Join(kinds, ", ") + ")"
+		}
+		if why := skips.text(); why != "" {
+			downloads += "; the others: " + why
 		}
 	}
 	return fmt.Sprintf("📊 Search finished in %s: %s checked, %s matched your titles, %s%s",
@@ -304,6 +336,30 @@ func recordHashFailure(hash string) (int, bool) {
 	hashFailures.counts[key]++
 	count := hashFailures.counts[key]
 	return count, count == hashFailureAlertThreshold
+}
+
+// renameRepairReportText summarises a periodic library check (rename to the
+// naming scheme, inferior copies and duplicates removed).
+func renameRepairReportText(series int, correct, renamed, discarded, duplicates, errs int64) string {
+	checked := countLabel(series, "series", "series")
+	if renamed+discarded+duplicates+errs == 0 {
+		return fmt.Sprintf("🗂 Library check: %s, %s — all correctly named, no inferior or duplicate copies",
+			checked, countLabel(correct, "episode", "episodes"))
+	}
+	var done []string
+	if renamed > 0 {
+		done = append(done, countLabel(renamed, "episode renamed", "episodes renamed"))
+	}
+	if discarded > 0 {
+		done = append(done, countLabel(discarded, "inferior copy removed", "inferior copies removed"))
+	}
+	if duplicates > 0 {
+		done = append(done, countLabel(duplicates, "duplicate removed", "duplicates removed"))
+	}
+	if errs > 0 {
+		done = append(done, countLabel(errs, "error (see the warnings above)", "errors (see the warnings above)"))
+	}
+	return fmt.Sprintf("🗂 Library check: %s · %s", checked, strings.Join(done, " · "))
 }
 
 // torrentErrorNoticeCooldown is how long a torrent/file error is reported only

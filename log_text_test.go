@@ -58,12 +58,22 @@ func TestLogTargetReadsLikeAPerson(t *testing.T) {
 func TestCycleReportTextIsReadable(t *testing.T) {
 	stats := &models.CycleStats{Scraped: 3612, Candidates: 183, DownloadsStarted: 5, GapsFilled: 1}
 	want := "📊 Search finished in 5 minutes: 3,612 releases checked, 183 matched your titles, 5 downloads started (5 upgrades, 1 missing episode filled)"
-	if got := cycleReportText("5 minutes", stats, 5, 0); got != want {
+	if got := cycleReportText("5 minutes", stats, 5, 0, cycleSkipCounts{}); got != want {
 		t.Fatalf("report =\n %q\nwant\n %q", got, want)
 	}
 	stats = &models.CycleStats{Scraped: 10, Candidates: 0, Errors: 2}
 	want = "📊 Search finished in 3 seconds: 10 releases checked, 0 matched your titles, nothing new to download; 2 problems (see the warnings above)"
-	if got := cycleReportText("3 seconds", stats, 0, 0); got != want {
+	if got := cycleReportText("3 seconds", stats, 0, 0, cycleSkipCounts{}); got != want {
+		t.Fatalf("report =\n %q\nwant\n %q", got, want)
+	}
+	stats = &models.CycleStats{Scraped: 6406, Candidates: 183}
+	want = "📊 Search finished in 1 minute: 6,406 releases checked, 183 matched your titles, nothing new to download: 170 already in the library, 13 already downloading"
+	if got := cycleReportText("1 minute", stats, 0, 0, cycleSkipCounts{InLibrary: 170, Downloading: 13}); got != want {
+		t.Fatalf("report =\n %q\nwant\n %q", got, want)
+	}
+	stats = &models.CycleStats{Scraped: 100, Candidates: 4, DownloadsStarted: 1}
+	want = "📊 Search finished in 1 minute: 100 releases checked, 4 matched your titles, 1 download started (1 new); the others: 2 already in the library, 1 waiting for a better version"
+	if got := cycleReportText("1 minute", stats, 0, 1, cycleSkipCounts{InLibrary: 2, Waiting: 1}); got != want {
 		t.Fatalf("report =\n %q\nwant\n %q", got, want)
 	}
 }
@@ -158,5 +168,32 @@ func TestTorznabShortReasonDropsTheURL(t *testing.T) {
 	}
 	if got := torznabShortReason(errors.New("dial tcp: connection refused")); got != "dial tcp: connection refused" {
 		t.Fatalf("reason = %q", got)
+	}
+}
+
+func TestRenameRepairReportText(t *testing.T) {
+	got := renameRepairReportText(37, 1234, 0, 0, 0, 0)
+	want := "🗂 Library check: 37 series, 1,234 episodes — all correctly named, no inferior or duplicate copies"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	got = renameRepairReportText(37, 1200, 3, 1, 0, 0)
+	want = "🗂 Library check: 37 series · 3 episodes renamed · 1 inferior copy removed"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestDedupeReleasesByHashKeepsFirstCopy(t *testing.T) {
+	magnet := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+	releases := []models.Release{
+		{Title: "feed", Magnet: magnet, Source: "TGx"},
+		{Title: "no-hash"},
+		{Title: "archive", Magnet: magnet + "&dn=other.name", Source: "archive:x"},
+		{Title: "no-hash-2"},
+	}
+	got := dedupeReleasesByHash(releases)
+	if len(got) != 3 || got[0].Title != "feed" || got[1].Title != "no-hash" || got[2].Title != "no-hash-2" {
+		t.Fatalf("deduped = %+v", got)
 	}
 }
