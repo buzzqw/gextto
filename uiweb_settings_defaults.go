@@ -124,7 +124,9 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_extra_settings":                    "Una per riga: chiave=valore\nmax_peerlist_size=4000\nmax_queued_disk_bytes=104857600\nactive_downloads=6\nsmooth_connects=true\nrequest_timeout=10",
 
 	// --- Motore torrent (backend) ------------------------------------------
-	"torrent_backend":                  "embedded",
+	// gx-torrent è il default di installazione; il motore integrato libtorrent
+	// resta selezionabile e fa da fallback automatico.
+	"torrent_backend":                  "gx-torrent",
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
 	"gxtorrent_url":                    "http://127.0.0.1:8890",
 	"gxtorrent_token":                  "",

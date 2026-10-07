@@ -776,32 +776,24 @@ var uiManagedSetting = map[string]bool{
 // libtorrent session (see libtorrent.go). Seed, stall, queue, speed, directory
 // and RAM-disk options are intentionally excluded: the automation layer applies
 // those with every engine, so they must stay editable.
+//
+// The network, queue and cache options are excluded too: gx-torrent reads the
+// same libtorrent_* keys (gxNetworkArgs and gxQueuePolicy), so they must stay
+// editable whichever engine is selected. Only knobs specific to the libtorrent
+// settings_pack remain listed here.
 var uiLibtorrentEngineOnlySettings = map[string]bool{
 	"libtorrent_enabled":                           true,
 	"libtorrent_auto_optimize":                     true,
 	"libtorrent_extra_settings":                    true,
-	"libtorrent_active_limit":                      true,
-	"libtorrent_active_seeds":                      true,
 	"libtorrent_aio_threads":                       true,
 	"libtorrent_alert_queue_size":                  true,
 	"libtorrent_allow_multiple_connections_per_ip": true,
 	"libtorrent_announce_interval":                 true,
 	"libtorrent_announce_to_all_tiers":             true,
 	"libtorrent_announce_to_all_trackers":          true,
-	"libtorrent_cache_expiry":                      true,
-	"libtorrent_cache_size":                        true,
 	"libtorrent_connections_limit":                 true,
-	"libtorrent_dont_count_slow_torrents":          true,
-	"libtorrent_dynamic_queue":                     true,
-	"libtorrent_dynamic_queue_max":                 true,
-	"libtorrent_dynamic_queue_min":                 true,
-	"libtorrent_encryption":                        true,
 	"libtorrent_half_open_limit":                   true,
-	"libtorrent_listen_interfaces":                 true,
-	"libtorrent_lsd":                               true,
 	"libtorrent_max_uploads_per_torrent":           true,
-	"libtorrent_natpmp":                            true,
-	"libtorrent_outgoing_interface":                true,
 	"libtorrent_prefer_rc4":                        true,
 	"libtorrent_torrent_connect_boost":             true,
 	"libtorrent_upload_slots_limit":                true,
@@ -879,7 +871,11 @@ func uiRenameEditorFrom(cfg *Config) *uiRenameEditor {
 // uiTorrentBackendOptions is the combo list of the transfer engines.
 func uiTorrentBackendOptions(value string) []uiFormOption {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.EqualFold(value, "anacrolix") {
+	if value == "" {
+		value = DefaultTorrentBackend
+	}
+	if strings.EqualFold(value, "anacrolix") {
+		// Removed backend: at runtime it is normalised to the embedded engine.
 		value = BackendEmbedded
 	}
 	options := []uiFormOption{

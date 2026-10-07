@@ -13,8 +13,9 @@ funzionare come servizio.
 ## Cosa offre Gextto
 
 - **Un servizio e un piano di controllo:** il demone gestisce ricerche
-  programmate, trasferimenti torrent, post-processing e archivio. Libtorrent è
-  integrato e predefinito; qBittorrent-nox è un'alternativa opzionale.
+  programmate, trasferimenti torrent, post-processing e archivio. Il motore
+  predefinito è gx-torrent (Go puro, processo sorvegliato); libtorrent integrato
+  e qBittorrent-nox sono alternative opzionali.
 - **Serie TV, film e fumetti:** monitora i titoli, cerca nelle sorgenti
   configurate e gestisce download e libreria da una UI web responsive, installabile
   sul telefono, o dalla TUI terminale. Le serie anime numerate per episodio

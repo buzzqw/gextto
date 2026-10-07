@@ -57,6 +57,19 @@ func TestMigrationPlanRejectsIncompleteTarget(t *testing.T) {
 	}
 }
 
+func TestMigrationPlanAcceptsGxTorrentTarget(t *testing.T) {
+	state := newTestAppState(t)
+	// gx-torrent shares Gextto's paths and is started by managed mode, so a
+	// switch to it must be ready (no unknown-target or path warning).
+	plan := BuildMigrationPlan(state, state.cfg, BackendGxTorrent)
+	if !plan.Ready {
+		t.Fatalf("gx-torrent plan must be ready: %+v", plan.Warnings)
+	}
+	if plan.ToBackend != BackendGxTorrent {
+		t.Fatalf("to backend = %q", plan.ToBackend)
+	}
+}
+
 func TestMigrationPlanListsManagedTorrents(t *testing.T) {
 	state := newTestAppState(t)
 	fake := newFakeQB()

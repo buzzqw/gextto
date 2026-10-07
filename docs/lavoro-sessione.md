@@ -329,6 +329,23 @@ rain è ora una copia modificata in `third_party/rain` (MIT, `replace` in
   - La memoria è in RAM: un riavvio di gextto la azzera, ma la release v2
     resta comunque in blocklist.
 
+### 3.12 gx-torrent come motore predefinito (07/10)
+- **Default di installazione**: `torrent_backend` mancante o vuoto ora vale
+  `gx-torrent` (`DefaultTorrentBackend` in `torrent_engine.go`,
+  `TorrentBackendName` in `web_handlers_torrent_backend.go`, `uiSettingDefaults`
+  e la vista config). Un valore **salvato** resta com'era: le installazioni
+  esistenti non cambiano motore da sole, e un valore sconosciuto/rimosso
+  (`anacrolix`) continua a ripiegare su `embedded`. Se gx-torrent non si attiva
+  (binario mancante, path non validi) il daemon ripiega comunque su libtorrent.
+- **Servizio agnostico**: rimosso `GEXTTO_LIBTORRENT=1` dalla unit; l'env
+  `GEXTTO_LIBTORRENT` resta solo come override manuale. Il motore lo decide la
+  setting, non il servizio.
+- **Impostazioni condivise**: le opzioni di rete, coda e cache (`libtorrent_*`)
+  usate anche da gx-torrent (`gxNetworkArgs`, `gxQueuePolicy`) non vengono più
+  disabilitate nella pagina Configurazione quando il motore è gx-torrent; restano
+  solo le voci davvero specifiche di libtorrent.
+- **README** (it/en) e `docs/gx-torrent.md` aggiornati.
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso

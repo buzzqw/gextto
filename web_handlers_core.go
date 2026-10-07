@@ -1016,7 +1016,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"rename_episodes":                      cfg.RenameEpisodes,
 		// Torrent backend selection and its per-backend settings. The
 		// qBittorrent password is never echoed: only its presence is reported.
-		"torrent_backend":                  settingsOr(cfg, "torrent_backend", "embedded"),
+		"torrent_backend":                  settingsOr(cfg, "torrent_backend", DefaultTorrentBackend),
 		"qbittorrent_url":                  settingsOr(cfg, "qbittorrent_url", ""),
 		"qbittorrent_username":             settingsOr(cfg, "qbittorrent_username", ""),
 		"qbittorrent_category":             settingsOr(cfg, "qbittorrent_category", ""),

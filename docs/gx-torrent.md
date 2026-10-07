@@ -1,10 +1,11 @@
 # gx-torrent: il motore torrent alternativo in puro Go
 
 `gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra la libreria
-[`cenkalti/rain`](https://github.com/cenkalti/rain). Gextto lo usa come
-alternativa al motore integrato libtorrent (`torrent_backend = gx-torrent`):
-non richiede `libtorrent-rasterbar`, gira in un processo separato e si
-controlla via REST su `127.0.0.1:8890`.
+[`cenkalti/rain`](https://github.com/cenkalti/rain). È il motore predefinito di
+Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
+gira in un processo separato e si controlla via REST su `127.0.0.1:8890`. Il
+motore integrato libtorrent resta selezionabile e fa da fallback automatico se
+gx-torrent non parte.
 
 Usa una copia modificata di rain in `third_party/rain`. Le modifiche sono
 descritte in `third_party/rain/GEXTTO.md`: porta unica, interfaccia uscente,
@@ -30,7 +31,10 @@ Codice:
 1. `make build` (o `scripts/build-daemon.sh`) compila `bin/gx-torrent` accanto
    a `bin/gexttod`; `make gx-torrent` compila solo il demone. Il pacchetto, `install.sh`
    e `gexttod --update` installano `gx-torrent` accanto a `gexttod`.
-2. In **Configurazione → Motore torrent** scegli `gx-torrent` e riavvia Gextto.
+2. `gx-torrent` è il motore predefinito di una nuova installazione: non serve
+   sceglierlo. Per usare invece libtorrent integrato imposta *Motore torrent* su
+   `embedded` e riavvia. Una configurazione che ha già salvato un motore resta
+   com'era: il nuovo default vale solo per le installazioni nuove.
 3. Con **gx-torrent — avviato e sorvegliato da Gextto** attivo (predefinito),
    Gextto avvia il demone da solo:
    - dati in `DATA_DIR/gx-torrent`;

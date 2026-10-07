@@ -141,6 +141,13 @@ const (
 	BackendGxTorrent   = "gx-torrent"
 )
 
+// DefaultTorrentBackend is the engine a fresh installation uses when no
+// `torrent_backend` has ever been saved. gx-torrent is the default since it is
+// pure Go, needs no libtorrent-rasterbar and runs in its own supervised process;
+// `embedded` (libtorrent) stays available and remains the automatic fallback
+// when gx-torrent cannot be activated.
+const DefaultTorrentBackend = BackendGxTorrent
+
 // capabilityLevels is the single source of truth for the parity matrix. It is
 // intentionally explicit: pretending a backend supports an operation it cannot
 // apply is worse than returning a clear "unavailable".

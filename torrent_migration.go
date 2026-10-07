@@ -103,6 +103,12 @@ func BuildMigrationPlan(s *AppState, cfg *Config, target string) MigrationManife
 	switch target {
 	case BackendEmbedded:
 		// Always available.
+	case BackendGxTorrent:
+		// Runs on this machine and shares Gextto's paths: only the resolved
+		// settings must be valid (the binary is started by managed mode).
+		if _, err := gxTorrentSettingsFromConfig(cfg); err != nil {
+			plan.Warnings = append(plan.Warnings, err.Error())
+		}
 	case BackendQbittorrent:
 		settings, err := qbittorrentSettingsFromConfig(cfg)
 		if err != nil {

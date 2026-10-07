@@ -108,8 +108,14 @@ func TestCapabilityParityIsComplete(t *testing.T) {
 func TestSelectTorrentEngineBackends(t *testing.T) {
 	// embedded -> nil engine (the adapter is built on demand).
 	cfg := DefaultConfig()
+	cfg.Settings["torrent_backend"] = BackendEmbedded
 	if engine, _, err := selectTorrentEngine(&cfg); err != nil || engine != nil {
 		t.Fatalf("embedded select = %v, %v", engine, err)
+	}
+	// A fresh installation with no saved backend uses gx-torrent.
+	cfgDefault := DefaultConfig()
+	if got := TorrentBackendName(&cfgDefault); got != BackendGxTorrent {
+		t.Fatalf("fresh install default backend = %q, want %q", got, BackendGxTorrent)
 	}
 	// qbittorrent without a URL is refused.
 	cfg.Settings["torrent_backend"] = BackendQbittorrent
@@ -137,6 +143,7 @@ func TestAlternativeBackendSuppressesEmbeddedSession(t *testing.T) {
 	}
 	cfg.DryRun = false
 	cfg.LibtorrentEnabled = true
+	cfg.Settings["torrent_backend"] = BackendEmbedded
 
 	if alternativeBackendActive(&cfg) {
 		t.Fatal("embedded backend must not suppress the libtorrent session")

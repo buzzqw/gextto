@@ -191,6 +191,10 @@ func transferTestConfig(t *testing.T, dataDir string, port uint16) Config {
 	cfg.DryRun = false
 	cfg.Active = false
 	cfg.LibtorrentEnabled = true
+	// This helper exercises the embedded libtorrent engine on purpose: keep the
+	// backend explicit so the new gx-torrent install default does not suppress
+	// the native session.
+	cfg.Settings["torrent_backend"] = BackendEmbedded
 	cfg.Libtorrent.PortMin = port
 	cfg.Libtorrent.PortMax = port
 	cfg.Libtorrent.Dht = false

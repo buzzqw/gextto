@@ -33,14 +33,19 @@ func ActiveTorrentBackend(s *AppState) TorrentBackend {
 	return s.activeEngine()
 }
 
-// TorrentBackendName returns the configured backend, defaulting to the embedded
-// libtorrent engine. Anything other than the known backends is normalised to
-// embedded.
+// TorrentBackendName returns the configured backend. A missing or empty
+// `torrent_backend` selects DefaultTorrentBackend (gx-torrent for a fresh
+// installation); a value that was saved but is unknown (a removed backend such
+// as `anacrolix`) is normalised to the embedded libtorrent engine so existing
+// installations keep transfering after an upgrade.
 func TorrentBackendName(cfg *Config) string {
-	value := BackendEmbedded
+	value := DefaultTorrentBackend
 	if cfg != nil {
 		if raw, ok := cfg.Settings["torrent_backend"]; ok {
 			value = strings.ToLower(strings.TrimSpace(raw))
+			if value == "" {
+				value = DefaultTorrentBackend
+			}
 		}
 	}
 	switch value {
@@ -49,6 +54,7 @@ func TorrentBackendName(cfg *Config) string {
 	case BackendGxTorrent:
 		return BackendGxTorrent
 	default:
+		// embedded, or an unknown/removed backend saved by an older install.
 		return BackendEmbedded
 	}
 }

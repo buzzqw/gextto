@@ -13,8 +13,9 @@ service.
 ## What Gextto offers
 
 - **One service, one control plane:** the daemon handles scheduled searches,
-  torrent transfers, post-processing and the library archive. Embedded libtorrent
-  is the default; qBittorrent-nox is an optional alternative.
+  torrent transfers, post-processing and the library archive. gx-torrent is the
+  default engine (pure Go, run as a supervised process); embedded libtorrent and
+  qBittorrent-nox are optional alternatives.
 - **Series, movies and comics:** monitor titles, search configured sources and
   manage downloads and archived media from one responsive web UI, installable on
   a phone, or the terminal TUI. Anime numbered by absolute episode ("Title -
