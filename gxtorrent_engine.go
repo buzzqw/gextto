@@ -149,7 +149,11 @@ func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
 		previous:       map[string]models.TorrentView{},
 		pendingMoves:   map[string]string{},
 	}
-	if settings.Managed && !engine.ping() {
+	alreadyRunning := engine.ping()
+	if settings.Managed && !alreadyRunning {
+		// Service boot: refresh the IP filter before the daemon starts, so it
+		// always begins with a fresh list (a supervisor restart reuses it).
+		gxEnsureIPFilter(cfg, true)
 		process, err := startManagedGxTorrent(cfg, settings)
 		if err != nil {
 			return nil, err
@@ -157,6 +161,15 @@ func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
 		engine.process = process
 		go engine.superviseManagedProcess()
 		engine.waitReady(15 * time.Second)
+	} else if alreadyRunning {
+		// A gx-torrent already runs (e.g. an operator-managed service): refresh
+		// and reload the IP filter for it too, so boot starts from a fresh list.
+		gxEnsureIPFilter(cfg, true)
+		if path := gxIPFilterPath(cfg); path != "" {
+			if _, err := engine.LoadIPFilter(path); err != nil {
+				logging.Debug("gx-torrent IP filter reload skipped", "error", err.Error())
+			}
+		}
 	}
 	return engine, nil
 }

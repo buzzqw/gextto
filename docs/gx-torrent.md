@@ -178,6 +178,8 @@ Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
     `libtorrent_apply_ip_filter` è attivo.
   - Il pulsante "Aggiorna IP filter" di gextto funziona anche con gx-torrent:
     scarica la lista se è un URL e la ricarica nel demone.
+  - Il file viene **aggiornato all'avvio del servizio** e poi **una volta a
+    settimana** mentre il servizio resta attivo (oltre al pulsante manuale).
 
 ## uTP e LSD
 
@@ -271,7 +273,9 @@ Le impostazioni libtorrent di gextto valgono anche per gx-torrent.
 - **`libtorrent_preallocate`**: i file nuovi vengono riservati per intero con
   `fallocate`; i file esclusi dalla selezione restano sparsi.
 - **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico
-  e la applica subito.
+  e la applica subito. L'auto-ottimizzazione di gx-torrent è **sempre attiva**:
+  ogni 15 minuti Gextto riasserisce cache e politica di coda, così la cache
+  resta dimensionata sulla RAM (1/32 lettura, 1/16 scrittura) senza intervento.
 - Un cambio di questi valori riapre la sessione del demone, come per i limiti
   di velocità.
 - Il pannello Salute mostra la cache effettiva.

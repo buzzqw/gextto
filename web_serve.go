@@ -53,6 +53,7 @@ func startBackgroundWorkers(state *AppState) {
 	register("cycle_worker", func() { cycleWorker(state) })
 	register("backup_worker", func() { backupWorker(state) })
 	register("optimize_worker", func() { optimizeWorker(state) })
+	register("ipfilter_refresh_worker", func() { ipFilterRefreshWorker(state) })
 	register("temp_cleanup_worker", func() { tempCleanupWorker(state) })
 	register("watched_folders_worker", func() { watchedFoldersWorker(state) })
 	register("housekeeping_worker", func() { housekeepingWorker(state) })

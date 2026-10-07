@@ -125,8 +125,9 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 		}
 	}
 	// Make sure the configured IP filter is on disk before building the network
-	// arguments, so gxNetworkArgs passes it with -ipfilter.
-	gxEnsureIPFilter(cfg)
+	// arguments, so gxNetworkArgs passes it with -ipfilter. A supervisor restart
+	// reuses the cached file; the service-boot refresh is done by the caller.
+	gxEnsureIPFilter(cfg, false)
 	args = append(args, gxNetworkArgs(cfg)...)
 	command := exec.Command(binary, args...)
 	command.Dir = dataDir
@@ -422,9 +423,10 @@ func gxIPFilterPath(cfg *Config) string {
 
 // gxEnsureIPFilter makes sure the configured IP filter is stored locally before
 // the managed daemon starts, so it is passed with -ipfilter. A URL is downloaded
-// (gzip/zip decoded); a local path is left to gxIPFilterPath. An already fresh
-// file is reused so a restart does not re-download the list every time.
-func gxEnsureIPFilter(cfg *Config) {
+// (gzip/zip decoded); a local path is left to gxIPFilterPath. `force` downloads
+// even when the cached file is recent: it is used at service boot, so the daemon
+// always starts with a fresh list; a later supervisor restart reuses the file.
+func gxEnsureIPFilter(cfg *Config, force bool) {
 	if cfg == nil {
 		return
 	}
@@ -433,8 +435,10 @@ func gxEnsureIPFilter(cfg *Config) {
 		return
 	}
 	path := filepath.Join(cfg.DataDir, "ipfilter.dat")
-	if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < 24*time.Hour {
-		return
+	if !force {
+		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < 24*time.Hour {
+			return
+		}
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		logging.Warn("cannot create the data directory for the IP filter", "error", err)

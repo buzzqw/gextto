@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -441,6 +443,34 @@ func TestGxProxyValidation(t *testing.T) {
 		if err := validateGxProxyURL(invalid); err == nil {
 			t.Fatalf("proxy %q must be refused", invalid)
 		}
+	}
+}
+
+func TestGxEnsureIPFilterForcesAtBoot(t *testing.T) {
+	body := "001.002.003.000 - 001.002.003.255 , 000 , test\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ipfilter.dat")
+	if err := os.WriteFile(path, []byte("old\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &Config{DataDir: dir}
+	cfg.Libtorrent.IpFilterPath = server.URL
+
+	// Not forced: a recent file is reused instead of downloading again.
+	gxEnsureIPFilter(cfg, false)
+	if got, _ := os.ReadFile(path); string(got) != "old\n" {
+		t.Fatalf("fresh cache must be reused, got %q", got)
+	}
+
+	// Forced (service boot): the file is replaced with the downloaded list.
+	gxEnsureIPFilter(cfg, true)
+	if got, _ := os.ReadFile(path); string(got) != body {
+		t.Fatalf("boot refresh must replace the file, got %q", got)
 	}
 }
 

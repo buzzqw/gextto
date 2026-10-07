@@ -1564,14 +1564,25 @@ func bg_applyLibtorrentOptimization(s *AppState) (bool, uint64, error) {
 // optimize_worker
 // ---------------------------------------------------------------------------
 
-// optimizeWorker implements `optimize_worker`: when
-// `libtorrent_auto_optimize` is enabled it periodically re-evaluates cache,
-// buffer and queue from the available resources and applies only changed values.
+// optimizeWorker implements `optimize_worker`. For gx-torrent it re-asserts the
+// engine's own optimization (cache sized from the RAM, queue policy) every
+// period; for the embedded engine it runs the libtorrent optimization when
+// `libtorrent_auto_optimize` is enabled.
 func optimizeWorker(state *AppState) {
 	const optimizePeriod = 15 * time.Minute
 	for {
 		if !state.SleepBackground(optimizePeriod) {
 			return
+		}
+		// gx-torrent owns its cache sizing: the daemon keeps it automatic
+		// (1/32 read, 1/16 write of the RAM). Re-assert the policy periodically
+		// so a machine/RAM change or a settings edit is re-applied; this is the
+		// gx-torrent continuous optimization and is always on.
+		if gx, ok := state.activeEngine().(*gxTorrentEngine); ok {
+			if _, err := gx.ApplyOptimization(latestConfig(state)); err != nil {
+				logging.Debug("gx-torrent continuous optimization failed", "error", err.Error())
+			}
+			continue
 		}
 		// Read-only use: the shared cached configuration is enough.
 		enabled := settingTruthy(latestConfig(state).Settings["libtorrent_auto_optimize"])
@@ -1586,6 +1597,44 @@ func optimizeWorker(state *AppState) {
 		} else {
 			logging.Debug("libtorrent continuous optimization: values already optimal")
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ipfilter_refresh_worker
+// ---------------------------------------------------------------------------
+
+// ipFilterRefreshInterval is how often the configured IP filter is downloaded
+// again and reloaded while the daemon stays up. The refresh at service boot is
+// separate (the managed gx-torrent gets a fresh list before it starts).
+const ipFilterRefreshInterval = 7 * 24 * time.Hour
+
+// ipFilterRefreshWorker keeps the IP filter fresh on a long-running daemon:
+// once a week it re-downloads the configured list (when it is a URL) and
+// reloads it into the active engine, so a stale blocklist does not survive for
+// months. A backend without IP filter support is skipped.
+func ipFilterRefreshWorker(state *AppState) {
+	for {
+		if !state.SleepBackground(ipFilterRefreshInterval) {
+			return
+		}
+		cfg := latestConfig(state)
+		if cfg == nil || strings.TrimSpace(cfg.Libtorrent.IpFilterPath) == "" {
+			continue
+		}
+		if _, ok := state.activeEngine().(interface {
+			LoadIPFilter(path string) (int, error)
+		}); !ok {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		rules, path, err := applyIPFilter(ctx, state)
+		cancel()
+		if err != nil {
+			logging.Warn("IP filter refresh failed", "error", err.Error())
+			continue
+		}
+		logging.Info("IP filter refreshed", "rules", rules, "path", path)
 	}
 }
 
