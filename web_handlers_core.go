@@ -981,6 +981,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"stop_on_old_page_threshold":           settingsOr(cfg, "stop_on_old_page_threshold", "3"),
 		"debug_enabled":                        settingsOr(cfg, "debug_enabled", "false"),
 		"move_episodes":                        settingsOr(cfg, "move_episodes", "false"),
+		"hardlink_seeding":                     settingsOr(cfg, "hardlink_seeding", "true"),
 		"rename_verify_interval":               settingsOr(cfg, "rename_verify_interval", "6"),
 		"cleanup_min_score_diff":               cfg.CleanupMinScoreDiff,
 		"upgrade_min_score_diff":               cfg.UpgradeMinScoreDiff,

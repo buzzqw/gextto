@@ -126,6 +126,7 @@ var uiSettingTooltipText = map[string]string{
 	"stop_on_old_page_threshold":                   "Quante pagine di elenco leggere per ogni feed (3 è un buon compromesso).",
 	"rename_verify_interval":                       "Ogni quante ore verificare che i file archiviati/rinominati siano ancora presenti.",
 	"move_episodes":                                "Attivo: al termine del seed la sorgente scaricata viene eliminata (il file resta in libreria). Spento: la sorgente scaricata viene copiata in libreria e mantenuta.",
+	"hardlink_seeding":                             "Attivo: un file che resta in seed entra in libreria come hardlink, cioè un secondo nome per gli stessi dati, senza occupare spazio due volte. Cancellare uno dei due nomi non tocca l'altro. Funziona solo se download e libreria sono sullo stesso filesystem; altrimenti gextto copia come prima.",
 	"debug_enabled":                                "Attiva log dettagliati e diagnostiche periodiche per il debug.",
 	"jellyfin_url":                                 "URL del server Jellyfin (es. http://127.0.0.1:8096).",
 	"jellyfin_api_key":                             "API key generata in Jellyfin → Dashboard → API Keys.",

@@ -777,6 +777,15 @@ func StagePackFile(
 	if err := ValidateDestinationFrom(source, destination); err != nil {
 		return "", false, err
 	}
+	if hardlinksEnabled(cfg) {
+		// The pack keeps seeding from its download folder: a hardlink puts the
+		// episode in the library without using the space a second time.
+		if err := hardlinkAtomically(file.Path, target); err == nil {
+			return target, true, nil
+		} else {
+			noteHardlinkFallback(file.Path, target, err)
+		}
+	}
 	temporary := filepath.Join(destination, name+".gextto-part")
 	defer beginFileOperation(file.Path)()
 	_ = os.Remove(temporary)

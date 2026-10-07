@@ -163,6 +163,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "stop_on_old_page_threshold", Label: "Pagine feed da leggere", Tab: "advanced"},
 	{Key: "rename_verify_interval", Label: "Verifica rinomina (ore)", Tab: "advanced"},
 	{Key: "move_episodes", Label: "Sposta gli episodi/pack in archivio (non copiare)", Tab: "seeding"},
+	{Key: "hardlink_seeding", Label: "Hardlink invece della copia durante il seed", Tab: "seeding"},
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "advanced"},
 	{Key: "delay_torrent_minutes", Label: "Delay serie (minuti, 0 = nessuno)", Tab: "acquisition"},
 	{Key: "delay_movies_minutes", Label: "Delay film (minuti, 0 = nessuno)", Tab: "acquisition"},

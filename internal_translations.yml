@@ -3175,3 +3175,4 @@ eng:
   "HTTP con credenziali": "HTTP with credentials"
   "SOCKS4": "SOCKS4"
   "SOCKS5 (hostname)": "SOCKS5 (hostname)"
+  "Hardlink invece della copia durante il seed": "Hardlink instead of copy while seeding"

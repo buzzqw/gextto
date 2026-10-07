@@ -357,6 +357,29 @@ artwork e altri allegati del pack non vengono copiati nell'archivio: restano nel
 cartella sorgente fino al suo spostamento nel Cestino. La cartella sorgente non
 viene mai spostata o eliminata mentre il torrent sta ancora facendo seeding.
 
+#### Hardlink al posto della copia
+
+Quando un file deve restare in seed e intanto entrare in libreria (episodi in
+cartella, season pack, episodi in modalità copia), Gextto prova prima a creare
+un **hardlink**: un secondo nome, nella cartella della serie, per gli stessi dati
+già scaricati. Il file compare in libreria subito e non occupa spazio una seconda
+volta.
+
+- I due nomi sono alla pari: cancellare per errore il file nella cartella di
+  download **non** tocca quello in libreria (si interrompe solo il seed), e
+  viceversa. I dati spariscono solo quando sono cancellati entrambi i nomi.
+- Funziona solo se download e libreria stanno sullo **stesso filesystem**
+  (stesso disco o stessa condivisione NAS). Se non è possibile (dischi diversi,
+  RAM disk, condivisione senza hardlink) Gextto copia come prima e lo scrive una
+  volta nel log con il motivo.
+- Un programma che modifica il video **sul posto** (riscrive i byte nello stesso
+  file, come alcuni tagger o `mkvpropedit`) cambierebbe anche il file in seed.
+  Gextto non lo fa; se usi strumenti del genere sulla libreria, disattiva
+  l'opzione.
+
+Si disattiva con *Configurazione → Seed e completamento → Hardlink invece della
+copia durante il seed*.
+
 Il Cestino deve essere configurato in *Configurazione → Percorsi*. Se non c'è una
 destinazione NAS, Gextto non tratta la cartella Download come archivio e non la
 sposta automaticamente nel Cestino. Lo spostamento automatico della cartella
@@ -1161,6 +1184,7 @@ I pesi sono raggruppati in: risoluzione (2160p/1080p/720p/576p), sorgente (BluRa
 | Seed massimo (giorni) | Limite principale di seeding in giorni; se maggiore di 0 prevale sul limite in minuti. |
 | Elimina i completati dopo il seed | Attivo: a fine seed il torrent completato viene tolto dalla sessione (come «Pulisci completati»). Spento: a fine seed il torrent resta nell'elenco come Completato e lo rimuovi tu con «Pulisci completati». Non influisce su dove vengono spostati i file. |
 | Sposta gli episodi/pack in archivio (non copiare) | Attivo: al termine del seed la sorgente scaricata viene eliminata (il file resta in libreria). Spento: la sorgente scaricata viene copiata in libreria e mantenuta. |
+| Hardlink invece della copia durante il seed | Attivo (predefinito): un file che resta in seed entra in libreria come hardlink, senza occupare spazio due volte; se download e libreria sono su filesystem diversi si copia. Vedi «Hardlink al posto della copia». |
 
 ### Notifiche
 

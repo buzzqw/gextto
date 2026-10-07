@@ -3862,3 +3862,4 @@ fra:
   HTTP con credenziali: HTTP avec identifiants
   SOCKS4: SOCKS4
   SOCKS5 (hostname): SOCKS5 (nom d'hôte)
+  "Hardlink invece della copia durante il seed": "Lien physique au lieu d'une copie pendant le partage"

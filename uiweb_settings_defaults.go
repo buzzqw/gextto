@@ -150,6 +150,7 @@ var uiSettingDefaults = map[string]string{
 	"stop_on_old_page_threshold": "3",
 	"rename_verify_interval":     "6",
 	"move_episodes":              "false",
+	"hardlink_seeding":           "true",
 	"debug_enabled":              "false",
 
 	// --- Acquisizione -------------------------------------------------------

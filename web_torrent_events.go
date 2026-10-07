@@ -2030,6 +2030,7 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 	target := filepath.Join(destination, filepath.Base(video))
 	sourceHandled := false
 	sourcePreserved := false
+	linked := false
 	seriesName := ""
 	if release.Series != nil {
 		seriesName = *release.Series
@@ -2054,9 +2055,11 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 			"hash", event.Hash, "name", event.Name, "title", release.Title)
 		return false, nil
 	} else {
-		if err := copyFileAtomically(video, target); err != nil {
+		value, err := linkOrCopyFile(cfg, video, target)
+		if err != nil {
 			return false, err
 		}
+		linked = value
 		sourceHandled = true
 		sourcePreserved = true
 	}
@@ -2068,8 +2071,13 @@ func tev_completeEpisodeFolderWithArchive(cfg *Config, db *Database, torrents To
 		return false, err
 	}
 	if processed && sourceHandled {
-		logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
-			"library_file", target)
+		if linked {
+			logging.Info(fmt.Sprintf("📁 «%s» linked into the library (hardlink, no extra space); the download stays to keep sharing it", event.Name),
+				"library_file", target)
+		} else {
+			logging.Info(fmt.Sprintf("📁 «%s» copied to the library; the download stays to keep sharing it", event.Name),
+				"library_file", target)
+		}
 	}
 	return processed, nil
 }

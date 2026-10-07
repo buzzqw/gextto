@@ -355,6 +355,26 @@ sidecars are not copied to the archive: they remain in the source folder until
 that folder is moved to Trash. The source folder is never moved or deleted while
 the torrent is still seeding.
 
+#### Hardlinks instead of copies
+
+When a file must keep seeding while it enters the library (episodes inside a
+folder, season packs, episodes in copy mode), Gextto first tries a **hardlink**:
+a second name, in the series folder, for the data already downloaded. The file
+appears in the library at once and does not use the space a second time.
+
+- Both names are equal: deleting the file in the download folder by mistake
+  does **not** touch the library file (only seeding stops), and vice versa. The
+  data is gone only when both names are deleted.
+- It works only when downloads and library are on the **same filesystem** (same
+  disk or same NAS share). When it is not possible (different disks, RAM disk, a
+  share without hardlinks) Gextto copies as before and logs the reason once.
+- A program that edits the video **in place** (rewrites bytes in the same file,
+  like some taggers or `mkvpropedit`) would also change the seeding file. Gextto
+  never does that; if you run such tools on the library, turn the option off.
+
+Turn it off under *Configuration → Seeding and completion → Hardlink instead of
+copy while seeding*.
+
 Trash must be configured under *Configuration → Paths*. Without a NAS
 destination, Gextto does not treat the Download directory as an archive and does
 not move the folder to Trash automatically. The automatic move of the source
@@ -1131,6 +1151,7 @@ Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Re
 | Max seed (days) | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. |
 | Remove completed items after seeding | On: at the end of seeding the completed torrent is removed from the session (like “Clean completed”). Off: at the end of seeding the torrent stays in the list as Completed and you remove it with “Clean completed”. It does not affect where files are moved. |
 | Move episodes/packs to the archive (do not copy) | On: at the end of seeding the downloaded source is deleted (the file stays in the library). Off: the downloaded source is copied to the library and kept. |
+| Hardlink instead of copy while seeding | On (default): a file that keeps seeding enters the library as a hardlink, without using the space twice; when downloads and library are on different filesystems it is copied. See “Hardlinks instead of copies”. |
 
 ### Notifications
 
