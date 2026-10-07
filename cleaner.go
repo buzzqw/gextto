@@ -735,8 +735,14 @@ func CleanupInferiorDuplicatesInDir(cfg *Config, series, archivePath string, pro
 		}
 		removeEmptyParents(candidate.Path, archivePath)
 		removed++
-		logging.Info(
-			"inferior duplicate moved to trash",
+		action := "moved to the trash"
+		if cfg.CleanupAction == "delete" {
+			action = "deleted"
+		}
+		logging.Info(fmt.Sprintf("🗑️ %s S%02dE%02d: «%s» %s — a higher-resolution copy of the same episode is in the library",
+			candidate.Series, candidate.Season, candidate.Episode, filepath.Base(candidate.Path), action))
+		logging.Debug(
+			"inferior duplicate removed",
 			"series", candidate.Series,
 			"season", candidate.Season,
 			"episode", candidate.Episode,

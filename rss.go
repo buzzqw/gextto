@@ -840,7 +840,13 @@ func sweepStaleFlareSolverrSessions(ctx context.Context, client *http.Client, en
 		}
 	}
 	if len(pending) > 0 {
-		logging.Debug("destroyed stale FlareSolverr sessions", "count", len(pending))
+		domains := make([]string, 0, len(pending))
+		for _, item := range pending {
+			domains = append(domains, item.domain)
+		}
+		logging.Info(fmt.Sprintf("🧹 Closed %s left idle for %s: %s",
+			countLabel(len(pending), "FlareSolverr browser session", "FlareSolverr browser sessions"),
+			logDuration(fsSessionTTL), strings.Join(domains, ", ")))
 	}
 	return len(pending)
 }
@@ -882,7 +888,8 @@ func reconcileFlareSolverrSessions(ctx context.Context, client *http.Client, end
 		}
 	}
 	if destroyed > 0 {
-		logging.Info("destroyed orphaned FlareSolverr sessions", "count", destroyed)
+		logging.Info(fmt.Sprintf("🧹 Closed %s left open by the previous run",
+			countLabel(destroyed, "FlareSolverr browser session", "FlareSolverr browser sessions")))
 	}
 	return destroyed
 }
@@ -2093,7 +2100,7 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 			return nil, transportErr
 		}
-		fetched, fetchErr := torznabViaFlareSolverr(ctx, indexer, *flaresolverr, fullURL, utils.RedactURLSecrets(transportErr.Error()))
+		fetched, fetchErr := torznabViaFlareSolverr(ctx, indexer, *flaresolverr, fullURL, torznabShortReason(transportErr))
 		if fetchErr != nil {
 			return nil, fmt.Errorf("direct Torznab request failed (%s); FlareSolverr fallback failed: %w",
 				utils.RedactURLSecrets(transportErr.Error()), fetchErr)
@@ -2143,15 +2150,46 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 	return parse_feed_body(body, indexer.Name)
 }
 
+// torznabShortReason is the readable cause of a failed Torznab request: the
+// transport error without the request URL (which carries the query and a
+// redacted API key and only makes the log line unreadable).
+func torznabShortReason(err error) string {
+	if err == nil {
+		return ""
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		err = urlErr.Err
+	}
+	reason := utils.RedactURLSecrets(err.Error())
+	if reason == "EOF" {
+		return "connection closed by the indexer (EOF)"
+	}
+	return reason
+}
+
 // torznabViaFlareSolverr retries a blocked Torznab request through
-// FlareSolverr, logging the (redacted) original error.
+// FlareSolverr and logs the outcome: what failed, whether the retry worked and
+// how long it took. The full request URL stays at DEBUG.
 func torznabViaFlareSolverr(ctx context.Context, indexer IndexerConfig, flaresolverr, fullURL, errorText string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	logging.Info("torznab request failed; retrying via FlareSolverr",
-		"indexer", indexer.Name, "reason", errorText)
-	return fetch_with_flaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)
+	logging.Debug("torznab request failed; retrying via FlareSolverr",
+		"indexer", indexer.Name, "reason", errorText, "url", utils.RedactURLSecrets(fullURL))
+	started := time.Now()
+	body, err := fetch_with_flaresolverr(ctx, defaultHTTPClient, flaresolverr, fullURL)
+	elapsed := time.Since(started).Round(100 * time.Millisecond)
+	if err != nil {
+		if ctx.Err() == nil {
+			logging.Warn(fmt.Sprintf("⚠️ Indexer «%s»: direct request failed (%s) and the FlareSolverr retry failed too after %s: %s",
+				indexer.Name, errorText, elapsed, utils.RedactURLSecrets(err.Error())))
+		}
+		return "", err
+	}
+	logging.Info(fmt.Sprintf("🛡️ Indexer «%s»: direct request failed (%s); answered through FlareSolverr in %s",
+		indexer.Name, errorText, elapsed))
+	return body, nil
 }
 
 func torznabContentType(body string) string {

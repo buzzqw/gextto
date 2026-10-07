@@ -289,7 +289,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			alreadyOk = append(alreadyOk, archivePath)
 			continue
 		}
-		logging.Info("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
+		logging.Debug("rename file", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "from", path, "to", target, "execute", execute)
 		if execute {
 			// The renamed file has a new path: update the DB, otherwise the next
 			// preview no longer finds the file.
@@ -487,6 +487,17 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		}
 	}
 	renamedCount := len(items) - discardedCount - errorCount
+	if execute {
+		// Say what changed, file by file: a bare count does not let the user
+		// find the episode afterwards. Failures already have their own WARN.
+		for _, item := range items {
+			if entry, ok := item.(map[string]any); ok {
+				if text := renameItemLogText(series.Name, entry, cfg.CleanupAction); text != "" {
+					logging.Info(text)
+				}
+			}
+		}
+	}
 	note := ""
 	if force {
 		note = " [force]"
@@ -606,7 +617,8 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 	lastMetadataPromotion := time.Now().Add(-30 * time.Second)
 	lastDynamicAdjustment := time.Now().Add(-90 * time.Second)
 	lastResumeSave := time.Now()
-	var lastQueueActive *int
+	// lastQueueCounts is the last logged "transferring/stuck/waiting" triple.
+	lastQueueCounts := ""
 	lastSpeedPolicy := time.Now().Add(-60 * time.Second)
 	var lastSpeed *bg_speedPair
 	lastDebugLog := time.Now().Add(-300 * time.Second)
@@ -776,37 +788,34 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 		if now.Sub(lastDynamicAdjustment) >= 90*time.Second {
 			effectiveDownloadKib, _ := bg_currentSpeedLimits(cfg)
 			torrents.AdjustQueue(cfg, effectiveDownloadKib)
-			// Queue visibility, like legacy extto ("📊 Queue: ..."): log when the
-			// number of active downloads changes, not on every tick.
+			// Queue visibility: log when the counts shown in the line change, not
+			// on every tick. Comparing the engine "downloading" state instead
+			// re-logged the same counts twice per stall probe (resumed, then
+			// parked again ten minutes later).
 			snapshot := torrents.List()
 			// Apply add-time options that need metadata (first/last pieces) or that
 			// pause as soon as metadata arrives (metadata-only adds).
 			if extras != nil {
 				extras.EnforceDeferredOptions(snapshot)
 			}
-			active := 0
+			queued := 0
+			transferring := 0
+			idle := 0
+			var rateKib uint64
 			for _, torrent := range snapshot {
-				if torrent.State == "downloading" {
-					active++
+				if torrent.State == "paused" {
+					queued++
 				}
+				switch {
+				case TorrentTransferring(torrent):
+					transferring++
+				case TorrentIdle(torrent):
+					idle++
+				}
+				rateKib += torrent.DownloadRate
 			}
-			if lastQueueActive == nil || *lastQueueActive != active {
-				queued := 0
-				transferring := 0
-				idle := 0
-				var rateKib uint64
-				for _, torrent := range snapshot {
-					if torrent.State == "paused" {
-						queued++
-					}
-					switch {
-					case TorrentTransferring(torrent):
-						transferring++
-					case TorrentIdle(torrent):
-						idle++
-					}
-					rateKib += torrent.DownloadRate
-				}
+			counts := fmt.Sprintf("%d/%d/%d", transferring, idle, queued)
+			if counts != lastQueueCounts {
 				rateKib /= 1024
 				speed := fmt.Sprintf("speed %d KB/s", rateKib)
 				if effectiveDownloadKib > 0 {
@@ -815,8 +824,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				// "Active" means really transferring: a download stuck at 0 B/s
 				// is counted apart, not as active.
 				logging.Info(fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed))
-				value := active
-				lastQueueActive = &value
+				lastQueueCounts = counts
 			}
 			lastDynamicAdjustment = now
 		}
@@ -1938,6 +1946,9 @@ func cycleWorker(state *AppState) {
 	lastRenameCheck := time.Now().Add(-6 * time.Hour)
 	// Guards against overlapping archive repairs (they can be slow on NFS).
 	var renameRepairRunning atomic.Bool
+	// lastRenameAllGood is when the "all episodes correctly named" line was
+	// last logged (unix seconds): at most once a day when nothing changes.
+	var lastRenameAllGood atomic.Int64
 	var lastInactiveLog *time.Time
 	firstRun := true
 	for {
@@ -2044,7 +2055,7 @@ func cycleWorker(state *AppState) {
 							// Deferred so a panic cannot leave the repair marked as
 							// running forever.
 							defer renameRepairRunning.Store(false)
-							var renamed, discarded, duplicates, errs int64
+							var renamed, discarded, duplicates, errs, correct int64
 							for _, name := range names {
 								_, value := seriesRenameApply(state, name, true, false, false)
 								values, ok := value.(map[string]any)
@@ -2055,10 +2066,16 @@ func cycleWorker(state *AppState) {
 								discarded += bg_countKey(values, "discarded_count")
 								duplicates += bg_countKey(values, "duplicates_removed")
 								errs += bg_countKey(values, "error_count")
+								correct += bg_countKey(values, "already_ok_count")
 							}
 							if renamed+discarded+duplicates+errs > 0 {
-								logging.Info(fmt.Sprintf("🗂 Archive rename repair: %d series checked · %d renamed · %d discarded · %d duplicates removed · %d errors",
-									len(names), renamed, discarded, duplicates, errs))
+								logging.Info(renameRepairReportText(len(names), correct, renamed, discarded, duplicates, errs))
+								lastRenameAllGood.Store(0)
+							} else if now := time.Now().Unix(); now-lastRenameAllGood.Load() >= 24*3600 {
+								// Nothing to do is still worth one line a day: it shows
+								// the library is being checked, not ignored.
+								logging.Info(renameRepairReportText(len(names), correct, 0, 0, 0, 0))
+								lastRenameAllGood.Store(now)
 							} else {
 								logging.Debug(fmt.Sprintf("🗂 Archive rename repair: %d series checked, nothing to change", len(names)))
 							}

@@ -133,22 +133,25 @@ func TestStallTimerRequiresRealProgress(t *testing.T) {
 	}
 }
 
-func TestStallRetryNoticeBackoff(t *testing.T) {
+func TestStallRetryBackoff(t *testing.T) {
 	now := time.Date(2026, time.October, 4, 12, 0, 0, 0, time.UTC)
 	entry := StallWatch{}
 	want := []time.Duration{time.Hour, 3 * time.Hour, 6 * time.Hour, 12 * time.Hour, 24 * time.Hour, 24 * time.Hour}
 	for index, delay := range want {
-		if !tev_stallRetryNoticeDue(&entry, now) {
-			t.Fatalf("notice %d should be due", index)
+		if got := tev_scheduleStallRetry(&entry, now, time.Hour); got != delay {
+			t.Fatalf("retry %d delay = %s, want %s", index, got, delay)
 		}
-		tev_scheduleNextStallRetryNotice(&entry, now)
-		if got := entry.nextRetryNoticeAt.Sub(now); got != delay {
-			t.Fatalf("notice %d delay = %s, want %s", index, got, delay)
+		if entry.nextRetryAt.Sub(now) != delay {
+			t.Fatalf("retry %d scheduled at %s, want +%s", index, entry.nextRetryAt, delay)
 		}
-		if tev_stallRetryNoticeDue(&entry, now.Add(delay-time.Second)) {
-			t.Fatalf("notice %d was due before its delay elapsed", index)
-		}
-		now = entry.nextRetryNoticeAt
+		now = entry.nextRetryAt
+	}
+	// A longer configured interval is the floor of every step.
+	if got := tev_stallRetryDelay(1, 4*time.Hour); got != 4*time.Hour {
+		t.Fatalf("delay with 4h setting = %s, want 4h", got)
+	}
+	if got := tev_stallRetryDelay(0, 20*time.Minute); got != 20*time.Minute {
+		t.Fatalf("first delay must honour the setting, got %s", got)
 	}
 }
 

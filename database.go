@@ -3467,7 +3467,7 @@ func (d *Database) LoadStallWatches() (map[string]StallWatch, error) {
 		if err != nil {
 			continue
 		}
-		entry := StallWatch{lastProgressAt: progressAt, lastDone: lastDone, retryNoticeStep: step, persisted: true}
+		entry := StallWatch{lastProgressAt: progressAt, lastDone: lastDone, retryStep: step, persisted: true}
 		// An empty stalled_since is an idle download not parked yet: only its
 		// progress clock was saved.
 		if stalledSince != "" {
@@ -3481,11 +3481,6 @@ func (d *Database) LoadStallWatches() (map[string]StallWatch, error) {
 			}
 			entry.stalledSince = &stalledAt
 			entry.nextRetryAt = retryAt
-		}
-		if nextNotice != "" {
-			if noticeAt, err := parse(nextNotice); err == nil {
-				entry.nextRetryNoticeAt = noticeAt
-			}
 		}
 		watches[strings.ToLower(hash)] = entry
 	}
@@ -3503,10 +3498,9 @@ func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
 	if entry.stalledSince != nil {
 		stalledSince = entry.stalledSince.UTC().Format(time.RFC3339Nano)
 	}
+	// next_notice_at is a leftover of the old log-only backoff: the retry
+	// itself now backs off, so only notice_step (the retry step) is used.
 	nextNotice := ""
-	if !entry.nextRetryNoticeAt.IsZero() {
-		nextNotice = entry.nextRetryNoticeAt.UTC().Format(time.RFC3339Nano)
-	}
 	_, err := d.db.Exec(`INSERT INTO stalled_torrents(hash,last_progress_at,last_done,stalled_since,next_retry_at,next_notice_at,notice_step,updated_at)
 		VALUES(?1,?2,?3,?4,?5,?6,?7,?8)
 		ON CONFLICT(hash) DO UPDATE SET last_progress_at=excluded.last_progress_at,last_done=excluded.last_done,
@@ -3514,7 +3508,7 @@ func (d *Database) SaveStallWatch(hash string, entry StallWatch) error {
 		notice_step=excluded.notice_step,updated_at=excluded.updated_at`,
 		strings.ToLower(hash), entry.lastProgressAt.UTC().Format(time.RFC3339Nano), entry.lastDone,
 		stalledSince, entry.nextRetryAt.UTC().Format(time.RFC3339Nano),
-		nextNotice, entry.retryNoticeStep, nowSQLite())
+		nextNotice, entry.retryStep, nowSQLite())
 	return err
 }
 

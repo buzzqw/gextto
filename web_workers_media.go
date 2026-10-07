@@ -175,15 +175,6 @@ func bwm_truthy(value string) bool {
 	return settingTruthy(value)
 }
 
-// bwm_optionalString renders a nullable error string as the tracing
-// `unwrap_or("none")` does.
-func bwm_optionalString(value *string) string {
-	if value == nil {
-		return "none"
-	}
-	return *value
-}
-
 // bwm_backupStatePath is the file holding the last automatic backup time.
 func bwm_backupStatePath(dataDir string) string {
 	return filepath.Join(dataDir, ".gextto-backup-last")
@@ -266,18 +257,7 @@ func bwm_executeScheduledBackup(cfg *Config, notifier *Notifier) error {
 			telegramUploaded = parts > 0
 		}
 	}
-	logging.Info(
-		"💾 Scheduled backup saved",
-		"path", steps.path,
-		"ftp_uploaded", steps.ftpUploaded,
-		"ftp_host", steps.ftpHost,
-		"ftp_remote", steps.ftpRemote,
-		"ftp_error", bwm_optionalString(steps.ftpError),
-		"cloud_copied", steps.cloudCopied,
-		"cloud_destination", steps.cloudDestination,
-		"cloud_error", bwm_optionalString(steps.cloudError),
-		"telegram_uploaded", telegramUploaded,
-	)
+	logging.Info(gh5_backupLogSummary(steps, true, telegramParts, telegramError))
 	// The notification gets an empty error for a step that was not configured
 	// (nil): the "none" placeholder would read as a failure.
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{

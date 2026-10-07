@@ -279,7 +279,7 @@ func gh5_runBackupSteps(dataDir, root string, retain int, ftp *gh5_ftpConfig, cl
 	if info, statErr := os.Stat(path); statErr == nil {
 		size = info.Size()
 	}
-	logging.Info("backup snapshot created", "path", path, "size_bytes", size)
+	logging.Debug("backup snapshot created", "path", path, "size_bytes", size)
 
 	steps := gh5_backupSteps{path: path, sizeBytes: size}
 	if ftp != nil {
@@ -452,18 +452,7 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 			logging.Debug("backup Telegram send completed", "uploaded", telegramUploaded, "parts", parts)
 		}
 	}
-	logging.Info(
-		"backup completed",
-		"path", steps.path,
-		"ftp_uploaded", steps.ftpUploaded,
-		"ftp_host", steps.ftpHost,
-		"ftp_remote", steps.ftpRemote,
-		"ftp_error", gh5_optionalString(steps.ftpError),
-		"cloud_copied", steps.cloudCopied,
-		"cloud_destination", steps.cloudDestination,
-		"cloud_error", gh5_optionalString(steps.cloudError),
-		"telegram_uploaded", telegramUploaded,
-	)
+	logging.Info(gh5_backupLogSummary(steps, false, telegramParts, telegramError))
 	// The notification gets an empty error for a step that was not configured
 	// (nil): the "none" placeholder would read as a failure.
 	_ = notifier.NotifyEvent("backup_completed", map[string]any{
@@ -495,11 +484,36 @@ func CreateBackup(w http.ResponseWriter, r *http.Request, s *AppState) {
 	})
 }
 
-func gh5_optionalString(value *string) string {
-	if value == nil {
-		return "none"
+// gh5_backupLogSummary is the single INFO line of a finished backup: size,
+// path and the outcome of each copy that is configured. Steps that are not
+// configured are not mentioned; failures also have their own WARN line.
+func gh5_backupLogSummary(steps gh5_backupSteps, scheduled bool, telegramParts int, telegramError string) string {
+	label := "💾 Backup saved"
+	if scheduled {
+		label = "💾 Scheduled backup saved"
 	}
-	return *value
+	parts := []string{fmt.Sprintf("%s (%s): %s", label, logging.HumanBytesI64(steps.sizeBytes), steps.path)}
+	switch {
+	case steps.ftpUploaded:
+		parts = append(parts, "FTP "+steps.ftpHost+" ✓")
+	case steps.ftpError != nil:
+		parts = append(parts, "FTP "+steps.ftpHost+" ✗")
+	}
+	switch {
+	case steps.cloudCopied:
+		parts = append(parts, "cloud copy ✓")
+	case steps.cloudError != nil:
+		parts = append(parts, "cloud copy ✗")
+	}
+	switch {
+	case telegramError != "":
+		parts = append(parts, "Telegram ✗")
+	case telegramParts > 1:
+		parts = append(parts, fmt.Sprintf("Telegram ✓ (%d parts)", telegramParts))
+	case telegramParts == 1:
+		parts = append(parts, "Telegram ✓")
+	}
+	return strings.Join(parts, " · ")
 }
 
 // DbPrunePreview implements `db_prune_preview`.
