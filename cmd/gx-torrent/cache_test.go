@@ -128,3 +128,10 @@ func TestAdaptiveCacheDisabledUsesStatic(t *testing.T) {
 		t.Fatalf("static sizing mismatch: got %d/%d want %d/%d", read, write, wantRead, wantWrite)
 	}
 }
+
+func TestRuntimeVersionUsesAppVersion(t *testing.T) {
+	v := runtimeVersion()
+	if len(v) < 5 || v[:4] != "1.1." {
+		t.Fatalf("runtime version = %q, want 1.1.<build>", v)
+	}
+}

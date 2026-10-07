@@ -124,7 +124,7 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	ok := d.session != nil
 	count := len(d.state.Torrents)
 	d.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": version, "torrents": count})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": runtimeVersion(), "torrents": count})
 }
 
 func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {

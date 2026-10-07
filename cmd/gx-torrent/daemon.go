@@ -1370,7 +1370,7 @@ func (d *Daemon) stats() daemonStats {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	out := daemonStats{
-		Version:         version,
+		Version:         runtimeVersion(),
 		UptimeSeconds:   int64(time.Since(d.startedAt).Seconds()),
 		Torrents:        len(views),
 		ActiveDownloads: d.limits.Downloads,

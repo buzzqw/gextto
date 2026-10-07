@@ -21,10 +21,21 @@ import (
 	"time"
 
 	clog "github.com/cenkalti/log"
+
+	"github.com/buzzqw/gextto/internal/constants"
 )
 
-// version is overridden at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// version may be overridden at build time with -ldflags "-X main.version=...".
+// Empty means: use the shared app version (1.1.<build>), so the daemon reports
+// the same string as the Gextto UI.
+var version = ""
+
+func runtimeVersion() string {
+	if version != "" {
+		return version
+	}
+	return constants.AppVersion()
+}
 
 func logf(format string, args ...any) {
 	log.Printf(format, args...)
@@ -147,7 +158,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println(version)
+		fmt.Println(runtimeVersion())
 		return
 	}
 	log.SetFlags(log.LstdFlags)
@@ -231,7 +242,7 @@ func main() {
 	}
 	serverErr := make(chan error, 1)
 	go func() {
-		logf("version %s listening on %s (data %s, downloads %s)", version, opts.Listen, opts.DataDir, opts.DownloadDir)
+		logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), opts.Listen, opts.DataDir, opts.DownloadDir)
 		serverErr <- server.ListenAndServe()
 	}()
 

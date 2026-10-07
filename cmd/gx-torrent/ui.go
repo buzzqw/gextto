@@ -278,7 +278,7 @@ const uiPageTemplate = `<!doctype html>
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <span class="muted">v{{.Version}} · up for {{.Uptime}} · {{.Now}}</span>
+  <span class="muted">{{.Version}} · up for {{.Uptime}} · {{.Now}}</span>
 </header>
 <main>
   {{if .Notice}}<div class="notice{{if .Error}} err{{end}}">{{.Notice}}</div>{{end}}

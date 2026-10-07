@@ -43,7 +43,7 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
     (
         cd "$ROOT"
         CGO_ENABLED=0 go build -trimpath \
-            -ldflags "-s -w -X main.version=$VERSION+$BUILD" \
+            -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
             -o "$GX_OUT" ./cmd/gx-torrent
     )
     printf 'built %s\n' "$GX_OUT"

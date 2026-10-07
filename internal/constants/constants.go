@@ -25,3 +25,8 @@ var Version = "0.1.0"
 // Build is the monotonic build number, overridden at build time with
 // `-X gextto/internal/constants.Build=...`. It identifies the exact binary.
 var Build = "1000"
+
+// AppVersion is the version shown in the UI and by gx-torrent:
+// "<major>.<minor>.<build>". Kept here so the gextto UI, the API and the
+// gx-torrent daemon all report the same string.
+func AppVersion() string { return "1.1." + Build }

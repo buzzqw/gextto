@@ -85,7 +85,7 @@ type uiShellChrome struct {
 func uiShellChromeFrom(s *AppState) uiShellChrome {
 	cfg := latestConfig(s)
 	chrome := uiShellChrome{
-		Version:      "1.1." + constants.Build,
+		Version:      constants.AppVersion(),
 		DryRun:       cfg.DryRun,
 		Status:       "offline",
 		CurrentTime:  uiNowClock(),
