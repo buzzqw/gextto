@@ -87,7 +87,7 @@ func TestCalendarICSListsSeasonEpisodesInWindow(t *testing.T) {
 	if _, err := state.db.db.Exec("INSERT INTO episodes(series_id,season,episode,downloaded_at) SELECT id,1,4,?1 FROM series WHERE name='Old Show'", today.Format(time.RFC3339)); err != nil {
 		t.Fatal(err)
 	}
-	events := icsCollectEvents(t.Context(), cfg, state.db, true, time.Now())
+	events := icsCollectEvents(t.Context(), cfg, state.db, func(text string) string { return text }, time.Now())
 	summaries := []string{}
 	for _, event := range events {
 		summaries = append(summaries, event.Summary)

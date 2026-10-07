@@ -308,23 +308,22 @@ func authLoginFailed(client string, now time.Time) {
 }
 
 func authLoginHandler(s *AppState, auth authSettings, w http.ResponseWriter, r *http.Request) {
-	italian := v2Language(s) == "it"
 	next := authSafeNext(r.FormValue("next"))
 	if r.Method != http.MethodPost {
-		authRenderLogin(w, italian, next, "", http.StatusOK)
+		authRenderLogin(s, w, next, "", http.StatusOK)
 		return
 	}
 	client := authClientAddress(r)
 	now := time.Now()
 	if authLoginBlocked(client, now) {
-		authRenderLogin(w, italian, next, pick(italian, "Troppi tentativi: riprova tra un minuto.", "Too many attempts: try again in a minute."), http.StatusTooManyRequests)
+		authRenderLogin(s, w, next, "Troppi tentativi: riprova tra un minuto.", http.StatusTooManyRequests)
 		return
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
 	if subtle.ConstantTimeCompare([]byte(username), []byte(auth.username)) != 1 || !auth.passwordMatches(r.FormValue("password")) {
 		authLoginFailed(client, now)
 		logging.Warn(fmt.Sprintf("Failed login to the web interface from %s", client))
-		authRenderLogin(w, italian, next, pick(italian, "Utente o password errati.", "Wrong username or password."), http.StatusUnauthorized)
+		authRenderLogin(s, w, next, "Utente o password errati.", http.StatusUnauthorized)
 		return
 	}
 	expires := now.Add(authSessionLifetime)
@@ -342,23 +341,27 @@ func authLoginHandler(s *AppState, auth authSettings, w http.ResponseWriter, r *
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
-func pick(italian bool, it, en string) string {
-	if italian {
-		return it
-	}
-	return en
+// uiText translates an Italian interface string into the active interface
+// language with the bundled catalogs (falling back to English, then to the
+// Italian text), like the rendered pages.
+func uiText(s *AppState, italian string) string {
+	dict, eng := v2Dictionaries(s)
+	return v2TranslateText(italian, dict, eng)
 }
 
-func authRenderLogin(w http.ResponseWriter, italian bool, next, message string, status int) {
+func authRenderLogin(s *AppState, w http.ResponseWriter, next, message string, status int) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.WriteHeader(status)
-	lang := pick(italian, "it", "en")
+	lang := v2Language(s)
+	if len(lang) > 2 {
+		lang = lang[:2]
+	}
 	errorBlock := ""
 	if message != "" {
-		errorBlock = `<p class="error" role="alert">` + html.EscapeString(message) + `</p>`
+		errorBlock = `<p class="error" role="alert">` + html.EscapeString(uiText(s, message)) + `</p>`
 	}
 	fmt.Fprintf(w, `<!doctype html>
 <html lang="%s"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -378,15 +381,16 @@ button{margin-top:20px;width:100%%;padding:11px;border:0;border-radius:8px;backg
 <h1>Gextto</h1><p>%s</p>
 <input type="hidden" name="next" value="%s">
 <label for="u">%s</label><input id="u" name="username" autocomplete="username" required autofocus>
-<label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" required>
+<label for="p">%s</label><input id="p" name="password" type="password" autocomplete="current-password" required>
 %s<button type="submit">%s</button>
 </form></body></html>`,
-		lang,
-		pick(italian, "Accesso", "Login"),
-		pick(italian, "Accedi per continuare.", "Log in to continue."),
+		html.EscapeString(lang),
+		html.EscapeString(uiText(s, "Accesso")),
+		html.EscapeString(uiText(s, "Accedi per continuare.")),
 		html.EscapeString(next),
-		pick(italian, "Utente", "Username"),
+		html.EscapeString(uiText(s, "Utente")),
+		html.EscapeString(uiText(s, "Password")),
 		errorBlock,
-		pick(italian, "Entra", "Log in"),
+		html.EscapeString(uiText(s, "Entra")),
 	)
 }

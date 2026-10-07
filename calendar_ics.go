@@ -55,13 +55,13 @@ func CalendarICS(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "TMDB API key is not configured", http.StatusConflict)
 		return
 	}
-	italian := v2Language(s) == "it"
-	lang := pick(italian, "it", "en")
+	lang := v2Language(s)
+	tr := func(italian string) string { return uiText(s, italian) }
 	icsCache.Lock()
 	body := icsCache.body
 	if body == nil || time.Since(icsCache.builtAt) > icsCacheTTL || icsCache.lang != lang {
-		events := icsCollectEvents(r.Context(), cfg, s.db, italian, time.Now())
-		body = []byte(renderICS(events, pick(italian, "Gextto — uscite", "Gextto — releases"), time.Now()))
+		events := icsCollectEvents(r.Context(), cfg, s.db, tr, time.Now())
+		body = []byte(renderICS(events, tr("Gextto — uscite"), time.Now()))
 		icsCache.body, icsCache.builtAt, icsCache.lang = body, time.Now(), lang
 	}
 	icsCache.Unlock()
@@ -71,7 +71,8 @@ func CalendarICS(w http.ResponseWriter, r *http.Request, s *AppState) {
 	_, _ = w.Write(body)
 }
 
-func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, italian bool, now time.Time) []icsEvent {
+// tr translates the Italian texts into the interface language.
+func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(string) string, now time.Time) []icsEvent {
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	from := today.AddDate(0, 0, -icsPastDays)
@@ -139,12 +140,10 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, italian bo
 					if episode.Name != nil && strings.TrimSpace(*episode.Name) != "" {
 						summary += " · " + strings.TrimSpace(*episode.Name)
 					}
-					description := pick(italian,
-						"Prima messa in onda originale (TMDB). La versione italiana può arrivare molto più tardi: quando gextto la scarica compare come «📥».",
-						"Original broadcast (TMDB). A localised release can come much later: when gextto downloads it, it shows up as “📥”.")
+					description := tr("Prima messa in onda originale (TMDB). La versione italiana può arrivare molto più tardi: quando gextto la scarica compare come «📥».")
 					if downloaded[[2]int64{*episode.SeasonNumber, *episode.EpisodeNumber}] {
 						summary = "✓ " + summary
-						description = pick(italian, "Prima messa in onda originale (TMDB). Già in libreria.", "Original broadcast (TMDB). Already in the library.")
+						description = tr("Prima messa in onda originale (TMDB). Già in libreria.")
 					}
 					found = append(found, icsEvent{
 						UID:         fmt.Sprintf("gextto-tv-%s-%s@gextto", tmdbID, code),
@@ -173,17 +172,15 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, italian bo
 			var description, day string
 			if localDay, kind, found, err := tmdb.MovieReleaseDate(ctx, movie.TmdbID, country); err == nil && found {
 				day = localDay
-				description = icsMovieReleaseText(italian, kind, country)
+				description = icsMovieReleaseText(tr, kind) + " · " + country
 			} else {
 				details, err := tmdb.MovieDetails(ctx, movie.TmdbID)
 				if err != nil || details == nil || details.ReleaseDate == nil {
 					return
 				}
 				day = *details.ReleaseDate
-				summary += pick(italian, " (uscita originale)", " (original release)")
-				description = pick(italian,
-					"Uscita originale (TMDB): per "+country+" non c'è ancora una data.",
-					"Original release (TMDB): no date yet for "+country+".")
+				summary += " " + tr("(uscita originale)")
+				description = tr("Uscita originale (TMDB): nel paese della lingua TMDB non c'è ancora una data.") + " · " + country
 			}
 			date, ok := inWindow(day)
 			if !ok {
@@ -200,7 +197,7 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, italian bo
 		}(movie)
 	}
 	wg.Wait()
-	events = append(events, icsArrivals(db, italian, today.AddDate(0, 0, -icsArrivalDays))...)
+	events = append(events, icsArrivals(db, tr, today.AddDate(0, 0, -icsArrivalDays))...)
 	sort.SliceStable(events, func(a, b int) bool {
 		if !events[a].Date.Equal(events[b].Date) {
 			return events[a].Date.Before(events[b].Date)
@@ -218,20 +215,20 @@ func icsCountry(language string) string {
 	return "IT"
 }
 
-func icsMovieReleaseText(italian bool, kind, country string) string {
+func icsMovieReleaseText(tr func(string) string, kind string) string {
 	switch kind {
 	case "digital":
-		return pick(italian, "Uscita digitale in "+country+" (TMDB).", "Digital release in "+country+" (TMDB).")
+		return tr("Uscita digitale (TMDB)")
 	case "physical":
-		return pick(italian, "Uscita home video in "+country+" (TMDB).", "Home video release in "+country+" (TMDB).")
+		return tr("Uscita home video (TMDB)")
 	default:
-		return pick(italian, "Uscita al cinema in "+country+" (TMDB).", "Theatrical release in "+country+" (TMDB).")
+		return tr("Uscita al cinema (TMDB)")
 	}
 }
 
 // icsArrivals lists what entered the library since from, on the day it
 // arrived.
-func icsArrivals(db *Database, italian bool, from time.Time) []icsEvent {
+func icsArrivals(db *Database, tr func(string) string, from time.Time) []icsEvent {
 	if db == nil {
 		return nil
 	}
@@ -257,7 +254,7 @@ func icsArrivals(db *Database, italian bool, from time.Time) []icsEvent {
 					UID:         fmt.Sprintf("gextto-arrived-%s-%s@gextto", icsUIDPart(name), code),
 					Date:        date,
 					Summary:     "📥 " + name + " " + code,
-					Description: pick(italian, "Arrivato in libreria.", "Arrived in the library."),
+					Description: tr("Arrivato in libreria."),
 				})
 			}
 		}
@@ -279,7 +276,7 @@ func icsArrivals(db *Database, italian bool, from time.Time) []icsEvent {
 					UID:         fmt.Sprintf("gextto-arrived-movie-%s-%d@gextto", icsUIDPart(name), year),
 					Date:        date,
 					Summary:     "📥 " + title,
-					Description: pick(italian, "Arrivato in libreria.", "Arrived in the library."),
+					Description: tr("Arrivato in libreria."),
 				})
 			}
 		}
