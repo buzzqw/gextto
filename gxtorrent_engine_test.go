@@ -505,3 +505,39 @@ func TestGxCacheMB(t *testing.T) {
 		t.Fatal("at least 1 MiB")
 	}
 }
+
+// TestGxAddFormCarriesSequential checks that the sequential add option reaches
+// the daemon. This is the streaming mode gx-torrent gained from rain v2.
+func TestGxAddFormCarriesSequential(t *testing.T) {
+	form := gxAddForm("/dl", AddOptions{Sequential: true})
+	if form.Get("sequential") != "1" {
+		t.Fatalf("sequential not sent to the daemon: %v", form)
+	}
+	if got := gxAddForm("/dl", AddOptions{}).Get("sequential"); got != "" {
+		t.Fatalf("sequential must be off by default, got %q", got)
+	}
+}
+
+// TestGxEngineSetSequentialPushesConfig checks that SetSequential reaches the
+// daemon as a config patch, and that an unchanged value is not pushed twice.
+func TestGxEngineSetSequentialPushesConfig(t *testing.T) {
+	engine, fake := newTestGxEngine(t, "")
+	if ok, err := engine.SetSequential(true); err != nil || !ok {
+		t.Fatalf("set sequential: ok=%v err=%v", ok, err)
+	}
+	fake.mu.Lock()
+	pushed := append([]string(nil), fake.configs...)
+	fake.mu.Unlock()
+	if len(pushed) != 1 || !strings.Contains(pushed[0], `"sequential":true`) {
+		t.Fatalf("config not pushed: %v", pushed)
+	}
+	if _, err := engine.SetSequential(true); err != nil {
+		t.Fatal(err)
+	}
+	fake.mu.Lock()
+	n := len(fake.configs)
+	fake.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("unchanged sequential pushed again: %d", n)
+	}
+}

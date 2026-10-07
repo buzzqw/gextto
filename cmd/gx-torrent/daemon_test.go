@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -934,5 +935,34 @@ func TestLSDDiscovery(t *testing.T) {
 	})
 	if leecher.stats().LSD.PeersFound == 0 {
 		t.Fatal("no peer counted as found by LSD")
+	}
+}
+
+// TestDaemonSequentialOption checks the per-add "sequential" option and the
+// daemon-wide default that gextto sets through the config endpoint.
+func TestDaemonSequentialOption(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 50_000)
+	hash, existing, err := d.add(addRequest{TorrentData: data, Destination: src, Sequential: true, SeedRatio: -1, SeedDays: -1})
+	if err != nil || existing {
+		t.Fatalf("add: %v existing=%v", err, existing)
+	}
+	if info, _ := findInfo(d, hash); !info.Sequential {
+		t.Fatalf("sequential not reported: %+v", info)
+	}
+
+	// The global default applies to torrents added afterwards.
+	if _, err := d.setConfig(map[string]json.RawMessage{"sequential": json.RawMessage(`true`)}); err != nil {
+		t.Fatal(err)
+	}
+	src2 := filepath.Join(t.TempDir(), "src2")
+	data2 := makeTorrent(t, src2, "other.bin", 50_000)
+	hash2, _, err := d.add(addRequest{TorrentData: data2, Destination: src2, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := findInfo(d, hash2); !info.Sequential {
+		t.Fatalf("global sequential default not applied: %+v", info)
 	}
 }

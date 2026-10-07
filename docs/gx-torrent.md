@@ -1,7 +1,7 @@
 # gx-torrent: il motore torrent alternativo in puro Go
 
 `gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra la libreria
-[`cenkalti/rain`](https://github.com/cenkalti/rain). È il motore predefinito di
+[`cenkalti/rain`](https://github.com/cenkalti/rain) (base v2.4.2). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
 gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
 espone anche una pagina web operativa apribile dal browser (per default su tutta
@@ -216,6 +216,25 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   gextto riceve "completato" quando sono pronti quelli.
 - Cambiare la selezione ferma il torrent per un attimo, sposta i file
   interessati tra `parts` e destinazione e lo fa ripartire.
+
+## Download sequenziale (streaming)
+
+Con `sequential` il torrent scarica i pezzi in ordine di indice invece che
+"rarest-first", e per prima cosa i bordi di ogni file (primo e ultimo ~1%,
+fino a 8 MB): è la modalità pensata per lo streaming, così un player può
+iniziare mentre il download prosegue. È più lenta nel complesso e peggiora la
+salute dello sciame, quindi resta **opzionale e spenta di default**.
+
+- Si imposta al momento dell'aggiunta: dalla pagina web (casella
+  *sequential*), con `sequential=1` su `POST /api/v1/add`, oppure dal campo
+  `AddOptions.Sequential` di Gextto (impostazione *Download sequenziale*,
+  `libtorrent_sequential`).
+- Il valore predefinito per i torrent aggiunti dopo si imposta con
+  `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
+  l'impostazione.
+- rain fissa l'ordine quando il torrent viene aggiunto: l'opzione vale per i
+  torrent **nuovi**, non cambia quelli già in corso. Lo stato è persistito e
+  riportato in `GET /api/v1/torrents` (`sequential`).
 
 ## Torrent BitTorrent v2
 
@@ -435,7 +454,7 @@ token è impostato.
 | `GET /api/v1/health` | stato e versione |
 | `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
-| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
+| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
@@ -460,7 +479,8 @@ Chiavi accettate da `POST /api/v1/config`:
 - `dont_count_slow`, `slow_rate`, `slow_after_secs`, `slow_rotate_secs`;
 - `dynamic_queue`, `dynamic_min`, `dynamic_max`;
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
-- `max_peer_dial`, `max_peer_accept`.
+- `max_peer_dial`, `max_peer_accept`;
+- `sequential` (predefinito per i torrent aggiunti dopo).
 
 ## Limiti noti (rain)
 
@@ -468,7 +488,6 @@ Le operazioni che rain non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- download sequenziale e prima/ultima parte;
 - web seed aggiunti a mano;
 - limiti di velocità e connessioni per singolo torrent;
 - super-seeding e upload mode;
@@ -476,6 +495,10 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 
+Il **download sequenziale** è supportato dalla base v2.4.2 (vedi sotto); la
+priorità "prima/ultima parte" dei file è inclusa nella modalità sequenziale:
+rain scarica per primi i bordi di ogni file (~1% della dimensione, fino a 8 MB),
+così i player trovano subito l'indice.
 
 Gli slot di upload e le connessioni per torrent restano quelli predefiniti di
 rain.
