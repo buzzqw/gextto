@@ -460,6 +460,12 @@ When the same cycle offers a single episode and a pack containing it with the
 same score, Gextto picks the release covering more episodes (at equal score a
 REMUX is still preferred).
 
+An episode that already has a torrent downloading is not missing: it is not
+searched again and it does not appear among the series' missing episodes, even
+when the torrent was added by hand, from a watched folder or from a phone. The
+same applies to a whole season while its season pack downloads. If the download
+fails the episode is missing again.
+
 ## 5. Movies
 
 - Tabs **Monitored / Downloaded**; sortable columns (name, year, quality,

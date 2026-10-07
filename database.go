@@ -2522,6 +2522,10 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 		return nil, err
 	}
 	ignoredRows.Close()
+	downloading, err := d.activeDownloadEpisodes()
+	if err != nil {
+		return nil, err
+	}
 	keys := make([]seasonTargetKey, 0, len(seasonTargets))
 	for key := range seasonTargets {
 		keys = append(keys, key)
@@ -2538,6 +2542,9 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 		if _, ok := completePacks[key]; ok {
 			continue
 		}
+		if downloading.season(key.Series, key.Season) {
+			continue
+		}
 		episodes := present[key]
 		for episode := int64(1); episode <= maxEpisode; episode++ {
 			if _, ok := ignored[key][episode]; ok {
@@ -2546,10 +2553,68 @@ func (d *Database) ArchiveGaps() ([]SeriesGap, error) {
 			if _, ok := episodes[episode]; ok {
 				continue
 			}
+			if downloading.episode(key.Series, key.Season, episode) {
+				continue
+			}
 			gaps = append(gaps, SeriesGap{Series: key.Series, Season: key.Season, Episode: episode})
 		}
 	}
 	return gaps, nil
+}
+
+// activeDownloads are the episodes and whole seasons a torrent is still
+// downloading or seeding. Downloads approved by the cycle already have an
+// episode row; this also covers the ones added by hand, from a watched folder
+// or from the phone, and season packs, so they are not searched as missing.
+type activeDownloads struct {
+	seasons  map[string]struct{}
+	episodes map[string]struct{}
+}
+
+func activeDownloadKey(series string, season int64) string {
+	return NormalizeSeriesName(series) + "\x00" + strconv.FormatInt(season, 10)
+}
+
+func (a activeDownloads) season(series string, season int64) bool {
+	_, ok := a.seasons[activeDownloadKey(series, season)]
+	return ok
+}
+
+func (a activeDownloads) episode(series string, season, episode int64) bool {
+	_, ok := a.episodes[activeDownloadKey(series, season)+"\x00"+strconv.FormatInt(episode, 10)]
+	return ok
+}
+
+func (d *Database) activeDownloadEpisodes() (activeDownloads, error) {
+	active := activeDownloads{seasons: map[string]struct{}{}, episodes: map[string]struct{}{}}
+	rows, err := d.db.Query("SELECT COALESCE(series_name,''), season, episode, COALESCE(metadata_json,'') FROM torrent_meta WHERE status NOT IN ('completed','error','removed') AND season IS NOT NULL AND COALESCE(series_name,'')<>''")
+	if err != nil {
+		return active, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, metadataJSON string
+		var season int64
+		var episode sql.NullInt64
+		if err := rows.Scan(&name, &season, &episode, &metadataJSON); err != nil {
+			return active, err
+		}
+		key := activeDownloadKey(name, season)
+		// A multi-episode release lists its episodes in the stored metadata.
+		var metadata models.TorrentMeta
+		if metadataJSON != "" && json.Unmarshal([]byte(metadataJSON), &metadata) == nil && len(metadata.Release.EpisodeRange) > 1 {
+			for _, value := range metadata.Release.EpisodeRange {
+				active.episodes[key+"\x00"+strconv.FormatInt(value, 10)] = struct{}{}
+			}
+			continue
+		}
+		if !episode.Valid || episode.Int64 == 0 {
+			active.seasons[key] = struct{}{}
+			continue
+		}
+		active.episodes[key+"\x00"+strconv.FormatInt(episode.Int64, 10)] = struct{}{}
+	}
+	return active, rows.Err()
 }
 
 // ArchiveGapsForSeries is the same gap calculation restricted to one series.
@@ -2652,9 +2717,16 @@ func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
 		seasons = append(seasons, season)
 	}
 	sort.Slice(seasons, func(i, j int) bool { return seasons[i] < seasons[j] })
+	downloading, err := d.activeDownloadEpisodes()
+	if err != nil {
+		return nil, err
+	}
 	gaps := make([][2]int64, 0)
 	for _, season := range seasons {
 		if _, ok := completeSeasons[season]; ok {
+			continue
+		}
+		if downloading.season(seriesName, season) {
 			continue
 		}
 		for episode := int64(1); episode <= targets[season]; episode++ {
@@ -2662,6 +2734,9 @@ func (d *Database) ArchiveGapsForSeries(seriesName string) ([][2]int64, error) {
 				continue
 			}
 			if _, ok := present[[2]int64{season, episode}]; ok {
+				continue
+			}
+			if downloading.episode(seriesName, season, episode) {
 				continue
 			}
 			gaps = append(gaps, [2]int64{season, episode})

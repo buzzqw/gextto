@@ -1989,3 +1989,41 @@ func TestCheckMovieScoredPrefersExactYear(t *testing.T) {
 		t.Fatalf("scores 2020=%d 2021=%d, want 100/200 (exact year replaced)", score2020, score2021)
 	}
 }
+
+func TestArchiveGapsSkipEpisodesAlreadyDownloading(t *testing.T) {
+	db := newTestDB(t)
+	if _, err := db.db.Exec("INSERT INTO series(name) VALUES ('Show')"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveSeriesMetadata("Show", [][2]int64{{1, 4}, {2, 3}}); err != nil {
+		t.Fatal(err)
+	}
+	// Added by hand: no episode row, only the torrent entry.
+	for _, row := range []struct {
+		hash, status string
+		season       int64
+		episode      any
+	}{
+		{"1111111111111111111111111111111111111111", "downloading", 1, 2},
+		{"2222222222222222222222222222222222222222", "queued", 2, nil}, // season pack
+		{"3333333333333333333333333333333333333333", "error", 1, 3},   // failed: still missing
+	} {
+		if _, err := db.db.Exec("INSERT INTO torrent_meta(hash,series_name,season,episode,status,updated_at) VALUES (?1,'show',?2,?3,?4,datetime('now'))", row.hash, row.season, row.episode, row.status); err != nil {
+			t.Fatal(err)
+		}
+	}
+	gaps, err := db.ArchiveGaps()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, gaps, []SeriesGap{
+		{Series: "Show", Season: 1, Episode: 1},
+		{Series: "Show", Season: 1, Episode: 3},
+		{Series: "Show", Season: 1, Episode: 4},
+	})
+	perSeries, err := db.ArchiveGapsForSeries("Show")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, perSeries, [][2]int64{{1, 1}, {1, 3}, {1, 4}})
+}

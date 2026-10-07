@@ -465,6 +465,12 @@ episodio per episodio. Quando nello stesso ciclo ci sono un episodio singolo e
 un pack che lo contiene con lo stesso punteggio, Gextto sceglie la release che
 copre più episodi (a parità di punteggio un REMUX resta comunque preferito).
 
+Un episodio che ha già un torrent in download non è un mancante: non viene
+cercato di nuovo e non compare tra i mancanti della serie, anche se il torrent è
+stato aggiunto a mano, da una cartella osservata o dal telefono. Lo stesso vale
+per tutta la stagione mentre se ne scarica il season pack. Se il download
+finisce in errore l'episodio torna tra i mancanti.
+
 ## 5. Film
 
 - Tab **Monitorati / Scaricati**; colonne ordinabili (nome, anno, qualità, lingua).
