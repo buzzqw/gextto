@@ -16,13 +16,14 @@ mostrato `write_cache=0`: la coda non si riempie perché storage e download
 vanno di pari passo. Decisione: **alzare comunque** il cap come rete di
 sicurezza, o **chiudere** il punto (nessun beneficio osservato).
 
-## 3. Verifica live del flusso RAM disk con gx-torrent
-Dopo il cambio di staging (`resolveSavePath` condivisa), gx-torrent parte su
-RAM disk/temp. Da provare un download reale che **attraversi il RAM disk e lo
-spostamento** a disco (copy+remove cross-filesystem), con seed ripreso.
-Test mirato proposto con **Big Buck Bunny** (piccolo, entra nella soglia).
-Nota: i link di download Blender/Google per BBB hanno dato 404 — serve una
-fonte (torrent WebTorrent di BBB, oppure file fornito localmente).
+## 3. ~~Verifica live del flusso RAM disk con gx-torrent~~ — FATTO
+Test mirato con Big Buck Bunny (`/home/andres/trasferimento/big-buck-bunny.torrent`,
+276 MB su 3 file, web seed `webtorrent.io`): scaricato sul **RAM disk**
+(`/mnt/ramdisk`, tmpfs) e poi **spostato a disco** con l'azione `move`
+(copy+remove cross-filesystem). Esito: `seeding`, RAM disk svuotato, file
+integri. Il staging su RAM disk e lo spostamento con gx-torrent funzionano.
+(Nota: l'ISO di Arch presente è di aprile, il torrent di `torrent-done` di
+ottobre: non combaciano, quindi non usabile come dato locale.)
 
 ## 4. Script di benchmark RAM riproducibile
 Committare in `scripts/` (o `docs/`) lo script usato per la misura di memoria
