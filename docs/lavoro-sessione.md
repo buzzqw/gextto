@@ -197,9 +197,11 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
    proprietario; i controlli su quella parte li fa lui.
 4. Il titolo del merge `281f89a` contiene "Claude" (vedi 3.2).
 
-### Proposte emerse ma non richieste
-- Escludere dalla ricerca dei mancanti gli episodi già in download.
-- Badge in barra sul numero di download attivi (web, telefono).
+### Proposte di migliorie
+Raccolte in `docs/proposte-migliorie.md` (hardlink, aggiornamento mirato
+Jellyfin/Plex, soglia "upgrade until", autenticazione facoltativa, iCal,
+ComicInfo.xml, anime, più due proposte minori). In attesa dei commenti del
+proprietario punto per punto: non implementare nulla prima della risposta.
 
 ---
 
@@ -222,7 +224,7 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
 
 ## 6. Come riprendere
 
-1. Leggere questo file e `CLAUDE.md`.
+1. Leggere questo file, `CLAUDE.md` e `docs/proposte-migliorie.md`.
 2. Configurare git come al punto 1.2 e installare `libtorrent-rasterbar-dev`.
 3. `git pull origin main`, `go test ./...` per partire da uno stato verde.
 4. Chiedere al proprietario quali punti della sezione 4 affrontare, oppure
