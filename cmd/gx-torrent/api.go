@@ -21,20 +21,28 @@ import (
 const maxTorrentFile = 32 << 20
 
 func (d *Daemon) routes() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/health", d.handleHealth)
-	mux.HandleFunc("GET /api/v1/stats", d.handleStats)
-	mux.HandleFunc("GET /api/v1/torrents", d.handleList)
-	mux.HandleFunc("POST /api/v1/add", d.handleAdd)
-	mux.HandleFunc("POST /api/v1/add-file", d.handleAddFile)
-	mux.HandleFunc("DELETE /api/v1/torrents/{hash}", d.handleRemove)
-	mux.HandleFunc("GET /api/v1/torrents/{hash}/{what}", d.handleInspect)
-	mux.HandleFunc("POST /api/v1/torrents/{hash}/{action}", d.handleAction)
-	mux.HandleFunc("POST /api/v1/pins/clear", d.handleClearPins)
-	mux.HandleFunc("POST /api/v1/ipfilter", d.handleIPFilter)
-	mux.HandleFunc("GET /api/v1/config", d.handleGetConfig)
-	mux.HandleFunc("POST /api/v1/config", d.handleSetConfig)
-	return d.authenticate(mux)
+	api := http.NewServeMux()
+	api.HandleFunc("GET /api/v1/health", d.handleHealth)
+	api.HandleFunc("GET /api/v1/stats", d.handleStats)
+	api.HandleFunc("GET /api/v1/torrents", d.handleList)
+	api.HandleFunc("POST /api/v1/add", d.handleAdd)
+	api.HandleFunc("POST /api/v1/add-file", d.handleAddFile)
+	api.HandleFunc("DELETE /api/v1/torrents/{hash}", d.handleRemove)
+	api.HandleFunc("GET /api/v1/torrents/{hash}/{what}", d.handleInspect)
+	api.HandleFunc("POST /api/v1/torrents/{hash}/{action}", d.handleAction)
+	api.HandleFunc("POST /api/v1/pins/clear", d.handleClearPins)
+	api.HandleFunc("POST /api/v1/ipfilter", d.handleIPFilter)
+	api.HandleFunc("GET /api/v1/config", d.handleGetConfig)
+	api.HandleFunc("POST /api/v1/config", d.handleSetConfig)
+
+	root := http.NewServeMux()
+	// The API keeps the token middleware; the read-only page below is served
+	// outside it (handleUI checks the token itself) so a browser can open
+	// http://127.0.0.1:8890/ without sending a custom header.
+	root.Handle("/api/", d.authenticate(api))
+	root.HandleFunc("GET /{$}", d.handleUI)
+	root.HandleFunc("GET /ui", d.handleUI)
+	return root
 }
 
 // authenticate requires the shared token on every request when one is set.

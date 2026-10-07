@@ -3,7 +3,8 @@
 `gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra la libreria
 [`cenkalti/rain`](https://github.com/cenkalti/rain). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
-gira in un processo separato e si controlla via REST su `127.0.0.1:8890`. Il
+gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
+espone anche una pagina di sola consultazione apribile dal browser. Il
 motore integrato libtorrent resta selezionabile e fa da fallback automatico se
 gx-torrent non parte.
 
@@ -53,7 +54,7 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | `gxtorrent_url` | `http://127.0.0.1:8890` | in modalità gestita deve essere loopback |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
 | `gxtorrent_managed` | `true` | avvio e sorveglianza da Gextto |
-| `gxtorrent_binary` | vuoto | percorso dell'eseguibile; vuoto = accanto a gexttod, poi nel `PATH` |
+| `gxtorrent_binary` | vuoto | percorso dell'eseguibile; vuoto = accanto a gexttod, poi nel `PATH`. Di norma lascialo vuoto: serve solo per puntare a un eseguibile diverso, es. un `gx-torrent` avviato da un tuo servizio systemd |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
 
@@ -65,6 +66,20 @@ Le impostazioni di coda e banda restano quelle della sezione *libtorrent*:
 - limiti di velocità standard, programmati e temporanei.
 
 Gextto le inoltra al demone.
+
+## Interfaccia web minimale
+
+All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
+demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina di sola
+consultazione** — riepilogo sessione (velocità, peer, porta, router, DHT,
+cifratura, cache) e tabella dei torrent (stato, progresso, rapporti, peer, ETA,
+cartella) — pensata per chi apre quell'indirizzo dal browser, come la Web UI di
+qBittorrent. Si aggiorna da sola ogni 5 secondi e **non modifica nulla**: aggiunta,
+pausa, rimozione restano in Gextto.
+
+Se è impostato `gxtorrent_token`, la pagina lo chiede al primo accesso
+(accetta anche `?token=…`) e lo ricorda in un cookie; l'API resta protetta come
+prima. In modalità gestita, senza token, la pagina è aperta su loopback.
 
 ## Uso standalone
 
