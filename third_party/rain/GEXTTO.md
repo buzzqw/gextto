@@ -21,6 +21,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Filtro IP | `internal/blocklist/blocklist.go`, `torrent/session_blocklist.go` | Formati intervallo, P2P e eMule `.dat` oltre al CIDR; `Session.LoadBlocklist` da file locale |
 | Selezione file | `torrent/torrent_selection.go`, `internal/allocator`, `internal/piece`, `internal/piecepicker`, `torrent/torrent_pieces.go`, `torrent/torrent_verification.go`, `torrent/torrent_allocation.go`, `torrent/torrent_stats.go` | `Config.FileSelection` e `Config.PartsDir`. I file esclusi stanno in `PartsDir/<id>`; il piece picker salta i pezzi non voluti; il completamento e `Stats.Bytes.Selected*` considerano solo i file scelti |
 | uTP | `torrent/session.go`, `torrent/session_listen.go`, `internal/netx` | `Config.UTP`: un socket UDP sulla porta unica, condiviso con il DHT; in uscita uTP e TCP in parallelo; peer uTP segnalati in `Peer.UTP`; contatori in `SessionStats` |
+| Preallocazione | `internal/storage/filestorage`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: i file nuovi vengono riservati con `fallocate` invece di essere creati sparsi |
 | Correzioni | `torrent/torrent_stop.go`, `torrent/torrent_pieces.go`, `internal/logger/logger.go`, `internal/infodownloader/infodownloader.go` | Vedi elenco sotto |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:

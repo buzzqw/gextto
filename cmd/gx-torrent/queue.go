@@ -41,6 +41,12 @@ type QueueConfig struct {
 	SpeedLimitUpload   int64 `json:"speed_limit_upload"`
 	MaxPeerDial        int   `json:"max_peer_dial"`
 	MaxPeerAccept      int   `json:"max_peer_accept"`
+	// Disk cache: CacheMB <= 0 sizes it from the RAM (automatic), otherwise
+	// it is the read cache and the write buffer in MiB. CacheTTLSecs keeps
+	// read blocks; Preallocate reserves new files in full.
+	CacheMB      int64 `json:"cache_mb"`
+	CacheTTLSecs int64 `json:"cache_ttl_secs"`
+	Preallocate  bool  `json:"preallocate"`
 }
 
 func defaultQueueConfig() QueueConfig {
@@ -54,6 +60,8 @@ func defaultQueueConfig() QueueConfig {
 		SlowRotateSecs:  1800,
 		DynamicMin:      1,
 		DynamicMax:      10,
+		CacheMB:         -1,
+		CacheTTLSecs:    300,
 	}
 }
 
@@ -88,6 +96,12 @@ func (c QueueConfig) normalized() QueueConfig {
 	}
 	if c.SpeedLimitUpload < 0 {
 		c.SpeedLimitUpload = 0
+	}
+	if c.CacheMB <= 0 {
+		c.CacheMB = -1
+	}
+	if c.CacheTTLSecs < 10 {
+		c.CacheTTLSecs = 300
 	}
 	return c
 }

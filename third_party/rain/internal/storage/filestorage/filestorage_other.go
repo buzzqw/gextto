@@ -11,3 +11,7 @@ func disableReadAhead(f *os.File) error {
 func applyNoAtimeFlag(f int) int {
 	return f
 }
+
+func preallocate(f *os.File, size int64) error {
+	return f.Truncate(size)
+}

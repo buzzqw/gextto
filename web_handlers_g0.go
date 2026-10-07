@@ -1774,6 +1774,26 @@ func OptimizeLibtorrentSettings(w http.ResponseWriter, r *http.Request, s *AppSt
 		})
 		return
 	}
+	// gx-torrent: the cache goes back to automatic (sized from the RAM).
+	if gx, ok := s.activeEngine().(*gxTorrentEngine); ok {
+		if err := SaveSetting(s.cfg.DataDir, "libtorrent_cache_size", "-1"); err != nil {
+			jsonError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result, err := gx.ApplyOptimization(latestConfig(s))
+		if err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		jsonStatus(w, http.StatusOK, map[string]any{
+			"ok":          true,
+			"applied":     true,
+			"backend":     BackendGxTorrent,
+			"optimized":   result,
+			"explanation": "Cache disco di gx-torrent automatica: lettura 1/32 e scrittura 1/16 della RAM, entro limiti sicuri.",
+		})
+		return
+	}
 	client, err := s.requireEmbedded("optimize_settings")
 	if err != nil {
 		jsonError(w, http.StatusConflict, err.Error())

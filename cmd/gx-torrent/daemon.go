@@ -233,6 +233,7 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.ResumeOnStartup = true
 	cfg.RPCEnabled = false
 	d.applyNetwork(&cfg)
+	d.applyCache(&cfg)
 	cfg.FileSelection = d.selectionFor
 	cfg.PartsDir = d.opts.PartsDir
 	cfg.SpeedLimitDownload = d.state.Config.SpeedLimitDownload
@@ -1216,7 +1217,8 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 	previous := d.state.Config
 	d.state.Config = next
 	if previous.SpeedLimitDownload != next.SpeedLimitDownload || previous.SpeedLimitUpload != next.SpeedLimitUpload ||
-		previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept {
+		previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
+		previous.CacheMB != next.CacheMB || previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate {
 		d.restartPending = true
 	}
 	d.saveLocked()
@@ -1258,6 +1260,10 @@ type daemonStats struct {
 	Proxy           bool          `json:"proxy"`
 	DHT             bool          `json:"dht"`
 	UTP             bool          `json:"utp"`
+	CacheReadMB     int64         `json:"cache_read_mb"`
+	CacheWriteMB    int64         `json:"cache_write_mb"`
+	CacheAuto       bool          `json:"cache_auto"`
+	Preallocate     bool          `json:"preallocate"`
 	LSD             lsdStatus     `json:"lsd"`
 	// Session holds rain's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
@@ -1283,7 +1289,10 @@ func (d *Daemon) stats() daemonStats {
 		Proxy:           d.opts.Network.Proxy != "",
 		DHT:             d.opts.Network.DHT && d.opts.Network.Proxy == "",
 		LSD:             d.lsd.status(),
+		Preallocate:     d.state.Config.Preallocate,
 	}
+	read, write, auto := cacheSizes(d.state.Config, memoryTotal())
+	out.CacheReadMB, out.CacheWriteMB, out.CacheAuto = read/mib, write/mib, auto
 	if out.LSD.Error == "" && d.lsdError != "" {
 		out.LSD.Error = d.lsdError
 	}

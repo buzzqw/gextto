@@ -11,8 +11,10 @@ import (
 
 // FileStorage implements Storage interface for saving files on disk.
 type FileStorage struct {
-	dest string
-	perm fs.FileMode
+	// Preallocate reserves the full size of new files (gextto fork).
+	Preallocate bool
+	dest        string
+	perm        fs.FileMode
 }
 
 // New returns a new FileStorage at the destination.
@@ -64,7 +66,11 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 		if err != nil {
 			return
 		}
-		err = of.Truncate(size)
+		if s.Preallocate {
+			err = preallocate(of, size)
+		} else {
+			err = of.Truncate(size)
+		}
 		return
 	}
 	if err != nil {

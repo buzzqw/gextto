@@ -252,3 +252,27 @@ func TestV2OnlyDetection(t *testing.T) {
 		t.Fatal("hybrid torrent is supported")
 	}
 }
+
+func TestCacheSizes(t *testing.T) {
+	cfg := defaultQueueConfig()
+	read, write, auto := cacheSizes(cfg, 2<<30) // 2 GiB of RAM
+	if !auto || read != 64*mib || write != 128*mib {
+		t.Fatalf("2 GiB: %d %d %v", read/mib, write/mib, auto)
+	}
+	read, write, _ = cacheSizes(cfg, 64<<30) // big server: capped
+	if read != 512*mib || write != 1024*mib {
+		t.Fatalf("64 GiB: %d %d", read/mib, write/mib)
+	}
+	read, _, _ = cacheSizes(cfg, 512<<20) // tiny box: floor
+	if read != 32*mib {
+		t.Fatalf("512 MiB: %d", read/mib)
+	}
+	cfg.CacheMB = 300
+	read, write, auto = cacheSizes(cfg, 2<<30)
+	if auto || read != 300*mib || write != 300*mib {
+		t.Fatalf("manual: %d %d %v", read/mib, write/mib, auto)
+	}
+	if defaultQueueConfig().normalized().CacheMB != -1 || (QueueConfig{}).normalized().CacheMB != -1 {
+		t.Fatal("0 and unset mean automatic")
+	}
+}

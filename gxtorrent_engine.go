@@ -579,7 +579,19 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"dynamic_queue":    lt.DynamicQueue,
 		"dynamic_min":      clamp(lt.DynamicQueueMin),
 		"dynamic_max":      clamp(lt.DynamicQueueMax),
+		"cache_mb":         gxCacheMB(lt.CacheSize),
+		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
+		"preallocate":      cfg.LibtorrentPreallocate(),
 	}
+}
+
+// gxCacheMB converts libtorrent_cache_size (16 KiB blocks, -1 automatic)
+// into the daemon's MiB value (-1 automatic: sized from the RAM).
+func gxCacheMB(blocks int64) int64 {
+	if blocks <= 0 {
+		return -1
+	}
+	return max((blocks*16+1023)/1024, 1)
 }
 
 func (e *gxTorrentEngine) pushConfig(values map[string]any, last *string) error {
@@ -1208,4 +1220,26 @@ func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 		return nil, err
 	}
 	return stats.Session, nil
+}
+
+// ApplyOptimization pushes the automatic disk cache and returns the sizes the
+// daemon computed from the RAM.
+func (e *gxTorrentEngine) ApplyOptimization(cfg *Config) (map[string]any, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("configuration unavailable")
+	}
+	if err := e.pushConfig(gxQueuePolicy(cfg), &e.queuePushed); err != nil {
+		return nil, err
+	}
+	var stats map[string]any
+	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &stats); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"backend":        BackendGxTorrent,
+		"cache_auto":     stats["cache_auto"],
+		"cache_read_mb":  stats["cache_read_mb"],
+		"cache_write_mb": stats["cache_write_mb"],
+		"preallocate":    stats["preallocate"],
+	}, nil
 }

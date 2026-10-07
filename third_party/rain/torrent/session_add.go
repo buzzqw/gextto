@@ -269,6 +269,9 @@ func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto *filesto
 		id = base64.RawURLEncoding.EncodeToString(u1[:])
 	}
 	sto, err = filestorage.New(s.getDataDir(id), s.config.FilePermissions)
+	if sto != nil {
+		sto.Preallocate = s.config.Preallocate
+	}
 	if err != nil {
 		return
 	}

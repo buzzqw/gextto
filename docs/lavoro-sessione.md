@@ -313,6 +313,22 @@ rain è ora una copia modificata in `third_party/rain` (MIT, `replace` in
   - tracker corrente;
   - seed connessi contati correttamente.
 
+### 3.11 Cache automatica gx-torrent e log dei v2 (07/10)
+- **Cache disco gx-torrent**:
+  - automatica dalla RAM (lettura 1/32, scrittura 1/16, entro limiti);
+  - oppure da `libtorrent_cache_size`;
+  - scadenza e preallocazione (`fallocate`) applicate;
+  - "Ottimizza impostazioni" funziona anche con gx-torrent;
+  - riga "Cache disco" nel pannello Salute.
+- **Log dei torrent solo v2**:
+  - «🔁 … was a BitTorrent v2-only torrent …; «…» (v1) is downloaded
+    instead» quando parte un'alternativa v1 o ibrida;
+  - «⏳ … no v1 or hybrid release is available yet» a fine ciclo se non c'è,
+    poi un promemoria al giorno;
+  - «⌛ … no longer tracked» dopo 30 giorni.
+  - La memoria è in RAM: un riavvio di gextto la azzera, ma la release v2
+    resta comunque in blocklist.
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso

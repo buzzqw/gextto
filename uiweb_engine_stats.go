@@ -137,6 +137,12 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	}
 	add("Proxy", proxy, false)
 	add("Filtro IP", fmt.Sprintf("%d regole", engineNum(stats, "ip_filter_rules")), false)
+	cacheMode := "impostata a mano"
+	if engineBool(stats, "cache_auto") {
+		cacheMode = "automatica (dalla RAM)"
+	}
+	add("Cache disco", fmt.Sprintf("%s · lettura %d MB · scrittura %d MB · preallocazione %s", cacheMode,
+		engineNum(stats, "cache_read_mb"), engineNum(stats, "cache_write_mb"), ternaryString(engineBool(stats, "preallocate"), "sì", "no")), false)
 	add("Disco", fmt.Sprintf("lettura %s · scrittura %s · cache lettura %s (hit %d%%) · buffer scrittura %s",
 		logging.HumanRate(engineNum(session, "disk_read_rate")), logging.HumanRate(engineNum(session, "disk_write_rate")),
 		logging.HumanBytesI64(engineNum(session, "read_cache_bytes")), engineNum(session, "read_cache_hit_percent"),

@@ -77,6 +77,9 @@ type Config struct {
 	// UTPOnly dials peers over uTP alone (tests); by default uTP and TCP are
 	// tried together and the first to connect wins.
 	UTPOnly bool
+	// Preallocate reserves the full size of new files instead of creating
+	// them sparse (gextto fork).
+	Preallocate bool
 	// OutgoingInterface binds every outgoing connection to an interface name
 	// or local IPv4 (gextto fork, VPN killswitch): when it has no address,
 	// nothing is sent.

@@ -88,6 +88,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	if err != nil {
 		return
 	}
+	sto.Preallocate = s.config.Preallocate
 	if s.sharedPort() {
 		spec.Port = int(s.config.ListenPort)
 	}

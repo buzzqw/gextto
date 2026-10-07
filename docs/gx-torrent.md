@@ -209,6 +209,28 @@ alcuni contatori interni di basso livello:
 - tempi dei job su disco;
 - pezzi falliti per peer.
 
+## Cache disco e preallocazione
+
+Le impostazioni libtorrent di gextto valgono anche per gx-torrent.
+
+- **`libtorrent_cache_size` = -1** (predefinito): cache automatica, calcolata
+  dalla RAM del server.
+  - Lettura: 1/32 della RAM, tra 32 e 512 MB.
+  - Buffer di scrittura: 1/16 della RAM, tra 64 MB e 1 GB.
+  - Esempi: con 2 GB di RAM 64 MB e 128 MB; con 16 GB 512 MB e 1 GB.
+  - I valori fissi di rain (256 MB e 1 GB) erano troppo alti per un server
+    piccolo.
+- **`libtorrent_cache_size` > 0**: la dimensione indicata (blocchi da 16 KiB)
+  vale per lettura e scrittura.
+- **`libtorrent_cache_expiry`**: dopo quanto scade un blocco in cache.
+- **`libtorrent_preallocate`**: i file nuovi vengono riservati per intero con
+  `fallocate`; i file esclusi dalla selezione restano sparsi.
+- **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico
+  e la applica subito.
+- Un cambio di questi valori riapre la sessione del demone, come per i limiti
+  di velocità.
+- Il pannello Salute mostra la cache effettiva.
+
 ## RAM disk
 
 Il flusso RAM disk di gextto (scaricare su tmpfs e spostare quando non c'è
@@ -398,12 +420,6 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - rimozione di tracker (l'aggiunta funziona);
 - torrent solo v2 (vedi sopra);
 
-Cache e preallocazione:
-
-- rain usa una propria cache: 256 MB in lettura e fino a 1 GB di buffer di
-  scrittura. Le impostazioni di cache disco della sezione libtorrent e il
-  pulsante "Ottimizza impostazioni" non si applicano.
-- I file vengono creati sparsi, senza preallocazione.
 
 Gli slot di upload e le connessioni per torrent restano quelli predefiniti di
 rain.

@@ -925,7 +925,9 @@ func RunCycleDomain(
 				if blockErr := db.Blocklist(&release, "BitTorrent v2-only, non supportato dal motore gx-torrent"); blockErr != nil {
 					logging.Debug("cannot blocklist v2-only release", "error", blockErr)
 				}
-				logging.Warn(fmt.Sprintf("⚠️ %s is a BitTorrent v2-only torrent, which gx-torrent cannot download: blocklisted, another release will be used", logTarget(&release)))
+				logging.Warn(fmt.Sprintf("⚠️ %s is a BitTorrent v2-only torrent, which gx-torrent cannot download: blocklisted, another release will be used", logTarget(&release)),
+					"release", release.Title)
+				rememberV2Skip(&release, time.Now())
 				continue
 			}
 			if err != nil {
@@ -982,6 +984,9 @@ func RunCycleDomain(
 				logMessage = fmt.Sprintf("🧪 Test mode: would download %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
 			}
 			logging.Info(logMessage, "release", release.Title, "from", release.Source)
+			if !cfg.DryRun {
+				reportV2Replacement(&release)
+			}
 			logging.Debug("download decision",
 				"target", releaseTarget(&release),
 				"quality", releaseQualityLabel(&release),
@@ -1066,6 +1071,9 @@ func RunCycleDomain(
 					"gap_episodes", episodesLabel(gapEpisodes))
 			}
 		}
+	}
+	if !cfg.DryRun {
+		reportPendingV2Skips(time.Now())
 	}
 	if err := db.SaveCycle(stats); err != nil {
 		return nil, err

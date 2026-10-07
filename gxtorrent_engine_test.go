@@ -322,3 +322,15 @@ func TestV2DetailCapsPerEngine(t *testing.T) {
 		t.Fatal("swarm label")
 	}
 }
+
+func TestGxCacheMB(t *testing.T) {
+	if gxCacheMB(-1) != -1 || gxCacheMB(0) != -1 {
+		t.Fatal("automatic")
+	}
+	if gxCacheMB(65536) != 1024 { // 65536 blocks of 16 KiB = 1 GiB
+		t.Fatalf("got %d", gxCacheMB(65536))
+	}
+	if gxCacheMB(1) != 1 {
+		t.Fatal("at least 1 MiB")
+	}
+}
