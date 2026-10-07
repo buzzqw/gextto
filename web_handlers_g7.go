@@ -673,7 +673,7 @@ func gh7_json_string(value map[string]any, key string) string {
 func gh7_setting_key_allowed(key string) bool {
 	for _, prefix := range []string{
 		"libtorrent_", "delay_", "housekeeping_", "media_info_", "score_", "tvdb_",
-		"simkl_", "backup_", "notify_", "jellyfin_", "plex_",
+		"simkl_", "backup_", "notify_", "jellyfin_", "plex_", "gxtorrent_",
 	} {
 		if strings.HasPrefix(key, prefix) {
 			return true
@@ -1021,7 +1021,7 @@ func MoveTorrentStorage(w http.ResponseWriter, r *http.Request, s *AppState) {
 		logging.Error("manual torrent storage move failed to start",
 			"hash", hash, "name", name, "destination", destination, "error", err.Error())
 	case result:
-		logging.Info("manual torrent storage move accepted by libtorrent; waiting for completion",
+		logging.Info("manual torrent storage move accepted by the torrent engine; waiting for completion",
 			"hash", hash, "name", name, "destination", destination)
 	default:
 		logging.Warn("manual torrent storage move not started: torrent session unavailable",

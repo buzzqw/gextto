@@ -3,6 +3,8 @@ module github.com/buzzqw/gextto
 go 1.26.8
 
 require (
+	github.com/cenkalti/log v1.0.0
+	github.com/cenkalti/rain v1.13.0
 	github.com/jlaffaye/ftp v0.2.4
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
@@ -13,8 +15,6 @@ require (
 
 require (
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
-	github.com/cenkalti/log v1.0.0 // indirect
-	github.com/cenkalti/rain v1.13.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect

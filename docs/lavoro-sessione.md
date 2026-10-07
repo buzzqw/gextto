@@ -204,6 +204,48 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
 | `698efbf` | Login, calendario e descrizioni delle nuove impostazioni tradotti nelle 6 lingue. |
 | `432ce98` + `docs:` | Manuali, README, SECURITY, ADVANCED, API, ARCHITECTURE, UI_V2, tui aggiornati. |
 
+### 3.7 gx-torrent completato (07/10) — dettagli in `docs/gx-torrent.md`
+Il commit `a2778b5` (altra sessione) era uno scheletro: gx-torrent non era mai
+selezionabile (`TorrentBackendName` lo riportava a `embedded`), le sue
+impostazioni non si salvavano (mancava `gxtorrent_` nella whitelist), la lista
+non dava progresso/percorso, niente eventi, rimozione che poteva cancellare i
+dati, coda che riprendeva i torrent messi in pausa dall'utente.
+Riscritti il demone (`cmd/gx-torrent/`) e l'adapter (`gxtorrent_engine.go`,
+`gxtorrent_runtime.go`):
+- **coda autogestita nel demone**:
+  - slot download/seed e tetto totale;
+  - i torrent lenti non contano;
+  - rotazione dei torrent fermi con raffreddamento di 30 minuti;
+  - pin e probe fuori coda;
+  - coda dinamica portata dal bridge C++;
+- **stalled**:
+  - `MarkStalled`/`Restart`/`ClearStalled` diventano park/probe/unpark;
+  - il parcheggio è persistente;
+  - i torrent ruotati restano `stalled` così l'orologio di `MonitorStalled`
+    non si azzera;
+- **dati al sicuro**:
+  - symlink per torrent;
+  - `delete_files` cancella solo il contenuto del torrent;
+  - spostamento con rename o copia;
+- **sicurezza**: token, solo loopback senza token, RPC di rain spento;
+- **gestione**: gextto avvia e sorveglia il binario; dopo 3 crash in 10
+  minuti torna a libtorrent;
+- **integrazione**: build/pacchetto/install/`--update`, impostazioni
+  (token, eseguibile; tolti categoria/tag), matrice capacità onesta;
+- **test**: test demone (anche con sessione rain reale) e adapter.
+
+Smoke test eseguito qui:
+- gextto avvia gx-torrent da sé;
+- il torrent locale viene verificato e va in seed;
+- pausa e ripresa da gextto funzionano (la pausa resta al 100%: bug di rain
+  corretto);
+- spostamento da gextto con symlink ripuntato;
+- dopo un kill -9 il demone viene riavviato da gextto;
+- allo spegnimento di gextto anche il demone si ferma con SIGTERM.
+
+Big Buck Bunny resta in `downloading_metadata`: il sandbox non raggiunge i
+peer (solo HTTPS).
+
 ---
 
 ## 4. Punti aperti e decisioni in sospeso
@@ -231,6 +273,18 @@ force-push su `main`: lasciato al proprietario, che per ora non l'ha fatto.
 3. **mircrew**: il codice dell'indexer è solo in locale sul server del
    proprietario; i controlli su quella parte li fa lui.
 4. Il titolo del merge `281f89a` contiene "Claude" (vedi 3.2).
+
+### Da verificare sul server reale (gx-torrent, 3.7)
+1. `make build`, poi in Configurazione → Motore torrent scegliere `gx-torrent`
+   e riavviare. Il log deve dire «gx-torrent avviato da Gextto» e
+   «Torrent engine: gx-torrent».
+2. Scaricare un torrent libero (es. Big Buck Bunny) e controllare:
+   - progresso;
+   - completamento e rinomina/import;
+   - log del demone in `DATA_DIR/gx-torrent/gx-torrent.log`.
+3. Con più torrent della soglia `active_downloads`, controllare:
+   - che quelli fermi liberino lo slot (`/api/v1/stats`: `slow`, `queued`);
+   - che le pause manuali restino tali.
 
 ### Da verificare sul server reale (migliorie 3.6)
 1. **Hardlink**: con download e libreria sullo stesso filesystem il log deve

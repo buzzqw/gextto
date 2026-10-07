@@ -7,7 +7,9 @@
 #   GEXTTO_BINARY=/path/gexttod scripts/...
 #
 # The build number is what `gexttod --version` prints and identifies the exact
-# binary.
+# binary. The gx-torrent daemon (pure Go, optional torrent backend) is built
+# next to gexttod, where Gextto's managed mode looks for it; set
+# GEXTTO_SKIP_GXTORRENT=1 to skip it.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,3 +37,14 @@ mkdir -p "$(dirname "$OUT")"
         -o "$OUT" ./cmd/gexttod
 )
 printf 'built %s (version %s, build %s)\n' "$OUT" "$VERSION" "$BUILD"
+
+if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
+    GX_OUT="$(dirname "$OUT")/gx-torrent"
+    (
+        cd "$ROOT"
+        CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w -X main.version=$VERSION+$BUILD" \
+            -o "$GX_OUT" ./cmd/gx-torrent
+    )
+    printf 'built %s\n' "$GX_OUT"
+fi

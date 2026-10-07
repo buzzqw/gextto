@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast test test-race test-real vet fmt check-ui installer-test tidy package clean run
+.PHONY: all build fast gx-torrent test test-race test-real vet fmt check-ui installer-test tidy package clean run
 
 all: build
 
@@ -12,6 +12,10 @@ build:
 
 fast:
 	scripts/build-daemon.sh
+
+# Only the gx-torrent daemon (pure Go, no libtorrent needed).
+gx-torrent:
+	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/gx-torrent ./cmd/gx-torrent
 
 test: check-ui installer-test
 	CGO_ENABLED=1 go test ./...

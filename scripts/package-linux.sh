@@ -3,7 +3,7 @@
 # `gexttod --update`. The Go binary embeds the server-rendered web UI, so the archive
 # ships the daemon, the bundled libtorrent shared libraries, a launcher and a
 # short README. Layout:
-#   gexttod  run.sh  lib/  README.md  VERSION
+#   gexttod  gx-torrent  run.sh  lib/  README.md  VERSION
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -45,6 +45,12 @@ trap 'rm -rf "$STAGE"' EXIT
 
 cp "$BINARY" "$STAGE/gexttod"
 chmod +x "$STAGE/gexttod"
+# Optional gx-torrent backend, built next to gexttod by build-daemon.sh.
+GX_BINARY="$(dirname "$BINARY")/gx-torrent"
+if [[ -x "$GX_BINARY" ]]; then
+  cp "$GX_BINARY" "$STAGE/gx-torrent"
+  chmod +x "$STAGE/gx-torrent"
+fi
 mkdir -p "$STAGE/lib"
 
 # Bundle the libtorrent shared libraries next to the executable: the daemon is

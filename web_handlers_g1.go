@@ -649,7 +649,7 @@ func RecheckTorrent(w http.ResponseWriter, r *http.Request, s *AppState) {
 	case err != nil:
 		logging.Error("manual torrent integrity check failed to start", "hash", hash, "name", name, "error", err.Error())
 	case ok:
-		logging.Info("manual torrent integrity check accepted by libtorrent", "hash", hash, "name", name)
+		logging.Info("manual torrent integrity check accepted by the torrent engine", "hash", hash, "name", name)
 	default:
 		logging.Warn("manual torrent integrity check not started: torrent session unavailable", "hash", hash, "name", name)
 	}

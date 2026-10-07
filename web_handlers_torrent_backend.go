@@ -46,6 +46,8 @@ func TorrentBackendName(cfg *Config) string {
 	switch value {
 	case BackendQbittorrent:
 		return BackendQbittorrent
+	case BackendGxTorrent:
+		return BackendGxTorrent
 	default:
 		return BackendEmbedded
 	}
@@ -67,6 +69,10 @@ func TorrentBackendStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	if engine, ok := active.(*qbittorrentEngine); ok {
 		payload["sync"] = engine.SyncStats()
+	}
+	if engine, ok := active.(*gxTorrentEngine); ok {
+		payload["sync"] = engine.SyncStats()
+		payload["gxtorrent_url"] = engine.settings.BaseURL
 	}
 	jsonResponse(w, payload)
 }

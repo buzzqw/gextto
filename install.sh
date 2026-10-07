@@ -241,6 +241,8 @@ install_files() {
   fi
 
   run install -m 0755 "$work/gexttod" "$INSTALL_DIR/gexttod"
+  # Optional gx-torrent backend: Gextto starts it from here in managed mode.
+  [[ -f "$work/gx-torrent" ]] && run install -m 0755 "$work/gx-torrent" "$INSTALL_DIR/gx-torrent"
   [[ -f "$work/run.sh" ]] && run install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
   [[ -f "$work/VERSION" ]] && run install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
 

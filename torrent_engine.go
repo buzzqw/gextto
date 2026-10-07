@@ -165,12 +165,12 @@ var capabilityLevels = map[string]map[string]string{
 	},
 	BackendGxTorrent: {
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
-		"recheck": "full", "move": "full", "limits": "none", "files": "full", "peers": "full",
-		"trackers": "full", "events": "none", "stats": "none", "sequential": "none",
-		"first_last": "none", "seed_policy": "none", "ramdisk": "none", "fastresume": "none",
-		"piece_diagnostics": "none", "categories": "none", "tags": "none", "sync": "none",
-		"preferences": "none", "super_seeding": "none", "upload_mode": "none",
-		"ip_filter": "none", "session_stats": "none", "web_seeds": "none",
+		"recheck": "full", "move": "full", "limits": "partial", "files": "full", "peers": "full",
+		"trackers": "partial", "events": "full", "stats": "full", "sequential": "none",
+		"first_last": "none", "seed_policy": "full", "ramdisk": "partial", "fastresume": "full",
+		"piece_diagnostics": "none", "categories": "none", "tags": "none", "sync": "full",
+		"preferences": "partial", "super_seeding": "none", "upload_mode": "none",
+		"ip_filter": "none", "session_stats": "partial", "web_seeds": "none",
 	},
 }
 

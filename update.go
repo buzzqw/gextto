@@ -472,6 +472,22 @@ func updateInstallRelease(root, installDir string) error {
 	}
 	updateRemovePath(backup)
 
+	// The optional gx-torrent daemon may be running (managed mode): install it
+	// through a rename so the running executable is never overwritten in place.
+	if source := filepath.Join(root, "gx-torrent"); updateIsFile(source) {
+		destination := filepath.Join(installDir, "gx-torrent")
+		staged := destination + ".new"
+		if err := updateCopyFileMode(source, staged); err != nil {
+			return fmt.Errorf("cannot install gx-torrent: %w", err)
+		}
+		if err := updateSetExecutable(staged); err != nil {
+			return err
+		}
+		if err := os.Rename(staged, destination); err != nil {
+			return fmt.Errorf("cannot install gx-torrent: %w", err)
+		}
+	}
+
 	// Keep the launcher and the release notes alongside the payload when shipped.
 	for _, file := range []string{"run.sh", "README.md"} {
 		source := filepath.Join(root, file)

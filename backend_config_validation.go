@@ -28,12 +28,12 @@ func validateBackendSetting(key, value string) error {
 		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return fmt.Errorf("%s must be a complete http(s) URL", key)
 		}
-	case "qbittorrent_request_timeout_secs":
+	case "qbittorrent_request_timeout_secs", "gxtorrent_request_timeout_secs":
 		if raw == "" {
 			return nil
 		}
 		return validateBackendInteger(key, raw, 1, 300)
-	case "qbittorrent_poll_interval_ms":
+	case "qbittorrent_poll_interval_ms", "gxtorrent_poll_interval_ms":
 		if raw == "" || raw == "0" {
 			return nil
 		}

@@ -36,7 +36,9 @@ func alternativeBackendActive(cfg *Config) bool {
 		}
 		return validateBackendMappings(settings.Mappings, requiredBackendPaths(cfg)) == nil
 	case BackendGxTorrent:
-		return true // Will add path mapping validation later if needed
+		// gx-torrent runs on this machine and shares Gextto's paths.
+		_, err := gxTorrentSettingsFromConfig(cfg)
+		return err == nil
 	default:
 		return false
 	}
@@ -74,7 +76,11 @@ func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		// TODO: Add preflight check for gx-torrent
+		if !engine.ping() {
+			note := "gx-torrent is not reachable at startup; the adapter stays installed and will retry"
+			logging.Warn(note, "url", engine.settings.BaseURL)
+			return engine, note, nil
+		}
 		return engine, "", nil
 	default:
 		return nil, "", nil
