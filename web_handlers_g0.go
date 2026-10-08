@@ -1515,7 +1515,7 @@ func gh0_runHousekeeping(s *AppState) (*HousekeepingReport, bool) {
 		logging.Warn("housekeeping failed", "error", err)
 		return nil, false
 	}
-	if _, err := gh0_runDbAction(s, "vacuum"); err != nil {
+	if _, err := gh0_runDbAction(s, "compact"); err != nil {
 		logging.Warn("housekeeping failed", "error", err)
 		return nil, false
 	}

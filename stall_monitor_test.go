@@ -204,3 +204,33 @@ func TestMonitorStalledIdleClockSurvivesRestart(t *testing.T) {
 		t.Fatal("a download that moved again kept its saved idle clock")
 	}
 }
+
+func TestMonitorStalledDoesNotRewriteAnUnchangedRow(t *testing.T) {
+	db := newTestDB(t)
+	cfg := &Config{Settings: map[string]string{
+		"libtorrent_stall_after_min": "60",
+		"libtorrent_stall_retry_min": "60",
+	}}
+	session := &stallSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{
+		{Hash: "fbi", Name: "FBI Stagione 2", State: "downloading", Progress: 74, TotalDone: 1000, NumPeers: 2},
+	}}}
+	watch := map[string]StallWatch{}
+	MonitorStalled(cfg, session, db, nil, watch)
+	entry := watch["fbi"]
+	entry.lastProgressAt = time.Now().Add(-61 * time.Minute)
+	watch["fbi"] = entry
+	MonitorStalled(cfg, session, db, nil, watch) // parked: the row is written
+	if _, err := db.db.Exec("UPDATE stalled_torrents SET updated_at='marker' WHERE hash='fbi'"); err != nil {
+		t.Fatal(err)
+	}
+	for tick := 0; tick < 5; tick++ {
+		MonitorStalled(cfg, session, db, nil, watch)
+	}
+	var updated string
+	if err := db.db.QueryRow("SELECT updated_at FROM stalled_torrents WHERE hash='fbi'").Scan(&updated); err != nil {
+		t.Fatal(err)
+	}
+	if updated != "marker" {
+		t.Fatalf("an unchanged parked torrent was rewritten at every tick (updated_at=%s)", updated)
+	}
+}

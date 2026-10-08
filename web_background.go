@@ -1768,11 +1768,16 @@ func tempCleanupWorker(state *AppState) {
 // configurable (`housekeeping_interval_hours`, 0/disabled via
 // `housekeeping_enabled`).
 func housekeepingWorker(state *AppState) {
-	if !state.SleepBackground(10 * time.Minute) {
+	// The last run is remembered across restarts: a restart (an update) must
+	// not trigger the cleanup again, it runs once per interval.
+	if !state.SleepBackground(housekeepingFirstDelay(latestConfig(state), time.Now())) {
 		return
 	}
 	for {
 		cfg := latestConfig(state)
+		if err := SaveSetting(cfg.DataDir, "housekeeping_last_run", strconv.FormatInt(time.Now().Unix(), 10)); err != nil {
+			logging.Debug("cannot record the housekeeping run", "error", err)
+		}
 		enabled := true
 		if value, ok := cfg.Settings["housekeeping_enabled"]; ok {
 			enabled = settingTruthy(value)
@@ -1793,22 +1798,39 @@ func housekeepingWorker(state *AppState) {
 				)
 			}
 		}
-		hours := int64(24)
-		if value, ok := cfg.Settings["housekeeping_interval_hours"]; ok {
-			if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
-				hours = parsed
-			}
-		}
-		if hours < 1 {
-			hours = 1
-		}
-		if hours > 24*30 {
-			hours = 24 * 30
-		}
-		if !state.SleepBackground(time.Duration(hours) * time.Hour) {
+		if !state.SleepBackground(housekeepingInterval(cfg)) {
 			return
 		}
 	}
+}
+
+// housekeepingInterval is `housekeeping_interval_hours` (default 24, 1–720).
+func housekeepingInterval(cfg *Config) time.Duration {
+	hours := int64(24)
+	if value, ok := cfg.Settings["housekeeping_interval_hours"]; ok {
+		if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+			hours = parsed
+		}
+	}
+	if hours < 1 {
+		hours = 1
+	}
+	if hours > 24*30 {
+		hours = 24 * 30
+	}
+	return time.Duration(hours) * time.Hour
+}
+
+// housekeepingFirstDelay waits at least 10 minutes after the start, and until
+// one interval has passed since the last run recorded before the restart.
+func housekeepingFirstDelay(cfg *Config, now time.Time) time.Duration {
+	delay := 10 * time.Minute
+	if last, err := strconv.ParseInt(strings.TrimSpace(cfg.Settings["housekeeping_last_run"]), 10, 64); err == nil && last > 0 {
+		if due := time.Unix(last, 0).Add(housekeepingInterval(cfg)).Sub(now); due > delay {
+			delay = due
+		}
+	}
+	return delay
 }
 
 // ---------------------------------------------------------------------------

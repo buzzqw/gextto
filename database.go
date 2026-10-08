@@ -541,6 +541,14 @@ func OptimizeConnection(db *sql.DB, action string) error {
 	switch action {
 	case "vacuum":
 		statement = "VACUUM;"
+	case "compact":
+		// VACUUM rewrites the whole file (the 500 MB archive means about 1 GB
+		// written between the WAL and the checkpoint): only when there is
+		// real free space to give back.
+		if !connectionWorthCompacting(db) {
+			return nil
+		}
+		statement = "VACUUM;"
 	case "analyze":
 		statement = "ANALYZE;"
 	default:
@@ -548,6 +556,18 @@ func OptimizeConnection(db *sql.DB, action string) error {
 	}
 	_, err := db.Exec(statement)
 	return err
+}
+
+// connectionWorthCompacting reports whether at least 20% of the database, or
+// 64 MB, is free pages.
+func connectionWorthCompacting(db *sql.DB) bool {
+	var pages, free, pageSize int64
+	if db.QueryRow("PRAGMA page_count").Scan(&pages) != nil ||
+		db.QueryRow("PRAGMA freelist_count").Scan(&free) != nil ||
+		db.QueryRow("PRAGMA page_size").Scan(&pageSize) != nil || pages == 0 {
+		return false
+	}
+	return free*5 >= pages || free*pageSize >= 64<<20
 }
 
 // CheckpointConnection checkpoints the WAL and truncates the `-wal` file.
