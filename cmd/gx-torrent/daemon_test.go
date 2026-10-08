@@ -1186,3 +1186,101 @@ func TestDaemonSequentialToggleReachesRunningTorrents(t *testing.T) {
 	}
 	waitFor(t, "sequential off", func() bool { return !sequential() })
 }
+
+func TestCompressPieceRuns(t *testing.T) {
+	if runs := compressPieceRuns(nil); len(runs) != 0 {
+		t.Fatalf("empty states -> %v", runs)
+	}
+	got := compressPieceRuns([]string{"have", "have", "downloading", "", "", "skipped"})
+	want := []pieceRun{{0, 1, "have"}, {2, 2, "downloading"}, {3, 4, ""}, {5, 5, "skipped"}}
+	if len(got) != len(want) {
+		t.Fatalf("runs = %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("run[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+// TestDaemonPieceDiagnostics checks the pieces endpoint: a seeding torrent
+// reports every piece as "have", and the runs cover the piece count exactly.
+func TestDaemonPieceDiagnostics(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Get(srv.URL + "/api/v1/torrents/" + hash + "/pieces")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("pieces -> %d", resp.StatusCode)
+	}
+	var payload struct {
+		PieceCount int        `json:"piece_count"`
+		Runs       []pieceRun `json:"runs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.PieceCount != 7 {
+		t.Fatalf("piece_count = %d, want 7", payload.PieceCount)
+	}
+	covered := 0
+	for _, run := range payload.Runs {
+		if run.State != "have" {
+			t.Fatalf("a seeding torrent reported state %q", run.State)
+		}
+		covered += run.End - run.Begin + 1
+	}
+	if covered != payload.PieceCount {
+		t.Fatalf("runs cover %d pieces, want %d", covered, payload.PieceCount)
+	}
+
+	// An unknown hash is a 404, not fabricated data.
+	resp2, err := http.Get(srv.URL + "/api/v1/torrents/" + strings.Repeat("0", 40) + "/pieces")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp2.Body.Close()
+	if resp2.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown hash -> %d, want 404", resp2.StatusCode)
+	}
+}
+
+// TestDaemonUIPiecesTab checks that the daemon's own web UI can render the
+// piece map for a seeding torrent.
+func TestDaemonUIPiecesTab(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	detail, err := d.uiDetailData(hash, "pieces")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.PiecesTotal != 7 || detail.PiecesHave != 7 {
+		t.Fatalf("pieces = %d/%d, want 7/7", detail.PiecesHave, detail.PiecesTotal)
+	}
+	covered := 0
+	for _, run := range detail.Pieces {
+		covered += run.End - run.Begin + 1
+	}
+	if covered != 7 || len(detail.Pieces) == 0 {
+		t.Fatalf("piece runs = %+v (covered %d)", detail.Pieces, covered)
+	}
+}

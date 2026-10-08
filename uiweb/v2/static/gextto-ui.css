@@ -1440,3 +1440,20 @@ pre.log-view { margin: 0; }
   .episode-sources-table th:nth-child(5),
   .episode-sources-table td:nth-child(5) { width: 28%; }
 }
+
+/* Piece diagnostics map (gx-torrent) */
+.piece-map {
+  display: flex;
+  width: 100%;
+  height: 20px;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-2, #f6f8fa);
+}
+.piece-run { min-width: 1px; height: 100%; }
+.piece-run.piece-have { background: #2da44e; }
+.piece-run.piece-down { background: #d4a72c; }
+.piece-run.piece-skip { background: #8c959f; opacity: 0.4; }
+.piece-run.piece-missing { background: #d0d7de; }

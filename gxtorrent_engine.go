@@ -1298,9 +1298,30 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 	return out, true, nil
 }
 
-// ---------------------------------------------------------------------------
-// mutations
-// ---------------------------------------------------------------------------
+// PieceRuns returns the piece states of a torrent as compact runs, for the
+// Gextto piece-diagnostics view. Run End is inclusive (gextto fork on the
+// daemon side).
+func (e *gxTorrentEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error) {
+	var payload struct {
+		Runs []struct {
+			Begin int    `json:"begin"`
+			End   int    `json:"end"`
+			State string `json:"state"`
+		} `json:"runs"`
+	}
+	if err := e.do(http.MethodGet, "/api/v1/torrents/"+url.PathEscape(strings.ToLower(hash))+"/pieces", nil, "", &payload); err != nil {
+		var apiErr gxAPIError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	runs := make([]TorrentPieceRun, 0, len(payload.Runs))
+	for _, run := range payload.Runs {
+		runs = append(runs, TorrentPieceRun{Begin: run.Begin, End: run.End, State: run.State})
+	}
+	return runs, true, nil
+}
 
 // SetFilePriorities selects the files to download (0 = skip). gx-torrent has
 // no priority levels: any value above 0 means "download". Skipped files stay

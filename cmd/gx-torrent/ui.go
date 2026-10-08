@@ -194,6 +194,16 @@ type uiDetailData struct {
 	Files    []uiFileRow
 	Peers    []uiPeerRow
 	Trackers []uiTrackerRow
+	Pieces   []uiPieceRun
+}
+
+// uiPieceRun is one run of consecutive pieces sharing a state, with the width
+// (percentage) used to draw the piece map.
+type uiPieceRun struct {
+	Begin int
+	End   int
+	State string
+	Pct   string
 }
 
 const uiStyle = `
@@ -300,6 +310,12 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 .flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
 .flag.on{background:#14532d;color:#86efac}
 @media(max-width:760px){.layout{flex-direction:column}.sidebar{flex-direction:row;flex-wrap:wrap;min-width:0}}
+.piece-map{display:flex;width:100%;height:20px;margin:8px 0;border:1px solid #243049;border-radius:6px;overflow:hidden;background:#0b0f18}
+.piece-run{min-width:1px;height:100%}
+.piece-run.piece-have{background:#2da44e}
+.piece-run.piece-down{background:#d4a72c}
+.piece-run.piece-skip{background:#8c959f;opacity:.4}
+.piece-run.piece-missing{background:#374151}
 `
 
 var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
@@ -530,6 +546,7 @@ const uiDetailTemplate = `{{define "detail"}}
   <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">Files ({{len .Files}})</button>
   <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peer ({{len .Peers}})</button>
   <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Tracker ({{len .Trackers}})</button>
+  <button type="button" class="{{if eq .Tab "pieces"}}on{{end}}" onclick="openDetail('{{.Hash}}','pieces')">Pieces ({{.PiecesHave}}/{{.PiecesTotal}})</button>
 </div>
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
 
@@ -628,6 +645,13 @@ const uiDetailTemplate = `{{define "detail"}}
     <label>Add trackers (one per line)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce"></textarea></label>
     <button type="submit">Add trackers</button>
   </form>
+{{else if eq .Tab "pieces"}}
+  {{if .Pieces}}
+  <p class="muted">{{.PiecesHave}}/{{.PiecesTotal}} pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped.</p>
+  <div class="piece-map" role="img" aria-label="Piece map: {{.PiecesHave}} of {{.PiecesTotal}} have">
+    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}} · pieces {{.Begin}}–{{.End}}"></span>{{end}}
+  </div>
+  {{else}}<p class="muted">Piece map is not available yet (metadata missing).</p>{{end}}
 {{end}}
 {{end}}`
 
@@ -1346,7 +1370,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 // under the daemon lock, the per-torrent calls (files/peers/trackers) run
 // outside it, like the REST inspection does.
 func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
-	if tab != "files" && tab != "peers" && tab != "trackers" {
+	if tab != "files" && tab != "peers" && tab != "trackers" && tab != "pieces" {
 		tab = "general"
 	}
 	d.mu.Lock()
@@ -1470,10 +1494,41 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 				Seeders: tracker.Seeders, Leechers: tracker.Leechers, Next: next,
 			})
 		}
+	case "pieces":
+		states, ready := t.PieceStates()
+		if ready {
+			total := len(states)
+			data.PiecesTotal = uint32(total)
+			have := uint32(0)
+			for index, state := range states {
+				if state == "have" {
+					have++
+				}
+				// Build the runs inline: the state slices here are per piece.
+				if last := len(data.Pieces) - 1; last >= 0 && data.Pieces[last].State == state {
+					data.Pieces[last].End = index
+					data.Pieces[last].Pct = pieceWidth(data.Pieces[last].End-data.Pieces[last].Begin+1, total)
+					continue
+				}
+				data.Pieces = append(data.Pieces, uiPieceRun{Begin: index, End: index, State: state, Pct: pieceWidth(1, total)})
+			}
+			data.PiecesHave = have
+			data.PiecesAvailable = have
+			data.PiecesChecked = have
+		}
 	}
 	// Magnet link for the "copy magnet" button.
 	data.Magnet = magnetLink(data.Hash, data.Name, trackers)
 	return data, nil
+}
+
+// pieceWidth returns the percentage width of a run of `length` pieces over
+// `total`, for the piece map.
+func pieceWidth(length, total int) string {
+	if total <= 0 {
+		return "0"
+	}
+	return strconv.FormatFloat(float64(length)*100/float64(total), 'f', 3, 64)
 }
 
 // sourceName labels where a peer was discovered.

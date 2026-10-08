@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
 )
 
 // v2Request always sends HX-Request, exactly like the browser does for the HTMX
@@ -1243,5 +1245,57 @@ func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
 		if !managed[key] {
 			t.Fatalf("setting %q must be managed (Auto) with gx-torrent self-management on", key)
 		}
+	}
+}
+
+// fakePieceEngine implements just enough of TorrentEngine for the piece
+// diagnostics view; the embedded nil interface panics on any other method.
+type fakePieceEngine struct {
+	TorrentEngine
+	hash string
+}
+
+func (fakePieceEngine) Name() string { return BackendGxTorrent }
+
+func (f fakePieceEngine) List() []models.TorrentView {
+	return []models.TorrentView{{Hash: f.hash, Name: "movie", State: "downloading", TotalSize: 700}}
+}
+
+func (fakePieceEngine) PieceRuns(string) ([]TorrentPieceRun, bool, error) {
+	return []TorrentPieceRun{
+		{Begin: 0, End: 3, State: "have"},
+		{Begin: 4, End: 6, State: "downloading"},
+	}, true, nil
+}
+
+func TestV2DetailPiecesTab(t *testing.T) {
+	state := newTestAppState(t)
+	fake := fakePieceEngine{hash: strings.Repeat("a", 40)}
+	state.setActiveEngine(fake)
+
+	view := v2DetailViewFrom(state, fake.hash, "pieces")
+	hasTab := false
+	for _, tab := range view.Tabs {
+		if tab.ID == "pieces" {
+			hasTab = true
+		}
+	}
+	if !hasTab {
+		t.Fatalf("the pieces tab is missing: %+v", view.Tabs)
+	}
+	if view.PieceCount != 7 || view.PiecesDone != 4 {
+		t.Fatalf("pieces = %d/%d, want 4/7", view.PiecesDone, view.PieceCount)
+	}
+	if len(view.Pieces) != 2 || view.Pieces[0].State != "have" || view.Pieces[1].Pct == "0" {
+		t.Fatalf("piece runs = %+v", view.Pieces)
+	}
+
+	// The API endpoint serves the same runs.
+	api := httptest.NewServer(Router(state))
+	defer api.Close()
+	code, _, raw := webGet(t, api, "/api/torrents/"+fake.hash+"/pieces")
+	body := string(raw)
+	if code != http.StatusOK || !strings.Contains(body, `"runs"`) || !strings.Contains(body, "have") {
+		t.Fatalf("pieces API -> %d: %s", code, body)
 	}
 }

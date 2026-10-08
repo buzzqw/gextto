@@ -46,3 +46,24 @@ func TestSetOrderMarksFileEdgesAtRuntime(t *testing.T) {
 		t.Fatalf("SetOrder did not clear the order: sequential=%v firstLast=%v", pp.sequential, pp.firstLast)
 	}
 }
+
+// gextto fork: PieceDownloading reports the pieces with an active downloader,
+// used by the daemon's piece diagnostics.
+func TestPieceDownloadingTracksWritingAndRequests(t *testing.T) {
+	pieces := []piece.Piece{
+		{Index: 0, Length: testPieceLength},
+		{Index: 1, Length: testPieceLength},
+		{Index: 2, Length: testPieceLength},
+	}
+	pp := New(pieces, 2, nil, false, false)
+	if pp.PieceDownloading(0) {
+		t.Fatal("an idle piece was reported as downloading")
+	}
+	pp.pieces[1].Writing = true
+	if !pp.PieceDownloading(1) {
+		t.Fatal("a writing piece was not reported as downloading")
+	}
+	if pp.PieceDownloading(3) {
+		t.Fatal("an out-of-range index was reported as downloading")
+	}
+}

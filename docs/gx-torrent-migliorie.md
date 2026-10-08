@@ -66,7 +66,7 @@ presenti o già gestiti da Gextto.
 | 2 | Upload/share mode | **Saltato** — si usa il seed infinito (ratio 0) | — |
 | 3 | Toggle sequential/first-last a caldo | **Fatto** — `PiecePicker.SetOrder` + `SetSequential` applicato ai torrent in corso | 3 |
 | 4 | Web seed add/remove via API | **Fatto** — `Torrent.AddWebseeds`/`RemoveWebseeds` + azione `webseeds` | 2 |
-| 5 | Diagnostica pezzi | **Sì** — API demone **e** UI Gextto | 4 |
+| 5 | Diagnostica pezzi | **Fatto** — API demone `pieces`, scheda Pezzi in Gextto e scheda Pieces nella pagina del demone | 4 |
 | 6 | Limiti velocità per-torrent | **Sì** | 5 |
 | 7 | Streaming HTTP Range + priorità pezzi | **Sì** — endpoint sul demone | 7 |
 | 8 | Limiti connessioni/upload per-torrent | **Sì** — utile con coda/cache automatiche | 6 |
@@ -118,4 +118,27 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
   `go test -run GxEngine .`) e test del fork dove tocca rain (`make test-rain`).
 - Per i punti con effetto visibile: aggiornare `docs/gx-torrent.md` (API e
   limiti), `docs/MANUAL.it.md`/`docs/MANUAL.en.md` e `README`.
+- **Nuovi pezzi di interfaccia**: ogni miglioria visibile va esposta sia nella UI
+  di Gextto (`uiweb/v2`) sia, dove ha senso, nella **pagina web del demone**
+  (`cmd/gx-torrent/ui.go`). Non lasciare una feature raggiungibile solo via API.
 - Confronti con libtorrent/qBittorrent solo su misura, non a impressione.
+
+## Ricontrollo finale (da fare a fine lavoro)
+
+Prima di considerare chiuso il piano, rileggere **tutto** il lavoro fatto e
+verificare, punto per punto:
+
+- [ ] la matrice `capabilityLevels` riflette davvero ciò che il fork sa fare
+      (nessun `partial`/`none` rimasto per errore, nessun `full` non testato);
+- [ ] le note e i testi della UI (`v2DetailCapsFor`, "Limiti noti",
+      `docs/gx-torrent.md`, `MANUAL.*`, `README`) sono aggiornati insieme;
+- [ ] ogni feature visibile è raggiungibile **sia** dalla UI di Gextto **sia**
+      dalla pagina web del demone;
+- [ ] i test coprono il percorso felice e i casi limite (lista vuota,
+      duplicati, not-found, torrent completato/fermo) e passano da soli
+      (`go test ./...`, `make test-rain`, check UI e installer);
+- [ ] le modifiche al fork sono marcate `gextto fork`, nell'inventario
+      `third_party/rain/GEXTTO.md` e non rompono il rebase futuro di rain;
+- [ ] `go vet`, `gofmt` e i test dei pacchetti toccati sono verdi;
+- [ ] nessuna regressione di compatibilità con libtorrent/qBittorrent (stessa
+      semantica di limiti, tracker, web seed).

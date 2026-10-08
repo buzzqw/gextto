@@ -180,6 +180,16 @@ func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	p.firstLast = firstLast
 }
 
+// PieceDownloading reports whether the piece at index i is being downloaded
+// right now (gextto fork, for piece diagnostics).
+func (p *PiecePicker) PieceDownloading(i uint32) bool {
+	if i >= uint32(len(p.pieces)) {
+		return false
+	}
+	mp := &p.pieces[i]
+	return mp.Writing || mp.Requested.Len() > 0 || mp.RequestedWebseed != nil
+}
+
 // CloseWebseedDownloader closes the download from a webseed source.
 func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.DownloadSpeed.Stop()

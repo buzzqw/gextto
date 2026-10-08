@@ -41,6 +41,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Tracker a caldo | `torrent/session_torrent.go`, `torrent/torrent_announce.go` | `Torrent.SetTrackers`: sostituisce la lista dei tracker a runtime (lista vuota = rimuovi tutto); i tracker rimossi ricevono un announce `stopped` best-effort; la lista è persistita nel resume |
 | Web seed a caldo | `torrent/torrent_webseed.go`, `torrent/session_torrent.go`, `internal/piecepicker/piecepicker.go` | `Torrent.AddWebseeds`/`RemoveWebseeds`: aggiungono/rimuovono web seed a runtime (persistiti nel resume); il picker tiene aggiornata la lista delle sorgenti |
 | Ordine a caldo | `internal/piecepicker/piecepicker.go`, `torrent/torrent_commands.go`, `torrent/session_torrent.go` | `PiecePicker.SetOrder` e `Torrent.SetSequential`/`SetFirstLast`: cambiano sequenziale/prima-ultima sul torrent in corso, ricalcolando i bordi dei file e persistendo il flag nel resume |
+| Diagnostica pezzi | `internal/piecepicker/piecepicker.go`, `torrent/session_torrent.go` | `PiecePicker.PieceDownloading` e `Torrent.PieceStates`: stato per pezzo (`have`/`downloading`/`skipped`/mancante) per la mappa pezzi; dopo il completamento rain azzera il picker, quindi gli stati si ricavano dai `pieces` |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 

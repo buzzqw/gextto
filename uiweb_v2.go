@@ -1253,6 +1253,15 @@ type v2DetailTab struct {
 
 type v2KV struct{ Label, Value string }
 
+// v2PieceRun is one run of consecutive pieces sharing a state, with the width
+// (percentage) used to draw the piece map.
+type v2PieceRun struct {
+	Begin int
+	End   int
+	State string
+	Pct   string
+}
+
 type v2DetailView struct {
 	Hash     string
 	Name     string
@@ -1265,7 +1274,12 @@ type v2DetailView struct {
 	Trackers []models.TrackerView
 	Files    []models.FileView
 	Peers    []models.PeerView
-	Error    string
+	// Pieces is the piece map for backends that report it (gx-torrent).
+	Pieces      []v2PieceRun
+	PieceCount  int
+	PiecesDone  int
+	PiecesReady bool
+	Error       string
 	// TabError explains why a tab is empty (engine unreachable, unsupported).
 	TabError string
 	Caps     v2DetailCaps
@@ -1279,6 +1293,8 @@ type v2DetailCaps struct {
 	WebSeeds     bool
 	RateLimits   bool
 	Connections  bool
+	// Pieces: the engine can report per-piece diagnostics.
+	Pieces bool
 	// FileLevels: priority levels; without it only skip/download.
 	FileLevels bool
 	// FileNote is shown above the file list.
@@ -1295,11 +1311,11 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 	switch backend {
 	case BackendGxTorrent:
 		return v2DetailCaps{
-			Backend:     "gx-torrent",
+			Backend: "gx-torrent", WebSeeds: true, Pieces: true,
 			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
 			LimitsNote:  "Con gx-torrent i limiti di velocità e di connessioni sono solo globali (Configurazione → libtorrent); qui si impostano ratio e giorni di seed.",
-			TrackerNote: "gx-torrent può aggiungere tracker ma non toglierli: le righe cancellate restano.",
-			GeneralNote: "Con gx-torrent non sono disponibili: super-seeding, upload/share mode, copie distribuite, download sequenziale e prima/ultima parte.",
+			TrackerNote: "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.",
+			GeneralNote: "Con gx-torrent non sono disponibili: super-seeding e upload/share mode. Il download sequenziale e la prima/ultima parte si attivano anche a caldo.",
 		}
 	case BackendQbittorrent:
 		return v2DetailCaps{
@@ -1326,6 +1342,9 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{ID: "general", Label: "Generale"}, {ID: "trackers", Label: "Tracker"},
 		{ID: "files", Label: "Contenuto"}, {ID: "peers", Label: "Peers"},
 		{ID: "limits", Label: "Limiti"}, {ID: "storage", Label: "Storage"},
+	}
+	if _, ok := s.activeEngine().(TorrentPieceInspector); ok {
+		view.Tabs = append(view.Tabs, v2DetailTab{ID: "pieces", Label: "Pezzi"})
 	}
 	for index := range view.Tabs {
 		view.Tabs[index].Active = view.Tabs[index].ID == tab
@@ -1403,6 +1422,28 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
 		view.Peers, _, tabErr = s.activeEngine().Peers(hash)
+	case "pieces":
+		if inspector, ok := s.activeEngine().(TorrentPieceInspector); ok {
+			var runs []TorrentPieceRun
+			runs, _, tabErr = inspector.PieceRuns(hash)
+			total := 0
+			for _, run := range runs {
+				total += run.End - run.Begin + 1
+			}
+			view.PieceCount = total
+			view.PiecesReady = total > 0
+			for _, run := range runs {
+				length := run.End - run.Begin + 1
+				pct := "0"
+				if total > 0 {
+					pct = strconv.FormatFloat(float64(length)*100/float64(total), 'f', 3, 64)
+				}
+				view.Pieces = append(view.Pieces, v2PieceRun{Begin: run.Begin, End: run.End, State: run.State, Pct: pct})
+				if run.State == "have" {
+					view.PiecesDone += length
+				}
+			}
+		}
 	}
 	if tabErr != nil {
 		view.TabError = "Il motore non ha risposto: " + tabErr.Error()

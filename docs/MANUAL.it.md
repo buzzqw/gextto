@@ -293,12 +293,14 @@ bloccata, già presente o inferiore al file archiviato.
 - **Colonne tabella**: Nome, Stato, Progresso, ↓, ↑, ETA, Peers, Ratio — clicca
   l'intestazione per ordinare. **Azioni bulk**: pausa, riprendi, recheck, rimuovi.
 - **Azioni riga**: pausa/riprendi, recheck, dettagli, rimuovi.
-- **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Limiti, Storage):
+- **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
   segna come fallito, sposta storage. In **Generale** trovi anche **Esporta
   .torrent**, **Super seeding** e l'aggiunta/rimozione di **web seed**; in
   **Tracker** puoi modificare l'intera lista (`tier|url` per riga); in
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima).
+  In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
+  mancante, spento saltato): compare con i motori che la espongono (gx-torrent).
 - Quando usi **Sposta storage**, il log registra richiesta, destinazione e
   accettazione del comando; l'esito finale viene scritto quando libtorrent
   completa o rifiuta lo spostamento. Con **Check** il log distingue comando

@@ -547,6 +547,14 @@
   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
   {{if .Peers}}<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Peer</th><th scope="col">Client</th><th scope="col">↓</th><th scope="col">↑</th><th scope="col">Progresso</th><th scope="col">Seed</th><th scope="col" title="Protocollo, cifratura e direzione della connessione">Connessione</th></tr></thead><tbody>{{range .Peers}}<tr><td>{{.Address}}</td><td class="truncate">{{if .Client}}{{.Client}}{{else}}—{{end}}</td><td>{{rate .DownloadRate}}</td><td>{{rate .UploadRate}}</td><td>{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}sì{{else}}no{{end}}</td><td>{{if .Utp}}uTP{{else}}TCP{{end}}{{if .Encrypted}} · cifrata{{end}}{{if .Incoming}} · in entrata{{else}} · in uscita{{end}}</td></tr>{{end}}</tbody></table></div>
   {{else}}<p class="muted">Nessun peer connesso.</p>{{end}}
+{{else if eq .Tab "pieces"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{if .PiecesReady}}
+    <p class="hint">{{.PiecesDone}}/{{.PieceCount}} pezzi scaricati. Verde: scaricato, giallo: in corso, grigio: mancante, spento: saltato; passa il mouse su una cella per l'intervallo.</p>
+    <div class="piece-map" role="img" aria-label="Mappa dei pezzi: {{.PiecesDone}} su {{.PieceCount}} scaricati">
+      {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}scaricato{{else if eq .State "downloading"}}in corso{{else if eq .State "skipped"}}saltato{{else}}mancante{{end}} · pezzi {{.Begin}}–{{.End}}"></span>{{end}}
+    </div>
+  {{else}}<p class="muted">Mappa dei pezzi non disponibile: metadata non ancora presenti.</p>{{end}}
 {{else if eq .Tab "limits"}}
   <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />

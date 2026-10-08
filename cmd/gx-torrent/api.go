@@ -318,6 +318,28 @@ type trackerInfo struct {
 	NextAnnounce int64  `json:"next_announce"`
 }
 
+// pieceRun is a compact run of consecutive pieces sharing a state. End is
+// inclusive, matching the Gextto piece-diagnostics contract.
+type pieceRun struct {
+	Begin int    `json:"begin"`
+	End   int    `json:"end"`
+	State string `json:"state"`
+}
+
+// compressPieceRuns groups consecutive pieces with the same state, so a large
+// torrent is a few runs instead of one entry per piece.
+func compressPieceRuns(states []string) []pieceRun {
+	runs := make([]pieceRun, 0, 8)
+	for index, state := range states {
+		if last := len(runs) - 1; last >= 0 && runs[last].State == state {
+			runs[last].End = index
+			continue
+		}
+		runs = append(runs, pieceRun{Begin: index, End: index, State: state})
+	}
+	return runs
+}
+
 func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 	d.mu.Lock()
 	t, _ := d.findLocked(r.PathValue("hash"))
@@ -386,6 +408,13 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			out = append(out, item)
 		}
 		writeJSON(w, http.StatusOK, out)
+	case "pieces":
+		states, ready := t.PieceStates()
+		if !ready {
+			writeJSON(w, http.StatusOK, map[string]any{"piece_count": 0, "runs": []pieceRun{}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"piece_count": len(states), "runs": compressPieceRuns(states)})
 	case "torrent-file":
 		data, err := t.Torrent()
 		if err != nil || len(data) == 0 {

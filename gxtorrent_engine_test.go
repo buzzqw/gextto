@@ -362,8 +362,8 @@ func TestGxManagedListen(t *testing.T) {
 
 func TestV2DetailCapsPerEngine(t *testing.T) {
 	gx := v2DetailCapsFor(BackendGxTorrent)
-	if gx.SuperSeeding || gx.WebSeeds || gx.RateLimits || gx.Connections || gx.FileLevels || gx.TrackerNote == "" {
-		t.Fatalf("gx-torrent must hide what it cannot do: %+v", gx)
+	if gx.SuperSeeding || !gx.WebSeeds || gx.RateLimits || gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
+		t.Fatalf("gx-torrent capabilities: %+v", gx)
 	}
 	qb := v2DetailCapsFor(BackendQbittorrent)
 	if !qb.SuperSeeding || qb.WebSeeds || !qb.RateLimits || qb.Connections || !qb.FileLevels {
@@ -840,5 +840,54 @@ func TestGxWebSeedsPostsAddAndRemove(t *testing.T) {
 	}
 	if remove != "1" {
 		t.Fatalf("remove flag not sent: %q", remove)
+	}
+}
+
+// TestGxPieceRuns checks the adapter maps the daemon's piece runs, and turns a
+// 404 into found=false instead of an error.
+func TestGxPieceRuns(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/pieces") {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"piece_count": 5,
+				"runs": []map[string]any{
+					{"begin": 0, "end": 3, "state": "have"},
+					{"begin": 4, "end": 4, "state": ""},
+				},
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	runs, found, err := e.PieceRuns("ABC")
+	if err != nil || !found {
+		t.Fatalf("PieceRuns: found=%v err=%v", found, err)
+	}
+	want := []TorrentPieceRun{{Begin: 0, End: 3, State: "have"}, {Begin: 4, End: 4, State: ""}}
+	if len(runs) != len(want) {
+		t.Fatalf("runs = %+v, want %+v", runs, want)
+	}
+	for i := range want {
+		if runs[i] != want[i] {
+			t.Fatalf("run[%d] = %+v, want %+v", i, runs[i], want[i])
+		}
+	}
+
+	notFound := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"torrent not found"}`, http.StatusNotFound)
+	}))
+	defer notFound.Close()
+	e2 := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: notFound.URL, Timeout: time.Second},
+		client:   notFound.Client(),
+	}
+	runs, found, err = e2.PieceRuns("ABC")
+	if err != nil || found || runs != nil {
+		t.Fatalf("not found: runs=%v found=%v err=%v", runs, found, err)
 	}
 }

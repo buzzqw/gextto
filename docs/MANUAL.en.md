@@ -292,12 +292,14 @@ inferior to the archived file.
 - **Table columns**: Name, Status, Progress, ↓, ↑, ETA, Peers, Ratio — click a
   header to sort. **Bulk actions**: pause, resume, recheck, remove.
 - **Row actions**: pause/resume, recheck, details, remove.
-- **Details** tabs: General, Tracker, Content, Peers, Limits, Storage; includes
-  copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
+- **Details** tabs: General, Tracker, Content, Peers, Pieces, Limits, Storage;
+  includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
   mark-failed, move storage. **General** also offers **Export .torrent**,
   **Super seeding** and web-seed add/remove; **Tracker** lets you edit the whole
   list (`tier|url` per line); **Content** sets the **per-file priority**
-  (Skip/Normal/High/Maximum).
+  (Skip/Normal/High/Maximum). **Pieces** shows the piece map (green have, yellow
+  downloading, grey missing, dimmed skipped) on engines that expose it
+  (gx-torrent).
 - When you use **Move storage**, the log records the request, destination and
   command acceptance; the final outcome is written when libtorrent completes or
   rejects the move. With **Check**, the log distinguishes command start from

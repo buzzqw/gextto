@@ -251,6 +251,35 @@ func (t *Torrent) Sequential() bool {
 	return query(t.torrent, func() bool { return t.torrent.sequential })
 }
 
+// PieceStates returns the state of every piece, in index order (gextto fork):
+// "have", "downloading", "skipped" or "" (missing). The second value is false
+// when the torrent has no metadata/pieces yet. Once completed rain drops the
+// piece picker, so the states are derived from the pieces and the picker is
+// consulted only for the "downloading" ones.
+func (t *Torrent) PieceStates() ([]string, bool) {
+	states := query(t.torrent, func() []string {
+		pieces := t.torrent.pieces
+		if len(pieces) == 0 {
+			return nil
+		}
+		out := make([]string, len(pieces))
+		for i := range pieces {
+			switch {
+			case pieces[i].Done:
+				out[i] = "have"
+			case pieces[i].Skip:
+				out[i] = "skipped"
+			case t.torrent.piecePicker != nil && t.torrent.piecePicker.PieceDownloading(uint32(i)):
+				out[i] = "downloading"
+			default:
+				out[i] = ""
+			}
+		}
+		return out
+	})
+	return states, states != nil
+}
+
 // Start downloading the torrent. If all pieces are completed, starts seeding them.
 func (t *Torrent) Start() error {
 	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true)

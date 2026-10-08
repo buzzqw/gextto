@@ -318,6 +318,16 @@ Gli stessi dati sono in `GET /api/v1/stats` del demone e in
 - **mancano** i tempi dei job su disco e i pezzi falliti per peer: rain non li
   misura e non sono implementati.
 
+## Diagnostica pezzi
+
+`GET /api/v1/torrents/{hash}/pieces` riporta lo stato di ogni pezzo come
+intervalli compatti (`begin`/`end` inclusivi, `state`): `have` (scaricato),
+`downloading` (in corso), `skipped` (file escluso) o `""` (mancante). La pagina
+web del demone ha una scheda **Pieces** con la mappa colorata; Gextto mostra la
+stessa mappa nella scheda **Pezzi** del dettaglio torrent. gx-torrent è il primo
+motore di Gextto a esporre la diagnostica dei pezzi (libtorrent risponde "non
+disponibile").
+
 ## Cache disco e preallocazione
 
 Le impostazioni libtorrent di gextto valgono anche per gx-torrent, ma la cache
@@ -524,7 +534,7 @@ token è impostato.
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
-| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|torrent-file` | ispezione (i file includono `priority`) |
+| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato) |
 | `POST /api/v1/pins/clear` | toglie tutti i pin |
 | `POST /api/v1/ipfilter` | ricarica il filtro IP (`path` facoltativo) |
 | `GET /api/v1/config` | configurazione e slot effettivi |
