@@ -24,15 +24,15 @@ import (
 )
 
 // version may be overridden at build time with -ldflags "-X main.version=...".
-// Empty means: use the shared app version (1.1.<build>), so the daemon reports
-// the same string as the Gextto UI.
+// Empty means: use the daemon's own version (1.1.<gx-torrent build>), which
+// counts gx-torrent's builds independently from Gextto's.
 var version = ""
 
 func runtimeVersion() string {
 	if version != "" {
 		return version
 	}
-	return constants.AppVersion()
+	return constants.GxTorrentVersion()
 }
 
 func logf(format string, args ...any) {

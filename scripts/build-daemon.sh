@@ -59,14 +59,17 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
     if [[ -x "$GX_OUT" && -f "$GX_HASH_FILE" && "$(cat "$GX_HASH_FILE")" == "$GX_HASH" && "${GEXTTO_FORCE_GXTORRENT:-0}" != "1" ]]; then
         printf 'gx-torrent unchanged, kept %s\n' "$GX_OUT"
     else
+        # A real gx-torrent build: bump its own build number (independent from
+        # Gextto's) and stamp it in.
+        GX_BUILD="$("$ROOT/scripts/next-gx-build-number.sh")"
         (
             cd "$ROOT"
             CGO_ENABLED=0 go build -trimpath -buildvcs=false \
-                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
+                -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$GX_BUILD" \
                 -o "$GX_OUT.new" ./cmd/gx-torrent
         )
         mv -f "$GX_OUT.new" "$GX_OUT"
         printf '%s\n' "$GX_HASH" > "$GX_HASH_FILE"
-        printf 'built %s\n' "$GX_OUT"
+        printf 'built %s (build %s)\n' "$GX_OUT" "$GX_BUILD"
     fi
 fi

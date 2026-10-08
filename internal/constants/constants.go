@@ -26,7 +26,17 @@ var Version = "0.1.0"
 // `-X gextto/internal/constants.Build=...`. It identifies the exact binary.
 var Build = "1000"
 
-// AppVersion is the version shown in the UI and by gx-torrent:
-// "<major>.<minor>.<build>". Kept here so the gextto UI, the API and the
-// gx-torrent daemon all report the same string.
+// AppVersion is the version shown in the Gextto UI and API:
+// "<major>.<minor>.<build>".
 func AppVersion() string { return "1.1." + Build }
+
+// GxTorrentBuild is the gx-torrent daemon's own monotonic build number,
+// independent from Build: it grows by one every time the daemon is rebuilt
+// (`scripts/next-gx-build-number.sh`), and is stamped with
+// `-X gextto/internal/constants.GxTorrentBuild=...`. As gx-torrent is left
+// untouched across Gextto updates, its number does not follow Gextto's.
+var GxTorrentBuild = "0"
+
+// GxTorrentVersion is what the gx-torrent daemon's CLI, web UI and
+// /api/v1/health report.
+func GxTorrentVersion() string { return "1.1." + GxTorrentBuild }

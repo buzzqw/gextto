@@ -9,8 +9,8 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Mai "Claude" nel titolo o nel corpo delle PR; il titolo descrive la modifica
   (es. `fix(logs): …`).
 - Autore dei commit: `buzzqw <azanzani@gmail.com>`.
-- Non committare `build_number`, `bin/` né directory dati (`data/`,
-  `gextto-data/`).
+- Non committare `build_number`, `gx-torrent.build_number`, `bin/` né directory
+  dati (`data/`, `gextto-data/`).
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
@@ -51,7 +51,14 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `-buildvcs=false`: senza, Go marchia la revisione git nel binario e ogni
   commit sembrerebbe un cambiamento di gx-torrent. Richiede CGO/libtorrent; i
   warning di deprecazione di libtorrent sono normali.
-- `make gx-torrent` — solo il demone (`CGO_ENABLED=0`).
+- Il demone ha un **numero di build proprio** (`gx-torrent.build_number`, non
+  committato), separato da quello di Gextto: cresce di uno a ogni build reale di
+  gx-torrent (`scripts/next-gx-build-number.sh`, usato da `make build` e da
+  `make gx-torrent`) e resta invariato quando gx-torrent non viene ricostruito.
+  È ciò che `gx-torrent --version`, `/api/v1/health` e la sua pagina web
+  riportano come `1.1.<n>`; la UI di Gextto continua a usare `1.1.<build>`.
+- `make gx-torrent` — solo il demone (`CGO_ENABLED=0`), con lo stesso numero di
+  build proprio.
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
   `gx-torrent` nella root (ora ignorato). Per il demone usa `make gx-torrent`
   (produce `bin/gx-torrent`).
@@ -95,8 +102,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Log: `gextto-data/gextto.log` e `gextto-data/gx-torrent/gx-torrent.log`
   (entrambi ruotati a 5 MB × 4); `gx-torrent.crash.log` solo per i crash.
 - Verifica: `systemctl --user status gextto`;
-  `curl -s http://127.0.0.1:5000/api/status` (campo `version` = `1.1.<build>`);
-  `curl -s http://127.0.0.1:8890/api/v1/health` (demone gx-torrent).
+  `curl -s http://127.0.0.1:5000/api/status` (campo `version` = `1.1.<build>` di
+  Gextto); `curl -s http://127.0.0.1:8890/api/v1/health` (demone gx-torrent:
+  `version` = `1.1.<suo build>`, `pid`, `fingerprint`).
 
 ## Convenzioni di modifica
 - Nuova opzione di un motore: demone (`cmd/gx-torrent`), adapter

@@ -25,6 +25,8 @@ docs/revisione-1.md
 
 # The monotonic build number is generated per build, never committed.
 build_number
+# The gx-torrent daemon's own build number (independent from gextto's).
+gx-torrent.build_number
 
 # Local configuration and secrets
 *.db
@@ -56,3 +58,5 @@ uiweb/end2end/playwright-report/
 
 # root-level build artifact (go build ./cmd/gx-torrent writes here)
 /gx-torrent
+# personal convenience build script (not part of the project)
+/builda-tutto.sh

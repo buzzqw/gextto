@@ -31,7 +31,11 @@ Codice:
 
 1. `make build` (o `scripts/build-daemon.sh`) compila `bin/gx-torrent` accanto
    a `bin/gexttod`; `make gx-torrent` compila solo il demone. Il pacchetto, `install.sh`
-   e `gexttod --update` installano `gx-torrent` accanto a `gexttod`.
+   e `gexttod --update` installano `gx-torrent` accanto a `gexttod`. Il demone ha
+   un **numero di build proprio** (`gx-torrent.build_number`), indipendente da
+   quello di Gextto: cresce di uno a ogni sua ricompilazione e resta invariato
+   quando la build non lo tocca. È la versione `1.1.<n>` riportata da
+   `gx-torrent --version`, dalla sua pagina web e da `/api/v1/health`.
 2. `gx-torrent` è il motore predefinito di una nuova installazione: non serve
    sceglierlo. Per usare invece libtorrent integrato imposta *Motore torrent* su
    `embedded` e riavvia. Una configurazione che ha già salvato un motore resta

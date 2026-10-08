@@ -130,10 +130,10 @@ func TestAdaptiveCacheDisabledUsesStatic(t *testing.T) {
 	}
 }
 
-func TestRuntimeVersionUsesAppVersion(t *testing.T) {
+func TestRuntimeVersionUsesGxTorrentBuild(t *testing.T) {
 	v := runtimeVersion()
 	if len(v) < 5 || v[:4] != "1.1." {
-		t.Fatalf("runtime version = %q, want 1.1.<build>", v)
+		t.Fatalf("runtime version = %q, want 1.1.<gx-torrent build>", v)
 	}
 }
 

@@ -13,9 +13,14 @@ build:
 fast:
 	scripts/build-daemon.sh
 
-# Only the gx-torrent daemon (pure Go, no libtorrent needed).
+# Only the gx-torrent daemon (pure Go, no libtorrent needed). Bumps the daemon's
+# own build number, independent from Gextto's.
 gx-torrent:
-	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o bin/gx-torrent ./cmd/gx-torrent
+	GX_BUILD="$$(scripts/next-gx-build-number.sh)"; \
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD" \
+		-o bin/gx-torrent ./cmd/gx-torrent; \
+	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 
 test: check-ui installer-test
 	CGO_ENABLED=1 go test ./...
