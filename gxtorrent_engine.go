@@ -910,6 +910,11 @@ func gxPeerLimits(connectionsLimit int64) (dial, accept int) {
 	if connectionsLimit <= 0 {
 		return 0, 0
 	}
+	// Clamp before converting: a limit from the config can be any int64, and
+	// the conversion to int (and the *4/5) must not overflow.
+	if connectionsLimit > math.MaxInt32 {
+		connectionsLimit = math.MaxInt32
+	}
 	dial = int(connectionsLimit * 4 / 5)
 	if dial < 1 {
 		dial = 1

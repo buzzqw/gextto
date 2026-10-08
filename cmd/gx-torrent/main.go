@@ -90,11 +90,20 @@ func parseBootstrapNodes(value string) []string {
 	return nodes
 }
 
-func envInt(key string, fallback int64) int64 {
-	if value, err := strconv.ParseInt(strings.TrimSpace(os.Getenv(key)), 10, 64); err == nil {
-		return value
+// envIntVal reads an integer env var, parsed directly into a native int so no
+// narrowing conversion takes place, and clamped into [low, high].
+func envIntVal(key string, fallback, low, high int) int {
+	value := fallback
+	if parsed, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key))); err == nil {
+		value = parsed
 	}
-	return fallback
+	if value < low {
+		value = low
+	}
+	if value > high {
+		value = high
+	}
+	return value
 }
 
 func envBool(key string, fallback bool) bool {
@@ -129,7 +138,7 @@ func main() {
 	listenIface := flag.String("listen-interface", envOr("GX_TORRENT_LISTEN_INTERFACE", ""), "IP or interface name for incoming peers (default all)")
 	outIface := flag.String("outgoing-interface", envOr("GX_TORRENT_OUTGOING_INTERFACE", ""), "bind all outgoing traffic to this interface or IP (VPN killswitch)")
 	proxyURL := flag.String("proxy", envOr("GX_TORRENT_PROXY", ""), "socks5://[user:pass@]host:port or http://host:port (disables DHT and UDP trackers)")
-	encryption := flag.Int("encryption", int(envInt("GX_TORRENT_ENCRYPTION", 1)), "0 disabled, 1 enabled, 2 forced")
+	encryption := flag.Int("encryption", envIntVal("GX_TORRENT_ENCRYPTION", 1, 0, 2), "0 disabled, 1 enabled, 2 forced")
 	noDHT := flag.Bool("no-dht", envBool("GX_TORRENT_NO_DHT", false), "disable DHT")
 	noPEX := flag.Bool("no-pex", envBool("GX_TORRENT_NO_PEX", false), "disable peer exchange")
 	noUTP := flag.Bool("no-utp", envBool("GX_TORRENT_NO_UTP", false), "disable uTP (peers over TCP only)")
