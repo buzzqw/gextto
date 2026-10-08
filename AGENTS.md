@@ -63,6 +63,25 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 
+## Code scanning (CodeQL)
+- Workflow `.github/workflows/codeql.yml` (linguaggio Go; gira su push/PR su
+  `main` e una volta a settimana). Non serve `sudo` né CGO per l'analisi.
+- **Model pack locale**: `.github/codeql/extensions/gextto-models` dichiara i
+  validatori di percorso che CodeQL non riconosce da solo (`pathStartsWith`,
+  `folderRenameWithin`, `comicDownloadFilename`). L'action non carica i pack
+  locali da sola: servono gli `CODEQL_ACTION_EXTRA_OPTIONS` già impostati nello
+  step *Analyze*. Se aggiungi un nuovo validatore di percorso, aggiungilo al
+  model pack (`models/gextto.model.yml`) invece di sopprimere a tappeto.
+- **Triage**: correggi gli alert reali (data-flow da input non fidato verso un
+  sink); per i by-design o i falsi positivi dimetti con un motivo esplicito:
+  `gh api -X PATCH repos/buzzqw/gextto/code-scanning/alerts/<n> -f state=dismissed
+  -f dismissed_reason='false positive|won't fix|used in tests' -f dismissed_comment='…'`.
+  Convenzioni: `go/path-injection` e `go/request-forgery` su percorsi/URL
+  configurati dall'operatore (save path assoluti, fetch di `.torrent`/filtri IP)
+  sono funzionalità intenzionali, API protetta da token; la crittografia di
+  protocollo (RC4 in MSE, SHA-1 nel DHT) non è modificabile.
+- Alert aperti: `gh api 'repos/buzzqw/gextto/code-scanning/alerts?state=open&per_page=100'`.
+
 ## Servizio in esecuzione su questa macchina
 - È un **servizio systemd utente** (non di sistema): `~/.config/systemd/user/gextto.service`,
   esegue `/home/andres/gextto/bin/gexttod` dal checkout, `GEXTTO_DATA_DIR=/home/andres/gextto-data`,
