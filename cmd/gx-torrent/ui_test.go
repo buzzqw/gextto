@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -157,6 +159,47 @@ func TestUIAddRemoteTorrent(t *testing.T) {
 	resp.Body.Close()
 	if len(d.list()) != 1 {
 		t.Fatalf("remote add: %d torrents, want 1", len(d.list()))
+	}
+}
+
+// TestUIAddAcceptsTorrentFile posts a .torrent file to the single add form.
+func TestUIAddAcceptsTorrentFile(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	torrentBytes := makeTorrent(t, src, "payload.bin", 80_000)
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	part, err := form.CreateFormFile("torrent", "payload.torrent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(torrentBytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.WriteField("destination", src); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, server.URL+"/ui/add", &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("add file -> %d", resp.StatusCode)
+	}
+	if len(d.list()) != 1 {
+		t.Fatalf("file add: %d torrents, want 1", len(d.list()))
 	}
 }
 
@@ -339,6 +382,121 @@ func TestUIGexttoLogTabReadsTheTail(t *testing.T) {
 	page.Body.Close()
 	if !strings.Contains(string(body), "Gextto log") {
 		t.Fatal("the Gextto log tab is missing")
+	}
+}
+
+// TestUIRemoveAcceptsDeleteFilesParam locks the unified remove parameter: the
+// page sends delete_files like the API, and the legacy files name still works.
+func TestUIRemoveAcceptsDeleteFilesParam(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 80_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.PostForm(server.URL+"/ui/remove", url.Values{"hash": {hash}, "delete_files": {"0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if _, ok := findInfo(d, hash); ok {
+		t.Fatal("torrent must be gone after remove with delete_files=0")
+	}
+}
+
+// TestUISuperSeedingAcceptsAlias locks the toggle aliases: enabled (like the
+// API action) and super_seeding (like the add forms) both switch it on.
+func TestUISuperSeedingAcceptsAlias(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 80_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	isSuperSeeding := func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && meta.SuperSeeding
+	}
+	for _, field := range []string{"enabled", "super_seeding"} {
+		if resp, err := http.PostForm(server.URL+"/ui/super-seeding", url.Values{"hash": {hash}, field: {"1"}}); err != nil {
+			t.Fatal(err)
+		} else {
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("super-seeding with %s -> %d", field, resp.StatusCode)
+			}
+		}
+		if !isSuperSeeding() {
+			t.Fatalf("super-seeding not enabled via %s", field)
+		}
+		if resp, err := http.PostForm(server.URL+"/ui/super-seeding", url.Values{"hash": {hash}}); err != nil {
+			t.Fatal(err)
+		} else {
+			resp.Body.Close()
+		}
+		if isSuperSeeding() {
+			t.Fatal("super-seeding must switch off without the flag")
+		}
+	}
+}
+
+// TestUISummaryCardsAreNotDuplicated locks the cards/statusbar split: live
+// values live in the statusbar, the cards keep counts and static settings.
+func TestUISummaryCardsAreNotDuplicated(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "payload.bin", 80_000), Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(server.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	body := string(raw)
+	for _, want := range []string{"<span>moving</span>", ">DHT <b>", `name="delete_files"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("page missing %q", want)
+		}
+	}
+	// One add form: every option appears exactly once.
+	for _, opt := range []string{`name="paused"`, `name="top"`, `name="sequential"`, `name="first_last"`, `name="super_seeding"`} {
+		if n := strings.Count(body, opt); n != 1 {
+			t.Fatalf("%s appears %d times, want 1", opt, n)
+		}
+	}
+	for _, gone := range []string{"nodi", "giorni", "non aperto", "Messaggio", "Prossimo", `name="files"`, "↓ speed</span>", "↑ speed</span>"} {
+		if strings.Contains(body, gone) {
+			t.Fatalf("page still contains %q", gone)
+		}
+	}
+
+	detail, err := http.Get(server.URL + "/ui/detail?hash=" + hash + "&tab=general")
+	if err != nil {
+		t.Fatal(err)
+	}
+	detailRaw, _ := io.ReadAll(detail.Body)
+	detail.Body.Close()
+	detailBody := string(detailRaw)
+	if !strings.Contains(detailBody, "Limits &amp; seeding (-1 global, 0 unlimited).") {
+		t.Fatal("detail general must explain -1/0 once for all limits")
+	}
+	if strings.Count(detailBody, "-1 global") != 1 {
+		t.Fatalf("detail repeats the -1/0 legend %d times", strings.Count(detailBody, "-1 global"))
 	}
 }
 

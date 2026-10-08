@@ -101,12 +101,14 @@ qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
 La scheda del browser mostra l'icona del demone (una freccia di download blu),
 inclusa nella pagina e servita anche da `GET /favicon.ico` senza token.
 
-- **Riepilogo sessione** in cima, su due righe di riquadri: stato torrent,
-  velocità, porta, scaricato/caricato nella sessione, router, DHT, uTP, filtro
-  IP, cache, spazio libero; barra di stato in basso.
-- **Aggiunta** da magnet, da URL a un `.torrent` (incolli l'indirizzo) o da file
-  locale caricato, con destinazione, pausa, "in cima alla coda", download
-  sequenziale, prima/ultima parte e limiti seed.
+- **Riepilogo sessione**: in cima i riquadri con i conteggi (torrent, downloading,
+  seeding, stalled, paused, moving), porta peer, filtro IP e cache; i valori live
+  (velocità, scaricato/caricato nella sessione, spazio libero, DHT, porta,
+  cifratura) stanno nella barra di stato in basso, sempre visibile.
+- **Aggiunta** da un'unica form: magnet, URL a un `.torrent` o file locale
+  caricato, con destinazione, pausa, "in cima alla coda", download
+  sequenziale, prima/ultima parte e super-seeding; i limiti di seed e velocità
+  si impostano per torrent nel dettaglio *Generale*.
 - **Tabella** a due righe per torrent (nome e cartella; avanzamento, stato,
   dimensioni, velocità, peer, seed, ratio di condivisione, ETA), con ricerca/filtro per nome, **filtro per stato** nella barra
   laterale, colonne ordinabili, selezione multipla e azioni di gruppo
@@ -114,8 +116,8 @@ inclusa nella pagina e servita anche da `GET /favicon.ico` senza token.
 - **Dettaglio per torrent** a schede: *Generale* (dati, pezzi, spazio,
   date, copia magnet, esporta `.torrent`, pin, sposta, limiti di
   velocità/connessioni/upload e seed, **web seed**), *File* (scarica/salta e
-  **streaming HTTP** con ▶), *Peer* (flag di connessione, trasporto, cifratura),
-  *Tracker* (stato, sciame, aggiunta e **rimozione**), *Pezzi* (mappa colorata).
+  **streaming HTTP** con ▶), *Peers* (flag di connessione, trasporto, cifratura),
+  *Trackers* (stato, sciame, aggiunta e **rimozione**), *Pezzi* (mappa colorata).
 - **Filtro IP** da URL o file; il campo è precompilato con il filtro
   configurato in Gextto.
 - **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette

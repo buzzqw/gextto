@@ -126,6 +126,23 @@ func formInt(r *http.Request, key string, fallback int64) int64 {
 	return fallback
 }
 
+// addRequestFromForm builds the options shared by the add endpoints (API and
+// UI, magnet/URL and file): one place for the parameter names so the forms
+// cannot drift apart. Callers set Magnet or TorrentData on top.
+func addRequestFromForm(r *http.Request) addRequest {
+	return addRequest{
+		Destination:    r.FormValue("destination"),
+		Paused:         formBool(r, "paused"),
+		QueueTop:       formBool(r, "top"),
+		StopAtMetadata: formBool(r, "stop_at_metadata"),
+		Sequential:     formBool(r, "sequential"),
+		FirstLast:      formBool(r, "first_last"),
+		SuperSeeding:   formBool(r, "super_seeding"),
+		SeedRatio:      formFloat(r, "seed_ratio", -1),
+		SeedDays:       formInt(r, "seed_days", -1),
+	}
+}
+
 func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	d.mu.Lock()
 	ok := d.session != nil
@@ -149,18 +166,9 @@ func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, errors.New("missing magnet"))
 		return
 	}
-	hash, existing, err := d.add(addRequest{
-		Magnet:         magnet,
-		Destination:    r.FormValue("destination"),
-		Paused:         formBool(r, "paused"),
-		QueueTop:       formBool(r, "top"),
-		StopAtMetadata: formBool(r, "stop_at_metadata"),
-		Sequential:     formBool(r, "sequential"),
-		FirstLast:      formBool(r, "first_last"),
-		SuperSeeding:   formBool(r, "super_seeding"),
-		SeedRatio:      formFloat(r, "seed_ratio", -1),
-		SeedDays:       formInt(r, "seed_days", -1),
-	})
+	req := addRequestFromForm(r)
+	req.Magnet = magnet
+	hash, existing, err := d.add(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -185,18 +193,9 @@ func (d *Daemon) handleAddFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	hash, existing, err := d.add(addRequest{
-		TorrentData:    data,
-		Destination:    r.FormValue("destination"),
-		Paused:         formBool(r, "paused"),
-		QueueTop:       formBool(r, "top"),
-		StopAtMetadata: formBool(r, "stop_at_metadata"),
-		Sequential:     formBool(r, "sequential"),
-		FirstLast:      formBool(r, "first_last"),
-		SuperSeeding:   formBool(r, "super_seeding"),
-		SeedRatio:      formFloat(r, "seed_ratio", -1),
-		SeedDays:       formInt(r, "seed_days", -1),
-	})
+	req := addRequestFromForm(r)
+	req.TorrentData = data
+	hash, existing, err := d.add(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return

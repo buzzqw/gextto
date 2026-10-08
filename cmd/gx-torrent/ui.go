@@ -225,10 +225,10 @@ header h1{font-size:20px;margin:0;font-weight:600}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
 .muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
-.cards{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin-bottom:12px}
-.card{min-width:0;background:#161d2c;border:1px solid #243049;border-radius:8px;padding:8px 12px}
-.card b{display:block;font-size:19px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card span{display:block;color:#93a1b5;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cards{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.card{min-width:0;background:#161d2c;border:1px solid #243049;border-radius:8px;padding:10px 14px}
+.card b{display:block;font-size:22px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card span{display:block;color:#93a1b5;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px;margin-bottom:12px}
 .toolbar form{display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap}
@@ -333,7 +333,18 @@ var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
 	"bytes":   uiBytes,
 	"rate":    uiRate,
 	"dur":     uiDuration,
-}).Parse(uiPageTemplate + uiLiveTemplate + uiDetailTemplate))
+}).Parse(uiPageTemplate + uiSharedTemplate + uiLiveTemplate + uiDetailTemplate))
+
+// uiSharedTemplate holds the form fragments used more than once, so the add
+// forms cannot drift apart.
+const uiSharedTemplate = `{{define "addopts"}}
+      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
+      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
+      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
+      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
+      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
+{{end}}`
 
 // uiFaviconSVG is the site icon of the daemon page: a download arrow into a
 // tray, in the page's blue. It is inlined in the pages (no request, no token)
@@ -371,25 +382,12 @@ var uiPageTemplate = `<!doctype html>
   <div id="cards">{{template "cards" .}}</div>
 
   <div class="toolbar">
-    <form method="post" action="/ui/add">
+    <form method="post" action="/ui/add" enctype="multipart/form-data">
       <input type="text" name="source" placeholder="paste magnet:… or https://…/file.torrent" autocomplete="off">
-      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
-      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
-      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
-      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
+      <span class="muted">or</span>
+      <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" title=".torrent file to add">
+      {{template "addopts"}}
       <button class="primary" type="submit">Add</button>
-    </form>
-    <form method="post" action="/ui/add-file" enctype="multipart/form-data">
-      <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" required title=".torrent file to add">
-      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
-      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
-      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
-      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
-      <button type="submit">Add .torrent</button>
     </form>
     <form method="post" action="/ui/ipfilter">
       <span class="muted">IP filter</span>
@@ -468,16 +466,10 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
     <div class="card"><b>{{.Seeding}}</b><span>seeding</span></div>
     <div class="card"><b>{{.Stalled}}</b><span>stalled</span></div>
     <div class="card"><b>{{.Paused}}</b><span>paused</span></div>
-    <div class="card"><b>{{.DownloadRate}}</b><span>↓ speed</span></div>
-    <div class="card"><b>{{.UploadRate}}</b><span>↑ speed</span></div>
+    <div class="card"><b>{{.Moving}}</b><span>moving</span></div>
     <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
-    <div class="card" title="Downloaded in this session"><b>{{bytes .TotalDown}}</b><span>downloaded</span></div>
-    <div class="card" title="Uploaded in this session"><b>{{bytes .TotalUp}}</b><span>uploaded</span></div>
-    <div class="card" title="Router port mapping"><b>{{.Router}}</b><span>{{if .ExternalIP}}{{.ExternalIP}}{{else}}router{{end}}</span></div>
-    <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>{{.DHTNodes}} nodes · uTP {{if .UTP}}on{{else}}off{{end}}</span></div>
     <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
     <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache r/w</span></div>
-    <div class="card" title="Free space of {{bytes .DiskTotal}}"><b>{{bytes .DiskFree}}</b><span>free of {{bytes .DiskTotal}}</span></div>
   </div>
 {{end}}{{define "live"}}
 
@@ -510,8 +502,8 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
       <th class="num" onclick="sortTable('done')">Done / Size</th>
       <th class="num" onclick="sortTable('down')">↓</th>
       <th class="num" onclick="sortTable('up')">↑</th>
-      <th class="num" onclick="sortTable('peers')">Peer</th>
-      <th class="num" onclick="sortTable('seeds')">Seed</th>
+      <th class="num" onclick="sortTable('peers')">Peers</th>
+      <th class="num" onclick="sortTable('seeds')">Seeds</th>
       <th class="num" onclick="sortTable('ratio')">Ratio</th>
       <th class="num" onclick="sortTable('eta')">ETA</th>
     </tr>
@@ -531,8 +523,8 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="verify"><button title="Recheck data on disk">✓</button></form>
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="reannounce"><button title="Reannounce to trackers">↻</button></form>
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Move to the top of the queue">⤒</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
         </div></td>
       </tr>
       <tr class="l2">
@@ -559,8 +551,8 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
     <span>↓ <b>{{.DownloadRate}}</b></span>
     <span>↑ <b>{{.UploadRate}}</b></span>
     <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
-    <span>Free space <b>{{bytes .DiskFree}}</b></span>
-    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodi{{else}}off{{end}}</b></span>
+    <span>Free space <b>{{bytes .DiskFree}} of {{bytes .DiskTotal}}</b></span>
+    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodes{{else}}off{{end}}</b></span>
     <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b></span>
     <span>Encryption <b>{{.Encryption}}</b></span>
   </div>
@@ -574,8 +566,8 @@ const uiDetailTemplate = `{{define "detail"}}
 <div class="detail-tabs">
   <button type="button" class="{{if eq .Tab "general"}}on{{end}}" onclick="openDetail('{{.Hash}}','general')">General</button>
   <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">Files ({{len .Files}})</button>
-  <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peer ({{len .Peers}})</button>
-  <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Tracker ({{len .Trackers}})</button>
+  <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peers ({{len .Peers}})</button>
+  <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Trackers ({{len .Trackers}})</button>
   <button type="button" class="{{if eq .Tab "pieces"}}on{{end}}" onclick="openDetail('{{.Hash}}','pieces')">Pieces ({{.PiecesHave}}/{{.PiecesTotal}})</button>
 </div>
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
@@ -594,7 +586,7 @@ const uiDetailTemplate = `{{define "detail"}}
     <div class="row"><span>Swarm (seeds / peers)</span><strong>{{.NumComplete}} / {{.NumIncomplete}}</strong></div>
     <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
     <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
-    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} giorni)</strong></div>
+    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} days)</strong></div>
     <div class="row"><span>Pin</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
     <div class="row"><span>Private</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
     <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
@@ -611,14 +603,15 @@ const uiDetailTemplate = `{{define "detail"}}
     <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copy magnet</button>
     <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Export .torrent</a>
   </div>
+  <p class="muted" style="margin:12px 0 0">Limits &amp; seeding (-1 global, 0 unlimited).</p>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Download limit KiB/s (-1 global, 0 unlimited)<input type="number" name="download_limit" value="{{.DownloadLimitKib}}"></label>
-    <label>Upload limit KiB/s (-1 global, 0 unlimited)<input type="number" name="upload_limit" value="{{.UploadLimitKib}}"></label>
-    <label>Max connections (-1 global, 0 unlimited)<input type="number" name="max_connections" value="{{.MaxConnections}}"></label>
-    <label>Max uploads (-1 global, 0 unlimited)<input type="number" name="max_uploads" value="{{.MaxUploads}}"></label>
-    <label>Seed ratio (-1 global, 0 unlimited)<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
-    <label>Seed days (-1 global, 0 unlimited)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
+    <label>Download limit KiB/s<input type="number" name="download_limit" value="{{.DownloadLimitKib}}"></label>
+    <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}"></label>
+    <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}"></label>
+    <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}"></label>
+    <label>Seed ratio<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
+    <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
     <button type="submit">Save limits</button>
   </form>
   <form class="form-grid" method="post" action="/ui/super-seeding">
@@ -677,13 +670,13 @@ const uiDetailTemplate = `{{define "detail"}}
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table>
-    <thead><tr><th>URL</th><th>State</th><th>Messaggio</th><th class="num">Seed</th><th class="num">Peer</th><th class="num">Prossimo</th><th></th></tr></thead>
+    <thead><tr><th>URL</th><th>State</th><th>Message</th><th class="num">Seeds</th><th class="num">Peers</th><th class="num">Next</th><th></th></tr></thead>
     <tbody>
     {{range .Trackers}}
       <tr><td class="name">{{.URL}}</td><td>{{.Status}}</td><td class="name">{{.Message}}</td>
       <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
       <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
-      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" title="Rimuove questo tracker">Remove</button></form></td></tr>
+      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" title="Remove this tracker">Remove</button></form></td></tr>
     {{end}}
     </tbody>
   </table>
@@ -909,39 +902,34 @@ func (d *Daemon) handleUIRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
-	err := d.remove(hash, formBool(r, "files"))
+	// The forms send delete_files (like the API); files is the legacy name.
+	deleteFiles := formBool(r, "delete_files") || formBool(r, "files")
+	err := d.remove(hash, deleteFiles)
 	d.uiDone(w, r, "Torrent removed", err)
 }
 
-// handleUIAdd adds a torrent from a magnet or from an http(s) URL to a
-// .torrent, with the usual destination/pause/top options. A local .torrent is
-// handled by handleUIAddFile.
-func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
-	if !d.uiAuthorized(w, r) {
-		return
+// uiBuildAddRequest builds one add request from an add form: an uploaded
+// .torrent file wins when present, otherwise a magnet link or an http(s) URL
+// to a .torrent in the source field. The form must already be parsed.
+func uiBuildAddRequest(r *http.Request) (addRequest, error) {
+	req := addRequestFromForm(r)
+	if file, _, err := r.FormFile("torrent"); err == nil {
+		data, readErr := io.ReadAll(io.LimitReader(file, maxTorrentFile))
+		_ = file.Close()
+		if readErr != nil {
+			return req, readErr
+		}
+		if len(bytes.TrimSpace(data)) > 0 {
+			req.TorrentData = data
+			return req, nil
+		}
 	}
-	if !d.uiSameOrigin(w, r) {
-		return
-	}
-	_ = r.ParseForm()
 	source := strings.TrimSpace(r.FormValue("source"))
 	if source == "" {
 		source = strings.TrimSpace(r.FormValue("magnet"))
 	}
 	if source == "" {
-		d.uiDone(w, r, "", fmt.Errorf("paste a magnet link or a .torrent URL"))
-		return
-	}
-	req := addRequest{
-		Destination:    r.FormValue("destination"),
-		Paused:         formBool(r, "paused"),
-		QueueTop:       formBool(r, "top"),
-		StopAtMetadata: formBool(r, "stop_at_metadata"),
-		Sequential:     formBool(r, "sequential"),
-		FirstLast:      formBool(r, "first_last"),
-		SuperSeeding:   formBool(r, "super_seeding"),
-		SeedRatio:      formFloat(r, "seed_ratio", -1),
-		SeedDays:       formInt(r, "seed_days", -1),
+		return req, fmt.Errorf("paste a magnet link, a .torrent URL or choose a .torrent file")
 	}
 	lower := strings.ToLower(source)
 	switch {
@@ -950,8 +938,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(lower, "http://"), strings.HasPrefix(lower, "https://"):
 		data, err := fetchRemoteTorrent(source)
 		if err != nil {
-			d.uiDone(w, r, "", fmt.Errorf("download: %w", err))
-			return
+			return req, fmt.Errorf("download: %w", err)
 		}
 		trimmed := strings.TrimSpace(string(data))
 		switch {
@@ -960,11 +947,18 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		case len(data) > 0 && data[0] == 'd':
 			req.TorrentData = data
 		default:
-			d.uiDone(w, r, "", fmt.Errorf("the URL does not contain a .torrent file"))
-			return
+			return req, fmt.Errorf("the URL does not contain a .torrent file")
 		}
 	default:
-		d.uiDone(w, r, "", fmt.Errorf("paste a magnet link or a .torrent URL"))
+		return req, fmt.Errorf("paste a magnet link, a .torrent URL or choose a .torrent file")
+	}
+	return req, nil
+}
+
+// uiFinishAdd stores one add request built by uiBuildAddRequest.
+func (d *Daemon) uiFinishAdd(w http.ResponseWriter, r *http.Request, req addRequest, err error) {
+	if err != nil {
+		d.uiDone(w, r, "", err)
 		return
 	}
 	_, existing, err := d.add(req)
@@ -977,6 +971,29 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		msg = "Torrent already present"
 	}
 	d.uiDone(w, r, msg, nil)
+}
+
+// handleUIAdd adds a torrent from the single add form: magnet, .torrent URL
+// or uploaded .torrent file, with the usual destination/pause/top options.
+func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+		r.Body = http.MaxBytesReader(w, r.Body, maxTorrentFile+1<<20)
+		if err := r.ParseMultipartForm(maxTorrentFile); err != nil {
+			d.uiDone(w, r, "", err)
+			return
+		}
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		_ = r.ParseForm()
+	}
+	req, err := uiBuildAddRequest(r)
+	d.uiFinishAdd(w, r, req, err)
 }
 
 // fetchRemoteTorrent downloads a .torrent from an http(s) URL, bounded in size
@@ -1001,8 +1018,8 @@ func fetchRemoteTorrent(rawURL string) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
 }
 
-// handleUIAddFile adds a torrent from an uploaded .torrent, with the usual
-// destination/pause/top options; it is the file counterpart of /ui/add.
+// handleUIAddFile is the legacy file-only counterpart of /ui/add: it accepts
+// the same request, so old clients keep working while the page shows one form.
 func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
@@ -1015,38 +1032,8 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		d.uiDone(w, r, "", err)
 		return
 	}
-	file, _, err := r.FormFile("torrent")
-	if err != nil {
-		d.uiDone(w, r, "", fmt.Errorf("missing .torrent file"))
-		return
-	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, maxTorrentFile))
-	if err != nil {
-		d.uiDone(w, r, "", err)
-		return
-	}
-	_, existing, err := d.add(addRequest{
-		TorrentData:    data,
-		Destination:    r.FormValue("destination"),
-		Paused:         formBool(r, "paused"),
-		QueueTop:       formBool(r, "top"),
-		StopAtMetadata: formBool(r, "stop_at_metadata"),
-		Sequential:     formBool(r, "sequential"),
-		FirstLast:      formBool(r, "first_last"),
-		SuperSeeding:   formBool(r, "super_seeding"),
-		SeedRatio:      formFloat(r, "seed_ratio", -1),
-		SeedDays:       formInt(r, "seed_days", -1),
-	})
-	if err != nil {
-		d.uiDone(w, r, "", err)
-		return
-	}
-	msg := "Torrent added"
-	if existing {
-		msg = "Torrent already present"
-	}
-	d.uiDone(w, r, msg, nil)
+	req, err := uiBuildAddRequest(r)
+	d.uiFinishAdd(w, r, req, err)
 }
 
 func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
@@ -1224,7 +1211,9 @@ func (d *Daemon) handleUISuperSeeding(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
-	enabled := formBool(r, "enabled")
+	// The toggle sends enabled (like the API action); super_seeding is the
+	// legacy alias from the add forms.
+	enabled := formBool(r, "enabled") || formBool(r, "super_seeding")
 	message := "Super-seeding off"
 	if enabled {
 		message = "Super-seeding on"
@@ -1339,7 +1328,7 @@ func (d *Daemon) uiSameOrigin(w http.ResponseWriter, r *http.Request) bool {
 	}
 	parsed, err := url.Parse(origin)
 	if err != nil || !strings.EqualFold(parsed.Host, r.Host) {
-		http.Error(w, "richiesta da un'altra origine rifiutata", http.StatusForbidden)
+		http.Error(w, "cross-origin request rejected", http.StatusForbidden)
 		return false
 	}
 	return true
@@ -1416,7 +1405,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		page.Router = strings.ToUpper(stats.PortMapping.Method)
 		page.ExternalIP = stats.PortMapping.ExternalIP
 	case stats.PortMapping.Error != "":
-		page.Router = "non aperto"
+		page.Router = "not open"
 	default:
 		page.Router = "—"
 	}
