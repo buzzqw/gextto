@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -186,5 +187,43 @@ func TestTorrentTransferringAndIdle(t *testing.T) {
 		if got := TorrentIdle(tc.view); got != tc.idle {
 			t.Errorf("TorrentIdle(%+v) = %v", tc.view, got)
 		}
+	}
+}
+
+type busyMoveSession struct {
+	stubTorrentSession
+	calls int
+}
+
+func (s *busyMoveSession) MoveStorage(hash, destination string) (bool, error) {
+	s.calls++
+	return false, errors.New("gx-torrent: the torrent is already being moved")
+}
+
+func TestRetryStorageMovesWaitsForAMoveTheEngineIsAlreadyRunning(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "downloads")
+	destination := filepath.Join(dir, "library")
+	for _, path := range []string{source, destination} {
+		if err := os.MkdirAll(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	session := &busyMoveSession{stubTorrentSession: stubTorrentSession{list: []models.TorrentView{{Hash: seedTestHash, Name: "Show.S01", SavePath: source}}}}
+	// Restored after a Gextto restart: not in flight for this run yet.
+	retries := map[string]StorageMoveRetry{
+		seedTestHash: {destination: destination, postSeed: true, nextAttempt: time.Now().Add(-time.Second)},
+	}
+	moveRequests := map[string]struct{}{}
+	RetryStorageMoves(session, moveRequests, map[string]struct{}{}, retries)
+	entry := retries[seedTestHash]
+	if !entry.inFlight || entry.attempts != 0 || !entry.nextAttempt.After(time.Now()) {
+		t.Fatalf("a move already running must be waited for, not counted as a failure: %+v", entry)
+	}
+	for tick := 0; tick < 10; tick++ {
+		RetryStorageMoves(session, moveRequests, map[string]struct{}{}, retries)
+	}
+	if session.calls != 1 {
+		t.Fatalf("the running move was re-issued %d times", session.calls)
 	}
 }

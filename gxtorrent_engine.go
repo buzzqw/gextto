@@ -117,6 +117,9 @@ type gxTorrentEngine struct {
 	process        *gxManagedProcess
 	supervisorStop chan struct{}
 	closed         bool
+	// replacing: the adopted daemon is being stopped on purpose to start the
+	// updated one, so its exit is not a crash.
+	replacing bool
 
 	mu               sync.Mutex
 	syncMu           sync.Mutex
@@ -151,6 +154,11 @@ func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
 		cache:          map[string]models.TorrentView{},
 		previous:       map[string]models.TorrentView{},
 		pendingMoves:   map[string]string{},
+	}
+	if dir := engine.torrentCopyDir(); dir != "" {
+		if renamed := renameHashTorrentCopies(dir); renamed > 0 {
+			logging.Info(fmt.Sprintf("🏷️ Renamed %d .torrent copies in %s from their hash to the torrent name", renamed, dir))
+		}
 	}
 	health, alreadyRunning := engine.health()
 	if settings.Managed && (!alreadyRunning || health.ownedBy(cfg)) {
@@ -329,8 +337,57 @@ func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
 		}
 		return
 	}
+	if moving := e.movesInProgress(); moving > 0 && gxPidAlive(health.Pid) {
+		// Stopping it now would cut a copy to the library in half: keep the
+		// old daemon until its moves are done, then replace it.
+		e.process = adoptGxProcess(health.Pid)
+		logging.Info(fmt.Sprintf("⏳ gx-torrent %s will restart with its new program or settings once %d move(s) in progress finish", health.Version, moving))
+		go e.replaceWhenIdle(health.Pid, health.Version)
+		return
+	}
 	logging.Info(fmt.Sprintf("🔄 Restarting gx-torrent %s: its program or settings changed", health.Version))
 	gxStopPid(health.Pid)
+}
+
+// movesInProgress returns how many storage moves the daemon is running.
+func (e *gxTorrentEngine) movesInProgress() int {
+	var stats struct {
+		Moving int `json:"moving"`
+	}
+	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &stats); err != nil {
+		return 0
+	}
+	return stats.Moving
+}
+
+// gxReplaceCheckEvery is how often a deferred daemon restart checks the moves.
+var gxReplaceCheckEvery = 15 * time.Second
+
+// replaceWhenIdle stops an outdated adopted daemon once it has no move in
+// progress; the supervisor then starts the current one.
+func (e *gxTorrentEngine) replaceWhenIdle(pid int, version string) {
+	defer recoverGoroutine("gx-torrent deferred restart")
+	ticker := time.NewTicker(gxReplaceCheckEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-e.supervisorStop:
+			return
+		case <-ticker.C:
+		}
+		if !gxPidAlive(pid) {
+			return
+		}
+		if e.movesInProgress() > 0 {
+			continue
+		}
+		e.processMu.Lock()
+		e.replacing = true
+		e.processMu.Unlock()
+		logging.Info(fmt.Sprintf("🔄 Moves finished: restarting gx-torrent %s with its new program or settings", version))
+		gxStopPid(pid)
+		return
+	}
 }
 
 func (e *gxTorrentEngine) ping() bool {
@@ -546,7 +603,7 @@ func (e *gxTorrentEngine) sync() error {
 			stateMissing := !fileExists(filepath.Join(e.settings.stateDir, hash+".torrent"))
 			// Also re-export when only the operator's configured copy is
 			// missing (e.g. a .torrent left by libtorrent in the state dir).
-			copyMissing := copyDir != "" && !fileExists(filepath.Join(copyDir, hash+".torrent"))
+			copyMissing := copyDir != "" && !fileExists(filepath.Join(copyDir, safeTorrentCopyName(view.Name, hash)+".torrent"))
 			if stateMissing || copyMissing {
 				export = append(export, hash)
 			}
@@ -601,9 +658,7 @@ func (e *gxTorrentEngine) ensureTorrentFile(hash string) {
 		// from libtorrent). Still mirror it into the operator's configured copy
 		// directory if that one is missing: Gextto's setting must hold for the
 		// active engine too.
-		if dir := e.torrentCopyDir(); dir != "" && !fileExists(filepath.Join(dir, hash+".torrent")) {
-			e.copyTorrentToConfiguredDir(hash, target)
-		}
+		e.copyTorrentToConfiguredDir(hash, target)
 		return
 	}
 	var data []byte
@@ -640,9 +695,86 @@ func (e *gxTorrentEngine) copyTorrentToConfiguredDir(hash, source string) {
 	if dir == "" || !fileExists(source) {
 		return
 	}
-	if err := copyFileAtomically(source, filepath.Join(dir, hash+".torrent")); err != nil {
+	target := filepath.Join(dir, gxTorrentCopyName(source, e.cachedName(hash), hash)+".torrent")
+	if fileExists(target) {
+		return
+	}
+	if err := copyFileAtomically(source, target); err != nil {
 		logging.Debug("cannot copy gx-torrent .torrent to the configured directory", "error", err.Error())
 	}
+}
+
+func (e *gxTorrentEngine) cachedName(hash string) string {
+	view, ok := e.cachedState(hash)
+	if !ok {
+		return ""
+	}
+	return view.Name
+}
+
+// gxTorrentCopyName is the recognisable name of a .torrent copy in the
+// operator's folder: the torrent name (as the embedded engine does), read from
+// the file when the session does not know it yet, the hash as a last resort.
+func gxTorrentCopyName(source, name, hash string) string {
+	if strings.TrimSpace(name) == "" || strings.EqualFold(strings.TrimSpace(name), hash) {
+		if data, err := os.ReadFile(source); err == nil {
+			if fromFile, ok := utils.TorrentName(data); ok {
+				name = fromFile
+			}
+		}
+	}
+	return safeTorrentCopyName(name, hash)
+}
+
+// renameHashTorrentCopies gives the copies an older gx-torrent adapter left as
+// <hash>.torrent in the operator's folder their torrent name. A copy whose
+// named file already exists is a duplicate and is removed.
+func renameHashTorrentCopies(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	renamed := 0
+	for _, entry := range entries {
+		base := strings.TrimSuffix(entry.Name(), ".torrent")
+		if entry.IsDir() || base == entry.Name() || !isHexHash(base) {
+			continue
+		}
+		source := filepath.Join(dir, entry.Name())
+		named := gxTorrentCopyName(source, "", base)
+		if strings.EqualFold(named, base) {
+			continue
+		}
+		target := filepath.Join(dir, named+".torrent")
+		if fileExists(target) {
+			if sameFileContent(source, target) {
+				_ = os.Remove(source)
+			}
+			continue
+		}
+		if err := os.Rename(source, target); err == nil {
+			renamed++
+		}
+	}
+	return renamed
+}
+
+func isHexHash(value string) bool {
+	if len(value) != 40 {
+		return false
+	}
+	for _, r := range strings.ToLower(value) {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func sameFileContent(a, b string) bool {
+	left, errA := os.ReadFile(a)
+	right, errB := os.ReadFile(b)
+	return errA == nil && errB == nil && bytes.Equal(left, right)
 }
 
 // List returns the last snapshot, refreshing it first.
@@ -1022,6 +1154,24 @@ func (e *gxTorrentEngine) AssociateStorage(hash, destination string) (bool, erro
 	}
 	e.refresh()
 	return true, nil
+}
+
+// MovingStorage returns the torrents the daemon is moving right now, as hash
+// -> name; ok is false when the daemon cannot be reached. Gextto uses it to
+// wait for a long copy to the NAS instead of re-issuing the move.
+func (e *gxTorrentEngine) MovingStorage() (map[string]string, bool) {
+	if e.sync() != nil {
+		return nil, false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	moving := map[string]string{}
+	for hash, view := range e.cache {
+		if view.State == "moving" {
+			moving[strings.ToLower(hash)] = view.Name
+		}
+	}
+	return moving, true
 }
 
 func (e *gxTorrentEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {

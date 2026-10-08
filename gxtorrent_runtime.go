@@ -436,9 +436,21 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		err := process.wait()
 		e.processMu.Lock()
 		closed = e.closed
+		replacing := e.replacing
+		e.replacing = false
 		e.processMu.Unlock()
 		if closed {
 			return
+		}
+		if replacing {
+			// A deliberate stop to run the updated daemon: start it at once,
+			// it is not a crash.
+			if restarted, err := startManagedGxTorrent(e.cfg, e.settings); err == nil {
+				e.processMu.Lock()
+				e.process = restarted
+				e.processMu.Unlock()
+				continue
+			}
 		}
 		exit := "uscita inattesa"
 		if err != nil {

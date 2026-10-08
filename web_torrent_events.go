@@ -53,6 +53,18 @@ type StallWatch struct {
 	// always do, downloads only once idle for tev_stallPersistAfter, so a
 	// restart does not reset the clock of a download that is already stuck.
 	persisted bool
+	// savedState is what the database row holds (see stallPersistedState):
+	// the row is rewritten only when it changes, not at every worker tick.
+	savedState string
+}
+
+// stallPersistedState is the part of a StallWatch stored in its row.
+func stallPersistedState(entry StallWatch) string {
+	since := ""
+	if entry.stalledSince != nil {
+		since = entry.stalledSince.UTC().Format(time.RFC3339Nano)
+	}
+	return fmt.Sprintf("%d|%d|%s|%d|%d", entry.lastProgressAt.UnixNano(), entry.lastDone, since, entry.nextRetryAt.UnixNano(), entry.retryStep)
 }
 
 // StorageMoveRetry is one pending/ongoing asynchronous storage move (implementation of
@@ -406,7 +418,19 @@ func RetryStorageMoves(torrents TorrentSession, moveRequests map[string]struct{}
 		destination := retry.destination
 		postSeed := retry.postSeed
 		moved, err := torrents.MoveStorage(hash, destination)
-		if err != nil {
+		if err != nil && tev_moveAlreadyRunning(err) {
+			// Restored after a Gextto restart while the engine was still
+			// copying: the move is running, wait for it like any in-flight one.
+			if entry, ok := retries[hash]; ok {
+				entry.inFlight = true
+				entry.nextAttempt = now.Add(time.Minute)
+				retries[hash] = entry
+			}
+			if postSeed {
+				postSeedMoves[hash] = struct{}{}
+			}
+			logging.Debug("storage move already running in the engine; waiting for it", "name", torrent.Name, "destination", destination)
+		} else if err != nil {
 			delete(moveRequests, hash)
 			logging.Warn("storage move retry failed synchronously",
 				"hash", hash, "name", torrent.Name, "destination", destination, "error", err.Error())
@@ -673,6 +697,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				case idle && !entry.persisted:
 					if err := db.SaveStallWatch(torrent.Hash, entry); err == nil {
 						entry.persisted = true
+						entry.savedState = stallPersistedState(entry)
 					}
 				case !idle && entry.persisted:
 					_ = db.DeleteStallWatch(torrent.Hash)
@@ -711,6 +736,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
 			} else {
 				entry.persisted = true
+				entry.savedState = stallPersistedState(entry)
 			}
 			watch[torrent.Hash] = entry
 			continue
@@ -811,10 +837,13 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 					"hash", torrent.Hash, "name", torrent.Name, "error", err.Error())
 			}
 		}
-		if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
-			logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
-		} else {
-			entry.persisted = true
+		if state := stallPersistedState(entry); !entry.persisted || state != entry.savedState {
+			if err := db.SaveStallWatch(torrent.Hash, entry); err != nil {
+				logging.Debug("could not persist stalled torrent retry state", "hash", torrent.Hash, "error", err.Error())
+			} else {
+				entry.persisted = true
+				entry.savedState = state
+			}
 		}
 		watch[torrent.Hash] = entry
 	}

@@ -11,8 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/models"
+	"github.com/buzzqw/gextto/internal/utils"
 )
 
 // fakeGxDaemon is a scripted gx-torrent API.
@@ -587,7 +591,8 @@ func TestGxMirrorsPreexistingTorrentCopy(t *testing.T) {
 	engine.settings.stateDir = state
 
 	engine.ensureTorrentFile(hash)
-	got, err := os.ReadFile(filepath.Join(copyDir, hash+".torrent"))
+	// The copy takes the torrent name, so the operator can recognise it.
+	got, err := os.ReadFile(filepath.Join(copyDir, "x.torrent"))
 	if err != nil {
 		t.Fatalf("torrent not mirrored into the configured copy dir: %v", err)
 	}
@@ -670,4 +675,102 @@ func TestAdoptedGxProcessDetectsExitAndStops(t *testing.T) {
 		t.Fatal("the exit of an adopted process was not detected")
 	}
 	process.Detach() // no-op after Stop
+}
+
+func TestGxDeferredRestartWaitsForMoves(t *testing.T) {
+	var moving atomic.Int32
+	moving.Store(1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"moving": moving.Load()})
+	}))
+	defer server.Close()
+	sleeper := exec.Command("sleep", "30")
+	if err := sleeper.Start(); err != nil {
+		t.Skip("sleep unavailable")
+	}
+	go func() { _ = sleeper.Wait() }()
+	defer func() { _ = sleeper.Process.Kill() }()
+
+	previous := gxReplaceCheckEvery
+	gxReplaceCheckEvery = 20 * time.Millisecond
+	defer func() { gxReplaceCheckEvery = previous }()
+	e := &gxTorrentEngine{
+		settings:       gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:         server.Client(),
+		supervisorStop: make(chan struct{}),
+	}
+	done := make(chan struct{})
+	go func() { e.replaceWhenIdle(sleeper.Process.Pid, "test"); close(done) }()
+
+	time.Sleep(200 * time.Millisecond)
+	if !gxPidAlive(sleeper.Process.Pid) {
+		t.Fatal("the daemon was stopped while a move was in progress")
+	}
+	moving.Store(0)
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the daemon was not restarted after the moves finished")
+	}
+	e.processMu.Lock()
+	replacing := e.replacing
+	e.processMu.Unlock()
+	if !replacing {
+		t.Fatal("the deliberate stop must not count as a crash")
+	}
+}
+
+func TestGxTorrentCopiesUseTheTorrentName(t *testing.T) {
+	dir := t.TempDir()
+	payload := []byte("d8:announce3:url4:infod6:lengthi1e4:name14:Show.S01E01.mk12:piece lengthi16384e6:pieces0:ee")
+	hash, ok := utils.TorrentInfoHash(payload)
+	if !ok {
+		t.Fatal("test torrent not parsed")
+	}
+	if name, ok := utils.TorrentName(payload); !ok || name != "Show.S01E01.mk" {
+		t.Fatalf("TorrentName = %q %v", name, ok)
+	}
+	source := filepath.Join(dir, hash+".torrent")
+	if err := os.WriteFile(source, payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := gxTorrentCopyName(source, "", hash); got != "Show.S01E01.mk" {
+		t.Fatalf("copy name = %q, want the torrent name", got)
+	}
+	if got := gxTorrentCopyName(source, "Live Name", hash); got != "Live Name" {
+		t.Fatalf("copy name = %q, want the session name", got)
+	}
+
+	// An old <hash>.torrent copy is renamed; a duplicate of a named copy goes.
+	if renamed := renameHashTorrentCopies(dir); renamed != 1 {
+		t.Fatalf("renamed %d copies, want 1", renamed)
+	}
+	if !fileExists(filepath.Join(dir, "Show.S01E01.mk.torrent")) || fileExists(source) {
+		t.Fatal("the hash-named copy was not renamed")
+	}
+	_ = os.WriteFile(source, payload, 0o644)
+	renameHashTorrentCopies(dir)
+	if fileExists(source) {
+		t.Fatal("an identical hash-named duplicate must be removed")
+	}
+	other := filepath.Join(dir, strings.Repeat("a", 40)+".torrent")
+	_ = os.WriteFile(other, []byte("not a torrent"), 0o644)
+	renameHashTorrentCopies(dir)
+	if !fileExists(other) {
+		t.Fatal("an unreadable file must be left alone")
+	}
+}
+
+func TestGxReportsTheMovesInProgress(t *testing.T) {
+	e := &gxTorrentEngine{cache: map[string]models.TorrentView{
+		"aa": {Hash: "aa", Name: "Moving.Pack", State: "moving"},
+		"bb": {Hash: "bb", Name: "Seeding", State: "seeding"},
+	}}
+	e.settings.PollInterval = time.Hour
+	e.lastAttempt = time.Now() // no daemon round-trip
+	var reporter storageMoveReporter = e
+	moving, ok := reporter.MovingStorage()
+	if !ok || len(moving) != 1 || moving["aa"] != "Moving.Pack" {
+		t.Fatalf("moving = %v, %v", moving, ok)
+	}
 }

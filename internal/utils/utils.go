@@ -452,6 +452,36 @@ func TorrentInfoHash(bytes []byte) (string, bool) {
 	return hex.EncodeToString(sum[:]), true
 }
 
+// TorrentName returns the name in the info dictionary of a bencoded .torrent
+// file (the folder or file name the torrent creates).
+func TorrentName(bytes []byte) (string, bool) {
+	start, end, ok := bencodeInfoSpan(bytes)
+	if !ok || start >= end || bytes[start] != 'd' {
+		return "", false
+	}
+	info := bytes[:end]
+	index := start + 1
+	for index < end && info[index] != 'e' {
+		keyEnd, ok := bencodeValueEnd(info, index)
+		if !ok {
+			return "", false
+		}
+		valueEnd, ok := bencodeValueEnd(info, keyEnd)
+		if !ok || valueEnd > end {
+			return "", false
+		}
+		if string(info[index:keyEnd]) == "4:name" {
+			colon := indexByteFrom(info, keyEnd, ':')
+			if colon < 0 || colon >= valueEnd {
+				return "", false
+			}
+			return string(info[colon+1 : valueEnd]), true
+		}
+		index = valueEnd
+	}
+	return "", false
+}
+
 func bencodeValueEnd(bytes []byte, start int) (int, bool) {
 	if start >= len(bytes) {
 		return 0, false
