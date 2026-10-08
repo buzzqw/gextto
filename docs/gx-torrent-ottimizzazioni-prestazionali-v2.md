@@ -22,8 +22,11 @@ per essere processata come singolo task/commit.
 | 5 | `servedRequests` a finestra limitata | **fatto** | `a8b3e77` |
 | 6 | Piece cache: TTL lazy (sharding non fatto, condizionale) | **fatto** | `60b090e` |
 | 7 | `Bitfield.Count` con `math/bits` | **fatto** | `8caf6ad` |
-| 3 | Rimozione `O_SYNC` + invariante di durabilità | rinviato (su richiesta) | — |
-| 8 | Opzionali (`findLocked` O(1), ETag/304) | non fatto: guadagno marginale, rimandato | — |
+| 3 | Rimozione `O_SYNC` + invariante di durabilità | **non da fare** (decisione: non implementare) | — |
+| 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** (decisione: non implementare) | — |
+
+Le voci 3 e 8 restano nel documento come riferimento e per le misure del §11,
+ma non verranno implementate.
 
 ---
 
@@ -196,6 +199,8 @@ non necessaria finché il polling non alloca.
 ---
 
 ## 3. Rimozione `O_SYNC` + invariante di durabilità  ← il progetto
+
+> **Decisione: non implementata.** Sezione conservata come riferimento.
 
 **Perché.** `filestorage.go:60` apre ogni file con `os.O_RDWR | os.O_SYNC`
 (upstream rain). `O_SYNC` obbliga ogni `write(2)` a completarsi su storage
@@ -494,6 +499,8 @@ casuali, lunghezze multiple di 8 e non. Aggiungere
 ---
 
 ## 8. Opzionali (solo se avanza tempo)
+
+> **Decisione: non implementati.** Sezione conservata come riferimento.
 
 1. **`findLocked` O(1)** (`daemon.go:441-452`): oggi `ListTorrents()` alloca e
    scansiona, calcolando `InfoHash().String()` per elemento, a ogni chiamata
