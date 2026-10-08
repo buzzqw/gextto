@@ -141,12 +141,14 @@ func (t *torrent) handleAddWebseeds(urls []string) {
 		}
 		src := &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}}
 		t.webseedSources = append(t.webseedSources, src)
-		if t.piecePicker != nil {
-			t.piecePicker.AddWebseedSource(src)
-		}
 		t.rawWebseedSources = append(t.rawWebseedSources, url)
 		existing[url] = struct{}{}
-		t.startPieceDownloaderForWebseed(src)
+		// The picker only exists between allocation and completion; while it is
+		// missing (stopped or finished) the source is used on the next start.
+		if t.piecePicker != nil {
+			t.piecePicker.AddWebseedSource(src)
+			t.startPieceDownloaderForWebseed(src)
+		}
 	}
 	t.persistWebseeds()
 }

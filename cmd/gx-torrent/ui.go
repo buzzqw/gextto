@@ -1504,7 +1504,6 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 				if state == "have" {
 					have++
 				}
-				// Build the runs inline: the state slices here are per piece.
 				if last := len(data.Pieces) - 1; last >= 0 && data.Pieces[last].State == state {
 					data.Pieces[last].End = index
 					data.Pieces[last].Pct = pieceWidth(data.Pieces[last].End-data.Pieces[last].Begin+1, total)
@@ -1513,8 +1512,6 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 				data.Pieces = append(data.Pieces, uiPieceRun{Begin: index, End: index, State: state, Pct: pieceWidth(1, total)})
 			}
 			data.PiecesHave = have
-			data.PiecesAvailable = have
-			data.PiecesChecked = have
 		}
 	}
 	// Magnet link for the "copy magnet" button.

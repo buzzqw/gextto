@@ -203,6 +203,9 @@ func (t *Torrent) SetTrackers(uris []string) error {
 	}
 	err := t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		if b == nil {
+			return nil
+		}
 		if len(raw) == 0 {
 			return b.Delete(boltdbresumer.Keys.Trackers)
 		}
