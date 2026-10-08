@@ -64,7 +64,7 @@ presenti o già gestiti da Gextto.
 |---|---|---|---|
 | 1 | Rimozione/sostituzione tracker | **Fatto** — `Torrent.SetTrackers` nel fork + azione `set-trackers` | 1 |
 | 2 | Upload/share mode | **Saltato** — si usa il seed infinito (ratio 0) | — |
-| 3 | Toggle sequential/first-last a caldo | **Sì** | 3 |
+| 3 | Toggle sequential/first-last a caldo | **Fatto** — `PiecePicker.SetOrder` + `SetSequential` applicato ai torrent in corso | 3 |
 | 4 | Web seed add/remove via API | **Fatto** — `Torrent.AddWebseeds`/`RemoveWebseeds` + azione `webseeds` | 2 |
 | 5 | Diagnostica pezzi | **Sì** — API demone **e** UI Gextto | 4 |
 | 6 | Limiti velocità per-torrent | **Sì** | 5 |

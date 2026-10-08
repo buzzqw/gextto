@@ -266,9 +266,11 @@ salute dello sciame, quindi resta **opzionale e spenta di default**.
   streaming senza rinunciare alla salute dello sciame.
 - Il valore predefinito per i torrent aggiunti dopo si imposta con
   `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
-  l'impostazione. `first_last` non ha un default di sessione.
-- rain fissa l'ordine quando il torrent viene aggiunto: l'opzione vale per i
-  torrent **nuovi**, non cambia quelli già in corso. Lo stato è persistito e
+  l'impostazione. **Cambiare questo valore a caldo applica l'ordine anche ai
+  torrent già in corso**, come libtorrent; `first_last` non ha un default di
+  sessione.
+- rain può cambiare l'ordine a caldo anche sul singolo torrent
+  (`Torrent.SetSequential`/`SetFirstLast` internamente); lo stato è persistito e
   riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).
 
 ## Torrent BitTorrent v2

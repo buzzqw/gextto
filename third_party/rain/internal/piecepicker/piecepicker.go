@@ -168,6 +168,18 @@ func markFileEdges(pieces []myPiece) {
 	}
 }
 
+// SetOrder changes the piece order at runtime (gextto fork): sequential picks
+// the pieces in index order, firstLast prioritizes the ends of every file.
+// Enabling either recomputes the file-edge flags; disabling both stops using
+// them (the flags may stay set, they are consulted only when an order is on).
+func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
+	if (sequential || firstLast) && !p.sequential && !p.firstLast {
+		markFileEdges(p.pieces)
+	}
+	p.sequential = sequential
+	p.firstLast = firstLast
+}
+
 // CloseWebseedDownloader closes the download from a webseed source.
 func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.DownloadSpeed.Stop()

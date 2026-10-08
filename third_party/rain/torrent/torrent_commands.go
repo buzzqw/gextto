@@ -3,12 +3,15 @@ package torrent
 import (
 	"errors"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/cenkalti/rain/v2/internal/magnet"
 	"github.com/cenkalti/rain/v2/internal/metainfo"
 	"github.com/cenkalti/rain/v2/internal/peersource"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
 	"github.com/cenkalti/rain/v2/internal/tracker"
+	"go.etcd.io/bbolt"
 )
 
 // sendCommand sends f to the torrent's run loop, where it executes on the
@@ -146,6 +149,32 @@ func (t *torrent) AddPeers(peers []*net.TCPAddr) {
 
 func (t *torrent) AddTrackers(trackers []tracker.Tracker) {
 	t.sendCommand(func() { t.handleNewTrackers(trackers) })
+}
+
+// setOrder changes the piece order at runtime and persists it (gextto fork).
+// It runs in the torrent goroutine.
+func (t *torrent) setOrder(sequential, firstLast bool) {
+	t.sequential = sequential
+	t.firstLast = firstLast
+	if t.piecePicker != nil {
+		t.piecePicker.SetOrder(sequential, firstLast)
+	}
+	t.persistOrder()
+}
+
+// persistOrder stores the piece order flags in the resume database, so a
+// runtime change survives a session reload (gextto fork).
+func (t *torrent) persistOrder() {
+	_ = t.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.id))
+		if b == nil {
+			return nil
+		}
+		if err := b.Put(boltdbresumer.Keys.Sequential, []byte(strconv.FormatBool(t.sequential))); err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.FirstLast, []byte(strconv.FormatBool(t.firstLast)))
+	})
 }
 
 // TrackerStatus is status of the Tracker.

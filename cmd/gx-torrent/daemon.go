@@ -1365,6 +1365,11 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 		d.cacheCheckedAt = time.Time{}
 		d.cacheAppliedAt = time.Time{}
 	}
+	// Sequential is a session-wide order, like libtorrent's: applying it must
+	// reach the torrents already running, not only the next ones.
+	if previous.Sequential != next.Sequential {
+		d.applySequentialLocked(next.Sequential)
+	}
 	// Peer limits, the cache TTL and preallocation are read by rain only when
 	// the session opens.
 	if previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
@@ -1374,6 +1379,24 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 	d.saveLocked()
 	d.poke()
 	return next, nil
+}
+
+// applySequentialLocked pushes the session-wide sequential flag onto every
+// running torrent and records it in their metadata (Gextto's view).
+func (d *Daemon) applySequentialLocked(sequential bool) {
+	if d.session == nil {
+		return
+	}
+	for _, t := range d.session.ListTorrents() {
+		if err := t.SetSequential(sequential); err != nil {
+			logf("cannot set sequential on %s: %v", t.ID(), err)
+			continue
+		}
+		if meta, ok := d.state.Torrents[t.ID()]; ok {
+			meta.Sequential = sequential
+		}
+	}
+	d.dirty = true
 }
 
 func (d *Daemon) config() (QueueConfig, effectiveLimits, bool) {

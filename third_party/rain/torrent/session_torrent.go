@@ -232,6 +232,25 @@ func (t *Torrent) RemoveWebseeds(urls []string) error {
 	return nil
 }
 
+// SetSequential enables or disables sequential download on the running torrent
+// (gextto fork); unlike the add-time option it takes effect at once.
+func (t *Torrent) SetSequential(sequential bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setOrder(sequential, t.torrent.firstLast) })
+	return nil
+}
+
+// SetFirstLast enables or disables the first/last-piece priority on the running
+// torrent (gextto fork).
+func (t *Torrent) SetFirstLast(firstLast bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setOrder(t.torrent.sequential, firstLast) })
+	return nil
+}
+
+// Sequential reports whether sequential download is enabled (gextto fork).
+func (t *Torrent) Sequential() bool {
+	return query(t.torrent, func() bool { return t.torrent.sequential })
+}
+
 // Start downloading the torrent. If all pieces are completed, starts seeding them.
 func (t *Torrent) Start() error {
 	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true)

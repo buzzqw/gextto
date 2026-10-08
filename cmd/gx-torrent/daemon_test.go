@@ -1154,3 +1154,35 @@ func TestDaemonAddAndRemoveWebseeds(t *testing.T) {
 		t.Fatalf("an empty removal changed the list: %v", got)
 	}
 }
+
+// TestDaemonSequentialToggleReachesRunningTorrents checks that the session-wide
+// sequential flag is pushed onto the torrents already running, like libtorrent,
+// not only stored as a default for the next ones.
+func TestDaemonSequentialToggleReachesRunningTorrents(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	sequential := func() bool {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		return tt != nil && tt.Sequential()
+	}
+	if sequential() {
+		t.Fatal("sequential must start off")
+	}
+	if _, err := d.setConfig(map[string]json.RawMessage{"sequential": json.RawMessage("true")}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "sequential on", sequential)
+	if _, err := d.setConfig(map[string]json.RawMessage{"sequential": json.RawMessage("false")}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "sequential off", func() bool { return !sequential() })
+}
