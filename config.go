@@ -315,6 +315,8 @@ type Config struct {
 	NotifyWebhookURL    *string            `json:"notify_webhook_url"`
 	NotifyWebhookSecret *string            `json:"notify_webhook_secret"`
 	NotifyWebhookFormat string             `json:"notify_webhook_format"`
+	NotifyWebhookToken  *string            `json:"notify_webhook_token"`
+	NotifyWebhookUser   *string            `json:"notify_webhook_user"`
 	NotifyEmail         bool               `json:"notify_email"`
 	EmailSMTP           string             `json:"email_smtp"`
 	EmailFrom           *string            `json:"email_from"`
@@ -761,6 +763,8 @@ func DefaultConfig() Config {
 		NotifyWebhookURL:    nil,
 		NotifyWebhookSecret: nil,
 		NotifyWebhookFormat: "gextto",
+		NotifyWebhookToken:  nil,
+		NotifyWebhookUser:   nil,
 		NotifyEmail:         false,
 		EmailSMTP:           "smtp.gmail.com:587",
 		EmailFrom:           nil,
@@ -2190,6 +2194,16 @@ func (c *Config) loadConfigDB() error {
 		c.NotifyWebhookFormat = strings.TrimSpace(value)
 	} else {
 		c.NotifyWebhookFormat = "gextto"
+	}
+	if value, ok := c.Settings["notify_webhook_token"]; ok && value != "" {
+		c.NotifyWebhookToken = &value
+	} else {
+		c.NotifyWebhookToken = nil
+	}
+	if value, ok := c.Settings["notify_webhook_user"]; ok && value != "" {
+		c.NotifyWebhookUser = &value
+	} else {
+		c.NotifyWebhookUser = nil
 	}
 	c.NotifyEmail = configBoolSetting(mapValue(c.Settings, "notify_email"))
 	if value, ok := c.Settings["email_smtp"]; ok {

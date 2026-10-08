@@ -972,6 +972,8 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"webhook_configured":                   cfg.NotifyWebhookURL != nil,
 		"notify_webhook_url":                   cfg.NotifyWebhookURL,
 		"notify_webhook_format":                cfg.NotifyWebhookFormat,
+		"notify_webhook_token_configured":      cfg.NotifyWebhookToken != nil,
+		"notify_webhook_user":                  cfg.NotifyWebhookUser,
 		"backup_retention":                     settingsOr(cfg, "backup_retention", "5"),
 		"backup_cloud_dir":                     settingsOr(cfg, "backup_cloud_dir", ""),
 		"min_free_space_gb":                    settingsOr(cfg, "min_free_space_gb", "0"),

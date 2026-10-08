@@ -697,7 +697,7 @@ func gh7_setting_key_allowed(key string) bool {
 		"archive_max_age_days", "archive_keep_min", "stop_on_old_page_threshold", "debug_enabled",
 		"move_episodes", "hardlink_seeding", "auth_enabled", "auth_local_bypass", "auth_username", "auth_password", "auth_api_key", "rename_verify_interval", "auto_remove_completed", "telegram_bot_token",
 		"telegram_chat_id", "email_smtp", "email_from", "email_to", "email_password",
-		"notify_webhook_format",
+		"notify_webhook_format", "notify_webhook_token", "notify_webhook_user",
 		"torrent_backend", "qbittorrent_url", "qbittorrent_username", "qbittorrent_password",
 		"qbittorrent_category", "qbittorrent_tag", "qbittorrent_request_timeout_secs",
 		"qbittorrent_poll_interval_ms", "qbittorrent_path_mappings", "qbittorrent_managed":

@@ -3594,7 +3594,11 @@ fra:
   Webhook URL: URL du webhook
   Webhook secret: Secret du webhook
   Formato webhook: Format du webhook
-  Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover. Per ntfy il segreto è il token Bearer. Per Gotify e Pushover il token va nell'URL.: Format de la charge utile envoyée à l'URL du webhook. Gextto, Discord, Slack, ntfy, Gotify ou Pushover. Pour ntfy, le secret est le jeton Bearer. Pour Gotify et Pushover, le jeton va dans l'URL.
+  "Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover.": "Format de la charge utile envoyée à l'URL du webhook. Gextto, Discord, Slack, ntfy, Gotify ou Pushover."
+  "Webhook token": "Jeton webhook"
+  "Webhook user (Pushover)": "Utilisateur webhook (Pushover)"
+  "Credenziale del provider scelto (ntfy, Gotify, Pushover); non visualizzata. Non serve per Gextto, Discord e Slack.": "Identifiant du fournisseur choisi (ntfy, Gotify, Pushover) ; non affiché. Inutile pour Gextto, Discord et Slack."
+  "Solo Pushover: la user key. Non serve per gli altri formati.": "Pushover uniquement : la clé utilisateur. Inutile pour les autres formats."
   Weekly Pack: Pack Hebdomadaire
   Weekly pack NON monitorato: Pack hebdomadaire NON suivi
   Weekly pack forzato: Pack hebdomadaire forcé

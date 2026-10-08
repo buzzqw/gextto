@@ -992,17 +992,18 @@ includono dimensione, tempo di download e velocità media.
 ### Webhook: quale URL e quale formato
 
 Il canale **Webhook** manda gli eventi a un servizio esterno senza bisogno di
-un'app dedicata: imposta l'**URL** e scegli il **Formato** giusto per il
-servizio. Gextto compone da solo il contenuto del messaggio.
+un'app dedicata: scegli il **Formato** del servizio, incolla l'**URL** e, se
+serve, metti la credenziale nel campo **Webhook token** (e in **Webhook user**
+per Pushover). L'URL resta pulito, senza token dentro.
 
-| Servizio | Webhook URL | Formato | Segreto |
+| Servizio | Webhook URL | Formato | Credenziale |
 |---|---|---|---|
 | Endpoint tuo | il tuo URL | **Gextto (JSON firmato)** | «Webhook secret» firma il corpo (HMAC SHA-256, header `x-gextto-signature`) |
-| Discord | URL del webhook del canale | **Discord** | non serve |
-| Slack | URL del webhook in ingresso | **Slack** | non serve |
-| ntfy | `https://ntfy.sh/<argomento>` (o il tuo server) | **ntfy** | «Webhook secret» = token Bearer, se l'argomento è protetto |
-| Gotify | `https://gotify.esempio/message?token=<APP_TOKEN>` | **Gotify** | il token è già nell'URL |
-| Pushover | `https://api.pushover.net/1/messages.json?token=<APP>&user=<USER>` | **Pushover** | token e user sono già nell'URL |
+| Discord | URL del webhook del canale | **Discord** | nessuna |
+| Slack | URL del webhook in ingresso | **Slack** | nessuna |
+| ntfy | `https://ntfy.sh/<argomento>` (o il tuo server) | **ntfy** | «Webhook token» = token Bearer, se l'argomento è protetto |
+| Gotify | `https://gotify.esempio/message` | **Gotify** | «Webhook token» = application token |
+| Pushover | `https://api.pushover.net/1/messages.json` | **Pushover** | «Webhook token» = application token, «Webhook user» = user key |
 
 Note:
 
@@ -1010,6 +1011,8 @@ Note:
   imposti il segreto, viene firmato; con gli altri formati Gextto invia il
   **testo leggibile** già composto e la firma HMAC non viene applicata (è
   specifica del formato Gextto);
+- la credenziale va nel campo **Webhook token**, non nell'URL; solo Discord e
+  Slack non ne hanno bisogno;
 - usa il pulsante di **test** nella scheda Notifiche: se l'URL o il token sono
   sbagliati lo dice subito, invece di fallire in silenzio alla prima consegna.
 
@@ -1568,7 +1571,9 @@ disk; qBittorrent, che non lo supporta, scarica sempre su disco.
 |---|---|
 | Webhook URL | URL del webhook a cui inviare gli eventi. |
 | Webhook secret | Segreto HMAC per firmare le richieste al webhook. |
-| Formato webhook | Formato del payload inviato all'URL del webhook (Gextto, Discord, Slack, ntfy, Gotify, Pushover). Per ntfy il segreto è il token Bearer; per Gotify e Pushover il token va nell'URL. |
+| Formato webhook | Formato del payload inviato all'URL del webhook (Gextto, Discord, Slack, ntfy, Gotify, Pushover). |
+| Webhook token | Credenziale del provider (ntfy, Gotify, Pushover); non visualizzata. Non serve per Gextto, Discord e Slack. |
+| Webhook user (Pushover) | Solo Pushover: la user key. Non serve per gli altri formati. |
 
 **Editor**
 

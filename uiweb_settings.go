@@ -269,6 +269,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "notify_webhook_url", Label: "Webhook URL", Tab: "notify", Group: "Webhook"},
 	{Key: "notify_webhook_secret", Label: "Webhook secret", Tab: "notify", Group: "Webhook"},
 	{Key: "notify_webhook_format", Label: "Formato webhook", Tab: "notify", Group: "Webhook"},
+	{Key: "notify_webhook_token", Label: "Webhook token", Tab: "notify", Group: "Webhook"},
+	{Key: "notify_webhook_user", Label: "Webhook user (Pushover)", Tab: "notify", Group: "Webhook"},
 
 	// --- Accesso e servizi --------------------------------------------------
 	{Key: "auth_enabled", Label: "Richiedi l'accesso (login)", Tab: "access", Group: "Login"},

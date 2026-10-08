@@ -40,6 +40,8 @@ type Notifier struct {
 	webhookURL       *string
 	webhookSecret    *string
 	webhookFormat    string
+	webhookToken     *string
+	webhookUser      *string
 	emailEnabled     bool
 	emailSMTP        string
 	emailFrom        *string
@@ -114,6 +116,8 @@ func FromConfig(cfg *Config) *Notifier {
 	notifier.webhookURL = cfg.NotifyWebhookURL
 	notifier.webhookSecret = cfg.NotifyWebhookSecret
 	notifier.webhookFormat = cfg.NotifyWebhookFormat
+	notifier.webhookToken = cfg.NotifyWebhookToken
+	notifier.webhookUser = cfg.NotifyWebhookUser
 	notifier.emailEnabled = cfg.NotifyEmail
 	notifier.emailSMTP = cfg.EmailSMTP
 	notifier.emailFrom = cfg.EmailFrom
@@ -396,8 +400,9 @@ func (n *Notifier) postRaw(rawURL, contentType string, headers map[string]string
 // webhookRequest builds the payload, content type and headers for the
 // configured webhook format. The default `gextto` format is the signed JSON
 // envelope; the other formats adapt the same text to a provider API. The URL
-// carries the endpoint and, for token-based providers (gotify, pushover), the
-// token/user in its query; the optional secret is the ntfy bearer token.
+// carries only the endpoint: the provider credential goes in the dedicated
+// "Webhook token" field (ntfy Bearer, gotify X-Gotify-Key, pushover token) and
+// Pushover's user key in "Webhook user".
 func (n *Notifier) webhookRequest(event string, data map[string]any) ([]byte, string, map[string]string, error) {
 	headers := map[string]string{}
 	switch strings.ToLower(strings.TrimSpace(n.webhookFormat)) {
@@ -408,17 +413,26 @@ func (n *Notifier) webhookRequest(event string, data map[string]any) ([]byte, st
 		body, err := json.Marshal(map[string]any{"text": formatEvent(event, data)})
 		return body, "application/json", headers, err
 	case "gotify":
+		if n.webhookToken != nil {
+			headers["X-Gotify-Key"] = *n.webhookToken
+		}
 		body, err := json.Marshal(map[string]any{"title": "Gextto", "message": formatEvent(event, data)})
 		return body, "application/json", headers, err
 	case "ntfy":
-		if n.webhookSecret != nil {
-			headers["Authorization"] = "Bearer " + *n.webhookSecret
+		if n.webhookToken != nil {
+			headers["Authorization"] = "Bearer " + *n.webhookToken
 		}
 		return []byte(formatEvent(event, data)), "text/plain; charset=utf-8", headers, nil
 	case "pushover":
 		form := url.Values{}
 		form.Set("title", "Gextto")
 		form.Set("message", formatEvent(event, data))
+		if n.webhookToken != nil {
+			form.Set("token", *n.webhookToken)
+		}
+		if n.webhookUser != nil {
+			form.Set("user", *n.webhookUser)
+		}
 		return []byte(form.Encode()), "application/x-www-form-urlencoded", headers, nil
 	default: // gextto
 		body, err := json.Marshal(map[string]any{"event": event, "data": data})
