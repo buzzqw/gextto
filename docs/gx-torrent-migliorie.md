@@ -123,22 +123,28 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
   (`cmd/gx-torrent/ui.go`). Non lasciare una feature raggiungibile solo via API.
 - Confronti con libtorrent/qBittorrent solo su misura, non a impressione.
 
-## Ricontrollo finale (da fare a fine lavoro)
+## Ricontrollo finale (fatto)
 
-Prima di considerare chiuso il piano, rileggere **tutto** il lavoro fatto e
-verificare, punto per punto:
+Ricontrollo eseguito a fine lavoro:
 
-- [ ] la matrice `capabilityLevels` riflette davvero ciò che il fork sa fare
-      (nessun `partial`/`none` rimasto per errore, nessun `full` non testato);
-- [ ] le note e i testi della UI (`v2DetailCapsFor`, "Limiti noti",
-      `docs/gx-torrent.md`, `MANUAL.*`, `README`) sono aggiornati insieme;
-- [ ] ogni feature visibile è raggiungibile **sia** dalla UI di Gextto **sia**
-      dalla pagina web del demone;
-- [ ] i test coprono il percorso felice e i casi limite (lista vuota,
-      duplicati, not-found, torrent completato/fermo) e passano da soli
-      (`go test ./...`, `make test-rain`, check UI e installer);
-- [ ] le modifiche al fork sono marcate `gextto fork`, nell'inventario
-      `third_party/rain/GEXTTO.md` e non rompono il rebase futuro di rain;
-- [ ] `go vet`, `gofmt` e i test dei pacchetti toccati sono verdi;
-- [ ] nessuna regressione di compatibilità con libtorrent/qBittorrent (stessa
-      semantica di limiti, tracker, web seed).
+- [x] `capabilityLevels`: gx-torrent ora `full` per `limits`, `trackers`,
+      `sequential`, `piece_diagnostics`, `web_seeds`; restano `partial`
+      `first_last` (solo all'aggiunta lato Gextto), `preferences` e
+      `session_stats`; `none` `super_seeding` e `upload_mode`.
+- [x] Note e testi aggiornati insieme: `v2DetailCapsFor`, "Limiti noti",
+      `docs/gx-torrent.md`, `docs/API.md`, `MANUAL.*`, `README*`.
+- [x] Ogni feature visibile è in entrambe le UI: tracker (aggiunta +
+      rimozione), web seed, limiti velocità/connessioni/upload, diagnostica
+      pezzi e streaming HTTP hanno sia la UI di Gextto sia la pagina del demone.
+- [x] Test del percorso felice e dei casi limite (lista vuota, duplicati,
+      not-found, 416, torrent completato/fermo); `make test` e `make test-rain`
+      verdi, con l'aggiunta del pacchetto `unchoker` a `make test-rain`.
+- [x] Modifiche al fork marcate `gextto fork` e nell'inventario
+      `third_party/rain/GEXTTO.md`.
+- [x] `go vet`, `gofmt` e i test dei pacchetti toccati sono verdi.
+- [x] Semantica coerente con libtorrent/qBittorrent: limiti `-1`/`0`/`>0`,
+      tracker sostituiti, web seed aggiunti/rimossi.
+
+Nota residua: l'attesa dei pezzi nello streaming è a polling (200 ms, timeout
+2 minuti) e non è coperta da un test end-to-end con sciame reale; è coperta la
+parte su dati già presenti e la mappatura byte→pezzi.
