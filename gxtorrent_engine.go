@@ -1521,8 +1521,9 @@ func (e *gxTorrentEngine) TorrentFilePath(hash string) (string, bool) {
 
 func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) string {
 	// Delegate to the shared helper so gx-torrent stages downloads exactly like
-	// the embedded engine: an explicit valid path wins, otherwise the RAM disk,
-	// then the configured temp/incomplete dir, then the final download dir.
+	// the embedded engine: an explicit valid path wins, otherwise the configured
+	// temp/incomplete dir, then the final download dir. The RAM disk is never an
+	// implicit default (an unknown-size add must not start on the tmpfs).
 	use := cfg
 	if use == nil {
 		use = e.cfg

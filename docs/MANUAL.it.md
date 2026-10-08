@@ -1350,6 +1350,14 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Margine libero da mantenere | Spazio libero da lasciare sul RAM disk una volta completato il download (GB). *(Unità: GB)* Compare solo con «Usa il RAM disk» attivo. |
 | Spazio minimo libero | Spazio minimo libero in byte richiesto per usare il RAM disk. 0 = usa il margine configurato. *(Unità: byte; 0 = usa il margine)* Compare solo con «Usa il RAM disk» attivo. |
 
+La scelta avviene il più presto possibile: un torrent la cui dimensione è già
+nota e supera la soglia va subito su disco; uno con dimensione **ancora
+sconosciuta** (tipico dei magnet) resta su disco finché non arrivano i metadati,
+poi viene spostato sul RAM disk **solo se** la dimensione reale rientra nella
+soglia. Un file troppo grande non tocca mai il RAM disk. La regola vale per tutti
+i download — automatici e aggiunti a mano — e per ogni motore che usa il RAM
+disk; qBittorrent, che non lo supporta, scarica sempre su disco.
+
 **Per esperti**
 
 | Impostazione | Cosa fa |

@@ -381,16 +381,14 @@ func nativeState(state int32, paused bool) string {
 	}
 }
 
-// preferredDownloadPath returns the download directory for automatic
-// acquisitions: RAM disk first (size still unknown), then the temporary disk,
-// then the final directory.
+// preferredDownloadPath returns the engine's fallback download directory when no
+// explicit path was chosen: the temporary disk, then the final directory. The
+// RAM disk is deliberately not a candidate — an add whose size is still unknown
+// must not start on the small tmpfs. A release known to fit gets the RAM disk as
+// an explicit path (see automaticDownloadPath), and the metadata handler moves
+// any other torrent whose real size turns out to fit.
 func preferredDownloadPath(cfg *Config) string {
 	var candidates []string
-	if cfg.RamdiskEnabled() {
-		if dir := cfg.RamdiskDir(); dir != nil {
-			candidates = append(candidates, *dir)
-		}
-	}
 	if cfg.LibtorrentTempDir != nil {
 		candidates = append(candidates, *cfg.LibtorrentTempDir)
 	}
@@ -411,10 +409,32 @@ func preferredDownloadPath(cfg *Config) string {
 	return cfg.LibtorrentDir
 }
 
+// ramdiskDefaultDir returns the RAM disk when it is enabled, mounted and has
+// enough free space for the configured margin. It is the explicit target for an
+// acquisition whose size is known to fit; it is never the implicit engine
+// default, so an unknown-size add cannot land there by accident.
+func ramdiskDefaultDir(cfg *Config) (string, bool) {
+	if !cfg.RamdiskEnabled() {
+		return "", false
+	}
+	dir := cfg.RamdiskDir()
+	if dir == nil || !pathIsDir(*dir) {
+		return "", false
+	}
+	minimumFree := cfg.RamdiskMinFreeBytes()
+	if minimumFree == 0 {
+		minimumFree = cfg.RamdiskMarginBytes()
+	}
+	if free := FreeSpaceBytes(*dir); free != nil && *free >= minimumFree {
+		return *dir, true
+	}
+	return "", false
+}
+
 // ReleaseFitsRamdisk reports whether a release whose size is already known can
 // be admitted to the RAM disk. An unknown or non-positive size is treated as
-// fitting: the torrent is then placed on the RAM disk and relocated by the
-// `metadata_received` handler if the real size turns out to be too large.
+// fitting here; the add path pairs this with RamdiskNeedsMetadata so an
+// unknown-size release is staged off the tmpfs and decided at metadata time.
 //
 // This lets an automatic acquisition that already knows it is a multi-gigabyte
 // season pack skip the tmpfs entirely instead of being moved out moments later.
@@ -432,11 +452,21 @@ func ReleaseFitsRamdisk(release *models.Release, cfg *Config) bool {
 	return uint64(release.SizeBytes) <= threshold
 }
 
-// ramdiskOverflowDir is where an oversized acquisition should be downloaded
-// instead of the RAM disk: the temporary disk when it exists, the final
-// directory otherwise. The returned path always exists as a directory so that
-// `resolveSavePath` does not fall back to `preferredDownloadPath` (which would
-// pick the RAM disk again).
+// RamdiskNeedsMetadata reports whether an acquisition must be staged off the
+// RAM disk until its metadata reveals the real size. The RAM disk is a small
+// tmpfs: an unknown-size release must not be placed there only to be moved out
+// moments later. The metadata handler then decides whether it fits
+// (`ramdisk_admission`) and moves it onto the tmpfs if so.
+//
+// This is an engine-independent policy: it only looks at the release size and
+// the configuration, never at the download daemon.
+func RamdiskNeedsMetadata(release *models.Release, cfg *Config) bool {
+	return cfg.RamdiskEnabled() && (release == nil || release.SizeBytes <= 0)
+}
+
+// ramdiskOverflowDir is where an oversized or unknown-size acquisition should be
+// downloaded instead of the RAM disk: the temporary disk when it exists, the
+// final directory otherwise. The returned path always exists as a directory.
 func ramdiskOverflowDir(cfg *Config) (string, bool) {
 	if cfg.LibtorrentTempDir != nil && pathIsDir(*cfg.LibtorrentTempDir) {
 		return *cfg.LibtorrentTempDir, true
@@ -445,6 +475,70 @@ func ramdiskOverflowDir(cfg *Config) (string, bool) {
 		return cfg.LibtorrentDir, true
 	}
 	return "", false
+}
+
+// automaticDownloadPath returns the explicit download path for an automatic
+// acquisition, or nil to let the engine choose. A release whose known size fits
+// the RAM disk returns nil: the engine stages it on the tmpfs. A release that
+// is known to be too big, or whose size is still unknown, returns the overflow
+// dir, so a multi-gigabyte payload never lands on the small RAM disk. The
+// unknown case is decided later, at metadata time.
+//
+// This policy is engine-independent: it only looks at the release and the
+// configuration, never at the download daemon.
+// capabilitiesReporter is implemented by torrent backends that declare what they
+// can do (`TorrentEngine.Capabilities`).
+type capabilitiesReporter interface {
+	Capabilities() map[string]bool
+}
+
+// engineSupportsRamdisk reports whether the active backend can stage downloads
+// on the RAM disk. qBittorrent reports `ramdisk: none`, so the whole RAM-disk
+// policy is a no-op there and every download stays on the default disk. A
+// backend that does not declare its capabilities keeps the historical behavior.
+func engineSupportsRamdisk(torrents TorrentSession) bool {
+	if reporter, ok := torrents.(capabilitiesReporter); ok {
+		if supported, known := reporter.Capabilities()["ramdisk"]; known {
+			return supported
+		}
+	}
+	return true
+}
+
+// automaticDownloadPath returns the explicit download path for an automatic
+// acquisition, or nil to let the engine choose. The RAM disk is chosen only when
+// the backend supports it and the release's known size fits it. A release known
+// to be too big, or whose size is still unknown, returns the overflow dir, so a
+// multi-gigabyte payload never lands on the small RAM disk; the unknown case is
+// decided later, at metadata time.
+//
+// This policy is engine-independent: it only looks at the release, the
+// configuration and the backend's declared capability, never at a specific
+// daemon.
+func automaticDownloadPath(release *models.Release, cfg *Config, ramdiskSupported bool) *string {
+	if dir, ok := DownloadDirFor(release, cfg); ok {
+		return &dir
+	}
+	if !ramdiskSupported || !cfg.RamdiskEnabled() {
+		// No RAM disk tier for this backend: the engine default (temp/final) is
+		// the only safe choice.
+		return nil
+	}
+	if !ReleaseFitsRamdisk(release, cfg) || RamdiskNeedsMetadata(release, cfg) {
+		// Known to be too big, or still unknown: stage off the tmpfs. An
+		// unknown size is decided at metadata time, which moves the torrent
+		// onto the RAM disk if it fits.
+		if dir, ok := ramdiskOverflowDir(cfg); ok {
+			return &dir
+		}
+		return nil
+	}
+	// Known to fit: the RAM disk is an explicit choice (the engine default no
+	// longer falls back to it), so ask for it when it has room.
+	if dir, ok := ramdiskDefaultDir(cfg); ok {
+		return &dir
+	}
+	return nil
 }
 
 // pathIsDir and fileExists resolve the path inside an os.Root so a crafted

@@ -1314,6 +1314,14 @@ Recalculate scores* after changing weights.
 | Free margin to keep | Free space to leave on the RAM disk once the download completes (GB). *(Unit: GB)* Shown only while «Use the RAM disk» is on. |
 | Minimum free space | Minimum free space in bytes required to use the RAM disk. 0 = use the configured margin. *(Unit: bytes; 0 = use the margin)* Shown only while «Use the RAM disk» is on. |
 
+The choice is made as early as possible: a torrent whose size is already known
+and exceeds the threshold goes straight to disk; one with an **unknown** size (as
+with most magnets) stays on disk until the metadata arrives, and is then moved
+onto the RAM disk **only if** the real size fits. An oversized file never touches
+the RAM disk. The rule applies to every download — automatic and manually added —
+and to every engine that uses the RAM disk; qBittorrent, which does not support
+it, always downloads to disk.
+
 **For experts**
 
 | Setting | What it does |

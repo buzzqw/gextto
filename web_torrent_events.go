@@ -79,6 +79,11 @@ type StorageMoveRetry struct {
 
 const tev_maxStorageMoveRetries uint8 = 5
 
+// ramdiskAdmitMaxProgress is the completion (percent) below which a torrent
+// whose metadata just arrived is still worth moving onto the RAM disk. Beyond
+// it the payload has really started and stays where it is.
+const ramdiskAdmitMaxProgress = 1.0
+
 const (
 	// Keep the existing metadata recovery cadence separate from the stalled
 	// download state machine below.
@@ -1491,6 +1496,74 @@ func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath 
 	}
 }
 
+// tev_ramdiskAdmission decides whether a torrent staged off the RAM disk because
+// its size was unknown should now be moved onto it: the metadata handler calls
+// it once the real size is known. It is the inverse of tev_ramdiskRelocation
+// and, like it, depends only on the configuration and the engine-agnostic
+// TorrentSession — never on the download daemon.
+func tev_ramdiskAdmission(cfg *Config, torrents TorrentSession, event *models.TorrentEvent) (string, bool) {
+	if !engineSupportsRamdisk(torrents) || !cfg.RamdiskEnabled() {
+		return "", false
+	}
+	ramdisk := cfg.RamdiskDir()
+	if ramdisk == nil {
+		return "", false
+	}
+	var torrent models.TorrentView
+	found := false
+	for _, candidate := range torrents.List() {
+		if strings.EqualFold(candidate.Hash, event.Hash) {
+			torrent = candidate
+			found = true
+			break
+		}
+	}
+	if !found || torrent.TotalSize <= 0 {
+		return "", false
+	}
+	if PathOnRamdisk(torrent.SavePath, *ramdisk) {
+		// Already there: tev_ramdiskRelocation owns the other direction.
+		return "", false
+	}
+	// This is the metadata decision point, before the payload is written. If a
+	// few pieces slipped in, moving is still cheap; a transfer that has really
+	// started is left where it is.
+	if torrent.TotalDone > 0 && torrent.Progress >= ramdiskAdmitMaxProgress {
+		return "", false
+	}
+	free := FreeSpaceBytes(*ramdisk)
+	if free == nil {
+		return "", false
+	}
+	uncommitted := torrents.RamdiskUncommittedBytes(*ramdisk, event.Hash)
+	// The whole payload ends up on the RAM disk, so require room for all of it
+	// (not just the bytes still missing): the already-written part is copied.
+	if err := RamdiskFits(cfg.RamdiskThresholdBytes(), cfg.RamdiskMarginBytes(), *free, uncommitted, uint64(torrent.TotalSize)); err != nil {
+		return "", false
+	}
+	return *ramdisk, true
+}
+
+// tev_admitToRamdisk moves a torrent onto the RAM disk once its metadata shows
+// that it fits.
+func tev_admitToRamdisk(cfg *Config, torrents TorrentSession, event *models.TorrentEvent) {
+	destination, ok := tev_ramdiskAdmission(cfg, torrents, event)
+	if !ok {
+		return
+	}
+	moved, err := torrents.MoveStorage(event.Hash, destination)
+	if err != nil && tev_moveAlreadyRunning(err) {
+		logging.Debug("RAM disk admission: move already in progress", "name", event.Name)
+	} else if err != nil {
+		logging.Warn("RAM disk admission failed",
+			"hash", event.Hash, "name", event.Name, "error", err.Error())
+	} else if moved {
+		logging.Info(fmt.Sprintf("💾 «%s» moved onto the RAM disk", event.Name))
+	} else {
+		logging.Debug("RAM disk admission was not applied", "hash", event.Hash, "name", event.Name)
+	}
+}
+
 // tev_enforceRamdiskCapacity implements `enforce_ramdisk_capacity`.
 func tev_enforceRamdiskCapacity(cfg *Config, torrents TorrentSession, event *models.TorrentEvent) {
 	reason, destination, ok := tev_ramdiskRelocation(cfg, torrents, event.Hash, event.SavePath)
@@ -2543,8 +2616,9 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 		return false, nil
 	}
 	switch event.Kind {
-	// legacy parity: at `add()` the size is unknown and the RAM disk is used
-	// first; once metadata arrives the real size decides if it still fits.
+	// A release whose size is unknown at `add()` is staged off the RAM disk;
+	// once metadata arrives the real size decides: it is moved onto the RAM
+	// disk when it fits, and out of it when it no longer does.
 	case "metadata_received":
 		// The indexer title can disagree with the torrent's real name (for
 		// example S06 in Jackett while the payload is S05). Reject this before
@@ -2581,6 +2655,7 @@ func HandleTorrentEvent(cfg *Config, torrents TorrentSession, db *Database, move
 			}
 		}
 		tev_enforceRamdiskCapacity(cfg, torrents, &event)
+		tev_admitToRamdisk(cfg, torrents, &event)
 		return false, nil
 	case "torrent_finished":
 		// Completion can be triggered twice (a recovered event after a

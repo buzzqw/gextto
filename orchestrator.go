@@ -876,17 +876,11 @@ func RunCycleDomain(
 			decisionReason = "gap_fill"
 		}
 		if approved {
-			var preferredPath *string
-			if downloadDir, ok := DownloadDirFor(&release, cfg); ok {
-				preferredPath = &downloadDir
-			} else if !ReleaseFitsRamdisk(&release, cfg) {
-				// The known size already exceeds the RAM disk threshold: download
-				// straight to disk instead of staging a multi-gigabyte season pack
-				// on the tmpfs and moving it out right after the metadata arrives.
-				if dir, ok := ramdiskOverflowDir(cfg); ok {
-					preferredPath = &dir
-				}
-			}
+			// The explicit path (or nil, to let the engine choose) is decided by
+			// the engine-independent RAM-disk policy: a known-too-big or
+			// unknown-size release is staged off the tmpfs, and the RAM disk is
+			// used only for backends that support it.
+			preferredPath := automaticDownloadPath(&release, cfg, engineSupportsRamdisk(torrents))
 			// The global guard measures the default download volume; a tag rule,
 			// the RAM-disk overflow or the RAM disk itself can redirect the
 			// download to another filesystem, so verify the chosen path too.

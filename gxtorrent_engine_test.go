@@ -559,7 +559,9 @@ func TestGxAutoSettingDrivesQueueAndCache(t *testing.T) {
 
 // TestGxResolveSavePathUsesIncompleteDir checks that gx-torrent stages new
 // downloads in the same folder the embedded engine uses (temp/incomplete, or
-// the RAM disk), instead of dropping them straight into the final dir.
+// the final dir), instead of dropping them straight into the final dir. The RAM
+// disk is never an implicit default: it is chosen explicitly only for a release
+// whose size is known to fit.
 func TestGxResolveSavePathUsesIncompleteDir(t *testing.T) {
 	temp := t.TempDir()
 	final := t.TempDir()
