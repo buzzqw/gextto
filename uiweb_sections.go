@@ -496,7 +496,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 		return section
 	}
 	return []uiPageSection{
-		sectionIntegration(uiIntegrationCardSection{
+		group("Servizi", sectionIntegration(uiIntegrationCardSection{
 			Title: "Simkl", Status: simklStatus, StatusClass: simklStatusClass,
 			Children: []uiPageSection{
 				sectionOAuth(uiOAuthSection{Name: "Accesso", StartPath: "/api/simkl/auth/start", PollPath: "/api/simkl/auth/poll", Buttons: []uiActionButton{
@@ -534,7 +534,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 					Empty: "Nessuna uscita o Simkl non configurato.",
 				}),
 			},
-		}),
+		})),
 		group("Media server", sectionSettingsActions("Jellyfin", "URL del server e API key (Jellyfin → Dashboard → API Keys).", uiSettingFields(cfg, "jellyfin_url", "jellyfin_api_key", "jellyfin_path_mappings"), []uiActionButton{
 			{Label: "Test connessione", Method: "POST", Path: "/api/jellyfin/test", Body: "{}", Hint: "Verifica che Jellyfin risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/jellyfin/refresh", Body: "{}", Hint: "Chiede a Jellyfin di aggiornare la libreria."},
@@ -543,19 +543,19 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			{Label: "Test connessione", Method: "POST", Path: "/api/plex/test", Body: "{}", Hint: "Verifica che Plex risponda."},
 			{Label: "Aggiorna libreria", Method: "POST", Path: "/api/plex/refresh", Body: "{}", Hint: "Chiede a Plex di aggiornare la libreria."},
 		})),
-		sectionEditor(uiIndexerEditor),
-		sectionSettingsActions("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"), []uiActionButton{
+		group("Sorgenti", sectionEditor(uiIndexerEditor)),
+		group("Sorgenti", sectionSettingsActions("FlareSolverr", "Proxy usato per superare Cloudflare sui siti di ricerca.", uiSettingFields(cfg, "flaresolverr_url"), []uiActionButton{
 			{Label: "Test FlareSolverr", Method: "POST", Path: "/api/flaresolverr/test", Body: "{}", Hint: "Verifica che FlareSolverr risponda."},
-		}),
-		sectionSourcesCheck(),
-		sectionLinks(uiLinksSection{
+		})),
+		group("Sorgenti", sectionSourcesCheck()),
+		group("Collegamenti", sectionLinks(uiLinksSection{
 			Title: "Calendario iCal",
 			Hint:  "Prossimi episodi e uscite dei film da aggiungere a Thunderbird, Google Calendar o al telefono: copia l'indirizzo del link e iscriviti al calendario. Con l'accesso protetto aggiungi ?apikey=<chiave> all'indirizzo.",
 			Links: []uiLinkItem{
 				{Label: "gextto.ics", Href: "/feed/calendar.ics"},
 			},
-		}),
-		sectionLinks(uiLinksSection{
+		})),
+		group("Collegamenti", sectionLinks(uiLinksSection{
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
 			Links: []uiLinkItem{
@@ -565,7 +565,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 				{Label: "Torrent .desktop", Href: "/api/browser-handlers/download?file=gextto-torrent.desktop"},
 				{Label: "install.sh", Href: "/api/browser-handlers/download?file=install.sh"},
 			},
-		}),
+		})),
 	}
 }
 

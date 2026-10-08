@@ -266,3 +266,12 @@ test("la ricerca archivio mostra l'indicatore web solo se richiesto", async ({ p
   await page.waitForTimeout(300);
   expect(await indicatorShown(), "web search must show its indicator").toBe(true);
 });
+
+test("integrazioni raggruppa le voci con intestazioni sticky", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/?view=integrations");
+  const labels = page.locator(".section-group-label");
+  await expect(labels).toHaveText(["Servizi", "Media server", "Sorgenti", "Collegamenti"]);
+  await expect(labels.first()).toHaveCSS("position", "sticky");
+  await expect(labels.first()).toBeVisible();
+});

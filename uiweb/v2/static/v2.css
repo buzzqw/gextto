@@ -418,6 +418,32 @@ html, body {
   gap: 12px;
 }
 
+/* Group headers on section pages (Integrazioni, Manutenzione): the same sticky,
+   accented separator used by the settings groups, so a long column of panels
+   stays anchored to its topic. */
+.section-group { display: flex; flex-direction: column; gap: 10px; }
+.section-group .section-group-label {
+  position: sticky;
+  top: 74px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 8px 0;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.section-group .section-group-label::before {
+  content: "";
+  flex: none;
+  width: 3px;
+  height: 0.95em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+}
+
 /* Navigation: clearer active state and hover feedback. */
 .sidebar .nav-item {
   border-radius: var(--v2-radius);

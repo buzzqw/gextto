@@ -1569,6 +1569,10 @@ with a certificate, or a VPN), otherwise the password travels in clear text.
 
 ## Appendix B. Reference — Integrations
 
+The page is grouped — **Services** (Simkl), **Media server** (Jellyfin, Plex),
+**Sources** (indexers, FlareSolverr, source check) and **Links** (iCal calendar,
+browser handlers) — with the group title stuck to the top while you scroll.
+
 ### Simkl
 
 | Field / action | What it does |

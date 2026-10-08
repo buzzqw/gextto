@@ -1258,10 +1258,12 @@
 {{define "v2_panels_page"}}
 <div class="view">
   {{range .Groups}}
-    {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
-    <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
-      {{range .Sections}}{{template "v2_section" .}}{{end}}
-    </div>
+    <section class="section-group">
+      {{if .Title}}<div class="section-group-label">{{.Title}}</div>{{end}}
+      <div class="{{if $.Stack}}v2-section-stack{{else if gt (len .Sections) 1}}grid-2{{end}}">
+        {{range .Sections}}{{template "v2_section" .}}{{end}}
+      </div>
+    </section>
   {{end}}
   {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
   <div id="v2-modal"></div>

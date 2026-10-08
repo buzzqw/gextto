@@ -1609,6 +1609,11 @@ password viaggia in chiaro.
 
 ## Appendice B. Riferimento — Integrazioni
 
+La pagina è divisa in gruppi — **Servizi** (Simkl), **Media server** (Jellyfin,
+Plex), **Sorgenti** (indexer, FlareSolverr, verifica sorgenti) e
+**Collegamenti** (calendario iCal, handler del browser) — con il titolo del
+gruppo agganciato in alto mentre scorri.
+
 ### Simkl
 
 | Campo / azione | Cosa fa |

@@ -15,7 +15,7 @@ const scan = async (page: import("@playwright/test").Page, path: string) => {
 };
 
 test.describe("accessibilità automatizzata", () => {
-  for (const path of ["/", "/?view=downloads", "/?view=settings", "/?view=maintenance", "/?view=health", "/?view=logs"]) {
+  for (const path of ["/", "/?view=downloads", "/?view=settings", "/?view=maintenance", "/?view=integrations", "/?view=health", "/?view=logs"]) {
     test(`nessuna violazione axe su ${path}`, async ({ page }) => {
       await scan(page, path);
     });
