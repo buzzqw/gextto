@@ -35,6 +35,7 @@ test-real:
 test-rain:
 	go test \
 		github.com/cenkalti/rain/v2/internal/bandwidth \
+		github.com/cenkalti/rain/v2/internal/bitfield \
 		github.com/cenkalti/rain/v2/internal/blocklist \
 		github.com/cenkalti/rain/v2/internal/mse \
 		github.com/cenkalti/rain/v2/internal/peerconn \

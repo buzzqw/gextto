@@ -2,8 +2,10 @@
 package bitfield
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"math/bits"
 )
 
 // NumBytes calculates the number of bytes required to represent a bitfield of `length` bits.
@@ -85,32 +87,19 @@ func (b *Bitfield) Test(i uint32) bool {
 	return (b.bytes[div] & (1 << (7 - mod))) > 0
 }
 
-var countCache = [256]byte{
-	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
-	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-	2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-	3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-	3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-	4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-}
-
-// Count returns the count of set bits.
+// Count returns the count of set bits. It uses the hardware popcount
+// (gextto fork) instead of a 256-byte lookup table.
 func (b *Bitfield) Count() uint32 {
-	var total uint32
-	for _, v := range b.bytes {
-		total += uint32(countCache[v])
+	var total int
+	bytes := b.bytes
+	for len(bytes) >= 8 {
+		total += bits.OnesCount64(binary.LittleEndian.Uint64(bytes))
+		bytes = bytes[8:]
 	}
-	return total
+	for _, v := range bytes {
+		total += bits.OnesCount8(v)
+	}
+	return uint32(total)
 }
 
 // All returns true if all bits are set, false otherwise.
