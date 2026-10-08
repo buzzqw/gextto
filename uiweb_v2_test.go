@@ -134,12 +134,12 @@ func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	if strings.Contains(body, `class="crumb v2-product-crumb"`) {
 		t.Fatalf("v2 topbar should not duplicate the product name above the page title")
 	}
-	if strings.Count(body, `class="metric"`)+strings.Count(body, `class="metric `) != 8 {
-		t.Fatalf("dashboard summary should contain 8 metric tiles")
+	if strings.Count(body, `class="metric"`)+strings.Count(body, `class="metric `) != 4 {
+		t.Fatalf("dashboard summary should contain 4 metric tiles")
 	}
 	code, css := v2Request(t, server, http.MethodGet, "/static/v2.css", nil)
-	if code != http.StatusOK || !strings.Contains(css, "grid-template-columns: repeat(8, minmax(0, 1fr))") {
-		t.Fatalf("dashboard eight-column layout missing -> %d", code)
+	if code != http.StatusOK || !strings.Contains(css, "grid-template-columns: repeat(4, minmax(0, 1fr))") {
+		t.Fatalf("dashboard four-column layout missing -> %d", code)
 	}
 	if strings.Contains(body, `src="/ui/static/gextto-ui.js"`) {
 		t.Fatal("v2 page must not load the classic UI script")
@@ -243,7 +243,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("dashboard -> %d", code)
 	}
-	for _, marker := range []string{"Backup", "Prossima ricerca", "automatica", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-actions-next-grid", "dashboard-consumption-panel", "dashboard-calendar-panel"} {
+	for _, marker := range []string{"Backup", "Ricerca automatica", "Prossima esecuzione", "Intervallo", "Ultimo ciclo", "In sessione", "Vai a Scarico", "session-strip-panel", "Cerca in archivio", "dashboard-feed", "Carica risultati", "dashboard-cycle-panel", "dashboard-calendar-panel"} {
 		if !strings.Contains(body, marker) {
 			t.Fatalf("dashboard missing %q", marker)
 		}
@@ -255,7 +255,7 @@ func TestV2DashboardAndDownloadControlsMatchClassic(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(script, "/api/search/archive") || !strings.Contains(script, "/api/search/dashboard") || !strings.Contains(script, "data-v2-dashboard-search-filter") {
 		t.Fatalf("dashboard two-phase search missing -> %d", code)
 	}
-	if strings.Index(body, "dashboard-actions-next-grid") > strings.Index(body, "dashboard-search-panel") || strings.Index(body, "Ultimo ciclo") > strings.Index(body, "Consumo banda") {
+	if strings.Index(body, "session-strip-panel") > strings.Index(body, "dashboard-summary-grid") || strings.Index(body, "dashboard-cycle-panel") > strings.Index(body, "dashboard-search-panel") {
 		t.Fatalf("dashboard panel order is incorrect")
 	}
 	code, body = v2Request(t, server, http.MethodGet, "/?view=downloads", nil)

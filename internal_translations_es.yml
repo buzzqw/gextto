@@ -340,6 +340,7 @@ spa:
   Avvia una scansione per tutti gli episodi non ancora scaricati di questa serie: Inicia un escaneo para todos los episodios aún no descargados
     de esta serie
   Avviare il recheck su: ¿Iniciar la comprobación de
+  Avvio: Inicio
   Avvio del servizio richiesto…: Iniciando el servicio solicitado…
   Avvio download Mega...: Iniciando descarga Mega...
   Avvio download diretto...: Iniciando descarga directa...
@@ -653,6 +654,7 @@ spa:
   'Consumo:': 'Consumo:'
   Conta quanti record verrebbero eliminati senza cancellare nulla: Cuenta cuántos registros se eliminarían sin borrar nada
   Contenuto: Contenido
+  Contenuto e verifica: Contenido y verificación
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett + Motori Web).: Cuenta atrás para el próximo
     inicio automático del motor de búsqueda (Scraping + Jackett + Motores Web).
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett).: Cuenta atrás para el próximo inicio automático
@@ -1517,6 +1519,7 @@ spa:
   In scarico: Descarga
   "Fermi a 0 B/s": "Detenidos a 0 B/s"
   In seed: En semillas
+  In sessione: En sesión
   Incolla il Client ID: Pegar el Client ID
   Incolla il Client Secret: Pegar el Client Secret
   Incolla il titolo di una release per vedere come viene analizzato e quanto vale con i pesi attuali.: Pegue el título de una versión para ver
@@ -1577,6 +1580,7 @@ spa:
   Interfaccia salvata: Interfaz guardada
   Interrogazione archivio, RSS, indexer e motori web…: Consulta de archivos, RSS, indexador y motores web…
   Interrompi ricerca e rimuovi: Detener búsqueda y eliminar
+  Intervallo: Intervalo
   Intervallo Refresh (minuti): Intervalo de Refresco (minutos)
   Intervallo announce (s): Anunciar intervalo(s)
   Intervallo ciclo (secondi): Intervalo de ciclo (segundos)
@@ -2534,6 +2538,7 @@ spa:
     local).'
   Ricerca Standard: Búsqueda estándar
   Ricerca TMDB, release, archivio storico e comics.: Búsqueda TMDB, lanzamientos, archivo histórico y cómics.
+  Ricerca automatica: Búsqueda automática
   Ricerca automatica serie/film (secondi): Búsqueda automática de series/películas (segundos)
   Ricerca client attivi nella rete locale/LAN. Inutile se scarichi su internet, utile nei campus o uffici.: Busca clientes activos en la red local/LAN.
     Inútil si descargas por internet, útil en campus u oficinas.
@@ -2933,6 +2938,7 @@ spa:
   Seleziona il Client Torrent (interno o esterno) che verrà utilizzato per scaricare i file.: Selecciona el Cliente Torrent (interno o externo)
     que se utilizará para descargar los archivos.
   Seleziona il download: Seleccione descargar
+  Seleziona i torrent per le azioni di gruppo: Seleccionar torrents para acciones masivas
   Seleziona il film per le azioni bulk: Seleccionar película para acciones masivas
   Seleziona il torrent: Seleccionar torrent
   Seleziona in quali giorni della settimana attivare lo scheduler orario.: Selecciona qué días de la semana activar el programador horario.

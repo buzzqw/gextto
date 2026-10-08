@@ -73,11 +73,12 @@ html, body {
 .dashboard-summary-grid {
   gap: 8px;
 }
-.dashboard-actions-next-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
+.dashboard-cycle-foot {
+  margin-top: 4px;
+  align-items: center;
+}
+.dashboard-cycle-foot form {
+  display: block !important;
 }
 .dashboard-actions-column {
   display: flex;
@@ -101,12 +102,6 @@ html, body {
 }
 .dashboard-quick-actions form .btn {
   height: 100%;
-}
-.dashboard-next-panel .panel-head h3 span {
-  display: block;
-}
-.dashboard-next-panel .dashboard-next-description {
-  margin-bottom: 0;
 }
 .dashboard-search-results-toolbar {
   margin-top: 10px;
@@ -200,12 +195,50 @@ html, body {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-2) 65%, transparent);
 }
+.torrent-add-options {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 4px 16px;
+  margin-top: 12px;
+}
+.opt-group {
+  min-width: 0;
+}
+.opt-group-title {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.opt-items {
+  gap: 4px 12px;
+}
+.check.warn {
+  border: 1px dashed color-mix(in srgb, var(--warn) 55%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+.check.warn > span {
+  color: var(--warn);
+  font-weight: 600;
+}
 .download-temp-toolbar > .muted:first-child {
   flex: 1 1 100%;
   font-weight: 700;
 }
 .download-global-toolbar > .muted {
   margin-left: auto;
+}
+/* The filter shares its row with the buttons instead of taking the whole
+   width: it grows a little but never pushes them below. */
+.download-global-toolbar > #v2-filter {
+  flex: 1 1 240px;
+  width: auto;
+  max-width: 340px;
+  min-width: 180px;
 }
 .download-bulk-toolbar .check:first-child {
   margin-right: 4px;
@@ -216,19 +249,74 @@ html, body {
 .download-bulk-toolbar .htx-status {
   flex: 1 1 100%;
 }
+.download-tag-toolbar {
+  margin-top: 2px;
+}
+/* Scarico: the bandwidth-limit toolbar stays behind the options toggle on
+   every viewport. The toggle lives outside the auto-refreshed table, so its
+   state survives the 5-second swaps. */
+.downloads-view:not(.show-download-tools) .download-temp-toolbar {
+  display: none;
+}
+.toolbar.download-tag-toolbar input.compact {
+  width: 150px;
+  flex: 0 1 150px;
+  min-width: 0;
+}
 .torrent-table th,
 .torrent-table td {
   padding-top: 9px;
   padding-bottom: 9px;
 }
-.dashboard-session-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+/* Compact session strip right under the intro: live counts at a glance. */
+.session-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.session-strip-title {
+  font-size: 0.95rem;
+}
+.session-strip .btn {
+  margin-left: auto;
+}
+/* Live session counter in the panel head: same type as the title. */
+.session-count {
+  font: inherit;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.session-panel .panel-head h3 {
+  min-width: 0;
+}
+/* Temporary limits live in the panel head, right of the live counter. */
+.session-panel .panel-head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.head-limits {
+  gap: 8px 12px;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px 0;
+}
+.head-limits .field.inline-field > span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.head-limits .input.compact {
+  width: 92px;
+  min-width: 0;
+}
+@media (min-width: 561px) {
+  .downloads-tools-toggle {
+    display: none;
+  }
 }
 @media (max-width: 900px) {
-  .dashboard-actions-next-grid {
-    grid-template-columns: 1fr;
-  }
-  .dashboard-session-grid {
+  .dashboard-quick-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -236,28 +324,25 @@ html, body {
   .dashboard-quick-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .dashboard-session-grid {
-    grid-template-columns: 1fr;
-  }
 }
 @media (min-width: 1180px) {
   .dashboard-summary-grid {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .dashboard-summary-grid .metric {
-    gap: 2px;
-    padding: 9px 8px;
+    gap: 4px;
+    padding: 12px 14px;
   }
   .dashboard-summary-grid .metric .metric-sub {
-    font-size: 0.68rem;
-    line-height: 1.15;
+    font-size: 0.75rem;
+    line-height: 1.2;
   }
   .dashboard-summary-grid .metric strong {
-    font-size: 1.1rem;
+    font-size: 1.5rem;
   }
   .dashboard-summary-grid .metric small {
-    font-size: 0.66rem;
-    line-height: 1.15;
+    font-size: 0.72rem;
+    line-height: 1.2;
   }
 }
 
@@ -907,18 +992,12 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   }
 
   /* Compact toolbars in Scarico to reduce vertical height */
-  .torrent-options {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-    font-size: 0.8rem;
-  }
-  .torrent-options .check {
-    min-height: 38px;
-    padding: 2px 6px;
+  .torrent-add-options {
+    grid-template-columns: 1fr;
   }
   .download-temp-toolbar,
-  .download-bulk-toolbar {
+  .download-bulk-toolbar,
+  .download-tag-toolbar {
     padding: 8px;
     gap: 6px;
   }
@@ -965,7 +1044,7 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
   .download-temp-toolbar .input.compact { width: 100%; min-width: 0; }
   .download-temp-toolbar > .btn { width: 100%; }
   .download-global-toolbar { display: flex; flex-wrap: wrap; }
-  .download-global-toolbar > #v2-filter { flex: 1 1 100%; min-width: 0; }
+  .download-global-toolbar > #v2-filter { flex: 1 1 100%; min-width: 0; max-width: none; }
   .download-global-toolbar > .field.inline-field { flex: 1 1 100%; min-width: 0; }
   .download-global-toolbar > .field.inline-field .input { min-width: 0; flex: 1; }
   .download-bulk-toolbar { display: flex; flex-wrap: wrap; }
@@ -1001,7 +1080,6 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 
 /* Pieces that exist only on a phone. */
 .nav-prefs { display: none; }
-.downloads-tools-toggle { display: none; }
 .ptr-hint { display: none; }
 details.add-torrent-panel > summary { list-style: none; cursor: default; }
 details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
@@ -1141,13 +1219,12 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 
   /* --- Dashboard: what is happening first, shortcuts after ------------- */
   .dashboard-view { display: flex; flex-direction: column; }
-  .dashboard-view > .dashboard-actions-next-grid { order: 1; }
-  .dashboard-view > .dashboard-session-grid { order: 2; display: grid; grid-template-columns: 1fr; }
+  .dashboard-view > .session-strip-panel { order: 0; }
+  .dashboard-view > .dashboard-cycle-panel { order: 1; }
   .dashboard-view > .dashboard-summary-grid { order: 3; }
   .dashboard-view > .panel:not(.dashboard-search-panel):not(.dashboard-explore-panel):not(.dashboard-feed-panel) { order: 4; }
   .dashboard-view > .dashboard-search-panel { order: 5; }
   .dashboard-view > * { order: 6; }
-  .dashboard-view .dashboard-consumption-panel,
   .dashboard-view .dashboard-explore-panel,
   .dashboard-view > .dashboard-intro { display: none; } /* the strip shows DRY-RUN */
 
@@ -1160,11 +1237,14 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   .downloads-view > * { order: 3; }
   details.add-torrent-panel > summary { cursor: pointer; }
   details.add-torrent-panel:not([open]) > summary { border-bottom: 0; }
+  details.dashboard-search-panel > summary { cursor: pointer; }
+  details.dashboard-search-panel:not([open]) > summary { border-bottom: 0; }
   .add-torrent-plus { display: inline; color: var(--accent); }
   .session-panel .panel-head { display: flex; align-items: center; gap: 8px; }
+.session-panel .panel-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .session-panel .session-panel-note { display: none; }
   .downloads-tools-toggle { display: inline-flex; margin-left: auto; }
-  .downloads-view:not(.show-download-tools) .download-temp-toolbar,
+  .downloads-view:not(.show-download-tools) .head-limits { display: none; }
   .downloads-view:not(.show-download-tools) .download-global-toolbar > [name="refresh"],
   .downloads-view:not(.show-download-tools) .download-global-toolbar > [name="auto"],
   .downloads-view:not(.show-download-tools) .download-global-toolbar > [hx-vals*="clear_completed"],

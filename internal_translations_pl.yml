@@ -338,6 +338,7 @@ pol:
   Avvia o riprende i torrent selezionati.: Uruchom lub wznów wybrane torrenty.
   Avvia una scansione per tutti gli episodi non ancora scaricati di questa serie: Rozpocznij skanowanie wszystkich niepobranych odcinków tej serii
   Avviare il recheck su: Rozpocznij ponowne sprawdzanie
+  Avvio: Start
   Avvio del servizio richiesto…: Uruchamianie żądanej usługi…
   Avvio download Mega...: Rozpoczęcie pobierania Mega...
   Avvio download diretto...: Rozpoczynanie bezpośredniego pobierania...
@@ -652,6 +653,7 @@ pol:
   'Consumo:': 'Zużycie:'
   Conta quanti record verrebbero eliminati senza cancellare nulla: Policz, ile rekordów zostałoby usuniętych bez usuwania czegokolwiek
   Contenuto: Spis treści
+  Contenuto e verifica: Zawartość i weryfikacja
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett + Motori Web).: Odliczanie do następnego automatycznego
     uruchomienia wyszukiwarki (Scraping + Jackett + Silniki internetowe).
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett).: Odliczanie do następnego autostartu wyszukiwarki
@@ -1512,6 +1514,7 @@ pol:
   In scarico: Rozładunek
   "Fermi a 0 B/s": "Zatrzymane na 0 B/s"
   In seed: W nasionach
+  In sessione: W sesji
   Incolla il Client ID: Wklej identyfikator klienta
   Incolla il Client Secret: Wklej klucz tajny klienta
   Incolla il titolo di una release per vedere come viene analizzato e quanto vale con i pesi attuali.: Wklej tytuł wydania, aby zobaczyć, jak
@@ -1572,6 +1575,7 @@ pol:
   Interfaccia salvata: Zapisany interfejs
   Interrogazione archivio, RSS, indexer e motori web…: Zapytanie archiwalne, RSS, indeksator i silniki internetowe…
   Interrompi ricerca e rimuovi: Zatrzymaj wyszukiwanie i usuń
+  Intervallo: Interwał
   Intervallo Refresh (minuti): Interwał odświeżania (minuty)
   Intervallo announce (s): Ogłoś interwał (y)
   Intervallo ciclo (secondi): Interwał cyklu (sekundy)
@@ -2533,6 +2537,7 @@ pol:
     (z pominięciem lokalnej bazy danych).'
   Ricerca Standard: Wyszukiwanie standardowe
   Ricerca TMDB, release, archivio storico e comics.: Wyszukiwanie w TMDB, wydania, archiwum historyczne i komiksy.
+  Ricerca automatica: Wyszukiwanie automatyczne
   Ricerca automatica serie/film (secondi): Automatyczne wyszukiwanie seriali/filmów (sekundy)
   Ricerca client attivi nella rete locale/LAN. Inutile se scarichi su internet, utile nei campus o uffici.: Wyszukuje aktywnych klientów w sieci
     lokalnej/LAN. Bezużyteczne, jeśli pobierasz z Internetu, przydatne na kampusach lub w biurach.
@@ -2928,6 +2933,7 @@ pol:
   Seleziona il Client Torrent (interno o esterno) che verrà utilizzato per scaricare i file.: Wybierz klienta Torrent (wewnętrznego lub zewnętrznego),
     który będzie używany do pobierania plików.
   Seleziona il download: Wybierz pobierz
+  Seleziona i torrent per le azioni di gruppo: Wybierz torrenty do działań zbiorczych
   Seleziona il film per le azioni bulk: Wybierz film do działań zbiorczych
   Seleziona il torrent: Wybierz torrent
   Seleziona in quali giorni della settimana attivare lo scheduler orario.: Wybierz dni tygodnia, w których chcesz aktywować harmonogram godzinowy.

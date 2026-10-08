@@ -347,6 +347,7 @@ fra:
   Avvia una scansione per tutti gli episodi non ancora scaricati di questa serie: Lancer une analyse pour tous les épisodes non encore téléchargés
     de cette série
   Avviare il recheck su: Lancer la vérification sur
+  Avvio: Démarrage
   Avvio del servizio richiesto…: Démarrage du service requis…
   Avvio download Mega...: Démarrage du téléchargement Mega...
   Avvio download diretto...: Démarrage du téléchargement direct...
@@ -667,6 +668,7 @@ fra:
   'Consumo:': 'Consommation :'
   Conta quanti record verrebbero eliminati senza cancellare nulla: Compte combien d'enregistrements seraient supprimés sans rien effacer
   Contenuto: Contenu
+  Contenuto e verifica: Contenu et vérification
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett + Motori Web).: Compte à rebours pour le prochain
     démarrage automatique du moteur de recherche (Scraping + Jackett + Moteurs Web).
   Conto alla rovescia per il prossimo avvio automatico del motore di ricerca (Scraping + Jackett).: Compte à rebours pour le prochain démarrage
@@ -1538,6 +1540,7 @@ fra:
   In scarico: Déchargement
   "Fermi a 0 B/s": "Bloqués à 0 B/s"
   In seed: En graines
+  In sessione: En session
   Incolla il Client ID: Coller le Client ID
   Incolla il Client Secret: Coller le Client Secret
   Incolla il titolo di una release per vedere come viene analizzato e quanto vale con i pesi attuali.: Collez un titre de version pour voir comment
@@ -1598,6 +1601,7 @@ fra:
   Interfaccia salvata: Interface enregistrée
   Interrogazione archivio, RSS, indexer e motori web…: Requête d'archives, RSS, indexeur et moteurs web…
   Interrompi ricerca e rimuovi: Arrêter la recherche et supprimer
+  Intervallo: Intervalle
   Intervallo Refresh (minuti): Intervalle d'Actualisation (minutes)
   Intervallo announce (s): Intervalle(s) d'annonce
   Intervallo ciclo (secondi): Intervalle de cycle (secondes)
@@ -2570,6 +2574,7 @@ fra:
     de données locale).'
   Ricerca Standard: Recherche standard
   Ricerca TMDB, release, archivio storico e comics.: Recherche TMDB, sorties, archives historiques et bandes dessinées.
+  Ricerca automatica: Recherche automatique
   Ricerca automatica serie/film (secondi): Recherche automatique de séries/films (secondes)
   Ricerca client attivi nella rete locale/LAN. Inutile se scarichi su internet, utile nei campus o uffici.: Recherche des clients actifs sur le
     réseau local/LAN. Inutile si vous téléchargez sur Internet, utile dans les campus ou les bureaux.
@@ -2970,6 +2975,7 @@ fra:
   Seleziona il Client Torrent (interno o esterno) che verrà utilizzato per scaricare i file.: Sélectionnez le Client Torrent (interne ou externe)
     qui sera utilisé pour télécharger les fichiers.
   Seleziona il download: Sélectionnez le téléchargement
+  Seleziona i torrent per le azioni di gruppo: Sélectionnez les torrents pour les actions groupées
   Seleziona il film per le azioni bulk: Sélectionner un film pour les actions groupées
   Seleziona il torrent: Sélectionnez torrent
   Seleziona in quali giorni della settimana attivare lo scheduler orario.: Sélectionnez les jours de la semaine pour activer le planificateur

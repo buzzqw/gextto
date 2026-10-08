@@ -1237,6 +1237,15 @@
     }
   }
 
+  // The add-torrent form starts closed for a compact page, unless it already
+  // holds a shared link to act on (then it opens on every viewport, and the
+  // downloads view also moves it first through has-add-link).
+  function openAddFormWithLink() {
+    var panel = document.querySelector("details.add-torrent-panel");
+    if (!panel) return;
+    var filled = panel.querySelector('input[name="magnet"]');
+    if (filled && filled.value) panel.setAttribute("open", "");
+  }
   // Panels marked data-mobile-collapse start closed on a phone, unless they
   // already hold something to act on (a shared link in the add form).
   function collapseOnPhone() {
@@ -1312,5 +1321,5 @@
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* optional */ }); });
   }
 
-  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); initPullToRefresh(); initLiveMetrics(); });
+  document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); initPullToRefresh(); initLiveMetrics(); });
 })();

@@ -82,6 +82,7 @@ type uiDashboardData struct {
 	SeenGroups       int64
 	TrashCount       int64
 	NextCycle        string
+	CycleInterval    string
 	Consumption      uiConsumption
 	Recent           []uiRecentDownload
 	FeedMatches      []uiFeedMatch
@@ -356,6 +357,7 @@ func uiDashboardDataFrom(s *AppState) uiDashboardData {
 	data.FreeSpace = health.DiskFreeBytes
 	data.TrashBytes = health.TrashBytes
 	if cfg.RefreshSecs > 0 {
+		data.CycleInterval = logging.HumanDuration(int64(cfg.RefreshSecs))
 		start, ok := s.db.LastCycleAt()
 		if snapshot := s.last_cycle.Snapshot(); snapshot.LastStartedAt != nil && (!ok || snapshot.LastStartedAt.After(start)) {
 			start, ok = *snapshot.LastStartedAt, true

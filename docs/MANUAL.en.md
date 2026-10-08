@@ -248,13 +248,15 @@ standalone Linux package described in the README (*Standalone Linux package*).
   installed-font detection depends on browser support for the Local Font Access
   API and may require permission.
 - **Manual global search** — searches archive + indexers + web engines.
-- **Cycle buttons** — run a full cycle or a single domain (Series, Movies,
-  Comics) or a backup now.
-- **Stat cards** — configured series/movies, downloaded files, free space,
-  archive magnets, session torrents, seen-from-feed groups.
+- **Automatic search** — run a full cycle or a single domain (Series, Movies,
+  Comics); shows next run, interval and last-cycle outcome; backup now.
+- **In session** — compact strip on top: speeds, downloading/stalled/seeding
+  torrents, last-30-days bandwidth and direct access to Downloads.
+- **Stat cards** — library (series/movies), free space, archive magnets
+  and engine.
 - **Network and active downloads** — CPU/RAM plus a live network sparkline.
-- **Consumption and disks**, **upcoming releases**, **last downloads**,
-  **recent activity** and **latest finds from sources**.
+- **Upcoming releases**, **last downloads**, **recent activity** and
+  **latest finds from sources**.
 
 ### Manual search from the Dashboard
 

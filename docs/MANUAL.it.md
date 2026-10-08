@@ -247,13 +247,16 @@ il pacchetto Linux autonomo descritto nel README (*Pacchetto Linux autonomo*).
   resta locale al browser; il rilevamento dei font installati dipende dal supporto
   del browser alla Local Font Access API e può richiedere un'autorizzazione.
 - **Ricerca manuale globale** — cerca in archivio + indexer + motori web.
-- **Pulsanti ciclo** — avvia un ciclo completo o di un solo dominio (Serie, Film,
-  Fumetti) o un backup immediato.
-- **Card statistiche** — serie/film configurati, file scaricati, spazio libero,
-  magnet in archivio, torrent in sessione, gruppi visti dai feed.
+- **Ricerca automatica** — avvia un ciclo completo o di un solo dominio (Serie,
+  Film, Fumetti); mostra prossima esecuzione, intervallo ed esito dell'ultimo
+  ciclo; backup immediato.
+- **In sessione** — striscia compatta in cima: velocità, torrent in scarico,
+  fermi e in seed, banda degli ultimi 30 giorni e accesso diretto a Scarico.
+- **Card statistiche** — libreria (serie/film), spazio libero, magnet in
+  archivio e motore.
 - **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.
-- **Consumo e dischi**, **prossime uscite**, **ultimi download**,
-  **attività recente** e **ultimi trovati nelle sorgenti**.
+- **Prossime uscite**, **ultimi download**, **attività recente** e **ultimi
+  trovati nelle sorgenti**.
 
 ### Ricerca manuale dalla Dashboard
 
