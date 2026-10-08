@@ -47,8 +47,10 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - `make build` — incrementa `build_number` (non committato) e compila
   `bin/gexttod` **e** `bin/gx-torrent`; quest'ultimo viene sostituito solo se
   il suo codice è cambiato (`bin/gx-torrent.code-sha256`,
-  `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Richiede CGO/libtorrent; i warning di
-  deprecazione di libtorrent sono normali.
+  `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il confronto compila con
+  `-buildvcs=false`: senza, Go marchia la revisione git nel binario e ogni
+  commit sembrerebbe un cambiamento di gx-torrent. Richiede CGO/libtorrent; i
+  warning di deprecazione di libtorrent sono normali.
 - `make gx-torrent` — solo il demone (`CGO_ENABLED=0`).
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
   `gx-torrent` nella root (ora ignorato). Per il demone usa `make gx-torrent`

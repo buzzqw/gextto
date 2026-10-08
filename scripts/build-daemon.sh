@@ -44,14 +44,16 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
     # update that touches only gexttod does not drop the transfers. The code is
     # compared on a build without the build number (stored in
     # gx-torrent.code-sha256); the installed binary keeps the build number of
-    # its last real change.
+    # its last real change. -buildvcs=false keeps the comparison meaningful:
+    # otherwise Go stamps vcs.revision into the binary and every commit looks
+    # like a gx-torrent change.
     GX_OUT="$(dirname "$OUT")/gx-torrent"
     GX_HASH_FILE="$GX_OUT.code-sha256"
     GX_PROBE="$(mktemp "${TMPDIR:-/tmp}/gx-torrent-probe.XXXXXX")"
     trap 'rm -f "$GX_PROBE"' EXIT
     (
         cd "$ROOT"
-        CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$GX_PROBE" ./cmd/gx-torrent
+        CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o "$GX_PROBE" ./cmd/gx-torrent
     )
     GX_HASH="$(sha256sum "$GX_PROBE" | cut -d' ' -f1)"
     if [[ -x "$GX_OUT" && -f "$GX_HASH_FILE" && "$(cat "$GX_HASH_FILE")" == "$GX_HASH" && "${GEXTTO_FORCE_GXTORRENT:-0}" != "1" ]]; then
@@ -59,7 +61,7 @@ if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
     else
         (
             cd "$ROOT"
-            CGO_ENABLED=0 go build -trimpath \
+            CGO_ENABLED=0 go build -trimpath -buildvcs=false \
                 -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
                 -o "$GX_OUT.new" ./cmd/gx-torrent
         )

@@ -15,7 +15,7 @@ fast:
 
 # Only the gx-torrent daemon (pure Go, no libtorrent needed).
 gx-torrent:
-	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/gx-torrent ./cmd/gx-torrent
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "-s -w" -o bin/gx-torrent ./cmd/gx-torrent
 
 test: check-ui installer-test
 	CGO_ENABLED=1 go test ./...
