@@ -27,7 +27,7 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Ottimizzazione database", "RAM disk", "Rinomina contenuto cartella",
-		"Progresso rinomina", "Duplicati video in libreria",
+		"Progresso rinomina", "Operazioni in background", "Duplicati video in libreria",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("maintenance page missing %q", want)
@@ -35,6 +35,11 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 	}
 	if strings.Contains(body, "non è ancora migrato") {
 		t.Fatal("maintenance page still shows unmigrated placeholders")
+	}
+	// The background-jobs panel polls its partial, so it stays in the DOM, but
+	// with no jobs it must take no space.
+	if !strings.Contains(body, `id="v2-jobs-panel"`) || !strings.Contains(body, `style="display:none"`) {
+		t.Fatal("empty background-jobs panel must be present but hidden")
 	}
 
 	code, body = v2Request(t, server, http.MethodGet, "/?view=integrations", nil)
@@ -104,6 +109,9 @@ func TestV2MaintenanceWidgetEndpoints(t *testing.T) {
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/partial/rename-progress", nil); code != http.StatusOK || !strings.Contains(body, "Nessuna rinomina") {
 		t.Fatalf("rename progress -> %d", code)
+	}
+	if code, body := v2Request(t, server, http.MethodGet, "/partial/jobs", nil); code != http.StatusOK || !strings.Contains(body, "Operazioni in background") {
+		t.Fatalf("jobs partial -> %d", code)
 	}
 }
 
