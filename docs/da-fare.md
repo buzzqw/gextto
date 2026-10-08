@@ -1,60 +1,58 @@
 # Da fare (backlog)
 
 Punti aperti, in ordine di rilevanza. Ripristinato l'8-10-2026: era finito per
-errore in `docs/archive/` pur essendo un backlog **attivo**. Qui restano solo i
-punti ancora aperti; quelli chiusi sono nella storia di git.
+errore in `docs/archive/` pur essendo un backlog **attivo**. Contiene solo ciò
+che risolve un problema reale; il resto è annotato sotto come chiuso.
 
-## gx-torrent / rain
+## Aperti
 
-### 1. Write-back cache nel fork di rain
-Far **usare più RAM** a gx-torrent quando lo storage è lento (HDD/NFS).
-Serve una vera cache write-back nel fork: tenere i pezzi verificati in memoria e
-scriverli in blocco, con **flush su stop/verify/move** e gestione sicura del
-resume (un pezzo non scritto non deve risultare completo). Oggi rain è
-write-through: `WriteCacheSize` è un tetto sui pezzi *in volo*
-(`third_party/rain/torrent/session.go:233`), quindi la RAM resta bassa anche
-alzando i cap (misurato). Cambiamento delicato; interseca la discussione su
-`O_SYNC` (una write-back con flush a lotti è l'alternativa "pulita" alla
-rimozione di `O_SYNC`).
+### 1. Il pannello "Operazioni in background" è quasi sempre vuoto
+Il pannello è alimentato da **solo tre** job:
+`scan-archives` (`web_handlers_g4.go:1234`), `rename-all`
+(`web_handlers_g2.go:688`), `media-info-backfill`
+(`web_handlers_g0.go:1363`). Tutte le altre operazioni lunghe della Manutenzione
+girano **sincrone**, senza avanzamento né annullamento: `clean-duplicates`,
+`housekeeping`, `clean-trash`, `rename-folder/apply`, `scan-archive` per serie,
+`backup/verify`, refresh Jellyfin/Plex. Per questo, nell'uso normale, il pannello
+dice sempre "Nessuna operazione in background", e le azioni lunghe non offrono
+una barra contestuale.
 
-### 2. Script di benchmark RAM/throughput dei motori, riproducibile
-Committare in `scripts/` lo script usato per le misure di memoria dei motori
-(workload da `torrent-done`, web seed locale con Range, staging locale vs NFS),
-così è ripetibile senza ricrearlo ogni volta. Oggi in `scripts/` non c'è nulla
-di benchmark; i micro-benchmark aggiunti al fork (`make test-rain` con `-bench`)
-coprono il picker, non i motori end-to-end.
+Serve una decisione, poi l'intervento:
+- **A** — portare al `JobManager` le operazioni lente (con progress e cancel);
+- **B** — se non si vuole, mostrare il pannello solo quando c'è davvero un job
+  (oggi è sempre presente, vuoto).
 
-### 3. Log: unificare "sostituzione" e "aggiunto alla libreria"
-Oggi due righe ravvicinate e ridondanti:
-- `cleaner.go:246`: `🗑️ Replaced with a better version: «nuovo»; the old file «vecchio» is in the trash`
+Quali operazioni meritano il porting è una scelta da fare: le più lente su NAS
+sono `clean-duplicates`, `rename-folder/apply`, `scan-archive`, `clean-trash`,
+`backup/verify`.
+
+### 2. Log: unificare "sostituzione" e "aggiunto alla libreria"
+Oggi due righe ravvicinate e ridondanti durante un upgrade:
+- `cleaner.go:241` `logInferiorFileReplaced`: `🗑️ Replaced with a better version: «nuovo»; the old file «vecchio» …`
 - `web_torrent_events.go:2454`: `📁 <serie> <ep> added to the library (X GB): <path>`
 
-Vanno fuse in **una sola riga parlante** che dica: episodio aggiornato, versione
-precedente spostata nel cestino, dimensione e percorso finale.
+Vanno fuse in **una sola riga parlante** (episodio aggiornato, versione
+precedente nel cestino, dimensione, percorso finale). Le due righe stanno in
+moduli diversi: prima va tracciato il percorso di upgrade, poi emessa dove si
+conoscono sia il vecchio sia il nuovo.
 
-## UI (da `docs/archive/UI_V2.md`, §4 e §11)
+## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
-### 4. Barra di avanzamento contestuale alla singola azione lunga
-Esiste il pannello "Operazioni in background" e la barra della rinomina, ma non
-una barra contestuale alla singola azione avviata.
-
-### 5. Esporre nel form i campi specialistici oggi solo via API
-L'aggiunta manuale (TMDB) è server-side con i campi principali; quelli più
-specialistici restano accessibili solo via API.
-
-### 6. Convertire i benchmark UI in test di performance in CI
-`go test -run '^$' -bench BenchmarkV2` esiste ma non gira in CI: nessun
-`Benchmark` nei workflow. Attenzione: i runner CI sono rumorosi, meglio un job
-non bloccante o un controllo sulle allocazioni più che sul tempo.
+- Script di benchmark RAM/throughput dei motori, riproducibile in `scripts/`
+  (workload noto, web seed locale con Range, staging locale vs NFS). Non serve
+  di per sé: è utile solo per prendere decisioni future con numeri.
 
 ## Chiusi / decisioni
 
-- **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto:
-  pannello in `uiweb/v2/templates/v2.html:264` e route `GET /dashboard/feed`
-  (`uiweb_v2.go:131`).
-
-- **Cap cache su storage lento (NFS)** — superato: la cache ora si autoregola
-  (`cmd/gx-torrent/cache.go:261`, tuner adattivo `cacheSizes`), quindi il "cap
-  come rete di sicurezza" non serve più.
-- **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07):
-  scaricato sul RAM disk e spostato a disco con `move`, file integri.
+- **Write-back cache nel fork di rain** — chiuso: la misura mostra
+  `write_cache=0` (storage e download di pari passo), quindi non ci sarebbe
+  guadagno. Da riaprire solo con uno storage realmente più lento della rete.
+- **Campi specialistici nel form di aggiunta** — chiuso: nessuna richiesta
+  concreta, sarebbe fuffa preventiva.
+- **Benchmark UI come test di performance in CI** — chiuso: il rendering SSR
+  costa ~1–3 ms/pagina, non è un problema; il job sarebbe processo a vuoto.
+- **Cap cache su storage lento (NFS)** — superato: la cache si autoregola
+  (`cmd/gx-torrent/cache.go:261`, tuner `cacheSizes`).
+- **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto
+  (`uiweb/v2/templates/v2.html:264`, route `GET /dashboard/feed`, `uiweb_v2.go:131`).
+- **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
