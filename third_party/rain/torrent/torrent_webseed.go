@@ -1,11 +1,16 @@
 package torrent
 
 import (
+	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/cenkalti/rain/v2/internal/piecewriter"
+	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
 	"github.com/cenkalti/rain/v2/internal/urldownloader"
 	"github.com/cenkalti/rain/v2/internal/webseedsource"
+	"github.com/rcrowley/go-metrics"
+	"go.etcd.io/bbolt"
 )
 
 func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
@@ -113,4 +118,92 @@ func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
 		}
 	case <-t.closeC:
 	}
+}
+
+// handleAddWebseeds appends web seed URLs at runtime (gextto fork), skipping the
+// duplicates and the configured maximum. It runs in the torrent goroutine.
+func (t *torrent) handleAddWebseeds(urls []string) {
+	existing := make(map[string]struct{}, len(t.webseedSources)+len(urls))
+	for _, src := range t.webseedSources {
+		existing[src.URL] = struct{}{}
+	}
+	maxSources := t.session.config.WebseedMaxSources
+	for _, url := range urls {
+		url = strings.TrimSpace(url)
+		if url == "" {
+			continue
+		}
+		if _, dup := existing[url]; dup {
+			continue
+		}
+		if maxSources > 0 && len(t.webseedSources) >= maxSources {
+			break
+		}
+		src := &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}}
+		t.webseedSources = append(t.webseedSources, src)
+		if t.piecePicker != nil {
+			t.piecePicker.AddWebseedSource(src)
+		}
+		t.rawWebseedSources = append(t.rawWebseedSources, url)
+		existing[url] = struct{}{}
+		t.startPieceDownloaderForWebseed(src)
+	}
+	t.persistWebseeds()
+}
+
+// handleRemoveWebseeds drops web seed URLs by exact match at runtime (gextto
+// fork). It runs in the torrent goroutine.
+func (t *torrent) handleRemoveWebseeds(urls []string) {
+	remove := make(map[string]struct{}, len(urls))
+	for _, url := range urls {
+		if url = strings.TrimSpace(url); url != "" {
+			remove[url] = struct{}{}
+		}
+	}
+	if len(remove) == 0 {
+		return
+	}
+	kept := make([]*webseedsource.WebseedSource, 0, len(t.webseedSources))
+	raw := make([]string, 0, len(t.rawWebseedSources))
+	for _, src := range t.webseedSources {
+		if _, drop := remove[src.URL]; drop {
+			wasDownloading := src.Downloading()
+			if t.piecePicker != nil {
+				t.closeWebseedDownloader(src)
+				t.piecePicker.RemoveWebseedSource(src)
+			}
+			// Closing the downloader does not go through
+			// handleWebseedPieceResult, so release its active slot here.
+			if wasDownloading && t.webseedActiveDownloads > 0 {
+				t.webseedActiveDownloads--
+			}
+			continue
+		}
+		kept = append(kept, src)
+		raw = append(raw, src.URL)
+	}
+	t.webseedSources = kept
+	t.rawWebseedSources = raw
+	t.persistWebseeds()
+	t.startPieceDownloaders()
+}
+
+// persistWebseeds stores the current web seed URL list in the resume database,
+// so an added or removed source survives a session reload.
+func (t *torrent) persistWebseeds() {
+	raw := t.rawWebseedSources
+	_ = t.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.id))
+		if b == nil {
+			return nil
+		}
+		if len(raw) == 0 {
+			return b.Delete(boltdbresumer.Keys.URLList)
+		}
+		value, err := json.Marshal(raw)
+		if err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.URLList, value)
+	})
 }

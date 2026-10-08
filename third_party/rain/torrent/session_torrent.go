@@ -219,6 +219,19 @@ func (t *Torrent) SetTrackers(uris []string) error {
 	return nil
 }
 
+// AddWebseeds adds web seed URLs to the torrent at runtime (gextto fork),
+// without reopening it; duplicates and the configured maximum are ignored.
+func (t *Torrent) AddWebseeds(urls []string) error {
+	t.torrent.sendCommand(func() { t.torrent.handleAddWebseeds(urls) })
+	return nil
+}
+
+// RemoveWebseeds removes web seed URLs (exact match) at runtime (gextto fork).
+func (t *Torrent) RemoveWebseeds(urls []string) error {
+	t.torrent.sendCommand(func() { t.torrent.handleRemoveWebseeds(urls) })
+	return nil
+}
+
 // Start downloading the torrent. If all pieces are completed, starts seeding them.
 func (t *Torrent) Start() error {
 	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true)

@@ -812,3 +812,33 @@ func TestGxSetTrackersPostsAReplacement(t *testing.T) {
 		t.Fatalf("clearing sent urls = %q, want empty", urls)
 	}
 }
+
+// TestGxWebSeedsPostsAddAndRemove checks that WebSeeds posts the webseeds
+// action with the URLs and the remove flag, instead of a capability error.
+func TestGxWebSeedsPostsAddAndRemove(t *testing.T) {
+	var action, urls, remove string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		action = r.URL.Path
+		_ = r.ParseForm()
+		urls = r.FormValue("urls")
+		remove = r.FormValue("remove")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	if ok, err := e.WebSeeds("ABC", "http://x/a\nhttp://x/b", false); err != nil || !ok {
+		t.Fatalf("add: ok=%v err=%v", ok, err)
+	}
+	if !strings.HasSuffix(action, "/webseeds") || urls != "http://x/a\nhttp://x/b" || remove != "" {
+		t.Fatalf("add posted action=%q urls=%q remove=%q", action, urls, remove)
+	}
+	if ok, err := e.WebSeeds("ABC", "http://x/a", true); err != nil || !ok {
+		t.Fatalf("remove: ok=%v err=%v", ok, err)
+	}
+	if remove != "1" {
+		t.Fatalf("remove flag not sent: %q", remove)
+	}
+}

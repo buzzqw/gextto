@@ -271,6 +271,18 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		err = d.setTrackers(hash, urls)
+	case "webseeds":
+		var urls []string
+		for _, line := range strings.Split(r.FormValue("urls"), "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				urls = append(urls, line)
+			}
+		}
+		if r.FormValue("remove") == "1" {
+			err = d.removeWebseeds(hash, urls)
+		} else {
+			err = d.addWebseeds(hash, urls)
+		}
 	default:
 		writeError(w, http.StatusBadRequest, errors.New("unknown action"))
 		return

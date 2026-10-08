@@ -1103,3 +1103,54 @@ func TestDaemonSetTrackersReplacesTheList(t *testing.T) {
 	}
 	waitFor(t, "cleared", func() bool { return len(trackerURLs()) == 0 })
 }
+
+// TestDaemonAddAndRemoveWebseeds checks the runtime web seed list: duplicates
+// are ignored, removal matches by URL, and an empty removal changes nothing.
+func TestDaemonAddAndRemoveWebseeds(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	webseeds := func() []string {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return nil
+		}
+		var out []string
+		for _, w := range tt.Webseeds() {
+			out = append(out, w.URL)
+		}
+		return out
+	}
+
+	if err := d.addWebseeds(hash, []string{"http://127.0.0.1:9/a", "http://127.0.0.1:9/a"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.addWebseeds(hash, []string{"http://127.0.0.1:9/b"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "two web seeds", func() bool { return len(webseeds()) == 2 })
+
+	if err := d.removeWebseeds(hash, []string{"http://127.0.0.1:9/a"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "one web seed left", func() bool {
+		got := webseeds()
+		return len(got) == 1 && got[0] == "http://127.0.0.1:9/b"
+	})
+
+	// An empty removal must not touch the list (unlike an empty set-trackers).
+	if err := d.removeWebseeds(hash, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := webseeds(); len(got) != 1 {
+		t.Fatalf("an empty removal changed the list: %v", got)
+	}
+}

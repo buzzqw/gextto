@@ -1342,8 +1342,16 @@ func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (boo
 	return true, nil
 }
 
+// WebSeeds adds or removes web seed URLs (one per line) at runtime.
 func (e *gxTorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error) {
-	return false, backendCapabilityError(BackendGxTorrent, "web_seeds")
+	form := url.Values{"urls": {urls}}
+	if remove {
+		form.Set("remove", "1")
+	}
+	if err := e.action(hash, "webseeds", form); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // SetLimits stores the per-torrent seed policy (enforced by Gextto). rain has

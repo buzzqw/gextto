@@ -185,6 +185,26 @@ func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.Downloader = nil
 }
 
+// AddWebseedSource adds a web seed source at runtime (gextto fork). The list is
+// rebuilt so it never aliases the caller's slice.
+func (p *PiecePicker) AddWebseedSource(src *webseedsource.WebseedSource) {
+	next := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources)+1)
+	next = append(next, p.webseedSources...)
+	p.webseedSources = append(next, src)
+}
+
+// RemoveWebseedSource drops a web seed source from the picker (gextto fork).
+// Close its downloader first (CloseWebseedDownloader) to release the pieces.
+func (p *PiecePicker) RemoveWebseedSource(src *webseedsource.WebseedSource) {
+	kept := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources))
+	for _, s := range p.webseedSources {
+		if s != src {
+			kept = append(kept, s)
+		}
+	}
+	p.webseedSources = kept
+}
+
 // WebseedStopAt sets the webseed downloader to stop at index `i`.
 func (p *PiecePicker) WebseedStopAt(src *webseedsource.WebseedSource, i uint32) (closed bool) {
 	oldEnd := src.Downloader.End

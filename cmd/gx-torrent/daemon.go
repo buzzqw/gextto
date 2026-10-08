@@ -1214,6 +1214,19 @@ func (d *Daemon) setTrackers(key string, urls []string) error {
 	})
 }
 
+// addWebseeds and removeWebseeds change the per-torrent web seed list at runtime.
+func (d *Daemon) addWebseeds(key string, urls []string) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		return t.AddWebseeds(urls)
+	})
+}
+
+func (d *Daemon) removeWebseeds(key string, urls []string) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		return t.RemoveWebseeds(urls)
+	})
+}
+
 // move relocates the payload and repoints the link. It runs in the
 // background; the new save_path appears in the list when it is done, and a
 // failure is reported in the torrent's error.
