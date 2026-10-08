@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1427,4 +1428,64 @@ func TestDaemonStreamServesARange(t *testing.T) {
 	if bad.StatusCode != http.StatusRequestedRangeNotSatisfiable {
 		t.Fatalf("bad range -> %d, want 416", bad.StatusCode)
 	}
+}
+
+// TestDaemonUIWebSeedsAndTrackerRemoval checks the daemon page's tracker removal
+// and web seed add/remove, so those features are reachable from its UI too.
+func TestDaemonUIWebSeedsAndTrackerRemoval(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	post := func(path, body string) {
+		t.Helper()
+		resp, err := http.Post(srv.URL+path, "application/x-www-form-urlencoded", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+
+	trackers := func() []string {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		var out []string
+		if tt != nil {
+			for _, tr := range tt.Trackers() {
+				out = append(out, tr.URL)
+			}
+		}
+		return out
+	}
+	trackerURL := "http://127.0.0.1:9/announce"
+	post("/ui/trackers", "hash="+hash+"&urls="+url.QueryEscape(trackerURL))
+	waitFor(t, "tracker added", func() bool { return len(trackers()) == 1 })
+	post("/ui/trackers", "hash="+hash+"&op=remove&url="+url.QueryEscape(trackerURL))
+	waitFor(t, "tracker removed", func() bool { return len(trackers()) == 0 })
+
+	webseeds := func() []string {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		var out []string
+		if tt != nil {
+			for _, ws := range tt.Webseeds() {
+				out = append(out, ws.URL)
+			}
+		}
+		return out
+	}
+	seedURL := "http://127.0.0.1:9/seed"
+	post("/ui/webseeds", "hash="+hash+"&urls="+url.QueryEscape(seedURL))
+	waitFor(t, "webseed added", func() bool { return len(webseeds()) == 1 })
+	post("/ui/webseeds", "hash="+hash+"&remove=1&urls="+url.QueryEscape(seedURL))
+	waitFor(t, "webseed removed", func() bool { return len(webseeds()) == 0 })
 }

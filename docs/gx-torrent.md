@@ -110,9 +110,10 @@ qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
   laterale, colonne ordinabili, selezione multipla e azioni di gruppo
   (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
 - **Dettaglio per torrent** a schede: *Generale* (dati, pezzi, spazio,
-  date, copia magnet, esporta `.torrent`, pin, sposta, limiti seed), *File*
-  (scarica/salta), *Peer* (flag di connessione, trasporto, cifratura),
-  *Tracker* (stato, sciame, aggiunta).
+  date, copia magnet, esporta `.torrent`, pin, sposta, limiti di
+  velocità/connessioni/upload e seed, **web seed**), *File* (scarica/salta e
+  **streaming HTTP** con ▶), *Peer* (flag di connessione, trasporto, cifratura),
+  *Tracker* (stato, sciame, aggiunta e **rimozione**), *Pezzi* (mappa colorata).
 - **Filtro IP** da URL o file; il campo è precompilato con il filtro
   configurato in Gextto.
 - **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette

@@ -201,6 +201,7 @@ type uiDetailData struct {
 	Peers    []uiPeerRow
 	Trackers []uiTrackerRow
 	Pieces   []uiPieceRun
+	WebSeeds []string
 }
 
 // uiPieceRun is one run of consecutive pieces sharing a state, with the width
@@ -597,6 +598,13 @@ const uiDetailTemplate = `{{define "detail"}}
     <label>Seed days (-1 global, 0 unlimited)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
     <button type="submit">Save limits</button>
   </form>
+  <form class="form-grid" method="post" action="/ui/webseeds">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
+    <label>Web seed (one URL per line)<textarea name="urls" rows="3" cols="60" placeholder="http://example/file">{{range .WebSeeds}}{{.}}
+{{end}}</textarea></label>
+    <button type="submit">Add</button>
+    <button type="submit" name="remove" value="1">Remove</button>
+  </form>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
     <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
@@ -641,12 +649,13 @@ const uiDetailTemplate = `{{define "detail"}}
 {{else if eq .Tab "trackers"}}
   {{if .Trackers}}
   <table>
-    <thead><tr><th>URL</th><th>State</th><th>Messaggio</th><th class="num">Seed</th><th class="num">Peer</th><th class="num">Prossimo</th></tr></thead>
+    <thead><tr><th>URL</th><th>State</th><th>Messaggio</th><th class="num">Seed</th><th class="num">Peer</th><th class="num">Prossimo</th><th></th></tr></thead>
     <tbody>
     {{range .Trackers}}
       <tr><td class="name">{{.URL}}</td><td>{{.Status}}</td><td class="name">{{.Message}}</td>
       <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
-      <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td></tr>
+      <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
+      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" title="Rimuove questo tracker">Remove</button></form></td></tr>
     {{end}}
     </tbody>
   </table>
@@ -1095,6 +1104,23 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 	hash := strings.TrimSpace(r.FormValue("hash"))
+	if r.FormValue("op") == "remove" {
+		url := strings.TrimSpace(r.FormValue("url"))
+		var remaining []string
+		d.mu.Lock()
+		t, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if t != nil {
+			for _, tr := range t.Trackers() {
+				if tr.URL != url {
+					remaining = append(remaining, tr.URL)
+				}
+			}
+		}
+		err := d.setTrackers(hash, remaining)
+		d.uiDoneDetail(w, r, hash, "trackers", "Tracker removed", err)
+		return
+	}
 	var urls []string
 	for _, line := range strings.Split(r.FormValue("urls"), "\n") {
 		if line = strings.TrimSpace(line); line != "" {
@@ -1107,6 +1133,34 @@ func (d *Daemon) handleUITrackers(w http.ResponseWriter, r *http.Request) {
 	}
 	err := d.addTrackers(hash, urls)
 	d.uiDoneDetail(w, r, hash, "trackers", fmt.Sprintf("%d trackers added", len(urls)), err)
+}
+
+func (d *Daemon) handleUIWebSeeds(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	var urls []string
+	for _, line := range strings.Split(r.FormValue("urls"), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			urls = append(urls, line)
+		}
+	}
+	if len(urls) == 0 {
+		d.uiDoneDetail(w, r, hash, "general", "", fmt.Errorf("no web seeds given"))
+		return
+	}
+	var err error
+	if r.FormValue("remove") == "1" {
+		err = d.removeWebseeds(hash, urls)
+	} else {
+		err = d.addWebseeds(hash, urls)
+	}
+	d.uiDoneDetail(w, r, hash, "general", "Web seeds updated", err)
 }
 
 func (d *Daemon) handleUISeedLimits(w http.ResponseWriter, r *http.Request) {
@@ -1457,6 +1511,11 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	}
 
 	trackers := t.Trackers()
+	var webseeds []string
+	for _, ws := range t.Webseeds() {
+		webseeds = append(webseeds, ws.URL)
+	}
+	data.WebSeeds = webseeds
 	switch tab {
 	case "files":
 		files, err := t.Files()

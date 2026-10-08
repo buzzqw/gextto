@@ -56,6 +56,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
 	root.HandleFunc("POST /ui/file-priority", d.handleUIFilePriority)
 	root.HandleFunc("POST /ui/trackers", d.handleUITrackers)
+	root.HandleFunc("POST /ui/webseeds", d.handleUIWebSeeds)
 	root.HandleFunc("POST /ui/seed-limits", d.handleUISeedLimits)
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
