@@ -2254,6 +2254,30 @@ func tev_markReleaseCompleted(cfg *Config, db *Database, release *models.Release
 // tev_completeTorrentOptions controls whether the original torrent source must
 // remain available for seeding. Single episodes are imported by copying their
 // video to the library, so they use preserveSource=true.
+// logLibraryImport records the archive/import phase of a completed release. When
+// the release superseded existing files it emits a single "updated" line that
+// also names the replaced file(s), instead of the import line plus one
+// "replaced" line per removed file.
+func logLibraryImport(cfg *Config, target string, size int64, path, suffix string, replaced []string) {
+	if len(replaced) == 0 {
+		logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s",
+			target, logging.HumanBytesI64(size), path, suffix))
+		return
+	}
+	action := "moved to the trash"
+	if cfg.CleanupAction == "delete" {
+		action = "deleted"
+	}
+	names := make([]string, len(replaced))
+	for i, file := range replaced {
+		names[i] = "«" + filepath.Base(file) + "»"
+	}
+	logging.Info(fmt.Sprintf("♻️ %s updated (%s): %s · %s %s %s",
+		target, logging.HumanBytesI64(size), path,
+		plural(len(replaced), "previous version", "previous versions"),
+		strings.Join(names, ", "), action))
+}
+
 func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSession, event *models.TorrentEvent, release *models.Release, tmdb *TmdbClient, preserveSource bool) (bool, error) {
 	// Record the episode under the configured series, not the raw parsed name.
 	normalizeReleaseSeries(cfg, release)
@@ -2355,6 +2379,8 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	if renamedSet {
 		processedPath = renamed
 	}
+	// Files the new release supersedes, to log a single upgrade line.
+	var replaced []string
 	if release.Kind == "series" && !release.IsPack {
 		if release.Series != nil && release.Season != nil && release.Episode != nil {
 			newFile := renamed
@@ -2378,8 +2404,11 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 				}
 				if value {
 					discarded = true
-				} else if _, err := CleanupOldEpisodeWithQuality(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, release.Quality); err != nil {
-					return false, err
+				} else {
+					replaced, err = cleanupOldEpisode(cfg, *release.Series, *release.Season, *release.Episode, score, newFile, archive, &release.Quality)
+					if err != nil {
+						return false, err
+					}
 				}
 			}
 		}
@@ -2405,8 +2434,11 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 			}
 			if value {
 				discarded = true
-			} else if _, err := CleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive); err != nil {
-				return false, err
+			} else {
+				replaced, err = cleanupOldMovie(cfg, release.Title, release.Year, score, newFile, archive)
+				if err != nil {
+					return false, err
+				}
 			}
 		}
 	}
@@ -2450,13 +2482,10 @@ func tev_completeTorrentOptions(cfg *Config, db *Database, torrents TorrentSessi
 	}
 	// Download completion is logged when the payload first reaches 100%. This
 	// later handler records the separate archive/import phase (often after a
-	// seed period), so the two lifecycle messages retain their real order.
-	logging.Info(fmt.Sprintf("📁 %s added to the library (%s): %s%s",
-		logTarget(release),
-		logging.HumanBytesI64(size),
-		processedPath,
-		suffix,
-	))
+	// seed period), so the two lifecycle messages retain their real order. When
+	// the release replaced existing files, one combined "updated" line is
+	// emitted instead of the import line plus one line per removed file.
+	logLibraryImport(cfg, logTarget(release), size, processedPath, suffix, replaced)
 	if !preserveSource && cfg.Libtorrent.AutoRemoveCompleted && (recoveredExisting || (renamedSet && !SamePath(processedPath, path))) {
 		removed, err := torrents.Remove(event.Hash, false)
 		if err != nil {

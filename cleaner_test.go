@@ -128,6 +128,35 @@ func TestCleanupUsesApprovedRepackMetadataWhenFinalNameOmitsRepack(t *testing.T)
 	assertTrue(t, cleanerFileExists(newFile), "il nuovo resta")
 }
 
+// TestCleanupOldEpisodeReportsRemovedPaths locks the contract used by the
+// combined upgrade log: the removal helper returns the files it removed, so the
+// completion handler can emit one line instead of one per file.
+func TestCleanupOldEpisodeReportsRemovedPaths(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "archive")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	old := filepath.Join(archive, "Example.S01E01.720p.WEB-DL.mkv")
+	cleanerWrite(t, old, "old")
+
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	cfg.TrashPath = &trash
+
+	kept := filepath.Join(archive, "Example - S01E01 - Title.mkv")
+	cleanerWrite(t, kept, "new")
+
+	removed, err := cleanupOldEpisode(&cfg, "Example", 1, 1, cleanerScore("Example.S01E01.1080p.WEB-DL.mkv"), kept, archive, nil)
+	if err != nil {
+		t.Fatalf("cleanup: %v", err)
+	}
+	if len(removed) != 1 || filepath.Base(removed[0]) != filepath.Base(old) {
+		t.Fatalf("removed = %v, want [%s]", removed, filepath.Base(old))
+	}
+}
+
 func TestMovesCompletedPackDirectoryToTrash(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "download")

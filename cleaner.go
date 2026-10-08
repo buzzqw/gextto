@@ -248,6 +248,15 @@ func logInferiorFileReplaced(cfg *Config, file, replacement string) {
 	logging.Debug("inferior file replaced", "file", file, "replacement", replacement)
 }
 
+// logRemovedFiles logs one "replaced" line per removed file. Used by the
+// callers that do not emit a combined upgrade line of their own (background
+// cleanup and post-processing); the completion handler logs a single line.
+func logRemovedFiles(cfg *Config, files []string, replacement string) {
+	for _, file := range files {
+		logInferiorFileReplaced(cfg, file, replacement)
+	}
+}
+
 // MoveToTrash moves a file or directory to the trash with a unique name; it
 // falls back to a recursive copy + remove when the trash is on another
 // filesystem (a plain rename fails with EXDEV, typical with a NAS).
@@ -478,7 +487,9 @@ func ResolveExistingTarget(source, target string, newScore int64, cfg *Config, k
 // CleanupOldEpisode removes archived files of the same series/season/episode
 // that are clearly inferior to the new file.
 func CleanupOldEpisode(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string) (int, error) {
-	return cleanupOldEpisode(cfg, series, season, episode, newScore, newFile, archivePath, nil)
+	removed, err := cleanupOldEpisode(cfg, series, season, episode, newScore, newFile, archivePath, nil)
+	logRemovedFiles(cfg, removed, newFile)
+	return len(removed), err
 }
 
 // CleanupOldEpisodeWithQuality is used when the caller still has the approved
@@ -486,26 +497,31 @@ func CleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 // release flags (notably REPACK), so technical tags parsed from the filename
 // are merged with the release quality before comparing older files.
 func CleanupOldEpisodeWithQuality(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string, candidateQuality models.Quality) (int, error) {
-	return cleanupOldEpisode(cfg, series, season, episode, newScore, newFile, archivePath, &candidateQuality)
+	removed, err := cleanupOldEpisode(cfg, series, season, episode, newScore, newFile, archivePath, &candidateQuality)
+	logRemovedFiles(cfg, removed, newFile)
+	return len(removed), err
 }
 
-func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string, candidateQuality *models.Quality) (int, error) {
+// cleanupOldEpisode removes the archived files that the new release supersedes
+// and returns their paths, so the caller can log a single line about the
+// upgrade instead of one line per removed file.
+func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int64, newFile, archivePath string, candidateQuality *models.Quality) ([]string, error) {
 	if !cfg.CleanupUpgrades || !localPath(archivePath) {
-		return 0, nil
+		return nil, nil
 	}
 	info, err := os.Stat(archivePath)
 	if err != nil || !info.IsDir() {
-		return 0, nil
+		return nil, nil
 	}
 	pattern, err := utils.CachedRegex(
 		`(?i)^(?P<name>.+?)[ ._-]+(?:s(?P<season>\d{1,2})e|(?P<nseason>\d{1,2})x)(?P<episode>\d{1,4})(?:[ ._-]|$)`,
 	)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	normalized := NormalizeSeriesName(series)
 	preferred := cfg.DefaultLanguage()
-	removed := 0
+	var removed []string
 	files, err := VideoFiles(archivePath)
 	if err != nil {
 		return removed, err
@@ -556,8 +572,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 						return removed, err
 					}
 					removeEmptyParents(file, archivePath)
-					removed++
-					logInferiorFileReplaced(cfg, file, newFile)
+					removed = append(removed, file)
 					continue
 				}
 			}
@@ -569,8 +584,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 			return removed, err
 		}
 		removeEmptyParents(file, archivePath)
-		removed++
-		logInferiorFileReplaced(cfg, file, newFile)
+		removed = append(removed, file)
 	}
 	return removed, nil
 }
@@ -854,15 +868,16 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 	return false, nil
 }
 
-// CleanupOldMovie removes archived files of the same movie that are clearly
-// inferior to the new file.
-func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string) (int, error) {
+// cleanupOldMovie removes archived files of the same movie that are clearly
+// inferior to the new file and returns their paths, so the caller can log a
+// single line about the upgrade.
+func cleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, newFile, archivePath string) ([]string, error) {
 	if !cfg.CleanupUpgrades || !localPath(archivePath) {
-		return 0, nil
+		return nil, nil
 	}
 	info, err := os.Stat(archivePath)
 	if err != nil || !info.IsDir() {
-		return 0, nil
+		return nil, nil
 	}
 	words := []string{}
 	for _, word := range strings.Fields(NormalizeSeriesName(movie)) {
@@ -871,10 +886,10 @@ func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 		}
 	}
 	preferred := cfg.DefaultLanguage()
-	removed := 0
+	var removed []string
 	yearPattern, err := utils.CachedRegex(`\b(19\d{2}|20\d{2})\b`)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	files, err := VideoFiles(archivePath)
 	if err != nil {
@@ -918,8 +933,7 @@ func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 						return removed, err
 					}
 					removeEmptyParents(file, archivePath)
-					removed++
-					logInferiorFileReplaced(cfg, file, newFile)
+					removed = append(removed, file)
 					continue
 				}
 			}
@@ -931,8 +945,7 @@ func CleanupOldMovie(cfg *Config, movie string, year *int64, newScore int64, new
 			return removed, err
 		}
 		removeEmptyParents(file, archivePath)
-		removed++
-		logInferiorFileReplaced(cfg, file, newFile)
+		removed = append(removed, file)
 	}
 	return removed, nil
 }
