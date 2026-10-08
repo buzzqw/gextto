@@ -16,6 +16,7 @@ specifiche.
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
+| [Scelte di progetto](scelte-di-progetto.md) | Perché il progetto è fatto così: posizionamento, gestori di indexer, politica di selezione. |
 | [Proposte di migliorie](proposte-migliorie.md) | Migliorie proposte, decisioni prese e stato di ciascuna. |
 | [Lavoro di sessione](lavoro-sessione.md) | Passaggio di consegne tra sessioni di sviluppo: regole, stato, punti aperti. |
 | [Da fare](da-fare.md) | Backlog dei punti ancora aperti. |

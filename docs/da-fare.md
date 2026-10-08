@@ -1,9 +1,29 @@
 # Da fare (backlog)
 
 Punti aperti. Ripristinato l'8-10-2026: era finito per errore in `docs/archive/`
-pur essendo un backlog **attivo**. Attualmente **non ci sono punti aperti**: gli
-ultimi due sono stati chiusi l'8-10-2026. Quelli sotto restano come memoria delle
-decisioni.
+pur essendo un backlog **attivo**. I due item recuperati dal piano di adozione
+(ora in `docs/scelte-di-progetto.md`) sono gli unici aperti.
+
+## Aperti
+
+### 1. Wizard di primo avvio (onboarding)
+Il vecchio piano di adozione lo indicava come l'item a più alto impatto. Oggi
+esistono solo `GET /api/setup` e `POST /api/setup/complete` (stato e conferma),
+**nessuna UI guidata**. Piano dettagliato già scritto in
+`docs/internal/SETUP_WIZARD_PLAN.md`.
+
+Percorso in ordine, ogni passo con un test che dà un esito concreto: locale e
+cartelle → backend di download (test di connessione) → indexer (URL + chiave del
+manager, con una ricerca di prova) → radici della libreria (anteprima scansione)
+→ naming (anteprima dal vivo) → media server (test) → notifiche (test) → primo
+ciclo reale. Riprendibile, saltabile, dry-run di default.
+
+### 2. Osservabilità e runbook
+- ID di correlazione attraverso ricerca → download → import;
+- metriche: profondità della coda, durata della ricerca, fallimenti di indexer e
+  import, spazio disco, ultimo ciclo riuscito;
+- la salute degli indexer del manager è già in Sources (`indexer_health.go`);
+- un breve runbook "un ciclo è fallito — dove guardare", basato su Health e Log.
 
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 

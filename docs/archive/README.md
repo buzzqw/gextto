@@ -24,5 +24,7 @@ Restano nella storia di git, non nel working tree:
   [`../gx-torrent-ottimizzazioni-prestazionali-v2.md`](../gx-torrent-ottimizzazioni-prestazionali-v2.md).
 
 Restano volutamente fuori dall'indice perché locali e non pubblicati (già in
-`.gitignore`): `docs/internal/`, `docs/revisione-1.md` (citato da commenti nel
-codice) e `docs/SONARR_RADARR_REPLACEMENT_PLAN.md`.
+`.gitignore`): `docs/internal/` e `docs/revisione-1.md` (citato da commenti nel
+codice). Il vecchio piano di adozione `SONARR_RADARR_REPLACEMENT_PLAN.md` è stato
+rimosso: le parti durevoli sono in
+[`../scelte-di-progetto.md`](../scelte-di-progetto.md).
