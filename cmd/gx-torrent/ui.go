@@ -605,7 +605,7 @@ const uiDetailTemplate = `{{define "detail"}}
 {{else if eq .Tab "files"}}
   {{if .Files}}
   <table>
-    <thead><tr><th>File</th><th class="num">Size</th><th class="num">Done</th><th>Priority</th></tr></thead>
+    <thead><tr><th>File</th><th class="num">Size</th><th class="num">Done</th><th>Priority</th><th>Play</th></tr></thead>
     <tbody>
     {{range .Files}}
       <tr>
@@ -616,6 +616,7 @@ const uiDetailTemplate = `{{define "detail"}}
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
           <select name="priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
         </form></td>
+        <td><a href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" title="Stream this file with HTTP Range; the pieces of the window are downloaded first">▶</a></td>
       </tr>
     {{end}}
     </tbody>

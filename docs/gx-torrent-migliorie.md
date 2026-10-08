@@ -68,7 +68,7 @@ presenti o già gestiti da Gextto.
 | 4 | Web seed add/remove via API | **Fatto** — `Torrent.AddWebseeds`/`RemoveWebseeds` + azione `webseeds` | 2 |
 | 5 | Diagnostica pezzi | **Fatto** — API demone `pieces`, scheda Pezzi in Gextto e scheda Pieces nella pagina del demone | 4 |
 | 6 | Limiti velocità per-torrent | **Fatto** — `Limiter.SetParent`/`SetLimitKiB` + `Torrent.SetSpeedLimits`, riapplicati al riavvio | 5 |
-| 7 | Streaming HTTP Range + priorità pezzi | **Sì** — endpoint sul demone | 7 |
+| 7 | Streaming HTTP Range + priorità pezzi | **Fatto** — `PiecePicker.SetStreamWindow`, endpoint demone `/ui/stream`, redirect Gextto e pulsante ▶ | 7 |
 | 8 | Limiti connessioni/upload per-torrent | **Fatto** — `Torrent.SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` | 6 |
 | 9 | IPv6 | **No** | — |
 | 10 | BitTorrent v2-only | **Wishlist** | — |

@@ -49,6 +49,10 @@ type PiecePicker struct {
 	// Pick the pieces at both ends of every file first, then continue
 	// rarest-first (gextto fork). Independent of sequential order.
 	firstLast bool
+
+	// streamBegin/streamEnd are the piece range a player is reading (gextto
+	// fork): those pieces are requested before any other. Empty when equal.
+	streamBegin, streamEnd uint32
 }
 
 type myPiece struct {
@@ -178,6 +182,34 @@ func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	}
 	p.sequential = sequential
 	p.firstLast = firstLast
+}
+
+// SetStreamWindow prioritizes the pieces in [begin, end) (gextto fork): the
+// pieces a player is reading are requested before the rest. begin == end clears
+// the window.
+func (p *PiecePicker) SetStreamWindow(begin, end uint32) {
+	if end > uint32(len(p.pieces)) {
+		end = uint32(len(p.pieces))
+	}
+	if begin > end {
+		begin = end
+	}
+	p.streamBegin, p.streamEnd = begin, end
+}
+
+// pickStreaming returns the first piece in the streaming window the peer can
+// download right now.
+func (p *PiecePicker) pickStreaming(pe *peer.Peer) *myPiece {
+	for i := p.streamBegin; i < p.streamEnd; i++ {
+		if i >= uint32(len(p.pieces)) {
+			return nil
+		}
+		mp := &p.pieces[i]
+		if mp.PickableBy(pe) {
+			return mp
+		}
+	}
+	return nil
 }
 
 // PieceDownloading reports whether the piece at index i is being downloaded
@@ -352,6 +384,12 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 	// Pieces at file edges come before the allowed-fast pieces, which are spread over the
 	// torrent. While choked they are the only pieces we can request, so this applies only
 	// after the peer unchokes us.
+	if !pe.PeerChoking {
+		// The player's streaming window comes first (gextto fork).
+		if mp = p.pickStreaming(pe); mp != nil {
+			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
+		}
+	}
 	if (p.sequential || p.firstLast) && !pe.PeerChoking {
 		mp = p.pickFileEdge(pe)
 		if mp != nil {

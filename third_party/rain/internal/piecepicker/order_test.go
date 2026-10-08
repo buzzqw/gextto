@@ -67,3 +67,25 @@ func TestPieceDownloadingTracksWritingAndRequests(t *testing.T) {
 		t.Fatal("an out-of-range index was reported as downloading")
 	}
 }
+
+// gextto fork: the streaming window makes the picker request those pieces
+// before any other.
+func TestStreamWindowPicksThosePiecesFirst(t *testing.T) {
+	pieces := []piece.Piece{
+		{Index: 0, Length: testPieceLength}, {Index: 1, Length: testPieceLength},
+		{Index: 2, Length: testPieceLength}, {Index: 3, Length: testPieceLength},
+		{Index: 4, Length: testPieceLength},
+	}
+	pe := testPeer(len(pieces))
+	pp := New(pieces, 2, nil, false, false)
+	for i := range pieces {
+		pp.HandleHave(pe, uint32(i))
+	}
+	pp.SetStreamWindow(3, 5)
+	for _, want := range []uint32{3, 4} {
+		got, _ := pp.PickFor(pe)
+		if got == nil || got.Index != want {
+			t.Fatalf("stream window picked %v, want piece %d", got, want)
+		}
+	}
+}

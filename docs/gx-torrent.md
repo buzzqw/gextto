@@ -328,6 +328,22 @@ stessa mappa nella scheda **Pezzi** del dettaglio torrent. gx-torrent è il prim
 motore di Gextto a esporre la diagnostica dei pezzi (libtorrent risponde "non
 disponibile").
 
+## Streaming HTTP (HTTP Range)
+
+Oltre al download sequenziale, il demone sa servire un file a un player mentre
+lo scarica: `GET /ui/stream?hash=<hash>&file=<indice>` restituisce il file e
+supporta una singola intestazione `Range: bytes=…` (risposta `206` con
+`Content-Range`, `Accept-Ranges: bytes`). I pezzi della finestra richiesta, più
+circa 16 MB di readahead, vengono chiesti per primi; se un pezzo non è ancora
+arrivato il demone aspetta (fino a 2 minuti) invece di servire zeri. Richieste
+non soddisfacibili rispondono `416`.
+
+L'autenticazione è quella della pagina web (cookie, header o `?token=`), quindi
+anche un player esterno (VLC, mpv) può usare l'URL completo di token. Da Gextto
+`GET /api/torrents/{hash}/stream?file=<indice>` reindirizza al demone aggiungendo
+il token lato server; nella scheda **Contenuto** del dettaglio torrent ogni file
+ha un pulsante **▶**, e la pagina del demone lo ha nella scheda **Files**.
+
 ## Cache disco e preallocazione
 
 Le impostazioni libtorrent di gextto valgono anche per gx-torrent, ma la cache

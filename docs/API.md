@@ -285,6 +285,7 @@ Per verifiche operative usa prima
 | POST | `/api/torrents/{hash}/scrape` |
 | POST | `/api/torrents/{hash}/share-mode` |
 | POST | `/api/torrents/{hash}/storage` |
+| GET | `/api/torrents/{hash}/stream` |
 | POST | `/api/torrents/{hash}/super-seeding` |
 | GET | `/api/torrents/{hash}/trackers` |
 | POST | `/api/torrents/{hash}/trackers` |

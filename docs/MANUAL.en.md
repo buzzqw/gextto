@@ -299,7 +299,9 @@ inferior to the archived file.
   list (`tier|url` per line); **Content** sets the **per-file priority**
   (Skip/Normal/High/Maximum). **Pieces** shows the piece map (green have, yellow
   downloading, grey missing, dimmed skipped) on engines that expose it
-  (gx-torrent).
+  (gx-torrent). With gx-torrent every file has a **▶** button that opens the
+  file's **HTTP streaming** (with Range): the pieces of the part being read are
+  downloaded first, so playback can start before the download finishes.
 - When you use **Move storage**, the log records the request, destination and
   command acceptance; the final outcome is written when libtorrent completes or
   rejects the move. With **Check**, the log distinguishes command start from

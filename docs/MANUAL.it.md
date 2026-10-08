@@ -301,6 +301,9 @@ bloccata, già presente o inferiore al file archiviato.
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima).
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
   mancante, spento saltato): compare con i motori che la espongono (gx-torrent).
+  Con gx-torrent ogni file ha un pulsante **▶** che apre lo **streaming HTTP**
+  del file (con Range): i pezzi della parte letta vengono scaricati per primi,
+  così puoi iniziare a guardare prima che il download finisca.
 - Quando usi **Sposta storage**, il log registra richiesta, destinazione e
   accettazione del comando; l'esito finale viene scritto quando libtorrent
   completa o rifiuta lo spostamento. Con **Check** il log distingue comando

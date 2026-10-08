@@ -1373,3 +1373,58 @@ func TestDaemonPerTorrentConnLimits(t *testing.T) {
 	d.mu.Unlock()
 	waitFor(t, "caps after reload", func() bool { c, u := connLimits(); return c == 25 && u == 4 })
 }
+
+// TestDaemonStreamServesARange checks the streaming endpoint: full download,
+// HTTP Range (206 with Content-Range) and the unsatisfiable case.
+func TestDaemonStreamServesARange(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/stream?hash=" + hash + "&file=0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || len(full) != 100_000 {
+		t.Fatalf("full stream -> %d, %d bytes", resp.StatusCode, len(full))
+	}
+	if resp.Header.Get("Accept-Ranges") != "bytes" {
+		t.Fatal("Accept-Ranges missing")
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/ui/stream?hash="+hash+"&file=0", nil)
+	req.Header.Set("Range", "bytes=10-19")
+	partial, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunk, _ := io.ReadAll(partial.Body)
+	partial.Body.Close()
+	if partial.StatusCode != http.StatusPartialContent || string(chunk) != string(full[10:20]) {
+		t.Fatalf("range -> %d %q, want bytes 10-19", partial.StatusCode, chunk)
+	}
+	if cr := partial.Header.Get("Content-Range"); cr != "bytes 10-19/100000" {
+		t.Fatalf("Content-Range = %q", cr)
+	}
+
+	req2, _ := http.NewRequest(http.MethodGet, srv.URL+"/ui/stream?hash="+hash+"&file=0", nil)
+	req2.Header.Set("Range", "bytes=999999-")
+	bad, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad.Body.Close()
+	if bad.StatusCode != http.StatusRequestedRangeNotSatisfiable {
+		t.Fatalf("bad range -> %d, want 416", bad.StatusCode)
+	}
+}

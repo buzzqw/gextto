@@ -44,6 +44,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Diagnostica pezzi | `internal/piecepicker/piecepicker.go`, `torrent/session_torrent.go` | `PiecePicker.PieceDownloading` e `Torrent.PieceStates`: stato per pezzo (`have`/`downloading`/`skipped`/mancante) per la mappa pezzi; dopo il completamento rain azzera il picker, quindi gli stati si ricavano dai `pieces` |
 | Limiti per-torrent | `internal/bandwidth/limiter.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_start.go`, `torrent/session_limits.go` | `Limiter.SetParent`/`SetLimitKiB` e `Torrent.SetSpeedLimits`: ogni torrent ha un limitatore proprio che eredita quello di sessione (`-1`), è illimitato (`0`) o ha un tetto (`>0`); peer e web seed usano quello del torrent, quindi cambia a caldo |
 | Connessioni/upload per-torrent | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: tetto alle connessioni instaurate (chiude le eccedenti al tick) e `Unchoker.SetNumUnchoked` per gli slot di upload |
+| Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` e `Torrent.FilePieceRange`/`SetFileStreamWindow`: i pezzi della finestra letta da un player vengono scelti per primi |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 

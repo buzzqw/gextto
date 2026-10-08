@@ -3,6 +3,7 @@ package gextto
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/models"
@@ -83,4 +84,42 @@ func repeatHash(character string) string {
 		out += character
 	}
 	return out
+}
+
+// TestTorrentStreamRedirectsToTheDaemon checks that the Gextto stream endpoint
+// refuses other engines and redirects to the daemon for gx-torrent, adding the
+// token server-side.
+func TestTorrentStreamRedirectsToTheDaemon(t *testing.T) {
+	state := newTestAppState(t)
+	api := httptest.NewServer(Router(state))
+	defer api.Close()
+	if code, _, _ := webGet(t, api, "/api/torrents/"+repeatHash("a")+"/stream?file=0"); code != http.StatusConflict {
+		t.Fatalf("embedded stream -> %d, want 409", code)
+	}
+
+	state.cfg.Settings["gxtorrent_url"] = "http://127.0.0.1:8890"
+	state.cfg.Settings["gxtorrent_token"] = "secret"
+	if err := SaveSetting(state.cfg.DataDir, "gxtorrent_url", "http://127.0.0.1:8890"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveSetting(state.cfg.DataDir, "gxtorrent_token", "secret"); err != nil {
+		t.Fatal(err)
+	}
+	state.setActiveEngine(fakePieceEngine{hash: repeatHash("a")})
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	req, _ := http.NewRequest(http.MethodGet, api.URL+"/api/torrents/"+repeatHash("a")+"/stream?file=0", nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("stream -> %d, want 302", resp.StatusCode)
+	}
+	location := resp.Header.Get("Location")
+	if !strings.Contains(location, "127.0.0.1:8890/ui/stream?") ||
+		!strings.Contains(location, "file=0") || !strings.Contains(location, "token=secret") {
+		t.Fatalf("Location = %q", location)
+	}
 }

@@ -260,6 +260,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "POST /api/torrents/{hash}/files/priority", SetFilePriorities)
 	handle(s, mux, "GET /api/torrents/{hash}/pieces", TorrentPieces)
 	handle(s, mux, "GET /api/torrents/{hash}/pieces/runs", TorrentPieces)
+	handle(s, mux, "GET /api/torrents/{hash}/stream", TorrentStream)
 	handle(s, mux, "POST /api/torrents/{hash}/selective", TorrentSelective)
 	handle(s, mux, "POST /api/torrents/{hash}/web-seeds", SetWebSeeds)
 	handle(s, mux, "POST /api/torrents/{hash}/super-seeding", SetSuperSeeding)
