@@ -1013,11 +1013,18 @@
       <div class="panel-body">{{range .Health.Disks}}<div class="row"><span>{{.Mount}} <small class="muted">{{.Filesystem}}</small></span><span class="muted">{{bytesU .FreeBytes}} / {{bytesU .TotalBytes}}</span></div>{{end}}</div>
     </div>
   </div>
+  {{if gt (len .PanelTables) 1}}
+  <div class="grid-2">
+    {{template "v2_health_engine" .Engine}}
+    {{template "v2_table_panel" (index .PanelTables 1)}}
+  </div>
+  {{else}}
   {{template "v2_health_engine" .Engine}}
+  {{end}}
+  {{if gt (len .PanelTables) 0}}{{template "v2_table_panel" (index .PanelTables 0)}}{{end}}
   {{if .Health.LastErrors}}
   <div class="panel"><div class="panel-head"><h3>Ultimi errori</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}</div></div>
   {{end}}
-  {{range .PanelTables}}{{template "v2_table_panel" .}}{{end}}
 </div>
 {{end}}
 

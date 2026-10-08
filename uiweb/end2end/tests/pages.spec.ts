@@ -275,3 +275,18 @@ test("integrazioni raggruppa le voci con intestazioni sticky", async ({ page }) 
   await expect(labels.first()).toHaveCSS("position", "sticky");
   await expect(labels.first()).toBeVisible();
 });
+
+test("Salute affianca Motore torrent e Stato provider", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/?view=health");
+  const engine = page.locator("#v2-health-engine");
+  const provider = page.locator("main .panel").filter({ has: page.locator("h3", { hasText: "Stato provider" }) });
+  await expect(engine).toBeVisible();
+  await expect(provider).toBeVisible();
+  const [e, p] = await Promise.all([engine.boundingBox(), provider.boundingBox()]);
+  expect(e).not.toBeNull();
+  expect(p).not.toBeNull();
+  // Same row, provider to the right of the engine panel.
+  expect(Math.abs(e!.y - p!.y)).toBeLessThan(60);
+  expect(p!.x).toBeGreaterThan(e!.x + e!.width - 5);
+});
