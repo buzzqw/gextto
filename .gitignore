@@ -60,3 +60,4 @@ uiweb/end2end/playwright-report/
 /gx-torrent
 # personal convenience build script (not part of the project)
 /builda-tutto.sh
+/rain-blocklist-pr.sh
