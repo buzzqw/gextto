@@ -18,6 +18,7 @@ specifiche.
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
 | [Proposte di migliorie](proposte-migliorie.md) | Migliorie proposte, decisioni prese e stato di ciascuna. |
 | [Lavoro di sessione](lavoro-sessione.md) | Passaggio di consegne tra sessioni di sviluppo: regole, stato, punti aperti. |
+| [Da fare](da-fare.md) | Backlog dei punti ancora aperti. |
 | [Accessibilità](accessibility-analysis.md) | Ambito, esito e limiti dell'accessibilità della UI web. |
 | [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (rain, demone, adapter). |
 | [Archivio](archive/README.md) | Report e piani storici, non più aggiornati. |

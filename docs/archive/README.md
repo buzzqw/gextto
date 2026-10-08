@@ -9,8 +9,7 @@ l'indice in [`../README.md`](../README.md).
 | `gextto-terra.md` | Rapporto tecnico Terra: miglioramenti proposti | interventi fatti o esclusi |
 | `pro-terra.md` | Rapporto tecnico Pro Terra: sicurezza, concorrenza, lifecycle | interventi fatti |
 | `revisione-2.md` | Revisione tecnica al commit `97142c1` | fotografia datata |
-| `UI_V2.md` | Report dello stato della UI SSR + HTMX (build 1229) | report datato |
-| `da-fare.md` | Backlog di spunti e desiderata | non è stato del progetto |
+| `UI_V2.md` | Report dello stato della UI SSR + HTMX (build 1229) | report datato; i punti aperti sono in `../da-fare.md` |
 
 ## Documenti rimossi in questa pulizia (2026-10-08)
 
