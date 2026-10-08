@@ -1060,6 +1060,11 @@ over their content. Entering Configuration hides the main menu bar, so the
 sections are no longer squeezed between the menu and the entries: the **Menu**
 button at the top left brings it back over the content (Esc closes it).
 
+When a section gathers several groups of settings (for example **Search cycle**
+and **Missing episodes** under *Automatic maintenance*), the group title stays
+**stuck to the top** while you scroll, with a coloured accent bar: the long list
+of options no longer makes you lose your place.
+
 How to read a row:
 
 - **Name and description** on the left; the control in the middle with its

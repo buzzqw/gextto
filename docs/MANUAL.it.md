@@ -1096,6 +1096,11 @@ così le sezioni non restano schiacciate tra il menu e le voci: il pulsante
 **Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc per
 richiuderla).
 
+Quando una sezione raccoglie più gruppi di impostazioni (per esempio **Ciclo di
+ricerca** ed **Episodi mancanti** in *Manutenzione automatica*), il titolo del
+gruppo resta **agganciato in alto** mentre scorri, con una barretta colorata
+d'accento: l'elenco lungo delle opzioni non ti fa più perdere il filo.
+
 Come si legge una riga:
 
 - **Nome e descrizione** a sinistra; il controllo al centro con l'**unità**
