@@ -522,16 +522,17 @@ casuali, lunghezze multiple di 8 e non. Aggiungere
 
 ## 9. Esclusi, con motivazione
 
-- **Rarity buckets / refactor del picker**: tecnica corretta (libtorrent,
-  anacrolix), ma il costo reale del pick è ignoto — `slices.SortFunc` è pdqsort
-  adattivo e l'array è quasi ordinato tra due pick; servirebbe un profilo con
-  pprof su uno sciame reale prima di un refactor pesante (mantenere i bucket in
-  `HandleHave`/`Cancel`/`removeHaving` e preservare il rilevamento endgame).
-  Da rivisitare **solo con dati**.
-- **Cursore watermark in `pickSequential`**: incompleto da solo; in modalità
-  sequenziale/preferenza-bordi il costo O(N) dominante è `pickFileEdge`
-  (`piecepicker.go:478-486`), aggiunto dal fork. Se si tocca, va sistemato
-  anche quello; priorità bassa.
+- **Rarity buckets / refactor del picker**: **misurato, non conviene** (vedi
+  §11bis). Il costo reale del pick a 27.250 pezzi è ~0,11 ms in regime normale
+  (pdqsort adattivo su ordine quasi stabile), non il disastro descritto dalla
+  v1; a decine di pick/s pesa <1% di un core. I rarity buckets
+  risparmierebbero ~0,1 ms/pick, per un refactor pesante (mantenere i bucket in
+  `HandleHave`/`Cancel`/`removeHaving`, preservare il rilevamento endgame).
+  Non conviene a questo carico.
+- **Cursore watermark in `pickSequential` / `pickFileEdge`**: **misurato, non
+  conviene** (§11bis): ~0,10 ms/pick quasi-completato e ~0,04 ms per il full
+  scan di `pickFileEdge` (l'unica inefficienza O(N) introdotta dal fork). Resta
+  documentato, ma non merita il rischio.
 - **Bitmask in `PieceDownloader`**: le mappe sono allocate solo per i download
   *concorrenti* (≈ n. peer), non per tutti i pezzi; il guadagno è trascurabile,
   e la bitmask a 64 bit non copre pezzi da 2–4 MiB. Non conviene.
@@ -630,3 +631,45 @@ di torrent: a ~1000 torrent la lista pesa ~1 MB e il `json.Marshal` per poll
 costa qualche ms, ed è lì che un ETag/304 o una mappa O(1) iniziano a
 risparmiare. Resta quindi **rimandato**: da fare solo in presenza di quel
 carico, non "a naso".
+
+## 11bis. Le altre voci del documento v1, misurate
+
+Per ciascuna voce che la v1 proponeva e che **non** è entrata nel piano, il
+verdetto con una misura o un ordine di grandezza.
+
+**Picker (`pickRarest` / `pickSequential` / `pickFileEdge`).** Benchmark nel
+fork: `third_party/rain/internal/piecepicker/picker_bench_test.go`
+(`go test -run '^$' -bench BenchmarkPicker`). 27.250 pezzi, Intel N97:
+
+| Path | Steady state | Peggior caso |
+|---|---|---|
+| `pickRarest` | 110 µs/pick | 1,11 ms/pick (ordine rimescolato a ogni pick, shuffle incluso) |
+| `pickSequential` (quasi completato) | 100 µs/pick | — (scansione 27k) |
+| `pickFileEdge` (full scan) | 38 µs/pick | — |
+
+A decine di pick/s il regime reale (ordine quasi stabile → pdqsort adattivo)
+costa **<1% di un core**. I rarity buckets risparmierebbero ~0,1 ms/pick: non
+vale un refactor che tocca `HandleHave`/`Cancel`/`removeHaving` e l'endgame. La
+v1 misurava il caso rimescolato e lo spacciava per tipico.
+
+**`clear(b.Data)` in `bufferpool`.** Un `clear` di 16 KiB è ~0,8 µs; a ~1000
+blocchi/s sono ~0,8 ms/s, **<0,1% di un core**. Inoltre il pool è condiviso
+(peerreader, urldownloader, piecewriter, piecePool) e non è scontato che tutti i
+percorsi riempiano l'intero buffer: micro-ottimizzazione non giustificata.
+
+**`saveLocked` sotto `d.mu`.** Non è sul percorso di polling (solo mutazioni e
+tick-quando-dirty). `state.json` è di 2,5 KB; `MarshalIndent` + `WriteFile` +
+`Rename` su NVMe costano ~0,1–0,3 ms, a ogni operazione esplicita dell'utente.
+Trascurabile; e la soluzione della v1 perdeva `dirty` sull'errore.
+
+**`HandleDisconnect` O(N).** Avviene alla disconnessione di un peer (poche al
+secondo); 27k iterazioni con `SliceSet.Remove` costano ~decine di µs per evento
+→ irrilevante. Il guard col bitfield è corretto ma inutile qui.
+
+**`FADV_RANDOM`.** La giustificazione della v1 (danneggia lo streaming HTTP) non
+si applica: `stream.go` legge con `os.Open`/`ReadAt`, fuori dallo storage di
+rain. Restano verifica e read-miss dell'upload, dove l'advice casuale è anzi
+appropriato. Non si tocca.
+
+Conclusione: al di fuori di ciò che è già stato fatto (voci 1, 2, 4, 5, 6, 7),
+**non c'è altro nel documento v1 che meriti** a questo carico.
