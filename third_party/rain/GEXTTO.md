@@ -38,6 +38,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Limiti a caldo | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: i peer usano un `bandwidth.Limiter` il cui ritmo cambia senza riaprire la sessione (prima `*ratelimit.Bucket` fisso) |
 | Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso |
 | Preallocazione su tmpfs | `internal/storage/filestorage/filestorage_linux.go` | Su tmpfs i file restano sparsi anche con `Preallocate` (test `preallocate_linux_test.go`) |
+| Tracker a caldo | `torrent/session_torrent.go`, `torrent/torrent_announce.go` | `Torrent.SetTrackers`: sostituisce la lista dei tracker a runtime (lista vuota = rimuovi tutto); i tracker rimossi ricevono un announce `stopped` best-effort; la lista è persistita nel resume |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 

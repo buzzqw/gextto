@@ -1055,3 +1055,51 @@ func TestMoveDropsTheEmptyFilesOfADownloadWithNothingYet(t *testing.T) {
 		t.Fatalf("no re-check expected for a torrent with nothing downloaded, state %s", state)
 	}
 }
+
+// TestDaemonSetTrackersReplacesTheList locks in that set-trackers replaces the
+// list (including clearing it) instead of only adding, so the Gextto editor can
+// remove trackers.
+func TestDaemonSetTrackersReplacesTheList(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	trackerURLs := func() []string {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return nil
+		}
+		var out []string
+		for _, tr := range tt.Trackers() {
+			out = append(out, tr.URL)
+		}
+		return out
+	}
+
+	if err := d.setTrackers(hash, []string{"http://127.0.0.1:1/announce", "udp://127.0.0.1:1"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "two trackers", func() bool { return len(trackerURLs()) == 2 })
+
+	// Replacement, not addition: the previous ones are gone.
+	if err := d.setTrackers(hash, []string{"http://127.0.0.1:2/announce"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "replaced", func() bool {
+		got := trackerURLs()
+		return len(got) == 1 && got[0] == "http://127.0.0.1:2/announce"
+	})
+
+	// An empty list removes every tracker.
+	if err := d.setTrackers(hash, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "cleared", func() bool { return len(trackerURLs()) == 0 })
+}

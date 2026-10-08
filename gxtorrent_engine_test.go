@@ -774,3 +774,41 @@ func TestGxReportsTheMovesInProgress(t *testing.T) {
 		t.Fatalf("moving = %v, %v", moving, ok)
 	}
 }
+
+// TestGxSetTrackersPostsAReplacement checks that SetTrackers posts set-trackers
+// with the deduplicated list, and posts an empty list to clear it, instead of
+// the old add-only "trackers" action.
+func TestGxSetTrackersPostsAReplacement(t *testing.T) {
+	var action, urls string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		action = r.URL.Path
+		_ = r.ParseForm()
+		urls = r.FormValue("urls")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	ok, err := e.SetTrackers("ABC", []TrackerEntry{
+		{URL: "http://a/announce"}, {URL: "  http://a/announce  "}, {URL: "udp://b:1"},
+	})
+	if err != nil || !ok {
+		t.Fatalf("SetTrackers: ok=%v err=%v", ok, err)
+	}
+	if !strings.HasSuffix(action, "/set-trackers") {
+		t.Fatalf("action = %q, want .../set-trackers", action)
+	}
+	if urls != "http://a/announce\nudp://b:1" {
+		t.Fatalf("urls = %q", urls)
+	}
+
+	// An empty list is a valid "remove every tracker".
+	if _, err := e.SetTrackers("ABC", nil); err != nil {
+		t.Fatal(err)
+	}
+	if urls != "" {
+		t.Fatalf("clearing sent urls = %q, want empty", urls)
+	}
+}

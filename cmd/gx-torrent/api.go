@@ -263,6 +263,14 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		err = d.addTrackers(hash, urls)
+	case "set-trackers":
+		var urls []string
+		for _, line := range strings.Split(r.FormValue("urls"), "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				urls = append(urls, line)
+			}
+		}
+		err = d.setTrackers(hash, urls)
 	default:
 		writeError(w, http.StatusBadRequest, errors.New("unknown action"))
 		return

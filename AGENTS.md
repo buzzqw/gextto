@@ -42,6 +42,8 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   (procedura di rebase a 3 vie con git, trappole note, punti d'integrazione,
   test da tenere verdi).
 - `third_party/dht` è la copia modificata di `nictuku/dht`.
+- Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
+  miglioramento: **`docs/gx-torrent-migliorie.md`**.
 
 ## Build e test
 - `make build` — incrementa `build_number` (non committato) e compila

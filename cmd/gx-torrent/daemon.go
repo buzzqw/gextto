@@ -1206,6 +1206,14 @@ func (d *Daemon) addTrackers(key string, urls []string) error {
 	})
 }
 
+// setTrackers replaces the torrent's tracker list; an empty list removes every
+// tracker. Unlike addTrackers it is not additive.
+func (d *Daemon) setTrackers(key string, urls []string) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		return t.SetTrackers(urls)
+	})
+}
+
 // move relocates the payload and repoints the link. It runs in the
 // background; the new save_path appears in the list when it is done, and a
 // failure is reported in the torrent's error.

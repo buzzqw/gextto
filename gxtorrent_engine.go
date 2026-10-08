@@ -1320,7 +1320,8 @@ func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bo
 	return true, nil
 }
 
-// SetTrackers adds the given trackers (rain cannot remove one).
+// SetTrackers replaces the torrent's tracker list (gextto fork on rain: an
+// empty list removes every tracker), like the embedded engine.
 func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
 	var urls []string
 	seen := map[string]struct{}{}
@@ -1335,10 +1336,7 @@ func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (boo
 		seen[value] = struct{}{}
 		urls = append(urls, value)
 	}
-	if len(urls) == 0 {
-		return false, nil
-	}
-	if err := e.action(hash, "trackers", url.Values{"urls": {strings.Join(urls, "\n")}}); err != nil {
+	if err := e.action(hash, "set-trackers", url.Values{"urls": {strings.Join(urls, "\n")}}); err != nil {
 		return false, err
 	}
 	return true, nil

@@ -535,6 +535,7 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `pin` (con `pinned=1/0`), `top`;
 - `move` e `associate` (con `destination`);
 - `seed-limits`, `trackers` (con `urls`, uno per riga);
+- `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `file-priorities` (con `priorities`, separate da virgola).
 
 Chiavi accettate da `POST /api/v1/config`:
@@ -555,7 +556,6 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - web seed aggiunti a mano;
 - limiti di velocità e connessioni per singolo torrent;
 - super-seeding e upload mode;
-- rimozione di tracker (l'aggiunta funziona);
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 

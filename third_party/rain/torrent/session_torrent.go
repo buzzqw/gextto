@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/cenkalti/rain/v2/internal/resumer/boltdbresumer"
@@ -170,6 +171,51 @@ func (t *Torrent) AddTracker(uri string) error {
 		return err
 	}
 	t.torrent.AddTrackers([]tracker.Tracker{tr})
+	return nil
+}
+
+// SetTrackers replaces the torrent's tracker list (gextto fork): an empty list
+// removes every tracker, like libtorrent. Peers already connected are left
+// alone; the removed trackers get a best-effort "stopped" announce, and the new
+// list is persisted so `Trackers()` and the resume data reflect the change.
+func (t *Torrent) SetTrackers(uris []string) error {
+	private := t.torrent.info != nil && t.torrent.info.Private
+	var (
+		resolved []tracker.Tracker
+		raw      [][]string
+		seen     = make(map[string]struct{}, len(uris))
+	)
+	for _, uri := range uris {
+		uri = strings.TrimSpace(uri)
+		if uri == "" {
+			continue
+		}
+		if _, dup := seen[uri]; dup {
+			continue
+		}
+		seen[uri] = struct{}{}
+		tr, err := t.torrent.session.trackerManager.Get(uri, t.torrent.session.config.TrackerHTTPTimeout, t.torrent.session.getTrackerUserAgent(private), int64(t.torrent.session.config.TrackerHTTPMaxResponseSize))
+		if err != nil {
+			return err
+		}
+		resolved = append(resolved, tr)
+		raw = append(raw, []string{uri})
+	}
+	err := t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		if len(raw) == 0 {
+			return b.Delete(boltdbresumer.Keys.Trackers)
+		}
+		value, err := json.Marshal(raw)
+		if err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.Trackers, value)
+	})
+	if err != nil {
+		return err
+	}
+	t.torrent.sendCommand(func() { t.torrent.handleSetTrackers(resolved, raw) })
 	return nil
 }
 
