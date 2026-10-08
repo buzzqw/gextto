@@ -910,20 +910,29 @@ func gxPeerLimits(connectionsLimit int64) (dial, accept int) {
 	if connectionsLimit <= 0 {
 		return 0, 0
 	}
-	// Clamp before converting: a limit from the config can be any int64, and
-	// the conversion to int (and the *4/5) must not overflow.
-	if connectionsLimit > math.MaxInt32 {
-		connectionsLimit = math.MaxInt32
-	}
-	dial = int(connectionsLimit * 4 / 5)
+	limit := clampPeerLimit(connectionsLimit)
+	dial = limit * 4 / 5
 	if dial < 1 {
 		dial = 1
 	}
-	accept = int(connectionsLimit) - dial
+	accept = limit - dial
 	if accept < 1 {
 		accept = 1
 	}
 	return dial, accept
+}
+
+// clampPeerLimit bounds a connections limit before narrowing it to int: an
+// explicit upper-bound return keeps the conversion from truncating (CodeQL
+// go/incorrect-integer-conversion), and MaxInt32*4/5 cannot overflow.
+func clampPeerLimit(value int64) int {
+	if value > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if value < 1 {
+		return 1
+	}
+	return int(value)
 }
 
 // gxCacheMB converts libtorrent_cache_size (16 KiB blocks, -1 automatic)
