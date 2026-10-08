@@ -564,3 +564,62 @@ casuali, lunghezze multiple di 8 e non. Aggiungere
   locale.
 - `handleList` serve già uno snapshot: non "clona i torrent" né interroga i run
   loop per la lista.
+
+---
+
+## 11. Stime misurate prima dell'implementazione (voci 3 e 8)
+
+Misure fatte su questa macchina (Intel N97) prima di toccare il codice, per
+quantificare i vantaggi attesi.
+
+### Voce 3 — `O_SYNC`, throughput di scrittura
+
+Il download dir `~/trasferimento` è **NFS4** (`192.168.1.119:/volume1/...`,
+`rsize/wsize=128 KiB`, link 1 GbE); l'alternativa locale è ext4 su NVMe.
+Microbenchmark: N MiB scritti in blocchi di B, con `O_SYNC` per `write`
+(comportamento attuale) contro scritture bufferizzate + `fsync` finale (la
+soluzione della voce 3, che sincronizza ogni `ResumeWriteInterval`).
+
+NFS (`~/trasferimento`):
+
+| Blocco | `O_SYNC` (attuale) | buffer + fsync | guadagno |
+|---|---|---|---|
+| 16 KiB | 35,1 MiB/s | 81,3 MiB/s | **2,3x** |
+| 64 KiB | 60,2 MiB/s | 89,6 MiB/s | 1,5x |
+| 256 KiB | 67,4 MiB/s | 108,7 MiB/s | 1,6x |
+| 1 MiB | 86,8 MiB/s | 102,4 MiB/s | 1,2x |
+
+NVMe locale (ext4):
+
+| Blocco | `O_SYNC` | buffer + fsync | guadagno |
+|---|---|---|---|
+| 16 KiB | 7,3 MiB/s | 862,7 MiB/s | **~118x** |
+| 256 KiB | 150,5 MiB/s | 975,5 MiB/s | 6,5x |
+| 1 MiB | 371,8 MiB/s | 962,5 MiB/s | 2,6x |
+
+**Previsione.** Con i torrent attuali (pezzi da 32 KiB a 2 MiB) sul NFS di
+download: **~1,2x–1,8x** di throughput in scrittura, con il tetto del link a
+~100–110 MiB/s; la stima vantata dalla v1 ("+300–800%") **non è supportata** su
+questo host. Il guadagno è tanto maggiore quanto più piccoli sono i pezzi e
+quanto più veloce è il disco: su storage locale e pezzi piccoli arriva a ordini
+di grandezza. In carico misto (seed in lettura + download in scrittura) il
+divario può allargarsi perché `O_SYNC` serializza i commit sotto il semaforo di
+scrittura.
+
+Cautela: la stima vale per il percorso di download; il seed in lettura non è
+toccato. La durabilità va mantenuta con l'invariante del §3 (fsync prima di
+persistere il bitfield), il cui costo è un commit bulk ogni
+`ResumeWriteInterval` (~2 min).
+
+### Voce 8 — `findLocked` O(1) ed ETag/304
+
+Stato attuale su questa macchina: **4 torrent**, risposta
+`/api/v1/torrents` di **3.822 byte** in **0,5–0,7 ms** totali (HTTP +
+serializzazione). `findLocked` scandisce 4 elementi: sotto il rumore di misura.
+
+**Previsione.** A questo numero di torrent il guadagno è **praticamente nullo**
+(<0,05% di CPU). Diventa misurabile solo con l'ordine delle centinaia/migliaia
+di torrent: a ~1000 torrent la lista pesa ~1 MB e il `json.Marshal` per poll
+costa qualche ms, ed è lì che un ETag/304 o una mappa O(1) iniziano a
+risparmiare. Resta quindi **rimandato**: da fare solo in presenza di quel
+carico, non "a naso".
