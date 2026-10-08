@@ -34,9 +34,8 @@ func TestUIPageServes(t *testing.T) {
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
 		t.Fatalf("GET / content type = %q", ct)
 	}
-	buf := make([]byte, 16384)
-	n, _ := resp.Body.Read(buf)
-	body := string(buf[:n])
+	raw, _ := io.ReadAll(resp.Body)
+	body := string(raw)
 	if !strings.Contains(body, "gx-torrent") || !strings.Contains(body, "Add") {
 		t.Fatalf("GET / body unexpected: %s", body)
 	}
@@ -55,9 +54,8 @@ func TestUILiveFragment(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /ui/live -> %d", resp.StatusCode)
 	}
-	buf := make([]byte, 8192)
-	n, _ := resp.Body.Read(buf)
-	body := string(buf[:n])
+	raw, _ := io.ReadAll(resp.Body)
+	body := string(raw)
 	if !strings.Contains(body, "IP filter") || strings.Contains(body, "<html") {
 		t.Fatalf("live fragment unexpected: %s", body)
 	}

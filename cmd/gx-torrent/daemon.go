@@ -271,6 +271,11 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	// written at the old path. The queue is the single owner of start/stop.
 	cfg.ResumeOnStartup = false
 	cfg.RPCEnabled = false
+	// rain rewrites every torrent's stats and bitfield in one fsync'd bolt
+	// transaction per interval: 30 s by default, about 300 MB a day on the
+	// state disk. Two minutes cuts that by four; the bitfield is also saved on
+	// completion and stop, so a crash only re-downloads the last pieces.
+	cfg.ResumeWriteInterval = 2 * time.Minute
 	d.applyNetwork(&cfg)
 	d.applyCache(&cfg)
 	cfg.FileSelection = d.selectionFor

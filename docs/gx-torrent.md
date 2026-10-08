@@ -95,12 +95,14 @@ demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
 operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
 qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
 
-- **Riepilogo sessione**: stato torrent, velocità, totali, porta/router, DHT,
-  uTP, cifratura, filtro IP, cache, spazio libero; barra di stato in basso.
+- **Riepilogo sessione** in cima, su due righe di riquadri: stato torrent,
+  velocità, porta, scaricato/caricato nella sessione, router, DHT, uTP, filtro
+  IP, cache, spazio libero; barra di stato in basso.
 - **Aggiunta** da magnet, da URL a un `.torrent` (incolli l'indirizzo) o da file
   locale caricato, con destinazione, pausa, "in cima alla coda", download
   sequenziale, prima/ultima parte e limiti seed.
-- **Tabella** con ricerca/filtro per nome, **filtro per stato** nella barra
+- **Tabella** a due righe per torrent (nome e cartella; avanzamento, stato,
+  dimensioni, velocità, peer, seed, ratio di condivisione, ETA), con ricerca/filtro per nome, **filtro per stato** nella barra
   laterale, colonne ordinabili, selezione multipla e azioni di gruppo
   (pausa/riprendi/verifica/ri-annuncio/cima/rimozione).
 - **Dettaglio per torrent** a schede: *Generale* (dati, pezzi, spazio,
@@ -355,6 +357,9 @@ più spazio o a fine download) funziona: lo spostamento tra filesystem diversi
 copia i file e riparte dal punto in cui era. È provato da un test che sposta
 un download al 20% da `/dev/shm` al disco.
 
+- Le copie `.torrent` nella cartella scelta dall'operatore
+  (`libtorrent_torrent_copy_dir`) prendono il nome del torrent, come con
+  libtorrent; le vecchie copie `<hash>.torrent` vengono rinominate all'avvio.
 - Un torrent in download che non ha ancora nessun pezzo verificato viene
   spostato senza copiare i suoi file vuoti: vengono ricreati nella
   destinazione, senza scrivere gigabyte di zeri sul NAS e senza il controllo
@@ -481,6 +486,14 @@ I limiti per torrent (`SetLimits` con ratio e giorni) vengono salvati dal
 demone e riportati nella lista (`-1` = globale, `0` = infinito). Li applica
 `EnforceSeedPolicy` di Gextto, come per gli altri motori: pausa a fine seed,
 poi spostamento o rimozione.
+
+## Scritture sul disco di stato
+
+Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
+resta sul disco locale: `session.db` è un database bbolt (mmap e lock), non
+adatto a NFS. Le scritture sono contenute: rain salva statistiche e bitfield
+ogni 2 minuti (`ResumeWriteInterval`, 30 s di default in rain), circa 100 MB
+al giorno a riposo; il log ruota a 5 MB × 4.
 
 ## Limiti di banda
 
