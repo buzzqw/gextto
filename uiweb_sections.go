@@ -213,10 +213,12 @@ type uiDownloadsPage struct {
 	TempMinutes int64
 	// Active scheduled speed limits and base limits
 	SchedActive bool
-	SchedDL     int64
-	SchedUL     int64
-	BaseDL      int64
-	BaseUL      int64
+	// TempShadowed: a temporary limit without expiry overridden by the schedule.
+	TempShadowed bool
+	SchedDL      int64
+	SchedUL      int64
+	BaseDL       int64
+	BaseUL       int64
 	// Tag catalog and selection used by the toolbar filters.
 	TagOptions          []string
 	AutoRemoveCompleted bool
@@ -592,6 +594,11 @@ func uiDownloadsPageFor(s *AppState) uiDownloadsPage {
 		page.SchedActive = true
 		page.SchedDL = dl
 		page.SchedUL = ul
+		// The schedule beats a temporary limit without expiry.
+		if page.TempActive && page.TempMinutes == 0 {
+			page.TempActive = false
+			page.TempShadowed = true
+		}
 	}
 	page.BaseDL = cfg.Libtorrent.DownloadLimitKib
 	page.BaseUL = cfg.Libtorrent.UploadLimitKib

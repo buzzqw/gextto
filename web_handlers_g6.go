@@ -191,29 +191,41 @@ func gh6_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 	return 0, 0, false
 }
 
-func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
+// Speed policy sources, in the order they are tried.
+const (
+	speedSourceTemp     = "temp"      // temporary limit with an expiry
+	speedSourceSchedule = "schedule"  // bandwidth schedule window
+	speedSourceTempKeep = "temp_keep" // temporary limit kept until removed
+	speedSourceBase     = "base"
+)
+
+// speedPolicy picks the global limits in force and where they come from.
+// A temporary limit with an expiry beats everything; the bandwidth schedule
+// beats a temporary limit without expiry, which in turn beats the base
+// limits. tempShadowed reports a permanent temporary limit that the schedule
+// is overriding right now.
+func speedPolicy(cfg *Config) (download, upload int64, source string, tempShadowed bool) {
 	now := time.Now().Unix()
 	tempUntil := gh6_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempEnabled := false
-	if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
-		tempEnabled = gh6_truthySetting(value)
+	tempEnabled := gh6_truthySetting(cfg.Settings["libtorrent_temp_limit_enabled"])
+	tempDownload := gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit")
+	tempUpload := gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
+	if tempEnabled && tempUntil > now {
+		return tempDownload, tempUpload, speedSourceTemp, false
 	}
-	if tempEnabled && (tempUntil == 0 || tempUntil > now) {
-		return gh6_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
-			gh6_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
-	}
+	tempKeep := tempEnabled && tempUntil == 0
 	if download, upload, ok := gh6_scheduledSpeedLimits(cfg); ok {
-		return download, upload
+		return download, upload, speedSourceSchedule, tempKeep
 	}
-	baseDownload := cfg.Libtorrent.DownloadLimitKib
-	if baseDownload < 0 {
-		baseDownload = 0
+	if tempKeep {
+		return tempDownload, tempUpload, speedSourceTempKeep, false
 	}
-	baseUpload := cfg.Libtorrent.UploadLimitKib
-	if baseUpload < 0 {
-		baseUpload = 0
-	}
-	return baseDownload, baseUpload
+	return max(cfg.Libtorrent.DownloadLimitKib, 0), max(cfg.Libtorrent.UploadLimitKib, 0), speedSourceBase, false
+}
+
+func gh6_currentSpeedLimits(cfg *Config) (int64, int64) {
+	download, upload, _, _ := speedPolicy(cfg)
+	return download, upload
 }
 
 func gh6_applySpeedPolicy(cfg *Config, torrents TorrentEngine) {
@@ -1386,12 +1398,9 @@ func GetTempLimits(w http.ResponseWriter, r *http.Request, s *AppState) {
 		remaining = until - now
 	}
 	schedDownload, schedUpload, schedActive := gh6_scheduledSpeedLimits(cfg)
-	download, upload := gh6_currentSpeedLimits(cfg)
-	source := "base"
-	if tempActive {
-		source = "temp"
-	} else if schedActive {
-		source = "schedule"
+	download, upload, source, _ := speedPolicy(cfg)
+	if source == speedSourceTempKeep {
+		source = speedSourceTemp
 	}
 	jsonResponse(w, map[string]any{
 		"source":             source,

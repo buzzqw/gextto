@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -519,6 +520,42 @@ func TestTempLimitsReportTheSpeedPolicyInForce(t *testing.T) {
 	}
 	if policy := read(); policy["source"] != "base" || policy["temp_active"] != false {
 		t.Fatalf("cleared policy = %v", policy)
+	}
+}
+
+func TestSpeedPolicyScheduleBeatsTemporaryLimitWithoutExpiry(t *testing.T) {
+	cfg := &Config{Settings: map[string]string{
+		"libtorrent_sched_enabled":      "true",
+		"libtorrent_sched_days":         "0,1,2,3,4,5,6",
+		"libtorrent_sched_start":        "00:00",
+		"libtorrent_sched_end":          "23:59",
+		"libtorrent_sched_dl_limit":     "8000",
+		"libtorrent_sched_ul_limit":     "1000",
+		"libtorrent_temp_limit_enabled": "1",
+		"libtorrent_temp_limit_until":   "0",
+		"libtorrent_temp_dl_limit":      "3000",
+		"libtorrent_temp_ul_limit":      "200",
+	}}
+	cfg.Libtorrent.DownloadLimitKib = 500
+	cfg.Libtorrent.UploadLimitKib = 50
+	if dl, ul, source, shadowed := speedPolicy(cfg); dl != 8000 || ul != 1000 || source != speedSourceSchedule || !shadowed {
+		t.Fatalf("permanent temp in schedule window = %d/%d %s shadowed=%v", dl, ul, source, shadowed)
+	}
+
+	cfg.Settings["libtorrent_temp_limit_until"] = strconv.FormatInt(time.Now().Unix()+600, 10)
+	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTemp {
+		t.Fatalf("temp with expiry in schedule window = %d/%d %s", dl, ul, source)
+	}
+
+	cfg.Settings["libtorrent_temp_limit_until"] = "0"
+	cfg.Settings["libtorrent_sched_enabled"] = "false"
+	if dl, ul, source, _ := speedPolicy(cfg); dl != 3000 || ul != 200 || source != speedSourceTempKeep {
+		t.Fatalf("permanent temp outside schedule = %d/%d %s", dl, ul, source)
+	}
+
+	cfg.Settings["libtorrent_temp_limit_enabled"] = "0"
+	if dl, ul, source, _ := speedPolicy(cfg); dl != 500 || ul != 50 || source != speedSourceBase {
+		t.Fatalf("base = %d/%d %s", dl, ul, source)
 	}
 }
 

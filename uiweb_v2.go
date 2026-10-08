@@ -939,6 +939,7 @@ type v2TorrentsView struct {
 	TempMinutes         int64
 	TempActive          bool
 	SchedActive         bool
+	TempShadowed        bool
 	SchedDL             int64
 	SchedUL             int64
 	BaseDL              int64
@@ -1109,6 +1110,7 @@ func v2TorrentsViewFrom(s *AppState, r *http.Request, message string, isErr bool
 		TempMinutes:         settings.TempMinutes,
 		TempActive:          settings.TempActive,
 		SchedActive:         settings.SchedActive,
+		TempShadowed:        settings.TempShadowed,
 		SchedDL:             settings.SchedDL,
 		SchedUL:             settings.SchedUL,
 		BaseDL:              settings.BaseDL,

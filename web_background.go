@@ -838,30 +838,37 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			lastDynamicAdjustment = now
 		}
 		if now.Sub(lastSpeedPolicy) >= 60*time.Second {
-			downloadKib, uploadKib := bg_currentSpeedLimits(cfg)
+			downloadKib, uploadKib, source, tempShadowed := speedPolicy(cfg)
 			// Always re-assert, not just on change: "Apply now" and the optimizer
 			// set the session limit to the unscheduled value (e.g. 3000 by day)
 			// and the policy must correct it on its own within a minute. The log
-			// stays only on real changes.
-			changed := lastSpeed == nil || lastSpeed.download != downloadKib || lastSpeed.upload != uploadKib
+			// stays only on real changes, of the values or of their source (the
+			// schedule starting or ending is logged even with equal values).
+			changed := lastSpeed == nil || lastSpeed.download != downloadKib || lastSpeed.upload != uploadKib || lastSpeed.source != source
 			if _, err := torrents.SetGlobalSpeedLimits(downloadKib, uploadKib); err != nil {
 				logging.Debug("speed policy apply failed", "error", err)
-			} else if changed {
-				source := "standard limit"
-				nowTs := now.Unix()
-				tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-				tempEnabled := false
-				if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
-					tempEnabled = settingTruthy(value)
+			} else {
+				if changed {
+					label := map[string]string{
+						speedSourceTemp:     "temporary limit",
+						speedSourceTempKeep: "temporary limit, until removed",
+						speedSourceSchedule: "scheduled limit",
+						speedSourceBase:     "standard limit",
+					}[source]
+					wasScheduled := lastSpeed != nil && lastSpeed.source == speedSourceSchedule
+					switch {
+					case source == speedSourceSchedule && !wasScheduled:
+						label = "schedule started"
+					case source != speedSourceSchedule && wasScheduled:
+						label += ", schedule ended"
+					}
+					if source == speedSourceSchedule && tempShadowed {
+						label += ", overrides the temporary limit without expiry"
+					}
+					logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s)", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), label))
 				}
-				if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
-					source = "temporary limit"
-				} else if _, _, ok := bg_scheduledSpeedLimits(cfg); ok {
-					source = "scheduled limit"
-				}
-				logging.Info(fmt.Sprintf("🚦 Speed set to %s download, %s upload (%s)", speedLimitLabel(downloadKib), speedLimitLabel(uploadKib), source))
+				lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib, source: source}
 			}
-			lastSpeed = &bg_speedPair{download: downloadKib, upload: uploadKib}
 			lastSpeedPolicy = now
 		}
 		// `debug_enabled`: periodic diagnostics for crashes/RAM/loops.
@@ -1433,6 +1440,7 @@ func syncTorrentMoves(db *Database, persisted map[string]persistedMove, retries 
 type bg_speedPair struct {
 	download int64
 	upload   int64
+	source   string
 }
 
 func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
@@ -1485,31 +1493,7 @@ func bg_scheduledSpeedLimits(cfg *Config) (int64, int64, bool) {
 }
 
 func bg_currentSpeedLimits(cfg *Config) (int64, int64) {
-	nowTs := time.Now().Unix()
-	tempUntil := bg_parseSettingInt(cfg, "libtorrent_temp_limit_until")
-	tempEnabled := false
-	if value, ok := cfg.Settings["libtorrent_temp_limit_enabled"]; ok {
-		tempEnabled = settingTruthy(value)
-	}
-	// An active temporary limit is an explicit user override and takes precedence
-	// over both the bandwidth schedule and the base limits.
-	if tempEnabled && (tempUntil == 0 || tempUntil > nowTs) {
-		return bg_parseSettingInt(cfg, "libtorrent_temp_dl_limit"),
-			bg_parseSettingInt(cfg, "libtorrent_temp_ul_limit")
-	}
-	// Scheduled speed window applies when no temporary limit is active.
-	if download, upload, ok := bg_scheduledSpeedLimits(cfg); ok {
-		return download, upload
-	}
-	baseDownload := cfg.Libtorrent.DownloadLimitKib
-	if baseDownload < 0 {
-		baseDownload = 0
-	}
-	baseUpload := cfg.Libtorrent.UploadLimitKib
-	if baseUpload < 0 {
-		baseUpload = 0
-	}
-	return baseDownload, baseUpload
+	return gh6_currentSpeedLimits(cfg)
 }
 
 func bg_residentKB() uint64 {

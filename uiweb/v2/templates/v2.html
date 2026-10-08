@@ -393,7 +393,7 @@
       {{if .TempActive}}
         <span class="badge ok" title="Limite temporaneo attivo{{if .TempMinutes}} (ancora circa {{.TempMinutes}} min){{else}} (fino a rimozione manuale){{end}}">⚡ Limite temporaneo attivo{{if .TempMinutes}} ({{.TempMinutes}}m){{else}} (perm.){{end}}</span>
       {{else if .SchedActive}}
-        <span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ Banda programmata attiva ({{.SchedDL}}/{{.SchedUL}} KiB/s)</span>
+        <span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ Banda programmata attiva ({{.SchedDL}}/{{.SchedUL}} KiB/s){{if .TempShadowed}} · sostituisce il limite temporaneo permanente{{end}}</span>
       {{else}}
         <span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">Limiti base ({{.BaseDL}}/{{.BaseUL}} KiB/s)</span>
       {{end}}

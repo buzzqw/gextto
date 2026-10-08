@@ -1010,7 +1010,8 @@ func (m *Model) speedPolicyLabel() string {
 	if policy == nil {
 		return ""
 	}
-	if minutes, active := m.TempLimitMinutes(); active {
+	// The schedule beats a temporary limit without expiry.
+	if minutes, active := m.TempLimitMinutes(); active && (minutes > 0 || policy.Source != "schedule") {
 		down, up := kibLabel(m.Tr, policy.TempDownloadKib), kibLabel(m.Tr, policy.TempUploadKib)
 		if minutes == 0 {
 			return m.Tr.Format("policy.tempkeep", down, up)
