@@ -614,8 +614,10 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
    inoltre eliminati automaticamente torrent in errore, log dei gap e backup di
    upgrade più vecchi delle rispettive retention configurate (predefinite:
    7 giorni per gli errori e 30 per log gap e backup upgrade); vengono rimossi
-   anche i backoff delle sorgenti scaduti. Alla fine i database vengono
-   compattati con `VACUUM`.
+   anche i backoff delle sorgenti scaduti. Alla fine vengono compattati con
+   `VACUUM` solo i database con almeno il 20% (o 64 MB) di spazio libero da
+   recuperare. L'housekeeping gira una volta per intervallo anche se Gextto si
+   riavvia: un riavvio non lo fa ripartire.
   La retention dell'Archivio è separata e si trova in **Configurazione →
   Avanzate**.
 - **Percorsi** — root libreria, cestino, cartelle download/temp/RAM disk, regole
@@ -643,10 +645,15 @@ dati.
   (predefinito `0.0.0.0:8890`: pagina web e API aperte su tutta la LAN; usa
   `127.0.0.1:8890` per tenerle solo sul server), **token** e **proxy**. All'indirizzo configurato apre anche una **pagina
   web operativa** (aggiungi magnet, pausa/riprendi, verifica, riannuncia, coda,
-  rimozione, filtro IP). La **cache disco è adattiva**: il demone la ricalcola
+  rimozione, filtro IP, scheda con il log di Gextto). Il demone **resta acceso
+  quando Gextto si riavvia** (ad esempio per un aggiornamento): al riavvio
+  Gextto lo riaggancia e i trasferimenti non si interrompono; viene riavviato
+  solo se il suo programma o le sue opzioni sono cambiati, e mai durante uno
+  spostamento di file. Se Gextto resta spento, il demone si ferma da solo dopo
+  15 minuti. La **cache disco è adattiva**: il demone la ricalcola
   ogni pochi minuti da memoria disponibile, download/seed attivi e tipo di
-  storage (più grande su HDD/NFS, piccola su SSD), con isteresi per non
-  riaprire inutilmente la sessione; il **filtro
+  storage (più grande su HDD/NFS, piccola su SSD) e la applica a caldo, come i
+  limiti di velocità, senza perdere i peer; il **filtro
   IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
   libtorrent. Supporta il **download sequenziale** e la **prima/ultima parte**

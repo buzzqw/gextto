@@ -601,7 +601,9 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
    automatically removes torrents in error, gap logs, and upgrade backups
    older than their configured retention periods (defaults: 7 days for errors
    and 30 days for gap logs and upgrade backups); expired source backoffs are
-   also removed. The databases are compacted with `VACUUM` afterwards. Archive
+   also removed. Afterwards only the databases with at least 20% (or 64 MB) of
+   free space to reclaim are compacted with `VACUUM`. Housekeeping runs once per
+   interval even when Gextto restarts: a restart does not trigger it again. Archive
   retention is separate and is configured under **Configuration → Advanced**.
 - **Paths** — library root, trash, download/temp/RAM-disk dirs, per-tag rules.
    A selected RAM-disk path remains configured, but a directory created under
@@ -628,10 +630,15 @@ same data.
   API open on the whole LAN; use `127.0.0.1:8890` to keep them on this host),
   **token** and **proxy**. At that address it also serves an
   **operational web page** (add magnet, pause/resume, verify, reannounce, queue,
-  remove, IP filter). The **disk cache is adaptive**: the daemon recomputes it
-  every few minutes from available memory, active downloads/seeds and the
-  storage class (larger on HDD/NFS, small on SSD), with hysteresis so it does
-  not reopen the session needlessly; the **IP filter** refreshes
+  remove, IP filter, a tab with the Gextto log). The daemon **keeps running
+  when Gextto restarts** (for example for an update): Gextto adopts it again
+  and the transfers are not interrupted; it is restarted only when its program
+  or options changed, and never in the middle of a file move. If Gextto stays
+  down, the daemon stops by itself after 15 minutes. The **disk cache is
+  adaptive**: the daemon recomputes it every few minutes from available memory,
+  active downloads/seeds and the storage class (larger on HDD/NFS, small on
+  SSD) and applies it in place, like the speed limits, without dropping peers;
+  the **IP filter** refreshes
   at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
   in 10 minutes) Gextto falls back to libtorrent by itself. It supports
   **sequential download** and **first/last piece** priority (set when adding a
