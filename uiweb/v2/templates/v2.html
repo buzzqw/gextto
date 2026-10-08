@@ -265,7 +265,6 @@
     <div class="panel-body"><div class="toolbar"><button class="btn sm" type="button" hx-get="/dashboard/feed" hx-target="#v2-dashboard-feed" hx-swap="innerHTML">Carica risultati</button></div><div id="v2-dashboard-feed" class="table-wrap" aria-live="polite"><p class="muted">Premi "Carica risultati" per leggere i feed.</p></div></div>
   </div>
   {{template "v2_dashboard_calendar" .Calendar}}
-  {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
 </div>
 {{end}}
 
@@ -1272,7 +1271,6 @@
       </div>
     </section>
   {{end}}
-  {{if .Jobs}}{{template "v2_jobs" .Jobs}}{{end}}
   <div id="v2-modal"></div>
 </div>
 {{end}}
@@ -1583,27 +1581,6 @@
 {{define "v2_rename_progress"}}
 <div class="progress" role="progressbar" aria-label="Avanzamento rinomina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}"><span style="width:{{.Percent}}%"></span></div>
 <p class="muted">{{if .Running}}In corso: {{.Current}}/{{.Total}}{{if .Series}} · {{.Series}}{{end}}{{if .Message}} · {{.Message}}{{end}}{{else}}Nessuna rinomina in corso.{{end}}{{if .Errors}} · {{.Errors}} errori{{end}}</p>
-{{end}}
-
-{{define "v2_jobs"}}
-<div class="panel" id="v2-jobs-panel" hx-get="/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
-  <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} in corso · {{len .Jobs}} recenti</small></div>
-  <div class="panel-body">
-    {{if .Jobs}}
-    <div class="table-wrap"><table class="data-table">
-      <caption class="sr-only">Operazioni in background</caption>
-      <thead><tr><th scope="col">Operazione</th><th scope="col">Stato</th><th scope="col">Avanzamento</th><th scope="col">Messaggio</th><th scope="col"></th></tr></thead>
-      <tbody>{{range .Jobs}}<tr>
-        <td>{{.Kind}}</td>
-        <td><span class="badge {{.StateClass}}">{{.StateLabel}}</span></td>
-        <td style="min-width:140px"><div class="progress"><span style="width:{{.Progress}}%"></span></div><small class="muted">{{.Progress}}%{{if .Started}} · {{.Started}}{{end}}</small></td>
-        <td class="truncate">{{if .Error}}{{.Error}}{{else}}{{.Message}}{{end}}</td>
-        <td class="row-actions">{{if not .Done}}<form hx-post="/jobs/cancel" hx-target="#v2-jobs-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="id" value="{{.ID}}" /><button class="btn sm danger" type="submit" hx-confirm="Annullare l'operazione?">Annulla</button></form>{{end}}</td>
-      </tr>{{end}}</tbody>
-    </table></div>
-    {{else}}<p class="muted">Nessuna operazione in background.</p>{{end}}
-  </div>
-</div>
 {{end}}
 
 {{define "v2_torrent_add_result"}}{{if .Error}}<p class="alert">{{.Message}}</p>{{else}}<p class="muted">{{.Message}}</p>{{end}}{{end}}

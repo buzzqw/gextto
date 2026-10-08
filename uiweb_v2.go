@@ -228,10 +228,6 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /oauth/start", V2OAuthStart)
 	v2Handle(s, mux, "POST /oauth/poll", V2OAuthPoll)
 
-	// Job in background (progresso e annullamento).
-	v2Handle(s, mux, "GET /partial/jobs", V2JobsPartial)
-	v2Handle(s, mux, "POST /jobs/cancel", V2JobCancel)
-
 	// Aggiunta torrent (magnet/URL o file .torrent).
 	v2Handle(s, mux, "POST /downloads/add", V2DownloadsAdd)
 
@@ -334,7 +330,6 @@ type v2DashboardView struct {
 	uiDashboardData
 	Calendar    []v2DashboardCalendarItem
 	PanelTables []v2TableData
-	Jobs        *v2JobsView
 	Search      v2SearchView
 }
 
@@ -423,11 +418,9 @@ func v2SectionTables(s *AppState, r *http.Request, sections []uiPageSection, vie
 
 func v2DashboardViewFrom(s *AppState, r *http.Request) v2DashboardView {
 	base := uiDashboardDataFrom(s)
-	jobs := v2JobsViewFrom(s)
 	return v2DashboardView{
 		uiDashboardData: base,
 		Calendar:        v2DashboardCalendarFrom(s),
-		Jobs:            &jobs,
 		Search:          v2SearchView{Redirect: "/?view=dashboard"},
 	}
 }
@@ -470,7 +463,6 @@ func v2ComicsViewFrom(s *AppState, r *http.Request) v2ComicsView {
 
 type v2PanelsView struct {
 	Groups []v2Group
-	Jobs   *v2JobsView
 	Stack  bool
 }
 
@@ -499,10 +491,6 @@ func v2PanelsViewFrom(s *AppState, r *http.Request, view string) v2PanelsView {
 	if panels, ok := uiPanelsPageFor(view, s); ok {
 		page.Groups = v2SectionGroups(s, r, view, panels.Sections)
 		page.Stack = panels.Stack
-	}
-	if view == "maintenance" {
-		jobs := v2JobsViewFrom(s)
-		page.Jobs = &jobs
 	}
 	return page
 }

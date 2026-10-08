@@ -18,10 +18,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -696,108 +694,6 @@ func V2OAuthPoll(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_oauth_output", v2OutputFromJSON(raw), dict, eng)
-}
-
-// ---------------------------------------------------------------------------
-// Job in background
-// ---------------------------------------------------------------------------
-
-type v2Job struct {
-	ID         string
-	Kind       string
-	State      string
-	StateLabel string
-	StateClass string
-	Progress   int
-	Message    string
-	Error      string
-	Started    string
-	Finished   string
-	Done       bool
-}
-
-type v2JobsView struct {
-	Jobs   []v2Job
-	Active int
-}
-
-func v2JobsViewFrom(s *AppState) v2JobsView {
-	view := v2JobsView{}
-	raw, status := v2InternalJSON(s, http.MethodGet, "/api/jobs", nil, nil)
-	if status >= 400 {
-		return view
-	}
-	var payload struct {
-		Jobs []struct {
-			ID         string     `json:"id"`
-			Kind       string     `json:"kind"`
-			State      string     `json:"state"`
-			Progress   float64    `json:"progress"`
-			Message    string     `json:"message"`
-			Error      string     `json:"error"`
-			StartedAt  *time.Time `json:"started_at"`
-			FinishedAt *time.Time `json:"finished_at"`
-		} `json:"jobs"`
-	}
-	if json.Unmarshal(raw, &payload) != nil {
-		return view
-	}
-	for _, job := range payload.Jobs {
-		entry := v2Job{
-			ID: job.ID, Kind: job.Kind, State: job.State, Message: job.Message, Error: job.Error,
-			Progress: int(job.Progress + 0.5), Done: job.State == "succeeded" || job.State == "failed" || job.State == "canceled",
-		}
-		switch job.State {
-		case "queued":
-			entry.StateLabel, entry.StateClass = "in coda", "warn"
-		case "running":
-			entry.StateLabel, entry.StateClass = "in corso", "warn"
-		case "succeeded":
-			entry.StateLabel, entry.StateClass = "completato", "ok"
-		case "failed":
-			entry.StateLabel, entry.StateClass = "non riuscito", "err"
-		case "canceled":
-			entry.StateLabel, entry.StateClass = "annullato", ""
-		default:
-			entry.StateLabel = job.State
-		}
-		if job.StartedAt != nil {
-			entry.Started = job.StartedAt.Local().Format("15:04:05")
-		}
-		if job.FinishedAt != nil {
-			entry.Finished = job.FinishedAt.Local().Format("15:04:05")
-		}
-		if !entry.Done {
-			view.Active++
-		}
-		view.Jobs = append(view.Jobs, entry)
-	}
-	sort.SliceStable(view.Jobs, func(i, j int) bool {
-		if view.Jobs[i].Done != view.Jobs[j].Done {
-			return !view.Jobs[i].Done
-		}
-		return view.Jobs[i].Started > view.Jobs[j].Started
-	})
-	return view
-}
-
-// V2JobsPartial renders the background-job list (polled by HTMX).
-func V2JobsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), dict, eng)
-}
-
-// V2JobCancel cancels a queued/running job and refreshes the list.
-func V2JobCancel(w http.ResponseWriter, r *http.Request, s *AppState) {
-	if id := strings.TrimSpace(r.FormValue("id")); id != "" {
-		v2InternalJSON(s, http.MethodPost, "/api/jobs/"+url.PathEscape(id)+"/cancel", nil, []byte("{}"))
-	}
-	if r.Header.Get("HX-Request") == "" {
-		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
-		return
-	}
-	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_jobs", v2JobsViewFrom(s), dict, eng)
 }
 
 // ---------------------------------------------------------------------------

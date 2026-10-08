@@ -62,7 +62,6 @@ type v2Section struct {
 	Ramdisk      *v2RamdiskView
 	FolderRename *v2FolderRenameView
 	Progress     *v2ProgressView
-	Jobs         *v2JobsView
 }
 
 type v2Group struct {
