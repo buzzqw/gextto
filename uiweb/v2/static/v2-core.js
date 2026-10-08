@@ -491,7 +491,7 @@
     var target = (base || "/") + "/" + name;
     fetch("/api/mkdir", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: target }) })
       .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Impossibile creare la cartella"); return data; }); })
-      .then(function () { overlay._target.value = target; closeFolderBrowser(); })
+      .then(function () { overlay._target.value = target; overlay._target.dispatchEvent(new Event("input", { bubbles: true })); closeFolderBrowser(); })
       .catch(function (error) { overlay.querySelector("[data-v2-browse-message]").textContent = error.message; });
   }
   function openFolderBrowser(input) {
@@ -507,7 +507,7 @@
     overlay.addEventListener("click", function (event) {
       if (event.target === overlay || event.target.closest("[data-v2-browse-close]")) closeFolderBrowser();
       else if (event.target.closest("[data-v2-browse-up]")) { overlay._current = overlay._parent || overlay._current; loadFolderBrowser(overlay); }
-      else if (event.target.closest("[data-v2-browse-select]")) { input.value = overlay._current; closeFolderBrowser(); }
+      else if (event.target.closest("[data-v2-browse-select]")) { input.value = overlay._current; input.dispatchEvent(new Event("input", { bubbles: true })); closeFolderBrowser(); }
       else if (event.target.closest("[data-v2-browse-create-prompt]")) { var entered = window.prompt("Nome nuova cartella:", ""); if (entered) { overlay.querySelector("[data-v2-browse-new]").value = entered; createFolder(overlay); } }
       else if (event.target.closest("[data-v2-browse-create]")) createFolder(overlay);
     });
@@ -547,17 +547,296 @@
     }
   });
 
-  // Settings tabs swap only the body with HTMX. Keep the chip highlight in
-  // sync with the tab that completed the request instead of leaving the
-  // initially rendered "Daemon" chip active.
+  // ------------------------------------------------------ settings editing --
+  // Every setting row is its own small form. The browser keeps each control's
+  // initial value (defaultValue/defaultChecked/defaultSelected), so a row is
+  // "dirty" when any control differs from it. Dirty rows are marked, counted
+  // in the save bar, saved together by «Salva tutto», and protected from
+  // being lost by a section change or by leaving the page.
+  var TRACKED = "form.setting-row[data-setting-key], form[data-v2-track]";
+  var savingAll = false;
+  var pendingDirty = "";
+  var focusHeading = false;
+
+  function controlDirty(control) {
+    if (control.disabled || control.type === "hidden" || control.type === "submit" || control.type === "button") return false;
+    if (control.type === "checkbox" || control.type === "radio") return control.checked !== control.defaultChecked;
+    if (control.tagName === "SELECT") {
+      for (var i = 0; i < control.options.length; i++) {
+        if (control.options[i].selected !== control.options[i].defaultSelected) return true;
+      }
+      return false;
+    }
+    return typeof control.value === "string" && control.value !== control.defaultValue;
+  }
+  function formDirty(form) {
+    if (form.getAttribute("data-v2-saving")) return false;
+    if (form.getAttribute("data-v2-force-dirty")) return true;
+    for (var i = 0; i < form.elements.length; i++) {
+      if (controlDirty(form.elements[i])) return true;
+    }
+    return false;
+  }
+  function dirtyForms(scope) {
+    return Array.prototype.filter.call((scope || document).querySelectorAll(TRACKED), formDirty);
+  }
+  function markForm(form) {
+    var dirty = formDirty(form);
+    if (dirty) form.setAttribute("data-dirty", "");
+    else form.removeAttribute("data-dirty");
+    var badges = form.querySelectorAll("[data-v2-dirty-badge]");
+    for (var i = 0; i < badges.length; i++) badges[i].hidden = !dirty;
+  }
+  function refreshSavebar() {
+    var bar = document.querySelector("[data-v2-savebar]");
+    if (!bar) return;
+    var rows = dirtyForms().filter(function (form) { return form.matches("form.setting-row[data-setting-key]"); });
+    var count = bar.querySelector("[data-v2-dirty-count]");
+    if (count) count.textContent = String(rows.length);
+    bar.hidden = rows.length === 0;
+  }
+  function refreshAll() {
+    Array.prototype.forEach.call(document.querySelectorAll(TRACKED), markForm);
+    refreshSavebar();
+  }
+  function announce(text) {
+    var live = document.getElementById("v2-settings-live");
+    if (!live || !text) return;
+    live.textContent = "";
+    window.setTimeout(function () { live.textContent = text; }, 30);
+  }
+  function messageOf(selector) {
+    var node = document.querySelector(selector);
+    return node ? node.textContent.trim() : "";
+  }
+
+  // A switch shows or hides the rows that depend on it, before it is saved,
+  // so the user immediately sees what turning it on means.
+  function applyDependents(row) {
+    if (!row || !row.matches || !row.matches("form.setting-row[data-setting-key]")) return;
+    var toggle = row.querySelector('input[role="switch"]');
+    if (!toggle) return;
+    var key = row.getAttribute("data-setting-key");
+    var children = document.querySelectorAll('[data-v2-depends-on="' + key + '"]');
+    for (var i = 0; i < children.length; i++) children[i].hidden = !toggle.checked;
+  }
+
+  function setRowValue(row, value) {
+    var toggle = row.querySelector('input[role="switch"]');
+    if (toggle) { toggle.checked = value === toggle.value; return; }
+    var days = row.querySelectorAll('.setting-days input[type="checkbox"]');
+    if (days.length) {
+      var wanted = {};
+      String(value).split(",").forEach(function (day) { wanted[day.trim()] = true; });
+      for (var i = 0; i < days.length; i++) days[i].checked = !!wanted[days[i].value];
+      return;
+    }
+    var control = row.querySelector('select[name="value"], textarea[name="value"], input[name="value"]:not([type="hidden"])');
+    if (control) control.value = value;
+  }
+
+  document.addEventListener("input", function (event) {
+    var form = event.target.closest && event.target.closest(TRACKED);
+    if (!form) return;
+    markForm(form);
+    refreshSavebar();
+  });
+  document.addEventListener("change", function (event) {
+    var form = event.target.closest && event.target.closest(TRACKED);
+    if (form) {
+      markForm(form);
+      refreshSavebar();
+      if (event.target.matches('input[role="switch"]')) applyDependents(form);
+    }
+    if (event.target.matches && event.target.matches("[data-v2-show-keys]")) {
+      showKeys(event.target.checked);
+      storageSet("gextto_settings_keys", event.target.checked ? "1" : "0");
+    }
+  });
+
+  function showKeys(on) {
+    var view = document.querySelector("[data-v2-settings]");
+    if (view) view.classList.toggle("show-keys", !!on);
+  }
+  function initSettingsView() {
+    var toggle = document.querySelector("[data-v2-show-keys]");
+    if (toggle) {
+      toggle.checked = storageGet("gextto_settings_keys") === "1";
+      showKeys(toggle.checked);
+    }
+    refreshAll();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initSettingsView);
+  else initSettingsView();
+
+  // Keys of the rows «Salva tutto» is saving: their own result is not
+  // announced one by one, a single summary is announced when the last row is
+  // back (htmx inserts each row after its request promise has resolved).
+  var batch = null;
+
+  function finishBatch() {
+    if (!batch || batch.pending > 0 || !batch.sent) return;
+    var keys = batch.keys;
+    var buttons = batch.buttons;
+    batch = null;
+    savingAll = false;
+    for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
+    var failed = keys.map(function (key) { return document.getElementById("v2-setting-" + key); })
+      .filter(function (row) { return row && row.querySelector(".htx-status.err"); });
+    refreshAll();
+    if (failed.length) {
+      announce(messageOf("[data-v2-errors-message]") + " " + failed.length);
+      var control = failed[0].querySelector("input:not([type=hidden]), select, textarea");
+      failed[0].hidden = false;
+      if (control) control.focus();
+    } else {
+      announce(messageOf("[data-v2-saved-all-message]") + " " + keys.length);
+    }
+  }
+
+  function saveAll() {
+    var rows = dirtyForms().filter(function (form) { return form.matches("form.setting-row[data-setting-key]"); });
+    if (!rows.length || !window.htmx || batch) return;
+    var bar = document.querySelector("[data-v2-savebar]");
+    var buttons = bar ? Array.prototype.slice.call(bar.querySelectorAll("button")) : [];
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = true;
+    savingAll = true;
+    var keys = rows.map(function (form) { return form.getAttribute("data-setting-key"); });
+    batch = { keys: keys, waiting: {}, pending: keys.length, sent: false, buttons: buttons };
+    keys.forEach(function (key) { batch.waiting[key] = true; });
+    // One request at a time: every save opens the configuration database.
+    var chain = Promise.resolve();
+    rows.forEach(function (form) {
+      chain = chain.then(function () {
+        if (!form.isConnected) return null;
+        return window.htmx.ajax("POST", form.getAttribute("hx-post") || "/settings/save", { source: form, target: form, swap: "outerHTML" });
+      }).catch(function () {
+        // A failed request leaves the row in place: stop waiting for it.
+        var key = form.getAttribute("data-setting-key");
+        if (batch && batch.waiting[key]) { delete batch.waiting[key]; batch.pending--; }
+      });
+    });
+    chain.then(function () {
+      if (!batch) return;
+      batch.sent = true;
+      // Rows that never came back (network error, removed) are not waited for.
+      var current = batch;
+      window.setTimeout(function () {
+        if (batch === current) { batch.pending = 0; finishBatch(); }
+      }, 3000);
+      finishBatch();
+    });
+  }
+  function discardAll() {
+    dirtyForms().forEach(function (form) {
+      form.reset();
+      form.removeAttribute("data-v2-force-dirty");
+      applyDependents(form);
+    });
+    refreshAll();
+  }
+
+  document.addEventListener("click", function (event) {
+    var target = event.target;
+    if (!target.closest) return;
+    var reset = target.closest("[data-v2-reset]");
+    if (reset) {
+      var row = reset.closest("form.setting-row");
+      if (row) {
+        setRowValue(row, reset.getAttribute("data-v2-reset"));
+        markForm(row);
+        refreshSavebar();
+        applyDependents(row);
+      }
+      return;
+    }
+    if (target.closest("[data-v2-save-all]")) { saveAll(); return; }
+    if (target.closest("[data-v2-discard]")) { discardAll(); }
+  });
+
+  document.body.addEventListener("htmx:beforeRequest", function (event) {
+    var detail = event.detail || {};
+    var elt = detail.elt;
+    var target = detail.target;
+    if (!elt || !elt.closest) return;
+    // Changing section (or swapping the whole page) drops unsaved edits.
+    var body = document.getElementById("v2-settings-body");
+    if (body && target && (target === body || (target.contains && target.contains(body)))) {
+      if (dirtyForms(body).length && !window.confirm(messageOf("[data-v2-leave-message]") || "?")) {
+        event.preventDefault();
+        var select = body.querySelector(".settings-nav-select select");
+        if (select) select.value = body.getAttribute("data-active-tab") || select.value;
+        return;
+      }
+      focusHeading = !!(elt.closest(".settings-nav") || elt.closest("#v2-settings-search"));
+    }
+    if (elt.matches && elt.matches(TRACKED)) {
+      // The form is being saved: its edits are no longer pending.
+      elt.setAttribute("data-v2-saving", "1");
+      elt.removeAttribute("data-v2-force-dirty");
+      markForm(elt);
+      refreshSavebar();
+      return;
+    }
+    if (elt.hasAttribute && elt.hasAttribute("data-v2-marks-dirty")) {
+      var selector = elt.getAttribute("data-v2-marks-dirty");
+      var owner = selector ? null : elt.closest("form[data-v2-track]");
+      if (owner) { owner.setAttribute("data-v2-force-dirty", "1"); markForm(owner); }
+      else pendingDirty = selector;
+    }
+  });
   document.body.addEventListener("htmx:afterRequest", function (event) {
     var detail = event.detail || {};
-    if (!detail.successful) return;
-    var chip = detail.elt && detail.elt.closest && detail.elt.closest(".settings-view .chip");
-    if (!chip) return;
-    Array.prototype.forEach.call(document.querySelectorAll(".settings-view .chip-row .chip"), function (item) {
-      item.classList.toggle("active", item === chip);
-    });
+    var elt = detail.elt;
+    if (!elt || !elt.matches || !elt.matches(TRACKED) || !elt.isConnected) return;
+    elt.removeAttribute("data-v2-saving");
+    if (detail.successful) {
+      // Saved without a swap (hx-swap="none"): the current values become the
+      // new baseline.
+      for (var i = 0; i < elt.elements.length; i++) {
+        var control = elt.elements[i];
+        if (control.type === "checkbox" || control.type === "radio") control.defaultChecked = control.checked;
+        else if (control.tagName === "SELECT") {
+          for (var j = 0; j < control.options.length; j++) control.options[j].defaultSelected = control.options[j].selected;
+        } else if (typeof control.value === "string" && control.type !== "hidden") control.defaultValue = control.value;
+      }
+    }
+    markForm(elt);
+    refreshSavebar();
+  });
+  document.body.addEventListener("htmx:load", function (event) {
+    var elt = event.detail && event.detail.elt;
+    if (!elt || !elt.matches) return;
+    if (pendingDirty) {
+      var marked = document.querySelector(pendingDirty);
+      if (marked) marked.setAttribute("data-v2-force-dirty", "1");
+      pendingDirty = "";
+    }
+    if (elt.id === "v2-settings-body") {
+      if (focusHeading && !elt.hasAttribute("data-highlight")) {
+        var heading = document.getElementById("v2-settings-heading");
+        if (heading) heading.focus();
+      }
+      focusHeading = false;
+    }
+    if (elt.matches("form.setting-row[data-setting-key]") && batch && batch.waiting[elt.getAttribute("data-setting-key")]) {
+      delete batch.waiting[elt.getAttribute("data-setting-key")];
+      batch.pending--;
+      refreshAll();
+      finishBatch();
+      return;
+    }
+    if (elt.matches("form.setting-row[data-setting-key]") && !savingAll) {
+      var status = elt.querySelector(".setting-status");
+      var label = elt.querySelector(".setting-label");
+      if (status && status.textContent.trim()) announce((label ? label.textContent.trim() + ": " : "") + status.textContent.trim());
+    }
+    refreshAll();
+  });
+  window.addEventListener("beforeunload", function (event) {
+    if (!dirtyForms().length) return;
+    event.preventDefault();
+    event.returnValue = "";
   });
 
   var discoverKind = "series";

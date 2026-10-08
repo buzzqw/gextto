@@ -36,7 +36,7 @@ test("una singola impostazione può essere salvata", async ({ page }) => {
   });
   await page.goto("/");
   await nav(page, "Configurazione").click();
-  const form = page.locator("form.setting-row").filter({ has: page.locator('input[name="value"]') }).first();
+  const form = page.locator("#v2-setting-refresh_interval");
   const input = form.locator('input[name="value"]');
   await expect(input).toBeVisible({ timeout: 20000 });
   await input.fill("17");
@@ -184,11 +184,16 @@ test.describe("mobile", () => {
     expect(overflow).toBeLessThanOrEqual(2);
   });
 
-  test("schede impostazioni restano raggiungibili con scorrimento orizzontale", async ({ page }) => {
+  test("le sezioni della configurazione si scelgono da una tendina", async ({ page }) => {
     await page.goto("/?view=settings");
-    const tabs = page.locator(".settings-view .chip-row").first();
-    await expect(tabs).toBeVisible();
-    await expect.poll(() => tabs.evaluate((element) => getComputedStyle(element).overflowX)).toBe("auto");
+    const picker = page.locator(".settings-nav-select select");
+    await expect(picker).toBeVisible();
+    await expect(page.locator(".settings-nav-list")).toBeHidden();
+    await picker.selectOption("notify");
+    await expect(page.locator("#v2-settings-heading")).toHaveText("Notifiche");
+    await expect(page).toHaveURL(/tab=notify/);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(2);
   });
 
   test("mobile tiene Log nella barra e raccoglie il resto in Altro", async ({ page }) => {

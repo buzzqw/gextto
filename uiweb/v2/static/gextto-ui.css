@@ -40,7 +40,7 @@
   --line: #bccbdd;
   --line-soft: #cfd9e6;
   --text: #2a3444;
-  --muted: #566480;
+  --muted: #4a566e; /* 5.5:1 on --bg, 6.5:1 on --surface (AA everywhere) */
   /* Text/status variants are dark enough for normal text on light surfaces.
      --accent-action remains brighter because it is used as a button fill. */
   --accent: #08704f;

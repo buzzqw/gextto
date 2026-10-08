@@ -618,11 +618,11 @@
 {{/* ------------------------------------------------------------------ */}}
 
 {{define "v2_settings"}}
-<div class="view settings-view">
+<div class="view settings-view" data-v2-settings>
   <div class="settings-head">
     <div class="settings-title-row">
-      <div><span class="eyebrow">Configurazione</span><h2>{{.ActiveLabel}}</h2></div>
-      <span class="settings-save-hint">Nella v2 ogni campo è un piccolo form HTMX</span>
+      <p class="settings-save-hint">Ogni impostazione si salva con il suo pulsante «Salva»; le modifiche in sospeso si salvano tutte insieme dalla barra in basso.</p>
+      <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>Mostra chiavi tecniche</span></label>
     </div>
     <div class="settings-search-row">
       <label class="settings-search-wrap">
@@ -633,37 +633,86 @@
       </label>
       <div id="v2-settings-search" class="card settings-results" aria-live="polite"><p class="muted">Cerca una impostazione per nome o chiave.</p></div>
     </div>
-    <div class="chip-row">
-      {{range .Tabs}}<a class="chip{{if .Active}} active{{end}}" href="/?view=settings&tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML" hx-push-url="/?view=settings&tab={{.ID}}">{{.Label}}</a>{{end}}
-    </div>
+    <div id="v2-settings-live" class="sr-only" role="status" aria-live="polite"></div>
+    <span hidden data-v2-leave-message>Ci sono modifiche non salvate. Uscire comunque?</span>
+    <span hidden data-v2-saved-all-message>Impostazioni salvate:</span>
+    <span hidden data-v2-errors-message>Impostazioni non salvate per un errore:</span>
   </div>
   {{template "v2_settings_body" .}}
+  <div class="settings-savebar" data-v2-savebar role="region" aria-label="Modifiche non salvate" hidden>
+    <span class="settings-savebar-text"><span>Modifiche non salvate:</span> <strong data-v2-dirty-count>0</strong></span>
+    <button class="btn sm" type="button" data-v2-discard>Annulla modifiche</button>
+    <button class="btn sm primary" type="button" data-v2-save-all>Salva tutto</button>
+  </div>
 </div>
 {{end}}
 
 {{define "v2_settings_body"}}
-<div id="v2-settings-body" class="settings-body">
-  {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-  {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
-  {{range .Groups}}
-  <div class="panel settings-panel">
-    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} impostazioni</small></div>
-    <div class="panel-body">
-      {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-      <div class="{{if $.FieldsGrid}}form-grid{{else}}settings-rows{{end}}">
-        {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
+<div id="v2-settings-body" class="settings-layout" data-active-tab="{{.ActiveID}}"{{if .Highlight}} data-highlight="{{.Highlight}}"{{end}}>
+  <nav class="settings-nav" aria-label="Sezioni della configurazione">
+    <form class="settings-nav-select" method="get" action="/">
+      <input type="hidden" name="view" value="settings" />
+      <label class="field"><span>Sezione</span>
+        <select class="input" name="tab" hx-get="/settings/body" hx-trigger="change" hx-target="#v2-settings-body" hx-swap="outerHTML">
+          {{range .Areas}}<optgroup label="{{.Label}}">{{range .Tabs}}<option value="{{.ID}}"{{if .Active}} selected{{end}}>{{.Label}}</option>{{end}}</optgroup>{{end}}
+        </select>
+      </label>
+      <noscript><button class="btn sm" type="submit">Apri</button></noscript>
+    </form>
+    <div class="settings-nav-list">
+      {{range .Areas}}
+      <p class="settings-nav-area" id="v2-settings-area-{{.Name}}">{{.Label}}</p>
+      <ul aria-labelledby="v2-settings-area-{{.Name}}">
+        {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{.Count}}</span>{{end}}</a></li>{{end}}
+      </ul>
+      {{end}}
+    </div>
+  </nav>
+  <div class="settings-main">
+    <div class="settings-section-head">
+      <span class="eyebrow">Configurazione</span>
+      <h2 id="v2-settings-heading" tabindex="-1">{{.ActiveLabel}}</h2>
+      {{if .Intro}}<p class="settings-intro">{{.Intro}}</p>{{end}}
+    </div>
+    {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
+    {{if .Actions}}
+    <div class="panel settings-panel settings-actions-panel">
+      <div class="panel-head"><h3>{{.Actions.Title}}</h3></div>
+      <div class="panel-body">
+        {{if .Actions.Hint}}<p class="hint">{{.Actions.Hint}}</p>{{end}}
+        <div class="toolbar">{{range .Actions.Buttons}}{{template "v2_button" .}}{{end}}</div>
       </div>
     </div>
+    {{end}}
+    {{if .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
+    {{range .Groups}}{{template "v2_setting_group" .}}{{end}}
+    {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
+    {{if not .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
+    {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
+    {{if and (not .Groups) (not .I18n) (not .ShowFeeds) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
+    {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
+    {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
   </div>
-  {{end}}
-  {{if .Rename}}{{template "v2_rename_editor" .Rename}}{{end}}
-  {{if not .EditorsFirst}}{{template "v2_settings_editors" .}}{{end}}
-  {{if .I18n}}{{template "v2_i18n_editor" .I18n}}{{end}}
-  {{if and (not .Groups) .Empty}}<p class="muted">{{.Empty}}</p>{{end}}
-  {{if eq .ActiveID "scores"}}{{template "v2_score_groups" .}}{{end}}
-  {{if eq .ActiveID "libtorrent"}}{{template "v2_ipfilter_action" .}}{{end}}
-  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;try{if(location.hash!=='#v2-setting-{{.Highlight}}'){location.hash='#v2-setting-{{.Highlight}}';}}catch(_){}e.scrollIntoView({block:'center',behavior:'smooth'});var o=e.style.outline,oo=e.style.outlineOffset,tr=e.style.transition;e.style.transition='outline-color .2s ease';e.style.outline='3px solid var(--accent-2)';e.style.outlineOffset='2px';e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash');e.style.outline=o;e.style.outlineOffset=oo;e.style.transition=tr;},2500);})();</script>{{end}}
+  {{if .Highlight}}<script>(function(){var e=document.getElementById('v2-setting-{{.Highlight}}');if(!e)return;e.hidden=false;var d=e.closest('details');if(d)d.open=true;try{if(location.hash!=='#v2-setting-{{.Highlight}}'){history.replaceState(null,'','#v2-setting-{{.Highlight}}');}}catch(_){}var still=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;e.scrollIntoView({block:'center',behavior:still?'auto':'smooth'});var c=e.querySelector('input:not([type=hidden]),select,textarea');if(c)c.focus({preventScroll:true});e.classList.add('setting-flash');setTimeout(function(){e.classList.remove('setting-flash');},2500);})();</script>{{end}}
 </div>
+{{end}}
+
+{{define "v2_setting_group"}}
+{{if .Collapsed}}
+<details class="panel settings-panel settings-collapsible{{if .Inactive}} settings-inactive{{end}}">
+  <summary class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></summary>
+{{else}}
+<div class="panel settings-panel">
+  <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></div>
+{{end}}
+  <div class="panel-body">
+    {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
+    <div class="{{if .Grid}}form-grid{{else}}settings-rows{{end}}">
+      {{range .Fields}}{{template "v2_setting_field" .}}{{end}}
+    </div>
+    {{if .Buttons}}<div class="toolbar settings-group-actions">{{range .Buttons}}{{template "v2_button" .}}{{end}}</div>{{end}}
+  </div>
+{{if .Collapsed}}</details>{{else}}</div>{{end}}
 {{end}}
 
 {{define "v2_ipfilter_action"}}
@@ -689,9 +738,9 @@
       {{range .ScoreGroups}}
       <form class="setting-row v2-score-group-row" method="post" action="/settings/score-groups" hx-post="/settings/score-groups" hx-target="#v2-score-groups" hx-swap="outerHTML">
         <input type="hidden" name="name" value="{{.Name}}" />
-        <div class="setting-info"><strong class="setting-label">{{.Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
-        <div class="setting-control"><input class="input" type="number" name="score" value="{{.Score}}" aria-label="Punteggio gruppo {{.Name}}" /></div>
-        <div class="setting-actions"><button class="btn sm primary" type="submit">Salva</button><button class="btn sm danger" type="submit" name="op" value="delete" hx-confirm="Rimuovere il gruppo {{.Name}}?">Rimuovi</button></div>
+        <div class="setting-info"><strong class="setting-label" id="v2-score-group-{{.Name}}">{{.Name}}</strong><code class="setting-key">score_group_{{.Name}}</code></div>
+        <div class="setting-control"><input class="input" type="number" name="score" value="{{.Score}}" aria-labelledby="v2-score-group-{{.Name}}" /></div>
+        <div class="setting-actions"><button class="btn sm primary" type="submit" id="v2-score-group-save-{{.Name}}" aria-labelledby="v2-score-group-save-{{.Name}} v2-score-group-{{.Name}}">Salva</button><button class="btn sm danger" type="submit" name="op" value="delete" id="v2-score-group-delete-{{.Name}}" aria-labelledby="v2-score-group-delete-{{.Name}} v2-score-group-{{.Name}}" hx-confirm="Rimuovere il gruppo {{.Name}}?">Rimuovi</button></div>
       </form>
       {{else}}<p class="muted">Nessun gruppo personalizzato configurato.</p>{{end}}
     </div>
@@ -709,9 +758,9 @@
 {{if .ShowFeeds}}
 <div class="card editor-card">
   <h3>Feed RSS</h3>
-  <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none">
+  <form method="post" action="/settings/feed" hx-post="/settings/feed" hx-swap="none" data-v2-track>
     <label class="field"><span>Un URL per riga</span><textarea class="input" name="feeds" rows="9">{{.Feeds}}</textarea></label>
-    <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button></div>
+    <div class="form-actions"><button class="btn sm primary" type="submit">Salva feed</button><span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span></div>
   </form>
 </div>
 {{end}}
@@ -737,7 +786,7 @@
 <section class="v2-content-filter-section" id="v2-content-filter-section">
   <div class="v2-content-tools-heading"><h4>Filtri contenuto esclusi</h4>{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</div>
   {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-  <form id="v2-content-filter-form" method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML">
+  <form id="v2-content-filter-form" method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="#v2-content-filter-section" hx-swap="outerHTML" data-v2-track>
     <input type="hidden" name="key" value="{{.Key}}" />
     <div class="toolbar checkbox-row">
       {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
@@ -752,7 +801,7 @@
   <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{if .Status}}<span class="htx-status ok">{{.Status}}</span>{{end}}</small></div>
   <div class="panel-body">
     {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-    <form method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML">
+    <form method="post" action="/settings/checkbox" hx-post="/settings/checkbox" hx-target="closest .panel" hx-swap="outerHTML" data-v2-track>
       <input type="hidden" name="key" value="{{.Key}}" />
       <div class="toolbar checkbox-row">
          {{range .Options}}<label class="check" title="{{.Label}}"><input type="checkbox" name="value" value="{{.Value}}"{{if .Selected}} checked{{end}} /> <span>{{.Label}}</span></label>{{end}}
@@ -815,15 +864,16 @@
 <div class="card editor-card">
   <h3>{{.Title}}</h3>
   {{if .Hint}}<p class="hint">{{.Hint}}</p>{{end}}
-  <form method="post" action="/settings/editor-save" hx-post="/settings/editor-save" hx-swap="none">
+  <form method="post" action="/settings/editor-save" hx-post="/settings/editor-save" hx-swap="none" data-v2-track>
     <input type="hidden" name="editor" value="{{.Key}}" />
     <input type="hidden" name="redirect" value="{{.Redirect}}" />
     <div id="v2-editor-{{.Key}}-rows">
       {{range .Rows}}{{template "v2_list_row" (dict "Editor" $ "Row" .)}}{{end}}
     </div>
     <div class="form-actions">
-       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" title="Aggiungi una nuova riga">Aggiungi riga</button>
+       <button class="btn sm" type="button" id="v2-editor-{{.Key}}-add" hx-get="/settings/editor-row?editor={{.Key}}&amp;index={{.NextIndex}}&amp;view={{.View}}&amp;tab={{.Tab}}" hx-target="#v2-editor-{{.Key}}-rows" hx-swap="beforeend" data-v2-marks-dirty title="Aggiungi una nuova riga">Aggiungi riga</button>
        <button class="btn sm primary" type="submit" title="Salva le righe di questa sezione">Salva</button>
+       <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span>
     </div>
   </form>
 </div>
@@ -840,7 +890,7 @@
     {{else}}<input class="input" name="{{$name}}__{{$index}}" value="{{$value}}" placeholder="{{.Placeholder}}" />{{end}}
   </label>
   {{end}}
-  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" title="Rimuovi questa riga">Rimuovi</button></div>
+  <div class="form-actions">{{if .Editor.HasTest}}<button class="btn sm" type="button" hx-post="/settings/editor-test" hx-include="closest .list-row" hx-vals='{"editor":"{{.Editor.Key}}","index":"{{.Row.Index}}"}' hx-target="#v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" hx-swap="innerHTML" title="Testa questa riga">Testa</button><span id="v2-list-test-{{.Editor.Key}}-{{.Row.Index}}" class="muted" aria-live="polite"></span>{{end}}<button class="btn sm danger" type="button" hx-get="/empty" hx-target="closest .list-row" hx-swap="outerHTML" data-v2-marks-dirty title="Rimuovi questa riga (da salvare)">Rimuovi</button></div>
 </div>
 {{end}}
 
@@ -848,13 +898,13 @@
 <div class="panel settings-panel" id="v2-rename-editor">
   <div class="panel-head"><h3>Composizione del nome</h3>{{if .Status}}<small class="muted">{{.Status}}</small>{{end}}</div>
   <div class="panel-body">
-    <form method="post" action="/settings/rename-save" hx-post="/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form">
+    <form method="post" action="/settings/rename-save" hx-post="/settings/rename-save" hx-swap="none" class="form-grid v2-rename-form" data-v2-track>
       <label class="field" title="Scegli il formato predefinito per il nome"><span>Formato</span><select class="input" name="format" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="change">{{range .Formats}}<option value="{{.Value}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}</select></label>
       <label class="field" title="Template usato per comporre il nome personalizzato"><span>Template personalizzato</span><input class="input" name="template" value="{{.Template}}" placeholder="{Serie} - {Stagione}{Episodio} - {Titolo} [{Risoluzione}][{Lingue}]" hx-post="/settings/rename-preview" hx-include="#v2-rename-editor" hx-target="#v2-rename-preview-code" hx-swap="outerHTML" hx-trigger="input changed delay:300ms" /></label>
       <div class="form-actions"><button class="btn sm primary" type="submit" title="Salva la composizione del nome">Salva rinomina</button></div>
     </form>
     <div class="field" style="margin-top:12px"><span>Pezzi del nome (clicca per aggiungere)</span>
-      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" title="Aggiungi il token {{.Label}} al template">{{.Label}}</button>{{end}}</div>
+      <div class="toolbar">{{range .Tokens}}<button class="btn sm" type="button" hx-post="/settings/rename-token" hx-vals='{"token":"{{.Token}}"}' hx-include="#v2-rename-editor" hx-target="#v2-rename-editor" hx-swap="outerHTML" data-v2-marks-dirty="#v2-rename-editor form" title="Aggiungi questo pezzo al template">{{.Label}}</button>{{end}}</div>
     </div>
     <div class="field" style="margin-top:12px"><span>Anteprima</span>{{template "v2_rename_preview_code" .}}</div>
   </div>
@@ -890,14 +940,14 @@
   <caption class="sr-only">Traduzioni configurate</caption>
   <colgroup><col class="i18n-key-col" /><col class="i18n-value-col" /></colgroup>
   <thead><tr><th scope="col">Chiave</th><th scope="col">Valore</th></tr></thead>
-  <tbody>{{range .Rows}}<tr>
-    <td class="i18n-key"><code>{{.Key}}</code></td>
+  <tbody>{{range $i, $row := .Rows}}<tr>
+    <td class="i18n-key"><code id="v2-i18n-key-{{$i}}">{{$row.Key}}</code></td>
     <td class="i18n-value">
       <form class="i18n-value-form" hx-post="/settings/i18n/set" hx-target="#v2-i18n-table" hx-swap="outerHTML">
         <input type="hidden" name="lang" value="{{$.Language}}" />
-        <input type="hidden" name="key" value="{{.Key}}" />
-        <input class="input" name="value" value="{{.Value}}" aria-label="Traduzione per {{.Key}}" />
-        <button class="btn sm" type="submit">Salva</button>
+        <input type="hidden" name="key" value="{{$row.Key}}" />
+        <input class="input" name="value" value="{{$row.Value}}" aria-labelledby="v2-i18n-key-{{$i}}" />
+        <button class="btn sm" type="submit" id="v2-i18n-save-{{$i}}" aria-labelledby="v2-i18n-save-{{$i}} v2-i18n-key-{{$i}}">Salva</button>
       </form>
     </td>
   </tr>{{end}}</tbody>
@@ -905,40 +955,53 @@
 {{end}}
 
 {{define "v2_setting_field"}}
-<form class="setting-row" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/settings/save"
-      hx-post="/settings/save" hx-target="this" hx-swap="outerHTML">
+<form class="setting-row{{if .Modified}} setting-modified-row{{end}}" data-setting-key="{{.Key}}" id="v2-setting-{{.Key}}" method="post" action="/settings/save"
+      hx-post="/settings/save" hx-target="this" hx-swap="outerHTML"{{if .DependsOn}} data-v2-depends-on="{{.DependsOn}}"{{end}}{{if .Hidden}} hidden{{end}}>
   <input type="hidden" name="key" value="{{.Key}}">
   <div class="setting-info">
-    <label class="setting-label" for="input-{{.Key}}" title="{{if .Hint}}{{.Hint}}{{else}}{{.Label}}{{end}}">{{.Label}}{{if .Hint}} <span class="setting-help" aria-hidden="true">ⓘ</span>{{end}}</label>
+    <div class="setting-title">
+      {{if eq .Kind "days"}}<span class="setting-label" id="label-{{.Key}}">{{.Label}}</span>{{else}}<label class="setting-label" id="label-{{.Key}}" for="input-{{.Key}}">{{.Label}}</label>{{end}}
+      {{if .Modified}}<span class="setting-badge">modificato</span>{{end}}
+      <span class="setting-badge setting-dirty" data-v2-dirty-badge hidden>non salvata</span>
+    </div>
+    {{if .Hint}}<p class="setting-hint" id="hint-{{.Key}}">{{.Hint}}</p>{{end}}
     <div class="setting-meta">
-      {{if .Hint}}<small class="setting-hint" title="{{.Hint}}">{{.Hint}}</small>{{end}}
-      <code class="setting-key" title="{{.Key}}">{{.Key}}</code>
+      {{if .Modified}}<span class="setting-default"><span>Predefinito:</span> <code>{{.Default}}</code></span>{{end}}
+      <code class="setting-key">{{.Key}}</code>
     </div>
   </div>
-  <div class="setting-control{{if or (eq .Key "archive_root") (eq .Key "trash_path") (eq .Key "libtorrent_dir") (eq .Key "libtorrent_temp_dir") (eq .Key "libtorrent_torrent_copy_dir") (eq .Key "libtorrent_ramdisk_dir")}} setting-control-browse{{end}}">
-    {{if .Disabled}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled title="{{.DisabledNote}}" />
+  <div class="setting-control{{if .Browse}} setting-control-browse{{end}}">
+    <div class="setting-input">
+    {{if .Disabled}}<input class="input" id="input-{{.Key}}" value="{{.Value}}" disabled aria-describedby="status-{{.Key}}" />
     {{else if .Managed}}<input class="input" id="input-{{.Key}}" value="Auto" disabled title="Gestito dall'ottimizzazione automatica" />
     {{else if eq .Kind "structured"}}<p class="hint">Valore strutturato: si modifica dalla sezione dedicata.</p>
-    {{else if eq .Kind "bool"}}<select class="input" name="value" id="input-{{.Key}}"><option value="{{.TrueValue}}" {{if .BoolValue}}selected{{end}}>Sì</option><option value="{{.FalseValue}}" {{if not .BoolValue}}selected{{end}}>No</option></select>
-    {{else if eq .Kind "select"}}<select class="input" name="value" id="input-{{.Key}}">{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
-    {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}">{{.Value}}</textarea>
-    {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}">{{.Value}}</textarea>
-     {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="non visualizzato" autocomplete="new-password" />
-     {{else if eq .Kind "number"}}<input class="input" type="number" step="1" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />
-     {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" />{{end}}
-     {{if or (eq .Key "archive_root") (eq .Key "trash_path") (eq .Key "libtorrent_dir") (eq .Key "libtorrent_temp_dir") (eq .Key "libtorrent_torrent_copy_dir") (eq .Key "libtorrent_ramdisk_dir")}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
-   </div>
+    {{else if eq .Kind "bool"}}<span class="switch"><input type="checkbox" role="switch" name="value" id="input-{{.Key}}" value="{{.TrueValue}}"{{if .BoolValue}} checked{{end}}{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} /><input type="hidden" name="value" value="{{.FalseValue}}" /><span class="switch-text" aria-hidden="true"><span class="switch-on">Sì</span><span class="switch-off">No</span></span></span>
+    {{else if eq .Kind "select"}}<select class="input" name="value" id="input-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{range .Options}}<option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+    {{else if eq .Kind "days"}}<div class="setting-days" role="group" aria-labelledby="label-{{.Key}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}>{{$key := .Key}}{{range $i, $day := .Options}}<label class="check"><input type="checkbox" name="value" value="{{$day.Value}}"{{if eq $i 0}} id="input-{{$key}}"{{end}}{{if $day.Selected}} checked{{end}} /> <span>{{$day.Label}}</span></label>{{end}}</div>
+    {{else if eq .Kind "tags"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{if .Placeholder}}{{.Placeholder}}{{else}}un valore per riga{{end}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
+    {{else if eq .Kind "area"}}<textarea class="input" name="value" id="input-{{.Key}}" rows="3" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}}>{{.Value}}</textarea>
+    {{else if eq .Kind "secret"}}<input class="input" type="password" name="value" id="input-{{.Key}}" value="" placeholder="{{if .Value}}impostato — lascia vuoto per non cambiarlo{{else}}non impostato{{end}}" autocomplete="new-password"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else if eq .Kind "number"}}<input class="input" type="number" step="{{if .Step}}{{.Step}}{{else}}1{{end}}" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else if eq .Kind "time"}}<input class="input" type="time" name="value" id="input-{{.Key}}" value="{{.Value}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else if eq .Kind "url"}}<input class="input" type="url" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" inputmode="url"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />
+    {{else}}<input class="input" name="value" id="input-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}"{{if .DescribedBy}} aria-describedby="{{.DescribedBy}}"{{end}}{{if .Error}} aria-invalid="true"{{end}} />{{end}}
+    {{if .Unit}}<span class="setting-unit" id="unit-{{.Key}}">{{.Unit}}</span>{{end}}
+    {{if .Browse}}<button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button>{{end}}
+    </div>
+    {{if .Zero}}<small class="setting-zero" id="zero-{{.Key}}">{{.Zero}}</small>{{end}}
+  </div>
   <div class="setting-actions">
-    <small class="setting-status muted" aria-live="polite">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Disabled}}{{.DisabledNote}}{{end}}</small>
-    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary" type="submit">Salva</button>{{end}}
+    <small class="setting-status" id="status-{{.Key}}">{{if .Status}}<span class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Status}}</span>{{else if .Disabled}}{{if .DisabledEngine}}<span>Non attivo con il motore</span> «{{.DisabledEngine}}»{{else}}{{.DisabledNote}}{{end}}{{end}}</small>
+    {{if .Resettable}}<button class="btn sm ghost setting-reset" type="button" id="reset-{{.Key}}" data-v2-reset="{{.Default}}" aria-labelledby="reset-{{.Key}} label-{{.Key}}" title="Ripristina il valore predefinito (da salvare)"><span aria-hidden="true">↺</span> <span>Predefinito</span></button>{{end}}
+    {{if and (ne .Kind "structured") (not .Managed) (not .Disabled)}}<button class="btn sm primary setting-save" type="submit" id="save-{{.Key}}" aria-labelledby="save-{{.Key}} label-{{.Key}}">Salva</button>{{end}}
   </div>
 </form>
 {{end}}
 
 {{define "v2_settings_search"}}
 {{if .Matches}}
-<table class="data-table"><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
-<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&tab={{.Tab}}&highlight={{.Key}}#v2-setting-{{.Key}}" hx-get="/settings/body?tab={{.Tab}}&highlight={{.Key}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td><code>{{.Key}}</code></td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
+<table class="data-table"><caption class="sr-only">Risultati della ricerca impostazioni</caption><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
+<tbody>{{range .Matches}}<tr><td><a href="/?view=settings&amp;tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}#v2-setting-{{.Key}}{{end}}" hx-get="/settings/body?tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}{{end}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td>{{if .Key}}<code>{{.Key}}</code>{{end}}</td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
 {{else}}<p class="muted">Nessuna impostazione corrisponde a «{{.Query}}».</p>{{end}}
 {{end}}
 
@@ -1654,6 +1717,7 @@
 {{define "v2_button"}}
 <form method="post" action="/section/action" hx-post="/section/action" hx-swap="none" style="display:inline">
   <input type="hidden" name="view" value="{{.View}}">
+  {{if .Redirect}}<input type="hidden" name="redirect" value="{{.Redirect}}">{{end}}
   <input type="hidden" name="path" value="{{.Path}}">
   <input type="hidden" name="method" value="{{.Method}}">
   <input type="hidden" name="body" value="{{.Body}}">

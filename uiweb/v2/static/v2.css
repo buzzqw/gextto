@@ -495,8 +495,10 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 }
 
 /* Status messages from table actions. */
-.htx-status.ok { color: #4ec97a; }
-.htx-status.err { color: #ff6b6b; }
+/* Theme tokens keep the status readable on light surfaces too (the fixed
+   #4ec97a/#ff6b6b were 1.9:1 and 2.5:1 on the light theme). */
+.htx-status.ok { color: var(--ok); }
+.htx-status.err { color: var(--err); }
 
 /* Non-blocking feedback for quick actions and section/settings actions. */
 #v2-toast-region {
@@ -814,32 +816,6 @@ form.htmx-request:not([hx-trigger*="every"]) button[type="submit"],
 .system-backdrop[hidden] {
   display: none !important;
   pointer-events: none !important;
-}
-
-/* Fix settings tabs on mobile/tablets <= 700px: smooth horizontal scroll */
-@media (max-width: 700px) {
-  .settings-view .chip-row {
-    display: flex !important;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding: 6px 0 10px;
-    gap: 6px;
-    scroll-snap-type: x proximity;
-  }
-  .settings-view .chip-row::-webkit-scrollbar {
-    display: none;
-  }
-  .settings-view .chip-row .chip {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-    min-height: 40px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 14px;
-    font-size: 0.84rem;
-  }
 }
 
 @media (max-width: 560px) {
@@ -1234,4 +1210,177 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
     font-size: 0.8rem;
   }
   .ptr-hint.ready { color: var(--accent); border-color: var(--accent); }
+}
+
+/* ------------------------------------------------------------------------
+   Configurazione: section navigation, setting rows and the save bar.
+   ------------------------------------------------------------------------ */
+
+/* Dark text on the light-theme accent fill was 3.1:1. */
+:root[data-theme="light"] .chip.active,
+:root[data-theme="light"] .torrent-detail-tabs [role="tab"].tab-active { color: #fff; }
+
+.settings-view .settings-head { position: static; }
+.settings-view .settings-title-row { align-items: center; flex-wrap: wrap; }
+.settings-view .settings-save-hint { margin: 0; max-width: 70ch; }
+.settings-keys-toggle { font-size: 0.82rem; color: var(--muted); }
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.settings-nav {
+  position: sticky;
+  top: 74px;
+  max-height: calc(100vh - 90px);
+  overflow-y: auto;
+}
+.settings-nav-select { display: none; }
+.settings-nav-list ul { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.settings-nav-area {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.settings-nav-link:hover { background: var(--surface-2); text-decoration: none; }
+.settings-nav-link[aria-current="page"] {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 700;
+}
+.settings-nav-count { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+
+.settings-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.settings-section-head h2 { margin: 2px 0 4px; font-size: 1.35rem; }
+.settings-section-head h2:focus { outline: none; }
+.settings-section-head h2:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 4px; }
+.settings-intro { margin: 0; color: var(--muted); max-width: 72ch; }
+
+/* Closed panels: expert knobs and settings the active engine ignores. */
+.settings-collapsible > summary { cursor: pointer; list-style: none; }
+.settings-collapsible > summary::-webkit-details-marker { display: none; }
+.settings-collapsible > summary h3::before { content: "▸ "; color: var(--muted); }
+.settings-collapsible[open] > summary h3::before { content: "▾ "; }
+.settings-collapsible:not([open]) > .panel-body { display: none; }
+.settings-inactive > summary h3 { color: var(--muted); }
+
+/* Setting rows: label and description on the left at a readable width, the
+   control with its unit in the middle, the result and actions on the right. */
+.settings-view .setting-row { grid-template-columns: minmax(240px, 1.6fr) minmax(220px, 1fr) auto; }
+.setting-row[hidden] { display: none; }
+.setting-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.setting-info .setting-hint { margin: 2px 0 0; font-size: 0.8rem; line-height: 1.4; max-width: 70ch; }
+.setting-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.setting-badge[hidden] { display: none; }
+.setting-dirty { border-color: var(--warn); color: var(--warn); }
+.setting-default { color: var(--muted); font-size: 0.75rem; }
+.settings-view:not(.show-keys) .setting-key { display: none; }
+.setting-input { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.setting-input > .input { flex: 1 1 auto; min-width: 0; }
+.setting-input > select.input { flex: 0 1 auto; }
+.setting-unit { color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+.setting-zero { display: block; margin-top: 3px; color: var(--muted); font-size: 0.75rem; }
+.setting-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.setting-days .check { min-height: 36px; }
+.setting-row[data-dirty] { box-shadow: inset 3px 0 0 var(--warn); padding-left: 10px; }
+/* The save button is a quiet outline until the row has something to save. */
+.settings-view .setting-row:not([data-dirty]) .setting-save {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--text);
+}
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--text); border-color: var(--line); }
+.form-grid .setting-row { grid-template-columns: 1fr; }
+
+/* Switch: a real checkbox styled as a toggle, with its state in words. */
+.switch { display: inline-flex; align-items: center; gap: 8px; }
+.switch input[role="switch"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-3);
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.switch input[role="switch"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .15s ease;
+}
+.switch input[role="switch"]:checked { background: var(--accent-action); border-color: var(--accent-action); }
+.switch input[role="switch"]:checked::after { transform: translateX(20px); background: #fff; }
+.switch input[role="switch"]:checked ~ .switch-text .switch-off,
+.switch input[role="switch"]:not(:checked) ~ .switch-text .switch-on { display: none; }
+.switch-text { font-size: 0.85rem; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) {
+  .switch input[role="switch"], .switch input[role="switch"]::after { transition: none; }
+}
+
+.settings-savebar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 30;
+  margin-top: 14px;
+  box-shadow: var(--v2-shadow);
+}
+.settings-group-actions { margin-top: 12px; }
+
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: 1fr; gap: 12px; }
+  .settings-nav { position: static; max-height: none; overflow: visible; }
+  .settings-nav-list { display: none; }
+  .settings-nav-select { display: block; }
+  .settings-nav-select .input { min-height: 46px; width: 100%; }
+}
+@media (max-width: 860px) {
+  .settings-view .setting-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .settings-savebar { bottom: 96px; flex-wrap: wrap; }
+}
+
+/* The generic input rule (input:not([type=checkbox]):not([type=radio])) is
+   more specific than the search box's own padding: keep room for the icon. */
+.settings-search-wrap input.settings-search { padding-left: 38px; }
+@media (max-width: 760px) {
+  /* On a phone the hint sits under the search box: let it wrap. */
+  .settings-search-row .settings-results { white-space: normal; text-overflow: clip; }
 }

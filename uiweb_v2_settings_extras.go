@@ -59,15 +59,13 @@ func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
 	// Select the destination from server-owned constants rather than echoing
 	// even a validated tab value into a redirect URL. The settings editor can
 	// derive `tab` from a submitted form, so keep this boundary explicit.
+	// uiSettingsCanonicalTab returns the ID from the server-owned tab table
+	// (resolving the aliases of the previous layout), never the input.
+	if canonical := uiSettingsCanonicalTab(tab); canonical != "" {
+		target += "&tab=" + canonical
+		tab = ""
+	}
 	switch tab {
-	case "sources":
-		target += "&tab=sources"
-	case "advanced":
-		target += "&tab=advanced"
-	case "rename":
-		target += "&tab=rename"
-	case "i18n":
-		target += "&tab=i18n"
 	case "rules":
 		target += "&tab=rules"
 	case "indexers":
@@ -76,8 +74,6 @@ func v2SettingsRedirect(w http.ResponseWriter, r *http.Request, tab string) {
 		target += "&tab=torrents"
 	case "general":
 		target += "&tab=general"
-	case "maintenance":
-		target += "&tab=maintenance"
 	}
 	if r.Header.Get("HX-Request") == "" {
 		http.Redirect(w, r, target, http.StatusSeeOther)
@@ -193,6 +189,17 @@ type v2ListEditorView struct {
 	HasTest                               bool
 	Rows                                  []v2ListRow
 	NextIndex                             int
+}
+
+// v2ListEditorTab is the settings tab that shows a structured editor.
+func v2ListEditorTab(key string) string {
+	switch key {
+	case "tag_dir_rules":
+		return "rename"
+	case "event_hooks":
+		return "notify"
+	}
+	return "sources"
 }
 
 func v2ListEditorByKey(key string) (uiListEditor, bool) {
@@ -319,18 +326,15 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if r.FormValue("view") == "settings" {
 		viewName = "settings"
 	}
-	var tabName string
-	switch r.FormValue("tab") {
-	case "sources":
-		tabName = "sources"
-	case "rules":
+	tabName := uiSettingsCanonicalTab(r.FormValue("tab"))
+	switch {
+	case tabName != "":
+	case r.FormValue("tab") == "rules":
 		tabName = "rules"
-	case "indexers":
+	case r.FormValue("tab") == "indexers":
 		tabName = "indexers"
-	case "advanced":
-		tabName = "advanced"
 	default:
-		tabName = "advanced"
+		tabName = v2ListEditorTab(canonicalKey)
 	}
 	view := v2ListEditorView{
 		Key:       canonicalKey,
@@ -346,12 +350,13 @@ func V2SettingsEditorRow(w http.ResponseWriter, r *http.Request, s *AppState) {
 		http.Error(w, "template error", http.StatusInternalServerError)
 		return
 	}
-	body := v2TranslateHTML(buffer.String(), dict, eng)
-	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend">Aggiungi riga</button>`,
+	addButton := fmt.Sprintf(`<button class="btn sm" type="button" id="v2-editor-%s-add" hx-swap-oob="true" hx-get="/settings/editor-row?editor=%s&amp;index=%d&amp;view=%s&amp;tab=%s" hx-target="#v2-editor-%s-rows" hx-swap="beforeend" data-v2-marks-dirty title="Aggiungi una nuova riga">Aggiungi riga</button>`,
 		canonicalKey, canonicalKey, index+1, viewName, tabName, canonicalKey)
+	// The out-of-band add button is translated with the row.
+	body := v2TranslateHTML(buffer.String()+addButton, dict, eng)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(body + addButton))
+	_, _ = w.Write([]byte(body))
 }
 
 func V2SettingsEditorTest(w http.ResponseWriter, r *http.Request, s *AppState) {
@@ -398,7 +403,7 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	key := r.FormValue("editor")
 	editor, ok := v2ListEditorByKey(key)
 	if !ok {
-		v2SettingsRedirect(w, r, "advanced")
+		v2SettingsRedirect(w, r, "sources")
 		return
 	}
 	_ = r.ParseForm()
@@ -443,11 +448,12 @@ func V2SettingsEditorSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 			}
 		}
 	}
-	switch tab {
-	case "sources", "rules", "indexers", "advanced", "rename", "i18n", "torrents", "general", "maintenance":
-		// valid tab
+	switch {
+	case uiSettingsCanonicalTab(tab) != "":
+	case tab == "rules", tab == "indexers", tab == "torrents", tab == "general":
+		// tabs of the pages that embed the same editors
 	default:
-		tab = "advanced"
+		tab = v2ListEditorTab(key)
 	}
 	v2SettingsRedirect(w, r, tab)
 }

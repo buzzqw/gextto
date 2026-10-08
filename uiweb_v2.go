@@ -826,8 +826,9 @@ func v2TranslateText(value string, dict, eng map[string]string) string {
 }
 
 func v2TranslatableAttr(name string) bool {
+	// "label" names the <optgroup> areas of the settings section picker.
 	switch name {
-	case "title", "placeholder", "aria-label":
+	case "title", "placeholder", "aria-label", "label":
 		return true
 	}
 	return false
@@ -1720,10 +1721,53 @@ type v2Field struct {
 	Error  bool
 }
 
+// DescribedBy lists the IDs of the texts that describe the control (hint,
+// unit, special value, save result), for aria-describedby.
+func (field v2Field) DescribedBy() string {
+	ids := []string{}
+	if field.Hint != "" {
+		ids = append(ids, "hint-"+field.Key)
+	}
+	if field.Unit != "" {
+		ids = append(ids, "unit-"+field.Key)
+	}
+	if field.Zero != "" {
+		ids = append(ids, "zero-"+field.Key)
+	}
+	if field.Status != "" || field.Disabled {
+		ids = append(ids, "status-"+field.Key)
+	}
+	return strings.Join(ids, " ")
+}
+
+// Browse reports whether the field is a server folder with a «Sfoglia» picker.
+func (field v2Field) Browse() bool {
+	switch field.Key {
+	case "archive_root", "trash_path", "libtorrent_dir", "libtorrent_temp_dir", "libtorrent_torrent_copy_dir", "libtorrent_ramdisk_dir":
+		return true
+	}
+	return false
+}
+
+// Resettable reports whether the row offers «Predefinito»: only when the
+// saved value differs from the default, so unchanged rows stay quiet.
+func (field v2Field) Resettable() bool {
+	return field.Modified && field.Default != "" && !field.Managed && !field.Disabled && field.Kind != "structured"
+}
+
+// v2UnusedSettingsHint explains the closed panels of options the active
+// torrent engine ignores (each row still says which engine is active).
+const v2UnusedSettingsHint = "Valgono solo con un altro motore torrent: restano salvate e tornano attive cambiando motore."
+
 type v2SettingGroup struct {
-	Title  string
-	Hint   string
-	Fields []v2Field
+	Title     string
+	Hint      string
+	Fields    []v2Field
+	Buttons   []v2Button
+	Grid      bool
+	Collapsed bool
+	// Inactive marks a whole panel that the active torrent engine ignores.
+	Inactive bool
 }
 
 // v2Fields wraps raw settings fields with the transient save status.
@@ -1735,15 +1779,23 @@ func v2Fields(fields []uiSettingField) []v2Field {
 	return out
 }
 
+// v2SettingsArea is one heading of the settings navigation with its tabs.
+type v2SettingsArea struct {
+	Name, Label string
+	Tabs        []uiSettingsTabRef
+}
+
 type v2SettingsView struct {
 	Tabs        []uiSettingsTabRef
+	Areas       []v2SettingsArea
 	ActiveID    string
 	ActiveLabel string
+	Intro       string
 	Groups      []v2SettingGroup
-	FieldsGrid  bool
 	Note        string
 	Empty       string
 	Highlight   string
+	Actions     *v2SettingsActions
 	ScoreGroups []v2ScoreGroup
 	ScoreNotice string
 	ScoreError  bool
@@ -1756,6 +1808,12 @@ type v2SettingsView struct {
 	ListEditors    []v2ListEditorView
 	Rename         *v2RenameView
 	I18n           *v2I18nView
+}
+
+// v2SettingsActions is the toolbar of API actions of a tab (Ottimizza, ...).
+type v2SettingsActions struct {
+	Title, Hint string
+	Buttons     []v2Button
 }
 
 type v2ScoreGroup struct {
@@ -1782,22 +1840,69 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 	view := v2SettingsView{
 		Tabs:        page.Tabs,
 		ActiveID:    page.ActiveID,
-		FieldsGrid:  page.FieldsGrid,
 		Highlight:   highlight,
 		ScoreGroups: v2ScoreGroupsFrom(s),
 		Empty:       "Nessuna impostazione in questa sezione.",
 	}
+	for _, area := range uiSettingsAreas {
+		converted := v2SettingsArea{Name: area.Name, Label: area.Label}
+		for _, ref := range page.Tabs {
+			if ref.Area == area.Name {
+				converted.Tabs = append(converted.Tabs, ref)
+			}
+		}
+		if len(converted.Tabs) > 0 {
+			view.Areas = append(view.Areas, converted)
+		}
+	}
 	for _, ref := range page.Tabs {
 		if ref.Active {
 			view.ActiveLabel = ref.Label
+			view.Intro = ref.Intro
 		}
 	}
+	// The tab is reached again from its own buttons: the redirect keeps it.
+	redirect := "/?view=settings&tab=" + page.ActiveID
+	buttons := func(list []uiActionButton) []v2Button {
+		out := v2Buttons("settings", list)
+		for index := range out {
+			out[index].Redirect = redirect
+		}
+		return out
+	}
+	if page.Actions != nil {
+		view.Actions = &v2SettingsActions{Title: page.Actions.Label, Hint: page.Actions.Hint, Buttons: buttons(page.Actions.Buttons)}
+	}
+	// Settings the active torrent engine ignores never sit among the ones
+	// that matter: a panel made only of them is closed, and the stray ones of
+	// a mixed panel move to a closed panel at the end of the tab.
+	unused := v2SettingGroup{Title: "Non usate dal motore attivo", Collapsed: true, Inactive: true}
 	for _, group := range page.Groups {
-		converted := v2SettingGroup{Title: group.Title, Hint: group.Hint}
+		converted := v2SettingGroup{Title: group.Title, Hint: group.Hint, Grid: group.Grid, Collapsed: group.Collapsed, Buttons: buttons(group.Buttons)}
+		allDisabled := len(group.Fields) > 0
 		for _, field := range group.Fields {
+			allDisabled = allDisabled && field.Disabled
+		}
+		for _, field := range group.Fields {
+			if field.Disabled && !allDisabled {
+				unused.Fields = append(unused.Fields, v2Field{uiSettingField: field})
+				continue
+			}
 			converted.Fields = append(converted.Fields, v2Field{uiSettingField: field})
 		}
-		view.Groups = append(view.Groups, converted)
+		if allDisabled {
+			converted.Collapsed, converted.Inactive = true, true
+			if converted.Hint == "" {
+				converted.Hint = v2UnusedSettingsHint
+			}
+		}
+		if len(converted.Fields) > 0 {
+			view.Groups = append(view.Groups, converted)
+		}
+	}
+	if len(unused.Fields) > 0 {
+		unused.Hint = v2UnusedSettingsHint
+		view.Groups = append(view.Groups, unused)
 	}
 	view.EditorsFirst = page.EditorsFirst
 	if page.ShowSources {
@@ -1807,7 +1912,7 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 	}
 	for _, editor := range page.ListEditors {
 		if key, ok := v2ListEditorKey(editor); ok {
-			view.ListEditors = append(view.ListEditors, v2ListEditorViewFrom(s, editor, key, "settings", "advanced"))
+			view.ListEditors = append(view.ListEditors, v2ListEditorViewFrom(s, editor, key, "settings", page.ActiveID))
 		}
 	}
 	if page.Rename != nil {
@@ -1898,10 +2003,15 @@ func v2ListEditorKey(editor uiListEditor) (string, bool) {
 	return "", false
 }
 
-// V2SettingsBody swaps only the settings body (tab navigation).
+// V2SettingsBody swaps the settings navigation and section (tab navigation,
+// search results). The address bar follows the section actually shown.
 func V2SettingsBody(w http.ResponseWriter, r *http.Request, s *AppState) {
 	dict, eng := v2Dictionaries(s)
-	v2Render(w, http.StatusOK, "v2_settings_body", v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight")), dict, eng)
+	view := v2SettingsViewFrom(s, r.FormValue("tab"), r.FormValue("highlight"))
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Push-Url", "/?view=settings&tab="+view.ActiveID)
+	}
+	v2Render(w, http.StatusOK, "v2_settings_body", view, dict, eng)
 }
 
 type v2SettingMatch struct {
@@ -1909,7 +2019,7 @@ type v2SettingMatch struct {
 }
 
 func v2SettingLabelFor(key string) string {
-	for _, def := range uiSettingsIndex {
+	for _, def := range append(append([]uiSettingDef{}, uiSettingsIndex...), uiScoreSettingDefs...) {
 		if def.Key == key {
 			return def.Label
 		}
@@ -1934,13 +2044,20 @@ func V2SettingsSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	seen := map[string]bool{}
-	for _, def := range uiSettingsIndex {
+	defs := append(append([]uiSettingDef{}, uiSettingsIndex...), uiScoreSettingDefs...)
+	for _, def := range defs {
 		haystack := strings.ToLower(def.Key + " " + def.Label + " " + uiSettingSearchTerms[def.Key])
 		if !strings.Contains(haystack, query) || seen[def.Key] {
 			continue
 		}
 		seen[def.Key] = true
 		out.Matches = append(out.Matches, v2SettingMatch{Key: def.Key, Label: def.Label, Tab: def.Tab, TabLabel: labels[def.Tab]})
+	}
+	// The structured editors have no key: their result opens the section.
+	for _, entry := range uiSettingsEditorSearchEntries {
+		if strings.Contains(strings.ToLower(entry.Label), query) {
+			out.Matches = append(out.Matches, v2SettingMatch{Label: entry.Label, Tab: entry.Tab, TabLabel: labels[entry.Tab]})
+		}
 	}
 	v2Render(w, http.StatusOK, "v2_settings_search", out, dict, eng)
 }
@@ -1973,6 +2090,12 @@ func V2SettingsSave(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if uiSettingIsSecret(key) && strings.TrimSpace(value) == "" {
 		render("non modificata", false)
 		return
+	}
+	// The weekdays are one checkbox each: join them back into "0,1,4".
+	if uiSettingMetaByKey[key].Kind == "days" {
+		_ = r.ParseForm()
+		value = uiDaysValue(r.Form["value"])
+		field = uiSettingFieldFor(key, v2SettingLabelFor(key), value)
 	}
 	if _, ok := uiJSONScalarList(latestConfig(s).Settings[key]); ok {
 		items := []string{}

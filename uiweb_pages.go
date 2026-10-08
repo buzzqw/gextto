@@ -106,6 +106,9 @@ type uiSettingField struct {
 	// suggests a control has an effect when the active engine ignores it.
 	Disabled     bool
 	DisabledNote string
+	// DisabledEngine is the active engine named by DisabledNote, so the page
+	// can render the note as a translatable sentence plus the engine name.
+	DisabledEngine string
 	// Options is set for Kind=="select": a fixed list to choose from.
 	Options []uiFormOption
 	// Hint is the descriptive tooltip shown on the label (ported from rextto).
@@ -119,6 +122,20 @@ type uiSettingField struct {
 	// TagJSON is set for Kind=="tags": the value was a JSON array of scalars and
 	// must be saved back as a JSON array (otherwise comma separated).
 	TagJSON bool
+	// Unit, Zero and DependsOn come from uiSettingMetaByKey: the suffix of the
+	// control, the meaning of the special value and the controlling switch.
+	Unit      string
+	Zero      string
+	DependsOn string
+	// Hidden hides a row whose controlling switch is off.
+	Hidden bool
+	// Default is the documented default in the field's own spelling (empty
+	// when there is none worth restoring); Modified marks a saved value that
+	// differs from it.
+	Default  string
+	Modified bool
+	// Step is the step of a number control ("1" for integers, "any" otherwise).
+	Step string
 }
 
 // uiBoolPairs maps the boolean spellings accepted by the backend to their pair,
@@ -148,6 +165,8 @@ func uiBoolValues(value string) (bool, string, string) {
 type uiSettingsTabRef struct {
 	ID     string
 	Label  string
+	Area   string
+	Intro  string
 	Active bool
 	Count  int
 }
@@ -202,6 +221,11 @@ type uiSettingGroup struct {
 	// Buttons are optional API actions rendered inside the group panel (the
 	// qBittorrent-nox tile, for example).
 	Buttons []uiActionButton
+	// Grid renders the fields as a compact two-column grid (score weights).
+	Grid bool
+	// Collapsed renders the group closed: expert options, and the panels of
+	// a torrent engine that is not the active one.
+	Collapsed bool
 }
 
 // uiCheckboxOption is one checkbox of a uiCheckboxGroup.
@@ -394,6 +418,11 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	}
 	fieldsByTab := map[string][]uiSettingField{}
 	activeBackend := uiActiveTorrentBackend(cfg)
+	// The score weights lead the Qualità e upgrade tab; its other settings
+	// (upgrade thresholds) follow them.
+	for _, def := range uiScoreSettingDefs {
+		fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(def.Key, def.Label, cfg.Settings[def.Key]))
+	}
 	for _, def := range uiSettingsIndex {
 		if _, ok := labels[def.Tab]; !ok {
 			continue
@@ -406,6 +435,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		if !uiBackendAllows(uiSettingAllowedBackends(def.Key), activeBackend) {
 			field.Disabled = true
 			field.DisabledNote = "Non attivo con il motore «" + uiBackendLabel(activeBackend) + "»."
+			field.DisabledEngine = uiBackendLabel(activeBackend)
 		}
 		// With gx-torrent self-management on, the daemon owns the cache and the
 		// queue tuning: show those settings as "Auto" (managed) instead of
@@ -414,9 +444,6 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			field.Managed = true
 		}
 		fieldsByTab[def.Tab] = append(fieldsByTab[def.Tab], field)
-	}
-	for _, def := range uiScoreSettingDefs {
-		fieldsByTab["scores"] = append(fieldsByTab["scores"], uiSettingFieldFor(def.Key, def.Label, cfg.Settings[def.Key]))
 	}
 
 	// Structured settings are edited with real forms (feed lines, indexer rows,
@@ -475,19 +502,19 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		}
 	}
 
-	special := map[string]bool{"sources": true, "scores": true, "advanced": true, "i18n": true}
+	special := map[string]bool{"sources": true, "scores": true, "system": true}
 	tabs := make([]uiSettingsTabRef, 0, len(order))
-	for _, id := range order {
-		if len(fieldsByTab[id]) == 0 && !special[id] {
+	for _, tab := range uiSettingsTabs {
+		if len(fieldsByTab[tab.ID]) == 0 && !special[tab.ID] {
 			continue
 		}
-		tabs = append(tabs, uiSettingsTabRef{ID: id, Label: labels[id], Count: len(fieldsByTab[id])})
+		tabs = append(tabs, uiSettingsTabRef{ID: tab.ID, Label: tab.Label, Area: tab.Area, Intro: tab.Intro, Count: len(fieldsByTab[tab.ID])})
 	}
 	if len(tabs) == 0 {
 		tabs = append(tabs, uiSettingsTabRef{ID: "daemon", Label: "Daemon"})
 	}
 
-	active := strings.TrimSpace(activeTab)
+	active := uiSettingsCanonicalTab(activeTab)
 	valid := false
 	for _, tab := range tabs {
 		if tab.ID == active {
@@ -515,7 +542,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 	}
 	// With the continuous optimization on, the queue/cache fields are handled
 	// by Rextto/Gextto: show them as "Auto" (read-only), like rextto does.
-	if active == "libtorrent" && settingsBool(cfg, "libtorrent_auto_optimize", false) {
+	if active == "performance" && settingsBool(cfg, "libtorrent_auto_optimize", false) {
 		for index := range page.Fields {
 			if uiManagedSetting[page.Fields[index].Key] {
 				page.Fields[index].Managed = true
@@ -532,35 +559,39 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			}
 		}
 	}
-	if active == "scores" {
-		// The score weights read best as a compact two-column grid.
-		page.FieldsGrid = true
-	}
 	if active == "rename" {
 		page.Rename = uiRenameEditorFrom(cfg)
 	}
+	uiHideDependentFields(page.Fields)
 	page.Groups = uiSettingsGroups(active, page.Fields)
 	if active == "backend" {
+		// The binary path is not appended: the sentence stays translatable and
+		// «Stato qBittorrent-nox» shows where the binary is installed.
 		hint := "Scegli il motore dalla tendina «Motore torrent». Il binario gestito è scaricato e aggiornato da Gextto."
-		if binary := qbittorrentManagedBinary(cfg); binary != "" {
-			hint += " Binario: " + binary + "."
-		}
-		buttons := []uiActionButton{
+		qbittorrentButtons := []uiActionButton{
 			{Label: "Installa / Ottimizza qBittorrent-nox", Class: "primary", Method: "POST", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Scarica o aggiorna qBittorrent-nox nella cartella dell'app e imposta le opzioni ottimali (URL locale, utente admin, gestione automatica)."},
 			{Label: "Stato qBittorrent-nox", Method: "GET", Path: "/api/torrent-backend/qbittorrent/update", Body: "{}", Hint: "Mostra dove è installato qBittorrent-nox e se c'è un aggiornamento."},
-			{Label: "Applica motore", Method: "POST", Path: "/api/torrent-backend", Body: "{}", Hint: "Verifica il motore configurato e indica se serve un riavvio."},
 			{Label: "Test connessione", Method: "POST", Path: "/api/torrent-backend/test", Body: "{}", Hint: "Verifica la connessione al qBittorrent-nox configurato."},
 		}
+		engineButtons := []uiActionButton{
+			{Label: "Applica motore", Class: "primary", Method: "POST", Path: "/api/torrent-backend", Body: "{}", Hint: "Verifica il motore configurato e indica se serve un riavvio."},
+		}
 		for index := range page.Groups {
-			if strings.HasPrefix(page.Groups[index].Title, "qBittorrent") {
+			switch {
+			case strings.HasPrefix(page.Groups[index].Title, "qBittorrent"):
 				page.Groups[index].Hint = hint
-				page.Groups[index].Buttons = buttons
+				page.Groups[index].Buttons = qbittorrentButtons
+			case page.Groups[index].Title == "Motore torrent":
+				page.Groups[index].Hint = "Dopo aver cambiato motore salva la scelta e premi «Applica motore»: Gextto verifica il motore e indica se serve un riavvio."
+				page.Groups[index].Buttons = engineButtons
 			}
 		}
 	}
 	page.ShowSources = active == "sources"
-	page.ShowEditors = active == "advanced"
-	page.ShowI18n = active == "i18n"
+	page.ShowI18n = active == "system"
+	page.ListEditors = uiSettingsTabEditors(active)
+	page.ShowEditors = len(page.ListEditors) > 0
+	applyNow := uiActionButton{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."}
 	switch active {
 	case "sources":
 		// The Indexer Torznab editor and FlareSolverr live only in Integrazioni
@@ -568,15 +599,19 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		// settings, so the same form is not shown twice.
 		page.EditorsFirst = true
 		page.CheckboxGroups = uiSourcesCheckboxGroups(cfg)
-	case "advanced":
-		page.ListEditors = uiAdvancedEditors
 	case "libtorrent":
+		page.Actions = &uiActionSection{
+			Label:   "Applica alla sessione",
+			Hint:    "Le impostazioni salvate valgono dal ciclo successivo; «Applica ora» le riapplica subito alla sessione attiva.",
+			Buttons: []uiActionButton{applyNow},
+		}
+	case "performance":
 		page.Actions = &uiActionSection{
 			Label: "Ottimizzazione",
 			Hint:  "Ottimizza calcola cache e buffer in base alla RAM e adatta la coda dinamica durante il funzionamento. Con l'ottimizzazione continua attiva i campi Download attivi, Seed attivi, Limite torrent attivi e Cache disco sono gestiti automaticamente (Auto).",
 			Buttons: []uiActionButton{
 				{Label: "Ottimizza", Class: "primary", Method: "POST", Path: "/api/torrents/optimize_settings", Body: "{}", Hint: "Applica una base sicura e suggerisce cache e buffer in base alla RAM."},
-				{Label: "Applica ora", Method: "POST", Path: "/api/torrents/apply_settings", Body: "{}", Hint: "Riapplica subito le impostazioni libtorrent alla sessione attiva."},
+				applyNow,
 			},
 		}
 	}
@@ -594,18 +629,7 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 		}
 	}
 	// Special editors have no single setting key: point the search at their tab.
-	for _, entry := range []uiSearchEntry{
-		{Key: "", Label: "Feed RSS", Tab: "sources"},
-		{Key: "", Label: "Motori web", Tab: "sources"},
-		{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},
-		{Key: "", Label: "Filtri per sorgente", Tab: "advanced"},
-		{Key: "", Label: "Regole tag → cartella", Tab: "advanced"},
-		{Key: "", Label: "Event hook", Tab: "advanced"},
-		{Key: "", Label: "Cartelle osservate", Tab: "advanced"},
-		{Key: "", Label: "Traduzioni", Tab: "i18n"},
-	} {
-		entries = append(entries, entry)
-	}
+	entries = append(entries, uiSettingsEditorSearchEntries...)
 	page.SearchIndexJSON = uiJSON(entries)
 	return page
 }
@@ -627,7 +651,12 @@ func uiSettingsGroups(tab string, fields []uiSettingField) []uiSettingGroup {
 	}
 	groups := make([]uiSettingGroup, 0, len(order))
 	for _, title := range order {
-		groups = append(groups, uiSettingGroup{Title: title, Fields: grouped[title]})
+		group := uiSettingGroup{Title: title, Fields: grouped[title], Collapsed: uiCollapsedSettingGroups[title]}
+		// The score weights read best as a compact two-column grid.
+		if tab == "scores" && len(grouped[title]) > 0 {
+			_, group.Grid = uiScoreGroupTitle(grouped[title][0].Key)
+		}
+		groups = append(groups, group)
 	}
 	return groups
 }
@@ -713,74 +742,91 @@ func uiSettingAutoLabel(key string) string {
 // is the only one large enough to need sub-groups; the others render a single
 // panel with the tab name.
 func uiSettingGroupTitle(tab, key string) string {
-	lowered := strings.ToLower(key)
-	switch tab {
-	case "daemon":
-		return "Daemon"
-	case "sources":
-		return "Blacklist"
-	case "backend":
-		// One panel per transfer engine, so the settings are clearly separated.
-		switch {
-		case strings.HasPrefix(lowered, "qbittorrent_"):
-			return "qBittorrent-nox"
-		case strings.HasPrefix(lowered, "gxtorrent_"):
-			return "gx-torrent"
-		default:
-			return "Motore torrent"
+	if group := uiSettingGroupByKey[key]; group != "" {
+		return group
+	}
+	// Only the score weights are not in the curated index (user-saved score
+	// overrides included): they are grouped by their prefix.
+	if tab == "scores" {
+		if title, ok := uiScoreGroupTitle(key); ok {
+			return title
 		}
-	case "advanced":
-		return "Avanzate"
-	case "acquisition":
-		return "Acquisizione automatica"
-	case "notify":
-		return "Notifiche"
-	case "paths":
-		return "Percorsi runtime"
-	case "rename":
-		return "Rinomina e pulizia"
-	case "scores":
-		switch {
-		case strings.HasPrefix(lowered, "score_res_"):
-			return "Risoluzione"
-		case strings.HasPrefix(lowered, "score_source_"):
-			return "Sorgente"
-		case strings.HasPrefix(lowered, "score_codec_"):
-			return "Codec"
-		case strings.HasPrefix(lowered, "score_audio_"):
-			return "Audio"
-		case strings.HasPrefix(lowered, "score_bonus_"):
-			return "Bonus"
-		case strings.HasPrefix(lowered, "score_group_"):
-			return "Gruppi custom"
-		default:
-			return "Punteggi qualità"
-		}
-	case "libtorrent":
-		switch {
-		case strings.Contains(lowered, "ramdisk") || strings.Contains(lowered, "port"):
-			return "RAM disk e porte"
-		case strings.Contains(lowered, "dl_limit") || strings.Contains(lowered, "ul_limit") || strings.Contains(lowered, "sched"):
-			return "Velocità e programmazione"
-		case strings.Contains(lowered, "extra_settings"):
-			return "Impostazioni avanzate"
-		case strings.Contains(lowered, "connections") || strings.Contains(lowered, "cache") ||
-			strings.Contains(lowered, "aio") || strings.Contains(lowered, "alert") ||
-			strings.Contains(lowered, "half_open") || strings.Contains(lowered, "upload_slots") ||
-			strings.Contains(lowered, "max_"):
-			return "Connessioni e prestazioni"
-		case strings.Contains(lowered, "dht") || strings.Contains(lowered, "pex") ||
-			strings.Contains(lowered, "lsd") || strings.Contains(lowered, "upnp") ||
-			strings.Contains(lowered, "natpmp") || strings.Contains(lowered, "utp") ||
-			strings.Contains(lowered, "encryption") || strings.Contains(lowered, "proxy") ||
-			strings.Contains(lowered, "ipfilter") || strings.Contains(lowered, "interface") ||
-			strings.Contains(lowered, "tracker") || strings.Contains(lowered, "announce"):
-			return "Protocolli e rete"
-		default:
-			return "Generale"
-		}
+		return "Punteggi qualità"
 	}
 	return "Impostazioni"
+}
+
+// uiScoreGroupTitle returns the panel of a score weight from its prefix.
+func uiScoreGroupTitle(key string) (string, bool) {
+	lowered := strings.ToLower(key)
+	switch {
+	case strings.HasPrefix(lowered, "score_res_"):
+		return "Risoluzione", true
+	case strings.HasPrefix(lowered, "score_source_"):
+		return "Sorgente", true
+	case strings.HasPrefix(lowered, "score_codec_"):
+		return "Codec", true
+	case strings.HasPrefix(lowered, "score_audio_"):
+		return "Audio", true
+	case strings.HasPrefix(lowered, "score_bonus_"):
+		return "Bonus", true
+	case strings.HasPrefix(lowered, "score_group_"):
+		return "Gruppi custom", true
+	}
+	return "", false
+}
+
+// uiCollapsedSettingGroups are panels closed by default: rarely needed knobs.
+var uiCollapsedSettingGroups = map[string]bool{"Per esperti": true}
+
+// uiHideDependentFields hides the rows whose controlling switch is off. A
+// switch that is managed or not used by the active engine never hides
+// anything: its own value is not what decides.
+func uiHideDependentFields(fields []uiSettingField) {
+	parents := map[string]uiSettingField{}
+	for _, field := range fields {
+		parents[field.Key] = field
+	}
+	for index := range fields {
+		parent, ok := parents[fields[index].DependsOn]
+		if !ok || parent.Kind != "bool" || parent.Managed || parent.Disabled {
+			continue
+		}
+		fields[index].Hidden = !parent.BoolValue
+	}
+}
+
+// uiSettingsTabEditors returns the structured list editors shown on a tab.
+func uiSettingsTabEditors(tab string) []uiListEditor {
+	paths := map[string][]string{
+		"sources": {"/api/config/source-filters", "/api/watched-folders"},
+		"rename":  {"/api/tag-dir-rules"},
+		"notify":  {"/api/event-hooks"},
+	}[tab]
+	editors := []uiListEditor{}
+	for _, path := range paths {
+		for _, editor := range uiAdvancedEditors {
+			if editor.GetPath == path {
+				editors = append(editors, editor)
+			}
+		}
+	}
+	return editors
+}
+
+// uiSettingsEditorSearchEntries point the settings search at the structured
+// editors, which have no single setting key.
+var uiSettingsEditorSearchEntries = []uiSearchEntry{
+	{Key: "", Label: "Feed RSS", Tab: "sources"},
+	{Key: "", Label: "Motori web", Tab: "sources"},
+	{Key: "", Label: "Filtri contenuto esclusi", Tab: "sources"},
+	{Key: "", Label: "Filtri per sorgente", Tab: "sources"},
+	{Key: "", Label: "Cartelle osservate", Tab: "sources"},
+	{Key: "", Label: "Gruppi custom", Tab: "scores"},
+	{Key: "", Label: "Composizione del nome", Tab: "rename"},
+	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},
+	{Key: "", Label: "Event hook", Tab: "notify"},
+	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 
 // uiManagedSetting lists the settings the continuous optimization drives: with
@@ -912,7 +958,83 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 	return options
 }
 
+// uiSettingFieldFor builds the editable field of a setting from its stored
+// value ("" when never saved), then applies the presentation metadata.
 func uiSettingFieldFor(key, label, value string) uiSettingField {
+	field := uiSettingFieldBase(key, label, value)
+	uiApplySettingMeta(&field, value)
+	return field
+}
+
+// uiApplySettingMeta sets the unit, special-value note, dependency, control
+// type and default of a field. stored is the raw saved value ("" if unset).
+func uiApplySettingMeta(field *uiSettingField, stored string) {
+	meta := uiSettingMetaByKey[field.Key]
+	field.Unit, field.Zero, field.DependsOn = meta.Unit, meta.Zero, meta.DependsOn
+	def := uiSettingDefault(field.Key)
+	switch field.Kind {
+	case "secret", "structured", "tags", "area":
+		return
+	}
+	switch meta.Kind {
+	case "time":
+		field.Kind = "time"
+	case "days":
+		field.Kind = "days"
+		field.Options = uiDaysOptions(field.Value)
+	case "url":
+		if field.Kind == "text" {
+			field.Kind = "url"
+		}
+	case "select":
+		selected := strings.TrimSpace(field.Value)
+		options := make([]uiFormOption, 0, len(meta.Options)+1)
+		found := false
+		for _, option := range meta.Options {
+			option.Selected = option.Value == selected
+			found = found || option.Selected
+			options = append(options, option)
+		}
+		if selected != "" && !found {
+			options = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, options...)
+		}
+		field.Kind, field.Options = "select", options
+	}
+	// The stored value alone cannot tell a boolean or a number when the key
+	// was never saved or uses another spelling ("1"): the default can.
+	if field.Kind == "text" {
+		defLower := strings.ToLower(strings.TrimSpace(def))
+		switch {
+		case uiIsBoolSpelling(defLower) && !uiIsNumber(defLower) && (strings.TrimSpace(field.Value) == "" || uiIsBoolSpelling(field.Value)):
+			field.Kind = "bool"
+			field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(field.Value)
+		case uiIsNumber(def) && (strings.TrimSpace(field.Value) == "" || uiIsNumber(field.Value)):
+			field.Kind = "number"
+		}
+	}
+	if field.Kind == "number" && field.Step == "" {
+		field.Step = "any"
+		if uiScoreSettingKeys[field.Key] {
+			field.Step = "1"
+		}
+	}
+	if def == "" || uiSettingIsSecret(field.Key) || uiSettingNoPrefill[field.Key] {
+		return
+	}
+	field.Default = def
+	if field.Kind == "bool" {
+		defBool, _, _ := uiBoolValues(def)
+		field.Default = field.FalseValue
+		if defBool {
+			field.Default = field.TrueValue
+		}
+	}
+	if strings.TrimSpace(stored) != "" && !uiSettingSameValue(*field, stored, def) {
+		field.Modified = true
+	}
+}
+
+func uiSettingFieldBase(key, label, value string) uiSettingField {
 	// Mirror rextto/extto: when the key was never saved, show the documented
 	// default instead of an empty control. Secrets and list-like values keep the
 	// default only as a placeholder so they are never written by accident.

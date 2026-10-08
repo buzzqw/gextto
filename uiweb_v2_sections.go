@@ -22,6 +22,8 @@ import (
 type v2Button struct {
 	uiActionButton
 	View string
+	// Redirect is the page reopened after the action (default: the view).
+	Redirect string
 }
 
 func v2Buttons(view string, buttons []uiActionButton) []v2Button {

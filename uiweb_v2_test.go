@@ -450,8 +450,8 @@ func TestV2SettingsPagesAndSave(t *testing.T) {
 	if code != http.StatusOK || !strings.Contains(body, "v2-settings-body") {
 		t.Fatalf("settings page -> %d", code)
 	}
-	if strings.Index(body, "Cerca una impostazione per nome o chiave.") > strings.Index(body, `class="chip-row"`) {
-		t.Fatalf("settings search hint must precede settings tabs")
+	if nav := strings.Index(body, `class="settings-nav"`); nav < 0 || strings.Index(body, "Cerca una impostazione per nome o chiave.") > nav {
+		t.Fatalf("settings search hint must precede the settings navigation")
 	}
 	if !strings.Contains(body, `class="settings-search-row"`) {
 		t.Fatalf("settings search row missing")
@@ -820,8 +820,12 @@ func TestV2SettingsStructuredEditors(t *testing.T) {
 	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=sources", nil); code != http.StatusOK || !strings.Contains(body, "Feed RSS") {
 		t.Fatalf("sources tab -> %d", code)
 	}
-	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "Filtri per sorgente") {
-		t.Fatalf("advanced tab -> %d", code)
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=sources", nil); code != http.StatusOK || !strings.Contains(body, "Filtri per sorgente") || !strings.Contains(body, "Cartelle osservate") {
+		t.Fatalf("source editors -> %d", code)
+	}
+	// The former Avanzate tab is an alias of Diagnostica e traduzioni.
+	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=advanced", nil); code != http.StatusOK || !strings.Contains(body, "v2-i18n-table") || !strings.Contains(body, `id="v2-setting-debug_enabled"`) {
+		t.Fatalf("advanced alias -> %d", code)
 	}
 	if code, body := v2Request(t, server, http.MethodGet, "/?view=settings&tab=rename", nil); code != http.StatusOK || !strings.Contains(body, "Composizione del nome") || !strings.Contains(body, "v2-rename-form") {
 		t.Fatalf("rename tab -> %d", code)
@@ -918,6 +922,9 @@ func TestV2TranslateHTMLMirrorsClientBehaviour(t *testing.T) {
 	}
 	if !strings.Contains(got, "var Percorsi = 1;") {
 		t.Fatalf("script content must not be translated: %s", got)
+	}
+	if got := v2TranslateHTML(`<optgroup label="Percorsi"></optgroup>`, map[string]string{"Percorsi": "Paths"}, nil); !strings.Contains(got, `label="Paths"`) {
+		t.Fatalf("optgroup label not translated: %s", got)
 	}
 	if italian := v2TranslateHTML(raw, nil, nil); italian != raw {
 		t.Fatalf("Italian must be untouched: %s", italian)
@@ -1234,7 +1241,7 @@ func TestV2SeriesSaveAnimeAndUpgradeToggles(t *testing.T) {
 // "Auto" (managed) instead of editable values.
 func TestGxAutoMarksCacheAndQueueManaged(t *testing.T) {
 	state := newTestAppState(t)
-	page := uiSettingsPageFrom(state, "libtorrent")
+	page := uiSettingsPageFrom(state, "performance")
 	managed := map[string]bool{}
 	for _, g := range page.Groups {
 		for _, f := range g.Fields {
