@@ -117,10 +117,11 @@ Non esiste un "migliore" in assoluto: sono strumenti con confini diversi. Questa
   `movie/lookup` + `POST movie`, `queue` — ma presuppone i profili nominati, le
   root folder e i tag (quindi viene dopo il primo punto) e va provato con un
   Jellyseerr reale, perché il client è rigido sulle forme delle risposte.
-- **Notifiche.** Molti provider (Discord, Slack, Pushover, Gotify, ntfy, …);
-  Gextto ha Telegram, webhook ed email.
-  *Fattibilità:* bassa complessità — sono quasi tutti semplici POST HTTP sopra il
-  notifier esistente.
+- **Notifiche.** *arr hanno molti provider nativi (Discord, Slack, Pushover,
+  Gotify, ntfy, …); Gextto ha Telegram, email e un webhook. *Fatto:* il webhook
+  ora parla anche **Discord, Slack, ntfy, Gotify e Pushover** tramite il
+  selettore di formato (`notify_webhook_format`), quindi il grosso è coperto;
+  restano i provider più esoterici.
 - **Import di librerie esistenti.** Flusso consolidato in *arr, parziale in
   Gextto. Non prioritario ora.
 - **Community, wiki, immagini Docker, cadenza di aggiornamento.** Questione di

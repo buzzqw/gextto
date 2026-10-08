@@ -95,6 +95,7 @@ var uiSettingTooltipText = map[string]string{
 	"email_to":                                     "Destinatari delle email (separati da virgola).",
 	"email_password":                               "Password/app-password SMTP (non visualizzata).",
 	"notify_webhook_url":                           "URL del webhook a cui inviare gli eventi.",
+	"notify_webhook_format":                        "Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover. Per ntfy il segreto è il token Bearer. Per Gotify e Pushover il token va nell'URL.",
 	"notify_webhook_secret":                        "Segreto HMAC per firmare le richieste al webhook.",
 	"rename_episodes":                              "Rinomina i file scaricati usando i metadati TMDB.",
 	"cleanup_upgrades":                             "Sostituisce versioni inferiori già archiviate con upgrade migliori.",

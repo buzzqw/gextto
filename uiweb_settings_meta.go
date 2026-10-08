@@ -116,6 +116,14 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"email_to":           {DependsOn: "notify_email"},
 	"email_password":     {DependsOn: "notify_email"},
 	"notify_webhook_url": {Kind: "url"},
+	"notify_webhook_format": {Kind: "select", Options: []uiFormOption{
+		{Value: "gextto", Label: "Gextto (JSON firmato)"},
+		{Value: "discord", Label: "Discord"},
+		{Value: "slack", Label: "Slack"},
+		{Value: "ntfy", Label: "ntfy"},
+		{Value: "gotify", Label: "Gotify"},
+		{Value: "pushover", Label: "Pushover"},
+	}},
 
 	// Accesso
 	"auth_local_bypass": {DependsOn: "auth_enabled"},

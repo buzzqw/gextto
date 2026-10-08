@@ -1741,6 +1741,8 @@ eng:
   "Watchlist e calendario provider": "Provider watchlist and calendar"
   "Webhook URL": "Webhook URL"
   "Webhook secret": "Webhook secret"
+  "Formato webhook": "Webhook format"
+  "Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover. Per ntfy il segreto è il token Bearer. Per Gotify e Pushover il token va nell'URL.": "Format of the payload sent to the webhook URL. Gextto, Discord, Slack, ntfy, Gotify or Pushover. For ntfy the secret is the Bearer token. For Gotify and Pushover the token goes in the URL."
   "Weekly pack ora monitorato": "Weekly pack now monitored"
   "Weekly pack — monitoraggio": "Weekly pack — monitoring"
   "Weekly {date}": "Weekly {date}"

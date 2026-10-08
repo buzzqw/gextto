@@ -3541,6 +3541,8 @@ pol:
   Web seed rimosso: Usunięto ziarno sieciowe
   Webhook URL: Adres URL webhooka
   Webhook secret: Sekret webhooka
+  Formato webhook: Format webhooka
+  Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover. Per ntfy il segreto è il token Bearer. Per Gotify e Pushover il token va nell'URL.: Format ładunku wysyłanego na adres URL webhooka. Gextto, Discord, Slack, ntfy, Gotify lub Pushover. W ntfy sekret to token Bearer. W Gotify i Pushover token znajduje się w adresie URL.
   Weekly Pack: Pakiet tygodniowy
   Weekly pack NON monitorato: Pakiet tygodniowy NIE jest monitorowany
   Weekly pack forzato: Przymusowy pakiet tygodniowy

@@ -268,6 +268,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "email_password", Label: "Password email", Tab: "notify", Group: "Email"},
 	{Key: "notify_webhook_url", Label: "Webhook URL", Tab: "notify", Group: "Webhook"},
 	{Key: "notify_webhook_secret", Label: "Webhook secret", Tab: "notify", Group: "Webhook"},
+	{Key: "notify_webhook_format", Label: "Formato webhook", Tab: "notify", Group: "Webhook"},
 
 	// --- Accesso e servizi --------------------------------------------------
 	{Key: "auth_enabled", Label: "Richiedi l'accesso (login)", Tab: "access", Group: "Login"},

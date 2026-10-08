@@ -3593,6 +3593,8 @@ fra:
   Web seed rimosso: Graine Web supprimée
   Webhook URL: URL du webhook
   Webhook secret: Secret du webhook
+  Formato webhook: Format du webhook
+  Formato del payload inviato all'URL del webhook. Gextto, Discord, Slack, ntfy, Gotify o Pushover. Per ntfy il segreto è il token Bearer. Per Gotify e Pushover il token va nell'URL.: Format de la charge utile envoyée à l'URL du webhook. Gextto, Discord, Slack, ntfy, Gotify ou Pushover. Pour ntfy, le secret est le jeton Bearer. Pour Gotify et Pushover, le jeton va dans l'URL.
   Weekly Pack: Pack Hebdomadaire
   Weekly pack NON monitorato: Pack hebdomadaire NON suivi
   Weekly pack forzato: Pack hebdomadaire forcé

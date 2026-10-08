@@ -39,6 +39,7 @@ type Notifier struct {
 	telegramChatID   *string
 	webhookURL       *string
 	webhookSecret    *string
+	webhookFormat    string
 	emailEnabled     bool
 	emailSMTP        string
 	emailFrom        *string
@@ -112,6 +113,7 @@ func FromConfig(cfg *Config) *Notifier {
 	notifier.telegramChatID = cfg.TelegramChatID
 	notifier.webhookURL = cfg.NotifyWebhookURL
 	notifier.webhookSecret = cfg.NotifyWebhookSecret
+	notifier.webhookFormat = cfg.NotifyWebhookFormat
 	notifier.emailEnabled = cfg.NotifyEmail
 	notifier.emailSMTP = cfg.EmailSMTP
 	notifier.emailFrom = cfg.EmailFrom
@@ -326,19 +328,13 @@ func (n *Notifier) deliverEvent(event string, data map[string]any) error {
 		}
 	}
 	if n.webhookURL != nil {
-		url := *n.webhookURL
-		body, err := json.Marshal(map[string]any{"event": event, "data": data})
+		target := *n.webhookURL
+		body, contentType, headers, err := n.webhookRequest(event, data)
 		if err != nil {
 			return err
 		}
-		headers := map[string]string{}
-		if n.webhookSecret != nil {
-			mac := hmac.New(sha256.New, []byte(*n.webhookSecret))
-			mac.Write(body)
-			headers["x-gextto-signature"] = "sha256=" + hexBytes(mac.Sum(nil))
-		}
 		send := func() error {
-			return n.postJSON(url, headers, body)
+			return n.postRaw(target, contentType, headers, body)
 		}
 		result := send()
 		for attempt := 0; attempt < 2; attempt++ {
@@ -380,6 +376,62 @@ func (n *Notifier) postJSON(rawURL string, headers map[string]string, payload []
 		return fmt.Errorf("HTTP %d", status)
 	}
 	return nil
+}
+
+// postRaw POSTs a body with an explicit content type and treats any 4xx/5xx
+// status as an error.
+func (n *Notifier) postRaw(rawURL, contentType string, headers map[string]string, payload []byte) error {
+	response, err := HTTPRequest(context.Background(), http.MethodPost, rawURL, headers, payload, contentType)
+	if err != nil {
+		return redactRequestError(err)
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, response.Body)
+	if response.StatusCode >= 400 {
+		return fmt.Errorf("HTTP %d", response.StatusCode)
+	}
+	return nil
+}
+
+// webhookRequest builds the payload, content type and headers for the
+// configured webhook format. The default `gextto` format is the signed JSON
+// envelope; the other formats adapt the same text to a provider API. The URL
+// carries the endpoint and, for token-based providers (gotify, pushover), the
+// token/user in its query; the optional secret is the ntfy bearer token.
+func (n *Notifier) webhookRequest(event string, data map[string]any) ([]byte, string, map[string]string, error) {
+	headers := map[string]string{}
+	switch strings.ToLower(strings.TrimSpace(n.webhookFormat)) {
+	case "discord":
+		body, err := json.Marshal(map[string]any{"content": formatEvent(event, data)})
+		return body, "application/json", headers, err
+	case "slack":
+		body, err := json.Marshal(map[string]any{"text": formatEvent(event, data)})
+		return body, "application/json", headers, err
+	case "gotify":
+		body, err := json.Marshal(map[string]any{"title": "Gextto", "message": formatEvent(event, data)})
+		return body, "application/json", headers, err
+	case "ntfy":
+		if n.webhookSecret != nil {
+			headers["Authorization"] = "Bearer " + *n.webhookSecret
+		}
+		return []byte(formatEvent(event, data)), "text/plain; charset=utf-8", headers, nil
+	case "pushover":
+		form := url.Values{}
+		form.Set("title", "Gextto")
+		form.Set("message", formatEvent(event, data))
+		return []byte(form.Encode()), "application/x-www-form-urlencoded", headers, nil
+	default: // gextto
+		body, err := json.Marshal(map[string]any{"event": event, "data": data})
+		if err != nil {
+			return nil, "", nil, err
+		}
+		if n.webhookSecret != nil {
+			mac := hmac.New(sha256.New, []byte(*n.webhookSecret))
+			mac.Write(body)
+			headers["x-gextto-signature"] = "sha256=" + hexBytes(mac.Sum(nil))
+		}
+		return body, "application/json", headers, nil
+	}
 }
 
 // throttleTelegram enforces at most one Telegram API call per second.

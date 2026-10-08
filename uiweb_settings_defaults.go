@@ -185,9 +185,10 @@ var uiSettingDefaults = map[string]string{
 	"temp_orphan_min_age_days":             "7",
 
 	// --- Notifiche ----------------------------------------------------------
-	"notify_telegram": "false",
-	"notify_email":    "false",
-	"email_smtp":      "smtp.gmail.com:587",
+	"notify_telegram":       "false",
+	"notify_email":          "false",
+	"email_smtp":            "smtp.gmail.com:587",
+	"notify_webhook_format": "gextto",
 
 	// --- Percorsi -----------------------------------------------------------
 	"cleanup_action": "move",

@@ -314,6 +314,7 @@ type Config struct {
 	TelegramChatID      *string            `json:"telegram_chat_id"`
 	NotifyWebhookURL    *string            `json:"notify_webhook_url"`
 	NotifyWebhookSecret *string            `json:"notify_webhook_secret"`
+	NotifyWebhookFormat string             `json:"notify_webhook_format"`
 	NotifyEmail         bool               `json:"notify_email"`
 	EmailSMTP           string             `json:"email_smtp"`
 	EmailFrom           *string            `json:"email_from"`
@@ -759,6 +760,7 @@ func DefaultConfig() Config {
 		TelegramChatID:      nil,
 		NotifyWebhookURL:    nil,
 		NotifyWebhookSecret: nil,
+		NotifyWebhookFormat: "gextto",
 		NotifyEmail:         false,
 		EmailSMTP:           "smtp.gmail.com:587",
 		EmailFrom:           nil,
@@ -2183,6 +2185,11 @@ func (c *Config) loadConfigDB() error {
 		c.NotifyWebhookSecret = &value
 	} else {
 		c.NotifyWebhookSecret = nil
+	}
+	if value, ok := c.Settings["notify_webhook_format"]; ok && strings.TrimSpace(value) != "" {
+		c.NotifyWebhookFormat = strings.TrimSpace(value)
+	} else {
+		c.NotifyWebhookFormat = "gextto"
 	}
 	c.NotifyEmail = configBoolSetting(mapValue(c.Settings, "notify_email"))
 	if value, ok := c.Settings["email_smtp"]; ok {

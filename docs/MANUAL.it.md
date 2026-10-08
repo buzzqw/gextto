@@ -1544,6 +1544,7 @@ disk; qBittorrent, che non lo supporta, scarica sempre su disco.
 |---|---|
 | Webhook URL | URL del webhook a cui inviare gli eventi. |
 | Webhook secret | Segreto HMAC per firmare le richieste al webhook. |
+| Formato webhook | Formato del payload inviato all'URL del webhook (Gextto, Discord, Slack, ntfy, Gotify, Pushover). Per ntfy il segreto è il token Bearer; per Gotify e Pushover il token va nell'URL. |
 
 **Editor**
 

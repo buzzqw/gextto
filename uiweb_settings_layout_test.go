@@ -47,7 +47,7 @@ var uiSettingsKeysBeforeReorganization = []string{
 	"housekeeping_history_days", "housekeeping_error_age_days", "housekeeping_gap_log_days",
 	"housekeeping_upgrade_backup_days", "media_info_backfill_enabled", "media_info_backfill_interval_minutes",
 	"media_info_backfill_batch", "temp_orphan_cleanup_enabled", "temp_orphan_min_age_days", "notify_telegram",
-	"telegram_bot_token", "telegram_chat_id", "notify_webhook_url", "notify_webhook_secret", "notify_email",
+	"telegram_bot_token", "telegram_chat_id", "notify_webhook_url", "notify_webhook_secret", "notify_webhook_format", "notify_email",
 	"email_smtp", "email_from", "email_to", "email_password", "archive_root", "trash_path", "cleanup_action",
 	"libtorrent_dir", "libtorrent_temp_dir", "libtorrent_torrent_copy_dir",
 }
@@ -56,11 +56,11 @@ var uiSettingsKeysBeforeReorganization = []string{
 // checks that each one is rendered, editable, in the section the index
 // assigns it to.
 func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
-	if got := len(uiSettingsKeysBeforeReorganization); got != 146 {
-		t.Fatalf("frozen list has %d keys, want 146", got)
+	if got := len(uiSettingsKeysBeforeReorganization); got != 147 {
+		t.Fatalf("frozen list has %d keys, want 147", got)
 	}
-	if got := len(uiSettingsIndex); got != 146 {
-		t.Fatalf("settings index has %d options, want the 146 of before", got)
+	if got := len(uiSettingsIndex); got != 147 {
+		t.Fatalf("settings index has %d options, want the 147 of before", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -99,8 +99,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 173 {
-		t.Fatalf("rendered %d options, want 173", found)
+	if found != 174 {
+		t.Fatalf("rendered %d options, want 174", found)
 	}
 
 	// Editors, panels and actions without a single key.

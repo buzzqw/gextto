@@ -1506,6 +1506,7 @@ it, always downloads to disk.
 |---|---|
 | Webhook URL | Webhook URL where events are sent. |
 | Webhook secret | HMAC secret to sign webhook requests. |
+| Webhook format | Format of the payload sent to the webhook URL (Gextto, Discord, Slack, ntfy, Gotify, Pushover). For ntfy the secret is the Bearer token; for Gotify and Pushover the token goes in the URL. |
 
 **Editors**
 
