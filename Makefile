@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-real test-rain vet fmt check-ui installer-test tidy package clean run
+.PHONY: all build fast gx-torrent test test-race test-real test-rain vet fmt check-ui installer-test tidy package clean run measure-seeding
 
 all: build
 
@@ -46,6 +46,13 @@ test-rain:
 # can stay non-blocking until the shared state has been audited.
 test-race:
 	CGO_ENABLED=1 go test -race ./...
+
+# Seeding/choking measurements (gextto fork). The deterministic unchoker harness
+# runs with `make test-rain`; this runs the opt-in local-swarm harness. Add
+# GX_MEASURE_SUPERSEED=1 to compare against super-seeding, GX_MEASURE_LEECHERS=N
+# for the swarm size. See docs/gx-torrent-misure-seeding.md.
+measure-seeding:
+	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
 
 vet:
 	CGO_ENABLED=1 go vet ./...

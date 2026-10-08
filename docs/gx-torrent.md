@@ -656,8 +656,14 @@ rain.
     - solo in uTP, con il DHT sullo stesso socket UDP;
     - con il peer trovato via LSD (multicast reale);
   - caricamento del filtro IP.
+  - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) la misura seeding/choking
+    su sciame locale, con byte e tempi per peer: metodo e metriche in
+    `docs/gx-torrent-misure-seeding.md`.
 - `go test ./internal/blocklist` in `third_party/rain` copre i formati del
   filtro IP.
+- `make test-rain` copre anche l'harness deterministico del choking
+  (`internal/unchoker/sim_test.go`) e il super-seeding
+  (`torrent/torrent_superseed_test.go`).
 - `go test -run GxEngine .` copre l'adapter:
   - stati ed eventi;
   - cache su interruzione;

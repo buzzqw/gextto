@@ -74,7 +74,7 @@ presenti o già gestiti da Gextto.
 | 10 | BitTorrent v2-only | **Wishlist** | — |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `Torrent.SetSuperSeeding` nel fork + azione `super-seeding` nel demone; capacità `super_seeding` = `full` | 8 |
 | 12 | Holepunching, WebTorrent | **Wishlist** | — |
-| 13 | Qualità seeding/choking | **Wishlist** — da misurare prima | — |
+| 13 | Qualità seeding/choking | **Misura** — harness pronto, misure da fare (`docs/gx-torrent-misure-seeding.md`) | — |
 
 Convenzione semantica scelta per i limiti: **-1 = eredita il globale, 0 =
 illimitato** (come libtorrent e come i campi già presenti nell'UI).
@@ -117,7 +117,9 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
 - **Holepunching, WebTorrent**: funzioni di nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima misurare gx-torrent vs libtorrent/qBittorrent
   sullo stesso sciame (rapporto, throughput in upload, tempo a 1:1), poi
-  valutare un investimento sul core di rain.
+  valutare un investimento sul core di rain. L'harness deterministico
+  dell'unchoker e lo sciame locale sono pronti; metodo e metriche in
+  `docs/gx-torrent-misure-seeding.md`.
 
 Fatto dalla wishlist: **super-seeding** (BEP 16), punto 8 del piano.
 

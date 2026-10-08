@@ -22,6 +22,9 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `internal/bandwidth/limiter_test.go` — il limite cambia a caldo;
 - `internal/storage/filestorage/preallocate_linux_test.go` — niente
   preallocazione su tmpfs;
+- `internal/unchoker/sim_test.go` — harness deterministico del choking: proprietà
+  dell'algoritmo (downloader/uploader più veloci, optimistic, budget di slot,
+  fairness) e benchmark del tick, per confrontare varianti e misurarne il costo;
 - `torrent/torrent_superseed_test.go` — rotazione dei pezzi offerti e selezione
   dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto).
 
