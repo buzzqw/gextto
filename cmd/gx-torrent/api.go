@@ -157,7 +157,10 @@ func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *Daemon) handleList(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, d.list())
+	// Serve the published snapshot: the read path never touches a torrent run
+	// loop, so a torrent blocked on a slow network mount cannot make the API
+	// time out and look like a dead daemon to Gextto.
+	writeJSON(w, http.StatusOK, d.snapshotViews())
 }
 
 func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {

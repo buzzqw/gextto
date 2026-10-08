@@ -401,6 +401,11 @@ un download al 20% da `/dev/shm` al disco.
   spostato senza copiare i suoi file vuoti: vengono ricreati nella
   destinazione, senza scrivere gigabyte di zeri sul NAS e senza il controllo
   completo che rain farebbe trovando file già presenti.
+- Un torrent con dimensione sconosciuta all'aggiunta (magnet) non parte sul RAM
+  disk: resta su disco finché i metadati non rivelano la dimensione, poi viene
+  spostato sul RAM disk solo se rientra nella soglia. Un file troppo grande non
+  tocca mai il tmpfs. La regola vale anche per gli add manuali e per ogni motore
+  con supporto `ramdisk`; qBittorrent (`ramdisk: none`) scarica sempre su disco.
 - Lo spazio "riservato" sul RAM disk non conta i torrent che ne stanno già
   uscendo.
 
@@ -622,6 +627,30 @@ Chiavi accettate da `POST /api/v1/config`:
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
 - `max_peer_dial`, `max_peer_accept`;
 - `sequential` (predefinito per i torrent aggiunti dopo).
+
+## Disponibilità dell'API (snapshot e lock)
+
+Gextto interroga `GET /api/v1/torrents` a ogni polling (1,5 s) con un timeout di
+15 s: se la risposta non arriva, il demone viene considerato non raggiungibile.
+La lista è quindi servita da uno **snapshot** pubblicato dal tick della coda e
+dai comandi che modificano lo stato, **senza prendere `d.mu` e senza toccare il
+run loop di alcun torrent**. Un torrent bloccato su I/O di storage (per esempio
+una copia lunga verso un mount di rete) non può così far sembrare l'API morta.
+
+Il tick lavora in tre fasi, per non tenere mai `d.mu` durante un'operazione che
+può bloccarsi:
+
+1. **Campionamento** (senza lock): per ogni torrent legge stats, peer e tracker
+   dal suo run loop e classifica lo storage (lo `statfs` sul mount di rete può
+   bloccarsi a lungo).
+2. **Applicazione** (con `d.mu`): aggiorna meta e coda a partire dai campioni,
+   calcola il piano e pubblica lo snapshot. Nessuna chiamata al run loop qui.
+3. **Azioni** (senza lock): esegue `Start`/`Stop` decisi dal piano; se il run
+   loop è occupato, l'azione viene semplicemente ritentata al tick successivo.
+
+Lo snapshot può essere vecchio al massimo di un tick (3 s predefiniti); ogni
+comando che cambia lo stato fa ripartire subito un tick, quindi la UI e Gextto
+vedono la modifica quasi immediatamente.
 
 ## Limiti noti (rain)
 

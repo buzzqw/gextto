@@ -127,6 +127,13 @@ type Daemon struct {
 	dirty          bool
 	startedAt      time.Time
 
+	// snapshot is the last published torrent view list. The REST list and the
+	// web page read it without d.mu, so a slow per-torrent call — a torrent run
+	// loop blocked on a network mount, say — can never make the daemon look
+	// unreachable.
+	snapMu   sync.RWMutex
+	snapshot []torrentInfo
+
 	listenHost    string
 	peerPort      int
 	mapper        *portMapper
@@ -143,6 +150,13 @@ type Daemon struct {
 	cacheClass     string
 	cacheCheckedAt time.Time
 	cacheAppliedAt time.Time
+
+	// classCached is the storage class of the download dir, refreshed without
+	// holding d.mu: statfs on an unresponsive network mount can block for a
+	// long time and must never stall the daemon lock.
+	classMu        sync.Mutex
+	classCached    string
+	classCheckedAt time.Time
 
 	// selection is read by rain from torrent goroutines: it has its own
 	// lock and must never wait for d.mu.
@@ -178,6 +192,9 @@ func newDaemon(opts Options) (*Daemon, error) {
 	if err := d.prepareNetwork(); err != nil {
 		return nil, err
 	}
+	// Classify the download storage before taking the lock: statfs on a network
+	// mount must never run under d.mu.
+	d.refreshStorageClass(time.Now())
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if err := d.openSessionLocked(); err != nil {
@@ -185,6 +202,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 	}
 	d.reconcileLocked()
 	d.saveLocked()
+	d.publishViewsLocked(d.buildViewsLocked())
 	if d.peerPort > 0 {
 		d.mapper = newPortMapper(d.peerPort, opts.Network.UPnP, opts.Network.NATPMP)
 		d.mapper.start()
@@ -492,7 +510,13 @@ func isRunning(status torrent.Status) bool {
 // reports 0 for a stopped torrent (its piece table exists only while it
 // runs), which would make a finished, paused torrent look empty.
 func (d *Daemon) statsLocked(t *torrent.Torrent) torrent.Stats {
-	stats := t.Stats()
+	return d.adjustStatsLocked(t, t.Stats())
+}
+
+// adjustStatsLocked applies the meta-driven fixes to a sample already taken
+// from the torrent run loop. The tick passes a sample collected outside d.mu,
+// so the per-torrent call itself never runs under the lock.
+func (d *Daemon) adjustStatsLocked(t *torrent.Torrent, stats torrent.Stats) torrent.Stats {
 	total := stats.Bytes.Total
 	if total <= 0 {
 		return stats
@@ -529,33 +553,78 @@ func isComplete(stats torrent.Stats) bool {
 	return stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 && stats.Bytes.Incomplete == 0
 }
 
+// collectedTorrent is one torrent sampled from its run loop. The sample is
+// taken before d.mu is held: rain's per-torrent calls can block on storage I/O
+// (a slow or unresponsive network mount), and holding the daemon lock through
+// them would freeze every API request.
+type collectedTorrent struct {
+	stats    torrent.Stats
+	peers    []torrent.Peer
+	trackers []torrent.Tracker
+}
+
 func (d *Daemon) tick(now time.Time) {
+	// Phase 1: sample the run loops without d.mu.
 	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.session == nil {
+	session := d.session
+	d.mu.Unlock()
+	if session == nil {
+		return
+	}
+	torrents := session.ListTorrents()
+	collected := make(map[string]collectedTorrent, len(torrents))
+	for _, t := range torrents {
+		collected[t.ID()] = collectedTorrent{
+			stats:    t.Stats(),
+			peers:    t.Peers(),
+			trackers: t.Trackers(),
+		}
+	}
+	// statfs on the download dir can block on a network mount: classify it
+	// outside d.mu.
+	d.refreshStorageClass(now)
+
+	// Phase 2: apply the samples under d.mu.
+	d.mu.Lock()
+	if d.session != session {
+		d.mu.Unlock()
 		return
 	}
 	if d.restartPending && len(d.moving) == 0 {
+		// The session is rebuilt: the samples belong to the old handles. The
+		// next tick (the config change pokes the queue) samples the new ones.
 		d.restartSessionLocked()
-		if d.session == nil {
-			return
-		}
+		d.mu.Unlock()
+		return
 	}
 	cfg := d.state.Config
 	slowAfter := time.Duration(cfg.SlowAfterSecs) * time.Second
 
-	torrents := d.session.ListTorrents()
+	torrents = d.session.ListTorrents()
+	statsOf := make(map[string]torrent.Stats, len(torrents))
+	for _, t := range torrents {
+		if sample, ok := collected[t.ID()]; ok {
+			statsOf[t.ID()] = d.adjustStatsLocked(t, sample.stats)
+		}
+	}
+	positions := d.queuePositionsLocked(torrents, statsOf)
+
 	handles := make(map[string]*torrent.Torrent, len(torrents))
 	items := make([]queueItem, 0, len(torrents))
 	var aggregate int64
 	queued := 0
 	activeDownloads, activeSeeds := 0, 0
+	var pendingStops []*torrent.Torrent
 	for _, t := range torrents {
 		id := t.ID()
+		stats, ok := statsOf[id]
+		if !ok {
+			// Added between the two phases: handled on the next tick.
+			continue
+		}
 		handles[id] = t
 		meta := d.metaLocked(t)
 		rt := d.runtimeLocked(id)
-		stats := d.statsLocked(t)
 		running := isRunning(stats.Status)
 		complete := isComplete(stats)
 		if running {
@@ -580,7 +649,7 @@ func (d *Daemon) tick(now time.Time) {
 			meta.UserPaused = true
 			d.dirty = true
 			if running {
-				_ = t.Stop()
+				pendingStops = append(pendingStops, t)
 				running = false
 			}
 		}
@@ -608,7 +677,8 @@ func (d *Daemon) tick(now time.Time) {
 			if !complete {
 				aggregate += int64(stats.Speed.Download)
 			}
-			d.refreshSwarmLocked(t, meta, rt, now)
+			sample := collected[id]
+			d.applySwarmLocked(meta, rt, now, sample.peers, sample.trackers)
 		} else {
 			rt.startedAt = time.Time{}
 			rt.lastActive = time.Time{}
@@ -646,25 +716,24 @@ func (d *Daemon) tick(now time.Time) {
 			meta.RotatedAt = now
 			meta.Pos = d.nextPosLocked()
 			d.dirty = true
-			logf("%s moves no data: set aside so another torrent can run", nameOf(handles[id]))
+			logf("«%s» moves no data: set aside so another torrent can run", statsOf[id].Name)
 		}
 	}
 	for _, id := range plan.Stop {
 		if t := handles[id]; t != nil {
-			if err := t.Stop(); err != nil {
-				logf("queue stop %s: %v", id, err)
-			}
+			pendingStops = append(pendingStops, t)
 		}
 	}
+	// Start and stop are issued outside d.mu: rain's sendCommand waits on the
+	// torrent run loop, which can be busy on storage I/O. The queue retries on
+	// the next tick, so a delayed action is not lost.
+	var pendingStarts []*torrent.Torrent
 	for _, id := range plan.Start {
 		t := handles[id]
 		if t == nil {
 			continue
 		}
-		if err := t.Start(); err != nil {
-			logf("queue start %s: %v", id, err)
-			continue
-		}
+		pendingStarts = append(pendingStarts, t)
 		rt := d.runtimeLocked(id)
 		rt.startedAt = now
 		rt.lastActive = time.Time{}
@@ -676,21 +745,41 @@ func (d *Daemon) tick(now time.Time) {
 	if d.dirty {
 		d.saveLocked()
 	}
-}
 
-func nameOf(t *torrent.Torrent) string {
-	if t == nil {
-		return "torrent"
+	// Publish the snapshot for the lock-free read path.
+	views := make([]torrentInfo, 0, len(handles))
+	for _, t := range torrents {
+		id := t.ID()
+		stats, ok := statsOf[id]
+		if !ok {
+			continue
+		}
+		views = append(views, d.infoLocked(t, stats, d.runtimeLocked(id), d.moving[id], positions))
 	}
-	return fmt.Sprintf("«%s»", t.Stats().Name)
+	sort.Slice(views, func(i, j int) bool { return views[i].Hash < views[j].Hash })
+	d.publishViewsLocked(views)
+	d.mu.Unlock()
+
+	// Phase 3: act on the run loops without holding d.mu.
+	for _, t := range pendingStops {
+		if err := t.Stop(); err != nil {
+			logf("queue stop %s: %v", t.ID(), err)
+		}
+	}
+	for _, t := range pendingStarts {
+		if err := t.Start(); err != nil {
+			logf("queue start %s: %v", t.ID(), err)
+		}
+	}
 }
 
-// refreshSwarmLocked samples peers every tick and tracker scrapes once a
-// minute; the swarm size survives a stop so a parked torrent keeps its
+// applySwarmLocked records the peer count sampled this tick and, once a minute,
+// the tracker scrape. The peers and trackers are collected outside d.mu (see
+// tick); the swarm size survives a stop so a parked torrent keeps its
 // diagnosis.
-func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *runtimeInfo, now time.Time) {
+func (d *Daemon) applySwarmLocked(meta *torrentMeta, rt *runtimeInfo, now time.Time, peers []torrent.Peer, trackers []torrent.Tracker) {
 	seeds := 0
-	for _, peer := range t.Peers() {
+	for _, peer := range peers {
 		if peer.Seed || peer.DownloadSpeed > 0 {
 			seeds++
 		}
@@ -702,7 +791,7 @@ func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *r
 	rt.lastTracker = now
 	swarmSeeds, swarmPeers, working := -1, -1, false
 	rt.tracker = ""
-	for _, tracker := range t.Trackers() {
+	for _, tracker := range trackers {
 		if tracker.Status != torrent.Working {
 			continue
 		}
@@ -807,11 +896,8 @@ func stateFor(meta *torrentMeta, stats torrent.Stats, moving bool) string {
 	return "paused"
 }
 
-func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrentInfo {
-	stats := d.statsLocked(t)
+func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtimeInfo, moving bool, queuePos map[string]int) torrentInfo {
 	meta := d.metaLocked(t)
-	rt := d.runtimeLocked(t.ID())
-	moving := d.moving[t.ID()]
 	if meta.Version == "" && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
 		if data, err := t.Torrent(); err == nil && len(data) > 0 {
 			// rain handles v1 and the v1 side of hybrid torrents; the raw
@@ -900,18 +986,24 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 }
 
 // queuePositionsLocked numbers the queue-managed downloads (0 = next to run).
-func (d *Daemon) queuePositionsLocked(torrents []*torrent.Torrent) map[string]int {
+// statsOf holds the already-adjusted per-torrent stats, so this never queries
+// a torrent run loop.
+func (d *Daemon) queuePositionsLocked(torrents []*torrent.Torrent, statsOf map[string]torrent.Stats) map[string]int {
 	type entry struct {
 		id  string
 		pos int64
 	}
 	var list []entry
 	for _, t := range torrents {
+		stats, ok := statsOf[t.ID()]
+		if !ok {
+			continue
+		}
 		meta := d.metaLocked(t)
 		if meta.UserPaused || meta.Parked || meta.Pinned || meta.Error != "" {
 			continue
 		}
-		if isComplete(d.statsLocked(t)) {
+		if isComplete(stats) {
 			continue
 		}
 		list = append(list, entry{t.ID(), meta.Pos})
@@ -929,23 +1021,57 @@ func (d *Daemon) queuePositionsLocked(torrents []*torrent.Torrent) map[string]in
 	return out
 }
 
-func (d *Daemon) list() []torrentInfo {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+// buildViewsLocked rebuilds the torrent view list. Callers hold d.mu. It
+// queries the torrent run loops (statsLocked); the tick path passes samples
+// collected outside the lock through the same helpers, so a slow run loop
+// cannot stall the read path.
+func (d *Daemon) buildViewsLocked() []torrentInfo {
 	if d.session == nil {
 		return []torrentInfo{}
 	}
 	torrents := d.session.ListTorrents()
-	positions := d.queuePositionsLocked(torrents)
+	statsOf := make(map[string]torrent.Stats, len(torrents))
+	for _, t := range torrents {
+		statsOf[t.ID()] = d.statsLocked(t)
+	}
+	positions := d.queuePositionsLocked(torrents, statsOf)
 	out := make([]torrentInfo, 0, len(torrents))
 	for _, t := range torrents {
-		out = append(out, d.infoLocked(t, positions))
+		out = append(out, d.infoLocked(t, statsOf[t.ID()], d.runtimeLocked(t.ID()), d.moving[t.ID()], positions))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Hash < out[j].Hash })
+	return out
+}
+
+// publishViewsLocked stores the view list for the lock-free readers.
+func (d *Daemon) publishViewsLocked(views []torrentInfo) {
+	d.snapMu.Lock()
+	d.snapshot = views
+	d.snapMu.Unlock()
+}
+
+// snapshotViews returns a copy of the last published view list. It never takes
+// d.mu nor touches a torrent run loop, so the REST list and the web page keep
+// answering even while the queue is blocked on storage I/O.
+func (d *Daemon) snapshotViews() []torrentInfo {
+	d.snapMu.RLock()
+	defer d.snapMu.RUnlock()
+	out := make([]torrentInfo, len(d.snapshot))
+	copy(out, d.snapshot)
+	return out
+}
+
+// list builds a fresh view list, publishes it and returns it. Internal callers
+// and tests use it; the hot read path uses snapshotViews.
+func (d *Daemon) list() []torrentInfo {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	views := d.buildViewsLocked()
 	if d.dirty {
 		d.saveLocked()
 	}
-	return out
+	d.publishViewsLocked(views)
+	return views
 }
 
 // ---------------------------------------------------------------------------
@@ -1366,6 +1492,9 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	from := meta.SavePath
 	name := stats.Name
 	d.mu.Unlock()
+	// Publish the "moving" state promptly: the read snapshot is refreshed by
+	// the tick, which may otherwise be up to Tick seconds away.
+	d.poke()
 
 	go d.finishMove(id, t, from, dest, name, wasRunning, associate, empty)
 	return nil
@@ -1547,7 +1676,13 @@ type daemonStats struct {
 }
 
 func (d *Daemon) stats() daemonStats {
-	views := d.list()
+	views := d.snapshotViews()
+	// statfs on the download dir can block on a network mount: compute it
+	// outside d.mu.
+	diskFreeBytes, diskTotalBytes := diskFree(d.opts.DownloadDir)
+	if diskTotalBytes == 0 {
+		diskFreeBytes, diskTotalBytes = diskFree(d.opts.DataDir)
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	out := daemonStats{
@@ -1575,10 +1710,7 @@ func (d *Daemon) stats() daemonStats {
 	}
 	out.CacheReadMB, out.CacheWriteMB, out.CacheAuto = read/mib, write/mib, auto
 	out.CacheReason, out.CacheStorage, out.MemAvailableMB = d.cacheReason, d.cacheClass, memoryAvailable()/mib
-	out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DownloadDir)
-	if out.DiskTotalBytes == 0 {
-		out.DiskFreeBytes, out.DiskTotalBytes = diskFree(d.opts.DataDir)
-	}
+	out.DiskFreeBytes, out.DiskTotalBytes = diskFreeBytes, diskTotalBytes
 	if out.LSD.Error == "" && d.lsdError != "" {
 		out.LSD.Error = d.lsdError
 	}

@@ -1006,9 +1006,14 @@ func TestSpeedLimitsChangeWithoutSessionReopen(t *testing.T) {
 	if _, err := d.setConfig(map[string]json.RawMessage{"max_peer_dial": json.RawMessage(`10`)}); err != nil {
 		t.Fatal(err)
 	}
-	if !d.restartPending {
-		t.Fatal("peer limits are read at session creation: a reopen is expected")
-	}
+	// The reopen is applied by the queue loop: wait for it instead of racing
+	// the loop on restartPending.
+	waitFor(t, "session reopened for the peer limits", func() bool {
+		d.mu.Lock()
+		changed := d.session != session
+		d.mu.Unlock()
+		return changed
+	})
 }
 
 func TestMoveDropsTheEmptyFilesOfADownloadWithNothingYet(t *testing.T) {
@@ -1562,4 +1567,40 @@ func TestSuperSeedingTransfer(t *testing.T) {
 		info, _ := findInfo(leecher, hash)
 		return info.Progress == 100
 	})
+}
+
+// TestListEndpointAnswersWhileTheLockIsHeld locks in the guarantee that keeps
+// Gextto from declaring the daemon unreachable: the REST list is served from
+// the published snapshot, without d.mu nor any torrent run loop. A tick stuck
+// on a torrent's storage I/O (a long move to a slow network mount) therefore
+// cannot turn a slow response into "daemon down".
+func TestListEndpointAnswersWhileTheLockIsHeld(t *testing.T) {
+	d := newTestDaemon(t)
+	// Seed the snapshot as the first tick would.
+	d.list()
+
+	server := httptest.NewServer(d.routes())
+	defer server.Close()
+
+	// Hold d.mu exactly as a tick blocked on a torrent run loop would.
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(server.URL + "/api/v1/torrents")
+	if err != nil {
+		t.Fatalf("the list endpoint must answer without d.mu: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var views []torrentInfo
+	if err := json.Unmarshal(body, &views); err != nil {
+		t.Fatalf("invalid list body %q: %v", body, err)
+	}
 }

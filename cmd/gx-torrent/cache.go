@@ -177,6 +177,27 @@ func storageClass(path string) string {
 	return "unknown"
 }
 
+// refreshStorageClass recomputes the download storage class when due and
+// returns it. It must be called WITHOUT holding d.mu: statfs on an
+// unresponsive network mount can block for a long time.
+func (d *Daemon) refreshStorageClass(now time.Time) string {
+	d.classMu.Lock()
+	defer d.classMu.Unlock()
+	if d.classCached == "" || d.classCheckedAt.IsZero() || now.Sub(d.classCheckedAt) >= cacheCheckEvery {
+		d.classCached = storageClass(d.downloadDir())
+		d.classCheckedAt = now
+	}
+	return d.classCached
+}
+
+// cachedStorageClass returns the last classified storage, or "" when the
+// download dir has not been classified yet.
+func (d *Daemon) cachedStorageClass() string {
+	d.classMu.Lock()
+	defer d.classMu.Unlock()
+	return d.classCached
+}
+
 // mountMajorMinor returns the "major:minor" of the filesystem backing path.
 func mountMajorMinor(path string) string {
 	abs, err := filepath.Abs(path)
@@ -225,7 +246,12 @@ func rotationalDevice(majmin string) bool {
 // applyCache fills rain's cache settings from the daemon's current target.
 func (d *Daemon) applyCache(cfg *torrent.Config) {
 	if d.cacheRead <= 0 || d.cacheWrite <= 0 {
-		d.cacheClass = storageClass(d.downloadDir())
+		d.cacheClass = d.cachedStorageClass()
+		if d.cacheClass == "" {
+			// First classification (tests, or a session opened before the first
+			// tick); in normal operation the tick refreshes it outside d.mu.
+			d.cacheClass = storageClass(d.downloadDir())
+		}
 		read, write, reason := adaptiveCache(d.state.Config, cacheInputs{
 			ram: memoryTotal(), available: memoryAvailable(), class: d.cacheClass,
 		})
@@ -253,7 +279,12 @@ func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds in
 		return
 	}
 	d.cacheCheckedAt = now
-	class := storageClass(d.downloadDir())
+	class := d.cachedStorageClass()
+	if class == "" {
+		// Never classified yet (tests, or a session opened before the first
+		// tick): in normal operation the tick sets it outside d.mu.
+		class = storageClass(d.downloadDir())
+	}
 	read, write, reason := adaptiveCache(d.state.Config, cacheInputs{
 		ram:             memoryTotal(),
 		available:       memoryAvailable(),

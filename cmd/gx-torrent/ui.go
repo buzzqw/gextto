@@ -1255,7 +1255,7 @@ func (d *Daemon) handleUIPin(w http.ResponseWriter, r *http.Request) {
 
 func (d *Daemon) uiEach(fn func(hash string) error) error {
 	var firstErr error
-	for _, view := range d.list() {
+	for _, view := range d.snapshotViews() {
 		if err := fn(view.Hash); err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -1367,7 +1367,7 @@ func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
 
 func (d *Daemon) uiPageData() (uiPageData, error) {
 	stats := d.stats()
-	views := d.list()
+	views := d.snapshotViews()
 	page := uiPageData{
 		Version:        stats.Version,
 		Uptime:         uiDuration(stats.UptimeSeconds),
@@ -1482,6 +1482,17 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	if tab != "files" && tab != "peers" && tab != "trackers" && tab != "pieces" {
 		tab = "general"
 	}
+	// Sample the torrent run loop without d.mu: a torrent can be blocked on
+	// storage I/O, and holding the daemon lock through the sample would stall
+	// every other request.
+	d.mu.Lock()
+	t, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if t == nil {
+		return uiDetailData{}, errNotFound
+	}
+	rawStats := t.Stats()
+
 	d.mu.Lock()
 	t, meta := d.findLocked(hash)
 	if t == nil {
@@ -1489,7 +1500,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		return uiDetailData{}, errNotFound
 	}
 	id := t.ID()
-	stats := d.statsLocked(t)
+	stats := d.adjustStatsLocked(t, rawStats)
 	rt := d.runtimeLocked(id)
 	name := stats.Name
 	state := stateFor(meta, stats, d.moving[id])
