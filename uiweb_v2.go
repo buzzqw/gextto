@@ -1768,6 +1768,8 @@ type v2SettingGroup struct {
 	Collapsed bool
 	// Inactive marks a whole panel that the active torrent engine ignores.
 	Inactive bool
+	// ID is the anchor of the panel, used by the section's group index.
+	ID string
 }
 
 // v2Fields wraps raw settings fields with the transient save status.
@@ -1903,6 +1905,10 @@ func v2SettingsViewFrom(s *AppState, tab, highlight string) v2SettingsView {
 	if len(unused.Fields) > 0 {
 		unused.Hint = v2UnusedSettingsHint
 		view.Groups = append(view.Groups, unused)
+	}
+	// Stable anchors for the in-section group index.
+	for i := range view.Groups {
+		view.Groups[i].ID = fmt.Sprintf("v2-settings-group-%d", i)
 	}
 	view.EditorsFirst = page.EditorsFirst
 	if page.ShowSources {

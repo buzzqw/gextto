@@ -1371,6 +1371,58 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
   }
 }
 
+/* In-section group index: a compact map to jump to a group. */
+.settings-group-index {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.settings-group-index-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.settings-group-index ul { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.settings-group-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+.settings-group-chip:hover { border-color: var(--accent); color: var(--text); text-decoration: none; }
+
+/* Jumping to a group must clear the sticky top bar and the group header. */
+.settings-main .settings-panel { scroll-margin-top: 92px; }
+
+/* Long lists: follow a row across its columns with a hover highlight and a very
+   light zebra. */
+.settings-view .setting-row:hover,
+.settings-view .setting-row:focus-within {
+  background: color-mix(in srgb, var(--accent-2) 9%, transparent);
+}
+.settings-rows .setting-row:nth-child(even) {
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
+}
+.settings-rows .setting-row:nth-child(even):hover,
+.settings-rows .setting-row:nth-child(even):focus-within {
+  background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+}
+
+/* «Solo modificate»: hide every row still at its default. These rules read the
+   row classes/attributes, so the filter keeps working after an HTMX save and
+   while a change is still unsaved, without re-running any script. */
+html.settings-only-modified .settings-group-index { display: none; }
+html.settings-only-modified .setting-row:not(.setting-modified-row):not([data-dirty]) { display: none; }
+html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not(:has(.setting-row[data-dirty])) { display: none; }
+
 .settings-nav {
   position: sticky;
   top: 74px;

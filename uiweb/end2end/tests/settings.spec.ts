@@ -152,3 +152,30 @@ test("il tema chiaro mantiene leggibili stato salvato e sezione attiva", async (
   const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
   expect(results.violations.map((violation) => violation.nodes.map((node) => node.html).join(" | "))).toEqual([]);
 });
+
+test("l'indice dei gruppi salta al gruppo scelto", async ({ page }) => {
+  await page.goto("/?view=settings&tab=libtorrent");
+  const index = page.getByRole("navigation", { name: "Gruppi di questa sezione" });
+  await expect(index).toBeVisible();
+  const chip = index.getByRole("link", { name: "Ricerca peer e tracker" });
+  await expect(chip).toBeVisible();
+  const target = await chip.getAttribute("href");
+  await chip.click();
+  await expect(page.locator(target!)).toBeInViewport();
+});
+
+test("il filtro «Solo modificate» mostra solo le impostazioni cambiate", async ({ page }) => {
+  await page.goto("/?view=settings&tab=daemon");
+  const rows = page.locator(".setting-row:visible");
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(1);
+  await page.locator("#input-refresh_interval").fill("7200");
+  await page.getByLabel("Solo modificate").check();
+  await expect(page.locator("#v2-setting-refresh_interval")).toBeVisible();
+  // Only the changed row (and the group holding it) stays.
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator(".settings-group-index")).toBeHidden();
+  await page.getByLabel("Solo modificate").uncheck();
+  await expect(rows).toHaveCount(before);
+  await expect(page.locator(".settings-group-index")).toBeVisible();
+});

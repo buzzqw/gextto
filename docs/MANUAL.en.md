@@ -1065,6 +1065,11 @@ and **Missing episodes** under *Automatic maintenance*), the group title stays
 **stuck to the top** while you scroll, with a coloured accent bar: the long list
 of options no longer makes you lose your place.
 
+Under the section title there is the **group index** (clickable chips) to jump
+straight to a group. The **Modified only** checkbox, next to *Show technical
+keys*, hides every setting still at its default value: handy to review only what
+you changed. Rows highlight on hover.
+
 How to read a row:
 
 - **Name and description** on the left; the control in the middle with its

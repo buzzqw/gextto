@@ -604,6 +604,7 @@
     <div class="settings-title-row">
       <p class="settings-save-hint">Ogni impostazione si salva con il suo pulsante «Salva»; le modifiche in sospeso si salvano tutte insieme dalla barra in basso.</p>
       <label class="check settings-keys-toggle"><input type="checkbox" data-v2-show-keys /> <span>Mostra chiavi tecniche</span></label>
+      <label class="check settings-modified-toggle" title="Nasconde le impostazioni rimaste al valore predefinito; restano visibili quelle modificate e quelle non ancora salvate"><input type="checkbox" data-v2-only-modified /> <span>Solo modificate</span></label>
     </div>
     <div class="settings-search-row">
       <label class="settings-search-wrap">
@@ -655,6 +656,10 @@
       <h2 id="v2-settings-heading" tabindex="-1">{{.ActiveLabel}}</h2>
       {{if .Intro}}<p class="settings-intro">{{.Intro}}</p>{{end}}
     </div>
+    {{if gt (len .Groups) 1}}<nav class="settings-group-index" aria-label="Gruppi di questa sezione">
+      <span class="settings-group-index-label">In questa sezione</span>
+      <ul>{{range .Groups}}{{if not .Collapsed}}<li><a class="settings-group-chip" href="#{{.ID}}">{{.Title}}</a></li>{{end}}{{end}}</ul>
+    </nav>{{end}}
     {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
     {{if .Actions}}
     <div class="panel settings-panel settings-actions-panel">
@@ -680,10 +685,10 @@
 
 {{define "v2_setting_group"}}
 {{if .Collapsed}}
-<details class="panel settings-panel settings-collapsible{{if .Inactive}} settings-inactive{{end}}">
+<details id="{{.ID}}" class="panel settings-panel settings-collapsible{{if .Inactive}} settings-inactive{{end}}">
   <summary class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></summary>
 {{else}}
-<div class="panel settings-panel">
+<div id="{{.ID}}" class="panel settings-panel">
   <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{len .Fields}} <span>impostazioni</span></small></div>
 {{end}}
   <div class="panel-body">

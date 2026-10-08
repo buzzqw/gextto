@@ -1101,6 +1101,12 @@ ricerca** ed **Episodi mancanti** in *Manutenzione automatica*), il titolo del
 gruppo resta **agganciato in alto** mentre scorri, con una barretta colorata
 d'accento: l'elenco lungo delle opzioni non ti fa più perdere il filo.
 
+Sotto il titolo della sezione c'è l'**indice dei gruppi** (chip cliccabili) per
+saltare direttamente a un gruppo. La casella **Solo modificate**, accanto a
+*Mostra chiavi tecniche*, nasconde tutte le impostazioni rimaste al valore
+predefinito: comoda per rivedere solo ciò che hai cambiato. Le righe si
+evidenziano al passaggio del mouse.
+
 Come si legge una riga:
 
 - **Nome e descrizione** a sinistra; il controllo al centro con l'**unità**

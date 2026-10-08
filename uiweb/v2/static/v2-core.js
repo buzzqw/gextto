@@ -77,6 +77,22 @@
   }
   setFamily(readFamily(), false);
 
+  // ------------------------------------------------ settings filter --------
+  // «Solo modificate»: hide the rows still at their default. The hiding itself
+  // is pure CSS on the row classes/attributes, so it keeps working after an
+  // HTMX save and while a change is still unsaved, without re-running here.
+  (function () {
+    var toggle = document.querySelector("[data-v2-only-modified]");
+    if (!toggle) return;
+    function apply(on) {
+      doc.classList.toggle("settings-only-modified", on);
+      toggle.checked = on;
+      storageSet("gextto_settings_only_modified", on ? "1" : "0");
+    }
+    apply(storageGet("gextto_settings_only_modified") === "1");
+    toggle.addEventListener("change", function () { apply(toggle.checked); });
+  }());
+
   // ------------------------------------------------------ mobile navigation --
   // The system group is a real control on phones, not just a visual label.
   function setSystemMenu(open) {
