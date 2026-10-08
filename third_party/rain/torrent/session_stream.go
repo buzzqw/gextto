@@ -59,6 +59,27 @@ func (t *Torrent) FilePieceRange(fileIndex int, offset, length int64) (begin, en
 	return got.begin, got.end, got.ok
 }
 
+// piecesDone reports whether every piece in [begin, end) is done or skipped. It
+// must run in the torrent goroutine.
+func (t *torrent) piecesDone(begin, end uint32) bool {
+	if len(t.pieces) == 0 {
+		return false
+	}
+	for i := begin; i < end && i < uint32(len(t.pieces)); i++ {
+		if !t.pieces[i].Done && !t.pieces[i].Skip {
+			return false
+		}
+	}
+	return true
+}
+
+// PiecesDone reports whether every piece in [begin, end) is present (gextto
+// fork, for the streaming wait loop). Unlike PieceStates it scans only the
+// requested range and allocates nothing.
+func (t *Torrent) PiecesDone(begin, end uint32) bool {
+	return query(t.torrent, func() bool { return t.torrent.piecesDone(begin, end) })
+}
+
 // SetFileStreamWindow makes the piece picker request the pieces of a file range
 // before any other (gextto fork); `length <= 0` clears the window. It returns
 // the piece range set.

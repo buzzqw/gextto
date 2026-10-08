@@ -137,18 +137,9 @@ func (d *Daemon) waitForPieces(t *torrent.Torrent, fileIndex int, offset, length
 }
 
 func piecesPresent(t *torrent.Torrent, begin, end uint32) bool {
-	states, ok := t.PieceStates()
-	if !ok {
-		return false
-	}
-	for i := begin; i < end && i < uint32(len(states)); i++ {
-		switch states[i] {
-		case "have", "skipped":
-		default:
-			return false
-		}
-	}
-	return true
+	// A targeted range check: PieceStates would allocate and visit a state
+	// string for every piece of the torrent, every poll.
+	return t.PiecesDone(begin, end)
 }
 
 // parseByteRange parses a single "bytes=" range. An empty header means the whole
