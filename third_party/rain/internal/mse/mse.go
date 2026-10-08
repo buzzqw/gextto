@@ -73,11 +73,25 @@ func (c CryptoMethod) String() string {
 	}
 }
 
+// inPlaceStreamWriter encrypts into the caller's own buffer (gextto fork):
+// cipher.StreamWriter would allocate a fresh []byte on every Write. The caller
+// must not reuse src afterwards. This is safe on the peer wire, where the
+// encrypted buffer is discarded right after the socket write.
+type inPlaceStreamWriter struct {
+	s cipher.Stream
+	w io.Writer
+}
+
+func (w *inPlaceStreamWriter) Write(p []byte) (int, error) {
+	w.s.XORKeyStream(p, p)
+	return w.w.Write(p)
+}
+
 // Stream wraps a io.ReadWriter that automatically does encrypt/decrypt on read/write.
 type Stream struct {
 	raw io.ReadWriter
 	r   *cipher.StreamReader
-	w   *cipher.StreamWriter
+	w   *inPlaceStreamWriter
 	r2  io.Reader
 }
 
@@ -162,7 +176,7 @@ func (s *Stream) HandshakeOutgoing(sKey []byte, cryptoProvide CryptoMethod, init
 	_ = binary.Write(writeBuf, binary.BigEndian, uint16(len(initialPayload)))
 	writeBuf.Write(initialPayload)
 	encBytes := writeBuf.Bytes()[40:]
-	s.w.S.XORKeyStream(encBytes, encBytes) // RC4
+	s.w.s.XORKeyStream(encBytes, encBytes) // RC4
 	debugln("--- out: writing Step 3")
 	_, err = writeBuf.WriteTo(s.raw)
 	if err != nil {
@@ -383,7 +397,7 @@ func (s *Stream) initRC4(encKey, decKey string, S *big.Int, sKey []byte) error {
 	discard := buf[:]
 	cipherEnc.XORKeyStream(discard, discard)
 	cipherDec.XORKeyStream(discard, discard)
-	s.w = &cipher.StreamWriter{S: cipherEnc, W: s.raw}
+	s.w = &inPlaceStreamWriter{s: cipherEnc, w: s.raw}
 	s.r = &cipher.StreamReader{S: cipherDec, R: s.raw}
 	return nil
 }
@@ -393,7 +407,7 @@ func (s *Stream) updateCipher(selected CryptoMethod) {
 	case RC4:
 	case PlainText:
 		s.r = &cipher.StreamReader{S: plainTextCipher{}, R: s.raw}
-		s.w = &cipher.StreamWriter{S: plainTextCipher{}, W: s.raw}
+		s.w = &inPlaceStreamWriter{s: plainTextCipher{}, w: s.raw}
 	}
 }
 
