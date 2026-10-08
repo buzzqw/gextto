@@ -30,6 +30,30 @@ test("la navigazione aggiorna titolo, sezione attiva e indirizzo", async ({ page
   await expect(page.locator("#v2-settings-heading")).toHaveText("Manutenzione automatica");
 });
 
+test("la configurazione nasconde il menu principale e lo riapre dal pulsante", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/?view=settings");
+  // The main navigation is out of the way, the «Cosa cercare» sidebar stays.
+  await expect(page.locator("#app-sidebar")).toBeHidden();
+  await expect(page.getByRole("navigation", { name: "Sezioni della configurazione" })).toBeVisible();
+  const toggle = page.locator("[data-app-menu-toggle]");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await expect(page.locator("#app-sidebar")).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  // Escape closes the drawer and returns to the focused button.
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#app-sidebar")).toBeHidden();
+});
+
+test("il menu principale resta visibile fuori dalla configurazione", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await expect(page.locator("#app-sidebar")).toBeVisible();
+  await expect(page.locator("[data-app-menu-toggle]")).toHaveCount(0);
+});
+
 test("le modifiche non salvate si vedono, si annullano e si salvano insieme", async ({ page }) => {
   await page.goto("/?view=settings&tab=daemon");
   const bar = page.locator("[data-v2-savebar]");

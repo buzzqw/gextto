@@ -113,6 +113,44 @@
     }
   });
 
+  // ------------------------------------------------ collapsible panels -----
+  // `data-mobile-collapse` panels (the add-torrent form, …) are expanded on
+  // desktop and collapsed on small screens, as the attribute name says.
+  (function () {
+    if (!window.matchMedia || !window.matchMedia("(min-width: 901px)").matches) return;
+    var panels = document.querySelectorAll("details[data-mobile-collapse]");
+    for (var i = 0; i < panels.length; i++) panels[i].open = true;
+  }());
+
+  // ------------------------------------------------ settings app menu ------
+  // The settings page hides the main navigation so the «Cosa cercare» sidebar
+  // is not squeezed between it and the entries. This button brings it back as
+  // a drawer over the content.
+  function setAppMenu(open) {
+    var shell = document.querySelector(".app-shell");
+    var toggle = document.querySelector("[data-app-menu-toggle]");
+    var backdrop = document.getElementById("app-menu-backdrop");
+    if (!shell || !toggle) return;
+    shell.classList.toggle("menu-open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    if (backdrop) backdrop.hidden = !open;
+  }
+  document.addEventListener("click", function (event) {
+    if (event.target && event.target.id === "app-menu-backdrop") {
+      setAppMenu(false);
+      return;
+    }
+    var toggle = event.target.closest && event.target.closest("[data-app-menu-toggle]");
+    if (toggle) {
+      var shell = document.querySelector(".app-shell");
+      setAppMenu(!(shell && shell.classList.contains("menu-open")));
+      return;
+    }
+    // Selecting a destination closes the drawer (the page navigates anyway).
+    var link = event.target.closest && event.target.closest("#app-sidebar a[href]");
+    if (link) setAppMenu(false);
+  });
+
   // ------------------------------------------------ torrent detail tabs --
   // HTMX replaces only the panel content. Keep the persistent tab bar in sync
   // with the panel requested by the user.
@@ -137,6 +175,7 @@
       var toggle = document.querySelector("[data-mobile-system-toggle]");
       if (toggle) toggle.focus();
     }
+    setAppMenu(false);
   });
 
   // -------------------------------------------------------------- dialogs --

@@ -1305,6 +1305,34 @@ details.add-torrent-panel > summary::-webkit-details-marker { display: none; }
 .settings-view .settings-save-hint { margin: 0; max-width: 70ch; }
 .settings-keys-toggle { font-size: 0.82rem; color: var(--muted); }
 
+/* Configurazione focuses on its own sections: the main navigation is hidden on
+   desktop so the «Cosa cercare» sidebar is not squeezed between it and the
+   entries. The topbar button (and Escape) brings the menu back as a drawer. */
+.app-menu-toggle { display: none; }
+.app-menu-backdrop,
+.app-menu-backdrop[hidden] { display: none !important; }
+
+.app-shell.is-settings .app-menu-toggle { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (min-width: 901px) {
+  .app-shell.is-settings .main-shell { margin-left: 0; }
+  .app-shell.is-settings:not(.menu-open) #app-sidebar { display: none; }
+  .app-shell.is-settings .app-menu-backdrop:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(4, 18, 31, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+}
+@media (max-width: 900px) {
+  /* The compact horizontal navigation is not in the way: the button is not
+     needed and would only add noise. */
+  .app-shell.is-settings .app-menu-toggle { display: none; }
+}
+
 .settings-layout {
   display: grid;
   grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);

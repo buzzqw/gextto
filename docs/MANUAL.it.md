@@ -1091,7 +1091,10 @@ sono nella colonna a sinistra, con il numero di impostazioni; su telefono si
 scelgono dalla tendina *Sezione*. L'indirizzo della pagina segue la sezione
 aperta, quindi si può salvare nei preferiti. I link alle vecchie schede
 (*Acquisizione*, *Avanzate*, *Traduzioni*) aprono la sezione che ne ha preso il
-contenuto.
+contenuto. Entrando in Configurazione la barra dei menu principale si nasconde,
+così le sezioni non restano schiacciate tra il menu e le voci: il pulsante
+**Menu** in alto a sinistra la fa ricomparire sopra il contenuto (Esc per
+richiuderla).
 
 Come si legge una riga:
 

@@ -34,7 +34,8 @@
 <body>
 <a class="skip-link" href="#v2-page">Vai al contenuto</a>
 <div id="app-system-backdrop" class="system-backdrop" hidden></div>
-<div class="app-shell">
+<div id="app-menu-backdrop" class="app-menu-backdrop" hidden></div>
+<div class="app-shell{{if eq .Page "settings"}} is-settings{{end}}" data-page="{{.Page}}">
   <aside class="sidebar" id="app-sidebar">
     <div class="brand" title="Gextto EXpert Torrent Transfer Orchestrator" aria-label="Gextto EXpert Torrent Transfer Orchestrator">
       <span class="brand-mark" aria-hidden="true">G</span>
@@ -66,6 +67,7 @@
   </aside>
   <main class="main-shell">
     <header class="topbar v2-topbar-sticky">
+      {{if eq .Page "settings"}}<button class="btn app-menu-toggle" type="button" data-app-menu-toggle aria-expanded="false" aria-controls="app-sidebar" title="Mostra o nascondi il menu principale"><span aria-hidden="true">☰</span><span class="app-menu-toggle-label">Menu</span></button>{{end}}
       <div class="topbar-title">
         <h1>{{.Title}}</h1>
       </div>
