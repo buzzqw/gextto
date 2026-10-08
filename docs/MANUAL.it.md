@@ -985,9 +985,33 @@ firewall.
 
 ## 11. Notifiche
 
-Configura Telegram, e-mail (SMTP) o un webhook (con segreto HMAC) e invia un
-test. Le notifiche di completamento includono dimensione, tempo di download e
-velocità media.
+Configura Telegram, e-mail (SMTP) o un webhook — anche verso Discord, Slack,
+ntfy, Gotify o Pushover — e invia un test. Le notifiche di completamento
+includono dimensione, tempo di download e velocità media.
+
+### Webhook: quale URL e quale formato
+
+Il canale **Webhook** manda gli eventi a un servizio esterno senza bisogno di
+un'app dedicata: imposta l'**URL** e scegli il **Formato** giusto per il
+servizio. Gextto compone da solo il contenuto del messaggio.
+
+| Servizio | Webhook URL | Formato | Segreto |
+|---|---|---|---|
+| Endpoint tuo | il tuo URL | **Gextto (JSON firmato)** | «Webhook secret» firma il corpo (HMAC SHA-256, header `x-gextto-signature`) |
+| Discord | URL del webhook del canale | **Discord** | non serve |
+| Slack | URL del webhook in ingresso | **Slack** | non serve |
+| ntfy | `https://ntfy.sh/<argomento>` (o il tuo server) | **ntfy** | «Webhook secret» = token Bearer, se l'argomento è protetto |
+| Gotify | `https://gotify.esempio/message?token=<APP_TOKEN>` | **Gotify** | il token è già nell'URL |
+| Pushover | `https://api.pushover.net/1/messages.json?token=<APP>&user=<USER>` | **Pushover** | token e user sono già nell'URL |
+
+Note:
+
+- con Formato **Gextto** il messaggio è un JSON `{"event":…,"data":…}` e, se
+  imposti il segreto, viene firmato; con gli altri formati Gextto invia il
+  **testo leggibile** già composto e la firma HMAC non viene applicata (è
+  specifica del formato Gextto);
+- usa il pulsante di **test** nella scheda Notifiche: se l'URL o il token sono
+  sbagliati lo dice subito, invece di fallire in silenzio alla prima consegna.
 
 ### Procedura di configurazione
 
