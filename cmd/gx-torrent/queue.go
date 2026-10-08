@@ -75,6 +75,14 @@ func defaultQueueConfig() QueueConfig {
 
 func boolPtr(v bool) *bool { return &v }
 
+// sameBoolPtr compares two optional flags, treating two nils as equal.
+func sameBoolPtr(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
 // normalized clamps the configuration into a usable range.
 func (c QueueConfig) normalized() QueueConfig {
 	if c.ActiveDownloads < 1 {

@@ -55,10 +55,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   (produce `bin/gx-torrent`).
 - `make test` — `check-ui-settings-index` + `installer-selftest` + `go test ./...`.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
-- Test del fork (modulo annidato, non incluso in `./...`):
-  `go test github.com/cenkalti/rain/v2/internal/...` dalla root (il modulo
-  annidato da solo non ha un `go.sum` completo), almeno `blocklist`,
-  `peerconn`, `piecepicker`, `bandwidth`, `storage/filestorage`.
+- Test del fork (modulo annidato, non incluso in `./...`): usa `make test-rain`
+  (`go test` dalla root sui cinque pacchetti con test). **Non** eseguire
+  `cd third_party/rain && go test ./...`: il modulo annidato da solo non ha un
+  `go.sum` completo e fallisce in fase di setup; anche `...` dalla root include
+  `internal/jsonutil`, le cui dipendenze di test mancano dal `go.sum` principale.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 

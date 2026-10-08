@@ -136,3 +136,25 @@ func TestRuntimeVersionUsesAppVersion(t *testing.T) {
 		t.Fatalf("runtime version = %q, want 1.1.<build>", v)
 	}
 }
+
+// A manual size is an explicit choice: even a small change must be applied at
+// once, not swallowed by the adaptive policy's 25% hysteresis.
+func TestAdaptCacheAppliesSmallManualChange(t *testing.T) {
+	d := &Daemon{opts: Options{DownloadDir: t.TempDir()}}
+	start := time.Now()
+	d.adaptCacheLocked(start, 1, 0, 0) // first evaluation, adaptive
+	applied := d.cacheRead
+	if applied <= 0 {
+		t.Fatalf("no cache target computed: %d", applied)
+	}
+	d.state.Config.CacheMB = applied/mib + 8 // manual, a few MiB away (<25%)
+	d.cacheCheckedAt = time.Time{}           // as setConfig does on the change
+	d.cacheAppliedAt = time.Time{}
+	d.adaptCacheLocked(start.Add(time.Second), 1, 0, 0)
+	if want := (applied/mib + 8) * mib; d.cacheRead != want || d.cacheWrite != want {
+		t.Fatalf("small manual cache change ignored: got read=%d write=%d want %d", d.cacheRead, d.cacheWrite, want)
+	}
+	if d.restartPending {
+		t.Fatal("the cache is resized in place: no session reopen")
+	}
+}

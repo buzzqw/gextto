@@ -1340,7 +1340,7 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 		}
 		logf("speed limits set to %d KiB/s download, %d KiB/s upload (0 = unlimited)", next.SpeedLimitDownload, next.SpeedLimitUpload)
 	}
-	if previous.CacheMB != next.CacheMB {
+	if previous.CacheMB != next.CacheMB || !sameBoolPtr(previous.Auto, next.Auto) {
 		d.cacheCheckedAt = time.Time{}
 		d.cacheAppliedAt = time.Time{}
 	}

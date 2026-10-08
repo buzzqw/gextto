@@ -1,9 +1,9 @@
 package main
 
-// cache.go sizes rain's disk cache. rain reads these values when the session is
-// created (piececache.New, resourcemanager.New), so they can only change by
-// reopening the session: Gextto pushes the manual value, the daemon retunes
-// itself on a coarse cadence (see adaptCacheLocked).
+// cache.go sizes rain's disk cache. Gextto pushes the manual value and the
+// daemon retunes itself on a coarse cadence (see adaptCacheLocked); the fork
+// applies a new read-cache and write-buffer size to the running session, so no
+// reopen is needed.
 //
 // rain's own defaults (256 MiB read cache, 1 GiB write buffer) are fixed and do
 // not consider the machine. Here the values follow the available RAM and the
@@ -34,7 +34,7 @@ const (
 	cacheWriteMin   = 96 << 20
 	cacheWriteMax   = 1536 << 20
 	cacheCheckEvery = 3 * time.Minute  // how often the target is recomputed
-	cacheApplyEvery = 10 * time.Minute // minimum time between session reopenings
+	cacheApplyEvery = 10 * time.Minute // minimum time between adaptive retunes
 )
 
 // memoryTotal reads MemTotal from /proc/meminfo (0 when unknown).
@@ -266,6 +266,19 @@ func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds in
 	if d.cacheRead == 0 {
 		// First evaluation.
 		d.applyCacheSizesLocked(read, write, reason, now)
+		return
+	}
+	// A manual size (CacheMB > 0) or a static policy is not a workload
+	// estimate: any change the operator asked for takes effect at once, even
+	// below the hysteresis threshold. Only the adaptive policy is damped, so
+	// its workload-driven swings do not retune the cache at every tick.
+	if !strings.HasPrefix(reason, "auto:") {
+		if read == d.cacheRead && write == d.cacheWrite {
+			d.cacheReason = reason
+			return
+		}
+		d.applyCacheSizesLocked(read, write, reason, now)
+		logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
 		return
 	}
 	if !cacheMoved(d.cacheRead, read) && !cacheMoved(d.cacheWrite, write) {

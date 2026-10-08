@@ -31,7 +31,7 @@ jobs:
         run: make test
 
       - name: Test bundled rain fork
-        run: cd third_party/rain && go test ./...
+        run: make test-rain
 
       - name: Build and package
         env:
