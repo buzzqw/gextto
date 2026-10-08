@@ -350,7 +350,10 @@ func TestScrapeAllSkipsTitleSearchWhenFeedsConfigured(t *testing.T) {
 func TestScrapeAllRunsTitleSearchWhenForced(t *testing.T) {
 	var indexerCalls atomic.Int32
 	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		indexerCalls.Add(1)
+		// The capabilities read (t=caps) is not a search.
+		if r.URL.Query().Get("t") != "caps" {
+			indexerCalls.Add(1)
+		}
 		_, _ = io.WriteString(w, `<rss><channel><item><title>Indexer.Item.S01E01</title><link>magnet:?xt=urn:btih:1123456789012345678901234567890123456789</link></item></channel></rss>`)
 	}))
 	defer indexer.Close()

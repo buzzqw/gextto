@@ -64,9 +64,10 @@ const (
 // indexerRequestTimeout bounds a single indexer/manager request. It is shorter
 // than automaticSearchTimeout so that one slow source fails on its own while the
 // healthy sources still return their results, instead of consuming the whole
-// search budget.
+// search budget. (With a 25s budget the 45s indexer limit was never reached: a
+// MirCrew on-demand answer was cut at 25s and only arrived one cycle later.)
 var (
-	automaticSearchTimeout = 25 * time.Second
+	automaticSearchTimeout = 50 * time.Second
 	// 45s: enough for the MirCrew indexer, which may search its forum and thank
 	// a topic on an on-demand query before answering.
 	indexerRequestTimeout = 45 * time.Second

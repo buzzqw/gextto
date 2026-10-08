@@ -919,6 +919,37 @@ func gh5_mirCrewIndexer(cfg *Config) *IndexerConfig {
 	return nil
 }
 
+// gh5_mirCrewLoginState reads the /status of the mircrew-indexer service at
+// base and reports whether its forum login has failed. A service without
+// /status (older versions) or an unreadable reply is not reported as failed.
+func gh5_mirCrewLoginState(base string) (string, bool) {
+	if strings.TrimSpace(base) == "" {
+		return "", false
+	}
+	status, reachable, body := gh6_servicesProbe(strings.TrimRight(base, "/")+"/status", 5*time.Second)
+	if !reachable || status != http.StatusOK {
+		return "", false
+	}
+	var payload struct {
+		LoggedIn   *bool  `json:"logged_in"`
+		LoginError string `json:"login_error"`
+		LastRun    string `json:"last_run"`
+	}
+	if json.Unmarshal([]byte(body), &payload) != nil || payload.LoggedIn == nil {
+		return "", false
+	}
+	loginError := strings.TrimSpace(payload.LoginError)
+	switch {
+	case loginError != "":
+		return utils.RedactURLSecrets(loginError), true
+	case !*payload.LoggedIn && strings.TrimSpace(payload.LastRun) != "":
+		// Logged out after a pass had already run: the login was lost.
+		return "", true
+	}
+	// Logged in, or still logging in right after the service started.
+	return "", false
+}
+
 func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
 	indexer := gh5_mirCrewIndexer(cfg)
 	if indexer == nil {
@@ -942,6 +973,17 @@ func gh5_mirCrewServiceStatus(cfg *Config) *models.ProviderStatus {
 	default:
 		entry.UserMessage = "Servizio mircrew-indexer attivo e raggiungibile."
 		entry.SuggestedAction = "Nessuna azione necessaria."
+		// The Torznab API answers from the local index even when the forum
+		// login is broken; then no new magnet can be unlocked. The service's
+		// /status (no API key, no side effects) tells the login state.
+		if loginError, failed := gh5_mirCrewLoginState(entry.URL); failed {
+			entry.UserMessage = "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito"
+			if loginError != "" {
+				entry.UserMessage += ": " + loginError
+			}
+			entry.UserMessage += "."
+			entry.SuggestedAction = "Controlla utente e password nella web UI del servizio (Impostazioni) e usa «Rifai login»."
+		}
 	}
 	gh5_mirCrewProbe.at = time.Now()
 	gh5_mirCrewProbe.entry = &entry

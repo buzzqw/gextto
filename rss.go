@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -1628,6 +1629,20 @@ func managerKind(indexer IndexerConfig) string {
 // isManagerSource reports whether the indexer is a Jackett/Prowlarr aggregate.
 // Those managers handle Cloudflare themselves, so FlareSolverr must not be used
 // for them.
+// torznabHostIsLocal reports whether the URL points to localhost or to a
+// literal private/link-local address, where Cloudflare cannot be in front.
+func torznabHostIsLocal(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	return isLocalAddress(net.ParseIP(host))
+}
+
 func isManagerSource(indexer IndexerConfig) bool {
 	if explicitManagerKind(indexer) != "" {
 		return true
@@ -2005,6 +2020,19 @@ func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [
 	endpoint := torznab_endpoint(indexer)
 	isProwlarrJSON := strings.HasSuffix(endpoint, "/api/v1/search")
 	searchType := normalizeSearchType(requestedType, query)
+	// Send only what the indexer declares (see torznab_caps.go); unknown caps
+	// keep every parameter.
+	caps := cachedSearchCaps(indexer)
+	if !caps.functionAvailable(searchType) {
+		searchType = searchTypeGeneric
+	}
+	var supportedIDs [][2]string
+	for _, pair := range externalIDs {
+		if caps.supports(searchType, strings.ToLower(strings.TrimSpace(pair[0]))) {
+			supportedIDs = append(supportedIDs, pair)
+		}
+	}
+	externalIDs = supportedIDs
 	var pairs []string
 	appendPair := func(key, value string) {
 		pairs = append(pairs, url.QueryEscape(key)+"="+url.QueryEscape(value))
@@ -2017,10 +2045,10 @@ func torznabRequestURLForType(indexer IndexerConfig, query string, externalIDs [
 	} else {
 		appendPair("t", searchType)
 		// Jackett accepts Torznab's structured TV/movie parameters directly.
-		if searchType == searchTypeTV {
+		if searchType == searchTypeTV && caps.supports(searchType, "season") {
 			if season, ok := seasonFromQuery(query); ok {
 				appendPair("season", strconv.FormatInt(season, 10))
-				if _, episode, hasEpisode := episodeFromQuery(query); hasEpisode {
+				if _, episode, hasEpisode := episodeFromQuery(query); hasEpisode && caps.supports(searchType, "ep") {
 					appendPair("ep", strconv.FormatInt(episode, 10))
 				}
 			}
@@ -2069,7 +2097,18 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 	if isManagerSource(indexer) {
 		flaresolverr = nil
 	}
+	if ctx.Err() == nil {
+		ensureSearchCaps(ctx, indexer)
+	}
 	fullURL := torznabRequestURLForType(indexer, query, externalIDs, searchType)
+	// An id the indexer refuses or cannot search by must not cost the whole
+	// search: the request is repeated once with the title only.
+	withoutIDs := func(reason string) ([]models.Release, error) {
+		logging.Debug("indexer search repeated without external ids",
+			"indexer", indexer.Name, "query", query, "reason", reason)
+		return fetchTorznabFlareSolverr(ctx, indexer, query, nil, flaresolverr, searchType)
+	}
+	sentIDs := len(externalIDs) > 0 && fullURL != torznabRequestURLForType(indexer, query, nil, searchType)
 	headers := map[string]string{}
 	if session, ok := session_for(fullURL); ok {
 		if session.userAgent != "" {
@@ -2100,6 +2139,12 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
 			return nil, transportErr
 		}
+		// A network error from a service on this machine or the LAN (a local
+		// Torznab indexer such as mircrew-indexer) is never a Cloudflare block:
+		// asking FlareSolverr would only repeat the request and hide the error.
+		if torznabHostIsLocal(fullURL) {
+			return nil, transportErr
+		}
 		fetched, fetchErr := torznabViaFlareSolverr(ctx, indexer, *flaresolverr, fullURL, torznabShortReason(transportErr))
 		if fetchErr != nil {
 			return nil, fmt.Errorf("direct Torznab request failed (%s); FlareSolverr fallback failed: %w",
@@ -2109,6 +2154,15 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		contentType = torznabContentType(body)
 	case response.StatusCode >= 400:
 		if !cloudflare_blocked(response.StatusCode) {
+			// Keep the indexer's own explanation (Jackett: "Torznab 203:
+			// tmdbid is not supported…") instead of a bare status code.
+			payload, _ := readLimitedBody(response.Body, 64<<10)
+			if torznabError := TorznabError(string(payload)); torznabError != "" {
+				if sentIDs && torznabUnsupportedParam(torznabError) {
+					return withoutIDs(torznabError)
+				}
+				return nil, fmt.Errorf("HTTP %d: %s", response.StatusCode, torznabError)
+			}
 			return nil, fmt.Errorf("HTTP %d", response.StatusCode)
 		}
 		if flaresolverr == nil || strings.TrimSpace(*flaresolverr) == "" {
@@ -2140,12 +2194,21 @@ func fetchTorznabFlareSolverr(ctx context.Context, indexer IndexerConfig, query 
 		}
 	}
 	if torznabError := TorznabError(body); torznabError != "" {
+		if sentIDs && torznabUnsupportedParam(torznabError) {
+			return withoutIDs(torznabError)
+		}
 		return nil, fmt.Errorf("%s", torznabError)
 	}
 	// Torznab/Prowlarr replies can be large; XML/JSON decoding also invokes the
 	// release parser for every item.
 	if strings.Contains(contentType, "json") || strings.HasPrefix(strings.TrimSpace(body), "[") {
-		return parseProwlarrBody(ctx, body, indexer.Name)
+		items, err := parseProwlarrBody(ctx, body, indexer.Name)
+		// Prowlarr answers an id search with nothing when its indexers cannot
+		// search by that id: try the title before concluding there is nothing.
+		if err == nil && len(items) == 0 && sentIDs && ctx.Err() == nil {
+			return withoutIDs("no result for the id search")
+		}
+		return items, err
 	}
 	return parse_feed_body(body, indexer.Name)
 }

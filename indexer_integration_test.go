@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -145,23 +146,47 @@ func TestIndexerSearchRetainsTorrentOnlyResults(t *testing.T) {
 	}
 }
 
-func TestSeriesEpisodeSearchUsesEpisodeAndExternalIDs(t *testing.T) {
+// prowlarrSearchRecorder is a Prowlarr whose capabilities are unknown (the
+// indexer list answers 404): it records the search queries and answers each
+// with no result.
+func prowlarrSearchRecorder(t *testing.T, wantType string) (*httptest.Server, *[]string) {
+	t.Helper()
+	var mu sync.Mutex
+	queries := []string{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Path; got != "/api/v1/search" {
-			t.Fatalf("path = %q", got)
+		if r.URL.Path == "/api/v1/indexer" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Path != "/api/v1/search" {
+			t.Errorf("path = %q", r.URL.Path)
 		}
 		values := r.URL.Query()
-		if values.Get("type") != searchTypeTV {
-			t.Fatalf("type = %q", values.Get("type"))
+		if values.Get("type") != wantType {
+			t.Errorf("type = %q, want %q", values.Get("type"), wantType)
 		}
-		if got := values.Get("query"); got != "Example Show S02E03{tvdbid:123}{tmdbid:456}{season:2}{episode:3}" {
-			t.Fatalf("query = %q", got)
-		}
+		mu.Lock()
+		queries = append(queries, values.Get("query"))
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `[]`)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
+	return server, &queries
+}
 
+// assertQueries checks the id search comes first and, since it found
+// nothing, is repeated with the title only (Prowlarr indexers that cannot
+// search by id answer an id search with nothing).
+func assertQueries(t *testing.T, got []string, want ...string) {
+	t.Helper()
+	if strings.Join(got, " | ") != strings.Join(want, " | ") {
+		t.Fatalf("queries = %q, want %q", got, want)
+	}
+}
+
+func TestSeriesEpisodeSearchUsesEpisodeAndExternalIDs(t *testing.T) {
+	server, queries := prowlarrSearchRecorder(t, searchTypeTV)
 	cfg := DefaultConfig()
 	cfg.WebsearchEngines = nil
 	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
@@ -169,22 +194,11 @@ func TestSeriesEpisodeSearchUsesEpisodeAndExternalIDs(t *testing.T) {
 	if releases := NewEngine().SearchSeriesEpisode(context.Background(), &cfg, series, 2, 3, false); len(releases) != 0 {
 		t.Fatalf("releases = %+v, want none", releases)
 	}
+	assertQueries(t, *queries, "Example Show S02E03{tvdbid:123}{tmdbid:456}{season:2}{episode:3}", "Example Show S02E03{season:2}{episode:3}")
 }
 
 func TestSeriesSeasonSearchUsesSeasonAndExternalIDs(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		values := r.URL.Query()
-		if values.Get("type") != searchTypeTV {
-			t.Fatalf("type = %q", values.Get("type"))
-		}
-		if got := values.Get("query"); got != "Example Show S02{tvdbid:123}{tmdbid:456}{season:2}" {
-			t.Fatalf("query = %q", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `[]`)
-	}))
-	defer server.Close()
-
+	server, queries := prowlarrSearchRecorder(t, searchTypeTV)
 	cfg := DefaultConfig()
 	cfg.WebsearchEngines = nil
 	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
@@ -192,22 +206,11 @@ func TestSeriesSeasonSearchUsesSeasonAndExternalIDs(t *testing.T) {
 	if releases := NewEngine().SearchSeriesSeason(context.Background(), &cfg, series, 2, false); len(releases) != 0 {
 		t.Fatalf("releases = %+v, want none", releases)
 	}
+	assertQueries(t, *queries, "Example Show S02{tvdbid:123}{tmdbid:456}{season:2}", "Example Show S02{season:2}")
 }
 
 func TestMovieSearchUsesMovieTypeAndTMDBID(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		values := r.URL.Query()
-		if values.Get("type") != searchTypeMovie {
-			t.Fatalf("type = %q", values.Get("type"))
-		}
-		if got := values.Get("query"); got != "Example Film 2026{tmdbid:987}" {
-			t.Fatalf("query = %q", got)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `[]`)
-	}))
-	defer server.Close()
-
+	server, queries := prowlarrSearchRecorder(t, searchTypeMovie)
 	cfg := DefaultConfig()
 	cfg.WebsearchEngines = nil
 	cfg.Indexers = []IndexerConfig{{Name: "Prowlarr", URL: server.URL, Enabled: true, Manager: ManagerProwlarr}}
@@ -215,6 +218,7 @@ func TestMovieSearchUsesMovieTypeAndTMDBID(t *testing.T) {
 	if releases := NewEngine().SearchMovie(context.Background(), &cfg, movie, false, false); len(releases) != 0 {
 		t.Fatalf("releases = %+v, want none", releases)
 	}
+	assertQueries(t, *queries, "Example Film 2026{tmdbid:987}", "Example Film 2026")
 }
 
 func TestProwlarrIndexerHealth(t *testing.T) {
