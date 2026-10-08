@@ -115,6 +115,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   per i torrent aggiunti dopo: dichiarale `"partial"`, mai falso successo.
 - Nuova impostazione UI: aggiungi default (`uiweb_settings_defaults.go`), indice
   (`uiweb_settings.go`), tooltip (`uiweb_tooltips.go`) e i testi dei manuali.
+- Una nuova feature visibile va esposta **sia** nella UI di Gextto
+  (`uiweb/v2`) **sia**, dove ha senso, nella pagina web del demone
+  (`cmd/gx-torrent/ui.go`): non lasciarla raggiungibile solo via API.
 - Aggiorna sempre `README.md`/`README.it.md` e `docs/MANUAL.it.md`/`docs/MANUAL.en.md`
   quando cambia il comportamento visibile. Documento tecnico motore:
   `docs/gx-torrent.md`; architettura: `docs/ARCHITECTURE.md`.
