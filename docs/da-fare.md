@@ -44,13 +44,14 @@ specialistici restano accessibili solo via API.
 
 ### 6. Convertire i benchmark UI in test di performance in CI
 `go test -run '^$' -bench BenchmarkV2` esiste ma non gira in CI: nessun
-`Benchmark` nei workflow.
-
-### 7. Dashboard: diagnostica "Ultimi trovati nei feed"
-Residuo consapevole del porting SSR+HTMX: la vista diagnostica dei feed non è
-stata riportata in Dashboard.
+`Benchmark` nei workflow. Attenzione: i runner CI sono rumorosi, meglio un job
+non bloccante o un controllo sulle allocazioni più che sul tempo.
 
 ## Chiusi / decisioni
+
+- **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto:
+  pannello in `uiweb/v2/templates/v2.html:264` e route `GET /dashboard/feed`
+  (`uiweb_v2.go:131`).
 
 - **Cap cache su storage lento (NFS)** — superato: la cache ora si autoregola
   (`cmd/gx-torrent/cache.go:261`, tuner adattivo `cacheSizes`), quindi il "cap
