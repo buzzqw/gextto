@@ -221,7 +221,11 @@ func (t *torrent) superSeedTick(now time.Time) {
 		if st.done {
 			continue
 		}
-		if pe.PeerInterested {
+		// A peer that is actively downloading the offered pieces is left alone;
+		// one that is interested but stalled (speed back to zero) or not
+		// interested at all gets another piece, so a peer can never be left
+		// waiting for a piece the seed never offered it.
+		if pe.PeerInterested && pe.DownloadSpeed() > 0 {
 			st.retryAt = now
 			continue
 		}

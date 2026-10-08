@@ -74,7 +74,7 @@ presenti o già gestiti da Gextto.
 | 10 | BitTorrent v2-only | **Wishlist** | — |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `Torrent.SetSuperSeeding` nel fork + azione `super-seeding` nel demone; capacità `super_seeding` = `full` | 8 |
 | 12 | Holepunching, WebTorrent | **Wishlist** | — |
-| 13 | Qualità seeding/choking | **Misura** — harness pronto, misure da fare (`docs/gx-torrent-misure-seeding.md`) | — |
+| 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; il super-seeding non dà guadagno su sciami locali piccoli, resta opt-in; lo scaling va verificato su sciame reale (`docs/gx-torrent-misure-seeding.md`) | — |
 
 Convenzione semantica scelta per i limiti: **-1 = eredita il globale, 0 =
 illimitato** (come libtorrent e come i campi già presenti nell'UI).
@@ -115,11 +115,11 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
 
 - **BitTorrent v2-only**: richiede il supporto v2 in rain (grande).
 - **Holepunching, WebTorrent**: funzioni di nicchia, molto lavoro.
-- **Qualità seeding/choking**: prima misurare gx-torrent vs libtorrent/qBittorrent
-  sullo stesso sciame (rapporto, throughput in upload, tempo a 1:1), poi
-  valutare un investimento sul core di rain. L'harness deterministico
-  dell'unchoker e lo sciame locale sono pronti; metodo e metriche in
-  `docs/gx-torrent-misure-seeding.md`.
+- **Qualità seeding/choking**: prima tornata di misure fatta (vedi
+  `docs/gx-torrent-misure-seeding.md`): il choking di rain è corretto ed
+  economico; il super-seeding non mostra guadagni su sciami locali piccoli e
+  resta opt-in. Per decidere sullo scaling serve la campagna su sciame reale
+  (gx-torrent vs libtorrent/qBittorrent, stessa politica, mediana su più run).
 
 Fatto dalla wishlist: **super-seeding** (BEP 16), punto 8 del piano.
 
