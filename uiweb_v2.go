@@ -1311,9 +1311,9 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 	switch backend {
 	case BackendGxTorrent:
 		return v2DetailCaps{
-			Backend: "gx-torrent", WebSeeds: true, Pieces: true,
+			Backend: "gx-torrent", WebSeeds: true, Pieces: true, RateLimits: true,
 			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
-			LimitsNote:  "Con gx-torrent i limiti di velocità e di connessioni sono solo globali (Configurazione → libtorrent); qui si impostano ratio e giorni di seed.",
+			LimitsNote:  "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato.",
 			TrackerNote: "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.",
 			GeneralNote: "Con gx-torrent non sono disponibili: super-seeding e upload/share mode. Il download sequenziale e la prima/ultima parte si attivano anche a caldo.",
 		}

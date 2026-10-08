@@ -520,6 +520,16 @@ configurazione solo quando cambia. Riaprono la sessione solo i limiti di peer
 (`max_peer_dial`/`max_peer_accept`), la scadenza della cache e la
 preallocazione.
 
+Ogni torrent ha un **limite di velocità proprio** (download e upload, KiB/s):
+`-1` eredita il globale, `0` è illimitato, un valore positivo è il limite. I
+peer del torrent usano un limitatore dedicato che, quando il torrent eredita,
+inoltra al limitatore di sessione: un cambio vale subito, senza riconnettere, e
+il limite globale continua a valere per la somma dei torrent che lo ereditano.
+Si imposta con `POST /api/v1/torrents/{hash}/seed-limits` (campi
+`download_limit`, `upload_limit`) o dalla pagina del demone; Gextto lo fa dal
+tab **Limiti** del dettaglio torrent. Gextto conserva i valori tra un riavvio e
+l'altro e il demone li riapplica alla sessione ricaricata.
+
 ## REST API (v1)
 
 Tutte le richieste richiedono `X-Gx-Token` (o `Authorization: Bearer`) se il
@@ -546,7 +556,8 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `restart` (con `probe_secs`), `park`, `unpark`;
 - `pin` (con `pinned=1/0`), `top`;
 - `move` e `associate` (con `destination`);
-- `seed-limits`, `trackers` (con `urls`, uno per riga);
+- `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 globale, 0 illimitato);
+- `trackers` (con `urls`, uno per riga);
 - `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
 - `file-priorities` (con `priorities`, separate da virgola).
@@ -566,7 +577,7 @@ Le operazioni che rain non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- limiti di velocità e connessioni per singolo torrent;
+- limiti di connessioni e slot di upload per singolo torrent;
 - super-seeding e upload mode;
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.

@@ -67,7 +67,7 @@ presenti o già gestiti da Gextto.
 | 3 | Toggle sequential/first-last a caldo | **Fatto** — `PiecePicker.SetOrder` + `SetSequential` applicato ai torrent in corso | 3 |
 | 4 | Web seed add/remove via API | **Fatto** — `Torrent.AddWebseeds`/`RemoveWebseeds` + azione `webseeds` | 2 |
 | 5 | Diagnostica pezzi | **Fatto** — API demone `pieces`, scheda Pezzi in Gextto e scheda Pieces nella pagina del demone | 4 |
-| 6 | Limiti velocità per-torrent | **Sì** | 5 |
+| 6 | Limiti velocità per-torrent | **Fatto** — `Limiter.SetParent`/`SetLimitKiB` + `Torrent.SetSpeedLimits`, riapplicati al riavvio | 5 |
 | 7 | Streaming HTTP Range + priorità pezzi | **Sì** — endpoint sul demone | 7 |
 | 8 | Limiti connessioni/upload per-torrent | **Sì** — utile con coda/cache automatiche | 6 |
 | 9 | IPv6 | **No** | — |

@@ -434,13 +434,16 @@ type gxTorrentItem struct {
 	NumIncomplete  int     `json:"num_incomplete"`
 	SeedRatio      float64 `json:"seed_ratio"`
 	SeedDays       int64   `json:"seed_days"`
-	HasMetadata    bool    `json:"has_metadata"`
-	AutoManaged    bool    `json:"auto_managed"`
-	Parked         bool    `json:"parked"`
-	Error          string  `json:"error"`
-	CompletedAt    int64   `json:"completed_at"`
-	CurrentTracker string  `json:"current_tracker"`
-	TorrentVersion string  `json:"torrent_version"`
+	// Per-torrent speed limits in KiB/s (-1 global, 0 unlimited).
+	DownloadLimitKib int64  `json:"download_limit_kib"`
+	UploadLimitKib   int64  `json:"upload_limit_kib"`
+	HasMetadata      bool   `json:"has_metadata"`
+	AutoManaged      bool   `json:"auto_managed"`
+	Parked           bool   `json:"parked"`
+	Error            string `json:"error"`
+	CompletedAt      int64  `json:"completed_at"`
+	CurrentTracker   string `json:"current_tracker"`
+	TorrentVersion   string `json:"torrent_version"`
 }
 
 func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.TorrentView {
@@ -455,8 +458,8 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		UploadRate:        uint64(maxInt64(0, item.UploadRate)),
 		DownloadRateTotal: uint64(maxInt64(0, item.DownloadRate)),
 		UploadRateTotal:   uint64(maxInt64(0, item.UploadRate)),
-		DownloadLimit:     -1,
-		UploadLimit:       -1,
+		DownloadLimit:     kibToBytes(item.DownloadLimitKib),
+		UploadLimit:       kibToBytes(item.UploadLimitKib),
 		AllTimeUpload:     item.Uploaded,
 		AllTimeDownload:   item.Downloaded,
 		SeedingSeconds:    item.SeedingSeconds,
@@ -1375,30 +1378,54 @@ func (e *gxTorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error)
 	return true, nil
 }
 
-// SetLimits stores the per-torrent seed policy (enforced by Gextto). rain has
-// no per-torrent rate limit: a positive rate limit is refused explicitly.
+// SetLimits stores the per-torrent seed policy and speed limits. rain's limits
+// are in KiB/s: -1 inherits the global, 0 is unlimited (gextto fork).
 func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
-	if downloadLimit > 0 || uploadLimit > 0 {
-		return false, backendCapabilityError(BackendGxTorrent, "per_torrent_rate_limit")
-	}
 	form := url.Values{}
+	form.Set("download_limit", strconv.FormatInt(bytesToKib(downloadLimit), 10))
+	form.Set("upload_limit", strconv.FormatInt(bytesToKib(uploadLimit), 10))
 	if seedRatio >= -1.0 {
 		form.Set("seed_ratio", strconv.FormatFloat(seedRatio, 'f', -1, 64))
 	}
 	if seedDays >= -1 {
 		form.Set("seed_days", strconv.FormatInt(seedDays, 10))
 	}
-	if len(form) == 0 {
-		return false, nil
-	}
 	if err := e.action(hash, "seed-limits", form); err != nil {
 		return false, err
 	}
 	e.updateCached(hash, func(view *models.TorrentView) {
+		view.DownloadLimit = downloadLimit
+		view.UploadLimit = uploadLimit
 		view.SeedRatio = seedRatio
 		view.SeedDays = seedDays
 	})
 	return true, nil
+}
+
+// bytesToKib maps a Gextto per-torrent limit in bytes to rain's KiB/s (gextto
+// fork): negative inherits the global, zero is unlimited, a positive value is
+// rounded up to at least 1 KiB.
+func bytesToKib(value int64) int64 {
+	switch {
+	case value < 0:
+		return -1
+	case value == 0:
+		return 0
+	default:
+		kib := value / 1024
+		if kib < 1 {
+			kib = 1
+		}
+		return kib
+	}
+}
+
+// kibToBytes is the reverse of bytesToKib for the list view.
+func kibToBytes(kib int64) int64 {
+	if kib <= 0 {
+		return kib
+	}
+	return kib * 1024
 }
 
 func (e *gxTorrentEngine) SetMaxConnections(hash string, value int) (bool, error) {

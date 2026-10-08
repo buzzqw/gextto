@@ -1284,3 +1284,51 @@ func TestDaemonUIPiecesTab(t *testing.T) {
 		t.Fatalf("piece runs = %+v (covered %d)", detail.Pieces, covered)
 	}
 }
+
+// TestDaemonPerTorrentSpeedLimits checks the per-torrent speed limits: the
+// action sets them, the view reports them, and a session reload reapplies them.
+func TestDaemonPerTorrentSpeedLimits(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	speedLimits := func() (int64, int64) {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return -2, -2
+		}
+		return tt.SpeedLimits()
+	}
+	if dl, ul := speedLimits(); dl != -1 || ul != -1 {
+		t.Fatalf("default limits = %d/%d, want -1/-1", dl, ul)
+	}
+
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Post(srv.URL+"/api/v1/torrents/"+hash+"/seed-limits",
+		"application/x-www-form-urlencoded",
+		strings.NewReader("download_limit=512&upload_limit=0&seed_ratio=-1&seed_days=-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	waitFor(t, "limits applied", func() bool { dl, ul := speedLimits(); return dl == 512 && ul == 0 })
+
+	info, _ := findInfo(d, hash)
+	if info.DownloadLimitKib != 512 || info.UploadLimitKib != 0 {
+		t.Fatalf("view limits = %d/%d, want 512/0", info.DownloadLimitKib, info.UploadLimitKib)
+	}
+
+	// rain does not persist them: a session reload must reapply the stored ones.
+	d.mu.Lock()
+	d.restartSessionLocked()
+	d.mu.Unlock()
+	waitFor(t, "limits after reload", func() bool { dl, ul := speedLimits(); return dl == 512 && ul == 0 })
+}

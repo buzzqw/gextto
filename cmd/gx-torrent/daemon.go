@@ -73,8 +73,13 @@ type torrentMeta struct {
 	RotatedAt  time.Time `json:"rotated_at,omitzero"`
 	SeedRatio  float64   `json:"seed_ratio"`
 	SeedDays   int64     `json:"seed_days"`
-	SwarmSeeds int       `json:"swarm_seeds"`
-	SwarmPeers int       `json:"swarm_peers"`
+	// Per-torrent speed limits in KiB/s (gextto fork): nil = inherit the global
+	// limit, 0 = unlimited, >0 = explicit. Pointers so a state file written
+	// before these existed still means "inherit".
+	DownloadLimitKib *int64 `json:"download_limit_kib,omitempty"`
+	UploadLimitKib   *int64 `json:"upload_limit_kib,omitempty"`
+	SwarmSeeds       int    `json:"swarm_seeds"`
+	SwarmPeers       int    `json:"swarm_peers"`
 	// DoneBytes is the last verified amount, reported while rain cannot
 	// compute it (a stopped torrent has no piece table).
 	DoneBytes int64 `json:"done_bytes,omitempty"`
@@ -334,6 +339,9 @@ func (d *Daemon) restartSessionLocked() {
 		d.restartPending = true
 		return
 	}
+	// rain does not persist the per-torrent speed limits: reapply them (and the
+	// paused/parked state) to the reloaded torrents.
+	d.reconcileLocked()
 	logf("session restarted to apply new settings")
 }
 
@@ -360,6 +368,10 @@ func (d *Daemon) reconcileLocked() {
 		if meta.Hash != hash {
 			meta.Hash = hash
 			d.dirty = true
+		}
+		// Re-apply the per-torrent speed limits stored across restarts.
+		if meta.DownloadLimitKib != nil || meta.UploadLimitKib != nil {
+			t.SetSpeedLimits(kibOrInherit(meta.DownloadLimitKib), kibOrInherit(meta.UploadLimitKib))
 		}
 		// Torrents parked or paused must not run, whatever rain restored.
 		if meta.UserPaused || meta.Parked {
@@ -702,50 +714,53 @@ func (d *Daemon) refreshSwarmLocked(t *torrent.Torrent, meta *torrentMeta, rt *r
 // ---------------------------------------------------------------------------
 
 type torrentInfo struct {
-	Hash            string  `json:"hash"`
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	State           string  `json:"state"`
-	SavePath        string  `json:"save_path"`
-	Progress        float64 `json:"progress"`
-	TotalSize       int64   `json:"total_size"`
-	TotalDone       int64   `json:"total_done"`
-	DownloadRate    int64   `json:"download_rate"`
-	UploadRate      int64   `json:"upload_rate"`
-	Downloaded      int64   `json:"downloaded"`
-	Uploaded        int64   `json:"uploaded"`
-	SeedingSeconds  int64   `json:"seeding_seconds"`
-	ActiveSeconds   int64   `json:"active_seconds"`
-	ETASeconds      int64   `json:"eta_seconds"`
-	CurrentTracker  string  `json:"current_tracker,omitempty"`
-	QueuePosition   int     `json:"queue_position"`
-	NumPeers        int     `json:"num_peers"`
-	NumSeeds        int     `json:"num_seeds"`
-	NumComplete     int     `json:"num_complete"`
-	NumIncomplete   int     `json:"num_incomplete"`
-	SeedRatio       float64 `json:"seed_ratio"`
-	SeedDays        int64   `json:"seed_days"`
-	HasMetadata     bool    `json:"has_metadata"`
-	AutoManaged     bool    `json:"auto_managed"`
-	Sequential      bool    `json:"sequential"`
-	FirstLast       bool    `json:"first_last"`
-	Pinned          bool    `json:"pinned"`
-	Parked          bool    `json:"parked"`
-	Probing         bool    `json:"probing"`
-	Slow            bool    `json:"slow"`
-	Private         bool    `json:"private"`
-	TorrentVersion  string  `json:"torrent_version"`
-	PiecesTotal     uint32  `json:"pieces_total"`
-	PiecesHave      uint32  `json:"pieces_have"`
-	PiecesAvailable uint32  `json:"pieces_available"`
-	PiecesChecked   uint32  `json:"pieces_checked"`
-	PieceLength     uint32  `json:"piece_length"`
-	Wasted          int64   `json:"wasted"`
-	Allocated       int64   `json:"allocated"`
-	FileCount       int     `json:"file_count"`
-	Error           string  `json:"error,omitempty"`
-	AddedAt         int64   `json:"added_at"`
-	CompletedAt     int64   `json:"completed_at,omitempty"`
+	Hash           string  `json:"hash"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	State          string  `json:"state"`
+	SavePath       string  `json:"save_path"`
+	Progress       float64 `json:"progress"`
+	TotalSize      int64   `json:"total_size"`
+	TotalDone      int64   `json:"total_done"`
+	DownloadRate   int64   `json:"download_rate"`
+	UploadRate     int64   `json:"upload_rate"`
+	Downloaded     int64   `json:"downloaded"`
+	Uploaded       int64   `json:"uploaded"`
+	SeedingSeconds int64   `json:"seeding_seconds"`
+	ActiveSeconds  int64   `json:"active_seconds"`
+	ETASeconds     int64   `json:"eta_seconds"`
+	CurrentTracker string  `json:"current_tracker,omitempty"`
+	QueuePosition  int     `json:"queue_position"`
+	NumPeers       int     `json:"num_peers"`
+	NumSeeds       int     `json:"num_seeds"`
+	NumComplete    int     `json:"num_complete"`
+	NumIncomplete  int     `json:"num_incomplete"`
+	SeedRatio      float64 `json:"seed_ratio"`
+	SeedDays       int64   `json:"seed_days"`
+	// Per-torrent speed limits in KiB/s (gextto fork): -1 global, 0 unlimited.
+	DownloadLimitKib int64  `json:"download_limit_kib"`
+	UploadLimitKib   int64  `json:"upload_limit_kib"`
+	HasMetadata      bool   `json:"has_metadata"`
+	AutoManaged      bool   `json:"auto_managed"`
+	Sequential       bool   `json:"sequential"`
+	FirstLast        bool   `json:"first_last"`
+	Pinned           bool   `json:"pinned"`
+	Parked           bool   `json:"parked"`
+	Probing          bool   `json:"probing"`
+	Slow             bool   `json:"slow"`
+	Private          bool   `json:"private"`
+	TorrentVersion   string `json:"torrent_version"`
+	PiecesTotal      uint32 `json:"pieces_total"`
+	PiecesHave       uint32 `json:"pieces_have"`
+	PiecesAvailable  uint32 `json:"pieces_available"`
+	PiecesChecked    uint32 `json:"pieces_checked"`
+	PieceLength      uint32 `json:"piece_length"`
+	Wasted           int64  `json:"wasted"`
+	Allocated        int64  `json:"allocated"`
+	FileCount        int    `json:"file_count"`
+	Error            string `json:"error,omitempty"`
+	AddedAt          int64  `json:"added_at"`
+	CompletedAt      int64  `json:"completed_at,omitempty"`
 }
 
 // stateFor maps rain's status and gx-torrent's flags onto Gextto's states.
@@ -810,48 +825,50 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		pos = -1
 	}
 	info := torrentInfo{
-		Hash:            t.InfoHash().String(),
-		ID:              t.ID(),
-		Name:            stats.Name,
-		State:           stateFor(meta, stats, moving),
-		SavePath:        meta.SavePath,
-		Progress:        progress,
-		TotalSize:       stats.Bytes.Total,
-		TotalDone:       stats.Bytes.Completed,
-		DownloadRate:    int64(stats.Speed.Download),
-		UploadRate:      int64(stats.Speed.Upload),
-		Downloaded:      stats.Bytes.Downloaded,
-		Uploaded:        stats.Bytes.Uploaded,
-		SeedingSeconds:  int64(stats.SeededFor.Seconds()),
-		ETASeconds:      eta,
-		QueuePosition:   pos,
-		NumPeers:        stats.Peers.Total,
-		NumSeeds:        rt.numSeeds,
-		CurrentTracker:  rt.tracker,
-		NumComplete:     meta.SwarmSeeds,
-		NumIncomplete:   meta.SwarmPeers,
-		SeedRatio:       meta.SeedRatio,
-		SeedDays:        meta.SeedDays,
-		HasMetadata:     stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
-		AutoManaged:     !meta.UserPaused && !meta.Parked && !meta.Pinned,
-		Sequential:      meta.Sequential,
-		FirstLast:       meta.FirstLast,
-		Pinned:          meta.Pinned,
-		Parked:          meta.Parked,
-		Probing:         !meta.ProbeUntil.IsZero(),
-		Slow:            rt.slow,
-		Private:         stats.Private,
-		TorrentVersion:  torrentVersion,
-		PiecesTotal:     stats.Pieces.Total,
-		PiecesHave:      stats.Pieces.Have,
-		PiecesAvailable: stats.Pieces.Available,
-		PiecesChecked:   stats.Pieces.Checked,
-		PieceLength:     stats.PieceLength,
-		Wasted:          stats.Bytes.Wasted,
-		Allocated:       stats.Bytes.Allocated,
-		FileCount:       stats.FileCount,
-		Error:           meta.Error,
-		AddedAt:         meta.AddedAt.Unix(),
+		Hash:             t.InfoHash().String(),
+		ID:               t.ID(),
+		Name:             stats.Name,
+		State:            stateFor(meta, stats, moving),
+		SavePath:         meta.SavePath,
+		Progress:         progress,
+		TotalSize:        stats.Bytes.Total,
+		TotalDone:        stats.Bytes.Completed,
+		DownloadRate:     int64(stats.Speed.Download),
+		UploadRate:       int64(stats.Speed.Upload),
+		Downloaded:       stats.Bytes.Downloaded,
+		Uploaded:         stats.Bytes.Uploaded,
+		SeedingSeconds:   int64(stats.SeededFor.Seconds()),
+		ETASeconds:       eta,
+		QueuePosition:    pos,
+		NumPeers:         stats.Peers.Total,
+		NumSeeds:         rt.numSeeds,
+		CurrentTracker:   rt.tracker,
+		NumComplete:      meta.SwarmSeeds,
+		NumIncomplete:    meta.SwarmPeers,
+		SeedRatio:        meta.SeedRatio,
+		SeedDays:         meta.SeedDays,
+		DownloadLimitKib: kibOrInherit(meta.DownloadLimitKib),
+		UploadLimitKib:   kibOrInherit(meta.UploadLimitKib),
+		HasMetadata:      stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0,
+		AutoManaged:      !meta.UserPaused && !meta.Parked && !meta.Pinned,
+		Sequential:       meta.Sequential,
+		FirstLast:        meta.FirstLast,
+		Pinned:           meta.Pinned,
+		Parked:           meta.Parked,
+		Probing:          !meta.ProbeUntil.IsZero(),
+		Slow:             rt.slow,
+		Private:          stats.Private,
+		TorrentVersion:   torrentVersion,
+		PiecesTotal:      stats.Pieces.Total,
+		PiecesHave:       stats.Pieces.Have,
+		PiecesAvailable:  stats.Pieces.Available,
+		PiecesChecked:    stats.Pieces.Checked,
+		PieceLength:      stats.PieceLength,
+		Wasted:           stats.Bytes.Wasted,
+		Allocated:        stats.Bytes.Allocated,
+		FileCount:        stats.FileCount,
+		Error:            meta.Error,
+		AddedAt:          meta.AddedAt.Unix(),
 	}
 	if info.Error == "" && stats.Error != nil {
 		info.Error = stats.Error.Error()
@@ -1168,13 +1185,35 @@ func (d *Daemon) setPin(key string, pinned bool) error {
 
 // setSeedLimits stores the per-torrent seed policy (-1 = global, 0 =
 // unlimited). Gextto enforces it.
-func (d *Daemon) setSeedLimits(key string, ratio *float64, days *int64) error {
-	return d.withTorrent(key, func(_ *torrent.Torrent, meta *torrentMeta) error {
+// kibOrInherit maps a stored per-torrent limit to the rain convention: nil means
+// inherit the global limit (-1).
+func kibOrInherit(value *int64) int64 {
+	if value == nil {
+		return -1
+	}
+	return *value
+}
+
+// setLimits stores the per-torrent seed policy and, when given, the speed
+// limits (KiB/s), applying the latter to the running torrent at once.
+func (d *Daemon) setLimits(key string, download, upload *int64, ratio *float64, days *int64) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if download != nil {
+			value := *download
+			meta.DownloadLimitKib = &value
+		}
+		if upload != nil {
+			value := *upload
+			meta.UploadLimitKib = &value
+		}
 		if ratio != nil {
 			meta.SeedRatio = *ratio
 		}
 		if days != nil {
 			meta.SeedDays = *days
+		}
+		if download != nil || upload != nil {
+			t.SetSpeedLimits(kibOrInherit(meta.DownloadLimitKib), kibOrInherit(meta.UploadLimitKib))
 		}
 		return nil
 	})

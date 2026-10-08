@@ -10,12 +10,14 @@ import (
 	"github.com/juju/ratelimit"
 )
 
-// Limiter is a token bucket shared by all peers of a session. A nil Limiter or
-// a zero rate means unlimited.
+// Limiter is a token bucket shared by the peers that hold it. A nil Limiter or
+// a zero rate means unlimited. A limiter may also inherit another one (gextto
+// fork): a torrent without an explicit limit forwards to the session limiter.
 type Limiter struct {
 	mu     sync.RWMutex
 	bucket *ratelimit.Bucket
 	rate   int64
+	parent *Limiter
 }
 
 // New returns a limiter of bytesPerSecond (0 = unlimited).
@@ -23,6 +25,30 @@ func New(bytesPerSecond int64) *Limiter {
 	l := &Limiter{}
 	l.SetRate(bytesPerSecond)
 	return l
+}
+
+// SetParent makes this limiter inherit another one (gextto fork): Take and Rate
+// forward to the parent until a new parent is set. A nil parent clears the
+// inheritance.
+func (l *Limiter) SetParent(parent *Limiter) {
+	l.mu.Lock()
+	l.parent = parent
+	l.mu.Unlock()
+}
+
+// SetLimitKiB sets an explicit limit in KiB/s (gextto fork). A negative value
+// inherits the session limiter, zero means unlimited.
+func (l *Limiter) SetLimitKiB(kib int64, session *Limiter) {
+	switch {
+	case kib < 0:
+		l.SetParent(session)
+	case kib == 0:
+		l.SetParent(nil)
+		l.SetRate(0)
+	default:
+		l.SetParent(nil)
+		l.SetRate(kib * 1024)
+	}
 }
 
 // SetRate changes the rate (0 = unlimited). Peers pick it up on their next
@@ -50,8 +76,13 @@ func (l *Limiter) Rate() int64 {
 		return 0
 	}
 	l.mu.RLock()
-	defer l.mu.RUnlock()
-	return l.rate
+	parent := l.parent
+	rate := l.rate
+	l.mu.RUnlock()
+	if parent != nil {
+		return parent.Rate()
+	}
+	return rate
 }
 
 // Take takes n bytes from the bucket and returns how long the caller must
@@ -61,8 +92,12 @@ func (l *Limiter) Take(n int64) time.Duration {
 		return 0
 	}
 	l.mu.RLock()
+	parent := l.parent
 	bucket := l.bucket
 	l.mu.RUnlock()
+	if parent != nil {
+		return parent.Take(n)
+	}
 	if bucket == nil {
 		return 0
 	}

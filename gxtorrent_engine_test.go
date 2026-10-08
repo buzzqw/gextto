@@ -224,14 +224,17 @@ func TestGxEngineOperations(t *testing.T) {
 	if !fake.seen("POST /api/v1/add?destination=%2Fdl&magnet=magnet%3A%3Fnew&top=1") {
 		t.Fatalf("add options not sent: %v", fake.requests)
 	}
-	if _, err := engine.SetLimits("aa", 1000, -1, 2.0, -1); err == nil {
-		t.Fatal("per-torrent rate limits are not supported and must say so")
+	if ok, err := engine.SetLimits("aa", 1000, -1, 2.0, -1); err != nil || !ok {
+		t.Fatalf("per-torrent speed limits: %v %v", ok, err)
+	}
+	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?download_limit=1&") {
+		t.Fatalf("download limit not converted to KiB: %v", fake.requests)
 	}
 	if ok, err := engine.SetLimits("aa", -1, -1, 2.0, 7); err != nil || !ok {
 		t.Fatalf("seed limits: %v %v", ok, err)
 	}
-	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?seed_days=7&seed_ratio=2") {
-		t.Fatal("seed limits not sent")
+	if !fake.seen("POST /api/v1/torrents/aa/seed-limits?download_limit=-1&seed_days=7&seed_ratio=2&upload_limit=-1") {
+		t.Fatalf("seed limits not sent: %v", fake.requests)
 	}
 	if ok, err := engine.SetFilePriorities("aa", []int32{4, 0, 7}); err != nil || !ok {
 		t.Fatalf("file priorities: %v %v", ok, err)
@@ -362,7 +365,7 @@ func TestGxManagedListen(t *testing.T) {
 
 func TestV2DetailCapsPerEngine(t *testing.T) {
 	gx := v2DetailCapsFor(BackendGxTorrent)
-	if gx.SuperSeeding || !gx.WebSeeds || gx.RateLimits || gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
+	if gx.SuperSeeding || !gx.WebSeeds || !gx.RateLimits || gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
 		t.Fatalf("gx-torrent capabilities: %+v", gx)
 	}
 	qb := v2DetailCapsFor(BackendQbittorrent)
@@ -889,5 +892,42 @@ func TestGxPieceRuns(t *testing.T) {
 	runs, found, err = e2.PieceRuns("ABC")
 	if err != nil || found || runs != nil {
 		t.Fatalf("not found: runs=%v found=%v err=%v", runs, found, err)
+	}
+}
+
+// TestGxSetLimitsPostsKibAndMapsThemBack checks the per-torrent speed limit
+// conversion (bytes <-> KiB) and the form the daemon receives.
+func TestGxSetLimitsPostsKibAndMapsThemBack(t *testing.T) {
+	var action, download, upload, ratio, days string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		action = r.URL.Path
+		_ = r.ParseForm()
+		download = r.FormValue("download_limit")
+		upload = r.FormValue("upload_limit")
+		ratio = r.FormValue("seed_ratio")
+		days = r.FormValue("seed_days")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	if ok, err := e.SetLimits("ABC", 2*1024*1024, 0, 1.5, 7); err != nil || !ok {
+		t.Fatalf("SetLimits: ok=%v err=%v", ok, err)
+	}
+	if !strings.HasSuffix(action, "/seed-limits") || download != "2048" || upload != "0" || ratio != "1.5" || days != "7" {
+		t.Fatalf("posted action=%q dl=%q ul=%q ratio=%q days=%q", action, download, upload, ratio, days)
+	}
+	if _, err := e.SetLimits("ABC", -1, 0, -1, -1); err != nil {
+		t.Fatal(err)
+	}
+	if download != "-1" || upload != "0" {
+		t.Fatalf("inherit: dl=%q ul=%q", download, upload)
+	}
+
+	view := e.toView(gxTorrentItem{Hash: "abc", DownloadLimitKib: 512, UploadLimitKib: -1}, time.Now())
+	if view.DownloadLimit != 512*1024 || view.UploadLimit != -1 {
+		t.Fatalf("view limits = %d/%d, want %d/-1", view.DownloadLimit, view.UploadLimit, 512*1024)
 	}
 }

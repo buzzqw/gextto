@@ -243,7 +243,16 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			value := formInt(r, "seed_days", -1)
 			days = &value
 		}
-		err = d.setSeedLimits(hash, ratio, days)
+		var download, upload *int64
+		if r.FormValue("download_limit") != "" {
+			value := formInt(r, "download_limit", -1)
+			download = &value
+		}
+		if r.FormValue("upload_limit") != "" {
+			value := formInt(r, "upload_limit", -1)
+			upload = &value
+		}
+		err = d.setLimits(hash, download, upload, ratio, days)
 	case "file-priorities":
 		var priorities []int
 		for _, field := range strings.Split(r.FormValue("priorities"), ",") {

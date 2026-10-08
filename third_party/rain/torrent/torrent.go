@@ -12,6 +12,7 @@ import (
 	"github.com/cenkalti/rain/v2/internal/addrlist"
 	"github.com/cenkalti/rain/v2/internal/allocator"
 	"github.com/cenkalti/rain/v2/internal/announcer"
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/bitfield"
 	"github.com/cenkalti/rain/v2/internal/blocklist"
 	"github.com/cenkalti/rain/v2/internal/bufferpool"
@@ -257,6 +258,15 @@ type torrent struct {
 	// (gextto fork).
 	firstLast bool
 
+	// Per-torrent rate limiters (gextto fork). They inherit the session
+	// limiters until an explicit per-torrent limit is set; peers hold these, so
+	// a change applies without reconnecting.
+	bucketDownload *bandwidth.Limiter
+	bucketUpload   *bandwidth.Limiter
+	// Explicit per-torrent speed limits in KiB/s (-1 = inherit the session).
+	downloadLimitKib int64
+	uploadLimitKib   int64
+
 	// True means that completeCmd has run before.
 	completeCmdRun bool
 
@@ -358,6 +368,14 @@ func newTorrent(
 		sequential:                sequential,
 		firstLast:                 firstLast,
 	}
+	// Per-torrent limiters inherit the session ones until an explicit limit is
+	// set (gextto fork).
+	t.bucketDownload = bandwidth.New(0)
+	t.bucketDownload.SetParent(s.bucketDownload)
+	t.bucketUpload = bandwidth.New(0)
+	t.bucketUpload.SetParent(s.bucketUpload)
+	t.downloadLimitKib = -1
+	t.uploadLimitKib = -1
 	if len(t.webseedSources) > s.config.WebseedMaxSources {
 		t.webseedSources = t.webseedSources[:10]
 	}

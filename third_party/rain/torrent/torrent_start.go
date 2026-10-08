@@ -194,7 +194,7 @@ func (t *torrent) startPieceDownloaderForWebseed(src *webseedsource.WebseedSourc
 
 func (t *torrent) startWebseedDownloader(sp *piecepicker.WebseedDownloadSpec) {
 	t.log.Debugf("downloading pieces %d-%d from webseed %s", sp.Begin, sp.End, sp.Source.URL)
-	ud := urldownloader.New(sp.Source.URL, sp.Begin, sp.End, t.session.bucketDownload)
+	ud := urldownloader.New(sp.Source.URL, sp.Begin, sp.End, t.bucketDownload)
 	for _, src := range t.webseedSources {
 		if src != sp.Source {
 			continue

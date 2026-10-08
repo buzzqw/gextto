@@ -173,8 +173,11 @@ type uiDetailData struct {
 
 	SeedRatio float64
 	SeedDays  int64
-	Pinned    bool
-	Private   bool
+	// Per-torrent speed limits in KiB/s (-1 global, 0 unlimited).
+	DownloadLimitKib int64
+	UploadLimitKib   int64
+	Pinned           bool
+	Private          bool
 
 	PiecesTotal     uint32
 	PiecesHave      uint32
@@ -583,9 +586,11 @@ const uiDetailTemplate = `{{define "detail"}}
   </div>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
+    <label>Download limit KiB/s (-1 global, 0 unlimited)<input type="number" name="download_limit" value="{{.DownloadLimitKib}}"></label>
+    <label>Upload limit KiB/s (-1 global, 0 unlimited)<input type="number" name="upload_limit" value="{{.UploadLimitKib}}"></label>
     <label>Seed ratio (-1 global, 0 unlimited)<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
     <label>Seed days (-1 global, 0 unlimited)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
-    <button type="submit">Save seed limits</button>
+    <button type="submit">Save limits</button>
   </form>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
@@ -1109,8 +1114,10 @@ func (d *Daemon) handleUISeedLimits(w http.ResponseWriter, r *http.Request) {
 	hash := strings.TrimSpace(r.FormValue("hash"))
 	ratio := formFloat(r, "seed_ratio", -1)
 	days := formInt(r, "seed_days", -1)
-	err := d.setSeedLimits(hash, &ratio, &days)
-	d.uiDoneDetail(w, r, hash, "general", "Seed limits saved", err)
+	download := formInt(r, "download_limit", -1)
+	upload := formInt(r, "upload_limit", -1)
+	err := d.setLimits(hash, &download, &upload, &ratio, &days)
+	d.uiDoneDetail(w, r, hash, "general", "Limits saved", err)
 }
 
 func (d *Daemon) handleUIMove(w http.ResponseWriter, r *http.Request) {
@@ -1387,6 +1394,8 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	savePath := meta.SavePath
 	seedRatio := meta.SeedRatio
 	seedDays := meta.SeedDays
+	downloadLimit := kibOrInherit(meta.DownloadLimitKib)
+	uploadLimit := kibOrInherit(meta.UploadLimitKib)
 	pinned := meta.Pinned
 	swarmSeeds := meta.SwarmSeeds
 	swarmPeers := meta.SwarmPeers
@@ -1417,6 +1426,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		DownRate: int64(stats.Speed.Download), UpRate: int64(stats.Speed.Upload), Ratio: ratio, ETA: eta,
 		NumPeers: stats.Peers.Total, NumSeeds: rt.numSeeds, NumComplete: swarmSeeds, NumIncomplete: swarmPeers,
 		SeedRatio: seedRatio, SeedDays: seedDays, Pinned: pinned, Private: stats.Private,
+		DownloadLimitKib: downloadLimit, UploadLimitKib: uploadLimit,
 		PiecesTotal: stats.Pieces.Total, PiecesHave: stats.Pieces.Have, PiecesAvailable: stats.Pieces.Available,
 		PiecesChecked: stats.Pieces.Checked, PieceLength: int64(stats.PieceLength),
 		Wasted: stats.Bytes.Wasted, Allocated: stats.Bytes.Allocated, FileCount: stats.FileCount,
