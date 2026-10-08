@@ -1,30 +1,9 @@
 # Da fare (backlog)
 
-Punti aperti, in ordine di rilevanza. Ripristinato l'8-10-2026: era finito per
-errore in `docs/archive/` pur essendo un backlog **attivo**. Contiene solo ciò
-che risolve un problema reale; il resto è annotato sotto come chiuso.
-
-## Aperti
-
-### 1. Log: unificare "sostituzione" e "aggiunto alla libreria"
-Oggi due righe ravvicinate e ridondanti durante un upgrade:
-- `cleaner.go:241` `logInferiorFileReplaced`: `🗑️ Replaced with a better version: «nuovo»; the old file «vecchio» …`
-- `web_torrent_events.go:2454`: `📁 <serie> <ep> added to the library (X GB): <path>`
-
-Vanno fuse in **una sola riga parlante** (episodio aggiornato, versione
-precedente nel cestino, dimensione, percorso finale). Le due righe stanno in
-moduli diversi (`cleaner.go` vs `web_torrent_events.go`): prima va tracciato il
-percorso di upgrade (`DiscardIfInferior*` → completamento), poi emessa dove si
-conoscono sia il vecchio sia il nuovo.
-
-Esempio di risultato finale:
-
-```
-♻️ FBI S03E01 aggiornato (1.4 GB): /SerieTV/FBI/S03/FBI.S03E01.1080p.mkv · versione precedente «FBI.S03E01.720p.mkv» nel cestino
-📁 FBI S03E02 aggiunto alla libreria (1.1 GB): /SerieTV/FBI/S03/FBI.S03E02.1080p.mkv
-```
-
-La seconda riga è il caso normale (nessuna sostituzione) e resta com'è.
+Punti aperti. Ripristinato l'8-10-2026: era finito per errore in `docs/archive/`
+pur essendo un backlog **attivo**. Attualmente **non ci sono punti aperti**: gli
+ultimi due sono stati chiusi l'8-10-2026. Quelli sotto restano come memoria delle
+decisioni.
 
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
@@ -34,11 +13,15 @@ La seconda riga è il caso normale (nessuna sostituzione) e resta com'è.
 
 ## Chiusi / decisioni
 
-- **Pannello "Operazioni in background"** — **rimosso** (2026-10-08): era
-  alimentato da soli tre job (`scan-archives`, `rename-all`,
-  `media-info-backfill`) e restava vuoto nell'uso normale, occupando spazio. Il
-  `JobManager` e l'API `/api/jobs` restano; la rinomina globale ha già la sua
-  barra dedicata (`Progresso rinomina`).
+- **Log di upgrade unificati** — fatto (commit `988d60a`). Una sostituzione
+  produce ora una sola riga, con il verbo e i nomi dei file sostituiti:
+  ```
+  ♻️ FBI S03E01 updated (1.4 GB): /SerieTV/FBI/S03/FBI.S03E01.1080p.mkv · previous version «FBI.S03E01.720p.mkv» moved to the trash
+  ```
+  L'aggiunta normale (nessuna sostituzione) resta `📁 … added to the library …`.
+- **Pannello "Operazioni in background"** — risolto (commit `65cb9bf`). Il
+  pannello resta e continua a funzionare (polling, annullamento), ma è **nascosto
+  quando non c'è alcun job**: non occupa più spazio a vuoto.
 - **Write-back cache nel fork di rain** — chiuso: la misura mostra
   `write_cache=0` (storage e download di pari passo), quindi non ci sarebbe
   guadagno. Da riaprire solo con uno storage realmente più lento della rete.
@@ -47,7 +30,7 @@ La seconda riga è il caso normale (nessuna sostituzione) e resta com'è.
 - **Benchmark UI come test di performance in CI** — chiuso: il rendering SSR
   costa ~1–3 ms/pagina, non è un problema.
 - **Cap cache su storage lento (NFS)** — superato: la cache si autoregola
-  (`cmd/gx-torrent/cache.go:261`, tuner `cacheSizes`).
+  (`cmd/gx-torrent/cache.go`, tuner `cacheSizes`).
 - **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto
-  (`uiweb/v2/templates/v2.html`, route `GET /dashboard/feed`, `uiweb_v2.go`).
+  (route `GET /dashboard/feed`, `uiweb_v2.go`).
 - **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
