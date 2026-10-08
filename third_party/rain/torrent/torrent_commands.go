@@ -151,6 +151,42 @@ func (t *torrent) AddTrackers(trackers []tracker.Tracker) {
 	t.sendCommand(func() { t.handleNewTrackers(trackers) })
 }
 
+// unlimitedUnchokedPeers is used when the per-torrent upload slots are set to
+// "unlimited" (gextto fork).
+const unlimitedUnchokedPeers = 1000
+
+// enforceConnectionLimit closes peers over the per-torrent cap (gextto fork).
+// It runs in the torrent goroutine.
+func (t *torrent) enforceConnectionLimit() {
+	if t.maxConnections <= 0 {
+		return
+	}
+	for len(t.peers) > t.maxConnections {
+		closed := false
+		for pe := range t.peers {
+			t.closePeer(pe)
+			closed = true
+			break
+		}
+		if !closed {
+			return
+		}
+	}
+}
+
+// applyMaxUploads sets the unchoker slots from maxUploads (gextto fork): zero
+// unchokes every interested peer. It runs in the torrent goroutine.
+func (t *torrent) applyMaxUploads() {
+	if t.unchoker == nil {
+		return
+	}
+	if t.maxUploads == 0 {
+		t.unchoker.SetNumUnchoked(unlimitedUnchokedPeers)
+		return
+	}
+	t.unchoker.SetNumUnchoked(t.maxUploads)
+}
+
 // setOrder changes the piece order at runtime and persists it (gextto fork).
 // It runs in the torrent goroutine.
 func (t *torrent) setOrder(sequential, firstLast bool) {

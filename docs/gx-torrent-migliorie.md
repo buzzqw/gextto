@@ -69,7 +69,7 @@ presenti o già gestiti da Gextto.
 | 5 | Diagnostica pezzi | **Fatto** — API demone `pieces`, scheda Pezzi in Gextto e scheda Pieces nella pagina del demone | 4 |
 | 6 | Limiti velocità per-torrent | **Fatto** — `Limiter.SetParent`/`SetLimitKiB` + `Torrent.SetSpeedLimits`, riapplicati al riavvio | 5 |
 | 7 | Streaming HTTP Range + priorità pezzi | **Sì** — endpoint sul demone | 7 |
-| 8 | Limiti connessioni/upload per-torrent | **Sì** — utile con coda/cache automatiche | 6 |
+| 8 | Limiti connessioni/upload per-torrent | **Fatto** — `Torrent.SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` | 6 |
 | 9 | IPv6 | **No** | — |
 | 10 | BitTorrent v2-only | **Wishlist** | — |
 | 11 | Super-seeding, holepunching, WebTorrent | **Wishlist** | — |

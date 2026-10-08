@@ -78,8 +78,12 @@ type torrentMeta struct {
 	// before these existed still means "inherit".
 	DownloadLimitKib *int64 `json:"download_limit_kib,omitempty"`
 	UploadLimitKib   *int64 `json:"upload_limit_kib,omitempty"`
-	SwarmSeeds       int    `json:"swarm_seeds"`
-	SwarmPeers       int    `json:"swarm_peers"`
+	// Per-torrent connection and upload-slot caps (gextto fork): nil = session
+	// default, 0 = unlimited, >0 = explicit.
+	MaxConnections *int64 `json:"max_connections,omitempty"`
+	MaxUploads     *int64 `json:"max_uploads,omitempty"`
+	SwarmSeeds     int    `json:"swarm_seeds"`
+	SwarmPeers     int    `json:"swarm_peers"`
 	// DoneBytes is the last verified amount, reported while rain cannot
 	// compute it (a stopped torrent has no piece table).
 	DoneBytes int64 `json:"done_bytes,omitempty"`
@@ -372,6 +376,12 @@ func (d *Daemon) reconcileLocked() {
 		// Re-apply the per-torrent speed limits stored across restarts.
 		if meta.DownloadLimitKib != nil || meta.UploadLimitKib != nil {
 			t.SetSpeedLimits(kibOrInherit(meta.DownloadLimitKib), kibOrInherit(meta.UploadLimitKib))
+		}
+		if meta.MaxConnections != nil {
+			t.SetMaxConnections(int(*meta.MaxConnections))
+		}
+		if meta.MaxUploads != nil {
+			t.SetMaxUploads(int(*meta.MaxUploads))
 		}
 		// Torrents parked or paused must not run, whatever rain restored.
 		if meta.UserPaused || meta.Parked {
@@ -1214,6 +1224,34 @@ func (d *Daemon) setLimits(key string, download, upload *int64, ratio *float64, 
 		}
 		if download != nil || upload != nil {
 			t.SetSpeedLimits(kibOrInherit(meta.DownloadLimitKib), kibOrInherit(meta.UploadLimitKib))
+		}
+		return nil
+	})
+}
+
+// setConnLimits stores and applies the per-torrent connection and upload-slot
+// caps. A nil limit is left unchanged; a negative one clears it.
+func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if maxConnections != nil {
+			if *maxConnections < 0 {
+				meta.MaxConnections = nil
+				t.SetMaxConnections(-1)
+			} else {
+				value := *maxConnections
+				meta.MaxConnections = &value
+				t.SetMaxConnections(int(value))
+			}
+		}
+		if maxUploads != nil {
+			if *maxUploads < 0 {
+				meta.MaxUploads = nil
+				t.SetMaxUploads(-1)
+			} else {
+				value := *maxUploads
+				meta.MaxUploads = &value
+				t.SetMaxUploads(int(value))
+			}
 		}
 		return nil
 	})

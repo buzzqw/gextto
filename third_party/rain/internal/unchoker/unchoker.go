@@ -55,6 +55,15 @@ func (u *Unchoker) HandleDisconnect(pe Peer) {
 	delete(u.peersUnchokedOptimistic, pe)
 }
 
+// SetNumUnchoked changes the number of upload slots (gextto fork). It must be
+// called from the owner goroutine that also runs TickUnchoke.
+func (u *Unchoker) SetNumUnchoked(n int) {
+	if n < 1 {
+		n = 1
+	}
+	u.numUnchoked = n
+}
+
 func (u *Unchoker) candidatesUnchoke(allPeers []Peer) []Peer {
 	peers := allPeers[:0]
 	for _, pe := range allPeers {

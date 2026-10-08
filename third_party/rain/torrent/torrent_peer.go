@@ -87,7 +87,14 @@ func (t *torrent) dialAddresses() {
 	peersConnected := func() int {
 		return len(t.outgoingPeers) + len(t.outgoingHandshakers)
 	}
-	for peersConnected() < t.session.config.MaxPeerDial {
+	maxDial := t.session.config.MaxPeerDial
+	if t.maxConnections > 0 {
+		// The per-torrent cap counts every established peer (gextto fork).
+		if allowed := t.maxConnections - len(t.peers) - len(t.incomingHandshakers); allowed < maxDial {
+			maxDial = allowed
+		}
+	}
+	for peersConnected() < maxDial {
 		addr, src := t.addrList.Pop()
 		if addr == nil {
 			t.setNeedMorePeers(true)

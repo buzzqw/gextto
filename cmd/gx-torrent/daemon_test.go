@@ -1332,3 +1332,44 @@ func TestDaemonPerTorrentSpeedLimits(t *testing.T) {
 	d.mu.Unlock()
 	waitFor(t, "limits after reload", func() bool { dl, ul := speedLimits(); return dl == 512 && ul == 0 })
 }
+
+// TestDaemonPerTorrentConnLimits checks the per-torrent connection and upload
+// caps: the action sets them and a session reload reapplies them.
+func TestDaemonPerTorrentConnLimits(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 100_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeding", func() bool { return stateOf(d, hash) == "seeding" })
+
+	connLimits := func() (int, int) {
+		d.mu.Lock()
+		tt, _ := d.findLocked(hash)
+		d.mu.Unlock()
+		if tt == nil {
+			return -1, -1
+		}
+		return tt.MaxConnections(), tt.MaxUploads()
+	}
+	if c, u := connLimits(); c != 0 || u != 0 {
+		t.Fatalf("default caps = %d/%d, want 0/0", c, u)
+	}
+
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Post(srv.URL+"/api/v1/torrents/"+hash+"/conn-limits",
+		"application/x-www-form-urlencoded", strings.NewReader("max_connections=25&max_uploads=4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	waitFor(t, "caps applied", func() bool { c, u := connLimits(); return c == 25 && u == 4 })
+
+	d.mu.Lock()
+	d.restartSessionLocked()
+	d.mu.Unlock()
+	waitFor(t, "caps after reload", func() bool { c, u := connLimits(); return c == 25 && u == 4 })
+}

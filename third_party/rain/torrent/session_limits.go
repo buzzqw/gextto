@@ -32,6 +32,39 @@ func (t *Torrent) SpeedLimits() (downloadKiB, uploadKiB int64) {
 	return got.download, got.upload
 }
 
+// SetMaxConnections caps the established peers of this torrent (gextto fork):
+// 0 means unlimited, a negative value restores the session default.
+func (t *Torrent) SetMaxConnections(value int) {
+	t.torrent.sendCommand(func() {
+		if value < 0 {
+			value = 0
+		}
+		t.torrent.maxConnections = value
+		t.torrent.enforceConnectionLimit()
+	})
+}
+
+// SetMaxUploads sets the upload slots of this torrent (gextto fork): 0 unchokes
+// every interested peer, a negative value restores the default.
+func (t *Torrent) SetMaxUploads(value int) {
+	t.torrent.sendCommand(func() {
+		if value < 0 {
+			value = 0
+		}
+		t.torrent.maxUploads = value
+		t.torrent.applyMaxUploads()
+	})
+}
+
+// MaxConnections and MaxUploads report the per-torrent caps (gextto fork).
+func (t *Torrent) MaxConnections() int {
+	return query(t.torrent, func() int { return t.torrent.maxConnections })
+}
+
+func (t *Torrent) MaxUploads() int {
+	return query(t.torrent, func() int { return t.torrent.maxUploads })
+}
+
 // SetCacheSizes changes the read cache and the write buffer in bytes. Values
 // <= 0 leave the current size.
 func (s *Session) SetCacheSizes(readBytes, writeBytes int64) {

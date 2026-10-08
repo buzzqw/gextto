@@ -170,7 +170,8 @@ func (t *torrent) handleRoutedConnection(h *incominghandshaker.IncomingHandshake
 		conn.Close()
 		return
 	}
-	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept {
+	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept ||
+		(t.maxConnections > 0 && len(t.peers) >= t.maxConnections) {
 		conn.Close()
 		return
 	}

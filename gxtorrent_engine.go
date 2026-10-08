@@ -1428,12 +1428,23 @@ func kibToBytes(kib int64) int64 {
 	return kib * 1024
 }
 
+// SetMaxConnections caps the established peers of this torrent (gextto fork):
+// 0 unlimited, -1 restores the session default.
 func (e *gxTorrentEngine) SetMaxConnections(hash string, value int) (bool, error) {
-	return false, backendCapabilityError(BackendGxTorrent, "per_torrent_connections")
+	return e.setConnLimit(hash, "max_connections", value)
 }
 
+// SetMaxUploads sets the upload slots of this torrent (gextto fork): 0 unchokes
+// every interested peer, -1 restores the session default.
 func (e *gxTorrentEngine) SetMaxUploads(hash string, value int) (bool, error) {
-	return false, backendCapabilityError(BackendGxTorrent, "per_torrent_uploads")
+	return e.setConnLimit(hash, "max_uploads", value)
+}
+
+func (e *gxTorrentEngine) setConnLimit(hash, field string, value int) (bool, error) {
+	if err := e.action(hash, "conn-limits", url.Values{field: {strconv.Itoa(value)}}); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // SetPin forces a torrent to run outside the queue; an empty hash unpins all.

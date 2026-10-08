@@ -365,7 +365,7 @@ func TestGxManagedListen(t *testing.T) {
 
 func TestV2DetailCapsPerEngine(t *testing.T) {
 	gx := v2DetailCapsFor(BackendGxTorrent)
-	if gx.SuperSeeding || !gx.WebSeeds || !gx.RateLimits || gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
+	if gx.SuperSeeding || !gx.WebSeeds || !gx.RateLimits || !gx.Connections || gx.FileLevels || !gx.Pieces || gx.TrackerNote == "" {
 		t.Fatalf("gx-torrent capabilities: %+v", gx)
 	}
 	qb := v2DetailCapsFor(BackendQbittorrent)
@@ -929,5 +929,34 @@ func TestGxSetLimitsPostsKibAndMapsThemBack(t *testing.T) {
 	view := e.toView(gxTorrentItem{Hash: "abc", DownloadLimitKib: 512, UploadLimitKib: -1}, time.Now())
 	if view.DownloadLimit != 512*1024 || view.UploadLimit != -1 {
 		t.Fatalf("view limits = %d/%d, want %d/-1", view.DownloadLimit, view.UploadLimit, 512*1024)
+	}
+}
+
+// TestGxSetConnLimitsPosts checks that SetMaxConnections and SetMaxUploads post
+// the conn-limits action instead of a capability error.
+func TestGxSetConnLimitsPosts(t *testing.T) {
+	var path, form string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_ = r.ParseForm()
+		form = r.Form.Encode()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	e := &gxTorrentEngine{
+		settings: gxTorrentSettings{BaseURL: server.URL, Timeout: time.Second},
+		client:   server.Client(),
+	}
+	if ok, err := e.SetMaxConnections("ABC", 50); err != nil || !ok {
+		t.Fatalf("SetMaxConnections: ok=%v err=%v", ok, err)
+	}
+	if !strings.HasSuffix(path, "/conn-limits") || form != "max_connections=50" {
+		t.Fatalf("connections posted path=%q form=%q", path, form)
+	}
+	if ok, err := e.SetMaxUploads("ABC", 3); err != nil || !ok {
+		t.Fatalf("SetMaxUploads: ok=%v err=%v", ok, err)
+	}
+	if form != "max_uploads=3" {
+		t.Fatalf("uploads posted form=%q", form)
 	}
 }

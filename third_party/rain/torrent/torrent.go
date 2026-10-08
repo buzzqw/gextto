@@ -266,6 +266,10 @@ type torrent struct {
 	// Explicit per-torrent speed limits in KiB/s (-1 = inherit the session).
 	downloadLimitKib int64
 	uploadLimitKib   int64
+	// Per-torrent connection and upload-slot caps (gextto fork). Zero means no
+	// per-torrent cap; the session budgets still apply.
+	maxConnections int
+	maxUploads     int
 
 	// True means that completeCmd has run before.
 	completeCmdRun bool

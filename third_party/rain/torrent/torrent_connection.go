@@ -7,7 +7,8 @@ import (
 )
 
 func (t *torrent) handleNewConnection(conn net.Conn) {
-	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept {
+	if len(t.incomingHandshakers)+len(t.incomingPeers) >= t.session.config.MaxPeerAccept ||
+		(t.maxConnections > 0 && len(t.peers) >= t.maxConnections) {
 		t.log.Debugln("peer limit reached, rejecting peer", conn.RemoteAddr().String())
 		conn.Close()
 		return

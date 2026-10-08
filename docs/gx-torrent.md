@@ -530,6 +530,13 @@ Si imposta con `POST /api/v1/torrents/{hash}/seed-limits` (campi
 tab **Limiti** del dettaglio torrent. Gextto conserva i valori tra un riavvio e
 l'altro e il demone li riapplica alla sessione ricaricata.
 
+Ogni torrent ha anche un **limite di connessioni** e di **slot di upload**
+propri (`POST /api/v1/torrents/{hash}/conn-limits`, campi `max_connections` e
+`max_uploads`; `-1` globale, `0` illimitato). Il limite di connessioni vale
+sulle connessioni instaurate; se lo si abbassa sotto il numero corrente, le
+eccedenti vengono chiuse al tick successivo. Gli slot di upload cambiano il
+numero di peer che l'unchoker tiene sbloccati.
+
 ## REST API (v1)
 
 Tutte le richieste richiedono `X-Gx-Token` (o `Authorization: Bearer`) se il
@@ -557,6 +564,7 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `pin` (con `pinned=1/0`), `top`;
 - `move` e `associate` (con `destination`);
 - `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 globale, 0 illimitato);
+- `conn-limits` (`max_connections`, `max_uploads`: -1 globale, 0 illimitato);
 - `trackers` (con `urls`, uno per riga);
 - `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
@@ -577,7 +585,6 @@ Le operazioni che rain non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- limiti di connessioni e slot di upload per singolo torrent;
 - super-seeding e upload mode;
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.

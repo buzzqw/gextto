@@ -253,6 +253,17 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			upload = &value
 		}
 		err = d.setLimits(hash, download, upload, ratio, days)
+	case "conn-limits":
+		var maxConnections, maxUploads *int64
+		if r.FormValue("max_connections") != "" {
+			value := formInt(r, "max_connections", -1)
+			maxConnections = &value
+		}
+		if r.FormValue("max_uploads") != "" {
+			value := formInt(r, "max_uploads", -1)
+			maxUploads = &value
+		}
+		err = d.setConnLimits(hash, maxConnections, maxUploads)
 	case "file-priorities":
 		var priorities []int
 		for _, field := range strings.Split(r.FormValue("priorities"), ",") {
