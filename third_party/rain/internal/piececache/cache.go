@@ -18,6 +18,7 @@ type Cache struct {
 	accessList    accessList
 	m             sync.RWMutex
 	sem           *semaphore.Semaphore
+	stopC         chan struct{} // gextto fork: stops the expiry sweeper
 
 	NumCached      metrics.Meter
 	NumTotal       metrics.Meter
@@ -28,23 +29,72 @@ type Cache struct {
 // Loader is a function that loads data from a piece.
 type Loader func() ([]byte, error)
 
+// sweepEvery is how often expired items are swept, derived from the TTL
+// (gextto fork).
+func sweepEvery(ttl time.Duration) time.Duration {
+	d := ttl / 2
+	if d < 10*time.Millisecond {
+		d = 10 * time.Millisecond
+	}
+	if d > 30*time.Second {
+		d = 30 * time.Second
+	}
+	return d
+}
+
 // New returns new Cache.
 func New(maxSize int64, ttl time.Duration, parallelReads uint) *Cache {
-	return &Cache{
+	c := &Cache{
 		maxSize:        maxSize,
 		ttl:            ttl,
 		items:          make(map[string]*item),
 		sem:            semaphore.New(int(parallelReads)),
+		stopC:          make(chan struct{}),
 		NumCached:      metrics.NewMeter(),
 		NumTotal:       metrics.NewMeter(),
 		NumLoad:        metrics.NewMeter(),
 		NumLoadedBytes: metrics.NewMeter(),
+	}
+	go c.sweepLoop()
+	return c
+}
+
+// sweepLoop drops expired items periodically. One timer for the whole cache
+// instead of one time.Timer per cached block.
+func (c *Cache) sweepLoop() {
+	t := time.NewTicker(sweepEvery(c.ttl))
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			c.sweep()
+		case <-c.stopC:
+			return
+		}
+	}
+}
+
+func (c *Cache) sweep() {
+	now := time.Now()
+	c.m.Lock()
+	defer c.m.Unlock()
+	var expired []*item
+	for _, i := range c.accessList {
+		if now.After(i.expireAt) {
+			expired = append(expired, i)
+		}
+	}
+	for _, i := range expired {
+		if i.index != -1 {
+			c.removeItem(i)
+		}
 	}
 }
 
 // Close the cache and release all resources. It drops all cached items,
 // stopping their expiry timers, then stops the metrics meters.
 func (c *Cache) Close() {
+	close(c.stopC)
 	c.Clear()
 	c.NumCached.Stop()
 	c.NumTotal.Stop()
@@ -56,9 +106,6 @@ func (c *Cache) Close() {
 func (c *Cache) Clear() {
 	c.m.Lock()
 	c.items = make(map[string]*item)
-	for _, i := range c.accessList {
-		i.timer.Stop()
-	}
 	c.accessList = nil
 	c.size = 0
 	c.m.Unlock()
@@ -111,11 +158,22 @@ func (c *Cache) getItem(key string) *item {
 
 	i, ok := c.items[key]
 	if ok {
-		c.NumCached.Mark(1)
-	} else {
-		i = &item{key: key}
-		c.items[key] = i
+		// Drop an expired item so the caller reloads it (gextto fork: lazy TTL
+		// instead of a per-item timer). Items still loading have index -1 and
+		// are kept.
+		if i.index != -1 && time.Now().After(i.expireAt) {
+			c.removeItem(i)
+			i = nil
+		}
 	}
+	if i != nil {
+		c.NumCached.Mark(1)
+		return i
+	}
+	// index -1 marks an item that is not in the access list yet; the zero value
+	// (0) would look like it sits at the head of the heap.
+	i = &item{key: key, index: -1}
+	c.items[key] = i
 	return i
 }
 
@@ -146,8 +204,16 @@ func (c *Cache) handleNewItem(i *item) ([]byte, error) {
 	defer c.m.Unlock()
 
 	if i.err != nil {
-		delete(c.items, i.key)
+		if c.items[i.key] == i {
+			delete(c.items, i.key)
+		}
 		return nil, i.err
+	}
+
+	// The item was evicted or replaced while loading (gextto fork): return the
+	// data but do not cache a stale copy under the key.
+	if c.items[i.key] != i {
+		return i.value, nil
 	}
 
 	// Do not cache values larger than cache size.
@@ -161,15 +227,8 @@ func (c *Cache) handleNewItem(i *item) ([]byte, error) {
 	c.size += int64(len(i.value))
 
 	i.lastAccessed = time.Now()
+	i.expireAt = i.lastAccessed.Add(c.ttl)
 	heap.Push(&c.accessList, i)
-
-	i.timer = time.AfterFunc(c.ttl, func() {
-		c.m.Lock()
-		if i.index != -1 {
-			c.removeItem(i)
-		}
-		c.m.Unlock()
-	})
 
 	return i.value, nil
 }
@@ -178,10 +237,13 @@ func (c *Cache) updateAccessTime(i *item) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
+	// The item may have been removed by the sweeper while it was in use.
+	if i.index == -1 {
+		return
+	}
 	i.lastAccessed = time.Now()
+	i.expireAt = i.lastAccessed.Add(c.ttl)
 	heap.Fix(&c.accessList, i.index)
-
-	i.timer.Reset(c.ttl)
 }
 
 func (c *Cache) makeRoom(i *item) {
@@ -192,7 +254,10 @@ func (c *Cache) makeRoom(i *item) {
 }
 
 func (c *Cache) removeItem(i *item) {
-	i.timer.Stop()
+	// Idempotent: the item may already have been removed or replaced.
+	if i.index == -1 || c.items[i.key] != i {
+		return
+	}
 	delete(c.items, i.key)
 	heap.Remove(&c.accessList, i.index)
 	c.size -= int64(len(i.value))

@@ -18,6 +18,7 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `internal/mse/mse_test.go` — scrittura MSE in place: round-trip di cifratura e zero allocazioni per blocco;
 - `internal/peerconn/peerconn_test.go` — contatore dei byte di protocollo;
 - `internal/peerconn/peerwriter/peerwriter_test.go` — la finestra di dedup delle richieste servite resta limitata e sfratta la più vecchia;
+- `internal/piececache/cache_test.go` — scadenza TTL lazy e sweeper, ricarica dopo scadenza, eviction per dimensione e uso concorrente;
 - `internal/piecepicker/sequential_skip_test.go` — i pezzi dei file esclusi non
   vengono mai scelti, nemmeno in modalità sequenziale o dal percorso
   "file edge";
@@ -45,7 +46,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Dedup richieste servite | `internal/peerconn/peerwriter/peerwriter.go` | `servedWindow`: finestra limitata (1024) al posto della mappa illimitata; evita la crescita senza limite e il rifiuto permanente delle ritrasmissioni |
 | Statistiche | `torrent/session_stats.go`, `torrent/torrent_stats.go` | Contatori uTP/TCP, nodi DHT, byte di protocollo, padding |
 | Limiti a caldo | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: i peer usano un `bandwidth.Limiter` il cui ritmo cambia senza riaprire la sessione (prima `*ratelimit.Bucket` fisso) |
-| Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso |
+| Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso. `Cache` usa anche una scadenza lazy con un solo sweeper periodico, al posto di un `time.Timer` per pezzo |
 | Preallocazione su tmpfs | `internal/storage/filestorage/filestorage_linux.go` | Su tmpfs i file restano sparsi anche con `Preallocate` (test `preallocate_linux_test.go`) |
 | Tracker a caldo | `torrent/session_torrent.go`, `torrent/torrent_announce.go` | `Torrent.SetTrackers`: sostituisce la lista dei tracker a runtime (lista vuota = rimuovi tutto); i tracker rimossi ricevono un announce `stopped` best-effort; la lista è persistita nel resume |
 | Web seed a caldo | `torrent/torrent_webseed.go`, `torrent/session_torrent.go`, `internal/piecepicker/piecepicker.go` | `Torrent.AddWebseeds`/`RemoveWebseeds`: aggiungono/rimuovono web seed a runtime (persistiti nel resume); il picker tiene aggiornata la lista delle sorgenti |
