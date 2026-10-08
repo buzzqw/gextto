@@ -8,10 +8,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/logger"
 	"github.com/cenkalti/rain/v2/internal/peerconn/peerreader"
 	"github.com/cenkalti/rain/v2/internal/peerprotocol"
-	"github.com/juju/ratelimit"
 )
 
 const keepAlivePeriod = 2 * time.Minute
@@ -28,14 +28,14 @@ type PeerWriter struct {
 	writeC                chan peerprotocol.Message
 	messages              chan any
 	servedRequests        map[peerprotocol.RequestMessage]struct{}
-	bucket                *ratelimit.Bucket
+	bucket                *bandwidth.Limiter // gextto fork: rate changes at runtime
 	log                   logger.Logger
 	stopC                 chan struct{}
 	doneC                 chan struct{}
 }
 
 // New returns a new PeerWriter by wrapping a net.Conn.
-func New(conn net.Conn, l logger.Logger, maxQueuedRequests int, fastEnabled bool, b *ratelimit.Bucket) *PeerWriter {
+func New(conn net.Conn, l logger.Logger, maxQueuedRequests int, fastEnabled bool, b *bandwidth.Limiter) *PeerWriter {
 	return &PeerWriter{
 		conn:              conn,
 		queueC:            make(chan peerprotocol.Message),
@@ -233,12 +233,13 @@ func (p *PeerWriter) messageWriter() {
 			// Put message ID
 			buf.Bytes()[4] = uint8(msg.ID())
 
-			if _, ok := msg.(Piece); ok && p.bucket != nil {
-				d := p.bucket.Take(int64(buf.Len()))
-				select {
-				case <-time.After(d):
-				case <-p.stopC:
-					return
+			if _, ok := msg.(Piece); ok {
+				if d := p.bucket.Take(int64(buf.Len())); d > 0 {
+					select {
+					case <-time.After(d):
+					case <-p.stopC:
+						return
+					}
 				}
 			}
 

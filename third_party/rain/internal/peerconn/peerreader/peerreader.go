@@ -9,11 +9,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/bufferpool"
 	"github.com/cenkalti/rain/v2/internal/logger"
 	"github.com/cenkalti/rain/v2/internal/peerprotocol"
 	"github.com/cenkalti/rain/v2/internal/piece"
-	"github.com/juju/ratelimit"
 )
 
 const (
@@ -34,7 +34,7 @@ type PeerReader struct {
 	log          logger.Logger
 	pieceTimeout time.Duration
 	maxMsgSize   int
-	bucket       *ratelimit.Bucket
+	bucket       *bandwidth.Limiter // gextto fork: rate changes at runtime
 	messages     chan any
 	stopC        chan struct{}
 	doneC        chan struct{}
@@ -43,7 +43,7 @@ type PeerReader struct {
 // New returns a new PeerReader by wrapping a net.Conn.
 // maxMsgSize is the largest message length accepted from the peer; larger
 // messages are rejected before allocating a buffer for them.
-func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxMsgSize int, b *ratelimit.Bucket) *PeerReader {
+func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxMsgSize int, b *bandwidth.Limiter) *PeerReader {
 	return &PeerReader{
 		conn:         conn,
 		r:            bufio.NewReaderSize(conn, readBufferSize),
@@ -280,8 +280,7 @@ func (p *PeerReader) readPiece(length uint32) (buf bufferpool.Buffer, err error)
 
 	var n, m int
 	for {
-		if p.bucket != nil {
-			d := p.bucket.Take(int64(length))
+		if d := p.bucket.Take(int64(length)); d > 0 {
 			select {
 			case <-time.After(d):
 			case <-p.stopC:

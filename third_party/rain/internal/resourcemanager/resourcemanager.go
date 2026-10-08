@@ -10,6 +10,7 @@ type ResourceManager[T any] struct {
 	requests  map[string][]request[T]
 	requestC  chan request[T]
 	releaseC  chan int64
+	limitC    chan int64 // gextto fork: SetLimit
 	statsC    chan chan Stats
 	closeC    chan struct{}
 	doneC     chan struct{}
@@ -39,6 +40,7 @@ func New[T any](limit int64) *ResourceManager[T] {
 		requests:  make(map[string][]request[T]),
 		requestC:  make(chan request[T]),
 		releaseC:  make(chan int64),
+		limitC:    make(chan int64),
 		statsC:    make(chan chan Stats),
 		closeC:    make(chan struct{}),
 		doneC:     make(chan struct{}),
@@ -93,6 +95,19 @@ func (m *ResourceManager[T]) Request(key string, data T, n int64, notifyC chan T
 	return
 }
 
+// SetLimit changes the amount of resources (gextto fork: the write buffer is
+// retuned at runtime). Shrinking below what is allocated only stops new grants
+// until enough is released.
+func (m *ResourceManager[T]) SetLimit(limit int64) {
+	if limit < 0 {
+		return
+	}
+	select {
+	case m.limitC <- limit:
+	case <-m.closeC:
+	}
+}
+
 // Release `n` resource to the manager.
 func (m *ResourceManager[T]) Release(n int64) {
 	select {
@@ -107,6 +122,9 @@ func (m *ResourceManager[T]) run() {
 		select {
 		case r := <-m.requestC:
 			m.handleRequest(r)
+		case limit := <-m.limitC:
+			m.available += limit - m.limit
+			m.limit = limit
 		case n := <-m.releaseC:
 			m.available += n
 			m.objects--

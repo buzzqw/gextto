@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/logger"
 	"github.com/cenkalti/rain/v2/internal/peerconn/peerreader"
 	"github.com/cenkalti/rain/v2/internal/peerconn/peerwriter"
 	"github.com/cenkalti/rain/v2/internal/peerprotocol"
-	"github.com/juju/ratelimit"
 )
 
 // gextto fork: raw peer wire bytes, counted before the message layer so the
@@ -49,7 +49,7 @@ type Conn struct {
 }
 
 // New returns a new PeerConn by wrapping a net.Conn.
-func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *ratelimit.Bucket) *Conn {
+func New(conn net.Conn, l logger.Logger, pieceTimeout time.Duration, maxRequestsIn, maxMsgSize int, fastEnabled bool, br, bw *bandwidth.Limiter) *Conn {
 	conn = &countingConn{Conn: conn}
 	return &Conn{
 		conn:     conn,

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/bitfield"
 	"github.com/cenkalti/rain/v2/internal/blocklist"
 	"github.com/cenkalti/rain/v2/internal/logger"
@@ -29,7 +30,6 @@ import (
 	"github.com/cenkalti/rain/v2/internal/storage"
 	"github.com/cenkalti/rain/v2/internal/tracker"
 	"github.com/cenkalti/rain/v2/internal/trackermanager"
-	"github.com/juju/ratelimit"
 	"github.com/nictuku/dht"
 	"go.etcd.io/bbolt"
 	berrors "go.etcd.io/bbolt/errors"
@@ -60,8 +60,9 @@ type Session struct {
 	createdAt      time.Time
 	semWrite       *semaphore.Semaphore
 	metrics        *sessionMetrics
-	bucketDownload *ratelimit.Bucket
-	bucketUpload   *ratelimit.Bucket
+	// gextto fork: limiters whose rate SetSpeedLimits changes at runtime.
+	bucketDownload *bandwidth.Limiter
+	bucketUpload   *bandwidth.Limiter
 	closeC         chan struct{}
 
 	// "stopped" event announcers of closed torrents, still running in the background.
@@ -257,14 +258,8 @@ func NewSession(cfg Config) (*Session, error) {
 	} else {
 		c.storage = newFileStorageProvider(&cfg)
 	}
-	dlSpeed := cfg.SpeedLimitDownload * 1024
-	if cfg.SpeedLimitDownload > 0 {
-		c.bucketDownload = ratelimit.NewBucketWithRate(float64(dlSpeed), dlSpeed)
-	}
-	ulSpeed := cfg.SpeedLimitUpload * 1024
-	if cfg.SpeedLimitUpload > 0 {
-		c.bucketUpload = ratelimit.NewBucketWithRate(float64(ulSpeed), ulSpeed)
-	}
+	c.bucketDownload = bandwidth.New(max(cfg.SpeedLimitDownload, 0) * 1024)
+	c.bucketUpload = bandwidth.New(max(cfg.SpeedLimitUpload, 0) * 1024)
 	err = c.startBlocklistReloader()
 	if err != nil {
 		return nil, err

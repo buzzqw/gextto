@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cenkalti/rain/v2/internal/bandwidth"
 	"github.com/cenkalti/rain/v2/internal/bitfield"
 	"github.com/cenkalti/rain/v2/internal/fast"
 	"github.com/cenkalti/rain/v2/internal/logger"
@@ -18,7 +19,6 @@ import (
 	"github.com/cenkalti/rain/v2/internal/piece"
 	"github.com/cenkalti/rain/v2/internal/sliceset"
 	"github.com/cenkalti/rain/v2/internal/stringutil"
-	"github.com/juju/ratelimit"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -84,7 +84,7 @@ type PieceMessage struct {
 }
 
 // New wraps the net.Conn and returns a new Peer.
-func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn, maxMsgSize int, br, bw *ratelimit.Bucket) *Peer {
+func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byte, cipher mse.CryptoMethod, pieceReadTimeout, snubTimeout time.Duration, maxRequestsIn, maxMsgSize int, br, bw *bandwidth.Limiter) *Peer {
 	bf, _ := bitfield.NewBytes(extensions[:], 64)
 	fastEnabled := bf.Test(61)
 	extensionsEnabled := bf.Test(43)

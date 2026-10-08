@@ -197,3 +197,14 @@ func (c *Cache) removeItem(i *item) {
 	heap.Remove(&c.accessList, i.index)
 	c.size -= int64(len(i.value))
 }
+
+// SetMaxSize changes the cache size, evicting the least recently used items
+// that no longer fit (gextto fork: the read cache is retuned at runtime).
+func (c *Cache) SetMaxSize(maxSize int64) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.maxSize = maxSize
+	for c.size > c.maxSize && len(c.accessList) > 0 {
+		c.removeItem(c.accessList[0])
+	}
+}

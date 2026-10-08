@@ -18,7 +18,10 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `internal/peerconn/peerconn_test.go` — contatore dei byte di protocollo;
 - `internal/piecepicker/sequential_skip_test.go` — i pezzi dei file esclusi non
   vengono mai scelti, nemmeno in modalità sequenziale o dal percorso
-  "file edge".
+  "file edge";
+- `internal/bandwidth/limiter_test.go` — il limite cambia a caldo;
+- `internal/storage/filestorage/preallocate_linux_test.go` — niente
+  preallocazione su tmpfs.
 
 Modifiche, tutte marcate nel codice con `gextto fork`:
 
@@ -32,6 +35,9 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Preallocazione | `internal/storage/filestorage`, `torrent/session_storage.go`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: i file nuovi vengono riservati con `fallocate` invece di essere creati sparsi. Il flag viaggia nel provider di storage, così vale sia per l'aggiunta sia per il ricaricamento |
 | Byte di protocollo | `internal/peerconn/peerconn.go`, `torrent/session_stats.go` | Contatore dei byte grezzi in lettura/scrittura per l'overhead di protocollo |
 | Statistiche | `torrent/session_stats.go`, `torrent/torrent_stats.go` | Contatori uTP/TCP, nodi DHT, byte di protocollo, padding |
+| Limiti a caldo | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: i peer usano un `bandwidth.Limiter` il cui ritmo cambia senza riaprire la sessione (prima `*ratelimit.Bucket` fisso) |
+| Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso |
+| Preallocazione su tmpfs | `internal/storage/filestorage/filestorage_linux.go` | Su tmpfs i file restano sparsi anche con `Preallocate` (test `preallocate_linux_test.go`) |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 
