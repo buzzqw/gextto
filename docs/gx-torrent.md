@@ -77,7 +77,7 @@ Gextto le inoltra al demone.
 All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
 demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
 operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
-qBittorrent. Si aggiorna da sola ogni 5 secondi senza ricaricare la pagina.
+qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
 
 - **Riepilogo sessione**: stato torrent, velocità, totali, porta/router, DHT,
   uTP, cifratura, filtro IP, cache, spazio libero; barra di stato in basso.

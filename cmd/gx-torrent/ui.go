@@ -54,6 +54,7 @@ type uiPageData struct {
 	PeerPort     int
 	Listen       string
 	Router       string
+	ExternalIP   string
 	PortOpen     bool
 	DHT          bool
 	DHTNodes     int64
@@ -199,10 +200,10 @@ header h1{font-size:20px;margin:0;font-weight:600}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
 .muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
-.cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.card{background:#161d2c;border:1px solid #243049;border-radius:10px;padding:14px 18px;min-width:140px}
-.card b{display:block;font-size:24px}
-.card span{color:#93a1b5;font-size:14px}
+.cards{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:12px}
+.card{flex:1 1 auto;background:#161d2c;border:1px solid #243049;border-radius:7px;padding:3px 6px}
+.card b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card span{display:block;color:#93a1b5;font-size:10.5px;white-space:nowrap}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px;margin-bottom:12px}
 .toolbar form{display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap}
 .toolbar input[type=text],.toolbar input[type=search]{min-width:200px}
@@ -213,7 +214,24 @@ th{color:#93a1b5;font-weight:500;font-size:13px;text-transform:uppercase;letter-
 tr:last-child td{border-bottom:0}
 td.num,th.num{text-align:right;white-space:nowrap}
 td.sel,th.sel{width:26px;text-align:center}
-td.name,th.name{min-width:280px;max-width:640px;word-break:break-word}
+tbody.t td{border-bottom:0;padding:4px 8px}
+#torrents thead th{padding:6px 8px}
+tbody.t tr.l1 td{padding-top:9px}
+tbody.t tr.l2 td{padding-bottom:9px;font-size:14px}
+tbody.t+tbody.t tr.l1 td{border-top:1px solid #1f2839}
+tbody.t:hover td{background:#1a2234}
+thead tr.h1 th{border-bottom:0;padding-bottom:2px}
+td.name{overflow-wrap:anywhere}
+td.name a{font-weight:600;text-decoration:none}
+td.name a:hover{text-decoration:underline}
+td.name .muted{margin-left:8px;font-size:12px}
+td.prog{min-width:110px}
+td.prog .bar{margin-top:0}
+td.prog small{color:#93a1b5;font-size:12px}
+td.actions{vertical-align:middle;width:1%}
+td.actions .btns{display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;width:150px;margin-left:auto}
+td.actions button{padding:3px 8px;font-size:13px}
+td.actions form{margin:0}
 .state{font-size:12px;padding:1px 8px;border-radius:999px;background:#243049;white-space:nowrap}
 .s-seeding{background:#14532d;color:#86efac}
 .s-downloading,.s-checking_files,.s-downloading_metadata{background:#172f4f;color:#93c5fd}
@@ -332,19 +350,20 @@ const uiPageTemplate = `<!doctype html>
 function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;updateSel();applyFilters();}});}
+function refresh(force){if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;applySort();updateSel();applyFilters();}});}
 function rowState(tr){return tr.getAttribute('data-state')||'';}
 function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
-function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody tr').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
+function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
 function filterRows(){applyFilters();}
 function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
 function selectAll(box){document.querySelectorAll('.rowsel').forEach(function(c){c.checked=box.checked});updateSel();}
 function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Select at least one torrent',true);return;}if(op==='remove-files'&&!confirm('Remove the selected torrents AND delete the files? Irreversible.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
-function sortTable(idx){var tb=document.querySelector('#live tbody');if(!tb)return;var rows=Array.prototype.slice.call(tb.querySelectorAll('tr'));var asc=tb.getAttribute('data-sort')!==String(idx);rows.sort(function(a,b){var av=a.children[idx].getAttribute('data-v')||a.children[idx].textContent;var bv=b.children[idx].getAttribute('data-v')||b.children[idx].textContent;var an=parseFloat(av),bn=parseFloat(bv);if(!isNaN(an)&&!isNaN(bn))return asc?an-bn:bn-an;return asc?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));});rows.forEach(function(r){tb.appendChild(r)});tb.setAttribute('data-sort',asc?String(idx):'');}
+function applySort(){var st=window.__sort;var tb=document.getElementById('torrents');if(!st||!tb)return;var groups=Array.prototype.slice.call(tb.querySelectorAll('tbody.t'));var attr='data-k-'+st.key;groups.sort(function(a,b){var av=a.getAttribute(attr)||'',bv=b.getAttribute(attr)||'';var an=parseFloat(av),bn=parseFloat(bv);var r=(!isNaN(an)&&!isNaN(bn))?an-bn:String(av).localeCompare(String(bv));return st.asc?r:-r;});groups.forEach(function(g){tb.appendChild(g)});}
+function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st.key===key&&st.asc)};applySort();}
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
 function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
-setInterval(function(){refresh(false)},5000);
+setInterval(function(){refresh(false)},2000);
 (function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
 </script>
 </body>
@@ -359,14 +378,14 @@ const uiLiveTemplate = `{{define "live"}}
     <div class="card"><b>{{.Paused}}</b><span>paused</span></div>
     <div class="card"><b>{{.DownloadRate}}</b><span>↓ speed</span></div>
     <div class="card"><b>{{.UploadRate}}</b><span>↑ speed</span></div>
-    <div class="card"><b>{{bytes .TotalDown}}</b><span>downloaded (session)</span></div>
-    <div class="card"><b>{{bytes .TotalUp}}</b><span>uploaded (session)</span></div>
+    <div class="card" title="Downloaded in this session"><b>{{bytes .TotalDown}}</b><span>downloaded</span></div>
+    <div class="card" title="Uploaded in this session"><b>{{bytes .TotalUp}}</b><span>uploaded</span></div>
     <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
-    <div class="card"><b>{{.Router}}</b><span>router</span></div>
+    <div class="card" title="Router port mapping"><b>{{.Router}}</b><span>{{if .ExternalIP}}{{.ExternalIP}}{{else}}router{{end}}</span></div>
     <div class="card"><b>DHT {{if .DHT}}on{{else}}off{{end}}</b><span>{{.DHTNodes}} nodes · uTP {{if .UTP}}on{{else}}off{{end}}</span></div>
-    <div class="card"><b>{{if .IPFilter}}{{.IPFilter}}{{else}}nessuno{{end}}</b><span>IP filter{{if .IPFilterPath}} · {{.IPFilterPath}}{{end}}</span></div>
-    <div class="card"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>read/write cache</span></div>
-    <div class="card"><b>{{bytes .DiskFree}}</b><span>free space (of {{bytes .DiskTotal}})</span></div>
+    <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
+    <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache r/w</span></div>
+    <div class="card" title="Free space of {{bytes .DiskTotal}}"><b>{{bytes .DiskFree}}</b><span>free of {{bytes .DiskTotal}}</span></div>
   </div>
 
   {{if .Rows}}
@@ -383,35 +402,30 @@ const uiLiveTemplate = `{{define "live"}}
     </aside>
     <div class="content">
     <table id="torrents">
-    <thead><tr>
-      <th class="sel"><input type="checkbox" title="Select all" onclick="selectAll(this)"></th>
-      <th class="name" onclick="sortTable(1)">Name</th>
-      <th onclick="sortTable(2)">State</th>
-      <th onclick="sortTable(3)">Progress</th>
-      <th class="num" onclick="sortTable(4)">Done / Size</th>
-      <th class="num" onclick="sortTable(5)">↓</th>
-      <th class="num" onclick="sortTable(6)">↑</th>
-      <th class="num" onclick="sortTable(7)">Peer</th>
-      <th class="num" onclick="sortTable(8)">Seed</th>
-      <th class="num" onclick="sortTable(9)">Ratio</th>
-      <th class="num" onclick="sortTable(10)">ETA</th>
-      <th class="actions">Actions</th>
-    </tr></thead>
-    <tbody>
+    <thead>
+    <tr class="h1">
+      <th class="sel" rowspan="2"><input type="checkbox" title="Select all" onclick="selectAll(this)"></th>
+      <th colspan="9" onclick="sortTable('name')">Name</th>
+      <th class="actions" rowspan="2">Actions</th>
+    </tr>
+    <tr>
+      <th onclick="sortTable('progress')">Progress</th>
+      <th onclick="sortTable('state')">State</th>
+      <th class="num" onclick="sortTable('done')">Done / Size</th>
+      <th class="num" onclick="sortTable('down')">↓</th>
+      <th class="num" onclick="sortTable('up')">↑</th>
+      <th class="num" onclick="sortTable('peers')">Peer</th>
+      <th class="num" onclick="sortTable('seeds')">Seed</th>
+      <th class="num" onclick="sortTable('ratio')">Ratio</th>
+      <th class="num" onclick="sortTable('eta')">ETA</th>
+    </tr>
+    </thead>
     {{range .Rows}}
-      <tr data-name="{{.Name}}" data-state="{{.State}}">
-        <td class="sel"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
-        <td class="name"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="Open torrent details">{{.Name}}</a><div class="muted">{{.SavePath}}</div></td>
-        <td><span class="state s-{{.State}}">{{.State}}</span></td>
-        <td data-v="{{.Progress}}"><div>{{.ProgressS}}</div><div class="bar"><i style="width:{{percent .Progress}}%"></i></div></td>
-        <td class="num" data-v="{{.TotalDone}}">{{.DoneSize}}</td>
-        <td class="num" data-v="{{.DLRate}}">{{.Down}}</td>
-        <td class="num" data-v="{{.ULRate}}">{{.Up}}</td>
-        <td class="num" data-v="{{.Peers}}">{{.Peers}}</td>
-        <td class="num" data-v="{{.Seeds}}">{{.Seeds}}</td>
-        <td class="num" data-v="{{.RatioVal}}">{{.Ratio}}</td>
-        <td class="num" data-v="{{.ETAVal}}">{{.ETA}}</td>
-        <td class="actions">
+    <tbody class="t" data-name="{{.Name}}" data-state="{{.State}}" data-k-name="{{.Name}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-done="{{.TotalDone}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-peers="{{.Peers}}" data-k-seeds="{{.Seeds}}" data-k-ratio="{{.RatioVal}}" data-k-eta="{{.ETAVal}}">
+      <tr class="l1">
+        <td class="sel" rowspan="2"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
+        <td class="name" colspan="9"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="Open torrent details">{{.Name}}</a><span class="muted">{{.SavePath}}</span></td>
+        <td class="actions" rowspan="2"><div class="btns">
           <button type="button" onclick="openDetail('{{.Hash}}')" title="Details: files, peers, trackers">⋯</button>
           {{if eq .State "paused"}}
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="resume"><button title="Resume">▶</button></form>
@@ -423,10 +437,21 @@ const uiLiveTemplate = `{{define "live"}}
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Move to the top of the queue">⤒</button></form>
           <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
           <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
-        </td>
+        </div></td>
       </tr>
-    {{end}}
+      <tr class="l2">
+        <td class="prog"><div class="bar"><i style="width:{{percent .Progress}}%"></i></div><small>{{.ProgressS}}</small></td>
+        <td><span class="state s-{{.State}}">{{.State}}</span></td>
+        <td class="num">{{.DoneSize}}</td>
+        <td class="num">{{.Down}}</td>
+        <td class="num">{{.Up}}</td>
+        <td class="num">{{.Peers}}</td>
+        <td class="num">{{.Seeds}}</td>
+        <td class="num">{{.Ratio}}</td>
+        <td class="num">{{.ETA}}</td>
+      </tr>
     </tbody>
+    {{end}}
     </table>
     </div>
   </div>
@@ -440,7 +465,7 @@ const uiLiveTemplate = `{{define "live"}}
     <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span>Free space <b>{{bytes .DiskFree}}</b></span>
     <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodi{{else}}off{{end}}</b></span>
-    <span>Port <b>{{if .PortOpen}}open ({{.Router}}){{else}}not open{{end}}</b></span>
+    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b></span>
     <span>Encryption <b>{{.Encryption}}</b></span>
   </div>
 {{end}}`
@@ -1172,9 +1197,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 	case stats.PortMapping.Method != "":
 		page.PortOpen = true
 		page.Router = strings.ToUpper(stats.PortMapping.Method)
-		if stats.PortMapping.ExternalIP != "" {
-			page.Router += " " + stats.PortMapping.ExternalIP
-		}
+		page.ExternalIP = stats.PortMapping.ExternalIP
 	case stats.PortMapping.Error != "":
 		page.Router = "non aperto"
 	default:
