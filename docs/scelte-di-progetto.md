@@ -94,23 +94,29 @@ Non esiste un "migliore" in assoluto: sono strumenti con confini diversi. Questa
   delay profile e profili diversi per serie e film. Gextto ha una politica
   unica con score, cutoff "upgrade until" e override per-titolo: più facile da
   capire, meno potente per regole fini.
-  *Fattibilità:* dei **profili nominati** sono un passo medio — la politica
-  globale diventa il profilo "Default" e ogni combinazione distinta di override
-  diventa un profilo generato, quindi la migrazione delle serie e dei film
-  esistenti è automatica. I **custom format** (motore regex di scoring più la
-  sua UI) sono il pezzo costoso e vanno valutati a parte.
+  *Fattibilità:* dare dei **nomi ai profili sul modello di Gextto** è un passo
+  medio: la politica globale diventa "Default" e ogni combinazione distinta di
+  override diventa un profilo generato, con migrazione automatica (i dati
+  per-titolo esistono già in `series.quality/language/subtitle/exclude` e in
+  `movies_config.*`). Riprodurre invece la **semantica di Sonarr** (lista
+  ordinata di qualità + cutoff + custom format) è un'altra cosa e più costosa; i
+  custom format (motore regex di scoring + UI) vanno valutati a parte.
 - **Maturità di import e rinomina.** Multi-episodio, specials, anime a
   numerazione assoluta, daily, import manuale con UI di matching e sostituzione.
   Gextto copre molto, ma con meno anni di casi limite assorbiti.
-  *Fattibilità:* il codice di Sonarr è pubblico e i suoi test di parsing sono un
-  catalogo di casi limite da cui attingere. Essendo GPLv3 (Gextto è EUPL 1.2) si
-  studia il comportamento e si **reimplementa**, senza copiare codice.
+  *Fattibilità:* il codice di Sonarr è pubblico: si **studia il comportamento** e
+  si reimplementa. Essendo GPLv3 (Gextto è EUPL 1.2) non si copia il codice **né
+  i file di test** (sono parte del progetto GPL): ci si costruisce un proprio
+  corpus da nomi reali e proprie attese.
 - **Ecosistema e API.** `/api/v3` è consumata da Overseerr/Jellyseerr e altri
   strumenti; Gextto non la espone. Attorno a *arr c'è anche un contorno (Bazarr
   per i sottotitoli, ecc.) che Gextto non copre.
   *Fattibilità:* la compatibilità completa non è realistica; un **sottoinsieme**
-  sufficiente a Jellyseerr (stato di sistema, root folder, profili, lookup e
-  aggiunta di serie/film) sì, ma presuppone i profili nominati del primo punto.
+  sufficiente a Jellyseerr sì — `system/status`, `qualityprofile`,
+  `languageprofile`, `rootfolder`, `tag`, `series/lookup` + `POST series`,
+  `movie/lookup` + `POST movie`, `queue` — ma presuppone i profili nominati, le
+  root folder e i tag (quindi viene dopo il primo punto) e va provato con un
+  Jellyseerr reale, perché il client è rigido sulle forme delle risposte.
 - **Notifiche.** Molti provider (Discord, Slack, Pushover, Gotify, ntfy, …);
   Gextto ha Telegram, webhook ed email.
   *Fattibilità:* bassa complessità — sono quasi tutti semplici POST HTTP sopra il
