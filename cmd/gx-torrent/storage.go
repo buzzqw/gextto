@@ -183,6 +183,25 @@ func movePayload(savePath, dest, name string) error {
 	return os.RemoveAll(source)
 }
 
+// discardEmptyPayload drops the files of a torrent with nothing downloaded
+// instead of moving them, and prepares the destination.
+func discardEmptyPayload(savePath, dest, name string) error {
+	source, err := payloadPath(savePath, name)
+	if err != nil {
+		return err
+	}
+	target, err := payloadPath(dest, name)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(source) != filepath.Clean(target) {
+		if err := os.RemoveAll(source); err != nil {
+			return err
+		}
+	}
+	return os.MkdirAll(dest, 0o755)
+}
+
 func isCrossDevice(err error) bool {
 	var linkErr *os.LinkError
 	if errors.As(err, &linkErr) {

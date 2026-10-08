@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
+	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
 	root.HandleFunc("GET /ui/torrent-file", d.handleUITorrentFile)
 	root.HandleFunc("POST /ui/action", d.handleUIAction)
 	root.HandleFunc("POST /ui/bulk", d.handleUIBulk)
@@ -62,6 +64,7 @@ func (d *Daemon) routes() http.Handler {
 // authenticate requires the shared token on every request when one is set.
 func (d *Daemon) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		markAPISeen()
 		if d.opts.Token != "" {
 			given := r.Header.Get("X-Gx-Token")
 			if given == "" {
@@ -124,7 +127,8 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	ok := d.session != nil
 	count := len(d.state.Torrents)
 	d.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": runtimeVersion(), "torrents": count})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": runtimeVersion(), "torrents": count,
+		"pid": os.Getpid(), "fingerprint": d.opts.Fingerprint, "data_dir": d.opts.DataDir})
 }
 
 func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {

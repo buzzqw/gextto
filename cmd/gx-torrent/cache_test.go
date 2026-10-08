@@ -93,23 +93,24 @@ func TestStorageClassLocalIsNotNetwork(t *testing.T) {
 	}
 }
 
-func TestAdaptCacheFirstEvaluationApplies(t *testing.T) {
+func TestAdaptCacheAppliesInPlaceWithoutSessionReopen(t *testing.T) {
 	d := &Daemon{opts: Options{DownloadDir: t.TempDir()}}
-	d.adaptCacheLocked(time.Now(), 3, 1, 1<<20)
+	start := time.Now()
+	d.adaptCacheLocked(start, 3, 1, 1<<20)
 	if d.cacheRead <= 0 || d.cacheWrite <= 0 {
 		t.Fatalf("no target computed: read=%d write=%d", d.cacheRead, d.cacheWrite)
 	}
-	if !d.restartPending {
-		t.Fatal("first evaluation must schedule a session reopen")
+	if d.restartPending {
+		t.Fatal("the cache is resized in place: no session reopen")
 	}
 	if d.cacheClass == "" {
 		t.Fatal("storage class not recorded")
 	}
 
-	// A second call within the interval must not schedule anything.
-	d.restartPending = false
-	d.adaptCacheLocked(time.Now(), 3, 1, 1<<20)
-	if d.restartPending {
+	// A second call within the interval must not recompute.
+	applied := d.cacheAppliedAt
+	d.adaptCacheLocked(start.Add(time.Second), 9, 9, 1<<30)
+	if d.cacheAppliedAt != applied || d.restartPending {
 		t.Fatal("must not recompute within the check interval")
 	}
 }

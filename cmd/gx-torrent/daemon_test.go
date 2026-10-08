@@ -981,3 +981,77 @@ func TestDaemonFirstLastOption(t *testing.T) {
 		t.Fatalf("first_last not reported: %+v", info)
 	}
 }
+
+func TestSpeedLimitsChangeWithoutSessionReopen(t *testing.T) {
+	d := newTestDaemon(t)
+	session := d.session
+	if _, err := d.setConfig(map[string]json.RawMessage{
+		"speed_limit_download": json.RawMessage(`500`),
+		"speed_limit_upload":   json.RawMessage(`100`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	pending := d.restartPending
+	d.mu.Unlock()
+	if pending {
+		t.Fatal("a speed limit change must not reopen the session")
+	}
+	d.tick(time.Now())
+	if d.session != session {
+		t.Fatal("the session was replaced")
+	}
+
+	if _, err := d.setConfig(map[string]json.RawMessage{"max_peer_dial": json.RawMessage(`10`)}); err != nil {
+		t.Fatal(err)
+	}
+	if !d.restartPending {
+		t.Fatal("peer limits are read at session creation: a reopen is expected")
+	}
+}
+
+func TestMoveDropsTheEmptyFilesOfADownloadWithNothingYet(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "empty.bin", 4<<20)
+	staging := filepath.Join(t.TempDir(), "staging")
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: staging})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "downloading without peers", func() bool { return stateOf(d, hash) == "downloading" })
+	staged := filepath.Join(staging, "empty.bin")
+	waitFor(t, "file allocated", func() bool { _, err := os.Stat(staged); return err == nil })
+	// Unverified bytes in the staged file: they must not travel with the move.
+	marker := []byte("not a verified piece")
+	file, err := os.OpenFile(staged, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = file.WriteAt(marker, 0)
+	_ = file.Close()
+
+	disk := filepath.Join(t.TempDir(), "disk")
+	if err := d.move(hash, disk, false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "moved", func() bool {
+		info, _ := findInfo(d, hash)
+		return info.SavePath == disk && info.State != "moving"
+	})
+	if _, err := os.Stat(staged); !os.IsNotExist(err) {
+		t.Fatalf("the staged empty file must be gone: %v", err)
+	}
+	waitFor(t, "recreated at the destination", func() bool { _, err := os.Stat(filepath.Join(disk, "empty.bin")); return err == nil })
+	head := make([]byte, len(marker))
+	if file, err := os.Open(filepath.Join(disk, "empty.bin")); err == nil {
+		_, _ = file.ReadAt(head, 0)
+		_ = file.Close()
+	}
+	if string(head) == string(marker) {
+		t.Fatal("the empty files were copied instead of recreated")
+	}
+	if state := stateOf(d, hash); state == "checking_files" {
+		t.Fatalf("no re-check expected for a torrent with nothing downloaded, state %s", state)
+	}
+}

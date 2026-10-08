@@ -245,8 +245,9 @@ func (d *Daemon) downloadDir() string {
 }
 
 // adaptCacheLocked recomputes the cache target from the live workload and
-// schedules a session reopen when it moved enough. rain can't retune at
-// runtime, so the cadence is coarse and hysteresis keeps it from thrashing.
+// applies it to the running session when it moved enough (the fork resizes
+// the read cache and the write buffer in place). Hysteresis and a coarse
+// cadence keep it from changing at every queue move.
 func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds int, downloadRate int64) {
 	if !d.cacheCheckedAt.IsZero() && now.Sub(d.cacheCheckedAt) < cacheCheckEvery {
 		return
@@ -263,23 +264,28 @@ func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds in
 	})
 	d.cacheClass = class
 	if d.cacheRead == 0 {
-		// First evaluation: apply on the next tick.
-		d.cacheRead, d.cacheWrite, d.cacheReason = read, write, reason
-		d.cacheAppliedAt = now
-		d.restartPending = true
+		// First evaluation.
+		d.applyCacheSizesLocked(read, write, reason, now)
 		return
 	}
 	if !cacheMoved(d.cacheRead, read) && !cacheMoved(d.cacheWrite, write) {
 		d.cacheReason = reason
 		return
 	}
-	if now.Sub(d.cacheAppliedAt) < cacheApplyEvery || len(d.moving) > 0 || d.restartPending {
+	if !d.cacheAppliedAt.IsZero() && now.Sub(d.cacheAppliedAt) < cacheApplyEvery {
 		return
 	}
+	d.applyCacheSizesLocked(read, write, reason, now)
+	logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
+}
+
+// applyCacheSizesLocked resizes the running session's caches.
+func (d *Daemon) applyCacheSizesLocked(read, write int64, reason string, now time.Time) {
 	d.cacheRead, d.cacheWrite, d.cacheReason = read, write, reason
 	d.cacheAppliedAt = now
-	d.restartPending = true
-	logf("cache retuned: read=%dMiB write=%dMiB (%s)", read/mib, write/mib, reason)
+	if d.session != nil {
+		d.session.SetCacheSizes(read, write)
+	}
 }
 
 // cacheMoved reports a change larger than 25%.

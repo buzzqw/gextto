@@ -63,11 +63,15 @@ type uiPageData struct {
 	Proxy        bool
 	IPFilter     int
 	IPFilterPath string
-	CacheReadMB  int64
-	CacheWB      int64
-	LSDPeers     int64
-	DiskFree     int64
-	DiskTotal    int64
+	// IPFilterSource prefills the IP filter field with Gextto's setting.
+	IPFilterSource string
+	// GexttoLog enables the Gextto log tab.
+	GexttoLog   bool
+	CacheReadMB int64
+	CacheWB     int64
+	LSDPeers    int64
+	DiskFree    int64
+	DiskTotal   int64
 
 	CountAll     int
 	CountDown    int
@@ -200,10 +204,11 @@ header h1{font-size:20px;margin:0;font-weight:600}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
 .muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
-.cards{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:12px}
-.card{flex:1 1 auto;background:#161d2c;border:1px solid #243049;border-radius:7px;padding:3px 6px}
-.card b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card span{display:block;color:#93a1b5;font-size:10.5px;white-space:nowrap}
+.cards{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.card{min-width:0;background:#161d2c;border:1px solid #243049;border-radius:8px;padding:6px 10px}
+.card b{display:block;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card span{display:block;color:#93a1b5;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px;margin-bottom:12px}
 .toolbar form{display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap}
 .toolbar input[type=text],.toolbar input[type=search]{min-width:200px}
@@ -222,9 +227,10 @@ tbody.t+tbody.t tr.l1 td{border-top:1px solid #1f2839}
 tbody.t:hover td{background:#1a2234}
 thead tr.h1 th{border-bottom:0;padding-bottom:2px}
 td.name{overflow-wrap:anywhere}
-td.name a{font-weight:600;text-decoration:none}
+td.name a{display:block;max-width:min(70ch,100%);font-weight:600;text-decoration:none}
 td.name a:hover{text-decoration:underline}
-td.name .muted{margin-left:8px;font-size:12px}
+td.name .muted{display:block;font-size:12px}
+#torrents th.num,#torrents td.num{min-width:72px}
 td.prog{min-width:110px}
 td.prog .bar{margin-top:0}
 td.prog small{color:#93a1b5;font-size:12px}
@@ -273,6 +279,13 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 .statusbar b{color:#e7ecf3;font-weight:600}
 .toast{position:fixed;top:14px;right:14px;z-index:80;background:#14351f;border:1px solid #1f6b3a;color:#e7ecf3;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:420px;transition:opacity .4s}
 .toast.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.logbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.logview{background:#0b0f18;border:1px solid #243049;border-radius:10px;padding:10px 12px;margin:0;max-height:75vh;overflow:auto;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.logview .warn{color:#fcd34d}
+.logview .error{color:#fca5a5}
+.logview .debug{color:#7c8aa0}
 .flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
 .flag.on{background:#14532d;color:#86efac}
 @media(max-width:760px){.layout{flex-direction:column}.sidebar{flex-direction:row;flex-wrap:wrap;min-width:0}}
@@ -322,7 +335,7 @@ const uiPageTemplate = `<!doctype html>
     </form>
     <form method="post" action="/ui/ipfilter">
       <span class="muted">IP filter</span>
-      <input type="text" name="source" placeholder="URL or local file" autocomplete="off">
+      <input type="text" name="source" placeholder="URL or local file" autocomplete="off" value="{{.IPFilterSource}}" style="min-width:min(520px,70vw)" title="Prefilled with the IP filter configured in Gextto">
       <button type="submit" title="Download (if a URL) and apply the IP filter now">Load filter</button>
     </form>
     <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off">
@@ -339,7 +352,25 @@ const uiPageTemplate = `<!doctype html>
     <button type="button" class="danger" onclick="bulk('remove-files')">✕ Remove and delete files</button>
   </div>
 
-  <div id="live">{{template "live" .}}</div>
+  {{if .GexttoLog}}
+  <div class="tabs">
+    <button type="button" class="on" id="tab-torrents" onclick="showTab('torrents')">Torrents</button>
+    <button type="button" id="tab-log" onclick="showTab('log')">Gextto log</button>
+  </div>
+  {{end}}
+  <div id="pane-torrents"><div id="live">{{template "live" .}}</div></div>
+  {{if .GexttoLog}}
+  <div id="pane-log" style="display:none">
+    <div class="logbar">
+      <label class="chk">Lines <select id="log-lines" onchange="loadLog()"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
+      <input type="search" id="log-filter" placeholder="Filter lines…" oninput="renderLog()" autocomplete="off">
+      <label class="chk"><input type="checkbox" id="log-nodebug" checked onchange="renderLog()"> hide DEBUG</label>
+      <button type="button" onclick="loadLog()">↻ Reload</button>
+      <span class="muted" id="log-info"></span>
+    </div>
+    <pre class="logview" id="log-view">Loading…</pre>
+  </div>
+  {{end}}
 </main>
 
 <div id="detail-modal" class="overlay" style="display:none">
@@ -350,7 +381,7 @@ const uiPageTemplate = `<!doctype html>
 function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;applySort();updateSel();applyFilters();}});}
+function refresh(force){if(window.__tab==='log')return;if(!force){if(document.querySelectorAll('.rowsel:checked').length>0)return;if(document.getElementById('detail-modal').style.display==='flex')return;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(t){document.getElementById('live').innerHTML=t;applySort();updateSel();applyFilters();}});}
 function rowState(tr){return tr.getAttribute('data-state')||'';}
 function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
 function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
@@ -363,6 +394,9 @@ function applySort(){var st=window.__sort;var tb=document.getElementById('torren
 function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st.key===key&&st.asc)};applySort();}
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
 function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
+function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
+function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent='loading…';fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' lines · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent='Cannot read the Gextto log: '+e.message;document.getElementById('log-info').textContent='';});}
+function renderLog(scroll){var view=document.getElementById('log-view');var q=(document.getElementById('log-filter').value||'').toLowerCase();var nodebug=document.getElementById('log-nodebug').checked;var frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 setInterval(function(){refresh(false)},2000);
 (function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
 </script>
@@ -633,6 +667,27 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 
 // handleUIDetail renders one tab of a torrent's detail, as a fragment for the
 // modal.
+// handleUIGexttoLog returns the tail of the Gextto log for the log tab. It is
+// read only when the tab is opened or reloaded.
+func (d *Daemon) handleUIGexttoLog(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if d.opts.GexttoLog == "" {
+		http.Error(w, "no Gextto log configured", http.StatusNotFound)
+		return
+	}
+	lines, _ := strconv.Atoi(r.URL.Query().Get("lines"))
+	lines = min(max(lines, 50), 5000)
+	tail, err := tailLines(d.opts.GexttoLog, lines)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{"path": d.opts.GexttoLog, "lines": tail})
+}
+
 func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
@@ -1165,33 +1220,35 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 	stats := d.stats()
 	views := d.list()
 	page := uiPageData{
-		Version:      stats.Version,
-		Uptime:       uiDuration(stats.UptimeSeconds),
-		Now:          time.Now().Format("15:04:05"),
-		Torrents:     stats.Torrents,
-		Down:         stats.Downloading,
-		Seeding:      stats.Seeding,
-		Stalled:      stats.Stalled,
-		Paused:       stats.Paused,
-		Moving:       stats.Moving,
-		DownloadRate: uiRate(stats.DownloadRate),
-		UploadRate:   uiRate(stats.UploadRate),
-		TotalDown:    stats.Session["bytes_downloaded"],
-		TotalUp:      stats.Session["bytes_uploaded"],
-		PeerPort:     stats.PeerPort,
-		Listen:       stats.ListenAddress,
-		DHT:          stats.DHT,
-		DHTNodes:     stats.Session["dht_nodes"],
-		UTP:          stats.UTP,
-		Encryption:   uiEncryption(stats.Encryption),
-		Proxy:        stats.Proxy,
-		IPFilter:     stats.IPFilterRules,
-		IPFilterPath: stats.IPFilterPath,
-		CacheReadMB:  stats.CacheReadMB,
-		CacheWB:      stats.CacheWriteMB,
-		LSDPeers:     stats.LSD.PeersFound,
-		DiskFree:     stats.DiskFreeBytes,
-		DiskTotal:    stats.DiskTotalBytes,
+		Version:        stats.Version,
+		Uptime:         uiDuration(stats.UptimeSeconds),
+		Now:            time.Now().Format("15:04:05"),
+		Torrents:       stats.Torrents,
+		Down:           stats.Downloading,
+		Seeding:        stats.Seeding,
+		Stalled:        stats.Stalled,
+		Paused:         stats.Paused,
+		Moving:         stats.Moving,
+		DownloadRate:   uiRate(stats.DownloadRate),
+		UploadRate:     uiRate(stats.UploadRate),
+		TotalDown:      stats.Session["bytes_downloaded"],
+		TotalUp:        stats.Session["bytes_uploaded"],
+		PeerPort:       stats.PeerPort,
+		Listen:         stats.ListenAddress,
+		DHT:            stats.DHT,
+		DHTNodes:       stats.Session["dht_nodes"],
+		UTP:            stats.UTP,
+		Encryption:     uiEncryption(stats.Encryption),
+		Proxy:          stats.Proxy,
+		IPFilter:       stats.IPFilterRules,
+		IPFilterPath:   stats.IPFilterPath,
+		IPFilterSource: d.opts.IPFilterSource,
+		GexttoLog:      d.opts.GexttoLog != "",
+		CacheReadMB:    stats.CacheReadMB,
+		CacheWB:        stats.CacheWriteMB,
+		LSDPeers:       stats.LSD.PeersFound,
+		DiskFree:       stats.DiskFreeBytes,
+		DiskTotal:      stats.DiskTotalBytes,
 	}
 	switch {
 	case stats.PortMapping.Method != "":

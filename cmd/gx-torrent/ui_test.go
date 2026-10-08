@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	clog "github.com/cenkalti/log"
 )
 
 func TestUIPageServes(t *testing.T) {
@@ -288,5 +292,70 @@ func TestUIPageRequiresToken(t *testing.T) {
 	// The API keeps requiring the token: the page does not loosen it.
 	if resp, _ := http.Get(server.URL + "/api/v1/stats"); resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("GET /api/v1/stats without token -> %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestUIGexttoLogTabReadsTheTail(t *testing.T) {
+	d := newTestDaemon(t)
+	logPath := filepath.Join(t.TempDir(), "gextto.log")
+	var content strings.Builder
+	for i := 1; i <= 3000; i++ {
+		fmt.Fprintf(&content, "2026-10-08 06:00:00  INFO line %d\n", i)
+	}
+	if err := os.WriteFile(logPath, []byte(content.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	// Without a configured log there is no tab and no endpoint.
+	if resp, err := http.Get(server.URL + "/ui/gextto-log"); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("no log configured -> %d, want 404", resp.StatusCode)
+		}
+	}
+
+	d.opts.GexttoLog = logPath
+	resp, err := http.Get(server.URL + "/ui/gextto-log?lines=200")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Path  string   `json:"path"`
+		Lines []string `json:"lines"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Lines) != 200 || !strings.HasSuffix(payload.Lines[199], "line 3000") || !strings.HasSuffix(payload.Lines[0], "line 2801") {
+		t.Fatalf("tail = %d lines, first %q, last %q", len(payload.Lines), payload.Lines[0], payload.Lines[len(payload.Lines)-1])
+	}
+
+	page, err := http.Get(server.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	if !strings.Contains(string(body), "Gextto log") {
+		t.Fatal("the Gextto log tab is missing")
+	}
+}
+
+func TestSwarmNoiseIsDemoted(t *testing.T) {
+	cases := map[string]bool{
+		"peer -> 1.2.3.4:6881|cannot complete outgoing handshake": true,
+		"peer <- 1.2.3.4:6881|peer reset":                         true,
+		"torrent abc|announce error: timeout":                     true,
+		"torrent abc|file allocation error":                       false,
+		"session|cannot open database":                            false,
+	}
+	for spec, want := range cases {
+		name, message, _ := strings.Cut(spec, "|")
+		if got := isSwarmNoise(&clog.Record{LoggerName: name, Message: message}); got != want {
+			t.Errorf("%s: noise=%v, want %v", spec, got, want)
+		}
 	}
 }

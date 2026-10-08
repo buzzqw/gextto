@@ -42,8 +42,15 @@ type Options struct {
 	AllowedRoots []string
 	Network      NetworkOptions
 	Debug        bool
-	Tick         time.Duration
-	ProbeWindow  time.Duration
+	// Fingerprint is reported by /api/v1/health so Gextto can adopt a daemon
+	// it started earlier with the same binary and options.
+	Fingerprint string
+	// GexttoLog is the Gextto log shown in the web page (empty = no tab).
+	GexttoLog string
+	// IPFilterSource is the IP filter URL or path configured in Gextto.
+	IPFilterSource string
+	Tick           time.Duration
+	ProbeWindow    time.Duration
 }
 
 // torrentMeta is what gx-torrent knows about a torrent beyond rain.
@@ -307,7 +314,7 @@ func (d *Daemon) openSessionLocked() error {
 }
 
 // restartSessionLocked applies settings rain reads only at session creation
-// (global speed and peer limits). Torrents resume exactly as they were: rain
+// (peer limits, cache TTL, preallocation). Torrents resume exactly as they were: rain
 // restores the started flag and gx-torrent keeps its own state.
 func (d *Daemon) restartSessionLocked() {
 	d.restartPending = false
@@ -322,8 +329,7 @@ func (d *Daemon) restartSessionLocked() {
 		d.restartPending = true
 		return
 	}
-	logf("session restarted to apply new limits (download %d KiB/s, upload %d KiB/s)",
-		d.state.Config.SpeedLimitDownload, d.state.Config.SpeedLimitUpload)
+	logf("session restarted to apply new settings")
 }
 
 // reconcileLocked aligns gx-torrent's state with the torrents rain loaded.
@@ -1220,6 +1226,13 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	id := t.ID()
 	stats := t.Stats()
 	wasRunning := isRunning(stats.Status)
+	// A torrent that is downloading but has no verified piece yet holds only
+	// empty (sparse or preallocated) files: copying them to another disk
+	// writes gigabytes of zeros and makes rain re-check them all at the
+	// destination. They are dropped and rain recreates them there. Only a
+	// running download qualifies: its piece table is authoritative, while a
+	// stopped or verifying torrent may sit on data not checked yet.
+	empty := !associate && stats.Status == torrent.Downloading && stats.Pieces.Have == 0 && stats.Bytes.Completed == 0
 	d.moving[id] = true
 	if err := t.Stop(); err != nil {
 		delete(d.moving, id)
@@ -1230,18 +1243,22 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	name := stats.Name
 	d.mu.Unlock()
 
-	go d.finishMove(id, t, from, dest, name, wasRunning, associate)
+	go d.finishMove(id, t, from, dest, name, wasRunning, associate, empty)
 	return nil
 }
 
-func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, wasRunning, associate bool) {
+func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, wasRunning, associate, empty bool) {
 	// rain stops asynchronously: wait until the files are closed.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
 		time.Sleep(200 * time.Millisecond)
 	}
 	var err error
-	if !associate {
+	switch {
+	case associate:
+	case empty:
+		err = discardEmptyPayload(from, dest, name)
+	default:
 		err = movePayload(from, dest, name)
 	}
 	if err == nil {
@@ -1260,7 +1277,11 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 		logf("moving «%s» to %s failed: %v", name, dest, err)
 	} else {
 		meta.SavePath = dest
-		logf("«%s» moved to %s", name, dest)
+		if empty {
+			logf("«%s» moved to %s (nothing downloaded yet: its empty files are recreated there)", name, dest)
+		} else {
+			logf("«%s» moved to %s", name, dest)
+		}
 		if associate {
 			if verifyErr := t.Verify(); verifyErr != nil {
 				logf("verify after relocation of «%s»: %v", name, verifyErr)
@@ -1306,9 +1327,22 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 	next = next.normalized()
 	previous := d.state.Config
 	d.state.Config = next
-	if previous.SpeedLimitDownload != next.SpeedLimitDownload || previous.SpeedLimitUpload != next.SpeedLimitUpload ||
-		previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
-		previous.CacheMB != next.CacheMB || previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate {
+	// Speed limits and the cache size change in place: reopening the session
+	// would drop every peer and stall the transfers for seconds.
+	if previous.SpeedLimitDownload != next.SpeedLimitDownload || previous.SpeedLimitUpload != next.SpeedLimitUpload {
+		if d.session != nil {
+			d.session.SetSpeedLimits(next.SpeedLimitDownload, next.SpeedLimitUpload)
+		}
+		logf("speed limits set to %d KiB/s download, %d KiB/s upload (0 = unlimited)", next.SpeedLimitDownload, next.SpeedLimitUpload)
+	}
+	if previous.CacheMB != next.CacheMB {
+		d.cacheCheckedAt = time.Time{}
+		d.cacheAppliedAt = time.Time{}
+	}
+	// Peer limits, the cache TTL and preallocation are read by rain only when
+	// the session opens.
+	if previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
+		previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate {
 		d.restartPending = true
 	}
 	d.saveLocked()

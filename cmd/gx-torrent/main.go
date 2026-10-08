@@ -20,8 +20,6 @@ import (
 	"syscall"
 	"time"
 
-	clog "github.com/cenkalti/log"
-
 	"github.com/buzzqw/gextto/internal/constants"
 )
 
@@ -39,17 +37,6 @@ func runtimeVersion() string {
 
 func logf(format string, args ...any) {
 	log.Printf(format, args...)
-}
-
-// rainLogHandler keeps rain's own log to warnings, or everything with -debug.
-func rainLogHandler(debug bool) clog.Handler {
-	handler := clog.NewFileHandler(os.Stderr)
-	if debug {
-		handler.SetLevel(clog.DEBUG)
-	} else {
-		handler.SetLevel(clog.WARNING)
-	}
-	return handler
 }
 
 func envOr(key, fallback string) string {
@@ -154,6 +141,11 @@ func main() {
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose rain logging")
+	logFile := flag.String("log-file", envOr("GX_TORRENT_LOG_FILE", ""), "write the log to this file, rotated at 5 MB keeping 4 files (default stderr)")
+	orphanTimeout := flag.Duration("orphan-timeout", 0, "stop when no API request arrives for this long (0 = never); Gextto sets it so a daemon it left running does not outlive it")
+	fingerprint := flag.String("fingerprint", "", "opaque value reported by /api/v1/health; Gextto uses it to recognise a daemon started with the same binary and options")
+	ipFilterSource := flag.String("ipfilter-source", envOr("GX_TORRENT_IPFILTER_SOURCE", ""), "IP filter URL or path configured in Gextto, prefilled in the web page")
+	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -163,6 +155,7 @@ func main() {
 	}
 	log.SetFlags(log.LstdFlags)
 	log.SetPrefix("gx-torrent: ")
+	setupLogFile(*logFile)
 
 	if !loopback(*listen) && *token == "" && !*insecure {
 		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", *listen)
@@ -218,9 +211,12 @@ func main() {
 			IPFilterTrackers:  *ipFilterTrackers,
 			DHTBootstrap:      parseBootstrapNodes(*dhtBootstrap),
 		},
-		Debug:       *debug,
-		Tick:        3 * time.Second,
-		ProbeWindow: 15 * time.Minute,
+		Debug:          *debug,
+		Fingerprint:    *fingerprint,
+		GexttoLog:      strings.TrimSpace(*gexttoLog),
+		IPFilterSource: strings.TrimSpace(*ipFilterSource),
+		Tick:           3 * time.Second,
+		ProbeWindow:    15 * time.Minute,
 	}
 	daemon, err := newDaemon(opts)
 	if err != nil {
@@ -248,6 +244,7 @@ func main() {
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	watchOrphan(*orphanTimeout, signals)
 	exitCode := 0
 	select {
 	case sig := <-signals:
