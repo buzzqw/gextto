@@ -17,6 +17,7 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `internal/blocklist/blocklist_test.go` — formati del filtro IP;
 - `internal/mse/mse_test.go` — scrittura MSE in place: round-trip di cifratura e zero allocazioni per blocco;
 - `internal/peerconn/peerconn_test.go` — contatore dei byte di protocollo;
+- `internal/peerconn/peerwriter/peerwriter_test.go` — la finestra di dedup delle richieste servite resta limitata e sfratta la più vecchia;
 - `internal/piecepicker/sequential_skip_test.go` — i pezzi dei file esclusi non
   vengono mai scelti, nemmeno in modalità sequenziale o dal percorso
   "file edge";
@@ -41,6 +42,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Preallocazione | `internal/storage/filestorage`, `torrent/session_storage.go`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: i file nuovi vengono riservati con `fallocate` invece di essere creati sparsi. Il flag viaggia nel provider di storage, così vale sia per l'aggiunta sia per il ricaricamento |
 | Byte di protocollo | `internal/peerconn/peerconn.go`, `torrent/session_stats.go` | Contatore dei byte grezzi in lettura/scrittura per l'overhead di protocollo |
 | MSE in place | `internal/mse/mse.go` | `inPlaceStreamWriter`: cifra RC4 nello stesso buffer del chiamante, eliminando l'allocazione per blocco di `cipher.StreamWriter` sul percorso di upload |
+| Dedup richieste servite | `internal/peerconn/peerwriter/peerwriter.go` | `servedWindow`: finestra limitata (1024) al posto della mappa illimitata; evita la crescita senza limite e il rifiuto permanente delle ritrasmissioni |
 | Statistiche | `torrent/session_stats.go`, `torrent/torrent_stats.go` | Contatori uTP/TCP, nodi DHT, byte di protocollo, padding |
 | Limiti a caldo | `internal/bandwidth`, `internal/peer`, `internal/peerconn/*`, `internal/urldownloader`, `torrent/session.go`, `torrent/session_limits.go` | `Session.SetSpeedLimits`: i peer usano un `bandwidth.Limiter` il cui ritmo cambia senza riaprire la sessione (prima `*ratelimit.Bucket` fisso) |
 | Cache a caldo | `internal/piececache/cache.go`, `internal/resourcemanager`, `torrent/session_limits.go` | `Session.SetCacheSizes`: read cache (`SetMaxSize`, sfratta l'eccedenza) e buffer di scrittura (`SetLimit`) ridimensionati sulla sessione in corso |

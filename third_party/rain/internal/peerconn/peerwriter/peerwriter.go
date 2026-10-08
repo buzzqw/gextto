@@ -16,6 +16,41 @@ import (
 
 const keepAlivePeriod = 2 * time.Minute
 
+// servedWindowSize bounds how many recently served blocks are remembered to
+// reject duplicate requests (gextto fork). Without a bound the map grew with
+// everything ever served, and legitimately re-requested blocks (e.g. after a
+// corrupt transfer) were rejected forever.
+const servedWindowSize = 1024
+
+// servedWindow is a bounded set of the most recently served request messages.
+type servedWindow struct {
+	m   map[peerprotocol.RequestMessage]struct{}
+	q   []peerprotocol.RequestMessage
+	max int
+}
+
+func newServedWindow(n int) *servedWindow {
+	return &servedWindow{
+		m:   make(map[peerprotocol.RequestMessage]struct{}),
+		q:   make([]peerprotocol.RequestMessage, 0, n),
+		max: n,
+	}
+}
+
+// seen records r and reports whether it was already within the window.
+func (w *servedWindow) seen(r peerprotocol.RequestMessage) bool {
+	if _, ok := w.m[r]; ok {
+		return true
+	}
+	w.m[r] = struct{}{}
+	w.q = append(w.q, r)
+	if len(w.q) > w.max {
+		delete(w.m, w.q[0])
+		w.q = w.q[1:]
+	}
+	return false
+}
+
 // PeerWriter is responsible for writing BitTorrent protocol messages to the peer connection.
 type PeerWriter struct {
 	conn                  net.Conn
@@ -27,7 +62,7 @@ type PeerWriter struct {
 	currentQueuedRequests int
 	writeC                chan peerprotocol.Message
 	messages              chan any
-	servedRequests        map[peerprotocol.RequestMessage]struct{}
+	servedRequests        *servedWindow
 	bucket                *bandwidth.Limiter // gextto fork: rate changes at runtime
 	log                   logger.Logger
 	stopC                 chan struct{}
@@ -45,7 +80,7 @@ func New(conn net.Conn, l logger.Logger, maxQueuedRequests int, fastEnabled bool
 		fastEnabled:       fastEnabled,
 		writeC:            make(chan peerprotocol.Message),
 		messages:          make(chan any),
-		servedRequests:    make(map[peerprotocol.RequestMessage]struct{}),
+		servedRequests:    newServedWindow(servedWindowSize),
 		bucket:            b,
 		log:               l,
 		stopC:             make(chan struct{}),
@@ -198,10 +233,8 @@ func (p *PeerWriter) messageWriter() {
 		case msg := <-p.writeC:
 			// Reject duplicate requests
 			if pi, ok := msg.(Piece); ok {
-				if _, ok = p.servedRequests[pi.RequestMessage]; ok {
+				if p.servedRequests.seen(pi.RequestMessage) {
 					msg = peerprotocol.RejectMessage{RequestMessage: pi.RequestMessage}
-				} else {
-					p.servedRequests[pi.RequestMessage] = struct{}{}
 				}
 			}
 
