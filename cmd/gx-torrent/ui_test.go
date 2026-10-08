@@ -357,3 +357,47 @@ func TestSwarmNoiseIsDemoted(t *testing.T) {
 		}
 	}
 }
+
+// TestUIFaviconWithoutToken checks the site icon: inlined in the page and in
+// the token page, and served at /favicon.ico without the token.
+func TestUIFaviconWithoutToken(t *testing.T) {
+	d := newTestDaemon(t)
+	d.opts.Token = "secret"
+	server := httptest.NewServer(d.routes())
+	t.Cleanup(server.Close)
+
+	resp, err := http.Get(server.URL + "/favicon.ico")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "image/svg+xml" || !strings.Contains(string(raw), "<svg") {
+		t.Fatalf("GET /favicon.ico -> %d %q", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+
+	// Without the token the page asks for it, and still shows the icon.
+	resp, err = http.Get(server.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	body := string(raw)
+	if !strings.Contains(body, `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,`) {
+		t.Fatalf("token page without icon: %s", body)
+	}
+	if strings.Contains(body, "%%") {
+		t.Fatalf("token page CSS carries a literal %%%%: %s", body)
+	}
+
+	resp, err = http.Get(server.URL + "/?token=secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(raw), `rel="icon"`) {
+		t.Fatalf("page without icon")
+	}
+}

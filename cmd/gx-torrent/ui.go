@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
@@ -334,12 +335,30 @@ var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
 	"dur":     uiDuration,
 }).Parse(uiPageTemplate + uiLiveTemplate + uiDetailTemplate))
 
-const uiPageTemplate = `<!doctype html>
+// uiFaviconSVG is the site icon of the daemon page: a download arrow into a
+// tray, in the page's blue. It is inlined in the pages (no request, no token)
+// and also served at /favicon.ico for browsers that ask for it directly.
+const uiFaviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><path d="M32 12v26m-11-11 11 11 11-11" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 44v6h34v-6" fill="none" stroke="#4fd6a1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+
+// uiFaviconLink is the <link rel="icon"> of the pages. Base64 keeps the data
+// URL compact and free of characters that need escaping.
+var uiFaviconLink = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,` +
+	base64.StdEncoding.EncodeToString([]byte(uiFaviconSVG)) + `">`
+
+// handleFavicon serves the site icon; like the page shell it needs no token.
+func handleFavicon(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write([]byte(uiFaviconSVG))
+}
+
+var uiPageTemplate = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
+` + uiFaviconLink + `
 <style>` + uiStyle + `</style>
 </head>
 <body>
@@ -684,11 +703,11 @@ const uiDetailTemplate = `{{define "detail"}}
 {{end}}
 {{end}}`
 
-const uiTokenPage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>gx-torrent</title>
+var uiTokenPage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>gx-torrent</title>` + uiFaviconLink + `
 <style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
 form{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
-input,button{width:100%%;padding:8px;margin:8px 0;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+input,button{width:100%;padding:8px;margin:8px 0;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 button{background:#2563eb;color:#fff;font-weight:600;border:0;cursor:pointer}.m{color:#93a1b5}</style></head>
 <body><form method="get" action="/">
 <h2 style="margin:0 0 6px">gx-torrent</h2>

@@ -42,6 +42,7 @@ func (d *Daemon) routes() http.Handler {
 	// http://127.0.0.1:8890/ without sending a custom header.
 	root.Handle("/api/", d.authenticate(api))
 	root.HandleFunc("GET /{$}", d.handleUI)
+	root.HandleFunc("GET /favicon.ico", handleFavicon)
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
