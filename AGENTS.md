@@ -114,7 +114,13 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   poi documentazione. Le opzioni legate alla creazione del picker valgono solo
   per i torrent aggiunti dopo: dichiarale `"partial"`, mai falso successo.
 - Nuova impostazione UI: aggiungi default (`uiweb_settings_defaults.go`), indice
-  (`uiweb_settings.go`), tooltip (`uiweb_tooltips.go`) e i testi dei manuali.
+  (`uiweb_settings.go`, con sezione e `Group` del pannello: lo script di
+  verifica rifiuta le voci senza gruppo), unità/valori speciali/dipendenza
+  (`uiweb_settings_meta.go`, non nell'etichetta), tooltip (`uiweb_tooltips.go`),
+  le traduzioni di etichetta e descrizione nei cataloghi `internal_translations*.yml`
+  e la riga nell'Appendice A dei manuali. Il test
+  `TestSettingsEveryPreviousOptionIsStillAvailable` conta le opzioni: se ne
+  aggiungi una aggiorna i conteggi.
 - Una nuova feature visibile va esposta **sia** nella UI di Gextto
   (`uiweb/v2`) **sia**, dove ha senso, nella pagina web del demone
   (`cmd/gx-torrent/ui.go`): non lasciarla raggiungibile solo via API.

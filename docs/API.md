@@ -8,7 +8,7 @@ build in esecuzione.
 ## Prima di usare l'API
 
 - Per impostazione predefinita l'API è aperta, come in una LAN fidata. Con
-  *Configurazione → Accesso → Richiedi l'accesso* attivo, chi non è in rete
+  *Configurazione → Accesso e servizi → Richiedi l'accesso (login)* attivo, chi non è in rete
   locale deve mandare la chiave API nell'header `X-Api-Key` (o `?apikey=`
   nell'indirizzo) oppure il cookie di sessione ottenuto da `/login`; senza
   credenziali le route `/api/…` rispondono `401`. Per l'accesso da Internet usa

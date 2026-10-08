@@ -11,7 +11,7 @@ selected in its header.
 > Start in **dry-run**. Verify paths, source access and one test title before
 > enabling active downloads. The UI is an administrative interface, open by
 > default: keep it on a trusted network or, for access from outside, turn on the
-> login (*Configuration → Access*) and use HTTPS.
+> login (*Configuration → Access and services*) and use HTTPS.
 
 ## How to use this guide
 
@@ -121,14 +121,16 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
 
 - If no data directory exists yet, complete the initial setup wizard.
 - **Active vs dry-run**: dry-run never starts real downloads; enable *active
-  mode* in *Configuration → Daemon* only when you are ready.
+  mode* (the *Automatic search and download* switch in *Configuration →
+  General*) only when you are ready.
 - Add series/movies from **Explore** (TMDB) or **Series / Movies → Add**.
 
 ### Recommended first cycle
 
-1. In *Configuration → Paths*, check the download, temporary, library and trash
+1. In *Configuration → Archive and space*, check the download, temporary, library and trash
    directories.
-2. In *Configuration → Sources*, add one working source and click **Verify**.
+2. In *Configuration → Sources*, add one working source and check it in
+   *Integrations → Check sources*.
    Add the others only after the first one works.
 3. Keep real downloads disabled and add one series with one season or one test
    movie.
@@ -317,7 +319,8 @@ inferior to the archived file.
 When a torrent stops increasing its completed-byte count for the configured
 period, it enters **stalled** state. Gextto pauses it in libtorrent too, so it no
 longer occupies an active slot. It remains in the session and is resumed and
-reannounced on the next retry. The values are under *Configuration → libtorrent*:
+reannounced on the next retry. The values are under *Configuration → Seeding and completion → Stalled
+torrents*:
 
 - **Consider stalled after** — 60 minutes by default;
 - **Stalled retry** — 60 minutes by default;
@@ -381,7 +384,7 @@ appears in the library at once and does not use the space a second time.
 Turn it off under *Configuration → Seeding and completion → Hardlink instead of
 copy while seeding*.
 
-Trash must be configured under *Configuration → Paths*. Without a NAS
+Trash must be configured under *Configuration → Archive and space*. Without a NAS
 destination, Gextto does not treat the Download directory as an archive and does
 not move the folder to Trash automatically. The automatic move of the source
 folder to Trash happens only with a NAS destination, a valid **Trash**
@@ -609,7 +612,8 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
    also removed. Afterwards only the databases with at least 20% (or 64 MB) of
    free space to reclaim are compacted with `VACUUM`. Housekeeping runs once per
    interval even when Gextto restarts: a restart does not trigger it again. Archive
-  retention is separate and is configured under **Configuration → Advanced**.
+  retention is separate and is configured under **Configuration → Automatic
+  maintenance → Release archive cleanup**.
 - **Paths** — library root, trash, download/temp/RAM-disk dirs, per-tag rules.
    A selected RAM-disk path remains configured, but a directory created under
    `/dev/shm` must be recreated after a reboot.
@@ -746,8 +750,9 @@ appear. A high score may bypass the delay according to configuration. Source
 backoff is different: repeated errors temporarily prevent new requests to the
 problematic source.
 
-In *Configuration → Acquisition* you can see level, deadline and last error. Use
-the per-source reset after fixing the cause; do not use it to hide a wrong API
+The delay is set in *Configuration → General → Delay before downloading*. The
+backoff state (level, deadline and last error) is in *Health → Provider
+status*. Use **Reset** per source after fixing the cause; do not use it to hide a wrong API
 key, or backoff will start again.
 
 ### Configuring a NAS safely
@@ -844,7 +849,7 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   them to the trash. The check uses the filename and technical data declared in
   the name; it does not compare file contents or calculate hashes. At the
   **same resolution** the version matching the
-  preferred language (*Configuration → Rename → default language*) is kept and a
+  preferred language (*Configuration → Library and renaming → Default language*) is kept and a
   duplicate that explicitly declares a different language is moved to trash;
   files with no language tag are left untouched. Files of torrents still in the
   session are protected, and emptied sub-folders are removed. The rename
@@ -997,7 +1002,7 @@ seconds.
 
 ## 13. Troubleshooting
 
-- **A source is unreachable** — check *Configuration → Sources → Verify* and the
+- **A source is unreachable** — check *Integrations → Check sources* and the
   sources health panel. For Jackett verify the base URL, API key and that at
   least one indexer is enabled in Jackett. Torznab errors are detected even when
   Jackett returns HTTP 200. Cloudflare-protected sites need a working
@@ -1008,8 +1013,8 @@ seconds.
   `/api/v2.0/indexers/all/results/torznab/api` twice.
 - **Nothing downloads** — confirm *active mode*, that the series/movie is
   enabled, and check the quality/language filters and the free-space guard.
-- **A torrent is stalled** — check the three values under *Configuration →
-  libtorrent*. It is intentionally paused and excluded from active slots; wait
+- **A torrent is stalled** — check the values under *Configuration →
+  Seeding and completion → Stalled torrents*. It is intentionally paused and excluded from active slots; wait
   for the retry or use **Resume/Restart** manually.
 - **A watched-folder file is not imported** — keep the `.torrent` or `.magnet`
   extension. Gextto waits for size and timestamp stability, then retries import
@@ -1040,221 +1045,482 @@ seconds.
 
 ## Appendix A. Reference — Configuration
 
-Each tab collects the editable settings. The *What it does* column mirrors the description shown in the UI.
+The page is split into four areas, each with its sections: **What to look
+for** (General, Sources, Quality and upgrades), **How to download** (Torrent
+engine, Speed and network, Queues and performance, Seeding and completion),
+**Where to store** (Library and renaming, Archive and space) and **System**
+(Automatic maintenance, Notifications, Access and services, Diagnostics and
+translations). On a computer the sections are in the left column, with the
+number of settings; on a phone you pick them from the *Section* list. The page
+address follows the open section, so it can be bookmarked. Links to the old
+tabs (*Acquisition*, *Advanced*, *Translations*) open the section that took
+over their content.
 
-### Daemon
+How to read a row:
+
+- **Name and description** on the left; the control in the middle with its
+  **unit** (seconds, minutes, GB, KiB/s…) and, below it, the meaning of the
+  **special values** (for example “0 = never”).
+- Yes/no options are **switches**; times use the time picker and the schedule
+  days are seven check boxes.
+- Options that depend on a switch (for example the speed schedule or RAM disk
+  fields) **appear only while the switch is on**, even before it is saved.
+- A value different from the default shows **changed**, the *Default* value
+  and the **↺ Default** button, which puts the default back in the field (it
+  still has to be saved).
+- The technical key (e.g. `refresh_interval`) is shown with **Show technical
+  keys**; the search finds it anyway.
+- Settings the active torrent engine does not use are collected, closed, in
+  **Not used by the active engine** (or in the panel of the inactive engine):
+  they stay saved and become active again when you switch engine. Rare options
+  are in the closed **For experts** panel.
+
+Each row is saved with its own **Save**. A field changed and not yet saved is
+marked **not saved** and the *Unsaved changes* bar appears at the bottom, with
+**Save all** and **Discard changes**. Changing section or leaving the page with
+pending changes asks for confirmation. The editors (feeds, filters, rules,
+hooks) have their own *Save* button and also show **not saved** until you save
+them.
+
+### What to look for
+
+#### General
+
+*When and how often Gextto looks for new releases and missing episodes.*
+
+**Search cycle**
 
 | Setting | What it does |
 |---|---|
-| Automatic series/movie search (seconds) | Interval between automatic series/movie searches, in seconds (21600 = 6 hours). |
-| Max release age (days) | Ignore releases older than N days (0 = no limit). Releases without a date are treated as published today. |
-| Max gaps per series/cycle | Maximum gaps to search per series in one cycle (0 = unlimited). |
-| Gap filling enabled | Enable filling recognised gaps (missing episodes) from available releases. |
-| Deep search interval (hours) | How many hours between targeted live indexer searches for gaps. |
-| Max deep searches per cycle | Maximum number of live searches per cycle. |
+| Automatic search and download | Enable or disable the Gextto daemon: automatic cycles and downloads. |
+| Automatic search interval | Interval between automatic series/movie searches, in seconds (21600 = 6 hours). *(Unit: seconds)* |
 | Online title search in the cycle | Search titles on indexers during the cycle: auto (only when no feeds are configured), yes (always), no (never, use only feeds and the local archive). |
-| Active | Enable or disable the Gextto daemon: automatic cycles and downloads. |
+| Maximum release age | Ignore releases older than N days (0 = no limit). Releases without a date are treated as published today. *(Unit: days; 0 = no limit)* |
 
-### Sources
+**Missing episodes**
+
+| Setting | What it does |
+|---|---|
+| Search for missing episodes | Enable filling recognised gaps (missing episodes) from available releases. |
+| Missing episodes per series in each cycle | Maximum gaps to search per series in one cycle (0 = unlimited). *(0 = unlimited)* Shown only while «Search for missing episodes» is on. |
+| Deep search interval | How many hours between targeted live indexer searches for gaps. *(Unit: hours)* Shown only while «Search for missing episodes» is on. |
+| Deep searches per cycle | Maximum number of live searches per cycle. Shown only while «Search for missing episodes» is on. |
+
+**Delay before downloading**
+
+| Setting | What it does |
+|---|---|
+| Delay for series | Delays the start of series downloads by this many minutes. 0 starts immediately. *(Unit: minutes; 0 = none)* |
+| Delay for movies | Delays the start of movie downloads by this many minutes. 0 starts immediately. *(Unit: minutes; 0 = none)* |
+| Skip the delay from this score | If a release reaches at least this score, the configured delay is ignored. *(0 = never)* |
+
+#### Sources
+
+*Where releases come from: RSS feeds, web engines, filters and watched folders.*
+
+**Feeds and blacklist**
 
 | Setting | What it does |
 |---|---|
 | Blacklist (one word per line) | Forbidden words, one per line: releases containing them are discarded. |
-| RSS feeds | List of RSS feeds read on every cycle (one URL per line). |
-| Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. |
-| Content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
+| Feed pages to read | How many listing pages to read per feed (3 is a good compromise). |
 
-### libtorrent
+**Editors**
 
 | Setting | What it does |
 |---|---|
-| Client enabled | Enable or completely disable the built-in libtorrent client. |
-| Automatic queue and resource management | Automatically adjusts how many torrents are active based on load. |
-| Continuous optimization (periodic) | Periodically applies cache, buffer and queue optimization based on resources. |
-| Preallocate disk space | Reserves all disk space up front before starting the download. |
-| Minimum dynamic download slots | Minimum number of dynamic downloads. The queue changes by at most one at a time. |
-| Maximum dynamic download slots | Maximum number of dynamic downloads. Consecutive consistent samples are required before increasing the queue. |
-| Don't count stalled torrents in active slots | Torrents that are not transferring data do not consume an active slot. |
-| Sequential download | Download files sequentially instead of in scattered pieces. |
-| Active downloads | Base value for active downloads; with the dynamic queue it is adapted at runtime. |
-| Active seeds | Base value for active seeds; with the dynamic queue it drops to 1 when downloads are queued. |
-| Active torrents limit | Base value for the active torrent limit; with the dynamic queue it becomes max(base, downloads + seeds + 2). |
-| Total connections limit | Maximum simultaneous peer connections at session level. |
-| Upload slots | Number of unchoked upload peers (-1 = automatic). |
-| Half-open limit | Maximum half-open connections (-1 = automatic). |
-| Max connections per torrent | Connection limit per torrent (-1 = unlimited). |
-| Max uploads per torrent | Upload limit per torrent (-1 = unlimited). |
-| Disk AIO threads | Dedicated threads for disk operations (-1 = automatic). |
-| Disk cache (blocks, -1 auto) | Disk cache size in blocks (-1 = automatic). |
-| Cache expiry (s) | Seconds of inactivity after which a block leaves the cache. |
-| Alert queue | Libtorrent alert queue size. |
+| RSS feeds | List of RSS feeds read on every cycle (one URL per line). |
+| Web engines | Web search engines used by gap-filling when feeds and indexers find nothing. |
+| Excluded content filters | Releases containing these words or scripts (e.g. [porno]) are excluded. |
+| Source filters | Keywords to accept or reject for a single source, enabled per row. |
+| Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
+
+#### Quality and upgrades
+
+*How releases are compared and when a better version replaces the one in the library.*
+
+Weights are grouped into Resolution, Source, Codec, Audio and Bonus (Dolby
+Vision, HDR, PROPER, REPACK, REAL). For each: **higher = more preferred**. The
+**Custom groups** panel adds a bonus or a penalty to a release group (the name
+must match the final tag of the release, e.g. TBK). Use *Maintenance →
+Recalculate scores* after changing weights.
+
+**Upgrades and replacement**
+
+| Setting | What it does |
+|---|---|
+| Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
+| Stop upgrading above this score | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. *(0 = never)* |
+| Replace versions already archived | Replaces lower versions already archived with better upgrades. |
+| Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
+
+### How to download
+
+#### Torrent engine
+
+*Which engine downloads the torrents and how Gextto reaches it.*
+
+**Torrent engine**
+
+| Setting | What it does |
+|---|---|
+| Torrent engine | Active torrent engine (gx-torrent, built-in libtorrent or qBittorrent-nox). |
+
+**gx-torrent**
+
+| Setting | What it does |
+|---|---|
+| gx-torrent — Web API URL | gx-torrent API URL (e.g. http://127.0.0.1:8890); Gextto drives the daemon there. |
+| gx-torrent — listen address (LAN) | Listen address of the managed daemon: web page and API open on the whole LAN (default `0.0.0.0:8890`; use `127.0.0.1:8890` to keep them on this host). The port is aligned with the URL. |
+| gx-torrent — automatic management (cache and queue) | Turns on gx-torrent self-management: dynamic queue and adaptive cache (sized on available memory, active downloads/seeds and storage type). On by default. Turn it off to set cache and slots by hand. |
+| gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
+| gx-torrent — request timeout | Timeout in seconds for HTTP requests to gx-torrent. *(Unit: seconds)* |
+| gx-torrent — polling interval | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). *(Unit: ms)* |
+
+**qBittorrent-nox**
+
+| Setting | What it does |
+|---|---|
+| qBittorrent-nox — downloaded and updated by Gextto | Gextto downloads the latest qBittorrent-nox release itself, installs it in the application folder (next to gexttod), starts/stops it with the service and updates it (with backup and rollback). The engine in use is still chosen in “Torrent engine”: this option does not change it. |
+| qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |
+| qBittorrent-nox — user | qBittorrent-nox Web UI username. |
+| qBittorrent-nox — password | qBittorrent-nox Web UI password (not shown). |
+| qBittorrent-nox — category | Category applied to torrents added to qBittorrent-nox. |
+| qBittorrent-nox — tag | Tag applied to torrents added to qBittorrent-nox. |
+| qBittorrent-nox — request timeout | Timeout in seconds for HTTP requests to qBittorrent-nox. *(Unit: seconds)* |
+| qBittorrent-nox — polling interval | Interval in milliseconds between torrent status reads. *(Unit: ms)* |
+| qBittorrent-nox — path mapping | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
+
+**built-in libtorrent**
+
+| Setting | What it does |
+|---|---|
+| built-in libtorrent — client enabled | Enable or completely disable the built-in libtorrent client. |
+
+**Actions**
+
+| Setting | What it does |
+|---|---|
+| Apply engine | Checks the configured engine and tells whether a restart is needed (*Torrent engine* panel). |
+| Install / Optimize qBittorrent-nox, qBittorrent-nox status, Connection test | In the *qBittorrent-nox* panel: install or update the managed binary, show where it is installed and whether an update exists, check the connection. |
+
+#### Speed and network
+
+*Bandwidth limits, time slots, ports and protocols of the torrent session.*
+
+**Speed limits**
+
+| Setting | What it does |
+|---|---|
+| Global download limit | Global download limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
+| Global upload limit | Global upload limit in KiB/s (0 = unlimited). *(Unit: KiB/s; 0 = unlimited)* |
+
+**Speed schedule**
+
+| Setting | What it does |
+|---|---|
+| Speed schedule enabled | Enable the time window with different speed limits. |
+| Schedule — start time | Schedule start time (HH:MM). Shown only while «Speed schedule enabled» is on. |
+| Schedule — end time | Schedule end time (HH:MM). Shown only while «Speed schedule enabled» is on. |
+| Schedule — days | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). *(no day = never active)* Shown only while «Speed schedule enabled» is on. |
+| Schedule — download | Download limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Shown only while «Speed schedule enabled» is on. |
+| Schedule — upload | Upload limit in KiB/s during the schedule. *(Unit: KiB/s; 0 = unlimited)* Shown only while «Speed schedule enabled» is on. |
+
+**Ports and interfaces**
+
+| Setting | What it does |
+|---|---|
+| Min port | Minimum libtorrent session port (requires service restart). |
+| Max port | Maximum libtorrent session port (requires service restart). |
+| Listen interfaces | Where libtorrent accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
+| Outgoing interface | VPN killswitch: interface used for all outgoing BitTorrent traffic. |
+
+**Peer and tracker discovery**
+
+| Setting | What it does |
+|---|---|
 | DHT | Enable the DHT network to find peers without a tracker. |
 | PEX | Peer Exchange: exchange peers with other clients. |
 | LSD | Local Service Discovery: finds peers on the local network. |
 | UPnP | Opens router ports automatically with UPnP. |
 | NAT-PMP | Opens router ports automatically with NAT-PMP. |
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
-| Prefer RC4 | Prefers RC4 encryption on connections. |
+| DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
 | Announce to all trackers | Announce to all trackers, not just the first of each tier. |
 | Announce to all tiers | Announce to all tiers, not just the first. |
-| Multiple connections per IP | Allows multiple connections from the same IP address. |
-| Announce interval (s) | Minimum interval (seconds) between two announces to the same tracker. |
-| Connect boost | Number of extra connection attempts when the torrent starts. |
-| DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
+| Announce interval | Minimum interval (seconds) between two announces to the same tracker. *(Unit: seconds)* |
+
+**Encryption and IP filter**
+
+| Setting | What it does |
+|---|---|
 | Encryption | Encryption policy: 0 disabled, 1 enabled, 2 forced. |
+| Prefer RC4 | Prefers RC4 encryption on connections. |
 | Apply IP filter | Apply the IP filter to trackers as well. |
 | IP filter (file/URL) | Local file or URL of the IP blocklist. |
-| Listen interfaces | Where libtorrent accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
-| Outgoing interface | VPN killswitch: interface used for all outgoing BitTorrent traffic. |
-| RAM disk folder | RAM disk to use for in-progress downloads, if available. |
+
+**Actions**
+
+| Setting | What it does |
+|---|---|
+| Apply now | Re-applies the settings to the active session right away (otherwise they apply from the next cycle). |
+| IP filter → Load / update now | Downloads the list from the configured URL (or uses the local file) and applies it to the active engine right away, gx-torrent included. |
+
+#### Queues and performance
+
+*How many torrents stay active, connections, RAM disk and cache.*
+
+**Queue and slots**
+
+| Setting | What it does |
+|---|---|
+| Continuous optimization (periodic) | Periodically applies cache, buffer and queue optimization based on resources. |
+| Automatic queue and resource management | Automatically adjusts how many torrents are active based on load. |
+| Minimum dynamic download slots | Minimum number of dynamic downloads. The queue changes by at most one at a time. Shown only while «Automatic queue and resource management» is on. |
+| Maximum dynamic download slots | Maximum number of dynamic downloads. Consecutive consistent samples are required before increasing the queue. Shown only while «Automatic queue and resource management» is on. |
+| Don't count stalled torrents in active slots | Torrents that are not transferring data do not consume an active slot. |
+| Active downloads | Base value for active downloads; with the dynamic queue it is adapted at runtime. |
+| Active seeds | Base value for active seeds; with the dynamic queue it drops to 1 when downloads are queued. |
+| Active torrents limit | Base value for the active torrent limit; with the dynamic queue it becomes max(base, downloads + seeds + 2). |
+
+**Download mode**
+
+| Setting | What it does |
+|---|---|
+| Sequential download | Download files sequentially instead of in scattered pieces. |
+| Preallocate disk space | Reserves all disk space up front before starting the download. |
+
+**Connections**
+
+| Setting | What it does |
+|---|---|
+| Total connections limit | Maximum simultaneous peer connections at session level. |
+| Upload slots | Number of unchoked upload peers (-1 = automatic). *(-1 = auto)* |
+| Half-open limit | Maximum half-open connections (-1 = automatic). *(-1 = auto)* |
+| Max connections per torrent | Connection limit per torrent (-1 = unlimited). *(-1 = unlimited)* |
+| Max uploads per torrent | Upload limit per torrent (-1 = unlimited). *(-1 = unlimited)* |
+| Multiple connections per IP | Allows multiple connections from the same IP address. |
+| Connect boost | Number of extra connection attempts when the torrent starts. |
+
+**RAM disk**
+
+| Setting | What it does |
+|---|---|
 | Use the RAM disk | Downloads to RAM the torrents that fit the threshold; larger ones go to disk. |
-| Max size per torrent (GB) | Maximum size of a single torrent allowed on the RAM disk (GB). |
-| Free margin to keep (GB) | Free space to leave on the RAM disk once the download completes (GB). |
-| Minimum free space (bytes, 0 = from margin) | Minimum free space in bytes required to use the RAM disk. 0 = use the configured margin. |
-| Min port | Minimum libtorrent session port (requires service restart). |
-| Max port | Maximum libtorrent session port (requires service restart). |
-| Global download (KiB/s, 0 = unlimited) | Global download limit in KiB/s (0 = unlimited). |
-| Global upload (KiB/s, 0 = unlimited) | Global upload limit in KiB/s (0 = unlimited). |
-| Speed schedule enabled | Enable the time window with different speed limits. |
-| Schedule — start time (HH:MM) | Schedule start time (HH:MM). |
-| Schedule — end time (HH:MM) | Schedule end time (HH:MM). |
-| Schedule — days (0=Mon … 6=Sun, e.g. 0,1,2,3,4) | Active days: 0=Mon … 6=Sun (e.g. 0,1,2,3,4). |
-| Schedule — download (KiB/s) | Download limit in KiB/s during the schedule. |
-| Schedule — upload (KiB/s) | Upload limit in KiB/s during the schedule. |
+| RAM disk folder | RAM disk to use for in-progress downloads, if available. Shown only while «Use the RAM disk» is on. |
+| Maximum size per torrent | Maximum size of a single torrent allowed on the RAM disk (GB). *(Unit: GB)* Shown only while «Use the RAM disk» is on. |
+| Free margin to keep | Free space to leave on the RAM disk once the download completes (GB). *(Unit: GB)* Shown only while «Use the RAM disk» is on. |
+| Minimum free space | Minimum free space in bytes required to use the RAM disk. 0 = use the configured margin. *(Unit: bytes; 0 = use the margin)* Shown only while «Use the RAM disk» is on. |
+
+**For experts**
+
+| Setting | What it does |
+|---|---|
+| Disk AIO threads | Dedicated threads for disk operations (-1 = automatic). *(-1 = auto)* |
+| Disk cache | Disk cache size in blocks (-1 = automatic). *(Unit: blocks; -1 = auto)* |
+| Cache expiry | Seconds of inactivity after which a block leaves the cache. *(Unit: seconds)* |
+| Alert queue | Libtorrent alert queue size. |
 | Advanced libtorrent settings | Advanced libtorrent settings, one per line in key=value format. |
-| Tab actions | **Optimize** computes cache and buffers based on RAM; **Apply now** immediately reapplies the settings to the active session. |
 
-### Torrent engine
-
-| Setting | What it does |
-|---|---|
-| Torrent engine | Active torrent engine (gx-torrent, built-in libtorrent or qBittorrent-nox). |
-| gx-torrent — Web API URL | gx-torrent API URL (e.g. http://127.0.0.1:8890); Gextto drives the daemon there. |
-| gx-torrent — listen address (LAN) | Listen address of the managed daemon: web page and API open on the whole LAN (default `0.0.0.0:8890`; use `127.0.0.1:8890` to keep them on this host). The port is aligned with the URL. |
-| gx-torrent — request timeout (seconds) | Timeout in seconds for HTTP requests to gx-torrent. |
-| gx-torrent — polling interval (ms) | Minimum interval in milliseconds between torrent status reads (the daemon owns the queue). |
-| gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
-| gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
-| qBittorrent-nox — Web API URL | qBittorrent-nox Web UI URL (e.g. http://127.0.0.1:8080). |
-| qBittorrent-nox — username | qBittorrent-nox Web UI username. |
-| qBittorrent-nox — password | qBittorrent-nox Web UI password (not shown). |
-| qBittorrent-nox — category | Category applied to torrents added to qBittorrent-nox. |
-| qBittorrent-nox — tag | Tag applied to torrents added to qBittorrent-nox. |
-| qBittorrent-nox — request timeout (seconds) | Timeout in seconds for HTTP requests to qBittorrent-nox. |
-| qBittorrent-nox — polling interval (ms) | Interval in milliseconds between torrent status reads. |
-| qBittorrent-nox — path mappings | Path mapping between Gextto and qBittorrent-nox, one per line (local=remote). |
-| qBittorrent-nox — downloaded and updated by Gextto | Gextto downloads the latest qBittorrent-nox release itself, installs it in the application folder (next to gexttod), starts/stops it with the service and updates it (with backup and rollback). The engine in use is still chosen in “Torrent engine”: this option does not change it. |
-| Tab actions | Refresh IP filter, Install/Optimize qBittorrent-nox, qBittorrent-nox status, Apply engine and Test connection. |
-
-### Scores
-
-Weights are grouped into: resolution (2160p/1080p/720p/576p), source (BluRay, Remux, WEB-DL, WEBRip, HDTV, DVDRip), codec (H.265, H.264), audio (TrueHD, DTS-HD, DTS, DDP, AC3, 5.1, AAC, MP3), bonus (Dolby Vision, HDR, PROPER, REPACK, REAL). For each: **higher = more preferred**. Custom groups are added here. Use *Maintenance → Recalculate scores* after changing weights.
-
-### Rename
+**Actions**
 
 | Setting | What it does |
 |---|---|
-| Rename episodes | Renames downloaded files using TMDB metadata. |
-| TVDB language (e.g. ita, eng) | Preferred language for TVDB metadata (e.g. ita, eng). |
-| TMDB language (e.g. it-IT) | Language used for TMDB metadata (e.g. it-IT, en-US). |
-| Default language (e.g. ita) | Default preferred language for series and movies (e.g. ita, eng). |
-| Upgrade cleanup | Replaces lower versions already archived with better upgrades. |
-| Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
-| Min score difference for upgrade | Minimum score difference to replace a file with a better upgrade. |
-| Stop upgrading above this score (0 = never) | Upgrade ceiling: once the library file scores at least this much it is no longer replaced by better releases; only a REPACK or PROPER, which fixes a defective release, is still accepted. With the default scores: 1080p WEB-DL H.264 ≈ 1280, 1080p WEB-DL H.265 DD+ ≈ 1480, 2160p WEB-DL ≈ 2480. It adds to the minimum difference: that one says *by how much* a release must improve, this one *up to where*. To stop upgrades for a single title use “No upgrades” on its page. “Why not this one?” says when a release is skipped because of this ceiling. |
-| TMDB API key | TMDB API key for titles, posters and metadata. |
-| TVDB API key | TheTVDB v4 API key for series search and metadata. |
-| Rename format | Template editor with tokens and preview to compose file names. |
+| Optimize | Computes cache and buffers from the RAM; with continuous optimization the queue and cache fields become *Auto*. |
+| Apply now | Re-applies the settings to the active session right away. |
 
-### Advanced
+#### Seeding and completion
+
+*How long to seed, what to do when a download finishes and how to handle stalled torrents.*
+
+**Seeds**
 
 | Setting | What it does |
 |---|---|
-| Minimum free space to download (GB) | Minimum free space (GB) on the download folder: below this threshold the cycle does not start downloads. |
-| Trash — retention days (0 = delete everything) | Retention days for non-forced cleanups; 0 deletes the whole trash content. Manual UI actions always empty the trash immediately. |
-| Automatic archive cleanup | Enable automatic archive cleanup according to max age and minimum number to keep. |
-| Archive — max age (days) | Maximum age of archive releases, in days (0 = no limit). |
-| Archive — keep at least N entries | Minimum number of recent releases to always keep in the archive. |
-| Feed pages to read | How many listing pages to read per feed (3 is a good compromise). |
-| Rename verification (hours) | How many hours between checks that archived/renamed files are still present. |
-| Debug (detailed logs) | Enables detailed logs and periodic diagnostics for debugging. |
-| Per-source filters | Keywords to accept or reject for a single source, enabled per row. |
-| Tag → folder rules | Associates a torrent tag with a temporary and a final folder. |
-| Event hooks | Runs a program on selected events (name, events, program, arguments, timeout). |
-| Watched folders | Automatically adds the .torrent/.magnet files found in the given folders (recursive, delete after). |
+| Global seed ratio | Upload/download ratio after which to stop seeding (0 = infinite). *(0 = infinite)* |
+| Maximum seeding | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. *(Unit: days; 0 = use the limit in minutes)* |
+| Maximum seeding (fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. *(Unit: minutes)* |
 
-### Acquisition
+**When a download completes**
 
 | Setting | What it does |
 |---|---|
-| Series delay (minutes, 0 = none) | Delays the start of series downloads by this many minutes. 0 starts immediately. |
-| Movie delay (minutes, 0 = none) | Delays the start of movie downloads by this many minutes. 0 starts immediately. |
-| Bypass the delay above this score (0 = never) | If a release reaches at least this score, the configured delay is ignored. |
-| Periodic housekeeping enabled | Enables periodic cleanup of technical data and history. |
-| Housekeeping — interval (hours) | Interval between two automatic housekeeping runs, in hours. |
-| Housekeeping — search-cycle statistics kept | Number of search cycle statistics to keep. |
-| Housekeeping — feed-seen entries (days, 0 = never) | Deletes feed-seen release history rows older than N days. |
-| Housekeeping — download history (days, 0 = keep) | Deletes download history rows of removed torrents older than N days. |
-| Housekeeping — error entries (days) | Deletes error torrent entries older than N days (minimum 1). |
-| Housekeeping — gap search log (days, 0 = never) | Deletes the missing-episode search log older than N days. |
-| Housekeeping — upgrade backups (days, 0 = never) | Deletes backups of files replaced by upgrades older than N days. |
-| Automatic MediaInfo backfill | Periodically analyses with ffprobe the files already present that have no MediaInfo yet. |
-| MediaInfo backfill — interval (minutes) | Minutes between two MediaInfo backfill passes. |
-| MediaInfo backfill — files per run | Maximum number of files analysed in each MediaInfo pass. |
-
-### Seeding and completion
-
-| Setting | What it does |
-|---|---|
-| Consider stalled after (minutes) | After this many minutes without progress the torrent is considered stalled. |
-| Stalled retry (minutes) | Interval between reannounce attempts for stalled torrents. |
-| Stalled removal (minutes, 0 = disabled) | After this period without progress, the torrent is removed automatically. Set 0 to completely disable automatic removal due to stalling. |
-| Global seed ratio (0 = infinite) | Upload/download ratio after which to stop seeding (0 = infinite). |
-| Maximum seed time (minutes, fallback) | Seeding limit in minutes, used only when Maximum seed (days) is 0. |
-| Max seed (days) | Primary seeding limit in days; when greater than 0 it takes precedence over the limit in minutes. |
 | Remove completed items after seeding | On: at the end of seeding the completed torrent is removed from the session (like “Clean completed”). Off: at the end of seeding the torrent stays in the list as Completed and you remove it with “Clean completed”. It does not affect where files are moved. |
 | Move episodes/packs to the archive (do not copy) | On: at the end of seeding the downloaded source is deleted (the file stays in the library). Off: the downloaded source is copied to the library and kept. |
 | Hardlink instead of copy while seeding | On (default): a file that keeps seeding enters the library as a hardlink, without using the space twice; when downloads and library are on different filesystems it is copied. See “Hardlinks instead of copies”. |
 
-### Notifications
+**Stalled torrents**
 
 | Setting | What it does |
 |---|---|
-| Telegram enabled | Send notifications to Telegram. |
-| Telegram bot token | Telegram bot token (from @BotFather). |
-| Telegram chat ID | ID of the chat/channel where notifications are sent. |
-| Webhook URL | Webhook URL where events are sent. |
-| Webhook secret | HMAC secret to sign webhook requests. |
-| Email enabled | Send notifications by email. |
-| SMTP | SMTP server as host:port (e.g. smtp.gmail.com:587). |
-| Email sender | Sender address for notification emails. |
-| Email recipient | Email recipients (comma-separated). |
-| Email password | SMTP password/app password (not shown). |
+| Consider stalled after | After this many minutes without progress the torrent is considered stalled. *(Unit: minutes)* |
+| Retry stalled torrents every | Interval between reannounce attempts for stalled torrents. *(Unit: minutes)* |
+| Remove stalled torrents after | After this period without progress, the torrent is removed automatically. Set 0 to completely disable automatic removal due to stalling. *(Unit: minutes; 0 = never)* |
+| Remove torrents without seeders after | Stall with zero seeders (dead swarm): removed after this shorter period, and the episode is searched again right away. Set 0 to use the general threshold. *(Unit: minutes; 0 = use the general threshold)* |
 
-### Paths
+### Where to store
+
+#### Library and renaming
+
+*How files are named and organized in the library.*
+
+**Rename**
+
+| Setting | What it does |
+|---|---|
+| Rename episodes | Renames downloaded files using TMDB metadata. |
+| Movies as single files (flatten folders) | If Yes, a movie that arrives inside a torrent folder is moved to the movies folder as a single file, with its subtitles and artwork. If No, it stays in its folder. |
+| Check renamed files every | How many hours between checks that archived/renamed files are still present. *(Unit: hours)* |
+
+**Metadata languages**
+
+| Setting | What it does |
+|---|---|
+| Default language | Default preferred language for series and movies (e.g. ita, eng). |
+| TVDB language | Preferred language for TVDB metadata (e.g. ita, eng). |
+| TMDB language | Language used for TMDB metadata (e.g. it-IT, en-US). |
+
+**Editors**
+
+| Setting | What it does |
+|---|---|
+| Name composition | Template editor with tokens and preview to compose file names. |
+| Tag → folder rules | Associates a torrent tag with a temporary and a final folder. |
+
+#### Archive and space
+
+*Working folders, trash and minimum disk space.*
+
+**Folders**
 
 | Setting | What it does |
 |---|---|
 | Archive folder | Default archive folder for content without a dedicated path. |
-| Trash folder | Folder where replaced/duplicate files are moved (if left empty, uses the trash subfolder in the data folder). |
-| Cleanup action | What to do with replaced files: move to trash or delete. |
 | Download folder | Default download folder for every engine. |
 | Temporary folder | Temporary folder for in-progress downloads. |
 | Copy .torrent files to | Copy the .torrent files of downloads here (empty = no copy). |
 
-### Access
+**Trash**
+
+| Setting | What it does |
+|---|---|
+| Trash folder | Folder where replaced/duplicate files are moved (if left empty, uses the trash subfolder in the data folder). |
+| What to do with replaced files | What to do with replaced files: move to trash or delete. |
+| Trash retention | Retention days for non-forced cleanups; 0 deletes the whole trash content. Manual UI actions always empty the trash immediately. *(Unit: days; 0 = empty everything)* |
+
+**Disk space**
+
+| Setting | What it does |
+|---|---|
+| Minimum free space to download | Minimum free space (GB) on the download folder: below this threshold the cycle does not start downloads. *(Unit: GB; 0 = no check)* |
+
+### System
+
+#### Automatic maintenance
+
+*Periodic cleanup of technical data, MediaInfo analysis and orphaned files.*
+
+**Housekeeping**
+
+| Setting | What it does |
+|---|---|
+| Periodic housekeeping enabled | Enables periodic cleanup of technical data and history. |
+| Housekeeping — interval | Interval between two automatic housekeeping runs, in hours. *(Unit: hours)* Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — search-cycle statistics kept | Number of search cycle statistics to keep. Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — seen in feeds | Deletes feed-seen release history rows older than N days. *(Unit: days; 0 = never)* Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — download history | Deletes download history rows of removed torrents older than N days. *(Unit: days; 0 = keep forever)* Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — error cards | Deletes error torrent entries older than N days (minimum 1). *(Unit: days)* Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — gap search log | Deletes the missing-episode search log older than N days. *(Unit: days; 0 = never)* Shown only while «Periodic housekeeping enabled» is on. |
+| Housekeeping — upgrade backups | Deletes backups of files replaced by upgrades older than N days. *(Unit: days; 0 = never)* Shown only while «Periodic housekeeping enabled» is on. |
+
+**Release archive cleanup**
+
+| Setting | What it does |
+|---|---|
+| Automatic archive cleanup | Enable automatic archive cleanup according to max age and minimum number to keep. |
+| Archive — maximum age | Maximum age of archive releases, in days (0 = no limit). *(Unit: days; 0 = no limit)* Shown only while «Automatic archive cleanup» is on. |
+| Archive — keep at least N entries | Minimum number of recent releases to always keep in the archive. Shown only while «Automatic archive cleanup» is on. |
+
+**MediaInfo analysis**
+
+| Setting | What it does |
+|---|---|
+| Automatic MediaInfo backfill | Periodically analyses with ffprobe the files already present that have no MediaInfo yet. |
+| MediaInfo backfill — interval | Minutes between two MediaInfo backfill passes. *(Unit: minutes)* Shown only while «Automatic MediaInfo backfill» is on. |
+| MediaInfo backfill — files per run | Maximum number of files analysed in each MediaInfo pass. Shown only while «Automatic MediaInfo backfill» is on. |
+
+**Orphaned files**
+
+| Setting | What it does |
+|---|---|
+| Move orphaned data in the temp folder to the trash | Every 30 minutes, moves to the trash the files and folders in the download temp folder that belong to no listed torrent and have not changed for at least the given number of days. Nothing is deleted: they stay in the trash until you empty it. |
+| Orphaned data — idle for at least | How many days an item in the temp folder must stay untouched, with no listed torrent, before it is moved to the trash. *(Unit: days)* Shown only while «Move orphaned data in the temp folder to the trash» is on. |
+
+#### Notifications
+
+*Telegram, email, webhooks and programs to run on events.*
+
+**Telegram**
+
+| Setting | What it does |
+|---|---|
+| Telegram enabled | Send notifications to Telegram. |
+| Telegram bot token | Telegram bot token (from @BotFather). Shown only while «Telegram enabled» is on. |
+| Telegram chat ID | ID of the chat/channel where notifications are sent. Shown only while «Telegram enabled» is on. |
+
+**Email**
+
+| Setting | What it does |
+|---|---|
+| Email enabled | Send notifications by email. |
+| SMTP | SMTP server as host:port (e.g. smtp.gmail.com:587). Shown only while «Email enabled» is on. |
+| Email sender | Sender address for notification emails. Shown only while «Email enabled» is on. |
+| Email recipient | Email recipients (comma-separated). Shown only while «Email enabled» is on. |
+| Email password | SMTP password/app password (not shown). Shown only while «Email enabled» is on. |
+
+**Webhook**
+
+| Setting | What it does |
+|---|---|
+| Webhook URL | Webhook URL where events are sent. |
+| Webhook secret | HMAC secret to sign webhook requests. |
+
+**Editors**
+
+| Setting | What it does |
+|---|---|
+| Event hooks | Runs a program on selected events (name, events, program, arguments, timeout). |
+
+#### Access and services
+
+*Login, API keys and credentials of external services.*
 
 Gextto is meant for a trusted LAN: access is **open by default**. When you
 reach it from outside (reverse proxy, port forwarding, VPN) you can require a
 login from clients that are not on the local network.
 
+**Login**
+
 | Setting | What it does |
 |---|---|
 | Require login | Off (default): no checks. On: clients outside the local network must log in or use the API key. Until a password or a key is set everything stays open (and the log says so). |
-| No login from the local network | On (default): 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x and local IPv6 addresses need no login. Behind a reverse proxy the real client address forwarded by the proxy counts (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), so a client coming from the Internet through the proxy still has to log in. |
-| Username | Login username (default `admin`). |
-| Password | Stored only as a bcrypt hash; changing it closes every open session. Leave the field empty to keep it. |
+| No login from the local network | On (default): 127.0.0.1, 192.168.x.x, 10.x.x.x, 172.16–31.x.x and local IPv6 addresses need no login. Behind a reverse proxy the real client address forwarded by the proxy counts (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`), so a client coming from the Internet through the proxy still has to log in. Shown only while «Require login» is on. |
+| Username | Login username (default `admin`). Shown only while «Require login» is on. |
+| Password | Stored only as a bcrypt hash; changing it closes every open session. Leave the field empty to keep it. Shown only while «Require login» is on. |
+
+**API keys**
+
+| Setting | What it does |
+|---|---|
 | API key (scripts, TUI, calendar) | For non-browser access: header `X-Api-Key: <key>` or `?apikey=<key>` in the URL. The TUI reads it from the `GEXTTO_API_KEY` variable. |
+| gx-torrent — access token (page and API on the LAN) | Under the **Access** tab: shared secret required by the page and the API; mandatory when the daemon listens on the network (not shown). |
+
+**Metadata services**
+
+| Setting | What it does |
+|---|---|
+| TMDB API key | TMDB API key for titles, posters and metadata. |
+| TVDB API key | TheTVDB v4 API key for series search and metadata. |
 
 A browser session lasts 30 days; `/logout` ends it. After five wrong passwords
 from the same address further attempts are blocked for a minute and each failure
@@ -1263,12 +1529,21 @@ is logged. If you lock yourself out, start Gextto with the environment variable
 can fix the settings. For access from outside always use HTTPS (reverse proxy
 with a certificate, or a VPN), otherwise the password travels in clear text.
 
-### Translations
+#### Diagnostics and translations
+
+*Detailed logs and interface texts.*
+
+**Diagnostics**
+
+| Setting | What it does |
+|---|---|
+| Debug (detailed logs) | Enables detailed logs and periodic diagnostics for debugging. |
+
+**Editors**
 
 | Setting | What it does |
 |---|---|
 | Translations | Export/import the UI string translations as YAML for Italian or English; import adds or updates keys without deleting the others. |
-
 
 ## Appendix B. Reference — Integrations
 
@@ -1340,6 +1615,27 @@ access control on (see *Access*) add `?apikey=<key>` to the address.
 | Enabled | Enables or disables the indexer. |
 | Test | Tests the indexer (for Jackett it uses `t=caps`). |
 
+A **direct** Torznab indexer (not Jackett/Prowlarr), for example the
+`mircrew-indexer` service on the same machine or the LAN, is added here with a
+URL ending in `/api`. Automatic searches wait up to 45 seconds for each indexer,
+so an answer that needs a forum search still arrives in the same cycle. When an
+indexer on a local or private-network address drops the connection or does not
+answer, Gextto does **not** retry through FlareSolverr (Cloudflare does not
+protect a LAN service): the error stays visible as it is. For `mircrew-indexer`,
+*Health → Provider status* shows whether the service answers and whether its
+login to the MirCrew forum worked; if it did not, log in again from the
+service's web UI.
+
+Gextto reads each indexer's capabilities once (the Torznab *caps*, for Prowlarr
+the list of its indexers, refreshed every 6 hours) and sends only the parameters
+the indexer declares. For example Jackett's "all" aggregate does not accept the
+TMDB id in series and movie searches, and Prowlarr's public indexers cannot
+search by id: in these cases the search uses title, season and episode instead
+of failing or coming back empty. If an indexer still rejects an id, the search
+is repeated right away without it; the error shown in *Health* carries the
+indexer's own explanation (for example "HTTP 400: Torznab 100: Invalid API
+Key") instead of the bare HTTP code.
+
 ### FlareSolverr
 
 | Field / action | What it does |
@@ -1347,7 +1643,7 @@ access control on (see *Access*) add `?apikey=<key>` to the address.
 | URL | URL of the FlareSolverr service used to bypass Cloudflare. |
 | Test FlareSolverr | Checks that FlareSolverr responds. |
 
-### Event hooks (Configuration → Advanced)
+### Event hooks (Configuration → Notifications)
 
 | Field / action | What it does |
 |---|---|
@@ -1365,7 +1661,7 @@ access control on (see *Access*) add `?apikey=<key>` to the address.
 | Magnet / Torrent handler | Downloads the scripts to open magnets and `.torrent` files directly in Gextto. |
 | Magnet / Torrent `.desktop` | `.desktop` versions for Linux desktop integration. |
 | `install.sh` | Downloads the installation script. |
-| Source check / Refresh | Checks feeds, indexers and web engines; with a query it also measures results, without changing settings. |
+| Check sources / Refresh | Checks feeds, indexers and web engines; with a query it also measures results, without changing settings. |
 
 ## Appendix C. Reference — Maintenance
 

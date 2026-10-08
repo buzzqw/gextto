@@ -101,7 +101,7 @@ selectable alternative.
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: by default the web UI and the API are
 > open. If you reach it from outside, turn on the optional login
-> (*Configuration → Access*; the local network stays free) and still use HTTPS
+> (*Configuration → Access and services*; the local network stays free) and still use HTTPS
 > through a reverse proxy or a VPN. Read the [security policy](docs/SECURITY.md)
 > before exposing it remotely.
 

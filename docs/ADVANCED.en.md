@@ -35,7 +35,7 @@ Gextto is meant for a trusted LAN and is open by default. Bind it to
 
 1. put an HTTPS reverse proxy (Caddy, nginx, Traefik) in front of it, or use a
    VPN such as Tailscale or WireGuard;
-2. turn on *Configuration → Access → Require login* and set a password (and an
+2. turn on *Configuration → Access and services → Require login* and set a password (and an
    API key if scripts or a calendar need one);
 3. keep "No login from the local network" on: nothing changes on the LAN.
 

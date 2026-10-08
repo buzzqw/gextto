@@ -76,9 +76,9 @@ Tutte le 16 voci di menu sono migrate, più le sotto-pagine di dettaglio.
 | Esplora | ✅ | ricerca release + Aggiungi, **calendario TMDB**, **tendenze/categorie TMDB**, **ricerca TMDB** con "Aggiungi alla libreria" |
 | Archivio | ✅ | tabella + ricerca + paginazione, aggiunta, download/eliminazione e spiegazione della decisione |
 | Fumetti | ✅ | tabella fumetti + **coda download HTTP**, esplorazione GetComics, link finder/download, weekly pack, storico e modifica |
-| Configurazione | ✅ | campi, ricerca, **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
-| Integrazioni | ✅ | scheda Simkl (stato, PIN, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex (con mappatura percorsi)/FlareSolverr, **editor indexer**, link al **calendario iCal**, link |
-| Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **verifica sorgenti**, **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
+| Configurazione | ✅ | quattro aree e 13 sezioni (colonna a sinistra, tendina su telefono), righe con unità, valori speciali, interruttori e campi dipendenti, **Predefinito**, barra **Salva tutto / Annulla modifiche** con conferma all'uscita, pannelli chiusi *Per esperti* e *Non usate dal motore attivo*, azioni del motore e di libtorrent; campi, ricerca (anche pesi ed editor), **feed RSS**, **gruppi checkbox**, **editor a righe** (indexer, filtri sorgente, regole tag→cartella, event hook, cartelle osservate), **rinomina**, **traduzioni** (elenco + **modifica per chiave**, import YAML, export, elimina lingua) |
+| Integrazioni | ✅ | scheda Simkl (stato, PIN, impostazioni, watchlist/calendario), impostazioni Jellyfin/Plex (con mappatura percorsi)/FlareSolverr, **editor indexer**, link al **calendario iCal**, **verifica sorgenti**, link |
+| Manutenzione | ✅ | azioni, pulizia DB, impostazioni backup, tabella backup, **cestino** (elenco/elimina/svuota), **duplicati** (anteprima/pulizia), **ottimizzazione DB** (VACUUM/ANALYZE), **RAM disk**, **rinomina cartella** (scansione/accettazione/applicazione), **progresso rinomina**, **job in background** (avanzamento e annullamento) |
 | Salute | ✅ | metriche, percorsi, dischi, errori, **sorgenti** (manuale) e **provider** |
 | Log | ✅ | filtro, limite righe, aggiornamento automatico ogni 5 s, **colorazione dei livelli lato server**, scroll automatico |
 | Blocklist | ✅ | tabella + rimozione |
@@ -128,7 +128,7 @@ portati:
 - `go test .` → **verde** (include la suite v2 completa, compreso
   `uiweb_v2_widgets_test.go`).
 - `go test ./...` → **verde**, tutti i package.
-- `scripts/check-ui-settings-index.sh` → OK (149 impostazioni, 12 tab).
+- `scripts/check-ui-settings-index.sh` → OK (173 impostazioni, 13 sezioni, ogni voce con il suo pannello).
 - `scripts/installer-selftest.sh` → tutti i check passati.
 - `go vet .` pulito; `gofmt -l` pulito.
 - Verifica live sul daemon con dati reali: 16/16 voci `/?view=…` → 200 e

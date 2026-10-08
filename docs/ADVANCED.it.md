@@ -37,7 +37,7 @@ l'accesso da fuori:
 
 1. metti davanti un reverse proxy HTTPS (Caddy, nginx, Traefik) o usa una VPN
    come Tailscale o WireGuard;
-2. attiva *Configurazione → Accesso → Richiedi l'accesso* e imposta una
+2. attiva *Configurazione → Accesso e servizi → Richiedi l'accesso (login)* e imposta una
    password (e, se ti serve per script o calendario, una chiave API);
 3. lascia attivo «Nessun login dalla rete locale»: dalla LAN non cambia nulla.
 

@@ -105,7 +105,7 @@ fallback automatico e alternativa selezionabile.
 > [!IMPORTANT]
 > Gextto è pensato per una rete fidata: per impostazione predefinita la UI web e
 > l'API sono aperte. Se lo raggiungi da fuori casa attiva il login facoltativo
-> (*Configurazione → Accesso*, la rete locale resta libera) e usa comunque HTTPS
+> (*Configurazione → Accesso e servizi*, la rete locale resta libera) e usa comunque HTTPS
 > tramite reverse proxy o VPN. Leggi prima la
 > [politica di sicurezza](docs/SECURITY.md).
 

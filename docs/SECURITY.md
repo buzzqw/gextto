@@ -27,7 +27,7 @@ Gextto is meant for a trusted LAN and its access control is **off by default**:
 anyone who reaches the web port can use it. Treat the port as an administrative
 interface.
 
-- **Optional login** (*Configuration → Access*): when enabled, clients outside
+- **Optional login** (*Configuration → Access and services*): when enabled, clients outside
   the local network must log in (bcrypt password, signed 30-day session cookie;
   a new password ends every session) or send the API key (`X-Api-Key` header or
   `?apikey=`). Five wrong passwords from one address block further attempts for

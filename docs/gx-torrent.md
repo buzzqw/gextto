@@ -98,6 +98,8 @@ All'indirizzo indicato da `gxtorrent_url` (default `http://127.0.0.1:8890`) il
 demone non espone solo l'API REST: `GET /` (o `/ui`) apre una **pagina web
 operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
 qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
+La scheda del browser mostra l'icona del demone (una freccia di download blu),
+inclusa nella pagina e servita anche da `GET /favicon.ico` senza token.
 
 - **Riepilogo sessione** in cima, su due righe di riquadri: stato torrent,
   velocità, porta, scaricato/caricato nella sessione, router, DHT, uTP, filtro

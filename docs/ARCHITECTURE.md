@@ -151,7 +151,7 @@ Il **bridge C++** per libtorrent è la coppia nella root:
 | `uiweb_sections.go` | sezioni riutilizzabili (tabella, azioni, form, progresso...). |
 | `uiweb_detail.go` | pagine di dettaglio serie/film. |
 | `uiweb_shell.go` | "chrome" della UI: barra in alto, sidebar, stato. |
-| `uiweb_settings.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | pagina Configurazione, default e tooltip. |
+| `uiweb_settings.go`, `uiweb_settings_meta.go`, `uiweb_settings_defaults.go`, `uiweb_tooltips.go` | pagina Configurazione: aree, sezioni e indice con il pannello (`Group`) di ogni impostazione; unità, valori speciali, tipo di controllo e interruttore da cui dipende; default; descrizioni. |
 | `uiweb_v2.go` | shell v2 (HTMX), routing dei frammenti e rendering. |
 | `uiweb_v2_dashboard.go`, `uiweb_v2_downloads.go`, `uiweb_v2_detail.go`, `uiweb_v2_search.go`, `uiweb_v2_comics.go`, `uiweb_v2_maintenance.go` | pagine v2 dedicate. |
 | `uiweb_v2_sections.go` | pagine composte da sezioni (Manutenzione, Integrazioni). |
@@ -203,7 +203,7 @@ Se modifichi questi file **serve ricompilare** il binario per vederli.
 | Aggiungere una pagina o un widget UI | `uiweb_v2*.go` + `uiweb/v2/templates/v2.html` (+ CSS/JS in `uiweb/v2/static/`) |
 | Aggiungere un worker di background | `web_serve.go` (registrazione) + `web_background.go` o `web_workers_media.go` |
 | Cambiare lo schema del database | `database.go` (+ test) e, se serve, `migrate.go` |
-| Aggiungere un'impostazione | `config.go` + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` |
+| Aggiungere un'impostazione | `config.go` + `uiweb_settings.go` (sezione e `Group`) + `uiweb_settings_meta.go` (unità, valore speciale, dipendenza) + `uiweb_settings_defaults.go` + `uiweb_tooltips.go` + cataloghi `internal_translations*.yml` |
 | Toccare la ricerca/sorgenti | `engine.go`, `rss.go`, `websearch.go`, `indexer_health.go` |
 | Toccare un motore torrent | `torrent_engine*.go` e il backend specifico |
 | Cambiare il bridge C++ | `libtorrent_bridge.cpp` + `libtorrent_bridge.h` (root), `libtorrent_cgo.go` |
