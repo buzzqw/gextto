@@ -8,9 +8,13 @@ package gextto
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -23,8 +27,11 @@ import (
 	"github.com/buzzqw/gextto/internal/logging"
 )
 
+// gxManagedProcess is the managed daemon: one Gextto started (cmd) or one it
+// found running from a previous Gextto run and adopted (pid only).
 type gxManagedProcess struct {
 	cmd    *exec.Cmd
+	pid    int
 	mu     sync.Mutex
 	closed bool
 	done   chan error
@@ -98,27 +105,44 @@ func listenIsLoopback(address string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedProcess, error) {
+// gxOrphanTimeout is how long a daemon kept running across Gextto restarts
+// waits for Gextto to come back before stopping by itself.
+const gxOrphanTimeout = 15 * time.Minute
+
+// gxManagedCommand is everything needed to start the managed daemon.
+type gxManagedCommand struct {
+	binary      string
+	args        []string
+	env         []string
+	dataDir     string
+	listen      string
+	fingerprint string
+}
+
+// buildManagedGxCommand prepares the daemon command line. The fingerprint
+// covers the binary content and every option, so a running daemon is reused
+// only when it is exactly the one this Gextto would start.
+func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCommand, error) {
 	binary, err := gxTorrentBinary()
 	if err != nil {
-		return nil, err
+		return gxManagedCommand{}, err
 	}
 	listen, err := gxManagedListen(settings)
 	if err != nil {
-		return nil, err
+		return gxManagedCommand{}, err
 	}
 	dataDir := filepath.Join(cfg.DataDir, "gx-torrent")
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		return nil, err
+		return gxManagedCommand{}, err
 	}
 	args := []string{"-listen", listen, "-data", dataDir}
 	if !listenIsLoopback(listen) && settings.Token == "" {
 		// The daemon refuses a non-loopback listen without a token. Instead of
 		// failing to start we opt into its documented `-insecure` mode, matching
-		// Gextto's trusted-LAN default, and say so loudly: the REST API is then
-		// reachable on the whole network.
+		// Gextto's trusted-LAN default: the REST API is then reachable on the
+		// whole network (set gxtorrent_token to protect it).
 		args = append(args, "-insecure")
-		logging.Warn("gx-torrent in ascolto sulla rete senza token: l'API è raggiungibile da chiunque sulla LAN — imposta gxtorrent_token per proteggerla", "listen", listen)
+		logging.Debug("gx-torrent listens on the network without a token: set gxtorrent_token to protect its API", "listen", listen)
 	}
 	if dir := strings.TrimSpace(cfg.LibtorrentDir); dir != "" {
 		if absolute, absErr := filepath.Abs(dir); absErr == nil {
@@ -130,37 +154,141 @@ func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedP
 	// reuses the cached file; the service-boot refresh is done by the caller.
 	gxEnsureIPFilter(cfg, false)
 	args = append(args, gxNetworkArgs(cfg)...)
-	command := exec.Command(binary, args...)
-	command.Dir = dataDir
-	command.Env = os.Environ()
+	args = append(args,
+		"-log-file", filepath.Join(dataDir, "gx-torrent.log"),
+		"-gextto-log", filepath.Join(cfg.DataDir, "gextto.log"),
+		"-orphan-timeout", gxOrphanTimeout.String(),
+	)
+	if source := strings.TrimSpace(cfg.Libtorrent.IpFilterPath); source != "" {
+		args = append(args, "-ipfilter-source", source)
+	}
+	env := os.Environ()
 	if settings.Token != "" {
 		// Passed through the environment, not argv, so it never shows in ps.
-		command.Env = append(command.Env, "GX_TORRENT_TOKEN="+settings.Token)
+		env = append(env, "GX_TORRENT_TOKEN="+settings.Token)
 	}
-	if proxy := strings.TrimSpace(cfg.Settings["gxtorrent_proxy"]); proxy != "" {
+	proxy := strings.TrimSpace(cfg.Settings["gxtorrent_proxy"])
+	if proxy != "" {
 		// May carry credentials: environment, not argv.
-		command.Env = append(command.Env, "GX_TORRENT_PROXY="+proxy)
+		env = append(env, "GX_TORRENT_PROXY="+proxy)
 	}
-	logFile, err := os.OpenFile(filepath.Join(dataDir, "gx-torrent.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	fingerprint, err := gxFingerprint(binary, args, settings.Token, proxy)
+	if err != nil {
+		return gxManagedCommand{}, err
+	}
+	args = append(args, "-fingerprint", fingerprint)
+	return gxManagedCommand{binary: binary, args: args, env: env, dataDir: dataDir, listen: listen, fingerprint: fingerprint}, nil
+}
+
+// gxFingerprint hashes the binary content and the options (secrets included
+// only as a hash, never in clear).
+func gxFingerprint(binary string, args []string, token, proxy string) (string, error) {
+	file, err := os.Open(binary)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+	for _, part := range append(append([]string{}, args...), "token="+token, "proxy="+proxy) {
+		hash.Write([]byte(part))
+		hash.Write([]byte{0})
+	}
+	return hex.EncodeToString(hash.Sum(nil))[:24], nil
+}
+
+var (
+	gxScopeOnce      sync.Once
+	gxScopeAvailable bool
+)
+
+// gxCanUseScope reports whether the daemon can be started in its own systemd
+// scope. Under the gextto systemd service this is what lets the daemon survive
+// a Gextto restart: systemd stops every process of the service's cgroup, and
+// the scope is a cgroup of its own.
+func gxCanUseScope() bool {
+	gxScopeOnce.Do(func() {
+		if os.Getenv("INVOCATION_ID") == "" {
+			return // not started by systemd
+		}
+		path, err := exec.LookPath("systemd-run")
+		if err != nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		probe := exec.CommandContext(ctx, path, "--user", "--scope", "--quiet", "--collect", "true")
+		gxScopeAvailable = probe.Run() == nil
+		if !gxScopeAvailable {
+			logging.Debug("systemd-run --user --scope unavailable: gx-torrent restarts with Gextto")
+		}
+	})
+	return gxScopeAvailable
+}
+
+func startManagedGxTorrent(cfg *Config, settings gxTorrentSettings) (*gxManagedProcess, error) {
+	spec, err := buildManagedGxCommand(cfg, settings)
 	if err != nil {
 		return nil, err
 	}
-	command.Stdout = logFile
-	command.Stderr = logFile
+	var command *exec.Cmd
+	if gxCanUseScope() {
+		scope := fmt.Sprintf("gextto-gx-torrent-%d", time.Now().Unix())
+		command = exec.Command("systemd-run", append([]string{"--user", "--scope", "--quiet", "--collect", "--unit=" + scope, "--", spec.binary}, spec.args...)...)
+	} else {
+		command = exec.Command(spec.binary, spec.args...)
+	}
+	command.Dir = spec.dataDir
+	command.Env = spec.env
+	// Its own session: a signal to Gextto's process group does not reach it.
+	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// The daemon writes its own rotating log (-log-file); this file only
+	// catches what the Go runtime prints on a crash.
+	crashLog, err := os.OpenFile(filepath.Join(spec.dataDir, "gx-torrent.crash.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	command.Stdout = crashLog
+	command.Stderr = crashLog
 	if err := command.Start(); err != nil {
-		logFile.Close()
+		crashLog.Close()
 		return nil, fmt.Errorf("avvio gx-torrent gestito: %w", err)
 	}
-	logging.Debug("gx-torrent avviato da Gextto", "binary", binary, "listen", listen, "data", dataDir)
-	process := &gxManagedProcess{cmd: command, done: make(chan error, 1)}
+	logging.Debug("gx-torrent avviato da Gextto", "binary", spec.binary, "listen", spec.listen, "data", spec.dataDir, "scope", gxCanUseScope())
+	process := &gxManagedProcess{cmd: command, pid: command.Process.Pid, done: make(chan error, 1)}
 	go func() {
 		defer recoverGoroutine("gx-torrent process wait")
 		err := command.Wait()
-		_ = logFile.Close()
+		_ = crashLog.Close()
 		process.done <- err
 		close(process.done)
 	}()
 	return process, nil
+}
+
+// adoptGxProcess follows a daemon started by a previous Gextto run: it is not
+// a child of this process, so its exit is detected by polling the pid.
+func adoptGxProcess(pid int) *gxManagedProcess {
+	process := &gxManagedProcess{pid: pid, done: make(chan error, 1)}
+	go func() {
+		defer recoverGoroutine("gx-torrent adopted process watch")
+		for gxPidAlive(pid) {
+			time.Sleep(2 * time.Second)
+		}
+		process.done <- errors.New("exited")
+		close(process.done)
+	}()
+	return process
+}
+
+func gxPidAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 func (p *gxManagedProcess) wait() error {
@@ -180,29 +308,75 @@ func (p *gxManagedProcess) wait() error {
 // this window is the process killed.
 const managedShutdownGrace = 45 * time.Second
 
-// Close asks the daemon to stop (SIGTERM) and waits for it so rain can save
+// Stop asks the daemon to stop (SIGTERM) and waits for it so rain can save
 // its resume data; it is killed after managedShutdownGrace.
-func (p *gxManagedProcess) Close() error {
+func (p *gxManagedProcess) Stop() error {
 	if p == nil {
 		return nil
 	}
 	p.mu.Lock()
-	if p.closed || p.cmd.Process == nil {
+	if p.closed || p.pid <= 0 {
 		p.mu.Unlock()
 		return nil
 	}
 	p.closed = true
 	p.mu.Unlock()
-	if err := p.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		_ = p.cmd.Process.Kill()
+	if err := syscall.Kill(p.pid, syscall.SIGTERM); err != nil {
+		_ = syscall.Kill(p.pid, syscall.SIGKILL)
 		return err
 	}
 	select {
 	case <-p.done:
 	case <-time.After(managedShutdownGrace):
-		_ = p.cmd.Process.Kill()
+		_ = syscall.Kill(p.pid, syscall.SIGKILL)
 	}
 	return nil
+}
+
+// Detach leaves the daemon running when Gextto exits: the next Gextto start
+// adopts it (same binary and options) instead of restarting every transfer.
+func (p *gxManagedProcess) Detach() {
+	if p == nil {
+		return
+	}
+	p.mu.Lock()
+	p.closed = true
+	p.mu.Unlock()
+}
+
+// gxStopLeftoverDaemon stops a managed gx-torrent left running by a previous
+// Gextto run when another engine is now active: it would hold the peer port
+// and keep transferring outside Gextto's control. A daemon without a
+// fingerprint was not started by Gextto and is left alone.
+func gxStopLeftoverDaemon(cfg *Config) {
+	settings, err := gxTorrentSettingsFromConfig(cfg)
+	if err != nil {
+		return
+	}
+	probe := &gxTorrentEngine{settings: settings, client: &http.Client{Timeout: 2 * time.Second}}
+	probe.settings.Timeout = 2 * time.Second
+	health, ok := probe.health()
+	if !ok || !health.ownedBy(cfg) || !gxPidAlive(health.Pid) {
+		return
+	}
+	logging.Info(fmt.Sprintf("⏹️ Stopping gx-torrent %s: another torrent engine is now active", health.Version))
+	gxStopPid(health.Pid)
+}
+
+// gxStopPid stops a daemon known only by its pid and waits for it to exit.
+func gxStopPid(pid int) {
+	if !gxPidAlive(pid) {
+		return
+	}
+	_ = syscall.Kill(pid, syscall.SIGTERM)
+	deadline := time.Now().Add(managedShutdownGrace)
+	for time.Now().Before(deadline) {
+		if !gxPidAlive(pid) {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	_ = syscall.Kill(pid, syscall.SIGKILL)
 }
 
 // gxCrashBudget records the failed life cycles of the managed daemon and
@@ -242,6 +416,10 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 	fallbackToLibtorrent := func() {
 		logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
 			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
+		e.processMu.Lock()
+		process := e.process
+		e.processMu.Unlock()
+		_ = process.Stop()
 		if saveErr := SaveSetting(e.settings.dataDir, "torrent_backend", BackendEmbedded); saveErr != nil {
 			logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
 		}
@@ -302,7 +480,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		closed = e.closed
 		e.processMu.Unlock()
 		if closed {
-			_ = restarted.Close()
+			_ = restarted.Stop()
 			return
 		}
 		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", budget.len())
@@ -424,34 +602,35 @@ func gxIPFilterPath(cfg *Config) string {
 // (gzip/zip decoded); a local path is left to gxIPFilterPath. `force` downloads
 // even when the cached file is recent: it is used at service boot, so the daemon
 // always starts with a fresh list; a later supervisor restart reuses the file.
-func gxEnsureIPFilter(cfg *Config, force bool) {
+func gxEnsureIPFilter(cfg *Config, force bool) bool {
 	if cfg == nil {
-		return
+		return false
 	}
 	target := strings.TrimSpace(cfg.Libtorrent.IpFilterPath)
 	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		return
+		return false
 	}
 	path := filepath.Join(cfg.DataDir, "ipfilter.dat")
 	if !force {
 		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < 24*time.Hour {
-			return
+			return false
 		}
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		logging.Warn("cannot create the data directory for the IP filter", "error", err)
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	data, errMessage := gh7_fetch_ipfilter(ctx, target)
 	if errMessage != "" {
 		logging.Warn("IP filter download failed; keeping the previous list", "url", target, "error", errMessage)
-		return
+		return false
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		logging.Warn("cannot store the IP filter", "path", path, "error", err)
-		return
+		return false
 	}
 	logging.Info("IP filter updated", "path", path, "bytes", len(data))
+	return true
 }

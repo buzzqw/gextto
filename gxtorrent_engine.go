@@ -152,19 +152,33 @@ func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
 		previous:       map[string]models.TorrentView{},
 		pendingMoves:   map[string]string{},
 	}
-	alreadyRunning := engine.ping()
-	if settings.Managed && !alreadyRunning {
-		// Service boot: refresh the IP filter before the daemon starts, so it
-		// always begins with a fresh list (a supervisor restart reuses it).
-		gxEnsureIPFilter(cfg, true)
-		process, err := startManagedGxTorrent(cfg, settings)
-		if err != nil {
-			return nil, err
+	health, alreadyRunning := engine.health()
+	if settings.Managed && (!alreadyRunning || health.ownedBy(cfg)) {
+		if alreadyRunning {
+			engine.adoptOrReplace(cfg, health)
+			engine.processMu.Lock()
+			adopted := engine.process != nil
+			engine.processMu.Unlock()
+			alreadyRunning = adopted
+			if adopted {
+				go engine.superviseManagedProcess()
+			}
 		}
-		engine.process = process
-		go engine.superviseManagedProcess()
-		engine.waitReady(15 * time.Second)
-	} else if alreadyRunning {
+		if !alreadyRunning {
+			// Fresh start: refresh the IP filter first, so the daemon begins
+			// with a fresh list (a supervisor restart reuses it).
+			gxEnsureIPFilter(cfg, true)
+			process, err := startManagedGxTorrent(cfg, settings)
+			if err != nil {
+				return nil, err
+			}
+			engine.process = process
+			go engine.superviseManagedProcess()
+			engine.waitReady(15 * time.Second)
+		}
+		return engine, nil
+	}
+	if alreadyRunning {
 		// A gx-torrent already runs (e.g. an operator-managed service): refresh
 		// and reload the IP filter for it too, so boot starts from a fresh list.
 		gxEnsureIPFilter(cfg, true)
@@ -264,6 +278,59 @@ func (e *gxTorrentEngine) action(hash, action string, form url.Values) error {
 		form = url.Values{}
 	}
 	return e.postForm("/api/v1/torrents/"+url.PathEscape(hash)+"/"+action, form)
+}
+
+// gxHealth is the daemon's /api/v1/health answer.
+type gxHealth struct {
+	OK          bool   `json:"ok"`
+	Version     string `json:"version"`
+	Pid         int    `json:"pid"`
+	Fingerprint string `json:"fingerprint"`
+	DataDir     string `json:"data_dir"`
+}
+
+// ownedBy reports whether this daemon is the one Gextto manages for cfg: it
+// carries a fingerprint and uses Gextto's own state directory. Any other
+// daemon answering on the URL is never adopted or stopped.
+func (h gxHealth) ownedBy(cfg *Config) bool {
+	if h.Fingerprint == "" || h.DataDir == "" || cfg == nil {
+		return false
+	}
+	return SamePath(h.DataDir, filepath.Join(cfg.DataDir, "gx-torrent"))
+}
+
+func (e *gxTorrentEngine) health() (gxHealth, bool) {
+	var health gxHealth
+	if err := e.do(http.MethodGet, "/api/v1/health", nil, "", &health); err != nil {
+		return health, false
+	}
+	return health, health.OK
+}
+
+// adoptOrReplace handles a managed daemon left running by a previous Gextto
+// run. Started with the same binary and options, it is adopted as it is: its
+// peers, queue and transfers carry on. Otherwise (Gextto or gx-torrent was
+// updated, a network option changed) it is stopped so a fresh one starts.
+func (e *gxTorrentEngine) adoptOrReplace(cfg *Config, health gxHealth) {
+	spec, err := buildManagedGxCommand(cfg, e.settings)
+	if err != nil {
+		logging.Debug("gx-torrent fingerprint unavailable", "error", err.Error())
+		return
+	}
+	if health.Fingerprint == spec.fingerprint && gxPidAlive(health.Pid) {
+		e.process = adoptGxProcess(health.Pid)
+		logging.Info(fmt.Sprintf("🔗 gx-torrent %s was already running: kept as it is, transfers were not interrupted", health.Version))
+		if gxEnsureIPFilter(cfg, false) {
+			if path := gxIPFilterPath(cfg); path != "" {
+				if _, err := e.LoadIPFilter(path); err != nil {
+					logging.Debug("gx-torrent IP filter reload skipped", "error", err.Error())
+				}
+			}
+		}
+		return
+	}
+	logging.Info(fmt.Sprintf("🔄 Restarting gx-torrent %s: its program or settings changed", health.Version))
+	gxStopPid(health.Pid)
 }
 
 func (e *gxTorrentEngine) ping() bool {
@@ -926,6 +993,14 @@ func (e *gxTorrentEngine) MoveStorage(hash, destination string) (bool, error) {
 	if view, ok := e.cachedState(hash); ok && SamePath(view.SavePath, destination) {
 		return false, nil
 	}
+	e.mu.Lock()
+	pending, moving := e.pendingMoves[hash]
+	e.mu.Unlock()
+	if moving && SamePath(pending, destination) {
+		// The same move is already running (the metadata handler and the RAM
+		// disk reconciliation can both ask for it): same answer as the daemon.
+		return false, errors.New("gx-torrent: the torrent is already being moved")
+	}
 	if err := e.action(hash, "move", url.Values{"destination": {destination}}); err != nil {
 		return false, err
 	}
@@ -951,8 +1026,22 @@ func (e *gxTorrentEngine) AssociateStorage(hash, destination string) (bool, erro
 
 func (e *gxTorrentEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash string) uint64 {
 	var total uint64
-	for _, view := range e.List() {
+	views := e.List()
+	e.mu.Lock()
+	leaving := map[string]bool{}
+	for hash, destination := range e.pendingMoves {
+		if !PathOnRamdisk(destination, ramdisk) {
+			leaving[strings.ToLower(hash)] = true
+		}
+	}
+	e.mu.Unlock()
+	for _, view := range views {
 		if strings.EqualFold(view.Hash, excludeHash) || !PathOnRamdisk(view.SavePath, ramdisk) {
+			continue
+		}
+		// A torrent already being moved off the RAM disk reserves nothing
+		// there: counting it would push other downloads off as well.
+		if view.State == "moving" || leaving[strings.ToLower(view.Hash)] {
 			continue
 		}
 		if remaining := view.TotalSize - view.TotalDone; remaining > 0 {
@@ -1360,9 +1449,9 @@ func (e *gxTorrentEngine) Close() error {
 	}
 	process := e.process
 	e.processMu.Unlock()
-	if process != nil {
-		return process.Close()
-	}
+	// The daemon outlives Gextto: the next start adopts it when nothing
+	// changed, and it stops by itself if Gextto does not come back.
+	process.Detach()
 	return nil
 }
 

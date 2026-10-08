@@ -26,6 +26,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - `gx-torrent` è **sempre avviato e sorvegliato** da Gextto quando è il motore
   attivo (nessuna opzione per disattivarlo). Un demone esterno già in ascolto
   sull'URL viene usato così com'è.
+- Il demone gestito **sopravvive ai riavvii di Gextto** (scope systemd
+  `gextto-gx-torrent-*.scope`): al riavvio Gextto lo riaggancia se binario e
+  opzioni sono uguali (`fingerprint` in `/api/v1/health`), altrimenti lo
+  riavvia. Si ferma da solo dopo 15 minuti senza Gextto. Dettagli in
+  `docs/gx-torrent.md`, *Attivazione*.
 
 ## rain (motore gx-torrent)
 - `third_party/rain` è una **copia vendored** di rain v2.4.2, modulo
@@ -40,7 +45,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 
 ## Build e test
 - `make build` — incrementa `build_number` (non committato) e compila
-  `bin/gexttod` **e** `bin/gx-torrent`. Richiede CGO/libtorrent; i warning di
+  `bin/gexttod` **e** `bin/gx-torrent`; quest'ultimo viene sostituito solo se
+  il suo codice è cambiato (`bin/gx-torrent.code-sha256`,
+  `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Richiede CGO/libtorrent; i warning di
   deprecazione di libtorrent sono normali.
 - `make gx-torrent` — solo il demone (`CGO_ENABLED=0`).
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
@@ -49,15 +56,22 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - `make test` — `check-ui-settings-index` + `installer-selftest` + `go test ./...`.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
 - Test del fork (modulo annidato, non incluso in `./...`):
-  `cd third_party/rain && go test ./internal/blocklist/ ./internal/peerconn/ ./internal/piecepicker/`.
+  `go test github.com/cenkalti/rain/v2/internal/...` dalla root (il modulo
+  annidato da solo non ha un `go.sum` completo), almeno `blocklist`,
+  `peerconn`, `piecepicker`, `bandwidth`, `storage/filestorage`.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 
 ## Servizio in esecuzione su questa macchina
 - È un **servizio systemd utente** (non di sistema): `~/.config/systemd/user/gextto.service`,
   esegue `/home/andres/gextto/bin/gexttod` dal checkout, `GEXTTO_DATA_DIR=/home/andres/gextto-data`,
-  UI su `0.0.0.0:5000`. Il figlio `gx-torrent` lo avvia `gexttod`.
-- Dopo una build: `systemctl --user restart gextto` (niente `sudo`).
+  UI su `0.0.0.0:5000`. `gx-torrent` lo avvia `gexttod`, in uno scope systemd
+  separato che resta vivo ai riavvii del servizio.
+- Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
+  `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
+  running: kept as it is"; altrimenti il demone viene riavviato.
+- Log: `gextto-data/gextto.log` e `gextto-data/gx-torrent/gx-torrent.log`
+  (entrambi ruotati a 5 MB × 4); `gx-torrent.crash.log` solo per i crash.
 - Verifica: `systemctl --user status gextto`;
   `curl -s http://127.0.0.1:5000/api/status` (campo `version` = `1.1.<build>`);
   `curl -s http://127.0.0.1:8890/api/v1/health` (demone gx-torrent).

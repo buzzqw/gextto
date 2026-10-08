@@ -48,6 +48,9 @@ func alternativeBackendActive(cfg *Config) bool {
 // embedded libtorrent adapter. The second return value is a human-readable
 // note (empty on the happy path), and an error means activation was refused.
 func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
+	if TorrentBackendName(cfg) != BackendGxTorrent {
+		gxStopLeftoverDaemon(cfg)
+	}
 	switch TorrentBackendName(cfg) {
 	case BackendQbittorrent:
 		settings, err := qbittorrentSettingsFromConfig(cfg)

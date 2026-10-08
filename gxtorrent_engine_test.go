@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -593,4 +594,80 @@ func TestGxMirrorsPreexistingTorrentCopy(t *testing.T) {
 	if string(got) != string(content) {
 		t.Fatalf("mirrored copy differs from the source")
 	}
+}
+
+func TestGxFingerprintTracksBinaryAndOptions(t *testing.T) {
+	dir := t.TempDir()
+	binary := filepath.Join(dir, "gx-torrent")
+	if err := os.WriteFile(binary, []byte("v1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base, err := gxFingerprint(binary, []string{"-listen", "0.0.0.0:8890"}, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	same, _ := gxFingerprint(binary, []string{"-listen", "0.0.0.0:8890"}, "", "")
+	if base != same {
+		t.Fatal("same binary and options must give the same fingerprint")
+	}
+	for name, other := range map[string]func() string{
+		"args": func() string { v, _ := gxFingerprint(binary, []string{"-listen", "127.0.0.1:8890"}, "", ""); return v },
+		"token": func() string {
+			v, _ := gxFingerprint(binary, []string{"-listen", "0.0.0.0:8890"}, "secret", "")
+			return v
+		},
+		"proxy": func() string {
+			v, _ := gxFingerprint(binary, []string{"-listen", "0.0.0.0:8890"}, "", "socks5://x")
+			return v
+		},
+		"binary": func() string {
+			_ = os.WriteFile(binary, []byte("v2"), 0o755)
+			v, _ := gxFingerprint(binary, []string{"-listen", "0.0.0.0:8890"}, "", "")
+			return v
+		},
+	} {
+		if other() == base {
+			t.Fatalf("a different %s must change the fingerprint", name)
+		}
+	}
+	if strings.Contains(base, "secret") {
+		t.Fatal("the fingerprint must not carry secrets in clear")
+	}
+}
+
+func TestGxHealthOwnedOnlyBySameDataDir(t *testing.T) {
+	cfg := &Config{DataDir: t.TempDir()}
+	own := gxHealth{OK: true, Fingerprint: "abc", DataDir: filepath.Join(cfg.DataDir, "gx-torrent")}
+	if !own.ownedBy(cfg) {
+		t.Fatal("the daemon of this data directory is Gextto's")
+	}
+	if (gxHealth{OK: true, Fingerprint: "abc", DataDir: "/srv/other/gx-torrent"}).ownedBy(cfg) {
+		t.Fatal("a daemon of another data directory must never be adopted or stopped")
+	}
+	if (gxHealth{OK: true, DataDir: own.DataDir}).ownedBy(cfg) {
+		t.Fatal("a daemon without fingerprint was not started by Gextto")
+	}
+}
+
+func TestAdoptedGxProcessDetectsExitAndStops(t *testing.T) {
+	sleeper := exec.Command("sleep", "30")
+	if err := sleeper.Start(); err != nil {
+		t.Skip("sleep unavailable")
+	}
+	go func() { _ = sleeper.Wait() }()
+	process := adoptGxProcess(sleeper.Process.Pid)
+	if !gxPidAlive(process.pid) {
+		t.Fatal("adopted process must be alive")
+	}
+	done := make(chan struct{})
+	go func() { _ = process.wait(); close(done) }()
+	if err := process.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the exit of an adopted process was not detected")
+	}
+	process.Detach() // no-op after Stop
 }

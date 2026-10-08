@@ -1400,6 +1400,12 @@ func bg_torrentNeedsArchiveImport(cfg *Config, db *Database, torrent *models.Tor
 	return true
 }
 
+// tev_moveAlreadyRunning recognises the engine refusing a move because the
+// same torrent is already being moved: the relocation is under way, not failed.
+func tev_moveAlreadyRunning(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "already being moved")
+}
+
 // tev_ramdiskRelocation implements `ramdisk_relocation`. It returns the reason and
 // destination when a torrent currently on the RAM disk should move to disk.
 func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath string) (string, string, bool) {
@@ -1463,7 +1469,9 @@ func tev_enforceRamdiskCapacity(cfg *Config, torrents TorrentSession, event *mod
 		return
 	}
 	moved, err := torrents.MoveStorage(event.Hash, destination)
-	if err != nil {
+	if err != nil && tev_moveAlreadyRunning(err) {
+		logging.Debug("RAM disk relocation: move already in progress", "name", event.Name)
+	} else if err != nil {
 		logging.Warn("RAM disk relocation failed",
 			"hash", event.Hash, "name", event.Name, "error", err.Error())
 	} else if moved {
@@ -1661,7 +1669,9 @@ func ReconcileRamdisk(cfg *Config, torrents TorrentSession, attempts map[string]
 		attempts[hash] = now
 		moved++
 		value, err := torrents.MoveStorage(hash, destination)
-		if err != nil {
+		if err != nil && tev_moveAlreadyRunning(err) {
+			logging.Debug("RAM disk reconciliation: move already in progress", "name", torrent.Name)
+		} else if err != nil {
 			logging.Warn("RAM disk reconciliation failed",
 				"hash", hash, "name", torrent.Name, "error", err.Error())
 		} else if value {

@@ -39,10 +39,26 @@ Codice:
 3. Gextto **avvia sempre e sorveglia** il demone quando gx-torrent è il motore
    attivo:
    - dati in `DATA_DIR/gx-torrent`;
-   - log in `DATA_DIR/gx-torrent/gx-torrent.log`;
+   - log in `DATA_DIR/gx-torrent/gx-torrent.log`, scritto dal demone stesso e
+     ruotato a 5 MB tenendo 4 file; gli errori dei singoli peer (handshake
+     scaduti, reset) e degli announce falliti sono a livello debug;
    - cartella di scarico predefinita uguale a quella di libtorrent;
-   - il demone viene riavviato se si chiude e fermato con SIGTERM all'uscita,
-     con 45 secondi di grazia prima del `Kill()` (rain salva i resume data);
+   - il demone viene riavviato se si chiude;
+   - **resta acceso quando Gextto si riavvia** (ad esempio per un
+     aggiornamento): sotto systemd parte in uno scope proprio
+     (`gextto-gx-torrent-*.scope`), quindi l'arresto del servizio non lo tocca.
+     Al riavvio Gextto lo riaggancia se ha lo stesso binario e le stesse
+     opzioni (`fingerprint` in `/api/v1/health`): peer, coda e trasferimenti
+     proseguono senza interruzioni. Se il binario o un'opzione di avvio sono
+     cambiati, Gextto lo ferma con SIGTERM (45 secondi di grazia, rain salva i
+     resume data) e ne avvia uno nuovo. `make build` sostituisce
+     `bin/gx-torrent` solo se il suo codice è cambiato
+     (`bin/gx-torrent.code-sha256`), così un aggiornamento che tocca solo
+     gexttod non ferma i download;
+   - se Gextto non torna, il demone si ferma da solo dopo 15 minuti senza
+     richieste (`-orphan-timeout`); se il motore attivo non è più gx-torrent,
+     Gextto all'avvio ferma il demone rimasto acceso. Gextto riaggancia o
+     ferma solo un demone con la propria cartella dati;
    - dopo 6 avvii/arresti anomali in 10 minuti Gextto smette di riprovare e
      torna a libtorrent. Uno spegnimento pulito (riavvio di Gextto o del
      servizio, ad esempio per un aggiornamento) non conta: il budget considera
@@ -91,7 +107,12 @@ qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
   date, copia magnet, esporta `.torrent`, pin, sposta, limiti seed), *File*
   (scarica/salta), *Peer* (flag di connessione, trasporto, cifratura),
   *Tracker* (stato, sciame, aggiunta).
-- **Filtro IP** da URL o file.
+- **Filtro IP** da URL o file; il campo è precompilato con il filtro
+  configurato in Gextto.
+- **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette
+  solo quando apri la scheda o premi *Ricarica*, con filtro testuale, DEBUG
+  nascosti di default e avvisi/errori colorati. Mentre è aperta la tabella
+  torrent non si aggiorna.
 - Scorciatoie: `/` per cercare, `Esc` per chiudere il dettaglio.
 
 Il comando definitivo resta comunque Gextto; la pagina è una comodità per
@@ -106,7 +127,7 @@ tenere pagina e API solo su questo server imposta `gxtorrent_listen =
 
 Un ascolto non loopback richiede `gxtorrent_token`: senza token Gextto avvia il
 demone con `-insecure` (coerente con la LAN fidata di default di Gextto) e lo
-segnala con un avviso nel log. Se è impostato `gxtorrent_token`, la pagina lo
+annota nel log a livello debug. Se è impostato `gxtorrent_token`, la pagina lo
 chiede al primo accesso (accetta anche `?token=…`) e lo ricorda in un cookie;
 l'API resta protetta come prima.
 
@@ -305,8 +326,8 @@ usare valori fissi.
   - Tetti: scrittura 96 MB–1,5 GB, lettura 32–512 MB, mai oltre 1/4 della RAM e
     1/8 della memoria disponibile.
   - **Isteresi**: si riapplica solo se il target cambia di oltre il 25%, al
-    massimo una volta ogni 10 minuti, perché rain legge la cache solo alla
-    creazione della sessione (un cambio = riapertura sessione).
+    massimo una volta ogni 10 minuti. Il fork di rain ridimensiona read cache e
+    buffer di scrittura sulla sessione in corso: nessuna riapertura.
   - rain non ha una cache write-back: il valore è un **tetto sui pezzi in volo**,
     e la cache di scrittura/coalescing vera la fa il kernel. La policy serve
     soprattutto a non sovra-dimensionare quando il carico è basso e a dare più
@@ -315,11 +336,13 @@ usare valori fissi.
   (blocchi da 16 KiB) vale per lettura e scrittura e la policy adattiva tace.
 - **`libtorrent_cache_expiry`**: dopo quanto scade un blocco in cache.
 - **`libtorrent_preallocate`**: i file nuovi vengono riservati per intero con
-  `fallocate`; i file esclusi dalla selezione restano sparsi.
+  `fallocate`; i file esclusi dalla selezione restano sparsi, e su tmpfs (RAM
+  disk) restano sparsi sempre: riservarli toglierebbe subito tutta la loro
+  dimensione alla RAM.
 - **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico e
   la applica subito.
-- Un cambio di questi valori riapre la sessione del demone, come per i limiti
-  di velocità.
+- La dimensione della cache cambia a caldo; scadenza della cache e
+  preallocazione invece riaprono la sessione del demone.
 - Il pannello Salute e `GET /api/v1/stats` mostrano la cache effettiva, il
   target scelto (`cache_read_mb`, `cache_write_mb`), il **motivo**
   (`cache_reason`), la classe storage (`cache_storage`) e la memoria
@@ -331,6 +354,13 @@ Il flusso RAM disk di gextto (scaricare su tmpfs e spostare quando non c'è
 più spazio o a fine download) funziona: lo spostamento tra filesystem diversi
 copia i file e riparte dal punto in cui era. È provato da un test che sposta
 un download al 20% da `/dev/shm` al disco.
+
+- Un torrent in download che non ha ancora nessun pezzo verificato viene
+  spostato senza copiare i suoi file vuoti: vengono ricreati nella
+  destinazione, senza scrivere gigabyte di zeri sul NAS e senza il controllo
+  completo che rain farebbe trovando file già presenti.
+- Lo spazio "riservato" sul RAM disk non conta i torrent che ne stanno già
+  uscendo.
 
 ## Layout su disco e sicurezza dei dati
 
@@ -454,15 +484,12 @@ poi spostamento o rimozione.
 
 ## Limiti di banda
 
-rain legge i limiti globali solo alla creazione della sessione. Quando Gextto
-cambia i limiti (programmazione, limite temporaneo), il demone riapre la
-sessione:
-
-- in un momento senza spostamenti in corso;
-- solo se i valori cambiano davvero (Gextto invia la configurazione solo quando
-  cambia);
-- i torrent riprendono esattamente come prima, grazie al flag "started" di rain
-  e allo stato del demone.
+I limiti globali cambiano a caldo (programmazione, limite temporaneo): il fork
+di rain usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
+quindi nessuna riapertura della sessione e nessun peer perso. Gextto invia la
+configurazione solo quando cambia. Riaprono la sessione solo i limiti di peer
+(`max_peer_dial`/`max_peer_accept`), la scadenza della cache e la
+preallocazione.
 
 ## REST API (v1)
 
