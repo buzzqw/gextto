@@ -784,9 +784,13 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 	// SxxExx singolo, NxNN, data (YYYY-MM-DD), stagione completa.
 	rangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})[-–]e?(\d{1,4})(?:[ ._-]|$)`)
 	multiRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})((?:e\d{1,4}){2,})(?:[ ._-]|$)`)
-	standardRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})e(\d{1,4})(?:[ ._-]|$)`)
+	// Season and episode markers may be separated by a dot or a space
+	// ("S01.E01", "S01 E01"), not only glued ("S01E01").
+	standardRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+s(\d{1,4})[ ._-]?e(\d{1,4})(?:[ ._-]|$)`)
 	nxRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})(?:[ ._-]|$)`)
+	nxRangeRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{1,2})x(\d{1,4})[-–](?:\d{1,2}x|x)?(\d{1,4})(?:[ ._-]|$)`)
 	itaRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+stagione[ ._-]*(\d{1,2})[ ._-]+(?:episodio|puntata|ep\.?)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
+	englishRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+season[ ._-]*(\d{1,2})[ ._-]+(?:episode|ep)[ ._-]*(\d{1,4})(?:[ ._-]|$)`)
 	dateRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ ._-]|$)`)
 	seasonPackRe := utils.MustCachedRegex(`(?i)^(.+?)[ ._-]+(?:stagione[ ._-]*|season[ ._-]?|s)(\d{1,2})(?:[ ._-]+(?:complete|completa))?(?:[ ._-]|$)`)
 	seriesName := func(capture []string) *string {
@@ -865,6 +869,27 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 		season = &seasonValue
 		episode = &episodeValue
 		episodeRange = []int64{episodeValue}
+	} else if capture := nxRangeRe.FindStringSubmatch(title); capture != nil {
+		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
+		if err != nil {
+			return nil
+		}
+		first, err := strconv.ParseInt(capture[3], 10, 64)
+		if err != nil {
+			return nil
+		}
+		end := first
+		if parsed, err := strconv.ParseInt(capture[4], 10, 64); err == nil && parsed >= first {
+			end = parsed
+		}
+		if seasonValue >= 1 && seasonValue <= 40 && first <= 99 {
+			series = seriesName(capture)
+			season = &seasonValue
+			episode = &first
+			for value := first; value <= end; value++ {
+				episodeRange = append(episodeRange, value)
+			}
+		}
 	} else if capture := nxRe.FindStringSubmatch(title); capture != nil {
 		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
 		if err != nil {
@@ -883,6 +908,19 @@ func ParseReleaseSource(title, magnet string, torrentURL *string, source string,
 			}
 		}
 	} else if capture := itaRe.FindStringSubmatch(title); capture != nil {
+		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
+		if err != nil {
+			return nil
+		}
+		episodeValue, err := strconv.ParseInt(capture[3], 10, 64)
+		if err != nil {
+			return nil
+		}
+		series = seriesName(capture)
+		season = &seasonValue
+		episode = &episodeValue
+		episodeRange = []int64{episodeValue}
+	} else if capture := englishRe.FindStringSubmatch(title); capture != nil {
 		seasonValue, err := strconv.ParseInt(capture[2], 10, 64)
 		if err != nil {
 			return nil
