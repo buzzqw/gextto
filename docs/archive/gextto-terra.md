@@ -33,7 +33,7 @@ la correttezza delle decisioni o la compatibilità di build.
 
 ## 1. Limitare l'esposizione del listener motore
 
-**Evidenza.** In [`web_serve.go`](../web_serve.go), `Serve` crea `webListener` e
+**Evidenza.** In [`web_serve.go`](../../web_serve.go), `Serve` crea `webListener` e
 `engineListener`, ma assegna a entrambi lo stesso `Router(state)` (righe
 174–238). La porta `EngineListen` serve quindi UI e tutte le API, non solo una
 superficie interna del motore.
@@ -53,7 +53,7 @@ esplicita per entrambi gli indirizzi.
 
 ## 2. Applicare un budget di concorrenza agli indexer
 
-**Evidenza.** In [`engine.go`](../engine.go), `searchOneWithDB` avvia una goroutine
+**Evidenza.** In [`engine.go`](../../engine.go), `searchOneWithDB` avvia una goroutine
 per ogni indexer abilitato (righe 411–438), senza semaforo. Il ciclo limita a due
 le ricerche di titoli, ma ogni ricerca può interrogare contemporaneamente tutti
 gli indexer configurati.
@@ -71,9 +71,9 @@ in timeout per provider.
 
 ## 3. Chiudere i worker senza una finestra di gara nativa
 
-**Evidenza.** `stopBackgroundWorkers` in [`web_serve.go`](../web_serve.go) attende
+**Evidenza.** `stopBackgroundWorkers` in [`web_serve.go`](../../web_serve.go) attende
 al massimo 15 secondi (righe 112–129), quindi prosegue anche se un ciclo è ancora
-in corso. Il chiamante in [`cmd/gexttod/main.go`](../cmd/gexttod/main.go) arresta poi
+in corso. Il chiamante in [`cmd/gexttod/main.go`](../../cmd/gexttod/main.go) arresta poi
 backend e sessione libtorrent.
 
 **Impatto.** Cancellazione e lock sono già gestiti con cura, ma una operazione
@@ -91,7 +91,7 @@ avvenire dopo l'inizio della sua chiusura.
 ## 4. Spostare l'indicizzazione dell'archivio fuori dal ciclo critico
 
 **Evidenza.** `RunCycleDomain` chiama `IndexArchive` per ogni serie non ancora
-in cache nel ciclo ([`orchestrator.go`](../orchestrator.go), righe 806–829). La cache
+in cache nel ciclo ([`orchestrator.go`](../../orchestrator.go), righe 806–829). La cache
 evita duplicati nello stesso ciclo, ma una libreria NAS grande può essere riletta
 ad ogni ciclo.
 
@@ -110,7 +110,7 @@ di upgrade devono restare identiche a quelle con indice ricostruito.
 ## 5. Rendere l'API un contratto verificabile
 
 **Evidenza.** Le route sono registrate manualmente in
-[`web_router.go`](../web_router.go) e `docs/API.md` è una tabella manuale. La
+[`web_router.go`](../../web_router.go) e `docs/API.md` è una tabella manuale. La
 revisione ha trovato due route qBittorrent nel router ma assenti dalla tabella;
 sono ora documentate, ma non esiste un controllo automatico nel repository.
 
@@ -124,7 +124,7 @@ percorso o presenza senza aggiornare la documentazione.
 
 ## 6. Pianificare la compatibilità con le nuove API libtorrent
 
-**Evidenza.** `make test` passa, ma [`libtorrent_bridge.cpp`](../libtorrent_bridge.cpp)
+**Evidenza.** `make test` passa, ma [`libtorrent_bridge.cpp`](../../libtorrent_bridge.cpp)
 genera warning per API deprecate: `half_open_limit`, cache, priorità, campi
 tracker e flag di resume. Il bridge contiene già un commento relativo ai campi
 deprecati in ABI v2.
@@ -138,7 +138,7 @@ trasferimento locale, restore, tracker, limiti e coda.
 
 ## 7. Modularizzare il router senza cambiare il contratto
 
-**Evidenza.** [`web_router.go`](../web_router.go) registra centinaia di route in una
+**Evidenza.** [`web_router.go`](../../web_router.go) registra centinaia di route in una
 funzione, mentre gli handler sono già divisi per aree in più file.
 
 **Proposta.** Introdurre registri per dominio (`registerTorrentRoutes`,

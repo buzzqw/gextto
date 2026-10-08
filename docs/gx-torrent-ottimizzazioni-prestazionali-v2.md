@@ -1,7 +1,8 @@
 # gx-torrent — Ottimizzazioni prestazionali, versione 2 (piano di lavoro)
 
-Sostituisce e riordina `docs/gx-torrent-ottimizzazioni-prestazionali.md`. Quella
-versione conteneva diagnosi in gran parte corrette come lettura del codice, ma
+Sostituisce e riordina la versione 1 dell'analisi prestazionale (rimossa dalla
+pulizia della documentazione dell'08-10-2026). Quella versione conteneva
+diagnosi in gran parte corrette come lettura del codice, ma
 con tre difetti: non distingueva il codice upstream rain v2.4.2 da quello del
 fork, presentava benchmark non riproducibili (nessuna funzione `Benchmark*`
 esiste nel repo) e ordinava per priorità interventi irrilevanti o rischiosi.
