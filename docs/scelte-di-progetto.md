@@ -81,3 +81,53 @@ regex/score come `*arr`. Sceglie invece:
 Motivo: i profili sono la parte più complessa — e più configurata male — del
 modello `*arr`. Una politica unica ben spiegata più il controllo per-titolo copre
 gli stessi bisogni con molta meno superficie.
+
+## Confronto con Sonarr/Radarr
+
+Non esiste un "migliore" in assoluto: sono strumenti con confini diversi. Questa
+è la fotografia onesta (2026-10).
+
+### Dove Sonarr/Radarr sono oggettivamente avanti
+
+- **Profili di qualità e custom format.** Scoring di risoluzione, sorgente, tipo
+  di release e release group, con "upgrade until"/cutoff e delay profile. Gextto
+  ha una politica unica più override per-titolo: più semplice, ma meno potente.
+- **Gestione indexer nativa.** Definizioni pronte per centinaia di tracker,
+  priorità e categorie per indexer, limiti. Gextto si appoggia a Torznab/RSS e a
+  un gestore esterno (Prowlarr/Jackett).
+- **Usenet.** SABnzbd/NZBGet oltre ai torrent. Gextto è torrent, HTTP e web seed
+  soltanto.
+- **Maturità di import e rinomina.** Multi-episodio, specials, anime a
+  numerazione assoluta, daily, import manuale con UI di matching e sostituzione.
+  Gextto copre molto, ma con meno anni di casi limite assorbiti.
+- **Ecosistema e API.** `/api/v3` è consumata da Overseerr/Jellyseerr e da altri
+  strumenti; Gextto non la espone (non-goal esplicito). Attorno a *arr esiste un
+  contorno (Bazarr per i sottotitoli, ecc.) che Gextto non copre.
+- **Notifiche.** Molti provider (Discord, Slack, Pushover, Gotify, ntfy, …).
+  Gextto ha Telegram, webhook ed email.
+- **Import di librerie esistenti.** Flusso consolidato; Gextto lo ha solo
+  parziale.
+- **Community, wiki, immagini Docker, cadenza di aggiornamento.** Maturità
+  difficile da replicare.
+
+### Dove Gextto è avanti (o almeno pari)
+
+- **Tutto in uno.** Serie, film e **fumetti** (che *arr non fanno) in un solo
+  demone: niente Prowlarr + qBittorrent + Mylar/Kapowarr separati.
+- **Motore torrent integrato.** Nessun client esterno: `gx-torrent` in puro Go,
+  libtorrent oppure qBittorrent-nox.
+- **Spiegabilità.** L'API di spiegazione del release dice perché è stato
+  accettato, rifiutato o preferito.
+- **Ricerca anche da motori web**, non solo dagli indexer.
+- **Leggerezza.** Un binario Go e SQLite; *arr girano su .NET.
+- **Semplicità.** Meno superficie di configurazione, con health, backup e
+  manutenzione integrati.
+
+### Verdetto
+
+Sonarr/Radarr restano **migliori** dove contano la potenza di selezione (profili
+e custom format), gli indexer nativi, l'usenet, i casi limite di import e
+l'ecosistema/API. Gextto è **migliore** su scope unico (fumetti inclusi), motore
+integrato, spiegabilità, footprint e semplicità. Presentarlo quindi come
+**alternativa per installazioni nuove** — senza rivendicare parità — è la
+posizione corretta, non una scusa.
