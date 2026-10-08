@@ -19,8 +19,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/cenkalti/rain/v2/torrent"
 )
 
 const (
@@ -102,20 +100,20 @@ func (s *lsdService) message(hashes []string) []byte {
 	return b.Bytes()
 }
 
-// dueHashes lists the running public torrents to announce now.
+// dueHashes lists the running public torrents to announce now. It reads the
+// lock-free snapshot (gextto fork): taking d.mu and calling t.Stats() here
+// would block the whole daemon on a torrent run loop stuck on storage I/O.
 func (s *lsdService) dueHashes(now time.Time) []string {
-	s.d.mu.Lock()
 	var running []string
-	if s.d.session != nil {
-		for _, t := range s.d.session.ListTorrents() {
-			stats := t.Stats()
-			if stats.Private || stats.Status == torrent.Stopped || stats.Status == torrent.Stopping {
-				continue
-			}
-			running = append(running, t.InfoHash().String())
+	for _, v := range s.d.snapshotViews() {
+		if v.Private {
+			continue
+		}
+		switch v.State {
+		case "downloading", "downloading_metadata", "seeding", "checking_files", "moving":
+			running = append(running, v.Hash)
 		}
 	}
-	s.d.mu.Unlock()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
