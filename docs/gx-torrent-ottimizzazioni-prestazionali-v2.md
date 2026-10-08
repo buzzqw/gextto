@@ -12,6 +12,21 @@ per essere processata come singolo task/commit.
 
 ---
 
+## Stato di avanzamento
+
+| # | Voce | Stato | Commit |
+|---|---|---|---|
+| 1 | LSD senza `d.mu` e senza `t.Stats()` | **fatto** | `d2a4060` |
+| 2 | Streaming: `PiecesDone` mirato | **fatto** | `ff2d4bf` |
+| 4 | MSE `StreamWriter` in-place | **fatto** | `5af2ee0` |
+| 5 | `servedRequests` a finestra limitata | **fatto** | `a8b3e77` |
+| 6 | Piece cache: TTL lazy (sharding non fatto, condizionale) | **fatto** | `60b090e` |
+| 7 | `Bitfield.Count` con `math/bits` | **fatto** | `8caf6ad` |
+| 3 | Rimozione `O_SYNC` + invariante di durabilità | rinviato (su richiesta) | — |
+| 8 | Opzionali (`findLocked` O(1), ETag/304) | non fatto: guadagno marginale, rimandato | — |
+
+---
+
 ## 0. Criteri di priorità e regole di ingaggio
 
 Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
