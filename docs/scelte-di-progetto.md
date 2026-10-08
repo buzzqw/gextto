@@ -85,30 +85,49 @@ gli stessi bisogni con molta meno superficie.
 ## Confronto con Sonarr/Radarr
 
 Non esiste un "migliore" in assoluto: sono strumenti con confini diversi. Questa
-è la fotografia onesta (2026-10).
+è la fotografia onesta (2026-10), con per ogni punto la posizione di Gextto.
 
-### Dove Sonarr/Radarr sono oggettivamente avanti
+### Dove Sonarr/Radarr sono avanti
 
-- **Profili di qualità e custom format.** Scoring di risoluzione, sorgente, tipo
-  di release e release group, con "upgrade until"/cutoff e delay profile. Gextto
-  ha una politica unica più override per-titolo: più semplice, ma meno potente.
-- **Gestione indexer nativa.** Definizioni pronte per centinaia di tracker,
-  priorità e categorie per indexer, limiti. Gextto si appoggia a Torznab/RSS e a
-  un gestore esterno (Prowlarr/Jackett).
-- **Usenet.** SABnzbd/NZBGet oltre ai torrent. Gextto è torrent, HTTP e web seed
-  soltanto.
+- **Profili di qualità e custom format.** È il loro punto più forte: score per
+  risoluzione, sorgente, tipo di release e release group (anche via regex),
+  delay profile e profili diversi per serie e film. Gextto ha una politica
+  unica con score, cutoff "upgrade until" e override per-titolo: più facile da
+  capire, meno potente per regole fini.
+  *Fattibilità:* dei **profili nominati** sono un passo medio — la politica
+  globale diventa il profilo "Default" e ogni combinazione distinta di override
+  diventa un profilo generato, quindi la migrazione delle serie e dei film
+  esistenti è automatica. I **custom format** (motore regex di scoring più la
+  sua UI) sono il pezzo costoso e vanno valutati a parte.
 - **Maturità di import e rinomina.** Multi-episodio, specials, anime a
   numerazione assoluta, daily, import manuale con UI di matching e sostituzione.
   Gextto copre molto, ma con meno anni di casi limite assorbiti.
-- **Ecosistema e API.** `/api/v3` è consumata da Overseerr/Jellyseerr e da altri
-  strumenti; Gextto non la espone (non-goal esplicito). Attorno a *arr esiste un
-  contorno (Bazarr per i sottotitoli, ecc.) che Gextto non copre.
-- **Notifiche.** Molti provider (Discord, Slack, Pushover, Gotify, ntfy, …).
+  *Fattibilità:* il codice di Sonarr è pubblico e i suoi test di parsing sono un
+  catalogo di casi limite da cui attingere. Essendo GPLv3 (Gextto è EUPL 1.2) si
+  studia il comportamento e si **reimplementa**, senza copiare codice.
+- **Ecosistema e API.** `/api/v3` è consumata da Overseerr/Jellyseerr e altri
+  strumenti; Gextto non la espone. Attorno a *arr c'è anche un contorno (Bazarr
+  per i sottotitoli, ecc.) che Gextto non copre.
+  *Fattibilità:* la compatibilità completa non è realistica; un **sottoinsieme**
+  sufficiente a Jellyseerr (stato di sistema, root folder, profili, lookup e
+  aggiunta di serie/film) sì, ma presuppone i profili nominati del primo punto.
+- **Notifiche.** Molti provider (Discord, Slack, Pushover, Gotify, ntfy, …);
   Gextto ha Telegram, webhook ed email.
-- **Import di librerie esistenti.** Flusso consolidato; Gextto lo ha solo
-  parziale.
-- **Community, wiki, immagini Docker, cadenza di aggiornamento.** Maturità
-  difficile da replicare.
+  *Fattibilità:* bassa complessità — sono quasi tutti semplici POST HTTP sopra il
+  notifier esistente.
+- **Import di librerie esistenti.** Flusso consolidato in *arr, parziale in
+  Gextto. Non prioritario ora.
+- **Community, wiki, immagini Docker, cadenza di aggiornamento.** Questione di
+  tempo, non di architettura.
+
+### Differenze che sono scelte, non lacune
+
+- **Indexer tramite gestore esterno.** *arr hanno definizioni native per
+  centinaia di tracker; Gextto usa Torznab/RSS e Prowlarr/Jackett. Delegare a un
+  gestore dedicato è una separazione delle responsabilità più pulita e più
+  sicura (credenziali e aggiornamenti dei tracker in un solo posto).
+- **Niente usenet.** *arr supportano SABnzbd/NZBGet; Gextto è torrent, HTTP e web
+  seed. Nel contesto italiano l'usenet è marginale, quindi non è un obiettivo.
 
 ### Dove Gextto è avanti (o almeno pari)
 
@@ -125,9 +144,11 @@ Non esiste un "migliore" in assoluto: sono strumenti con confini diversi. Questa
 
 ### Verdetto
 
-Sonarr/Radarr restano **migliori** dove contano la potenza di selezione (profili
-e custom format), gli indexer nativi, l'usenet, i casi limite di import e
-l'ecosistema/API. Gextto è **migliore** su scope unico (fumetti inclusi), motore
-integrato, spiegabilità, footprint e semplicità. Presentarlo quindi come
-**alternativa per installazioni nuove** — senza rivendicare parità — è la
-posizione corretta, non una scusa.
+Sonarr/Radarr restano **migliori** su potenza di selezione (profili e custom
+format), casi limite di import ed ecosistema/API. Gextto è **migliore** su scope
+unico (fumetti inclusi), motore integrato, spiegabilità, footprint e semplicità.
+Indexer esterni e assenza di usenet sono scelte coerenti con il target, non
+mancanze. Le lacune reali sono colmabili per gradi — notifiche subito, profili
+nominati e casi limite di import poi, API compatibile per ultima — e fino ad
+allora la posizione corretta è **alternativa per installazioni nuove**, senza
+rivendicare parità.
