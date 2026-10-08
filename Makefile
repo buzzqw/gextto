@@ -39,7 +39,8 @@ test-rain:
 		github.com/cenkalti/rain/v2/internal/peerconn \
 		github.com/cenkalti/rain/v2/internal/piecepicker \
 		github.com/cenkalti/rain/v2/internal/storage/filestorage \
-		github.com/cenkalti/rain/v2/internal/unchoker
+		github.com/cenkalti/rain/v2/internal/unchoker \
+		github.com/cenkalti/rain/v2/torrent
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.

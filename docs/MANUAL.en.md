@@ -295,7 +295,8 @@ inferior to the archived file.
 - **Details** tabs: General, Tracker, Content, Peers, Pieces, Limits, Storage;
   includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
   mark-failed, move storage. **General** also offers **Export .torrent**,
-  **Super seeding** and web-seed add/remove; **Tracker** lets you edit the whole
+  **Super seeding** (with gx-torrent it only applies once the torrent is complete
+  and it deliberately lowers the seed's upload) and web-seed add/remove; **Tracker** lets you edit the whole
   list (`tier|url` per line); **Content** sets the **per-file priority**
   (Skip/Normal/High/Maximum). **Pieces** shows the piece map (green have, yellow
   downloading, grey missing, dimmed skipped) on engines that expose it

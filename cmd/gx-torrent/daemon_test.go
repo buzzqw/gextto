@@ -1489,3 +1489,77 @@ func TestDaemonUIWebSeedsAndTrackerRemoval(t *testing.T) {
 	post("/ui/webseeds", "hash="+hash+"&remove=1&urls="+url.QueryEscape(seedURL))
 	waitFor(t, "webseed removed", func() bool { return len(webseeds()) == 0 })
 }
+
+// TestDaemonSuperSeedingOptionAndAction checks the per-add super-seeding option
+// and the runtime toggle through the API and the daemon's own web page.
+func TestDaemonSuperSeedingOptionAndAction(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "payload.bin", 50_000)
+	hash, existing, err := d.add(addRequest{TorrentData: data, Destination: src, SuperSeeding: true, SeedRatio: -1, SeedDays: -1})
+	if err != nil || existing {
+		t.Fatalf("add: %v existing=%v", err, existing)
+	}
+	if info, _ := findInfo(d, hash); !info.SuperSeeding {
+		t.Fatalf("super-seeding not reported at add: %+v", info)
+	}
+
+	// Runtime toggle through the internal action.
+	if err := d.setSuperSeeding(hash, false); err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := findInfo(d, hash); info.SuperSeeding {
+		t.Fatal("super-seeding still reported after disabling")
+	}
+
+	// And through the daemon's own web page.
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+	resp, err := http.Post(srv.URL+"/ui/super-seeding", "application/x-www-form-urlencoded", strings.NewReader("hash="+hash+"&enabled=1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if info, _ := findInfo(d, hash); !info.SuperSeeding {
+		t.Fatal("super-seeding not enabled from the web page")
+	}
+}
+
+// TestSuperSeedingTransfer checks that a leecher fully downloads from a seed in
+// super-seeding mode: the seed advertises a couple of pieces at a time and only
+// serves those, so completing proves the advertised pieces cycle correctly.
+func TestSuperSeedingTransfer(t *testing.T) {
+	lsdTick = 200 * time.Millisecond
+	// On one machine the sender is this host's own address, which rain ignores
+	// as itself: dial loopback instead.
+	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
+	defer func() {
+		lsdTick = lsdTickDefault
+		lsdPeerHost = func(ip net.IP) string { return ip.String() }
+	}()
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43500, PortEnd: 43599, Encryption: 1, LSD: true})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43600, PortEnd: 43699, Encryption: 1, LSD: true})
+	waitFor(t, "LSD started", func() bool {
+		seeder.mu.Lock()
+		defer seeder.mu.Unlock()
+		return seeder.lsd != nil || seeder.lsdError != ""
+	})
+	if seeder.lsdError != "" {
+		t.Skipf("multicast not available here: %s", seeder.lsdError)
+	}
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "seed.bin", 300_000)
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src, SuperSeeding: true, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+	dst := filepath.Join(t.TempDir(), "dst")
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "download from a super-seeding peer", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+}

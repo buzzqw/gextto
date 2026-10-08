@@ -1311,11 +1311,11 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 	switch backend {
 	case BackendGxTorrent:
 		return v2DetailCaps{
-			Backend: "gx-torrent", WebSeeds: true, Pieces: true, RateLimits: true, Connections: true,
+			Backend: "gx-torrent", SuperSeeding: true, WebSeeds: true, Pieces: true, RateLimits: true, Connections: true,
 			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
 			LimitsNote:  "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato.",
 			TrackerNote: "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.",
-			GeneralNote: "Con gx-torrent non sono disponibili: super-seeding e upload/share mode. Il download sequenziale e la prima/ultima parte si attivano anche a caldo.",
+			GeneralNote: "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale, la prima/ultima parte e il super-seeding (BEP 16) si attivano anche a caldo; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed.",
 		}
 	case BackendQbittorrent:
 		return v2DetailCaps{

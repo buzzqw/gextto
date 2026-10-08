@@ -520,6 +520,28 @@ demone e riportati nella lista (`-1` = globale, `0` = infinito). Li applica
 `EnforceSeedPolicy` di Gextto, come per gli altri motori: pausa a fine seed,
 poi spostamento o rimozione.
 
+## Super-seeding (BEP 16)
+
+Su un torrent **completato** si può attivare il super-seeding: il motore non
+annuncia l'intero bitfield, ma **un pezzo alla volta** per peer, e serve solo i
+pezzi offerti a quel peer. Serve per il *seeding iniziale*: spinge lo sciame a
+scambiarsi i dati invece di scaricarli tutti dal seed, al prezzo di un upload del
+seed **volutamente più basso**.
+
+- `POST /api/v1/torrents/{hash}/super-seeding` con `enabled=1/0`, o la casella
+  nella pagina del demone; Gextto lo attiva dal tab **Generale** del dettaglio.
+- Vale solo a torrent completato: attivato prima, entra in funzione al
+  completamento; su un torrent in download o fermo è inerte.
+- È una **strategia di seeding**: non tocca coda, slot, seed policy né limiti di
+  banda. Quando la seed policy di Gextto (ratio/giorni) ferma il torrent, il
+  super-seeding si ferma con lui.
+- Il flag è persistito nel resume del demone, quindi sopravvive a un riavvio.
+- Come libtorrent, `have` e `not-interested` fanno avanzare gli annunci; i pezzi
+  offerti non si ripetono e, quando sono finiti, il peer viene liberato col
+  bitfield pieno.
+
+Gextto segnala la capacità `super_seeding` per gx-torrent (`full`).
+
 ## Scritture sul disco di stato
 
 Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
@@ -564,7 +586,7 @@ token è impostato.
 | `GET /api/v1/health` | stato e versione |
 | `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
-| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
+| `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
@@ -585,6 +607,7 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `trackers` (con `urls`, uno per riga);
 - `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
+- `super-seeding` (con `enabled=1/0`: BEP 16 sul torrent completato);
 - `file-priorities` (con `priorities`, separate da virgola).
 
 Chiavi accettate da `POST /api/v1/config`:
@@ -602,7 +625,7 @@ Le operazioni che rain non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- super-seeding e upload mode;
+- upload mode;
 - torrent solo v2 (vedi sopra);
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 

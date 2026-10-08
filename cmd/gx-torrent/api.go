@@ -58,6 +58,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/trackers", d.handleUITrackers)
 	root.HandleFunc("POST /ui/webseeds", d.handleUIWebSeeds)
 	root.HandleFunc("POST /ui/seed-limits", d.handleUISeedLimits)
+	root.HandleFunc("POST /ui/super-seeding", d.handleUISuperSeeding)
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
 	return root
@@ -155,6 +156,7 @@ func (d *Daemon) handleAdd(w http.ResponseWriter, r *http.Request) {
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
 		FirstLast:      formBool(r, "first_last"),
+		SuperSeeding:   formBool(r, "super_seeding"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})
@@ -190,6 +192,7 @@ func (d *Daemon) handleAddFile(w http.ResponseWriter, r *http.Request) {
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
 		FirstLast:      formBool(r, "first_last"),
+		SuperSeeding:   formBool(r, "super_seeding"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})
@@ -266,6 +269,8 @@ func (d *Daemon) handleAction(w http.ResponseWriter, r *http.Request) {
 			maxUploads = &value
 		}
 		err = d.setConnLimits(hash, maxConnections, maxUploads)
+	case "super-seeding":
+		err = d.setSuperSeeding(hash, formBool(r, "enabled"))
 	case "file-priorities":
 		var priorities []int
 		for _, field := range strings.Split(r.FormValue("priorities"), ",") {

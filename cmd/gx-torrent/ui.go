@@ -179,8 +179,10 @@ type uiDetailData struct {
 	// Per-torrent connection/upload-slot caps (-1 global, 0 unlimited).
 	MaxConnections int64
 	MaxUploads     int64
-	Pinned         bool
-	Private        bool
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	SuperSeeding bool
+	Pinned       bool
+	Private      bool
 
 	PiecesTotal     uint32
 	PiecesHave      uint32
@@ -357,6 +359,7 @@ const uiPageTemplate = `<!doctype html>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
       <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
       <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
+      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
       <button class="primary" type="submit">Add</button>
     </form>
     <form method="post" action="/ui/add-file" enctype="multipart/form-data">
@@ -366,6 +369,7 @@ const uiPageTemplate = `<!doctype html>
       <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
       <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
       <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
+      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
       <button type="submit">Add .torrent</button>
     </form>
     <form method="post" action="/ui/ipfilter">
@@ -597,6 +601,11 @@ const uiDetailTemplate = `{{define "detail"}}
     <label>Seed ratio (-1 global, 0 unlimited)<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
     <label>Seed days (-1 global, 0 unlimited)<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
     <button type="submit">Save limits</button>
+  </form>
+  <form class="form-grid" method="post" action="/ui/super-seeding">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
+    <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="enabled" value="1"{{if .SuperSeeding}} checked{{end}}> Super-seeding (BEP 16)</label>
+    <button type="submit">Save</button>
   </form>
   <form class="form-grid" method="post" action="/ui/webseeds">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
@@ -911,6 +920,7 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
 		FirstLast:      formBool(r, "first_last"),
+		SuperSeeding:   formBool(r, "super_seeding"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	}
@@ -1005,6 +1015,7 @@ func (d *Daemon) handleUIAddFile(w http.ResponseWriter, r *http.Request) {
 		StopAtMetadata: formBool(r, "stop_at_metadata"),
 		Sequential:     formBool(r, "sequential"),
 		FirstLast:      formBool(r, "first_last"),
+		SuperSeeding:   formBool(r, "super_seeding"),
 		SeedRatio:      formFloat(r, "seed_ratio", -1),
 		SeedDays:       formInt(r, "seed_days", -1),
 	})
@@ -1183,6 +1194,24 @@ func (d *Daemon) handleUISeedLimits(w http.ResponseWriter, r *http.Request) {
 		err = d.setConnLimits(hash, &maxConnections, &maxUploads)
 	}
 	d.uiDoneDetail(w, r, hash, "general", "Limits saved", err)
+}
+
+func (d *Daemon) handleUISuperSeeding(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	enabled := formBool(r, "enabled")
+	message := "Super-seeding off"
+	if enabled {
+		message = "Super-seeding on"
+	}
+	err := d.setSuperSeeding(hash, enabled)
+	d.uiDoneDetail(w, r, hash, "general", message, err)
 }
 
 func (d *Daemon) handleUIMove(w http.ResponseWriter, r *http.Request) {
@@ -1463,6 +1492,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	uploadLimit := kibOrInherit(meta.UploadLimitKib)
 	maxConnections := kibOrInherit(meta.MaxConnections)
 	maxUploads := kibOrInherit(meta.MaxUploads)
+	superSeeding := meta.SuperSeeding
 	pinned := meta.Pinned
 	swarmSeeds := meta.SwarmSeeds
 	swarmPeers := meta.SwarmPeers
@@ -1494,7 +1524,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		NumPeers: stats.Peers.Total, NumSeeds: rt.numSeeds, NumComplete: swarmSeeds, NumIncomplete: swarmPeers,
 		SeedRatio: seedRatio, SeedDays: seedDays, Pinned: pinned, Private: stats.Private,
 		DownloadLimitKib: downloadLimit, UploadLimitKib: uploadLimit,
-		MaxConnections: maxConnections, MaxUploads: maxUploads,
+		MaxConnections: maxConnections, MaxUploads: maxUploads, SuperSeeding: superSeeding,
 		PiecesTotal: stats.Pieces.Total, PiecesHave: stats.Pieces.Have, PiecesAvailable: stats.Pieces.Available,
 		PiecesChecked: stats.Pieces.Checked, PieceLength: int64(stats.PieceLength),
 		Wasted: stats.Bytes.Wasted, Allocated: stats.Bytes.Allocated, FileCount: stats.FileCount,

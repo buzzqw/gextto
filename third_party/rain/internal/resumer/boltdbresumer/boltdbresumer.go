@@ -36,6 +36,7 @@ var Keys = struct {
 	CompleteCmdRun    []byte
 	Sequential        []byte
 	FirstLast         []byte
+	SuperSeeding      []byte
 	Version           []byte
 }{
 	InfoHash:          []byte("info_hash"),
@@ -58,6 +59,7 @@ var Keys = struct {
 	CompleteCmdRun:    []byte("complete_cmd_run"),
 	Sequential:        []byte("sequential"),
 	FirstLast:         []byte("first_last"),
+	SuperSeeding:      []byte("super_seeding"),
 	Version:           []byte("version"),
 }
 
@@ -125,6 +127,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.CompleteCmdRun, []byte(strconv.FormatBool(spec.CompleteCmdRun)))
 		_ = b.Put(Keys.Sequential, []byte(strconv.FormatBool(spec.Sequential)))
 		_ = b.Put(Keys.FirstLast, []byte(strconv.FormatBool(spec.FirstLast)))
+		_ = b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(spec.SuperSeeding)))
 		_ = b.Put(Keys.Version, []byte(strconv.Itoa(version)))
 		return nil
 	})
@@ -189,6 +192,13 @@ func (r *Resumer) HandleStopAfterMetadata(torrentID string) error {
 func (r *Resumer) WriteCompleteCmdRun(torrentID string) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.CompleteCmdRun, []byte(strconv.FormatBool(true)))
+	})
+}
+
+// WriteSuperSeeding writes the super-seeding flag of a torrent (gextto fork).
+func (r *Resumer) WriteSuperSeeding(torrentID string, value bool) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		return b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(value)))
 	})
 }
 
@@ -364,6 +374,14 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		value = b.Get(Keys.FirstLast)
 		if value != nil {
 			spec.FirstLast, err = strconv.ParseBool(string(value))
+			if err != nil {
+				return err
+			}
+		}
+
+		value = b.Get(Keys.SuperSeeding)
+		if value != nil {
+			spec.SuperSeeding, err = strconv.ParseBool(string(value))
 			if err != nil {
 				return err
 			}

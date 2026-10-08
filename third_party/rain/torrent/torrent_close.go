@@ -44,6 +44,7 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	delete(t.outgoingPeers, pe)
 	delete(t.peerIDs, pe.ID)
 	delete(t.connectedPeerIPs, pe.IP())
+	delete(t.superSeedPeers, pe)
 	if t.piecePicker != nil {
 		t.piecePicker.HandleDisconnect(pe)
 	}

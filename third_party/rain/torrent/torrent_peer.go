@@ -154,19 +154,10 @@ func (t *torrent) startPeer(
 }
 
 func (t *torrent) sendFirstMessage(p *peer.Peer) {
-	bf := t.bitfield
-	switch {
-	case p.FastEnabled && bf != nil && bf.All():
-		msg := peerprotocol.HaveAllMessage{}
-		p.SendMessage(msg)
-	case p.FastEnabled && (bf == nil || bf.Count() == 0):
-		msg := peerprotocol.HaveNoneMessage{}
-		p.SendMessage(msg)
-	case bf != nil:
-		bitfieldData := make([]byte, len(bf.Bytes()))
-		copy(bitfieldData, bf.Bytes())
-		msg := peerprotocol.BitfieldMessage{Data: bitfieldData}
-		p.SendMessage(&msg)
+	if t.superSeedActive() {
+		t.superSeedStartPeer(p, true)
+	} else {
+		t.sendBitfield(p)
 	}
 	var metadataSize uint32
 	if t.info != nil {
@@ -184,8 +175,29 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 		msg := peerprotocol.PortMessage{Port: t.session.config.DHTPort}
 		p.SendMessage(msg)
 	}
-	if p.FastEnabled && t.pieces != nil {
+	// Super-seeding skips the allowed-fast set (gextto fork), like libtorrent:
+	// it would let a peer grab unadvertised pieces.
+	if p.FastEnabled && t.pieces != nil && !t.superSeedActive() {
 		p.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)
+	}
+}
+
+// sendBitfield advertises our pieces to a peer: have-all/have-none for the fast
+// extension, a plain bitfield otherwise.
+func (t *torrent) sendBitfield(p *peer.Peer) {
+	bf := t.bitfield
+	switch {
+	case p.FastEnabled && bf != nil && bf.All():
+		msg := peerprotocol.HaveAllMessage{}
+		p.SendMessage(msg)
+	case p.FastEnabled && (bf == nil || bf.Count() == 0):
+		msg := peerprotocol.HaveNoneMessage{}
+		p.SendMessage(msg)
+	case bf != nil:
+		bitfieldData := make([]byte, len(bf.Bytes()))
+		copy(bitfieldData, bf.Bytes())
+		msg := peerprotocol.BitfieldMessage{Data: bitfieldData}
+		p.SendMessage(&msg)
 	}
 }
 

@@ -132,6 +132,12 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			break
 		}
 		// pe.Logger().Debug("Peer ", pe.String(), " has piece #", pi.Index)
+		if pe.Bitfield != nil {
+			pe.Bitfield.Set(msg.Index)
+		}
+		if t.superSeedActive() {
+			t.superSeedHandleHave(pe, int32(msg.Index))
+		}
 		if t.piecePicker != nil {
 			t.piecePicker.HandleHave(pe, msg.Index)
 		}
@@ -154,11 +160,17 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			break
 		}
 		pe.Logger().Debugln("Received bitfield:", bf.Hex())
-		if t.piecePicker != nil {
-			for i := uint32(0); i < bf.Len(); i++ {
-				if bf.Test(i) {
-					t.piecePicker.HandleHave(pe, i)
-				}
+		for i := uint32(0); i < bf.Len(); i++ {
+			if !bf.Test(i) {
+				continue
+			}
+			// Track the remote bitfield even when we are a seed and there is
+			// no piece picker (gextto fork); super-seeding needs it.
+			if pe.Bitfield != nil {
+				pe.Bitfield.Set(i)
+			}
+			if t.piecePicker != nil {
+				t.piecePicker.HandleHave(pe, i)
 			}
 		}
 		t.updateInterestedState(pe)
@@ -228,6 +240,13 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		t.unchoker.FastUnchoke(pe)
 	case peerprotocol.NotInterestedMessage:
 		pe.PeerInterested = false
+		// A super-seeding peer that downloaded the advertised pieces and has
+		// nothing else to ask for goes "not interested" (it may have skipped the
+		// redundant "have" because it knows the seed already has them): offer it
+		// a new piece so it becomes interested again (gextto fork).
+		if t.superSeedActive() {
+			t.superSeedOfferNext(pe)
+		}
 	case peerprotocol.RequestMessage:
 		if t.pieces == nil || t.bitfield == nil {
 			pe.Logger().Error("request received but we don't have info")
@@ -242,6 +261,12 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		if !validPieceRequest(msg.Begin, msg.Length, t.pieces[msg.Index].Length) {
 			pe.Logger().Errorln("invalid request begin:", msg.Begin, "length:", msg.Length)
 			t.closePeer(pe)
+			break
+		}
+		// While super-seeding we serve only the pieces offered to this peer
+		// (gextto fork).
+		if t.superSeedActive() && !t.superSeedOffered(pe, int32(msg.Index)) {
+			pe.SendMessage(peerprotocol.RejectMessage{RequestMessage: msg})
 			break
 		}
 		pi := &t.pieces[msg.Index]

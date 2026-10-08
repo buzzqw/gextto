@@ -29,7 +29,7 @@ di verità usata dall'UI.
 |---|---|---|
 | Limiti per-torrent | velocità download/upload | `SetLimits` rifiuta un rate > 0 (`ErrCapabilityUnavailable`) |
 | Limiti per-torrent | connessioni e upload slot | `SetMaxConnections`/`SetMaxUploads` rifiutano |
-| Modalità | upload/share mode, super-seeding | rain non li ha |
+| Modalità | upload/share mode | ~~super-seeding~~ (fatto dal fork, vedi Decisioni); upload/share mode non c'è |
 | Priorità | per-pezzo e diagnostica pezzi | solo incluso/escluso per file |
 | Tracker | rimozione | ~~rain aggiunge ma non rimuove~~ (fatto: `set-trackers`) |
 | Web seed | add/remove a caldo | rain legge solo il `url-list` del `.torrent` |
@@ -72,8 +72,9 @@ presenti o già gestiti da Gextto.
 | 8 | Limiti connessioni/upload per-torrent | **Fatto** — `Torrent.SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` | 6 |
 | 9 | IPv6 | **No** | — |
 | 10 | BitTorrent v2-only | **Wishlist** | — |
-| 11 | Super-seeding, holepunching, WebTorrent | **Wishlist** | — |
-| 12 | Qualità seeding/choking | **Wishlist** — da misurare prima | — |
+| 11 | Super-seeding (BEP 16) | **Fatto** — `Torrent.SetSuperSeeding` nel fork + azione `super-seeding` nel demone; capacità `super_seeding` = `full` | 8 |
+| 12 | Holepunching, WebTorrent | **Wishlist** | — |
+| 13 | Qualità seeding/choking | **Wishlist** — da misurare prima | — |
 
 Convenzione semantica scelta per i limiti: **-1 = eredita il globale, 0 =
 illimitato** (come libtorrent e come i campi già presenti nell'UI).
@@ -103,14 +104,22 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
 7. **Streaming.** Endpoint HTTP con Range sul demone e priorità/readahead ai
    pezzi della finestra richiesta; il picker privilegia il range, così un player
    (o Jellyfin) può leggere mentre il download prosegue.
+8. **Super-seeding (fatto).** `Torrent.SetSuperSeeding` attiva il BEP 16 sul
+   torrent completato: annuncia un pezzo alla volta e serve solo i pezzi offerti
+   a quel peer, senza mai ripeterli; avanza su `have`/`not-interested` e, a
+   esaurimento, libera il peer col bitfield pieno. Azione `super-seeding` nel
+   demone e capacità `super_seeding` = `full`. È una strategia di seeding: non
+   tocca coda, seed policy né limiti di banda.
 
 ### Wishlist
 
 - **BitTorrent v2-only**: richiede il supporto v2 in rain (grande).
-- **Super-seeding, holepunching, WebTorrent**: funzioni di nicchia, molto lavoro.
+- **Holepunching, WebTorrent**: funzioni di nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima misurare gx-torrent vs libtorrent/qBittorrent
   sullo stesso sciame (rapporto, throughput in upload, tempo a 1:1), poi
   valutare un investimento sul core di rain.
+
+Fatto dalla wishlist: **super-seeding** (BEP 16), punto 8 del piano.
 
 ## Criterio di verifica
 
@@ -128,14 +137,19 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
 Ricontrollo eseguito a fine lavoro:
 
 - [x] `capabilityLevels`: gx-torrent ora `full` per `limits`, `trackers`,
-      `sequential`, `piece_diagnostics`, `web_seeds`; restano `partial`
-      `first_last` (solo all'aggiunta lato Gextto), `preferences` e
-      `session_stats`; `none` `super_seeding` e `upload_mode`.
+      `sequential`, `piece_diagnostics`, `web_seeds`, `super_seeding`; restano
+      `partial` `first_last` (solo all'aggiunta lato Gextto), `preferences` e
+      `session_stats`; `none` `upload_mode`.
 - [x] Note e testi aggiornati insieme: `v2DetailCapsFor`, "Limiti noti",
       `docs/gx-torrent.md`, `docs/API.md`, `MANUAL.*`, `README*`.
 - [x] Ogni feature visibile è in entrambe le UI: tracker (aggiunta +
       rimozione), web seed, limiti velocità/connessioni/upload, diagnostica
-      pezzi e streaming HTTP hanno sia la UI di Gextto sia la pagina del demone.
+      pezzi, streaming HTTP e super-seeding hanno sia la UI di Gextto sia la
+      pagina del demone.
+- [x] Super-seeding (BEP 16): `Torrent.SetSuperSeeding` nel fork (pezzi offerti
+      mai ripetuti, avanzamento su `have`/`not-interested` e tick, rilascio col
+      bitfield pieno a esaurimento), azione `super-seeding` nel demone, flag
+      persistito nel resume; test del fork e test end-to-end seed→leecher.
 - [x] Test del percorso felice e dei casi limite (lista vuota, duplicati,
       not-found, 416, torrent completato/fermo); `make test` e `make test-rain`
       verdi, con l'aggiunta del pacchetto `unchoker` a `make test-rain`.

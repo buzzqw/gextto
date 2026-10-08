@@ -444,6 +444,8 @@ type gxTorrentItem struct {
 	CompletedAt      int64  `json:"completed_at"`
 	CurrentTracker   string `json:"current_tracker"`
 	TorrentVersion   string `json:"torrent_version"`
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	SuperSeeding bool `json:"super_seeding"`
 }
 
 func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.TorrentView {
@@ -481,6 +483,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		CurrentTracker:    item.CurrentTracker,
 		Error:             strings.TrimSpace(item.Error),
 		Stalled:           item.State == "stalled",
+		SuperSeeding:      item.SuperSeeding,
 	}
 	if item.CompletedAt > 0 {
 		view.FinishedSeconds = int64(now.Sub(time.Unix(item.CompletedAt, 0)).Seconds())
@@ -1442,6 +1445,21 @@ func (e *gxTorrentEngine) SetMaxUploads(hash string, value int) (bool, error) {
 
 func (e *gxTorrentEngine) setConnLimit(hash, field string, value int) (bool, error) {
 	if err := e.action(hash, "conn-limits", url.Values{field: {strconv.Itoa(value)}}); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// SetSuperSeeding toggles BEP 16 super-seeding on this torrent (gextto fork):
+// while seeding it advertises one piece at a time so the swarm spreads the data.
+// It is a seeding strategy: it does not touch the queue, the seed policy or the
+// bandwidth limits.
+func (e *gxTorrentEngine) SetSuperSeeding(hash string, enabled bool) (bool, error) {
+	value := "0"
+	if enabled {
+		value = "1"
+	}
+	if err := e.action(hash, "super-seeding", url.Values{"enabled": {value}}); err != nil {
 		return false, err
 	}
 	return true, nil

@@ -21,7 +21,9 @@ Test del fork mantenuti (girano dentro questo modulo):
   "file edge";
 - `internal/bandwidth/limiter_test.go` — il limite cambia a caldo;
 - `internal/storage/filestorage/preallocate_linux_test.go` — niente
-  preallocazione su tmpfs.
+  preallocazione su tmpfs;
+- `torrent/torrent_superseed_test.go` — rotazione dei pezzi offerti e selezione
+  dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto).
 
 Modifiche, tutte marcate nel codice con `gextto fork`:
 
@@ -45,6 +47,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Limiti per-torrent | `internal/bandwidth/limiter.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_start.go`, `torrent/session_limits.go` | `Limiter.SetParent`/`SetLimitKiB` e `Torrent.SetSpeedLimits`: ogni torrent ha un limitatore proprio che eredita quello di sessione (`-1`), è illimitato (`0`) o ha un tetto (`>0`); peer e web seed usano quello del torrent, quindi cambia a caldo |
 | Connessioni/upload per-torrent | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: tetto alle connessioni instaurate (chiude le eccedenti al tick) e `Unchoker.SetNumUnchoked` per gli slot di upload |
 | Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` e `Torrent.FilePieceRange`/`SetFileStreamWindow`: i pezzi della finestra letta da un player vengono scelti per primi |
+| Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 sul torrent in corso, attivo solo a torrent completato. Annuncia un pezzo alla volta e serve solo i pezzi *offerti* a quel peer; i pezzi offerti non si ripetono, `have`/`not-interested` e un tick di ritentativo fanno avanzare, e a esaurimento il peer viene liberato col bitfield pieno. Il flag è persistito nel resume. Il fork traccia anche il bitfield remoto quando il piece picker è `nil` (seed), che il super-seeding richiede |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 

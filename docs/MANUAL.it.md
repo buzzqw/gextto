@@ -296,7 +296,8 @@ bloccata, già presente o inferiore al file archiviato.
 - **Dettagli** (tab Generale, Tracker, Contenuto, Peers, Pezzi, Limiti, Storage):
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
   segna come fallito, sposta storage. In **Generale** trovi anche **Esporta
-  .torrent**, **Super seeding** e l'aggiunta/rimozione di **web seed**; in
+  .torrent**, **Super seeding** (con gx-torrent vale solo a torrent completato e
+  riduce di proposito l'upload del seed) e l'aggiunta/rimozione di **web seed**; in
   **Tracker** puoi modificare l'intera lista (`tier|url` per riga); in
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima).
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio

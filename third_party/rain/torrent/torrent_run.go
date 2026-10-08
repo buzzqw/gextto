@@ -57,6 +57,7 @@ func (t *torrent) run() {
 		case <-t.unchokeTicker.C:
 			t.enforceConnectionLimit()
 			t.unchoker.TickUnchoke(t.getPeersForUnchoker(), t.completed)
+			t.superSeedTick(time.Now())
 		case ih := <-t.incomingHandshakerResultC:
 			t.handleIncomingHandshakeDone(ih)
 		case oh := <-t.outgoingHandshakerResultC:

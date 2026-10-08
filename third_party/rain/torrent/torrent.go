@@ -258,6 +258,18 @@ type torrent struct {
 	// (gextto fork).
 	firstLast bool
 
+	// superSeeding enables BEP 16 super-seeding (gextto fork): while seeding,
+	// the torrent advertises a single piece at a time and serves only that, so
+	// the swarm spreads the data instead of the seed uploading it repeatedly.
+	// It is a per-torrent, opt-in seeding strategy and never affects the
+	// queue, the seed policy or the bandwidth limits.
+	superSeeding bool
+
+	// superSeedPeers holds per-peer super-seeding state. It is only populated
+	// while superSeeding is on and the torrent is completed. Owned by the run
+	// goroutine, like the rest of the torrent state.
+	superSeedPeers map[*peer.Peer]*superSeedPeer
+
 	// Per-torrent rate limiters (gextto fork). They inherit the session
 	// limiters until an explicit per-torrent limit is set; peers hold these, so
 	// a change applies without reconnecting.
@@ -298,6 +310,7 @@ func newTorrent(
 	completeCmdRun bool,
 	sequential bool,
 	firstLast bool,
+	superSeeding bool,
 ) (*torrent, error) {
 	if len(infoHash) != 20 {
 		return nil, errors.New("invalid infoHash (must be 20 bytes)")
@@ -371,6 +384,8 @@ func newTorrent(
 		completeCmdRun:            completeCmdRun,
 		sequential:                sequential,
 		firstLast:                 firstLast,
+		superSeeding:              superSeeding,
+		superSeedPeers:            make(map[*peer.Peer]*superSeedPeer),
 	}
 	// Per-torrent limiters inherit the session ones until an explicit limit is
 	// set (gextto fork).

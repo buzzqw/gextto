@@ -254,6 +254,21 @@ func (t *Torrent) Sequential() bool {
 	return query(t.torrent, func() bool { return t.torrent.sequential })
 }
 
+// SetSuperSeeding enables or disables BEP 16 super-seeding on the running
+// torrent (gextto fork). It takes effect when the torrent is complete: the seed
+// advertises one piece at a time and serves only that piece, so the swarm
+// spreads the data. It is a seeding strategy only and never touches the queue,
+// the seed policy or the bandwidth limits.
+func (t *Torrent) SetSuperSeeding(superSeeding bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setSuperSeeding(superSeeding) })
+	return nil
+}
+
+// SuperSeeding reports whether super-seeding is enabled (gextto fork).
+func (t *Torrent) SuperSeeding() bool {
+	return query(t.torrent, func() bool { return t.torrent.superSeeding })
+}
+
 // PieceStates returns the state of every piece, in index order (gextto fork):
 // "have", "downloading", "skipped" or "" (missing). The second value is false
 // when the torrent has no metadata/pieces yet. Once completed rain drops the

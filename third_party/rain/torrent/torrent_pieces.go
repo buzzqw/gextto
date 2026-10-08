@@ -42,6 +42,11 @@ func (t *torrent) checkCompletion() bool {
 	}
 	t.piecePicker = nil
 	t.updateSeedDuration(time.Now())
+	if t.superSeeding {
+		// The torrent just became a seed: start super-seeding the peers that
+		// are still connected (gextto fork).
+		t.superSeedAllPeers()
+	}
 	if !t.completeCmdRun && len(t.session.config.OnCompleteCmd) > 0 {
 		go t.session.runOnCompleteCmd(t)
 		t.completeCmdRun = true

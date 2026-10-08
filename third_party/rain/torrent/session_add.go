@@ -40,6 +40,11 @@ type AddTorrentOptions struct {
 	// continues rarest-first (gextto fork). Useful for streaming without
 	// giving up the rarest-first ordering for the rest of the torrent.
 	FirstLast bool
+	// SuperSeeding enables BEP 16 super-seeding (gextto fork): once the
+	// torrent is complete it advertises one piece at a time and serves only
+	// that, so the swarm spreads the data. Seeding strategy only; it does not
+	// affect the queue, the seed policy or the bandwidth limits.
+	SuperSeeding bool
 }
 
 // AddTorrent adds a new torrent to the session by reading .torrent metainfo from reader.
@@ -103,6 +108,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		false, // completeCmdRun
 		opt.Sequential,
 		opt.FirstLast,
+		opt.SuperSeeding,
 	)
 	if err != nil {
 		return nil, err
@@ -125,6 +131,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		StopAfterMetadata: opt.StopAfterMetadata,
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
+		SuperSeeding:      opt.SuperSeeding,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {
@@ -221,6 +228,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		false, // completeCmdRun
 		opt.Sequential,
 		opt.FirstLast,
+		opt.SuperSeeding,
 	)
 	if err != nil {
 		return nil, err
@@ -242,6 +250,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		StopAfterMetadata: opt.StopAfterMetadata,
 		Sequential:        opt.Sequential,
 		FirstLast:         opt.FirstLast,
+		SuperSeeding:      opt.SuperSeeding,
 	}
 	err = s.resumer.Write(id, rspec)
 	if err != nil {

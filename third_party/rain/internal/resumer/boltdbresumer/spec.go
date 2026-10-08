@@ -27,7 +27,9 @@ type Spec struct {
 	CompleteCmdRun    bool
 	Sequential        bool
 	FirstLast         bool
-	Version           int
+	// SuperSeeding enables BEP 16 super-seeding (gextto fork).
+	SuperSeeding bool
+	Version      int
 }
 
 type jsonSpec struct {
@@ -46,6 +48,7 @@ type jsonSpec struct {
 	CompleteCmdRun    bool
 	Sequential        bool
 	FirstLast         bool
+	SuperSeeding      bool
 	Version           int
 
 	// JSON unsafe types
@@ -73,6 +76,7 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		CompleteCmdRun:    s.CompleteCmdRun,
 		Sequential:        s.Sequential,
 		FirstLast:         s.FirstLast,
+		SuperSeeding:      s.SuperSeeding,
 		Version:           s.Version,
 
 		InfoHash:  base64.StdEncoding.EncodeToString(s.InfoHash),
@@ -118,6 +122,7 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 	s.CompleteCmdRun = j.CompleteCmdRun
 	s.Sequential = j.Sequential
 	s.FirstLast = j.FirstLast
+	s.SuperSeeding = j.SuperSeeding
 	s.Version = j.Version
 	return nil
 }

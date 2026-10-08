@@ -114,6 +114,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 		spec.CompleteCmdRun,
 		spec.Sequential,
 		spec.FirstLast,
+		spec.SuperSeeding,
 	)
 	if err != nil {
 		return
@@ -191,6 +192,7 @@ func (s *Session) CompactDatabase(output string) error {
 			CompleteCmdRun:    t.torrent.completeCmdRun,
 			Sequential:        t.torrent.sequential,
 			FirstLast:         t.torrent.firstLast,
+			SuperSeeding:      t.torrent.superSeeding,
 		}
 		err = res.Write(t.torrent.id, spec)
 		if err != nil {

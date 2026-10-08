@@ -68,11 +68,13 @@ type torrentMeta struct {
 	// StopAtMetadata pauses a magnet as soon as its metadata arrives.
 	StopAtMetadata bool `json:"stop_at_metadata,omitempty"`
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
-	Sequential bool      `json:"sequential,omitempty"`
-	FirstLast  bool      `json:"first_last,omitempty"`
-	RotatedAt  time.Time `json:"rotated_at,omitzero"`
-	SeedRatio  float64   `json:"seed_ratio"`
-	SeedDays   int64     `json:"seed_days"`
+	Sequential bool `json:"sequential,omitempty"`
+	FirstLast  bool `json:"first_last,omitempty"`
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	SuperSeeding bool      `json:"super_seeding,omitempty"`
+	RotatedAt    time.Time `json:"rotated_at,omitzero"`
+	SeedRatio    float64   `json:"seed_ratio"`
+	SeedDays     int64     `json:"seed_days"`
 	// Per-torrent speed limits in KiB/s (gextto fork): nil = inherit the global
 	// limit, 0 = unlimited, >0 = explicit. Pointers so a state file written
 	// before these existed still means "inherit".
@@ -383,6 +385,9 @@ func (d *Daemon) reconcileLocked() {
 		if meta.MaxUploads != nil {
 			t.SetMaxUploads(int(*meta.MaxUploads))
 		}
+		// Super-seeding is a per-torrent seeding strategy; keep it in sync with
+		// the daemon state (rain persists it too, gextto fork).
+		_ = t.SetSuperSeeding(meta.SuperSeeding)
 		// Torrents parked or paused must not run, whatever rain restored.
 		if meta.UserPaused || meta.Parked {
 			_ = t.Stop()
@@ -754,6 +759,7 @@ type torrentInfo struct {
 	AutoManaged      bool   `json:"auto_managed"`
 	Sequential       bool   `json:"sequential"`
 	FirstLast        bool   `json:"first_last"`
+	SuperSeeding     bool   `json:"super_seeding"`
 	Pinned           bool   `json:"pinned"`
 	Parked           bool   `json:"parked"`
 	Probing          bool   `json:"probing"`
@@ -863,6 +869,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, queuePos map[string]int) torrent
 		AutoManaged:      !meta.UserPaused && !meta.Parked && !meta.Pinned,
 		Sequential:       meta.Sequential,
 		FirstLast:        meta.FirstLast,
+		SuperSeeding:     meta.SuperSeeding,
 		Pinned:           meta.Pinned,
 		Parked:           meta.Parked,
 		Probing:          !meta.ProbeUntil.IsZero(),
@@ -959,8 +966,10 @@ type addRequest struct {
 	Sequential bool
 	// FirstLast downloads the ends of every file first (gextto fork).
 	FirstLast bool
-	SeedRatio float64
-	SeedDays  int64
+	// SuperSeeding enables BEP 16 super-seeding, a seeding strategy (gextto fork).
+	SuperSeeding bool
+	SeedRatio    float64
+	SeedDays     int64
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -1002,7 +1011,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		_ = os.Remove(d.linkPath(id))
 		return "", false, errors.New("session not available")
 	}
-	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential, FirstLast: req.FirstLast}
+	opt := &torrent.AddTorrentOptions{ID: id, Stopped: true, Sequential: req.Sequential || d.state.Config.Sequential, FirstLast: req.FirstLast, SuperSeeding: req.SuperSeeding}
 	var t *torrent.Torrent
 	if req.Magnet != "" {
 		t, err = d.session.AddURI(req.Magnet, opt)
@@ -1037,7 +1046,9 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		UserPaused: req.Paused, StopAtMetadata: req.StopAtMetadata && !isComplete(d.statsLocked(t)),
 		Sequential: req.Sequential || d.state.Config.Sequential,
 		FirstLast:  req.FirstLast,
-		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		// SuperSeeding is a per-torrent seeding strategy, not a queue default.
+		SuperSeeding: req.SuperSeeding,
+		SeedRatio:    req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 	}
 	d.saveLocked()
 	d.poke()
@@ -1254,6 +1265,16 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 			}
 		}
 		return nil
+	})
+}
+
+// setSuperSeeding toggles BEP 16 super-seeding on a torrent (gextto fork). It
+// is a seeding strategy: it does not touch the queue, the seed policy or the
+// bandwidth limits.
+func (d *Daemon) setSuperSeeding(key string, enabled bool) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		meta.SuperSeeding = enabled
+		return t.SetSuperSeeding(enabled)
 	})
 }
 
