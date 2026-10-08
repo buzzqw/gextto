@@ -137,12 +137,34 @@ func TestParsesRemuxAsSource(t *testing.T) {
 			t.Fatalf("%s: IsRemux() = false, want true", title)
 		}
 	}
-	// A plain BluRay stays bluray, and "BDMux" is not a remux.
+	// A plain BluRay stays bluray, and "BDMux" is not a remux: it is a BluRay
+	// encode with the Italian audio muxed in.
 	if got := ParseQuality("Movie.2024.2160p.BluRay.ITA.x264").Source; got != "bluray" {
 		t.Fatalf("plain bluray source = %q, want bluray", got)
 	}
-	if got := ParseQuality("Movie.2024.2160p.BDMux.ITA.x264").Source; got != "unknown" {
-		t.Fatalf("bdmux source = %q, want unknown", got)
+	if got := ParseQuality("Movie.2024.2160p.BDMux.ITA.x264").Source; got != "bluray" {
+		t.Fatalf("bdmux source = %q, want bluray", got)
+	}
+}
+
+// TestParsesItalianMuxSourceTags covers the source tags of Italian releases
+// (MirCrew and similar trackers): the mux tag names the video source.
+func TestParsesItalianMuxSourceTags(t *testing.T) {
+	for title, want := range map[string]string{
+		"FBI.Most.Wanted-1x02-Conseguenze.di.un.trauma.DLMux-1080p-x264-AC3.ITA-ENG-Sub.ENG-by.quintrix.mkv": "webdl",
+		"Serie.S01E01.720p.DLRip.ITA.x264-GRP":   "webrip",
+		"Movie.2010.1080p.BDMux.ITA.ENG.x265":    "bluray",
+		"La nostra terra (2014) [DVDremux]":      "dvdrip",
+		"Film.1999.DVD-Remux.ITA.AC3":            "dvdrip",
+		"Spider-Man.2002.2160p.BDRemux.ITA.x265": "remux",
+		"Show.S01E01.1080p.WEBMux.ITA.ENG":       "webdl",
+	} {
+		if got := ParseQuality(title).Source; got != want {
+			t.Errorf("%s: source = %q, want %q", title, got, want)
+		}
+	}
+	if quality := ParseQuality("La nostra terra (2014) [DVDremux]"); quality.IsRemux() {
+		t.Fatal("a DVD remux must not take the BluRay remux upgrade path")
 	}
 }
 

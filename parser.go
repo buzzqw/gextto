@@ -487,10 +487,22 @@ func ParseQuality(title string) models.Quality {
 	// this source, which made score_source_remux and the whole remux upgrade
 	// path (Quality.IsRemux, UpgradeReason, incumbentWins) unreachable. Italian
 	// releases are almost always tagged "BDRemux", which contains "remux".
+	//
+	// "DVDRemux" (common on Italian trackers such as MirCrew) is a DVD, not a
+	// BluRay remux: scoring it as remux would rank an SD DVD above a BluRay.
+	case strings.Contains(low, "dvdremux") || strings.Contains(low, "dvd-remux") || strings.Contains(low, "dvd.remux") || strings.Contains(tNormLang, "dvd remux"):
+		source = "dvdrip"
 	case strings.Contains(low, "remux"):
 		source = "remux"
-	case strings.Contains(low, "bluray") || strings.Contains(low, "bdrip") || strings.Contains(low, "brrip"):
+	// Italian mux tags name the video source the Italian audio was muxed
+	// onto: BDMux is a BluRay encode (not a remux), DLMux a WEB-DL, DLRip a
+	// WEBRip.
+	case strings.Contains(low, "bluray") || strings.Contains(low, "bdrip") || strings.Contains(low, "brrip") || strings.Contains(low, "bdmux"):
 		source = "bluray"
+	case strings.Contains(low, "dlrip"):
+		source = "webrip"
+	case strings.Contains(low, "dlmux"):
+		source = "webdl"
 	// WEBRip must be checked before the generic "web" catch-all: otherwise
 	// every WEBRip title was classified as WEB-DL (and scored as one), which
 	// turned an equal-quality re-release into a false "source" upgrade.
