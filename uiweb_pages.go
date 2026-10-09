@@ -960,7 +960,7 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 	}
 	options = append(options,
 		uiFormOption{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
-		uiFormOption{Value: BackendGxTorrent, Label: "gx-torrent (demone alternativo)", Selected: value == BackendGxTorrent},
+		uiFormOption{Value: BackendGxTorrent, Label: "gx-torrent (predefinito)", Selected: value == BackendGxTorrent},
 	)
 	if value != BackendQbittorrent && value != BackendGxTorrent && !(LibtorrentCompiled() && value == BackendEmbedded) {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)

@@ -156,7 +156,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_preallocate":                       "Riserva subito tutto lo spazio su disco prima di iniziare il download.",
 	"tmdb_api_key":                                 "Chiave API TMDB (consigliata, gratuita): fonte principale di titoli, poster e metadati. Se c'è, ha la precedenza su TVDB.",
 	"libtorrent_torrent_copy_dir":                  "Copia qui i file .torrent dei download (vuoto = nessuna copia).",
-	"torrent_backend":                              "Motore torrent attivo (libtorrent integrato, qBittorrent-nox o gx-torrent).",
+	"torrent_backend":                              "Motore torrent attivo (gx-torrent predefinito, qBittorrent-nox o libtorrent integrato se compilato).",
 	"qbittorrent_url":                              "URL dell'interfaccia Web di qBittorrent-nox (es. http://127.0.0.1:8080).",
 	"qbittorrent_username":                         "Utente dell'interfaccia Web di qBittorrent-nox.",
 	"qbittorrent_password":                         "Password dell'interfaccia Web di qBittorrent-nox (non visualizzata).",
