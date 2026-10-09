@@ -4699,6 +4699,29 @@ func (d *Database) RecentCycles(limit int64) ([]any, error) {
 	return items, rows.Err()
 }
 
+// RecentCycleStats returns the most recent cycle history as typed rows, for the
+// Salute page trends. Entries whose payload cannot be read are skipped.
+func (d *Database) RecentCycleStats(limit int64) ([]models.CycleHistoryEntry, error) {
+	rows, err := d.db.Query("SELECT at,payload_json FROM cycle_history ORDER BY id DESC LIMIT ?1", clampInt64(limit, 1, 1000))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]models.CycleHistoryEntry, 0)
+	for rows.Next() {
+		var at, payload string
+		if err := rows.Scan(&at, &payload); err != nil {
+			return nil, err
+		}
+		entry := models.CycleHistoryEntry{At: at}
+		if err := json.Unmarshal([]byte(payload), &entry.CycleStats); err != nil {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out, rows.Err()
+}
+
 // LastCycleAt returns the start time of the most recent persisted cycle, so a
 // restart can resume the schedule instead of running a full scrape immediately.
 func (d *Database) LastCycleAt() (time.Time, bool) {

@@ -1102,6 +1102,43 @@ func TestRecordsAndGroupsSeenMoviesAndSeries(t *testing.T) {
 	assertEqual(t, pruned, 0)
 }
 
+// TestRecentCycleStatsRoundTrip checks the typed cycle history keeps the new
+// duration and per-source fields, so the Salute "Ricerche" panel can show them.
+func TestRecentCycleStatsRoundTrip(t *testing.T) {
+	db := newTestDB(t)
+	saved := models.CycleStats{
+		Scraped:          10,
+		Candidates:       4,
+		DownloadsStarted: 2,
+		Errors:           1,
+		DurationSeconds:  125,
+		Sources: []models.CycleSourceStat{
+			{Kind: "feed", Name: "TGx", OK: 1, Results: 3},
+			{Kind: "indexer", Name: "fast", Fail: 1, LastError: "timeout"},
+		},
+	}
+	if err := db.SaveCycle(&saved); err != nil {
+		t.Fatal(err)
+	}
+	cycles, err := db.RecentCycleStats(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cycles) != 1 {
+		t.Fatalf("want 1 cycle, got %d", len(cycles))
+	}
+	got := cycles[0]
+	if got.DurationSeconds != 125 || got.Scraped != 10 || got.DownloadsStarted != 2 || got.Errors != 1 {
+		t.Fatalf("cycle fields not preserved: %+v", got.CycleStats)
+	}
+	if len(got.Sources) != 2 || got.Sources[1].Name != "fast" || got.Sources[1].LastError != "timeout" {
+		t.Fatalf("sources not preserved: %+v", got.Sources)
+	}
+	if got.At == "" {
+		t.Fatal("cycle timestamp missing")
+	}
+}
+
 func TestPrunePreviewCountsWithoutDeleting(t *testing.T) {
 	db := newTestDB(t)
 	for i := 0; i < 5; i++ {

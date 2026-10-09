@@ -86,6 +86,7 @@ func RunCycleDomain(
 		return stats, nil
 	}
 	if domainIs(domain, "comics") {
+		stats.DurationSeconds = int(cycleElapsedSeconds(stats))
 		if err := db.SaveCycle(stats); err != nil {
 			return nil, err
 		}
@@ -127,13 +128,14 @@ func RunCycleDomain(
 		}
 	}
 
-	releases, err := engine.ScrapeAll(ctx, cfg)
+	releases, sources, err := engine.ScrapeAll(ctx, cfg)
 	if err != nil {
 		if cycleCancelled(ctx) {
 			return stats, nil
 		}
 		return nil, err
 	}
+	stats.Sources = sources
 	// Anime numbered by absolute episode become season/episode releases
 	// before anything is filtered by kind.
 	releases = resolveAnimeReleases(ctx, cfg, releases)
@@ -1091,20 +1093,28 @@ func RunCycleDomain(
 	if !cfg.DryRun {
 		reportPendingV2Skips(time.Now())
 	}
+	elapsed := cycleElapsedSeconds(stats)
+	stats.DurationSeconds = int(elapsed)
 	if err := db.SaveCycle(stats); err != nil {
 		return nil, err
-	}
-	started := time.Now().UTC()
-	if stats.LastStartedAt != nil {
-		started = *stats.LastStartedAt
-	}
-	elapsed := int64(time.Since(started).Seconds())
-	if elapsed < 0 {
-		elapsed = 0
 	}
 	logging.Info(cycleReportText(logDuration(time.Duration(elapsed)*time.Second), stats, upgrades, newItems, skips))
 	logging.Info(cycleDivider)
 	return stats, nil
+}
+
+// cycleElapsedSeconds is how long the cycle has been running, from its recorded
+// start time, rounded down.
+func cycleElapsedSeconds(stats *models.CycleStats) int64 {
+	started := time.Now().UTC()
+	if stats != nil && stats.LastStartedAt != nil {
+		started = *stats.LastStartedAt
+	}
+	elapsed := int64(time.Since(started).Seconds())
+	if elapsed < 0 {
+		return 0
+	}
+	return elapsed
 }
 
 // prioritizeArchiveGapDownloads starts archive-backed missing episodes before
@@ -2017,6 +2027,7 @@ func runComicsIfDue(ctx context.Context, cfg *Config, db *Database, comics *Comi
 // example because the download disk is full). The stats are still persisted, so
 // the UI and /api/cycles show why nothing was downloaded.
 func finishCycleWithoutDownloads(db *Database, stats *models.CycleStats) (*models.CycleStats, error) {
+	stats.DurationSeconds = int(cycleElapsedSeconds(stats))
 	if err := db.SaveCycle(stats); err != nil {
 		return nil, err
 	}

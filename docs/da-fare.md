@@ -9,7 +9,10 @@ pur essendo un backlog **attivo**. Dei due item recuperati dal piano di adozione
 ### 1. Osservabilità: metriche nel tempo
 ID di correlazione e runbook sono fatti (vedi sotto). Resta la parte metriche:
 andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
-- durata delle ricerche e sorgenti che non rispondono, ciclo per ciclo;
+- ~~durata delle ricerche e sorgenti che non rispondono, ciclo per ciclo~~ —
+  fatto (2026-10-10): `CycleStats` salva durata ed esito per sorgente nel ciclo
+  (`cycle_history`), con il pannello **Ricerche** in *Salute* (`uiweb.go`,
+  `RecentCycleStats`, `ScrapeAll`). Restano da valutare gli avvisi a soglia;
 - import falliti al giorno, da quanto non c'è un ciclo riuscito (con avviso
   oltre una soglia), titoli in coda e da quanto aspettano;
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`).

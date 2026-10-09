@@ -1041,6 +1041,27 @@
   {{template "v2_health_engine" .Engine}}
   {{end}}
   {{if gt (len .PanelTables) 0}}{{template "v2_table_panel" (index .PanelTables 0)}}{{end}}
+  <div class="panel">
+    <div class="panel-head"><h3>Ricerche</h3></div>
+    <div class="panel-body">
+      {{if .Cycles}}
+      <div class="table-wrap"><table class="data-table">
+        <caption class="sr-only">Storico delle ricerche</caption>
+        <thead><tr><th scope="col">Quando</th><th scope="col">Durata</th><th scope="col">Release</th><th scope="col">Download</th><th scope="col">Errori</th><th scope="col">Sorgenti</th></tr></thead>
+        <tbody>{{range .Cycles}}<tr>
+          <td class="nowrap">{{.When}}</td>
+          <td class="nowrap">{{.Duration}}</td>
+          <td class="numeric">{{.Scraped}}</td>
+          <td class="numeric">{{.Downloads}}</td>
+          <td class="numeric">{{if .Errors}}<span class="hl-err">{{.Errors}}</span>{{else}}0{{end}}</td>
+          <td>{{if .FailedCount}}<span class="hl-err" title="{{.SourceDetail}}">{{.FailedCount}}</span>{{else}}<span class="muted">ok</span>{{end}}</td>
+        </tr>{{end}}</tbody>
+      </table></div>
+      {{else}}
+      <p class="muted">Nessuna ricerca registrata.</p>
+      {{end}}
+    </div>
+  </div>
   {{if .Health.LastErrors}}
   <div class="panel"><div class="panel-head"><h3>Ultimi errori</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}</div></div>
   {{end}}

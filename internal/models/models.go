@@ -459,6 +459,18 @@ type TorrentMeta struct {
 	Release Release `json:"release"`
 }
 
+// CycleSourceStat is how one source (a feed, an indexer or a web search engine)
+// behaved in a search cycle. It is kept in the cycle history so the Salute page
+// can show a source that keeps failing instead of only the live check.
+type CycleSourceStat struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	OK        int    `json:"ok"`
+	Fail      int    `json:"fail"`
+	Results   int    `json:"results"`
+	LastError string `json:"last_error,omitempty"`
+}
+
 // CycleStats summarises a scrape cycle.
 type CycleStats struct {
 	Scraped          int            `json:"scraped"`
@@ -468,6 +480,18 @@ type CycleStats struct {
 	Errors           int            `json:"errors"`
 	ErrorDetails     map[string]int `json:"error_details"`
 	LastStartedAt    *time.Time     `json:"last_started_at"`
+	// DurationSeconds is how long the cycle took, for the cycle history.
+	DurationSeconds int `json:"duration_seconds"`
+	// Sources is the per-source outcome of the cycle (feeds, indexers, engines).
+	Sources []CycleSourceStat `json:"sources,omitempty"`
+}
+
+// CycleHistoryEntry is one stored cycle together with the wall-clock time the
+// row was written (UTC, `2006-01-02 15:04:05`), as read back from the cycle
+// history.
+type CycleHistoryEntry struct {
+	At string `json:"at"`
+	CycleStats
 }
 
 // Error records a categorised cycle error.

@@ -178,7 +178,7 @@ func TestScrapeAllRetainsFastIndexerResultsWhenSearchTimesOut(t *testing.T) {
 	cfg.Indexers = []IndexerConfig{{Name: "fast", URL: fast.URL, Enabled: true}, {Name: "slow", URL: slow.URL, Enabled: true}}
 	cfg.WebsearchEngines = nil
 
-	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	releases, _, err := state.engine.ScrapeAll(context.Background(), &cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestScrapeAllSearchesSeriesAliases(t *testing.T) {
 	cfg.Indexers = []IndexerConfig{{Name: "test", URL: indexer.URL, Enabled: true}}
 	cfg.WebsearchEngines = nil
 
-	if _, err := state.engine.ScrapeAll(context.Background(), &cfg); err != nil {
+	if _, _, err := state.engine.ScrapeAll(context.Background(), &cfg); err != nil {
 		t.Fatal(err)
 	}
 	mutex.Lock()
@@ -335,12 +335,24 @@ func TestScrapeAllSkipsTitleSearchWhenFeedsConfigured(t *testing.T) {
 	cfg.Indexers = []IndexerConfig{{Name: "test-indexer", URL: indexer.URL, Enabled: true}}
 	cfg.WebsearchEngines = nil
 
-	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	releases, sources, err := state.engine.ScrapeAll(context.Background(), &cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(releases) != 1 {
 		t.Fatalf("expected 1 feed release, got %d", len(releases))
+	}
+	if len(sources) == 0 {
+		t.Fatal("expected per-source stats for the cycle")
+	}
+	foundFeed := false
+	for _, source := range sources {
+		if source.Kind == "feed" && source.OK > 0 {
+			foundFeed = true
+		}
+	}
+	if !foundFeed {
+		t.Fatalf("expected a successful feed in the source stats: %+v", sources)
 	}
 	if calls := indexerCalls.Load(); calls != 0 {
 		t.Fatalf("expected 0 indexer calls when feeds present, got %d", calls)
@@ -372,7 +384,7 @@ func TestScrapeAllRunsTitleSearchWhenForced(t *testing.T) {
 	cfg.Settings = map[string]string{"cycle_title_search": "always"}
 	cfg.WebsearchEngines = nil
 
-	releases, err := state.engine.ScrapeAll(context.Background(), &cfg)
+	releases, _, err := state.engine.ScrapeAll(context.Background(), &cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

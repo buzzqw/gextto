@@ -935,6 +935,30 @@ func TestV2TranslateHTMLMirrorsClientBehaviour(t *testing.T) {
 	}
 }
 
+// TestV2HealthRicerchePanel checks the Salute "Ricerche" panel shows the stored
+// cycle history: duration and the sources that failed, with their last error.
+func TestV2HealthRicerchePanel(t *testing.T) {
+	state := newTestAppState(t)
+	if err := state.db.SaveCycle(&models.CycleStats{
+		Scraped: 10, DownloadsStarted: 2, Errors: 1, DurationSeconds: 125,
+		Sources: []models.CycleSourceStat{{Kind: "feed", Name: "TGx", Fail: 1, LastError: "timeout"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=health", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /?view=health -> %d", code)
+	}
+	for _, want := range []string{"Ricerche", "2m 05s", `title="TGx: timeout"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("health page missing %q", want)
+		}
+	}
+}
+
 // TestV2HealthTilesPollIndependently checks the Salute tiles refresh on their
 // own schedules: Stato, Memoria and Uptime every 5s, Disco dati hourly.
 func TestV2HealthTilesPollIndependently(t *testing.T) {

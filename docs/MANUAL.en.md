@@ -997,6 +997,11 @@ the others.
   recent errors, disks. For Jackett the check uses the Torznab `caps` endpoint,
   so an API-key or configured-indexer problem is distinguished from simple host
   reachability.
+- **Searches** — the same-named panel on the Health page keeps the history of
+  the last cycles: when, duration, releases checked, downloads started, errors
+  and how many sources did not answer (hover the number for the reason). It
+  helps spot a source that keeps failing or a cycle that got slower. API:
+  `GET /api/last_cycles`.
 - **Web logs** — live SSE stream with text filter, line count and follow/pause.
   Lines are English and explicitly formatted as `date time  LEVEL message ·
   key: value`, with highlighted keywords (NAS, download, sources, filters,

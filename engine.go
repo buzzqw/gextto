@@ -147,7 +147,7 @@ func (e *Engine) FetchTorrent(ctx context.Context, rawURL string) ([]byte, strin
 // ScrapeAll scans every configured feed and then searches every enabled series
 // and movie on the Torznab indexers and web engines, returning the unique
 // releases that survive the global filters.
-func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, error) {
+func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, []models.CycleSourceStat, error) {
 	var all []models.Release
 	maxPages := cfg.FeedMaxPages()
 	maxAgeDays := cfg.MaxReleaseAgeDays
@@ -473,7 +473,24 @@ func (e *Engine) ScrapeAll(ctx context.Context, cfg *Config) ([]models.Release, 
 	}
 	printSourceReport(sourceStats)
 	cache.Save()
-	return all, nil
+	return all, cycleSourceStats(sourceStats), nil
+}
+
+// cycleSourceStats converts the drained per-source outcomes into the compact
+// form stored in the cycle history.
+func cycleSourceStats(entries []logging.SourceStatEntry) []models.CycleSourceStat {
+	out := make([]models.CycleSourceStat, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, models.CycleSourceStat{
+			Kind:      entry.Kind,
+			Name:      entry.Name,
+			OK:        entry.Stats.OK,
+			Fail:      entry.Stats.Fail,
+			Results:   entry.Stats.Results,
+			LastError: entry.Stats.LastError,
+		})
+	}
+	return out
 }
 
 // scrapeFeed runs one feed inside its backoff window and total time budget,

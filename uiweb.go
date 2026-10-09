@@ -193,6 +193,20 @@ type uiHealthData struct {
 	Uptime        string
 	ProcessUptime string
 	Panels        []uiPageSection
+	// Cycles is the recent search-cycle history (newest first), for the
+	// "Ricerche" panel: duration and per-source outcome over time.
+	Cycles []uiCycleRow
+}
+
+// uiCycleRow is one search cycle as shown in the Salute "Ricerche" panel.
+type uiCycleRow struct {
+	When         string
+	Duration     string
+	Scraped      int
+	Downloads    int
+	Errors       int
+	FailedCount  int
+	SourceDetail string
 }
 
 // uiLogsData is the view-model of the Log page.
@@ -413,7 +427,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 		used := health.DiskTotalBytes - health.DiskFreeBytes
 		usedPct = strconv.FormatFloat(float64(used)/float64(health.DiskTotalBytes)*100, 'f', 1, 64) + "%"
 	}
-	return uiHealthData{
+	data := uiHealthData{
 		Health:        health,
 		StatusReason:  healthStatusReason(health),
 		DiskUsedPct:   usedPct,
@@ -460,6 +474,55 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 			}),
 		},
 	}
+	if cycles, err := s.db.RecentCycleStats(uiHealthCycleRows); err == nil {
+		data.Cycles = uiCycleRowsFrom(cycles, time.Now())
+	}
+	return data
+}
+
+// uiHealthCycleRows is how many recent cycles the Salute "Ricerche" panel shows.
+const uiHealthCycleRows = 12
+
+// uiCycleRowsFrom turns the stored cycles into display rows, computing for each
+// the number of sources that failed and their last error (for the tooltip).
+func uiCycleRowsFrom(cycles []models.CycleHistoryEntry, now time.Time) []uiCycleRow {
+	rows := make([]uiCycleRow, 0, len(cycles))
+	for _, cycle := range cycles {
+		row := uiCycleRow{
+			When:      uiCycleWhen(cycle, now),
+			Duration:  logging.HumanDuration(int64(cycle.DurationSeconds)),
+			Scraped:   cycle.Scraped,
+			Downloads: cycle.DownloadsStarted,
+			Errors:    cycle.Errors,
+		}
+		var failed []string
+		for _, source := range cycle.Sources {
+			if source.Fail == 0 {
+				continue
+			}
+			row.FailedCount++
+			detail := source.Name
+			if strings.TrimSpace(source.LastError) != "" {
+				detail += ": " + source.LastError
+			}
+			failed = append(failed, detail)
+		}
+		row.SourceDetail = strings.Join(failed, "; ")
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+// uiCycleWhen renders when a stored cycle ran: the wall-clock row time (UTC),
+// falling back to the cycle's own start time.
+func uiCycleWhen(cycle models.CycleHistoryEntry, now time.Time) string {
+	if at, err := time.ParseInLocation("2006-01-02 15:04:05", cycle.At, time.UTC); err == nil {
+		return v2ProblemTime(at, now)
+	}
+	if cycle.LastStartedAt != nil {
+		return v2ProblemTime(*cycle.LastStartedAt, now)
+	}
+	return "—"
 }
 
 // healthStatusReason explains a non-ok health status (or lists the missing

@@ -1026,6 +1026,11 @@ la pulizia degli altri.
   ultimi errori, dischi. Per Jackett il controllo usa l'endpoint Torznab `caps`;
   un problema di API key o di configurazione degli indexer viene quindi distinto
   dalla semplice raggiungibilità della macchina.
+- **Ricerche** — nel riquadro omonimo della pagina Salute c'è lo storico degli
+  ultimi cicli: quando, durata, release esaminate, download avviati, errori e
+  quante sorgenti non hanno risposto (il motivo compare passando il mouse sul
+  numero). Serve a riconoscere una sorgente che fallisce ripetutamente o un ciclo
+  diventato più lento. API: `GET /api/last_cycles`.
 - **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
   Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO messaggio
   · campo: valore`, con parole chiave evidenziate (NAS, download, sorgenti,

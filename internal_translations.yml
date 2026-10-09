@@ -3709,3 +3709,8 @@ eng:
   "In attesa dei metadati.": "Waiting for metadata."
   "Download completo.": "Download complete."
   "libtorrent ha riportato un errore.": "The torrent engine reported an error."
+  "Ricerche": "Searches"
+  "Durata": "Duration"
+  "Errori": "Errors"
+  "Storico delle ricerche": "Search history"
+  "Nessuna ricerca registrata.": "No searches recorded yet."
