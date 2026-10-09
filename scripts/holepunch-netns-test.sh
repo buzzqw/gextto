@@ -122,6 +122,7 @@ setup_netns() {
 
   # router <-> client A (distinct names: the two veth ends must not collide)
   ip link add var type veth peer name vac
+  ip link set var netns "$R"
   ip link set vac netns "$A"
   ip netns exec "$R" ip addr add 10.10.0.1/24 dev var
   ip netns exec "$R" ip link set var up
@@ -131,6 +132,7 @@ setup_netns() {
 
   # router <-> client B
   ip link add vbr type veth peer name vbc
+  ip link set vbr netns "$R"
   ip link set vbc netns "$B"
   ip netns exec "$R" ip addr add 10.20.0.1/24 dev vbr
   ip netns exec "$R" ip link set vbr up
