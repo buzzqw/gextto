@@ -93,5 +93,8 @@ echo "highest glibc symbol required: ${glibc:-none}"
 
 "$ROOT/scripts/package-linux.sh" --binary "$BINARY" --arch "$ARCH" \
   --output "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz" ${LABEL:+--label "$LABEL"}
-tar -tzf "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz" | grep -qx './gx-torrent' \
+# List first, then search: `tar | grep -q` fails under pipefail when grep
+# stops reading early and tar gets SIGPIPE.
+contents="$(tar -tzf "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz")"
+grep -qx './gx-torrent' <<< "$contents" \
   || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }
