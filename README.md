@@ -87,7 +87,6 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | RAM disk | yes | yes | — |
 | Fast resume | yes | yes | — |
 | Per-piece diagnostics | yes | — | — |
-| Engine preferences | partial | yes | partial |
 | Session stats | partial | yes | partial |
 | Session sync | yes | — | yes |
 | IP filter | yes | yes | partial |

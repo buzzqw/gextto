@@ -43,7 +43,6 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"ramdisk", "RAM disk", "RAM disk"},
 	{"fastresume", "Fast resume", "Fast resume"},
 	{"piece_diagnostics", "Diagnostica dei pezzi", "Per-piece diagnostics"},
-	{"preferences", "Preferenze del motore", "Engine preferences"},
 	{"session_stats", "Statistiche di sessione", "Session stats"},
 	{"sync", "Sincronizzazione della sessione", "Session sync"},
 	{"ip_filter", "Filtro IP", "IP filter"},

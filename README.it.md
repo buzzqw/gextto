@@ -90,7 +90,6 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | RAM disk | sì | sì | — |
 | Fast resume | sì | sì | — |
 | Diagnostica dei pezzi | sì | — | — |
-| Preferenze del motore | parziale | sì | parziale |
 | Statistiche di sessione | parziale | sì | parziale |
 | Sincronizzazione della sessione | sì | — | sì |
 | Filtro IP | sì | sì | parziale |
