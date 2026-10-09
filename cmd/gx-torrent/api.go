@@ -338,6 +338,7 @@ type fileInfo struct {
 type peerInfo struct {
 	Address      string  `json:"address"`
 	Client       string  `json:"client"`
+	Source       string  `json:"source"`
 	DownloadRate int     `json:"download_rate"`
 	UploadRate   int     `json:"upload_rate"`
 	Incoming     bool    `json:"incoming"`
@@ -413,6 +414,7 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			out = append(out, peerInfo{
 				Address:      peer.Addr.String(),
 				Client:       peer.Client,
+				Source:       sourceName(peer.Source),
 				DownloadRate: peer.DownloadSpeed,
 				UploadRate:   peer.UploadSpeed,
 				Incoming:     peer.Source == torrent.SourceIncoming,
