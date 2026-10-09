@@ -76,6 +76,15 @@ WORK="$(mktemp -d /tmp/holepunch-netns.XXXXXX)"
 R=gx-r; A=gx-a; B=gx-b
 PIDS=()
 
+# remove_links deletes veth ends that a previous aborted run may have left in
+# the root namespace (the peer inside a deleted netns disappears with it).
+remove_links() {
+  local link
+  for link in vrel var vbr; do
+    ip link del "$link" 2>/dev/null || true
+  done
+}
+
 cleanup() {
   local pid
   for pid in "${PIDS[@]:-}"; do
@@ -88,6 +97,7 @@ cleanup() {
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
   ip netns del "$R" 2>/dev/null || true
+  remove_links
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -97,6 +107,7 @@ setup_netns() {
   ip netns del "$R" 2>/dev/null || true
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
+  remove_links
   ip netns add "$R"
   ip netns add "$A"
   ip netns add "$B"
@@ -109,22 +120,22 @@ setup_netns() {
   ip netns exec "$R" ip addr add 10.0.0.2/24 dev vr
   ip netns exec "$R" ip link set vr up
 
-  # router <-> client A
-  ip link add va type veth peer name va
-  ip link set va netns "$A"
-  ip netns exec "$R" ip addr add 10.10.0.1/24 dev va
-  ip netns exec "$R" ip link set va up
-  ip netns exec "$A" ip addr add 10.10.0.2/24 dev va
-  ip netns exec "$A" ip link set va up
+  # router <-> client A (distinct names: the two veth ends must not collide)
+  ip link add var type veth peer name vac
+  ip link set vac netns "$A"
+  ip netns exec "$R" ip addr add 10.10.0.1/24 dev var
+  ip netns exec "$R" ip link set var up
+  ip netns exec "$A" ip addr add 10.10.0.2/24 dev vac
+  ip netns exec "$A" ip link set vac up
   ip netns exec "$A" ip route add default via 10.10.0.1
 
   # router <-> client B
-  ip link add vb type veth peer name vb
-  ip link set vb netns "$B"
-  ip netns exec "$R" ip addr add 10.20.0.1/24 dev vb
-  ip netns exec "$R" ip link set vb up
-  ip netns exec "$B" ip addr add 10.20.0.2/24 dev vb
-  ip netns exec "$B" ip link set vb up
+  ip link add vbr type veth peer name vbc
+  ip link set vbc netns "$B"
+  ip netns exec "$R" ip addr add 10.20.0.1/24 dev vbr
+  ip netns exec "$R" ip link set vbr up
+  ip netns exec "$B" ip addr add 10.20.0.2/24 dev vbc
+  ip netns exec "$B" ip link set vbc up
   ip netns exec "$B" ip route add default via 10.20.0.1
 
   # Router: forwarding e NAT verso la root; niente inbound nuovo verso i client
@@ -132,12 +143,12 @@ setup_netns() {
   ip netns exec "$R" sysctl -qw net.ipv4.ip_forward=1
   ip netns exec "$R" iptables -t nat -A POSTROUTING -o vr -j MASQUERADE
   ip netns exec "$R" iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-  ip netns exec "$R" iptables -A FORWARD -i vr -o va -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i vr -o vb -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i va -o vb -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i vb -o va -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i va -o vr -j ACCEPT
-  ip netns exec "$R" iptables -A FORWARD -i vb -o vr -j ACCEPT
+  ip netns exec "$R" iptables -A FORWARD -i vr -o var -j DROP
+  ip netns exec "$R" iptables -A FORWARD -i vr -o vbr -j DROP
+  ip netns exec "$R" iptables -A FORWARD -i var -o vbr -j DROP
+  ip netns exec "$R" iptables -A FORWARD -i vbr -o var -j DROP
+  ip netns exec "$R" iptables -A FORWARD -i var -o vr -j ACCEPT
+  ip netns exec "$R" iptables -A FORWARD -i vbr -o vr -j ACCEPT
 }
 
 # ------------------------------------------------- tracciante + torrent ---------
