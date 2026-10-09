@@ -198,8 +198,6 @@ class H(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
-    def log_message(self, *args):
-        pass
 http.server.HTTPServer(('0.0.0.0', int(sys.argv[1])), H).serve_forever()
 PY
 }
@@ -302,11 +300,18 @@ wait_api "$L" "$RELAY_API" || { echo "--- relay.log ---" >&2; tail -n 20 "$WORK/
 wait_api "$A" "$A_API"     || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "leecher API non risponde"; }
 wait_api "$B" "$B_API"     || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "seeder API non risponde"; }
 
+# Reachability across the NAT: the leecher must reach the lab (tracker + relay
+# peer port) through the router, or nothing else can work.
+TRACKER_CODE="$(ip netns exec "$A" curl -s -m 3 -o /dev/null -w '%{http_code}' "http://10.0.0.1:$TRACKER_PORT/" 2>/dev/null || true)"
+RELAY_TCP="fail"
+if ip netns exec "$A" timeout 3 bash -c "exec 3<>/dev/tcp/10.0.0.1/$RELAY_PEER_PORT" 2>/dev/null; then RELAY_TCP="open"; fi
+log "probe da gx-a -> gx-lab: tracker_http=${TRACKER_CODE:-fail} relay_tcp=$RELAY_TCP"
+
 log "il seeder (B) carica il .torrent e i dati"
-daemon_api "$B" "$B_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed" >/dev/null
+log "  B add-file: $(daemon_api "$B" "$B_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed")"
 MAGNET="magnet:?xt=urn:btih:$HASH&tr=$TRACKER"
-daemon_api "$L" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
-daemon_api "$A" "$A_API"     /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
+log "  relay add: $(daemon_api "$L" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
+log "  A add: $(daemon_api "$A" "$A_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
 
 log "attendo che il leecher raggiunga il seeder (max ${DEADLINE}s)"
 result="niente"
@@ -329,6 +334,15 @@ else
 fi
 echo "--- peer del leecher ---"
 daemon_api "$A" "$A_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null || true
+echo
+if [[ "$result" != "holepunch" ]]; then
+  echo "--- tracker.log (ultime righe) ---"
+  tail -n 10 "$WORK/tracker.log" 2>/dev/null || true
+  for n in relay a b; do
+    echo "--- $n.log (tracker/peer/holepunch/error) ---"
+    grep -iE "tracker|holepunch|peer|error" "$WORK/$n.log" 2>/dev/null | tail -n 12 || true
+  done
+fi
 echo
 if [[ "$KEEP" == "1" ]]; then
   warn "topologia lasciata attiva (--keep); log in $WORK"
