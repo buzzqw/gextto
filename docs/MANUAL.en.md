@@ -125,8 +125,10 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
   opens the server folder picker, which can also create folders; **Check** tests
   as the service user whether each folder exists and is writable, the disk type
   including NAS mounts, the free space and whether it is on the same disk as the
-  library), *Sources* (a Prowlarr/Jackett indexer and the TMDB key),
-  *First title* (the TMDB search with its add button) and *Start* (automatic
+  library), *Sources* (a Prowlarr/Jackett indexer and the TMDB key,
+  recommended, or alternatively the TVDB key with its PIN when needed),
+  *First title* (the search on TMDB, or on TVDB without a TMDB key, with its add
+  button) and *Start* (automatic
   cycle and leaving test mode). It can be skipped and reopened at any time from
   `/?view=setup`; an installation that already has series, movies or an archive
   does not show it.
@@ -134,6 +136,8 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
   mode* (the *Automatic search and download* switch in *Configuration →
   General*) only when you are ready.
 - Add series/movies from **Explore** (TMDB) or **Series / Movies → Add**.
+- Metadata (seasons, episodes, posters, calendar) comes from TMDB or TVDB: see
+  *Configuration → Metadata: TMDB or TVDB*.
 - The **Donate** button (PayPal) is always visible at the bottom right: if
   Gextto is useful to you, you can support development; the address is also in
   the README.
@@ -426,7 +430,7 @@ aliases, exclusions, NAS path, subtitles, timeframe).
   completeness), cast links to TVDB/TMDB and, if configured, a **“disabled
   seasons”** badge. The archive path is shown in the header and the edit form
   includes **Browse** for choosing a server-side folder.
-- Actions: search missing, scan archive, refresh from TMDB, rename preview /
+- Actions: search missing, scan archive, refresh from TMDB (or TVDB), rename preview /
   execute, edit.
   The rename preview lists the *Old → New* names and has a **Force rename**
   button: it reprocesses files that already pass the quick check, recomputing
@@ -463,10 +467,10 @@ The most important fields are:
 `[SubsPlease] One Piece - 1071 (1080p)`, `One Piece Ep 1071 SUB ITA`,
 `One.Piece.1071.SUB.ITA`. With **Anime (absolute numbering)** on, Gextto
 recognises these titles for the series, maps the number to season and episode
-using the TMDB seasons (episode 30 with seasons of 12, 12 and 24 = S03E06) and,
+using the TMDB seasons, or the TVDB ones without a TMDB key (episode 30 with seasons of 12, 12 and 24 = S03E06) and,
 when it looks for a missing episode, also searches for the absolute number.
 `Title S01E1071`, produced by some indexers, is read as an absolute number too
-when season 1 has fewer episodes. Without a TMDB key the absolute number is used
+when season 1 has fewer episodes. Without a TMDB or TVDB key the absolute number is used
 as an episode of season 1. Only series marked this way are affected: for the
 others a title with a number is never read like this.
 
@@ -536,7 +540,8 @@ are using the API directly.
 ## 6. Explore, Archive, Comics
 
 - **Explore** — TMDB trending/today/popular/top-rated/now playing/upcoming, TMDB
-  search, generic release search, add-to-library. Cards are shown in a five-column
+  search, generic release search, add-to-library. The lists exist only on TMDB:
+  with only the TVDB key the title search goes to TVDB. Cards are shown in a five-column
   wall; a title already in the library carries a **Già in lista** badge and its
   add button is disabled, so you never create a duplicate by mistake.
 - **Archive** — full-text search of past releases with pagination, batch queue,
@@ -1120,7 +1125,8 @@ seconds.
   extension. Gextto waits for size and timestamp stability, then retries import
   errors automatically; check the watcher log.
 - **A file is not renamed** — `mediainfo` should be installed (technical tags);
-  check *Rename* settings and the TMDB key.
+  check *Rename* settings and the TMDB key (or the TVDB key and its PIN).
+  Without metadata the episode title becomes “Episodio N”.
 - **A release is visible but not selected** — open **Why not this one?** and
   check monitored title, global filters, sanity, quality/language and archive
   comparison first. If those pass, read the informational cycle-selection step:
@@ -1497,7 +1503,7 @@ it, always downloads to disk.
 
 | Setting | What it does |
 |---|---|
-| Rename episodes | Renames downloaded files using TMDB metadata. |
+| Rename episodes | Renames downloaded files using TMDB metadata (or TVDB without a TMDB key). |
 | Movies as single files (flatten folders) | If Yes, a movie that arrives inside a torrent folder is moved to the movies folder as a single file, with its subtitles and artwork. If No, it stays in its folder. |
 | Check renamed files every | How many hours between checks that archived/renamed files are still present. *(Unit: hours)* |
 
@@ -1651,8 +1657,31 @@ login from clients that are not on the local network.
 
 | Setting | What it does |
 |---|---|
-| TMDB API key | TMDB API key for titles, posters and metadata. |
-| TVDB API key | TheTVDB v4 API key for series search and metadata. |
+| TMDB API key (recommended) | Free TMDB API key: the main source of titles, posters and metadata. When set, it takes precedence over TVDB. |
+| TVDB API key (alternative to TMDB) | TheTVDB v4 API key: without the TMDB key it provides all the metadata. |
+| TVDB subscriber PIN | TheTVDB subscription PIN, asked at login only by “user-supported” keys. |
+
+#### Metadata: TMDB or TVDB
+
+Gextto uses metadata to know how many episodes each season has (missing
+episodes, season packs, completeness), the series status, anime numbering, the
+calendar, episode titles in file names, posters and the series and movie
+pages. One of the two keys is enough:
+
+- **TMDB (recommended)** — free key from themoviedb.org → Settings → API. When
+  it is set Gextto always uses TMDB, even if the TVDB key is set too.
+- **TVDB (alternative)** — v4 key from thetvdb.com → Dashboard → API keys.
+  Without the TMDB key it provides every feature listed above except the
+  trending and popular lists of **Explore**, which exist only on TMDB.
+  “User-supported” keys require a paid TheTVDB subscription: enter its PIN in
+  *TVDB subscriber PIN*. Episode titles follow the *TVDB language* (e.g. `ita`);
+  an untranslated episode keeps its original title.
+
+Without either key Gextto still downloads, but without the data above: missing
+episodes stop at the last one already downloaded and files get generic titles
+(“Episodio N”). TMDB and TVDB use different ids: a series added with TVDB keeps
+its TVDB id, and if you later set the TMDB key Gextto finds the series on TMDB
+by name.
 
 A browser session lasts 30 days; `/logout` ends it. After five wrong passwords
 from the same address further attempts are blocked for a minute and each failure
@@ -1740,10 +1769,10 @@ years after the original broadcast, so the calendar tells three things apart:
 | Entry | What it means |
 |---|---|
 | 📥 Series S01E04 | episode or movie that **arrived in the library**, on the day Gextto downloaded it (last 30 days). The only date that says when it is really available. |
-| 📺 Series S02E03 · Title | **original broadcast** (TMDB) of the current season, from the last week to the next two months. It is not the date of a localised release; ✓ when the episode is already in the library. |
-| 🎬 Movie | release of a monitored movie **in your country** (TMDB: digital, then home video, then cinema; the country follows the TMDB language, e.g. `it-IT`). When that country has no date yet the original one is shown, marked “(original release)”. |
+| 📺 Series S02E03 · Title | **original broadcast** (TMDB, or TVDB) of the current season, from the last week to the next two months. It is not the date of a localised release; ✓ when the episode is already in the library. |
+| 🎬 Movie | release of a monitored movie **in your country** (TMDB: digital, then home video, then cinema; the country follows the TMDB language, e.g. `it-IT`). When that country has no date yet the original one is shown, marked “(original release)”. With only the TVDB key the movie's first release is shown, always marked “(original release)”. |
 
-A TMDB key is required; the calendar is rebuilt at most every 30 minutes. With
+A TMDB or TVDB key is required; the calendar is rebuilt at most every 30 minutes. With
 access control on (see *Access*) add `?apikey=<key>` to the address.
 
 ### Torznab indexers
