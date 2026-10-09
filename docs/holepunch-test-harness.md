@@ -114,6 +114,9 @@ sudo scripts/holepunch-netns-test.sh --keep       # lascia la topologia per il d
 sudo scripts/holepunch-netns-test.sh --size 16    # torrent piu' grande
 ```
 
+Un esempio di esecuzione riuscita (output testuale, con la sorgente `holepunch`
+sul lato che diala) è in `scripts/risultato.txt`.
+
 Variabili utili per il debug:
 
 - `HOLEPUNCH_DEADLINE=<s>` — timeout dell'attesa del buco (default 90).
