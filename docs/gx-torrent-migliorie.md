@@ -140,7 +140,7 @@ Ricontrollo eseguito a fine lavoro:
 - [x] `capabilityLevels`: gx-torrent ora `full` per `limits`, `trackers`,
       `sequential`, `piece_diagnostics`, `web_seeds`, `super_seeding`,
       `session_stats`; resta `partial` `first_last` (solo all'aggiunta lato
-      Gextto); `none` `upload_mode`.
+      Gextto).
 - [x] Note e testi aggiornati insieme: `v2DetailCapsFor`, "Limiti noti",
       `docs/gx-torrent.md`, `docs/API.md`, `MANUAL.*`, `README*`.
 - [x] Ogni feature visibile è in entrambe le UI: tracker (aggiunta +

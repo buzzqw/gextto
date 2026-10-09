@@ -83,7 +83,6 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | First/last piece | partial | yes | yes |
 | Seed policy | yes | yes | partial |
 | Super-seeding (BEP 16) | yes | yes | partial |
-| Upload/share mode | — | yes | — |
 | RAM disk | yes | yes | — |
 | Fast resume | yes | yes | — |
 | Per-piece diagnostics | yes | — | — |

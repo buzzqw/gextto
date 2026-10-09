@@ -39,7 +39,6 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"first_last", "Prima/ultima parte", "First/last piece"},
 	{"seed_policy", "Policy di seed", "Seed policy"},
 	{"super_seeding", "Super-seeding (BEP 16)", "Super-seeding (BEP 16)"},
-	{"upload_mode", "Upload/share mode", "Upload/share mode"},
 	{"ramdisk", "RAM disk", "RAM disk"},
 	{"fastresume", "Fast resume", "Fast resume"},
 	{"piece_diagnostics", "Diagnostica dei pezzi", "Per-piece diagnostics"},

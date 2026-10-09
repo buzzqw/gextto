@@ -86,7 +86,6 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | Prima/ultima parte | parziale | sì | sì |
 | Policy di seed | sì | sì | parziale |
 | Super-seeding (BEP 16) | sì | sì | parziale |
-| Upload/share mode | — | sì | — |
 | RAM disk | sì | sì | — |
 | Fast resume | sì | sì | — |
 | Diagnostica dei pezzi | sì | — | — |
