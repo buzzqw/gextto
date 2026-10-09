@@ -239,3 +239,17 @@ func TestTorrentBackendAndListUseActiveEngine(t *testing.T) {
 		t.Fatalf("capability matrix missing: %s", body)
 	}
 }
+
+// TestTorrentBackendOptionsGateLibtorrent pins that the embedded engine is only
+// offered when the binary is compiled with libtorrent.
+func TestTorrentBackendOptionsGateLibtorrent(t *testing.T) {
+	embedded := false
+	for _, option := range uiTorrentBackendOptions("") {
+		if option.Value == BackendEmbedded {
+			embedded = true
+		}
+	}
+	if embedded != LibtorrentCompiled() {
+		t.Fatalf("embedded option present=%v, LibtorrentCompiled=%v", embedded, LibtorrentCompiled())
+	}
+}
