@@ -354,6 +354,17 @@ resolve_service_identity() {
 install_files() {
   local work="$1"
   run install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$DATA_DIR"
+  # Switching service user (e.g. from the isolated "gextto" account to the
+  # local user) must leave the existing data writable: re-own it when the
+  # owner differs, so databases and state keep working after the switch.
+  if [[ "$DRY_RUN" != "1" && -d "$DATA_DIR" ]]; then
+    local data_owner
+    data_owner="$(stat -c '%U' "$DATA_DIR" 2>/dev/null || true)"
+    if [[ -n "$data_owner" && "$data_owner" != "$SERVICE_USER" ]]; then
+      log "data directory owner $data_owner -> $SERVICE_USER (chown -R)"
+      run chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DATA_DIR"
+    fi
+  fi
   run install -d "$INSTALL_DIR"
 
   # Keep the previous binary so a failed upgrade can be rolled back.
