@@ -48,6 +48,7 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"sync", "Sincronizzazione della sessione", "Session sync"},
 	{"ip_filter", "Filtro IP", "IP filter"},
 	{"web_seeds", "Web seed", "Web seeds"},
+	{"holepunch", "Holepunching (BEP 55)", "Holepunching (BEP 55)"},
 }
 
 // capabilityDocColumns is the engine order and labels of the generated table.

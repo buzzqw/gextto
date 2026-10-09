@@ -92,6 +92,7 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | Session sync | yes | — | yes |
 | IP filter | yes | yes | partial |
 | Web seeds | yes | yes | partial |
+| Holepunching (BEP 55) | yes | — | — |
 <!-- capability-matrix:end -->
 
 ## Resource footprint

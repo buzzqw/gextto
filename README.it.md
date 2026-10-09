@@ -95,6 +95,7 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | Sincronizzazione della sessione | sì | — | sì |
 | Filtro IP | sì | sì | parziale |
 | Web seed | sì | sì | parziale |
+| Holepunching (BEP 55) | sì | — | — |
 <!-- capability-matrix:end -->
 
 ## Uso delle risorse
