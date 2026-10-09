@@ -1,0 +1,13 @@
+andres@debminis:~/gextto/scripts$ sudo ./holepunch-netns-test.sh [sudo] password di andres: ==> topologia: seed+relay in gx-lab, due client dietro NAT (solo namespace, host intatto) ==> tracker HTTP su 
+10.0.0.1:13800 ==> creo un torrent di prova da 4 MiB ==> info hash: aa63212ca9555d2267e6df638b9e408f91f4b6d5 ==> avvio i daemon (uTP + holepunch attivi) ==> probe verso gx-lab: tracker_http A=200 B=200 
+peer_tcp_A->seed=fail (atteso fail: solo uTP) ==> il seed pubblico serve i dati ==> seed add-file: {"existing":false,"hash":"aa63212ca9555d2267e6df638b9e408f91f4b6d5"} ==> seed stato: "progress":0 ==> il 
+relay e' un leecher interessato (download_limit basso, resta incompleto) ==> relay add: {"existing":false,"hash":"aa63212ca9555d2267e6df638b9e408f91f4b6d5"} ==> relay download_limit=1: {"status":"ok"} ==> 
+B entra come leecher, completa dal seed e resta connesso al relay ==> B add: {"existing":false,"hash":"aa63212ca9555d2267e6df638b9e408f91f4b6d5"} ==> B completo (seed dietro NAT, tenuto dal relay 
+interessato) ==> entra A (leecher, download limitato) e chiede l'introduzione al relay ==> A add: {"existing":false,"hash":"aa63212ca9555d2267e6df638b9e408f91f4b6d5"} ==> A download_limit=1: 
+{"status":"ok"} ==> attendo che i due client si colleghino via holepunch (max 90s) ==> PASS: i due client si sono collegati via holepunch (BEP 55) --- peer di A (leecher) --- 
+[{"address":"10.1.0.1:51410","client":"Rain 
+0.0.0","source":"tracker","download_rate":6729,"upload_rate":1682,"incoming":false,"encrypted":true,"utp":true,"progress":11.71875,"seed":false},{"address":"10.0.0.1:51400","client":"Rain 
+0.0.0","source":"tracker","download_rate":17218,"upload_rate":0,"incoming":false,"encrypted":true,"utp":true,"progress":100,"seed":true},{"address":"10.20.0.2:51402","client":"Rain 
+0.0.0","source":"incoming","download_rate":0,"upload_rate":0,"incoming":true,"encrypted":true,"utp":true,"progress":100,"seed":true}] --- peer di B (seed) --- [{"address":"10.1.0.1:51410","client":"Rain 
+0.0.0","source":"tracker","download_rate":5268,"upload_rate":1904,"incoming":false,"encrypted":true,"utp":true,"progress":11.328125,"seed":false},{"address":"10.10.0.2:51401","client":"Rain 
+0.0.0","source":"holepunch","download_rate":0,"upload_rate":0,"incoming":false,"encrypted":true,"utp":true,"progress":6.25,"seed":false}]
