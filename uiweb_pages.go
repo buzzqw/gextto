@@ -1039,7 +1039,11 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 			}
 		}
 	}
-	if def == "" || uiSettingIsSecret(field.Key) || uiSettingNoPrefill[field.Key] {
+	// uiSettingNoPrefill keeps list/JSON values out of the textarea so an
+	// accidental Save cannot overwrite the stored structure. It must not hide
+	// the deliberate «Predefinito» action though: the default is exposed on the
+	// row and only applied when the user clicks the button.
+	if def == "" || uiSettingIsSecret(field.Key) {
 		return
 	}
 	field.Default = def
