@@ -95,8 +95,10 @@ GEXTTO_BINARY="$BINARY" GEXTTO_FORCE_GXTORRENT=1 "$ROOT/scripts/build-daemon.sh"
 # Fail early, with the exact reason, if the binaries do not run here.
 "$BINARY" --version
 "$ROOT/bin/gx-torrent" --version >/dev/null
-glibc="$(objdump -T "$BINARY" | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)"
-echo "highest glibc symbol required: ${glibc:-none}"
+# The pure Go build is static: objdump -T fails on it and there is no glibc
+# requirement to report.
+glibc="$(objdump -T "$BINARY" 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1 || true)"
+echo "highest glibc symbol required: ${glibc:-none (static binary)}"
 
 "$ROOT/scripts/package-linux.sh" --binary "$BINARY" --arch "$ARCH" \
   --output "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz" ${LABEL:+--label "$LABEL"}
