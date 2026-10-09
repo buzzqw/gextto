@@ -1150,16 +1150,17 @@ func gh3AddParsedRelease(s *AppState, release models.Release) (int, any) {
 		_ = s.db.SetTorrentReason(hash, "manual")
 	}
 	title := release.Title
+	logHash, _ := utils.MagnetHash(release.Magnet)
 	go func() {
 		defer recoverGoroutine("g3 background")
 		added, err := s.activeEngine().Add(source, s.cfg)
 		switch {
 		case err != nil:
-			logging.Error("manual torrent add failed", "title", title, "error", err.Error())
+			logging.Error("manual torrent add failed", "title", title, "error", err.Error(), "hash", logHash)
 		case added:
-			logging.Info("manual torrent queued", "title", title)
+			logging.Info("manual torrent queued", "title", title, "score", score, "hash", logHash)
 		default:
-			logging.Info("manual torrent already queued", "title", title)
+			logging.Info("manual torrent already queued", "title", title, "hash", logHash)
 		}
 	}()
 	return http.StatusAccepted, map[string]any{"ok": true, "title": title, "queued": true}

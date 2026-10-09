@@ -8,6 +8,7 @@ package gextto
 
 import (
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -216,6 +217,43 @@ func V2SeriesSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view.Results = v2DedupSources(view.Results)
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_sources_modal", view, dict, eng)
+}
+
+// v2SeriesHistoryView is the download story of a series or of one episode.
+type v2SeriesHistoryView struct {
+	Label  string
+	Events []AcquisitionEvent
+	Error  string
+	// Modal wraps the table in a dialog (episode button); the series page
+	// loads the bare table into its own panel.
+	Modal bool
+}
+
+// V2SeriesHistory renders the acquisition events of a series, or of one
+// season/episode, newest first: a modal for an episode, a panel body for the
+// whole series.
+func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
+	series := strings.TrimSpace(r.FormValue("series"))
+	season, seasonErr := optionalInt64(r.FormValue("season"))
+	episode, episodeErr := optionalInt64(r.FormValue("episode"))
+	view := v2SeriesHistoryView{Label: series, Modal: r.FormValue("modal") != ""}
+	limit := 50
+	switch {
+	case seasonErr != nil || episodeErr != nil:
+		view.Error = "Stagione o episodio non validi."
+	default:
+		if season != nil && episode != nil {
+			view.Label = fmt.Sprintf("%s S%02dE%02d", series, *season, *episode)
+			limit = 200
+		}
+		events, err := s.db.AcquisitionEventsForTitle(series, season, episode, limit)
+		if err != nil {
+			view.Error = "Storia non disponibile: " + err.Error()
+		}
+		view.Events = events
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_series_history", view, dict, eng)
 }
 
 // V2SeriesEpisodeSearch opens the manual episode search modal: the local

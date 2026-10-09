@@ -149,3 +149,51 @@ func TestReadableFormatterDoesNotExposeTorrentHashes(t *testing.T) {
 		t.Fatalf("expected redacted readable log: %q", text)
 	}
 }
+
+func TestAcquisitionIDReplacesHashAndReachesSink(t *testing.T) {
+	dir := t.TempDir()
+	closeLog := Init(dir, "acq.log", 1<<20, 2)
+	defer closeLog()
+	var events []Event
+	SetEventSink(func(event Event) { events = append(events, event) })
+	defer SetEventSink(nil)
+	SetLevel("warn")
+	defer SetLevel("info")
+
+	hash := "449C4E37BE4464B10497F74827548892B061FC22"
+	Info("download started", "hash", hash, "name", "Example")
+	Warn("move failed", "magnet_hash", hash, "error", "busy")
+	Warn("no subject", "old_hash", hash)
+	Debug("noise", "hash", hash)
+
+	data, err := os.ReadFile(FilePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	id := AcqID(hash)
+	if len(id) != 6 || id != AcqID(strings.ToLower(hash)) {
+		t.Fatalf("unexpected acquisition id %q", id)
+	}
+	if strings.Contains(strings.ToLower(text), strings.ToLower(hash)) {
+		t.Fatalf("torrent hash leaked in log: %q", text)
+	}
+	if !strings.Contains(text, "move failed · error: busy · acq: "+id) {
+		t.Fatalf("missing acquisition id: %q", text)
+	}
+	if strings.Contains(text, "no subject · acq:") {
+		t.Fatalf("old_hash must not name the acquisition: %q", text)
+	}
+	if strings.Contains(text, "download started") {
+		t.Fatalf("info line written below the warn level: %q", text)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events (info below level included, debug excluded), got %d: %+v", len(events), events)
+	}
+	if events[0].Hash != strings.ToLower(hash) || events[0].Message != "download started" || events[0].Fields != "name: Example" {
+		t.Fatalf("unexpected first event: %+v", events[0])
+	}
+	if events[1].Level != LevelWarn || events[1].Fields != "error: busy" {
+		t.Fatalf("unexpected second event: %+v", events[1])
+	}
+}

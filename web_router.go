@@ -29,6 +29,7 @@ func Router(s *AppState) *http.ServeMux {
 	handle(s, mux, "GET /api/jobs", JobsList)
 	handle(s, mux, "GET /api/jobs/{id}", JobsGet)
 	handle(s, mux, "POST /api/jobs/{id}/cancel", JobsCancel)
+	handle(s, mux, "GET /api/acquisitions", AcquisitionsApi)
 	handle(s, mux, "GET /api/logs", Logs)
 	handle(s, mux, "GET /api/logs/stream", LogsStream)
 	handle(s, mux, "GET /api/notifications/stream", NotificationsStream)

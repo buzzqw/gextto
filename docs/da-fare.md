@@ -6,12 +6,13 @@ pur essendo un backlog **attivo**. Dei due item recuperati dal piano di adozione
 
 ## Aperti
 
-### 1. Osservabilità e runbook
-- ID di correlazione attraverso ricerca → download → import;
-- metriche: profondità della coda, durata della ricerca, fallimenti di indexer e
-  import, spazio disco, ultimo ciclo riuscito;
-- la salute degli indexer del manager è già in Sources (`indexer_health.go`);
-- un breve runbook "un ciclo è fallito — dove guardare", basato su Health e Log.
+### 1. Osservabilità: metriche nel tempo
+ID di correlazione e runbook sono fatti (vedi sotto). Resta la parte metriche:
+andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
+- durata delle ricerche e sorgenti che non rispondono, ciclo per ciclo;
+- import falliti al giorno, da quanto non c'è un ciclo riuscito (con avviso
+  oltre una soglia), titoli in coda e da quanto aspettano;
+- la salute degli indexer del manager è già in Sources (`indexer_health.go`).
 
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
@@ -21,6 +22,13 @@ pur essendo un backlog **attivo**. Dei due item recuperati dal piano di adozione
 
 ## Chiusi / decisioni
 
+- **ID di correlazione e storia dei download** — fatto (2026-10-10). Le righe di
+  log su un torrent portano `acq: <id>` (ID corto derivato dall'hash, che resta
+  nascosto) e finiscono in `acquisition_events`: scheda *Storia* nel dettaglio
+  torrent, 📜 per puntata e pannello nella pagina della serie, API
+  `/api/acquisitions` (`acquisition.go`).
+- **Runbook "un episodio non è arrivato"** — fatto (2026-10-10), in
+  *Risoluzione problemi* di `MANUAL.it.md`/`MANUAL.en.md`, costruito sulla storia.
 - **Wizard di primo avvio (onboarding)** — fatto e giudicato concluso
   (2026-10-10). Procedura guidata in `uiweb_v2_setup.go` (commit `c8162d8`), poi
   TVDB come alternativa a TMDB e scelta della lingua al primo passo.

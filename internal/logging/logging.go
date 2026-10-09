@@ -5,6 +5,8 @@
 package logging
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -110,8 +112,17 @@ func ProblemCount() uint64 { return problemCount.Load() }
 
 func logf(level Level, message string, kv []any) {
 	logMu.Lock()
+	sink := eventSink
 	if level < minLevel {
 		logMu.Unlock()
+		// A line below the log level still belongs to an acquisition's
+		// history: the operator may log only warnings and still want to see
+		// when a download started or reached the library.
+		if sink != nil && level >= LevelInfo {
+			if hash := acquisitionHash(kv); hash != "" {
+				sink(newEvent(level, hash, message, kv))
+			}
+		}
 		return
 	}
 	if level >= LevelWarn {
@@ -120,12 +131,33 @@ func logf(level Level, message string, kv []any) {
 	writer := logWriter
 	logMu.Unlock()
 
+	acqHash := acquisitionHash(kv)
 	var sb strings.Builder
 	sb.WriteString(time.Now().Format("2006-01-02 15:04:05"))
 	sb.WriteByte(' ')
 	fmt.Fprintf(&sb, "%5s", level.String())
 	sb.WriteByte(' ')
 	sb.WriteString(redactTorrentHashes(message))
+	sb.WriteString(renderFields(kv))
+	if acqHash != "" {
+		sb.WriteString(" · " + AcqField + ": ")
+		sb.WriteString(AcqID(acqHash))
+	}
+	sb.WriteByte('\n')
+
+	line := sb.String()
+	logMu.Lock()
+	_, _ = io.WriteString(writer, line)
+	logMu.Unlock()
+	if sink != nil && acqHash != "" && level >= LevelInfo {
+		sink(newEvent(level, acqHash, message, kv))
+	}
+}
+
+// renderFields formats the structured fields as ` · key: value`, leaving out
+// every field that carries a torrent hash or magnet.
+func renderFields(kv []any) string {
+	var sb strings.Builder
 	for i := 0; i+1 < len(kv); i += 2 {
 		key, _ := kv[i].(string)
 		if key == "" {
@@ -139,11 +171,77 @@ func logf(level Level, message string, kv []any) {
 		sb.WriteString(": ")
 		sb.WriteString(redactTorrentHashes(formatValue(kv[i+1])))
 	}
-	sb.WriteByte('\n')
+	return sb.String()
+}
 
-	line := sb.String()
+// AcqField is the log field that names an acquisition: the path of one
+// download from its start to the library. Its value is AcqID of the torrent
+// hash, never the hash itself.
+const AcqField = "acq"
+
+// acquisitionHashKeys are the fields whose value identifies the torrent a line
+// is about. Other hash fields (old_hash, new_hash) describe a relation and are
+// not the subject of the line.
+var acquisitionHashKeys = map[string]bool{"hash": true, "magnet_hash": true, "torrent_hash": true, "info_hash": true}
+
+var acquisitionHashPattern = regexp.MustCompile(`(?i)^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+// acquisitionHash returns the lower-case torrent hash a line is about, or "".
+func acquisitionHash(kv []any) string {
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, _ := kv[i].(string)
+		if !acquisitionHashKeys[strings.ToLower(strings.TrimSpace(key))] {
+			continue
+		}
+		value := strings.TrimSpace(formatValue(kv[i+1]))
+		if acquisitionHashPattern.MatchString(value) {
+			return strings.ToLower(value)
+		}
+	}
+	return ""
+}
+
+// AcqID derives the short acquisition ID shown in the log from a torrent hash.
+// It is one-way: the log never exposes the hash, but the same download always
+// gets the same ID, so filtering the log on it shows its whole story.
+func AcqID(hash string) string {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte("gextto-acq:" + hash))
+	return hex.EncodeToString(sum[:])[:6]
+}
+
+// Event is a log line about one acquisition, handed to the event sink.
+type Event struct {
+	At      time.Time
+	Level   Level
+	Hash    string
+	Message string
+	// Fields are the rendered structured fields (` · key: value`), without hashes.
+	Fields string
+}
+
+func newEvent(level Level, hash, message string, kv []any) Event {
+	return Event{
+		At:      time.Now(),
+		Level:   level,
+		Hash:    hash,
+		Message: redactTorrentHashes(message),
+		Fields:  strings.TrimPrefix(renderFields(kv), " · "),
+	}
+}
+
+var eventSink func(Event)
+
+// SetEventSink installs the function that receives every INFO, WARN and ERROR
+// line about an acquisition (a line with a hash field), whatever the log level.
+// It is called synchronously from the logging goroutine and must not block or
+// log; nil removes it.
+func SetEventSink(sink func(Event)) {
 	logMu.Lock()
-	_, _ = io.WriteString(writer, line)
+	eventSink = sink
 	logMu.Unlock()
 }
 

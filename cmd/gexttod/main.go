@@ -99,6 +99,10 @@ func runDaemon(dryRun bool, configOption *string) error {
 		return err
 	}
 	defer db.Close()
+	// Store the story of each download (log lines with a torrent hash); stopped
+	// before the database closes, after flushing the pending events.
+	stopAcquisitions := gextto.StartAcquisitionRecorder(db)
+	defer stopAcquisitions()
 	archive, err := gextto.OpenArchive(filepath.Join(cfg.DataDir, constants.DefaultArchiveFile))
 	if err != nil {
 		return err

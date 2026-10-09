@@ -1020,6 +1020,16 @@ la pulizia degli altri.
   completamento, eventuale spostamento su NAS e importazione in archivio). I
   messaggi torrent includono sempre nome o titolo leggibile; gli hash torrent
   sono nascosti nel log utente.
+- **ID acquisizione e storia dei download** — le righe che riguardano un
+  download finiscono con `acq: 7f3a2c`: un ID corto che resta lo stesso
+  dall'avvio del download all'arrivo in libreria. Scrivendolo nel filtro del log
+  si vede solo quel download. Le stesse righe (INFO, WARN ed ERROR, anche con il
+  log impostato su `warn`) vengono salvate come **storia**: scheda *Storia* nel
+  dettaglio del torrent, pulsante 📜 su ogni puntata e pannello *Storia dei
+  download* nella pagina della serie. Le righe ripetute uguali diventano una sola
+  con il contatore (×N); la storia si conserva 180 giorni e resta leggibile anche
+  dopo la rotazione del log e la rimozione del torrent. API: `GET
+  /api/acquisitions?hash=…`, `?acq=…` oppure `?series=…&season=…&episode=…`.
 - **Grafici** — sparkline CPU/RAM/download/upload/disco/RAM disk e consumo
   giornaliero.
 - **Attività** — eventi torrent recenti e download.
@@ -1184,6 +1194,26 @@ dopo 30 secondi.
   brusco (crash, mancanza di corrente) i download ripartono da dove erano, e
   quelli che il motore avesse comunque perso vengono riaggiunti all'avvio
   riusando i dati già scaricati.
+- **Un episodio non è arrivato: dove guardare** — parti dalla serie e premi 📜
+  sulla puntata.
+  - *Nessun evento*: Gextto non l'ha mai scaricato. Usa 🔍 (ricerca manuale) e
+    **Perché non questa?** per capire se la release non c'è nelle sorgenti o se
+    è stata scartata da filtri, qualità, lingua o ritardi; controlla anche lo
+    stato delle sorgenti in *Salute*.
+  - *📥 Downloading e poi niente*: il download è in corso o fermo. Apri il
+    torrent da *Scarico*: «⏸️ is stuck» indica pochi utenti che condividono,
+    «❌ Gave up» che è stato abbandonato e alla prossima ricerca ne cercherà
+    un'altra versione.
+  - *🎉 downloaded ma nessun 📁*: il file è scaricato ma non è arrivato in
+    libreria. Cerca «⚠️ still cannot be moved» o «Could not move»: di solito
+    NAS non raggiungibile, permessi o spazio; i tentativi riprendono da soli.
+  - *«discarded as inferior»*: in libreria c'era già una versione almeno
+    altrettanto buona, quindi quella nuova è stata scartata. È il comportamento
+    previsto.
+  - *📁 added / ♻️ updated*: è in libreria; se il nome non è quello atteso vedi
+    il punto sulla rinomina qui sopra.
+  Per il dettaglio completo apri *Mostra nel log* dal torrent: filtra il log
+  sulle righe di quel solo download.
 - **Il backup FTP fallisce** — usa *Test FTP*: indica il passo che fallisce
   (connessione, login, percorso remoto, upload, rimozione) e lo registra nel log.
 - **Log** — vedi `data/gextto.log` (rotazione a 5 MB) o il viewer nella UI.

@@ -36,6 +36,7 @@ Per verifiche operative usa prima
 | Method | Path |
 |---|---|
 | GET | `/` |
+| GET | `/api/acquisitions` |
 | GET | `/api/archive` |
 | POST | `/api/archive/add` |
 | POST | `/api/archive/batch-download` |

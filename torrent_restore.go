@@ -143,6 +143,7 @@ func restoreMissingTorrents(cfg *Config, db *Database, engine TorrentEngine) int
 			break
 		}
 		release := item.Release
+		hash := item.Hash
 		candidates := append([]string{}, folders...)
 		if dir, ok := DownloadDirFor(&release, cfg); ok {
 			candidates = append([]string{dir}, candidates...)
@@ -155,16 +156,16 @@ func restoreMissingTorrents(cfg *Config, db *Database, engine TorrentEngine) int
 		added, err := engine.AddWithPath(release.Magnet, cfg, preferred)
 		if err != nil || !added {
 			logging.Warn(fmt.Sprintf("⚠️ %s was lost from the torrent engine and could not be added back", logTarget(&release)),
-				"error", err)
+				"error", err, "hash", hash)
 			continue
 		}
 		restored++
 		if folder != "" {
 			logging.Info(fmt.Sprintf("♻️ %s had been lost by an unclean stop; added back, and the data already in %s will be checked and reused",
-				logTarget(&release), folder))
+				logTarget(&release), folder), "hash", hash)
 		} else {
 			logging.Info(fmt.Sprintf("♻️ %s had been lost by an unclean stop; added back (no earlier data found, it starts again)",
-				logTarget(&release)))
+				logTarget(&release)), "hash", hash)
 		}
 	}
 	return restored

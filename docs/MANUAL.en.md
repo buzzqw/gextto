@@ -990,6 +990,16 @@ the others.
   the filter decisions, and download events (start, metadata, completion, any
   NAS move and archive import). Torrent messages always include the readable
   name or title; torrent hashes are hidden from the user-facing log.
+- **Acquisition ID and download history** — lines about a download end with
+  `acq: 7f3a2c`: a short ID that stays the same from the start of the download
+  to its arrival in the library. Typing it in the log filter shows only that
+  download. The same lines (INFO, WARN and ERROR, even with the log set to
+  `warn`) are stored as its **history**: the *History* tab in the torrent
+  detail, the 📜 button on every episode and the *Download history* panel on
+  the series page. Identical repeated lines become one with a counter (×N); the
+  history is kept for 180 days and stays readable after the log rotates and the
+  torrent is removed. API: `GET /api/acquisitions?hash=…`, `?acq=…` or
+  `?series=…&season=…&episode=…`.
 - **Charts** — CPU/RAM/download/upload/disk/ram-disk sparklines and daily
   consumption.
 - **Activity** — recent torrent events and downloads.
@@ -1150,6 +1160,25 @@ seconds.
   an unclean stop (crash, power loss) downloads resume where they were, and any
   the engine still lost are added back at start-up, reusing the data already
   downloaded.
+- **An episode did not arrive: where to look** — start from the series and
+  press 📜 on the episode.
+  - *No events*: Gextto never downloaded it. Use 🔍 (manual search) and **Why
+    not this one?** to see whether the release is missing from the sources or
+    was rejected by filters, quality, language or delays; check the source
+    status in *Health* too.
+  - *📥 Downloading and then nothing*: the download is running or stuck. Open
+    the torrent from *Downloads*: "⏸️ is stuck" means few users are sharing it,
+    "❌ Gave up" that it was abandoned and the next search will look for
+    another version.
+  - *🎉 downloaded but no 📁*: the file is downloaded but did not reach the
+    library. Look for "⚠️ still cannot be moved" or "Could not move": usually
+    an unreachable NAS, permissions or space; the attempts resume on their own.
+  - *"discarded as inferior"*: the library already had a version at least as
+    good, so the new one was discarded. This is expected.
+  - *📁 added / ♻️ updated*: it is in the library; if the name is not the
+    expected one see the renaming item above.
+  For the full detail open *Show in the log* from the torrent: it filters the
+  log on the lines of that download only.
 - **FTP backup fails** — use *Test FTP*: it reports the failing step (connection,
   login, remote path, upload, delete) and logs it.
 - **Logs** — see `data/gextto.log` (rotated at 5 MB) or the in-app log viewer.

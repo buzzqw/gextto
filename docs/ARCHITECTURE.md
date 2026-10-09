@@ -144,6 +144,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `httpx.go` | client HTTP condiviso per sorgenti e provider. |
 | `jsonutil.go` | normalizzazione fedele delle risposte JSON. |
 | `health.go` | report di salute (dashboard/endpoint). |
+| `acquisition.go` + `web_handlers_acquisitions.go` | storia dei download: le righe di log con un hash torrent (campo `acq: <id>` di `internal/logging`) salvate in `acquisition_events`; API `/api/acquisitions`, scheda *Storia* e 📜 nella UI. |
 | `health_monitor.go` | monitor che logga lo stato `degraded` con motivo e recupero. |
 | `jobs.go` | gestore dei job di background. |
 
@@ -180,7 +181,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | Pacchetto | Contenuto |
 |---|---|
 | `internal/constants` | costanti condivise (porte, default, versione/build). |
-| `internal/logging` | logger del daemon. |
+| `internal/logging` | logger del daemon; trasforma i campi hash in `acq: <id>` e passa quelle righe al sink della storia dei download. |
 | `internal/models` | tipi condivisi. |
 | `internal/rules` | regole di matching. |
 | `internal/utils` | utilità generiche. |

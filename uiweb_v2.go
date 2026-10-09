@@ -207,6 +207,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	// Dettagli Serie/Film.
 	v2Handle(s, mux, "POST /series/save", V2SeriesSave)
 	v2Handle(s, mux, "GET /series/sources", V2SeriesSources)
+	v2Handle(s, mux, "GET /series/history", V2SeriesHistory)
 	v2Handle(s, mux, "POST /series/episode-search", V2SeriesEpisodeSearch)
 	v2Handle(s, mux, "GET /series/episode-search-online", V2SeriesEpisodeSearchOnline)
 	v2Handle(s, mux, "GET /series/rename-preview", V2SeriesRenamePreview)
@@ -1295,6 +1296,10 @@ type v2DetailView struct {
 	Trackers []models.TrackerView
 	Files    []models.FileView
 	Peers    []models.PeerView
+	// AcqID is the short acquisition ID printed in the log (`acq: 7f3a2c`).
+	AcqID string
+	// History is the stored story of this download (tab "history").
+	History []AcquisitionEvent
 	// Pieces is the piece map for backends that report it (gx-torrent).
 	Pieces      []v2PieceRun
 	PieceCount  int
@@ -1367,6 +1372,8 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if _, ok := s.activeEngine().(TorrentPieceInspector); ok {
 		view.Tabs = append(view.Tabs, v2DetailTab{ID: "pieces", Label: "Pezzi"})
 	}
+	view.Tabs = append(view.Tabs, v2DetailTab{ID: "history", Label: "Storia"})
+	view.AcqID = logging.AcqID(hash)
 	for index := range view.Tabs {
 		view.Tabs[index].Active = view.Tabs[index].ID == tab
 	}
@@ -1425,6 +1432,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
 		{Label: "Magnet", Value: magnet},
+		{Label: "ID acquisizione", Value: view.AcqID},
 	}
 	if torrent.Error != "" {
 		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error})
@@ -1443,6 +1451,11 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		view.Files, _, tabErr = s.activeEngine().Files(hash)
 	case "peers":
 		view.Peers, _, tabErr = s.activeEngine().Peers(hash)
+	case "history":
+		var historyErr error
+		if view.History, historyErr = s.db.AcquisitionEvents(hash); historyErr != nil {
+			view.TabError = "Storia non disponibile: " + historyErr.Error()
+		}
 	case "pieces":
 		if inspector, ok := s.activeEngine().(TorrentPieceInspector); ok {
 			var runs []TorrentPieceRun

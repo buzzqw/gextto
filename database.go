@@ -862,6 +862,10 @@ func (d *Database) migrate() error {
 	if _, err := d.db.Exec(databaseTorrentMoveSchema); err != nil {
 		return err
 	}
+	// Acquisition history (acquisition.go): the story of each download.
+	if _, err := d.db.Exec(databaseAcquisitionSchema); err != nil {
+		return err
+	}
 	// Identità della release bloccata (come il legacy `download_blocklist`):
 	// hash + serie/stagione/episodio o film/anno, per audit e UI.
 	for _, column := range []struct{ table, name, definition string }{

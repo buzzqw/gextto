@@ -539,6 +539,9 @@
       {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}scaricato{{else if eq .State "downloading"}}in corso{{else if eq .State "skipped"}}saltato{{else}}mancante{{end}} · pezzi {{.Begin}}–{{.End}}"></span>{{end}}
     </div>
   {{else}}<p class="muted">Mappa dei pezzi non disponibile: metadata non ancora presenti.</p>{{end}}
+{{else if eq .Tab "history"}}
+  {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
+  {{template "v2_acquisition_events" (dict "Events" .History "AcqID" .AcqID "ShowTitle" false)}}
 {{else if eq .Tab "limits"}}
   <form class="form-grid" hx-post="/downloads/detail/action" hx-target="#v2-detail-panel" hx-swap="innerHTML">
     <input type="hidden" name="hash" value="{{.Hash}}" /><input type="hidden" name="tab" value="limits" /><input type="hidden" name="op" value="limits" />
@@ -564,6 +567,13 @@
 </div>
 {{end}}
 
+{{end}}
+
+{{define "v2_acquisition_events"}}
+{{if .AcqID}}<p class="hint"><span>ID acquisizione:</span> <code>{{.AcqID}}</code> · <a href="/?view=logs&amp;filter={{printf "acq: %s" .AcqID | urlquery}}" title="Apri il log filtrato su questo download">Mostra nel log</a></p>
+<p class="hint">Ogni riga del log di questo download contiene questo ID.</p>{{end}}
+{{if .Events}}<div class="table-wrap"><table class="data-table acquisition-events"><caption class="sr-only">Storia del download</caption><thead><tr><th scope="col">Quando</th>{{if .ShowTitle}}<th scope="col">Download</th>{{end}}<th scope="col">Evento</th><th scope="col">Dettagli</th></tr></thead><tbody>{{range .Events}}<tr class="acq-{{.LevelClass}}"><td class="nowrap">{{.At}}{{if gt .Repeat 1}} <span class="badge" title="Ripetuto più volte: l'ora è quella dell'ultima">×{{.Repeat}}</span><br /><small class="muted"><span>dal</span> {{.FirstAt}}</small>{{end}}</td>{{if $.ShowTitle}}<td class="truncate" title="{{.Title}}"><code>{{.AcqID}}</code> {{.EpisodeLabel}}</td>{{end}}<td>{{if eq .Level "WARN"}}<span class="badge warn">avviso</span> {{else if eq .Level "ERROR"}}<span class="badge err">errore</span> {{end}}{{.Message}}</td><td class="truncate" title="{{.Fields}}">{{if .Fields}}{{.Fields}}{{else}}—{{end}}</td></tr>{{end}}</tbody></table></div>
+{{else}}<p class="muted">Nessun evento registrato per questo download. La storia si costruisce dalle righe di log scritte da questa versione in poi.</p>{{end}}
 {{end}}
 
 {{define "v2_detail_action"}}
@@ -2107,6 +2117,7 @@
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .IgnorePath "Method" "POST" "Body" .IgnoreBody "Label" (ternary .Ignored "✓" "🚫") "Class" "icon-action" "Title" "Ignora o riabilita")}}
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .Redownload "Method" "POST" "Body" "{}" "Label" "↻" "Class" "icon-action" "Title" "Rendi di nuovo scaricabile")}}
                 <button class="btn sm icon-action" type="button" hx-get="/series/sources?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}" hx-target="#v2-modal" hx-swap="innerHTML" title="Sorgenti in archivio locale (nessuna ricerca online)" aria-label="Sorgenti in archivio S{{.Season}}E{{.Episode}}"><span aria-hidden="true">ⓘ</span></button>
+                <button class="btn sm icon-action" type="button" hx-get="/series/history?series={{$.PathName}}&amp;season={{.Season}}&amp;episode={{.Episode}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia dei download di questa puntata: ricerca, download, spostamenti, errori" aria-label="Storia dei download della puntata">📜</button>
                 {{template "v2_action_btn" (dict "Redirect" (printf "/?view=series&series=%s" $.PathName) "Path" .DeletePath "Method" "DELETE" "Body" "{}" "Label" "🗑️" "Class" "icon-action danger" "Title" "Elimina dall'archivio" "Confirm" "Eliminare questa puntata dall'archivio?")}}
               </td>
             </tr>
@@ -2118,6 +2129,11 @@
       </div>
       {{else}}<p class="muted">Nessun episodio noto.</p>{{end}}
     </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Storia dei download</h3><small class="muted">Ultimi 50 eventi; 📜 su una puntata mostra la sua storia completa.</small></div>
+    <div class="panel-body" hx-get="/series/history?series={{.PathName}}" hx-trigger="load" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
   </div>
 
   <div class="panel">
@@ -2233,6 +2249,18 @@
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">{{if .Hint}}{{.Hint}}{{else}}Nessuna sorgente disponibile per questa puntata.{{end}}</p>{{end}}
+{{end}}
+
+{{define "v2_series_history"}}
+{{if .Modal}}<div class="overlay" style="display:block">
+  <div class="modal v2-history-modal" role="dialog" aria-modal="true" aria-labelledby="v2-history-title">
+    <div class="modal-head"><h3 id="v2-history-title"><span>Storia</span> {{.Label}}</h3>
+      <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+    <div class="modal-body">{{end}}
+{{if .Error}}<p class="alert">{{.Error}}</p>{{else}}{{template "v2_acquisition_events" (dict "Events" .Events "AcqID" "" "ShowTitle" true)}}{{end}}
+{{if .Modal}}</div>
+  </div>
+</div>{{end}}
 {{end}}
 
 {{define "v2_sources_modal"}}
