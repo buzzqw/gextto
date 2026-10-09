@@ -69,7 +69,7 @@ automatico se gx-torrent non riesce a restare attivo.
 | Motore | Dove gira | Vantaggi | Limiti — quando sceglierlo |
 |---|---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria (loopback per default, protetta da token se esposta in LAN); i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna; un crash resta nel suo processo; download sequenziale e prima/ultima parte; diagnostica dei pezzi; streaming HTTP con Range; super-seeding (BEP 16); limiti di velocità, connessioni e upload per torrent; impronta di memoria adattiva (cache dimensionata su RAM disponibile, download/seed attivi e tipo di storage); test porte integrato e pulizia dei tracker che non funzionano mai; se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi, niente solo-v2; solo IPv4: niente listener, DHT o uTP IPv6; niente WebTorrent/WebRTC né holepunching NAT; niente upload/share mode; la priorità prima/ultima parte è parziale | vuoi un motore autonomo con dipendenze C/C++ minime e sviluppo attivo |
-| libtorrent (integrato) | Stesso processo di Gextto (`libtorrent-rasterbar`) | Matrice di parità completa: sequenziale, prima/ultima parte, limiti per torrent, super-seeding, web seed, fast resume, RAM disk, upload mode; tutte le regolazioni avanzate di libtorrent | Gextto e il motore condividono un processo, quindi un crash li coinvolge entrambi; richiede la libreria libtorrent a runtime; niente pagina web propria e niente diagnostica dei pezzi tramite Gextto | ti serve un controllo avanzato che Gextto non espone per gx-torrent, o la massima compatibilità |
+| libtorrent (integrato) | Stesso processo di Gextto, libtorrent-rasterbar; il pacchetto di release include la libreria | Matrice di parità completa: sequenziale, prima/ultima parte, limiti per torrent, super-seeding, web seed, fast resume, RAM disk, upload mode; tutte le regolazioni avanzate di libtorrent | Gextto e il motore condividono un processo, quindi un crash li coinvolge entrambi; gexttod linka libtorrent e non si compila senza (il pacchetto di release include la libreria, quindi non serve installare nulla a runtime); niente pagina web propria e niente diagnostica dei pezzi tramite Gextto | ti serve un controllo avanzato che Gextto non espone per gx-torrent, o la massima compatibilità |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Riusa un qBittorrent esistente e il suo ecosistema/Web UI; sequenziale e limiti per torrent; il trasferimento gira in un processo isolato | Servono le mappature percorsi se i due processi vedono path diversi; niente RAM disk, fast resume, upload mode né diagnostica dei pezzi; super-seeding, filtro IP e web seed solo parziali; un processo e una dipendenza in più | hai già qBittorrent-nox o preferisci la sua UI |
 
 ## Uso delle risorse
@@ -114,7 +114,8 @@ Installa il programma in `/opt/gextto`, conserva i dati del servizio in
 `/var/lib/gextto` ed espone la UI sulla porta 5000. Il motore torrent
 predefinito, `gx-torrent` (Go puro, senza libtorrent), viene installato accanto
 a `gexttod` e avviato in modalità gestita; libtorrent integrato resta come
-fallback automatico e alternativa selezionabile.
+fallback automatico e alternativa selezionabile. Non serve installare altro: il
+pacchetto include sia il demone gx-torrent sia la libreria condivisa libtorrent.
 
 Prima di toccare il sistema l'installer avvia una volta il programma scaricato:
 se mancano librerie o la glibc è troppo vecchia lo dice subito, senza lasciare un
@@ -131,8 +132,10 @@ utente, `--media-group <gruppo>` aggiunge l'utente del servizio a quel gruppo.
 ### Installazione dal sorgente
 
 Servono Go 1.26+, compilatore C++17 e header di sviluppo libtorrent-rasterbar.
-La build normale include la UI web: non è richiesto un build frontend separato.
-Consulta il [manuale sviluppatori](docs/DEVELOPERS.md).
+libtorrent serve solo per compilare: il pacchetto di release la include già,
+quindi un'installazione normale non richiede toolchain C/C++. La build normale
+include la UI web: non è richiesto un build frontend separato. Consulta il
+[manuale sviluppatori](docs/DEVELOPERS.md).
 
 ```bash
 make build

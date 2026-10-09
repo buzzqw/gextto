@@ -67,7 +67,7 @@ if gx-torrent cannot stay up.
 | Engine | Where it runs | Strengths | Limits — pick it when |
 |---|---|---|---|
 | gx-torrent (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page (loopback by default, token-protected if exposed on the LAN); transfers keep running while Gextto restarts or updates; a crash stays in its process; sequential and first/last download; per-piece diagnostics; HTTP streaming with Range; BEP 16 super-seeding; per-torrent speed, connection and upload limits; adaptive memory footprint (cache sized from available RAM, active downloads/seeds and the storage type); built-in peer-port test and cleanup of trackers that never work; falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only, no v2-only torrents; IPv4 only, no IPv6 listener, DHT or uTP; no WebTorrent/WebRTC and no NAT holepunching; no upload/share mode; first/last prioritization is partial | you want a self-contained engine with minimal C/C++ dependencies and active development |
-| libtorrent (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full parity matrix: sequential, first/last, per-torrent limits, super-seeding, web seeds, fast resume, RAM disk, upload mode; every advanced libtorrent knob | Gextto and the engine share one process, so a crash takes both down; needs the libtorrent library at runtime; no separate web page and no per-piece diagnostics through Gextto | you need an advanced control Gextto does not expose for gx-torrent, or maximum compatibility |
+| libtorrent (embedded) | Same process as Gextto, libtorrent-rasterbar; the released package bundles the library | Full parity matrix: sequential, first/last, per-torrent limits, super-seeding, web seeds, fast resume, RAM disk, upload mode; every advanced libtorrent knob | Gextto and the engine share one process, so a crash takes both down; gexttod links libtorrent and cannot be built without it (the released package includes the library, so nothing to install at runtime); no separate web page and no per-piece diagnostics through Gextto | you need an advanced control Gextto does not expose for gx-torrent, or maximum compatibility |
 | qBittorrent-nox | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; sequential and per-torrent limits; the transfer runs in an isolated process | Needs path mappings when the two processes see different paths; no RAM disk, no fast resume, no upload mode and no piece diagnostics; super-seeding, IP filter and web seeds only partial; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
 
 ## Resource footprint
@@ -110,7 +110,8 @@ It installs the program in `/opt/gextto`, stores service data in
 `/var/lib/gextto`, and exposes the UI on port 5000. The default torrent engine,
 `gx-torrent` (pure Go, no libtorrent needed), is installed next to `gexttod` and
 started in managed mode; embedded libtorrent stays as the automatic fallback and
-selectable alternative.
+selectable alternative. Nothing else must be installed: the package bundles both
+the gx-torrent daemon and the libtorrent shared library.
 
 Before touching the system the installer runs the downloaded program once: a
 missing library or a too-old glibc is reported right away instead of leaving a
@@ -127,8 +128,10 @@ user, `--media-group <group>` adds the service user to that group.
 ### Install from source
 
 Source builds require Go 1.26+, a C++17 compiler and libtorrent-rasterbar
-development headers. The normal build embeds the web UI; no separate frontend
-build is required. See the [developer manual](docs/DEVELOPERS.md).
+development headers. libtorrent is needed only to build: the released package
+already bundles it, so a normal install requires no C/C++ toolchain. The normal
+build embeds the web UI; no separate frontend build is required. See the
+[developer manual](docs/DEVELOPERS.md).
 
 ```bash
 make build
