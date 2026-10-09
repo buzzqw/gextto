@@ -64,6 +64,8 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"libtorrent_sched_dl_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_sched_ul_limit":    {Unit: "KiB/s", Zero: "0 = illimitato", DependsOn: "libtorrent_sched_enabled"},
 	"libtorrent_announce_interval": {Unit: "secondi"},
+	// Ricerca peer e tracker
+	"libtorrent_holepunch": {DependsOn: "libtorrent_utp"},
 
 	// Code e prestazioni
 	"libtorrent_dynamic_queue_min":           {DependsOn: "libtorrent_dynamic_queue"},

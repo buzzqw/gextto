@@ -263,6 +263,22 @@ libtorrent; non è il relè via nodo DHT proprietario di libtorrent.
   `ut_holepunch` un ID diverso da 3 non viene capito (limite preesistente
   dell'architettura estensioni di rain).
 
+### Verifica
+
+Il codec, la decisione del relè, l'inoltro della configurazione e la mappatura
+della sorgente sono coperti dai test (`make test-rain`,
+`go test ./cmd/gx-torrent/`, `go test .`). Per una prova **reale** su NAT serve
+una topologia con namespace di rete (root/CAP_NET_ADMIN, non disponibile in CI):
+
+1. due namespace "dietro NAT" collegati a un router che fa MASQUERADE, più un
+   terzo peer raggiungibile da entrambi (il relè);
+2. avvia tre `gx-torrent` (uTP e holepunch attivi) con lo stesso torrent: il
+   relè connesso a entrambi gli altri, il leecher e il seeder dietro NAT;
+3. il leecher conosce l'endpoint del seeder ma non riesce a diallarlo, quindi
+   chiede il rendezvous al relè. Se il buco riesce, il peer compare con origine
+   **`holepunch`** tra i peer del torrent (pagina web del demone o campo
+   `source` in `/api/v1/torrents/<hash>/peers`).
+
 ## Selezione dei file
 
 Si possono scaricare solo alcuni file di un torrent: priorità 0 = escluso,
