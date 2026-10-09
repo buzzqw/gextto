@@ -259,6 +259,8 @@ func (t *torrent) getPeers() []Peer {
 			source = SourceIncoming
 		case peersource.Manual:
 			source = SourceManual
+		case peersource.Holepunch:
+			source = SourceHolepunch
 		default:
 			t.crash("unhandled peer source")
 		}

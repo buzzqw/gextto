@@ -292,6 +292,9 @@ const (
 	SourceIncoming
 	// SourceManual indicates that the peer is added manually via AddPeer method.
 	SourceManual
+	// SourceHolepunch indicates that the peer was reached via a BEP 55
+	// holepunch rendezvous (gextto fork).
+	SourceHolepunch
 )
 
 func (t *torrent) Peers() []Peer {

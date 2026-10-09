@@ -316,6 +316,8 @@ func (h *rpcHandler) GetTorrentPeers(args *rpctypes.GetTorrentPeersRequest, repl
 			source = "INCOMING"
 		case SourceManual:
 			source = "MANUAL"
+		case SourceHolepunch:
+			source = "HOLEPUNCH"
 		default:
 			source = "UNKNOWN"
 		}

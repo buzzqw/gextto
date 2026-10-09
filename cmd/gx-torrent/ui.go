@@ -1736,6 +1736,8 @@ func sourceName(source torrent.PeerSource) string {
 		return "incoming"
 	case torrent.SourceManual:
 		return "manual"
+	case torrent.SourceHolepunch:
+		return "holepunch"
 	default:
 		return "—"
 	}
