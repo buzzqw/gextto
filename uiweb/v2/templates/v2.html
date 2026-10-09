@@ -1551,6 +1551,13 @@
       {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
 
       {{if eq .Step 1}}
+      <form method="post" action="/language" class="v2-setup-form">
+        <fieldset class="v2-setup-fields"><legend>Lingua dell'interfaccia</legend>
+          <span class="field-row"><select class="input" name="lang" aria-label="Lingua dell'interfaccia" onchange="this.form.submit()">
+            <option value="it"{{if eq .Language "it"}} selected{{end}}>Italiano</option><option value="en"{{if eq .Language "en"}} selected{{end}}>English</option><option value="de"{{if eq .Language "de"}} selected{{end}}>Deutsch</option><option value="fr"{{if eq .Language "fr"}} selected{{end}}>Français</option><option value="es"{{if eq .Language "es"}} selected{{end}}>Español</option><option value="pl"{{if eq .Language "pl"}} selected{{end}}>Polski</option>
+          </select></span>
+        </fieldset>
+      </form>
       <h3>Chi può usare Gextto?</h3>
       <p class="hint">L'interfaccia ascolta su tutta la rete. Una password impedisce a chiunque altro di cambiare la configurazione o avviare download. Dalla rete locale puoi lasciare l'accesso libero.</p>
       <form method="post" action="/setup/auth" class="v2-setup-form">

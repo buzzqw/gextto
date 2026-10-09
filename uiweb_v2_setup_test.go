@@ -167,3 +167,23 @@ func TestV2SetupTvdbKeyWithoutTmdb(t *testing.T) {
 		t.Fatalf("movies = %+v", movies)
 	}
 }
+
+func TestV2SetupAsksLanguage(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=setup&step=1", nil)
+	if code != http.StatusOK || !strings.Contains(body, `<option value="it" selected>Italiano</option>`) {
+		t.Fatalf("step 1 -> %d, missing the language choice", code)
+	}
+	if _, err := state.i18n.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.i18n.SetLanguage("en"); err != nil {
+		t.Fatal(err)
+	}
+	_, body = v2Request(t, server, http.MethodGet, "/?view=setup&step=1", nil)
+	if !strings.Contains(body, `<option value="en" selected="">English</option>`) || !strings.Contains(body, "Who can use Gextto?") {
+		t.Fatal("step 1 in English: language not selected or page not translated")
+	}
+}

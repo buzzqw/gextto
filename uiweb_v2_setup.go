@@ -6,7 +6,7 @@ package gextto
 // validation as the settings page, so the wizard cannot store anything the
 // settings page would refuse:
 //
-//  1. Accesso    login on/off, user and password
+//  1. Accesso    interface language, login on/off, user and password
 //  2. Cartelle   library (NAS), downloads, temporary files, trash, each checked
 //                live: exists, writable by the service user, filesystem, space
 //  3. Fonti      a Prowlarr/Jackett indexer, the TMDB key (recommended) and,
@@ -65,6 +65,7 @@ type v2SetupView struct {
 	Message     string
 	Error       bool
 	ServiceUser string
+	Language    string
 	AuthEnabled bool
 	AuthUser    string
 	AuthBypass  bool
@@ -125,6 +126,7 @@ func v2SetupViewFrom(s *AppState, r *http.Request) v2SetupView {
 		Step:        step,
 		Message:     strings.TrimSpace(r.FormValue("msg")),
 		Error:       r.FormValue("msg_err") == "1",
+		Language:    v2Language(s),
 		AuthEnabled: settingsBool(cfg, authEnabledSetting, false),
 		AuthUser:    strings.TrimSpace(cfg.Settings[authUsernameSetting]),
 		AuthBypass:  settingsBool(cfg, authLocalBypassSetting, true),
