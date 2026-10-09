@@ -520,6 +520,9 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .badge.warn { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); }
 .badge.err { background: color-mix(in srgb, var(--err) 22%, transparent); color: var(--err); }
 .acquisition-events td.nowrap { white-space: nowrap; }
+.dashboard-problems-table td.nowrap { white-space: nowrap; }
+.dashboard-problems-panel h4 { margin: 12px 0 6px; }
+.dashboard-problems-panel h4:first-child { margin-top: 0; }
 .torrent-table td:nth-child(3) .badge { font-size: 0.68rem; white-space: nowrap; }
 
 .progress {

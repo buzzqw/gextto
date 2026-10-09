@@ -202,6 +202,11 @@
       <a class="btn sm" href="/?view=downloads">Vai a Scarico</a>
     </div>
   </div>
+  <div id="v2-modal"></div>
+  <div class="panel dashboard-problems-panel">
+    <div class="panel-head"><h3>Da controllare</h3><small class="muted">Download fermi, spostamenti in sospeso e avvisi delle ultime 24 ore</small></div>
+    <div class="panel-body" id="v2-dashboard-problems" hx-get="/dashboard/problems" hx-trigger="load, every 60s" hx-swap="innerHTML"><p class="muted">Caricamento…</p></div>
+  </div>
   <div class="grid-4 dashboard-summary-grid">
     <div class="metric mint"><span class="metric-sub">Serie TV / Film</span><strong>{{.SeriesConfigured}} / {{.MoviesConfigured}}</strong></div>
     <div class="metric amber"><span class="metric-sub">Spazio libero</span><strong>{{bytesU .FreeSpace}}</strong><small class="muted" title="Cestino">{{bytesU .TrashBytes}}</small></div>
@@ -2249,6 +2254,20 @@
   </tr>{{end}}</tbody>
 </table></div>
 {{else}}<p class="muted">{{if .Hint}}{{.Hint}}{{else}}Nessuna sorgente disponibile per questa puntata.{{end}}</p>{{end}}
+{{end}}
+
+{{define "v2_dashboard_problems"}}
+{{if .Error}}<p class="alert">{{.Error}}</p>{{end}}
+{{if .Empty}}<p class="muted"><span class="badge ok">ok</span> <span>Niente da controllare: nessun download fermo, nessuno spostamento in sospeso e nessun avviso nelle ultime 24 ore.</span></p>{{end}}
+{{if .Stalled}}<h4>Fermi</h4>
+<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Download fermi</caption><thead><tr><th scope="col">Download</th><th scope="col">Progresso</th><th scope="col">Fermo dalle</th><th scope="col">Motivo</th><th scope="col" title="Quando Gextto lo abbandona e cerca un'altra versione">Abbandono previsto</th><th scope="col">Prossimo tentativo</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Stalled}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td class="numeric">{{.Progress}}</td><td class="nowrap">{{.Since}}</td><td>{{.Reason}}</td><td class="nowrap">{{.GiveUpAt}}</td><td class="nowrap">{{.NextRetry}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+{{if .Moves}}<h4>Spostamenti in sospeso</h4>
+<div class="table-wrap"><table class="data-table dashboard-problems-table"><caption class="sr-only">Spostamenti in libreria in sospeso</caption><thead><tr><th scope="col">Download</th><th scope="col">Destinazione</th><th scope="col">Tentativi</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Moves}}<tr><td class="truncate" title="{{.Name}}">{{.Name}}</td><td class="truncate" title="{{.Destination}}"><code>{{.Destination}}</code></td><td class="numeric">{{.Attempts}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
+{{if .Recent}}<h4>Ultime 24 ore</h4>
+<div class="table-wrap"><table class="data-table dashboard-problems-table acquisition-events"><caption class="sr-only">Avvisi delle ultime 24 ore</caption><thead><tr><th scope="col">Quando</th><th scope="col">Download</th><th scope="col">Evento</th><th scope="col">Azioni</th></tr></thead>
+<tbody>{{range .Recent}}<tr class="acq-{{.LevelClass}}"><td class="nowrap">{{.At}}{{if gt .Repeat 1}} <span class="badge" title="Avvisi di questo download nelle ultime 24 ore">×{{.Repeat}}</span>{{end}}</td><td class="truncate" title="{{.Title}}">{{if .SeriesName}}{{.SeriesName}} {{.EpisodeLabel}}{{else}}{{.Title}}{{end}}</td><td>{{if eq .Level "WARN"}}<span class="badge warn">avviso</span> {{else if eq .Level "ERROR"}}<span class="badge err">errore</span> {{end}}{{.Message}}</td><td class="row-actions"><button class="btn sm" type="button" hx-get="/series/history?hash={{.Hash}}&amp;modal=1" hx-target="#v2-modal" hx-swap="innerHTML" title="Storia di questo download">Storia</button></td></tr>{{end}}</tbody></table></div>{{end}}
 {{end}}
 
 {{define "v2_series_history"}}

@@ -201,9 +201,28 @@ func (d *Database) AcquisitionEventsByAcqID(acq string) ([]AcquisitionEvent, err
 	return d.AcquisitionEvents(match)
 }
 
+// AcquisitionProblemsSince returns, for every download with a warning, an
+// error or a salvage (🛟) since the given time, its most recent such event,
+// newest first, at most limit rows. Repeat holds how many there were.
+func (d *Database) AcquisitionProblemsSince(since time.Time, limit int) ([]AcquisitionEvent, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	return d.scanAcquisitionEvents(`SELECT e.id, e.hash, e.first_at, e.at, p.total, e.level, e.message, e.fields, e.kind, e.title, e.series_name, e.season, e.episode
+		FROM acquisition_events e JOIN (
+			SELECT hash, MAX(id) AS last_id, SUM(repeat) AS total FROM acquisition_events
+			WHERE at >= ?1 AND (level IN ('WARN','ERROR') OR message LIKE '🛟%')
+			GROUP BY hash) p ON e.id = p.last_id
+		ORDER BY e.id DESC LIMIT ?2`, since.Format(acquisitionTimeLayout), limit)
+}
+
 func (d *Database) queryAcquisitionEvents(clause string, args ...any) ([]AcquisitionEvent, error) {
-	rows, err := d.db.Query(`SELECT id, hash, first_at, at, repeat, level, message, fields, kind, title, series_name, season, episode
+	return d.scanAcquisitionEvents(`SELECT id, hash, first_at, at, repeat, level, message, fields, kind, title, series_name, season, episode
 		FROM acquisition_events `+clause, args...)
+}
+
+func (d *Database) scanAcquisitionEvents(query string, args ...any) ([]AcquisitionEvent, error) {
+	rows, err := d.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

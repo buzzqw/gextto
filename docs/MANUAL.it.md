@@ -274,6 +274,12 @@ il pacchetto Linux autonomo descritto nel README (*Pacchetto Linux autonomo*).
   ciclo; backup immediato.
 - **In sessione** — striscia compatta in cima: velocità, torrent in scarico,
   fermi e in seed, banda degli ultimi 30 giorni e accesso diretto a Scarico.
+- **Da controllare** — sotto la striscia: i download **fermi** (con il motivo,
+  il prossimo tentativo e quando verranno abbandonati), gli **spostamenti in
+  libreria in sospeso** (destinazione e tentativi) e gli avvisi, gli errori e i
+  recuperi di pack 🛟 delle **ultime 24 ore**, uno per download. *Storia* apre
+  la storia completa di quel download. Si aggiorna da solo ogni minuto; se è
+  tutto a posto dice «Niente da controllare».
 - **Card statistiche** — libreria (serie/film), spazio libero, magnet in
   archivio e motore.
 - **Rete e download attivi** — CPU/RAM e sparkline di rete in tempo reale.

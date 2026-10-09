@@ -631,14 +631,27 @@ func tev_scheduleStallRetry(entry *StallWatch, now time.Time, base time.Duration
 	return delay
 }
 
+// tev_stallGiveupWindow is how long a parked torrent is kept before it is
+// abandoned, also in minutes; false means never. A dead swarm (zero seeders)
+// is very unlikely to revive, so it gets its own shorter window; when it
+// expires the gap is retried immediately.
+func tev_stallGiveupWindow(cfg *Config, torrent *models.TorrentView) (time.Duration, float64, bool) {
+	minutes := tev_configuredStallGiveupMinutes(cfg)
+	if deadSwarm := tev_settingFloatOr(cfg, "libtorrent_dead_swarm_giveup_min", 4320.0); deadSwarm > 0 {
+		if code, _, _ := DiagnoseTorrent(torrent); code == "dead_swarm" {
+			minutes = deadSwarm
+		}
+	}
+	if minutes <= 0 {
+		return 0, 0, false
+	}
+	return time.Duration(minutes * 60.0 * float64(time.Second)), minutes, true
+}
+
 // MonitorStalled implements `monitor_stalled`.
 func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier *Notifier, watch map[string]StallWatch) {
 	stallAfterMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_after_min", 60.0)
 	retryMinutes := tev_settingFloatOr(cfg, "libtorrent_stall_retry_min", 60.0)
-	giveupMinutes := tev_configuredStallGiveupMinutes(cfg)
-	// A dead swarm (zero seeders) is very unlikely to revive, so it gets its own
-	// shorter give-up window; when it expires the gap is retried immediately.
-	deadSwarmGiveupMinutes := tev_settingFloatOr(cfg, "libtorrent_dead_swarm_giveup_min", 4320.0)
 	if stallAfterMinutes <= 0 {
 		clear(watch)
 		return
@@ -649,11 +662,6 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 		retryValue = 1.0
 	}
 	retryTimeout := time.Duration(retryValue * 60.0 * float64(time.Second))
-	giveupTimeout := time.Duration(0)
-	hasGiveup := giveupMinutes > 0
-	if hasGiveup {
-		giveupTimeout = time.Duration(giveupMinutes * 60.0 * float64(time.Second))
-	}
 	probeTimeout := tev_stallProbeWindow
 	if probeTimeout > retryTimeout/2 {
 		probeTimeout = retryTimeout / 2
@@ -764,16 +772,7 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 			entry.lastDone = torrent.TotalDone
 		}
 		stalledSince := *entry.stalledSince
-		entryGiveup := giveupTimeout
-		entryGiveupMinutes := giveupMinutes
-		hasEntryGiveup := hasGiveup
-		if deadSwarmGiveupMinutes > 0 {
-			if code, _, _ := DiagnoseTorrent(&torrent); code == "dead_swarm" {
-				entryGiveup = time.Duration(deadSwarmGiveupMinutes * 60.0 * float64(time.Second))
-				entryGiveupMinutes = deadSwarmGiveupMinutes
-				hasEntryGiveup = true
-			}
-		}
+		entryGiveup, entryGiveupMinutes, hasEntryGiveup := tev_stallGiveupWindow(cfg, &torrent)
 		if hasEntryGiveup && now.Sub(stalledSince) >= entryGiveup {
 			var metadata *models.TorrentMeta
 			failedTitle := ""

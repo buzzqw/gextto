@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/logging"
 	"github.com/buzzqw/gextto/internal/utils"
 )
 
@@ -231,14 +232,26 @@ type v2SeriesHistoryView struct {
 
 // V2SeriesHistory renders the acquisition events of a series, or of one
 // season/episode, newest first: a modal for an episode, a panel body for the
-// whole series.
+// whole series. With `hash` it shows the story of one download instead.
 func V2SeriesHistory(w http.ResponseWriter, r *http.Request, s *AppState) {
 	series := strings.TrimSpace(r.FormValue("series"))
 	season, seasonErr := optionalInt64(r.FormValue("season"))
 	episode, episodeErr := optionalInt64(r.FormValue("episode"))
 	view := v2SeriesHistoryView{Label: series, Modal: r.FormValue("modal") != ""}
 	limit := 50
+	hash := strings.TrimSpace(r.FormValue("hash"))
 	switch {
+	case hash != "":
+		// One download, oldest first: opened from the dashboard problems.
+		events, err := s.db.AcquisitionEvents(hash)
+		if err != nil {
+			view.Error = "Storia non disponibile: " + err.Error()
+		}
+		view.Events = events
+		view.Label = logging.AcqID(hash)
+		if len(events) > 0 && events[0].Title != "" {
+			view.Label = events[0].Title
+		}
 	case seasonErr != nil || episodeErr != nil:
 		view.Error = "Stagione o episodio non validi."
 	default:
