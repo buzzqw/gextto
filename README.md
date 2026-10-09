@@ -58,19 +58,29 @@ swaps only the transfer engine in *Configuration → Torrent engine*. One engine
 runs at a time, so switching is a controlled migration, never two clients on the
 same data.
 
-gx-torrent is the engine the project develops and recommends: it is the default,
-it is pure Go (no C/C++ at all), it has its own web page, its transfers keep
-running while Gextto restarts or updates, and new transfer features land there
-first (HTTP streaming with Range, a built-in peer-port test, adaptive
-memory/cache sizing, NAT holepunching with BEP 55). The other two are there when
-you need a control gx-torrent does not expose yet, or maximum compatibility;
-libtorrent is also the automatic fallback if gx-torrent cannot stay up.
+**gx-torrent is the default and recommended engine**: it is pure Go (no C/C++
+at all), runs as a separate supervised process, has its own web page, its
+transfers keep running while Gextto restarts or updates, and new transfer
+features land there first (HTTP streaming with Range, a built-in peer-port test,
+adaptive memory/cache sizing, NAT holepunching with BEP 55). Gextto's default
+build is **pure Go and does not include libtorrent**: gx-torrent is all it needs.
+
+**libtorrent (embedded)** is a **build option** (`make build-libtorrent`,
+`GEXTTO_LIBTORRENT=1`): it adds the libtorrent engine inside Gextto's own process
+and the automatic fallback if gx-torrent cannot stay up. Without libtorrent
+compiled in the option is **not selectable** (it does not appear in the *Torrent
+engine* drop-down). An engine crash also takes Gextto down.
+
+**qBittorrent-nox** stays for those who already run it or prefer its UI: Gextto
+drives it through its Web API.
 
 | Engine | Where it runs | When to pick it |
 |---|---|---|
-| gx-torrent (default) | Separate supervised Go process, no libtorrent | The default: pure Go, **no C/C++ dependencies**, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
-| libtorrent (embedded) | Same process as Gextto; bundled in the binary **only when built with libtorrent** | An advanced control or maximum compatibility; also the automatic fallback. A crash takes Gextto down too. **Not part of the default (pure-Go) build** |
+| gx-torrent (default) | Separate supervised Go process; **no libtorrent** | The default: pure Go, no C/C++ dependencies, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
+| libtorrent (embedded) | Same process as Gextto; bundled **only when you build with libtorrent** (`make build-libtorrent`) | An advanced control or maximum compatibility; also the automatic fallback (when compiled in). A crash takes Gextto down too. **Not part of the default (pure-Go) build, and not selectable without it** |
 | qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
+
+How to include libtorrent: see *Install from source* below.
 
 ### Capability matrix
 
@@ -138,10 +148,11 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 It installs the program in `/opt/gextto`, stores service data in
 `/var/lib/gextto`, and exposes the UI on port 5000. The default torrent engine,
-`gx-torrent` (pure Go, no libtorrent needed), is installed next to `gexttod` and
-started in managed mode; embedded libtorrent stays as the automatic fallback and
-selectable alternative. Nothing else must be installed: the package bundles both
-the gx-torrent daemon and the libtorrent shared library.
+`gx-torrent` (pure Go), is installed next to `gexttod` and started in managed
+mode. The default release package is **pure Go** and does not include libtorrent:
+nothing else must be installed. The embedded libtorrent engine needs a dedicated
+build (`make build-libtorrent`, see below); otherwise external qBittorrent-nox
+remains an option.
 
 Before touching the system the installer runs the downloaded program once: a
 missing library or a too-old glibc is reported right away instead of leaving a

@@ -60,20 +60,30 @@ e sostituisce solo il motore di trasferimento in *Configurazione → Motore
 torrent*. Un motore gira alla volta, quindi il cambio è una migrazione
 controllata, mai due client sugli stessi dati.
 
-gx-torrent è il motore che il progetto sviluppa e consiglia: è il predefinito,
-è Go puro (niente C/C++), ha una pagina web propria, i trasferimenti proseguono
-mentre Gextto si riavvia o si aggiorna e le novità di trasferimento arrivano
-prima lì (streaming HTTP con Range, test porte integrato, gestione adattiva di
-memoria/cache, holepunching NAT con BEP 55). Gli altri due restano quando ti
-serve un controllo che gx-torrent non espone ancora, o la massima compatibilità;
-libtorrent è anche il fallback automatico se gx-torrent non riesce a restare
-attivo.
+**gx-torrent è il motore predefinito e consigliato**: è Go puro (nessuna
+dipendenza C/C++), gira in un processo separato e sorvegliato, ha una pagina web
+propria, i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna, ed è
+dove arrivano prima le novità (streaming HTTP con Range, test porte integrato,
+gestione adattiva di memoria/cache, holepunching NAT con BEP 55). La build
+predefinita di Gextto è **Go puro e non include libtorrent**: per funzionare
+serve solo gx-torrent.
+
+**libtorrent integrato** è un'**opzione di build** (`make build-libtorrent`,
+`GEXTTO_LIBTORRENT=1`): aggiunge il motore libtorrent nello stesso processo di
+Gextto e il fallback automatico se gx-torrent non riesce a restare attivo. Senza
+libtorrent compilato l'opzione **non è selezionabile** (non compare nella
+tendina *Motore torrent*). Un crash del motore coinvolge anche Gextto.
+
+**qBittorrent-nox** resta per chi lo usa già o preferisce la sua UI: Gextto lo
+pilota via Web API.
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
-| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Il predefinito: Go puro, **nessuna dipendenza C/C++**, autonomo, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC |
-| libtorrent (integrato) | Stesso processo di Gextto; incluso nel binario **solo se compilato con libtorrent** | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico. Un crash coinvolge anche Gextto. **Non è nella build predefinita (Go puro)** |
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato; **nessun libtorrent** | Il predefinito: Go puro, nessuna dipendenza C/C++, autonomo, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC |
+| libtorrent (integrato) | Stesso processo di Gextto; incluso **solo se compili con libtorrent** (`make build-libtorrent`) | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico (se compilato). Un crash coinvolge anche Gextto. **Non è nella build predefinita (Go puro) e senza di esso non è selezionabile** |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
+
+Come includere libtorrent: vedi *Installazione dal sorgente* più sotto.
 
 ### Matrice delle capacità
 
@@ -143,10 +153,11 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 Installa il programma in `/opt/gextto`, conserva i dati del servizio in
 `/var/lib/gextto` ed espone la UI sulla porta 5000. Il motore torrent
-predefinito, `gx-torrent` (Go puro, senza libtorrent), viene installato accanto
-a `gexttod` e avviato in modalità gestita; libtorrent integrato resta come
-fallback automatico e alternativa selezionabile. Non serve installare altro: il
-pacchetto include sia il demone gx-torrent sia la libreria condivisa libtorrent.
+predefinito, `gx-torrent` (Go puro), viene installato accanto a `gexttod` e
+avviato in modalità gestita. Il pacchetto di release predefinito è **Go puro** e
+non include libtorrent: non serve installare altro. Per il motore libtorrent
+integrato serve una build apposita (`make build-libtorrent`, vedi più sotto);
+in alternativa resta qBittorrent-nox esterno.
 
 Prima di toccare il sistema l'installer avvia una volta il programma scaricato:
 se mancano librerie o la glibc è troppo vecchia lo dice subito, senza lasciare un
