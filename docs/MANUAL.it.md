@@ -680,7 +680,7 @@ tab, è nell'[Appendice A](#appendice-a-riferimento--configurazione).
   selettore in alto. La UI traduce le stringhe a runtime e, se manca una
   traduzione, mostra la sorgente italiana.
 
-### Motore torrent (gx-torrent, libtorrent integrato, qBittorrent-nox)
+### Motore torrent (gx-torrent, qBittorrent-nox, libtorrent opzionale)
 
 Gextto possiede sempre database, coda, punteggi, post-processing, rinomina e
 archivio; è sostituibile solo il piano di trasferimento, scelto in
@@ -705,14 +705,14 @@ dati.
   limiti di velocità, senza perdere i peer; il **filtro
   IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
-  libtorrent. Supporta il **download sequenziale** e la **prima/ultima parte**
+  libtorrent, se è compilato. Supporta il **download sequenziale** e la **prima/ultima parte**
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
   *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
-  nuovi). Non
-  supporta torrent **solo-v2**, limiti di velocità/connessioni per singolo
-  torrent, web seed manuali né rimozione tracker.
-- **libtorrent integrato** — la sessione inclusa, nello stesso processo;
-  valgono tutte le voci *libtorrent*.
+  nuovi). Non supporta torrent **solo-v2** né WebTorrent/WebRTC.
+- **libtorrent (build opzionale)** — la sessione libtorrent nello stesso processo
+  di Gextto, presente **solo se hai compilato Gextto con libtorrent**
+  (`make build-libtorrent`); i pacchetti di release non la includono. Valgono
+  tutte le voci *libtorrent*.
 - **qBittorrent-nox** — Gextto pilota un qBittorrent-nox esistente tramite la sua
   Web API. Imposta URL, utente/password, categoria, tag e intervallo di polling, e
   le **mappature percorsi** `locale=remoto` quando i due processi vedono percorsi

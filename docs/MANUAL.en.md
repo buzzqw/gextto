@@ -666,7 +666,7 @@ highlighted with a “Save all” bar. The complete per-tab list of every entry 
     The interface translates strings at runtime and falls back to the Italian
     source when a translation is missing.
 
-### Torrent engine (gx-torrent, embedded libtorrent, qBittorrent-nox)
+### Torrent engine (gx-torrent, qBittorrent-nox, optional libtorrent)
 
 Gextto always keeps its own database, queue, scoring, post-processing, renaming
 and archive; only the transfer plane is pluggable, chosen in
@@ -690,13 +690,15 @@ same data.
   SSD) and applies it in place, like the speed limits, without dropping peers;
   the **IP filter** refreshes
   at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
-  in 10 minutes) Gextto falls back to libtorrent by itself. It supports
+  in 10 minutes) Gextto falls back to libtorrent by itself, when it is
+  compiled in. It supports
   **sequential download** and **first/last piece** priority (set when adding a
   torrent, or for every new torrent in *Configuration → Queues and performance →
   Download mode*; they apply to new torrents). It does not support **v2-only**
-  torrents, per-torrent rate/connection limits, manual web seeds or tracker
-  removal.
-- **Embedded libtorrent** — the bundled in-process session; every
+  torrents or WebTorrent/WebRTC.
+- **libtorrent (optional build)** — the libtorrent session inside Gextto's own
+  process, available **only if you built Gextto with it**
+  (`make build-libtorrent`); release packages do not include it. Every
   *libtorrent* setting applies.
 - **qBittorrent-nox** — Gextto drives an existing qBittorrent-nox through its Web
   API. Set the URL, user/password, category, tag and poll interval, and the
