@@ -1336,7 +1336,7 @@ func v2DetailCapsFor(backend string) v2DetailCaps {
 			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
 			LimitsNote:  "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato.",
 			TrackerNote: "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.",
-			GeneralNote: "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale, la prima/ultima parte e il super-seeding (BEP 16) si attivano anche a caldo; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed.",
+			GeneralNote: "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale e il super-seeding (BEP 16) si attivano anche a caldo, la prima/ultima parte solo quando aggiungi il torrent; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed.",
 		}
 	case BackendQbittorrent:
 		return v2DetailCaps{
@@ -1770,10 +1770,10 @@ func (field v2Field) Browse() bool {
 }
 
 // Resettable reports whether the row offers «Predefinito»: whenever the field
-// has a known default, so the button is available on every resetting field and
-// a user who changed something can always restore it.
+// has a registered default (even an empty one), so the button is available on
+// every resetting field and a user who changed something can always restore it.
 func (field v2Field) Resettable() bool {
-	return field.Default != "" && !field.Managed && !field.Disabled && field.Kind != "structured" && field.Kind != "secret"
+	return field.HasDefault && !field.Managed && !field.Disabled && field.Kind != "structured" && field.Kind != "secret"
 }
 
 // DefaultInline reports whether the default can be shown inline in the row

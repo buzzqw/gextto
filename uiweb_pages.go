@@ -134,6 +134,10 @@ type uiSettingField struct {
 	// differs from it.
 	Default  string
 	Modified bool
+	// HasDefault is true when the key has a registered default, even an empty
+	// one: it drives the «Predefinito» action, which may reset the field to
+	// empty (e.g. no schedule, no extra settings).
+	HasDefault bool
 	// Step is the step of a number control ("1" for integers, "any" otherwise).
 	Step string
 }
@@ -984,7 +988,7 @@ func uiSettingFieldFor(key, label, value string) uiSettingField {
 func uiApplySettingMeta(field *uiSettingField, stored string) {
 	meta := uiSettingMetaByKey[field.Key]
 	field.Unit, field.Zero, field.DependsOn = meta.Unit, meta.Zero, meta.DependsOn
-	def := uiSettingDefault(field.Key)
+	def, hasDefault := uiSettingDefaults[field.Key]
 	// Secrets and structured values never expose a default. List-like controls
 	// (tags, area: e.g. blacklist, extra settings) keep their raw kind but still
 	// get the default, so «Predefinito» works there too.
@@ -1042,8 +1046,17 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 	// uiSettingNoPrefill keeps list/JSON values out of the textarea so an
 	// accidental Save cannot overwrite the stored structure. It must not hide
 	// the deliberate «Predefinito» action though: the default is exposed on the
-	// row and only applied when the user clicks the button.
-	if def == "" || uiSettingIsSecret(field.Key) {
+	// row and only applied when the user clicks the button. Secrets never get a
+	// default; a registered empty default is a real value ("no override"), so it
+	// resets the field to empty.
+	if !hasDefault || uiSettingIsSecret(field.Key) {
+		return
+	}
+	field.HasDefault = true
+	if def == "" {
+		if strings.TrimSpace(stored) != "" {
+			field.Modified = true
+		}
 		return
 	}
 	field.Default = def
