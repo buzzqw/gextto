@@ -59,16 +59,18 @@ runs at a time, so switching is a controlled migration, never two clients on the
 same data.
 
 gx-torrent is the engine the project develops and recommends: it is the default,
-it needs no C/C++ toolchain at runtime, and new transfer features land there
-first. The other two are there when you need a control gx-torrent does not
-expose yet, or maximum compatibility; libtorrent is also the automatic fallback
-if gx-torrent cannot stay up.
+it needs no C/C++ toolchain at runtime, it has its own web page, its transfers
+keep running while Gextto restarts or updates, and new transfer features land
+there first (HTTP streaming with Range, a built-in peer-port test, adaptive
+memory/cache sizing). The other two are there when you need a control gx-torrent
+does not expose yet, or maximum compatibility; libtorrent is also the automatic
+fallback if gx-torrent cannot stay up.
 
-| Engine | Where it runs | Strengths | Limits — pick it when |
-|---|---|---|---|
-| gx-torrent (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page (loopback by default, token-protected if exposed on the LAN); transfers keep running while Gextto restarts or updates; a crash stays in its process; HTTP streaming with Range; adaptive memory footprint (cache sized from available RAM, active downloads/seeds and the storage type); built-in peer-port test and cleanup of trackers that never work; falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only, no v2-only torrents; no WebTorrent/WebRTC and no NAT holepunching; see the capability matrix below | the default: a self-contained engine with minimal C/C++ dependencies and active development |
-| libtorrent (embedded) | Same process as Gextto, libtorrent-rasterbar; the released package bundles the library | The reference engine: broadest, most mature feature set and every advanced libtorrent knob (see the matrix) | Gextto and the engine share one process, so a crash takes both down; gexttod links libtorrent and cannot be built without it (the released package includes the library, so nothing to install at runtime); no separate web page | you need an advanced control or maximum compatibility; it is also the automatic fallback if gx-torrent cannot stay up |
-| qBittorrent-nox | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; the transfer runs in an isolated process | Needs path mappings when the two processes see different paths; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
+| Engine | Where it runs | When to pick it |
+|---|---|---|
+| gx-torrent (default) | Separate supervised Go process, no libtorrent | The default: self-contained, minimal C/C++ dependencies, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC or NAT holepunching |
+| libtorrent (embedded) | Same process as Gextto, libtorrent-rasterbar bundled in the release | An advanced control or maximum compatibility; also the automatic fallback. A crash takes Gextto down too, and gexttod cannot be built without libtorrent |
+| qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
 
 ### Capability matrix
 
@@ -77,21 +79,8 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 <!-- capability-matrix:start -->
 | Capability | gx-torrent | libtorrent (embedded) | qBittorrent-nox |
 | --- | :--: | :--: | :--: |
-| Add | yes | yes | yes |
-| List | yes | yes | yes |
-| Pause | yes | yes | yes |
-| Resume | yes | yes | yes |
-| Remove | yes | yes | yes |
-| Recheck | yes | yes | yes |
-| Move | yes | yes | yes |
-| Sequential download | yes | yes | yes |
+| Add, Remove, Pause, Resume, List, Recheck, Move, Sequential download, File selection, Per-torrent limits, Peers, Trackers, Events, Stats, Categories, Tags | yes | yes | yes |
 | First/last piece | partial | yes | yes |
-| File selection | yes | yes | yes |
-| Per-torrent limits | yes | yes | yes |
-| Peers | yes | yes | yes |
-| Trackers | yes | yes | yes |
-| Events | yes | yes | yes |
-| Torrent stats | yes | yes | yes |
 | Seed policy | yes | yes | partial |
 | Super-seeding (BEP 16) | yes | yes | partial |
 | Upload/share mode | — | yes | — |
@@ -103,8 +92,6 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | Session sync | yes | — | yes |
 | IP filter | yes | yes | partial |
 | Web seeds | yes | yes | partial |
-| Categories | yes | yes | yes |
-| Tags | yes | yes | yes |
 <!-- capability-matrix:end -->
 
 ## Resource footprint

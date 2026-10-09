@@ -1,15 +1,14 @@
 package gextto
 
-// The READMEs show a complete engine capability matrix. It is generated from
-// capabilityLevels (torrent_engine.go), the single source of truth the UI and
-// the API already use, so the table can never drift from the code.
+// The READMEs show an engine capability matrix generated from capabilityLevels
+// (torrent_engine.go), the single source of truth the UI and the API use, so the
+// table can never drift from the code.
 //
-// When capabilityLevels changes, refresh the docs with:
+// Capabilities supported by every engine (add, remove, pause, ...) are collapsed
+// into one "basic" row; the others get one row each. Nothing here is edited by
+// hand except the labels: when capabilityLevels changes, refresh the docs with
 //
 //	UPDATE_README=1 go test -run TestReadmeCapabilityMatrix .
-//
-// capabilityDocRows fixes the human order and the Italian/English labels; it
-// must list every capability of the matrix.
 
 import (
 	"fmt"
@@ -18,22 +17,26 @@ import (
 	"testing"
 )
 
+// capabilityDocRows gives the label of every capability (Italian and English)
+// and the order in which the rows are rendered. It must cover the whole matrix.
 var capabilityDocRows = []struct{ Key, IT, EN string }{
-	{"add", "Aggiunta", "Add"},
-	{"list", "Elenco", "List"},
+	{"add", "Aggiungi", "Add"},
+	{"remove", "Rimuovi", "Remove"},
 	{"pause", "Pausa", "Pause"},
 	{"resume", "Riprendi", "Resume"},
-	{"remove", "Rimozione", "Remove"},
-	{"recheck", "Ricontrollo dei dati", "Recheck"},
-	{"move", "Spostamento", "Move"},
+	{"list", "Elenca", "List"},
+	{"recheck", "Ricontrolla", "Recheck"},
+	{"move", "Sposta", "Move"},
 	{"sequential", "Download sequenziale", "Sequential download"},
-	{"first_last", "Prima/ultima parte", "First/last piece"},
-	{"files", "Selezione dei file", "File selection"},
+	{"files", "Selezione file", "File selection"},
 	{"limits", "Limiti per torrent", "Per-torrent limits"},
 	{"peers", "Peer", "Peers"},
 	{"trackers", "Tracker", "Trackers"},
 	{"events", "Eventi", "Events"},
-	{"stats", "Statistiche del torrent", "Torrent stats"},
+	{"stats", "Statistiche", "Stats"},
+	{"categories", "Categorie", "Categories"},
+	{"tags", "Tag", "Tags"},
+	{"first_last", "Prima/ultima parte", "First/last piece"},
 	{"seed_policy", "Policy di seed", "Seed policy"},
 	{"super_seeding", "Super-seeding (BEP 16)", "Super-seeding (BEP 16)"},
 	{"upload_mode", "Upload/share mode", "Upload/share mode"},
@@ -45,8 +48,6 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"sync", "Sincronizzazione della sessione", "Session sync"},
 	{"ip_filter", "Filtro IP", "IP filter"},
 	{"web_seeds", "Web seed", "Web seeds"},
-	{"categories", "Categorie", "Categories"},
-	{"tags", "Tag", "Tags"},
 }
 
 // capabilityDocColumns is the engine order and labels of the generated table.
@@ -78,29 +79,56 @@ func capabilityDocLevel(level, lang string) string {
 	}
 }
 
+// capabilityIsBasic is true when every engine supports the capability.
+func capabilityIsBasic(parity map[string]map[string]string, key string) bool {
+	for _, col := range capabilityDocColumns {
+		if parity[key][col.Backend] != "full" {
+			return false
+		}
+	}
+	return true
+}
+
 // renderCapabilityMatrix builds the markdown table for one language.
 func renderCapabilityMatrix(lang string) string {
 	parity := CapabilityParity()
-	header := []string{map[string]string{"it": "Funzione", "en": "Capability"}[lang]}
+	label := func(it, en string) string {
+		if lang == "it" {
+			return it
+		}
+		return en
+	}
+	header := []string{label("Capacità", "Capability")}
 	align := []string{"---"}
 	for _, col := range capabilityDocColumns {
-		label := col.EN
-		if lang == "it" {
-			label = col.IT
-		}
-		header = append(header, label)
+		header = append(header, label(col.IT, col.EN))
 		align = append(align, ":--:")
 	}
 	lines := []string{
 		"| " + strings.Join(header, " | ") + " |",
 		"| " + strings.Join(align, " | ") + " |",
 	}
+
+	// Capabilities every engine supports share one row.
+	var basic []string
 	for _, row := range capabilityDocRows {
-		label := row.EN
-		if lang == "it" {
-			label = row.IT
+		if capabilityIsBasic(parity, row.Key) {
+			basic = append(basic, label(row.IT, row.EN))
 		}
-		cells := []string{label}
+	}
+	if len(basic) > 0 {
+		cells := []string{strings.Join(basic, ", ")}
+		for range capabilityDocColumns {
+			cells = append(cells, capabilityDocLevel("full", lang))
+		}
+		lines = append(lines, "| "+strings.Join(cells, " | ")+" |")
+	}
+	// The rest get one row each.
+	for _, row := range capabilityDocRows {
+		if capabilityIsBasic(parity, row.Key) {
+			continue
+		}
+		cells := []string{label(row.IT, row.EN)}
 		for _, col := range capabilityDocColumns {
 			cells = append(cells, capabilityDocLevel(parity[row.Key][col.Backend], lang))
 		}
@@ -140,7 +168,7 @@ func TestReadmeCapabilityMatrix(t *testing.T) {
 	}
 	for _, name := range capabilityNames() {
 		if !documented[name] {
-			t.Fatalf("capability %q has no README row; add it to capabilityDocRows", name)
+			t.Fatalf("capability %q has no label; add it to capabilityDocRows", name)
 		}
 	}
 

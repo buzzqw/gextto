@@ -61,39 +61,29 @@ torrent*. Un motore gira alla volta, quindi il cambio è una migrazione
 controllata, mai due client sugli stessi dati.
 
 gx-torrent è il motore che il progetto sviluppa e consiglia: è il predefinito,
-non richiede una toolchain C/C++ a runtime e le novità di trasferimento arrivano
-prima lì. Gli altri due restano quando ti serve un controllo che gx-torrent non
-espone ancora, o la massima compatibilità; libtorrent è anche il fallback
-automatico se gx-torrent non riesce a restare attivo.
+non richiede una toolchain C/C++ a runtime, ha una pagina web propria, i
+trasferimenti proseguono mentre Gextto si riavvia o si aggiorna e le novità di
+trasferimento arrivano prima lì (streaming HTTP con Range, test porte integrato,
+gestione adattiva di memoria/cache). Gli altri due restano quando ti serve un
+controllo che gx-torrent non espone ancora, o la massima compatibilità;
+libtorrent è anche il fallback automatico se gx-torrent non riesce a restare
+attivo.
 
-| Motore | Dove gira | Vantaggi | Limiti — quando sceglierlo |
-|---|---|---|---|
-| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria (loopback per default, protetta da token se esposta in LAN); i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna; un crash resta nel suo processo; streaming HTTP con Range; impronta di memoria adattiva (cache dimensionata su RAM disponibile, download/seed attivi e tipo di storage); test porte integrato e pulizia dei tracker che non funzionano mai; se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi, niente solo-v2; niente WebTorrent/WebRTC né holepunching NAT; vedi la matrice delle capacità qui sotto | il predefinito: un motore autonomo con dipendenze C/C++ minime e sviluppo attivo |
-| libtorrent (integrato) | Stesso processo di Gextto, libtorrent-rasterbar; il pacchetto di release include la libreria | Il motore di riferimento: set di funzioni più ampio e maturo e tutte le regolazioni avanzate di libtorrent (vedi la matrice) | Gextto e il motore condividono un processo, quindi un crash li coinvolge entrambi; gexttod linka libtorrent e non si compila senza (il pacchetto di release include la libreria, quindi non serve installare nulla a runtime); niente pagina web propria | ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico se gx-torrent non riesce a restare attivo |
-| qBittorrent-nox | Demone esterno, pilotato via Web API | Riusa un qBittorrent esistente e il suo ecosistema/Web UI; il trasferimento gira in un processo isolato | Servono le mappature percorsi se i due processi vedono path diversi; un processo e una dipendenza in più | hai già qBittorrent-nox o preferisci la sua UI |
+| Motore | Dove gira | Quando sceglierlo |
+|---|---|---|
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Il predefinito: autonomo, dipendenze C/C++ minime, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC né holepunching NAT |
+| libtorrent (integrato) | Stesso processo di Gextto, libtorrent-rasterbar incluso nel pacchetto | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico. Un crash coinvolge anche Gextto e gexttod non si compila senza libtorrent |
+| qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
 
 ### Matrice delle capacità
 
 Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = non disponibile. La tabella è generata da `capabilityLevels` in [`torrent_engine.go`](torrent_engine.go), l'unica fonte di verità usata dalla UI; un test la tiene allineata, quindi la matrice si modifica lì, mai qui.
 
 <!-- capability-matrix:start -->
-| Funzione | gx-torrent | libtorrent integrato | qBittorrent-nox |
+| Capacità | gx-torrent | libtorrent integrato | qBittorrent-nox |
 | --- | :--: | :--: | :--: |
-| Aggiunta | sì | sì | sì |
-| Elenco | sì | sì | sì |
-| Pausa | sì | sì | sì |
-| Riprendi | sì | sì | sì |
-| Rimozione | sì | sì | sì |
-| Ricontrollo dei dati | sì | sì | sì |
-| Spostamento | sì | sì | sì |
-| Download sequenziale | sì | sì | sì |
+| Aggiungi, Rimuovi, Pausa, Riprendi, Elenca, Ricontrolla, Sposta, Download sequenziale, Selezione file, Limiti per torrent, Peer, Tracker, Eventi, Statistiche, Categorie, Tag | sì | sì | sì |
 | Prima/ultima parte | parziale | sì | sì |
-| Selezione dei file | sì | sì | sì |
-| Limiti per torrent | sì | sì | sì |
-| Peer | sì | sì | sì |
-| Tracker | sì | sì | sì |
-| Eventi | sì | sì | sì |
-| Statistiche del torrent | sì | sì | sì |
 | Policy di seed | sì | sì | parziale |
 | Super-seeding (BEP 16) | sì | sì | parziale |
 | Upload/share mode | — | sì | — |
@@ -105,8 +95,6 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | Sincronizzazione della sessione | sì | — | sì |
 | Filtro IP | sì | sì | parziale |
 | Web seed | sì | sì | parziale |
-| Categorie | sì | sì | sì |
-| Tag | sì | sì | sì |
 <!-- capability-matrix:end -->
 
 ## Uso delle risorse
