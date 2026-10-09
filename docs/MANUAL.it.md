@@ -357,6 +357,14 @@ inglese) cerca le righe `is stuck at`, che indicano anche il motivo, poi
 `is still stuck` a ogni nuovo tentativo e `is downloading again` quando
 riparte; solo dopo il limite finale compare `Gave up on`.
 
+Quando abbandona un **pack di stagione**, Gextto prima porta in libreria gli
+episodi i cui file sono già completi (tutti i pezzi verificati), come farebbe con
+un pack finito, e solo dopo rimuove il torrent e i dati parziali: nel log compare
+`🛟 … already complete, added to the library before giving up` con l'elenco
+degli episodi. Alla ricerca successiva vengono cercati solo quelli ancora
+mancanti. Il recupero richiede una cartella della libreria (quella della serie o
+quella generale); vale con ogni motore, anche per un torrent parcheggiato.
+
 ### Stati e azioni consigliate
 
 | Stato | Significato | Azione consigliata |

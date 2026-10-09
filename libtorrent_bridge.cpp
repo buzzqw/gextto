@@ -1013,7 +1013,9 @@ size_t gextto_lt_files(gextto_lt_session* session, const char* hash, gextto_lt_f
         auto info = handle.torrent_file();
         if (!info) return 0;
         auto storage = info->files();
-        std::vector<std::int64_t> progress = handle.file_progress();
+        // Only verified pieces count: a file reported complete must be safe to
+        // import (the salvage of an abandoned season pack relies on it).
+        std::vector<std::int64_t> progress = handle.file_progress(lt::torrent_handle::piece_granularity);
         std::vector<int> priorities = handle.file_priorities();
         const int total = storage.num_files();
         if (output == nullptr || capacity == 0) return static_cast<size_t>(total);

@@ -781,11 +781,19 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				metadata = value
 				failedTitle = value.Release.Title
 			}
+			// The complete episodes of a season pack reach the library before
+			// the torrent and its partial data are removed.
+			salvaged, salvageRestored := tev_salvagePackEpisodes(cfg, torrents, db, torrent, metadata)
 			restored, _ := db.RestoreUpgrade(torrent.Hash)
+			restored = restored || salvageRestored
 			_ = db.MarkTorrentError(torrent.Hash, "stalled download")
-			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: stuck at %s for %s. It is removed and the next search will look for another version",
+			nextStep := "the next search will look for another version"
+			if salvaged > 0 {
+				nextStep = "the next search will look for the episodes still missing"
+			}
+			logging.Warn(fmt.Sprintf("❌ Gave up on «%s»: stuck at %s for %s. It is removed and %s",
 				torrent.Name, logPercent(torrent.Progress),
-				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute)))),
+				logDuration(time.Duration(entryGiveupMinutes*float64(time.Minute))), nextStep),
 				"title", failedTitle, "hash", torrent.Hash)
 			if tev_removeFailedTorrent(torrents, torrent.Hash) {
 				_ = db.MarkTorrentRemovedAt(torrent.Hash)
@@ -797,10 +805,11 @@ func MonitorStalled(cfg *Config, torrents TorrentSession, db *Database, notifier
 				_ = db.ClearGapSearched(*metadata.Release.Series, *metadata.Release.Season, *metadata.Release.Episode)
 			}
 			_ = notifier.NotifyEvent("download_failed", map[string]any{
-				"hash":             torrent.Hash,
-				"title":            failedTitle,
-				"error":            "stalled download",
-				"upgrade_restored": restored,
+				"hash":              torrent.Hash,
+				"title":             failedTitle,
+				"error":             "stalled download",
+				"upgrade_restored":  restored,
+				"salvaged_episodes": salvaged,
 			})
 			delete(watch, torrent.Hash)
 			torrents.ClearStalled(torrent.Hash)

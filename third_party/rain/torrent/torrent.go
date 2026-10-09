@@ -473,7 +473,10 @@ func (t *torrent) Files() ([]File, error) {
 
 func (t *torrent) FileStats() ([]FileStats, error) {
 	if len(t.pieces) == 0 {
-		return nil, errors.New("torrent not running so file stats unavailable")
+		// gextto fork: a stopped torrent has no pieces in memory but keeps its
+		// verified bitfield, so the completed files of a parked or abandoned
+		// download can still be found (and imported) without restarting it.
+		return t.fileStatsFromBitfield()
 	}
 
 	files, err := t.Files()
@@ -533,4 +536,42 @@ func (t *torrent) announceDHT() {
 // This function needs to be called before creating a Session.
 func DisableLogging() {
 	logger.Disable()
+}
+
+// fileStatsFromBitfield computes the completed bytes of every file from the
+// verified bitfield, for a torrent whose pieces are not loaded (gextto fork).
+func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
+	t.mBitfield.RLock()
+	defer t.mBitfield.RUnlock()
+	if t.info == nil || t.bitfield == nil || t.info.PieceLength == 0 {
+		return nil, errors.New("torrent not running so file stats unavailable")
+	}
+	return fileStatsFromPieces(t.info.Files, int64(t.info.PieceLength), t.bitfield.Test), nil
+}
+
+// fileStatsFromPieces maps completed pieces onto the files laid end to end
+// (padding files included, as they take space in the piece stream) and returns
+// the completed bytes of each non-padding file (gextto fork).
+func fileStatsFromPieces(files []metainfo.File, pieceLength int64, done func(uint32) bool) []FileStats {
+	stats := make([]FileStats, 0, len(files))
+	var offset int64
+	for _, f := range files {
+		start, end := offset, offset+f.Length
+		offset = end
+		if f.Padding {
+			continue
+		}
+		var completed int64
+		if f.Length > 0 {
+			for index := start / pieceLength; index*pieceLength < end; index++ {
+				if !done(uint32(index)) {
+					continue
+				}
+				pieceStart, pieceEnd := index*pieceLength, (index+1)*pieceLength
+				completed += min(pieceEnd, end) - max(pieceStart, start)
+			}
+		}
+		stats = append(stats, FileStats{File: File{path: f.Path, length: f.Length}, BytesCompleted: completed})
+	}
+	return stats
 }

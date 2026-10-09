@@ -357,6 +357,14 @@ with `is stuck at`, which also give the reason, then `is still stuck` at each
 retry and `is downloading again` when it recovers; `Gave up on` appears only
 after the final limit.
 
+When it abandons a **season pack**, Gextto first brings into the library the
+episodes whose files are already complete (every piece verified), as it would
+with a finished pack, and only then removes the torrent and its partial data:
+the log shows `🛟 … already complete, added to the library before giving up`
+with the list of episodes. The next search only looks for the ones still
+missing. The salvage needs a library folder (the series one or the general
+one); it works with every engine, even for a parked torrent.
+
 ### States and recommended actions
 
 | State | Meaning | Recommended action |
