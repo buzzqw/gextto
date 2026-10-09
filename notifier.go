@@ -1079,6 +1079,14 @@ func formatEvent(event string, data map[string]any) string {
 				"⛔ non riesce a restare attivo; passo al motore libtorrent",
 				"⛔ cannot stay up; falling back to the embedded libtorrent engine",
 			))
+	case "engine_unstable":
+		retry, _ := jsonInt(mapLookup(data, "retry_minutes"))
+		return fmt.Sprintf("gx-torrent: %s (%s %d min)",
+			messages.Pick(
+				"⛔ non riesce a restare attivo e questa build non include libtorrent: trasferimenti fermi, riprovo in modalità sicura",
+				"⛔ cannot stay up and this build has no libtorrent: transfers stopped, retrying in safe mode",
+			),
+			messages.Pick("prossimo tentativo tra", "next attempt in"), retry)
 	case "engine_error":
 		errText := text("error")
 		if errText == "" {

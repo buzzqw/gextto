@@ -154,6 +154,9 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	// reuses the cached file; the service-boot refresh is done by the caller.
 	gxEnsureIPFilter(cfg, false)
 	args = append(args, gxNetworkArgs(cfg)...)
+	if settings.SafeMode {
+		args = append(args, "-no-utp", "-no-holepunch")
+	}
 	args = append(args,
 		"-log-file", filepath.Join(dataDir, "gx-torrent.log"),
 		"-gextto-log", filepath.Join(cfg.DataDir, "gextto.log"),
@@ -420,14 +423,41 @@ func (e *gxTorrentEngine) notifyEvent(event string, data map[string]any) {
 	}()
 }
 
+// gxUnstablePauses are the waits before trying gx-torrent again, one per
+// exhausted crash budget, on a build without libtorrent.
+var gxUnstablePauses = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, time.Hour}
+
+// gxUnstablePause returns the wait after the n-th exhausted crash budget
+// (n from 0); the last pause repeats.
+func gxUnstablePause(n int) time.Duration {
+	if n >= len(gxUnstablePauses) {
+		n = len(gxUnstablePauses) - 1
+	}
+	if n < 0 {
+		n = 0
+	}
+	return gxUnstablePauses[n]
+}
+
+// gxStableUptime is how long the daemon must stay up before the unstable
+// pauses start again from the shortest one.
+const gxStableUptime = 30 * time.Minute
+
 // superviseManagedProcess restarts the managed daemon after an unexpected exit
-// or a failed start. It gives up (and hands the transfers back to embedded
-// libtorrent, saving the setting and restarting the service) once the crash
-// budget is exhausted: the daemon is not recovering on its own.
+// or a failed start. Once the crash budget is exhausted the daemon is not
+// recovering on its own: a build with libtorrent hands the transfers back to
+// the embedded engine (saving the setting and restarting the service). A build
+// without libtorrent has nothing to fall back to, so it keeps gx-torrent, in
+// safe mode and with growing pauses, instead of restarting the service in a
+// loop.
 func (e *gxTorrentEngine) superviseManagedProcess() {
 	defer recoverGoroutine("gx-torrent supervisor")
 	const restartPause = 5 * time.Second
-	budget := gxCrashBudget{window: 10 * time.Minute, max: 6}
+	newBudget := func() gxCrashBudget { return gxCrashBudget{window: 10 * time.Minute, max: 6} }
+	budget := newBudget()
+	startSettings := e.settings
+	unstable := 0
+	startedAt := time.Now()
 	fallbackToLibtorrent := func() {
 		logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
 			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
@@ -440,6 +470,31 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			logging.Error("impossibile impostare torrent_backend=embedded", "error", saveErr)
 		}
 		requestServiceActionLater("restart")
+	}
+	// budgetExhausted reacts to an exhausted crash budget and reports whether
+	// the supervisor must stop.
+	budgetExhausted := func() bool {
+		if LibtorrentCompiled() {
+			fallbackToLibtorrent()
+			return true
+		}
+		pause := gxUnstablePause(unstable)
+		unstable++
+		startSettings.SafeMode = true
+		logging.Error("gx-torrent non riesce a restare attivo e questa build non include libtorrent: trasferimenti fermi, nuovo tentativo in modalità sicura (senza uTP e holepunch)",
+			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()),
+			"retry_in", pause.String(), "crash_log", filepath.Join(e.cfg.DataDir, "gx-torrent", "gx-torrent.crash.log"))
+		e.notifyEvent("engine_unstable", map[string]any{
+			"crashes":       budget.len(),
+			"retry_minutes": int(pause.Minutes()),
+		})
+		budget = newBudget()
+		select {
+		case <-e.supervisorStop:
+			return true
+		case <-time.After(pause):
+			return false
+		}
 	}
 	for {
 		e.processMu.Lock()
@@ -461,12 +516,16 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		if replacing {
 			// A deliberate stop to run the updated daemon: start it at once,
 			// it is not a crash.
-			if restarted, err := startManagedGxTorrent(e.cfg, e.settings); err == nil {
+			if restarted, err := startManagedGxTorrent(e.cfg, startSettings); err == nil {
 				e.processMu.Lock()
 				e.process = restarted
 				e.processMu.Unlock()
+				startedAt = time.Now()
 				continue
 			}
+		}
+		if time.Since(startedAt) >= gxStableUptime {
+			unstable = 0
 		}
 		exit := "uscita inattesa"
 		if err != nil {
@@ -474,8 +533,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		}
 		logging.Error("gx-torrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", budget.len()+1)
 		e.notifyEvent("engine_crashed", map[string]any{"error": exit, "restarts_in_window": budget.len() + 1})
-		if budget.register(time.Now()) {
-			fallbackToLibtorrent()
+		if budget.register(time.Now()) && budgetExhausted() {
 			return
 		}
 		select {
@@ -489,13 +547,12 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 		var restarted *gxManagedProcess
 		for {
 			var startErr error
-			restarted, startErr = startManagedGxTorrent(e.cfg, e.settings)
+			restarted, startErr = startManagedGxTorrent(e.cfg, startSettings)
 			if startErr == nil {
 				break
 			}
 			logging.Error("riavvio di gx-torrent gestito non riuscito", "error", startErr, "restarts_in_window", budget.len()+1)
-			if budget.register(time.Now()) {
-				fallbackToLibtorrent()
+			if budget.register(time.Now()) && budgetExhausted() {
 				return
 			}
 			select {
@@ -504,6 +561,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			case <-time.After(restartPause):
 			}
 		}
+		startedAt = time.Now()
 		e.processMu.Lock()
 		e.process = restarted
 		closed = e.closed

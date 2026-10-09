@@ -1041,3 +1041,48 @@ func TestGxSessionStatsMapping(t *testing.T) {
 		t.Fatalf("no incoming connections -> has_incoming = %d, want 0", none["net.has_incoming_connections"])
 	}
 }
+
+// TestGxUnstablePauseGrows pins the waits used on a build without libtorrent
+// when gx-torrent keeps crashing: they grow and then repeat the longest.
+func TestGxUnstablePauseGrows(t *testing.T) {
+	want := []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, time.Hour, time.Hour}
+	for n, expected := range want {
+		if got := gxUnstablePause(n); got != expected {
+			t.Errorf("gxUnstablePause(%d) = %v, want %v", n, got, expected)
+		}
+	}
+}
+
+// TestBuildManagedGxCommandSafeMode makes sure safe mode starts the daemon
+// without uTP and holepunching, and changes the fingerprint so a daemon
+// started in safe mode is not mistaken for a normal one.
+func TestBuildManagedGxCommandSafeMode(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "gx-torrent"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	cfg := DefaultConfig()
+	cfg.DataDir = t.TempDir()
+	settings := gxTorrentSettings{BaseURL: "http://127.0.0.1:8890"}
+
+	normal, err := buildManagedGxCommand(&cfg, settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.SafeMode = true
+	safe, err := buildManagedGxCommand(&cfg, settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(safe.args, " ")
+	if !strings.Contains(joined, "-no-utp") || !strings.Contains(joined, "-no-holepunch") {
+		t.Fatalf("safe mode args = %q, want -no-utp and -no-holepunch", joined)
+	}
+	if strings.Contains(strings.Join(normal.args, " "), "-no-holepunch") {
+		t.Fatalf("normal start must not disable holepunching: %q", normal.args)
+	}
+	if normal.fingerprint == safe.fingerprint {
+		t.Fatal("safe mode must change the daemon fingerprint")
+	}
+}

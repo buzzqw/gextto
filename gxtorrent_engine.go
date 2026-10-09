@@ -49,8 +49,12 @@ type gxTorrentSettings struct {
 	Timeout      time.Duration
 	PollInterval time.Duration
 	Managed      bool
-	stateDir     string
-	dataDir      string
+	// SafeMode starts the managed daemon without uTP and holepunching. The
+	// supervisor sets it on a build without libtorrent when gx-torrent keeps
+	// crashing, since there is no other engine to hand the transfers to.
+	SafeMode bool
+	stateDir string
+	dataDir  string
 }
 
 func gxTorrentSettingsFromConfig(cfg *Config) (gxTorrentSettings, error) {

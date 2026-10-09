@@ -287,6 +287,9 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	if got := formatEvent("engine_fallback", nil); !strings.Contains(got, "libtorrent") {
 		t.Fatalf("engine_fallback it = %q", got)
 	}
+	if got := formatEvent("engine_unstable", map[string]any{"retry_minutes": 5}); !strings.Contains(got, "modalità sicura") || !strings.Contains(got, "5 min") {
+		t.Fatalf("engine_unstable it = %q", got)
+	}
 	if got := formatEvent("health_degraded", map[string]any{"status": "degraded", "reason": "disk full"}); !strings.Contains(got, "PROBLEMA") || !strings.Contains(got, "disk full") {
 		t.Fatalf("health_degraded it = %q", got)
 	}
