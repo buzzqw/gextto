@@ -293,6 +293,9 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	if got := formatEvent("health_degraded", map[string]any{"status": "degraded", "reason": "disk full"}); !strings.Contains(got, "PROBLEMA") || !strings.Contains(got, "disk full") {
 		t.Fatalf("health_degraded it = %q", got)
 	}
+	if got := formatEvent("cycle_warning", map[string]any{"reason": "la sorgente TGx non risponde da 3 cicli"}); !strings.Contains(got, "RICERCA") || !strings.Contains(got, "TGx") {
+		t.Fatalf("cycle_warning it = %q", got)
+	}
 
 	messages.SetLanguage("en")
 	restart = formatEvent("daemon_restarted", map[string]any{"run": 3, "down_seconds": 4})
@@ -301,6 +304,9 @@ func TestNotifierFormatEventLifecycle(t *testing.T) {
 	}
 	if got := formatEvent("health_recovered", nil); !strings.Contains(got, "healthy") {
 		t.Fatalf("health_recovered en = %q", got)
+	}
+	if got := formatEvent("cycle_recovered", nil); !strings.Contains(got, "healthy again") {
+		t.Fatalf("cycle_recovered en = %q", got)
 	}
 }
 

@@ -655,6 +655,10 @@ func formatEmailSubject(event string, data map[string]any) string {
 		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Fumetto in attesa", "Comic pending"), itemLabel)
 	case "gap_filled":
 		return fmt.Sprintf("Gextto: %s — %s", messages.Pick("Gap riempito", "Gap filled"), itemLabel)
+	case "cycle_warning":
+		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca da controllare", "Search needs attention"))
+	case "cycle_recovered":
+		return fmt.Sprintf("Gextto: %s", messages.Pick("Ricerca di nuovo regolare", "Search healthy again"))
 	default:
 		return fmt.Sprintf("Gextto [%s]", event)
 	}
@@ -1101,6 +1105,12 @@ func formatEvent(event string, data map[string]any) string {
 			messages.Pick("Motivo", "Reason"), text("reason"))
 	case "health_recovered":
 		return messages.Pick("✅ Gextto di nuovo operativo", "✅ Gextto healthy again")
+	case "cycle_warning":
+		return fmt.Sprintf("%s\n\n%s: %s",
+			messages.Pick("⚠️ LA RICERCA AUTOMATICA HA UN PROBLEMA", "⚠️ THE AUTOMATIC SEARCH HAS A PROBLEM"),
+			messages.Pick("Motivo", "Reason"), text("reason"))
+	case "cycle_recovered":
+		return messages.Pick("✅ La ricerca automatica è di nuovo regolare", "✅ The automatic search is healthy again")
 	default:
 		if value, ok := mapLookup(data, "text").(string); ok {
 			return fmt.Sprintf("Gextto [%s] %s", event, value)

@@ -1001,7 +1001,11 @@ the others.
   the last cycles: when, duration, releases checked, downloads started, errors
   and how many sources did not answer (hover the number for the reason). It
   helps spot a source that keeps failing or a cycle that got slower. API:
-  `GET /api/last_cycles`.
+  `GET /api/last_cycles`. Gextto warns on its own (WARN line and notification)
+  when a source has not answered for three cycles, when the last search took
+  more than three hours, or when no cycle without errors has completed for three
+  intervals (at least two hours); it also reports when everything is healthy
+  again.
 - **Web logs** — live SSE stream with text filter, line count and follow/pause.
   Lines are English and explicitly formatted as `date time  LEVEL message ·
   key: value`, with highlighted keywords (NAS, download, sources, filters,

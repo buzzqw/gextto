@@ -516,11 +516,8 @@ func uiCycleRowsFrom(cycles []models.CycleHistoryEntry, now time.Time) []uiCycle
 // uiCycleWhen renders when a stored cycle ran: the wall-clock row time (UTC),
 // falling back to the cycle's own start time.
 func uiCycleWhen(cycle models.CycleHistoryEntry, now time.Time) string {
-	if at, err := time.ParseInLocation("2006-01-02 15:04:05", cycle.At, time.UTC); err == nil {
+	if at := cycleTime(cycle); !at.IsZero() {
 		return v2ProblemTime(at, now)
-	}
-	if cycle.LastStartedAt != nil {
-		return v2ProblemTime(*cycle.LastStartedAt, now)
 	}
 	return "—"
 }
