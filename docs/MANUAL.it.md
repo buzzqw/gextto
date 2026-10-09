@@ -211,9 +211,10 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 L'installer deve essere eseguito come root e richiede systemd. Usa `GEXTTO_REPO`
 e `GEXTTO_RELEASE` per scegliere un repository o una release diversi. Salva i
-dati del servizio in `/var/lib/gextto`, il programma in `/opt/gextto` e il token
-API generato in `/etc/gextto/gextto.env`. Installer e `gexttod --update`
-installano lo stesso payload.
+dati del servizio in `/var/lib/gextto` e il programma in `/opt/gextto`; un file
+opzionale `/etc/gextto/gextto.env`, se presente, viene caricato come variabili
+d'ambiente (il token API non è lì: si imposta in *Configurazione → Accesso e
+servizi*). Installer e `gexttod --update` installano lo stesso payload.
 
 Per un'installazione senza root da un checkout sorgente:
 
@@ -229,16 +230,16 @@ Il servizio per-utente ascolta per default sulla porta 5000 su tutte le
 interfacce. Limita l'accesso con firewall o reverse proxy; usa
 `loginctl enable-linger "$USER"` se deve rimanere attivo dopo il logout.
 `--update` scarica `gextto-linux-<arch>.tar.gz`, verifica il `.sha256`
-pubblicato quando presente, prepara i file e poi sostituisce l'eseguibile (con la
+pubblicato (obbligatorio: senza checksum l'aggiornamento viene rifiutato), prepara i file e poi sostituisce l'eseguibile (con la
 UI web inclusa), la `lib/` e `run.sh` con rename atomici. Dati e configurazione in
 `GEXTTO_DATA_DIR` (default `/var/lib/gextto`) non vengono mai toccati: un
 download, un checksum o un'estrazione falliti lasciano l'installazione in
 esecuzione invariata, e uno swap fallito viene ripristinato. Il marker `VERSION`
 accanto all'eseguibile viene aggiornato ed è mostrato da `--version`.
 
-Il repository ufficiale pubblica attualmente asset Linux per `x86_64`. Un asset
-`aarch64` funziona se fornito da un repository personalizzato tramite
-`GEXTTO_REPO`.
+Il repository ufficiale pubblica, per ogni release, gli asset Linux **x86_64 e
+aarch64** (archivio, `.sha256` e manifest). L'installer e `gexttod --update`
+scelgono l'asset in base all'architettura della macchina.
 
 - `--channel stable` / `--release <tag>` — scelgono la release da installare;
 - `--install-dir <dir>` — installa altrove (default: la directory del binario);

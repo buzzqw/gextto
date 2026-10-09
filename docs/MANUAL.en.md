@@ -213,8 +213,10 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 
 The installer must run as root and requires systemd. Use `GEXTTO_REPO` and
 `GEXTTO_RELEASE` to select another repository or release. It stores the service
-data in `/var/lib/gextto`, the program in `/opt/gextto`, and the generated API
-token in `/etc/gextto/gextto.env`.
+data in `/var/lib/gextto` and the program in `/opt/gextto`; an optional
+`/etc/gextto/gextto.env` file, if present, is loaded as environment overrides
+(the API token is not stored there: set it in *Configuration → Access and
+services*).
 
 For a no-root installation from a source checkout:
 
@@ -231,7 +233,7 @@ access with a firewall or reverse proxy; use
 `loginctl enable-linger "$USER"` if it must run after logout.
 The installer and `gexttod --update` install the same release payload.
 `--update` downloads `gextto-linux-<arch>.tar.gz`, verifies the
-published `.sha256` when present, stages the files, then swaps the executable
+published `.sha256` (required: without a checksum the update is refused), stages the files, then swaps the executable
 (with the embedded web UI), the bundled `lib/` and `run.sh` with atomic renames.
 Data and
 configuration in `GEXTTO_DATA_DIR` (default `/var/lib/gextto`) are never touched:
@@ -239,8 +241,9 @@ a failed download, checksum or extraction leaves the running installation
 untouched, and a failed swap is rolled back. The `VERSION` marker next to the
 executable is updated and shown by `--version`.
 
-The official repository currently publishes Linux assets for `x86_64`. An
-`aarch64` asset works when supplied by a custom repository via `GEXTTO_REPO`.
+The official repository publishes Linux assets for **x86_64 and aarch64**
+(archive, `.sha256` and manifest) with every release. The installer and
+`gexttod --update` pick the asset for the machine's architecture.
 
 - `--channel stable` / `--release <tag>` — choose the release to install;
 - `--install-dir <dir>` — install elsewhere (default: the binary's directory);

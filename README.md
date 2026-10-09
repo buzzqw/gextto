@@ -58,11 +58,17 @@ swaps only the transfer engine in *Configuration → Torrent engine*. One engine
 runs at a time, so switching is a controlled migration, never two clients on the
 same data.
 
-| Engine | Where it runs | Strengths | Trade-offs — pick it when |
+gx-torrent is the engine the project develops and recommends: it is the default,
+it needs no C/C++ toolchain at runtime, and new transfer features land there
+first. The other two are there when you need a control gx-torrent does not
+expose yet, or maximum compatibility; libtorrent is also the automatic fallback
+if gx-torrent cannot stay up.
+
+| Engine | Where it runs | Strengths | Limits — pick it when |
 |---|---|---|---|
-| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page (loopback by default, token-protected if exposed on the LAN); drops trackers that never work and has a built-in **peer-port test**; **transfers keep running while Gextto restarts or updates**; a crash stays in its process; **sequential and first/last download**; **per-piece diagnostics**; **HTTP streaming with Range**; **BEP 16 super-seeding**; a **small, adaptive memory footprint** (cache sized from available RAM, active downloads/seeds and the storage type); falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); file priority levels; no large in-process disk cache | you want a self-contained engine with minimal C/C++ dependencies |
-| **libtorrent** (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full feature set: sequential, per-torrent limits, super-seeding, web seeds, piece diagnostics; every advanced knob | Gextto and the engine share one process; needs the libtorrent library | you need every advanced control or maximum compatibility |
-| **qBittorrent-nox** | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; supports sequential and its own limits | Needs path mappings when the two processes see different paths; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
+| gx-torrent (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page (loopback by default, token-protected if exposed on the LAN); transfers keep running while Gextto restarts or updates; a crash stays in its process; sequential and first/last download; per-piece diagnostics; HTTP streaming with Range; BEP 16 super-seeding; per-torrent speed, connection and upload limits; adaptive memory footprint (cache sized from available RAM, active downloads/seeds and the storage type); built-in peer-port test and cleanup of trackers that never work; falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only, no v2-only torrents; IPv4 only, no IPv6 listener, DHT or uTP; no WebTorrent/WebRTC and no NAT holepunching; no upload/share mode; first/last prioritization is partial | you want a self-contained engine with minimal C/C++ dependencies and active development |
+| libtorrent (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full parity matrix: sequential, first/last, per-torrent limits, super-seeding, web seeds, fast resume, RAM disk, upload mode; every advanced libtorrent knob | Gextto and the engine share one process, so a crash takes both down; needs the libtorrent library at runtime; no separate web page and no per-piece diagnostics through Gextto | you need an advanced control Gextto does not expose for gx-torrent, or maximum compatibility |
+| qBittorrent-nox | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; sequential and per-torrent limits; the transfer runs in an isolated process | Needs path mappings when the two processes see different paths; no RAM disk, no fast resume, no upload mode and no piece diagnostics; super-seeding, IP filter and web seeds only partial; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
 
 ## Resource footprint
 
@@ -78,9 +84,9 @@ downloads on a 16 GB machine, the engine footprint differs sharply:
 
 | Engine | Idle (torrents loaded) | Peak while transferring |
 |---|---:|---:|
-| **gx-torrent** | ~25 MB | ~100 MB |
-| **embedded libtorrent** (in Gextto's process) | ~0.5 GB | 3–5 GB |
-| **qBittorrent-nox** | ~40 MB | ~5 GB |
+| gx-torrent | ~25 MB | ~100 MB |
+| embedded libtorrent (in Gextto's process) | ~0.5 GB | 3–5 GB |
+| qBittorrent-nox | ~40 MB | ~5 GB |
 
 libtorrent and qBittorrent keep a large in-process disk cache (GBs of anonymous
 memory). gx-torrent has **no large in-process write-back cache by design**: it

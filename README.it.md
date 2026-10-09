@@ -60,11 +60,17 @@ e sostituisce solo il motore di trasferimento in *Configurazione → Motore
 torrent*. Un motore gira alla volta, quindi il cambio è una migrazione
 controllata, mai due client sugli stessi dati.
 
-| Motore | Dove gira | Vantaggi | Svantaggi — quando sceglierlo |
+gx-torrent è il motore che il progetto sviluppa e consiglia: è il predefinito,
+non richiede una toolchain C/C++ a runtime e le novità di trasferimento arrivano
+prima lì. Gli altri due restano quando ti serve un controllo che gx-torrent non
+espone ancora, o la massima compatibilità; libtorrent è anche il fallback
+automatico se gx-torrent non riesce a restare attivo.
+
+| Motore | Dove gira | Vantaggi | Limiti — quando sceglierlo |
 |---|---|---|---|
-| **gx-torrent** (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria (loopback per default, protetta da token se esposta in LAN); elimina i tracker che non funzionano mai e ha un **test porte** integrato; **i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna**; un crash resta nel suo processo; **download sequenziale e prima/ultima parte**; **diagnostica dei pezzi**; **streaming HTTP con Range**; **super-seeding (BEP 16)**; **impronta di memoria piccola e adattiva** (cache dimensionata su RAM disponibile, download/seed attivi e tipo di storage); se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi (niente solo-v2); livelli di priorità per file; nessuna grande cache disco in-process | vuoi un motore autonomo con dipendenze C/C++ minime |
-| **libtorrent** (integrato) | Stesso processo di Gextto (`libtorrent-rasterbar`) | Set completo: sequenziale, limiti per torrent, super-seeding, web seed, diagnostica pezzi; tutte le regolazioni avanzate | Gextto e il motore condividono un processo; richiede la libreria libtorrent | ti servono tutti i controlli avanzati o la massima compatibilità |
-| **qBittorrent-nox** | Demone esterno, pilotato via Web API | Riusa un qBittorrent esistente e il suo ecosistema/Web UI; supporta il sequenziale e i suoi limiti | Servono le mappature percorsi se i due processi vedono path diversi; un processo e una dipendenza in più | hai già qBittorrent-nox o preferisci la sua UI |
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Go puro, nessun `libtorrent-rasterbar`; pagina web propria (loopback per default, protetta da token se esposta in LAN); i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna; un crash resta nel suo processo; download sequenziale e prima/ultima parte; diagnostica dei pezzi; streaming HTTP con Range; super-seeding (BEP 16); limiti di velocità, connessioni e upload per torrent; impronta di memoria adattiva (cache dimensionata su RAM disponibile, download/seed attivi e tipo di storage); test porte integrato e pulizia dei tracker che non funzionano mai; se non riesce a restare attivo torna da solo a libtorrent | Solo torrent BitTorrent v1 e ibridi, niente solo-v2; solo IPv4: niente listener, DHT o uTP IPv6; niente WebTorrent/WebRTC né holepunching NAT; niente upload/share mode; la priorità prima/ultima parte è parziale | vuoi un motore autonomo con dipendenze C/C++ minime e sviluppo attivo |
+| libtorrent (integrato) | Stesso processo di Gextto (`libtorrent-rasterbar`) | Matrice di parità completa: sequenziale, prima/ultima parte, limiti per torrent, super-seeding, web seed, fast resume, RAM disk, upload mode; tutte le regolazioni avanzate di libtorrent | Gextto e il motore condividono un processo, quindi un crash li coinvolge entrambi; richiede la libreria libtorrent a runtime; niente pagina web propria e niente diagnostica dei pezzi tramite Gextto | ti serve un controllo avanzato che Gextto non espone per gx-torrent, o la massima compatibilità |
+| qBittorrent-nox | Demone esterno, pilotato via Web API | Riusa un qBittorrent esistente e il suo ecosistema/Web UI; sequenziale e limiti per torrent; il trasferimento gira in un processo isolato | Servono le mappature percorsi se i due processi vedono path diversi; niente RAM disk, fast resume, upload mode né diagnostica dei pezzi; super-seeding, filtro IP e web seed solo parziali; un processo e una dipendenza in più | hai già qBittorrent-nox o preferisci la sua UI |
 
 ## Uso delle risorse
 
@@ -81,9 +87,9 @@ download su una macchina da 16 GB, l'impronta del motore cambia molto:
 
 | Motore | Idle (torrent caricati) | Picco durante il trasferimento |
 |---|---:|---:|
-| **gx-torrent** | ~25 MB | ~100 MB |
-| **libtorrent integrato** (nel processo di Gextto) | ~0,5 GB | 3–5 GB |
-| **qBittorrent-nox** | ~40 MB | ~5 GB |
+| gx-torrent | ~25 MB | ~100 MB |
+| libtorrent integrato (nel processo di Gextto) | ~0,5 GB | 3–5 GB |
+| qBittorrent-nox | ~40 MB | ~5 GB |
 
 libtorrent e qBittorrent tengono una grande cache disco in-process (GB di
 memoria anonima). gx-torrent **non ha una grande cache write-back in-process, per
