@@ -140,6 +140,12 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   (`gxtorrent_engine.go`), matrice `capabilityLevels` (`torrent_engine.go`),
   poi documentazione. Le opzioni legate alla creazione del picker valgono solo
   per i torrent aggiunti dopo: dichiarale `"partial"`, mai falso successo.
+- **Capacità dei motori**: `capabilityLevels` è l'unica fonte di verità. La
+  matrice capacità dei README è **generata** da lì: se aggiungi una capacità,
+  aggiungila anche a `capabilityDocRows` (`capability_matrix_docs_test.go`) e
+  rigenera con `UPDATE_README=1 go test -run TestReadmeCapabilityMatrix .`.
+  `TestReadmeCapabilityMatrix` fallisce finché README.md, README.it.md e la
+  matrice non coincidono: non modificare quelle tabelle a mano.
 - Nuova impostazione UI: aggiungi default (`uiweb_settings_defaults.go`), indice
   (`uiweb_settings.go`, con sezione e `Group` del pannello: lo script di
   verifica rifiuta le voci senza gruppo), unità/valori speciali/dipendenza
