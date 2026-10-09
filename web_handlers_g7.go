@@ -1544,7 +1544,11 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	if cfg.TmdbAPIKey == nil {
+	// TMDB is the primary source; without its key TVDB (when configured) is
+	// used on its own, for series and movies alike.
+	tmdbConfigured := cfg.TmdbAPIKey != nil && strings.TrimSpace(*cfg.TmdbAPIKey) != ""
+	tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+	if !tmdbConfigured && !tvdb.Configured() {
 		jsonError(w, http.StatusConflict, "TMDB API key is not configured")
 		return
 	}
@@ -1557,8 +1561,25 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	isMovie := strings.EqualFold(input.Kind, "movie")
-	tmdb := NewTmdbClient(cfg.TmdbAPIKey)
 
+	if !tmdbConfigured {
+		ctx, cancel := context.WithTimeout(r.Context(), gh7_external_search_timeout)
+		defer cancel()
+		items, err := gh7_tvdbSearchItems(ctx, cfg, tvdb, isMovie, query)
+		if ctx.Err() == context.DeadlineExceeded {
+			jsonError(w, http.StatusGatewayTimeout,
+				fmt.Sprintf("TVDB non ha risposto entro %ds", int(gh7_external_search_timeout.Seconds())))
+			return
+		}
+		if err != nil {
+			jsonError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		jsonResponse(w, map[string]any{"ok": true, "kind": input.Kind, "items": items, "source": "tvdb"})
+		return
+	}
+
+	tmdb := NewTmdbClient(cfg.TmdbAPIKey)
 	ctx, cancel := context.WithTimeout(r.Context(), gh7_external_search_timeout)
 	defer cancel()
 	var items []TmdbItem
@@ -1600,31 +1621,13 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// Fallback TVDB (series only): when TMDB returns no results OR fails
 	// (error/timeout). If TVDB also yields nothing and TMDB had failed, the
 	// original TMDB error is reported.
-	tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
-	tvdbItems := []any{}
 	tctx, tcancel := context.WithTimeout(r.Context(), gh7_external_search_timeout)
 	defer tcancel()
-	raw, tvdbErr := tvdb.SearchSeries(tctx, query)
+	tvdbItems, tvdbErr := gh7_tvdbSearchItems(tctx, cfg, tvdb, false, query)
 	if tctx.Err() == context.DeadlineExceeded {
 		logging.Debug("TVDB fallback search timed out")
 	} else if tvdbErr != nil {
 		logging.Debug("TVDB fallback search failed", "error", tvdbErr.Error())
-	} else {
-		for _, item := range raw {
-			mapped, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			tvdbItems = append(tvdbItems, map[string]any{
-				"id":             0,
-				"name":           mapped["name"],
-				"overview":       mapped["overview"],
-				"poster":         mapped["image"],
-				"first_air_date": mapped["year"],
-				"external":       "tvdb",
-				"tvdb_id":        mapped["tvdb_id"],
-			})
-		}
 	}
 	if len(tvdbItems) == 0 && tmdbFailed {
 		if tmdbTimedOut {
@@ -1641,6 +1644,88 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		logging.Info("TMDB senza risultati o non raggiungibile: uso il fallback TVDB", "query", query)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "kind": "series", "items": tvdbItems, "source": source})
+}
+
+// gh7_tvdbSearchItems searches TVDB series or movies and maps the results to
+// the item shape of TmdbSearch ("id" 0, the TVDB id in "tvdb_id").
+func gh7_tvdbSearchItems(ctx context.Context, cfg *Config, tvdb *TvdbClient, isMovie bool, query string) ([]any, error) {
+	items := []any{}
+	if isMovie {
+		raw, err := tvdb.SearchMovies(ctx, query)
+		if err != nil {
+			return items, err
+		}
+		for _, item := range raw {
+			mapped, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			id := v2AnyString(mapped["id"])
+			year := v2AnyString(mapped["release_date"])
+			items = append(items, map[string]any{
+				"id":           0,
+				"title":        mapped["title"],
+				"overview":     mapped["overview"],
+				"poster":       mapped["poster_path"],
+				"release_date": mapped["release_date"],
+				"external":     "tvdb",
+				"tvdb_id":      mapped["id"],
+				"in_library":   gh7_tvdbItemInLibrary(cfg, true, id, v2AnyString(mapped["title"]), year),
+			})
+		}
+		return items, nil
+	}
+	raw, err := tvdb.SearchSeries(ctx, query)
+	if err != nil {
+		return items, err
+	}
+	for _, item := range raw {
+		mapped, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		items = append(items, map[string]any{
+			"id":             0,
+			"name":           mapped["name"],
+			"overview":       mapped["overview"],
+			"poster":         mapped["image"],
+			"first_air_date": mapped["year"],
+			"external":       "tvdb",
+			"tvdb_id":        mapped["tvdb_id"],
+			"in_library":     gh7_tvdbItemInLibrary(cfg, false, v2AnyString(mapped["tvdb_id"]), v2AnyString(mapped["name"]), ""),
+		})
+	}
+	return items, nil
+}
+
+// gh7_tvdbItemInLibrary is gh_tmdbItemInLibrary for a TVDB result: same TVDB
+// id, or same name (and year, for movies when both are known).
+func gh7_tvdbItemInLibrary(cfg *Config, isMovie bool, id, name, year string) bool {
+	if cfg == nil {
+		return false
+	}
+	id, name, year = strings.TrimSpace(id), strings.TrimSpace(name), strings.TrimSpace(year)
+	if isMovie {
+		for _, movie := range cfg.Movies {
+			if id != "" && strings.TrimSpace(movie.TvdbID) == id {
+				return true
+			}
+			if name != "" && strings.EqualFold(strings.TrimSpace(movie.Name), name) &&
+				(year == "" || movie.Year == "" || strings.HasPrefix(movie.Year, year)) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, series := range cfg.Series {
+		if id != "" && strings.TrimSpace(series.TvdbID) == id {
+			return true
+		}
+		if name != "" && strings.EqualFold(strings.TrimSpace(series.Name), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // TorrentPeersLegacy handles POST /api/torrents/peers.

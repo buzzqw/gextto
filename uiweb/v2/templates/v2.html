@@ -1592,7 +1592,7 @@
 
       {{else if eq .Step 3}}
       <h3>Da dove cercare</h3>
-      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e usa TMDB per titoli, locandine e calendario. Puoi aggiungerne altri dopo, in Impostazioni.</p>
+      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e usa TMDB per titoli, locandine e calendario. Senza TMDB può cercare i titoli su TVDB, ma calendario e locandine richiedono TMDB. Puoi aggiungerne altri dopo, in Impostazioni.</p>
       {{if .Indexers}}<p><span class="badge ok">Indexer configurati</span> {{range .Indexers}}<code>{{.Name}}</code> {{end}}</p>{{end}}
       <form method="post" action="/setup/sources" class="v2-setup-form">
         <fieldset class="v2-setup-fields"><legend>Aggiungi un indexer</legend>
@@ -1605,6 +1605,10 @@
           <label><span>TMDB API key</span><input class="input" type="password" name="tmdb_api_key" autocomplete="off" placeholder="{{if .TmdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
           <small class="hint">Gratuita su themoviedb.org → Impostazioni → API.</small>
         </fieldset>
+        <fieldset class="v2-setup-fields"><legend>TVDB (alternativa)</legend>
+          <label><span>TVDB API key</span><input class="input" type="password" name="tvdb_api_key" autocomplete="off" placeholder="{{if .TvdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
+          <small class="hint">Usata per la ricerca dei titoli solo se manca la chiave TMDB. Chiave v4 da thetvdb.com → Dashboard → API keys; a seconda del tipo di chiave può servire un abbonamento TVDB.</small>
+        </fieldset>
         <div class="toolbar">
           <button class="btn primary" type="submit">Salva e continua</button>
           <a class="btn" href="/?view=setup&amp;step=2">Indietro</a>
@@ -1614,17 +1618,18 @@
 
       {{else if eq .Step 4}}
       <h3>La tua prima serie o il tuo primo film</h3>
-      <p class="hint">Cerca un titolo su TMDB e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</p>
+      <p class="hint">Cerca un titolo su {{if .TmdbSet}}TMDB{{else}}TVDB{{end}} e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</p>
       {{if or .SeriesCount .MoviesCount}}<p><span class="badge ok">In libreria</span> <span>Serie TV</span> <strong>{{.SeriesCount}}</strong> · <span>Film</span> <strong>{{.MoviesCount}}</strong></p>{{end}}
-      {{if .TmdbSet}}
+      {{if or .TmdbSet .TvdbSet}}
+      {{$source := "TVDB"}}{{if .TmdbSet}}{{$source = "TMDB"}}{{end}}
       <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
         <select class="input" name="kind" aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
-        <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
-        <button class="btn primary" type="submit">Cerca su TMDB</button>
+        <input class="input" type="search" name="query" aria-label="Titolo da cercare su {{$source}}" placeholder="Titolo da cercare su {{$source}}" />
+        <button class="btn primary" type="submit">Cerca su {{$source}}</button>
       </form>
       <div id="v2-tmdb-results" aria-live="polite"></div>
       {{else}}
-      <p class="alert">Senza la TMDB API key la ricerca dei titoli non è disponibile: aggiungila al passo precedente, oppure aggiungi i titoli dopo da Serie TV e Film.</p>
+      <p class="alert">Senza una API key TMDB o TVDB la ricerca dei titoli non è disponibile: aggiungila al passo precedente, oppure aggiungi i titoli dopo da Serie TV e Film.</p>
       {{end}}
       <div class="toolbar">
         <a class="btn primary" href="/?view=setup&amp;step=5">Continua</a>
@@ -1636,7 +1641,7 @@
       <ul class="v2-setup-summary">
         <li>{{if .ArchiveSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Cartella della libreria</span></li>
         <li>{{if .HasIndexer}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un indexer</span></li>
-        <li>{{if .TmdbSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>TMDB API key</span></li>
+        <li>{{if .TmdbSet}}<span class="badge ok">OK</span> <span>TMDB API key</span>{{else if .TvdbSet}}<span class="badge ok">OK</span> <span>TVDB API key (senza TMDB: niente calendario né locandine)</span>{{else}}<span class="badge warn">Manca</span> <span>TMDB o TVDB API key</span>{{end}}</li>
         <li>{{if or .SeriesCount .MoviesCount}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un titolo in libreria</span></li>
       </ul>
       <form method="post" action="/setup/finish" class="v2-setup-form">
@@ -1834,8 +1839,8 @@
   <div class="tmdb-card">
     <div class="tmdb-poster{{if not .Poster}} placeholder{{end}}">{{if .Poster}}<img loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{else}}N/D{{end}}</div>
     <div class="tmdb-card-body">
-       {{if .TmdbURL}}<a class="tmdb-result-title truncate" href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TMDB">{{.Name}}</a>{{else}}<strong class="truncate" title="{{.Name}}">{{.Name}}</strong>{{end}}
-       <small>TMDB {{.TmdbID}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
+       {{if .TmdbURL}}<a class="tmdb-result-title truncate" href="{{.TmdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TMDB">{{.Name}}</a>{{else if .TvdbURL}}<a class="tmdb-result-title truncate" href="{{.TvdbURL}}" target="_blank" rel="noopener" title="Apri {{.Name}} su TVDB">{{.Name}}</a>{{else}}<strong class="truncate" title="{{.Name}}">{{.Name}}</strong>{{end}}
+       <small>{{if .TmdbID}}TMDB {{.TmdbID}}{{else if .TvdbID}}TVDB {{.TvdbID}}{{end}}{{if .Year}} · {{.Year}}{{end}}{{if gt .Vote 0.0}} · ★ {{printf "%.1f" .Vote}}{{end}}{{if and .TmdbID .TvdbURL}} · <a href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</small>
       {{if .Overview}}<p class="tmdb-overview">{{.Overview}}</p>{{end}}
       {{if .InLibrary}}<span class="badge ok tmdb-in-library" title="Già presente nella libreria">Già in lista</span>
        {{else}}<form hx-get="/tmdb/manual?kind={{.Kind}}&amp;name={{.Name | urlquery}}&amp;year={{.Year | urlquery}}&amp;tmdb_id={{.TmdbID | urlquery}}&amp;tvdb_id={{.TvdbID | urlquery}}&amp;redirect=/?view={{if eq .Kind "movie"}}movies{{else}}series{{end}}" hx-target="#v2-modal" hx-swap="innerHTML">

@@ -134,3 +134,36 @@ func TestV2SetupPathsKeepsUnchangedDownloadFolder(t *testing.T) {
 		t.Fatalf("unchanged download folder refused: %q", location)
 	}
 }
+
+func TestV2SetupTvdbKeyWithoutTmdb(t *testing.T) {
+	tvdbLoginAndSearch(t, "tok", "movie",
+		`{"data":[{"tvdb_id":"321","name":"Dune","year":"2021","image_url":"https://artworks.thetvdb.com/dune.jpg"}]}`)
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	v2Request(t, server, http.MethodPost, "/setup/sources", url.Values{"tvdb_api_key": {"tvdb-key"}})
+	if key := latestConfig(state).TvdbAPIKey(); key == nil || *key != "tvdb-key" {
+		t.Fatalf("tvdb key not stored: %v", key)
+	}
+	code, body := v2Request(t, server, http.MethodGet, "/?view=setup&step=4", nil)
+	if code != http.StatusOK || !strings.Contains(body, "Cerca su TVDB") {
+		t.Fatalf("step 4 without TMDB -> %d, missing the TVDB search", code)
+	}
+
+	// Without a TMDB key the title search goes straight to TVDB, movies included.
+	code, body = v2Request(t, server, http.MethodPost, "/tmdb/search", url.Values{"kind": {"movie"}, "query": {"dune"}})
+	if code != http.StatusOK || !strings.Contains(body, "TVDB 321") || !strings.Contains(body, "tvdb_id=321") || strings.Contains(body, "TMDB 0") {
+		t.Fatalf("TVDB search -> %d:\n%s", code, body)
+	}
+
+	// A TVDB-only result can be added to the library.
+	code, body = v2Request(t, server, http.MethodPost, "/tmdb/add", url.Values{"kind": {"movie"}, "name": {"Dune"}, "year": {"2021"}, "tvdb_id": {"321"}})
+	if code != http.StatusOK || strings.Contains(body, "badge err") {
+		t.Fatalf("add TVDB movie -> %d: %s", code, body)
+	}
+	movies := latestConfig(state).Movies
+	if len(movies) != 1 || movies[0].TvdbID != "321" || movies[0].TmdbID != "" {
+		t.Fatalf("movies = %+v", movies)
+	}
+}

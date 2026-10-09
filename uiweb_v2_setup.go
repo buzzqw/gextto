@@ -9,8 +9,10 @@ package gextto
 //  1. Accesso    login on/off, user and password
 //  2. Cartelle   library (NAS), downloads, temporary files, trash, each checked
 //                live: exists, writable by the service user, filesystem, space
-//  3. Fonti      a Prowlarr/Jackett indexer and the TMDB key
-//  4. Primo titolo  the usual TMDB search with its "add" buttons
+//  3. Fonti      a Prowlarr/Jackett indexer, the TMDB key and, as an
+//                alternative for the title search, the TVDB key
+//  4. Primo titolo  the usual TMDB search (TVDB without a TMDB key) with
+//                its "add" buttons
 //  5. Attiva     leave dry-run and start the automatic cycle
 
 import (
@@ -71,6 +73,7 @@ type v2SetupView struct {
 	Mounts      []string
 	Indexers    []IndexerConfig
 	TmdbSet     bool
+	TvdbSet     bool
 	SeriesCount int
 	MoviesCount int
 	Active      bool
@@ -128,6 +131,7 @@ func v2SetupViewFrom(s *AppState, r *http.Request) v2SetupView {
 		AuthHasPass: strings.TrimSpace(cfg.Settings[authPasswordSetting]) != "",
 		Indexers:    cfg.Indexers,
 		TmdbSet:     cfg.TmdbAPIKey != nil && strings.TrimSpace(*cfg.TmdbAPIKey) != "",
+		TvdbSet:     WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage()).Configured(),
 		SeriesCount: len(cfg.Series),
 		MoviesCount: len(cfg.Movies),
 		Active:      cfg.Active,
@@ -455,13 +459,15 @@ func V2SetupPaths(w http.ResponseWriter, r *http.Request, s *AppState) {
 	v2SetupRedirect(w, r, 3, "Cartelle salvate.", false)
 }
 
-// V2SetupSources saves step 3: an optional indexer and the TMDB key.
+// V2SetupSources saves step 3: an optional indexer and the TMDB/TVDB keys.
 func V2SetupSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	if key := strings.TrimSpace(r.FormValue("tmdb_api_key")); key != "" {
-		if err := v2SetupSave(s, "tmdb_api_key", key); err != nil {
-			v2SetupRedirect(w, r, 3, err.Error(), true)
-			return
+	for _, field := range []string{"tmdb_api_key", "tvdb_api_key"} {
+		if key := strings.TrimSpace(r.FormValue(field)); key != "" {
+			if err := v2SetupSave(s, field, key); err != nil {
+				v2SetupRedirect(w, r, 3, err.Error(), true)
+				return
+			}
 		}
 	}
 	indexerURL := strings.TrimSpace(r.FormValue("indexer_url"))

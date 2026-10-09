@@ -1056,6 +1056,10 @@ type v2TMDBItem struct {
 
 func v2TMDBItemFromMap(kind string, item map[string]any) v2TMDBItem {
 	out := v2TMDBItem{Kind: kind, TmdbID: v2AnyID(item["id"]), TvdbID: v2AnyID(item["tvdb_id"]), InLibrary: v2Truthy(item["in_library"])}
+	if out.TmdbID == "0" {
+		// TVDB results carry "id": 0, which is not a TMDB id.
+		out.TmdbID = ""
+	}
 	tmdbKind, tvdbKind := "movie", "movie"
 	if kind != "movie" {
 		tmdbKind, tvdbKind = "tv", "series"

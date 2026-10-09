@@ -1466,7 +1466,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if strings.TrimSpace(input.Name) == "" || strings.TrimSpace(input.TmdbId) == "" {
+	if strings.TrimSpace(input.Name) == "" || (strings.TrimSpace(input.TmdbId) == "" && strings.TrimSpace(input.TvdbId) == "") {
 		jsonError(w, http.StatusBadRequest, "TMDB item is incomplete")
 		return
 	}
@@ -1491,7 +1491,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Name:                 strings.TrimSpace(input.Name),
 			Year:                 strings.TrimSpace(input.Year),
 			TmdbID:               strings.TrimSpace(input.TmdbId),
-			TvdbID:               "",
+			TvdbID:               strings.TrimSpace(input.TvdbId),
 			OriginalTitle:        "",
 			Overview:             "",
 			PosterPath:           "",
