@@ -218,12 +218,52 @@ func TestNotifierFormatEventItalian(t *testing.T) {
 	if got := formatEvent("gap_filled", episode); !strings.HasPrefix(got, "Gextto: gap riempito") {
 		t.Fatalf("gap_filled = %q", got)
 	}
+	// The download_started payload uses the reason code "gap_fill" (see
+	// orchestrator.go), which must be translated too, not shown raw.
+	withGap := formatEvent("download_started", map[string]any{
+		"series": "FBI", "season": 2, "episode": 5, "reason": "gap_fill",
+	})
+	if strings.Contains(withGap, "gap_fill") {
+		t.Fatalf("download_started leaked the raw reason code: %q", withGap)
+	}
+	if !strings.Contains(withGap, "Episodio mancante trovato") {
+		t.Fatalf("download_started did not translate gap_fill: %q", withGap)
+	}
 	if got := formatEvent("message", map[string]any{"text": "ciao"}); got != "ciao" {
 		t.Fatalf("message = %q, want ciao", got)
 	}
 	movie := map[string]any{"kind": "movie", "title": "Dune"}
 	if got := formatEvent("download_started", movie); !strings.Contains(got, "Dune") {
 		t.Fatalf("movie download_started missing title: %q", got)
+	}
+}
+
+// TestNotifierFormatEventReasonCodes checks that the raw reason codes used in
+// download_started payloads are always rendered as labels, never leaked.
+func TestNotifierFormatEventReasonCodes(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	for _, tc := range []struct {
+		lang, code, want string
+	}{
+		{"it", "gap_fill", "Episodio mancante trovato"},
+		{"it", "gap_filled", "Episodio mancante trovato"},
+		{"en", "gap_fill", "Missing episode found"},
+		{"en", "gap_filled", "Missing episode found"},
+		{"it", "upgrade", "Qualità superiore trovata"},
+		{"en", "upgrade", "Better quality found"},
+	} {
+		messages.SetLanguage(tc.lang)
+		got := formatEvent("download_started", map[string]any{
+			"series": "FBI", "season": 2, "episode": 5, "reason": tc.code,
+		})
+		if strings.Contains(got, tc.code) {
+			t.Fatalf("[%s] %q leaked the raw code: %q", tc.lang, tc.code, got)
+		}
+		if !strings.Contains(got, tc.want) {
+			t.Fatalf("[%s] %q = %q, want %q", tc.lang, tc.code, got, tc.want)
+		}
 	}
 }
 

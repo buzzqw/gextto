@@ -703,7 +703,7 @@ func formatEvent(event string, data map[string]any) string {
 	switch reasonCode {
 	case "upgrade":
 		reason = messages.Pick("⬆️ Qualità superiore trovata", "⬆️ Better quality found")
-	case "gap_filled":
+	case "gap_filled", "gap_fill":
 		reason = messages.Pick("🔎 Episodio mancante trovato", "🔎 Missing episode found")
 	case "restored":
 		reason = messages.Pick("♻️ Download ripristinato", "♻️ Download restored")
