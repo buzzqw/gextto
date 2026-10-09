@@ -1549,8 +1549,8 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 }
 
 // gxWarnUnsupportedOptions notes the add-time options rain cannot apply, so a
-// caller does not believe they were honored. rain has no sequential download,
-// first/last-piece priority, seed mode or per-torrent limits.
+// caller does not believe they were honored. Of the add-time options only seed
+// mode is missing.
 func gxWarnUnsupportedOptions(options AddOptions) {
 	var unsupported []string
 	if options.SeedMode {

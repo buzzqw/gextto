@@ -180,7 +180,7 @@ var capabilityLevels = map[string]map[string]string{
 		"add": "full", "list": "full", "pause": "full", "resume": "full", "remove": "full",
 		"recheck": "full", "move": "full", "limits": "full", "files": "full", "peers": "full",
 		"trackers": "full", "events": "full", "stats": "full", "sequential": "full",
-		"first_last": "partial", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
+		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "full", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "full",
 		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
