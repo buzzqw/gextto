@@ -242,6 +242,18 @@ func pathStartsWith(path, prefix string) bool {
 		(relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))
 }
 
+// hasParentComponent reports whether path contains a ".." component, the only
+// form of directory traversal. A substring check would also reject legitimate
+// names such as "From - S02E10 - C'era una volta... .mkv".
+func hasParentComponent(path string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
+}
+
 // SamePath reports whether two paths refer to the same filesystem location
 // (implementation of `same_path`).
 func SamePath(left, right string) bool {
@@ -1375,7 +1387,7 @@ func flattenMovieFolder(cfg *Config, release *models.Release, videoPath string) 
 		return videoPath, nil
 	}
 	target := filepath.Clean(filepath.Join(root, filepath.Base(videoPath)))
-	if strings.Contains(target, "..") {
+	if hasParentComponent(target) {
 		return videoPath, fmt.Errorf("invalid movie destination path: %s", target)
 	}
 	if SamePath(videoPath, target) {
@@ -1405,7 +1417,7 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 	}
 	dir = filepath.Clean(dir)
 	root = filepath.Clean(root)
-	if strings.Contains(dir, "..") || strings.Contains(root, "..") {
+	if hasParentComponent(dir) || hasParentComponent(root) {
 		return
 	}
 	entries, err := os.ReadDir(dir)
@@ -1416,7 +1428,7 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 		return
 	}
 	target := filepath.Clean(filepath.Join(root, stem))
-	if strings.Contains(target, "..") {
+	if hasParentComponent(target) {
 		return
 	}
 	if _, err := os.Stat(target); err == nil {
@@ -1430,7 +1442,7 @@ func renameLeftoverMovieFolder(dir, root, stem string) {
 func moveMovieCompanions(oldDir, root, videoBase string) {
 	oldDir = filepath.Clean(oldDir)
 	root = filepath.Clean(root)
-	if strings.Contains(oldDir, "..") || strings.Contains(root, "..") {
+	if hasParentComponent(oldDir) || hasParentComponent(root) {
 		return
 	}
 	stem := strings.TrimSuffix(filepath.Base(videoBase), filepath.Ext(videoBase))
@@ -1470,7 +1482,7 @@ func moveMovieCompanions(oldDir, root, videoBase string) {
 			targetName = stem + "-" + kind + filepath.Ext(name)
 		}
 		target := filepath.Clean(filepath.Join(root, targetName))
-		if strings.Contains(target, "..") {
+		if hasParentComponent(target) {
 			continue
 		}
 		if _, statErr := os.Stat(target); statErr == nil {
@@ -1495,11 +1507,11 @@ func movieArtworkKind(name string) string {
 func removeEmptyDirsUpTo(from, root string) {
 	dir := filepath.Clean(from)
 	root = filepath.Clean(root)
-	if strings.Contains(dir, "..") || strings.Contains(root, "..") {
+	if hasParentComponent(dir) || hasParentComponent(root) {
 		return
 	}
 	for !SamePath(dir, root) && pathWithin(dir, root) {
-		if strings.Contains(dir, "..") {
+		if hasParentComponent(dir) {
 			return
 		}
 		entries, err := os.ReadDir(dir)
@@ -1898,7 +1910,7 @@ func DiscardSidecars(source string, cfg *Config) (int, error) {
 // configured: refusing is safer than deleting a file the user asked to keep.
 func trashOrRemove(path string, cfg *Config) error {
 	path = filepath.Clean(path)
-	if strings.Contains(path, "..") {
+	if hasParentComponent(path) {
 		return fmt.Errorf("invalid path: %s", path)
 	}
 	if cfg.CleanupAction == "delete" {

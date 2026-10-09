@@ -418,6 +418,48 @@ func TestCleanupOrphanThumbs(t *testing.T) {
 	}
 }
 
+// TestCleanupOrphanThumbsEllipsisTitle: un titolo con i puntini di sospensione
+// ("C'era una volta...") non è un percorso con "..": la miniatura orfana va nel
+// cestino invece di bloccare la pulizia con "invalid path".
+func TestCleanupOrphanThumbsEllipsisTitle(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "From")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cleanerWrite(t, filepath.Join(archive, "From - S02E10 - C'era una volta... - [2160p].mkv"), "video")
+	kept := filepath.Join(archive, "From - S02E10 - C'era una volta... - [2160p]-thumb.jpg")
+	orphan := filepath.Join(archive, "From - S02E10 - C'era una volta... - [1080p]-thumb.jpg")
+	for _, file := range []string{kept, orphan} {
+		cleanerWrite(t, file, "img")
+	}
+	cfg := DefaultConfig()
+	cfg.CleanupAction = "move"
+	cfg.TrashPath = &trash
+	removed, err := CleanupOrphanThumbs(&cfg, archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, removed, 1)
+	assertTrue(t, !cleanerFileExists(orphan), "la miniatura orfana va nel cestino")
+	assertTrue(t, cleanerFileExists(kept), "la miniatura con il video resta")
+}
+
+func TestHasParentComponent(t *testing.T) {
+	for path, want := range map[string]bool{
+		"/srv/From/C'era una volta... .mkv": false,
+		"/srv/Hanna.finito/x..y.mkv":        false,
+		"/srv/...":                          false,
+		"..":                                true,
+		"../escape":                         true,
+		"a/../b":                            true,
+		"/srv/serie/..":                     true,
+	} {
+		assertEqual(t, hasParentComponent(path), want)
+	}
+}
+
 func TestHardSourceUpgradeTrashesOldBelowScoreThreshold(t *testing.T) {
 	root := t.TempDir()
 	archive := filepath.Join(root, "archive")

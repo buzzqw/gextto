@@ -224,7 +224,7 @@ func duplicateTarget(trash, file string) string {
 // handleDuplicate removes a duplicate file according to the cleanup action.
 func handleDuplicate(file string, cfg *Config) error {
 	file = filepath.Clean(file)
-	if strings.Contains(file, "..") {
+	if hasParentComponent(file) {
 		return fmt.Errorf("invalid path: %s", file)
 	}
 	if cfg.CleanupAction == "delete" {
@@ -272,11 +272,11 @@ func MoveToTrash(source, trash string) (string, error) {
 	if SamePath(source, trash) || pathWithin(trash, source) {
 		return "", fmt.Errorf("trash path %q is inside the source %q", trash, source)
 	}
-	if strings.Contains(source, "..") {
+	if hasParentComponent(source) {
 		return "", fmt.Errorf("invalid source path %q", source)
 	}
 	target := duplicateTarget(trash, source)
-	if strings.Contains(target, "..") {
+	if hasParentComponent(target) {
 		return "", fmt.Errorf("invalid target path %q", target)
 	}
 	renameErr := os.Rename(source, target)
@@ -403,7 +403,7 @@ func copyRecursive(source, target string) error {
 func cleanerCopyFile(source, target string, mode os.FileMode) error {
 	source = filepath.Clean(source)
 	target = filepath.Clean(target)
-	if strings.Contains(source, "..") || strings.Contains(target, "..") {
+	if hasParentComponent(source) || hasParentComponent(target) {
 		return fmt.Errorf("invalid path in copy: %s -> %s", source, target)
 	}
 	defer beginFileOperation(target)()
