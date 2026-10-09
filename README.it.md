@@ -141,7 +141,9 @@ include la UI web: non è richiesto un build frontend separato. Consulta il
 make build
 ```
 
-`make build` incrementa il numero della build locale e scrive il demone
+`make build` incrementa il numero di build **committato** (`build_number`, la
+stessa sorgente condivisa con la CI: checkout e versione installata mostrano lo
+stesso `1.1.<n>`) e scrive il demone
 versionato in `bin/gexttod`, insieme al motore `gx-torrent` in puro Go. Per
 ricompilare senza incrementare il numero usa `make fast`. Per compilare **solo**
 il demone `gx-torrent` (non servono C++ né libtorrent) usa `make gx-torrent`.

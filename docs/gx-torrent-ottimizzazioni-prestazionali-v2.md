@@ -46,7 +46,8 @@ Regole valide per ogni voce (da `AGENTS.md`):
 - Test mirati: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`,
   `make test-rain`, `make test`.
 - Invarianti: `scripts/check-ui-settings-index.sh`, `scripts/installer-selftest.sh`.
-- Non committare `build_number`, `gx-torrent.build_number`, `bin/`, `data/`.
+- Non committare `gx-torrent.build_number`, `bin/`, `data/`; `build_number`
+  invece è committato ed è la sorgente condivisa del numero di build.
 - Se cambia un comportamento visibile: aggiornare `README.md`/`README.it.md`,
   `docs/MANUAL.*` e `docs/gx-torrent.md`.
 

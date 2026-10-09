@@ -9,8 +9,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Mai "Claude" nel titolo o nel corpo delle PR; il titolo descrive la modifica
   (es. `fix(logs): …`).
 - Autore dei commit: `buzzqw <azanzani@gmail.com>`.
-- Non committare `build_number`, `gx-torrent.build_number`, `bin/` né directory
-  dati (`data/`, `gextto-data/`).
+- Non committare `gx-torrent.build_number`, `bin/` né directory dati (`data/`,
+  `gextto-data/`). `build_number` invece **è committato**: è la sorgente unica
+  del numero di build condivisa tra checkout e CI (vedi *Build e test*).
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
@@ -46,13 +47,19 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   miglioramento: **`docs/gx-torrent-migliorie.md`**.
 
 ## Build e test
-- `make build` — incrementa `build_number` (non committato) e compila
+- `make build` — incrementa `build_number` (committato) e compila
   `bin/gexttod` **e** `bin/gx-torrent`; quest'ultimo viene sostituito solo se
   il suo codice è cambiato (`bin/gx-torrent.code-sha256`,
   `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il confronto compila con
   `-buildvcs=false`: senza, Go marchia la revisione git nel binario e ogni
   commit sembrerebbe un cambiamento di gx-torrent. Richiede CGO/libtorrent; i
   warning di deprecazione di libtorrent sono normali.
+- `build_number` è la **sorgente unica** del numero di build: checkout e CI
+  leggono lo stesso file (base attuale `1462`). La CI non usa più
+  `github.run_number`: build e `release.json` prendono il valore dal file, così
+  la versione installata ha lo **stesso** `1.1.<n>` del checkout. Per far
+  avanzare il numero si fa `make build` e si committa il file aggiornato. Dopo
+  un `git pull` che cambia `build_number`, ricompila per allineare il badge.
 - Il demone ha un **numero di build proprio** (`gx-torrent.build_number`, non
   committato), separato da quello di Gextto: cresce di uno a ogni build reale di
   gx-torrent (`scripts/next-gx-build-number.sh`, usato da `make build` e da

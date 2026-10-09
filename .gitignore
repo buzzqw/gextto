@@ -22,8 +22,6 @@ coverage.xml
 docs/internal/
 docs/revisione-1.md
 
-# The monotonic build number is generated per build, never committed.
-build_number
 # The gx-torrent daemon's own build number (independent from gextto's).
 gx-torrent.build_number
 

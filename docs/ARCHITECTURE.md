@@ -29,7 +29,7 @@ gextto/
 ├── .github/                CI, CodeQL, dependabot, release
 ├── go.mod / go.sum         dipendenze Go
 ├── Makefile                comandi di build/test
-├── VERSION, build_number   versione e numero di build (build_number non è committato)
+├── VERSION, build_number   versione e numero di build (build_number committato, condiviso con la CI)
 └── bin/                    binario compilato (ignorato da git)
 ```
 

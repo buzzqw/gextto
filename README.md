@@ -137,7 +137,9 @@ build embeds the web UI; no separate frontend build is required. See the
 make build
 ```
 
-`make build` increments the local build number and writes the versioned daemon
+`make build` increments the **committed** build number (`build_number`, the same
+source shared with CI, so the checkout and the released version show the same
+`1.1.<n>`) and writes the versioned daemon
 to `bin/gexttod`, plus the pure-Go `gx-torrent` engine next to it. To rebuild
 without incrementing the number, use `make fast`. To build **only** the
 `gx-torrent` daemon (no C++/libtorrent needed), use `make gx-torrent`. Verify

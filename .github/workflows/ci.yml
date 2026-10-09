@@ -48,8 +48,6 @@ jobs:
         run: make test-rain
 
       - name: Build
-        env:
-          GEXTTO_BUILD: ${{ github.run_number }}
         run: scripts/build-daemon.sh
 
   # Phase 0 of the technical review: run the race detector as a separate,

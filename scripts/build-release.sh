@@ -12,7 +12,9 @@
 #       builds in the current system, which must be the baseline (CI jobs run
 #       with `container: ubuntu:22.04`)
 #
-# Environment: GEXTTO_BUILD (build number), GEXTTO_COMMIT, GEXTTO_BASE_IMAGE.
+# Environment: GEXTTO_BUILD (build number; when unset the committed
+# build_number file is used, so checkout and CI share the same number),
+# GEXTTO_COMMIT, GEXTTO_BASE_IMAGE.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

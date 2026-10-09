@@ -60,8 +60,6 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build and package
-        env:
-          GEXTTO_BUILD: ${{ github.run_number }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           scripts/build-release.sh --in-container --label "${GITHUB_REF_NAME}" --output-dir dist
@@ -92,7 +90,7 @@ jobs:
       - name: Write release manifest
         run: |
           scripts/release-manifest.sh --channel stable --label "${GITHUB_REF_NAME}" \
-            --build "${{ github.run_number }}" --output dist/release.json
+            --output dist/release.json
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
