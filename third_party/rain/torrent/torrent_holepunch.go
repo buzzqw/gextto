@@ -123,6 +123,7 @@ func planHolepunchRendezvous(sender *net.TCPAddr, msg peerprotocol.HolepunchMess
 // handleHolepunchRendezvous relays an introduction between the initiator and a
 // peer we are connected to, per BEP 55.
 func (t *torrent) handleHolepunchRendezvous(sender *peer.Peer, msg peerprotocol.HolepunchMessage) {
+	t.log.Debugf("holepunch rendezvous from %s: target %s", sender.Addr(), msg.AddrPort())
 	peers := make([]*peer.Peer, 0, len(t.peers))
 	relays := make([]holepunchRelay, 0, len(t.peers))
 	for pe := range t.peers {
@@ -205,4 +206,5 @@ func (t *torrent) tryHolepunchRendezvous(target *net.TCPAddr) {
 	if sent > 0 {
 		t.holepunchAttempted[key] = struct{}{}
 	}
+	t.log.Debugf("holepunch rendezvous for %s sent to %d peer(s)", target, sent)
 }

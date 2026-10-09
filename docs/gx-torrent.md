@@ -275,17 +275,38 @@ make gx-torrent          # costruisce bin/gx-torrent
 sudo scripts/holepunch-netns-test.sh
 ```
 
-Crea due namespace "dietro NAT" e un router con MASQUERADE, un tracker HTTP
-minimo e tre daemon (relay + leecher + seeder) con uTP e holepunch attivi. Se il
-buco riesce, il leecher compare con origine **`holepunch`** tra i peer del
-torrent. `--keep` lascia la topologia attiva per il debug; lo script riporta
-sempre cosa ha osservato (holepunch / connessione diretta / niente).
+Crea due reti client **distinte** dietro **firewall stateful** (nessun NAT: i
+client conservano IP e porta peer), un tracker HTTP minimo e quattro daemon con
+uTP e holepunch attivi: un seed pubblico e un relay, su IP diversi in `gx-lab`,
+più due client (A dietro gx-r1, B dietro gx-r2). Il firewall lascia uscire, DROPa
+le nuove connessioni in entrata e accetta le risposte: è il comportamento che
+conta per il BEP 55 (filtro "cone" port-preserving). B entra come leecher,
+scarica dal seed e completa restando connesso al relay: serve un relay **leecher
+interessato** ai suoi dati, perché un seed scarta i peer non interessati quando
+completa. Solo allora entra A (leecher): A non raggiunge B direttamente, chiede
+l'introduzione al relay; il relay manda `connect` a entrambi e i due dialano su
+uTP. Chi diala per primo compare con origine **`holepunch`**, l'altro vede la
+connessione come `incoming`: il test passa se compare su uno dei due. I router
+rifiutano il TCP verso le porte peer, così il buco si apre su uTP. `--keep` lascia
+la topologia attiva per il debug; lo script riporta cosa ha osservato (holepunch
+/ diretta / niente) e, sui fallimenti, le righe `holepunch` dei log (rendezvous
+inviato/ricevuto, `connect` ricevuto).
 
-Nota: Linux conntrack è endpoint-dependent, quindi con il solo MASQUERADE il
-buco può non aprirsi (serve un NAT "cone"); in quel caso lo script lo dice e le
-regole del router vanno tarate. Il criterio di successo resta l'origine peer
-`holepunch` (pagina web del demone o campo `source` in
-`/api/v1/torrents/<hash>/peers`).
+Perché firewall e non NAT: netfilter Linux **non emula un NAT port-translating
+"cone"**. Un pacchetto diretto all'IP WAN del router (il dial diretto del
+leecher, prima del rendezvous) crea una entry conntrack locale che occupa la
+porta esterna del peer e impedisce al target di creare la propria mappatura
+quando riceve il `connect`; con un solo IP esterno condiviso il buco non può
+aprirsi. Il firewall stateful, senza traduzione di indirizzo, riproduce lo stesso
+comportamento osservabile (inbound non richiesto bloccato, buco che si apre solo
+dopo il dial incrociato) e rende il test deterministico. Il comportamento è
+verificato dal criterio `source`/`incoming` su `/api/v1/torrents/<hash>/peers`
+(la pagina web del demone mostra la stessa origine).
+
+Nota: seed e relay devono stare su IP diversi perché rain deduplica i peer per
+IP (`connectedPeerIPs`); due daemon sullo stesso IP verrebbero visti come un solo
+peer. Entrambi vanno avviati con `-outgoing-interface` uguale all'IP di ascolto,
+altrimenti annunciano al tracker il proprio IP "di default" (sbagliato).
 
 ## Selezione dei file
 

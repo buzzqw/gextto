@@ -8,17 +8,40 @@
 # Topologia (tutto dentro namespace di rete dedicati: la rete dell'host NON
 # viene toccata, ne' interfacce ne' rotte ne' firewall):
 #
-#   gx-lab (relay)        gx-r (router)                 client netns
-#   --------------        --------------                ------------
-#   relay 10.0.0.1  <---  vr 10.0.0.2
-#                         var 10.10.0.1  <---  gx-a 10.10.0.2  (leecher, dietro NAT)
-#                         vbr 10.20.0.1  <---  gx-b 10.20.0.2  (seeder,  dietro NAT)
+#   gx-lab (pubblico)        gx-r1 (firewall)          client netns
+#   -----------------        --------------            ------------
+#   seed 10.0.0.1:51400
+#   relay 10.1.0.1:51410 <-- vr1 10.0.0.2
+#                            var 10.10.0.1  <--- gx-a 10.10.0.2 (leecher, filtrato)
 #
-# Il router fa MASQUERADE verso gx-lab (i client escono) e DROPpa le nuove
-# connessioni in entrata e tra i due client: leecher e seeder non si vedono
-# direttamente, entrambi raggiungono solo il relay. Un tracker HTTP minimo
-# (python3, in gx-lab) fa conoscere gli endpoint. Se il buco riesce, il leecher
-# compare con origine "holepunch" tra i peer del torrent.
+#   gx-lab (pubblico)        gx-r2 (firewall)          client netns
+#   -----------------        --------------            ------------
+#   seed 10.0.0.1:51400
+#   relay 10.1.0.1:51410 <-- vr2 10.1.0.2
+#                            vbr 10.20.0.1  <--- gx-b 10.20.0.2 (seed,   filtrato)
+#
+# (seed e relay su IP diversi: rain deduplica i peer per IP, quindi due daemon
+# sullo stesso IP verrebbero visti come un solo peer.)
+# Due reti client **distinte** dietro firewall stateful (nessun NAT): i client
+# conservano il loro IP e la loro porta peer, ma il firewall DROPa le nuove
+# connessioni in entrata e accetta solo le risposte (ESTABLISHED/RELATED). E'
+# il comportamento che conta per il BEP 55 (filtro "cone" port-preserving): il
+# buco si apre quando entrambi i lati dialano per primi. Nota: un vero NAT
+# port-translating non e' emulabile in modo affidabile con netfilter Linux (una
+# entry conntrack "locale" per un pacchetto diretto all'IP WAN occupa la porta
+# esterna e blocca la mappatura del target), quindi l'harness usa un firewall
+# stateful, che produce lo stesso comportamento osservabile. gx-lab instrada
+# tra le due subnet. Un tracker HTTP minimo (python3, in gx-lab) fa conoscere
+# gli endpoint.
+#
+# Ruoli (per esercitare davvero il percorso BEP 55, non un dial incrociato):
+# il seed pubblico serve i dati; B entra come leecher, scarica e completa, e
+# resta connesso al relay perche' il relay e' un **leecher interessato** ai suoi
+# dati (un seed scarta i peer non interessati quando completa). Solo allora
+# entra A: A non raggiunge B direttamente (B, da seed, non apre dial), chiede
+# l'introduzione al relay e i due aprono il buco su uTP. A e il relay hanno un
+# limite di download basso, cosi' restano leecher durante la prova. A compare
+# con origine "holepunch" tra i peer.
 #
 # Uso:
 #   sudo scripts/holepunch-netns-test.sh [--bin PATH] [--keep] [--size MiB]
@@ -27,10 +50,11 @@
 # All'uscita vengono rimossi i namespace, i veth e i daemon: sul sistema
 # restano solo le voci in /run/netns durante l'esecuzione.
 #
-# NOTA: Linux conntrack e endpoint-dependent, quindi con il solo MASQUERADE il
-# buco puo non aprirsi (serve un NAT "cone"). Lo script riporta sempre cosa ha
-# osservato (connessione diretta / holepunch / niente), così le regole del
-# router si possono tarare. Vedi docs/gx-torrent.md, sezione Holepunching.
+# NOTA: per un buco "da NAT" servirebbe un NAT port-translating cone; netfilter
+# Linux non lo emula in modo affidabile (vedi sopra), quindi l'harness usa
+# firewall stateful. Se il buco non riesce, lo script riporta cosa ha osservato
+# (holepunch / diretta / niente) e le righe holepunch dei log. Vedi
+# docs/gx-torrent.md, sezione Holepunching.
 set -euo pipefail
 
 # Anchor relative paths to the repository root, not the caller's directory.
@@ -39,13 +63,18 @@ BIN="${ROOT}/bin/gx-torrent"
 SIZE_MIB=4
 KEEP=0
 TRACKER_PORT=13800
-RELAY_PEER_PORT=51400
+SEED_PEER_PORT=51400
+RELAY_PEER_PORT=51410
 A_PEER_PORT=51401
 B_PEER_PORT=51402
+# Porte peer bloccate in TCP dai router (solo uTP sul percorso dei peer).
+PEER_TCP_RANGE="${SEED_PEER_PORT}:51500"
+SEED_API=18880
 RELAY_API=18881
 A_API=18882
 B_API=18883
-DEADLINE=90
+DEADLINE="${HOLEPUNCH_DEADLINE:-90}"
+B_DEADLINE="${HOLEPUNCH_B_DEADLINE:-60}"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -53,7 +82,7 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   printf 'Usage: %s [--bin PATH] [--keep] [--size MiB]\n\n' "$(basename "$0")"
-  sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,57p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -74,14 +103,14 @@ done
 BIN="$(realpath "$BIN")"
 
 WORK="$(mktemp -d /tmp/holepunch-netns.XXXXXX)"
-L=gx-lab; R=gx-r; A=gx-a; B=gx-b
+L=gx-lab; R1=gx-r1; R2=gx-r2; A=gx-a; B=gx-b
 PIDS=()
 
 # remove_links deletes veth ends that a previous aborted run may have left in
 # the root namespace (the peer inside a deleted netns disappears with it).
 remove_links() {
   local link
-  for link in vrel var vbr; do
+  for link in vrel1 vr1 vrel2 vr2 var vac vbr vbc; do
     ip link del "$link" 2>/dev/null || true
   done
 }
@@ -92,12 +121,13 @@ cleanup() {
     kill "$pid" 2>/dev/null || true
   done
   if [[ "$KEEP" == "1" ]]; then
-    warn "kept for debugging: netns $L $R $A $B, work dir $WORK"
+    warn "kept for debugging: netns $L $R1 $R2 $A $B, work dir $WORK"
     return
   fi
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
-  ip netns del "$R" 2>/dev/null || true
+  ip netns del "$R2" 2>/dev/null || true
+  ip netns del "$R1" 2>/dev/null || true
   ip netns del "$L" 2>/dev/null || true
   remove_links
   rm -rf "$WORK"
@@ -105,63 +135,96 @@ cleanup() {
 trap cleanup EXIT
 
 # --------------------------------------------------------------- topologia ---
+# fw_router <netns> <wan-dev> <lan-dev>: firewall stateful (nessun NAT). Il
+# client conserva il suo IP e la sua porta peer: il firewall lascia uscire, DROPa
+# le nuove connessioni in entrata e accetta le risposte (ESTABLISHED/RELATED),
+# esattamente il comportamento di un NAT "port-preserving" ma senza traduzione.
+# Rifiuta il TCP verso le porte peer, cosi' il buco si apre su uTP.
+fw_router() {
+  local ns="$1" wan="$2" lan="$3"
+  ip netns exec "$ns" sysctl -qw net.ipv4.ip_forward=1
+  ip netns exec "$ns" sysctl -qw net.ipv4.conf.all.rp_filter=0
+  ip netns exec "$ns" iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+  ip netns exec "$ns" iptables -A FORWARD -i "$lan" -o "$wan" -p tcp --dport "$PEER_TCP_RANGE" -j REJECT --reject-with tcp-reset
+  ip netns exec "$ns" iptables -A FORWARD -i "$wan" -o "$lan" -j DROP
+  ip netns exec "$ns" iptables -A FORWARD -i "$lan" -o "$wan" -j ACCEPT
+}
+
 setup_netns() {
-  ip netns del "$R" 2>/dev/null || true
+  ip netns del "$R1" 2>/dev/null || true
+  ip netns del "$R2" 2>/dev/null || true
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
   ip netns del "$L" 2>/dev/null || true
   remove_links
   ip netns add "$L"
-  ip netns add "$R"
+  ip netns add "$R1"
+  ip netns add "$R2"
   ip netns add "$A"
   ip netns add "$B"
   # loopback is down by default in a fresh namespace: the daemon API binds it.
   ip netns exec "$L" ip link set lo up
-  ip netns exec "$R" ip link set lo up
+  ip netns exec "$R1" ip link set lo up
+  ip netns exec "$R2" ip link set lo up
   ip netns exec "$A" ip link set lo up
   ip netns exec "$B" ip link set lo up
 
-  # lab (relay) <-> router: both ends live in a namespace, so the host network
-  # namespace is never touched (not even transiently, after the moves).
-  ip link add vrel type veth peer name vr
-  ip link set vrel netns "$L"
-  ip link set vr netns "$R"
-  ip netns exec "$L" ip addr add 10.0.0.1/24 dev vrel
-  ip netns exec "$L" ip link set vrel up
-  ip netns exec "$R" ip addr add 10.0.0.2/24 dev vr
-  ip netns exec "$R" ip link set vr up
+  # lab (pubblico) <-> NAT A
+  ip link add vrel1 type veth peer name vr1
+  ip link set vrel1 netns "$L"
+  ip link set vr1 netns "$R1"
+  ip netns exec "$L" ip addr add 10.0.0.1/24 dev vrel1
+  ip netns exec "$L" ip link set vrel1 up
+  ip netns exec "$R1" ip addr add 10.0.0.2/24 dev vr1
+  ip netns exec "$R1" ip link set vr1 up
 
-  # router <-> client A (distinct names: the two veth ends must not collide)
+  # lab (pubblico) <-> NAT B, su una subnet diversa: indirizzi esterni distinti.
+  ip link add vrel2 type veth peer name vr2
+  ip link set vrel2 netns "$L"
+  ip link set vr2 netns "$R2"
+  ip netns exec "$L" ip addr add 10.1.0.1/24 dev vrel2
+  ip netns exec "$L" ip link set vrel2 up
+  ip netns exec "$R2" ip addr add 10.1.0.2/24 dev vr2
+  ip netns exec "$R2" ip link set vr2 up
+
+  # NAT A <-> client A (distinct names: the two veth ends must not collide)
   ip link add var type veth peer name vac
-  ip link set var netns "$R"
+  ip link set var netns "$R1"
   ip link set vac netns "$A"
-  ip netns exec "$R" ip addr add 10.10.0.1/24 dev var
-  ip netns exec "$R" ip link set var up
+  ip netns exec "$R1" ip addr add 10.10.0.1/24 dev var
+  ip netns exec "$R1" ip link set var up
   ip netns exec "$A" ip addr add 10.10.0.2/24 dev vac
   ip netns exec "$A" ip link set vac up
   ip netns exec "$A" ip route add default via 10.10.0.1
 
-  # router <-> client B
+  # NAT B <-> client B
   ip link add vbr type veth peer name vbc
-  ip link set vbr netns "$R"
+  ip link set vbr netns "$R2"
   ip link set vbc netns "$B"
-  ip netns exec "$R" ip addr add 10.20.0.1/24 dev vbr
-  ip netns exec "$R" ip link set vbr up
+  ip netns exec "$R2" ip addr add 10.20.0.1/24 dev vbr
+  ip netns exec "$R2" ip link set vbr up
   ip netns exec "$B" ip addr add 10.20.0.2/24 dev vbc
   ip netns exec "$B" ip link set vbc up
   ip netns exec "$B" ip route add default via 10.20.0.1
 
-  # Router: forwarding e NAT verso la root; niente inbound nuovo verso i client
-  # ne tra i due client (li rende "dietro NAT" e non raggiungibili tra loro).
-  ip netns exec "$R" sysctl -qw net.ipv4.ip_forward=1
-  ip netns exec "$R" iptables -t nat -A POSTROUTING -o vr -j MASQUERADE
-  ip netns exec "$R" iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-  ip netns exec "$R" iptables -A FORWARD -i vr -o var -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i vr -o vbr -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i var -o vbr -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i vbr -o var -j DROP
-  ip netns exec "$R" iptables -A FORWARD -i var -o vr -j ACCEPT
-  ip netns exec "$R" iptables -A FORWARD -i vbr -o vr -j ACCEPT
+  # I due NAT escono verso il lab.
+  ip netns exec "$R1" ip route add default via 10.0.0.1
+  ip netns exec "$R2" ip route add default via 10.1.0.1
+
+  # Il lab inoltra tra i due WAN (nessun NAT qui): e' la rete "pubblica".
+  ip netns exec "$L" sysctl -qw net.ipv4.ip_forward=1
+  ip netns exec "$L" sysctl -qw net.ipv4.conf.all.rp_filter=0
+  ip netns exec "$L" sysctl -qw net.ipv4.conf.default.rp_filter=0
+  ip netns exec "$L" sysctl -qw net.ipv4.conf.vrel1.rp_filter=0
+  ip netns exec "$L" sysctl -qw net.ipv4.conf.vrel2.rp_filter=0
+
+  # Il lab instrada verso le due subnet dei client (nessun NAT: gli indirizzi
+  # dei client restano quelli visti da tracker e relay).
+  ip netns exec "$L" ip route add 10.10.0.0/24 via 10.0.0.2
+  ip netns exec "$L" ip route add 10.20.0.0/24 via 10.1.0.2
+
+  fw_router "$R1" vr1 var
+  fw_router "$R2" vr2 vbr
 }
 
 # ------------------------------------------------- tracciante + torrent ---------
@@ -192,7 +255,10 @@ class H(http.server.BaseHTTPRequestHandler):
                 out += socket.inet_aton(pip) + struct.pack('>H', pport)
             except OSError:
                 pass
-        body = b'd8:intervali60e5:peers' + str(len(out)).encode() + b':' + out + b'e'
+        # interval piu' lungo del tempo del rendezvous: evita che un re-annuncio
+        # faccia ripartire il dial diretto mentre il buco si sta aprendo (cosi'
+        # la connessione resta quella holepunch).
+        body = b'd8:intervali30e12:min intervali30e5:peers' + str(len(out)).encode() + b':' + out + b'e'
         self.send_response(200)
         self.send_header('Content-Type', 'text/plain')
         self.send_header('Content-Length', str(len(body)))
@@ -236,8 +302,8 @@ PY
 
 # ------------------------------------------------------------------ daemon ----
 start_daemon() {
-  # start_daemon <netns|-> <data-dir> <api> <peer-port> <listen-ip> <logfile>
-  local ns="$1" data="$2" api="$3" port="$4" ip="$5" logfile="$6"
+  # start_daemon <netns|-> <data-dir> <api> <peer-port> <listen-ip> <logfile> [outgoing-ip]
+  local ns="$1" data="$2" api="$3" port="$4" ip="$5" logfile="$6" out="${7:-}"
   mkdir -p "$data"
   local args=(
     -data "$data"
@@ -247,6 +313,9 @@ start_daemon() {
     -no-dht -no-lsd -no-upnp -no-natpmp
     -debug
   )
+  # Il socket del tracker non e' legato all'interfaccia di ascolto: senza questo
+  # il demone annuncerebbe il suo IP "di default" invece di quello di ascolto.
+  [[ -n "$out" ]] && args+=(-outgoing-interface "$out")
   if [[ "$ns" == "-" ]]; then
     "$BIN" "${args[@]}" >"$logfile" 2>&1 &
   else
@@ -276,7 +345,7 @@ wait_api() {
 }
 
 # --------------------------------------------------------------------- test ---
-log "topologia: relay in gx-lab + leecher/seeder dietro NAT (solo namespace, host intatto)"
+log "topologia: seed+relay in gx-lab, due client dietro NAT (solo namespace, host intatto)"
 setup_netns
 
 log "tracker HTTP su 10.0.0.1:$TRACKER_PORT"
@@ -292,55 +361,91 @@ cp "$WORK/content/holepunch.bin" "$WORK/seed/holepunch.bin"
 HASH="$(write_torrent "$WORK/content/holepunch.bin" "$WORK/test.torrent" "$TRACKER")"
 log "info hash: $HASH"
 
-log "avvio i tre daemon (uTP + holepunch attivi)"
-start_daemon "$L"  "$WORK/relay" "$RELAY_API" "$RELAY_PEER_PORT" "10.0.0.1" "$WORK/relay.log"
-start_daemon "$A"  "$WORK/a"     "$A_API"     "$A_PEER_PORT"     "10.10.0.2" "$WORK/a.log"
-start_daemon "$B"  "$WORK/b"     "$B_API"     "$B_PEER_PORT"     "10.20.0.2" "$WORK/b.log"
+log "avvio i daemon (uTP + holepunch attivi)"
+start_daemon "$L" "$WORK/seed"  "$SEED_API"  "$SEED_PEER_PORT"  "10.0.0.1"  "$WORK/seed.log"  "10.0.0.1"
+start_daemon "$L" "$WORK/relay" "$RELAY_API" "$RELAY_PEER_PORT" "10.1.0.1"  "$WORK/relay.log" "10.1.0.1"
+start_daemon "$A" "$WORK/a"     "$A_API"     "$A_PEER_PORT"     "10.10.0.2" "$WORK/a.log"
+start_daemon "$B" "$WORK/b"     "$B_API"     "$B_PEER_PORT"     "10.20.0.2" "$WORK/b.log"
+wait_api "$L" "$SEED_API"  || { echo "--- seed.log ---" >&2; tail -n 20 "$WORK/seed.log" >&2; die "seed API non risponde"; }
 wait_api "$L" "$RELAY_API" || { echo "--- relay.log ---" >&2; tail -n 20 "$WORK/relay.log" >&2; die "relay API non risponde"; }
-wait_api "$A" "$A_API"     || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "leecher API non risponde"; }
-wait_api "$B" "$B_API"     || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "seeder API non risponde"; }
+wait_api "$A" "$A_API"     || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "A API non risponde"; }
+wait_api "$B" "$B_API"     || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "B API non risponde"; }
 
-# Reachability across the NAT: the leecher must reach the lab (tracker + relay
-# peer port) through the router, or nothing else can work.
+# Raggiungibilita' del lab attraverso i NAT: tracker HTTP (TCP) e, di
+# proposito, nessun peer TCP (solo uTP: il buco si apre su UDP).
 TRACKER_CODE="$(ip netns exec "$A" curl -s -m 3 -o /dev/null -w '%{http_code}' "http://10.0.0.1:$TRACKER_PORT/" 2>/dev/null || true)"
-RELAY_TCP="fail"
-if ip netns exec "$A" timeout 3 bash -c "exec 3<>/dev/tcp/10.0.0.1/$RELAY_PEER_PORT" 2>/dev/null; then RELAY_TCP="open"; fi
-log "probe da gx-a -> gx-lab: tracker_http=${TRACKER_CODE:-fail} relay_tcp=$RELAY_TCP"
+TRACKER_CODE_B="$(ip netns exec "$B" curl -s -m 3 -o /dev/null -w '%{http_code}' "http://10.0.0.1:$TRACKER_PORT/" 2>/dev/null || true)"
+SEED_TCP="fail"
+if ip netns exec "$A" timeout 3 bash -c "exec 3<>/dev/tcp/10.0.0.1/$SEED_PEER_PORT" 2>/dev/null; then SEED_TCP="open"; fi
+log "probe verso gx-lab: tracker_http A=${TRACKER_CODE:-fail} B=${TRACKER_CODE_B:-fail} peer_tcp_A->seed=$SEED_TCP (atteso fail: solo uTP)"
 
-log "il seeder (B) carica il .torrent e i dati"
-log "  B add-file: $(daemon_api "$B" "$B_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed")"
 MAGNET="magnet:?xt=urn:btih:$HASH&tr=$TRACKER"
-log "  relay add: $(daemon_api "$L" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
-log "  A add: $(daemon_api "$A" "$A_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
 
-log "attendo che il leecher raggiunga il seeder (max ${DEADLINE}s)"
+log "il seed pubblico serve i dati"
+log "  seed add-file: $(daemon_api "$L" "$SEED_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed")"
+log "  seed stato: $(daemon_api "$L" "$SEED_API" /api/v1/torrents | grep -o '"progress":[0-9.]*' | head -1)"
+
+log "il relay e' un leecher interessato (download_limit basso, resta incompleto)"
+log "  relay add: $(daemon_api "$L" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
+log "  relay download_limit=1: $(daemon_api "$L" "$RELAY_API" "/api/v1/torrents/$HASH/seed-limits" -d download_limit=1)"
+
+log "B entra come leecher, completa dal seed e resta connesso al relay"
+log "  B add: $(daemon_api "$B" "$B_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
+b_done=0
+for _ in $(seq 1 "$B_DEADLINE"); do
+  if daemon_api "$B" "$B_API" /api/v1/torrents 2>/dev/null | grep -q '"progress":100'; then b_done=1; break; fi
+  sleep 1
+done
+if [[ "$b_done" == "1" ]]; then
+  log "  B completo (seed dietro NAT, tenuto dal relay interessato)"
+else
+  warn "B non ha completato entro ${B_DEADLINE}s: procedo comunque"
+fi
+
+# A deve restare leecher mentre prova a raggiungere B: se completasse, il dial
+# verso B verrebbe abortito e il rendezvous BEP 55 non partirebbe.
+log "entra A (leecher, download limitato) e chiede l'introduzione al relay"
+log "  A add: $(daemon_api "$A" "$A_API" /api/v1/add --data-urlencode "magnet=$MAGNET")"
+log "  A download_limit=1: $(daemon_api "$A" "$A_API" "/api/v1/torrents/$HASH/seed-limits" -d download_limit=1)"
+
+log "attendo che i due client si colleghino via holepunch (max ${DEADLINE}s)"
 result="niente"
 for _ in $(seq 1 "$DEADLINE"); do
-  peers="$(daemon_api "$A" "$A_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null || true)"
-  case "$peers" in
-    *'"source":"holepunch"'*) result="holepunch"; break ;;
-    *'"address":"10.20.0.2'*) result="diretta"; break ;;
-  esac
+  # BEP 55 puo' aprirsi da entrambi i lati: chi diala ha sorgente "holepunch",
+  # l'altro vede la connessione come "incoming". Basta che compaia su uno dei due.
+  peerA="$(daemon_api "$A" "$A_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null | tr -d '[]' | tr '}' '\n' || true)"
+  peerB="$(daemon_api "$B" "$B_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null | tr -d '[]' | tr '}' '\n' || true)"
+  if printf '%s\n%s\n' "$peerA" "$peerB" | grep -q '"source":"holepunch"'; then result="holepunch"; break; fi
+  if printf '%s\n' "$peerA" | grep '"address":"10.20.0.2' | grep -q '"source":"tracker"'; then result="diretta"; break; fi
   sleep 1
 done
 
 echo
-if [[ "$result" == "holepunch" ]]; then
-  log "PASS: il leecher ha raggiunto il seeder via holepunch (BEP 55)"
-elif [[ "$result" == "diretta" ]]; then
-  warn "il leecher ha raggiunto il seeder DIRETTAMENTE: il NAT emulato e troppo permissivo (non ha esercitato il buco)"
-else
-  warn "nessuna connessione osservata: puo servire un NAT 'cone' o regole conntrack diverse"
+if [[ "${HOLEPUNCH_DIAG:-0}" == "1" ]]; then
+  for ns in "$R1" "$R2"; do
+    echo "--- conntrack $ns (porte peer) ---"
+    ip netns exec "$ns" cat /proc/net/nf_conntrack 2>/dev/null | grep -aE "sport=514|dport=514" | head -30 || true
+  done
 fi
-echo "--- peer del leecher ---"
+if [[ "$result" == "holepunch" ]]; then
+  log "PASS: i due client si sono collegati via holepunch (BEP 55)"
+elif [[ "$result" == "diretta" ]]; then
+  warn "il leecher ha raggiunto B DIRETTAMENTE: il filtro emulato e' troppo permissivo (non ha esercitato il buco)"
+else
+  warn "nessuna connessione osservata: puo' servire un filtro 'cone' port-preserving"
+fi
+echo "--- peer di A (leecher) ---"
 daemon_api "$A" "$A_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null || true
+echo
+echo "--- peer di B (seed) ---"
+daemon_api "$B" "$B_API" "/api/v1/torrents/$HASH/peers" 2>/dev/null || true
 echo
 if [[ "$result" != "holepunch" ]]; then
   echo "--- tracker.log (ultime righe) ---"
   tail -n 10 "$WORK/tracker.log" 2>/dev/null || true
-  for n in relay a b; do
-    echo "--- $n.log (tracker/peer/holepunch/error) ---"
-    grep -iE "tracker|holepunch|peer|error" "$WORK/$n.log" 2>/dev/null | tail -n 12 || true
+  for n in seed relay a b; do
+    echo "--- $n.log (holepunch) ---"
+    grep -a -i "holepunch" "$WORK/$n.log" 2>/dev/null | tail -n 8 || true
   done
 fi
 echo
