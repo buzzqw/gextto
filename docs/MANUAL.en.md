@@ -217,7 +217,9 @@ The installer must run as root and requires systemd. Use `GEXTTO_REPO` and
 data in `/var/lib/gextto` and the program in `/opt/gextto`; an optional
 `/etc/gextto/gextto.env` file, if present, is loaded as environment overrides
 (the API token is not stored there: set it in *Configuration → Access and
-services*).
+services*). By default the service runs as **the user who runs the installer**;
+`--user NAME` (or `GEXTTO_USER`) selects another user, and `--user gextto` the
+isolated, login-less system account.
 
 For a no-root installation from a source checkout:
 

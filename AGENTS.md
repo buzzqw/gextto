@@ -96,6 +96,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `<data>/update-request`, la unit root esegue `gexttod --update` (log in
   `/var/log/gextto-update.log`), che tiene `gexttod.prev` e lo ripristina se la
   nuova versione non parte.
+- Utente del servizio: per default è **l'utente locale che esegue l'installer**
+  (`SUDO_USER`), così può creare cartelle nei media di quell'utente; `--user
+  gextto` (o `GEXTTO_USER`) usa l'account di sistema isolato e senza login, con
+  `--media-group` per l'accesso ai media altrui. Il gruppo della unit è il gruppo
+  primario dell'utente (`id -gn`), non necessariamente il nome utente.
 - Prova reale dell'installer: container con systemd (`--privileged
   --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw`) e
   `install.sh --local-archive dist/gextto-linux-x86_64.tar.gz`.

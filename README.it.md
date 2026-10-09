@@ -156,8 +156,12 @@ pacchetto include sia il demone gx-torrent sia la libreria condivisa libtorrent.
 
 Prima di toccare il sistema l'installer avvia una volta il programma scaricato:
 se mancano librerie o la glibc è troppo vecchia lo dice subito, senza lasciare un
-servizio che non parte. Se la libreria è su un NAS di proprietà di un altro
-utente, `--media-group <gruppo>` aggiunge l'utente del servizio a quel gruppo.
+servizio che non parte. Il servizio gira per impostazione predefinita con
+**l'utente locale che esegue l'installer**, così può creare cartelle nella tua
+libreria senza permessi aggiuntivi; `--user gextto` usa invece l'account di
+sistema isolato e senza login. Se la libreria è su un NAS di proprietà di un
+altro utente, `--media-group <gruppo>` aggiunge l'utente del servizio a quel
+gruppo.
 
 > [!IMPORTANT]
 > Gextto è pensato per una rete fidata: per impostazione predefinita la UI web e

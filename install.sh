@@ -15,7 +15,7 @@
 # service that never starts.
 #
 # Environment overrides (kept for backward compatibility): GEXTTO_DATA_DIR,
-# GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_LISTEN, GEXTTO_USER,
+# GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP,
 # GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
 # GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
 # GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
@@ -27,7 +27,12 @@ PORT="${GEXTTO_PORT:-5000}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
 # LISTEN empty means the default 0.0.0.0:$PORT, resolved once PORT is known.
 LISTEN="${GEXTTO_LISTEN:-}"
-SERVICE_USER="${GEXTTO_USER:-gextto}"
+# Service user: by default the local user who runs the installer, so the
+# daemon can create folders in that user's media tree without extra
+# permissions. Use `--user gextto` (or GEXTTO_USER) for the isolated,
+# login-less system account; GEXTTO_GROUP overrides its group.
+SERVICE_USER="${GEXTTO_USER:-}"
+SERVICE_GROUP="${GEXTTO_GROUP:-}"
 REPO="${GEXTTO_REPO:-buzzqw/gextto}"
 RELEASE="${GEXTTO_RELEASE:-continuous}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
@@ -107,16 +112,19 @@ Options:
       --engine-port PORT  internal engine port (default: 8889)
       --data-dir DIR      service data directory (default: /var/lib/gextto)
       --install-dir DIR   program directory (default: /opt/gextto)
-      --user NAME         service user (default: gextto)
+      --user NAME         service user; default: the local user who runs the
+                          installer (use "gextto" for the isolated, login-less
+                          system account)
       --media-group G     add the service user to group G (repeatable or
                           comma-separated), e.g. the group that owns the NAS
                           media folders
       --local-archive F   install from a local .tar.gz instead of downloading us
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
-GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE,
-GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
-GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
+GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP, GEXTTO_INSTALL_DIR, GEXTTO_REPO,
+GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE,
+GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT,
+GEXTTO_MEDIA_GROUPS.
 EOF
 }
 
@@ -297,15 +305,13 @@ create_service_user() {
     run useradd --system --user-group --home-dir "$DATA_DIR" --shell "$nologin" "$SERVICE_USER" \
       || die "unable to create service user $SERVICE_USER"
     log "created service user $SERVICE_USER"
+    SERVICE_GROUP="$SERVICE_USER"
     # Remember that we created it, so --purge removes only our own account and
     # never a pre-existing system user that happened to share the name.
     if [[ "$DRY_RUN" != "1" ]]; then
       install -d /etc/gextto
       printf '%s\n' "$SERVICE_USER" > /etc/gextto/created-user
     fi
-  fi
-  if ! getent group "$SERVICE_USER" >/dev/null 2>&1; then
-    run groupadd --system "$SERVICE_USER" || true
   fi
   # Supplementary groups give the service access to media folders owned by
   # another user (NAS mounts, a shared "media" group) without touching their
@@ -324,9 +330,30 @@ create_service_user() {
   done
 }
 
+# resolve_service_identity picks the service user and its primary group. With
+# no --user/GEXTTO_USER the local user who invoked the installer wins (SUDO_USER),
+# falling back to a dedicated "gextto" account for unattended/root runs.
+resolve_service_identity() {
+  if [[ -z "$SERVICE_USER" ]]; then
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+      SERVICE_USER="$SUDO_USER"
+    else
+      SERVICE_USER="gextto"
+    fi
+  fi
+  if [[ -n "$SERVICE_GROUP" ]]; then
+    return 0
+  fi
+  if id -u "$SERVICE_USER" >/dev/null 2>&1; then
+    SERVICE_GROUP="$(id -gn "$SERVICE_USER" 2>/dev/null || echo "$SERVICE_USER")"
+  else
+    SERVICE_GROUP="$SERVICE_USER"
+  fi
+}
+
 install_files() {
   local work="$1"
-  run install -d -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
+  run install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" "$DATA_DIR"
   run install -d "$INSTALL_DIR"
 
   # Keep the previous binary so a failed upgrade can be rolled back.
@@ -373,7 +400,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=$SERVICE_USER
-Group=$SERVICE_USER
+Group=$SERVICE_GROUP
 EnvironmentFile=-/etc/gextto/gextto.env
 Environment=GEXTTO_DATA_DIR=$DATA_DIR
 Environment=GEXTTO_LISTEN=$LISTEN
@@ -557,6 +584,7 @@ print_summary() {
 
 main() {
   parse_args "$@"
+  resolve_service_identity
   # Resolve the listen address. --listen (or GEXTTO_LISTEN) may carry its own
   # port, and the health check below must poll the port actually bound.
   if [[ -n "$LISTEN" ]]; then
@@ -577,6 +605,7 @@ main() {
 
   # --dry-run changes nothing and may be reviewed without privileges.
   [[ "$DRY_RUN" == "1" ]] || require_root
+  log "service user: $SERVICE_USER (group $SERVICE_GROUP)"
   preflight
   install_packages
   require_download_tools

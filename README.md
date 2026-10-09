@@ -152,8 +152,11 @@ the gx-torrent daemon and the libtorrent shared library.
 
 Before touching the system the installer runs the downloaded program once: a
 missing library or a too-old glibc is reported right away instead of leaving a
-service that never starts. When the library lives on a NAS owned by another
-user, `--media-group <group>` adds the service user to that group.
+service that never starts. By default the service runs as **the local user who
+runs the installer**, so it can create folders in your library without extra
+permissions; `--user gextto` uses the isolated, login-less system account
+instead. When the library lives on a NAS owned by another user,
+`--media-group <group>` adds the service user to that group.
 
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: by default the web UI and the API are

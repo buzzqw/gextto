@@ -215,7 +215,10 @@ e `GEXTTO_RELEASE` per scegliere un repository o una release diversi. Salva i
 dati del servizio in `/var/lib/gextto` e il programma in `/opt/gextto`; un file
 opzionale `/etc/gextto/gextto.env`, se presente, viene caricato come variabili
 d'ambiente (il token API non è lì: si imposta in *Configurazione → Accesso e
-servizi*). Installer e `gexttod --update` installano lo stesso payload.
+servizi*). Installer e `gexttod --update` installano lo stesso payload. Per
+impostazione predefinita il servizio gira con **l'utente che esegue
+l'installer**; `--user NAME` (o `GEXTTO_USER`) sceglie un altro utente e
+`--user gextto` l'account di sistema isolato e senza login.
 
 Per un'installazione senza root da un checkout sorgente:
 
