@@ -267,7 +267,8 @@ func Serve(state *AppState) error {
 	} else if state.cfg.Active {
 		mode = "downloads are enabled"
 	}
-	logStartupBanner(state.cfg.DataDir)
+	prevRun := logStartupBanner(state.cfg.DataDir)
+	notifyRestart(state, prevRun)
 	logging.Info(fmt.Sprintf("🚀 Gextto started — web interface at http://%s · %s · engine: %s", webAddr, mode, state.activeEngine().Name()))
 	logging.Debug("startup details", "engine_api", "http://"+engineAddr, "libtorrent", LibtorrentVersion())
 
@@ -321,6 +322,7 @@ func Serve(state *AppState) error {
 		shutdownServers(webServer, engineServer)
 		stopBackgroundWorkers(state)
 		recordShutdown(state.cfg.DataDir, "fatal error: "+err.Error())
+		notifyDaemonError(state, err)
 		return err
 	case <-ctx.Done():
 		cancelRequests()

@@ -1033,6 +1033,66 @@ func formatEvent(event string, data map[string]any) string {
 		}
 
 		return strings.Join(lines, "\n")
+	case "daemon_restarted":
+		run, _ := jsonInt(mapLookup(data, "run"))
+		head := messages.Pick(
+			fmt.Sprintf("♻️ Gextto riavviato (avvio #%d)", run),
+			fmt.Sprintf("♻️ Gextto restarted (run #%d)", run),
+		)
+		if version := text("version"); version != "" {
+			head += " — " + version
+		}
+		down, hasDown := jsonInt(mapLookup(data, "down_seconds"))
+		unclean, _ := mapLookup(data, "unclean").(bool)
+		switch {
+		case hasDown && down >= 0:
+			head += messages.Pick(" · fermo da ", " · down for ") + formatDuration(down)
+		case unclean:
+			head += messages.Pick(" · dopo un arresto anomalo", " · after an unclean shutdown")
+		}
+		return head
+	case "daemon_error":
+		errText := text("error")
+		if errText == "" {
+			errText = messages.Pick("errore non specificato", "unspecified error")
+		}
+		return fmt.Sprintf("Gextto: %s — %s",
+			messages.Pick("🛑 arresto per un errore", "🛑 stopped by an error"), errText)
+	case "engine_crashed":
+		errText := text("error")
+		if errText == "" {
+			errText = messages.Pick("uscita inattesa", "unexpected exit")
+		}
+		restarts, _ := jsonInt(mapLookup(data, "restarts_in_window"))
+		return fmt.Sprintf("gx-torrent: %s — %s (%s %d)",
+			messages.Pick("⚠️ uscita inattesa", "⚠️ unexpected exit"),
+			errText,
+			messages.Pick("riavvii recenti:", "recent restarts:"), restarts)
+	case "engine_restarted":
+		restarts, _ := jsonInt(mapLookup(data, "restarts_in_window"))
+		return fmt.Sprintf("gx-torrent: %s (%s %d)",
+			messages.Pick("🔄 riavviato dopo un'uscita inattesa", "🔄 restarted after an unexpected exit"),
+			messages.Pick("riavvii recenti:", "recent restarts:"), restarts)
+	case "engine_fallback":
+		return fmt.Sprintf("gx-torrent: %s",
+			messages.Pick(
+				"⛔ non riesce a restare attivo; passo al motore libtorrent",
+				"⛔ cannot stay up; falling back to the embedded libtorrent engine",
+			))
+	case "engine_error":
+		errText := text("error")
+		if errText == "" {
+			errText = messages.Pick("errore non specificato", "unspecified error")
+		}
+		return fmt.Sprintf("gx-torrent: %s — %s",
+			messages.Pick("⚠️ problema", "⚠️ problem"), errText)
+	case "health_degraded":
+		return fmt.Sprintf("%s\n\n%s: %s\n%s: %s",
+			messages.Pick("⚠️ GEXTTO HA UN PROBLEMA", "⚠️ GEXTTO HAS A PROBLEM"),
+			messages.Pick("Stato", "Status"), text("status"),
+			messages.Pick("Motivo", "Reason"), text("reason"))
+	case "health_recovered":
+		return messages.Pick("✅ Gextto di nuovo operativo", "✅ Gextto healthy again")
 	default:
 		if value, ok := mapLookup(data, "text").(string); ok {
 			return fmt.Sprintf("Gextto [%s] %s", event, value)

@@ -109,7 +109,7 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	// embedded -> nil engine (the adapter is built on demand).
 	cfg := DefaultConfig()
 	cfg.Settings["torrent_backend"] = BackendEmbedded
-	if engine, _, err := selectTorrentEngine(&cfg); err != nil || engine != nil {
+	if engine, _, err := selectTorrentEngine(&cfg, nil); err != nil || engine != nil {
 		t.Fatalf("embedded select = %v, %v", engine, err)
 	}
 	// A fresh installation with no saved backend uses gx-torrent.
@@ -119,13 +119,13 @@ func TestSelectTorrentEngineBackends(t *testing.T) {
 	}
 	// qbittorrent without a URL is refused.
 	cfg.Settings["torrent_backend"] = BackendQbittorrent
-	if _, _, err := selectTorrentEngine(&cfg); err == nil {
+	if _, _, err := selectTorrentEngine(&cfg, nil); err == nil {
 		t.Fatal("qbittorrent without url must be refused")
 	}
 	// Removed backend values fall back to the embedded implementation.
 	cfg2 := DefaultConfig()
 	cfg2.Settings["torrent_backend"] = "anacrolix"
-	engine, _, err := selectTorrentEngine(&cfg2)
+	engine, _, err := selectTorrentEngine(&cfg2, nil)
 	if err != nil || engine != nil || TorrentBackendName(&cfg2) != BackendEmbedded {
 		t.Fatalf("legacy anacrolix selection must fall back to embedded: engine=%v err=%v", engine, err)
 	}

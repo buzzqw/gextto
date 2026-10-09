@@ -67,8 +67,17 @@ func healthMonitorWorker(state *AppState) {
 				"data_dir", paths.DataDir,
 				"data_dir_writable", health.DataDirWritable,
 			)
+			if state.notifier != nil {
+				_ = state.notifier.NotifyEvent("health_degraded", map[string]any{
+					"status": health.Status,
+					"reason": reason,
+				})
+			}
 		case "recovered":
 			logging.Info("health check recovered", "status", health.Status)
+			if state.notifier != nil {
+				_ = state.notifier.NotifyEvent("health_recovered", map[string]any{"status": health.Status})
+			}
 		}
 		if !state.SleepBackground(healthMonitorPeriod) {
 			return

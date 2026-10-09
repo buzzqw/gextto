@@ -405,6 +405,21 @@ func (b *gxCrashBudget) register(now time.Time) bool {
 // len reports how many failures are currently inside the window.
 func (b *gxCrashBudget) len() int { return len(b.events) }
 
+// notifyEvent sends a lifecycle notification when a notifier is wired. Best
+// effort: a failure to notify must never affect supervision.
+func (e *gxTorrentEngine) notifyEvent(event string, data map[string]any) {
+	if e == nil || e.notifier == nil {
+		return
+	}
+	notifier := e.notifier
+	go func() {
+		defer recoverGoroutine("gx-torrent notifier")
+		if err := notifier.NotifyEvent(event, data); err != nil {
+			logging.Warn("gx-torrent notification failed", "event", event, "error", err)
+		}
+	}()
+}
+
 // superviseManagedProcess restarts the managed daemon after an unexpected exit
 // or a failed start. It gives up (and hands the transfers back to embedded
 // libtorrent, saving the setting and restarting the service) once the crash
@@ -416,6 +431,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 	fallbackToLibtorrent := func() {
 		logging.Error("gx-torrent non riesce a restare attivo: passo al motore libtorrent e riavvio il servizio",
 			"crashes", budget.len(), "window_minutes", int(budget.window.Minutes()))
+		e.notifyEvent("engine_fallback", map[string]any{"crashes": budget.len()})
 		e.processMu.Lock()
 		process := e.process
 		e.processMu.Unlock()
@@ -457,6 +473,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			exit = err.Error()
 		}
 		logging.Error("gx-torrent gestito terminato in modo inatteso", "error", exit, "restarts_in_window", budget.len()+1)
+		e.notifyEvent("engine_crashed", map[string]any{"error": exit, "restarts_in_window": budget.len() + 1})
 		if budget.register(time.Now()) {
 			fallbackToLibtorrent()
 			return
@@ -496,6 +513,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 			return
 		}
 		logging.Info("gx-torrent gestito riavviato dopo un'uscita inattesa", "restart", budget.len())
+		e.notifyEvent("engine_restarted", map[string]any{"restarts_in_window": budget.len()})
 	}
 }
 

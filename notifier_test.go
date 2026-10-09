@@ -267,6 +267,40 @@ func TestNotifierFormatEventReasonCodes(t *testing.T) {
 	}
 }
 
+// TestNotifierFormatEventLifecycle covers daemon/engine lifecycle and health
+// notifications in both languages.
+func TestNotifierFormatEventLifecycle(t *testing.T) {
+	previous := messages.Language()
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	messages.SetLanguage("it")
+	restart := formatEvent("daemon_restarted", map[string]any{"run": 3, "version": "1.1.1467", "down_seconds": 4})
+	if !strings.Contains(restart, "riavviato") || !strings.Contains(restart, "avvio #3") || !strings.Contains(restart, "4s") {
+		t.Fatalf("daemon_restarted it = %q", restart)
+	}
+	if got := formatEvent("daemon_restarted", map[string]any{"run": 2, "unclean": true}); !strings.Contains(got, "arresto anomalo") {
+		t.Fatalf("daemon_restarted unclean it = %q", got)
+	}
+	if got := formatEvent("engine_crashed", map[string]any{"error": "exit 1", "restarts_in_window": 2}); !strings.Contains(got, "uscita inattesa") || !strings.Contains(got, "exit 1") {
+		t.Fatalf("engine_crashed it = %q", got)
+	}
+	if got := formatEvent("engine_fallback", nil); !strings.Contains(got, "libtorrent") {
+		t.Fatalf("engine_fallback it = %q", got)
+	}
+	if got := formatEvent("health_degraded", map[string]any{"status": "degraded", "reason": "disk full"}); !strings.Contains(got, "PROBLEMA") || !strings.Contains(got, "disk full") {
+		t.Fatalf("health_degraded it = %q", got)
+	}
+
+	messages.SetLanguage("en")
+	restart = formatEvent("daemon_restarted", map[string]any{"run": 3, "down_seconds": 4})
+	if !strings.Contains(restart, "restarted") || !strings.Contains(restart, "run #3") || !strings.Contains(restart, "down for 4s") {
+		t.Fatalf("daemon_restarted en = %q", restart)
+	}
+	if got := formatEvent("health_recovered", nil); !strings.Contains(got, "healthy") {
+		t.Fatalf("health_recovered en = %q", got)
+	}
+}
+
 // TestNotifierFormatHelpers covers the human formatting helpers used in the
 // notification bodies.
 func TestNotifierFormatHelpers(t *testing.T) {

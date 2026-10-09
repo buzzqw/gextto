@@ -112,6 +112,9 @@ type gxTorrentEngine struct {
 	settings gxTorrentSettings
 	client   *http.Client
 	cfg      *Config
+	// notifier delivers lifecycle notifications (crash, restart, fallback).
+	// Optional: nil disables them.
+	notifier *Notifier
 
 	processMu      sync.Mutex
 	process        *gxManagedProcess
@@ -141,7 +144,7 @@ var _ TorrentEngine = (*gxTorrentEngine)(nil)
 // newGxTorrentEngine builds the adapter and, in managed mode, starts the
 // daemon. It does not require the daemon to answer: an outage degrades to a
 // stale view and the adapter keeps retrying.
-func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
+func newGxTorrentEngine(cfg *Config, notifier *Notifier) (*gxTorrentEngine, error) {
 	settings, err := gxTorrentSettingsFromConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -150,6 +153,7 @@ func newGxTorrentEngine(cfg *Config) (*gxTorrentEngine, error) {
 		settings:       settings,
 		client:         &http.Client{Timeout: settings.Timeout},
 		cfg:            cfg,
+		notifier:       notifier,
 		supervisorStop: make(chan struct{}),
 		cache:          map[string]models.TorrentView{},
 		previous:       map[string]models.TorrentView{},

@@ -89,9 +89,9 @@ func shutdownBanner(s runState, now time.Time, reason string) string {
 	return fmt.Sprintf("🛑 Gextto stopping (%s) — uptime %s", reason, uptime)
 }
 
-// logStartupBanner logs the start line and records the run so the next start can
-// report it.
-func logStartupBanner(dataDir string) {
+// logStartupBanner logs the start line, records the run and returns the
+// previous run (zero for a first start) so callers can notify on a restart.
+func logStartupBanner(dataDir string) runState {
 	prev := loadRunState(dataDir)
 	now := time.Now().UTC()
 	logging.Info(startupBanner(prev, now))
@@ -103,6 +103,41 @@ func logStartupBanner(dataDir string) {
 		Commit:    constants.Commit,
 		PID:       os.Getpid(),
 	})
+	return prev
+}
+
+// notifyRestart sends a restart notification when this is not the first start.
+// A crash is reported here, at the next start: a dying process cannot notify.
+func notifyRestart(state *AppState, prev runState) {
+	if state == nil || state.notifier == nil || prev.Runs <= 0 {
+		return
+	}
+	data := map[string]any{
+		"run":     prev.Runs + 1,
+		"version": constants.AppVersion(),
+	}
+	if t, err := time.Parse(time.RFC3339, prev.StoppedAt); err == nil && !t.IsZero() {
+		data["down_seconds"] = int64(time.Since(t).Seconds())
+	} else {
+		data["unclean"] = true
+	}
+	notifier := state.notifier
+	go func() {
+		defer recoverGoroutine("restart notifier")
+		if err := notifier.NotifyEvent("daemon_restarted", data); err != nil {
+			logging.Warn("restart notification failed", "error", err)
+		}
+	}()
+}
+
+// notifyDaemonError reports a fatal shutdown just before the process exits.
+func notifyDaemonError(state *AppState, err error) {
+	if state == nil || state.notifier == nil || err == nil {
+		return
+	}
+	if nErr := state.notifier.NotifyEvent("daemon_error", map[string]any{"error": err.Error()}); nErr != nil {
+		logging.Warn("shutdown notification failed", "error", nErr)
+	}
 }
 
 // recordShutdown stamps the run as cleanly stopped; the next start then shows

@@ -92,7 +92,7 @@ func newTestGxEngine(t *testing.T, token string) (*gxTorrentEngine, *fakeGxDaemo
 			"gxtorrent_poll_interval_ms": "0",
 		},
 	}
-	engine, err := newGxTorrentEngine(cfg)
+	engine, err := newGxTorrentEngine(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

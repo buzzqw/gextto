@@ -48,7 +48,7 @@ func alternativeBackendActive(cfg *Config) bool {
 // selectTorrentEngine builds the configured backend. A nil engine means the
 // embedded libtorrent adapter. The second return value is a human-readable
 // note (empty on the happy path), and an error means activation was refused.
-func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
+func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string, error) {
 	if TorrentBackendName(cfg) != BackendGxTorrent {
 		gxStopLeftoverDaemon(cfg)
 	}
@@ -76,7 +76,7 @@ func selectTorrentEngine(cfg *Config) (TorrentEngine, string, error) {
 		}
 		return engine, "", nil
 	case BackendGxTorrent:
-		engine, err := newGxTorrentEngine(cfg)
+		engine, err := newGxTorrentEngine(cfg, notifier)
 		if err != nil {
 			return nil, "", err
 		}
@@ -210,7 +210,7 @@ func ConfigureTorrentEngine(s *AppState, cfg *Config) error {
 	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.Settings["torrent_backend"]), "anacrolix") {
 		logging.Warn("torrent backend anacrolix has been removed; falling back to embedded libtorrent")
 	}
-	engine, note, err := selectTorrentEngine(cfg)
+	engine, note, err := selectTorrentEngine(cfg, s.notifier)
 	if err != nil {
 		return err
 	}

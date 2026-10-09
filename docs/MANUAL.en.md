@@ -1008,6 +1008,24 @@ Configure Telegram, e-mail (SMTP) or a webhook — including Discord, Slack,
 ntfy, Gotify or Pushover — and send a test. Completion notifications include
 size, download time and average speed.
 
+### Status notifications (Gextto and gx-torrent)
+
+Besides download events, Gextto notifies service problems:
+
+- **Gextto restart** — on every start after the first, with the run number and
+  how long it was down; if the previous stop was not recorded (crash, `kill -9`)
+  it is reported as an unclean shutdown;
+- **stopped by an error** — when the service exits because of a fatal error;
+- **gx-torrent** — unexpected exit of the managed daemon, restart after the
+  exit, and falling back to the libtorrent engine when it cannot stay up;
+- **health problems** — when the health check finds a problem and when it is
+  healthy again.
+
+A dead process cannot notify its own crash: a Gextto crash is therefore reported
+on the next start. If Gextto does not come back (for example the service is
+disabled) no notification is sent: use a systemd watchdog (`OnFailure=`) for
+that case.
+
 ### Webhook: which URL and which format
 
 The **Webhook** channel sends events to an external service with no dedicated
