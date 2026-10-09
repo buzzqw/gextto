@@ -396,3 +396,23 @@ func TestArchiveAndRemoveTorrentIncompleteFails(t *testing.T) {
 		t.Fatalf("expected failure archiving incomplete torrent, got ok=%v, err=%v", ok, err)
 	}
 }
+
+// TestForeignTorrentAlreadyAnnouncedComics covers a weekly pack queued by the
+// comics module: it has no release metadata, but the comics module announces
+// its completion, so archiving it must not send a second "added manually"
+// notification.
+func TestForeignTorrentAlreadyAnnouncedComics(t *testing.T) {
+	comics := openTestComicsDb(t)
+	defer comics.Close()
+	comicHash := "aaaabbbbccccddddeeeeffff0000111122223333"
+	if err := comics.AddTorrent(comicHash, "weekly:2026-09-30", "Weekly Pack 2026-09-30", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	s := &AppState{comics: comics}
+	if !foreignTorrentAlreadyAnnounced(s, comicHash) {
+		t.Error("comics torrent should count as already announced")
+	}
+	if foreignTorrentAlreadyAnnounced(s, "9999888877776666555544443333222211110000") {
+		t.Error("unknown foreign torrent should not count as already announced")
+	}
+}

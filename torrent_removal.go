@@ -139,6 +139,24 @@ func moveDirAcrossDevices(source, target string) error {
 	return err
 }
 
+// foreignTorrentAlreadyAnnounced reports whether a torrent without release
+// metadata had its completion announced already: a foreign torrent is announced
+// ("added manually") when it finishes downloading, and a comics torrent by the
+// comics module, so archiving it is not a new completion.
+func foreignTorrentAlreadyAnnounced(s *AppState, hash string) bool {
+	if s.db != nil {
+		if status, err := s.db.TorrentStatus(hash); err == nil && status != nil && *status == "completed" {
+			return true
+		}
+	}
+	if s.comics != nil {
+		if comic, err := s.comics.Torrent(hash); err == nil && comic != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func notifyArchivedTorrent(s *AppState, hash string, release *models.Release, finalPath string, sizeBytes int64, torrentName string) {
 	if s == nil || s.notifier == nil {
 		return
@@ -545,13 +563,8 @@ func ArchiveAndRemoveTorrent(s *AppState, cfg *Config, hash string) (bool, error
 		}
 	}
 	size, _ := SizeOfPath(target)
-	// A foreign torrent was already announced ("added manually") when it
-	// finished downloading; moving it to the archive is not a new completion.
-	alreadyAnnounced := false
+	alreadyAnnounced := foreignTorrentAlreadyAnnounced(s, hash)
 	if s.db != nil {
-		if status, err := s.db.TorrentStatus(hash); err == nil && status != nil && *status == "completed" {
-			alreadyAnnounced = true
-		}
 		_ = s.db.MarkTorrentCompleted(hash, target, size)
 	}
 	if !alreadyAnnounced {
