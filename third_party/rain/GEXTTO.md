@@ -30,7 +30,11 @@ Test del fork mantenuti (girano dentro questo modulo):
   dell'algoritmo (downloader/uploader più veloci, optimistic, budget di slot,
   fairness) e benchmark del tick, per confrontare varianti e misurarne il costo;
 - `torrent/torrent_superseed_test.go` — rotazione dei pezzi offerti e selezione
-  dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto).
+  dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto);
+- `internal/peerprotocol/holepunch_test.go` — codec BEP 55 `ut_holepunch`
+  (round-trip v4/v6, errori, framing nell'estensione, fuzz);
+- `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
+  errori `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer`).
 
 Modifiche, tutte marcate nel codice con `gextto fork`:
 
@@ -58,6 +62,7 @@ Modifiche, tutte marcate nel codice con `gextto fork`:
 | Connessioni/upload per-torrent | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: tetto alle connessioni instaurate (chiude le eccedenti al tick) e `Unchoker.SetNumUnchoked` per gli slot di upload |
 | Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` e `Torrent.FilePieceRange`/`SetFileStreamWindow`: i pezzi della finestra letta da un player vengono scelti per primi. `Torrent.PiecesDone(begin,end)`: check mirato del range, senza allocare uno stato per ogni pezzo |
 | Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 sul torrent in corso, attivo solo a torrent completato. Annuncia un pezzo alla volta e serve solo i pezzi *offerti* a quel peer; i pezzi offerti non si ripetono, `have`/`not-interested` e un tick di ritentativo fanno avanzare, e a esaurimento il peer viene liberato col bitfield pieno. Il flag è persistito nel resume. Il fork traccia anche il bitfield remoto quando il piece picker è `nil` (seed), che il super-seeding richiede |
+| Holepunching | `internal/peerprotocol/holepunch.go`, `internal/peerprotocol/extension.go`, `internal/peersource`, `torrent/config.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_handshake.go`, `torrent/torrent_holepunch.go` | BEP 55 `ut_holepunch`: `Config.Holepunch` annuncia l'estensione e abilita il relè peer. Quando un dial fallisce, `tryHolepunchRendezvous` (una volta per endpoint, max 8 relè) chiede l'introduzione; il relè risponde con `connect` a entrambi e ogni lato dial su uTP (`peersource.Holepunch`). `planHolepunchRendezvous` è pura e testata |
 
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 

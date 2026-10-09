@@ -379,6 +379,8 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			break
 		}
 		t.handleNewPeers(addrs, peersource.PEX)
+	case peerprotocol.HolepunchMessage:
+		t.handleHolepunchMessage(pe, msg)
 	default:
 		t.crash(fmt.Sprintf("unhandled peer message type: %T", msg))
 	}

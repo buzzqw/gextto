@@ -222,6 +222,11 @@ type torrent struct {
 	// Peers that are sending corrupt data are banned.
 	bannedPeerIPs map[string]struct{}
 
+	// Endpoints already reached through a BEP 55 holepunch rendezvous (gextto
+	// fork): one rendezvous attempt per endpoint, so a failing dial does not
+	// flood relays.
+	holepunchAttempted map[string]struct{}
+
 	// A signal sent to run() loop when announcers are stopped.
 	announcersStoppedC chan struct{}
 
@@ -364,6 +369,7 @@ func newTorrent(
 		verifierResultC:           make(chan *verifier.Verifier),
 		connectedPeerIPs:          make(map[string]struct{}),
 		bannedPeerIPs:             make(map[string]struct{}),
+		holepunchAttempted:        make(map[string]struct{}),
 		announcersStoppedC:        make(chan struct{}, 1), // buffered so a detached stop announcer can finish
 		dhtPeersC:                 make(chan []*net.TCPAddr, 1),
 		externalIP:                externalip.FirstExternalIP(),

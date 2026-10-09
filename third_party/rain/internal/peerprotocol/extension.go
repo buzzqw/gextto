@@ -17,6 +17,8 @@ const (
 	ExtensionIDMetadata
 	// ExtensionIDPEX is ID for PEX extension messages.
 	ExtensionIDPEX
+	// ExtensionIDHolepunch is ID for BEP 55 ut_holepunch messages (gextto fork).
+	ExtensionIDHolepunch
 )
 
 const (
@@ -24,6 +26,9 @@ const (
 	ExtensionKeyMetadata = "ut_metadata"
 	// ExtensionKeyPEX is the key for the PEX extension.
 	ExtensionKeyPEX = "ut_pex"
+	// ExtensionKeyHolepunch is the key for the BEP 55 holepunch extension
+	// (gextto fork).
+	ExtensionKeyHolepunch = "ut_holepunch"
 )
 
 const (
@@ -54,6 +59,17 @@ func (m ExtensionMessage) WriteTo(w io.Writer) (n int64, err error) {
 	nn, err := w.Write([]byte{m.ExtendedMessageID})
 	n += int64(nn)
 	if err != nil {
+		return
+	}
+	// Holepunch messages are a fixed binary payload, not bencoded (gextto fork).
+	if hp, ok := m.Payload.(HolepunchMessage); ok {
+		var data []byte
+		data, err = hp.MarshalBinary()
+		if err != nil {
+			return
+		}
+		nn, err = w.Write(data)
+		n += int64(nn)
 		return
 	}
 	wc := newWriterCounter(w)
@@ -100,6 +116,10 @@ func (m *ExtensionMessage) UnmarshalBinary(data []byte) error {
 		var extMsg ExtensionPEXMessage
 		err = dec.Decode(&extMsg)
 		m.Payload = extMsg
+	case ExtensionIDHolepunch:
+		var extMsg HolepunchMessage
+		err = extMsg.UnmarshalBinary(payload)
+		m.Payload = extMsg
 	default:
 		return fmt.Errorf("peer sent invalid extension message id: %d", m.ExtendedMessageID)
 	}
@@ -116,12 +136,16 @@ type ExtensionHandshakeMessage struct {
 }
 
 // NewExtensionHandshake returns a new ExtensionHandshakeMessage by filling the struct with given values.
-func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int) ExtensionHandshakeMessage {
+func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int, holepunch bool) ExtensionHandshakeMessage {
+	m := map[string]uint8{
+		ExtensionKeyMetadata: ExtensionIDMetadata,
+		ExtensionKeyPEX:      ExtensionIDPEX,
+	}
+	if holepunch {
+		m[ExtensionKeyHolepunch] = ExtensionIDHolepunch
+	}
 	return ExtensionHandshakeMessage{
-		M: map[string]uint8{
-			ExtensionKeyMetadata: ExtensionIDMetadata,
-			ExtensionKeyPEX:      ExtensionIDPEX,
-		},
+		M:            m,
 		V:            version,
 		YourIP:       string(truncateIP(yourip)),
 		MetadataSize: int(metadataSize),

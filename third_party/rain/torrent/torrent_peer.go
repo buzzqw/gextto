@@ -164,7 +164,7 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 		metadataSize = uint32(len(t.info.Bytes))
 	}
 	if p.ExtensionsEnabled {
-		extHandshakeMsg := peerprotocol.NewExtensionHandshake(metadataSize, t.getClientVersion(), p.Addr().IP, t.session.config.MaxRequestsIn)
+		extHandshakeMsg := peerprotocol.NewExtensionHandshake(metadataSize, t.getClientVersion(), p.Addr().IP, t.session.config.MaxRequestsIn, t.session.config.Holepunch)
 		msg := peerprotocol.ExtensionMessage{
 			ExtendedMessageID: peerprotocol.ExtensionIDHandshake,
 			Payload:           extHandshakeMsg,

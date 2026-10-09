@@ -14,6 +14,9 @@ const (
 	Manual
 	// Incoming indicates that the peer found us. We did not found the peer.
 	Incoming
+	// Holepunch indicates that the peer was reached via a BEP 55 rendezvous
+	// (gextto fork).
+	Holepunch
 )
 
 func (s Source) String() string {
@@ -28,6 +31,8 @@ func (s Source) String() string {
 		return "manual"
 	case Incoming:
 		return "incoming"
+	case Holepunch:
+		return "holepunch"
 	default:
 		panic("unhandled source")
 	}

@@ -80,6 +80,10 @@ type Config struct {
 	// UTPOnly dials peers over uTP alone (tests); by default uTP and TCP are
 	// tried together and the first to connect wins.
 	UTPOnly bool `yaml:"utp-only"`
+	// Holepunch advertises and honors the BEP 55 ut_holepunch extension, so a
+	// peer behind a NAT can still be reached through a relaying peer (gextto
+	// fork). It needs UTP and works best with PEX enabled.
+	Holepunch bool `yaml:"holepunch"`
 	// Preallocate reserves the full size of new files instead of creating
 	// them sparse (gextto fork).
 	Preallocate bool `yaml:"preallocate"`

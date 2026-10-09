@@ -40,6 +40,7 @@ test-rain:
 		github.com/cenkalti/rain/v2/internal/mse \
 		github.com/cenkalti/rain/v2/internal/peerconn \
 		github.com/cenkalti/rain/v2/internal/peerconn/peerwriter \
+		github.com/cenkalti/rain/v2/internal/peerprotocol \
 		github.com/cenkalti/rain/v2/internal/piececache \
 		github.com/cenkalti/rain/v2/internal/piecepicker \
 		github.com/cenkalti/rain/v2/internal/storage/filestorage \
