@@ -5,26 +5,27 @@
 # e il binario del demone (default: ./bin/gx-torrent, costruito da `make
 # gx-torrent` o `make build`).
 #
-# Topologia:
+# Topologia (tutto dentro namespace di rete dedicati: la rete dell'host NON
+# viene toccata, ne' interfacce ne' rotte ne' firewall):
 #
-#   root netns            gx-r (router)                 client netns
-#   -------------         --------------                ------------
+#   gx-lab (relay)        gx-r (router)                 client netns
+#   --------------        --------------                ------------
 #   relay 10.0.0.1  <---  vr 10.0.0.2
-#                         va 10.10.0.1  <---  gx-a 10.10.0.2  (leecher, dietro NAT)
-#                         vb 10.20.0.1  <---  gx-b 10.20.0.2  (seeder,  dietro NAT)
+#                         var 10.10.0.1  <---  gx-a 10.10.0.2  (leecher, dietro NAT)
+#                         vbr 10.20.0.1  <---  gx-b 10.20.0.2  (seeder,  dietro NAT)
 #
-# Il router fa MASQUERADE verso la root (i client escono) e DROPpa le nuove
+# Il router fa MASQUERADE verso gx-lab (i client escono) e DROPpa le nuove
 # connessioni in entrata e tra i due client: leecher e seeder non si vedono
 # direttamente, entrambi raggiungono solo il relay. Un tracker HTTP minimo
-# (python3, in root) fa conoscere gli endpoint. Se il buco riesce, il leecher
+# (python3, in gx-lab) fa conoscere gli endpoint. Se il buco riesce, il leecher
 # compare con origine "holepunch" tra i peer del torrent.
 #
 # Uso:
 #   sudo scripts/holepunch-netns-test.sh [--bin PATH] [--keep] [--size MiB]
 #   sudo scripts/holepunch-netns-test.sh --help
 #
-# Con --keep la topologia e i daemon restano su per il debug (pulizia manuale con
-# `ip netns del ...` e kill dei processi). Senza --keep tutto viene rimosso.
+# All'uscita vengono rimossi i namespace, i veth e i daemon: sul sistema
+# restano solo le voci in /run/netns durante l'esecuzione.
 #
 # NOTA: Linux conntrack e endpoint-dependent, quindi con il solo MASQUERADE il
 # buco puo non aprirsi (serve un NAT "cone"). Lo script riporta sempre cosa ha
@@ -73,7 +74,7 @@ done
 BIN="$(realpath "$BIN")"
 
 WORK="$(mktemp -d /tmp/holepunch-netns.XXXXXX)"
-R=gx-r; A=gx-a; B=gx-b
+L=gx-lab; R=gx-r; A=gx-a; B=gx-b
 PIDS=()
 
 # remove_links deletes veth ends that a previous aborted run may have left in
@@ -91,12 +92,13 @@ cleanup() {
     kill "$pid" 2>/dev/null || true
   done
   if [[ "$KEEP" == "1" ]]; then
-    warn "kept for debugging: netns $R $A $B, work dir $WORK"
+    warn "kept for debugging: netns $L $R $A $B, work dir $WORK"
     return
   fi
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
   ip netns del "$R" 2>/dev/null || true
+  ip netns del "$L" 2>/dev/null || true
   remove_links
   rm -rf "$WORK"
 }
@@ -107,20 +109,25 @@ setup_netns() {
   ip netns del "$R" 2>/dev/null || true
   ip netns del "$A" 2>/dev/null || true
   ip netns del "$B" 2>/dev/null || true
+  ip netns del "$L" 2>/dev/null || true
   remove_links
+  ip netns add "$L"
   ip netns add "$R"
   ip netns add "$A"
   ip netns add "$B"
   # loopback is down by default in a fresh namespace: the daemon API binds it.
+  ip netns exec "$L" ip link set lo up
   ip netns exec "$R" ip link set lo up
   ip netns exec "$A" ip link set lo up
   ip netns exec "$B" ip link set lo up
 
-  # root <-> router
+  # lab (relay) <-> router: both ends live in a namespace, so the host network
+  # namespace is never touched (not even transiently, after the moves).
   ip link add vrel type veth peer name vr
+  ip link set vrel netns "$L"
   ip link set vr netns "$R"
-  ip addr add 10.0.0.1/24 dev vrel
-  ip link set vrel up
+  ip netns exec "$L" ip addr add 10.0.0.1/24 dev vrel
+  ip netns exec "$L" ip link set vrel up
   ip netns exec "$R" ip addr add 10.0.0.2/24 dev vr
   ip netns exec "$R" ip link set vr up
 
@@ -271,12 +278,12 @@ wait_api() {
 }
 
 # --------------------------------------------------------------------- test ---
-log "topologia: relay (root) + leecher/seeder dietro NAT"
+log "topologia: relay in gx-lab + leecher/seeder dietro NAT (solo namespace, host intatto)"
 setup_netns
 
 log "tracker HTTP su 10.0.0.1:$TRACKER_PORT"
 write_tracker
-python3 "$WORK/tracker.py" "$TRACKER_PORT" >"$WORK/tracker.log" 2>&1 &
+ip netns exec "$L" python3 "$WORK/tracker.py" "$TRACKER_PORT" >"$WORK/tracker.log" 2>&1 &
 PIDS+=("$!")
 TRACKER="http://10.0.0.1:$TRACKER_PORT/announce"
 
@@ -288,18 +295,18 @@ HASH="$(write_torrent "$WORK/content/holepunch.bin" "$WORK/test.torrent" "$TRACK
 log "info hash: $HASH"
 
 log "avvio i tre daemon (uTP + holepunch attivi)"
-start_daemon "-"   "$WORK/relay" "$RELAY_API" "$RELAY_PEER_PORT" "10.0.0.1" "$WORK/relay.log"
+start_daemon "$L"  "$WORK/relay" "$RELAY_API" "$RELAY_PEER_PORT" "10.0.0.1" "$WORK/relay.log"
 start_daemon "$A"  "$WORK/a"     "$A_API"     "$A_PEER_PORT"     "10.10.0.2" "$WORK/a.log"
 start_daemon "$B"  "$WORK/b"     "$B_API"     "$B_PEER_PORT"     "10.20.0.2" "$WORK/b.log"
-wait_api "-" "$RELAY_API" || { echo "--- relay.log ---" >&2; tail -n 20 "$WORK/relay.log" >&2; die "relay API non risponde"; }
-wait_api "$A" "$A_API"    || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "leecher API non risponde"; }
-wait_api "$B" "$B_API"    || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "seeder API non risponde"; }
+wait_api "$L" "$RELAY_API" || { echo "--- relay.log ---" >&2; tail -n 20 "$WORK/relay.log" >&2; die "relay API non risponde"; }
+wait_api "$A" "$A_API"     || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "leecher API non risponde"; }
+wait_api "$B" "$B_API"     || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "seeder API non risponde"; }
 
 log "il seeder (B) carica il .torrent e i dati"
 daemon_api "$B" "$B_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed" >/dev/null
 MAGNET="magnet:?xt=urn:btih:$HASH&tr=$TRACKER"
-daemon_api "-" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
-daemon_api "$A" "$A_API"    /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
+daemon_api "$L" "$RELAY_API" /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
+daemon_api "$A" "$A_API"     /api/v1/add --data-urlencode "magnet=$MAGNET" >/dev/null
 
 log "attendo che il leecher raggiunga il seeder (max ${DEADLINE}s)"
 result="niente"
