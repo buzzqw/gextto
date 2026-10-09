@@ -648,6 +648,7 @@
       {{range .Areas}}
       <p class="settings-nav-area" id="v2-settings-area-{{.Name}}">{{.Label}}</p>
       <ul aria-labelledby="v2-settings-area-{{.Name}}">
+        {{if eq .Name "search"}}<li><a class="settings-nav-link settings-nav-back" href="/" aria-label="Torna al menu"><span aria-hidden="true">←</span> <span>Torna al menu</span></a></li>{{end}}
         {{range .Tabs}}<li><a class="settings-nav-link{{if .Active}} active{{end}}" href="/?view=settings&amp;tab={{.ID}}" hx-get="/settings/body?tab={{.ID}}" hx-target="#v2-settings-body" hx-swap="outerHTML"{{if .Active}} aria-current="page"{{end}}><span>{{.Label}}</span>{{if .Count}}<span class="settings-nav-count" aria-hidden="true">{{.Count}}</span>{{end}}</a></li>{{end}}
       </ul>
       {{end}}

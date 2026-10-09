@@ -1485,6 +1485,8 @@ html.settings-only-modified .settings-panel:not(:has(.setting-modified-row)):not
   font-weight: 700;
 }
 .settings-nav-count { color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.settings-nav-back { color: var(--muted); font-size: 0.85rem; }
+.settings-nav-back:hover { color: var(--text); }
 
 .settings-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .settings-section-head h2 { margin: 2px 0 4px; font-size: 1.35rem; }
