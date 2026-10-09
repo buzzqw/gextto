@@ -1383,6 +1383,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | UPnP | Apre le porte del router automaticamente con UPnP. |
 | NAT-PMP | Apre le porte del router automaticamente con NAT-PMP. |
 | uTP | Abilita il protocollo uTP (UDP) oltre a TCP. |
+| Holepunching (BEP 55) | Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP. |
 | Nodi bootstrap DHT | Nodi DHT iniziali (host:porta separati da virgola). |
 | Annuncia a tutti i tracker | Annuncia a tutti i tracker, non solo al primo di ogni tier. |
 | Annuncia a tutti i tier | Annuncia a tutti i tier, non solo al primo. |

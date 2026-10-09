@@ -574,6 +574,9 @@ func gxNetworkArgs(cfg *Config) []string {
 	if !lt.Utp {
 		args = append(args, "-no-utp")
 	}
+	if !lt.Holepunch {
+		args = append(args, "-no-holepunch")
+	}
 	if !lt.Lsd {
 		args = append(args, "-no-lsd")
 	}

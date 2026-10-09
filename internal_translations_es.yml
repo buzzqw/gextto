@@ -75,6 +75,7 @@ spa:
   Abilita: Habilitar
   Abilita Selezionate: Habilitar Seleccionadas
   Abilita il protocollo uTP (UDP) oltre a TCP.: Habilite el protocolo uTP (UDP) además de TCP.
+  'Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.': 'Abre una conexión directa con los pares detrás de NAT a través de un par que hace de relé (BEP 55). Requiere uTP.'
   ? Abilita la pulizia automatica dell'archivio al termine di ogni ciclo. Rimuove record più vecchi di 'Archive Max Age' mantenendo almeno 'Archive
     Keep Min' voci.
   : Habilita la limpieza automática del archivo al final de cada ciclo. Elimina registros más antiguos que 'Archive Max Age' manteniendo al menos
@@ -3762,6 +3763,7 @@ spa:
   trovati: encontrados
   trovato: encontrado
   uTP: uTP
+  'Holepunching (BEP 55)': 'Holepunching (BEP 55)'
   'ultima sincronizzazione: {time}': 'última sincronización: {time}'
   upgrade: mejoras
   usando come Redirect URI, poi incolla le credenziali.: usando <code>urn:ietf:wg:oauth:2.0:oob</code> como Redirect URI, luego pega tus credenciales.

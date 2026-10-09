@@ -173,6 +173,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_upnp", Label: "UPnP", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "libtorrent_natpmp", Label: "NAT-PMP", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "libtorrent_utp", Label: "uTP", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
+	{Key: "libtorrent_holepunch", Label: "Holepunching (BEP 55)", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "libtorrent_dht_bootstrap_nodes", Label: "Nodi bootstrap DHT", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "libtorrent_announce_to_all_trackers", Label: "Annuncia a tutti i tracker", Tab: "libtorrent", Group: "Ricerca peer e tracker"},
 	{Key: "libtorrent_announce_to_all_tiers", Label: "Annuncia a tutti i tier", Tab: "libtorrent", Group: "Ricerca peer e tracker"},

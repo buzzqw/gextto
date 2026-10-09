@@ -316,6 +316,7 @@ func TestGxNetworkArgs(t *testing.T) {
 	cfg.Libtorrent.Dht = true
 	cfg.Libtorrent.Pex = false
 	cfg.Libtorrent.Utp = true
+	cfg.Libtorrent.Holepunch = true
 	cfg.Libtorrent.Lsd = false
 	cfg.Libtorrent.Upnp = false
 	cfg.Libtorrent.Natpmp = true
@@ -324,6 +325,11 @@ func TestGxNetworkArgs(t *testing.T) {
 	want := "-peer-ports 51413 -listen-interface wg0 -outgoing-interface wg0 -encryption 2 -no-pex -no-lsd -no-upnp -ipfilter-trackers=true"
 	if got != want {
 		t.Fatalf("got  %q\nwant %q", got, want)
+	}
+	// Disabling holepunching is forwarded to the daemon.
+	cfg.Libtorrent.Holepunch = false
+	if got := strings.Join(gxNetworkArgs(cfg), " "); !strings.Contains(got, "-no-holepunch") {
+		t.Fatalf("holepunch off not forwarded: %q", got)
 	}
 	cfg.Libtorrent.ListenInterfaces = "0.0.0.0:6881-6891"
 	if host, ports := gxListenInterface(cfg.Libtorrent.ListenInterfaces); host != "" || ports != "6881-6891" {

@@ -1345,6 +1345,7 @@ Recalculate scores* after changing weights.
 | UPnP | Opens router ports automatically with UPnP. |
 | NAT-PMP | Opens router ports automatically with NAT-PMP. |
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
+| Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |
 | Announce to all trackers | Announce to all trackers, not just the first of each tier. |
 | Announce to all tiers | Announce to all tiers, not just the first. |

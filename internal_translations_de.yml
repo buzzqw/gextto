@@ -77,6 +77,7 @@ deu:
   Abilita: Aktivieren
   Abilita Selezionate: Ausgewählte aktivieren
   Abilita il protocollo uTP (UDP) oltre a TCP.: Aktivieren Sie zusätzlich zu TCP das uTP-Protokoll (UDP).
+  'Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.': 'Öffnet eine direkte Verbindung zu Peers hinter NAT über einen Relay-Peer (BEP 55). Erfordert uTP.'
   ? Abilita la pulizia automatica dell'archivio al termine di ogni ciclo. Rimuove record più vecchi di 'Archive Max Age' mantenendo almeno 'Archive
     Keep Min' voci.
   : Aktiviert die automatische Archivbereinigung am Ende jedes Zyklus. Entfernt Einträge, die älter sind als 'Archive Max Age', behält aber mindestens
@@ -3813,6 +3814,7 @@ deu:
   trovati: gefunden
   trovato: gefunden
   uTP: uTP
+  'Holepunching (BEP 55)': 'Holepunching (BEP 55)'
   'ultima sincronizzazione: {time}': 'letzte Synchronisierung: {time}'
   upgrade: Upgrades
   usando come Redirect URI, poi incolla le credenziali.: als Redirect URI verwenden, dann die Anmeldedaten einfügen.

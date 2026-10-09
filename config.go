@@ -214,6 +214,7 @@ type LibtorrentSettings struct {
 	AnnounceInterval              int64  `json:"announce_interval"`
 	TorrentConnectBoost           int64  `json:"torrent_connect_boost"`
 	Utp                           bool   `json:"utp"`
+	Holepunch                     bool   `json:"holepunch"`
 	PreferRc4                     bool   `json:"prefer_rc4"`
 	AnnounceToAllTrackers         bool   `json:"announce_to_all_trackers"`
 	AnnounceToAllTiers            bool   `json:"announce_to_all_tiers"`
@@ -263,6 +264,7 @@ func DefaultLibtorrentSettings() LibtorrentSettings {
 		AnnounceInterval:              1800,
 		TorrentConnectBoost:           50,
 		Utp:                           true,
+		Holepunch:                     true,
 		PreferRc4:                     false,
 		AnnounceToAllTrackers:         false,
 		AnnounceToAllTiers:            false,
@@ -2296,6 +2298,7 @@ func (c *Config) loadConfigDB() error {
 		AnnounceInterval:              numberSettingInt(c.Settings, "libtorrent_announce_interval", 1800),
 		TorrentConnectBoost:           numberSettingInt(c.Settings, "libtorrent_torrent_connect_boost", 50),
 		Utp:                           boolSettingOr(c.Settings, "libtorrent_utp", true),
+		Holepunch:                     boolSettingOr(c.Settings, "libtorrent_holepunch", true),
 		PreferRc4:                     configBoolSetting(mapValue(c.Settings, "libtorrent_prefer_rc4")),
 		AnnounceToAllTrackers:         configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_trackers")),
 		AnnounceToAllTiers:            configBoolSetting(mapValue(c.Settings, "libtorrent_announce_to_all_tiers")),

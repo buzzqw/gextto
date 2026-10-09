@@ -42,6 +42,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_upnp":                              "Apre le porte del router automaticamente con UPnP.",
 	"libtorrent_natpmp":                            "Apre le porte del router automaticamente con NAT-PMP.",
 	"libtorrent_utp":                               "Abilita il protocollo uTP (UDP) oltre a TCP.",
+	"libtorrent_holepunch":                         "Apre una connessione diretta ai peer dietro NAT tramite un peer che fa da relè (BEP 55). Richiede uTP.",
 	"libtorrent_prefer_rc4":                        "Preferisce la cifratura RC4 sulle connessioni.",
 	"libtorrent_announce_to_all_trackers":          "Annuncia a tutti i tracker, non solo al primo di ogni tier.",
 	"libtorrent_announce_to_all_tiers":             "Annuncia a tutti i tier, non solo al primo.",

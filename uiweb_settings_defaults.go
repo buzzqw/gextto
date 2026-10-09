@@ -94,6 +94,7 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_upnp":                              "true",
 	"libtorrent_natpmp":                            "true",
 	"libtorrent_utp":                               "true",
+	"libtorrent_holepunch":                         "true",
 	"libtorrent_prefer_rc4":                        "false",
 	"libtorrent_announce_to_all_trackers":          "false",
 	"libtorrent_announce_to_all_tiers":             "false",
