@@ -885,12 +885,10 @@ func RunCycleDomain(
 		// and the torrent's "Motivo" say why this download was started.
 		stallStuckScore := int64(0)
 		stallApplies := false
-		if key, ok := releaseStallKey(&release); ok {
-			if stuckScore, has := stallAlternatives[key]; has && stallScoreDrop > 0 {
-				stallStuckScore = stuckScore
-				stallApplies = true
-				decisionReason = "stall_alternative"
-			}
+		if stuckScore, has := releaseStallScore(&release, stallAlternatives); has && stallScoreDrop > 0 {
+			stallStuckScore = stuckScore
+			stallApplies = true
+			decisionReason = "stall_alternative"
 		}
 		if approved {
 			// The explicit path (or nil, to let the engine choose) is decided by
@@ -1473,18 +1471,17 @@ func releaseTarget(release *models.Release) string {
 	return release.Title
 }
 
-// releaseStallKey returns the live-episode key of a single-episode series
-// release, used to look up the stall tolerance.
-func releaseStallKey(release *models.Release) (models.LiveEpisodeKey, bool) {
-	if release == nil || release.Kind != "series" || release.Series == nil ||
-		release.Season == nil || release.Episode == nil {
-		return models.LiveEpisodeKey{}, false
+// releaseStallScore returns the best score of the stuck download among the
+// episodes covered by a series release (a single episode or a season pack),
+// used to look up the stall tolerance.
+func releaseStallScore(release *models.Release, alternatives map[models.LiveEpisodeKey]int64) (int64, bool) {
+	best, found := int64(0), false
+	for _, key := range releaseEpisodeKeys(release) {
+		if score, ok := alternatives[key]; ok && (!found || score > best) {
+			best, found = score, true
+		}
 	}
-	return models.LiveEpisodeKey{
-		Series:  NormalizeSeriesName(*release.Series),
-		Season:  *release.Season,
-		Episode: *release.Episode,
-	}, true
+	return best, found
 }
 
 // releaseEpisodeKeys lists every episode covered by a series release: a single

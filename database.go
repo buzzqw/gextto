@@ -1249,6 +1249,18 @@ func (d *Database) loadMovieUpgradeBackup(id int64) (upgradeBackup, error) {
 	return backup, nil
 }
 
+// packHasStallTolerance reports whether any episode of the pack may accept an
+// alternative because its current download is stuck.
+func packHasStallTolerance(context *models.ApprovalContext, seriesName string, season int64, episodes []int64, score int64) bool {
+	series := NormalizeSeriesName(seriesName)
+	for _, episode := range episodes {
+		if context.AllowsStallAlternative(models.LiveEpisodeKey{Series: series, Season: season, Episode: episode}, score) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkSeriesPack implements `Database::check_series_pack`.
 func (d *Database) checkSeriesPack(release *models.Release, hash string, score, minScoreDiff int64, context *models.ApprovalContext, manual bool) (bool, string, error) {
 	if release.Season == nil {
@@ -1381,7 +1393,10 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 			return false, "", err
 		}
 		activeRows.Close()
-		if packAlreadyActive {
+		// A pack already downloading blocks a second one, unless it is stuck:
+		// the stall tolerance is only granted to a season whose active
+		// downloads are all stuck, so any tolerated episode proves it.
+		if packAlreadyActive && !packHasStallTolerance(context, seriesName, season, targets, score) {
 			return false, "active_pack", nil
 		}
 	}
@@ -1414,21 +1429,24 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 	}
 	existingRows.Close()
 	for _, episode := range targets {
+		key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
+		// As for a single episode: a download stuck for a while does not block
+		// an alternative pack within the configured tolerance.
+		stallAlternative := !manual && context.AllowsStallAlternative(key, score)
 		active := activeEpisodes[episode]
 		if !manual && !active && live != nil {
-			key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
 			if _, ok := live.Episodes[key]; ok {
 				active = true
 			}
 		}
-		if active {
+		if active && !stallAlternative {
 			continue
 		}
 		state, existing := existingEpisodes[episode]
 		if !existing {
 			if archive != nil {
 				if disk, ok := archive.BestFor(season, episode); ok {
-					if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, minScoreDiff, context.UpgradeUntilScore) == "" {
+					if upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore) == "" {
 						continue
 					}
 				}
@@ -1457,16 +1475,30 @@ func (d *Database) checkSeriesPack(release *models.Release, hash string, score, 
 		}
 		oldQuality := ParseQuality(state.Title)
 		oldScore := state.Score
-		if archive != nil {
-			if disk, ok := archive.BestFor(season, episode); ok {
-				oldQuality = MergeQuality(disk.Quality, ParseQuality(state.Title))
-				if disk.Score > oldScore {
-					oldScore = disk.Score
+		var accept bool
+		if stallAlternative {
+			// The row carries the stuck release's score: the alternative is
+			// allowed below it (already bounded by StallScoreDrop) and only has
+			// to beat the file on disk, with the relaxed difference.
+			accept = !context.ForbidUpgrade
+			if archive != nil {
+				if disk, ok := archive.BestFor(season, episode); ok {
+					accept = accept && upgradeReasonUntil(&release.Quality, &disk.Quality, score, disk.Score, context.StallAdjustedMinDiff(minScoreDiff, key), context.UpgradeUntilScore) != ""
 				}
 			}
+		} else {
+			if archive != nil {
+				if disk, ok := archive.BestFor(season, episode); ok {
+					oldQuality = MergeQuality(disk.Quality, ParseQuality(state.Title))
+					if disk.Score > oldScore {
+						oldScore = disk.Score
+					}
+				}
+			}
+			enrichQualityWithMediaInfo(state.MediaInfo, &oldQuality)
+			accept = upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, minScoreDiff, context.UpgradeUntilScore) != "" && !context.ForbidUpgrade
 		}
-		enrichQualityWithMediaInfo(state.MediaInfo, &oldQuality)
-		if manual || (upgradeReasonUntil(&release.Quality, &oldQuality, score, oldScore, minScoreDiff, context.UpgradeUntilScore) != "" && !context.ForbidUpgrade) {
+		if manual || accept {
 			previous, err := d.loadSeriesUpgradeBackup(tx, state.ID, seriesName)
 			if err != nil {
 				return false, "", err
@@ -3754,16 +3786,23 @@ func (d *Database) StalledAlternatives(minStall time.Time) (map[models.LiveEpiso
 		if blocked[fmt.Sprintf("%s|%d", seriesNorm, season)] {
 			continue
 		}
+		// A season pack: expand its episode range, so every episode it covers can
+		// be filled by an alternative while the pack is stuck. A pack's row may
+		// still carry its first episode in the episode column, so the range in
+		// the metadata wins over it.
 		episodes := []int64{}
-		if episode.Valid && episode.Int64 > 0 {
-			episodes = append(episodes, episode.Int64)
-		} else if metadata != "" {
-			// A season pack: expand its episode range, so a single missing
-			// episode can be filled by an alternative while the pack is stuck.
+		if metadata != "" {
 			var meta models.TorrentMeta
-			if err := json.Unmarshal([]byte(metadata), &meta); err == nil {
-				episodes = append(episodes, meta.Release.EpisodeRange...)
+			if err := json.Unmarshal([]byte(metadata), &meta); err == nil && (meta.Release.IsPack || len(meta.Release.EpisodeRange) > 1) {
+				for _, value := range meta.Release.EpisodeRange {
+					if value > 0 {
+						episodes = append(episodes, value)
+					}
+				}
 			}
+		}
+		if len(episodes) == 0 && episode.Valid && episode.Int64 > 0 {
+			episodes = append(episodes, episode.Int64)
 		}
 		for _, value := range episodes {
 			key := models.LiveEpisodeKey{Series: seriesNorm, Season: season, Episode: value}

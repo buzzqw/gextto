@@ -507,6 +507,8 @@ Exception: if a download stays **stuck at 0 B/s or still waiting for metadata**
 Quality and upgrades → Stuck downloads*), the search may start an alternative
 for the same episode within the allowed points, **without removing** the stuck
 torrent: if it recovers, archive deduplication will still keep the best copy.
+This also covers season packs: a stuck pack makes every episode it covers
+eligible, and the alternative may be a single episode or another pack.
 
 ## 5. Movies
 

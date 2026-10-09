@@ -511,7 +511,9 @@ metadati** (l'elenco dei file non è mai arrivato) oltre il tempo configurato
 (*Configurazione → Qualità e upgrade → Download bloccati*), la ricerca può
 avviare un'alternativa della stessa puntata entro i punti tollerati, **senza
 rimuovere** il torrent bloccato: se quello si riprende, la deduplica
-dell'archivio terrà comunque la copia migliore.
+dell'archivio terrà comunque la copia migliore. Vale anche per i season pack:
+un pack bloccato rende idonee tutte le puntate che contiene, e l'alternativa può
+essere una singola puntata o un altro pack.
 
 ## 5. Film
 

@@ -259,3 +259,76 @@ func TestStalledAlternativeIncludesMetadataWaiter(t *testing.T) {
 		t.Fatalf("metadata waiter missing from %v", alternatives)
 	}
 }
+
+// TestStallAlternativeCoversSeasonPacks covers a stuck season pack whose row
+// still carries its first episode: the tolerance must reach every episode of
+// its range, and another season pack within the drop must be accepted as the
+// alternative.
+func TestStallAlternativeCoversSeasonPacks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gextto-stall-pack.db")
+	db, err := OpenDatabase(path)
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	cfg := DefaultConfig()
+	cfg.Series = []SeriesConfig{{Name: "Example Show", Enabled: true}}
+
+	pack := func(magnetChar, resolution string) *models.Release {
+		release := decisionTestRelease()
+		release.Title = "Example Show S01E01-08 " + resolution + " WEB-DL"
+		release.Magnet = "magnet:?xt=urn:btih:" + strings.Repeat(magnetChar, 40)
+		release.Quality.Resolution = resolution
+		release.IsPack = true
+		release.EpisodeRange = []int64{1, 2, 3, 4, 5, 6, 7, 8}
+		return release
+	}
+	stuck := pack("e", "1080p")
+	stuckScore := cfg.ReleaseScore(stuck)
+	candidate := pack("f", "720p")
+	candScore := cfg.ReleaseScore(candidate)
+	if candScore >= stuckScore {
+		t.Fatalf("fixture: candidate %d must score below stuck %d", candScore, stuckScore)
+	}
+
+	if ok, reason, err := db.CheckSeriesScored(stuck, stuckScore, cfg.UpgradeMinScoreDiff, &models.ApprovalContext{}); err != nil || !ok {
+		t.Fatalf("stuck approval: ok=%v reason=%q err=%v", ok, reason, err)
+	}
+	if err := db.RegisterTorrentScored(stuck, stuckScore); err != nil {
+		t.Fatalf("register stuck: %v", err)
+	}
+	hash, _ := utils.MagnetHash(stuck.Magnet)
+	stalledSince := time.Now().Add(-2 * time.Hour)
+	if err := db.SaveStallWatch(hash, StallWatch{lastProgressAt: stalledSince, stalledSince: &stalledSince, nextRetryAt: time.Now()}); err != nil {
+		t.Fatalf("save stall watch: %v", err)
+	}
+
+	alternatives, err := db.StalledAlternatives(time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatalf("stalled alternatives: %v", err)
+	}
+	for episode := int64(1); episode <= 8; episode++ {
+		key := models.LiveEpisodeKey{Series: NormalizeSeriesName("Example Show"), Season: 1, Episode: episode}
+		if alternatives[key] != stuckScore {
+			t.Fatalf("episode %d missing from the stalled map: %v", episode, alternatives)
+		}
+	}
+	if score, ok := releaseStallScore(candidate, alternatives); !ok || score != stuckScore {
+		t.Fatalf("releaseStallScore(pack) = %d/%v, want %d/true", score, ok, stuckScore)
+	}
+
+	// Without the tolerance the stuck pack blocks the candidate.
+	if ok, reason, err := db.CheckSeriesScored(candidate, candScore, cfg.UpgradeMinScoreDiff, &models.ApprovalContext{DryRun: true}); err != nil || ok {
+		t.Fatalf("baseline: ok=%v reason=%q err=%v", ok, reason, err)
+	}
+	// One point short of the drop: still refused.
+	narrow := &models.ApprovalContext{StallAlternatives: alternatives, StallScoreDrop: stuckScore - candScore - 1, DryRun: true}
+	if ok, reason, err := db.CheckSeriesScored(candidate, candScore, cfg.UpgradeMinScoreDiff, narrow); err != nil || ok {
+		t.Fatalf("narrow tolerance: ok=%v reason=%q err=%v", ok, reason, err)
+	}
+	tolerant := &models.ApprovalContext{StallAlternatives: alternatives, StallScoreDrop: stuckScore - candScore}
+	if ok, reason, err := db.CheckSeriesScored(candidate, candScore, cfg.UpgradeMinScoreDiff, tolerant); err != nil || !ok {
+		t.Fatalf("tolerant approval: ok=%v reason=%q err=%v", ok, reason, err)
+	}
+}
