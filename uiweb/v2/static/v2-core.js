@@ -697,16 +697,21 @@
 
   function setRowValue(row, value) {
     var toggle = row.querySelector('input[role="switch"]');
-    if (toggle) { toggle.checked = value === toggle.value; return; }
+    if (toggle) { var want = value === toggle.value; if (toggle.checked === want) return false; toggle.checked = want; return true; }
     var days = row.querySelectorAll('.setting-days input[type="checkbox"]');
     if (days.length) {
       var wanted = {};
       String(value).split(",").forEach(function (day) { wanted[day.trim()] = true; });
-      for (var i = 0; i < days.length; i++) days[i].checked = !!wanted[days[i].value];
-      return;
+      var changed = false;
+      for (var i = 0; i < days.length; i++) {
+        var on = !!wanted[days[i].value];
+        if (days[i].checked !== on) { days[i].checked = on; changed = true; }
+      }
+      return changed;
     }
     var control = row.querySelector('select[name="value"], textarea[name="value"], input[name="value"]:not([type="hidden"])');
-    if (control) control.value = value;
+    if (control) { if (control.value === value) return false; control.value = value; return true; }
+    return false;
   }
 
   document.addEventListener("input", function (event) {
@@ -817,10 +822,11 @@
     if (reset) {
       var row = reset.closest("form.setting-row");
       if (row) {
-        setRowValue(row, reset.getAttribute("data-v2-reset"));
-        markForm(row);
-        refreshSavebar();
-        applyDependents(row);
+        if (setRowValue(row, reset.getAttribute("data-v2-reset"))) {
+          markForm(row);
+          refreshSavebar();
+          applyDependents(row);
+        }
       }
       return;
     }

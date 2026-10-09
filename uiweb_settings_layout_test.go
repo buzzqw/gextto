@@ -235,6 +235,11 @@ func TestSettingsRowsControlsAndAccessibility(t *testing.T) {
 	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"libtorrent_dht"}, "value": {"true", "false"}}); latestConfig(state).Settings["libtorrent_dht"] != "true" || strings.Contains(saved, "setting-badge\">modificato") {
 		t.Fatalf("switch on not saved or still marked modified: %s", saved)
 	}
+	// The «Predefinito» button must be available on every resetting field, even
+	// one already equal to its default (here: saved "true" == default "true").
+	if !strings.Contains(saved, `data-v2-reset="true"`) {
+		t.Fatalf("a field equal to its default must still offer «Predefinito»: %s", saved)
+	}
 	// Errors are tied to their control.
 	if _, saved = v2Request(t, server, http.MethodPost, "/settings/save", url.Values{"key": {"score_res_1080p"}, "value": {"abc"}}); !strings.Contains(saved, `aria-invalid="true"`) || !strings.Contains(saved, "status-score_res_1080p") {
 		t.Fatalf("score error must mark the control invalid: %s", saved)

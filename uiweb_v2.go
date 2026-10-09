@@ -1769,10 +1769,11 @@ func (field v2Field) Browse() bool {
 	return false
 }
 
-// Resettable reports whether the row offers «Predefinito»: only when the
-// saved value differs from the default, so unchanged rows stay quiet.
+// Resettable reports whether the row offers «Predefinito»: whenever the field
+// has a known default, so the button is available on every resetting field and
+// a user who changed something can always restore it.
 func (field v2Field) Resettable() bool {
-	return field.Modified && field.Default != "" && !field.Managed && !field.Disabled && field.Kind != "structured"
+	return field.Default != "" && !field.Managed && !field.Disabled && field.Kind != "structured" && field.Kind != "secret"
 }
 
 // v2UnusedSettingsHint explains the closed panels of options the active
