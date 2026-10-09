@@ -98,6 +98,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `container: ubuntu:22.04` per x86_64 e aarch64 (`ubuntu-24.04-arm`). Un
   binario compilato su un sistema più nuovo non parte su Debian 12/Ubuntu 22.04.
   Il bridge C++ deve compilare anche con libtorrent 2.0.5 (`LIBTORRENT_VERSION_NUM`).
+- Ogni architettura esce in due varianti (matrice `variant` dei job `package`):
+  `gextto-linux-<arch>.tar.gz` (Go puro, predefinita) e
+  `gextto-linux-<arch>-libtorrent.tar.gz` (`GEXTTO_LIBTORRENT=1`, con il motore
+  libtorrent integrato). `install.sh --libtorrent` installa la seconda e
+  `gexttod --update` resta sulla variante installata (`LibtorrentCompiled()`).
 - `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
   `constants.BuiltAt`; `scripts/release-manifest.sh` scrive `release.json`
   (versione, commit, ultimi commit) pubblicato accanto ai pacchetti: è ciò che

@@ -18,7 +18,7 @@
 # GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP,
 # GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
 # GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
-# GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
+# GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS, GEXTTO_LIBTORRENT.
 set -euo pipefail
 
 INSTALL_DIR="${GEXTTO_INSTALL_DIR:-/opt/gextto}"
@@ -35,6 +35,7 @@ SERVICE_USER="${GEXTTO_USER:-}"
 SERVICE_GROUP="${GEXTTO_GROUP:-}"
 REPO="${GEXTTO_REPO:-buzzqw/gextto}"
 RELEASE="${GEXTTO_RELEASE:-continuous}"
+LIBTORRENT="${GEXTTO_LIBTORRENT:-0}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
 NO_START="${GEXTTO_NO_START:-0}"
 HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
@@ -118,6 +119,8 @@ Options:
       --media-group G     add the service user to group G (repeatable or
                           comma-separated), e.g. the group that owns the NAS
                           media folders
+      --libtorrent        install the build with the embedded libtorrent engine
+                          (gextto-linux-<arch>-libtorrent.tar.gz)
       --local-archive F   install from a local .tar.gz instead of downloading us
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
@@ -144,6 +147,7 @@ parse_args() {
       --install-dir) INSTALL_DIR="${2:-}"; [[ -n "$INSTALL_DIR" ]] || die "--install-dir requires a value"; shift 2 ;;
       --user) SERVICE_USER="${2:-}"; [[ -n "$SERVICE_USER" ]] || die "--user requires a value"; shift 2 ;;
       --media-group) [[ -n "${2:-}" ]] || die "--media-group requires a value"; MEDIA_GROUPS="${MEDIA_GROUPS:+$MEDIA_GROUPS,}$2"; shift 2 ;;
+      --libtorrent) LIBTORRENT=1; shift ;;
       --local-archive) LOCAL_ARCHIVE="${2:-}"; [[ -n "$LOCAL_ARCHIVE" ]] || die "--local-archive requires a value"; shift 2 ;;
       *) die "unknown option: $1 (use --help)" ;;
     esac
@@ -223,7 +227,9 @@ payload_asset() {
     aarch64|arm64) arch=aarch64 ;;
     *) die "unsupported architecture: $arch (accepted: x86_64, aarch64)" ;;
   esac
-  printf 'gextto-linux-%s.tar.gz' "$arch"
+  local variant=""
+  [[ "$LIBTORRENT" == "1" ]] && variant="-libtorrent"
+  printf 'gextto-linux-%s%s.tar.gz' "$arch" "$variant"
 }
 
 payload_base() {

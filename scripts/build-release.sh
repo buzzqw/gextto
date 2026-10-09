@@ -7,7 +7,8 @@
 #
 #   scripts/build-release.sh [--label TEXT] [--output-dir DIR]
 #       runs the build in an ubuntu:22.04 container (docker or podman) and
-#       leaves gextto-linux-<arch>.tar.gz(.sha256) in DIR (default: dist/)
+#       leaves gextto-linux-<arch>.tar.gz(.sha256) in DIR (default: dist/);
+#       with GEXTTO_LIBTORRENT=1 the archive is gextto-linux-<arch>-libtorrent.tar.gz
 #   scripts/build-release.sh --in-container [--label TEXT] [--output-dir DIR]
 #       builds in the current system, which must be the baseline (CI jobs run
 #       with `container: ubuntu:22.04`)
@@ -88,6 +89,13 @@ fi
 export HOME="${HOME:-/root}" GOTOOLCHAIN=local
 
 ARCH="$(uname -m)"
+# The libtorrent build is published next to the pure Go one: its name says so,
+# and the updater keeps an installation on the variant it runs.
+VARIANT=""
+if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
+  VARIANT="-libtorrent"
+fi
+ARCHIVE="$OUTPUT_DIR/gextto-linux-${ARCH}${VARIANT}.tar.gz"
 mkdir -p "$OUTPUT_DIR"
 BINARY="$ROOT/bin/gexttod"
 GEXTTO_BINARY="$BINARY" GEXTTO_FORCE_GXTORRENT=1 "$ROOT/scripts/build-daemon.sh"
@@ -99,11 +107,15 @@ GEXTTO_BINARY="$BINARY" GEXTTO_FORCE_GXTORRENT=1 "$ROOT/scripts/build-daemon.sh"
 # requirement to report.
 glibc="$(objdump -T "$BINARY" 2>/dev/null | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1 || true)"
 echo "highest glibc symbol required: ${glibc:-none (static binary)}"
+if [[ -n "$VARIANT" ]]; then
+  objdump -p "$BINARY" | grep -q 'NEEDED.*libtorrent-rasterbar' \
+    || { echo "the libtorrent build is not linked to libtorrent-rasterbar" >&2; exit 1; }
+fi
 
 "$ROOT/scripts/package-linux.sh" --binary "$BINARY" --arch "$ARCH" \
-  --output "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz" ${LABEL:+--label "$LABEL"}
+  --output "$ARCHIVE" ${LABEL:+--label "$LABEL"}
 # List first, then search: `tar | grep -q` fails under pipefail when grep
 # stops reading early and tar gets SIGPIPE.
-contents="$(tar -tzf "$OUTPUT_DIR/gextto-linux-${ARCH}.tar.gz")"
+contents="$(tar -tzf "$ARCHIVE")"
 grep -qx './gx-torrent' <<< "$contents" \
   || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }

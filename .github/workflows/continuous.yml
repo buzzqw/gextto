@@ -43,16 +43,27 @@ jobs:
   # The build number is not taken from github.run_number: build-daemon.sh reads
   # the committed build_number file, so the installed version shows the same
   # 1.1.<n> as the checkout.
+  # Each architecture is built twice: the default pure Go archive and the
+  # variant with the embedded libtorrent engine, published as
+  # gextto-linux-<arch>-libtorrent.tar.gz.
   package:
-    name: package (${{ matrix.arch }})
+    name: package (${{ matrix.arch }}, ${{ matrix.variant }})
     needs: test
     strategy:
       matrix:
+        arch: [x86_64, aarch64]
+        variant: [go, libtorrent]
         include:
           - arch: x86_64
             runner: ubuntu-24.04
           - arch: aarch64
             runner: ubuntu-24.04-arm
+          - variant: go
+            libtorrent: '0'
+            suffix: ''
+          - variant: libtorrent
+            libtorrent: '1'
+            suffix: '-libtorrent'
     runs-on: ${{ matrix.runner }}
     container: ubuntu:22.04
     defaults:
@@ -68,6 +79,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build and package
+        env:
+          GEXTTO_LIBTORRENT: ${{ matrix.libtorrent }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           scripts/build-release.sh --in-container --label "continuous-${GITHUB_SHA::12}" --output-dir dist
@@ -75,8 +88,8 @@ jobs:
       - name: Upload archive
         uses: actions/upload-artifact@v4
         with:
-          name: gextto-linux-${{ matrix.arch }}
-          path: dist/gextto-linux-*
+          name: gextto-linux-${{ matrix.arch }}${{ matrix.suffix }}
+          path: dist/gextto-linux-${{ matrix.arch }}${{ matrix.suffix }}.tar.gz*
           if-no-files-found: error
 
   publish:

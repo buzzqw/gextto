@@ -117,3 +117,11 @@ func TestWorkDirCleanupRemovesTheDirectory(t *testing.T) {
 		t.Fatalf("work dir %q was not removed", work.Path())
 	}
 }
+
+func TestArchiveURLLibtorrentVariant(t *testing.T) {
+	got := ArchiveURL("me/gextto", "continuous", "x86_64"+LibtorrentArchiveSuffix)
+	want := "https://github.com/me/gextto/releases/download/continuous/gextto-linux-x86_64-libtorrent.tar.gz"
+	if got != want {
+		t.Fatalf("ArchiveURL = %q, want %q", got, want)
+	}
+}

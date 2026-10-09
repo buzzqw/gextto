@@ -100,8 +100,12 @@ func ChannelFromMarker(marker string) string {
 	return "continuous"
 }
 
+// LibtorrentArchiveSuffix marks the release asset that embeds the libtorrent
+// engine (gextto-linux-<arch>-libtorrent.tar.gz).
+const LibtorrentArchiveSuffix = "-libtorrent"
+
 // ArchiveURL builds the release asset URL for a repository, release and
-// architecture.
+// architecture. The architecture may carry LibtorrentArchiveSuffix.
 func ArchiveURL(repo, release, arch string) string {
 	asset := fmt.Sprintf("%s-%s.tar.gz", ArchiveStem, arch)
 	if release == "latest" || release == "stable" {
@@ -172,6 +176,11 @@ func Run(ctx context.Context, opts UpdateOptions) error {
 		arch, err := updateTargetArch()
 		if err != nil {
 			return err
+		}
+		// An installation built with libtorrent stays on that variant: the
+		// default archive is pure Go and would drop the embedded engine.
+		if LibtorrentCompiled() {
+			arch += LibtorrentArchiveSuffix
 		}
 		url := ArchiveURL(repo, release, arch)
 		destination := filepath.Join(work.Path(), path.Base(url))
