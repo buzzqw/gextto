@@ -25,6 +25,17 @@ ciclo reale. Riprendibile, saltabile, dry-run di default.
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`);
 - un breve runbook "un ciclo è fallito — dove guardare", basato su Health e Log.
 
+### 3. Pulsante "Ripristina predefinito" su ogni impostazione
+Accanto a ogni campo delle impostazioni, un pulsante **predefinito** che riporta
+il campo al valore di default "certo" (quello già in `uiweb_settings_defaults.go`
+e nella meta per unità/valori speciali), senza salvare a sorpresa: il campo
+mostra il default e l'utente conferma. Va esteso a **tutti** i campi e i pannelli
+(Compilazione, Sorgenti, libtorrent, Motore torrent, Punteggi, Rinomina,
+Avanzate, Notifiche, ...), così un utente che ha combinato un pasticcio sa come
+tornare indietro. Serve anche definire un default certo dove oggi manca (es. i
+valori speciali `-1`/`0` documentati) e il pulsante deve funzionare sia per i
+campi semplici (testo/bool/select) sia per quelli strutturati (tag, percorsi).
+
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
 - Script di benchmark RAM/throughput dei motori, riproducibile in `scripts/`
