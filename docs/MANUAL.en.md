@@ -692,7 +692,8 @@ same data.
   at boot and then once a week. If the daemon cannot stay up (6 abnormal starts
   in 10 minutes) Gextto falls back to libtorrent by itself. It supports
   **sequential download** and **first/last piece** priority (set when adding a
-  torrent; they apply to new torrents). It does not support **v2-only**
+  torrent, or for every new torrent in *Configuration → Queues and performance →
+  Download mode*; they apply to new torrents). It does not support **v2-only**
   torrents, per-torrent rate/connection limits, manual web seeds or tracker
   removal.
 - **Embedded libtorrent** — the bundled in-process session; every
@@ -1415,6 +1416,7 @@ Recalculate scores* after changing weights.
 | Setting | What it does |
 |---|---|
 | Sequential download | Download files sequentially instead of in scattered pieces. |
+| First/last piece of files | Download the start and end of every file first in all new torrents, then continue normally: useful to watch a video while it downloads. Works with every engine; torrents already running are not changed. |
 | Preallocate disk space | Reserves all disk space up front before starting the download. |
 
 **Connections**

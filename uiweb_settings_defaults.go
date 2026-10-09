@@ -72,6 +72,7 @@ var uiSettingDefaults = map[string]string{
 	"libtorrent_stall_giveup_min":                  "20160",
 	"libtorrent_dead_swarm_giveup_min":             "4320",
 	"libtorrent_sequential":                        "false",
+	"libtorrent_first_last":                        "false",
 	"libtorrent_active_downloads":                  "3",
 	"libtorrent_active_seeds":                      "3",
 	"libtorrent_active_limit":                      "5",

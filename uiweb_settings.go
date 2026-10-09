@@ -193,6 +193,7 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "libtorrent_active_seeds", Label: "Seed attivi", Tab: "performance", Group: "Coda e slot"},
 	{Key: "libtorrent_active_limit", Label: "Limite torrent attivi", Tab: "performance", Group: "Coda e slot"},
 	{Key: "libtorrent_sequential", Label: "Download sequenziale", Tab: "performance", Group: "Modalità di download"},
+	{Key: "libtorrent_first_last", Label: "Prima/ultima parte dei file", Tab: "performance", Group: "Modalità di download"},
 	{Key: "libtorrent_preallocate", Label: "Prealloca lo spazio su disco", Tab: "performance", Group: "Modalità di download"},
 	{Key: "libtorrent_connections_limit", Label: "Limite connessioni totali", Tab: "performance", Group: "Connessioni"},
 	{Key: "libtorrent_upload_slots_limit", Label: "Slot upload", Tab: "performance", Group: "Connessioni"},

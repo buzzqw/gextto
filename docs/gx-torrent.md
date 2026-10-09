@@ -333,16 +333,18 @@ salute dello sciame, quindi resta **opzionale e spenta di default**.
 - Si imposta al momento dell'aggiunta: dalla pagina web (caselle
   *sequential* e *first/last*), con `sequential=1` / `first_last=1` su
   `POST /api/v1/add`, oppure dai campi `AddOptions.Sequential` /
-  `AddOptions.FirstLast` di Gextto (impostazione *Download sequenziale*,
-  `libtorrent_sequential`, e la casella prima/ultima parte).
+  `AddOptions.FirstLast` di Gextto (impostazioni *Download sequenziale*,
+  `libtorrent_sequential`, e *Prima/ultima parte dei file*,
+  `libtorrent_first_last`, oltre alle caselle del form di aggiunta).
 - `first_last` scarica per primi i bordi di ogni file e poi prosegue
   **rarest-first**: è indipendente dall'ordine sequenziale e utile allo
   streaming senza rinunciare alla salute dello sciame.
 - Il valore predefinito per i torrent aggiunti dopo si imposta con
   `POST /api/v1/config` (`{"sequential":true}`): Gextto lo fa quando cambia
   l'impostazione. **Cambiare questo valore a caldo applica l'ordine anche ai
-  torrent già in corso**, come libtorrent; `first_last` non ha un default di
-  sessione.
+  torrent già in corso**, come libtorrent. `first_last` non ha un default di
+  sessione nel demone: con *Prima/ultima parte dei file* attiva è Gextto ad
+  aggiungere `first_last=1` a ogni nuovo torrent.
 - rain può cambiare l'ordine a caldo anche sul singolo torrent
   (`Torrent.SetSequential`/`SetFirstLast` internamente); lo stato è persistito e
   riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).

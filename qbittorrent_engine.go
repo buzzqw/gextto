@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -105,7 +106,9 @@ func qbittorrentSettingsFromConfig(cfg *Config) (qbittorrentSettings, error) {
 // qbittorrentEngine is a TorrentEngine backed by qBittorrent-nox.
 type qbittorrentEngine struct {
 	settings qbittorrentSettings
-	client   *qbittorrent.Client
+	// firstLastDefault adds firstLastPiecePrio to every new torrent.
+	firstLastDefault atomic.Bool
+	client           *qbittorrent.Client
 	// cfg is the startup snapshot, kept so the watchdog can restart the
 	// managed process without an AppState.
 	cfg *Config
@@ -1408,8 +1411,13 @@ func (e *qbittorrentEngine) addOptions(options AddOptions) qbittorrent.AddOption
 		Tags:       e.settings.Tag,
 		Paused:     options.Paused,
 		Sequential: options.Sequential,
-		FirstLast:  options.FirstLast,
+		FirstLast:  options.FirstLast || e.firstLastDefault.Load(),
 	}
+}
+
+// SetFirstLastDefault implements TorrentEngine.
+func (e *qbittorrentEngine) SetFirstLastDefault(enabled bool) {
+	e.firstLastDefault.Store(enabled)
 }
 
 func (e *qbittorrentEngine) Add(magnet string, cfg *Config) (bool, error) {

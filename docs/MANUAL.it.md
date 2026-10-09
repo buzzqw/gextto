@@ -706,7 +706,9 @@ dati.
   IP** si aggiorna all'avvio e poi una volta a settimana. Se il demone non
   riesce a restare attivo (6 avvii anomali in 10 minuti) Gextto torna da solo a
   libtorrent. Supporta il **download sequenziale** e la **prima/ultima parte**
-  dei file (si impostano all'aggiunta; valgono per i torrent nuovi). Non
+  dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
+  *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
+  nuovi). Non
   supporta torrent **solo-v2**, limiti di velocità/connessioni per singolo
   torrent, web seed manuali né rimozione tracker.
 - **libtorrent integrato** — la sessione inclusa, nello stesso processo;
@@ -1453,6 +1455,7 @@ Il pannello **Gruppi custom** aggiunge un bonus o una penalità a un release gro
 | Impostazione | Cosa fa |
 |---|---|
 | Download sequenziale | Scarica i file in ordine sequenziale invece che a pezzi sparsi. |
+| Prima/ultima parte dei file | Scarica per primi l'inizio e la fine di ogni file in tutti i nuovi torrent, poi prosegue normalmente: utile per guardare un video mentre scarica. Vale con ogni motore; i torrent già in corso non cambiano. |
 | Prealloca lo spazio su disco | Riserva subito tutto lo spazio su disco prima di iniziare il download. |
 
 **Connessioni**

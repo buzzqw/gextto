@@ -19,6 +19,7 @@ var uiSettingTooltipText = map[string]string{
 	"libtorrent_dead_swarm_giveup_min":             "Stallo con zero seeder (dead swarm): rimosso dopo questo periodo, più breve, e la puntata viene ricercata di nuovo subito. Imposta 0 per usare la soglia generale.",
 	"libtorrent_auto_optimize":                     "Applica periodicamente l'ottimizzazione di cache, buffer e coda in base alle risorse.",
 	"libtorrent_sequential":                        "Scarica i file in ordine sequenziale invece che a pezzi sparsi.",
+	"libtorrent_first_last":                        "Scarica per primi l'inizio e la fine di ogni file in tutti i nuovi torrent, poi prosegue normalmente: utile per guardare un video mentre scarica. Vale con ogni motore; i torrent già in corso non cambiano.",
 	"libtorrent_extra_settings":                    "Impostazioni libtorrent avanzate, una per riga nel formato chiave=valore.",
 	"libtorrent_active_downloads":                  "Valore base dei download attivi; con la coda dinamica viene adattato a runtime.",
 	"libtorrent_active_seeds":                      "Valore base dei seed attivi; con la coda dinamica scende a 1 quando ci sono download in coda.",

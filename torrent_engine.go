@@ -106,6 +106,10 @@ type TorrentEngine interface {
 	SetMaxUploads(hash string, value int) (bool, error)
 	SetPin(hash string, pinned bool) (bool, error)
 	SetSequential(enabled bool) (bool, error)
+	// SetFirstLastDefault turns on the first/last-piece priority for every
+	// torrent added afterwards (setting `libtorrent_first_last`), on top of the
+	// per-torrent AddOptions.FirstLast.
+	SetFirstLastDefault(enabled bool)
 	AssociateStorage(hash, destination string) (bool, error)
 	TorrentFilePath(hash string) (string, bool)
 }

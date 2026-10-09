@@ -928,6 +928,9 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				lastSequential = &sequential
 			}
 		}
+		// A plain flag on the engine: re-applying it each pass also covers a
+		// switch of the active engine.
+		torrents.SetFirstLastDefault(settingTruthy(cfg.Settings["libtorrent_first_last"]))
 		MonitorMetadata(cfg, torrents, db, notifier, metadataWaitStart, metadataFirstSeen, metadataLastWarning)
 		MonitorStalled(cfg, torrents, db, notifier, stallWaitStart)
 		if now.Sub(lastRamdiskCheck) >= 30*time.Second {

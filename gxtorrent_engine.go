@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
@@ -110,8 +111,10 @@ func gxManagedListenSetting(cfg *Config) string {
 // gxTorrentEngine is a TorrentEngine backed by the gx-torrent daemon.
 type gxTorrentEngine struct {
 	settings gxTorrentSettings
-	client   *http.Client
-	cfg      *Config
+	// firstLastDefault adds first_last to every new torrent.
+	firstLastDefault atomic.Bool
+	client           *http.Client
+	cfg              *Config
 	// notifier delivers lifecycle notifications (crash, restart, fallback).
 	// Optional: nil disables them.
 	notifier *Notifier
@@ -1511,6 +1514,11 @@ func (e *gxTorrentEngine) SetSequential(enabled bool) (bool, error) {
 	return true, nil
 }
 
+// SetFirstLastDefault implements TorrentEngine.
+func (e *gxTorrentEngine) SetFirstLastDefault(enabled bool) {
+	e.firstLastDefault.Store(enabled)
+}
+
 // TorrentFilePath returns the .torrent copy Gextto keeps for the hash.
 func (e *gxTorrentEngine) TorrentFilePath(hash string) (string, bool) {
 	hash = strings.ToLower(strings.TrimSpace(hash))
@@ -1603,6 +1611,7 @@ func (e *gxTorrentEngine) AddWithOptions(magnet string, cfg *Config, preferredPa
 		return false, nil
 	}
 	gxWarnUnsupportedOptions(options)
+	options.FirstLast = options.FirstLast || e.firstLastDefault.Load()
 	form := gxAddForm(e.resolveSavePath(preferredPath, cfg), options)
 	form.Set("magnet", magnet)
 	var result struct {
@@ -1638,6 +1647,7 @@ func (e *gxTorrentEngine) AddTorrentFileWithOptions(torrentPath string, cfg *Con
 		return nil, fmt.Errorf("torrent file not readable: %w", err)
 	}
 	gxWarnUnsupportedOptions(options)
+	options.FirstLast = options.FirstLast || e.firstLastDefault.Load()
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 	for key, values := range gxAddForm(e.resolveSavePath(preferredPath, cfg), options) {

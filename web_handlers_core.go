@@ -978,6 +978,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"gap_deep_max_per_cycle":               settingsParseUint(cfg, "gap_deep_max_per_cycle", 5),
 		"libtorrent_sched_enabled":             settingsOr(cfg, "libtorrent_sched_enabled", "false"),
 		"libtorrent_sequential":                settingsOr(cfg, "libtorrent_sequential", "false"),
+		"libtorrent_first_last":                settingsOr(cfg, "libtorrent_first_last", "false"),
 		"libtorrent_extra_settings":            settingsOr(cfg, "libtorrent_extra_settings", ""),
 		"libtorrent_sched_start":               settingsOr(cfg, "libtorrent_sched_start", "23:00"),
 		"libtorrent_sched_end":                 settingsOr(cfg, "libtorrent_sched_end", "08:00"),

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -190,7 +191,9 @@ type LibtorrentClient struct {
 
 	// firstLastPending holds torrents waiting for metadata to apply first/last
 	// piece priorities.
-	firstLastMu      sync.RWMutex
+	firstLastMu sync.RWMutex
+	// firstLastDefault applies first/last to every new torrent.
+	firstLastDefault atomic.Bool
 	firstLastPending map[string]struct{}
 
 	// stopAtMetadata holds torrents to pause as soon as metadata arrives.
@@ -1118,6 +1121,8 @@ func (c *LibtorrentClient) AddTorrentFile(torrentPath, savePath string) (*string
 	if added == 0 {
 		return nil, fmt.Errorf("libtorrent torrent-file add failed: %s", errMessage)
 	}
+	// Only the global defaults: this entry point takes no AddOptions.
+	c.registerDeferredOptions(hash, "", AddOptions{})
 	return &hash, nil
 }
 
@@ -1138,6 +1143,8 @@ func (c *LibtorrentClient) AddTorrentFileEx(torrentPath, savePath string, option
 	}
 	c.unmarkRemoved(hash)
 	c.invalidateListCache()
+	// Only the global defaults: callers with AddOptions register them after.
+	c.registerDeferredOptions(hash, "", AddOptions{})
 	return &hash, nil
 }
 
@@ -1171,7 +1178,7 @@ func (c *LibtorrentClient) AddFileWithOptions(torrentPath string, cfg *Config, p
 // metadata is available.
 func (c *LibtorrentClient) registerDeferredOptions(hash, name string, options AddOptions) {
 	normalized := strings.ToLower(hash)
-	if options.FirstLast {
+	if options.FirstLast || c.firstLastDefault.Load() {
 		c.firstLastMu.Lock()
 		c.firstLastPending[normalized] = struct{}{}
 		c.firstLastMu.Unlock()
@@ -1259,6 +1266,13 @@ func (c *LibtorrentClient) QueueTop(hash string) (bool, error) {
 		return false, fmt.Errorf("libtorrent queue top failed: %s", errMessage)
 	}
 	return true, nil
+}
+
+// SetFirstLastDefault implements TorrentEngine.
+func (c *LibtorrentClient) SetFirstLastDefault(enabled bool) {
+	if c != nil {
+		c.firstLastDefault.Store(enabled)
+	}
 }
 
 // SetFirstLast prioritises the first and last piece of every file.
