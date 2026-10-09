@@ -111,6 +111,10 @@ setup_netns() {
   ip netns add "$R"
   ip netns add "$A"
   ip netns add "$B"
+  # loopback is down by default in a fresh namespace: the daemon API binds it.
+  ip netns exec "$R" ip link set lo up
+  ip netns exec "$A" ip link set lo up
+  ip netns exec "$B" ip link set lo up
 
   # root <-> router
   ip link add vrel type veth peer name vr
@@ -287,9 +291,9 @@ log "avvio i tre daemon (uTP + holepunch attivi)"
 start_daemon "-"   "$WORK/relay" "$RELAY_API" "$RELAY_PEER_PORT" "10.0.0.1" "$WORK/relay.log"
 start_daemon "$A"  "$WORK/a"     "$A_API"     "$A_PEER_PORT"     "10.10.0.2" "$WORK/a.log"
 start_daemon "$B"  "$WORK/b"     "$B_API"     "$B_PEER_PORT"     "10.20.0.2" "$WORK/b.log"
-wait_api "-" "$RELAY_API" || die "relay API non risponde (vedi $WORK/relay.log)"
-wait_api "$A" "$A_API"    || die "leecher API non risponde (vedi $WORK/a.log)"
-wait_api "$B" "$B_API"    || die "seeder API non risponde (vedi $WORK/b.log)"
+wait_api "-" "$RELAY_API" || { echo "--- relay.log ---" >&2; tail -n 20 "$WORK/relay.log" >&2; die "relay API non risponde"; }
+wait_api "$A" "$A_API"    || { echo "--- a.log ---" >&2; tail -n 20 "$WORK/a.log" >&2; die "leecher API non risponde"; }
+wait_api "$B" "$B_API"    || { echo "--- b.log ---" >&2; tail -n 20 "$WORK/b.log" >&2; die "seeder API non risponde"; }
 
 log "il seeder (B) carica il .torrent e i dati"
 daemon_api "$B" "$B_API" /api/v1/add-file -F "torrent=@$WORK/test.torrent" -F "destination=$WORK/seed" >/dev/null
