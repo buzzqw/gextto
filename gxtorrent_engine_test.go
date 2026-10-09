@@ -1000,3 +1000,44 @@ func TestGxSetSuperSeedingPosts(t *testing.T) {
 		t.Fatalf("super-seeding off posted form=%q", form)
 	}
 }
+
+// TestGxSessionStatsMapping pins the libtorrent-style counter names exposed by
+// gx-torrent, so /api/libtorrent/session-stats reads the same whichever engine
+// is active.
+func TestGxSessionStatsMapping(t *testing.T) {
+	in := map[string]int64{
+		"bytes_downloaded":       1000,
+		"bytes_uploaded":         200,
+		"peers_incoming_tcp":     2,
+		"peers_incoming_utp":     1,
+		"peers_tcp":              3,
+		"peers_utp":              4,
+		"dht_nodes":              55,
+		"disk_queue_depth":       6,
+		"read_ops_total":         7,
+		"write_ops_total":        8,
+		"read_cache_hit_percent": 42,
+	}
+	got := gxSessionStats(in)
+	want := map[string]int64{
+		"net.recv_payload_bytes":       1000,
+		"net.sent_payload_bytes":       200,
+		"net.has_incoming_connections": 1,
+		"peer.num_tcp_peers":           3,
+		"peer.num_utp_peers":           4,
+		"dht.dht_nodes":                55,
+		"disk.queued_disk_jobs":        6,
+		"disk.num_read_ops":            7,
+		"disk.num_write_ops":           8,
+		"read_cache_hit_percent":       42,
+	}
+	for key, value := range want {
+		if got[key] != value {
+			t.Fatalf("gxSessionStats[%q] = %d, want %d", key, got[key], value)
+		}
+	}
+	none := gxSessionStats(map[string]int64{"peers_incoming_tcp": 0, "peers_incoming_utp": 0})
+	if none["net.has_incoming_connections"] != 0 {
+		t.Fatalf("no incoming connections -> has_incoming = %d, want 0", none["net.has_incoming_connections"])
+	}
+}

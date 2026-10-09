@@ -129,6 +129,12 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	lsdText := onOff(engineBool(lsd, "enabled"), fmt.Sprintf("%d peer trovati in rete locale", engineNum(lsd, "peers_found")))
 	add("LSD", lsdText, engineString(lsd, "error") != "")
 	out.Rows[len(out.Rows)-1].Detail = engineString(lsd, "error")
+	incoming := engineNum(session, "peers_incoming_tcp") + engineNum(session, "peers_incoming_utp")
+	incomingText := "nessuna finora (porta forse chiusa sul router)"
+	if incoming > 0 {
+		incomingText = fmt.Sprintf("sì (%d)", incoming)
+	}
+	add("Connessioni in entrata", incomingText, false)
 	encryption := map[int64]string{0: "disattivata", 1: "attiva", 2: "obbligatoria"}[engineNum(stats, "encryption")]
 	add("Cifratura", encryption, false)
 	proxy := "nessuno"
@@ -143,6 +149,8 @@ func uiGxEngineStats(engine TorrentEngine) uiEngineStats {
 	}
 	add("Cache disco", fmt.Sprintf("%s · lettura %d MB · scrittura %d MB · preallocazione %s", cacheMode,
 		engineNum(stats, "cache_read_mb"), engineNum(stats, "cache_write_mb"), ternaryString(engineBool(stats, "preallocate"), "sì", "no")), false)
+	add("I/O disco", fmt.Sprintf("job in coda %d · letture %d · scritture %d",
+		engineNum(session, "disk_queue_depth"), engineNum(session, "read_ops_total"), engineNum(session, "write_ops_total")), false)
 	add("Disco", fmt.Sprintf("lettura %s · scrittura %s · cache lettura %s (hit %d%%) · buffer scrittura %s",
 		logging.HumanRate(engineNum(session, "disk_read_rate")), logging.HumanRate(engineNum(session, "disk_write_rate")),
 		logging.HumanBytesI64(engineNum(session, "read_cache_bytes")), engineNum(session, "read_cache_hit_percent"),

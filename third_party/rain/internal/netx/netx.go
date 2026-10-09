@@ -205,6 +205,7 @@ var (
 	OutgoingUTP atomic.Int64
 	OutgoingTCP atomic.Int64
 	IncomingUTP atomic.Int64
+	IncomingTCP atomic.Int64
 )
 
 // SetUTPDialer enables uTP for peer connections (nil disables it). With only
@@ -340,4 +341,14 @@ func (c *UTPConn) Close() error {
 func IsUTPAddr(addr string) bool {
 	_, ok := utpPeers.Load(addr)
 	return ok
+}
+
+// UTPPeerCount returns how many peer connections are currently open over uTP.
+func UTPPeerCount() int {
+	count := 0
+	utpPeers.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
 }

@@ -375,6 +375,7 @@ Con gx-torrent mostra:
 - velocità e slot della coda;
 - porta e apertura sul router (in rosso se non riuscita);
 - DHT (nodi), uTP (connessioni uTP e TCP), LSD (peer trovati);
+- connessioni in entrata e I/O disco (job in coda, letture/scritture totali);
 - cifratura, proxy, regole del filtro IP;
 - disco e cache, totali della sessione.
 
@@ -385,7 +386,11 @@ Con libtorrent mostra:
 - connessioni in entrata, job su disco, totali.
 
 Gli stessi dati sono in `GET /api/v1/stats` del demone e in
-`GET /api/libtorrent/session-stats` di gextto. Rispetto a libtorrent:
+`GET /api/libtorrent/session-stats` di gextto. I contatori condivisi usano i
+**nomi di libtorrent** anche per gx-torrent (`net.recv_payload_bytes`,
+`peer.num_tcp_peers`, `disk.num_read_ops`, …), così l'endpoint è uniforme; i
+contatori specifici di rain (cache, velocità disco, traffico DHT) restano
+accanto. Rispetto a libtorrent:
 
 - l'**overhead di protocollo** è disponibile (`protocol_overhead_bytes`: byte
   scambiati sulle connessioni peer meno il payload, cifratura compresa);

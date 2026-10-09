@@ -15,6 +15,10 @@ import (
 type SessionStats struct {
 	// gextto fork: peer connections by transport since start.
 	OutgoingUTP, OutgoingTCP, IncomingUTP int64
+	// gextto fork: incoming TCP connections since start (mirrors IncomingUTP).
+	IncomingTCP int64
+	// gextto fork: currently connected peers by transport.
+	TCPPeers, UTPPeers int
 	// UTP and DHT report whether they are active.
 	UTP bool
 	DHT bool
@@ -88,6 +92,12 @@ type SessionStats struct {
 	BytesRead int64
 	// Number of bytes written to disk.
 	BytesWritten int64
+
+	// gextto fork: cumulative read/write operations since start. Their rate is
+	// ReadsPerSecond/WritesPerSecond; the meters' total is what libtorrent
+	// reports as disk.num_read_ops / disk.num_write_ops.
+	ReadOpsTotal  int64
+	WriteOpsTotal int64
 }
 
 // Stats returns current statistics about the Session.
@@ -96,6 +106,14 @@ func (s *Session) Stats() SessionStats {
 	out.OutgoingUTP = netx.OutgoingUTP.Load()
 	out.OutgoingTCP = netx.OutgoingTCP.Load()
 	out.IncomingUTP = netx.IncomingUTP.Load()
+	out.IncomingTCP = netx.IncomingTCP.Load()
+	out.UTPPeers = netx.UTPPeerCount()
+	if out.UTPPeers > out.Peers {
+		out.UTPPeers = out.Peers
+	}
+	out.TCPPeers = out.Peers - out.UTPPeers
+	out.ReadOpsTotal = s.metrics.ReadsPerSecond.Count()
+	out.WriteOpsTotal = s.metrics.WritesPerSecond.Count()
 	out.UTP = s.utpSocket != nil
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()

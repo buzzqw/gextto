@@ -709,7 +709,9 @@ Gextto falls back to the embedded engine and logs a warning.
 The configuration tile shows the active engine, its status and a
 reachability/path test, so you can validate a backend before switching. The
 **Health → Torrent engine** panel summarises the active engine (queue, speed,
-port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache). Whichever engine
+port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache, incoming
+connections, disk I/O with queued jobs and read/write totals, session totals).
+Whichever engine
 is active, the **Downloads** screen and every automation stay the same.
 
 ### Performance: RAM and CPU

@@ -183,7 +183,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "partial", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "full", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "full", "upload_mode": "none",
-		"ip_filter": "full", "session_stats": "partial", "web_seeds": "full",
+		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "full",
 	},
 }

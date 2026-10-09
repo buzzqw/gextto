@@ -1739,7 +1739,31 @@ func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 	if err := e.do(http.MethodGet, "/api/v1/stats", nil, "", &stats); err != nil {
 		return nil, err
 	}
-	return stats.Session, nil
+	return gxSessionStats(stats.Session), nil
+}
+
+// gxSessionStats maps the daemon's session counters to libtorrent's counter
+// names, so /api/libtorrent/session-stats reads the same whichever engine is
+// active, and keeps the gx-torrent-specific counters alongside. Pure, so it is
+// easy to test.
+func gxSessionStats(session map[string]int64) map[string]int64 {
+	out := map[string]int64{
+		"net.recv_payload_bytes":       session["bytes_downloaded"],
+		"net.sent_payload_bytes":       session["bytes_uploaded"],
+		"net.has_incoming_connections": boolToInt(session["peers_incoming_tcp"]+session["peers_incoming_utp"] > 0),
+		"peer.num_tcp_peers":           session["peers_tcp"],
+		"peer.num_utp_peers":           session["peers_utp"],
+		"dht.dht_nodes":                session["dht_nodes"],
+		"disk.queued_disk_jobs":        session["disk_queue_depth"],
+		"disk.num_read_ops":            session["read_ops_total"],
+		"disk.num_write_ops":           session["write_ops_total"],
+	}
+	for key, value := range session {
+		if _, exists := out[key]; !exists {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 // ApplyOptimization pushes the automatic disk cache and returns the sizes the

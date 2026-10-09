@@ -138,9 +138,9 @@ Fatto dalla wishlist: **super-seeding** (BEP 16), punto 8 del piano.
 Ricontrollo eseguito a fine lavoro:
 
 - [x] `capabilityLevels`: gx-torrent ora `full` per `limits`, `trackers`,
-      `sequential`, `piece_diagnostics`, `web_seeds`, `super_seeding`; restano
-      `partial` `first_last` (solo all'aggiunta lato Gextto), `preferences` e
-      `session_stats`; `none` `upload_mode`.
+      `sequential`, `piece_diagnostics`, `web_seeds`, `super_seeding`,
+      `session_stats`; resta `partial` `first_last` (solo all'aggiunta lato
+      Gextto); `none` `upload_mode`.
 - [x] Note e testi aggiornati insieme: `v2DetailCapsFor`, "Limiti noti",
       `docs/gx-torrent.md`, `docs/API.md`, `MANUAL.*`, `README*`.
 - [x] Ogni feature visibile è in entrambe le UI: tracker (aggiunta +

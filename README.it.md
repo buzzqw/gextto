@@ -90,12 +90,19 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | RAM disk | sì | sì | — |
 | Fast resume | sì | sì | — |
 | Diagnostica dei pezzi | sì | — | — |
-| Statistiche di sessione | parziale | sì | parziale |
+| Statistiche di sessione | sì | sì | parziale |
 | Sincronizzazione della sessione | sì | — | sì |
 | Filtro IP | sì | sì | parziale |
 | Web seed | sì | sì | parziale |
 | Holepunching (BEP 55) | sì | — | — |
 <!-- capability-matrix:end -->
+
+Le statistiche del motore attivo — torrent per stato, velocità e slot,
+porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni in
+entrata** e **I/O disco** (job in coda, letture/scritture totali) con i totali di
+sessione — sono nel pannello **Salute → Motore torrent** (`/?view=health`); gli
+stessi contatori sono in `GET /api/v1/stats` del demone e in
+`GET /api/libtorrent/session-stats`.
 
 ## Uso delle risorse
 

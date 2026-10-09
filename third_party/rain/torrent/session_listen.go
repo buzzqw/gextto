@@ -88,6 +88,7 @@ func (s *Session) acceptShared(listener *net.TCPListener) {
 			}
 			return
 		}
+		netx.IncomingTCP.Add(1)
 		addr, ok := conn.RemoteAddr().(*net.TCPAddr)
 		if !ok {
 			conn.Close()

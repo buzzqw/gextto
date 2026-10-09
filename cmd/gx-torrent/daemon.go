@@ -1820,6 +1820,12 @@ func (d *Daemon) stats() daemonStats {
 			"peers_outgoing_utp":       s.OutgoingUTP,
 			"peers_outgoing_tcp":       s.OutgoingTCP,
 			"peers_incoming_utp":       s.IncomingUTP,
+			"peers_incoming_tcp":       s.IncomingTCP,
+			"peers_tcp":                int64(s.TCPPeers),
+			"peers_utp":                int64(s.UTPPeers),
+			"read_ops_total":           s.ReadOpsTotal,
+			"write_ops_total":          s.WriteOpsTotal,
+			"disk_queue_depth":         int64(s.ReadsActive + s.ReadsPending + s.WritesActive + s.WritesPending),
 			"peer_wire_downloaded":     s.PeerWireDownloaded,
 			"peer_wire_uploaded":       s.PeerWireUploaded,
 		}

@@ -71,6 +71,9 @@ type uiPageData struct {
 	GexttoLog   bool
 	CacheReadMB int64
 	CacheWB     int64
+	ReadOpsTotal  int64
+	WriteOpsTotal int64
+	IncomingConns int64
 	LSDPeers    int64
 	DiskFree    int64
 	DiskTotal   int64
@@ -477,6 +480,8 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
     <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
     <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
     <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache r/w</span></div>
+    <div class="card" title="Disk read / write operations since start"><b>{{.ReadOpsTotal}}/{{.WriteOpsTotal}}</b><span>I/O ops r/w</span></div>
+    <div class="card" title="Incoming peer connections since start"><b>{{.IncomingConns}}</b><span>incoming</span></div>
   </div>
 {{end}}{{define "live"}}
 
@@ -1457,6 +1462,9 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		GexttoLog:      d.opts.GexttoLog != "",
 		CacheReadMB:    stats.CacheReadMB,
 		CacheWB:        stats.CacheWriteMB,
+		ReadOpsTotal:   stats.Session["read_ops_total"],
+		WriteOpsTotal:  stats.Session["write_ops_total"],
+		IncomingConns:  stats.Session["peers_incoming_tcp"] + stats.Session["peers_incoming_utp"],
 		LSDPeers:       stats.LSD.PeersFound,
 		DiskFree:       stats.DiskFreeBytes,
 		DiskTotal:      stats.DiskTotalBytes,

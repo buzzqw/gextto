@@ -87,12 +87,19 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | RAM disk | yes | yes | — |
 | Fast resume | yes | yes | — |
 | Per-piece diagnostics | yes | — | — |
-| Session stats | partial | yes | partial |
+| Session stats | yes | yes | partial |
 | Session sync | yes | — | yes |
 | IP filter | yes | yes | partial |
 | Web seeds | yes | yes | partial |
 | Holepunching (BEP 55) | yes | — | — |
 <!-- capability-matrix:end -->
+
+The active engine's statistics — torrents by state, speed and queue slots,
+port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming
+connections** and **disk I/O** (queue, read/write totals) with session totals —
+are in the **Health → Torrent engine** panel (`/?view=health`); the same
+counters are in the daemon's `GET /api/v1/stats` and in
+`GET /api/libtorrent/session-stats`.
 
 ## Resource footprint
 
