@@ -32,7 +32,9 @@
 # router si possono tarare. Vedi docs/gx-torrent.md, sezione Holepunching.
 set -euo pipefail
 
-BIN="${PWD}/bin/gx-torrent"
+# Anchor relative paths to the repository root, not the caller's directory.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="${ROOT}/bin/gx-torrent"
 SIZE_MIB=4
 KEEP=0
 TRACKER_PORT=13800
