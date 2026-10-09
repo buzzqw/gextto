@@ -52,6 +52,21 @@ func TestV2SetupStepsRender(t *testing.T) {
 	}
 }
 
+func TestV2SetupPathsHaveFolderBrowser(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+	code, body := v2Request(t, server, http.MethodGet, "/?view=setup&step=2", nil)
+	if code != http.StatusOK {
+		t.Fatalf("step 2 -> %d", code)
+	}
+	for _, key := range []string{"archive_root", "libtorrent_dir", "libtorrent_temp_dir", "trash_path"} {
+		if !strings.Contains(body, `data-v2-browse-for="`+key+`"`) || !strings.Contains(body, `name="`+key+`"`) {
+			t.Fatalf("step 2: %s has no folder browser", key)
+		}
+	}
+}
+
 func TestV2SetupPathsCheckAndSave(t *testing.T) {
 	state := newTestAppState(t)
 	library := t.TempDir()

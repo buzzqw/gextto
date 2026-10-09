@@ -122,7 +122,8 @@ Gextto gira come un unico servizio. Apri la UI all'indirizzo `http://<host>:5000
 
 - Su un'installazione nuova la prima visita apre la **Configurazione iniziale**,
   in cinque passi: *Accesso* (password, con accesso libero dalla rete locale se
-  vuoi), *Cartelle* (libreria, download, temporanei e cestino; **Verifica**
+  vuoi), *Cartelle* (libreria, download, temporanei e cestino; **Sfoglia** apre
+  il selettore delle cartelle del server e può crearne di nuove; **Verifica**
   controlla con l'utente del servizio se ogni cartella esiste ed è scrivibile,
   il tipo di disco, NAS compreso, lo spazio libero e se sta sullo stesso disco
   della libreria), *Fonti* (un indexer Prowlarr/Jackett e la chiave TMDB),

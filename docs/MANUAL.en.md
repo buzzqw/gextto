@@ -121,10 +121,11 @@ Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
 
 - On a new installation the first visit opens the **Initial setup**, in five
   steps: *Access* (a password, optionally with open access from the local
-  network), *Folders* (library, downloads, temporary files and trash; **Check**
-  tests as the service user whether each folder exists and is writable, the
-  disk type including NAS mounts, the free space and whether it is on the same
-  disk as the library), *Sources* (a Prowlarr/Jackett indexer and the TMDB key),
+  network), *Folders* (library, downloads, temporary files and trash; **Browse**
+  opens the server folder picker, which can also create folders; **Check** tests
+  as the service user whether each folder exists and is writable, the disk type
+  including NAS mounts, the free space and whether it is on the same disk as the
+  library), *Sources* (a Prowlarr/Jackett indexer and the TMDB key),
   *First title* (the TMDB search with its add button) and *Start* (automatic
   cycle and leaving test mode). It can be skipped and reopened at any time from
   `/?view=setup`; an installation that already has series, movies or an archive

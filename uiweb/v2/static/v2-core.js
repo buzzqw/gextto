@@ -955,7 +955,13 @@
     var browse = event.target.closest && event.target.closest("[data-v2-browse-for]");
     if (browse) {
       var scope = browse.closest("form") || browse.closest(".setting-row");
-      var input = scope && (scope.querySelector("[data-v2-browse-input]") || scope.querySelector('[name="value"]'));
+      var key = browse.getAttribute("data-v2-browse-for");
+      var input = scope && (
+        (key && scope.querySelector('[data-v2-browse-input][name="' + key + '"]')) ||
+        (key && scope.querySelector('[name="' + key + '"]')) ||
+        scope.querySelector("[data-v2-browse-input]") ||
+        scope.querySelector('[name="value"]')
+      );
       if (input) openFolderBrowser(input);
       return;
     }

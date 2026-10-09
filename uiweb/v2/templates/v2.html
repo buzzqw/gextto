@@ -1571,7 +1571,7 @@
       <form method="post" action="/setup/paths" class="v2-setup-form">
         {{range .Paths}}
         <div class="v2-setup-path">
-          <label><span>{{.Label}}</span><input class="input" name="{{.Key}}" id="v2-setup-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" spellcheck="false" /></label>
+          <label><span>{{.Label}}</span><span class="field-row"><input class="input" name="{{.Key}}" id="v2-setup-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" spellcheck="false" data-v2-browse-input /><button class="btn sm" type="button" data-v2-browse-for="{{.Key}}" title="Sfoglia le cartelle disponibili sul server">Sfoglia</button></span></label>
           <small class="hint">{{.Hint}}</small>
           {{if .Checked}}<div class="v2-setup-check">
             {{if .Problem}}<span class="badge err">Problema</span> <span>{{.Problem}}</span>
