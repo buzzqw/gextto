@@ -503,6 +503,13 @@ func (e *Engine) scrapeFeed(ctx context.Context, cfg *Config, rawURL string, max
 		}
 		return items
 	}
+	// Cancellation of the whole cycle (shutdown, stopped search) belongs to
+	// the search lifecycle, not to the feed: do not put the provider in
+	// backoff or emit a warning, as searchOneWithDB does for indexers.
+	if ctx.Err() != nil {
+		logging.Debug("feed fetch stopped with the cycle context", "feed", feed, "reason", err)
+		return nil
+	}
 	message := utils.RedactURLSecrets(err.Error())
 	if errors.Is(err, context.DeadlineExceeded) {
 		message = fmt.Sprintf("feed exceeded the %ds total time budget", int(feedFetchBudget.Seconds()))
