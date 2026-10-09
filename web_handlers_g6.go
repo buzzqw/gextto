@@ -582,11 +582,7 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	requested := strings.TrimSpace(queryParam(r, "path"))
 	if requested == "" {
-		if home := os.Getenv("HOME"); home != "" {
-			requested = home
-		} else {
-			requested = "/"
-		}
+		requested = gh6_browseDefaultPath()
 	}
 	absolute, err := filepath.Abs(requested)
 	if err != nil {
@@ -595,15 +591,27 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	canonical, err := filepath.EvalSymlinks(absolute)
 	if err != nil {
-		jsonError(w, http.StatusNotFound, err.Error())
-		return
+		// The path may not exist yet (the setup wizard offers folders that are
+		// created on save, and a magnet download can name a still-missing
+		// folder): open the nearest existing ancestor so the picker stays
+		// navigable instead of failing and stranding the user.
+		canonical = gh6_nearestDir(absolute)
+		if canonical == "" {
+			jsonError(w, http.StatusNotFound, err.Error())
+			return
+		}
+	} else if info, statErr := os.Stat(canonical); statErr != nil || !info.IsDir() {
+		canonical = filepath.Dir(canonical)
 	}
-	if !gh6_isDir(canonical) {
-		jsonError(w, http.StatusBadRequest, "not a directory")
-		return
-	}
+
 	dirs := []string{}
-	if entries, err := os.ReadDir(canonical); err == nil {
+	message := ""
+	entries, err := os.ReadDir(canonical)
+	if err != nil {
+		// An unreadable directory (permissions of the service user) still has
+		// to keep the picker usable: report the reason but let it go back up.
+		message = err.Error()
+	} else {
 		for _, entry := range entries {
 			child := filepath.Join(canonical, entry.Name())
 			if gh6_isDir(child) {
@@ -616,12 +624,44 @@ func BrowseDir(w http.ResponseWriter, r *http.Request, s *AppState) {
 	if canonical != "/" {
 		parent = filepath.Dir(canonical)
 	}
-	jsonResponse(w, map[string]any{
+	response := map[string]any{
 		"ok":     true,
 		"path":   canonical,
 		"parent": parent,
 		"dirs":   dirs,
-	})
+	}
+	if message != "" {
+		response["error"] = message
+	}
+	jsonResponse(w, response)
+}
+
+// gh6_browseDefaultPath is where the folder picker starts with no path: the
+// service user's home when it is usable, otherwise the root.
+func gh6_browseDefaultPath() string {
+	if home := os.Getenv("HOME"); home != "" && gh6_isDir(home) {
+		return home
+	}
+	return "/"
+}
+
+// gh6_nearestDir returns the closest existing directory at or above path, or ""
+// when there is none. A hit that is not a directory resolves to its parent.
+func gh6_nearestDir(path string) string {
+	for current := path; ; {
+		if info, err := os.Stat(current); err == nil {
+			if info.IsDir() {
+				return current
+			}
+			current = filepath.Dir(current)
+			continue
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+		current = parent
+	}
 }
 
 // ComicCheckLinks implements `comic_check_links`.

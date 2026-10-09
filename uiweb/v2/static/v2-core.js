@@ -541,6 +541,8 @@
         overlay._parent = data.parent || "";
         path.value = overlay._current;
         list.textContent = "";
+        var message = overlay.querySelector("[data-v2-browse-message]");
+        if (message) message.textContent = data.error || "";
         var dirs = data.dirs || [];
         if (!dirs.length) { list.textContent = "Nessuna sottocartella."; return; }
         dirs.forEach(function (dir) {
