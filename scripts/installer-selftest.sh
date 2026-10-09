@@ -114,6 +114,16 @@ check_install() {
     --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --local-archive is honoured" 0 "use local payload"
 
+  capture bash "$INSTALL" --dry-run --libtorrent --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: --libtorrent selects the libtorrent build" 0 "-libtorrent.tar.gz"
+
+  capture bash "$INSTALL" --dry-run --gx-torrent --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: --gx-torrent selects the gx-torrent build" 0 "build: gx-torrent only"
+  if contains "-libtorrent.tar.gz"; then fail "$label: --gx-torrent avoids the libtorrent build"; else pass "$label: --gx-torrent avoids the libtorrent build"; fi
+
+  LAST_OUT="$(GEXTTO_LIBTORRENT=yes bash "$INSTALL" --dry-run --data-dir "$TMP/data" --install-dir "$TMP/opt" 2>&1)"; LAST_CODE=$?
+  expect "$label: invalid GEXTTO_LIBTORRENT is rejected" 1 "must be 0 or 1"
+
   capture bash "$INSTALL" --dry-run --version latest --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --version latest selects the latest release" 0 "releases/latest/download"
 

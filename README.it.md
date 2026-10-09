@@ -73,9 +73,10 @@ Gextto lo pilota via Web API.
 **libtorrent** è una terza scelta che esiste **solo se compili Gextto con
 libtorrent** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): il motore gira
 allora nello stesso processo di Gextto ed è anche il fallback automatico se
-gx-torrent non riesce a restare attivo. I pacchetti di release e `make build` non
-lo includono, e senza di esso l'opzione non compare nella tendina *Motore
-torrent*. Un crash del motore coinvolge anche Gextto.
+gx-torrent non riesce a restare attivo. `make build` e il pacchetto di release
+predefinito non lo includono; l'installer chiede quale build installare e propone
+anche quella con libtorrent (`--libtorrent` per sceglierla senza domanda). Senza
+di esso l'opzione non compare nella tendina *Motore torrent*. Un crash del motore coinvolge anche Gextto.
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|

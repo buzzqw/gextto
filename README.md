@@ -71,8 +71,10 @@ its UI: Gextto drives it through its Web API.
 **libtorrent** is a third choice that exists **only if you build Gextto with
 it** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): the engine then runs inside
 Gextto's own process and also acts as the automatic fallback if gx-torrent cannot
-stay up. Release packages and `make build` do not include it, and without it the
-option does not appear in the *Torrent engine* drop-down. An engine crash also
+stay up. `make build` and the default release package do not include it; the
+installer asks which build to install and offers the one with libtorrent too
+(`--libtorrent` to choose it without the question). Without it the option does
+not appear in the *Torrent engine* drop-down. An engine crash also
 takes Gextto down.
 
 | Engine | Where it runs | When to pick it |

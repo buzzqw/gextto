@@ -19,6 +19,9 @@
 # GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
 # GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
 # GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS, GEXTTO_LIBTORRENT.
+#
+# Without --gx-torrent/--libtorrent the installer asks on the terminal which
+# build to install: gx-torrent only, or with the embedded libtorrent engine too.
 set -euo pipefail
 
 INSTALL_DIR="${GEXTTO_INSTALL_DIR:-/opt/gextto}"
@@ -35,7 +38,10 @@ SERVICE_USER="${GEXTTO_USER:-}"
 SERVICE_GROUP="${GEXTTO_GROUP:-}"
 REPO="${GEXTTO_REPO:-buzzqw/gextto}"
 RELEASE="${GEXTTO_RELEASE:-continuous}"
-LIBTORRENT="${GEXTTO_LIBTORRENT:-0}"
+# Payload variant: 0 = gx-torrent only, 1 = also the embedded libtorrent
+# engine. Empty means "not chosen": the installer asks on a terminal, otherwise
+# keeps the variant already installed (gx-torrent only on a fresh install).
+LIBTORRENT="${GEXTTO_LIBTORRENT:-}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
 NO_START="${GEXTTO_NO_START:-0}"
 HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
@@ -119,15 +125,22 @@ Options:
       --media-group G     add the service user to group G (repeatable or
                           comma-separated), e.g. the group that owns the NAS
                           media folders
-      --libtorrent        install the build with the embedded libtorrent engine
-                          (gextto-linux-<arch>-libtorrent.tar.gz)
+      --gx-torrent        install the build with the gx-torrent engine only
+                          (gextto-linux-<arch>.tar.gz); skips the question
+      --libtorrent        install the build that also embeds the libtorrent
+                          engine (gextto-linux-<arch>-libtorrent.tar.gz);
+                          skips the question
       --local-archive F   install from a local .tar.gz instead of downloading us
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
 GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_GROUP, GEXTTO_INSTALL_DIR, GEXTTO_REPO,
 GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE,
 GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT,
-GEXTTO_MEDIA_GROUPS.
+GEXTTO_MEDIA_GROUPS, GEXTTO_LIBTORRENT (0 or 1).
+
+Without --gx-torrent/--libtorrent the installer asks which build to install
+when run from a terminal; otherwise it keeps the build already installed
+(gx-torrent only on a fresh install).
 EOF
 }
 
@@ -147,6 +160,7 @@ parse_args() {
       --install-dir) INSTALL_DIR="${2:-}"; [[ -n "$INSTALL_DIR" ]] || die "--install-dir requires a value"; shift 2 ;;
       --user) SERVICE_USER="${2:-}"; [[ -n "$SERVICE_USER" ]] || die "--user requires a value"; shift 2 ;;
       --media-group) [[ -n "${2:-}" ]] || die "--media-group requires a value"; MEDIA_GROUPS="${MEDIA_GROUPS:+$MEDIA_GROUPS,}$2"; shift 2 ;;
+      --gx-torrent) LIBTORRENT=0; shift ;;
       --libtorrent) LIBTORRENT=1; shift ;;
       --local-archive) LOCAL_ARCHIVE="${2:-}"; [[ -n "$LOCAL_ARCHIVE" ]] || die "--local-archive requires a value"; shift 2 ;;
       *) die "unknown option: $1 (use --help)" ;;
@@ -216,6 +230,57 @@ install_packages() {
   else
     warn "unknown distribution: install curl, tar, sha256sum, OpenSSL and zstd manually"
   fi
+}
+
+# installed_variant prints 1 when the program already in INSTALL_DIR embeds
+# libtorrent (its --version names it), 0 otherwise or on a fresh install.
+installed_variant() {
+  local binary="$INSTALL_DIR/gexttod" output
+  if [[ -x "$binary" ]] \
+    && output="$(LD_LIBRARY_PATH="$INSTALL_DIR/lib" "$binary" --version 2>/dev/null)" \
+    && [[ "$output" == *libtorrent* ]]; then
+    printf '1'
+  else
+    printf '0'
+  fi
+}
+
+# choose_variant settles LIBTORRENT. An explicit flag or GEXTTO_LIBTORRENT
+# wins; otherwise the installer asks on the terminal (it reads /dev/tty, so it
+# works with `curl ... | sudo bash` too), proposing the variant already
+# installed. Without a terminal, and in --dry-run, it keeps that default.
+choose_variant() {
+  case "$LIBTORRENT" in
+    0|1) return 0 ;;
+    "") ;;
+    *) die "GEXTTO_LIBTORRENT must be 0 or 1 (got: $LIBTORRENT)" ;;
+  esac
+  local current; current="$(installed_variant)"
+  LIBTORRENT="$current"
+  # A local archive already is the chosen build: nothing to download.
+  [[ -n "$LOCAL_ARCHIVE" || "$DRY_RUN" == "1" ]] && return 0
+  [[ -t 2 ]] && { : </dev/tty; } 2>/dev/null || return 0
+
+  local default_choice=1 answer
+  [[ "$current" == "1" ]] && default_choice=2
+  {
+    printf '\n\033[1mWhich Gextto build do you want to install?\033[0m\n'
+    printf '  1) gx-torrent only (recommended): smaller, pure Go torrent engine\n'
+    printf '  2) gx-torrent + libtorrent: also embeds the libtorrent engine, selectable\n'
+    printf '     in Settings (bigger, needs OpenSSL 3 and libstdc++ on the system)\n'
+    [[ "$current" == "1" ]] && printf '  (the installed build includes libtorrent)\n'
+  } >&2
+  while true; do
+    printf 'Choice [%s]: ' "$default_choice" >&2
+    IFS= read -r answer </dev/tty || answer=""
+    answer="${answer:-$default_choice}"
+    case "$answer" in
+      1) LIBTORRENT=0; break ;;
+      2) LIBTORRENT=1; break ;;
+      *) printf 'Please answer 1 or 2.\n' >&2 ;;
+    esac
+  done
+  printf '\n' >&2
 }
 
 # payload_asset resolves the published asset name for the current or requested
@@ -626,6 +691,12 @@ main() {
   preflight
   install_packages
   require_download_tools
+  choose_variant
+  if [[ "$LIBTORRENT" == "1" ]]; then
+    log "build: gx-torrent + embedded libtorrent"
+  else
+    log "build: gx-torrent only"
+  fi
 
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "$WORK_DIR"' EXIT
