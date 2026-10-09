@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -520,6 +521,7 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 		return nil, err
 	}
 	normalized := NormalizeSeriesName(series)
+	aliases := seriesAliases(cfg, series)
 	preferred := cfg.DefaultLanguage()
 	var removed []string
 	files, err := VideoFiles(archivePath)
@@ -540,14 +542,14 @@ func cleanupOldEpisode(cfg *Config, series string, season, episode, newScore int
 		if captures != nil {
 			if cleanerEpisodeMatches(pattern, captures, season, episode) {
 				fileSeries := cleanerCapture(pattern, captures, "name")
-				if SeriesNamesMatch(normalized, fileSeries) {
+				if seriesNameMatchesAny(normalized, aliases, fileSeries) {
 					epMatched = true
 				}
 			}
 		}
 		if !epMatched {
 			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
-			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
+			if ok && idSeason == season && idEpisode == episode && seriesNameMatchesAny(normalized, aliases, idSeries) {
 				epMatched = true
 			}
 		}
@@ -597,6 +599,10 @@ type DuplicateCandidate struct {
 	Path           string `json:"path"`
 	ResolutionRank int    `json:"resolution_rank"`
 	BestRank       int    `json:"best_rank"`
+	// Reason is why the file is inferior: "resolution", "language", "quality"
+	// (same resolution, the best copy would be an upgrade) or "identical" (a
+	// second copy of the same file under another name).
+	Reason string `json:"reason,omitempty"`
 }
 
 // inferiorGroupKey groups files by (directory, season, episode).
@@ -616,7 +622,19 @@ type inferiorFile struct {
 // per episode inside a series folder. It is deliberately conservative: files at
 // the same resolution (e.g. different languages) and files with an unrecognised
 // resolution are never reported.
-func FindInferiorDuplicatesInDir(series, archivePath string, protected map[string]struct{}, preferredLanguage string) ([]DuplicateCandidate, error) {
+func FindInferiorDuplicatesInDir(series, archivePath string, protected map[string]struct{}, preferredLanguage string, aliases ...string) ([]DuplicateCandidate, error) {
+	return findInferiorDuplicates(nil, series, aliases, archivePath, protected, preferredLanguage)
+}
+
+// FindSeriesDuplicatesInDir is FindInferiorDuplicatesInDir for a configured
+// series: files named after one of its aliases count too, and copies at the
+// same resolution are compared by quality, so an older or identical copy kept
+// next to a better one is found as well.
+func FindSeriesDuplicatesInDir(cfg *Config, series, archivePath string, protected map[string]struct{}) ([]DuplicateCandidate, error) {
+	return findInferiorDuplicates(cfg, series, seriesAliases(cfg, series), archivePath, protected, cfg.DefaultLanguage())
+}
+
+func findInferiorDuplicates(cfg *Config, series string, aliases []string, archivePath string, protected map[string]struct{}, preferredLanguage string) ([]DuplicateCandidate, error) {
 	if !localPath(archivePath) {
 		return nil, nil
 	}
@@ -653,7 +671,7 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 		captures := pattern.FindStringSubmatch(name)
 		if captures != nil {
 			fileSeries := cleanerCapture(pattern, captures, "name")
-			if fileSeries != "" && SeriesNamesMatch(normalized, fileSeries) {
+			if fileSeries != "" && seriesNameMatchesAny(normalized, aliases, fileSeries) {
 				seasonRaw := cleanerCapture(pattern, captures, "s", "ns")
 				episodeRaw := cleanerCapture(pattern, captures, "e")
 				if seasonRaw != "" && episodeRaw != "" {
@@ -669,7 +687,7 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 		}
 		if !matched {
 			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
-			if ok && SeriesNamesMatch(normalized, idSeries) {
+			if ok && seriesNameMatchesAny(normalized, aliases, idSeries) {
 				season = idSeason
 				episode = idEpisode
 				matched = true
@@ -710,6 +728,7 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 				}
 			}
 		}
+		var sameResolution []string
 		for _, item := range grouped {
 			rank := item.rank
 			file := item.path
@@ -717,6 +736,10 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 			lowerResolution := rank > 0 && rank < best
 			wrongLanguage := bestHasPreferred && rank == best && languageMatchFor(name, preferredLanguage) == languageOther
 			if lowerResolution || wrongLanguage {
+				reason := "resolution"
+				if !lowerResolution {
+					reason = "language"
+				}
 				candidates = append(candidates, DuplicateCandidate{
 					Series:         series,
 					Season:         key.season,
@@ -724,11 +747,175 @@ func FindInferiorDuplicatesInDir(series, archivePath string, protected map[strin
 					Path:           file,
 					ResolutionRank: rank,
 					BestRank:       best,
+					Reason:         reason,
+				})
+			} else if rank == best {
+				sameResolution = append(sameResolution, file)
+			}
+		}
+		if cfg != nil {
+			for _, file := range sameResolutionInferior(cfg, sameResolution, preferredLanguage) {
+				candidates = append(candidates, DuplicateCandidate{
+					Series:         series,
+					Season:         key.season,
+					Episode:        key.episode,
+					Path:           file.path,
+					ResolutionRank: best,
+					BestRank:       best,
+					Reason:         file.reason,
 				})
 			}
 		}
 	}
 	return candidates, nil
+}
+
+// inferiorCopy is a same-resolution copy to drop and why.
+type inferiorCopy struct {
+	path   string
+	reason string
+}
+
+// sameResolutionInferior picks, among copies of one episode at the same
+// resolution, the ones to drop: those the best copy would replace by the same
+// rules as a download upgrade, and second copies of the same file (same size)
+// that only differ by name. A copy that would be an upgrade over the best one in
+// some respect (HDR, remux, ...) is always kept, and so is a copy in the
+// preferred language when the best one does not declare it.
+func sameResolutionInferior(cfg *Config, files []string, preferredLanguage string) []inferiorCopy {
+	if len(files) < 2 {
+		return nil
+	}
+	type scored struct {
+		path    string
+		quality models.Quality
+		score   int64
+		size    int64
+	}
+	items := make([]scored, 0, len(files))
+	for _, file := range files {
+		name, _ := cleanerName(file)
+		size, _ := SizeOfPath(file)
+		items = append(items, scored{path: file, quality: ParseQuality(name), score: cfg.FileScore(file, "series", ""), size: size})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].score != items[j].score {
+			return items[i].score > items[j].score
+		}
+		if items[i].size != items[j].size {
+			return items[i].size > items[j].size
+		}
+		return items[i].path < items[j].path
+	})
+	top := items[0]
+	topPreferred := languageMatchFor(filepath.Base(top.path), preferredLanguage) == languagePreferred
+	var inferior []inferiorCopy
+	for _, item := range items[1:] {
+		if item.quality.UpgradeReason(&top.quality, item.score, top.score, cfg.CleanupMinScoreDiff) != "" {
+			continue
+		}
+		if !topPreferred && languageMatchFor(filepath.Base(item.path), preferredLanguage) == languagePreferred {
+			continue
+		}
+		switch {
+		case top.quality.UpgradeReason(&item.quality, top.score, item.score, cfg.CleanupMinScoreDiff) != "":
+			inferior = append(inferior, inferiorCopy{item.path, "quality"})
+		case item.size > 0 && item.size == top.size:
+			inferior = append(inferior, inferiorCopy{item.path, "identical"})
+		}
+	}
+	return inferior
+}
+
+// seriesAliases returns the aliases of a configured series, so a file named
+// after one of them (often the long title of the release) is recognised as the
+// series. An exact name wins over the tolerant match.
+func seriesAliases(cfg *Config, series string) []string {
+	if cfg == nil {
+		return nil
+	}
+	normalized := NormalizeSeriesName(series)
+	for index := range cfg.Series {
+		if NormalizeSeriesName(cfg.Series[index].Name) == normalized {
+			return cfg.Series[index].Aliases
+		}
+	}
+	if found := cfg.FindSeriesByName(series); found != nil {
+		return found.Aliases
+	}
+	return nil
+}
+
+// seriesNameMatchesAny reports whether fileSeries names the series or one of
+// its aliases.
+func seriesNameMatchesAny(series string, aliases []string, fileSeries string) bool {
+	if SeriesNamesMatch(series, fileSeries) {
+		return true
+	}
+	for _, alias := range aliases {
+		if strings.TrimSpace(alias) != "" && SeriesNamesMatch(alias, fileSeries) {
+			return true
+		}
+	}
+	return false
+}
+
+// orphanThumbPattern matches a media-server thumbnail: "<video stem>-thumb.<ext>".
+var orphanThumbPattern = regexp.MustCompile(`(?i)^(.+)-thumb\.(jpe?g|png|webp)$`)
+
+// CleanupOrphanThumbs removes, below a series folder, the thumbnails whose
+// video no longer exists next to them (renamed or discarded): media servers
+// recreate them for the current files. Other sidecars are left alone.
+func CleanupOrphanThumbs(cfg *Config, archivePath string) (int, error) {
+	if !localPath(archivePath) {
+		return 0, nil
+	}
+	if info, err := os.Stat(archivePath); err != nil || !info.IsDir() {
+		return 0, nil
+	}
+	// Video stems per folder, read once: matching the entries covers any case
+	// of the extension (.mkv, .MKV).
+	stems := map[string]map[string]bool{}
+	videoStems := func(directory string) map[string]bool {
+		if found, ok := stems[directory]; ok {
+			return found
+		}
+		found := map[string]bool{}
+		if entries, err := os.ReadDir(directory); err == nil {
+			for _, entry := range entries {
+				if !entry.IsDir() && isVideoExtension(entry.Name()) {
+					found[strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))] = true
+				}
+			}
+		}
+		stems[directory] = found
+		return found
+	}
+	removed := 0
+	err := filepath.WalkDir(archivePath, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if path != archivePath && (strings.HasPrefix(entry.Name(), ".") || strings.HasPrefix(entry.Name(), "@")) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		match := orphanThumbPattern.FindStringSubmatch(entry.Name())
+		if match == nil {
+			return nil
+		}
+		if videoStems(filepath.Dir(path))[match[1]] {
+			return nil
+		}
+		if err := trashOrRemove(path, cfg); err != nil {
+			return err
+		}
+		removed++
+		return nil
+	})
+	return removed, err
 }
 
 // CleanupInferiorDuplicatesInDir moves the inferior duplicates found by
@@ -737,8 +924,7 @@ func CleanupInferiorDuplicatesInDir(cfg *Config, series, archivePath string, pro
 	if !cfg.CleanupUpgrades {
 		return 0, nil
 	}
-	preferred := cfg.DefaultLanguage()
-	candidates, err := FindInferiorDuplicatesInDir(series, archivePath, protected, preferred)
+	candidates, err := FindSeriesDuplicatesInDir(cfg, series, archivePath, protected)
 	if err != nil {
 		return 0, err
 	}
@@ -753,8 +939,17 @@ func CleanupInferiorDuplicatesInDir(cfg *Config, series, archivePath string, pro
 		if cfg.CleanupAction == "delete" {
 			action = "deleted"
 		}
-		logging.Info(fmt.Sprintf("🗑️ %s S%02dE%02d: «%s» %s — a higher-resolution copy of the same episode is in the library",
-			candidate.Series, candidate.Season, candidate.Episode, filepath.Base(candidate.Path), action))
+		why := "a higher-resolution copy of the same episode is in the library"
+		switch candidate.Reason {
+		case "language":
+			why = "a copy of the same episode in the preferred language is in the library"
+		case "quality":
+			why = "a better copy of the same episode is in the library"
+		case "identical":
+			why = "it is a second copy of a file already in the library"
+		}
+		logging.Info(fmt.Sprintf("🗑️ %s S%02dE%02d: «%s» %s — %s",
+			candidate.Series, candidate.Season, candidate.Episode, filepath.Base(candidate.Path), action, why))
 		logging.Debug(
 			"inferior duplicate removed",
 			"series", candidate.Series,
@@ -763,6 +958,7 @@ func CleanupInferiorDuplicatesInDir(cfg *Config, series, archivePath string, pro
 			"file", candidate.Path,
 			"rank", candidate.ResolutionRank,
 			"best", candidate.BestRank,
+			"reason", candidate.Reason,
 		)
 	}
 	return removed, nil
@@ -798,6 +994,7 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 		return false, err
 	}
 	normalized := NormalizeSeriesName(series)
+	aliases := seriesAliases(cfg, series)
 	preferred := cfg.DefaultLanguage()
 	files, err := VideoFiles(archivePath)
 	if err != nil {
@@ -817,14 +1014,14 @@ func discardIfInferiorWithQuality(cfg *Config, series string, season, episode, n
 		if captures != nil {
 			if cleanerEpisodeMatches(pattern, captures, season, episode) {
 				fileSeries := cleanerCapture(pattern, captures, "name")
-				if SeriesNamesMatch(normalized, fileSeries) {
+				if seriesNameMatchesAny(normalized, aliases, fileSeries) {
 					epMatched = true
 				}
 			}
 		}
 		if !epMatched {
 			idSeries, idSeason, idEpisode, ok := extractEpisodeIdentityFromPath(file, name)
-			if ok && idSeason == season && idEpisode == episode && SeriesNamesMatch(normalized, idSeries) {
+			if ok && idSeason == season && idEpisode == episode && seriesNameMatchesAny(normalized, aliases, idSeries) {
 				epMatched = true
 			}
 		}

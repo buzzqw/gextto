@@ -302,14 +302,120 @@ func TestFindsAndTrashesOnlyLowerResolutionDuplicates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cleanup duplicates: %v", err)
 	}
-	assertEqual(t, removed, 1)
+	// Il 480p (risoluzione) e, a pari 1080p, l'h264 che l'h265 sostituirebbe
+	// come aggiornamento (stesse regole del download).
+	assertEqual(t, removed, 2)
 	if _, err := os.Stat(old); !os.IsNotExist(err) {
 		t.Fatalf("il 480p deve essere rimosso")
 	}
 	assertTrue(t, cleanerFileExists(hd), "il 1080p resta")
-	// Le due versioni 1080p senza lingua restano entrambe.
-	assertTrue(t, cleanerFileExists(s2a), "il primo 1080p resta")
-	assertTrue(t, cleanerFileExists(s2b), "il secondo 1080p resta")
+	assertTrue(t, !cleanerFileExists(s2a), "l'h264 a pari risoluzione va nel cestino")
+	assertTrue(t, cleanerFileExists(s2b), "l'h265 resta")
+}
+
+// TestSeriesDuplicatesUseAliasesAndQuality riproduce Marshals: file con il
+// titolo lungo della release (alias), una copia h264 accanto alla WEB-DL h265 e
+// due copie identiche che differiscono solo nel nome.
+func TestSeriesDuplicatesUseAliasesAndQuality(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "Marshals")
+	trash := filepath.Join(root, "trash")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	uhd := filepath.Join(archive, "Marshals - S01E01 - Piya Wiconi - [2160p][h265][EAC3 5.1][IT+EN].mkv")
+	rawHD := filepath.Join(archive, "Marshals.A.Yellowstone.Story.S01E01.Piya.Wiconi.1080p.AMZN.WEB-DL.ITA.ENG.DDP5.1.H.265-G66.mkv")
+	webdl := filepath.Join(archive, "Marshals - S01E11 - Sul Ghiaccio Sottile - [WEB-DL][1080p][h265][EAC3 5.1][IT+EN].mkv")
+	h264 := filepath.Join(archive, "Marshals - S01E11 - Sul Ghiaccio Sottile - [1080p][h264][EAC3 5.1][IT+EN].mkv")
+	named := filepath.Join(archive, "Marshals - S01E13 - I Lupi alle Porte - [WEB-DL][1080p][h265][EAC3 5.1][IT+EN].mkv")
+	copied := filepath.Join(archive, "Marshals - S01E13 - I Lupi alle Porte - [1080p][h265][EAC3 5.1][IT+EN].mkv")
+	for _, file := range []string{uhd, rawHD, webdl, h264} {
+		cleanerWrite(t, file, filepath.Base(file))
+	}
+	cleanerWrite(t, named, "same bytes")
+	cleanerWrite(t, copied, "same bytes")
+
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	cfg.CleanupAction = "move"
+	cfg.TrashPath = &trash
+	cfg.Series = []SeriesConfig{{Name: "Marshals", Enabled: true, Aliases: []string{"Marshals A Yellowstone Story"}}}
+
+	candidates, err := FindSeriesDuplicatesInDir(&cfg, "Marshals", archive, map[string]struct{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reasons := map[string]string{}
+	for _, candidate := range candidates {
+		reasons[candidate.Path] = candidate.Reason
+	}
+	assertEqual(t, len(reasons), 3)
+	assertEqual(t, reasons[rawHD], "resolution")
+	assertEqual(t, reasons[h264], "quality")
+	assertEqual(t, reasons[copied], "identical")
+
+	// Senza configurazione restano le regole di prima: l'alias non è noto.
+	plain, err := FindInferiorDuplicatesInDir("Marshals", archive, map[string]struct{}{}, "ita")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, len(plain), 0)
+}
+
+// TestSameResolutionKeepsPreferredLanguage: a pari risoluzione non si scarta la
+// copia nella lingua preferita a favore di una senza lingua dichiarata.
+func TestSameResolutionKeepsPreferredLanguage(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "Example")
+	if err := os.MkdirAll(archive, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ita := filepath.Join(archive, "Example - S01E01 - Pilot - [1080p][h264][EAC3][IT].mkv")
+	untagged := filepath.Join(archive, "Example - S01E01 - Pilot - [WEB-DL][1080p][h265][EAC3 5.1].mkv")
+	cleanerWrite(t, ita, "ita")
+	cleanerWrite(t, untagged, "untagged")
+	cfg := DefaultConfig()
+	cfg.CleanupUpgrades = true
+	candidates, err := FindSeriesDuplicatesInDir(&cfg, "Example", archive, map[string]struct{}{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range candidates {
+		if candidate.Path == ita {
+			t.Fatalf("la copia ITA non deve essere scartata: %+v", candidate)
+		}
+	}
+}
+
+// TestCleanupOrphanThumbs: via le miniature senza video, restano quelle con il
+// video (anche con estensione maiuscola) e le cartelle di sistema.
+func TestCleanupOrphanThumbs(t *testing.T) {
+	root := t.TempDir()
+	archive := filepath.Join(root, "Example")
+	trash := filepath.Join(root, "trash")
+	system := filepath.Join(archive, "@eaDir")
+	if err := os.MkdirAll(system, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cleanerWrite(t, filepath.Join(archive, "Example - S01E01.MKV"), "video")
+	kept := filepath.Join(archive, "Example - S01E01-thumb.jpg")
+	orphan := filepath.Join(archive, "Example.S01E01.1080p.WEB-DL-thumb.jpg")
+	untouched := filepath.Join(system, "orphan-thumb.jpg")
+	poster := filepath.Join(archive, "season01-poster.jpg")
+	for _, file := range []string{kept, orphan, untouched, poster} {
+		cleanerWrite(t, file, "img")
+	}
+	cfg := DefaultConfig()
+	cfg.CleanupAction = "move"
+	cfg.TrashPath = &trash
+	removed, err := CleanupOrphanThumbs(&cfg, archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertEqual(t, removed, 1)
+	assertTrue(t, !cleanerFileExists(orphan), "la miniatura orfana va nel cestino")
+	for _, file := range []string{kept, untouched, poster} {
+		assertTrue(t, cleanerFileExists(file), filepath.Base(file)+" resta")
+	}
 }
 
 func TestHardSourceUpgradeTrashesOldBelowScoreThreshold(t *testing.T) {

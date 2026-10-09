@@ -337,7 +337,6 @@ func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 	execute := input.Execute
 	cfg := latestConfig(s)
 	protected := gh2_protectedTorrentPaths(s.activeEngine())
-	preferred := cfg.DefaultLanguage()
 	candidates := []DuplicateCandidate{}
 	removed := 0
 	for index := range cfg.Series {
@@ -355,7 +354,7 @@ func CleanDuplicates(w http.ResponseWriter, r *http.Request, s *AppState) {
 				removed += count
 			}
 		} else {
-			found, err := FindInferiorDuplicatesInDir(series.Name, directory, protected, preferred)
+			found, err := FindSeriesDuplicatesInDir(cfg, series.Name, directory, protected)
 			if err != nil {
 				logging.Warn("duplicate scan failed", "series", series.Name, "error", err)
 			} else {

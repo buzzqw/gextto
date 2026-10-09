@@ -266,6 +266,18 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 		} else {
 			target, renameErr = PreviewEpisodeRename(ctx, path, &release, cfg, tmdb)
 		}
+		if errors.Is(renameErr, ErrInferiorDuplicate) {
+			// The library already holds a copy at least as good: the file went
+			// to the trash. That is a discarded duplicate, not a failure.
+			_, _ = DiscardSidecars(path, cfg)
+			items = append(items, map[string]any{
+				"season":    episode.Season,
+				"episode":   episode.Episode,
+				"from":      archivePath,
+				"discarded": true,
+			})
+			continue
+		}
 		if renameErr != nil {
 			logging.Warn("rename file failed", "series", series.Name, "season", episode.Season, "episode", episode.Episode, "error", renameErr)
 			items = append(items, map[string]any{
@@ -350,7 +362,7 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			if nameIndex >= 0 && nameIndex < len(captures) {
 				fileSeries = captures[nameIndex]
 			}
-			if fileSeries == "" || !SeriesNamesMatch(series.Name, fileSeries) {
+			if fileSeries == "" || !seriesNameMatchesAny(series.Name, series.Aliases, fileSeries) {
 				continue
 			}
 			seasonValue := ""
@@ -429,6 +441,16 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 				continue
 			}
 			target, err := RenameEpisode(ctx, file, &release, cfg, tmdb)
+			if errors.Is(err, ErrInferiorDuplicate) {
+				_, _ = DiscardSidecars(file, cfg)
+				items = append(items, map[string]any{
+					"season":    season,
+					"episode":   episodeNumber,
+					"from":      file,
+					"discarded": true,
+				})
+				continue
+			}
 			if err != nil {
 				// Never surface API keys embedded in URLs (e.g. TMDB) in logs.
 				redacted := utils.RedactURLSecrets(err.Error())
@@ -468,6 +490,12 @@ func seriesRenameApply(s *AppState, name string, execute, force, sourceOnly bool
 			duplicatesRemoved = removed
 		} else {
 			logging.Warn("duplicate cleanup failed", "series", series.Name, "error", err)
+		}
+		// Thumbnails left behind by files renamed or discarded above.
+		if removed, err := CleanupOrphanThumbs(cfg, resolvedArchive); err != nil {
+			logging.Warn("orphan thumbnail cleanup failed", "series", series.Name, "error", err)
+		} else if removed > 0 {
+			logging.Info(fmt.Sprintf("🗑️ %s: %d thumbnail(s) without their video removed", series.Name, removed))
 		}
 	}
 
