@@ -43,13 +43,31 @@ func TestCycleWarningReasonToleratesOneBadCycle(t *testing.T) {
 func TestCycleWarningReasonSourceStreak(t *testing.T) {
 	now := time.Now()
 	var cycles []models.CycleHistoryEntry
-	for i := 0; i < cycleSourceFailStreak; i++ {
+	for i := 0; i < cycleSourceFailCount; i++ {
 		cycles = append(cycles, testCycle(now.Add(-time.Duration(i)*time.Hour), 60, 1,
 			models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1, LastError: "timeout"}))
 	}
 	got := cycleWarningReason(cycles, 6*time.Hour, now)
-	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 cicli") {
-		t.Fatalf("source streak not reported: %q", got)
+	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 delle ultime 3") {
+		t.Fatalf("repeated source failures not reported: %q", got)
+	}
+}
+
+// TestCycleWarningReasonSourceFailsAcrossWindow checks the warning still fires
+// when the provider backoff skips the source on some cycles: failures are
+// counted across the window, not consecutively.
+func TestCycleWarningReasonSourceFailsAcrossWindow(t *testing.T) {
+	now := time.Now()
+	cycles := []models.CycleHistoryEntry{
+		testCycle(now.Add(-1*time.Hour), 60, 1, models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1}),
+		testCycle(now.Add(-2*time.Hour), 60, 0), // skipped (backoff): source absent
+		testCycle(now.Add(-3*time.Hour), 60, 1, models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1}),
+		testCycle(now.Add(-4*time.Hour), 60, 0), // skipped (backoff)
+		testCycle(now.Add(-5*time.Hour), 60, 1, models.CycleSourceStat{Kind: "feed", Name: "TGx", Fail: 1}),
+	}
+	got := cycleWarningReason(cycles, 6*time.Hour, now)
+	if !strings.Contains(got, "TGx") || !strings.Contains(got, "3 delle ultime 3") {
+		t.Fatalf("windowed source failures not reported: %q", got)
 	}
 }
 

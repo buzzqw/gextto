@@ -1031,10 +1031,10 @@ la pulizia degli altri.
   quante sorgenti non hanno risposto (il motivo compare passando il mouse sul
   numero). Serve a riconoscere una sorgente che fallisce ripetutamente o un ciclo
   diventato più lento. API: `GET /api/last_cycles`. Su questi stessi dati Gextto
-  avvisa da sé (riga WARN e notifica) se una sorgente non risponde da tre cicli,
-  se l'ultima ricerca ha impiegato più di tre ore o se non c'è una ricerca senza
-  errori da tre intervalli (minimo due ore); avvisa anche quando tutto torna
-  regolare.
+  avvisa da sé (riga WARN e notifica) se una sorgente ha fallito in tre delle
+  ultime ricerche, se l'ultima ricerca ha impiegato più di tre ore o se non c'è
+  una ricerca senza errori da tre intervalli (minimo due ore); avvisa anche
+  quando tutto torna regolare.
 - **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
   Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO messaggio
   · campo: valore`, con parole chiave evidenziate (NAS, download, sorgenti,

@@ -14,9 +14,9 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   (`cycle_history`), con il pannello **Ricerche** in *Salute* (`uiweb.go`,
   `RecentCycleStats`, `ScrapeAll`);
 - ~~avviso oltre una soglia~~ — fatto (2026-10-10): `cycle_monitor.go` avvisa
-  (riga WARN + notifica) se una sorgente fallisce 3 cicli di fila, se l'ultima
-  ricerca supera 3 ore o se non c'è un ciclo senza errori da 3 intervalli (minimo
-  2 ore), e segnala il ritorno alla normalità;
+  (riga WARN + notifica) se una sorgente ha fallito in 3 delle ultime ricerche,
+  se l'ultima ricerca supera 3 ore o se non c'è un ciclo senza errori da 3
+  intervalli (minimo 2 ore), e segnala il ritorno alla normalità;
 - restano: import falliti al giorno e titoli in coda con il tempo di attesa;
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`).
 

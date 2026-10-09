@@ -25,9 +25,11 @@ const (
 	cycleMonitorHeartbeat = time.Hour
 	// cycleMonitorHistory is how many recent cycles the warnings look at.
 	cycleMonitorHistory = 12
-	// cycleSourceFailStreak is how many consecutive cycles a single source must
-	// fail before it is worth a warning.
-	cycleSourceFailStreak = 3
+	// cycleSourceFailCount is how many times a single source may fail across the
+	// recent cycles before it is worth a warning. Counting across the window
+	// (not consecutive cycles) keeps the warning working when the provider
+	// backoff skips a source for a cycle.
+	cycleSourceFailCount = 3
 	// cycleSlowWarning is a cycle duration long enough to point at a runaway or
 	// very slow search (the default interval is six hours).
 	cycleSlowWarning = 3 * time.Hour
@@ -75,31 +77,38 @@ func cycleWarningReason(cycles []models.CycleHistoryEntry, interval time.Duratio
 	}
 	var problems []string
 
-	// A source that failed in the last cycleSourceFailStreak cycles in a row.
-	streaks := map[string]int{}
-	for _, source := range cycles[0].Sources {
-		if source.Fail == 0 {
-			continue
-		}
-		streak := 0
-		for _, cycle := range cycles {
-			stat, ok := cycleSource(cycle, source.Kind, source.Name)
-			if !ok || stat.Fail == 0 {
-				break
+	// A source that failed cycleSourceFailCount times across the recent cycles.
+	type sourceTally struct {
+		name     string
+		attempts int
+		failures int
+	}
+	tally := map[string]*sourceTally{}
+	for _, cycle := range cycles {
+		for _, source := range cycle.Sources {
+			key := source.Kind + "\x01" + source.Name
+			entry := tally[key]
+			if entry == nil {
+				entry = &sourceTally{name: source.Name}
+				tally[key] = entry
 			}
-			streak++
-		}
-		if streak >= cycleSourceFailStreak {
-			streaks[source.Name] = streak
+			entry.attempts++
+			if source.Fail > 0 {
+				entry.failures++
+			}
 		}
 	}
-	names := make([]string, 0, len(streaks))
-	for name := range streaks {
-		names = append(names, name)
+	keys := make([]string, 0, len(tally))
+	for key := range tally {
+		keys = append(keys, key)
 	}
-	sort.Strings(names)
-	for _, name := range names {
-		problems = append(problems, fmt.Sprintf("la sorgente %s non risponde da %d cicli", name, streaks[name]))
+	sort.Strings(keys)
+	for _, key := range keys {
+		entry := tally[key]
+		if entry.failures >= cycleSourceFailCount {
+			problems = append(problems, fmt.Sprintf("la sorgente %s ha fallito in %d delle ultime %d ricerche",
+				entry.name, entry.failures, entry.attempts))
+		}
 	}
 
 	// A single cycle that took far too long.
@@ -144,16 +153,6 @@ func cycleStaleThreshold(interval time.Duration) time.Duration {
 		threshold = cycleStaleFloor
 	}
 	return threshold
-}
-
-// cycleSource finds one source in a cycle by kind and name.
-func cycleSource(cycle models.CycleHistoryEntry, kind, name string) (models.CycleSourceStat, bool) {
-	for _, source := range cycle.Sources {
-		if source.Kind == kind && source.Name == name {
-			return source, true
-		}
-	}
-	return models.CycleSourceStat{}, false
 }
 
 // cycleTime is when a stored cycle ran: the row time (UTC), falling back to the
