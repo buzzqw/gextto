@@ -952,12 +952,17 @@ func uiTorrentBackendOptions(value string) []uiFormOption {
 		// Removed backend: at runtime it is normalised to the embedded engine.
 		value = BackendEmbedded
 	}
-	options := []uiFormOption{
-		{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded},
-		{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
-		{Value: BackendGxTorrent, Label: "gx-torrent (demone alternativo)", Selected: value == BackendGxTorrent},
+	options := []uiFormOption{}
+	// The embedded libtorrent engine only exists in a build compiled with it;
+	// when it is absent the option is not offered.
+	if LibtorrentCompiled() {
+		options = append(options, uiFormOption{Value: BackendEmbedded, Label: "libtorrent (integrato)", Selected: value == BackendEmbedded})
 	}
-	if value != BackendEmbedded && value != BackendQbittorrent && value != BackendGxTorrent {
+	options = append(options,
+		uiFormOption{Value: BackendQbittorrent, Label: uiBackendLabel(BackendQbittorrent), Selected: value == BackendQbittorrent},
+		uiFormOption{Value: BackendGxTorrent, Label: "gx-torrent (demone alternativo)", Selected: value == BackendGxTorrent},
+	)
+	if value != BackendQbittorrent && value != BackendGxTorrent && !(LibtorrentCompiled() && value == BackendEmbedded) {
 		options = append([]uiFormOption{{Value: value, Label: value + " (non valido)", Selected: true}}, options...)
 		for index := 1; index < len(options); index++ {
 			options[index].Selected = false

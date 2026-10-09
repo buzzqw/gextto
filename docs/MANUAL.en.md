@@ -228,7 +228,7 @@ isolated, login-less system account.
 For a no-root installation from a source checkout:
 
 ```bash
-make build
+make build          # pure Go (default); 'make build-libtorrent' for libtorrent
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh

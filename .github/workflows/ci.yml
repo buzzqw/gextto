@@ -27,11 +27,6 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Install native dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libtorrent-rasterbar-dev
-
       - name: UI settings index
         run: make check-ui
 
@@ -49,6 +44,32 @@ jobs:
 
       - name: Build
         run: scripts/build-daemon.sh
+
+  # The default build and tests are pure Go; this job keeps the opt-in embedded
+  # libtorrent engine (cgo) covered. It installs the dev headers.
+  libtorrent:
+    name: embedded libtorrent (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libtorrent-rasterbar-dev
+
+      - name: Test with libtorrent
+        run: make test-libtorrent
+
+      - name: Build with libtorrent
+        run: make fast-libtorrent
 
   # Phase 0 of the technical review: run the race detector as a separate,
   # non-blocking job. Its result is collected before it becomes required.

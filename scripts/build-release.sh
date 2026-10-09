@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build the release archive on the oldest supported baseline: Ubuntu 22.04
-# (glibc 2.35, libtorrent 2.0.5). A binary linked there runs on every
-# distribution the installer supports (Debian 12+, Ubuntu 22.04+, Fedora,
-# openSUSE Leap 15.6+/Tumbleweed, Arch); one built on a newer system needs a
-# newer glibc and does not start on the older ones.
+# (glibc 2.35). The default release is pure Go (static, no libtorrent); with
+# GEXTTO_LIBTORRENT=1 it also links libtorrent 2.0.5, whose C++ ABI pins the
+# baseline. A binary built on a newer system may need a newer glibc and not
+# start on the older ones.
 #
 #   scripts/build-release.sh [--label TEXT] [--output-dir DIR]
 #       runs the build in an ubuntu:22.04 container (docker or podman) and
@@ -14,7 +14,8 @@
 #
 # Environment: GEXTTO_BUILD (build number; when unset the committed
 # build_number file is used, so checkout and CI share the same number),
-# GEXTTO_COMMIT, GEXTTO_BASE_IMAGE.
+# GEXTTO_COMMIT, GEXTTO_BASE_IMAGE, GEXTTO_LIBTORRENT (set to 1 to include the
+# embedded libtorrent engine; by default the release is pure Go).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,6 +48,7 @@ if [[ "$IN_CONTAINER" != "1" ]]; then
   exec "$engine" run --rm \
     -v "$ROOT:/src:ro" -v "$OUTPUT_DIR:/out" \
     -e GEXTTO_BUILD="${GEXTTO_BUILD:-}" -e GEXTTO_COMMIT="$commit" \
+    -e GEXTTO_LIBTORRENT="${GEXTTO_LIBTORRENT:-0}" \
     "$BASE_IMAGE" bash -c '
       set -euo pipefail
       mkdir -p /build
@@ -60,8 +62,11 @@ if command -v apt-get >/dev/null 2>&1; then
   SUDO=""
   [[ "$(id -u)" == "0" ]] || SUDO="sudo"
   $SUDO apt-get update -qq
-  $SUDO apt-get install -y -qq --no-install-recommends \
-    build-essential pkg-config libtorrent-rasterbar-dev ca-certificates curl git binutils >/dev/null
+  packages="ca-certificates curl git binutils"
+  if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
+    packages="build-essential pkg-config libtorrent-rasterbar-dev $packages"
+  fi
+  $SUDO apt-get install -y -qq --no-install-recommends $packages >/dev/null
 fi
 
 # Go: the version required by go.mod, unless a recent enough one is installed.

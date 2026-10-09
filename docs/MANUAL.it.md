@@ -227,7 +227,7 @@ l'installer**; `--user NAME` (o `GEXTTO_USER`) sceglie un altro utente e
 Per un'installazione senza root da un checkout sorgente:
 
 ```bash
-make build
+make build          # Go puro (predefinita); 'make build-libtorrent' per libtorrent
 GEXTTO_DATA_DIR="$HOME/gextto-data" \
   GEXTTO_LISTEN=127.0.0.1:5000 \
   scripts/install-user-service.sh

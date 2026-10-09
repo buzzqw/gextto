@@ -3,15 +3,25 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build fast gx-torrent test test-race test-real test-rain vet fmt check-ui installer-test tidy package clean run measure-seeding
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-rain vet fmt check-ui installer-test tidy package clean run measure-seeding
 
 all: build
 
+# Default build: pure Go. gx-torrent (the default engine) is a pure-Go daemon;
+# the embedded libtorrent engine is opt-in (see build-libtorrent).
 build:
 	GEXTTO_BUMP_BUILD=1 scripts/build-daemon.sh
 
+# Same, linking the embedded libtorrent engine (needs libtorrent-rasterbar-dev
+# and a C/C++ toolchain).
+build-libtorrent:
+	GEXTTO_BUMP_BUILD=1 GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh
+
 fast:
 	scripts/build-daemon.sh
+
+fast-libtorrent:
+	GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh
 
 # Only the gx-torrent daemon (pure Go, no libtorrent needed). Bumps the daemon's
 # own build number, independent from Gextto's.
@@ -23,6 +33,11 @@ gx-torrent:
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 
 test: check-ui installer-test
+	CGO_ENABLED=0 go test ./...
+
+# Tests with the embedded libtorrent engine (cgo; needs the dev headers). The
+# default `make test` is pure Go and skips the libtorrent-only tests.
+test-libtorrent: check-ui installer-test
 	CGO_ENABLED=1 go test ./...
 
 test-real:
@@ -60,7 +75,7 @@ measure-seeding:
 	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
 
 vet:
-	CGO_ENABLED=1 go vet ./...
+	CGO_ENABLED=0 go vet ./...
 
 fmt:
 	gofmt -w .

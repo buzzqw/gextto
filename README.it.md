@@ -72,7 +72,7 @@ attivo.
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
 | gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Il predefinito: Go puro, **nessuna dipendenza C/C++**, autonomo, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC |
-| libtorrent (integrato) | Stesso processo di Gextto, libtorrent-rasterbar incluso nel pacchetto | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico. Un crash coinvolge anche Gextto e gexttod non si compila senza libtorrent |
+| libtorrent (integrato) | Stesso processo di Gextto; incluso nel binario **solo se compilato con libtorrent** | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico. Un crash coinvolge anche Gextto. **Non è nella build predefinita (Go puro)** |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
 
 ### Matrice delle capacità
@@ -166,21 +166,23 @@ gruppo.
 
 ### Installazione dal sorgente
 
-Servono Go 1.26+, compilatore C++17 e header di sviluppo libtorrent-rasterbar.
-libtorrent serve solo per compilare: il pacchetto di release la include già,
-quindi un'installazione normale non richiede toolchain C/C++. La build normale
-include la UI web: non è richiesto un build frontend separato. Consulta il
-[manuale sviluppatori](docs/DEVELOPERS.md).
+Serve Go 1.26+. La build predefinita è in **Go puro** e non richiede libtorrent.
+Per includere il motore **libtorrent integrato** servono anche un compilatore
+C++17 e gli header di sviluppo libtorrent-rasterbar: è un'**opzione di build**.
+La build normale include la UI web: non è richiesto un build frontend separato.
+Consulta il [manuale sviluppatori](docs/DEVELOPERS.md).
 
 ```bash
-make build
+make build                 # Go puro (predefinita): gx-torrent, nessun libtorrent
+make build-libtorrent      # include anche il motore libtorrent integrato
 ```
 
 `make build` incrementa il numero di build **committato** (`build_number`, la
 stessa sorgente condivisa con la CI: checkout e versione installata mostrano lo
 stesso `1.1.<n>`) e scrive il demone
 versionato in `bin/gexttod`, insieme al motore `gx-torrent` in puro Go. Per
-ricompilare senza incrementare il numero usa `make fast`. Per compilare **solo**
+ricompilare senza incrementare il numero usa `make fast` (o
+`make fast-libtorrent` per la variante con libtorrent). Per compilare **solo**
 il demone `gx-torrent` (non servono C++ né libtorrent) usa `make gx-torrent`.
 Verifica binario, versione del prodotto, numero di build e versione di libtorrent
 collegata con:

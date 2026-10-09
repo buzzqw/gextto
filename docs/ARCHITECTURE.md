@@ -46,11 +46,15 @@ cmd/gexttod/main.go  →  gextto.Parse(args)  →  gextto.Run(...)   (cli.go/run
 ```
 
 Il **numero di build** è generato dallo script `scripts/build-daemon.sh`
-(e `scripts/next-build-number.sh`) e inciso nel binario; non è versionato.
+(e `scripts/next-build-number.sh`) e inciso nel binario.
 
-Il **bridge C++** per libtorrent è la coppia nella root:
-`libtorrent_bridge.cpp` (compilato da cgo) + `libtorrent_bridge.h` (header).
-`libtorrent_cgo.go` è solo il collante Go; la logica è in `libtorrent.go`.
+La build predefinita è in **Go puro** (gx-torrent, nessun libtorrent). Il
+**bridge C++** per libtorrent è **opt-in**: è la coppia nella root
+`libtorrent_bridge.cpp` (compilato da cgo) + `libtorrent_bridge.h` (header),
+inclusa solo con `CGO_ENABLED=1` (`make build-libtorrent`,
+`GEXTTO_LIBTORRENT=1 scripts/build-daemon.sh`). Senza cgo, `libtorrent_nocgo.go`
+fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
+`LibtorrentCompiled()` distingue le due build.
 
 ## 3. Package principale: file per area
 

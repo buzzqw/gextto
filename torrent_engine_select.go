@@ -86,6 +86,11 @@ func selectTorrentEngine(cfg *Config, notifier *Notifier) (TorrentEngine, string
 			return engine, note, nil
 		}
 		return engine, "", nil
+	case BackendEmbedded:
+		if !LibtorrentCompiled() {
+			return nil, "", fmt.Errorf("libtorrent integrato non incluso in questa build (compila con make build-libtorrent)")
+		}
+		return nil, "", nil
 	default:
 		return nil, "", nil
 	}

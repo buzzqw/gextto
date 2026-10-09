@@ -63,6 +63,10 @@ func cgoLtDestroy(session unsafe.Pointer) {
 	C.gextto_lt_destroy((*C.gextto_lt_session)(session))
 }
 
+// LibtorrentCompiled reports whether this binary includes the embedded
+// libtorrent engine. True here: this file is compiled only with cgo.
+func LibtorrentCompiled() bool { return true }
+
 func cgoLtVersion() string {
 	buffer := make([]byte, 128)
 	C.gextto_lt_version((*C.char)(unsafe.Pointer(&buffer[0])), C.size_t(len(buffer)))

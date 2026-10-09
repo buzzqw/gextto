@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Build the gextto daemon with the version and build number compiled in.
 #
-#   scripts/build-daemon.sh              # use the current build number
+#   scripts/build-daemon.sh              # pure Go (default): no libtorrent
+#   GEXTTO_LIBTORRENT=1 scripts/...      # also link the embedded libtorrent
 #   GEXTTO_BUMP_BUILD=1 scripts/...      # increment the build number first
 #   GEXTTO_BUILD=1234 scripts/...        # force a specific number (CI)
 #   GEXTTO_BINARY=/path/gexttod scripts/...
+#
+# By default the binary is pure Go: gx-torrent (the default engine) is a pure-Go
+# daemon and does not need libtorrent-rasterbar. The embedded libtorrent engine
+# is opt-in with GEXTTO_LIBTORRENT=1, which enables cgo and needs the dev headers
+# and a C/C++ toolchain.
 #
 # The build number is what `gexttod --version` prints and identifies the exact
 # binary. The gx-torrent daemon (pure Go, optional torrent backend) is built
@@ -34,15 +40,25 @@ COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-}}"
 BUILT_AT="${GEXTTO_BUILT_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 mkdir -p "$(dirname "$OUT")"
+# Pure Go by default; GEXTTO_LIBTORRENT=1 links the embedded libtorrent engine.
+CGO_ENABLED_BUILD=0
+if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
+    CGO_ENABLED_BUILD=1
+fi
 (
     cd "$ROOT"
     TAGS=()
     [[ -n "${GEXTTO_TAGS:-}" ]] && TAGS=(-tags "$GEXTTO_TAGS")
-    CGO_ENABLED=1 go build -trimpath "${TAGS[@]}" \
+    CGO_ENABLED="$CGO_ENABLED_BUILD" go build -trimpath "${TAGS[@]}" \
         -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
         -o "$OUT" ./cmd/gexttod
 )
-printf 'built %s (version %s, build %s)\n' "$OUT" "$VERSION" "$BUILD"
+if [[ "$CGO_ENABLED_BUILD" == "1" ]]; then
+    LIBS="libtorrent"
+else
+    LIBS="pure Go"
+fi
+printf 'built %s (version %s, build %s, %s)\n' "$OUT" "$VERSION" "$BUILD" "$LIBS"
 
 if [[ "${GEXTTO_SKIP_GXTORRENT:-0}" != "1" ]]; then
     # gx-torrent is replaced only when its code changed. Gextto keeps a running

@@ -69,7 +69,7 @@ libtorrent is also the automatic fallback if gx-torrent cannot stay up.
 | Engine | Where it runs | When to pick it |
 |---|---|---|
 | gx-torrent (default) | Separate supervised Go process, no libtorrent | The default: pure Go, **no C/C++ dependencies**, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
-| libtorrent (embedded) | Same process as Gextto, libtorrent-rasterbar bundled in the release | An advanced control or maximum compatibility; also the automatic fallback. A crash takes Gextto down too, and gexttod cannot be built without libtorrent |
+| libtorrent (embedded) | Same process as Gextto; bundled in the binary **only when built with libtorrent** | An advanced control or maximum compatibility; also the automatic fallback. A crash takes Gextto down too. **Not part of the default (pure-Go) build** |
 | qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
 
 ### Capability matrix
@@ -160,21 +160,23 @@ instead. When the library lives on a NAS owned by another user,
 
 ### Install from source
 
-Source builds require Go 1.26+, a C++17 compiler and libtorrent-rasterbar
-development headers. libtorrent is needed only to build: the released package
-already bundles it, so a normal install requires no C/C++ toolchain. The normal
-build embeds the web UI; no separate frontend build is required. See the
+Go 1.26+ is required. The default build is **pure Go** and needs no libtorrent.
+To include the **embedded libtorrent** engine, also install a C++17 compiler and
+the libtorrent-rasterbar development headers: it is a **build option**. The
+normal build embeds the web UI; no separate frontend build is required. See the
 [developer manual](docs/DEVELOPERS.md).
 
 ```bash
-make build
+make build                 # pure Go (default): gx-torrent, no libtorrent
+make build-libtorrent      # also link the embedded libtorrent engine
 ```
 
 `make build` increments the **committed** build number (`build_number`, the same
 source shared with CI, so the checkout and the released version show the same
 `1.1.<n>`) and writes the versioned daemon
 to `bin/gexttod`, plus the pure-Go `gx-torrent` engine next to it. To rebuild
-without incrementing the number, use `make fast`. To build **only** the
+without incrementing the number, use `make fast` (or `make fast-libtorrent` for
+the libtorrent variant). To build **only** the
 `gx-torrent` daemon (no C++/libtorrent needed), use `make gx-torrent`. Verify
 the exact binary, product version, build number and linked libtorrent version
 with:

@@ -48,12 +48,19 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 
 ## Build e test
 - `make build` — incrementa `build_number` (committato) e compila
-  `bin/gexttod` **e** `bin/gx-torrent`; quest'ultimo viene sostituito solo se
-  il suo codice è cambiato (`bin/gx-torrent.code-sha256`,
-  `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il confronto compila con
-  `-buildvcs=false`: senza, Go marchia la revisione git nel binario e ogni
-  commit sembrerebbe un cambiamento di gx-torrent. Richiede CGO/libtorrent; i
-  warning di deprecazione di libtorrent sono normali.
+  `bin/gexttod` **e** `bin/gx-torrent`. La build è **Go puro di default**
+  (`CGO_ENABLED=0`, nessun libtorrent: `gx-torrent` è il motore predefinito).
+  Per includere il motore **libtorrent integrato** usa `make build-libtorrent`
+  (`GEXTTO_LIBTORRENT=1`), che attiva CGO e richiede compilatore C++17 e header
+  libtorrent-rasterbar; i warning di deprecazione di libtorrent sono normali.
+  `gx-torrent` viene sostituito solo se il suo codice è cambiato
+  (`bin/gx-torrent.code-sha256`, `GEXTTO_FORCE_GXTORRENT=1` per forzarlo). Il
+  confronto compila con `-buildvcs=false`: senza, Go marchia la revisione git
+  nel binario e ogni commit sembrerebbe un cambiamento di gx-torrent.
+- Senza cgo, `libtorrent_nocgo.go` (`//go:build !cgo`) fornisce gli stub del
+  bridge e `LibtorrentCompiled()` è `false`: il backend `embedded` non è
+  selezionabile (l'opzione non compare nella UI e la selezione è rifiutata);
+  un `torrent_backend=embedded` salvato fa partire il demone su gx-torrent.
 - `build_number` è la **sorgente unica** del numero di build: checkout e CI
   leggono lo stesso file (base attuale `1462`). La CI non usa più
   `github.run_number`: build e `release.json` prendono il valore dal file, così
@@ -71,7 +78,10 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
   `gx-torrent` nella root (ora ignorato). Per il demone usa `make gx-torrent`
   (produce `bin/gx-torrent`).
-- `make test` — `check-ui-settings-index` + `installer-selftest` + `go test ./...`.
+- `make test` — `check-ui-settings-index` + `installer-selftest` +
+  `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
+  `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
+  anche quelli e richiede libtorrent.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
 - Test del fork (modulo annidato, non incluso in `./...`): usa `make test-rain`
   (`go test` dalla root sui pacchetti con test del fork). **Non** eseguire
