@@ -89,9 +89,16 @@ check_install() {
 
   capture bash "$INSTALL" --help
   if contains "--media-group"; then pass "$label: --help documents --media-group"; else fail "$label: --help documents --media-group"; fi
+  if contains "--listen"; then pass "$label: --help documents --listen"; else fail "$label: --help documents --listen"; fi
 
   capture bash "$INSTALL" --dry-run --media-group gextto-selftest-missing-group --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: a missing media group is skipped" 0 "does not exist; skipped"
+
+  capture bash "$INSTALL" --dry-run --listen 127.0.0.1:5100 --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: --listen is honoured" 0 "listening on 127.0.0.1:5100"
+
+  capture bash "$INSTALL" --dry-run --listen not-a-port --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: --listen without a port is rejected" 1 "must end with a port"
 
   capture bash "$INSTALL" --dry-run --uninstall --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --dry-run --uninstall works" 0 "uninstalled"

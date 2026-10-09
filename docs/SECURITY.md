@@ -67,8 +67,13 @@ interface.
   size cap; the probe of a media file runs `ffprobe` with a timeout and a
   local-only protocol whitelist, and refuses paths that start with `-`.
 - **Atomic self-update.** `gexttod --update` downloads the release archive,
-  verifies the published `.sha256` when present, stages the payload and swaps it
-  with renames; a failure leaves the running installation untouched.
+  stages the payload and swaps it with renames; a failure leaves the running
+  installation untouched. The published `.sha256` is **required**: an update
+  that cannot be verified is refused (the same rule as `install.sh`). The
+  checksum is served from the same GitHub release as the archive, so it protects
+  against a corrupted or partial download, not against a compromised release
+  account: the GitHub release is the trust root, and there is no separate GPG
+  signature. Downloads are HTTPS-only.
 
 ## Operational responsibilities
 

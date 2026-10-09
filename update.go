@@ -276,26 +276,27 @@ func updateDownload(ctx context.Context, url, destination string) error {
 	return nil
 }
 
-// verifyRemoteChecksum verifies the archive against a `.sha256` asset when the
-// release publishes one. A missing checksum is tolerated because not every build
-// publishes it.
+// verifyRemoteChecksum verifies the archive against the release's `.sha256`
+// asset. The checksum is required: every published payload ships one, and an
+// update that cannot verify what it installs is refused (the installer has the
+// same rule). A local `--archive` without a `.sha256` is still allowed.
 func verifyRemoteChecksum(ctx context.Context, archive, checksumURL string) error {
 	client := &http.Client{Timeout: 60 * time.Second}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, checksumURL, nil)
 	if err != nil {
-		fmt.Println("  checksum:   not published by this release (continuing)")
-		return nil
+		return fmt.Errorf("checksum: cannot request %s: %w", checksumURL, err)
 	}
 	request.Header.Set("User-Agent", updateUserAgent())
 	response, err := client.Do(request)
 	if err != nil {
-		fmt.Println("  checksum:   not published by this release (continuing)")
-		return nil
+		return fmt.Errorf("checksum: cannot download %s: %w", checksumURL, err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("checksum: this release does not publish %s; refusing to install an unverified payload", checksumURL)
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		fmt.Println("  checksum:   not published by this release (continuing)")
-		return nil
+		return fmt.Errorf("checksum: HTTP %d for %s", response.StatusCode, checksumURL)
 	}
 	body, err := readLimitedBody(response.Body, maxAPIResponseBytes)
 	if err != nil {
@@ -306,8 +307,7 @@ func verifyRemoteChecksum(ctx context.Context, archive, checksumURL string) erro
 		expected = strings.ToLower(fields[0])
 	}
 	if len(expected) != 64 {
-		fmt.Println("  checksum:   not published by this release (continuing)")
-		return nil
+		return fmt.Errorf("checksum: malformed .sha256 for %s", filepath.Base(archive))
 	}
 	return updateCompareChecksum(archive, expected)
 }
@@ -363,7 +363,9 @@ func updateSha256File(path string) (string, error) {
 }
 
 func updateExtract(archive, destination string) error {
-	cmd := exec.Command("tar", "-xzf", archive, "-C", destination)
+	// --no-same-owner: the archive is checksum-verified, but the updater runs as
+	// root and must never hand files the numeric owner stored at build time.
+	cmd := exec.Command("tar", "--no-same-owner", "-xzf", archive, "-C", destination)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

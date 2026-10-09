@@ -15,15 +15,18 @@
 # service that never starts.
 #
 # Environment overrides (kept for backward compatibility): GEXTTO_DATA_DIR,
-# GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_USER, GEXTTO_INSTALL_DIR,
-# GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES,
-# GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START, GEXTTO_HEALTH_TIMEOUT.
+# GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_LISTEN, GEXTTO_USER,
+# GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
+# GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
+# GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
 set -euo pipefail
 
 INSTALL_DIR="${GEXTTO_INSTALL_DIR:-/opt/gextto}"
 DATA_DIR="${GEXTTO_DATA_DIR:-/var/lib/gextto}"
 PORT="${GEXTTO_PORT:-5000}"
 ENGINE_PORT="${GEXTTO_ENGINE_PORT:-8889}"
+# LISTEN empty means the default 0.0.0.0:$PORT, resolved once PORT is known.
+LISTEN="${GEXTTO_LISTEN:-}"
 SERVICE_USER="${GEXTTO_USER:-gextto}"
 REPO="${GEXTTO_REPO:-buzzqw/gextto}"
 RELEASE="${GEXTTO_RELEASE:-continuous}"
@@ -32,6 +35,11 @@ NO_START="${GEXTTO_NO_START:-0}"
 HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
 HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-60}"
 MEDIA_GROUPS="${GEXTTO_MEDIA_GROUPS:-}"
+
+# Download hardening: HTTPS only (redirects included), a real TLS floor and
+# timeouts, so a hung or downgrading mirror cannot block or weaken the install.
+CURL_OPTS=(--fail --location --retry 3 --retry-delay 2 --proto '=https'
+  --proto-redir '=https' --tlsv1.2 --connect-timeout 15 --max-time 300)
 CHECKOUT_ROOT=""
 # Piped into bash (`curl ... | sudo bash`) there is no script file and
 # BASH_SOURCE is unset: with `set -u` it must be read with a default.
@@ -94,6 +102,8 @@ Options:
       --version TAG       release tag or "latest"/"stable" (default: continuous)
       --release TAG       alias of --version
       --port PORT         web UI port (default: 5000)
+      --listen ADDR:PORT  web UI listen address (default: 0.0.0.0:PORT;
+                          use 127.0.0.1:PORT to keep it on this host only)
       --engine-port PORT  internal engine port (default: 8889)
       --data-dir DIR      service data directory (default: /var/lib/gextto)
       --install-dir DIR   program directory (default: /opt/gextto)
@@ -104,9 +114,9 @@ Options:
       --local-archive F   install from a local .tar.gz instead of downloading us
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
-GEXTTO_USER, GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
-GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
-GEXTTO_MEDIA_GROUPS.
+GEXTTO_LISTEN, GEXTTO_USER, GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE,
+GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
+GEXTTO_HEALTH_TIMEOUT, GEXTTO_HTTP_TIMEOUT, GEXTTO_MEDIA_GROUPS.
 EOF
 }
 
@@ -121,6 +131,7 @@ parse_args() {
       --version|--release) RELEASE="${2:-}"; [[ -n "$RELEASE" ]] || die "$1 requires a value"; shift 2 ;;
       --port) PORT="${2:-}"; [[ -n "$PORT" ]] || die "--port requires a value"; shift 2 ;;
       --engine-port) ENGINE_PORT="${2:-}"; [[ -n "$ENGINE_PORT" ]] || die "--engine-port requires a value"; shift 2 ;;
+      --listen) LISTEN="${2:-}"; [[ -n "$LISTEN" ]] || die "--listen requires a value"; shift 2 ;;
       --data-dir) DATA_DIR="${2:-}"; [[ -n "$DATA_DIR" ]] || die "--data-dir requires a value"; shift 2 ;;
       --install-dir) INSTALL_DIR="${2:-}"; [[ -n "$INSTALL_DIR" ]] || die "--install-dir requires a value"; shift 2 ;;
       --user) SERVICE_USER="${2:-}"; [[ -n "$SERVICE_USER" ]] || die "--user requires a value"; shift 2 ;;
@@ -172,7 +183,7 @@ install_packages() {
     return
   fi
   if command -v apt-get >/dev/null; then
-    apt-get update -y || warn "apt-get update failed; continuing"
+    apt-get update || warn "apt-get update failed; continuing"
     apt-get install -y ca-certificates curl tar coreutils openssl libstdc++6 zlib1g zstd \
       || apt-get install -y ca-certificates curl tar coreutils openssl \
       || warn "some optional packages could not be installed; continuing"
@@ -241,15 +252,17 @@ obtain_payload() {
     fi
     log "downloading ${REPO} ${RELEASE} (${asset#gextto-linux-})"
     local cachebust; cachebust="$(date +%s)"
-    curl -fL --retry 3 --retry-delay 2 "${base}/${asset}?cachebust=${cachebust}" -o "$work/$asset" \
+    curl "${CURL_OPTS[@]}" "${base}/${asset}?cachebust=${cachebust}" -o "$work/$asset" \
       || die "unable to download ${asset} from ${base}"
-    curl -fL --retry 3 --retry-delay 2 "${base}/${asset}.sha256?cachebust=${cachebust}" -o "$work/${asset}.sha256" \
+    curl "${CURL_OPTS[@]}" "${base}/${asset}.sha256?cachebust=${cachebust}" -o "$work/${asset}.sha256" \
       || die "unable to download checksum for ${asset}"
     (cd "$work" && sha256sum -c "${asset}.sha256") \
       || die "checksum verification failed for ${asset}"
   fi
 
-  tar -xzf "$work/$asset" -C "$work"
+  # --no-same-owner: the archive is checksum-verified, but extracting as root
+  # must never hand files the numeric owner stored at build time.
+  tar --no-same-owner -xzf "$work/$asset" -C "$work"
   [[ -x "$work/gexttod" ]] || die "published payload does not contain an executable gexttod"
   check_payload_runs "$work"
 }
@@ -284,6 +297,12 @@ create_service_user() {
     run useradd --system --user-group --home-dir "$DATA_DIR" --shell "$nologin" "$SERVICE_USER" \
       || die "unable to create service user $SERVICE_USER"
     log "created service user $SERVICE_USER"
+    # Remember that we created it, so --purge removes only our own account and
+    # never a pre-existing system user that happened to share the name.
+    if [[ "$DRY_RUN" != "1" ]]; then
+      install -d /etc/gextto
+      printf '%s\n' "$SERVICE_USER" > /etc/gextto/created-user
+    fi
   fi
   if ! getent group "$SERVICE_USER" >/dev/null 2>&1; then
     run groupadd --system "$SERVICE_USER" || true
@@ -357,7 +376,7 @@ User=$SERVICE_USER
 Group=$SERVICE_USER
 EnvironmentFile=-/etc/gextto/gextto.env
 Environment=GEXTTO_DATA_DIR=$DATA_DIR
-Environment=GEXTTO_LISTEN=0.0.0.0:$PORT
+Environment=GEXTTO_LISTEN=$LISTEN
 Environment=GEXTTO_ENGINE_LISTEN=127.0.0.1:$ENGINE_PORT
 Environment=GEXTTO_LOG=info
 WorkingDirectory=$DATA_DIR
@@ -499,6 +518,16 @@ uninstall() {
   if [[ "$PURGE" == "1" ]]; then
     warn "removing data directory $DATA_DIR (databases, downloads, backups)"
     run rm -rf "$DATA_DIR"
+    # Remove the service account only when this installer created it (the
+    # marker is read before /etc/gextto is removed).
+    local created_user=""
+    [[ -f /etc/gextto/created-user ]] && created_user="$(cat /etc/gextto/created-user 2>/dev/null || true)"
+    if [[ -n "$created_user" ]] && id -u "$created_user" >/dev/null 2>&1; then
+      run userdel "$created_user" 2>/dev/null || warn "could not remove user $created_user"
+      run groupdel "$created_user" 2>/dev/null || true
+    fi
+    # Environment overrides, if the operator added any.
+    run rm -rf /etc/gextto
   else
     log "data kept in $DATA_DIR (use --purge to remove it)"
   fi
@@ -515,15 +544,27 @@ print_summary() {
   log "gextto installed${version:+ (version $version)}"
   local lan_ip
   lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
-  log "UI:      http://${lan_ip:-127.0.0.1}:$PORT  (listening on 0.0.0.0:$PORT)"
+  log "UI:      http://${lan_ip:-127.0.0.1}:$PORT  (listening on $LISTEN)"
   log "first run: open the UI, the setup wizard guides you through folders, sources and the first title"
   log "status:  systemctl status $SERVICE_NAME"
   log "logs:    journalctl -u $SERVICE_NAME -f"
-  warn "the web UI is open until a password is set: the setup wizard asks for one at the first visit (for access from the internet use an HTTPS reverse proxy, see docs/SECURITY.md)"
+  # Only warn about the open UI when it is actually reachable off-host.
+  case "$LISTEN" in
+    127.*|localhost:*|"[::1]:"*) ;;
+    *) warn "the web UI is open until a password is set: the setup wizard asks for one at the first visit (for access from the internet use an HTTPS reverse proxy, see docs/SECURITY.md)" ;;
+  esac
 }
 
 main() {
   parse_args "$@"
+  # Resolve the listen address. --listen (or GEXTTO_LISTEN) may carry its own
+  # port, and the health check below must poll the port actually bound.
+  if [[ -n "$LISTEN" ]]; then
+    PORT="${LISTEN##*:}"
+    [[ "$PORT" =~ ^[0-9]+$ ]] || die "--listen must end with a port: $LISTEN"
+  else
+    LISTEN="0.0.0.0:$PORT"
+  fi
   [[ "$PURGE" != "1" || "$ACTION" == "uninstall" ]] || die "--purge requires --uninstall"
   validate_directory_target "$DATA_DIR" "data directory"
   validate_directory_target "$INSTALL_DIR" "install directory"
