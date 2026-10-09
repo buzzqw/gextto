@@ -33,7 +33,9 @@ HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
 HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-60}"
 MEDIA_GROUPS="${GEXTTO_MEDIA_GROUPS:-}"
 CHECKOUT_ROOT=""
-if [[ -f "${BASH_SOURCE[0]}" ]]; then
+# Piped into bash (`curl ... | sudo bash`) there is no script file and
+# BASH_SOURCE is unset: with `set -u` it must be read with a default.
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
   CHECKOUT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 DRY_RUN=0

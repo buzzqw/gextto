@@ -83,6 +83,10 @@ check_install() {
     fail "$label: --dry-run enables the update path unit"
   fi
 
+  # The documented `curl ... | sudo bash` reads the script from stdin.
+  LAST_OUT="$(bash -s -- --dry-run --data-dir "$TMP/data" --install-dir "$TMP/opt" < "$INSTALL" 2>&1)"; LAST_CODE=$?
+  expect "$label: works when piped into bash" 0 "systemctl restart gextto.service"
+
   capture bash "$INSTALL" --help
   if contains "--media-group"; then pass "$label: --help documents --media-group"; else fail "$label: --help documents --media-group"; fi
 
