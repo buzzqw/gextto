@@ -61,17 +61,16 @@ torrent*. Un motore gira alla volta, quindi il cambio è una migrazione
 controllata, mai due client sugli stessi dati.
 
 gx-torrent è il motore che il progetto sviluppa e consiglia: è il predefinito,
-non richiede una toolchain C/C++ a runtime, ha una pagina web propria, i
-trasferimenti proseguono mentre Gextto si riavvia o si aggiorna e le novità di
-trasferimento arrivano prima lì (streaming HTTP con Range, test porte integrato,
-gestione adattiva di memoria/cache). Gli altri due restano quando ti serve un
-controllo che gx-torrent non espone ancora, o la massima compatibilità;
-libtorrent è anche il fallback automatico se gx-torrent non riesce a restare
-attivo.
+è Go puro (niente C/C++), ha una pagina web propria, i trasferimenti proseguono
+mentre Gextto si riavvia o si aggiorna e le novità di trasferimento arrivano
+prima lì (streaming HTTP con Range, test porte integrato, gestione adattiva di
+memoria/cache). Gli altri due restano quando ti serve un controllo che gx-torrent
+non espone ancora, o la massima compatibilità; libtorrent è anche il fallback
+automatico se gx-torrent non riesce a restare attivo.
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
-| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Il predefinito: autonomo, dipendenze C/C++ minime, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC né holepunching NAT |
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato, senza libtorrent | Il predefinito: Go puro, **nessuna dipendenza C/C++**, autonomo, sviluppo attivo. Solo torrent BitTorrent v1 e ibridi (niente solo-v2), niente WebTorrent/WebRTC né holepunching NAT |
 | libtorrent (integrato) | Stesso processo di Gextto, libtorrent-rasterbar incluso nel pacchetto | Ti serve un controllo avanzato o la massima compatibilità; è anche il fallback automatico. Un crash coinvolge anche Gextto e gexttod non si compila senza libtorrent |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
 

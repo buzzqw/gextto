@@ -59,16 +59,16 @@ runs at a time, so switching is a controlled migration, never two clients on the
 same data.
 
 gx-torrent is the engine the project develops and recommends: it is the default,
-it needs no C/C++ toolchain at runtime, it has its own web page, its transfers
-keep running while Gextto restarts or updates, and new transfer features land
-there first (HTTP streaming with Range, a built-in peer-port test, adaptive
+it is pure Go (no C/C++ at all), it has its own web page, its transfers keep
+running while Gextto restarts or updates, and new transfer features land there
+first (HTTP streaming with Range, a built-in peer-port test, adaptive
 memory/cache sizing). The other two are there when you need a control gx-torrent
 does not expose yet, or maximum compatibility; libtorrent is also the automatic
 fallback if gx-torrent cannot stay up.
 
 | Engine | Where it runs | When to pick it |
 |---|---|---|
-| gx-torrent (default) | Separate supervised Go process, no libtorrent | The default: self-contained, minimal C/C++ dependencies, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC or NAT holepunching |
+| gx-torrent (default) | Separate supervised Go process, no libtorrent | The default: pure Go, **no C/C++ dependencies**, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC or NAT holepunching |
 | libtorrent (embedded) | Same process as Gextto, libtorrent-rasterbar bundled in the release | An advanced control or maximum compatibility; also the automatic fallback. A crash takes Gextto down too, and gexttod cannot be built without libtorrent |
 | qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
 
