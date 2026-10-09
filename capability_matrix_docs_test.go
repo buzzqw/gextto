@@ -18,7 +18,9 @@ import (
 )
 
 // capabilityDocRows gives the label of every capability (Italian and English)
-// and the order in which the rows are rendered. It must cover the whole matrix.
+// and the order in which the rows are rendered. It must cover the whole matrix;
+// an empty label keeps an internal capability (API plumbing every engine has)
+// out of the table.
 var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"add", "Aggiungi", "Add"},
 	{"remove", "Rimuovi", "Remove"},
@@ -32,8 +34,8 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 	{"limits", "Limiti per torrent", "Per-torrent limits"},
 	{"peers", "Peer", "Peers"},
 	{"trackers", "Tracker", "Trackers"},
-	{"events", "Eventi", "Events"},
-	{"stats", "Statistiche", "Stats"},
+	{"events", "", ""},
+	{"stats", "", ""},
 	{"categories", "Categorie", "Categories"},
 	{"tags", "Tag", "Tags"},
 	{"first_last", "Prima/ultima parte", "First/last piece"},
@@ -52,8 +54,8 @@ var capabilityDocRows = []struct{ Key, IT, EN string }{
 // capabilityDocColumns is the engine order and labels of the generated table.
 var capabilityDocColumns = []struct{ Backend, IT, EN string }{
 	{BackendGxTorrent, "gx-torrent", "gx-torrent"},
-	{BackendEmbedded, "libtorrent integrato", "libtorrent (embedded)"},
 	{BackendQbittorrent, "qBittorrent-nox", "qBittorrent-nox"},
+	{BackendEmbedded, "libtorrent (build opzionale)", "libtorrent (optional build)"},
 }
 
 const (
@@ -78,17 +80,9 @@ func capabilityDocLevel(level, lang string) string {
 	}
 }
 
-// capabilityIsBasic is true when every engine supports the capability.
-func capabilityIsBasic(parity map[string]map[string]string, key string) bool {
-	for _, col := range capabilityDocColumns {
-		if parity[key][col.Backend] != "full" {
-			return false
-		}
-	}
-	return true
-}
-
 // renderCapabilityMatrix builds the markdown table for one language.
+// Capabilities with the same level on every engine share one row, in the order
+// of their first appearance in capabilityDocRows.
 func renderCapabilityMatrix(lang string) string {
 	parity := CapabilityParity()
 	label := func(it, en string) string {
@@ -108,29 +102,31 @@ func renderCapabilityMatrix(lang string) string {
 		"| " + strings.Join(align, " | ") + " |",
 	}
 
-	// Capabilities every engine supports share one row.
-	var basic []string
-	for _, row := range capabilityDocRows {
-		if capabilityIsBasic(parity, row.Key) {
-			basic = append(basic, label(row.IT, row.EN))
-		}
+	type group struct {
+		names  []string
+		levels []string
 	}
-	if len(basic) > 0 {
-		cells := []string{strings.Join(basic, ", ")}
-		for range capabilityDocColumns {
-			cells = append(cells, capabilityDocLevel("full", lang))
-		}
-		lines = append(lines, "| "+strings.Join(cells, " | ")+" |")
-	}
-	// The rest get one row each.
+	var groups []*group
+	byLevels := map[string]*group{}
 	for _, row := range capabilityDocRows {
-		if capabilityIsBasic(parity, row.Key) {
+		if row.EN == "" {
 			continue
 		}
-		cells := []string{label(row.IT, row.EN)}
+		levels := make([]string, 0, len(capabilityDocColumns))
 		for _, col := range capabilityDocColumns {
-			cells = append(cells, capabilityDocLevel(parity[row.Key][col.Backend], lang))
+			levels = append(levels, capabilityDocLevel(parity[row.Key][col.Backend], lang))
 		}
+		key := strings.Join(levels, "|")
+		g, ok := byLevels[key]
+		if !ok {
+			g = &group{levels: levels}
+			byLevels[key] = g
+			groups = append(groups, g)
+		}
+		g.names = append(g.names, label(row.IT, row.EN))
+	}
+	for _, g := range groups {
+		cells := append([]string{strings.Join(g.names, ", ")}, g.levels...)
 		lines = append(lines, "| "+strings.Join(cells, " | ")+" |")
 	}
 	return strings.Join(lines, "\n")

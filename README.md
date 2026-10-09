@@ -14,8 +14,8 @@ service.
 
 - **One service, one control plane:** the daemon handles scheduled searches,
   torrent transfers, post-processing and the library archive. gx-torrent is the
-  default engine (pure Go, run as a supervised process); embedded libtorrent and
-  qBittorrent-nox are optional alternatives.
+  default engine (pure Go, run as a supervised process); qBittorrent-nox is the
+  alternative, and libtorrent a third choice only if you compile it in.
 - **Series, movies and comics:** monitor titles, search configured sources and
   manage downloads and archived media from one responsive web UI, installable on
   a phone, or the terminal TUI. Anime numbered by absolute episode ("Title -
@@ -63,22 +63,23 @@ at all), runs as a separate supervised process, has its own web page, its
 transfers keep running while Gextto restarts or updates, and new transfer
 features land there first (HTTP streaming with Range, a built-in peer-port test,
 adaptive memory/cache sizing, NAT holepunching with BEP 55). Gextto's default
-build is **pure Go and does not include libtorrent**: gx-torrent is all it needs.
+build is **pure Go**: gx-torrent is all it needs.
 
-**libtorrent (embedded)** is a **build option** (`make build-libtorrent`,
-`GEXTTO_LIBTORRENT=1`): it adds the libtorrent engine inside Gextto's own process
-and the automatic fallback if gx-torrent cannot stay up. Without libtorrent
-compiled in the option is **not selectable** (it does not appear in the *Torrent
-engine* drop-down). An engine crash also takes Gextto down.
+**qBittorrent-nox** is the alternative for those who already run it or prefer
+its UI: Gextto drives it through its Web API.
 
-**qBittorrent-nox** stays for those who already run it or prefer its UI: Gextto
-drives it through its Web API.
+**libtorrent** is a third choice that exists **only if you build Gextto with
+it** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): the engine then runs inside
+Gextto's own process and also acts as the automatic fallback if gx-torrent cannot
+stay up. Release packages and `make build` do not include it, and without it the
+option does not appear in the *Torrent engine* drop-down. An engine crash also
+takes Gextto down.
 
 | Engine | Where it runs | When to pick it |
 |---|---|---|
-| gx-torrent (default) | Separate supervised Go process; **no libtorrent** | The default: pure Go, no C/C++ dependencies, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
-| libtorrent (embedded) | Same process as Gextto; bundled **only when you build with libtorrent** (`make build-libtorrent`) | An advanced control or maximum compatibility; also the automatic fallback (when compiled in). A crash takes Gextto down too. **Not part of the default (pure-Go) build, and not selectable without it** |
+| gx-torrent (default) | Separate supervised Go process | The default: pure Go, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
 | qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
+| libtorrent (optional build) | Inside Gextto's process; **only if you compiled it in** (`make build-libtorrent`) | You need libtorrent's advanced controls or its compatibility; also the automatic fallback. A crash takes Gextto down too |
 
 How to include libtorrent: see *Install from source* below.
 
@@ -87,20 +88,13 @@ How to include libtorrent: see *Install from source* below.
 Levels: **yes** = supported, **partial** = supported with limits, **—** = not available. The table is generated from `capabilityLevels` in [`torrent_engine.go`](torrent_engine.go), the single source of truth the UI uses; a test keeps it in sync, so the matrix is edited there, never here.
 
 <!-- capability-matrix:start -->
-| Capability | gx-torrent | libtorrent (embedded) | qBittorrent-nox |
+| Capability | gx-torrent | qBittorrent-nox | libtorrent (optional build) |
 | --- | :--: | :--: | :--: |
-| Add, Remove, Pause, Resume, List, Recheck, Move, Sequential download, File selection, Per-torrent limits, Peers, Trackers, Events, Stats, Categories, Tags | yes | yes | yes |
-| First/last piece | partial | yes | yes |
-| Seed policy | yes | yes | partial |
-| Super-seeding (BEP 16) | yes | yes | partial |
-| RAM disk | yes | yes | — |
-| Fast resume | yes | yes | — |
-| Per-piece diagnostics | yes | — | — |
-| Session stats | yes | yes | partial |
-| Session sync | yes | — | yes |
-| IP filter | yes | yes | partial |
-| Web seeds | yes | yes | partial |
-| Holepunching (BEP 55) | yes | — | — |
+| Add, Remove, Pause, Resume, List, Recheck, Move, Sequential download, File selection, Per-torrent limits, Peers, Trackers, Categories, Tags, First/last piece | yes | yes | yes |
+| Seed policy, Super-seeding (BEP 16), Session stats, IP filter, Web seeds | yes | partial | yes |
+| RAM disk, Fast resume | yes | — | yes |
+| Per-piece diagnostics, Holepunching (BEP 55) | yes | — | — |
+| Session sync | yes | yes | — |
 <!-- capability-matrix:end -->
 
 The active engine's statistics — torrents by state, speed and queue slots,
@@ -125,8 +119,8 @@ downloads on a 16 GB machine, the engine footprint differs sharply:
 | Engine | Idle (torrents loaded) | Peak while transferring |
 |---|---:|---:|
 | gx-torrent | ~25 MB | ~100 MB |
-| embedded libtorrent (in Gextto's process) | ~0.5 GB | 3–5 GB |
 | qBittorrent-nox | ~40 MB | ~5 GB |
+| libtorrent (in Gextto's process, optional build) | ~0.5 GB | 3–5 GB |
 
 libtorrent and qBittorrent keep a large in-process disk cache (GBs of anonymous
 memory). gx-torrent has **no large in-process write-back cache by design**: it
@@ -149,10 +143,9 @@ curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sud
 It installs the program in `/opt/gextto`, stores service data in
 `/var/lib/gextto`, and exposes the UI on port 5000. The default torrent engine,
 `gx-torrent` (pure Go), is installed next to `gexttod` and started in managed
-mode. The default release package is **pure Go** and does not include libtorrent:
-nothing else must be installed. The embedded libtorrent engine needs a dedicated
-build (`make build-libtorrent`, see below); otherwise external qBittorrent-nox
-remains an option.
+mode. The release package is **pure Go**: nothing else must be installed. An
+external qBittorrent-nox can be used instead; the libtorrent engine needs a build
+of your own (`make build-libtorrent`, see below).
 
 Before touching the system the installer runs the downloaded program once: a
 missing library or a too-old glibc is reported right away instead of leaving a
@@ -171,15 +164,15 @@ instead. When the library lives on a NAS owned by another user,
 
 ### Install from source
 
-Go 1.26+ is required. The default build is **pure Go** and needs no libtorrent.
-To include the **embedded libtorrent** engine, also install a C++17 compiler and
-the libtorrent-rasterbar development headers: it is a **build option**. The
+Go 1.26+ is required; the default build is **pure Go**. Only to include the
+optional **libtorrent** engine, also install a C++17 compiler and the
+libtorrent-rasterbar development headers. The
 normal build embeds the web UI; no separate frontend build is required. See the
 [developer manual](docs/DEVELOPERS.md).
 
 ```bash
-make build                 # pure Go (default): gx-torrent, no libtorrent
-make build-libtorrent      # also link the embedded libtorrent engine
+make build                 # pure Go (default), with gx-torrent
+make build-libtorrent      # also link the optional libtorrent engine
 ```
 
 `make build` increments the **committed** build number (`build_number`, the same
@@ -188,9 +181,8 @@ source shared with CI, so the checkout and the released version show the same
 to `bin/gexttod`, plus the pure-Go `gx-torrent` engine next to it. To rebuild
 without incrementing the number, use `make fast` (or `make fast-libtorrent` for
 the libtorrent variant). To build **only** the
-`gx-torrent` daemon (no C++/libtorrent needed), use `make gx-torrent`. Verify
-the exact binary, product version, build number and linked libtorrent version
-with:
+`gx-torrent` daemon, use `make gx-torrent`. Verify the exact binary, product
+version, build number and, if linked, the libtorrent version with:
 
 ```bash
 ./bin/gexttod --version
@@ -306,7 +298,7 @@ any copyrighted content.
 - What you download is **entirely your responsibility**. Use Gextto only for
   content you have the right to access — public domain, Creative Commons, or
   media you own.
-- The torrent integration (libtorrent) is a neutral technology. Gextto does not
+- BitTorrent, and the engines Gextto drives, are a neutral technology. Gextto does not
   encourage or facilitate piracy.
 - This project is released under the **EUPL 1.2** open-source license.
 
