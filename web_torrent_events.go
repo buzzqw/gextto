@@ -1263,8 +1263,11 @@ func tev_postSeedRelocate(cfg *Config, torrents TorrentSession, db *Database, to
 	// archive destination. Moving to LibtorrentDir first makes the completion
 	// handler scan the whole work tree (including unrelated backups) and leaves
 	// the completed file outside its library.
+	// A release whose library copy is already in place (a season pack or copy
+	// mode import) only has to leave RAM/tmp: moving its torrent tree into the
+	// archive would add a second copy as a subfolder of the series.
 	destination := cfg.LibtorrentDir
-	if db != nil {
+	if db != nil && !tev_completedSourceDisposable(db, torrent.Hash, current) {
 		if meta, err := db.TorrentMeta(torrent.Hash); err == nil && meta != nil {
 			if configured, ok := ConfiguredDestinationFor(&meta.Release, cfg); ok && strings.TrimSpace(configured) != "" {
 				destination = configured

@@ -275,6 +275,26 @@ func TestEnforceSeedPolicyMovesRamdiskSourceDirectlyToArchive(t *testing.T) {
 	}
 }
 
+// TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied pins the season
+// pack duplicate (Wolf Like Me): a pack seeded from tmp whose episodes were
+// already copied into the series folder must leave tmp for the download folder,
+// not be moved into the archive as a second copy in a subfolder.
+func TestEnforceSeedPolicyRamdiskSkipsArchiveWhenAlreadyCopied(t *testing.T) {
+	db, cfg, view, source, processed := seedTestSetup(t)
+	cfg.Settings["libtorrent_ramdisk_enabled"] = "yes"
+	cfg.Settings["libtorrent_ramdisk_dir"] = filepath.Dir(source)
+	downloads := filepath.Join(t.TempDir(), "downloads")
+	cfg.LibtorrentDir = downloads
+	library := filepath.Dir(processed)
+	cfg.ArchiveRoot = &library
+
+	session := &stubTorrentSession{list: []models.TorrentView{view}}
+	EnforceSeedPolicy(cfg, session, db, map[string]struct{}{}, map[string]StorageMoveRetry{}, map[string]time.Time{})
+	if got := session.moved[seedTestHash]; got != downloads {
+		t.Fatalf("post-seed destination of an already archived copy = %q, want %q", got, downloads)
+	}
+}
+
 // TestEnforceSeedPolicyAssociatesExistingArchive recovers a destination that
 // was populated before a restart interrupted the storage_moved event.
 func TestEnforceSeedPolicyAssociatesExistingArchive(t *testing.T) {
