@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build the daemon from this checkout and install it as a systemd *system*
-# service. For a production install use install.sh, which also creates the
-# dedicated service account; this script is aimed at a local server where the
-# checkout is the source of truth.
+# service, running as the current user. For a production install use install.sh
+# (it also defaults to the local user; add `--user gextto` for the isolated
+# dedicated account); this script is aimed at a local server where the checkout
+# is the source of truth.
 #
 # For a per-user service without root, use scripts/install-user-service.sh.
 set -euo pipefail

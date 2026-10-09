@@ -60,7 +60,8 @@ GEXTTO_DATA_DIR=/new/data GEXTTO_ACTIVE=1 GEXTTO_DRY_RUN=0 gexttod
 
 ### 5. Install as a service
 
-A system unit (replace the paths and the user):
+A system unit (replace the paths and the user; `install.sh` uses the local user
+by default, or `gextto` for the isolated account):
 
 ```ini
 [Unit]
@@ -70,8 +71,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=gextto
-Group=gextto
+User=<user>
+Group=<group>
 WorkingDirectory=/var/lib/gextto
 ExecStart=/opt/gextto/gexttod
 Environment=GEXTTO_DATA_DIR=/var/lib/gextto

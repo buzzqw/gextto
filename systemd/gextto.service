@@ -5,6 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Account that runs the service and owns the media library. The installer uses
+# the local user by default; start-gextto-service.sh replaces this with the
+# current user (id -un / id -gn).
 User=gextto
 Group=gextto
 Environment=GEXTTO_DATA_DIR=/var/lib/gextto
