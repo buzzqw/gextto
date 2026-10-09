@@ -1,24 +1,12 @@
 # Da fare (backlog)
 
 Punti aperti. Ripristinato l'8-10-2026: era finito per errore in `docs/archive/`
-pur essendo un backlog **attivo**. I due item recuperati dal piano di adozione
-(ora in `docs/scelte-di-progetto.md`) sono gli unici aperti.
+pur essendo un backlog **attivo**. Dei due item recuperati dal piano di adozione
+(ora in `docs/scelte-di-progetto.md`) resta aperta solo l'osservabilità.
 
 ## Aperti
 
-### 1. Wizard di primo avvio (onboarding)
-Il vecchio piano di adozione lo indicava come l'item a più alto impatto. Oggi
-esistono solo `GET /api/setup` e `POST /api/setup/complete` (stato e conferma),
-**nessuna UI guidata**. Piano dettagliato già scritto in
-`docs/internal/SETUP_WIZARD_PLAN.md`.
-
-Percorso in ordine, ogni passo con un test che dà un esito concreto: locale e
-cartelle → backend di download (test di connessione) → indexer (URL + chiave del
-manager, con una ricerca di prova) → radici della libreria (anteprima scansione)
-→ naming (anteprima dal vivo) → media server (test) → notifiche (test) → primo
-ciclo reale. Riprendibile, saltabile, dry-run di default.
-
-### 2. Osservabilità e runbook
+### 1. Osservabilità e runbook
 - ID di correlazione attraverso ricerca → download → import;
 - metriche: profondità della coda, durata della ricerca, fallimenti di indexer e
   import, spazio disco, ultimo ciclo riuscito;
@@ -33,6 +21,9 @@ ciclo reale. Riprendibile, saltabile, dry-run di default.
 
 ## Chiusi / decisioni
 
+- **Wizard di primo avvio (onboarding)** — fatto e giudicato concluso
+  (2026-10-10). Procedura guidata in `uiweb_v2_setup.go` (commit `c8162d8`), poi
+  TVDB come alternativa a TMDB e scelta della lingua al primo passo.
 - **Pulsante «Predefinito» su ogni impostazione** — fatto. Ogni campo non segreto
   con un default registrato (anche vuoto: «no schedule», nessun bootstrap DHT)
   mostra il pulsante ↺ accanto a «Salva»: riempie il campo col default e l'utente
