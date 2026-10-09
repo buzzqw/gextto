@@ -1000,6 +1000,7 @@ func ConfigView(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"default_language":                     cfg.DefaultLanguage(),
 		"tvdb_api_key":                         tvdbAPIKey,
 		"tvdb_configured":                      tvdbKey != nil,
+		"tvdb_pin":                             cfg.TvdbPin(),
 		"tvdb_language":                        cfg.TvdbLanguage(),
 		"simkl_configured":                     settingsOr(cfg, "simkl_client_id", "") != "",
 		"simkl_authenticated":                  settingsOr(cfg, "simkl_access_token", "") != "",

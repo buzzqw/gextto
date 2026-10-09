@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/buzzqw/gextto/internal/models"
 )
@@ -76,22 +75,21 @@ func (n animeNumbering) absolute(season, episode int64) (int64, bool) {
 	return 0, false
 }
 
-// animeNumberingFor reads the season sizes of an anime series from TMDB (the
-// TMDB client caches them).
+// animeNumberingFor reads the season sizes of an anime series from TMDB, or
+// TVDB without a TMDB key (both clients cache them).
 func animeNumberingFor(ctx context.Context, cfg *Config, series *SeriesConfig) animeNumbering {
-	if cfg == nil || series == nil || cfg.TmdbAPIKey == nil {
+	if cfg == nil || series == nil {
 		return newAnimeNumbering(nil)
 	}
-	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	tmdbID := strings.TrimSpace(series.TmdbID)
-	if tmdbID == "" {
-		resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
-		if err != nil || resolved == nil {
-			return newAnimeNumbering(nil)
-		}
-		tmdbID = *resolved
+	meta := seriesMetadataFor(cfg)
+	if !meta.Configured() {
+		return newAnimeNumbering(nil)
 	}
-	counts, err := tmdb.SeasonCounts(ctx, tmdbID)
+	seriesID, err := metadataSeriesID(ctx, meta, series)
+	if err != nil || seriesID == nil {
+		return newAnimeNumbering(nil)
+	}
+	counts, err := meta.SeasonCounts(ctx, *seriesID)
 	if err != nil {
 		return newAnimeNumbering(nil)
 	}

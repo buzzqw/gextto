@@ -1072,6 +1072,7 @@ func SourcesHealth(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"items":        items,
 		"flaresolverr": cfg.FlaresolverrURL != nil,
 		"tmdb":         cfg.TmdbAPIKey != nil,
+		"tvdb":         tvdbClientFor(cfg).Configured(),
 	})
 }
 

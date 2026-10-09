@@ -282,8 +282,9 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "auth_password", Label: "Password", Tab: "access", Group: "Login"},
 	{Key: "auth_api_key", Label: "Chiave API (script, TUI, calendario)", Tab: "access", Group: "Chiavi API"},
 	{Key: "gxtorrent_token", Label: "gx-torrent — token di accesso (pagina e API in LAN)", Tab: "access", Group: "Chiavi API"},
-	{Key: "tmdb_api_key", Label: "TMDB API key", Tab: "access", Group: "Servizi metadati"},
-	{Key: "tvdb_api_key", Label: "TVDB API key", Tab: "access", Group: "Servizi metadati"},
+	{Key: "tmdb_api_key", Label: "TMDB API key (consigliata)", Tab: "access", Group: "Servizi metadati"},
+	{Key: "tvdb_api_key", Label: "TVDB API key (alternativa a TMDB)", Tab: "access", Group: "Servizi metadati"},
+	{Key: "tvdb_pin", Label: "TVDB PIN abbonato", Tab: "access", Group: "Servizi metadati"},
 
 	// --- Diagnostica e traduzioni -------------------------------------------
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "system", Group: "Diagnostica"},

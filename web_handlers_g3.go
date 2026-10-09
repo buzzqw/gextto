@@ -394,7 +394,7 @@ func MovieMetadataSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	var lookupErr error
 	switch source {
 	case "tvdb":
-		tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+		tvdb := tvdbClientFor(cfg)
 		if !tvdb.Configured() {
 			jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "TVDB API key is not configured"})
 			return

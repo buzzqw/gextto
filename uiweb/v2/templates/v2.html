@@ -1592,7 +1592,7 @@
 
       {{else if eq .Step 3}}
       <h3>Da dove cercare</h3>
-      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e usa TMDB per titoli, locandine e calendario. Senza TMDB può cercare i titoli su TVDB, ma calendario e locandine richiedono TMDB. Puoi aggiungerne altri dopo, in Impostazioni.</p>
+      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e prende titoli, stagioni, episodi, locandine e calendario da TMDB (consigliato) oppure da TVDB. Basta una delle due chiavi: se ci sono entrambe vince TMDB. Puoi aggiungere altro dopo, in Impostazioni.</p>
       {{if .Indexers}}<p><span class="badge ok">Indexer configurati</span> {{range .Indexers}}<code>{{.Name}}</code> {{end}}</p>{{end}}
       <form method="post" action="/setup/sources" class="v2-setup-form">
         <fieldset class="v2-setup-fields"><legend>Aggiungi un indexer</legend>
@@ -1601,13 +1601,14 @@
           <label><span>URL base</span><input class="input" name="indexer_url" placeholder="http://127.0.0.1:9696" inputmode="url" spellcheck="false" /></label>
           <label><span>API key</span><input class="input" type="password" name="indexer_api_key" autocomplete="off" /></label>
         </fieldset>
-        <fieldset class="v2-setup-fields"><legend>TMDB</legend>
+        <fieldset class="v2-setup-fields"><legend>TMDB (consigliato)</legend>
           <label><span>TMDB API key</span><input class="input" type="password" name="tmdb_api_key" autocomplete="off" placeholder="{{if .TmdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
-          <small class="hint">Gratuita su themoviedb.org → Impostazioni → API.</small>
+          <small class="hint">Gratuita su themoviedb.org → Impostazioni → API. È la fonte consigliata.</small>
         </fieldset>
         <fieldset class="v2-setup-fields"><legend>TVDB (alternativa)</legend>
           <label><span>TVDB API key</span><input class="input" type="password" name="tvdb_api_key" autocomplete="off" placeholder="{{if .TvdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
-          <small class="hint">Usata per la ricerca dei titoli solo se manca la chiave TMDB. Chiave v4 da thetvdb.com → Dashboard → API keys; a seconda del tipo di chiave può servire un abbonamento TVDB.</small>
+          <label><span>PIN abbonato</span><input class="input" type="password" name="tvdb_pin" autocomplete="off" placeholder="solo se la chiave lo richiede" /></label>
+          <small class="hint">Usata al posto di TMDB quando manca la chiave TMDB. Chiave v4 da thetvdb.com → Dashboard → API keys. Le chiavi «user-supported» richiedono un abbonamento TVDB e il suo PIN. Con TVDB manca solo la sezione Scopri.</small>
         </fieldset>
         <div class="toolbar">
           <button class="btn primary" type="submit">Salva e continua</button>
@@ -1641,7 +1642,7 @@
       <ul class="v2-setup-summary">
         <li>{{if .ArchiveSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Cartella della libreria</span></li>
         <li>{{if .HasIndexer}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un indexer</span></li>
-        <li>{{if .TmdbSet}}<span class="badge ok">OK</span> <span>TMDB API key</span>{{else if .TvdbSet}}<span class="badge ok">OK</span> <span>TVDB API key (senza TMDB: niente calendario né locandine)</span>{{else}}<span class="badge warn">Manca</span> <span>TMDB o TVDB API key</span>{{end}}</li>
+        <li>{{if .TmdbSet}}<span class="badge ok">OK</span> <span>TMDB API key</span>{{else if .TvdbSet}}<span class="badge ok">OK</span> <span>TVDB API key (TMDB è consigliata; senza TMDB manca la sezione Scopri)</span>{{else}}<span class="badge warn">Manca</span> <span>TMDB o TVDB API key</span>{{end}}</li>
         <li>{{if or .SeriesCount .MoviesCount}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un titolo in libreria</span></li>
       </ul>
       <form method="post" action="/setup/finish" class="v2-setup-form">

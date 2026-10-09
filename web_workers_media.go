@@ -124,7 +124,7 @@ func calendarWarmupWorker(state *AppState) {
 	}
 	for {
 		cfg := latestConfig(state)
-		if cfg.TmdbAPIKey != nil {
+		if metadataConfigured(cfg) {
 			if _, ok := cacheGet("calendar", 120*time.Second); !ok {
 				response := gh0_buildCalendar(context.Background(), cfg)
 				cachePut("calendar", response)

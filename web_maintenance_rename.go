@@ -376,8 +376,8 @@ func folderRenameSearchSeries(ctx context.Context, cfg *Config, query string) ([
 			}
 		}
 	}
-	if key := cfg.TvdbAPIKey(); key != nil {
-		items, err := WithLanguage(key, cfg.TvdbLanguage()).SearchSeries(ctx, query)
+	if cfg.TvdbAPIKey() != nil {
+		items, err := tvdbClientFor(cfg).SearchSeries(ctx, query)
 		if err != nil {
 			if len(candidates) == 0 && firstErr == nil {
 				firstErr = err
@@ -417,8 +417,8 @@ func folderRenameSearchMovies(ctx context.Context, cfg *Config, query string, ye
 			}
 		}
 	}
-	if key := cfg.TvdbAPIKey(); key != nil {
-		items, err := WithLanguage(key, cfg.TvdbLanguage()).SearchMovies(ctx, query)
+	if cfg.TvdbAPIKey() != nil {
+		items, err := tvdbClientFor(cfg).SearchMovies(ctx, query)
 		if err != nil {
 			if len(candidates) == 0 && firstErr == nil {
 				firstErr = err
@@ -481,10 +481,25 @@ func folderRenameSortCandidates(candidates []folderRenameCandidate) []folderRena
 }
 
 func folderRenameEpisodeTitle(ctx context.Context, cfg *Config, candidate folderRenameCandidate, season, episode int64) (string, error) {
-	if cfg.TmdbAPIKey == nil || candidate.ID == "" {
+	if candidate.ID == "" {
 		return "", fmt.Errorf("episodio non disponibile")
 	}
-	title, err := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()).EpisodeTitle(ctx, candidate.ID, season, episode)
+	// The id belongs to the provider that found the candidate.
+	var title *string
+	var err error
+	switch candidate.Provider {
+	case "tvdb":
+		tvdb := tvdbClientFor(cfg)
+		if !tvdb.Configured() {
+			return "", fmt.Errorf("episodio non disponibile")
+		}
+		title, err = tvdb.EpisodeTitle(ctx, candidate.ID, season, episode)
+	default:
+		if cfg.TmdbAPIKey == nil {
+			return "", fmt.Errorf("episodio non disponibile")
+		}
+		title, err = NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage()).EpisodeTitle(ctx, candidate.ID, season, episode)
+	}
 	if err != nil || title == nil {
 		return "", fmt.Errorf("episodio non disponibile")
 	}

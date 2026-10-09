@@ -1248,25 +1248,22 @@ func EpisodeSources(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 // refreshSeriesMetadataForSearch loads the season episode counts needed by the
-// manual missing search. It is deliberately limited to counts: the explicit
-// metadata action below additionally refreshes status and air dates.
+// manual missing search (from TMDB, or TVDB without a TMDB key). It is
+// deliberately limited to counts: the explicit metadata action below
+// additionally refreshes status and air dates.
 func refreshSeriesMetadataForSearch(ctx context.Context, cfg *Config, db *Database, series *SeriesConfig) error {
-	if cfg == nil || cfg.TmdbAPIKey == nil {
-		return fmt.Errorf("TMDB API key is not configured")
+	meta := seriesMetadataFor(cfg)
+	if !meta.Configured() {
+		return fmt.Errorf("TMDB API key is not configured (nor a TVDB one)")
 	}
-	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	resolved := strings.TrimSpace(series.TmdbID)
-	if resolved == "" {
-		id, err := tmdb.ResolveSeriesID(ctx, series.Name)
-		if err != nil {
-			return err
-		}
-		if id == nil {
-			return fmt.Errorf("series not found on TMDB")
-		}
-		resolved = *id
+	resolved, err := metadataSeriesID(ctx, meta, series)
+	if err != nil {
+		return err
 	}
-	counts, err := tmdb.SeasonCounts(ctx, resolved)
+	if resolved == nil {
+		return fmt.Errorf("series not found on %s", strings.ToUpper(meta.Source()))
+	}
+	counts, err := meta.SeasonCounts(ctx, *resolved)
 	if err != nil {
 		return err
 	}
@@ -1276,7 +1273,7 @@ func refreshSeriesMetadataForSearch(ctx context.Context, cfg *Config, db *Databa
 	}
 	sort.Slice(values, func(i, j int) bool { return values[i][0] < values[j][0] })
 	if len(values) == 0 {
-		return fmt.Errorf("TMDB returned no season metadata")
+		return fmt.Errorf("%s returned no season metadata", strings.ToUpper(meta.Source()))
 	}
 	return db.SaveSeriesMetadata(series.Name, values)
 }
@@ -1294,26 +1291,27 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		jsonError(w, http.StatusNotFound, "series not found")
 		return
 	}
-	if cfg.TmdbAPIKey == nil {
-		jsonError(w, http.StatusConflict, "TMDB API key is not configured")
+	meta := seriesMetadataFor(&cfg)
+	if !meta.Configured() {
+		jsonError(w, http.StatusConflict, "TMDB API key is not configured (nor a TVDB one)")
 		return
 	}
 	ctx := r.Context()
-	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	resolved := strings.TrimSpace(series.TmdbID)
+	source := strings.ToUpper(meta.Source())
+	resolved := meta.StoredID(&series)
 	if resolved == "" {
-		id, err := tmdb.ResolveSeriesID(ctx, series.Name)
+		id, err := meta.ResolveSeriesID(ctx, series.Name)
 		if err != nil {
 			jsonError(w, http.StatusBadGateway, err.Error())
 			return
 		}
 		if id == nil {
-			jsonError(w, http.StatusNotFound, "series not found on TMDB")
+			jsonError(w, http.StatusNotFound, "series not found on "+source)
 			return
 		}
 		resolved = *id
 	}
-	counts, err := tmdb.SeasonCounts(ctx, resolved)
+	counts, err := meta.SeasonCounts(ctx, resolved)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
@@ -1331,11 +1329,11 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		if season <= 0 {
 			continue
 		}
-		episodes, err := tmdb.SeasonEpisodes(ctx, resolved, season)
+		episodes, err := meta.SeasonEpisodes(ctx, resolved, season)
 		if err != nil {
 			airDateErrors++
-			logging.Warn("TMDB season air-date refresh failed",
-				"series", series.Name, "season", season, "error", err.Error())
+			logging.Warn("season air-date refresh failed",
+				"series", series.Name, "season", season, "source", meta.Source(), "error", err.Error())
 			continue
 		}
 		for _, episode := range episodes {
@@ -1357,13 +1355,13 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 		jsonError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if info, err := tmdb.SeriesInfo(ctx, series.Name, &resolved); err == nil && info != nil {
+	if info, err := meta.SeriesInfo(ctx, series.Name, &resolved); err == nil && info != nil {
 		if err := s.db.SaveSeriesStatus(series.Name, gh7_json_string(info, "status"), gh7_json_string(info, "last_air_date")); err != nil {
 			logging.Warn("series status save failed", "series", series.Name, "error", err.Error())
 		}
 	}
 	stored := false
-	if strings.TrimSpace(series.TmdbID) == "" {
+	if meta.StoredID(&series) == "" {
 		for i := range cfg.Series {
 			item := &cfg.Series[i]
 			aliasMatch := false
@@ -1374,7 +1372,11 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 				}
 			}
 			if item.Name == series.Name || aliasMatch {
-				item.TmdbID = resolved
+				if meta.Source() == "tvdb" {
+					item.TvdbID = resolved
+				} else {
+					item.TmdbID = resolved
+				}
 				stored = true
 			}
 		}
@@ -1390,11 +1392,17 @@ func SeriesMetadataRefresh(w http.ResponseWriter, r *http.Request, s *AppState) 
 	for _, value := range values {
 		seasons = append(seasons, map[string]any{"season": value[0], "episodes": value[1]})
 	}
+	tmdbID, tvdbID := resolved, ""
+	if meta.Source() == "tvdb" {
+		tmdbID, tvdbID = "", resolved
+	}
 	jsonResponse(w, map[string]any{
 		"ok":                true,
 		"series":            series.Name,
-		"tmdb_id":           resolved,
+		"tmdb_id":           tmdbID,
+		"tvdb_id":           tvdbID,
 		"tmdb_id_stored":    stored,
+		"source":            meta.Source(),
 		"air_dates_updated": len(airDates),
 		"air_date_errors":   airDateErrors,
 		"seasons":           seasons,
@@ -1547,9 +1555,9 @@ func TmdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// TMDB is the primary source; without its key TVDB (when configured) is
 	// used on its own, for series and movies alike.
 	tmdbConfigured := cfg.TmdbAPIKey != nil && strings.TrimSpace(*cfg.TmdbAPIKey) != ""
-	tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+	tvdb := tvdbClientFor(cfg)
 	if !tmdbConfigured && !tvdb.Configured() {
-		jsonError(w, http.StatusConflict, "TMDB API key is not configured")
+		jsonError(w, http.StatusConflict, "TMDB API key is not configured (nor a TVDB one)")
 		return
 	}
 	if input.Kind == "" {
@@ -1754,7 +1762,7 @@ func TvdbSearch(w http.ResponseWriter, r *http.Request, s *AppState) {
 		return
 	}
 	cfg := latestConfig(s)
-	client := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+	client := tvdbClientFor(cfg)
 	if !client.Configured() {
 		jsonError(w, http.StatusPreconditionRequired, "TVDB API key non configurata")
 		return

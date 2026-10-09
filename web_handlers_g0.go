@@ -338,6 +338,13 @@ func MovieDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 				cast = credits
 			}
 		}
+	} else if tvdb := tvdbClientFor(cfg); tvdb.Configured() && strings.TrimSpace(movieCopy.TvdbID) != "" {
+		metadata = storedMetadata
+		if item, err := tvdb.MovieDetails(r.Context(), movieCopy.TvdbID); err == nil {
+			if details, ok := item.(map[string]any); ok {
+				metadata = gh0_tvdbMovieMetadata(details, storedMetadata, cfg.TvdbLanguage())
+			}
+		}
 	} else {
 		metadata = storedMetadata
 	}
@@ -350,6 +357,38 @@ func MovieDetail(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"cast":     cast,
 		"matches":  matches,
 	})
+}
+
+// gh0_tvdbMovieMetadata maps a TVDB movie record onto the metadata of the
+// movie detail, keeping the stored values TVDB does not have.
+func gh0_tvdbMovieMetadata(details, stored map[string]any, language string) map[string]any {
+	out := map[string]any{}
+	for key, value := range stored {
+		out[key] = value
+	}
+	out["source"] = "tvdb"
+	originalName, _ := tvdbString(details["name"])
+	if name := tvdbTranslation(details, "nameTranslations", "name", language, originalName); name != "" {
+		out["title"] = name
+	}
+	if original, ok := tvdbString(details["originalName"]); ok && original != "" {
+		out["original_title"] = original
+	} else if originalName != "" {
+		out["original_title"] = originalName
+	}
+	overview, _ := tvdbString(details["overview"])
+	if text := tvdbTranslation(details, "overviewTranslations", "overview", language, overview); text != "" {
+		out["overview"] = text
+	}
+	if image, ok := tvdbString(details["image"]); ok && image != "" {
+		out["poster_path"] = image
+	}
+	if date, ok := tvdbString(tvdbGet(details["first_release"], "date")); ok && date != "" {
+		out["release_date"] = date
+	} else if year := v2AnyString(details["year"]); year != "" {
+		out["release_date"] = year
+	}
+	return out
 }
 
 func gh0_metadataSource(tvdbID string) string {
@@ -638,6 +677,7 @@ func RecentDownloads(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	cfg := latestConfig(s)
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	meta := seriesMetadataWith(cfg, tmdb)
 
 	out := make([]map[string]any, len(items))
 	var wg sync.WaitGroup
@@ -649,14 +689,16 @@ func RecentDownloads(w http.ResponseWriter, r *http.Request, s *AppState) {
 			value := gh0_toMap(item)
 			var poster *string
 			if item.Kind == "series" {
-				if found, err := tmdb.PosterForSeries(r.Context(), item.Name); err == nil {
+				if found, err := meta.PosterForSeries(r.Context(), item.Name); err == nil {
 					poster = found
 				}
+			} else if meta.Source() == "tvdb" {
+				poster = tvdbMoviePoster(r.Context(), meta.(tvdbSeriesMetadata).TvdbClient, item.Name, item.Year)
 			} else if movie, err := tmdb.SearchMovie(r.Context(), item.Name, item.Year); err == nil && movie != nil {
 				poster = movie.PosterPath
 			}
-			if poster != nil {
-				value["poster"] = fmt.Sprintf("https://image.tmdb.org/t/p/w154%s", *poster)
+			if poster != nil && *poster != "" {
+				value["poster"] = metadataImageURL(*poster, "w154")
 			}
 			out[position] = value
 		}(index, items[index])
@@ -790,8 +832,8 @@ func gh0_releaseMatchesSeriesEpisode(release models.Release, series *SeriesConfi
 
 func Calendar(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	if cfg.TmdbAPIKey == nil {
-		jsonError(w, http.StatusConflict, "TMDB API key is not configured")
+	if !metadataConfigured(cfg) {
+		jsonError(w, http.StatusConflict, "TMDB API key is not configured (nor a TVDB one)")
 		return
 	}
 	if cached, ok := cacheGet("calendar", 120*time.Second); ok {
@@ -804,7 +846,7 @@ func Calendar(w http.ResponseWriter, r *http.Request, s *AppState) {
 }
 
 func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
-	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	meta := seriesMetadataFor(cfg)
 	enabled := []SeriesConfig{}
 	for _, series := range cfg.Series {
 		if series.Enabled {
@@ -818,37 +860,31 @@ func gh0_buildCalendar(ctx context.Context, cfg *Config) map[string]any {
 		go func(position int, series SeriesConfig) {
 			defer recoverGoroutine("series list")
 			defer wg.Done()
-			var tmdbID *string
-			if strings.TrimSpace(series.TmdbID) == "" {
-				resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
-				if err != nil {
-					return
-				}
-				tmdbID = resolved
-			} else {
-				value := series.TmdbID
-				tmdbID = &value
-			}
-			if tmdbID == nil {
+			seriesID, err := metadataSeriesID(ctx, meta, &series)
+			if err != nil || seriesID == nil {
 				return
 			}
-			episode, err := tmdb.NextEpisode(ctx, *tmdbID)
+			episode, err := meta.NextEpisode(ctx, *seriesID)
 			if err != nil {
-				logging.Debug("TMDB calendar lookup failed", "series", series.Name, "error", err)
+				logging.Debug("calendar lookup failed", "series", series.Name, "source", meta.Source(), "error", err)
 				return
 			}
 			if episode == nil {
 				return
 			}
 			var poster *string
-			if path, err := tmdb.PosterForSeries(ctx, series.Name); err == nil && path != nil {
-				value := fmt.Sprintf("https://image.tmdb.org/t/p/w154%s", *path)
+			if path, err := meta.PosterForSeries(ctx, series.Name); err == nil && path != nil {
+				value := metadataImageURL(*path, "w154")
 				poster = &value
+			}
+			tmdbID, tvdbID := *seriesID, strings.TrimSpace(series.TvdbID)
+			if meta.Source() == "tvdb" {
+				tmdbID, tvdbID = strings.TrimSpace(series.TmdbID), *seriesID
 			}
 			items[position] = map[string]any{
 				"series":  series.Name,
-				"tmdb_id": *tmdbID,
-				"tvdb_id": strings.TrimSpace(series.TvdbID),
+				"tmdb_id": tmdbID,
+				"tvdb_id": tvdbID,
 				"episode": gh0_toMap(episode),
 				"poster":  poster,
 			}
@@ -1528,7 +1564,7 @@ func gh0_runHousekeeping(s *AppState) (*HousekeepingReport, bool) {
 
 func TvdbSeries(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	client := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+	client := tvdbClientFor(cfg)
 	if !client.Configured() {
 		jsonError(w, http.StatusPreconditionRequired, "TVDB API key non configurata")
 		return

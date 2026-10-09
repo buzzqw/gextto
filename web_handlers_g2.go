@@ -921,7 +921,7 @@ func SeriesSearchMissing(w http.ResponseWriter, r *http.Request, s *AppState) {
 	// A newly added series may not have season counts yet. Populate them before
 	// calculating gaps so the first manual search does not misleadingly report
 	// zero episodes just because the background refresh has not run.
-	if cfg.TmdbAPIKey != nil {
+	if metadataConfigured(cfg) {
 		stale, err := s.db.SeriesMetadataStale(series.Name, 24)
 		if err != nil || stale {
 			if err := refreshSeriesMetadataForSearch(r.Context(), cfg, s.db, series); err != nil {

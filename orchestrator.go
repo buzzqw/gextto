@@ -1878,13 +1878,14 @@ func intSetSuperset(superset, subset map[int64]struct{}) bool {
 	return true
 }
 
-// refreshSeriesMetadata refreshes the TMDB season counts and status of enabled
-// series when their metadata is stale or the status was never persisted.
+// refreshSeriesMetadata refreshes the season counts and status of enabled
+// series (from TMDB, or TVDB without a TMDB key) when their metadata is stale
+// or the status was never persisted.
 func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
-	if cfg.TmdbAPIKey == nil {
+	meta := seriesMetadataFor(cfg)
+	if !meta.Configured() {
 		return
 	}
-	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
 	knownStatuses, _ := db.SeriesStatuses()
 	for i := range cfg.Series {
 		if ctx != nil && ctx.Err() != nil {
@@ -1898,43 +1899,34 @@ func refreshSeriesMetadata(ctx context.Context, cfg *Config, db *Database) {
 		if err != nil {
 			stale = true
 		}
-		// Fetch the TMDB status even when season metadata is recent if the
-		// status has never been persisted (the first refresh).
+		// Fetch the status even when season metadata is recent if the status
+		// has never been persisted (the first refresh).
 		_, known := knownStatuses[series.Name]
 		needsStatus := !known
 		if !stale && !needsStatus {
 			continue
 		}
-		var tmdbID *string
-		if strings.TrimSpace(series.TmdbID) != "" {
-			id := series.TmdbID
-			tmdbID = &id
-		} else {
-			resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
-			if err == nil {
-				tmdbID = resolved
-			}
-		}
-		if tmdbID == nil {
+		seriesID, err := metadataSeriesID(ctx, meta, series)
+		if err != nil || seriesID == nil {
 			continue
 		}
 		if stale {
-			counts, err := tmdb.SeasonCounts(ctx, *tmdbID)
+			counts, err := meta.SeasonCounts(ctx, *seriesID)
 			if err == nil {
 				values := make([][2]int64, 0, len(counts))
 				for season, count := range counts {
 					values = append(values, [2]int64{season, count})
 				}
 				if err := db.SaveSeriesMetadata(series.Name, values); err != nil {
-					logging.Warn("TMDB season metadata save failed", "series", series.Name, "error", err)
+					logging.Warn("season metadata save failed", "series", series.Name, "source", meta.Source(), "error", err)
 				}
 			} else {
-				logging.Debug("TMDB season metadata refresh failed", "series", series.Name, "error", err)
+				logging.Debug("season metadata refresh failed", "series", series.Name, "source", meta.Source(), "error", err)
 			}
 		}
-		// Persist TMDB status ("Ended"/"Returning Series") for the series-list
+		// Persist the status ("Ended"/"Returning Series") for the series-list
 		// badge.
-		if info, err := tmdb.SeriesInfo(ctx, series.Name, tmdbID); err == nil && info != nil {
+		if info, err := meta.SeriesInfo(ctx, series.Name, seriesID); err == nil && info != nil {
 			status, _ := info["status"].(string)
 			lastAirDate, _ := info["last_air_date"].(string)
 			if err := db.SaveSeriesStatus(series.Name, status, lastAirDate); err != nil {

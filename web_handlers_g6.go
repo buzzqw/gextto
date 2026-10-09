@@ -481,7 +481,7 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"release_date":   item.ReleaseDate,
 		}
 	} else if source == "tvdb" {
-		tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+		tvdb := tvdbClientFor(cfg)
 		if !tvdb.Configured() {
 			jsonError(w, http.StatusConflict, "TVDB API key is not configured")
 			return
@@ -504,10 +504,12 @@ func ApplyMovieMetadata(w http.ResponseWriter, r *http.Request, s *AppState) {
 		} else if value, present := itemMap["image_url"]; present {
 			poster = value
 		}
+		// Title and overview in the TVDB language when translated.
+		translated := gh0_tvdbMovieMetadata(itemMap, map[string]any{}, cfg.TvdbLanguage())
 		details = map[string]any{
-			"title":          itemMap["name"],
+			"title":          translated["title"],
 			"original_title": itemMap["originalName"],
-			"overview":       itemMap["overview"],
+			"overview":       translated["overview"],
 			"poster_path":    poster,
 			"release_date":   itemMap["year"],
 		}
@@ -1487,7 +1489,7 @@ func SimklWatchlist(w http.ResponseWriter, r *http.Request, s *AppState) {
 func TmdbDiscover(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
 	if cfg.TmdbAPIKey == nil {
-		jsonError(w, http.StatusConflict, "TMDB API key is not configured")
+		jsonError(w, http.StatusConflict, "TMDB API key is not configured: Discover needs TMDB (TVDB has no trending or popular lists)")
 		return
 	}
 	var input DiscoverInput

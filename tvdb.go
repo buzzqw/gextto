@@ -24,11 +24,51 @@ var tvdbAPI = "https://api4.thetvdb.com/v4"
 type TvdbClient struct {
 	client   *http.Client
 	key      *string
+	pin      string
 	language string
+}
 
-	mu         sync.Mutex
-	cachedAuth string
-	expiry     time.Time
+// tvdbTokens caches the login tokens of every client, keyed by API base URL,
+// key and PIN: clients are built per request, and each one logging in again
+// would cost a round trip on every metadata lookup.
+var tvdbTokens = struct {
+	sync.Mutex
+	items map[string]tvdbToken
+}{items: map[string]tvdbToken{}}
+
+type tvdbToken struct {
+	value  string
+	expiry time.Time
+}
+
+// tvdbClientFor builds the TVDB client of the configuration: API key,
+// subscriber PIN (needed by "user-supported" keys) and language.
+func tvdbClientFor(cfg *Config) *TvdbClient {
+	if cfg == nil {
+		return New(nil)
+	}
+	return WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage()).WithPin(cfg.TvdbPin())
+}
+
+// WithPin sets the TVDB subscriber PIN sent at login (blank: none).
+func (c *TvdbClient) WithPin(pin string) *TvdbClient {
+	c.pin = strings.TrimSpace(pin)
+	return c
+}
+
+func (c *TvdbClient) tokenKey() string {
+	return tvdbAPI + "\x00" + strings.TrimSpace(*c.key) + "\x00" + c.pin
+}
+
+// forgetToken drops the cached token after the API refused it (401), so the
+// next request logs in again.
+func (c *TvdbClient) forgetToken() {
+	if c.key == nil {
+		return
+	}
+	tvdbTokens.Lock()
+	delete(tvdbTokens.items, c.tokenKey())
+	tvdbTokens.Unlock()
 }
 
 // New builds a TVDB client for the given API key (nil disables it), defaulting
@@ -63,15 +103,19 @@ func (c *TvdbClient) token(ctx context.Context) (string, error) {
 	if c.key == nil || strings.TrimSpace(*c.key) == "" {
 		return "", fmt.Errorf("TVDB API key non configurata")
 	}
-	c.mu.Lock()
-	if c.cachedAuth != "" && time.Now().Before(c.expiry) {
-		cached := c.cachedAuth
-		c.mu.Unlock()
-		return cached, nil
+	cacheKey := c.tokenKey()
+	tvdbTokens.Lock()
+	if cached, ok := tvdbTokens.items[cacheKey]; ok && time.Now().Before(cached.expiry) {
+		tvdbTokens.Unlock()
+		return cached.value, nil
 	}
-	c.mu.Unlock()
+	tvdbTokens.Unlock()
 
-	payload, err := json.Marshal(map[string]any{"apikey": *c.key})
+	login := map[string]any{"apikey": strings.TrimSpace(*c.key)}
+	if c.pin != "" {
+		login["pin"] = c.pin
+	}
+	payload, err := json.Marshal(login)
 	if err != nil {
 		return "", err
 	}
@@ -90,10 +134,9 @@ func (c *TvdbClient) token(ctx context.Context) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("TVDB login senza token")
 	}
-	c.mu.Lock()
-	c.cachedAuth = token
-	c.expiry = time.Now().Add(23 * time.Hour)
-	c.mu.Unlock()
+	tvdbTokens.Lock()
+	tvdbTokens.items[cacheKey] = tvdbToken{value: token, expiry: time.Now().Add(23 * time.Hour)}
+	tvdbTokens.Unlock()
 	return token, nil
 }
 
@@ -190,7 +233,7 @@ func (c *TvdbClient) MovieDetails(ctx context.Context, id string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rawURL := tvdbAPI + "/movies/" + strconv.FormatInt(parsed, 10) + "/extended"
+	rawURL := tvdbAPI + "/movies/" + strconv.FormatInt(parsed, 10) + "/extended?meta=translations&short=true"
 	headers := map[string]string{
 		"Accept-Language": c.language,
 		"Authorization":   "Bearer " + token,

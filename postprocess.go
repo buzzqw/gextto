@@ -1041,12 +1041,20 @@ func episodeTarget(
 	// TMDB has no per-episode endpoint for E00 specials/recaps. Keep the
 	// configured fallback title instead of failing the completed import on its
 	// expected 404 response.
-	if tmdb != nil && episode > 0 {
-		tmdbID := series.TmdbID
-		if strings.TrimSpace(tmdbID) == "" {
-			resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
+	// Titles come from TMDB, or from TVDB without a TMDB key.
+	meta := seriesMetadataWith(cfg, tmdb)
+	if tmdb != nil && episode > 0 && meta.Configured() {
+		tmdbID := meta.StoredID(series)
+		if tmdbID == "" {
+			resolved, err := meta.ResolveSeriesID(ctx, series.Name)
 			if err != nil {
-				return "", "", false, err
+				if meta.Source() == "tmdb" {
+					return "", "", false, err
+				}
+				// The TVDB login (key/PIN) is easier to get wrong: a failure
+				// only costs the episode title, never the import.
+				logging.Warn("episode metadata unavailable; using fallback title",
+					"series", series.Name, "source", meta.Source(), "error", err.Error())
 			}
 			if resolved != nil {
 				tmdbID = *resolved
@@ -1055,7 +1063,7 @@ func episodeTarget(
 			}
 		}
 		if tmdbID != "" {
-			t, err := tmdb.EpisodeTitle(ctx, tmdbID, season, episode)
+			t, err := meta.EpisodeTitle(ctx, tmdbID, season, episode)
 			if err != nil {
 				// Metadata only improves the display name. A missing/unknown
 				// episode (or a temporary provider failure) must never prevent a

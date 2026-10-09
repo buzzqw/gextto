@@ -193,6 +193,11 @@ func NewTmdbClientWithLanguage(key *string, language string) *TmdbClient {
 	}
 }
 
+// Configured reports whether a non-blank TMDB API key is set.
+func (t *TmdbClient) Configured() bool {
+	return t != nil && t.key != nil && strings.TrimSpace(*t.key) != ""
+}
+
 // Clone mirrors the derived `Clone` impl: the cache (and its lock) is shared,
 // just like the `Arc<Mutex<...>>`.
 func (t *TmdbClient) Clone() *TmdbClient {

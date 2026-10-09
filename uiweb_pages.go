@@ -1227,8 +1227,8 @@ func uiSettingIsSecret(key string) bool {
 			return true
 		}
 	}
-	// A proxy URL can embed credentials.
-	return strings.HasSuffix(lowered, "_proxy")
+	// A proxy URL can embed credentials; a PIN is a credential too.
+	return strings.HasSuffix(lowered, "_proxy") || strings.HasSuffix(lowered, "_pin")
 }
 
 func uiSettingKind(key, value string) string {

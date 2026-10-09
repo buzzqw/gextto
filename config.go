@@ -1010,6 +1010,12 @@ func (c *Config) TvdbAPIKey() *string {
 	return nil
 }
 
+// TvdbPin is the TheTVDB subscriber PIN, needed at login by the
+// "user-supported" API keys (blank when not set).
+func (c *Config) TvdbPin() string {
+	return strings.TrimSpace(c.Settings["tvdb_pin"])
+}
+
 // TvdbLanguage is the preferred TVDB language (falls back to the default
 // acquisition language).
 func (c *Config) TvdbLanguage() string {

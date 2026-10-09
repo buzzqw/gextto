@@ -1186,12 +1186,13 @@ func SeriesInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	ctx := r.Context()
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
-	var tmdbID *string
-	if strings.TrimSpace(series.TmdbID) != "" {
-		value := series.TmdbID
-		tmdbID = &value
+	// TMDB when its key is set, else TVDB: both return the TMDB /tv shape.
+	meta := seriesMetadataWith(cfg, tmdb)
+	var storedID *string
+	if id := meta.StoredID(series); id != "" {
+		storedID = &id
 	}
-	value, err := tmdb.SeriesInfo(ctx, series.Name, tmdbID)
+	value, err := meta.SeriesInfo(ctx, series.Name, storedID)
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, err.Error())
 		return
@@ -1202,8 +1203,8 @@ func SeriesInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 
 	var poster *string
-	if path, ok := value["poster_path"].(string); ok {
-		address := "https://image.tmdb.org/t/p/w300" + path
+	if path, ok := value["poster_path"].(string); ok && path != "" {
+		address := metadataImageURL(path, "w300")
 		poster = &address
 	}
 	var network *string
@@ -1243,9 +1244,11 @@ func SeriesInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 		lastAirDate = &text
 	}
 
-	tvdb := WithLanguage(cfg.TvdbAPIKey(), cfg.TvdbLanguage())
+	tvdb := tvdbClientFor(cfg)
 	var tvdbID *int64
 	if parsed, parseErr := strconv.ParseInt(strings.TrimSpace(series.TvdbID), 10, 64); parseErr == nil {
+		tvdbID = &parsed
+	} else if parsed, ok := tvdbSeriesID(v2AnyString(value["tvdb_id"])); ok {
 		tvdbID = &parsed
 	}
 	if tvdbID == nil {
@@ -1325,12 +1328,20 @@ func SeriesInfo(w http.ResponseWriter, r *http.Request, s *AppState) {
 			"last_episode":   value["last_episode_to_air"],
 			"next_episode":   value["next_episode_to_air"],
 			"tmdb_id":        value["id"],
-			"tvdb_id":        series.TvdbID,
+			"tvdb_id":        gh5_seriesTvdbID(series.TvdbID, tvdbID),
 			"tvdb_url":       tvdbURL,
 			"cast":           cast,
 			"genres":         genres,
 		},
 	})
+}
+
+// gh5_seriesTvdbID is the stored TVDB id of a series, else the one found.
+func gh5_seriesTvdbID(stored string, found *int64) string {
+	if strings.TrimSpace(stored) != "" || found == nil {
+		return stored
+	}
+	return strconv.FormatInt(*found, 10)
 }
 
 // ServiceRestart implements `service_restart`.

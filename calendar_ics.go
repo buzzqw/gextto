@@ -51,8 +51,8 @@ var icsCache struct {
 // CalendarICS serves GET /feed/calendar.ics.
 func CalendarICS(w http.ResponseWriter, r *http.Request, s *AppState) {
 	cfg := latestConfig(s)
-	if cfg.TmdbAPIKey == nil {
-		http.Error(w, "TMDB API key is not configured", http.StatusConflict)
+	if !metadataConfigured(cfg) {
+		http.Error(w, "TMDB API key is not configured (nor a TVDB one)", http.StatusConflict)
 		return
 	}
 	lang := v2Language(s)
@@ -74,6 +74,19 @@ func CalendarICS(w http.ResponseWriter, r *http.Request, s *AppState) {
 // tr translates the Italian texts into the interface language.
 func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(string) string, now time.Time) []icsEvent {
 	tmdb := NewTmdbClientWithLanguage(cfg.TmdbAPIKey, cfg.TmdbLanguage())
+	meta := seriesMetadataWith(cfg, tmdb)
+	// sourced names the provider in the event texts ("… (TMDB)" → "(TVDB)"),
+	// and keeps the TVDB UIDs apart from the TMDB ones.
+	sourced := func(text string) string {
+		if meta.Source() == "tvdb" {
+			return strings.ReplaceAll(text, "TMDB", "TVDB")
+		}
+		return text
+	}
+	uidPrefix := ""
+	if meta.Source() == "tvdb" {
+		uidPrefix = "tvdb-"
+	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	from := today.AddDate(0, 0, -icsPastDays)
 	to := today.AddDate(0, 0, icsFutureDays)
@@ -100,17 +113,14 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 			defer wg.Done()
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
-			tmdbID := strings.TrimSpace(series.TmdbID)
-			if tmdbID == "" {
-				resolved, err := tmdb.ResolveSeriesID(ctx, series.Name)
-				if err != nil || resolved == nil {
-					return
-				}
-				tmdbID = *resolved
+			resolved, err := metadataSeriesID(ctx, meta, &series)
+			if err != nil || resolved == nil {
+				return
 			}
-			next, err := tmdb.NextEpisode(ctx, tmdbID)
+			seriesID := *resolved
+			next, err := meta.NextEpisode(ctx, seriesID)
 			if err != nil {
-				logging.Debug("calendar feed: TMDB lookup failed", "series", series.Name, "error", err)
+				logging.Debug("calendar feed: metadata lookup failed", "series", series.Name, "source", meta.Source(), "error", err)
 				return
 			}
 			seasons := map[int64]bool{}
@@ -123,7 +133,7 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 			downloaded := icsDownloadedEpisodes(db, series.Name)
 			found := []icsEvent{}
 			for season := range seasons {
-				episodes, err := tmdb.SeasonEpisodes(ctx, tmdbID, season)
+				episodes, err := meta.SeasonEpisodes(ctx, seriesID, season)
 				if err != nil {
 					continue
 				}
@@ -140,13 +150,13 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 					if episode.Name != nil && strings.TrimSpace(*episode.Name) != "" {
 						summary += " · " + strings.TrimSpace(*episode.Name)
 					}
-					description := tr("Prima messa in onda originale (TMDB). La versione italiana può arrivare molto più tardi: quando gextto la scarica compare come «📥».")
+					description := sourced(tr("Prima messa in onda originale (TMDB). La versione italiana può arrivare molto più tardi: quando gextto la scarica compare come «📥»."))
 					if downloaded[[2]int64{*episode.SeasonNumber, *episode.EpisodeNumber}] {
 						summary = "✓ " + summary
-						description = tr("Prima messa in onda originale (TMDB). Già in libreria.")
+						description = sourced(tr("Prima messa in onda originale (TMDB). Già in libreria."))
 					}
 					found = append(found, icsEvent{
-						UID:         fmt.Sprintf("gextto-tv-%s-%s@gextto", tmdbID, code),
+						UID:         fmt.Sprintf("gextto-tv-%s%s-%s@gextto", uidPrefix, seriesID, code),
 						Date:        date,
 						Summary:     summary,
 						Description: description,
@@ -158,8 +168,36 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 			mu.Unlock()
 		}(series)
 	}
+	tvdbMovies := meta.Source() == "tvdb"
 	for _, movie := range cfg.Movies {
-		if !movie.Enabled || strings.TrimSpace(movie.TmdbID) == "" {
+		if !movie.Enabled {
+			continue
+		}
+		if tvdbMovies {
+			if strings.TrimSpace(movie.TvdbID) == "" {
+				continue
+			}
+			wg.Add(1)
+			go func(movie MovieConfig) {
+				defer recoverGoroutine("calendar feed")
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+				date, ok := inWindow(tvdbMovieReleaseDate(ctx, tvdbClientFor(cfg), movie.TvdbID))
+				if !ok {
+					return
+				}
+				mu.Lock()
+				events = append(events, icsEvent{
+					UID:     fmt.Sprintf("gextto-movie-tvdb-%s@gextto", strings.TrimSpace(movie.TvdbID)),
+					Date:    date,
+					Summary: "🎬 " + movie.Name + " " + tr("(uscita originale)"),
+				})
+				mu.Unlock()
+			}(movie)
+			continue
+		}
+		if strings.TrimSpace(movie.TmdbID) == "" {
 			continue
 		}
 		wg.Add(1)
@@ -205,6 +243,20 @@ func icsCollectEvents(ctx context.Context, cfg *Config, db *Database, tr func(st
 		return events[a].Summary < events[b].Summary
 	})
 	return events
+}
+
+// tvdbMovieReleaseDate returns the first release date of a TVDB movie
+// ("YYYY-MM-DD"), or "" when TVDB has none.
+func tvdbMovieReleaseDate(ctx context.Context, tvdb *TvdbClient, id string) string {
+	item, err := tvdb.MovieDetails(ctx, id)
+	if err != nil {
+		return ""
+	}
+	details, _ := item.(map[string]any)
+	if date, ok := tvdbString(tvdbGet(details["first_release"], "date")); ok {
+		return strings.TrimSpace(date)
+	}
+	return ""
 }
 
 // icsCountry takes the region of the TMDB language ("it-IT" → "IT").
