@@ -1776,6 +1776,13 @@ func (field v2Field) Resettable() bool {
 	return field.Default != "" && !field.Managed && !field.Disabled && field.Kind != "structured" && field.Kind != "secret"
 }
 
+// DefaultInline reports whether the default can be shown inline in the row
+// header. Long or multi-line defaults (blacklist, extra settings) would break
+// the layout, so they only get the button.
+func (field v2Field) DefaultInline() bool {
+	return field.Default != "" && !strings.Contains(field.Default, "\n") && len([]rune(field.Default)) <= 80
+}
+
 // v2UnusedSettingsHint explains the closed panels of options the active
 // torrent engine ignores (each row still says which engine is active).
 const v2UnusedSettingsHint = "Valgono solo con un altro motore torrent: restano salvate e tornano attive cambiando motore."

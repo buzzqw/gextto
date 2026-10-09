@@ -985,50 +985,58 @@ func uiApplySettingMeta(field *uiSettingField, stored string) {
 	meta := uiSettingMetaByKey[field.Key]
 	field.Unit, field.Zero, field.DependsOn = meta.Unit, meta.Zero, meta.DependsOn
 	def := uiSettingDefault(field.Key)
+	// Secrets and structured values never expose a default. List-like controls
+	// (tags, area: e.g. blacklist, extra settings) keep their raw kind but still
+	// get the default, so «Predefinito» works there too.
+	refineKind := true
 	switch field.Kind {
-	case "secret", "structured", "tags", "area":
+	case "secret", "structured":
 		return
+	case "tags", "area":
+		refineKind = false
 	}
-	switch meta.Kind {
-	case "time":
-		field.Kind = "time"
-	case "days":
-		field.Kind = "days"
-		field.Options = uiDaysOptions(field.Value)
-	case "url":
+	if refineKind {
+		switch meta.Kind {
+		case "time":
+			field.Kind = "time"
+		case "days":
+			field.Kind = "days"
+			field.Options = uiDaysOptions(field.Value)
+		case "url":
+			if field.Kind == "text" {
+				field.Kind = "url"
+			}
+		case "select":
+			selected := strings.TrimSpace(field.Value)
+			options := make([]uiFormOption, 0, len(meta.Options)+1)
+			found := false
+			for _, option := range meta.Options {
+				option.Selected = option.Value == selected
+				found = found || option.Selected
+				options = append(options, option)
+			}
+			if selected != "" && !found {
+				options = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, options...)
+			}
+			field.Kind, field.Options = "select", options
+		}
+		// The stored value alone cannot tell a boolean or a number when the key
+		// was never saved or uses another spelling ("1"): the default can.
 		if field.Kind == "text" {
-			field.Kind = "url"
+			defLower := strings.ToLower(strings.TrimSpace(def))
+			switch {
+			case uiIsBoolSpelling(defLower) && !uiIsNumber(defLower) && (strings.TrimSpace(field.Value) == "" || uiIsBoolSpelling(field.Value)):
+				field.Kind = "bool"
+				field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(field.Value)
+			case uiIsNumber(def) && (strings.TrimSpace(field.Value) == "" || uiIsNumber(field.Value)):
+				field.Kind = "number"
+			}
 		}
-	case "select":
-		selected := strings.TrimSpace(field.Value)
-		options := make([]uiFormOption, 0, len(meta.Options)+1)
-		found := false
-		for _, option := range meta.Options {
-			option.Selected = option.Value == selected
-			found = found || option.Selected
-			options = append(options, option)
-		}
-		if selected != "" && !found {
-			options = append([]uiFormOption{{Value: selected, Label: selected + " (personalizzata)", Selected: true}}, options...)
-		}
-		field.Kind, field.Options = "select", options
-	}
-	// The stored value alone cannot tell a boolean or a number when the key
-	// was never saved or uses another spelling ("1"): the default can.
-	if field.Kind == "text" {
-		defLower := strings.ToLower(strings.TrimSpace(def))
-		switch {
-		case uiIsBoolSpelling(defLower) && !uiIsNumber(defLower) && (strings.TrimSpace(field.Value) == "" || uiIsBoolSpelling(field.Value)):
-			field.Kind = "bool"
-			field.BoolValue, field.TrueValue, field.FalseValue = uiBoolValues(field.Value)
-		case uiIsNumber(def) && (strings.TrimSpace(field.Value) == "" || uiIsNumber(field.Value)):
-			field.Kind = "number"
-		}
-	}
-	if field.Kind == "number" && field.Step == "" {
-		field.Step = "any"
-		if uiScoreSettingKeys[field.Key] {
-			field.Step = "1"
+		if field.Kind == "number" && field.Step == "" {
+			field.Step = "any"
+			if uiScoreSettingKeys[field.Key] {
+				field.Step = "1"
+			}
 		}
 	}
 	if def == "" || uiSettingIsSecret(field.Key) || uiSettingNoPrefill[field.Key] {
