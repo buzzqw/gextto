@@ -6,8 +6,10 @@ package gextto
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type v2TrashItem struct {
@@ -82,4 +84,77 @@ func V2SourcesCheck(w http.ResponseWriter, r *http.Request, s *AppState) {
 	request.URL.RawQuery = query.Encode()
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_table_body", v2TableDataFrom(s, request, "health-sources", spec), dict, eng)
+}
+
+// v2UpdateView is the "Aggiornamenti" maintenance panel.
+type v2UpdateView struct {
+	UpdateStatus
+	Message string
+	Error   bool
+}
+
+// CheckedLabel is the last check time in local time.
+func (v v2UpdateView) CheckedLabel() string { return v2UpdateTimeLabel(v.CheckedAt) }
+
+// LatestBuiltLabel is the build time of the newest release in local time.
+func (v v2UpdateView) LatestBuiltLabel() string { return v2UpdateTimeLabel(v.LatestBuiltAt) }
+
+func v2UpdateTimeLabel(value string) string {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return value
+	}
+	return parsed.Local().Format("2006-01-02 15:04")
+}
+
+// V2Update renders the update panel; POST action=check checks now and
+// action=apply requests the update. While an update runs the panel polls
+// itself with ?from=<version>: once the restarted daemon answers with another
+// version it reports the update as done.
+func V2Update(w http.ResponseWriter, r *http.Request, s *AppState) {
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/?view=maintenance", http.StatusSeeOther)
+		return
+	}
+	cfg := latestConfig(s)
+	view := v2UpdateView{}
+	if r.Method == http.MethodPost {
+		switch r.FormValue("action") {
+		case "check":
+			updates.Check(r.Context())
+		case "apply":
+			if err := updates.RequestUpdate(cfg); err != nil {
+				view.Message, view.Error = v2UpdateErrorMessage(err), true
+			} else {
+				view.Message = "Aggiornamento avviato: Gextto si riavvierà da solo."
+			}
+		}
+	}
+	view.UpdateStatus = updates.Status(cfg)
+	if from := strings.TrimSpace(r.FormValue("from")); from != "" && !view.Requested {
+		if from != view.Version {
+			view.Message = "Aggiornamento completato."
+		} else if view.Message == "" {
+			view.Message, view.Error = "L'aggiornamento non è stato installato: controlla il log qui sotto.", true
+		}
+	}
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_update_panel", view, dict, eng)
+}
+
+// v2UpdateErrorMessage turns a RequestUpdate error into a message of the UI.
+func v2UpdateErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, errUpdateSourceBuild):
+		return "Installazione da sorgenti: aggiorna con git pull e make build."
+	case errors.Is(err, errUpdateNoUpdater):
+		return "Aggiornamento dalla UI non configurato: riesegui l'installer (install.sh) per abilitarlo, oppure usa sudo gexttod --update."
+	case errors.Is(err, errUpdateInProgress):
+		return "Un aggiornamento è già in corso."
+	case errors.Is(err, errUpdateNone):
+		return "Nessun aggiornamento disponibile."
+	case errors.Is(err, errUpdateBackup):
+		return "Backup prima dell'aggiornamento non riuscito: aggiornamento annullato."
+	}
+	return err.Error()
 }

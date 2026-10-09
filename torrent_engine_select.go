@@ -4,7 +4,8 @@ package gextto
 // engine, with the mandatory preflight that protects the filesystem: a backend
 // is never activated when a path it may be asked to use cannot be translated.
 //
-// `embedded` (libtorrent) stays the default. Selecting qBittorrent is opt-in
+// `gx-torrent` is the default (DefaultTorrentBackend); embedded libtorrent is
+// the automatic fallback. Selecting qBittorrent is opt-in
 // and non-destructive: if the connectivity preflight fails the adapter is still
 // installed (it degrades to an empty/stale view), but a path-mapping failure
 // refuses activation because it could relocate files to the wrong place.

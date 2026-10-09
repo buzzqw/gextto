@@ -59,8 +59,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 	if got := len(uiSettingsKeysBeforeReorganization); got != 149 {
 		t.Fatalf("frozen list has %d keys, want 149", got)
 	}
-	if got := len(uiSettingsIndex); got != 149 {
-		t.Fatalf("settings index has %d options, want the 149 of before", got)
+	if got := len(uiSettingsIndex); got != 152 {
+		t.Fatalf("settings index has %d options, want the 149 of before plus the 2 stall-alternative options and update_check", got)
 	}
 	if got := len(uiScoreSettingDefs); got != 27 {
 		t.Fatalf("score weights = %d, want 27", got)
@@ -99,8 +99,8 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		}
 		found++
 	}
-	if found != 176 {
-		t.Fatalf("rendered %d options, want 176", found)
+	if found != 179 {
+		t.Fatalf("rendered %d options, want 179", found)
 	}
 
 	// Editors, panels and actions without a single key.

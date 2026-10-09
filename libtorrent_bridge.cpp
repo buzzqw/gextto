@@ -1092,9 +1092,18 @@ int gextto_lt_associate_storage(gextto_lt_session* session, const char* hash, co
         // libtorrent re-check the data at the new location. When the destination
         // already holds the payload this associates (and seeds) it instead of
         // failing with "already exists".
+#if LIBTORRENT_VERSION_NUM >= 20007
         handle.move_storage(destination, lt::move_flags_t::reset_save_path);
         handle.force_recheck();
         return 1;
+#else
+        // The release archive is built on an older baseline (Ubuntu 22.04,
+        // libtorrent 2.0.5) so it runs on every supported distribution; that
+        // libtorrent cannot change the save path without moving the files.
+        (void)handle;
+        set_error(error, error_size, "associating existing data requires libtorrent 2.0.7 or newer");
+        return 0;
+#endif
     } catch (const std::exception& exception) {
         set_error(error, error_size, exception.what());
     } catch (...) {

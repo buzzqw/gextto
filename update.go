@@ -79,6 +79,24 @@ func ReleaseName(opts UpdateOptions) string {
 	if value, ok := os.LookupEnv("GEXTTO_CHANNEL"); ok {
 		return value
 	}
+	if marker, ok := updateInstalledMarker(); ok {
+		return ChannelFromMarker(marker)
+	}
+	return "continuous"
+}
+
+// ChannelFromMarker maps the installed release marker to the channel that
+// updates it: a tagged release ("v1.2.3") follows the stable releases
+// ("latest"), anything else ("continuous", "continuous-<sha>") the continuous
+// build. An update never silently switches channel.
+func ChannelFromMarker(marker string) string {
+	marker = strings.TrimSpace(marker)
+	if len(marker) > 1 && marker[0] == 'v' && marker[1] >= '0' && marker[1] <= '9' {
+		return "latest"
+	}
+	if marker == "latest" || marker == "stable" {
+		return "latest"
+	}
 	return "continuous"
 }
 
@@ -186,7 +204,17 @@ func Run(ctx context.Context, opts UpdateOptions) error {
 	if err := updateInstallRelease(root, installDir); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(installDir, "VERSION"), []byte(release+"\n"), 0o644); err != nil {
+	// The payload's own marker ("continuous-<sha>", "v1.2.3") says exactly
+	// what is installed; the release name is only a fallback.
+	marker := []byte(release + "\n")
+	if payload, err := os.ReadFile(filepath.Join(root, "VERSION")); err == nil && strings.TrimSpace(string(payload)) != "" {
+		marker = payload
+	}
+	// The previous marker goes back in place if the new version is rolled back.
+	if previous, err := os.ReadFile(filepath.Join(installDir, "VERSION")); err == nil {
+		_ = os.WriteFile(filepath.Join(installDir, "VERSION.prev"), previous, 0o644)
+	}
+	if err := os.WriteFile(filepath.Join(installDir, "VERSION"), marker, 0o644); err != nil {
 		return err
 	}
 	fmt.Printf("Gextto updated to %s in %s\n", release, installDir)
@@ -467,11 +495,17 @@ func updateInstallRelease(root, installDir string) error {
 		committed = append(committed, item)
 	}
 
-	// Success: the previous versions are no longer needed.
+	// Success: the previous directories are no longer needed. The previous
+	// executable is kept as gexttod.prev (as the installer does): if the new
+	// version does not start, updateRestartService puts it back.
 	for _, item := range committed {
 		updateRemovePath(item.previous)
 	}
-	updateRemovePath(backup)
+	if hadBinary {
+		if err := os.Rename(backup, filepath.Join(installDir, constants.AppName+".prev")); err != nil {
+			updateRemovePath(backup)
+		}
+	}
 
 	// The gx-torrent daemon may be running (managed mode): install it
 	// through a rename so the running executable is never overwritten in place.
@@ -518,15 +552,70 @@ func updateRestartService(opts UpdateOptions) error {
 		fmt.Printf("Run `sudo systemctl restart %s` to start the new version.\n", ServiceName)
 		return nil
 	}
-	cmd := exec.Command("systemctl", "restart", ServiceName)
+	if err := updateSystemctl("restart", ServiceName); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not restart %s; run `systemctl restart %s` manually.\n", ServiceName, ServiceName)
+		return nil
+	}
+	if updateWaitActive(30 * time.Second) {
+		fmt.Printf("Service %s restarted.\n", ServiceName)
+		return nil
+	}
+	// The new version does not start: put the previous executable back.
+	installDir, err := updateResolveInstallDir(opts)
+	if err != nil {
+		return fmt.Errorf("%s did not start after the update: %w", ServiceName, err)
+	}
+	previous := filepath.Join(installDir, constants.AppName+".prev")
+	if !updateIsFile(previous) {
+		return fmt.Errorf("%s did not start after the update and no previous version is available; inspect: journalctl -u %s -n 100", ServiceName, ServiceName)
+	}
+	fmt.Fprintf(os.Stderr, "%s did not start after the update: restoring the previous version.\n", ServiceName)
+	binary := filepath.Join(installDir, constants.AppName)
+	staged := binary + ".rollback"
+	if err := updateCopyFileMode(previous, staged); err != nil {
+		return fmt.Errorf("rollback failed: %w", err)
+	}
+	if err := os.Rename(staged, binary); err != nil {
+		updateRemovePath(staged)
+		return fmt.Errorf("rollback failed: %w", err)
+	}
+	if previousMarker, err := os.ReadFile(filepath.Join(installDir, "VERSION.prev")); err == nil {
+		_ = os.WriteFile(filepath.Join(installDir, "VERSION"), previousMarker, 0o644)
+	} else {
+		_ = os.WriteFile(filepath.Join(installDir, "VERSION"), []byte("rollback\n"), 0o644)
+	}
+	if err := updateSystemctl("restart", ServiceName); err != nil || !updateWaitActive(30*time.Second) {
+		return fmt.Errorf("the update failed and the previous version did not start either; inspect: journalctl -u %s -n 100", ServiceName)
+	}
+	return fmt.Errorf("the new version did not start: the previous one was restored and is running")
+}
+
+func updateSystemctl(args ...string) error {
+	cmd := exec.Command("systemctl", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err == nil {
-		fmt.Printf("Service %s restarted.\n", ServiceName)
-	} else {
-		fmt.Fprintf(os.Stderr, "Could not restart %s; run `systemctl restart %s` manually.\n", ServiceName, ServiceName)
+	return cmd.Run()
+}
+
+// updateWaitActive polls the service until it is active, for at most limit.
+// `systemctl restart` returns once the unit started; a binary that crashes
+// right away shows up as "activating"/"failed" within a few seconds.
+func updateWaitActive(limit time.Duration) bool {
+	deadline := time.Now().Add(limit)
+	stable := 0
+	for time.Now().Before(deadline) {
+		if exec.Command("systemctl", "is-active", "--quiet", ServiceName).Run() == nil {
+			// Active for five consecutive seconds: not a crash loop.
+			stable++
+			if stable >= 5 {
+				return true
+			}
+		} else {
+			stable = 0
+		}
+		time.Sleep(time.Second)
 	}
-	return nil
+	return false
 }
 
 func updateSetExecutable(path string) error {

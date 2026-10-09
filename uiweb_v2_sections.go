@@ -63,6 +63,8 @@ type v2Section struct {
 	FolderRename *v2FolderRenameView
 	Progress     *v2ProgressView
 	Jobs         *v2JobsView
+	GxLog        *v2LogsView
+	Update       *v2UpdateView
 }
 
 type v2Group struct {
@@ -163,6 +165,14 @@ func v2ConvertSection(s *AppState, r *http.Request, view string, section uiPageS
 	case "folder_rename":
 		item.FolderRename = &v2FolderRenameView{}
 		item.Title = "Rinomina contenuto cartella"
+	case "update":
+		widget := v2UpdateView{UpdateStatus: updates.Status(latestConfig(s))}
+		item.Update = &widget
+		item.Title = "Aggiornamenti"
+	case "gx_log":
+		widget := v2GxLogsViewFrom(s, "", 500, "", false)
+		item.GxLog = &widget
+		item.Title = "Log gx-torrent"
 	default:
 		// Keep unknown section kinds visible without exposing a legacy fallback.
 	}
@@ -274,6 +284,34 @@ func v2ActionFlash(path string, raw []byte, status int) (string, bool) {
 				return "Cestino già vuoto: nessun elemento da eliminare.", false
 			}
 			return fmt.Sprintf("Cestino svuotato: %d elementi eliminati.", payload.Files), false
+		}
+	}
+	if path == "/api/torrent-backend/portcheck" {
+		var payload struct {
+			Port       int    `json:"port"`
+			Listening  bool   `json:"listening"`
+			Open       bool   `json:"open"`
+			Method     string `json:"method"`
+			ExternalIP string `json:"external_ip"`
+			Detail     string `json:"detail"`
+		}
+		if json.Unmarshal(raw, &payload) == nil {
+			where := ""
+			if payload.ExternalIP != "" {
+				where = " · IP " + payload.ExternalIP
+			}
+			switch {
+			case payload.Open:
+				method := strings.ToUpper(payload.Method)
+				if method == "" {
+					method = "manuale"
+				}
+				return fmt.Sprintf("Porta %d aperta (%s%s): ricevi connessioni in ingresso.", payload.Port, method, where), false
+			case payload.Listening:
+				return fmt.Sprintf("Porta %d in ascolto ma non inoltrata dal router%s. %s", payload.Port, where, payload.Detail), false
+			default:
+				return fmt.Sprintf("Porta %d chiusa. %s", payload.Port, payload.Detail), false
+			}
 		}
 	}
 	return "Operazione completata.", false

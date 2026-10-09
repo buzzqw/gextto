@@ -19,6 +19,10 @@ func TestBrandingHasNoLegacyName(t *testing.T) {
 	}
 
 	state := newTestAppState(t)
+	// A fresh state opens the setup wizard; the branding is checked on the dashboard.
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatal(err)
+	}
 	recorder := httptest.NewRecorder()
 	V2Page(recorder, httptest.NewRequest(http.MethodGet, "/", nil), state)
 	body := recorder.Body.Bytes()

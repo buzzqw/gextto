@@ -717,6 +717,9 @@ func RunCycleDomain(
 			liveDownloads.Episodes[*key] = struct{}{}
 		}
 	}
+	// Episodes whose download is stuck for long enough may accept a temporary
+	// alternative within a few points, without removing the stuck torrent.
+	stallAlternatives, stallScoreDrop := stalledAlternativeContext(cfg, db, torrents)
 
 	upgrades := 0
 	var skips cycleSkipCounts
@@ -860,6 +863,8 @@ func RunCycleDomain(
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
 			GapEpisode:        isGap,
 			DryRun:            cfg.DryRun,
+			StallAlternatives: stallAlternatives,
+			StallScoreDrop:    stallScoreDrop,
 		}
 		// Decide only: nothing is written until the torrent is in the engine
 		// (see commitReleaseApproval).
@@ -874,6 +879,18 @@ func RunCycleDomain(
 			decisionReason = "gap_filled"
 		} else if len(gapEpisodes) > 0 {
 			decisionReason = "gap_fill"
+		}
+		// An episode whose download is stuck may now accept an alternative
+		// within the configured tolerance: mark it so the log, the notification
+		// and the torrent's "Motivo" say why this download was started.
+		stallStuckScore := int64(0)
+		stallApplies := false
+		if key, ok := releaseStallKey(&release); ok {
+			if stuckScore, has := stallAlternatives[key]; has && stallScoreDrop > 0 {
+				stallStuckScore = stuckScore
+				stallApplies = true
+				decisionReason = "stall_alternative"
+			}
 		}
 		if approved {
 			// The explicit path (or nil, to let the engine choose) is decided by
@@ -972,6 +989,12 @@ func RunCycleDomain(
 				}
 			case approvalReason == "upgrade":
 				why = "better version than the one you have"
+			}
+			if stallApplies {
+				why = "an alternative while the current download is stuck"
+				logging.Info(fmt.Sprintf("⏱️ %s: current download stuck for over %s, starting an alternative within %d points",
+					logTarget(&release), logDuration(time.Duration(cfg.StallAlternativeAfterMin)*time.Minute), stallScoreDrop),
+					"stuck_score", stallStuckScore, "candidate_score", releaseScore)
 			}
 			logMessage := fmt.Sprintf("📥 Downloading %s — %s (%s)", logTarget(&release), why, friendlyQuality(release.Quality))
 			if cfg.DryRun {
@@ -1177,6 +1200,7 @@ func prioritizeArchiveGapDownloads(
 			live.Episodes[*key] = struct{}{}
 		}
 	}
+	stallAlternatives, stallScoreDrop := stalledAlternativeContext(cfg, db, torrents)
 	logging.Info(fmt.Sprintf("🧩 %s can be downloaded right away from the local release archive",
 		countLabel(int64(len(candidates)), "missing episode", "missing episodes")))
 	started := 0
@@ -1195,6 +1219,8 @@ func prioritizeArchiveGapDownloads(
 			ForbidUpgrade:     series.DisableUpgrades,
 			UpgradeUntilScore: cfg.UpgradeUntilScore,
 			GapEpisode:        true,
+			StallAlternatives: stallAlternatives,
+			StallScoreDrop:    stallScoreDrop,
 		}
 		approved, reason, err := evaluateReleaseApproval(db, &release, candidate.score, cfg.UpgradeMinScoreDiff, approvalContext, series.DisableUpgrades, true)
 		if err != nil {
@@ -1447,6 +1473,89 @@ func releaseTarget(release *models.Release) string {
 	return release.Title
 }
 
+// releaseStallKey returns the live-episode key of a single-episode series
+// release, used to look up the stall tolerance.
+func releaseStallKey(release *models.Release) (models.LiveEpisodeKey, bool) {
+	if release == nil || release.Kind != "series" || release.Series == nil ||
+		release.Season == nil || release.Episode == nil {
+		return models.LiveEpisodeKey{}, false
+	}
+	return models.LiveEpisodeKey{
+		Series:  NormalizeSeriesName(*release.Series),
+		Season:  *release.Season,
+		Episode: *release.Episode,
+	}, true
+}
+
+// releaseEpisodeKeys lists every episode covered by a series release: a single
+// episode, or the whole range of a season pack.
+func releaseEpisodeKeys(release *models.Release) []models.LiveEpisodeKey {
+	if release == nil || release.Kind != "series" || release.Series == nil || release.Season == nil {
+		return nil
+	}
+	episodes := release.EpisodeRange
+	if len(episodes) == 0 && release.Episode != nil && *release.Episode > 0 {
+		episodes = []int64{*release.Episode}
+	}
+	if len(episodes) == 0 {
+		return nil
+	}
+	series := NormalizeSeriesName(*release.Series)
+	keys := make([]models.LiveEpisodeKey, 0, len(episodes))
+	for _, episode := range episodes {
+		keys = append(keys, models.LiveEpisodeKey{Series: series, Season: *release.Season, Episode: episode})
+	}
+	return keys
+}
+
+// stalledAlternativeContext loads, once per cycle, the stuck episodes that may
+// accept a temporary alternative and the configured score tolerance. It returns
+// a nil map and 0 when the feature is disabled or nothing is stuck.
+//
+// Two kinds of stuck download are covered: a torrent parked by the stall
+// monitor (no bytes for a while, persisted in the database) and a magnet still
+// waiting for its file list, which is handled by the metadata monitor and is
+// therefore not parked.
+func stalledAlternativeContext(cfg *Config, db *Database, torrents TorrentSession) (map[models.LiveEpisodeKey]int64, int64) {
+	if cfg == nil || db == nil || cfg.StallAlternativeAfterMin <= 0 || cfg.StallAlternativeScoreDrop <= 0 {
+		return nil, 0
+	}
+	after := time.Duration(cfg.StallAlternativeAfterMin) * time.Minute
+	alternatives, err := db.StalledAlternatives(time.Now().Add(-after))
+	if err != nil {
+		logging.Debug("could not load stalled alternatives", "error", err)
+		alternatives = map[models.LiveEpisodeKey]int64{}
+	}
+	if alternatives == nil {
+		alternatives = map[models.LiveEpisodeKey]int64{}
+	}
+	if torrents != nil {
+		for _, torrent := range torrents.List() {
+			if torrent.HasMetadata || torrent.State != "downloading_metadata" {
+				continue
+			}
+			if time.Duration(torrent.ActiveSeconds)*time.Second < after {
+				continue
+			}
+			meta, err := db.TorrentMeta(torrent.Hash)
+			if err != nil || meta == nil {
+				continue
+			}
+			release := &meta.Release
+			score := cfg.ReleaseScore(release)
+			for _, key := range releaseEpisodeKeys(release) {
+				if current, ok := alternatives[key]; !ok || score > current {
+					alternatives[key] = score
+				}
+			}
+		}
+	}
+	if len(alternatives) == 0 {
+		return nil, 0
+	}
+	return alternatives, cfg.StallAlternativeScoreDrop
+}
+
 // reconcilePackIdentityFromMagnet prefers the torrent display name's season and
 // episode range over the (possibly wrong) indexer title for season packs.
 func reconcilePackIdentityFromMagnet(release *models.Release) {
@@ -1668,22 +1777,43 @@ func mergeSeriesCandidate(best []models.Release, release models.Release, score i
 	return append(best, release), false
 }
 
+// seederTieBreak prefers, at an equal score, the release whose swarm is known
+// to have seeders. Indexers report seeders inconsistently, so a missing count
+// (<= 0) never wins: it only loses against a positive one. This keeps the
+// search from committing a slot to a source that already looks dead when an
+// equally good alternative reports healthy seeders.
+func seederTieBreak(a *models.Release, b *models.Release) bool {
+	return a.Seeders > 0 && a.Seeders > b.Seeders
+}
+
 // releaseStrictlyBetter reports whether a must replace b: a higher score, or at
-// equal score a REMUX against a non-REMUX. It is the negation of incumbentWins.
+// equal score a REMUX against a non-REMUX, or a known-healthier swarm. It is the
+// negation of incumbentWins.
 func releaseStrictlyBetter(a *models.Release, aScore int64, b *models.Release, bScore int64) bool {
-	return aScore > bScore || (aScore == bScore && a.Quality.IsRemux() && !b.Quality.IsRemux())
+	if aScore != bScore {
+		return aScore > bScore
+	}
+	if a.Quality.IsRemux() != b.Quality.IsRemux() {
+		return a.Quality.IsRemux()
+	}
+	return seederTieBreak(a, b)
 }
 
 // incumbentWins is true when `incumbent` must not be replaced by `candidate`:
 // at equal scores a REMUX (full-resolution version) wins, especially when it is
-// the remux of an episode that was already selected or downloaded.
+// the remux of an episode that was already selected or downloaded, and a
+// healthier swarm breaks a remaining tie.
 func incumbentWins(candidate *models.Release, candidateScore int64, incumbent *models.Release, cfg *Config) bool {
 	// Use the same policy-aware score the candidate was ranked with, so score
 	// rules and custom formats cannot make the two sides inconsistent.
 	incumbentScore := cfg.ReleaseScore(incumbent)
-	return incumbentScore > candidateScore ||
-		(incumbentScore == candidateScore &&
-			!(candidate.Quality.IsRemux() && !incumbent.Quality.IsRemux()))
+	if incumbentScore != candidateScore {
+		return incumbentScore > candidateScore
+	}
+	if candidate.Quality.IsRemux() != incumbent.Quality.IsRemux() {
+		return !(candidate.Quality.IsRemux() && !incumbent.Quality.IsRemux())
+	}
+	return !seederTieBreak(candidate, incumbent)
 }
 
 // gapTarget identifies one open archive gap.

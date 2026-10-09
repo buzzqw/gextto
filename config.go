@@ -286,52 +286,58 @@ func (s *LibtorrentSettings) UnmarshalJSON(data []byte) error {
 
 // Config is the runtime configuration of the daemon.
 type Config struct {
-	DataDir             string             `json:"data_dir"`
-	Listen              string             `json:"listen"`
-	EngineListen        string             `json:"engine_listen"`
-	RefreshSecs         uint64             `json:"refresh_secs"`
-	Active              bool               `json:"active"`
-	DryRun              bool               `json:"dry_run"`
-	FeedURLs            []string           `json:"feed_urls"`
-	Blacklist           []string           `json:"blacklist"`
-	ContentFilters      []string           `json:"content_filters"`
-	SourceFilters       []SourceFilter     `json:"source_filters"`
-	MaxReleaseAgeDays   int64              `json:"max_release_age_days"`
-	Series              []SeriesConfig     `json:"series"`
-	Movies              []MovieConfig      `json:"movies"`
-	Indexers            []IndexerConfig    `json:"indexers"`
-	WebsearchEngines    []string           `json:"websearch_engines"`
-	FlaresolverrURL     *string            `json:"flaresolverr_url"`
-	Settings            map[string]string  `json:"settings"`
-	TmdbAPIKey          *string            `json:"tmdb_api_key"`
-	RenameEpisodes      bool               `json:"rename_episodes"`
-	RenameFormat        string             `json:"rename_format"`
-	RenameTemplate      string             `json:"rename_template"`
-	ArchiveRoot         *string            `json:"archive_root"`
-	TrashPath           *string            `json:"trash_path"`
-	NotifyTelegram      bool               `json:"notify_telegram"`
-	TelegramBotToken    *string            `json:"telegram_bot_token"`
-	TelegramChatID      *string            `json:"telegram_chat_id"`
-	NotifyWebhookURL    *string            `json:"notify_webhook_url"`
-	NotifyWebhookSecret *string            `json:"notify_webhook_secret"`
-	NotifyWebhookFormat string             `json:"notify_webhook_format"`
-	NotifyWebhookToken  *string            `json:"notify_webhook_token"`
-	NotifyWebhookUser   *string            `json:"notify_webhook_user"`
-	NotifyEmail         bool               `json:"notify_email"`
-	EmailSMTP           string             `json:"email_smtp"`
-	EmailFrom           *string            `json:"email_from"`
-	EmailTo             *string            `json:"email_to"`
-	EmailPassword       *string            `json:"email_password"`
-	CleanupUpgrades     bool               `json:"cleanup_upgrades"`
-	CleanupMinScoreDiff int64              `json:"cleanup_min_score_diff"`
-	UpgradeMinScoreDiff int64              `json:"upgrade_min_score_diff"`
-	UpgradeUntilScore   int64              `json:"upgrade_until_score"`
-	CleanupAction       string             `json:"cleanup_action"`
-	LibtorrentEnabled   bool               `json:"libtorrent_enabled"`
-	Libtorrent          LibtorrentSettings `json:"libtorrent"`
-	LibtorrentDir       string             `json:"libtorrent_dir"`
-	LibtorrentTempDir   *string            `json:"libtorrent_temp_dir"`
-	StateDir            string             `json:"state_dir"`
+	DataDir             string            `json:"data_dir"`
+	Listen              string            `json:"listen"`
+	EngineListen        string            `json:"engine_listen"`
+	RefreshSecs         uint64            `json:"refresh_secs"`
+	Active              bool              `json:"active"`
+	DryRun              bool              `json:"dry_run"`
+	FeedURLs            []string          `json:"feed_urls"`
+	Blacklist           []string          `json:"blacklist"`
+	ContentFilters      []string          `json:"content_filters"`
+	SourceFilters       []SourceFilter    `json:"source_filters"`
+	MaxReleaseAgeDays   int64             `json:"max_release_age_days"`
+	Series              []SeriesConfig    `json:"series"`
+	Movies              []MovieConfig     `json:"movies"`
+	Indexers            []IndexerConfig   `json:"indexers"`
+	WebsearchEngines    []string          `json:"websearch_engines"`
+	FlaresolverrURL     *string           `json:"flaresolverr_url"`
+	Settings            map[string]string `json:"settings"`
+	TmdbAPIKey          *string           `json:"tmdb_api_key"`
+	RenameEpisodes      bool              `json:"rename_episodes"`
+	RenameFormat        string            `json:"rename_format"`
+	RenameTemplate      string            `json:"rename_template"`
+	ArchiveRoot         *string           `json:"archive_root"`
+	TrashPath           *string           `json:"trash_path"`
+	NotifyTelegram      bool              `json:"notify_telegram"`
+	TelegramBotToken    *string           `json:"telegram_bot_token"`
+	TelegramChatID      *string           `json:"telegram_chat_id"`
+	NotifyWebhookURL    *string           `json:"notify_webhook_url"`
+	NotifyWebhookSecret *string           `json:"notify_webhook_secret"`
+	NotifyWebhookFormat string            `json:"notify_webhook_format"`
+	NotifyWebhookToken  *string           `json:"notify_webhook_token"`
+	NotifyWebhookUser   *string           `json:"notify_webhook_user"`
+	NotifyEmail         bool              `json:"notify_email"`
+	EmailSMTP           string            `json:"email_smtp"`
+	EmailFrom           *string           `json:"email_from"`
+	EmailTo             *string           `json:"email_to"`
+	EmailPassword       *string           `json:"email_password"`
+	CleanupUpgrades     bool              `json:"cleanup_upgrades"`
+	CleanupMinScoreDiff int64             `json:"cleanup_min_score_diff"`
+	UpgradeMinScoreDiff int64             `json:"upgrade_min_score_diff"`
+	UpgradeUntilScore   int64             `json:"upgrade_until_score"`
+	// StallAlternativeAfterMin/ScoreDrop relax the quality floor for an episode
+	// whose download is stuck: after this many minutes without progress an
+	// alternative scoring up to ScoreDrop points less may be started, while the
+	// stuck torrent stays in the session. 0 disables either half.
+	StallAlternativeAfterMin  int64              `json:"stall_alternative_after_min"`
+	StallAlternativeScoreDrop int64              `json:"stall_alternative_score_drop"`
+	CleanupAction             string             `json:"cleanup_action"`
+	LibtorrentEnabled         bool               `json:"libtorrent_enabled"`
+	Libtorrent                LibtorrentSettings `json:"libtorrent"`
+	LibtorrentDir             string             `json:"libtorrent_dir"`
+	LibtorrentTempDir         *string            `json:"libtorrent_temp_dir"`
+	StateDir                  string             `json:"state_dir"`
 }
 
 const defaultRenameFormatValue = "base"
@@ -752,51 +758,53 @@ func DefaultConfig() Config {
 	libtorrentTempDir := filepath.Join(dataDir, "incomplete")
 	trashPath := filepath.Join(dataDir, "trash")
 	return Config{
-		StateDir:            filepath.Join(dataDir, constants.DefaultStateDir),
-		LibtorrentDir:       filepath.Join(dataDir, "downloads"),
-		LibtorrentTempDir:   &libtorrentTempDir,
-		ArchiveRoot:         nil,
-		TrashPath:           &trashPath,
-		NotifyTelegram:      false,
-		TelegramBotToken:    nil,
-		TelegramChatID:      nil,
-		NotifyWebhookURL:    nil,
-		NotifyWebhookSecret: nil,
-		NotifyWebhookFormat: "gextto",
-		NotifyWebhookToken:  nil,
-		NotifyWebhookUser:   nil,
-		NotifyEmail:         false,
-		EmailSMTP:           "smtp.gmail.com:587",
-		EmailFrom:           nil,
-		EmailTo:             nil,
-		EmailPassword:       nil,
-		CleanupUpgrades:     false,
-		CleanupMinScoreDiff: 0,
-		UpgradeMinScoreDiff: 200,
-		CleanupAction:       "move",
-		Listen:              listen,
-		EngineListen:        engineListen,
-		Active:              false,
-		DryRun:              true,
-		DataDir:             dataDir,
-		RefreshSecs:         constants.DefaultRefreshSecs,
-		FeedURLs:            []string{},
-		Blacklist:           defaultBlacklist(),
-		ContentFilters:      []string{},
-		SourceFilters:       []SourceFilter{},
-		MaxReleaseAgeDays:   0,
-		Series:              []SeriesConfig{},
-		Movies:              []MovieConfig{},
-		Settings:            map[string]string{},
-		Indexers:            []IndexerConfig{},
-		WebsearchEngines:    []string{},
-		FlaresolverrURL:     nil,
-		TmdbAPIKey:          nil,
-		RenameEpisodes:      false,
-		LibtorrentEnabled:   true,
-		Libtorrent:          DefaultLibtorrentSettings(),
-		RenameFormat:        defaultRenameFormatValue,
-		RenameTemplate:      defaultRenameTemplateValue,
+		StateDir:                  filepath.Join(dataDir, constants.DefaultStateDir),
+		LibtorrentDir:             filepath.Join(dataDir, "downloads"),
+		LibtorrentTempDir:         &libtorrentTempDir,
+		ArchiveRoot:               nil,
+		TrashPath:                 &trashPath,
+		NotifyTelegram:            false,
+		TelegramBotToken:          nil,
+		TelegramChatID:            nil,
+		NotifyWebhookURL:          nil,
+		NotifyWebhookSecret:       nil,
+		NotifyWebhookFormat:       "gextto",
+		NotifyWebhookToken:        nil,
+		NotifyWebhookUser:         nil,
+		NotifyEmail:               false,
+		EmailSMTP:                 "smtp.gmail.com:587",
+		EmailFrom:                 nil,
+		EmailTo:                   nil,
+		EmailPassword:             nil,
+		CleanupUpgrades:           false,
+		CleanupMinScoreDiff:       0,
+		UpgradeMinScoreDiff:       200,
+		StallAlternativeAfterMin:  360,
+		StallAlternativeScoreDrop: 100,
+		CleanupAction:             "move",
+		Listen:                    listen,
+		EngineListen:              engineListen,
+		Active:                    false,
+		DryRun:                    true,
+		DataDir:                   dataDir,
+		RefreshSecs:               constants.DefaultRefreshSecs,
+		FeedURLs:                  []string{},
+		Blacklist:                 defaultBlacklist(),
+		ContentFilters:            []string{},
+		SourceFilters:             []SourceFilter{},
+		MaxReleaseAgeDays:         0,
+		Series:                    []SeriesConfig{},
+		Movies:                    []MovieConfig{},
+		Settings:                  map[string]string{},
+		Indexers:                  []IndexerConfig{},
+		WebsearchEngines:          []string{},
+		FlaresolverrURL:           nil,
+		TmdbAPIKey:                nil,
+		RenameEpisodes:            false,
+		LibtorrentEnabled:         true,
+		Libtorrent:                DefaultLibtorrentSettings(),
+		RenameFormat:              defaultRenameFormatValue,
+		RenameTemplate:            defaultRenameTemplateValue,
 	}
 }
 
@@ -2235,6 +2243,14 @@ func (c *Config) loadConfigDB() error {
 	c.UpgradeUntilScore = numberSettingInt(c.Settings, "upgrade_until_score", 0)
 	if c.UpgradeUntilScore < 0 {
 		c.UpgradeUntilScore = 0
+	}
+	c.StallAlternativeAfterMin = numberSettingInt(c.Settings, "stall_alternative_after_min", 360)
+	if c.StallAlternativeAfterMin < 0 {
+		c.StallAlternativeAfterMin = 0
+	}
+	c.StallAlternativeScoreDrop = numberSettingInt(c.Settings, "stall_alternative_score_drop", 100)
+	if c.StallAlternativeScoreDrop < 0 {
+		c.StallAlternativeScoreDrop = 0
 	}
 	if value, ok := c.Settings["cleanup_action"]; ok {
 		switch value {

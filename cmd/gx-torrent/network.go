@@ -183,20 +183,41 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	cfg.BlocklistEnabledForOutgoingConnections = true
 }
 
+// ipFilterBytes returns the filter file content, reusing the cached copy while
+// path, size and mtime are unchanged. The same bytes are then handed to rain,
+// which still parses them (its blocklist is session-scoped), but the multi-
+// megabyte disk read is skipped on every session reopen.
+func (d *Daemon) ipFilterBytes(path string) ([]byte, string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, "", err
+	}
+	stamp := fmt.Sprintf("%s|%d|%d", path, info.Size(), info.ModTime().UnixNano())
+	if d.ipFilterData != nil && d.ipFilterStamp == stamp {
+		return d.ipFilterData, stamp, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, "", err
+	}
+	return data, stamp, nil
+}
+
 // loadIPFilterLocked (re)loads the IP filter file into the session.
 func (d *Daemon) loadIPFilterLocked(path string) (int, error) {
 	if path == "" || d.session == nil {
 		return 0, nil
 	}
-	file, err := os.Open(path)
+	data, stamp, err := d.ipFilterBytes(path)
 	if err != nil {
 		return 0, err
 	}
-	defer file.Close()
-	rules, err := d.session.LoadBlocklist(file)
+	rules, err := d.session.LoadBlocklist(bytes.NewReader(data))
 	if err != nil {
 		return 0, err
 	}
+	d.ipFilterData = data
+	d.ipFilterStamp = stamp
 	d.ipFilterRules = rules
 	d.ipFilterPath = path
 	return rules, nil
@@ -211,6 +232,9 @@ func (d *Daemon) loadIPFilter(path string) (int, error) {
 	if path == "" {
 		path = d.opts.Network.IPFilter
 	}
+	// A manual reload must bypass the cache: the operator may have edited the
+	// file without changing its path.
+	d.ipFilterStamp = ""
 	rules, err := d.loadIPFilterLocked(path)
 	if err == nil {
 		logf("IP filter loaded: %d rules from %s", rules, path)

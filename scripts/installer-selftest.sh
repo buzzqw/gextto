@@ -72,6 +72,23 @@ check_install() {
     fail "$label: --dry-run writes the unit"
   fi
 
+  if contains "write /etc/systemd/system/gextto-update.path"; then
+    pass "$label: --dry-run sets up in-app updates"
+  else
+    fail "$label: --dry-run sets up in-app updates"
+  fi
+  if contains "systemctl enable --now gextto-update.path"; then
+    pass "$label: --dry-run enables the update path unit"
+  else
+    fail "$label: --dry-run enables the update path unit"
+  fi
+
+  capture bash "$INSTALL" --help
+  if contains "--media-group"; then pass "$label: --help documents --media-group"; else fail "$label: --help documents --media-group"; fi
+
+  capture bash "$INSTALL" --dry-run --media-group gextto-selftest-missing-group --data-dir "$TMP/data" --install-dir "$TMP/opt"
+  expect "$label: a missing media group is skipped" 0 "does not exist; skipped"
+
   capture bash "$INSTALL" --dry-run --uninstall --data-dir "$TMP/data" --install-dir "$TMP/opt"
   expect "$label: --dry-run --uninstall works" 0 "uninstalled"
 
@@ -137,6 +154,19 @@ check_package_script() {
 
   capture bash "$ROOT/scripts/package-linux.sh" --binary
   expect "package-linux.sh: missing option value is rejected" 2 "requires a value"
+
+  capture bash -n "$ROOT/scripts/build-release.sh"
+  expect "build-release.sh: syntax" 0
+  capture bash "$ROOT/scripts/build-release.sh" --label
+  expect "build-release.sh: missing option value is rejected" 2 "requires a value"
+
+  capture bash "$ROOT/scripts/release-manifest.sh" --build 12 --commits 2 --output "$TMP/release.json"
+  expect "release-manifest.sh: writes the manifest" 0 "manifest:"
+  if grep -q '"app_version": "1.1.12"' "$TMP/release.json" 2>/dev/null && grep -q '"commits": \[' "$TMP/release.json"; then
+    pass "release-manifest.sh: manifest has version and commits"
+  else
+    fail "release-manifest.sh: manifest has version and commits"
+  fi
 }
 
 printf 'installer self-test\n'

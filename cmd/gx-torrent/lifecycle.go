@@ -7,11 +7,14 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -65,6 +68,7 @@ type swarmNoiseFilter struct {
 
 func (f *swarmNoiseFilter) Handle(rec *clog.Record) {
 	if rec.Level > clog.CRITICAL && rec.Level <= clog.WARNING && isSwarmNoise(rec) {
+		peerNoiseCounters.add(swarmNoiseCategory(rec))
 		demoted := *rec
 		demoted.Level = clog.DEBUG
 		rec = &demoted
@@ -75,11 +79,96 @@ func (f *swarmNoiseFilter) Handle(rec *clog.Record) {
 // isSwarmNoise recognises the per-peer and per-tracker errors rain logs at
 // error level.
 func isSwarmNoise(rec *clog.Record) bool {
-	if strings.HasPrefix(rec.LoggerName, "peer ") {
+	if strings.HasPrefix(rec.LoggerName, "peer ") || strings.HasPrefix(rec.LoggerName, "conn ") {
 		return true
 	}
 	return strings.HasPrefix(rec.LoggerName, "torrent ") &&
 		(strings.Contains(rec.Message, "announce error") || strings.Contains(rec.Message, "webseed"))
+}
+
+// swarmNoiseCategory buckets a demoted record so the periodic summary says
+// whether the swarm is merely chatty or the network is genuinely unhealthy.
+func swarmNoiseCategory(rec *clog.Record) string {
+	message := rec.Message
+	switch {
+	case strings.Contains(message, "announce error"):
+		return "tracker"
+	case strings.Contains(message, "outgoing handshake"):
+		return "handshake"
+	case strings.Contains(message, "peer reset"):
+		return "reset"
+	case strings.Contains(message, "timed out waiting for ack"):
+		return "ack_timeout"
+	case strings.Contains(message, "i/o timeout"):
+		return "io_timeout"
+	case strings.Contains(message, "cannot write message"):
+		return "write"
+	default:
+		return "other"
+	}
+}
+
+// peerNoiseStats accumulates the peer/tracker errors demoted by the filter.
+// They are no longer printed one by one; a periodic summary reports how many
+// arrived since the last check, and the totals are exposed by /api/v1/health.
+type peerNoiseStats struct {
+	mu       sync.Mutex
+	total    map[string]int64
+	reported map[string]int64
+}
+
+func newPeerNoiseStats() *peerNoiseStats {
+	return &peerNoiseStats{total: map[string]int64{}, reported: map[string]int64{}}
+}
+
+var peerNoiseCounters = newPeerNoiseStats()
+
+func (s *peerNoiseStats) add(category string) {
+	s.mu.Lock()
+	s.total[category]++
+	s.mu.Unlock()
+}
+
+// totals returns a copy of the cumulative counts since start-up.
+func (s *peerNoiseStats) totals() map[string]int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]int64, len(s.total))
+	for key, value := range s.total {
+		out[key] = value
+	}
+	return out
+}
+
+// drain returns the counts that arrived since the previous drain.
+func (s *peerNoiseStats) drain() map[string]int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]int64{}
+	for key, value := range s.total {
+		if delta := value - s.reported[key]; delta > 0 {
+			out[key] = delta
+			s.reported[key] = value
+		}
+	}
+	return out
+}
+
+// formatPeerNoise renders the deltas as a stable, compact line.
+func formatPeerNoise(deltas map[string]int64) string {
+	if len(deltas) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(deltas))
+	for key := range deltas {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, deltas[key]))
+	}
+	return strings.Join(parts, " ")
 }
 
 // apiSeen records the last API request (Unix seconds) for the orphan watchdog.

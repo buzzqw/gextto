@@ -40,3 +40,12 @@ var GxTorrentBuild = "0"
 // GxTorrentVersion is what the gx-torrent daemon's CLI, web UI and
 // /api/v1/health report.
 func GxTorrentVersion() string { return "1.1." + GxTorrentBuild }
+
+// Commit is the git commit the binary was built from, stamped with
+// `-X gextto/internal/constants.Commit=...` by scripts/build-daemon.sh. The
+// in-app update check compares it with the published release manifest.
+var Commit = ""
+
+// BuiltAt is the build time (RFC 3339, UTC), stamped like Commit. A release is
+// offered as an update only when it was built after the running binary.
+var BuiltAt = ""

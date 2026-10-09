@@ -56,6 +56,16 @@ func logCount[T logInteger](value T) string {
 }
 
 // logPercent rounds a progress percentage for display: "9%", "99.5%".
+// shortTorrentName trims a torrent display name for the one-line download
+// summary: long release names would make the periodic status unreadable.
+func shortTorrentName(name string) string {
+	name = strings.TrimSpace(name)
+	if len(name) <= 40 {
+		return name
+	}
+	return strings.TrimSpace(name[:39]) + "…"
+}
+
 func logPercent(progress float64) string {
 	if progress >= 99 && progress < 100 {
 		return strconv.FormatFloat(math.Floor(progress*10)/10, 'f', -1, 64) + "%"

@@ -74,6 +74,26 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 
+## Release, installer e aggiornamenti
+- Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35, libtorrent
+  2.0.5) con `scripts/build-release.sh`: in locale gira in un container
+  docker/podman, in CI (`continuous.yml`, `release.yml`) i job `package` usano
+  `container: ubuntu:22.04` per x86_64 e aarch64 (`ubuntu-24.04-arm`). Un
+  binario compilato su un sistema più nuovo non parte su Debian 12/Ubuntu 22.04.
+  Il bridge C++ deve compilare anche con libtorrent 2.0.5 (`LIBTORRENT_VERSION_NUM`).
+- `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
+  `constants.BuiltAt`; `scripts/release-manifest.sh` scrive `release.json`
+  (versione, commit, ultimi commit) pubblicato accanto ai pacchetti: è ciò che
+  legge il controllo aggiornamenti in-app (`update_check.go`).
+- `install.sh` installa anche `gextto-update.path`/`.service`: la UI scrive
+  `<data>/update-request`, la unit root esegue `gexttod --update` (log in
+  `/var/log/gextto-update.log`), che tiene `gexttod.prev` e lo ripristina se la
+  nuova versione non parte.
+- Prova reale dell'installer: container con systemd (`--privileged
+  --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw`) e
+  `install.sh --local-archive dist/gextto-linux-x86_64.tar.gz`.
+- La procedura guidata di primo avvio è `uiweb_v2_setup.go` (`/?view=setup`).
+
 ## Code scanning (CodeQL)
 - Workflow `.github/workflows/codeql.yml` (linguaggio Go; gira su push/PR su
   `main` e una volta a settimana). Non serve `sudo` né CGO per l'analisi.

@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  linux-x86_64:
-    name: build and publish release
+  test:
+    name: test
     runs-on: ubuntu-24.04
     steps:
       - name: Check out source
@@ -33,18 +33,71 @@ jobs:
       - name: Test bundled rain fork
         run: make test-rain
 
+  # Built on Ubuntu 22.04 (glibc 2.35) so the archive runs on every supported
+  # distribution. See scripts/build-release.sh.
+  package:
+    name: package (${{ matrix.arch }})
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container: ubuntu:22.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install git
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends ca-certificates git curl
+
+      - name: Check out source
+        uses: actions/checkout@v7
+
       - name: Build and package
         env:
           GEXTTO_BUILD: ${{ github.run_number }}
         run: |
-          scripts/build-daemon.sh
-          scripts/package-linux.sh --label "${GITHUB_REF_NAME}"
-          tar -tzf gextto-linux-*.tar.gz | grep -qx './gx-torrent' \
-            || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          scripts/build-release.sh --in-container --label "${GITHUB_REF_NAME}" --output-dir dist
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: gextto-linux-${{ matrix.arch }}
+          path: dist/gextto-linux-*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 200
+
+      - name: Download archives
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write release manifest
+        run: |
+          scripts/release-manifest.sh --channel stable --label "${GITHUB_REF_NAME}" \
+            --build "${{ github.run_number }}" --output dist/release.json
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            gextto-linux-*.tar.gz
-            gextto-linux-*.tar.gz.sha256
+            dist/gextto-linux-*.tar.gz
+            dist/gextto-linux-*.tar.gz.sha256
+            dist/release.json

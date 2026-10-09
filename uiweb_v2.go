@@ -165,6 +165,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 
 	// Log (frammento aggiornabile).
 	v2Handle(s, mux, "GET /partial/logs", V2LogsPartial)
+	v2Handle(s, mux, "GET /maintenance/gx-torrent/log", V2GxLogsPartial)
 	v2Handle(s, mux, "GET /partial/chrome", V2ChromePartial)
 	v2Handle(s, mux, "GET /partial/chrome/sse", V2ChromeSSE)
 	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
@@ -220,6 +221,12 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "POST /maintenance/duplicates", V2Duplicates)
 	v2Handle(s, mux, "POST /maintenance/db", V2DBMaintenance)
 	v2Handle(s, mux, "POST /maintenance/ramdisk", V2Ramdisk)
+	v2Handle(s, mux, "GET /maintenance/update", V2Update)
+	v2Handle(s, mux, "POST /setup/auth", V2SetupAuth)
+	v2Handle(s, mux, "POST /setup/paths", V2SetupPaths)
+	v2Handle(s, mux, "POST /setup/sources", V2SetupSources)
+	v2Handle(s, mux, "POST /setup/finish", V2SetupFinish)
+	v2Handle(s, mux, "POST /maintenance/update", V2Update)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/scan", V2FolderRenameScan)
 	v2Handle(s, mux, "POST /maintenance/folder-rename/apply", V2FolderRenameApply)
 	v2Handle(s, mux, "GET /partial/rename-progress", V2RenameProgress)
@@ -273,6 +280,8 @@ type v2ShellData struct {
 	// through the redirect URL) rendered as a toast on every page.
 	Flash    string
 	FlashErr bool
+	// Update drives the "update available" badge next to the donate button.
+	Update UpdateStatus
 }
 
 func v2Render(w http.ResponseWriter, status int, name string, data any, dict, eng map[string]string) {
@@ -297,6 +306,9 @@ func v2PageLabel(view string) string {
 				return item.Label
 			}
 		}
+	}
+	if view == "setup" {
+		return "Configurazione iniziale"
 	}
 	return view
 }
@@ -548,6 +560,8 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 		return "v2_panels_page", v2PanelsViewFrom(s, r, view)
 	case "search":
 		return "v2_search", v2SearchView{}
+	case "setup":
+		return "v2_setup", v2SetupViewFrom(s, r)
 	case "comics":
 		return "v2_comics", v2ComicsViewFrom(s, r)
 	}
@@ -561,6 +575,11 @@ func v2Content(s *AppState, r *http.Request, view string) (string, any) {
 func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	view := strings.TrimSpace(r.URL.Query().Get("view"))
 	if view == "" {
+		// A fresh installation starts from the setup wizard.
+		if r.URL.RawQuery == "" && v2SetupNeeded(s) {
+			http.Redirect(w, r, "/?view=setup", http.StatusSeeOther)
+			return
+		}
 		view = "dashboard"
 	}
 	body, content := v2Content(s, r, view)
@@ -574,6 +593,7 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Body:     body,
 		Flash:    strings.TrimSpace(r.FormValue("toast")),
 		FlashErr: r.FormValue("toast_err") == "1",
+		Update:   updates.Status(cfg),
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)
@@ -2141,9 +2161,11 @@ type v2LogsView struct {
 	Filter   string
 	LinesNum int
 	// Log is the selected log file name; LogFiles lists the files available in
-	// the data directory (current first, then rotated backups).
-	Log      string
-	LogFiles []string
+	// the data directory (current first, then rotated backups). ActiveLog is the
+	// name of the file currently being written, so the selector can mark it.
+	Log       string
+	ActiveLog string
+	LogFiles  []string
 	// ProblemsOnly keeps only the WARN and ERROR lines.
 	ProblemsOnly bool
 }
@@ -2184,13 +2206,41 @@ func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string, pr
 	path, selected := coreResolveLog(s.cfg.DataDir, logName)
 	raw := coreTailLines(path, linesNum)
 	view := v2LogsView{
-		Filter:   filter,
-		LinesNum: linesNum,
-		Log:      selected,
-		LogFiles: coreLogFiles(s.cfg.DataDir),
+		Filter:    filter,
+		LinesNum:  linesNum,
+		Log:       selected,
+		ActiveLog: coreLogBaseName,
+		LogFiles:  coreLogFiles(s.cfg.DataDir),
 	}
 	view.ProblemsOnly = len(problemsOnly) > 0 && problemsOnly[0]
-	needle := strings.ToLower(filter)
+	v2FillLogLines(&view, raw)
+	return view
+}
+
+// v2GxLogsViewFrom is the gx-torrent daemon counterpart of v2LogsViewFrom: the
+// daemon writes its own rotating log under <data>/gx-torrent/.
+func v2GxLogsViewFrom(s *AppState, filter string, linesNum int, logName string, problemsOnly bool) v2LogsView {
+	if linesNum <= 0 || linesNum > 5000 {
+		linesNum = 500
+	}
+	path, selected := coreResolveGxLog(s.cfg.DataDir, logName)
+	raw := coreTailLines(path, linesNum)
+	view := v2LogsView{
+		Filter:       filter,
+		LinesNum:     linesNum,
+		Log:          selected,
+		ActiveLog:    coreGxLogBaseName,
+		LogFiles:     coreGxLogFiles(s.cfg.DataDir),
+		ProblemsOnly: problemsOnly,
+	}
+	v2FillLogLines(&view, raw)
+	return view
+}
+
+// v2FillLogLines applies the text filter and the WARN/ERROR selection to raw
+// log lines and stores the highlighted result.
+func v2FillLogLines(view *v2LogsView, raw []string) {
+	needle := strings.ToLower(view.Filter)
 	for _, line := range raw {
 		if needle != "" && !strings.Contains(strings.ToLower(line), needle) {
 			continue
@@ -2201,7 +2251,6 @@ func v2LogsViewFrom(s *AppState, filter string, linesNum int, logName string, pr
 		view.Lines = append(view.Lines, v2HighlightLogLine(line))
 	}
 	view.Count = len(view.Lines)
-	return view
 }
 
 // V2LogsPartial re-renders the log view (filter, refresh and periodic poll). It
@@ -2217,6 +2266,25 @@ func V2LogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	body := v2TranslateHTML(buffer.String(), dict, eng)
 	body += fmt.Sprintf(`<span id="v2-logs-count" hx-swap-oob="true">%d</span>`, view.Count)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(body))
+}
+
+// V2GxLogsPartial re-renders the gx-torrent log panel in Maintenance (filter,
+// refresh and the log-file selector). Like V2LogsPartial it updates the line
+// count out of band, since only the <pre> is swapped.
+func V2GxLogsPartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	linesNum, _ := strconv.Atoi(r.FormValue("lines"))
+	view := v2GxLogsViewFrom(s, r.FormValue("filter"), linesNum, r.FormValue("log"), r.FormValue("level") == "problems")
+	dict, eng := v2Dictionaries(s)
+	var buffer bytes.Buffer
+	if err := v2Templates.ExecuteTemplate(&buffer, "v2_gx_log_view", view); err != nil {
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	body := v2TranslateHTML(buffer.String(), dict, eng)
+	body += fmt.Sprintf(`<span id="v2-gx-logs-count" hx-swap-oob="true">%d</span>`, view.Count)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(body))

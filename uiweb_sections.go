@@ -442,6 +442,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 			{Label: "Housekeeping", Method: "POST", Path: "/api/maintenance/housekeeping", Body: "{}", Confirm: "Eseguire l'housekeeping (pulizia dati tecnici e storico)?", Hint: "Pulizia dati tecnici e storico, senza toccare la libreria."},
 			{Label: "Riavvia servizio", Class: "danger", Method: "POST", Path: "/api/service/restart", Body: "{}", Confirm: "Riavviare il servizio gextto?", Hint: "Riavvia il daemon Gextto."},
 		}}),
+		group("Aggiornamenti", uiPageSection{Kind: "update"}),
 		uiPageSection{Kind: "folder_rename"},
 		sectionProgress("Progresso rinomina", "/api/rename-progress"),
 		group("Libreria", uiPageSection{Kind: "duplicates"}),
@@ -455,6 +456,7 @@ func uiMaintenanceSections(s *AppState, cfg *Config) []uiPageSection {
 				{Name: "error_age_days", Label: "Giorni errori", Kind: "number", Value: "7", Hint: "Conserva le schede dei torrent in errore per almeno N giorni prima di rimuoverle dal database."},
 			},
 		})),
+		group("Log", uiPageSection{Kind: "gx_log"}),
 		group("Backup", sectionForm(uiFormSection{
 			Title: "Impostazioni backup",
 			Hint:  "Il backup crea uno ZIP locale dei database. Puoi conservarne più copie, programmarlo a intervalli o a un orario preciso e inviarne una copia opzionale via FTP, in una cartella cloud locale sincronizzata o su Telegram. Lascia vuoti i collegamenti che non vuoi usare.",

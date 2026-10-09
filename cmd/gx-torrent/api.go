@@ -25,6 +25,7 @@ func (d *Daemon) routes() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/v1/health", d.handleHealth)
 	api.HandleFunc("GET /api/v1/stats", d.handleStats)
+	api.HandleFunc("GET /api/v1/portcheck", d.handlePortCheck)
 	api.HandleFunc("GET /api/v1/torrents", d.handleList)
 	api.HandleFunc("POST /api/v1/add", d.handleAdd)
 	api.HandleFunc("POST /api/v1/add-file", d.handleAddFile)
@@ -47,6 +48,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/live", d.handleUILive)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
 	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
+	root.HandleFunc("GET /ui/portcheck", d.handleUIPortCheck)
 	root.HandleFunc("GET /ui/stream", d.handleUIStream)
 	root.HandleFunc("GET /ui/torrent-file", d.handleUITorrentFile)
 	root.HandleFunc("POST /ui/action", d.handleUIAction)
@@ -154,6 +156,12 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, d.stats())
+}
+
+// handlePortCheck is the eMule-style "test ports": is the daemon listening and
+// does the router actually forward the peer port?
+func (d *Daemon) handlePortCheck(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, d.mapper.check())
 }
 
 func (d *Daemon) handleList(w http.ResponseWriter, _ *http.Request) {

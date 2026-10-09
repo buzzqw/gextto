@@ -30,6 +30,7 @@ type upnpClient interface {
 	AddPortMappingCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string, internalPort uint16, internalClient string, enabled bool, description string, lease uint32) error
 	DeletePortMappingCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) error
 	GetExternalIPAddressCtx(ctx context.Context) (string, error)
+	GetSpecificPortMappingEntryCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) (internalPort uint16, internalClient string, enabled bool, description string, lease uint32, err error)
 	LocalAddr() net.IP
 }
 
@@ -148,6 +149,11 @@ func (m *portMapper) mapUPnP() error {
 		return fmt.Errorf("cannot determine the local address towards the router")
 	}
 	for _, proto := range []string{"TCP", "UDP"} {
+		// Verify before (re)adding: a mapping that is already there does not
+		// need to be reopened every refresh.
+		if m.upnpMappingPresent(ctx, client, proto) {
+			continue
+		}
 		if err := client.AddPortMappingCtx(ctx, "", uint16(m.port), proto, uint16(m.port), local.String(), true,
 			"gx-torrent", uint32(portLease.Seconds())); err != nil {
 			m.mu.Lock()
@@ -159,6 +165,84 @@ func (m *portMapper) mapUPnP() error {
 	external, _ := client.GetExternalIPAddressCtx(ctx)
 	m.recordSuccess("upnp", external, client, nil)
 	return nil
+}
+
+// upnpMappingPresent reports whether the router already forwards the peer port
+// to this host for the given protocol.
+func (m *portMapper) upnpMappingPresent(ctx context.Context, client upnpClient, proto string) bool {
+	internalPort, internalClient, enabled, _, _, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(m.port), proto)
+	if err != nil || !enabled || int(internalPort) != m.port {
+		return false
+	}
+	local := client.LocalAddr()
+	if local != nil && strings.TrimSpace(internalClient) != "" && internalClient != local.String() {
+		return false
+	}
+	return true
+}
+
+// portCheck is the result of the "Test porte" action: whether the daemon is
+// listening locally and whether the router forwards the port.
+type portCheck struct {
+	Port       int    `json:"port"`
+	Listening  bool   `json:"listening"`
+	Mapped     bool   `json:"mapped"`
+	Method     string `json:"method,omitempty"`
+	ExternalIP string `json:"external_ip,omitempty"`
+	Open       bool   `json:"open"`
+	Detail     string `json:"detail,omitempty"`
+	Error      string `json:"error,omitempty"`
+}
+
+// checkLocalListener dials the daemon's own peer port: a successful TCP
+// connection proves the listener is bound.
+func checkLocalListener(port int) bool {
+	if port <= 0 {
+		return false
+	}
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 2*time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// check reports whether the peer port is open, verifying the UPnP mapping with
+// the router when possible instead of trusting only the last map result.
+func (m *portMapper) check() portCheck {
+	if m == nil {
+		return portCheck{}
+	}
+	out := portCheck{Port: m.port, Listening: checkLocalListener(m.port)}
+	m.mu.Lock()
+	method, external, lastErr := m.method, m.externalIP, m.lastErr
+	upnp := m.upnpClient
+	mappedRecently := !m.mappedAt.IsZero() && time.Since(m.mappedAt) < 2*portRefresh
+	m.mu.Unlock()
+	out.Method, out.ExternalIP, out.Error = method, external, lastErr
+
+	switch {
+	case method == "upnp" && upnp != nil:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		tcp := m.upnpMappingPresent(ctx, upnp, "TCP")
+		udp := m.upnpMappingPresent(ctx, upnp, "UDP")
+		out.Mapped = tcp && udp
+		if out.Mapped {
+			out.Detail = "mapping UPnP presente (TCP+UDP)"
+		} else {
+			out.Detail = "mapping UPnP mancante o incompleto"
+		}
+	case mappedRecently:
+		out.Mapped = true
+		out.Detail = "mapping " + strings.ToUpper(method) + " attivo"
+	default:
+		out.Mapped = false
+		out.Detail = "nessun mapping automatico: verifica l'inoltro manuale sul router"
+	}
+	out.Open = out.Listening && out.Mapped
+	return out
 }
 
 func discoverIGD(ctx context.Context) (upnpClient, error) {

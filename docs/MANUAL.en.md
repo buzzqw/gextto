@@ -119,11 +119,23 @@ See [`SECURITY.md`](SECURITY.md) for the full network model.
 
 Gextto runs as a single service. Open the web UI at `http://<host>:5000`.
 
-- If no data directory exists yet, complete the initial setup wizard.
+- On a new installation the first visit opens the **Initial setup**, in five
+  steps: *Access* (a password, optionally with open access from the local
+  network), *Folders* (library, downloads, temporary files and trash; **Check**
+  tests as the service user whether each folder exists and is writable, the
+  disk type including NAS mounts, the free space and whether it is on the same
+  disk as the library), *Sources* (a Prowlarr/Jackett indexer and the TMDB key),
+  *First title* (the TMDB search with its add button) and *Start* (automatic
+  cycle and leaving test mode). It can be skipped and reopened at any time from
+  `/?view=setup`; an installation that already has series, movies or an archive
+  does not show it.
 - **Active vs dry-run**: dry-run never starts real downloads; enable *active
   mode* (the *Automatic search and download* switch in *Configuration →
   General*) only when you are ready.
 - Add series/movies from **Explore** (TMDB) or **Series / Movies → Add**.
+- The **Donate** button (PayPal) is always visible at the bottom right: if
+  Gextto is useful to you, you can support development; the address is also in
+  the README.
 
 ### Recommended first cycle
 
@@ -166,7 +178,9 @@ understands:
 - `gexttod --version` — installed version, build number, release marker and
   bundled libtorrent;
 - `gexttod --help` — usage summary;
-- `gexttod --update` — download and install the latest payload;
+- `gexttod --update` — download and install the latest payload of the installed
+  channel (continuous or stable); the previous version is kept as
+  `gexttod.prev` and put back by itself if the new one does not start;
 - `gexttod --config <file>` and `gexttod --dry-run` — used by the service and for
   local tests.
 
@@ -468,14 +482,21 @@ Gextto normally avoids downloading older episodes when later episodes already
 exist, unless this is a recognised gap or a genuine upgrade. A season pack can
 fill several episodes, but archive comparison still happens episode by episode.
 When the same cycle offers a single episode and a pack containing it with the
-same score, Gextto picks the release covering more episodes (at equal score a
-REMUX is still preferred).
+same score, Gextto picks the release covering more episodes. At an equal score a
+REMUX is still preferred and, at a further tie, the release with **known
+seeders** wins (a healthy swarm is less likely to stall).
 
 An episode that already has a torrent downloading is not missing: it is not
 searched again and it does not appear among the series' missing episodes, even
 when the torrent was added by hand, from a watched folder or from a phone. The
 same applies to a whole season while its season pack downloads. If the download
 fails the episode is missing again.
+
+Exception: if a download stays **stuck at 0 B/s or still waiting for metadata**
+(its file list never arrived) beyond the configured window (*Configuration →
+Quality and upgrades → Stuck downloads*), the search may start an alternative
+for the same episode within the allowed points, **without removing** the stuck
+torrent: if it recovers, archive deduplication will still keep the best copy.
 
 ## 5. Movies
 
@@ -513,7 +534,14 @@ are using the API directly.
   wall; a title already in the library carries a **Già in lista** badge and its
   add button is disabled, so you never create a duplicate by mistake.
 - **Archive** — full-text search of past releases with pagination, batch queue,
-  copy magnet, delete; **Series/Movies from feed** tabs. The **Source** column
+  copy magnet, delete; **Series/Movies from feed** tabs. The local archive search
+  is **instant**: it starts on its own as you type (from three characters on)
+  and uses the FTS5 index, so it does not burden the database. For shorter terms
+  (e.g. `IT`) press **Enter** or **Search**: the threshold only gates the
+  automatic search, not the explicit one. A `-word` filter
+  excludes titles containing it. The **Also search the web** checkbox extends the
+  search to indexers and online engines: it is much slower and therefore only
+  runs when you press **Search**, not on every keystroke. The **Source** column
   shows only the provider/domain (the full URL is in the tooltip), and every row
   offers **Why not this one?** like the search table.
 - **Seen from feed** — every release seen in the sources, grouped by title
@@ -637,9 +665,9 @@ same data.
 
 - **gx-torrent** (default) — a pure-Go BitTorrent daemon, started and supervised
   by Gextto in a separate process; it needs no `libtorrent-rasterbar`. Set the
-  **Web API URL**, the **listen address** (default `0.0.0.0:8890`: web page and
-  API open on the whole LAN; use `127.0.0.1:8890` to keep them on this host),
-  **token** and **proxy**. At that address it also serves an
+  **Web API URL**, the **listen address** (default `127.0.0.1:8890`: web page
+  and API on this host only; use `0.0.0.0:8890` **and a token** to expose them
+  on the LAN), **token** and **proxy**. At that address it also serves an
   **operational web page** (add magnet, pause/resume, verify, reannounce, queue,
   remove, IP filter, a tab with the Gextto log). The daemon **keeps running
   when Gextto restarts** (for example for an update): Gextto adopts it again
@@ -830,6 +858,17 @@ arguments if the command may be recorded in system logs.
 
 The complete list of actions and parameters is in [Appendix C](#appendix-c-reference--maintenance).
 
+- **Updates** — installed version and channel, latest published version and
+  what changed (the commits after the installed one, linked to GitHub). **Check
+  now** asks GitHub right away; **Update now** backs up the databases and asks
+  the `gextto-update` system service, set up by the installer, to update:
+  Gextto waits for the copies to the library to finish, restarts with the new
+  version and the panel reports it by itself. If the new version does not start
+  the previous one comes back; the log of the last update is at the bottom of
+  the panel. When a new version exists an **Update available** button also
+  appears above **Donate**. On a source installation the panel says to use
+  `git pull` and `make build`.
+
 - Backup now, clean trash, rescore, scan archives, **Refresh MediaInfo**
   (probes archived files without data via `ffprobe` and stores it) and restart
   the service.
@@ -861,6 +900,11 @@ The complete list of actions and parameters is in [Appendix C](#appendix-c-refer
   HDTV, BluRay…) in archived names that lost it, recovering it from the original
   release title in the database. It never invents a source: unknown stays
   untouched. Preview first, then execute; no re-download is involved.
+- **gx-torrent log** — panel with the latest lines of the torrent engine log
+  (`gx-torrent/gx-torrent.log`), separate from Gextto's log and kept across
+  service restarts. You can filter its text, show only warnings and errors, and
+  pick between the active file and the rotations (`.1`, `.2`, `.3`). Useful when
+  a download or a transfer does not behave as expected.
  - **Database**: prune by cycles/error age, **seen-from-feed retention** (days; 0
    keeps everything), keyword prune with a list of the matching rows, and
    **VACUUM / ANALYZE** across all databases.
@@ -1196,6 +1240,13 @@ Recalculate scores* after changing weights.
 | Replace versions already archived | Replaces lower versions already archived with better upgrades. |
 | Min score difference for cleanup | Minimum score difference to replace an existing file with a better one (cleanup). |
 
+**Stuck downloads**
+
+| Setting | What it does |
+|---|---|
+| Try an alternative after (stall) | If a download has been stuck for at least these minutes — at 0 B/s or still waiting for its file list (metadata, typical of dead magnets) — the search may start an alternative version of the same episode or movie. The stuck download stays in the session and may still recover; archive deduplication will then keep the best copy. *(0 = never)* |
+| Score drop for the alternative | How many points below the stuck release an alternative may score: only an adequate alternative is started, never a poor version. The stuck download is not removed. *(0 = disabled)* |
+
 ### How to download
 
 #### Torrent engine
@@ -1213,7 +1264,7 @@ Recalculate scores* after changing weights.
 | Setting | What it does |
 |---|---|
 | gx-torrent — Web API URL | gx-torrent API URL (e.g. http://127.0.0.1:8890); Gextto drives the daemon there. |
-| gx-torrent — listen address (LAN) | Listen address of the managed daemon: web page and API open on the whole LAN (default `0.0.0.0:8890`; use `127.0.0.1:8890` to keep them on this host). The port is aligned with the URL. |
+| gx-torrent — listen address (LAN) | Listen address of the managed daemon. Default `127.0.0.1:8890`: the web page and API stay on this host only. To expose them on the LAN use `0.0.0.0:8890` and set `gxtorrent_token` (without a token Gextto starts the daemon in `-insecure`). The port is aligned with the URL. |
 | gx-torrent — automatic management (cache and queue) | Turns on gx-torrent self-management: dynamic queue and adaptive cache (sized on available memory, active downloads/seeds and storage type). On by default. Turn it off to set cache and slots by hand. |
 | gx-torrent — proxy (socks5:// or http://) | Proxy for peers, HTTP trackers and web seeds; with a proxy, DHT and UDP trackers are disabled (not shown). |
 | gx-torrent — request timeout | Timeout in seconds for HTTP requests to gx-torrent. *(Unit: seconds)* |
@@ -1276,6 +1327,7 @@ Recalculate scores* after changing weights.
 | Max port | Maximum libtorrent session port (requires service restart). |
 | Listen interfaces | Where libtorrent accepts connections: 0.0.0.0:6881-6891 for all interfaces, 127.0.0.1:6881 local only, or wg0:6881/tun0:6881 for a VPN. The suggested value works in most cases. |
 | Outgoing interface | VPN killswitch: interface used for all outgoing BitTorrent traffic. |
+| Test ports | Checks that the peer port is listening and that the router forwards it (the message says "open", "listening but not forwarded" or "closed"). Available with the **gx-torrent** engine. |
 
 **Peer and tracker discovery**
 
@@ -1592,6 +1644,12 @@ with a certificate, or a VPN), otherwise the password travels in clear text.
 |---|---|
 | Debug (detailed logs) | Enables detailed logs and periodic diagnostics for debugging. |
 
+**Updates**
+
+| Setting | What it does |
+|---|---|
+| Check for updates | Every 6 hours downloads the latest release information from GitHub and, when a newer one exists, shows «Update available». It sends no data and never updates on its own: the update only starts from Maintenance. |
+
 **Editors**
 
 | Setting | What it does |
@@ -1766,6 +1824,12 @@ Key") instead of the bare HTTP code.
 | Trash — Empty trash | Deletes every trash item. |
 | Database cleanup — Cycles to keep | Number of cycle statistics to keep. |
 | Database cleanup — Error days | Keeps error torrent entries for at least N days before removing them. |
+
+### Log
+
+| Item | What it does |
+|---|---|
+| gx-torrent log | Latest lines of the torrent engine log (`gx-torrent/gx-torrent.log`), with text filter, warnings/errors only, line count and a choice between the active file and the rotations. |
 
 ### Backup
 

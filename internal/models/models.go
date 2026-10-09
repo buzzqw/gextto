@@ -381,6 +381,44 @@ type ApprovalContext struct {
 	// DryRun evaluates the decision without writing placeholders, torrent rows
 	// or upgrades to the database. Used by the automatic cycle in dry-run mode.
 	DryRun bool
+	// StallAlternatives maps an episode whose download is stuck (parked for a
+	// while) to the score of the stuck release. When present, a candidate may
+	// be accepted even though the episode is already downloading, as long as it
+	// stays within StallScoreDrop of the stuck release. This lets the search
+	// try an alternative without removing the stuck torrent.
+	StallAlternatives map[LiveEpisodeKey]int64
+	// StallScoreDrop is how many points below the stuck release an alternative
+	// may score (0 disables the tolerance).
+	StallScoreDrop int64
+}
+
+// stallTolerance returns the stuck release score for key, if any.
+func (c *ApprovalContext) stallTolerance(key LiveEpisodeKey) (int64, bool) {
+	if c == nil || c.StallScoreDrop <= 0 || c.StallAlternatives == nil {
+		return 0, false
+	}
+	score, ok := c.StallAlternatives[key]
+	return score, ok
+}
+
+// AllowsStallAlternative reports whether a candidate with the given score may
+// be started for an episode whose current download is stuck.
+func (c *ApprovalContext) AllowsStallAlternative(key LiveEpisodeKey, score int64) bool {
+	stuck, ok := c.stallTolerance(key)
+	return ok && score >= stuck-c.StallScoreDrop
+}
+
+// StallAlternative applies the stall tolerance to a minimum score difference:
+// while an episode is stuck, an upgrade may replace with fewer extra points.
+func (c *ApprovalContext) StallAdjustedMinDiff(minScoreDiff int64, key LiveEpisodeKey) int64 {
+	if _, ok := c.stallTolerance(key); !ok {
+		return minScoreDiff
+	}
+	adjusted := minScoreDiff - c.StallScoreDrop
+	if adjusted < 0 {
+		adjusted = 0
+	}
+	return adjusted
 }
 
 // Release is a candidate release discovered from a source.

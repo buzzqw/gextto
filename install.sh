@@ -8,6 +8,12 @@
 #   sudo bash install.sh --uninstall
 #   sudo bash install.sh --dry-run
 #
+# The payload is built on Ubuntu 22.04 (glibc 2.35), so it runs on Debian 12+,
+# Ubuntu 22.04+, Fedora 39+, openSUSE Leap 15.6+/Tumbleweed and Arch. Before
+# touching the system the installer runs the downloaded binary once: an
+# incompatible system is reported with the missing libraries instead of a
+# service that never starts.
+#
 # Environment overrides (kept for backward compatibility): GEXTTO_DATA_DIR,
 # GEXTTO_PORT, GEXTTO_ENGINE_PORT, GEXTTO_USER, GEXTTO_INSTALL_DIR,
 # GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH, GEXTTO_SKIP_PACKAGES,
@@ -24,6 +30,8 @@ RELEASE="${GEXTTO_RELEASE:-continuous}"
 LOCAL_ARCHIVE="${GEXTTO_LOCAL_ARCHIVE:-}"
 NO_START="${GEXTTO_NO_START:-0}"
 HEALTH_TIMEOUT="${GEXTTO_HEALTH_TIMEOUT:-20}"
+HTTP_TIMEOUT="${GEXTTO_HTTP_TIMEOUT:-60}"
+MEDIA_GROUPS="${GEXTTO_MEDIA_GROUPS:-}"
 CHECKOUT_ROOT=""
 if [[ -f "${BASH_SOURCE[0]}" ]]; then
   CHECKOUT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,6 +43,12 @@ WORK_DIR=""
 
 SERVICE_NAME="gextto.service"
 UNIT_PATH="/etc/systemd/system/gextto.service"
+# In-app updates: the web UI (running as the unprivileged service user) drops a
+# request file in the data directory; this root path unit notices it and runs
+# `gexttod --update`, which replaces the program and restarts the service.
+UPDATE_PATH_UNIT="/etc/systemd/system/gextto-update.path"
+UPDATE_SERVICE_UNIT="/etc/systemd/system/gextto-update.service"
+UPDATE_LOG="/var/log/gextto-update.log"
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$*" >&2; }
@@ -82,11 +96,15 @@ Options:
       --data-dir DIR      service data directory (default: /var/lib/gextto)
       --install-dir DIR   program directory (default: /opt/gextto)
       --user NAME         service user (default: gextto)
+      --media-group G     add the service user to group G (repeatable or
+                          comma-separated), e.g. the group that owns the NAS
+                          media folders
       --local-archive F   install from a local .tar.gz instead of downloading us
 
 Environment overrides: GEXTTO_DATA_DIR, GEXTTO_PORT, GEXTTO_ENGINE_PORT,
 GEXTTO_USER, GEXTTO_INSTALL_DIR, GEXTTO_REPO, GEXTTO_RELEASE, GEXTTO_ARCH,
-GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START.
+GEXTTO_SKIP_PACKAGES, GEXTTO_LOCAL_ARCHIVE, GEXTTO_NO_START,
+GEXTTO_MEDIA_GROUPS.
 EOF
 }
 
@@ -104,6 +122,7 @@ parse_args() {
       --data-dir) DATA_DIR="${2:-}"; [[ -n "$DATA_DIR" ]] || die "--data-dir requires a value"; shift 2 ;;
       --install-dir) INSTALL_DIR="${2:-}"; [[ -n "$INSTALL_DIR" ]] || die "--install-dir requires a value"; shift 2 ;;
       --user) SERVICE_USER="${2:-}"; [[ -n "$SERVICE_USER" ]] || die "--user requires a value"; shift 2 ;;
+      --media-group) [[ -n "${2:-}" ]] || die "--media-group requires a value"; MEDIA_GROUPS="${MEDIA_GROUPS:+$MEDIA_GROUPS,}$2"; shift 2 ;;
       --local-archive) LOCAL_ARCHIVE="${2:-}"; [[ -n "$LOCAL_ARCHIVE" ]] || die "--local-archive requires a value"; shift 2 ;;
       *) die "unknown option: $1 (use --help)" ;;
     esac
@@ -126,9 +145,19 @@ preflight() {
   if ! command -v systemctl >/dev/null 2>&1 || [[ ! -d /run/systemd/system ]]; then
     fail_or_warn "systemd is required (no running systemd detected)"
   fi
+  # curl, tar and gzip are checked after install_packages, which installs
+  # them: minimal systems (containers, netinstall) often lack them.
   local cmd
-  for cmd in curl tar sha256sum install id useradd realpath; do
+  for cmd in sha256sum install id useradd realpath; do
     command -v "$cmd" >/dev/null 2>&1 || fail_or_warn "missing required command: $cmd"
+  done
+}
+
+require_download_tools() {
+  [[ "$DRY_RUN" == "1" ]] && return 0
+  local cmd
+  for cmd in curl tar gzip; do
+    command -v "$cmd" >/dev/null 2>&1 || die "missing required command: $cmd (install it and run the installer again)"
   done
 }
 
@@ -146,14 +175,19 @@ install_packages() {
       || apt-get install -y ca-certificates curl tar coreutils openssl \
       || warn "some optional packages could not be installed; continuing"
   elif command -v dnf >/dev/null; then
-    dnf install -y ca-certificates curl tar coreutils openssl openssl-libs libstdc++ zlib zstd \
+    dnf install -y ca-certificates curl tar gzip coreutils openssl openssl-libs libstdc++ zlib zstd \
       || warn "some optional packages could not be installed; continuing"
   elif command -v zypper >/dev/null; then
-    zypper --non-interactive install ca-certificates curl tar coreutils openssl libstdc++6 zlib zstd \
+    # The bundled libtorrent needs OpenSSL 3: on Leap 15.x it is libopenssl3,
+    # not installed by default (the default openssl there is 1.1).
+    zypper --non-interactive install ca-certificates curl tar gzip coreutils openssl libopenssl3 libstdc++6 zlib zstd \
+      || zypper --non-interactive install ca-certificates curl tar gzip libopenssl3 libstdc++6 \
       || warn "some optional packages could not be installed; continuing"
   elif command -v pacman >/dev/null; then
-    pacman -Sy --noconfirm ca-certificates curl tar coreutils openssl zlib zstd \
-      || warn "some optional packages could not be installed; continuing"
+    # No -y: refreshing the databases without a full upgrade (-Syu) is a
+    # partial upgrade, which Arch does not support.
+    pacman -S --needed --noconfirm ca-certificates curl tar gzip coreutils openssl gcc-libs zlib zstd \
+      || warn "some optional packages could not be installed (run pacman -Syu first?); continuing"
   else
     warn "unknown distribution: install curl, tar, sha256sum, OpenSSL and zstd manually"
   fi
@@ -193,6 +227,7 @@ obtain_payload() {
     fi
     cp -f "$LOCAL_ARCHIVE" "$work/$asset"
     if [[ -f "$LOCAL_ARCHIVE.sha256" ]]; then
+      cp -f "$LOCAL_ARCHIVE.sha256" "$work/$asset.sha256"
       (cd "$work" && sha256sum -c "$asset.sha256") || die "checksum verification failed for $asset"
     else
       warn "no $asset.sha256 next to the local archive; skipping verification"
@@ -214,6 +249,29 @@ obtain_payload() {
 
   tar -xzf "$work/$asset" -C "$work"
   [[ -x "$work/gexttod" ]] || die "published payload does not contain an executable gexttod"
+  check_payload_runs "$work"
+}
+
+# check_payload_runs starts the downloaded binary once (--version only) before
+# anything on the system changes. A missing library or a too-old glibc is
+# reported with the exact cause instead of a service that never starts.
+check_payload_runs() {
+  local work="$1" output
+  if output="$(LD_LIBRARY_PATH="$work/lib" "$work/gexttod" --version 2>&1)"; then
+    log "payload ok: $output"
+    return 0
+  fi
+  warn "the downloaded gexttod does not run on this system:"
+  printf '   %s\n' "$output" >&2
+  if command -v ldd >/dev/null 2>&1; then
+    local missing
+    missing="$(LD_LIBRARY_PATH="$work/lib" ldd "$work/gexttod" "$work"/lib/*.so* 2>/dev/null | grep 'not found' | sort -u || true)"
+    [[ -n "$missing" ]] && { warn "missing libraries:"; printf '   %s\n' "$missing" >&2; }
+  fi
+  if printf '%s' "$output" | grep -q 'GLIBC_'; then
+    warn "this system's C library is older than the one Gextto needs (glibc 2.35: Debian 12, Ubuntu 22.04 or newer)"
+  fi
+  die "installation aborted; nothing was changed"
 }
 
 create_service_user() {
@@ -228,6 +286,21 @@ create_service_user() {
   if ! getent group "$SERVICE_USER" >/dev/null 2>&1; then
     run groupadd --system "$SERVICE_USER" || true
   fi
+  # Supplementary groups give the service access to media folders owned by
+  # another user (NAS mounts, a shared "media" group) without touching their
+  # permissions.
+  local group
+  local -a groups
+  IFS=',' read -r -a groups <<< "$MEDIA_GROUPS"
+  for group in "${groups[@]}"; do
+    group="${group// /}"
+    [[ -n "$group" ]] || continue
+    if ! getent group "$group" >/dev/null 2>&1; then
+      warn "group $group does not exist; skipped"
+      continue
+    fi
+    run usermod -a -G "$group" "$SERVICE_USER" && log "service user $SERVICE_USER added to group $group"
+  done
 }
 
 install_files() {
@@ -307,11 +380,74 @@ UNIT
   printf '%s\n' "$unit" > "$UNIT_PATH"
 }
 
+# write_update_units installs the root path unit that serves the "Update"
+# button of the web UI. The request file only triggers the update: its content
+# is ignored, so the unprivileged service cannot choose what root runs or
+# downloads. The update follows the installed channel (continuous or stable).
+write_update_units() {
+  local request="$DATA_DIR/update-request"
+  local path_unit service_unit
+  path_unit="$(cat <<UNIT
+[Unit]
+Description=Watch for Gextto update requests from the web UI
+
+[Path]
+PathExists=$request
+Unit=gextto-update.service
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+)"
+  service_unit="$(cat <<UNIT
+[Unit]
+Description=Update Gextto (requested from the web UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Remove the request first: a failed update must not loop.
+ExecStartPre=/bin/rm -f $request
+ExecStart=$INSTALL_DIR/gexttod --update
+StandardOutput=append:$UPDATE_LOG
+StandardError=append:$UPDATE_LOG
+# The restart waits for media copies to the NAS to finish.
+TimeoutStartSec=infinity
+UNIT
+)"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf '   [dry-run] write %s and %s\n' "$UPDATE_PATH_UNIT" "$UPDATE_SERVICE_UNIT" >&2
+    return 0
+  fi
+  printf '%s\n' "$path_unit" > "$UPDATE_PATH_UNIT"
+  printf '%s\n' "$service_unit" > "$UPDATE_SERVICE_UNIT"
+  # Readable by the service, so the UI can show how the last update went.
+  touch "$UPDATE_LOG"
+  chmod 0644 "$UPDATE_LOG"
+}
+
+# wait_for_http waits until the web UI answers. A service that is "active" may
+# still be migrating its databases: only an HTTP answer proves it works.
+wait_for_http() {
+  local waited=0
+  while (( waited < HTTP_TIMEOUT )); do
+    if curl -fs -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/api/status"; then
+      log "web UI answering on port $PORT"
+      return 0
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  warn "the service is running but the web UI did not answer within ${HTTP_TIMEOUT}s; inspect: journalctl -u $SERVICE_NAME -n 100"
+}
+
 # restart_and_verify restarts the service, waits for it to become active and
 # rolls back the previous binary when the new one fails to start.
 restart_and_verify() {
   run systemctl daemon-reload
   run systemctl enable "$SERVICE_NAME"
+  run systemctl enable --now gextto-update.path || warn "could not enable in-app updates (gextto-update.path)"
   if [[ "$NO_START" == "1" ]]; then
     log "service installed but not started (--no-start)"
     return 0
@@ -323,7 +459,9 @@ restart_and_verify() {
   while (( waited < HEALTH_TIMEOUT )); do
     if systemctl is-active --quiet "$SERVICE_NAME"; then
       log "gextto is running"
-      rm -f "$INSTALL_DIR/gexttod.prev"
+      # Keep the previous binary as gexttod.prev: the in-app updater restores
+      # it when a new version fails to start.
+      wait_for_http
       return 0
     fi
     sleep 1
@@ -350,6 +488,10 @@ uninstall() {
     run systemctl disable --now "$SERVICE_NAME" || warn "could not stop/disable $SERVICE_NAME"
   fi
   [[ -f "$UNIT_PATH" ]] && run rm -f "$UNIT_PATH"
+  if [[ -f "$UPDATE_PATH_UNIT" ]]; then
+    run systemctl disable --now gextto-update.path || true
+  fi
+  run rm -f "$UPDATE_PATH_UNIT" "$UPDATE_SERVICE_UNIT"
   run systemctl daemon-reload || true
 
   if [[ "$PURGE" == "1" ]]; then
@@ -369,10 +511,13 @@ print_summary() {
     version="$(tr -d '[:space:]' < "$INSTALL_DIR/VERSION" 2>/dev/null || true)"
   fi
   log "gextto installed${version:+ (version $version)}"
-  log "UI:      http://127.0.0.1:$PORT  (listening on 0.0.0.0:$PORT)"
+  local lan_ip
+  lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+  log "UI:      http://${lan_ip:-127.0.0.1}:$PORT  (listening on 0.0.0.0:$PORT)"
+  log "first run: open the UI, the setup wizard guides you through folders, sources and the first title"
   log "status:  systemctl status $SERVICE_NAME"
   log "logs:    journalctl -u $SERVICE_NAME -f"
-  warn "the web UI has no built-in authentication: keep it on a trusted network or put an authenticated HTTPS reverse proxy in front (see docs/SECURITY.md)"
+  warn "the web UI is open until a password is set: the setup wizard asks for one at the first visit (for access from the internet use an HTTPS reverse proxy, see docs/SECURITY.md)"
 }
 
 main() {
@@ -391,6 +536,7 @@ main() {
   [[ "$DRY_RUN" == "1" ]] || require_root
   preflight
   install_packages
+  require_download_tools
 
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "$WORK_DIR"' EXIT
@@ -399,6 +545,7 @@ main() {
   create_service_user
   install_files "$WORK_DIR"
   write_unit
+  write_update_units
   restart_and_verify
   print_summary
 }

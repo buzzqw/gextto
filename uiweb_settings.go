@@ -132,6 +132,8 @@ var uiSettingsIndex = []uiSettingDef{
 	{Key: "upgrade_until_score", Label: "Smetti di migliorare oltre questo punteggio", Tab: "scores", Group: "Upgrade e sostituzione"},
 	{Key: "cleanup_upgrades", Label: "Sostituisci le versioni già archiviate", Tab: "scores", Group: "Upgrade e sostituzione"},
 	{Key: "cleanup_min_score_diff", Label: "Differenza minima score per cleanup", Tab: "scores", Group: "Upgrade e sostituzione"},
+	{Key: "stall_alternative_after_min", Label: "Prova un'alternativa dopo (stallo)", Tab: "scores", Group: "Download bloccati"},
+	{Key: "stall_alternative_score_drop", Label: "Punteggio in meno per l'alternativa", Tab: "scores", Group: "Download bloccati"},
 
 	// --- Motore torrent: one panel per engine -------------------------------
 	{Key: "torrent_backend", Label: "Motore torrent", Tab: "backend", Group: "Motore torrent"},
@@ -284,6 +286,7 @@ var uiSettingsIndex = []uiSettingDef{
 
 	// --- Diagnostica e traduzioni -------------------------------------------
 	{Key: "debug_enabled", Label: "Debug (log dettagliati)", Tab: "system", Group: "Diagnostica"},
+	{Key: "update_check", Label: "Controlla gli aggiornamenti", Tab: "system", Group: "Aggiornamenti"},
 }
 
 // uiSettingGroupByKey maps an indexed setting to its explicit panel.

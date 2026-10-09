@@ -27,13 +27,19 @@ else
     [[ -n "$BUILD" ]] || BUILD=1000
 fi
 
+# The commit and build time let the in-app update check tell whether a
+# published release is newer than the running binary (release.json).
+COMMIT="${GEXTTO_COMMIT:-${GITHUB_SHA:-}}"
+[[ -n "$COMMIT" ]] || COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+BUILT_AT="${GEXTTO_BUILT_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
 mkdir -p "$(dirname "$OUT")"
 (
     cd "$ROOT"
     TAGS=()
     [[ -n "${GEXTTO_TAGS:-}" ]] && TAGS=(-tags "$GEXTTO_TAGS")
     CGO_ENABLED=1 go build -trimpath "${TAGS[@]}" \
-        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD" \
+        -ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.Version=$VERSION -X github.com/buzzqw/gextto/internal/constants.Build=$BUILD -X github.com/buzzqw/gextto/internal/constants.Commit=$COMMIT -X github.com/buzzqw/gextto/internal/constants.BuiltAt=$BUILT_AT" \
         -o "$OUT" ./cmd/gexttod
 )
 printf 'built %s (version %s, build %s)\n' "$OUT" "$VERSION" "$BUILD"

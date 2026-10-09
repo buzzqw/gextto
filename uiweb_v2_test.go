@@ -119,6 +119,10 @@ func TestV2ContentFilterArchiveCleanupSearchAndBulkDelete(t *testing.T) {
 
 func TestV2ShellRendersNavigationAndOfficialCss(t *testing.T) {
 	state := newTestAppState(t)
+	// A fresh state opens the setup wizard; this test is about the dashboard.
+	if err := CompleteSetup(state.cfg); err != nil {
+		t.Fatal(err)
+	}
 	server := httptest.NewServer(Router(state))
 	t.Cleanup(server.Close)
 
@@ -682,7 +686,7 @@ func TestV2LibraryPagesKeepTheirPanelFlows(t *testing.T) {
 		"series":  {"Aggiungi una serie", "Serie monitorate"},
 		"movies":  {"Aggiungi un film", "Film monitorati"},
 		"gaps":    {"Cerca un episodio mancante", "Episodi mancanti"},
-		"archive": {"Aggiungi all&#39;archivio", "Cerca anche nel web", "archive-search-input"},
+		"archive": {"Aggiungi all&#39;archivio", "Cerca anche nel web", "archive-search-input", "gexttoArchiveLiveAllowed"},
 	}
 	for view, markers := range wants {
 		code, body := v2Request(t, server, http.MethodGet, "/?view="+view, nil)
@@ -1070,6 +1074,54 @@ func TestV2LogsSelectorReadsChosenFile(t *testing.T) {
 	code, body := v2Request(t, server, http.MethodGet, "/partial/logs?log=gextto.log.1", nil)
 	if code != http.StatusOK || !strings.Contains(body, "BACKUP-MARKER") || strings.Contains(body, "CURRENT-MARKER") {
 		t.Fatalf("partial did not read the selected backup -> %d: %s", code, body)
+	}
+}
+
+// TestV2MaintenanceGxTorrentLog covers the gx-torrent log panel in Maintenance:
+// it shows the daemon log, reads a chosen rotated file and filters lines.
+func TestV2MaintenanceGxTorrentLog(t *testing.T) {
+	state := newTestAppState(t)
+	gxDir := filepath.Join(state.cfg.DataDir, "gx-torrent")
+	if err := os.MkdirAll(gxDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gxDir, "gx-torrent.log"), []byte("2026-10-09 05:00:00  INFO GX-ACTIVE-MARKER\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gxDir, "gx-torrent.log.1"), []byte("GX-OLD-MARKER\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, page := v2Request(t, server, http.MethodGet, "/?view=maintenance", nil)
+	if code != http.StatusOK {
+		t.Fatalf("maintenance page -> %d", code)
+	}
+	for _, want := range []string{
+		"Log gx-torrent",
+		"GX-ACTIVE-MARKER",
+		`value="gx-torrent.log" selected`,
+		"gx-torrent.log (attivo)",
+		`hx-get="/maintenance/gx-torrent/log"`,
+	} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("maintenance page missing %q", want)
+		}
+	}
+
+	code, body := v2Request(t, server, http.MethodGet, "/maintenance/gx-torrent/log?log=gx-torrent.log.1", nil)
+	if code != http.StatusOK || !strings.Contains(body, "GX-OLD-MARKER") || strings.Contains(body, "GX-ACTIVE-MARKER") {
+		t.Fatalf("gx partial did not read the selected file -> %d: %s", code, body)
+	}
+
+	code, body = v2Request(t, server, http.MethodGet, "/maintenance/gx-torrent/log?filter=ACTIVE", nil)
+	if code != http.StatusOK || !strings.Contains(body, "GX-ACTIVE-MARKER") {
+		t.Fatalf("gx partial filter -> %d: %s", code, body)
+	}
+	code, body = v2Request(t, server, http.MethodGet, "/maintenance/gx-torrent/log?filter=NOTHING-MATCHES-HERE", nil)
+	if code != http.StatusOK || strings.Contains(body, "GX-ACTIVE-MARKER") {
+		t.Fatalf("gx partial filter should drop lines -> %d: %s", code, body)
 	}
 }
 

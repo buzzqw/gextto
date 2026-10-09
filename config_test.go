@@ -605,6 +605,33 @@ func TestSavesAndReloadsLibraryConfiguration(t *testing.T) {
 	}
 }
 
+// TestStallAlternativeDefaultsAreActive proves the temporary quality tolerance
+// is on by default (6 hours, 100 points) and can be tuned or disabled from the
+// settings without a code change.
+func TestStallAlternativeDefaultsAreActive(t *testing.T) {
+	dir := t.TempDir()
+	cfg := DefaultConfig()
+	cfg.DataDir = dir
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StallAlternativeAfterMin != 360 || cfg.StallAlternativeScoreDrop != 100 {
+		t.Fatalf("defaults = %d/%d, want 360/100", cfg.StallAlternativeAfterMin, cfg.StallAlternativeScoreDrop)
+	}
+	if err := saveConfigSetting(dir, "stall_alternative_after_min", "0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfigSetting(dir, "stall_alternative_score_drop", "50"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.loadConfigDB(); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StallAlternativeAfterMin != 0 || cfg.StallAlternativeScoreDrop != 50 {
+		t.Fatalf("overrides = %d/%d, want 0/50", cfg.StallAlternativeAfterMin, cfg.StallAlternativeScoreDrop)
+	}
+}
+
 func TestSavesAndReloadsMovieStaticMetadata(t *testing.T) {
 	dir := t.TempDir()
 	movies := []MovieConfig{{

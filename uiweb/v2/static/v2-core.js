@@ -305,6 +305,23 @@
   }
   window.gexttoCanPollLogs = canPollLogs;
 
+  // The archive holds hundreds of thousands of rows, so its toolbar searches
+  // live while typing. Two cases are left to the explicit "Cerca" button: the
+  // "web" tick would start an online indexer/web search on every keystroke,
+  // and very short terms (one or two characters) match a huge share of the
+  // table, so the FTS prefix query would still have to count every hit. From
+  // three characters on it is a cheap local FTS query and is fired
+  // immediately. An empty term reloads the full first page.
+  function archiveLiveAllowed(form, event) {
+    if (event && event.target && event.target.type === "checkbox") return false;
+    var web = form && form.querySelector ? form.querySelector('input[name="web"]') : null;
+    if (web && web.checked) return false;
+    var input = form && form.querySelector ? form.querySelector('input[name="q"]') : null;
+    var term = String(input && input.value || "").trim();
+    return term.length === 0 || term.length >= 3;
+  }
+  window.gexttoArchiveLiveAllowed = archiveLiveAllowed;
+
   document.addEventListener("mousedown", function (event) {
     var logView = document.getElementById("v2-logs-view");
     if (logView && (event.target === logView || logView.contains(event.target))) {
@@ -1375,6 +1392,26 @@
   if ("serviceWorker" in navigator && window.isSecureContext) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () { /* optional */ }); });
   }
+
+  // Setup wizard: a detected mount fills the library field; the login fields
+  // follow their checkbox.
+  document.addEventListener("click", function (event) {
+    var button = event.target.closest ? event.target.closest("[data-v2-setup-fill]") : null;
+    if (!button) return;
+    var input = document.getElementById("v2-setup-" + button.getAttribute("data-v2-setup-fill"));
+    if (input) { input.value = button.getAttribute("data-value") || ""; input.focus(); }
+  });
+  function syncSetupToggles() {
+    var toggles = document.querySelectorAll("[data-v2-setup-toggle]");
+    for (var i = 0; i < toggles.length; i++) {
+      var target = document.getElementById(toggles[i].getAttribute("data-v2-setup-toggle"));
+      if (target) target.hidden = !toggles[i].checked;
+    }
+  }
+  document.addEventListener("change", function (event) {
+    if (event.target.matches && event.target.matches("[data-v2-setup-toggle]")) syncSetupToggles();
+  });
+  document.addEventListener("DOMContentLoaded", syncSetupToggles);
 
   document.addEventListener("DOMContentLoaded", function () { ensureTooltips(document); scanModal(); pinLogTail(); updateTorrentSelection(); updateLogsFollowButton(); initToastRegion(); updateProblemsChip(); updateDownloadsBadge(); collapseOnPhone(); openAddFormWithLink(); initPullToRefresh(); initLiveMetrics(); });
 })();

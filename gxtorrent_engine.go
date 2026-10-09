@@ -277,6 +277,16 @@ func (e *gxTorrentEngine) postForm(path string, form url.Values) error {
 	return e.do(http.MethodPost, path, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded", nil)
 }
 
+// PortCheck asks the daemon whether its peer port is reachable: it is listening
+// and the router forwards it. Only gx-torrent exposes this.
+func (e *gxTorrentEngine) PortCheck() (map[string]any, error) {
+	var out map[string]any
+	if err := e.do(http.MethodGet, "/api/v1/portcheck", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (e *gxTorrentEngine) action(hash, action string, form url.Values) error {
 	hash = strings.ToLower(strings.TrimSpace(hash))
 	if hash == "" {

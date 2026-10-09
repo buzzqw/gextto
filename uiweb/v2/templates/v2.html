@@ -125,12 +125,15 @@
        {{else if eq .Body "v2_panels_page"}}{{template "v2_panels_page" .Content}}
 		{{else if eq .Body "v2_movies"}}{{template "v2_movies" .Content}}
        {{else if eq .Body "v2_search"}}{{template "v2_search" .Content}}
+      {{else if eq .Body "v2_setup"}}{{template "v2_setup" .Content}}
       {{else if eq .Body "v2_series_detail"}}{{template "v2_series_detail" .Content}}
       {{else if eq .Body "v2_movie_detail"}}{{template "v2_movie_detail" .Content}}
       {{else}}{{template "v2_unavailable" .Content}}{{end}}
     </div>
   </main>
 </div>
+{{if .Update.Available}}<a class="v2-update-badge" href="/?view=maintenance#v2-update-panel" title="Nuova versione disponibile: apri Manutenzione"><span aria-hidden="true">⬆️</span><span class="v2-update-badge-label">Aggiornamento disponibile</span></a>{{end}}
+<a class="v2-donate" href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project" target="_blank" rel="noopener noreferrer" title="Sostieni Gextto con una donazione PayPal" aria-label="Sostieni Gextto con una donazione PayPal"><span class="v2-donate-icon" aria-hidden="true">❤️</span><span class="v2-donate-label">Dona</span></a>
 </body>
 </html>{{end}}
 
@@ -1085,7 +1088,7 @@
          <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
          <button class="btn sm" type="button" data-v2-logs-copy title="Copia le righe di log visibili o la selezione negli appunti">📋 Copia</button>
          <select class="input" name="log" aria-label="File di log" title="Scegli quale file di log leggere; il primo è quello attivo">
-          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . "gextto.log"}} (attivo){{end}}</option>{{end}}
+          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (attivo){{end}}</option>{{end}}
          </select>
       </form>
       {{template "v2_logs_view" .}}
@@ -1096,6 +1099,38 @@
 
 {{define "v2_logs_view"}}
 <pre class="log-view" id="v2-logs-view" data-v2-logs-lines>{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>
+{{end}}
+
+{{define "v2_gx_log_panel"}}
+<div class="panel">
+  <div class="panel-head"><h3>Log gx-torrent</h3><small class="muted"><span id="v2-gx-logs-count">{{.Count}}</span> righe</small></div>
+  <div class="panel-body">
+    <p class="hint">Ultime righe del log del motore torrent gx-torrent (<code>gx-torrent/gx-torrent.log</code>), separato dal log di Gextto e conservato tra i riavvii del servizio. Utile quando un download o un trasferimento non si comporta come previsto.</p>
+    <form class="toolbar logs-toolbar" hx-get="/maintenance/gx-torrent/log" hx-target="#v2-gx-log-view" hx-swap="outerHTML" hx-trigger="submit, change">
+      <input class="input" type="search" name="filter" value="{{.Filter}}" aria-label="Filtra le righe del log gx-torrent" placeholder="Filtra le righe…" title="Filtra il testo delle righe del log" />
+      <button class="btn sm primary" type="submit" title="Filtra le righe del log">🔍 Filtra</button>
+      <select class="input compact" name="level" aria-label="Livello" title="Mostra tutte le righe o solo avvisi ed errori">
+        <option value="">Tutte le righe</option>
+        <option value="problems"{{if .ProblemsOnly}} selected{{end}}>Solo avvisi ed errori</option>
+      </select>
+      <select class="input compact" name="lines" aria-label="Numero di righe" title="Numero massimo di righe da visualizzare">
+        <option value="200"{{if eq .LinesNum 200}} selected{{end}}>200</option>
+        <option value="500"{{if eq .LinesNum 500}} selected{{end}}>500</option>
+        <option value="1000"{{if eq .LinesNum 1000}} selected{{end}}>1000</option>
+        <option value="2000"{{if eq .LinesNum 2000}} selected{{end}}>2000</option>
+      </select>
+      <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
+      <select class="input" name="log" aria-label="File di log gx-torrent" title="Scegli quale file di log leggere; il primo è quello attivo">
+        {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (attivo){{end}}</option>{{end}}
+      </select>
+    </form>
+    {{template "v2_gx_log_view" .}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_gx_log_view"}}
+{{if .Lines}}<pre class="log-view" id="v2-gx-log-view">{{range .Lines}}<span class="log-line">{{.}}</span>{{end}}</pre>{{else}}<pre class="log-view" id="v2-gx-log-view"><span class="muted">Nessuna riga da mostrare: gx-torrent potrebbe non essere il motore attivo o il log non è ancora stato creato.</span></pre>{{end}}
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -1199,11 +1234,11 @@
     <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} voci</small></div>
     <div class="panel-body">
       {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
-      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="submit{{if ne .BaseView "archive"}}, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
+      {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="{{if eq .BaseView "archive"}}submit, input[window.gexttoArchiveLiveAllowed && window.gexttoArchiveLiveAllowed(this, event)] changed delay:300ms{{else}}submit, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
         {{if .Manual}}<input type="hidden" name="load" value="1" />{{end}}
         <input type="hidden" name="sort" value="{{.Sort}}" />
         <input type="hidden" name="dir" value="{{.Dir}}" />
-        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="Cerca…" aria-label="Cerca" />{{end}}
+        {{if .Search}}<input class="input{{if eq .BaseView "archive"}} archive-search-input{{end}}" type="search" name="q" value="{{.Query}}" placeholder="{{if eq .BaseView "archive"}}Cerca in archivio, almeno 3 caratteri{{else}}Cerca…{{end}}" aria-label="Cerca"{{if eq .BaseView "archive"}} title="La ricerca nell'archivio parte da sola da 3 caratteri. Per termini più corti (es. IT) premi Invio o Cerca. Con «Cerca anche nel web» la ricerca online parte solo da Cerca."{{end}} />{{end}}
         {{if .Filter}}<input class="input" type="search" name="f" value="{{.FilterQuery}}" placeholder="Filtra l'elenco…" aria-label="Filtra l'elenco" />{{end}}
         {{if eq .BaseView "archive"}}
         <label class="check archive-web-check" title="Cerca anche nei motori web e indexer online"><input type="checkbox" name="web" value="1"{{if .WebSearch}} checked{{end}} /> <span>Cerca anche nel web</span></label>
@@ -1359,6 +1394,8 @@
 {{else if eq .Kind "ramdisk"}}{{with .Ramdisk}}{{template "v2_ramdisk_panel" .}}{{end}}
 {{else if eq .Kind "folder_rename"}}{{with .FolderRename}}{{template "v2_folder_rename_panel" .}}{{end}}
 {{else if eq .Kind "progress"}}{{with .Progress}}{{template "v2_rename_progress_panel" .}}{{end}}
+{{else if eq .Kind "update"}}{{with .Update}}{{template "v2_update_panel" .}}{{end}}
+{{else if eq .Kind "gx_log"}}{{with .GxLog}}{{template "v2_gx_log_panel" .}}{{end}}
 {{else if eq .Kind "list_editor"}}{{if .ListEditor}}{{template "v2_list_editor" .ListEditor}}{{end}}
 {{else if eq .Kind "sources_check"}}
 <div class="panel">
@@ -1500,6 +1537,161 @@
     </div>
     {{if and (or (eq .Action "vacuum") (eq .Action "analyze")) (not .Error)}}<div class="stat-grid" style="margin-top:10px"><span class="stat"><strong>{{bytes .BeforeSize}}</strong> prima</span><span class="stat"><strong>{{bytes .AfterSize}}</strong> dopo</span></div>{{end}}
     {{if .Checks}}<div class="table-wrap" style="margin-top:10px"><table class="data-table"><caption class="sr-only">Esito verifica database</caption><thead><tr><th scope="col">Database</th><th scope="col">Esito</th><th scope="col">Dettaglio</th></tr></thead><tbody>{{range .Checks}}<tr><td>{{.Name}}</td><td>{{if .OK}}<span class="badge ok">valido</span>{{else}}<span class="badge err">problema</span>{{end}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody></table></div>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "v2_setup"}}
+<section class="v2-setup" aria-labelledby="v2-setup-title">
+  <div class="panel">
+    <div class="panel-head"><h2 id="v2-setup-title">Configurazione iniziale</h2><small class="muted">{{.Step}} / 5</small></div>
+    <div class="panel-body">
+      <ol class="v2-setup-steps">{{range .Steps}}<li class="{{if .Current}}current{{else if .Done}}done{{end}}"{{if .Current}} aria-current="step"{{end}}><a href="/?view=setup&amp;step={{.Number}}"><span class="v2-setup-num">{{.Number}}</span> <span>{{.Title}}</span></a></li>{{end}}</ol>
+      {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="{{if .Error}}alert{{else}}status{{end}}">{{.Message}}</p>{{end}}
+
+      {{if eq .Step 1}}
+      <h3>Chi può usare Gextto?</h3>
+      <p class="hint">L'interfaccia ascolta su tutta la rete. Una password impedisce a chiunque altro di cambiare la configurazione o avviare download. Dalla rete locale puoi lasciare l'accesso libero.</p>
+      <form method="post" action="/setup/auth" class="v2-setup-form">
+        <label class="check"><input type="checkbox" name="auth" value="on"{{if or .AuthEnabled (not .AuthHasPass)}} checked{{end}} data-v2-setup-toggle="v2-setup-auth" /> <span>Proteggi l'accesso con una password</span></label>
+        <div id="v2-setup-auth" class="v2-setup-fields">
+          <label><span>Utente</span><input class="input" name="username" value="{{if .AuthUser}}{{.AuthUser}}{{else}}admin{{end}}" autocomplete="username" /></label>
+          <label><span>Password</span><input class="input" type="password" name="password" autocomplete="new-password" minlength="8" placeholder="{{if .AuthHasPass}}impostata — lascia vuoto per non cambiarla{{else}}almeno 8 caratteri{{end}}" /></label>
+          <label><span>Ripeti la password</span><input class="input" type="password" name="password2" autocomplete="new-password" /></label>
+          <label class="check"><input type="checkbox" name="local_bypass" value="on"{{if .AuthBypass}} checked{{end}} /> <span>Nessun login dalla rete locale</span></label>
+        </div>
+        <div class="toolbar"><button class="btn primary" type="submit">Salva e continua</button></div>
+      </form>
+
+      {{else if eq .Step 2}}
+      <h3>Dove salvare i file</h3>
+      <p class="hint">Verifica controlla ogni cartella con l'utente del servizio: se esiste, se è scrivibile, il tipo di disco e lo spazio libero. Download e temporanei sullo stesso disco della libreria permettono spostamenti istantanei.</p>
+      {{if .ServiceUser}}<p class="hint"><span>Utente del servizio:</span> <code>{{.ServiceUser}}</code></p>{{end}}
+      {{if .Mounts}}<p class="hint"><span>Cartelle di rete e dischi montati trovati:</span> {{range .Mounts}}<button class="btn sm" type="button" data-v2-setup-fill="archive_root" data-value="{{.}}">{{.}}</button> {{end}}</p>{{end}}
+      <form method="post" action="/setup/paths" class="v2-setup-form">
+        {{range .Paths}}
+        <div class="v2-setup-path">
+          <label><span>{{.Label}}</span><input class="input" name="{{.Key}}" id="v2-setup-{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" spellcheck="false" /></label>
+          <small class="hint">{{.Hint}}</small>
+          {{if .Checked}}<div class="v2-setup-check">
+            {{if .Problem}}<span class="badge err">Problema</span> <span>{{.Problem}}</span>
+            {{else if .Value}}<span class="badge ok">OK</span>{{if .WillCreate}} <span>Verrà creata.</span>{{end}}{{else}}<span class="muted">Valore predefinito.</span>{{end}}
+            {{if .Filesystem}} <small class="muted">{{.Filesystem}}{{if .FreeBytes}} · {{bytesU .FreeBytes}}{{end}}</small>{{end}}
+            {{if .Network}} <span class="badge">NAS</span>{{end}}
+            {{if .SameAsLib}} <span class="badge ok">stesso disco della libreria</span>{{end}}
+          </div>{{end}}
+          {{if and .Checked (not .Writable) .Exists}}<p class="hint">Dai i permessi di scrittura al gruppo che possiede la cartella e reinstalla con <code>--media-group &lt;gruppo&gt;</code>, oppure, per NFS/SMB, controlla le opzioni di montaggio (uid/gid, all_squash).</p>{{end}}
+        </div>
+        {{end}}
+        <div class="toolbar">
+          <button class="btn" type="submit" name="action" value="check">Verifica</button>
+          <button class="btn primary" type="submit" name="action" value="save">Salva e continua</button>
+          <a class="btn" href="/?view=setup&amp;step=1">Indietro</a>
+        </div>
+      </form>
+
+      {{else if eq .Step 3}}
+      <h3>Da dove cercare</h3>
+      <p class="hint">Gextto cerca le release negli indexer di Prowlarr o Jackett e usa TMDB per titoli, locandine e calendario. Puoi aggiungerne altri dopo, in Impostazioni.</p>
+      {{if .Indexers}}<p><span class="badge ok">Indexer configurati</span> {{range .Indexers}}<code>{{.Name}}</code> {{end}}</p>{{end}}
+      <form method="post" action="/setup/sources" class="v2-setup-form">
+        <fieldset class="v2-setup-fields"><legend>Aggiungi un indexer</legend>
+          <label><span>Tipo</span><select class="input" name="indexer_manager"><option value="prowlarr">Prowlarr</option><option value="jackett">Jackett</option></select></label>
+          <label><span>Nome</span><input class="input" name="indexer_name" placeholder="prowlarr" /></label>
+          <label><span>URL base</span><input class="input" name="indexer_url" placeholder="http://127.0.0.1:9696" inputmode="url" spellcheck="false" /></label>
+          <label><span>API key</span><input class="input" type="password" name="indexer_api_key" autocomplete="off" /></label>
+        </fieldset>
+        <fieldset class="v2-setup-fields"><legend>TMDB</legend>
+          <label><span>TMDB API key</span><input class="input" type="password" name="tmdb_api_key" autocomplete="off" placeholder="{{if .TmdbSet}}impostata — lascia vuoto per non cambiarla{{else}}non impostata{{end}}" /></label>
+          <small class="hint">Gratuita su themoviedb.org → Impostazioni → API.</small>
+        </fieldset>
+        <div class="toolbar">
+          <button class="btn primary" type="submit">Salva e continua</button>
+          <a class="btn" href="/?view=setup&amp;step=2">Indietro</a>
+          <a class="btn" href="/?view=setup&amp;step=4">Salta</a>
+        </div>
+      </form>
+
+      {{else if eq .Step 4}}
+      <h3>La tua prima serie o il tuo primo film</h3>
+      <p class="hint">Cerca un titolo su TMDB e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</p>
+      {{if or .SeriesCount .MoviesCount}}<p><span class="badge ok">In libreria</span> <span>Serie TV</span> <strong>{{.SeriesCount}}</strong> · <span>Film</span> <strong>{{.MoviesCount}}</strong></p>{{end}}
+      {{if .TmdbSet}}
+      <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
+        <select class="input" name="kind" aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
+        <input class="input" type="search" name="query" aria-label="Titolo da cercare su TMDB" placeholder="Titolo da cercare su TMDB" />
+        <button class="btn primary" type="submit">Cerca su TMDB</button>
+      </form>
+      <div id="v2-tmdb-results" aria-live="polite"></div>
+      {{else}}
+      <p class="alert">Senza la TMDB API key la ricerca dei titoli non è disponibile: aggiungila al passo precedente, oppure aggiungi i titoli dopo da Serie TV e Film.</p>
+      {{end}}
+      <div class="toolbar">
+        <a class="btn primary" href="/?view=setup&amp;step=5">Continua</a>
+        <a class="btn" href="/?view=setup&amp;step=3">Indietro</a>
+      </div>
+
+      {{else}}
+      <h3>Pronto a partire</h3>
+      <ul class="v2-setup-summary">
+        <li>{{if .ArchiveSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Cartella della libreria</span></li>
+        <li>{{if .HasIndexer}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un indexer</span></li>
+        <li>{{if .TmdbSet}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>TMDB API key</span></li>
+        <li>{{if or .SeriesCount .MoviesCount}}<span class="badge ok">OK</span>{{else}}<span class="badge warn">Manca</span>{{end}} <span>Almeno un titolo in libreria</span></li>
+      </ul>
+      <form method="post" action="/setup/finish" class="v2-setup-form">
+        <label class="check"><input type="checkbox" name="active" value="on" checked /> <span>Avvia la ricerca automatica (ciclo ogni 6 ore)</span></label>
+        <label class="check"><input type="checkbox" name="real_downloads" value="on"{{if not .DryRun}} checked{{end}} /> <span>Scarica davvero (disattiva la modalità prova)</span></label>
+        <p class="hint">In modalità prova Gextto cerca e mostra cosa scaricherebbe, senza scaricare nulla: utile per verificare filtri e qualità.</p>
+        <div class="toolbar">
+          <button class="btn primary" type="submit">Completa</button>
+          <a class="btn" href="/?view=setup&amp;step=4">Indietro</a>
+        </div>
+      </form>
+      {{end}}
+
+      {{if not .Completed}}
+      <form method="post" action="/setup/finish" class="v2-setup-skip"><input type="hidden" name="action" value="skip" /><button class="btn sm" type="submit">Salta la configurazione guidata</button></form>
+      {{end}}
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{define "v2_update_panel"}}
+<div class="panel" id="v2-update-panel"{{if .Requested}} hx-get="/maintenance/update?from={{.Version}}" hx-trigger="every 5s" hx-swap="outerHTML"{{end}}>
+  <div class="panel-head"><h3>Aggiornamenti</h3><small class="muted">{{.Version}} · {{.Channel}}</small></div>
+  <div class="panel-body">
+    {{if .Message}}<p class="alert{{if not .Error}} ok{{end}}" role="status">{{.Message}}</p>{{end}}
+    {{if not .Managed}}
+    <p class="hint">Installazione da sorgenti: aggiorna con git pull e make build.</p>
+    {{else}}
+    {{if .Requested}}
+    <p class="alert ok" role="status"><span>Aggiornamento in corso: Gextto attende la fine delle copie verso la libreria, poi si riavvia. Questo pannello si aggiorna da solo.</span></p>
+    {{else if .Available}}
+    <p><span class="badge warn">Nuova versione</span> <strong>{{.LatestVersion}}</strong> <small class="muted">{{.LatestBuiltLabel}}</small></p>
+    {{if .Changes}}
+    <p class="hint">Novità rispetto alla versione installata:</p>
+    <ul class="v2-update-changes">{{range .Changes}}<li><a href="{{.URL}}" target="_blank" rel="noopener noreferrer"><code>{{.Short}}</code></a> <small class="muted">{{.Day}}</small> {{.Subject}}</li>{{end}}</ul>
+    {{if not .ChangesComplete}}<p class="hint">Elenco parziale: la versione installata è più vecchia delle modifiche mostrate.</p>{{end}}
+    {{end}}
+    {{if .Updater}}
+    <p class="hint">Prima di aggiornare viene creato un backup dei database. Se la nuova versione non parte, torna automaticamente quella precedente.</p>
+    {{else}}
+    <p class="alert">Aggiornamento dalla UI non configurato: riesegui l'installer (install.sh) per abilitarlo, oppure usa sudo gexttod --update.</p>
+    {{end}}
+    {{else if .CheckedAt}}
+    <p><span class="badge ok">Aggiornato</span> <span>Gextto è all'ultima versione disponibile.</span></p>
+    {{end}}
+    {{if .Error}}<p class="alert" role="alert"><span>Controllo aggiornamenti non riuscito:</span> {{.Error}}</p>{{end}}
+    {{if not .CheckEnabled}}<p class="hint">Controllo automatico disattivato (Impostazioni → Sistema → Aggiornamenti).</p>{{end}}
+    <div class="toolbar">
+      <form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" style="display:inline"><input type="hidden" name="action" value="check" /><button class="btn sm" type="submit">Controlla ora</button></form>
+      {{if .CanApply}}<form hx-post="/maintenance/update" hx-target="#v2-update-panel" hx-swap="outerHTML" hx-confirm="Aggiornare Gextto ora? Il servizio si riavvia al termine." style="display:inline"><input type="hidden" name="action" value="apply" /><button class="btn sm primary" type="submit">Aggiorna ora</button></form>{{end}}
+      {{if .CheckedAt}}<small class="muted"><span>Ultimo controllo:</span> {{.CheckedLabel}}</small>{{end}}
+    </div>
+    {{if .LastLog}}<details><summary>Log dell'ultimo aggiornamento</summary><pre class="log-view">{{.LastLog}}</pre></details>{{end}}
+    {{end}}
   </div>
 </div>
 {{end}}

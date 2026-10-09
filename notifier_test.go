@@ -508,3 +508,47 @@ func TestFormatEmailSubject(t *testing.T) {
 		t.Fatalf("subj3 = %q", subj3)
 	}
 }
+
+// TestSeasonPackNotificationIsCompact locks the season-pack message: it lists
+// compact episode ranges instead of full paths, and names the discarded
+// episodes while making clear they come from the pack (the library has a better
+// copy).
+func TestSeasonPackNotificationIsCompact(t *testing.T) {
+	previous := messages.Language()
+	messages.SetLanguage("it")
+	t.Cleanup(func() { messages.SetLanguage(previous) })
+
+	episodes := []any{}
+	for _, episode := range []int64{1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13} {
+		episodes = append(episodes, map[string]any{
+			"series":  "Brilliant Minds",
+			"season":  int64(1),
+			"episode": episode,
+			"path":    "/archivio/Brilliant Minds/Brilliant Minds - S01E.mkv",
+		})
+	}
+	body := formatEvent("season_pack_completed", map[string]any{
+		"series":          "Brilliant Minds",
+		"season":          int64(1),
+		"size_bytes":      int64(8676162000),
+		"new_count":       int64(11),
+		"discarded_count": int64(2),
+		"episodes":        episodes,
+		"discarded": []any{
+			map[string]any{"episode": int64(4), "path": "/archivio/E04.mkv", "name": "E04.mkv"},
+			map[string]any{"episode": int64(10), "path": "/archivio/E10.mkv", "name": "E10.mkv"},
+		},
+		"path": "/home/andres/SerieTVArchivio/Brilliant Minds",
+	})
+	for _, want := range []string{
+		"✅ 11 nuovi: E01-E03, E05-E09, E11-E13",
+		"🗑️ 2 scartati dal pack (in libreria c'è già una copia migliore): E04, E10",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, ".mkv") {
+		t.Fatalf("body must not list full file paths:\n%s", body)
+	}
+}

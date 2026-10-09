@@ -100,6 +100,9 @@ type persistedState struct {
 	Config   QueueConfig             `json:"config"`
 	NextPos  int64                   `json:"next_pos"`
 	Torrents map[string]*torrentMeta `json:"torrents"`
+	// BadTrackers maps a tracker URL to the Unix time until which it stays
+	// disabled after failing continuously (see tracker_health.go).
+	BadTrackers map[string]int64 `json:"bad_trackers,omitempty"`
 }
 
 // runtimeInfo is volatile per-torrent bookkeeping.
@@ -126,6 +129,10 @@ type Daemon struct {
 	restartPending bool
 	dirty          bool
 	startedAt      time.Time
+	// lastPeerNoiseReport rate-limits the periodic peer/tracker error summary.
+	lastPeerNoiseReport time.Time
+	// trackers drops trackers that never work (see tracker_health.go).
+	trackers *trackerHealth
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
@@ -141,6 +148,11 @@ type Daemon struct {
 	lsdError      string
 	ipFilterPath  string
 	ipFilterRules int
+	// ipFilterData caches the raw filter file so a session reopen (peer limits,
+	// cache TTL, preallocation) does not re-read a multi-megabyte file from
+	// disk; ipFilterStamp is path|size|mtime and is empty when not cached.
+	ipFilterData  []byte
+	ipFilterStamp string
 
 	// Adaptive disk cache (see cache.go). rain reads the cache sizes when the
 	// session is created, so a retune reopens the session on a coarse cadence.
@@ -182,6 +194,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		moving:    map[string]bool{},
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
+		trackers:  newTrackerHealth(),
 	}
 	if err := d.loadState(); err != nil {
 		return nil, err
@@ -255,12 +268,14 @@ func (d *Daemon) loadState() error {
 	}
 	loaded.Config = loaded.Config.normalized()
 	d.state = loaded
+	d.trackers.loadDisabled(loaded.BadTrackers)
 	return nil
 }
 
 // saveLocked writes the state atomically. Failures are logged: the session
 // keeps working and the next change retries.
 func (d *Daemon) saveLocked() {
+	d.state.BadTrackers = d.trackers.disabledSnapshot()
 	data, err := json.MarshalIndent(d.state, "", "  ")
 	if err != nil {
 		logf("cannot encode state: %v", err)
@@ -563,7 +578,25 @@ type collectedTorrent struct {
 	trackers []torrent.Tracker
 }
 
+// peerNoiseReportEvery is how often the demoted peer/tracker errors are
+// summarised. They are not printed one by one (see swarmNoiseFilter), so an
+// idle log does not hide a growing connectivity problem.
+const peerNoiseReportEvery = 10 * time.Minute
+
+// reportPeerNoise logs the peer/tracker errors demoted since the last report.
+// It runs on the single queue-loop goroutine.
+func (d *Daemon) reportPeerNoise(now time.Time) {
+	if !d.lastPeerNoiseReport.IsZero() && now.Sub(d.lastPeerNoiseReport) < peerNoiseReportEvery {
+		return
+	}
+	d.lastPeerNoiseReport = now
+	if line := formatPeerNoise(peerNoiseCounters.drain()); line != "" {
+		logf("peer noise: %s", line)
+	}
+}
+
 func (d *Daemon) tick(now time.Time) {
+	d.reportPeerNoise(now)
 	// Phase 1: sample the run loops without d.mu.
 	d.mu.Lock()
 	session := d.session
@@ -583,6 +616,9 @@ func (d *Daemon) tick(now time.Time) {
 	// statfs on the download dir can block on a network mount: classify it
 	// outside d.mu.
 	d.refreshStorageClass(now)
+	// Drop trackers that have been failing for too long. It takes d.mu through
+	// setTrackers, so it must run outside the section below.
+	d.updateTrackerHealth(collected, now)
 
 	// Phase 2: apply the samples under d.mu.
 	d.mu.Lock()
@@ -1673,6 +1709,10 @@ type daemonStats struct {
 	DiskTotalBytes  int64         `json:"disk_total_bytes"`
 	// Session holds rain's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
+	// PeerErrors counts the peer/tracker errors demoted by the log filter since
+	// start-up, by category. Useful to tell a chatty swarm from a real problem
+	// without flooding the log.
+	PeerErrors map[string]int64 `json:"peer_errors,omitempty"`
 }
 
 func (d *Daemon) stats() daemonStats {
@@ -1703,6 +1743,9 @@ func (d *Daemon) stats() daemonStats {
 		DHT:             d.opts.Network.DHT && d.opts.Network.Proxy == "",
 		LSD:             d.lsd.status(),
 		Preallocate:     d.state.Config.Preallocate,
+	}
+	if peerErrors := peerNoiseCounters.totals(); len(peerErrors) > 0 {
+		out.PeerErrors = peerErrors
 	}
 	read, write, auto := cacheSizes(d.state.Config, memoryTotal())
 	if d.cacheRead > 0 {

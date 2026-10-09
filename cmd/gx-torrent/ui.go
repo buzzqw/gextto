@@ -57,6 +57,7 @@ type uiPageData struct {
 	Router       string
 	ExternalIP   string
 	PortOpen     bool
+	PeerErrors   string
 	DHT          bool
 	DHTNodes     int64
 	UTP          bool
@@ -308,6 +309,11 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 .content{flex:1;min-width:0}
 .statusbar{position:sticky;bottom:0;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#131a28;border:1px solid #243049;border-radius:10px;padding:10px 14px;font-size:14px;color:#93a1b5}
 .statusbar b{color:#e7ecf3;font-weight:600}
+.statusbar button{padding:3px 8px;border-radius:7px;border:1px solid #2b3a55;background:#1b2536;color:#cbd5e1;font-size:12px;cursor:pointer}
+.portdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#6b7280}
+.portdot.ok{background:#22c55e;box-shadow:0 0 6px #22c55e}
+.portdot.warn{background:#f59e0b}
+.portdot.bad{background:#ef4444}
 .toast{position:fixed;top:14px;right:14px;z-index:80;background:#14351f;border:1px solid #1f6b3a;color:#e7ecf3;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:420px;transition:opacity .4s}
 .toast.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
@@ -449,6 +455,7 @@ function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll(
 function applySort(){var st=window.__sort;var tb=document.getElementById('torrents');if(!st||!tb)return;var groups=Array.prototype.slice.call(tb.querySelectorAll('tbody.t'));var attr='data-k-'+st.key;groups.sort(function(a,b){var av=a.getAttribute(attr)||'',bv=b.getAttribute(attr)||'';var an=parseFloat(av),bn=parseFloat(bv);var r=(!isNaN(an)&&!isNaN(bn))?an-bn:String(av).localeCompare(String(bv));return st.asc?r:-r;});groups.forEach(function(g){tb.appendChild(g)});}
 function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st.key===key&&st.asc)};applySort();}
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
+function testPorts(){var out=document.getElementById('portcheck-result');if(!out)return;out.textContent=' checking…';fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){out.innerHTML=h;}).catch(function(e){out.textContent=' test failed: '+e.message;});}
 function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
 function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
 function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent='loading…';fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' lines · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent='Cannot read the Gextto log: '+e.message;document.getElementById('log-info').textContent='';});}
@@ -553,8 +560,9 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
     <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span>Free space <b>{{bytes .DiskFree}} of {{bytes .DiskTotal}}</b></span>
     <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodes{{else}}off{{end}}</b></span>
-    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b></span>
+    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b> <button type="button" onclick="testPorts()" title="Verifica se la porta è in ascolto e inoltrata dal router">Test porte</button> <span id="portcheck-result"></span></span>
     <span>Encryption <b>{{.Encryption}}</b></span>
+    {{if .PeerErrors}}<span title="Errori peer/tracker filtrati dal log, per categoria (dall'avvio)">Peer <b>{{.PeerErrors}}</b></span>{{end}}
   </div>
 {{end}}`
 
@@ -767,6 +775,60 @@ func (d *Daemon) handleUIGexttoLog(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"path": d.opts.GexttoLog, "lines": tail})
+}
+
+// handleUIPortCheck renders the "Test porte" result for the status bar: a
+// coloured dot (green open, amber listening but not forwarded, red closed) and
+// a short explanation.
+// uiPeerErrors renders the demoted peer/tracker error totals compactly, e.g.
+// "handshake 12 · reset 3". Empty when there is no noise yet.
+func uiPeerErrors(counts map[string]int64) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s %d", key, counts[key]))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	check := d.mapper.check()
+	class, label := "bad", "porta chiusa"
+	switch {
+	case check.Port <= 0:
+		class, label = "bad", "nessuna porta peer configurata"
+	case check.Open:
+		class, label = "ok", "porta aperta"
+	case check.Listening:
+		class, label = "warn", "in ascolto, non inoltrata"
+	}
+	detail := check.Detail
+	if check.ExternalIP != "" {
+		if detail != "" {
+			detail += " · "
+		}
+		detail += "IP " + check.ExternalIP
+	}
+	if check.Error != "" {
+		if detail != "" {
+			detail += " · "
+		}
+		detail += check.Error
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = fmt.Fprintf(w, `<span class="portdot %s"></span>%s <span class="muted">%s</span>`,
+		class, template.HTMLEscapeString(label), template.HTMLEscapeString(detail))
 }
 
 func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
@@ -1409,6 +1471,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 	default:
 		page.Router = "—"
 	}
+	page.PeerErrors = uiPeerErrors(stats.PeerErrors)
 	for _, view := range views {
 		row := uiTorrentRow{
 			Hash:      view.Hash,

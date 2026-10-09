@@ -204,6 +204,28 @@ func TorrentBackendTest(w http.ResponseWriter, r *http.Request, s *AppState) {
 	jsonResponse(w, result)
 }
 
+// TorrentBackendPortCheck tests the peer port of the active engine: is it
+// listening and does the router forward it (the eMule-style "test ports")?
+// Only gx-torrent, whose daemon owns the router mapping, can answer.
+func TorrentBackendPortCheck(w http.ResponseWriter, r *http.Request, s *AppState) {
+	checker, ok := s.activeEngine().(interface {
+		PortCheck() (map[string]any, error)
+	})
+	if !ok {
+		jsonStatus(w, http.StatusConflict, map[string]any{"ok": false, "error": "il test porte è disponibile solo con il motore gx-torrent"})
+		return
+	}
+	result, err := checker.PortCheck()
+	if err != nil {
+		logging.Info("torrent backend port check", "backend", "gx-torrent", "ok", false, "error", err.Error())
+		jsonStatus(w, http.StatusBadGateway, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	result["ok"] = true
+	logging.Info("torrent backend port check", "backend", "gx-torrent", "open", result["open"], "port", result["port"])
+	jsonResponse(w, result)
+}
+
 // TorrentBackendPreflight implements `torrent_backend_preflight`: it validates
 // the path mappings and the connectivity of the configured backend before it
 // is ever activated. A path-mapping failure is blocking.

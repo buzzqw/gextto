@@ -37,8 +37,15 @@ service.
   automatically; a move to the archive interrupted by a restart resumes on its
   own. While a file seeds it enters the library as a hardlink, without using the
   space twice (when downloads and library share a filesystem).
+- **Recovers from stuck downloads:** a download that stops making progress — no
+  bytes for a while, or a magnet still waiting for its file list — can be
+  superseded by an adequate alternative after a configurable window, while the
+  stuck torrent keeps trying (see *Configuration → Quality and upgrades → Stuck
+  downloads*).
 - **Operational tools included:** health checks, logs, backups, maintenance,
-  notifications, NAS paths, seeding controls and a blocklist.
+  notifications, NAS paths, seeding controls and a blocklist. The archive search
+  is instant while you type, and the **gx-torrent log** is readable from
+  Maintenance.
 
 The UI is available at `http://<host>:5000/` and supports Italian, English,
 German, French, Spanish and Polish. The full [English manual](docs/MANUAL.en.md)
@@ -53,7 +60,7 @@ same data.
 
 | Engine | Where it runs | Strengths | Trade-offs — pick it when |
 |---|---|---|---|
-| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page reachable on the LAN; **transfers keep running while Gextto restarts or updates**; a crash stays in its process; **sequential and first/last download**; **per-piece diagnostics**; **HTTP streaming with Range**; **BEP 16 super-seeding**; a **small, adaptive memory footprint** (cache sized from available RAM, active downloads/seeds and the storage type); falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); file priority levels; no large in-process disk cache | you want a self-contained engine with minimal C/C++ dependencies |
+| **gx-torrent** (default) | Separate supervised Go process, no libtorrent | Pure Go, no `libtorrent-rasterbar`; its own web page (loopback by default, token-protected if exposed on the LAN); drops trackers that never work and has a built-in **peer-port test**; **transfers keep running while Gextto restarts or updates**; a crash stays in its process; **sequential and first/last download**; **per-piece diagnostics**; **HTTP streaming with Range**; **BEP 16 super-seeding**; a **small, adaptive memory footprint** (cache sized from available RAM, active downloads/seeds and the storage type); falls back to libtorrent automatically if it cannot stay up | BitTorrent v1 and hybrid only (no v2-only torrents); file priority levels; no large in-process disk cache | you want a self-contained engine with minimal C/C++ dependencies |
 | **libtorrent** (embedded) | Same process as Gextto (`libtorrent-rasterbar`) | Full feature set: sequential, per-torrent limits, super-seeding, web seeds, piece diagnostics; every advanced knob | Gextto and the engine share one process; needs the libtorrent library | you need every advanced control or maximum compatibility |
 | **qBittorrent-nox** | External daemon, driven through its Web API | Reuse an existing qBittorrent and its Web UI/ecosystem; supports sequential and its own limits | Needs path mappings when the two processes see different paths; an extra process and dependency | you already run qBittorrent-nox or prefer its own UI |
 
@@ -85,8 +92,9 @@ writes fall behind the download.
 
 ## Install on Linux
 
-The official installer targets 64-bit Linux systems with systemd. Run it as
-root:
+The official installer targets 64-bit Linux systems (x86_64 or aarch64) with
+systemd: Debian 12+, Ubuntu 22.04+, Fedora, openSUSE Leap 15.6+/Tumbleweed and
+Arch Linux. Run it as root:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buzzqw/gextto/main/install.sh | sudo bash
@@ -97,6 +105,11 @@ It installs the program in `/opt/gextto`, stores service data in
 `gx-torrent` (pure Go, no libtorrent needed), is installed next to `gexttod` and
 started in managed mode; embedded libtorrent stays as the automatic fallback and
 selectable alternative.
+
+Before touching the system the installer runs the downloaded program once: a
+missing library or a too-old glibc is reported right away instead of leaving a
+service that never starts. When the library lives on a NAS owned by another
+user, `--media-group <group>` adds the service user to that group.
 
 > [!IMPORTANT]
 > Gextto is meant for a trusted network: by default the web UI and the API are
@@ -128,7 +141,9 @@ with:
 
 ## First safe run
 
-1. Open `http://<server>:5000` and complete setup.
+1. Open `http://<server>:5000`: the first visit starts the **setup wizard**
+   (password, folders with a permission check, indexer and TMDB, first title,
+   activation). You can skip it and reopen it from `/?view=setup`.
 2. Configure storage paths, one source, and TMDB/TVDB credentials if needed.
 3. Keep **dry-run** enabled; add one test title and run a manual search or
    cycle.
@@ -141,7 +156,14 @@ The detailed setup checklist, NAS guidance and troubleshooting are in the
 
 ## Update and uninstall
 
-For an official installation, run the installer again. It verifies the release
+With the official installation, when a new version is published an **Update
+available** button appears above **Donate**: *Maintenance → Updates* shows the
+installed version, what changed (the commits) and an **Update now** button. A
+database backup is taken first; if the new version does not start, the previous
+one comes back by itself. The check (a small request to GitHub every 6 hours)
+can be turned off in *Configuration → System → Updates*.
+
+Alternatively, run the installer again. It verifies the release
 checksum when published, replaces the binary atomically, restarts the service
 and, if the new version fails to start, rolls back to the previous one. Data and
 configuration are left untouched.
@@ -212,7 +234,8 @@ For the full documentation tree, start from the [documentation index](docs/READM
 ## Support the project
 
 If Gextto is useful to you and you would like to support its development, you
-can make a contribution via PayPal. Thank you!
+can make a contribution via PayPal. Thank you! A **Donate** button is also
+always visible in the UI, at the bottom right.
 
 [![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA.svg?logo=paypal)](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=azanzani@gmail.com&item_name=Support+Gextto+Project)
 

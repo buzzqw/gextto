@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -708,6 +709,8 @@ func formatEvent(event string, data map[string]any) string {
 		reason = messages.Pick("♻️ Download ripristinato", "♻️ Download restored")
 	case "approved":
 		reason = messages.Pick("🆕 Nuovo episodio approvato", "🆕 New episode approved")
+	case "stall_alternative":
+		reason = messages.Pick("⏱️ Download bloccato: provo un'alternativa", "⏱️ Stuck download: trying an alternative")
 	case "":
 		reason = messages.Pick("✅ Release approvata", "✅ Release approved")
 	default:
@@ -811,12 +814,9 @@ func formatEvent(event string, data map[string]any) string {
 		season, _ := jsonInt(mapLookup(data, "season"))
 		size, _ := jsonInt(mapLookup(data, "size_bytes"))
 		newCount, _ := jsonInt(mapLookup(data, "new_count"))
-		var discarded string
-		if count, ok := jsonInt(mapLookup(data, "discarded_count")); ok && count > 0 {
-			discarded = fmt.Sprintf(" 🗑️ %d %s", count, messages.Pick("inferiori scartati", "inferior discarded"))
-		}
-		return fmt.Sprintf(
-			"%s\n\n🎬 %s S%02d\n\n💾 %s\n\n✅ %d %s %s\n%s\n\n📂 %s",
+		discardedCount, _ := jsonInt(mapLookup(data, "discarded_count"))
+		body := fmt.Sprintf(
+			"%s\n\n🎬 %s S%02d\n\n💾 %s\n\n✅ %d %s",
 			messages.Pick(
 				"✅ DOWNLOAD COMPLETATO — SEASON PACK ARCHIVIATO",
 				"✅ DOWNLOAD COMPLETE — SEASON PACK ARCHIVED",
@@ -826,10 +826,19 @@ func formatEvent(event string, data map[string]any) string {
 			formatBytes(size),
 			newCount,
 			messages.Pick("nuovi", "new"),
-			discarded,
-			formatSeasonEpisodes(mapLookup(data, "episodes")),
-			valueText(data, "path", ""),
 		)
+		if kept := formatSeasonEpisodes(mapLookup(data, "episodes")); kept != "" {
+			body += ": " + kept
+		}
+		if discardedCount > 0 {
+			body += fmt.Sprintf("\n🗑️ %d %s", discardedCount, messages.Pick(
+				"scartati dal pack (in libreria c'è già una copia migliore)",
+				"discarded from the pack (the library already has a better copy)"))
+			if discarded := formatDiscardedEpisodes(mapLookup(data, "discarded")); discarded != "" {
+				body += ": " + discarded
+			}
+		}
+		return body + fmt.Sprintf("\n\n📂 %s", valueText(data, "path", ""))
 	case "torrent_error":
 		name := text("name")
 		if name == "" {
@@ -1032,7 +1041,42 @@ func formatEvent(event string, data map[string]any) string {
 	}
 }
 
-// formatSeasonEpisodes renders the `episodes` array of a season pack.
+// formatEpisodeRanges collapses episode numbers into compact ranges, e.g.
+// [1,2,3,5,6,9] -> "E01-E03, E05-E06, E09". Duplicates and order are ignored.
+func formatEpisodeRanges(values []int64) string {
+	if len(values) == 0 {
+		return ""
+	}
+	sorted := append([]int64(nil), values...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	deduped := make([]int64, 0, len(sorted))
+	for index, value := range sorted {
+		if index == 0 || value != sorted[index-1] {
+			deduped = append(deduped, value)
+		}
+	}
+	parts := make([]string, 0, len(deduped))
+	for index := 0; index < len(deduped); {
+		start := deduped[index]
+		end := start
+		for index+1 < len(deduped) && deduped[index+1] == end+1 {
+			index++
+			end = deduped[index]
+		}
+		if start == end {
+			parts = append(parts, fmt.Sprintf("E%02d", start))
+		} else {
+			parts = append(parts, fmt.Sprintf("E%02d-E%02d", start, end))
+		}
+		index++
+	}
+	return strings.Join(parts, ", ")
+}
+
+// formatSeasonEpisodes renders the `episodes` array of a season pack as a
+// compact list of episode numbers, collapsing consecutive episodes into ranges.
+// The full paths stay out of the message: they are noise, the series folder is
+// already shown at the bottom.
 func formatSeasonEpisodes(value any) string {
 	value = deref(value)
 	if value == nil {
@@ -1042,16 +1086,62 @@ func formatSeasonEpisodes(value any) string {
 	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
 		return ""
 	}
-	parts := make([]string, 0, rv.Len())
+	type packEpisode struct{ season, episode int64 }
+	list := make([]packEpisode, 0, rv.Len())
+	seasons := map[int64]struct{}{}
 	for index := 0; index < rv.Len(); index++ {
 		item := rv.Index(index).Interface()
-		series := jsonString(mapLookup(item, "series"))
 		season, _ := jsonInt(mapLookup(item, "season"))
 		episode, _ := jsonInt(mapLookup(item, "episode"))
-		path := jsonString(mapLookup(item, "path"))
-		parts = append(parts, fmt.Sprintf("✅ %s - S%02dE%02d - %s", series, season, episode, path))
+		list = append(list, packEpisode{season: season, episode: episode})
+		seasons[season] = struct{}{}
 	}
-	return strings.Join(parts, "\n")
+	if len(list) == 0 {
+		return ""
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].season != list[j].season {
+			return list[i].season < list[j].season
+		}
+		return list[i].episode < list[j].episode
+	})
+	multipleSeasons := len(seasons) > 1
+	parts := make([]string, 0, len(seasons))
+	for index := 0; index < len(list); {
+		season := list[index].season
+		values := []int64{}
+		for index < len(list) && list[index].season == season {
+			values = append(values, list[index].episode)
+			index++
+		}
+		ranges := formatEpisodeRanges(values)
+		if multipleSeasons {
+			parts = append(parts, fmt.Sprintf("S%02d %s", season, ranges))
+		} else {
+			parts = append(parts, ranges)
+		}
+	}
+	return strings.Join(parts, " · ")
+}
+
+// formatDiscardedEpisodes renders the episode numbers of the pack files that
+// were rejected as inferior to what the library already holds. The paths stay
+// out of the message; the season is shown in the title.
+func formatDiscardedEpisodes(value any) string {
+	value = deref(value)
+	if value == nil {
+		return ""
+	}
+	rv := reflect.ValueOf(value)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return ""
+	}
+	values := make([]int64, 0, rv.Len())
+	for index := 0; index < rv.Len(); index++ {
+		episode, _ := jsonInt(mapLookup(rv.Index(index).Interface(), "episode"))
+		values = append(values, episode)
+	}
+	return formatEpisodeRanges(values)
 }
 
 // hexBytes renders bytes as lowercase hexadecimal.

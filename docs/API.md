@@ -236,6 +236,7 @@ Per verifiche operative usa prima
 | POST | `/api/torrent-backend/preflight` |
 | POST | `/api/torrent-backend/qbittorrent/update` |
 | POST | `/api/torrent-backend/test` |
+| POST | `/api/torrent-backend/portcheck` |
 | GET | `/api/torrent-migrations` |
 | POST | `/api/torrent-migrations/cancel` |
 | POST | `/api/torrent-migrations/plan` |
@@ -296,6 +297,9 @@ Per verifiche operative usa prima
 | POST | `/api/trash/delete` |
 | POST | `/api/tvdb/search` |
 | GET | `/api/tvdb/series/{id}` |
+| GET | `/api/update` |
+| POST | `/api/update/apply` |
+| POST | `/api/update/check` |
 | POST | `/api/upload-torrent` |
 | GET | `/api/watched-folders` |
 | POST | `/api/watched-folders` |

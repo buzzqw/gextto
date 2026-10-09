@@ -43,7 +43,9 @@ var uiSettingMetaByKey = map[string]uiSettingMeta{
 	"delay_bypass_score":    {Zero: "0 = mai"},
 
 	// Qualità e upgrade
-	"upgrade_until_score": {Zero: "0 = mai"},
+	"upgrade_until_score":          {Zero: "0 = mai"},
+	"stall_alternative_after_min":  {Unit: "minuti", Zero: "0 = mai"},
+	"stall_alternative_score_drop": {Zero: "0 = disattivato"},
 
 	// Motore torrent
 	"qbittorrent_url":                  {Kind: "url"},

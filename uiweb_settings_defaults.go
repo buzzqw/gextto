@@ -129,7 +129,7 @@ var uiSettingDefaults = map[string]string{
 	"torrent_backend":                  "gx-torrent",
 	"qbittorrent_url":                  "http://127.0.0.1:8080",
 	"gxtorrent_url":                    "http://127.0.0.1:8890",
-	"gxtorrent_listen":                 "0.0.0.0:8890",
+	"gxtorrent_listen":                 "127.0.0.1:8890",
 	"gxtorrent_token":                  "",
 	"gxtorrent_proxy":                  "",
 	"gxtorrent_request_timeout_secs":   "15",
@@ -150,6 +150,10 @@ var uiSettingDefaults = map[string]string{
 	"cleanup_min_score_diff": "0",
 	"upgrade_min_score_diff": "200",
 	"upgrade_until_score":    "0",
+	// A stuck download keeps retrying, but after this long without progress the
+	// search may start an alternative that scores up to this many points less.
+	"stall_alternative_after_min":  "360",
+	"stall_alternative_score_drop": "100",
 
 	// --- Avanzate -----------------------------------------------------------
 	"min_free_space_gb":          "0",
@@ -165,6 +169,7 @@ var uiSettingDefaults = map[string]string{
 	"auth_username":              "admin",
 	"hardlink_seeding":           "true",
 	"debug_enabled":              "false",
+	"update_check":               "true",
 
 	// --- Acquisizione -------------------------------------------------------
 	"delay_torrent_minutes":                "0",

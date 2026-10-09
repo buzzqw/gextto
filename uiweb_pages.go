@@ -605,6 +605,14 @@ func uiSettingsPageFrom(s *AppState, activeTab string) uiSettingsPage {
 			Hint:    "Le impostazioni salvate valgono dal ciclo successivo; «Applica ora» le riapplica subito alla sessione attiva.",
 			Buttons: []uiActionButton{applyNow},
 		}
+		for index := range page.Groups {
+			if page.Groups[index].Title == "Porte e interfacce" {
+				page.Groups[index].Hint = "Porta peer usata dal motore torrent. «Test porte» verifica che sia in ascolto e inoltrata dal router (disponibile con gx-torrent)."
+				page.Groups[index].Buttons = []uiActionButton{
+					{Label: "Test porte", Method: "POST", Path: "/api/torrent-backend/portcheck", Body: "{}", Hint: "Controlla che la porta peer sia in ascolto e che il router la inoltri."},
+				}
+			}
+		}
 	case "performance":
 		page.Actions = &uiActionSection{
 			Label: "Ottimizzazione",

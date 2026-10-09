@@ -549,6 +549,49 @@ func coreResolveLog(dir, name string) (string, string) {
 	return filepath.Join(dir, coreLogBaseName), coreLogBaseName
 }
 
+// coreGxLogBaseName is the gx-torrent daemon log basename. The daemon keeps its
+// own rotating log (5 MB × 4) under <data>/gx-torrent/, separate from Gextto's.
+const coreGxLogBaseName = "gx-torrent.log"
+
+// coreGxLogDir is where the managed gx-torrent daemon writes its log. It is the
+// same path buildManagedGxCommand passes as -log-file.
+func coreGxLogDir(dataDir string) string {
+	return filepath.Join(dataDir, "gx-torrent")
+}
+
+// coreGxLogFiles lists the gx-torrent log files that actually exist, current
+// first, then the rotated backups from newest to oldest.
+func coreGxLogFiles(dataDir string) []string {
+	dir := coreGxLogDir(dataDir)
+	files := []string{coreGxLogBaseName}
+	for index := 1; index <= 99; index++ {
+		name := fmt.Sprintf("%s.%d", coreGxLogBaseName, index)
+		if info, err := os.Stat(filepath.Join(dir, name)); err == nil && !info.IsDir() {
+			files = append(files, name)
+		}
+	}
+	return files
+}
+
+// coreResolveGxLog selects a gx-torrent log file by name, refusing anything
+// outside the known set so the query parameter can never escape the data
+// directory. An empty or unknown name falls back to the current log.
+func coreResolveGxLog(dataDir, name string) (string, string) {
+	dir := coreGxLogDir(dataDir)
+	available := coreGxLogFiles(dataDir)
+	if name != "" {
+		for _, candidate := range available {
+			if candidate == name {
+				return filepath.Join(dir, candidate), candidate
+			}
+		}
+	}
+	if len(available) > 0 {
+		return filepath.Join(dir, available[0]), available[0]
+	}
+	return filepath.Join(dir, coreGxLogBaseName), coreGxLogBaseName
+}
+
 // Logs returns the tail of the daemon log.
 func Logs(w http.ResponseWriter, r *http.Request, s *AppState) {
 	limit := queryIntVal(r, "limit", 200)

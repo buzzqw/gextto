@@ -28,6 +28,7 @@ func TestV2WidgetsPanelsRender(t *testing.T) {
 	for _, want := range []string{
 		"Ottimizzazione database", "RAM disk", "Rinomina contenuto cartella",
 		"Progresso rinomina", "Operazioni in background", "Duplicati video in libreria",
+		"Log gx-torrent",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("maintenance page missing %q", want)

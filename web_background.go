@@ -802,6 +802,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 			transferring := 0
 			idle := 0
 			var rateKib uint64
+			stuck := []string{}
 			for _, torrent := range snapshot {
 				// A torrent parked by the stall monitor is stuck whatever its
 				// engine state: after a restart it comes back merely paused
@@ -810,6 +811,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 				if entry, ok := stallWaitStart[torrent.Hash]; ok && entry.stalledSince != nil && !TorrentTransferring(torrent) && torrent.Progress < 100 {
 					idle++
 					rateKib += torrent.DownloadRate
+					stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
 					continue
 				}
 				if torrent.State == "paused" {
@@ -820,6 +822,7 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					transferring++
 				case TorrentIdle(torrent):
 					idle++
+					stuck = append(stuck, fmt.Sprintf("%s %s", shortTorrentName(torrent.Name), logPercent(torrent.Progress)))
 				}
 				rateKib += torrent.DownloadRate
 			}
@@ -831,8 +834,20 @@ func torrentEventWorker(configPath string, fallback *Config, state *AppState, db
 					speed += fmt.Sprintf(" (limit %d KB/s)", effectiveDownloadKib)
 				}
 				// "Active" means really transferring: a download stuck at 0 B/s
-				// is counted apart, not as active.
-				logging.Info(fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed))
+				// is counted apart, not as active. Naming the stuck ones (with
+				// their real progress) tells a partially downloaded torrent
+				// apart from a dead one.
+				line := fmt.Sprintf("📊 Downloads: %d transferring, %d stuck at 0 B/s, %d waiting or paused · %s", transferring, idle, queued, speed)
+				if len(stuck) > 0 {
+					shown := stuck
+					extra := ""
+					if len(shown) > 3 {
+						extra = fmt.Sprintf(" +%d", len(shown)-3)
+						shown = shown[:3]
+					}
+					line += " · in stallo: " + strings.Join(shown, ", ") + extra
+				}
+				logging.Info(line)
 				lastQueueCounts = counts
 			}
 			lastDynamicAdjustment = now

@@ -1033,13 +1033,17 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, "", err
 	}
+	episodeKey := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
+	// A download stuck for a while does not block an alternative within the
+	// configured tolerance: the stuck torrent stays in the session and may still
+	// recover, while the alternative gets a chance.
+	stallAlternative := !manual && context.AllowsStallAlternative(episodeKey, score)
 	if !manual && live != nil {
-		key := models.LiveEpisodeKey{Series: NormalizeSeriesName(seriesName), Season: season, Episode: episode}
-		if _, ok := live.Episodes[key]; ok {
+		if _, ok := live.Episodes[episodeKey]; ok && !stallAlternative {
 			return false, "active_episode", nil
 		}
 	}
-	if !manual {
+	if !manual && !stallAlternative {
 		var exists bool
 		if err := d.db.QueryRow("SELECT EXISTS(SELECT 1 FROM torrent_meta WHERE lower(series_name)=lower(?1) AND season=?2 AND (episode=?3 OR episode IS NULL) AND status NOT IN ('completed','error','removed'))", seriesName, season, episode).Scan(&exists); err != nil {
 			return false, "", err
@@ -1108,7 +1112,7 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 					comparisonScore = dbScore
 				}
 			}
-			if upgradeReasonUntil(&release.Quality, &comparisonQuality, score, comparisonScore, minScoreDiff, context.UpgradeUntilScore) == "" {
+			if upgradeReasonUntil(&release.Quality, &comparisonQuality, score, comparisonScore, context.StallAdjustedMinDiff(minScoreDiff, episodeKey), context.UpgradeUntilScore) == "" {
 				return false, "duplicate", nil
 			}
 		}
@@ -1128,7 +1132,10 @@ func (d *Database) checkSeriesScoredInner(release *models.Release, score, minSco
 		}
 		oldQuality := ParseQuality(dbTitle)
 		enrichQualityWithMediaInfo(dbMediaInfo, &oldQuality)
-		if !manual && !missingArchivedFile && upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore) == "" {
+		// A stuck download's placeholder carries the stuck release's score: while
+		// the tolerance applies, the alternative is allowed below it (the
+		// candidate was already bounded by StallScoreDrop above).
+		if !manual && !missingArchivedFile && !stallAlternative && upgradeReasonUntil(&release.Quality, &oldQuality, score, dbScore, minScoreDiff, context.UpgradeUntilScore) == "" {
 			return false, "duplicate", nil
 		}
 		if dryRun {
@@ -3685,6 +3692,87 @@ func (d *Database) DeleteStallWatch(hash string) error {
 	}
 	_, err := d.db.Exec("DELETE FROM stalled_torrents WHERE hash=?1", strings.ToLower(hash))
 	return err
+}
+
+// StalledAlternatives returns, per episode covered by a download that has not
+// received a byte since minStall (and is parked as stalled), the best score of
+// the stuck release.
+// It powers the temporary quality tolerance of the search: while an episode is
+// stuck, an alternative within a few points may be started without removing the
+// stuck torrent. Episodes whose season already holds a healthy active download
+// are omitted, so a stuck episode never piles a second alternative on top of a
+// download that is still progressing.
+func (d *Database) StalledAlternatives(minStall time.Time) (map[models.LiveEpisodeKey]int64, error) {
+	result := map[models.LiveEpisodeKey]int64{}
+	if d == nil || d.db == nil {
+		return result, nil
+	}
+	blocked := map[string]bool{}
+	blockedRows, err := d.db.Query(`SELECT DISTINCT lower(series_name), season
+		FROM torrent_meta tm LEFT JOIN stalled_torrents st ON st.hash=tm.hash
+		WHERE tm.status NOT IN ('completed','error','removed') AND tm.season IS NOT NULL AND st.hash IS NULL`)
+	if err != nil {
+		return nil, err
+	}
+	for blockedRows.Next() {
+		var series string
+		var season int64
+		if err := blockedRows.Scan(&series, &season); err != nil {
+			blockedRows.Close()
+			return nil, err
+		}
+		blocked[fmt.Sprintf("%s|%d", NormalizeSeriesName(series), season)] = true
+	}
+	if err := blockedRows.Err(); err != nil {
+		blockedRows.Close()
+		return nil, err
+	}
+	blockedRows.Close()
+
+	// The window is measured from the last byte received (last_progress_at), not
+	// from when the stall monitor parked the torrent: the user configures "no
+	// progress for N minutes", not "parked for N minutes".
+	cutoff := minStall.UTC().Format(time.RFC3339Nano)
+	rows, err := d.db.Query(`SELECT lower(series_name), season, episode, quality_score, COALESCE(metadata_json,'')
+		FROM torrent_meta tm JOIN stalled_torrents st ON st.hash=tm.hash
+		WHERE tm.status NOT IN ('completed','error','removed') AND tm.season IS NOT NULL
+		  AND st.stalled_since <> '' AND st.last_progress_at <= ?1`, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var series string
+		var season int64
+		var episode sql.NullInt64
+		var score int64
+		var metadata string
+		if err := rows.Scan(&series, &season, &episode, &score, &metadata); err != nil {
+			return nil, err
+		}
+		seriesNorm := NormalizeSeriesName(series)
+		if blocked[fmt.Sprintf("%s|%d", seriesNorm, season)] {
+			continue
+		}
+		episodes := []int64{}
+		if episode.Valid && episode.Int64 > 0 {
+			episodes = append(episodes, episode.Int64)
+		} else if metadata != "" {
+			// A season pack: expand its episode range, so a single missing
+			// episode can be filled by an alternative while the pack is stuck.
+			var meta models.TorrentMeta
+			if err := json.Unmarshal([]byte(metadata), &meta); err == nil {
+				episodes = append(episodes, meta.Release.EpisodeRange...)
+			}
+		}
+		for _, value := range episodes {
+			key := models.LiveEpisodeKey{Series: seriesNorm, Season: season, Episode: value}
+			if current, ok := result[key]; !ok || score > current {
+				result[key] = score
+			}
+		}
+	}
+	return result, rows.Err()
 }
 
 // TorrentMeta returns the release associated with a torrent hash, restoring it
