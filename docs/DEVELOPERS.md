@@ -30,17 +30,26 @@ the torrent backends and where to make common changes, see
 
 ## Requirements and build
 
-Install Go 1.26 or newer, a C++17 toolchain and `libtorrent-rasterbar`
-development headers. The normal build embeds the web UI; it does not need a
+Install Go 1.26 or newer. The default build is **pure Go** and needs no
+libtorrent: `gx-torrent`, the default engine, is a pure-Go daemon built next to
+`gexttod`. To include the embedded **libtorrent** engine, also install a C++17
+toolchain and the `libtorrent-rasterbar` development headers, then build with
+`GEXTTO_LIBTORRENT=1`. The normal build embeds the web UI; it does not need a
 separate frontend build.
 
 ```bash
-make build
-go test ./...
+make build                 # pure Go (default): gx-torrent
+make build-libtorrent      # also link the embedded libtorrent engine
+go test ./...              # pure-Go tests (libtorrent tests are behind //go:build cgo)
 ```
 
-The executable is written to `bin/gexttod`. Supported torrent backends are
-embedded libtorrent and the qBittorrent-nox Web API adapter.
+The executable is written to `bin/gexttod`, with the pure-Go `gx-torrent` daemon
+next to it. Supported torrent backends are **gx-torrent** (default, pure Go),
+**embedded libtorrent** (present only in a build made with `GEXTTO_LIBTORRENT=1`;
+`LibtorrentCompiled()` reports it, and without it the backend is not selectable)
+and the **qBittorrent-nox** Web API adapter. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the cgo boundary (`libtorrent_cgo.go` vs
+the `libtorrent_nocgo.go` stub).
 
 ## Local development
 
@@ -118,11 +127,17 @@ Run these checks before a commit:
 
 ```bash
 gofmt -w changed.go
-go test ./...
-go test -race ./...
+make test                 # pure Go: check-ui + installer self-test + CGO_ENABLED=0 go test ./...
+make test-rain            # tests of the vendored rain fork
+CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (and the libtorrent headers)
 node --check uiweb/v2/static/v2-core.js
 git diff --check
 ```
+
+`make test` is pure Go and skips the libtorrent-only tests (guarded by
+`//go:build cgo`). Run `make test-libtorrent` and `make build-libtorrent`
+(requires the libtorrent headers) when you touch the embedded engine, the cgo
+bridge or the capability gating.
 
 The end-to-end suite is under `uiweb/end2end` and requires a running daemon:
 
@@ -138,13 +153,15 @@ interaction code.
 
 ## Concurrency and safety
 
-The daemon mixes HTTP handlers, long-lived workers and a CGo libtorrent
-session, so a few invariants are load-bearing:
+The daemon mixes HTTP handlers, long-lived workers and (in a build made with
+`GEXTTO_LIBTORRENT=1`) a CGo libtorrent session, so a few invariants are
+load-bearing:
 
 - **The native session handle is shared state.** Reads of `LibtorrentClient.session`
   must take `sessionMu.RLock()`; `Shutdown` destroys the handle under
   `sessionMu.Lock()`. Never read the field directly in a new method — a cgo
-  call on a destroyed session aborts the process.
+  call on a destroyed session aborts the process. This only applies when
+  libtorrent is compiled in; `LibtorrentCompiled()` distinguishes the builds.
 - **Goroutines started by HTTP handlers** (manual cycle, rename-all) must be
   tracked in a `WaitGroup` or derive from `BackgroundContext()` so they finish
   before the torrent session is torn down.
@@ -162,9 +179,12 @@ make build
 scripts/package-linux.sh
 ```
 
-The payload contains `gexttod`, the bundled `libtorrent`, `run.sh`, `VERSION`
-and a quick-start README. It is the payload consumed by the official installer
-and by the advanced self-update command.
+The default payload is **pure Go**: `gexttod`, the `gx-torrent` daemon, `run.sh`,
+`VERSION` and a quick-start README. It bundles the `libtorrent` shared library
+only when built with `GEXTTO_LIBTORRENT=1`; `scripts/build-release.sh` builds the
+release in an Ubuntu 22.04 container (the libtorrent C++ ABI pins that baseline).
+It is the payload consumed by the official installer and by the advanced
+self-update command.
 
 Keep generated binaries, databases, logs and local configuration out of Git.
 Release checks and CI configuration are maintained outside the user manuals.
