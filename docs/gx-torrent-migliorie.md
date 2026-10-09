@@ -44,8 +44,7 @@ anacrolix espone, per sua natura di libreria: encryption, DHT, PEX, uTP,
 WebTorrent, WebSeeds, BitTorrent v2, holepunching, **Reader con seek/readahead**
 (streaming), storage backend alternativi (blob/file/bolt/mmap/sqlite/FUSE).
 Quindi, oltre alle voci sopra, mancano a gx-torrent: **streaming con
-readahead**, **WebTorrent/WebRTC**, **holepunching (BEP 55)**, **storage
-alternativi**.
+readahead**, **WebTorrent/WebRTC**, **storage alternativi**.
 
 `gx-torrent` ha però cose che le librerie non offrono: daemon sorvegliato, UI
 web, REST, UPnP/NAT-PMP, porta unica, proxy SOCKS/HTTP, filtro IP in più formati,
@@ -73,7 +72,7 @@ presenti o già gestiti da Gextto.
 | 9 | IPv6 | **No** | — |
 | 10 | BitTorrent v2-only | **Wishlist** | — |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `Torrent.SetSuperSeeding` nel fork + azione `super-seeding` nel demone; capacità `super_seeding` = `full` | 8 |
-| 12 | Holepunching, WebTorrent | **Wishlist** | — |
+| 12 | Holepunching (BEP 55) | **Fatto** — estensione `ut_holepunch` nel fork (codec), relè peer (`planHolepunchRendezvous`), `connect` che dial su uTP, avvio automatico dopo un dial fallito; attivo insieme a uTP anche nel demone (`-no-holepunch`). WebTorrent resta in wishlist | — |
 | 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; il super-seeding non dà guadagno su sciami locali piccoli, resta opt-in; lo scaling va verificato su sciame reale (`docs/gx-torrent-misure-seeding.md`) | — |
 
 Convenzione semantica scelta per i limiti: **-1 = eredita il globale, 0 =
@@ -114,7 +113,7 @@ Un commit per punto, con test e documentazione. Ordine: **1 → 4 → 3 → 5 �
 ### Wishlist
 
 - **BitTorrent v2-only**: richiede il supporto v2 in rain (grande).
-- **Holepunching, WebTorrent**: funzioni di nicchia, molto lavoro.
+- **WebTorrent/WebRTC**: funzione di nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata di misure fatta (vedi
   `docs/gx-torrent-misure-seeding.md`): il choking di rain è corretto ed
   economico; il super-seeding non mostra guadagni su sciami locali piccoli e

@@ -41,6 +41,9 @@ type NetworkOptions struct {
 	// the DHT. UTPOnly dials uTP alone (tests).
 	UTP     bool
 	UTPOnly bool
+	// Holepunch enables BEP 55 holepunching over uTP, so peers behind a NAT
+	// can still be reached through a relaying peer (gextto fork).
+	Holepunch bool
 	// LSD finds peers on the local network (BEP 14 multicast).
 	LSD    bool
 	UPnP   bool
@@ -152,6 +155,8 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	}
 	cfg.UTP = n.UTP && d.peerPort > 0 && n.Proxy == ""
 	cfg.UTPOnly = n.UTPOnly
+	// Holepunching is uTP-only (it punches UDP mappings), so it follows uTP.
+	cfg.Holepunch = n.Holepunch && cfg.UTP
 	if n.OutgoingInterface != "" {
 		// uTP shares the DHT socket, bound to the VPN address: without it,
 		// UDP must not leave by another route.

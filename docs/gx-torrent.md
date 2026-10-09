@@ -239,6 +239,28 @@ Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
   - È spento con proxy o interfaccia uscente, per non annunciare i torrent
     fuori dal tunnel.
 
+## Holepunching (BEP 55)
+
+Un peer dietro NAT che non può ricevere connessioni in entrata può comunque
+essere raggiunto passando da un peer che fa da **relè** (`ut_holepunch`). È lo
+standard BEP 55, quindi interoperabile con µTorrent, BitComet, qBittorrent e
+libtorrent; non è il relè via nodo DHT proprietario di libtorrent.
+
+- Si attiva insieme a uTP (`libtorrent_utp`): senza uTP (o con un proxy) è
+  spento, perché il "buco" si apre sulle mappature UDP. Il flag del demone è
+  `-no-holepunch` (`GX_TORRENT_NO_HOLEPUNCH=1`), attivo di default.
+- Quando un dial diretto fallisce, gx-torrent chiede a un peer connesso
+  (al massimo 8) di fare da relè per quell'endpoint, una volta sola; il relè,
+  se è connesso al bersaglio e questi supporta l'estensione, manda un
+  `connect` a entrambi e ognuno avvia una connessione uTP verso l'altro.
+- Il bersaglio viene ricercato tra i peer connessi per IP e porta; gli errori
+  di protocollo (`NoSuchPeer`, `NotConnected`, `NoSupport`, `NoSelf`) vengono
+  riportati come previsto dal BEP.
+- Limite noto: come per `ut_metadata`/`ut_pex`, il messaggio in entrata viene
+  riconosciuto tramite l'ID locale dell'estensione; un peer che assegna a
+  `ut_holepunch` un ID diverso da 3 non viene capito (limite preesistente
+  dell'architettura estensioni di rain).
+
 ## Selezione dei file
 
 Si possono scaricare solo alcuni file di un torrent: priorità 0 = escluso,

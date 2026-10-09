@@ -142,6 +142,7 @@ func main() {
 	noDHT := flag.Bool("no-dht", envBool("GX_TORRENT_NO_DHT", false), "disable DHT")
 	noPEX := flag.Bool("no-pex", envBool("GX_TORRENT_NO_PEX", false), "disable peer exchange")
 	noUTP := flag.Bool("no-utp", envBool("GX_TORRENT_NO_UTP", false), "disable uTP (peers over TCP only)")
+	noHolepunch := flag.Bool("no-holepunch", envBool("GX_TORRENT_NO_HOLEPUNCH", false), "disable BEP 55 holepunching (needs uTP)")
 	noLSD := flag.Bool("no-lsd", envBool("GX_TORRENT_NO_LSD", false), "disable local service discovery")
 	noUPnP := flag.Bool("no-upnp", envBool("GX_TORRENT_NO_UPNP", false), "do not open the port on the router with UPnP")
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
@@ -213,6 +214,7 @@ func main() {
 			DHT:               !*noDHT,
 			PEX:               !*noPEX,
 			UTP:               !*noUTP,
+			Holepunch:         !*noHolepunch,
 			LSD:               !*noLSD,
 			UPnP:              !*noUPnP,
 			NATPMP:            !*noNATPMP,

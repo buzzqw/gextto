@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 func TestIPFilterBytesCache(t *testing.T) {
@@ -30,5 +32,26 @@ func TestIPFilterBytesCache(t *testing.T) {
 	cached, _, err := d.ipFilterBytes(path)
 	if err != nil || string(cached) != "CACHED" {
 		t.Fatalf("cache was not reused: %q/%v", cached, err)
+	}
+}
+
+// Holepunching punches UDP mappings, so it follows uTP: enabling it without uTP
+// must still leave it off in the rain session.
+func TestApplyNetworkHolepunchFollowsUTP(t *testing.T) {
+	d := &Daemon{}
+	d.peerPort = 51413
+
+	cfg := &torrent.Config{}
+	d.opts.Network = NetworkOptions{UTP: true, Holepunch: true}
+	d.applyNetwork(cfg)
+	if !cfg.UTP || !cfg.Holepunch {
+		t.Fatalf("utp=%v holepunch=%v, want both on", cfg.UTP, cfg.Holepunch)
+	}
+
+	cfg = &torrent.Config{}
+	d.opts.Network = NetworkOptions{UTP: false, Holepunch: true}
+	d.applyNetwork(cfg)
+	if cfg.UTP || cfg.Holepunch {
+		t.Fatalf("utp=%v holepunch=%v, want both off", cfg.UTP, cfg.Holepunch)
 	}
 }
