@@ -267,17 +267,25 @@ libtorrent; non è il relè via nodo DHT proprietario di libtorrent.
 
 Il codec, la decisione del relè, l'inoltro della configurazione e la mappatura
 della sorgente sono coperti dai test (`make test-rain`,
-`go test ./cmd/gx-torrent/`, `go test .`). Per una prova **reale** su NAT serve
-una topologia con namespace di rete (root/CAP_NET_ADMIN, non disponibile in CI):
+`go test ./cmd/gx-torrent/`, `go test .`). Per una prova **reale** su NAT c'è un
+harness root-only, `scripts/holepunch-netns-test.sh`:
 
-1. due namespace "dietro NAT" collegati a un router che fa MASQUERADE, più un
-   terzo peer raggiungibile da entrambi (il relè);
-2. avvia tre `gx-torrent` (uTP e holepunch attivi) con lo stesso torrent: il
-   relè connesso a entrambi gli altri, il leecher e il seeder dietro NAT;
-3. il leecher conosce l'endpoint del seeder ma non riesce a diallarlo, quindi
-   chiede il rendezvous al relè. Se il buco riesce, il peer compare con origine
-   **`holepunch`** tra i peer del torrent (pagina web del demone o campo
-   `source` in `/api/v1/torrents/<hash>/peers`).
+```bash
+make gx-torrent          # costruisce bin/gx-torrent
+sudo scripts/holepunch-netns-test.sh
+```
+
+Crea due namespace "dietro NAT" e un router con MASQUERADE, un tracker HTTP
+minimo e tre daemon (relay + leecher + seeder) con uTP e holepunch attivi. Se il
+buco riesce, il leecher compare con origine **`holepunch`** tra i peer del
+torrent. `--keep` lascia la topologia attiva per il debug; lo script riporta
+sempre cosa ha osservato (holepunch / connessione diretta / niente).
+
+Nota: Linux conntrack è endpoint-dependent, quindi con il solo MASQUERADE il
+buco può non aprirsi (serve un NAT "cone"); in quel caso lo script lo dice e le
+regole del router vanno tarate. Il criterio di successo resta l'origine peer
+`holepunch` (pagina web del demone o campo `source` in
+`/api/v1/torrents/<hash>/peers`).
 
 ## Selezione dei file
 

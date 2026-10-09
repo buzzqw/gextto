@@ -178,6 +178,11 @@ check_package_script() {
   else
     fail "release-manifest.sh: manifest has version and commits"
   fi
+
+  capture bash -n "$ROOT/scripts/holepunch-netns-test.sh"
+  expect "holepunch-netns-test.sh: syntax" 0
+  capture bash "$ROOT/scripts/holepunch-netns-test.sh" --help
+  expect "holepunch-netns-test.sh: --help exits 0" 0 "Usage:"
 }
 
 printf 'installer self-test\n'
