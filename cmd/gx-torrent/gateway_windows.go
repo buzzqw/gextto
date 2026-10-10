@@ -26,16 +26,24 @@ const mibIPForwardRowSize = 56
 // letting UPnP/NAT-PMP pick the interface.
 func defaultGateway() (net.IP, error) {
 	var size uint32
-	// The first call sizes the table (ERROR_INSUFFICIENT_BUFFER = 122).
+	// The first call sizes the table (ERROR_INSUFFICIENT_BUFFER = 122). A route
+	// added in between (VPN, DHCP renewal) makes the table grow, so the sized
+	// call is retried a few times with the new size.
 	const insufficientBuffer = 122
 	ret, _, _ := getIPForwardTable.Call(0, uintptr(unsafe.Pointer(&size)), 0)
 	if ret != insufficientBuffer || size == 0 {
 		return nil, fmt.Errorf("GetIpForwardTable failed: %d", ret)
 	}
-	buffer := make([]byte, size)
-	ret, _, _ = getIPForwardTable.Call(uintptr(unsafe.Pointer(&buffer[0])), uintptr(unsafe.Pointer(&size)), 0)
-	if ret != 0 {
-		return nil, fmt.Errorf("GetIpForwardTable failed: %d", ret)
+	var buffer []byte
+	for attempt := 0; ; attempt++ {
+		buffer = make([]byte, size)
+		ret, _, _ = getIPForwardTable.Call(uintptr(unsafe.Pointer(&buffer[0])), uintptr(unsafe.Pointer(&size)), 0)
+		if ret == 0 {
+			break
+		}
+		if ret != insufficientBuffer || attempt == 2 {
+			return nil, fmt.Errorf("GetIpForwardTable failed: %d", ret)
+		}
 	}
 	if len(buffer) < 4 {
 		return nil, fmt.Errorf("no default gateway")

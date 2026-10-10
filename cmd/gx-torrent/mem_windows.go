@@ -42,9 +42,10 @@ func memoryTotal() int64 {
 	return total
 }
 
-// memoryAvailable is the free physical memory (0 when unknown). Windows does
-// not expose a reclaimable-cache figure like Linux' MemAvailable, so this is
-// the plain free count: the adaptive policy still reacts to real pressure.
+// memoryAvailable is the available physical memory (0 when unknown).
+// AvailPhys counts free and zeroed pages plus the standby list (reusable file
+// cache), so it is the counterpart of Linux' MemAvailable, not a bare free
+// count.
 func memoryAvailable() int64 {
 	_, available := readMemoryStatus()
 	return available

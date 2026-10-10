@@ -316,16 +316,23 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	serverErr := make(chan error, 1)
-	go func() {
-		logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), opts.Listen, opts.DataDir, opts.DownloadDir)
-		serverErr <- server.ListenAndServe()
-	}()
+	// Listen before serving, so the browser below never reaches the address
+	// ahead of the server and is not opened at all when the port is taken.
+	listener, listenErr := net.Listen("tcp", opts.Listen)
+	if listenErr != nil {
+		serverErr <- listenErr
+	} else {
+		go func() {
+			logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), opts.Listen, opts.DataDir, opts.DownloadDir)
+			serverErr <- server.Serve(listener)
+		}()
+	}
 
 	// First run in standalone: open the web wizard in the browser, so the
 	// installation is guided instead of typed. Best-effort: a headless server
 	// (no graphical session) or a missing browser is silently skipped, and the
 	// wizard stays reachable at the printed address.
-	if opts.Mode == ModeStandalone && !daemon.setupComplete() {
+	if listenErr == nil && opts.Mode == ModeStandalone && !daemon.setupComplete() {
 		if url := localSetupURL(opts.Listen); url != "" {
 			logf("first run: open %s to configure gx-torrent", url)
 			go func() {

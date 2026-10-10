@@ -99,8 +99,9 @@ drives as its torrent engine).
 ```
 
 Then open `http://<host>:8890/`: the first run shows the **setup wizard**
-(language, download folder, password, LAN access, peer port). The settings are
-saved in `settings.json` under the data directory.
+(language, download and temporary folders, peer port with a reachability test,
+bandwidth limits, password, LAN access, indexers). The settings are saved in
+`settings.json` under the data directory.
 
 ## Interfaces
 
