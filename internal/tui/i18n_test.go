@@ -2,15 +2,15 @@ package tui
 
 import "testing"
 
-// TestCatalogIsComplete fails when a string is missing in either language.
+// TestCatalogIsComplete fails when a string is missing in any language.
 func TestCatalogIsComplete(t *testing.T) {
+	names := []string{"Italian", "English", "German", "French", "Spanish", "Polish"}
 	for _, key := range CatalogKeys() {
 		entry := catalog[key]
-		if entry[0] == "" {
-			t.Errorf("missing Italian translation for %q", key)
-		}
-		if entry[1] == "" {
-			t.Errorf("missing English translation for %q", key)
+		for i, name := range names {
+			if entry[i] == "" {
+				t.Errorf("missing %s translation for %q", name, key)
+			}
 		}
 	}
 }
@@ -49,10 +49,17 @@ func TestTranslatorUnknownKey(t *testing.T) {
 }
 
 func TestTranslatorFallbackLanguage(t *testing.T) {
-	// French is unsupported: fall back to Italian.
-	fr := NewTranslator("fr")
-	if fr.Lang() != "it" {
-		t.Errorf("unsupported language should fall back to it, got %q", fr.Lang())
+	// German/French/Spanish/Polish are supported now.
+	for _, tc := range []struct{ lang, want string }{
+		{"de", "de"}, {"fr", "fr"}, {"es", "es"}, {"pl", "pl"},
+	} {
+		if got := NewTranslator(tc.lang).Lang(); got != tc.want {
+			t.Errorf("NewTranslator(%q).Lang() = %q, want %q", tc.lang, got, tc.want)
+		}
+	}
+	// An unknown language falls back to Italian.
+	if got := NewTranslator("xx").Lang(); got != "it" {
+		t.Errorf("unknown language should fall back to it, got %q", got)
 	}
 }
 
