@@ -73,7 +73,7 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   selezionabile (l'opzione non compare nella UI e la selezione è rifiutata);
   un `torrent_backend=embedded` salvato fa partire il demone su gx-torrent.
 - `build_number` è la **sorgente unica** del numero di build: checkout e CI
-  leggono lo stesso file (base attuale `1522`). La CI non usa più
+  leggono lo stesso file (base attuale `1523`). La CI non usa più
   `github.run_number`: build e `release.json` prendono il valore dal file, così
   la versione installata ha lo **stesso** `1.1.<n>` del checkout. Per far
   avanzare il numero si fa `make build` e si committa il file aggiornato. Dopo
