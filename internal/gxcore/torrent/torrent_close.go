@@ -45,10 +45,11 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	delete(t.peerIDs, pe.ID)
 	delete(t.connectedPeerIPs, pe.IP())
 	delete(t.superSeedPeers, pe)
-	if lf, ok := t.v2Pending[pe]; ok {
+	if req, ok := t.v2Pending[pe]; ok {
 		delete(t.v2Pending, pe)
-		if lf.inflightIndex >= 0 {
-			lf.inflightIndex = -1
+		if req != nil && req.file != nil {
+			// Put the chunk back so another peer fetches it.
+			req.file.failChunk(req.index / req.file.chunk)
 		}
 	}
 	delete(t.v2NoHashPeers, pe)

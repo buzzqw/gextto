@@ -21,12 +21,16 @@ import (
 // v2ChunkMax bounds one hash request; BEP 52 suggests at most 512 hashes.
 const v2ChunkMax = 512
 
-// v2HashTimeout is how long a hash request may stay unanswered. Only one request
-// per file is in flight, so a peer that keeps the connection alive but never
-// answers would otherwise stall that file's piece layer for good.
+// v2HashTimeout is how long a hash request may stay unanswered before the peer
+// is dropped from the pool and the chunk is retried elsewhere. Several chunks
+// are in flight at once (one per peer), so a silent peer no longer stalls a
+// file's whole piece layer.
 const v2HashTimeout = 30 * time.Second
 
-// v2LayerFile tracks the download of one file's piece layer.
+// v2LayerFile tracks the download of one file's piece layer. The layer is split
+// into fixed chunks of at most v2ChunkMax hashes; each chunk is requested from
+// one peer, and different chunks can be in flight at different peers at the
+// same time, so a large file's layer is fetched in parallel.
 type v2LayerFile struct {
 	root    [32]byte
 	fileIdx int
@@ -38,11 +42,49 @@ type v2LayerFile struct {
 	level        int
 	data         []byte // numPieces * 32 bytes
 
-	next          int // next padded index to request
-	inflightIndex int // index of the request in flight (-1 = none)
-	inflightCount int
-	inflightProof int
-	inflightAt    time.Time
+	chunk     int          // hashes per request (a power of two, <= v2ChunkMax)
+	chunks    int          // number of chunks (padded / chunk)
+	nextChunk int          // first chunk never requested
+	inflight  map[int]bool // chunk numbers currently requested
+	retry     []int        // chunk numbers to request again
+}
+
+// v2HashRequest is one chunk request in flight at a peer.
+type v2HashRequest struct {
+	file  *v2LayerFile
+	index int // base-layer index of the first hash (chunk * chunk size)
+	count int
+	proof int
+	at    time.Time
+}
+
+// allocateChunk hands out the next chunk to request (a retry first), reporting
+// false when the file has nothing left to ask for.
+func (lf *v2LayerFile) allocateChunk() (int, bool) {
+	if n := len(lf.retry); n > 0 {
+		chunk := lf.retry[n-1]
+		lf.retry = lf.retry[:n-1]
+		return chunk, true
+	}
+	if lf.nextChunk < lf.chunks {
+		chunk := lf.nextChunk
+		lf.nextChunk++
+		return chunk, true
+	}
+	return 0, false
+}
+
+// failChunk releases a chunk that was in flight and queues it for another peer.
+func (lf *v2LayerFile) failChunk(chunk int) {
+	if lf.inflight != nil {
+		delete(lf.inflight, chunk)
+	}
+	lf.retry = append(lf.retry, chunk)
+}
+
+// done reports whether every chunk has been received and none is pending.
+func (lf *v2LayerFile) done() bool {
+	return lf.nextChunk >= lf.chunks && len(lf.inflight) == 0 && len(lf.retry) == 0
 }
 
 // advertisesV2 reports whether this torrent has a BitTorrent v2 identity (a
@@ -151,7 +193,7 @@ func (t *torrent) initV2Layers() {
 		return
 	}
 	t.v2LayerByRoot = make(map[string]*v2LayerFile)
-	t.v2Pending = make(map[*peer.Peer]*v2LayerFile)
+	t.v2Pending = make(map[*peer.Peer]*v2HashRequest)
 	t.v2NoHashPeers = make(map[*peer.Peer]struct{})
 	level := merkle.PieceLevel(int(t.info.PieceLength))
 	if level < 0 {
@@ -164,33 +206,46 @@ func (t *torrent) initV2Layers() {
 		numPieces := int((f.Length + int64(t.info.PieceLength) - 1) / int64(t.info.PieceLength))
 		numBlocks := int((f.Length + int64(merkle.BlockSize) - 1) / int64(merkle.BlockSize))
 		paddedLeaves := merkle.NextPowerOfTwo(numBlocks)
+		padded := paddedLeaves >> level
+		chunk := padded
+		if chunk > v2ChunkMax {
+			chunk = v2ChunkMax
+		}
+		if chunk < 1 {
+			continue
+		}
 		lf := &v2LayerFile{
-			root:          f.PiecesRoot,
-			fileIdx:       fi,
-			numPieces:     numPieces,
-			padded:        paddedLeaves >> level,
-			paddedLeaves:  paddedLeaves,
-			level:         level,
-			data:          make([]byte, numPieces*merkle.HashSize),
-			inflightIndex: -1,
+			root:         f.PiecesRoot,
+			fileIdx:      fi,
+			numPieces:    numPieces,
+			padded:       padded,
+			paddedLeaves: paddedLeaves,
+			level:        level,
+			data:         make([]byte, numPieces*merkle.HashSize),
+			chunk:        chunk,
+			chunks:       padded / chunk,
+			inflight:     make(map[int]bool),
 		}
 		t.v2LayerFiles = append(t.v2LayerFiles, lf)
 		t.v2LayerByRoot[string(f.PiecesRoot[:])] = lf
 	}
 }
 
-// nextV2LayerFile returns the first file whose layer still needs a request.
-func (t *torrent) nextV2LayerFile() *v2LayerFile {
+// nextV2Chunk returns the next file with a chunk to request and the chunk
+// number, reserving that chunk.
+func (t *torrent) nextV2Chunk() (*v2LayerFile, int, bool) {
 	for _, lf := range t.v2LayerFiles {
-		if lf.next < lf.padded && lf.inflightIndex < 0 {
-			return lf
+		if chunk, ok := lf.allocateChunk(); ok {
+			return lf, chunk, true
 		}
 	}
-	return nil
+	return nil, 0, false
 }
 
-// startV2LayerDownload issues hash requests for the piece layers still missing.
-// It runs on the torrent loop, the only goroutine that touches this state.
+// startV2LayerDownload issues hash requests for the piece layers still missing,
+// one chunk per free peer, so several peers fetch different chunks of a file at
+// the same time. It runs on the torrent loop, the only goroutine touching this
+// state.
 func (t *torrent) startV2LayerDownload() {
 	if t.info == nil || !t.info.V2 {
 		return
@@ -211,6 +266,13 @@ func (t *torrent) startV2LayerDownload() {
 		t.finishV2Layers()
 		return
 	}
+	proofLayers := func(lf *v2LayerFile) int {
+		proof := merkle.Log2(lf.paddedLeaves) - lf.level - 1
+		if proof < 0 {
+			proof = 0
+		}
+		return proof
+	}
 	for pe := range t.peers {
 		if _, ok := t.v2Pending[pe]; ok {
 			continue
@@ -223,85 +285,74 @@ func (t *torrent) startV2LayerDownload() {
 		if !pe.ProtocolV2 {
 			continue
 		}
-		lf := t.nextV2LayerFile()
-		if lf == nil {
+		lf, chunk, ok := t.nextV2Chunk()
+		if !ok {
 			return
 		}
-		count := lf.padded
-		if count > v2ChunkMax {
-			count = v2ChunkMax
-		}
-		if count < 1 {
-			continue
-		}
-		proofLayers := merkle.Log2(lf.paddedLeaves) - lf.level - 1
-		if proofLayers < 0 {
-			proofLayers = 0
-		}
+		index := chunk * lf.chunk
+		proof := proofLayers(lf)
 		hdr := peerprotocol.HashRequestHeader{
 			Root:        lf.root,
 			Base:        uint32(lf.level),
-			Index:       uint32(lf.next),
-			Length:      uint32(count),
-			ProofLayers: uint32(proofLayers),
+			Index:       uint32(index),
+			Length:      uint32(lf.chunk),
+			ProofLayers: uint32(proof),
 		}
-		lf.inflightIndex = lf.next
-		lf.inflightCount = count
-		lf.inflightProof = proofLayers
-		lf.inflightAt = time.Now()
-		t.v2Pending[pe] = lf
+		lf.inflight[chunk] = true
+		t.v2Pending[pe] = &v2HashRequest{
+			file: lf, index: index, count: lf.chunk, proof: proof, at: time.Now(),
+		}
 		pe.SendMessage(peerprotocol.HashRequestMessage{HashRequestHeader: hdr})
 	}
 }
 
 // handleHashes verifies a "hashes" reply and stores the requested layer range.
 func (t *torrent) handleHashes(pe *peer.Peer, msg peerprotocol.HashesMessage) {
-	lf, ok := t.v2Pending[pe]
+	req, ok := t.v2Pending[pe]
 	if !ok {
 		return
 	}
 	delete(t.v2Pending, pe)
-	if lf.inflightIndex < 0 {
+	if req == nil || req.file == nil {
 		return
 	}
-	index, count := lf.inflightIndex, lf.inflightCount
+	lf := req.file
 	expected := peerprotocol.HashRequestHeader{
 		Root:        lf.root,
 		Base:        uint32(lf.level),
-		Index:       uint32(index),
-		Length:      uint32(count),
-		ProofLayers: uint32(lf.inflightProof),
+		Index:       uint32(req.index),
+		Length:      uint32(req.count),
+		ProofLayers: uint32(req.proof),
 	}
 	if msg.HashRequestHeader != expected {
-		// Not a reply to our request: drop it and ask again.
-		lf.inflightIndex = -1
+		// Not the reply to the request we sent: retry this chunk elsewhere.
+		lf.failChunk(req.index / lf.chunk)
 		t.startV2LayerDownload()
 		return
 	}
-	uncles := lf.inflightProof - merkle.Log2(count) + 1
+	uncles := req.proof - merkle.Log2(req.count) + 1
 	if uncles < 0 {
 		uncles = 0
 	}
-	if len(msg.Hashes) != count+uncles {
-		t.v2LayerFailed(pe, lf)
+	if len(msg.Hashes) != req.count+uncles {
+		t.v2LayerFailed(pe, lf, req)
 		return
 	}
-	if !merkle.VerifyHashes(lf.root, lf.paddedLeaves, lf.level, index, count, msg.Hashes[:count], msg.Hashes[count:]) {
+	if !merkle.VerifyHashes(lf.root, lf.paddedLeaves, lf.level, req.index, req.count, msg.Hashes[:req.count], msg.Hashes[req.count:]) {
 		// A peer that serves a hash range not anchored to the file's pieces
-		// root is dropped; another peer retries the same range.
+		// root is dropped; another peer retries the same chunk.
 		t.closePeer(pe)
-		t.v2LayerFailed(pe, lf)
+		t.v2LayerFailed(pe, lf, req)
 		return
 	}
-	for i := 0; i < count; i++ {
-		p := index + i
+	for i := 0; i < req.count; i++ {
+		p := req.index + i
 		if p >= lf.numPieces {
 			break
 		}
 		copy(lf.data[p*merkle.HashSize:], msg.Hashes[i][:])
 	}
-	lf.next = index + count
-	lf.inflightIndex = -1
+	delete(lf.inflight, req.index/lf.chunk)
 	if t.v2LayersComplete() {
 		t.finishV2Layers()
 		return
@@ -310,15 +361,15 @@ func (t *torrent) handleHashes(pe *peer.Peer, msg peerprotocol.HashesMessage) {
 }
 
 // handleHashReject marks a peer as unable to serve hash requests and retries
-// the request elsewhere.
+// the chunk elsewhere.
 func (t *torrent) handleHashReject(pe *peer.Peer, msg peerprotocol.HashRejectMessage) {
-	lf, ok := t.v2Pending[pe]
+	req, ok := t.v2Pending[pe]
 	if !ok {
 		return
 	}
 	delete(t.v2Pending, pe)
-	if lf != nil && lf.inflightIndex >= 0 && msg.Root == lf.root {
-		lf.inflightIndex = -1
+	if req != nil && req.file != nil && msg.Root == req.file.root {
+		req.file.failChunk(req.index / req.file.chunk)
 	}
 	if t.v2NoHashPeers == nil {
 		t.v2NoHashPeers = make(map[*peer.Peer]struct{})
@@ -328,16 +379,16 @@ func (t *torrent) handleHashReject(pe *peer.Peer, msg peerprotocol.HashRejectMes
 }
 
 // expireV2HashRequests gives up on hash requests unanswered for longer than
-// v2HashTimeout: the peer is not asked again and the range goes to another one.
+// v2HashTimeout: the peer is not asked again and the chunk goes to another one.
 // It runs on the torrent loop's periodic tick.
 func (t *torrent) expireV2HashRequests(now time.Time) {
 	expired := false
-	for pe, lf := range t.v2Pending {
-		if lf == nil || lf.inflightIndex < 0 || now.Sub(lf.inflightAt) < v2HashTimeout {
+	for pe, req := range t.v2Pending {
+		if req == nil || req.file == nil || now.Sub(req.at) < v2HashTimeout {
 			continue
 		}
 		delete(t.v2Pending, pe)
-		lf.inflightIndex = -1
+		req.file.failChunk(req.index / req.file.chunk)
 		if t.v2NoHashPeers == nil {
 			t.v2NoHashPeers = make(map[*peer.Peer]struct{})
 		}
@@ -349,10 +400,10 @@ func (t *torrent) expireV2HashRequests(now time.Time) {
 	}
 }
 
-// v2LayerFailed resets the in-flight request so another peer can retry it.
-func (t *torrent) v2LayerFailed(pe *peer.Peer, lf *v2LayerFile) {
-	if lf != nil {
-		lf.inflightIndex = -1
+// v2LayerFailed releases a failed chunk for another peer and drops the peer.
+func (t *torrent) v2LayerFailed(pe *peer.Peer, lf *v2LayerFile, req *v2HashRequest) {
+	if lf != nil && req != nil {
+		lf.failChunk(req.index / lf.chunk)
 	}
 	if t.v2NoHashPeers == nil {
 		t.v2NoHashPeers = make(map[*peer.Peer]struct{})
@@ -362,11 +413,8 @@ func (t *torrent) v2LayerFailed(pe *peer.Peer, lf *v2LayerFile) {
 }
 
 func (t *torrent) v2LayersComplete() bool {
-	if len(t.v2LayerFiles) == 0 {
-		return true
-	}
 	for _, lf := range t.v2LayerFiles {
-		if lf.next < lf.padded {
+		if !lf.done() {
 			return false
 		}
 	}

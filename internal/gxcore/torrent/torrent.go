@@ -84,7 +84,7 @@ type torrent struct {
 	v2LayerFiles  []*v2LayerFile
 	v2LayerByRoot map[string]*v2LayerFile
 	v2Trees       map[string]*merkle.LayerTree
-	v2Pending     map[*peer.Peer]*v2LayerFile
+	v2Pending     map[*peer.Peer]*v2HashRequest
 	v2NoHashPeers map[*peer.Peer]struct{}
 
 	// Bitfield for pieces we have. It is created after we got info.
