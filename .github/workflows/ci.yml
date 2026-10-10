@@ -95,6 +95,9 @@ jobs:
       - name: Race test
         run: make test-race
 
+      - name: Race test (DHT module)
+        run: cd third_party/dht && CGO_ENABLED=1 go test -race ./...
+
   # Build the standalone container image and smoke-test it, so the Dockerfile
   # keeps working. Publishing is not done here (release.yml owns releases).
   container:

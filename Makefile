@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht vet fmt check-ui installer-test tidy package clean run measure-seeding
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding
 
 all: build
 
@@ -31,6 +31,11 @@ gx-torrent:
 		-ldflags "-s -w -X github.com/buzzqw/gextto/internal/constants.GxTorrentBuild=$$GX_BUILD" \
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
+
+# Build the standalone container image (needs docker). The daemon's build
+# number is taken from gx-torrent.build_number when it exists.
+container:
+	docker build --build-arg GX_BUILD="$$(cat gx-torrent.build_number 2>/dev/null || echo 0)" -t gx-torrent .
 
 test: check-ui installer-test test-dht
 	CGO_ENABLED=0 go test ./...
