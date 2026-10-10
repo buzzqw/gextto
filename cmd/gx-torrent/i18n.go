@@ -135,6 +135,12 @@ var uiCatalog = map[string][5]string{
 	"tag, tag":                  {"tag, tag", "Tag, Tag", "étiquette, étiquette", "etiqueta, etiqueta", "tag, tag"},
 	"Category and tags updated": {"Categoria e tag aggiornati", "Kategorie und Tags aktualisiert", "Catégorie et étiquettes mises à jour", "Categoría y etiquetas actualizadas", "Zaktualizowano kategorię i tagi"},
 
+	// Indexer search (standalone).
+	"Search":           {"Cerca", "Suchen", "Rechercher", "Buscar", "Szukaj"},
+	"Search indexers…": {"Cerca negli indexer…", "Indexer durchsuchen…", "Rechercher dans les indexeurs…", "Buscar en los indexadores…", "Szukaj w indekserach…"},
+	"Searching…":       {"Ricerca…", "Suche…", "Recherche…", "Buscando…", "Szukam…"},
+	"No results":       {"Nessun risultato", "Keine Ergebnisse", "Aucun résultat", "Sin resultados", "Brak wyników"},
+
 	// Files tab.
 	"Priority": {"Priorità", "Priorität", "Priorité", "Prioridad", "Priorytet"},
 	"Play":     {"Riproduci", "Abspielen", "Lire", "Reproducir", "Odtwórz"},
@@ -264,6 +270,11 @@ var uiClientKeys = []string{
 	"loading…",
 	"Cannot read the Gextto log:",
 	"lines",
+	"Search",
+	"Searching…",
+	"No results",
+	"Seeds",
+	"Add",
 }
 
 // uiLangIndex maps a language code to its column in uiCatalog.

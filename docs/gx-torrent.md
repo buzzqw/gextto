@@ -258,7 +258,9 @@ La **ricerca su indexer** (standalone) usa la chiave `indexers` di
 `settings.json`, un array JSON di endpoint Torznab
 (`[{"name":"Jackett","url":"http://host:9117","apikey":"…"}]`, così Jackett e
 Prowlarr): `GET /ui/search?q=…` interroga tutti, unisce i risultati e li ordina
-per seed. In managed non è disponibile.
+per seed. Con almeno un indexer configurato compare nella pagina la **casella di
+ricerca**, con i risultati e un pulsante *Add* per aggiungere il torrent. In
+managed non è disponibile.
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:

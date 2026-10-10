@@ -90,6 +90,8 @@ type uiPageData struct {
 	// Categories and Tags are the qBittorrent-style labels (standalone mode).
 	Categories []string
 	Tags       []string
+	// SearchEnabled shows the indexer search box (standalone with indexers).
+	SearchEnabled bool
 
 	Rows []uiTorrentRow
 }
@@ -1023,6 +1025,7 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 	}
 	sort.Strings(page.Categories)
 	page.Tags = d.tagsSnapshot()
+	page.SearchEnabled = d.opts.Mode == ModeStandalone && len(d.indexers()) > 0
 	for _, view := range views {
 		row := uiTorrentRow{
 			Hash:      view.Hash,

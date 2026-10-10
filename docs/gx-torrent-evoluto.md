@@ -487,7 +487,7 @@ Aggiornato al 2026-10-10.
 | F3: compatibilità verificata col client qBittorrent di Gextto (`internal/qbittorrent`) | fatto |
 | F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
 | F2: ricerca su indexer — client Torznab (`internal/torznab`) ed endpoint `/ui/search` | fatto |
-| F2: ricerca su indexer — tab nella pagina | da fare |
+| F2: ricerca su indexer — casella e risultati nella pagina | fatto |
 | F3: app/preferences e altri endpoint qBittorrent | fatto |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
