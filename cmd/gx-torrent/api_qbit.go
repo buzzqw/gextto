@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 const (
@@ -40,7 +42,12 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/delete", d.handleQbitDelete)
 	mux.HandleFunc("POST /api/v2/torrents/pause", d.handleQbitPause)
 	mux.HandleFunc("POST /api/v2/torrents/resume", d.handleQbitResume)
+	mux.HandleFunc("POST /api/v2/torrents/stop", d.handleQbitPause)
+	mux.HandleFunc("POST /api/v2/torrents/start", d.handleQbitResume)
 	mux.HandleFunc("POST /api/v2/torrents/recheck", d.handleQbitRecheck)
+	mux.HandleFunc("POST /api/v2/torrents/reannounce", d.handleQbitReannounce)
+	mux.HandleFunc("POST /api/v2/torrents/setLocation", d.handleQbitSetLocation)
+	mux.HandleFunc("GET /api/v2/torrents/trackers", d.handleQbitTrackers)
 	mux.HandleFunc("GET /api/v2/torrents/categories", d.handleQbitCategories)
 	mux.HandleFunc("POST /api/v2/torrents/createCategory", d.handleQbitCreateCategory)
 	mux.HandleFunc("POST /api/v2/torrents/removeCategories", d.handleQbitRemoveCategories)
@@ -256,6 +263,58 @@ func (d *Daemon) handleQbitRecheck(w http.ResponseWriter, r *http.Request) {
 		_ = d.verify(hash)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitReannounce(w http.ResponseWriter, r *http.Request) {
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.reannounce(hash)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitSetLocation(w http.ResponseWriter, r *http.Request) {
+	location := strings.TrimSpace(r.FormValue("location"))
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.move(hash, location, false)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// qbitTracker is the qBittorrent tracker object (status: 0 disabled, 1 not
+// contacted, 2 working, 3 updating, 4 not working).
+type qbitTracker struct {
+	URL      string `json:"url"`
+	Status   int    `json:"status"`
+	NumPeers int    `json:"num_peers"`
+	Message  string `json:"msg"`
+}
+
+func (d *Daemon) handleQbitTrackers(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	t, _ := d.findLocked(r.URL.Query().Get("hash"))
+	d.mu.Unlock()
+	if t == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	out := []qbitTracker{}
+	for _, tracker := range t.Trackers() {
+		status := 1
+		switch tracker.Status {
+		case torrent.Working:
+			status = 2
+		case torrent.Contacting:
+			status = 3
+		case torrent.NotWorking:
+			status = 4
+		}
+		message := tracker.Warning
+		if tracker.Error != nil {
+			message = tracker.Error.Error()
+		}
+		out = append(out, qbitTracker{URL: tracker.URL, Status: status, NumPeers: tracker.Seeders + tracker.Leechers, Message: message})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {

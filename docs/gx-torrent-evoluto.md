@@ -483,10 +483,10 @@ Aggiornato al 2026-10-10.
 | F1: ascolto LAN senza token permesso in standalone (managed invariato) | fatto |
 | F1: wizard di primo avvio (lingua, cartella, password, LAN, porta) | fatto |
 | F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare |
-| F3: API compatibile qBittorrent (MVP: auth, app, transfer, torrents info/add/delete/pause/resume/recheck) | fatto |
-| F3: categorie e tag (modello demone + API qBittorrent) | fatto |
+| F3: API compatibile qBittorrent (auth, app, transfer, torrents info/add/delete/pause/resume/recheck/properties/files/trackers/reannounce/setLocation + categorie/tag) | fatto |
+| F3: compatibilità verificata col client qBittorrent di Gextto (`internal/qbittorrent`) | fatto |
 | F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
-| F3: app/preferences e altri endpoint qBittorrent | da fare |
+| F3: app/preferences e altri endpoint qBittorrent | fatto |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
 ---
