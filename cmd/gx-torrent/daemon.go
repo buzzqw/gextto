@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -125,8 +126,51 @@ type persistedState struct {
 	// FeedSeen records the feed items already added, so a restart does not add
 	// them again (key: feed name + item guid).
 	FeedSeen map[string]int64 `json:"feed_seen,omitempty"`
-	// FeedSmart is the highest episode added per series+season (smart episode).
-	FeedSmart map[string]int `json:"feed_smart,omitempty"`
+	// FeedSmart is the set of episodes already taken per series+season (smart
+	// episode), each with the time it was added.
+	FeedSmart map[string]smartEpisodes `json:"feed_smart,omitempty"`
+}
+
+// smartEpisodes is the set of episodes already taken for one series+season, each
+// with the Unix time it was added. A set is needed (not just the highest number)
+// because a feed can list a newer episode before an older one: keeping only the
+// maximum loses the older episode forever.
+type smartEpisodes map[int]int64
+
+// UnmarshalJSON accepts both the current form (a JSON object of
+// "episode": addedAt) and the older one (a single integer, the highest episode
+// seen), so a state file written before the set existed still loads.
+func (s *smartEpisodes) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || bytes.Equal(data, []byte("null")) {
+		return nil
+	}
+	if data[0] != '{' {
+		var highest int
+		if err := json.Unmarshal(data, &highest); err != nil {
+			return err
+		}
+		legacy := smartEpisodes{}
+		for ep := 0; ep <= highest; ep++ {
+			legacy[ep] = 0
+		}
+		*s = legacy
+		return nil
+	}
+	raw := map[string]int64{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	out := smartEpisodes{}
+	for key, at := range raw {
+		ep, err := strconv.Atoi(key)
+		if err != nil {
+			continue
+		}
+		out[ep] = at
+	}
+	*s = out
+	return nil
 }
 
 // runtimeInfo is volatile per-torrent bookkeeping.

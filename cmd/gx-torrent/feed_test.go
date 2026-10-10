@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -154,19 +156,84 @@ func TestPollFeedsOrderedRulesAndSmartEpisode(t *testing.T) {
 			`{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv"}}]`)
 
 	d.pollFeeds()
-	waitFor(t, "the newest episode", func() bool { return len(d.snapshotViews()) == 1 })
-	view := d.snapshotViews()[0]
-	if view.Hash != "1111111111111111111111111111111111111111" {
-		t.Fatalf("added %q, want S01E05", view.Hash)
+	// E05 (listed first) and E04 both match; E06 is a CAM and is filtered. The
+	// smart set keeps every episode, so E04 is not lost when it follows E05.
+	waitFor(t, "both episodes", func() bool { return len(d.snapshotViews()) == 2 })
+	hashes := map[string]string{}
+	for _, view := range d.snapshotViews() {
+		hashes[view.Hash] = view.Category
 	}
-	if view.Category != "tv" {
-		t.Fatalf("category = %q, want tv", view.Category)
+	if hashes["1111111111111111111111111111111111111111"] != "tv" || hashes["2222222222222222222222222222222222222222"] != "tv" {
+		t.Fatalf("added %v, want E05 and E04 as tv", hashes)
+	}
+	if _, ok := hashes["3333333333333333333333333333333333333333"]; ok {
+		t.Fatal("the CAM episode must be filtered")
 	}
 
-	// A second poll adds nothing: E05 is seen and E04/E06 are filtered.
+	// A second poll adds nothing: both episodes are seen.
 	d.pollFeeds()
-	if len(d.snapshotViews()) != 1 {
+	if len(d.snapshotViews()) != 2 {
 		t.Fatalf("re-poll added torrents: %d", len(d.snapshotViews()))
+	}
+}
+
+// TestSmartEpisodeKeepsOlderEpisodeAfterNewer is the regression the maximum-only
+// memory caused: a later poll that lists an older episode must still add it,
+// because the newer one was taken earlier.
+func TestSmartEpisodeKeepsOlderEpisodeAfterNewer(t *testing.T) {
+	var body atomic.Value
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write(body.Load().([]byte))
+	}))
+	defer feed.Close()
+	body.Store([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Show S01E05 1080p</title><guid>e5</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+</channel></rss>`))
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey, `[{"name":"shows","match":{"smart_episode":true}}]`)
+
+	d.pollFeeds()
+	waitFor(t, "E05", func() bool { return len(d.snapshotViews()) == 1 })
+
+	// The feed now also lists the older E04: it must be added, not skipped.
+	body.Store([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Show S01E05 1080p</title><guid>e5</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+<item><title>Show S01E04 1080p</title><guid>e4</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:2222222222222222222222222222222222222222">x</a>]]></description></item>
+</channel></rss>`))
+	d.pollFeeds()
+	waitFor(t, "E04 after E05", func() bool { return len(d.snapshotViews()) == 2 })
+	found := false
+	for _, view := range d.snapshotViews() {
+		if view.Hash == "2222222222222222222222222222222222222222" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the older episode that arrived after the newer one was lost")
+	}
+}
+
+func TestFeedSmartStateLegacyFormatLoads(t *testing.T) {
+	// A state file written before the set existed stored the highest episode as
+	// a plain integer; it must still load and behave as "seen up to there".
+	path := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"feed_smart":{"Show\u00001":5}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d := &Daemon{opts: Options{StatePath: path}}
+	if err := d.loadState(); err != nil {
+		t.Fatalf("a legacy feed_smart value must load: %v", err)
+	}
+	if !d.smartEpisodeSeen("Show\x001", 3) || !d.smartEpisodeSeen("Show\x001", 5) {
+		t.Fatal("the legacy episode set was not migrated")
+	}
+	if d.smartEpisodeSeen("Show\x001", 6) {
+		t.Fatal("an episode above the legacy high-water mark must not be seen")
 	}
 }
 

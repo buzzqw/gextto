@@ -199,15 +199,17 @@ func (d *Daemon) pollFeeds() {
 				continue
 			}
 			smartKey := ""
+			smartEpisodeNum := 0
 			if smart {
 				series, season, episode, found := rss.FindEpisode(item.Title)
 				if !found {
 					continue
 				}
 				smartKey = fmt.Sprintf("%s\x00%d", series, season)
-				if episode <= d.smartEpisode(smartKey) {
+				if d.smartEpisodeSeen(smartKey, episode) {
 					continue
 				}
+				smartEpisodeNum = episode
 			}
 			newlyAdded, err := d.addFeedItem(item, action)
 			if err != nil {
@@ -218,8 +220,7 @@ func (d *Daemon) pollFeeds() {
 			}
 			d.markFeedSeen(name, item.GUID)
 			if smartKey != "" {
-				_, _, episode, _ := rss.FindEpisode(item.Title)
-				d.setSmartEpisode(smartKey, episode)
+				d.markSmartEpisode(smartKey, smartEpisodeNum)
 			}
 			if newlyAdded {
 				added++
@@ -302,25 +303,42 @@ func (d *Daemon) rules() []rss.Rule {
 	return list
 }
 
-// smartEpisode is the highest episode already added for a series+season key.
-func (d *Daemon) smartEpisode(key string) int {
+// smartEpisodeSeen reports whether an episode of a series+season was already
+// taken (smart episode). Keeping the whole set, not just the highest number,
+// means an episode that arrives after a newer one is still accepted.
+func (d *Daemon) smartEpisodeSeen(key string, episode int) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.state.FeedSmart[key]
+	eps, ok := d.state.FeedSmart[key]
+	if !ok {
+		return false
+	}
+	_, seen := eps[episode]
+	return seen
 }
 
-// setSmartEpisode records the highest episode added for a series+season key.
-func (d *Daemon) setSmartEpisode(key string, episode int) {
+// markSmartEpisode records an episode as taken and prunes entries older than
+// the retention window.
+func (d *Daemon) markSmartEpisode(key string, episode int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.state.FeedSmart == nil {
-		d.state.FeedSmart = map[string]int{}
+		d.state.FeedSmart = map[string]smartEpisodes{}
 	}
-	if episode > d.state.FeedSmart[key] {
-		d.state.FeedSmart[key] = episode
-		d.dirty = true
-		d.saveLocked()
+	eps := d.state.FeedSmart[key]
+	if eps == nil {
+		eps = smartEpisodes{}
+		d.state.FeedSmart[key] = eps
 	}
+	now := time.Now()
+	eps[episode] = now.Unix()
+	for ep, at := range eps {
+		if at > 0 && now.Sub(time.Unix(at, 0)) > feedSeenRetention {
+			delete(eps, ep)
+		}
+	}
+	d.dirty = true
+	d.saveLocked()
 }
 
 // feedSeenKey is the persisted key of one item.
