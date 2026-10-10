@@ -265,13 +265,21 @@ fallback (`Truncate`): funzionano, senza l'ottimizzazione.
 **Installazione su Windows.** Il demone riconosce di essere avviato dal
 Service Control Manager (`svc.IsWindowsService`, `service_windows.go`) e gira
 come **servizio nativo**: un solo comando avvia il server HTTP e i torrent, e lo
-stop del servizio li ferma in modo pulito. Il pacchetto
+stop del servizio li ferma in modo pulito. Il servizio gira come **account
+virtuale** `NT SERVICE\gx-torrent` (non `LocalSystem`): lo crea il Service
+Control Manager e non ha diritti oltre a quelli concessi dall'installer — la
+cartella del programma in lettura/esecuzione e `%ProgramData%\gx-torrent` in
+scrittura. Una **cartella di download** scelta altrove va concessa a parte
+(`icacls D:\media /grant "NT SERVICE\gx-torrent:(OI)(CI)M"`), altrimenti il
+demone non può scrivere. Girare sotto un account dedicato (invece di SYSTEM)
+limita anche la scrittura di file arbitrari a cui un client dell'API può
+arrivare impostando `destination`. Il pacchetto
 `scripts/package-gx-torrent-windows.sh` produce
 `gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
-(`New-Service`, avviato in PowerShell elevato), `uninstall-service.ps1` e
-`README.txt` con l'alternativa `sc create`. Dati e log in
-`%ProgramData%\gx-torrent`; il servizio gira in **sessione 0**, quindi non apre
-il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
+(`New-Service` + account virtuale + `icacls`, avviato in PowerShell elevato),
+`uninstall-service.ps1` e `README.txt` con l'alternativa `sc create`. Dati e log
+in `%ProgramData%\gx-torrent`; il servizio gira in **sessione 0**, quindi non
+apre il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
 Installer e unit systemd restano per Linux.
 
 In breve, sul PC Windows:

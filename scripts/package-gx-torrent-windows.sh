@@ -63,6 +63,13 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $exe = Join-Path $dir "gx-torrent.exe"
 if (-not (Test-Path $exe)) { throw "gx-torrent.exe not found next to this script" }
 
+$serviceName = "gx-torrent"
+# A virtual service account: the Service Control Manager creates it and grants
+# it "Log on as a service". It has no rights beyond what this script grants —
+# unlike LocalSystem, which can write anywhere and is a SYSTEM-privileged
+# arbitrary-file-write target for anything that reaches the API.
+$account = "NT SERVICE\$serviceName"
+
 # Data, logs and the web UI live under ProgramData; the first run opens the
 # wizard at http://<host>:8890/ui/setup to choose folders, ports and bandwidth.
 $data = Join-Path $env:ProgramData "gx-torrent"
@@ -71,19 +78,27 @@ $log = Join-Path $data "gx-torrent.log"
 
 $bin = '"' + $exe + '" -mode standalone -listen 0.0.0.0:8890 -data "' + $data + '" -log-file "' + $log + '"'
 
-if (Get-Service -Name gx-torrent -ErrorAction SilentlyContinue) {
-    Stop-Service -Name gx-torrent -Force -ErrorAction SilentlyContinue
-    sc.exe delete gx-torrent | Out-Null
+if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+    Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+    sc.exe delete $serviceName | Out-Null
     Start-Sleep -Seconds 1
 }
-New-Service -Name gx-torrent -BinaryPathName $bin -DisplayName "gx-torrent" `
+New-Service -Name $serviceName -BinaryPathName $bin -DisplayName "gx-torrent" `
     -Description "gx-torrent (BitTorrent client, web UI on the listen port)" -StartupType Automatic
-Start-Service -Name gx-torrent
-Write-Host "gx-torrent installed and started."
+# Run as the service's own virtual account, not LocalSystem.
+sc.exe config $serviceName obj= "$account" | Out-Null
+# Let it read its own program folder and write its data folder (state, logs,
+# default downloads). A download folder chosen elsewhere must be granted too.
+icacls $dir /grant "${account}:(OI)(CI)RX" | Out-Null
+icacls $data /grant "${account}:(OI)(CI)F" | Out-Null
+Start-Service -Name $serviceName
+Write-Host "gx-torrent installed and started (running as $account)."
 Write-Host "  Web UI:  http://<host>:8890/  (first run: http://<host>:8890/ui/setup)"
 Write-Host "  Data:    $data"
 Write-Host "  Log:     $log"
-Write-Host "  Stop:    Stop-Service gx-torrent   Uninstall: .\uninstall-service.ps1"
+Write-Host "  Stop:    Stop-Service $serviceName   Uninstall: .\uninstall-service.ps1"
+Write-Host "  Note: a download folder outside $data needs access for the account, e.g."
+Write-Host "        icacls D:\media /grant `"${account}:(OI)(CI)M`""
 PS1
 
 cat > "$STAGE/uninstall-service.ps1" <<'PS1'
@@ -140,6 +155,12 @@ INTERFACES
 
 NOTES
 -----
+- The service runs as the virtual account NT SERVICE\gx-torrent (not
+  LocalSystem). The installer grants it its program folder (read/execute) and
+  %ProgramData%\gx-torrent (full). If you point the download folder somewhere
+  else, grant that folder too, e.g.
+      icacls D:\media /grant "NT SERVICE\gx-torrent:(OI)(CI)M"
+  without it the daemon cannot write the downloads.
 - The service runs in session 0: it never opens a browser; reach the wizard at
   the printed address.
 - A download folder on a network share must be a UNC path (\\server\share\...),

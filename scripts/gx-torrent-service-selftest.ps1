@@ -30,9 +30,15 @@ Remove-TestService
 try {
     # The same binPath the shipped install-service.ps1 builds.
     $bin = '"' + $exe + '" -mode standalone -listen 127.0.0.1:' + $Port + ' -data "' + $data + '" -log-file "' + $log + '"'
-    Write-Host "installing service $ServiceName"
+    # Mirror install-service.ps1: run as the service's own virtual account (not
+    # LocalSystem) with access only to its data folder.
+    $account = "NT SERVICE\$ServiceName"
+    Write-Host "installing service $ServiceName as $account"
     New-Service -Name $ServiceName -BinaryPathName $bin -StartupType Manual `
         -DisplayName "gx-torrent service selftest" | Out-Null
+    sc.exe config $ServiceName obj= "$account" | Out-Null
+    icacls (Split-Path -Parent $exe) /grant "${account}:(OI)(CI)RX" | Out-Null
+    icacls $data /grant "${account}:(OI)(CI)F" | Out-Null
     Start-Service -Name $ServiceName
     Write-Host "service started; waiting for /api/v1/health on port $Port"
 
