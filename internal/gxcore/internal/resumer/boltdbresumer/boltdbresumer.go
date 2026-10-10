@@ -25,6 +25,7 @@ var Keys = struct {
 	Dest              []byte
 	Info              []byte
 	Bitfield          []byte
+	PieceLayers       []byte
 	AddedAt           []byte
 	BytesDownloaded   []byte
 	BytesUploaded     []byte
@@ -48,6 +49,7 @@ var Keys = struct {
 	Dest:              []byte("dest"),
 	Info:              []byte("info"),
 	Bitfield:          []byte("bitfield"),
+	PieceLayers:       []byte("piece_layers"),
 	AddedAt:           []byte("added_at"),
 	BytesDownloaded:   []byte("bytes_downloaded"),
 	BytesUploaded:     []byte("bytes_uploaded"),
@@ -115,6 +117,7 @@ func (r *Resumer) Write(torrentID string, spec *Spec) error {
 		_ = b.Put(Keys.URLList, urlList)
 		_ = b.Put(Keys.FixedPeers, fixedPeers)
 		_ = b.Put(Keys.Info, spec.Info)
+		_ = b.Put(Keys.PieceLayers, spec.PieceLayers)
 		_ = b.Put(Keys.Bitfield, spec.Bitfield)
 		_ = b.Put(Keys.AddedAt, []byte(spec.AddedAt.Format(time.RFC3339)))
 		_ = b.Put(Keys.BytesDownloaded, []byte(strconv.FormatInt(spec.BytesDownloaded, 10)))
@@ -283,6 +286,12 @@ func (r *Resumer) Read(torrentID string) (spec *Spec, err error) {
 		if value != nil {
 			spec.Info = make([]byte, len(value))
 			copy(spec.Info, value)
+		}
+
+		value = b.Get(Keys.PieceLayers)
+		if value != nil {
+			spec.PieceLayers = make([]byte, len(value))
+			copy(spec.PieceLayers, value)
 		}
 
 		value = b.Get(Keys.Bitfield)

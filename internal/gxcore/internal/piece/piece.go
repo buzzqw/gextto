@@ -189,9 +189,19 @@ func (p *Piece) VerifyHash(buf []byte, h hash.Hash) bool {
 // built file by file, the tail piece of a file is shorter than the piece length
 // and no piece spans two files (BEP 52).
 func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
-	leaves := int(info.PieceLength / BlockSize)
+	pieceLeaves := int(info.PieceLength / BlockSize)
 	pieces := make([]Piece, 0, info.NumPieces)
 	for fi, f := range info.Files {
+		numBlocks := int((f.Length + BlockSize - 1) / BlockSize)
+		span := pieceLeaves
+		if numBlocks <= pieceLeaves {
+			// The file fits in one piece: its single hash is the file's pieces
+			// root, over nextPow2(numBlocks) leaves, not the piece boundary.
+			span = nextPow2(numBlocks)
+			if span < 1 {
+				span = 1
+			}
+		}
 		var off int64
 		for off < f.Length {
 			n := int64(info.PieceLength)
@@ -204,7 +214,7 @@ func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
 				Length:   uint32(n),
 				Hash:     info.PieceHash(global),
 				V2:       true,
-				V2Leaves: leaves,
+				V2Leaves: span,
 				Data: filesection.Piece{{
 					File:   files[fi].Storage,
 					Offset: off,
@@ -216,6 +226,17 @@ func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
 		}
 	}
 	return pieces
+}
+
+func nextPow2(n int) int {
+	if n <= 1 {
+		return 1
+	}
+	p := 1
+	for p < n {
+		p <<= 1
+	}
+	return p
 }
 
 // VerifyV2 returns true when the buffer hashes to the piece's merkle node: the

@@ -47,7 +47,15 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 	}()
 
 	v.Bitfield = bitfield.New(uint32(len(pieces)))
-	buf := make([]byte, pieces[0].Length)
+	// The buffer is sized to the largest piece: in v2 the pieces have different
+	// lengths (per-file tails), so the first piece is not necessarily the widest.
+	maxLen := 0
+	for _, p := range pieces {
+		if int(p.Length) > maxLen {
+			maxLen = int(p.Length)
+		}
+	}
+	buf := make([]byte, maxLen)
 	hash := sha1.New()
 	var numOK uint32
 	for _, p := range pieces {

@@ -55,11 +55,16 @@ func listenUDPOn(host string, port int) (net.PacketConn, error) {
 // its family, so a VPN-bound or explicit address never widens.
 func udpProtoForAddr(addr net.Addr) string {
 	udp, ok := addr.(*net.UDPAddr)
-	if !ok || udp.IP == nil || udp.IP.IsUnspecified() {
+	if !ok || udp.IP == nil {
 		return "udp"
 	}
 	if udp.IP.To4() != nil {
+		// A concrete IPv4 socket, including one bound to 0.0.0.0 after the
+		// dual-stack bind fell back to IPv4 (no IPv6 on the host).
 		return "udp4"
+	}
+	if udp.IP.IsUnspecified() {
+		return "udp" // [::]: a dual-stack socket
 	}
 	return "udp6"
 }

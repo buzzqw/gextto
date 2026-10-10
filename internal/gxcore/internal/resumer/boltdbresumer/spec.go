@@ -8,13 +8,16 @@ import (
 
 // Spec contains fields for resuming an existing torrent.
 type Spec struct {
-	InfoHash          []byte
-	Port              int
-	Name              string
-	Trackers          [][]string
-	URLList           []string
-	FixedPeers        []string
-	Info              []byte
+	InfoHash   []byte
+	Port       int
+	Name       string
+	Trackers   [][]string
+	URLList    []string
+	FixedPeers []string
+	Info       []byte
+	// PieceLayers is the bencoded BEP 52 "piece layers" of a v2 torrent (nil
+	// for v1): the info dict alone is not enough to rebuild a v2 torrent.
+	PieceLayers       []byte
 	Bitfield          []byte
 	AddedAt           time.Time
 	BytesDownloaded   int64
@@ -52,10 +55,11 @@ type jsonSpec struct {
 	Version           int
 
 	// JSON unsafe types
-	InfoHash  string
-	Info      string
-	Bitfield  string
-	SeededFor int64
+	InfoHash    string
+	Info        string
+	PieceLayers string
+	Bitfield    string
+	SeededFor   int64
 }
 
 // MarshalJSON converts the Spec to a JSON string.
@@ -79,10 +83,11 @@ func (s Spec) MarshalJSON() ([]byte, error) {
 		SuperSeeding:      s.SuperSeeding,
 		Version:           s.Version,
 
-		InfoHash:  base64.StdEncoding.EncodeToString(s.InfoHash),
-		Info:      base64.StdEncoding.EncodeToString(s.Info),
-		Bitfield:  base64.StdEncoding.EncodeToString(s.Bitfield),
-		SeededFor: int64(s.SeededFor),
+		InfoHash:    base64.StdEncoding.EncodeToString(s.InfoHash),
+		Info:        base64.StdEncoding.EncodeToString(s.Info),
+		PieceLayers: base64.StdEncoding.EncodeToString(s.PieceLayers),
+		Bitfield:    base64.StdEncoding.EncodeToString(s.Bitfield),
+		SeededFor:   int64(s.SeededFor),
 	}
 	return json.Marshal(j)
 }
@@ -99,6 +104,10 @@ func (s *Spec) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	s.Info, err = base64.StdEncoding.DecodeString(j.Info)
+	if err != nil {
+		return err
+	}
+	s.PieceLayers, err = base64.StdEncoding.DecodeString(j.PieceLayers)
 	if err != nil {
 		return err
 	}

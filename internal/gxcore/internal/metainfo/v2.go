@@ -3,9 +3,12 @@ package metainfo
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/zeebo/bencode"
@@ -115,6 +118,9 @@ func NewV2Info(b []byte) (*Info, error) {
 	if ib.MetaVersion != 2 && len(ib.Pieces) == 0 {
 		return nil, errZeroPieces
 	}
+	if ib.MetaVersion == 2 && ib.PieceLength == 0 {
+		return nil, errZeroPieceLength
+	}
 	i := &Info{
 		PieceLength: ib.PieceLength,
 		Name:        ib.Name,
@@ -139,7 +145,11 @@ func NewV2Info(b []byte) (*Info, error) {
 		i.PieceHashLen = 32
 		var pieces uint32
 		for _, f := range i.V2Files {
-			i.Files = append(i.Files, File{Path: f.Path, Length: f.Length})
+			name, err := sanitizeV2Path(f.Path)
+			if err != nil {
+				return nil, err
+			}
+			i.Files = append(i.Files, File{Path: name, Length: f.Length})
 			i.Length += f.Length
 			pieces += uint32((f.Length + int64(ib.PieceLength) - 1) / int64(ib.PieceLength))
 		}
@@ -258,4 +268,57 @@ func nextPow2(n int) int {
 		p <<= 1
 	}
 	return p
+}
+
+// sanitizeV2Path cleans a BEP 52 "file tree" path like v1 does: it rejects ".."
+// components and sanitizes each one (valid UTF-8, length, separators). BEP 52
+// requires this to avoid directory traversal.
+func sanitizeV2Path(p string) (string, error) {
+	parts := strings.Split(p, "/")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.TrimSpace(part) == ".." {
+			return "", fmt.Errorf("invalid file name: %q", p)
+		}
+		out = append(out, cleanName(part))
+	}
+	return filepath.Join(out...), nil
+}
+
+// ParseInfo parses an info dictionary, accepting a BitTorrent v2-only one when
+// its "piece layers" are provided (the resumer reload path). It is the v2-aware
+// counterpart of NewInfo.
+func ParseInfo(b []byte, useUTF8Keys, hidePaddings bool, layers map[string][]byte) (*Info, error) {
+	i, err := NewInfo(b, useUTF8Keys, hidePaddings)
+	if errors.Is(err, ErrV2Only) {
+		v2, verr := NewV2Info(b)
+		if verr != nil {
+			return nil, verr
+		}
+		if aerr := v2.AttachV2Pieces(layers); aerr != nil {
+			return nil, aerr
+		}
+		return v2, nil
+	}
+	return i, err
+}
+
+// EncodePieceLayers bencodes a v2 "piece layers" map for persistence.
+func EncodePieceLayers(layers map[string][]byte) ([]byte, error) {
+	if len(layers) == 0 {
+		return nil, nil
+	}
+	return bencode.EncodeBytes(layers)
+}
+
+// DecodePieceLayers decodes a bencoded "piece layers" map.
+func DecodePieceLayers(b []byte) (map[string][]byte, error) {
+	if len(b) == 0 {
+		return nil, nil
+	}
+	var m map[string][]byte
+	if err := bencode.DecodeBytes(b, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }

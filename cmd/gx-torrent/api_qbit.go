@@ -174,13 +174,47 @@ type qbitTorrent struct {
 	MagnetURI    string  `json:"magnet_uri"`
 }
 
-func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, _ *http.Request) {
+func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, r *http.Request) {
 	views := d.snapshotViews()
+	wanted := d.qbitHashFilter(r)
 	out := make([]qbitTorrent, 0, len(views))
 	for _, v := range views {
+		if wanted != nil {
+			if _, ok := wanted[strings.ToLower(v.Hash)]; !ok {
+				continue
+			}
+		}
 		out = append(out, qbitView(v))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// qbitHashFilter returns the set of requested info hashes (lowercase) from the
+// "hashes" or "hash" field, or nil when the request asks for every torrent. An
+// unknown hash yields an empty (non-nil) set, so /torrents/info?hashes=X is
+// empty rather than returning an unrelated torrent.
+func (d *Daemon) qbitHashFilter(r *http.Request) map[string]struct{} {
+	raw := strings.TrimSpace(r.URL.Query().Get("hashes"))
+	if raw == "" {
+		raw = strings.TrimSpace(r.URL.Query().Get("hash"))
+	}
+	if raw == "" || strings.EqualFold(raw, "all") {
+		return nil
+	}
+	set := make(map[string]struct{})
+	for _, h := range d.qbitHashes(raw) {
+		set[strings.ToLower(h)] = struct{}{}
+	}
+	return set
+}
+
+// qbitHashParam returns the torrents a POST action addresses: the singular
+// "hash" field (addTrackers/removeTrackers) or the plural "hashes".
+func (d *Daemon) qbitHashParam(r *http.Request) []string {
+	if h := strings.TrimSpace(r.FormValue("hash")); h != "" {
+		return d.qbitHashes(h)
+	}
+	return d.qbitHashes(r.FormValue("hashes"))
 }
 
 func qbitView(v torrentInfo) qbitTorrent {
@@ -359,7 +393,7 @@ func (d *Daemon) handleQbitSetSuperSeeding(w http.ResponseWriter, r *http.Reques
 func (d *Daemon) handleQbitAddTrackers(w http.ResponseWriter, r *http.Request) {
 	urls := qbitLines(r.FormValue("urls"))
 	if len(urls) > 0 {
-		for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		for _, hash := range d.qbitHashParam(r) {
 			_ = d.addTrackers(hash, urls)
 		}
 	}
@@ -370,7 +404,7 @@ func (d *Daemon) handleQbitAddTrackers(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) handleQbitRemoveTrackers(w http.ResponseWriter, r *http.Request) {
 	urls := qbitLines(r.FormValue("urls"))
 	if len(urls) > 0 {
-		for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		for _, hash := range d.qbitHashParam(r) {
 			_ = d.removeTrackers(hash, urls)
 		}
 	}
@@ -568,8 +602,9 @@ func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleQbitAdd accepts the "urls" field (magnet links and .torrent URLs), one
-// per line, plus savepath and paused, the way Sonarr and Radarr send them.
+// handleQbitAdd accepts "urls" (magnet links and .torrent URLs, one per line)
+// and an uploaded .torrent (multipart field "torrents"), plus savepath, paused,
+// sequentialDownload and firstLastPiecePrio, the way Sonarr and Radarr send them.
 func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
@@ -579,14 +614,38 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		savePath = d.categorySavePath(category)
 	}
 	paused := strings.EqualFold(strings.TrimSpace(r.FormValue("paused")), "true")
-	urls := r.FormValue("urls")
+	sequential := strings.EqualFold(strings.TrimSpace(r.FormValue("sequentialDownload")), "true")
+	firstLast := strings.EqualFold(strings.TrimSpace(r.FormValue("firstLastPiecePrio")), "true")
 	added := false
+
+	// Uploaded .torrent files (multipart field "torrents").
+	if err := r.ParseMultipartForm(maxTorrentFile); err == nil && r.MultipartForm != nil {
+		for _, fhs := range r.MultipartForm.File["torrents"] {
+			f, err := fhs.Open()
+			if err != nil {
+				continue
+			}
+			data, readErr := io.ReadAll(io.LimitReader(f, maxTorrentFile))
+			f.Close()
+			if readErr != nil || len(data) == 0 {
+				continue
+			}
+			req := addRequest{TorrentData: data, Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast}
+			if _, _, err := d.add(req); err != nil {
+				qbitText(w, http.StatusUnsupportedMediaType, qbitInvalidCode)
+				return
+			}
+			added = true
+		}
+	}
+
+	urls := r.FormValue("urls")
 	for _, raw := range strings.FieldsFunc(urls, func(r rune) bool { return r == '\n' || r == '\r' }) {
 		line := strings.TrimSpace(raw)
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags, Sequential: sequential, FirstLast: firstLast}
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
@@ -850,7 +909,12 @@ func (d *Daemon) qbitSetSpeedLimit(key, value string) error {
 	if err != nil || bytesPerSecond < 0 {
 		return fmt.Errorf("invalid limit %q", value)
 	}
-	raw, err := json.Marshal(bytesPerSecond / 1024)
+	kib := bytesPerSecond / 1024
+	if bytesPerSecond > 0 && kib < 1 {
+		// A positive but tiny limit must not become 0 (unlimited).
+		kib = 1
+	}
+	raw, err := json.Marshal(kib)
 	if err != nil {
 		return err
 	}

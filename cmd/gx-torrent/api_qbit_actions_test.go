@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -202,4 +203,55 @@ func TestQbitSetPreferences(t *testing.T) {
 	if dl != 2048 || up != 1024 {
 		t.Fatalf("global limits = %d/%d KiB, want 2048/1024", dl, up)
 	}
+
+	// A positive but tiny limit rounds up to 1 KiB, not 0 (which means unlimited).
+	resp2, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {`{"dl_limit":512}`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp2.Body.Close()
+	d.mu.Lock()
+	small := d.state.Config.SpeedLimitDownload
+	d.mu.Unlock()
+	if small != 1 {
+		t.Fatalf("small global limit = %d KiB, want 1", small)
+	}
+}
+
+func TestQbitTorrentsInfoFilterAndAddTrackers(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 100_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	// /torrents/info?hashes=<hash> returns only that torrent.
+	resp, err := http.Get(srv.URL + "/api/v2/torrents/info?hashes=" + hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(list) != 1 {
+		t.Fatalf("info filter returned %d items, want 1", len(list))
+	}
+	if got, _ := list[0]["hash"].(string); !strings.EqualFold(got, hash) {
+		t.Fatalf("info filter returned %q, want %q", got, hash)
+	}
+
+	// addTrackers addresses the torrent with the singular "hash" field.
+	r2, err := http.PostForm(srv.URL+"/api/v2/torrents/addTrackers", url.Values{"hash": {hash}, "urls": {"http://x/announce"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2.Body.Close()
+	waitFor(t, "tracker added via the singular hash", func() bool {
+		return len(trackerURLs(t, d, hash)) == 1
+	})
 }

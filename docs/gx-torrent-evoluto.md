@@ -501,9 +501,13 @@ rimanenti:
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, **feed dai risultati di ricerca**, **notifiche webhook su match/errore**) | §12.2 | fatto |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
-**Aperti, da discutere dopo i precedenti:** il completamento di **F4 IPv6**
-(manca DHT BEP 32 e i punti elencati sopra), **F4 BitTorrent v2**, e i ritocchi
-al wizard (indexer/cartella temporanea). Il **distacco da rain** è
+**Punto finale:** al termine, **controllo approfondito di tutto il codice
+lavorato** in questa sessione (IPv6/DHT BEP 32, BitTorrent v2, API qBittorrent e
+RSS, container, de-rain) prima di considerarlo chiuso.
+
+**Aperti, da discutere dopo i precedenti:** **F4 BitTorrent v2** (restano i
+magnet v2) e i ritocchi al wizard (indexer/cartella temporanea). Il
+**distacco da rain** è
 avvenuto: nel codice non resta alcun riferimento a rain (namespace, stringhe di
 rete e commenti). I riferimenti all'**upstream** rain restano solo dove indicano
 origine, licenza o confronto (documenti come questo, `LICENSE`). I **marcatori

@@ -84,7 +84,7 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		}
 		t.stopInfoDownloaders()
 
-		info, err := t.session.parseInfo(id.Bytes, boltdbresumer.LatestVersion)
+		info, err := t.session.parseInfo(id.Bytes, boltdbresumer.LatestVersion, nil)
 		if err != nil {
 			t.stop(fmt.Errorf("cannot parse info bytes: %w", err))
 			break

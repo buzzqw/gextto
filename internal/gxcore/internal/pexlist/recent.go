@@ -17,8 +17,13 @@ type RecentlySeen struct {
 	length int
 }
 
-// Add a new address to the list.
+// Add a new address to the list. IPv6 peers are not tracked here (this list
+// feeds the IPv4 "dropped" part of a PEX message); they are ignored so a v6
+// address is never stored as 0.0.0.0.
 func (l *RecentlySeen) Add(addr *net.TCPAddr) {
+	if addr == nil || addr.IP.To4() == nil {
+		return
+	}
 	cp := tracker.NewCompactPeer(addr)
 	if l.has(cp) {
 		return

@@ -116,7 +116,43 @@ func TestPieceLayersParsed(t *testing.T) {
 	}
 }
 
+func TestPieceLayersRoundTrip(t *testing.T) {
+	m := map[string][]byte{"root": {1, 2, 3, 4}}
+	b, err := EncodePieceLayers(m)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	if len(b) == 0 {
+		t.Fatal("encode returned empty")
+	}
+	got, err := DecodePieceLayers(b)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got) != 1 || !bytes.Equal(got["root"], []byte{1, 2, 3, 4}) {
+		t.Fatalf("round-trip = %v", got)
+	}
+}
+
 const net32 = 32
+
+func TestV2FilePathTraversalRejected(t *testing.T) {
+	info := map[string]any{
+		"name":         "t",
+		"piece length": 16384,
+		"meta version": 2,
+		"file tree": map[string]any{
+			"..": map[string]any{"evil": map[string]any{"": map[string]any{"length": 10}}},
+		},
+	}
+	raw, err := bencode.EncodeBytes(info)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewV2Info(raw); err == nil {
+		t.Fatal("a .. component in the v2 file tree must be rejected")
+	}
+}
 
 func TestV2PerFilePieces(t *testing.T) {
 	block := merkle.BlockSize

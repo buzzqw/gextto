@@ -22,6 +22,21 @@ func binaryContact(t *testing.T, hostPort string) string {
 	return c
 }
 
+// TestListenIPv6Brackets locks in that an IPv6 listen address is bracketed
+// before use, otherwise net.ListenPacket fails with "too many colons".
+func TestListenIPv6Brackets(t *testing.T) {
+	if l, err := net.Listen("tcp6", "[::1]:0"); err != nil {
+		t.Skip("no IPv6 loopback")
+	} else {
+		l.Close()
+	}
+	conn, err := listen("::1", 0, "udp6", &nullLogger{})
+	if err != nil {
+		t.Fatalf("listen on ::1 failed: %v", err)
+	}
+	conn.Close()
+}
+
 func TestParseNodesString(t *testing.T) {
 	const (
 		id4 = "AAAAAAAAAAAAAAAAAAAA" // 20 bytes

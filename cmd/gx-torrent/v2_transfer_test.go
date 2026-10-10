@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	zbencode "github.com/zeebo/bencode"
 )
@@ -143,14 +144,16 @@ func TestV2OnlyTransfer(t *testing.T) {
 
 	payloadA := v2Payload(5*v2BlockSize, 0x21) // 3 pieces, tail of 1 block
 	payloadB := v2Payload(3*v2BlockSize, 0x53) // 2 pieces, tail of 1 block
-	torrent := makeV2TorrentMulti(t, []v2FileSpec{{"a.bin", payloadA}, {"b.bin", payloadB}}, 2*v2BlockSize)
+	payloadC := v2Payload(10*1024, 0x7a)       // one block: a single-piece file
+	torrent := makeV2TorrentMulti(t, []v2FileSpec{
+		{"a.bin", payloadA}, {"b.bin", payloadB}, {"c.bin", payloadC},
+	}, 2*v2BlockSize)
 
 	src := t.TempDir()
-	if err := os.WriteFile(filepath.Join(src, "a.bin"), payloadA, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(src, "b.bin"), payloadB, 0o644); err != nil {
-		t.Fatal(err)
+	for name, data := range map[string][]byte{"a.bin": payloadA, "b.bin": payloadB, "c.bin": payloadC} {
+		if err := os.WriteFile(filepath.Join(src, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	hash, _, err := seeder.add(addRequest{TorrentData: torrent, Destination: src})
 	if err != nil {
@@ -174,10 +177,58 @@ func TestV2OnlyTransfer(t *testing.T) {
 	}
 
 	waitFor(t, "v2 download complete", func() bool { return stateOf(leecher, hash) == "seeding" })
-	for name, want := range map[string][]byte{"a.bin": payloadA, "b.bin": payloadB} {
+	for name, want := range map[string][]byte{"a.bin": payloadA, "b.bin": payloadB, "c.bin": payloadC} {
 		got, err := os.ReadFile(filepath.Join(dst, name))
 		if err != nil || !bytes.Equal(got, want) {
 			t.Fatalf("downloaded %s differs: %v", name, err)
 		}
 	}
+}
+
+// TestV2TorrentSurvivesRestart locks in that a v2 torrent is not lost when the
+// daemon restarts: its piece layers are persisted with the resume data, so the
+// torrent is rebuilt and verified again.
+func TestV2TorrentSurvivesRestart(t *testing.T) {
+	data := t.TempDir()
+	src := t.TempDir()
+	payload := v2Payload(3*v2BlockSize, 0x11) // 2 pieces
+	torrent := makeV2TorrentMulti(t, []v2FileSpec{{"movie.bin", payload}}, 2*v2BlockSize)
+	if err := os.WriteFile(filepath.Join(src, "movie.bin"), payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opts := Options{
+		Listen:      "127.0.0.1:0",
+		DataDir:     data,
+		LinkDir:     filepath.Join(data, "links"),
+		DownloadDir: filepath.Join(data, "downloads"),
+		DBPath:      filepath.Join(data, "session.db"),
+		StatePath:   filepath.Join(data, "state.json"),
+		Network:     NetworkOptions{PortBegin: 44200, PortEnd: 44299, Encryption: 1},
+		Tick:        50 * time.Millisecond,
+		ProbeWindow: time.Minute,
+	}
+	boot := func() (*Daemon, func()) {
+		d, err := newDaemon(opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() { d.run(stop); close(done) }()
+		return d, func() { close(stop); <-done; d.close() }
+	}
+
+	d1, stop1 := boot()
+	hash, _, err := d1.add(addRequest{TorrentData: torrent, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(d1, hash) == "seeding" })
+	stop1()
+
+	d2, stop2 := boot()
+	defer stop2()
+	waitFor(t, "v2 torrent reloaded", func() bool { _, ok := findInfo(d2, hash); return ok })
+	waitFor(t, "reloaded v2 seeding", func() bool { return stateOf(d2, hash) == "seeding" })
 }

@@ -3,6 +3,7 @@ package torrent
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/cachedpiece"
@@ -332,7 +333,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 	case peerprotocol.PortMessage:
 		if t.session.dht != nil {
-			t.session.dht.AddNode(fmt.Sprintf("%s:%d", pe.IP(), msg.Port))
+			t.session.dht.AddNode(net.JoinHostPort(pe.IP(), strconv.Itoa(int(msg.Port))))
 		}
 	case peerwriter.BlockUploaded:
 		l := int64(msg.Length)

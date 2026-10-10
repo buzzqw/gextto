@@ -225,7 +225,7 @@ type packetType struct {
 
 func listen(addr string, listenPort int, proto string, log DebugLogger) (socket packetConn, err error) {
 	log.Debugf("DHT: Listening for peers on IP: %s port: %d Protocol=%s\n", addr, listenPort, proto)
-	listener, err := net.ListenPacket(proto, addr+":"+strconv.Itoa(listenPort))
+	listener, err := net.ListenPacket(proto, net.JoinHostPort(addr, strconv.Itoa(listenPort)))
 	if err != nil {
 		log.Debugf("DHT: Listen failed:%s\n", err)
 	}

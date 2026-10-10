@@ -119,6 +119,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 			t.Close()
 		}
 	}()
+	layers, _ := metainfo.EncodePieceLayers(mi.PieceLayers)
 	rspec := &boltdbresumer.Spec{
 		InfoHash:          mi.Info.Hash[:],
 		Port:              port,
@@ -126,6 +127,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		Trackers:          mi.AnnounceList,
 		URLList:           mi.URLList,
 		Info:              mi.Info.Bytes,
+		PieceLayers:       layers,
 		AddedAt:           t.addedAt,
 		StopAfterDownload: opt.StopAfterDownload,
 		StopAfterMetadata: opt.StopAfterMetadata,

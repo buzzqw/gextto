@@ -36,7 +36,7 @@ func (s *Session) loadExistingTorrents(ids []string) {
 	}
 }
 
-func (s *Session) parseInfo(b []byte, version int) (*metainfo.Info, error) {
+func (s *Session) parseInfo(b []byte, version int, layers map[string][]byte) (*metainfo.Info, error) {
 	var useUTF8Keys bool
 	var hidePaddings bool
 	switch version {
@@ -49,7 +49,7 @@ func (s *Session) parseInfo(b []byte, version int) (*metainfo.Info, error) {
 	default:
 		return nil, fmt.Errorf("unknown resume data version: %d", version)
 	}
-	i, err := metainfo.NewInfo(b, useUTF8Keys, hidePaddings)
+	i, err := metainfo.ParseInfo(b, useUTF8Keys, hidePaddings, layers)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,8 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	var bf *bitfield.Bitfield
 	var private bool
 	if len(spec.Info) > 0 {
-		info2, err2 := s.parseInfo(spec.Info, spec.Version)
+		layers, _ := metainfo.DecodePieceLayers(spec.PieceLayers)
+		info2, err2 := s.parseInfo(spec.Info, spec.Version, layers)
 		if err2 != nil {
 			return nil, spec.Started, err2
 		}

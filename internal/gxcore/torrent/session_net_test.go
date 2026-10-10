@@ -76,9 +76,10 @@ func TestUDPProtoSelection(t *testing.T) {
 		want string
 	}{
 		{&net.UDPAddr{}, "udp"},
-		{&net.UDPAddr{IP: net.IPv4zero}, "udp"},
+		{&net.UDPAddr{IP: net.IPv4zero}, "udp4"},
 		{&net.UDPAddr{IP: net.ParseIP("127.0.0.1")}, "udp4"},
 		{&net.UDPAddr{IP: net.ParseIP("::1")}, "udp6"},
+		{&net.UDPAddr{IP: net.IPv6zero}, "udp"},
 		{&net.TCPAddr{IP: net.ParseIP("127.0.0.1")}, "udp"},
 	}
 	for _, c := range addrs {
