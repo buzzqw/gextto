@@ -63,7 +63,7 @@ if command -v apt-get >/dev/null 2>&1; then
   SUDO=""
   [[ "$(id -u)" == "0" ]] || SUDO="sudo"
   $SUDO apt-get update -qq
-  packages="ca-certificates curl git binutils zip"
+  packages="ca-certificates curl git binutils zip unzip"
   if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
     packages="build-essential pkg-config libtorrent-rasterbar-dev $packages"
   fi
