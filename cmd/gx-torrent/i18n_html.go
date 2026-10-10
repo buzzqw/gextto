@@ -142,6 +142,8 @@ func (d *Daemon) renderUI(w http.ResponseWriter, r *http.Request, name string, d
 		err = uiTemplates().ExecuteTemplate(&buffer, name, data)
 	}
 	if err != nil {
+		logf("ui render %s: %v", name, err)
+		http.Error(w, "page render failed", http.StatusInternalServerError)
 		return
 	}
 	body := uiTranslateHTML(buffer.String(), uiDictionary(d.uiLang(r)))
