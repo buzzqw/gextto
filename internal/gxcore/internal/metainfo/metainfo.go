@@ -18,6 +18,10 @@ type MetaInfo struct {
 	Info         Info
 	AnnounceList [][]string
 	URLList      []string
+	// PieceLayers maps a v2 merkle root ("pieces root") to the concatenated
+	// hashes of the layer that covers one piece length (BEP 52). Hashes are
+	// stored in binary form. Empty for a v1 torrent.
+	PieceLayers map[string][]byte
 }
 
 // New returns a torrent from bencoded stream.
@@ -28,6 +32,7 @@ func New(r io.Reader) (*MetaInfo, error) {
 		Announce     bencode.RawMessage `bencode:"announce"`
 		AnnounceList bencode.RawMessage `bencode:"announce-list"`
 		URLList      bencode.RawMessage `bencode:"url-list"`
+		PieceLayers  bencode.RawMessage `bencode:"piece layers"`
 	}
 	err := bencode.NewDecoder(r).Decode(&t)
 	if err != nil {
@@ -81,6 +86,14 @@ func New(r io.Reader) (*MetaInfo, error) {
 			if err == nil && isWebseedSupported(s) {
 				ret.URLList = append(ret.URLList, s)
 			}
+		}
+	}
+	// BEP 52: "piece layers" is a top-level dictionary mapping each file's
+	// merkle root to the hashes of one layer of its tree.
+	if len(t.PieceLayers) > 0 {
+		var layers map[string][]byte
+		if lerr := bencode.DecodeBytes(t.PieceLayers, &layers); lerr == nil {
+			ret.PieceLayers = layers
 		}
 	}
 	return &ret, nil

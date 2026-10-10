@@ -18,6 +18,10 @@ type Magnet struct {
 	Name     string
 	Trackers [][]string
 	Peers    []string
+	// V2InfoHash is the SHA-256 info hash from a "urn:btmh:" topic (BEP 52),
+	// present on hybrid links. HasV2 reports whether it was found.
+	V2InfoHash [32]byte
+	HasV2      bool
 }
 
 // New parses the string and returns new Magnet.
@@ -46,6 +50,7 @@ func New(s string) (*Magnet, error) {
 	if err != nil {
 		return nil, err
 	}
+	magnet.V2InfoHash, magnet.HasV2 = parseV2InfoHash(xts)
 
 	names := params["dn"]
 	if len(names) != 0 {
@@ -129,6 +134,30 @@ func parseInfoHash(xts []string) ([20]byte, error) {
 		return [20]byte{}, errors.New("magnet link has no v1 info hash: BitTorrent v2 is not supported")
 	}
 	return [20]byte{}, errors.New("invalid xt param: must start with \"urn:btih:\"")
+}
+
+// parseV2InfoHash returns the SHA-256 info hash of a "urn:btmh:" topic (BEP
+// 52). The value is a multihash: "1220" (SHA2-256, 32 bytes) followed by the
+// 64 hex characters of the digest. A hybrid magnet link carries both a btih and
+// a btmh topic; the v1 hash is the one usable today.
+func parseV2InfoHash(xts []string) ([32]byte, bool) {
+	for _, xt := range xts {
+		s, ok := strings.CutPrefix(xt, "urn:btmh:")
+		if !ok {
+			continue
+		}
+		if len(s) != 68 || !strings.HasPrefix(s, "1220") {
+			continue
+		}
+		b, err := hex.DecodeString(s[4:])
+		if err != nil || len(b) != 32 {
+			continue
+		}
+		var h [32]byte
+		copy(h[:], b)
+		return h, true
+	}
+	return [32]byte{}, false
 }
 
 // infoHashString returns a new info hash value from a string.

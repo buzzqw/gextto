@@ -2,6 +2,7 @@ package metainfo
 
 import (
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -21,6 +22,12 @@ var (
 	errZeroPieceLength  = errors.New("torrent has zero piece length")
 	errZeroPieces       = errors.New("torrent has zero pieces")
 	errPieceLength      = errors.New("piece length must be multiple of 16K")
+	// ErrV2Only marks a BitTorrent v2-only torrent (BEP 52): it has a
+	// "meta version" of 2 and a "file tree" but no v1 "pieces".
+	ErrV2Only = errors.New("torrent is BitTorrent v2 only")
+	// ErrUnknownMetaVersion marks a torrent created with a newer, unsupported
+	// "meta version".
+	ErrUnknownMetaVersion = errors.New("unsupported meta version")
 )
 
 // Info contains information about torrent.
@@ -34,7 +41,14 @@ type Info struct {
 	Bytes       []byte
 	Private     bool
 	Files       []File
-	pieces      []byte
+	// MetaVersion is the BEP 52 "meta version" (0 when absent, i.e. v1).
+	MetaVersion int64
+	// V2Hash is the SHA-256 of the info dictionary when MetaVersion >= 2.
+	// The handshake and tracker use its first 20 bytes.
+	V2Hash [32]byte
+	// HasV2 reports whether the info dictionary carried a "meta version".
+	HasV2  bool
+	pieces []byte
 }
 
 // File represents a file inside a Torrent.
@@ -72,6 +86,9 @@ type infoType struct {
 	Private     bencode.RawMessage `bencode:"private"`
 	Length      int64              `bencode:"length"` // Single File Mode
 	Files       []file             `bencode:"files"`  // Multiple File mode
+	// BEP 52 (BitTorrent v2)
+	MetaVersion int64              `bencode:"meta version"`
+	FileTree    bencode.RawMessage `bencode:"file tree"`
 }
 
 func (ib *infoType) overrideUTF8Keys() {
@@ -90,6 +107,13 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	var ib infoType
 	if err := bencode.DecodeBytes(b, &ib); err != nil {
 		return nil, err
+	}
+	// BEP 52: the meta version is checked first, before any other validation.
+	if ib.MetaVersion > 2 {
+		return nil, ErrUnknownMetaVersion
+	}
+	if ib.MetaVersion == 2 && len(ib.Pieces) == 0 {
+		return nil, ErrV2Only
 	}
 	if ib.PieceLength == 0 {
 		return nil, errZeroPieceLength
@@ -118,6 +142,8 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 		pieces:      ib.Pieces,
 		Name:        ib.Name,
 		Private:     parsePrivateField(ib.Private),
+		MetaVersion: ib.MetaVersion,
+		HasV2:       ib.MetaVersion != 0 || len(ib.FileTree) > 0,
 	}
 	multiFile := len(ib.Files) > 0
 	if multiFile {
@@ -141,6 +167,11 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 	hash := sha1.New()
 	_, _ = hash.Write(b)
 	copy(i.Hash[:], hash.Sum(nil))
+	// BEP 52: a v2 (or hybrid) torrent hashes the same info dictionary with
+	// SHA-256; the handshake and tracker use its first 20 bytes.
+	if i.HasV2 {
+		i.V2Hash = sha256.Sum256(b)
+	}
 
 	// name field is optional
 	if ib.Name != "" {
