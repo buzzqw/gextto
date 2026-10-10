@@ -167,7 +167,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "none",
 		"super_seeding": "full",
-		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
+		"ip_filter":     "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "none",
 	},
 	BackendQbittorrent: {
@@ -177,7 +177,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "partial",
-		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "partial",
+		"ip_filter":     "partial", "session_stats": "partial", "web_seeds": "partial",
 		"holepunch": "none",
 	},
 	BackendGxTorrent: {
@@ -187,7 +187,7 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "full", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "full",
-		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
+		"ip_filter":     "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "full",
 	},
 }
