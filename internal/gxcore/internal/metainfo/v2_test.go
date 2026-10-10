@@ -118,63 +118,6 @@ func TestPieceLayersParsed(t *testing.T) {
 
 const net32 = 32
 
-func TestV2LayoutAndPieces(t *testing.T) {
-	block := merkle.BlockSize
-	pieceLength := 2 * block // 32 KiB
-	dataA := bytes.Repeat([]byte{0xA1}, 5*block)
-	dataB := bytes.Repeat([]byte{0xB2}, block)
-	leavesA := merkle.LeafHashes(dataA)
-	rootA := merkle.Root(leavesA)
-	layerA := merkle.PieceLayer(leavesA, pieceLength) // ceil(5/2) = 3 hashes
-	rootB := merkle.Root(merkle.LeafHashes(dataB))    // one block: root = leaf
-
-	info := map[string]any{
-		"name":         "v2set",
-		"piece length": pieceLength,
-		"meta version": 2,
-		"file tree": map[string]any{
-			"a.bin": map[string]any{"": map[string]any{"length": len(dataA), "pieces root": rootA[:]}},
-			"b.bin": map[string]any{"": map[string]any{"length": len(dataB), "pieces root": rootB[:]}},
-		},
-	}
-	raw, err := bencode.EncodeBytes(info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	i, err := NewV2Info(raw)
-	if err != nil {
-		t.Fatalf("NewV2Info: %v", err)
-	}
-	if i.NumPieces != 4 {
-		t.Fatalf("NumPieces = %d, want 4 (3 for a.bin + 1 for b.bin)", i.NumPieces)
-	}
-	if i.PieceHashLen != net32 {
-		t.Fatalf("PieceHashLen = %d, want 32", i.PieceHashLen)
-	}
-	// Files: a.bin (5 blocks), a padding file (1 block), b.bin (1 block).
-	if len(i.Files) != 3 || !i.Files[1].Padding || i.Files[1].Length != int64(block) {
-		t.Fatalf("files = %+v", i.Files)
-	}
-	if i.Length != int64(len(dataA)+len(dataB)) || i.Padding != int64(block) {
-		t.Fatalf("length/padding = %d/%d", i.Length, i.Padding)
-	}
-
-	layerBytes := make([]byte, 0, len(layerA)*net32)
-	for _, h := range layerA {
-		layerBytes = append(layerBytes, h[:]...)
-	}
-	layers := map[string][]byte{string(rootA[:]): layerBytes}
-	if err := i.AttachV2Pieces(layers); err != nil {
-		t.Fatalf("AttachV2Pieces: %v", err)
-	}
-	if len(i.PieceHash(0)) != net32 || len(i.PieceHash(3)) != net32 {
-		t.Fatal("piece hashes are not 32 bytes")
-	}
-	if !bytes.Equal(i.PieceHash(3), rootB[:]) {
-		t.Fatalf("last piece hash = %x, want the b.bin root", i.PieceHash(3))
-	}
-}
-
 func TestParseFileTree(t *testing.T) {
 	tree := map[string]any{
 		"a.txt": map[string]any{"": map[string]any{"length": 100}},
@@ -238,7 +181,7 @@ func TestNewV2InfoOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewV2Info: %v", err)
 	}
-	if i.MetaVersion != 2 || !i.HasV2 || i.NumPieces != 1 {
+	if i.MetaVersion != 2 || !i.HasV2 || i.NumPieces != 0 {
 		t.Fatalf("MetaVersion=%d HasV2=%v NumPieces=%d", i.MetaVersion, i.HasV2, i.NumPieces)
 	}
 	if len(i.V2Files) != 1 || i.V2Files[0].Path != "v2only" || i.V2Files[0].Length != 10 {

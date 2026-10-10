@@ -1,9 +1,6 @@
 package torrent
 
 import (
-	"crypto/sha1"
-	"crypto/sha256"
-	"hash"
 	"net"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/acceptor"
@@ -70,17 +67,7 @@ func (t *torrent) startVerifier() {
 		t.crash("zero length pieces")
 	}
 	t.verifier = verifier.New()
-	t.verifier.NewHash = t.newPieceHashFunc()
 	go t.verifier.Run(t.pieces, t.verifierProgressC, t.verifierResultC)
-}
-
-// newPieceHashFunc returns the hash constructor for this torrent's pieces:
-// SHA-256 for a BitTorrent v2 torrent, SHA-1 otherwise.
-func (t *torrent) newPieceHashFunc() func() hash.Hash {
-	if t.info != nil && t.info.PieceHashLen == 32 {
-		return sha256.New
-	}
-	return sha1.New
 }
 
 func (t *torrent) startAllocator() {

@@ -131,29 +131,9 @@ func NewV2Info(b []byte) (*Info, error) {
 			return nil, err
 		}
 		i.V2Files = files
-	}
-	if ib.MetaVersion == 2 && len(ib.Pieces) == 0 {
-		// v2-only: align every file to a piece boundary. The v2 pieces never
-		// span two files, so a zero padding file (never written to disk, its
-		// bytes are the zero padding BEP 52 expects) is inserted between them.
-		layout, numPieces := buildV2Layout(i.V2Files, ib.PieceLength)
-		i.Files = layout
-		i.NumPieces = numPieces
-		i.PieceHashLen = 32
-		var total, padding int64
-		for _, f := range layout {
-			if f.Padding {
-				padding += f.Length
-			} else {
-				total += f.Length
-			}
+		for _, f := range files {
+			i.Length += f.Length
 		}
-		i.Length = total
-		i.Padding = padding
-		return i, nil
-	}
-	for _, f := range i.V2Files {
-		i.Length += f.Length
 	}
 	if len(ib.Pieces) > 0 && len(ib.Pieces)%sha1.Size == 0 {
 		i.NumPieces = uint32(len(ib.Pieces) / sha1.Size)
@@ -168,54 +148,6 @@ func NewV2Info(b []byte) (*Info, error) {
 		}
 	}
 	return i, nil
-}
-
-// buildV2Layout builds the flat v1-style file list for a v2 torrent: the real
-// files in tree order with a synthetic zero padding file between two files that
-// would otherwise share a piece. It returns the list and the total piece count.
-func buildV2Layout(files []V2File, pieceLength uint32) ([]File, uint32) {
-	if pieceLength == 0 {
-		return nil, 0
-	}
-	out := make([]File, 0, len(files)*2)
-	var numPieces uint32
-	pl := int64(pieceLength)
-	for i, f := range files {
-		out = append(out, File{Path: f.Path, Length: f.Length})
-		numPieces += uint32((f.Length + pl - 1) / pl)
-		if rem := f.Length % pl; rem != 0 && i < len(files)-1 {
-			pad := pl - rem
-			out = append(out, File{Path: path.Join(".pad", fmt.Sprintf("%d-%d", i, pad)), Length: pad, Padding: true})
-		}
-	}
-	return out, numPieces
-}
-
-// AttachV2Pieces fills the concatenated piece hashes of a v2 torrent from its
-// "piece layers", validating them against the files' pieces roots first. Files
-// that fit in one piece contribute their pieces root (BEP 52 stores no layer
-// entry for them).
-func (i *Info) AttachV2Pieces(layers map[string][]byte) error {
-	if err := VerifyPieceLayers(i.V2Files, int(i.PieceLength), layers); err != nil {
-		return err
-	}
-	pieces := make([]byte, 0, int(i.NumPieces)*32)
-	for _, f := range i.V2Files {
-		if f.Length == 0 || !f.HasRoot {
-			continue
-		}
-		if f.Length <= int64(i.PieceLength) {
-			pieces = append(pieces, f.PiecesRoot[:]...)
-			continue
-		}
-		pieces = append(pieces, layers[string(f.PiecesRoot[:])]...)
-	}
-	if uint32(len(pieces)/32) != i.NumPieces {
-		return fmt.Errorf("v2 piece hashes: got %d, want %d", len(pieces)/32, i.NumPieces)
-	}
-	i.PieceHashLen = 32
-	i.pieces = pieces
-	return nil
 }
 
 // VerifyPieceLayers checks a BEP 52 "piece layers" map against the files of a

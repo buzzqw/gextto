@@ -113,7 +113,7 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 	t.pieceMessagesC.Suspend()
 	t.webseedPieceResultC.Suspend()
 
-	pw := piecewriter.New(piece, pe, pd.Buffer, t.newPieceHashFunc())
+	pw := piecewriter.New(piece, pe, pd.Buffer)
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 }
 

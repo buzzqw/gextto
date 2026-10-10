@@ -2,7 +2,6 @@ package verifier
 
 import (
 	"crypto/sha1"
-	"hash"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
@@ -12,9 +11,6 @@ import (
 type Verifier struct {
 	Bitfield *bitfield.Bitfield
 	Error    error
-
-	// NewHash builds the piece hash (SHA-1 by default, SHA-256 for v2).
-	NewHash func() hash.Hash
 
 	closeC chan struct{}
 	doneC  chan struct{}
@@ -28,9 +24,8 @@ type Progress struct {
 // New returns a new Verifier.
 func New() *Verifier {
 	return &Verifier{
-		NewHash: sha1.New,
-		closeC:  make(chan struct{}),
-		doneC:   make(chan struct{}),
+		closeC: make(chan struct{}),
+		doneC:  make(chan struct{}),
 	}
 }
 
@@ -54,9 +49,6 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 	v.Bitfield = bitfield.New(uint32(len(pieces)))
 	buf := make([]byte, pieces[0].Length)
 	hash := sha1.New()
-	if v.NewHash != nil {
-		hash = v.NewHash()
-	}
 	var numOK uint32
 	for _, p := range pieces {
 		buf = buf[:p.Length]
