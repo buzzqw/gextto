@@ -614,12 +614,16 @@ type collectedTorrent struct {
 const peerNoiseReportEvery = 10 * time.Minute
 
 // reportPeerNoise logs the peer/tracker errors demoted since the last report.
-// It runs on the single queue-loop goroutine.
+// It normally runs on the single queue-loop goroutine; the timestamp is taken
+// under d.mu so a test (or a future caller) ticking concurrently cannot race it.
 func (d *Daemon) reportPeerNoise(now time.Time) {
+	d.mu.Lock()
 	if !d.lastPeerNoiseReport.IsZero() && now.Sub(d.lastPeerNoiseReport) < peerNoiseReportEvery {
+		d.mu.Unlock()
 		return
 	}
 	d.lastPeerNoiseReport = now
+	d.mu.Unlock()
 	if line := formatPeerNoise(peerNoiseCounters.drain()); line != "" {
 		logf("peer noise: %s", line)
 	}
