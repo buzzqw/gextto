@@ -236,6 +236,13 @@ password, "LAN senza password", porta peer. Il wizard scrive `settings.json` e
 marca il setup completato; la lingua vale subito, cartella e porta al prossimo
 avvio (la chiave `peer-ports` è letta quando la flag non è passata).
 
+In standalone il demone espone anche un'**API compatibile qBittorrent**
+(`/api/v2`) per Sonarr, Radarr e le app mobili: `auth/login` e `auth/logout`
+(cookie `SID`, la stessa password del login), `app/version`,
+`app/webapiVersion`, `transfer/info` e
+`torrents/info|add|delete|pause|resume|recheck`. Senza password configurata
+l'API è aperta. In managed **non** è esposta: comanda solo Gextto.
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 
