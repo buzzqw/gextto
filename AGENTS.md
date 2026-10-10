@@ -92,8 +92,14 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - **Windows**: il motore (`internal/gxcore`) e il demone (`cmd/gx-torrent`) sono
   Go puro e **cross-compilano** per Windows (amd64/arm64):
   `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Lo strato
-  di piattaforma del demone è `cmd/gx-torrent/fsinfo_*.go`; le letture di `/proc`
-  e `/sys` degradano senza errore. La CI (`ci.yml`, job `build-test`) ha degli
+  di piattaforma del demone è nei file `cmd/gx-torrent/*_linux.go` /
+  `*_windows.go` / `*_other.go` (`fsinfo_*`, `mem_*`, `storageclass_*`,
+  `gateway_*`, `defaultdir_*`, `link_*`, `storage_xdev_*`): su Windows memoria,
+  spazio libero, filesystem di rete, classe HDD/SSD e gateway di default sono
+  letti con le API Win32, il link di libreria è una **junction** (nessun
+  privilegio symlink) e il move tra volumi riconosce `ERROR_NOT_SAME_DEVICE`.
+  Restano senza equivalente nativo solo le ottimizzazioni `fadvise` e `fallocate`
+  (fallback `Truncate`). La CI (`ci.yml`, job `build-test`) ha degli
   step che cross-compilano **sia il motore sia il demone** per Windows, così il
   supporto non regredisce. Gextto intero (`cmd/gexttod`) **non** è Windows:
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix

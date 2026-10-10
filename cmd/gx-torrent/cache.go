@@ -13,10 +13,7 @@ package main
 // buffers on demand, so the process stays small when the load is light.
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,41 +33,6 @@ const (
 	cacheCheckEvery = 3 * time.Minute  // how often the target is recomputed
 	cacheApplyEvery = 10 * time.Minute // minimum time between adaptive retunes
 )
-
-// memoryTotal reads MemTotal from /proc/meminfo (0 when unknown).
-func memoryTotal() int64 {
-	return meminfoKib("MemTotal:") * 1024
-}
-
-// memoryAvailable reads MemAvailable (reclaimable memory) or falls back to
-// MemFree. MemAvailable is the right signal: it accounts for the page cache
-// that can be dropped under pressure, so the cache grows only when memory is
-// genuinely free.
-func memoryAvailable() int64 {
-	if v := meminfoKib("MemAvailable:"); v > 0 {
-		return v * 1024
-	}
-	return meminfoKib("MemFree:") * 1024
-}
-
-func meminfoKib(key string) int64 {
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) >= 2 && fields[0] == key {
-			var kib int64
-			if _, err := fmt.Sscanf(fields[1], "%d", &kib); err == nil {
-				return kib
-			}
-		}
-	}
-	return 0
-}
 
 func clamp64(value, low, high int64) int64 {
 	return max(low, min(value, high))
@@ -156,7 +118,8 @@ func adaptiveCache(cfg queue.Config, in cacheInputs) (read, write int64, reason 
 
 // storageClass classifies where downloads are written, so the policy can lean
 // larger on slow storage. Network filesystems are detected per platform (statfs
-// on Linux, the drive type on Windows); local disks from their rotational flag.
+// on Linux, the drive type on Windows); the local-disk class (spinning vs
+// solid state) comes from localStorageClass, also per platform.
 func storageClass(path string) string {
 	if strings.TrimSpace(path) == "" {
 		return "unknown"
@@ -164,13 +127,7 @@ func storageClass(path string) string {
 	if networkFilesystem(path) {
 		return "network"
 	}
-	if majmin := mountMajorMinor(path); majmin != "" {
-		if rotationalDevice(majmin) {
-			return "hdd"
-		}
-		return "ssd"
-	}
-	return "unknown"
+	return localStorageClass(path)
 }
 
 // refreshStorageClass recomputes the download storage class when due and
@@ -192,51 +149,6 @@ func (d *Daemon) cachedStorageClass() string {
 	d.classMu.Lock()
 	defer d.classMu.Unlock()
 	return d.classCached
-}
-
-// mountMajorMinor returns the "major:minor" of the filesystem backing path.
-func mountMajorMinor(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return ""
-	}
-	file, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-	best, bestLen := "", -1
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 5 {
-			continue
-		}
-		mount := fields[4]
-		if abs == mount || strings.HasPrefix(abs, strings.TrimSuffix(mount, "/")+"/") {
-			if len(mount) > bestLen {
-				best, bestLen = fields[2], len(mount)
-			}
-		}
-	}
-	return best
-}
-
-// rotationalDevice reports whether the device "major:minor" sits on a spinning
-// disk. It resolves the partition symlink and reads the whole disk's flag.
-func rotationalDevice(majmin string) bool {
-	target, err := filepath.EvalSymlinks("/sys/dev/block/" + majmin)
-	if err != nil {
-		return false
-	}
-	parts := strings.Split(target, "/")
-	for i, p := range parts {
-		if p == "block" && i+1 < len(parts) {
-			data, err := os.ReadFile("/sys/block/" + parts[i+1] + "/queue/rotational")
-			return err == nil && strings.TrimSpace(string(data)) == "1"
-		}
-	}
-	return false
 }
 
 // applyCache fills the engine's cache settings from the daemon's current target.

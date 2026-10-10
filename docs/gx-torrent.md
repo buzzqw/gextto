@@ -229,13 +229,22 @@ le **POST di `/api/v2`** (che non usano un token): un client che non manda
 `Origin`/`Referer` resta ammesso. In managed la pagina si comporta come prima (le
 POST dell'API v1 restano protette dal token).
 
-**Piattaforme.** Il demone è Go puro e compila anche per **Windows** (amd64 e
-arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Su Windows le
-funzioni che leggono `/proc` o `/sys` (stima della RAM per la cache, distinzione
-HDD/SSD, gateway di default per UPnP/NAT-PMP) degradano senza errore: UI, API e
-download funzionano, mentre la cache usa i valori prudenti di default. Spazio
-libero e filesystem di rete sono letti con le API Win32
-(`GetDiskFreeSpaceEx`, `GetDriveType`), non con `statfs`. Installer e unit
+**Piattaforme.** Il demone è Go puro e gira anche su **Windows** (amd64 e
+arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Le letture di
+sistema usano le API Win32, quindi la cache e la diagnostica restano piene:
+memoria (`GlobalMemoryStatusEx`) per dimensionare la cache, spazio libero
+(`GetDiskFreeSpaceEx`), filesystem di rete (`GetDriveType`), classe del disco
+HDD/SSD (seek penalty via `IOCTL_STORAGE_QUERY_PROPERTY`) e gateway di default
+per UPnP/NAT-PMP (tabella di routing). La cartella dati di default è
+`%LOCALAPPDATA%\gx-torrent`. Il **link di libreria** di ogni torrent
+(`DataDir/<id>`) è una **junction** su Windows, non un symlink: la junction non
+richiede il privilegio `SeCreateSymbolicLinkPrivilege` (né la Modalità
+sviluppatore) ed è letta come symlink dall'engine; su Unix resta il symlink
+atomico. La migrazione tra volumi riconosce anche l'errore Windows
+`ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix.
+Restano senza equivalente nativo solo due **ottimizzazioni** di I/O — il
+readahead (`fadvise`) e la preallocazione con `fallocate` — che usano il
+fallback (`Truncate`): funzionano, senza l'ottimizzazione. Installer e unit
 systemd restano per Linux.
 
 In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col

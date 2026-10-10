@@ -47,15 +47,8 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-func defaultDataDir() string {
-	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
-		return filepath.Join(dir, "gx-torrent")
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".local", "share", "gx-torrent")
-	}
-	return "gx-torrent-data"
-}
+// defaultDataDir is defined per platform (defaultdir_unix.go /
+// defaultdir_windows.go).
 
 // resolvePortRange picks the peer port range: the flag or environment wins,
 // then the standalone settings, then the built-in default.

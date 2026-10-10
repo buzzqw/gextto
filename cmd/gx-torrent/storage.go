@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 )
 
 // linkPath is the engine's data directory of one torrent.
@@ -54,8 +53,11 @@ func pathWithin(path, root string) bool {
 	return strings.HasPrefix(path, strings.TrimRight(root, string(os.PathSeparator))+string(os.PathSeparator))
 }
 
-// pointLink makes DataDir/<id> point at dest, atomically replacing an older
-// link. A real directory left there by an older layout is never replaced.
+// pointLink makes DataDir/<id> point at dest, replacing an older link. A real
+// directory left there by an older layout is never replaced. The link itself is
+// platform-specific (replaceDirLink): a symlink on Unix, a junction on Windows
+// (which needs no symlink privilege and is read back transparently by
+// os.Readlink/Lstat).
 func (d *Daemon) pointLink(id, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
@@ -67,16 +69,7 @@ func (d *Daemon) pointLink(id, dest string) error {
 	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink == 0 {
 		return fmt.Errorf("%s is a real directory, not a gx-torrent link", link)
 	}
-	tmp := link + ".tmp"
-	_ = os.Remove(tmp)
-	if err := os.Symlink(dest, tmp); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, link); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
+	return replaceDirLink(link, dest)
 }
 
 // readLink returns the save path behind DataDir/<id>. A legacy real directory
@@ -202,13 +195,8 @@ func discardEmptyPayload(savePath, dest, name string) error {
 	return os.MkdirAll(dest, 0o755)
 }
 
-func isCrossDevice(err error) bool {
-	var linkErr *os.LinkError
-	if errors.As(err, &linkErr) {
-		return errors.Is(linkErr.Err, syscall.EXDEV)
-	}
-	return errors.Is(err, syscall.EXDEV)
-}
+// isCrossDevice is defined per platform (storage_xdev_*.go): Unix uses EXDEV,
+// Windows maps ERROR_NOT_SAME_DEVICE as well.
 
 // copyTree copies a file or a directory tree, preserving permissions.
 func copyTree(source, target string) error {

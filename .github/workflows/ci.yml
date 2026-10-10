@@ -58,6 +58,11 @@ jobs:
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/gx-torrent/
           GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -o /dev/null ./cmd/gx-torrent/
 
+      # Vet compiles the Windows files of both the engine and the daemon (tests
+      # included), catching platform-specific mistakes the linux vet cannot.
+      - name: Vet for Windows
+        run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./internal/gxcore/... ./cmd/gx-torrent/
+
   # The default build and tests are pure Go; this job keeps the opt-in embedded
   # libtorrent engine (cgo) covered. It installs the dev headers.
   libtorrent:
