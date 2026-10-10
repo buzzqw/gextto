@@ -485,6 +485,52 @@ func TestSharedPortTransfer(t *testing.T) {
 	}
 }
 
+// TestSharedPortTransferIPv6 is the IPv6 twin of TestSharedPortTransfer: both
+// daemons listen on ::1 and the leecher dials the seeder's IPv6 address.
+func TestSharedPortTransferIPv6(t *testing.T) {
+	if l, err := net.Listen("tcp6", "[::1]:0"); err != nil {
+		t.Skip("no IPv6 loopback")
+	} else {
+		l.Close()
+	}
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 42600, PortEnd: 42699, Encryption: 1, ListenInterface: "::1"})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 42700, PortEnd: 42799, Encryption: 1, ListenInterface: "::1"})
+	if seeder.peerPort == 0 || leecher.peerPort == 0 || seeder.peerPort == leecher.peerPort {
+		t.Fatalf("unexpected ports %d %d", seeder.peerPort, leecher.peerPort)
+	}
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeTorrent(t, src, "movie6.bin", 300_000)
+	// A second torrent proves the routing picks the right one on the shared port.
+	other := filepath.Join(t.TempDir(), "other")
+	if _, _, err := seeder.add(addRequest{TorrentData: makeTorrent(t, other, "other6.bin", 20_000), Destination: other}); err != nil {
+		t.Fatal(err)
+	}
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+	dst := filepath.Join(t.TempDir(), "dst")
+	if _, _, err := leecher.add(addRequest{TorrentData: data, Destination: dst}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "leecher running", func() bool { return stateOf(leecher, hash) == "downloading" })
+	leecher.mu.Lock()
+	handle, _ := leecher.findLocked(hash)
+	leecher.mu.Unlock()
+	if err := handle.AddPeer(fmt.Sprintf("[::1]:%d", seeder.peerPort)); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "download through the IPv6 shared port", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100
+	})
+	if !sameFile(t, filepath.Join(src, "movie6.bin"), filepath.Join(dst, "movie6.bin")) {
+		t.Fatal("payload differs after the IPv6 transfer")
+	}
+}
+
 // makeMultiTorrent writes dir/name/<files> and returns the .torrent bytes.
 func makeMultiTorrent(t *testing.T, dir, name string, sizes []int) []byte {
 	t.Helper()
