@@ -121,6 +121,32 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   (route `GET /dashboard/feed`, `uiweb_v2.go`).
 - **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
 
+### 1.4 Micro-ottimizzazioni UI/i18n (aperte, misurate il 2026-10-10)
+
+Follow-up dei commit `06c9128`/`6cf568e`/`7f43b44`. Nessuno è un collo di
+bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
+
+| # | Voce | Misura (disco locale, `CGO_ENABLED=0 go test`) | Guadagno atteso |
+|---|---|---|---|
+| 1 | Probe di scrivibilità nel chrome | `stat`+`write_probe` (create+fsync+delete): **~15,6 µs/op** (200 it.); `uiShellChromeFrom` intero **~164 µs/op** → il probe è ~10% del chrome in test | ~15 µs/render, niente fsync per render; su datadir NFS varrebbe millisecondi |
+| 2 | Test di identità della cache dizionario | riuso confermato: due `Dictionary("de")` = **stesso puntatore** | solo qualità del test, nessun effetto runtime |
+| 3 | Memo client i18n per `AppState` | **+1 entry per stato**, ~**2,4 KB/entry** (20 stati → 20 entry, 47.240 byte) | nullo in produzione (1 entry); pulizia solo per i test |
+
+1. **Cachare o saltare il `write_probe` nel percorso live.** `uiShellChromeFrom`
+   (`uiweb_shell.go`) gira a ogni pagina, ogni partial (`V2ChromePartial`) e
+   ogni tick SSE (5 s per tab aperta, `V2ChromeSSE` in `uiweb_v2.go`), e ogni
+   volta fa `os.Stat` + `write_probe` (`health.go`: create con `O_EXCL`, `Sync`,
+   close, remove). Non è una regressione (il probe c'era già dentro
+   `CheckWithPaths`), ma la scrivibilità del datadir non cambia da un secondo
+   all'altro: cachare l'esito 30–60 s o saltare il probe in SSE/partial.
+2. **Rafforzare `TestDictionaryCacheAndInvalidate`** (`i18n_test.go`): oggi
+   confronta solo le lunghezze e contiene `if &first == nil` (vacuo: l'indirizzo
+   di una variabile non è mai nil) — una rebuild a ogni chiamata passerebbe lo
+   stesso. Confrontare l'identità con `reflect.ValueOf(m).Pointer()`.
+3. **Pulire `v2ClientI18nMemo`** (`uiweb_v2_client_i18n.go`, chiave `*I18nDb`):
+   ogni `AppState` lascia un'entry; in produzione è una sola, nei test crescono
+   (`newTestAppState`). Valutare un `Reset` per i test o una chiave con cleanup.
+
 ---
 
 ## 2. Migliorie Gextto implementate
