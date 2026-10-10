@@ -100,7 +100,15 @@ func newTestDaemon(t *testing.T) *Daemon {
 
 func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 	t.Helper()
-	data := t.TempDir()
+	// Touch t.TempDir first: its cleanup (removing the whole per-test temp tree)
+	// is registered on the first call, so registering the daemon close after it
+	// makes the close run first (cleanups run LIFO). The daemon's own data lives
+	// outside that tree, see below.
+	_ = t.TempDir()
+	data, err := os.MkdirTemp("", "gx-torrent-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
 	opts := Options{
 		Listen:      "127.0.0.1:0",
 		DataDir:     data,
@@ -115,6 +123,7 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 	}
 	d, err := newDaemon(opts)
 	if err != nil {
+		removeTestDir(data)
 		t.Fatal(err)
 	}
 	stop := make(chan struct{})
@@ -124,8 +133,25 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 		close(stop)
 		<-done
 		d.close()
+		// The daemon's data is not inside t.TempDir: the engine can still write
+		// a file for a moment after Close returns, and Go's t.TempDir does a
+		// single RemoveAll that would then fail with "directory not empty"
+		// (this flaked the CI). Retry the removal here instead.
+		removeTestDir(data)
 	})
 	return d
+}
+
+// removeTestDir removes a test directory, retrying briefly because a background
+// engine goroutine can create a file right after the daemon closes.
+func removeTestDir(path string) {
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if err := os.RemoveAll(path); err == nil || time.Now().After(deadline) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 func waitFor(t *testing.T, what string, check func() bool) {
