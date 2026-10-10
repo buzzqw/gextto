@@ -21,15 +21,22 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
 - restano: import falliti al giorno e titoli in coda con il tempo di attesa;
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`).
 
-### 2. i18n: stringhe generate dal client JS
-La chrome server-side è stata completata (2026-10-10, ~258 stringhe aggiunte ai
-cataloghi). Restano **hardcoded in italiano** le stringhe prodotte dal
-JavaScript (`uiweb/v2/static/v2-core.js`): conteggio selezione ("N selezionati ·
-Azioni:"), messaggi di copia ("Copiato"), ricerca nell'archivio, risultati
-trovati, pull-to-refresh, permessi browser. Non passano dai cataloghi e restano
-italiane in tutte le lingue: serve un meccanismo di traduzione lato client
-(dizionario iniettato o `data-`attribute + `v2TranslateText`). Idem le stringhe
-di errore costruite in Go (`uiweb_v2_problems.go`), oggi tollerate.
+### 2. i18n — fatto (2026-10-10)
+Pacchetto completo in sei lingue (it, en, de, fr, es, pl):
+- **UI web**: chrome, etichette, tooltip, hint, messaggi (server-side) e le
+  stringhe generate dal client JS (`window.__v2i18n` + `t()` in `v2-core.js`).
+- **Errori API/HTMX** mostrati all'utente: localizzati con `uiText`.
+- **Notifiche** (Telegram/email/webhook): `messages.Pick` ora usa un catalogo
+  it→{de,fr,es,pl} (`internal/messages/catalog.go`).
+- **TUI**: catalogo a 6 lingue (`internal/tui/i18n.go`).
+- **Pagina web di gx-torrent**: tradotta con lo stesso approccio (catalogo +
+  `translateHTML`), lingua passata da Gextto con `-lang` e `?lang=xx`.
+- **Guardia**: `TestUIIsTranslatable` fallisce se una stringa UI di template o
+  view-model Go (o un letterale di `uiText`) non è una chiave dei cataloghi, con
+  un allowlist esplicito per nomi/token/codici; `TestClientI18nKeysTranslated`
+  copre le chiavi del client.
+Restano **in inglese per scelta** i log del daemon; le stringhe tecniche degli
+errori API non mostrate all'utente possono rimanere nella lingua originale.
 
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
