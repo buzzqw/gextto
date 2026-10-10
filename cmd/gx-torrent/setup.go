@@ -135,19 +135,22 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	if port != "" {
 		store.Set("peer-ports", port)
 	}
+	// The bandwidth limits are a runtime setting (state.json), like the ones the
+	// web page changes: apply them through the same path so they take effect at
+	// once and are persisted. They are applied before the wizard is marked done,
+	// so a failure is shown to the operator instead of being silently logged.
+	if len(limits) > 0 {
+		if _, err := d.setConfig(limits); err != nil {
+			logf("setup: cannot apply the bandwidth limits: %v", err)
+			d.renderSetup(w, r, "The bandwidth limits could not be applied; check that the data folder is writable.")
+			return
+		}
+	}
 	store.Set(setupCompleteKey, "true")
 	if err := store.Save(); err != nil {
 		logf("setup: cannot save settings: %v", err)
 		d.renderSetup(w, r, "Setup failed.")
 		return
-	}
-	// The bandwidth limits are a runtime setting (state.json), like the ones the
-	// web page changes: apply them through the same path so they take effect at
-	// once and are persisted.
-	if len(limits) > 0 {
-		if _, err := d.setConfig(limits); err != nil {
-			logf("setup: cannot apply the bandwidth limits: %v", err)
-		}
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
