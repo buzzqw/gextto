@@ -125,7 +125,7 @@ func TestV2BlockLayerHashRequest(t *testing.T) {
 		t.Fatalf("dial seed: %v", err)
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(15 * time.Second))
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 	rawV2Handshake(t, conn, v2InfoHash20(t, torrent))
 	writeHashRequest(t, conn, root, 0, 0, uint32(count), proof)
 
@@ -133,7 +133,10 @@ func TestV2BlockLayerHashRequest(t *testing.T) {
 		id, payloadBytes := readPeerMessage(t, conn)
 		switch id {
 		case 23: // hash reject
-			t.Fatal("the seed rejected a base=0 hash request")
+			// The block-layer tree is read from disk in the background, off the
+			// torrent loop: a reject just means "not ready yet". Ask again.
+			time.Sleep(50 * time.Millisecond)
+			writeHashRequest(t, conn, root, 0, 0, uint32(count), proof)
 		case 22: // hashes
 			if len(payloadBytes) != 48+count*32 {
 				t.Fatalf("hashes reply has %d bytes, want %d", len(payloadBytes), 48+count*32)

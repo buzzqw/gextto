@@ -75,6 +75,16 @@ func (t *LayerTree) Root() [HashSize]byte {
 	return t.layers[len(t.layers)-1][0]
 }
 
+// Size returns the memory held by the tree's layers, in bytes, so a caller can
+// bound a cache of trees.
+func (t *LayerTree) Size() int {
+	total := 0
+	for _, layer := range t.layers {
+		total += len(layer) * HashSize
+	}
+	return total
+}
+
 // Height returns the absolute level of the root (the block layer is 0).
 func (t *LayerTree) Height() int {
 	return t.Base + len(t.layers) - 1

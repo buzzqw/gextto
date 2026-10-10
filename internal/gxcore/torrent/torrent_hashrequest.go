@@ -163,48 +163,153 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	return got, true
 }
 
-// v2BlockTree returns (and caches) the block-layer tree (base=0) of a v2 file,
-// built from the data of its verified pieces, so a seed can answer leaf-layer
-// hash requests. It returns nil when the file is not fully present, because a
-// tree with missing leaves padded by zero hashes would not anchor to the file's
-// root. The build reads the file from disk, on the torrent loop, and is cached:
-// the cost is paid once per file that is actually asked for.
+// v2BlockCacheBudget bounds the memory the block-layer trees of one torrent may
+// hold. A tree is big (a 40 GB file is a few hundred MB including the padded
+// layers); the budget keeps a large file from pinning that for the whole
+// torrent lifetime while still caching the most recently used one.
+const v2BlockCacheBudget = 256 << 20
+
+// v2BlockRetryAfter is how long a failed block-tree build is remembered, so a
+// peer asking again does not trigger a rebuild storm.
+const v2BlockRetryAfter = time.Minute
+
+// v2BlockTreeEntry is one cached block-layer tree with its size and last use.
+type v2BlockTreeEntry struct {
+	tree     *merkle.LayerTree
+	bytes    int64
+	lastUsed time.Time
+}
+
+// v2BlockTree returns the cached block-layer tree (base=0) of a v2 file, or nil
+// when it is not ready. A missing tree starts a background build and the
+// request is refused (hash reject) until it is done: the build reads the whole
+// file from disk, which on a slow HDD can take minutes and must never block the
+// torrent loop. A file that is not fully present, or whose data no longer
+// matches its pieces root, is not served.
 func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
 	f := t.info.V2Files[fi]
 	key := string(f.PiecesRoot[:])
-	if tree, ok := t.v2BlockTrees[key]; ok {
+	now := time.Now()
+	t.v2BlockMu.Lock()
+	if entry, ok := t.v2BlockTrees[key]; ok {
+		entry.lastUsed = now
+		tree := entry.tree
+		t.v2BlockMu.Unlock()
 		return tree
 	}
-	if t.pieces == nil || t.bitfield == nil {
+	if t.v2BlockBusy[key] {
+		t.v2BlockMu.Unlock()
 		return nil
+	}
+	if until, ok := t.v2BlockFailed[key]; ok && now.Before(until) {
+		t.v2BlockMu.Unlock()
+		return nil
+	}
+	if !t.v2FileComplete(fi) {
+		t.v2BlockMu.Unlock()
+		return nil
+	}
+	if t.v2BlockBusy == nil {
+		t.v2BlockBusy = map[string]bool{}
+	}
+	t.v2BlockBusy[key] = true
+	t.v2BlockMu.Unlock()
+	go t.buildV2BlockTree(fi, key)
+	return nil
+}
+
+// v2FileComplete reports whether every piece of a v2 file is present.
+func (t *torrent) v2FileComplete(fi int) bool {
+	if t.pieces == nil || t.bitfield == nil {
+		return false
 	}
 	start, count := t.v2FilePieceRange(fi)
 	if count == 0 || start+count > len(t.pieces) {
-		return nil
+		return false
 	}
 	for i := start; i < start+count; i++ {
 		if !t.bitfield.Test(uint32(i)) {
-			return nil // not fully present
+			return false
 		}
 	}
+	return true
+}
+
+// buildV2BlockTree reads a v2 file's verified data off the torrent loop, builds
+// its block-layer tree, verifies it against the file's pieces root and caches
+// it. On any failure the file is put on a short cooldown so another request
+// does not immediately retry.
+func (t *torrent) buildV2BlockTree(fi int, key string) {
+	tree := t.buildV2BlockTreeData(fi)
+	t.v2BlockMu.Lock()
+	delete(t.v2BlockBusy, key)
+	if tree == nil {
+		if t.v2BlockFailed == nil {
+			t.v2BlockFailed = map[string]time.Time{}
+		}
+		t.v2BlockFailed[key] = time.Now().Add(v2BlockRetryAfter)
+		t.v2BlockMu.Unlock()
+		return
+	}
+	if t.v2BlockTrees == nil {
+		t.v2BlockTrees = map[string]*v2BlockTreeEntry{}
+	}
+	size := int64(tree.Size())
+	t.v2BlockTrees[key] = &v2BlockTreeEntry{tree: tree, bytes: size, lastUsed: time.Now()}
+	t.v2BlockBytes += size
+	t.evictV2BlockTreesLocked()
+	delete(t.v2BlockFailed, key)
+	t.v2BlockMu.Unlock()
+}
+
+// buildV2BlockTreeData does the disk read and the root check. The read buffer is
+// reused across a file's pieces: allocating p.Length bytes per piece would be
+// wasteful for large pieces.
+func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
+	f := t.info.V2Files[fi]
+	if !t.v2FileComplete(fi) {
+		return nil
+	}
+	start, count := t.v2FilePieceRange(fi)
+	buf := make([]byte, int(t.info.PieceLength))
 	leaves := make([][merkle.HashSize]byte, 0, count)
 	for i := start; i < start+count; i++ {
 		p := t.pieces[i]
-		data := make([]byte, p.Length)
+		if int(p.Length) > len(buf) {
+			buf = make([]byte, p.Length)
+		}
+		data := buf[:p.Length]
 		if _, err := p.Data.ReadAt(data, 0); err != nil {
 			return nil
 		}
 		leaves = appendBlockLeaves(leaves, data)
 	}
 	tree := merkle.NewLayerTree(0, leaves)
-	if tree == nil {
+	if tree == nil || tree.Root() != f.PiecesRoot {
+		// The data on disk does not anchor to the file's root (changed since it
+		// was verified): never serve hashes that would fail another peer's
+		// verification.
 		return nil
 	}
-	if t.v2BlockTrees == nil {
-		t.v2BlockTrees = make(map[string]*merkle.LayerTree)
-	}
-	t.v2BlockTrees[key] = tree
 	return tree
+}
+
+// evictV2BlockTreesLocked drops the least recently used trees until the cache
+// is under its budget. At least the newest entry is kept even when it alone
+// exceeds the budget, so a very large file is still cached. The caller holds
+// v2BlockMu.
+func (t *torrent) evictV2BlockTreesLocked() {
+	for t.v2BlockBytes > v2BlockCacheBudget && len(t.v2BlockTrees) > 1 {
+		var oldestKey string
+		var oldest time.Time
+		for key, entry := range t.v2BlockTrees {
+			if oldestKey == "" || entry.lastUsed.Before(oldest) {
+				oldestKey, oldest = key, entry.lastUsed
+			}
+		}
+		t.v2BlockBytes -= t.v2BlockTrees[oldestKey].bytes
+		delete(t.v2BlockTrees, oldestKey)
+	}
 }
 
 // v2FilePieceRange returns the file's piece index range in the global piece

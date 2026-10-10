@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 )
@@ -32,5 +33,36 @@ func TestAppendBlockLeavesMatchesContiguousHashes(t *testing.T) {
 	// The tree built from the leaves anchors to the file's leaf-layer root.
 	if merkle.NewLayerTree(0, got) == nil {
 		t.Fatal("nil layer tree")
+	}
+}
+
+// TestV2BlockCacheEvictsLeastRecentlyUsed pins the memory bound: the oldest
+// tree is dropped first when the cache goes over budget, and a single tree that
+// alone exceeds the budget is still kept.
+func TestV2BlockCacheEvictsLeastRecentlyUsed(t *testing.T) {
+	tr := &torrent{
+		v2BlockTrees: map[string]*v2BlockTreeEntry{
+			"a": {bytes: v2BlockCacheBudget, lastUsed: time.Unix(1, 0)},
+			"b": {bytes: v2BlockCacheBudget, lastUsed: time.Unix(2, 0)},
+		},
+		v2BlockBytes: 2 * v2BlockCacheBudget,
+	}
+	tr.evictV2BlockTreesLocked()
+	if _, ok := tr.v2BlockTrees["a"]; ok {
+		t.Fatal("the least recently used tree must be evicted")
+	}
+	if _, ok := tr.v2BlockTrees["b"]; !ok {
+		t.Fatal("the most recently used tree must be kept")
+	}
+
+	only := &torrent{
+		v2BlockTrees: map[string]*v2BlockTreeEntry{
+			"big": {bytes: 2 * v2BlockCacheBudget, lastUsed: time.Unix(1, 0)},
+		},
+		v2BlockBytes: 2 * v2BlockCacheBudget,
+	}
+	only.evictV2BlockTreesLocked()
+	if len(only.v2BlockTrees) != 1 {
+		t.Fatal("a single tree over the budget must still be cached")
 	}
 }

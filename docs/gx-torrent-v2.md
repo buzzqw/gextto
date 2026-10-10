@@ -43,9 +43,13 @@ leech in-process).
   `TestExpireV2HashRequestsReleasesStaleRequest`);
 - il seed risponde anche alle richieste del **layer dei blocchi** (`base = 0`),
   che un leecher libtorrent usa per verificare i blocchi durante il download:
-  l'albero è costruito dai pezzi verificati (`v2BlockTree`), in cache per-file e
-  solo per un file interamente presente, altrimenti `hash reject`
-  (`TestAppendBlockLeavesMatchesContiguousHashes`; interop end-to-end con un
+  l'albero è costruito dai pezzi verificati (`v2BlockTree`), **fuori dal loop del
+  torrent** (lettura completa del file: un `hash reject` è "non ancora pronto",
+  il client ritenta), in cache per-file con **budget di memoria** ed eviction LRU,
+  solo per un file interamente presente e con la radice **verificata** contro
+  `pieces root`, altrimenti `hash reject`
+  (`TestAppendBlockLeavesMatchesContiguousHashes`,
+  `TestV2BlockCacheEvictsLeastRecentlyUsed`; interop end-to-end con un
   client TCP grezzo in `cmd/gx-torrent/v2_blocklayer_test.go`).
 
 ## 2. BEP 52 in sintesi (regole che contano)
