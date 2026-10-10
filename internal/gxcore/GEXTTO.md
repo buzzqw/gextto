@@ -76,7 +76,15 @@ Modifiche rispetto alla base upstream:
 Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
 
 - `Config.PacketConn`, per usare il socket uTP;
-- `Stats()` con i nodi conosciuti e il traffico.
+- `Stats()` con i nodi conosciuti e il traffico;
+- **dual-stack IPv6 (BEP 32)**: con `Config.UDPProto == "udp"` il DHT parla
+  entrambe le famiglie; i contatti v4 e v6 vengono separati nei campi
+  `nodes`/`nodes6` delle risposte (`nodesForInfoHash`, `replyFindNode`), letti
+  entrambi in ingresso (`nodeResponseFields`) e richiesti con `want: ["n4","n6"]`
+  in `get_peers`. `"udp4"` (default) e `"udp6"` restano mono-famiglia;
+- **read-loop robusto**: `readFromSocket` restituisce il buffer all'arena sul
+  percorso d'errore e controlla `stop` prima di bloccarsi su `Pop`, così
+  `Stop()` non può più restare appeso quando il socket condiviso viene chiuso.
 
 uTP usa `github.com/anacrolix/utp` (MPL-2.0) come dipendenza non modificata.
 

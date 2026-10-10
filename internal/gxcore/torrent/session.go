@@ -197,8 +197,16 @@ func NewSession(cfg Config) (*Session, error) {
 		dhtConfig := dht.NewConfig()
 		dhtConfig.Address = cfg.DHTHost
 		dhtConfig.Port = int(cfg.DHTPort)
+		// IPv6 DHT (BEP 32): follow the family of the shared socket, or of the
+		// configured host when the DHT opens its own. A dual-stack socket maps
+		// to the family-agnostic "udp"; a specific address stays on its family.
+		dhtConfig.UDPProto = udpProtoForHost(cfg.DHTHost)
 		if utpSocket != nil {
 			dhtConfig.PacketConn = utpSocket
+			dhtConfig.UDPProto = udpProtoForAddr(utpSocket.LocalAddr())
+		} else if dhtConfig.UDPProto == "udp" {
+			// Let the DHT bind a dual-stack socket on its own.
+			dhtConfig.Address = ""
 		}
 		dhtConfig.DHTRouters = strings.Join(cfg.DHTBootstrapNodes, ",")
 		dhtConfig.SaveRoutingTable = false

@@ -60,6 +60,34 @@ func TestListenTCPOnSpecificAddressIsSingleStack(t *testing.T) {
 	}
 }
 
+func TestUDPProtoSelection(t *testing.T) {
+	hosts := []struct{ host, want string }{
+		{"", "udp"}, {"0.0.0.0", "udp"}, {"::", "udp"},
+		{"127.0.0.1", "udp4"}, {"192.168.1.5", "udp4"},
+		{"::1", "udp6"}, {"2001:db8::1", "udp6"},
+	}
+	for _, c := range hosts {
+		if got := udpProtoForHost(c.host); got != c.want {
+			t.Errorf("udpProtoForHost(%q) = %q, want %q", c.host, got, c.want)
+		}
+	}
+	addrs := []struct {
+		addr net.Addr
+		want string
+	}{
+		{&net.UDPAddr{}, "udp"},
+		{&net.UDPAddr{IP: net.IPv4zero}, "udp"},
+		{&net.UDPAddr{IP: net.ParseIP("127.0.0.1")}, "udp4"},
+		{&net.UDPAddr{IP: net.ParseIP("::1")}, "udp6"},
+		{&net.TCPAddr{IP: net.ParseIP("127.0.0.1")}, "udp"},
+	}
+	for _, c := range addrs {
+		if got := udpProtoForAddr(c.addr); got != c.want {
+			t.Errorf("udpProtoForAddr(%v) = %q, want %q", c.addr, got, c.want)
+		}
+	}
+}
+
 func TestListenUDPOnUnspecifiedIsDualStack(t *testing.T) {
 	pc, err := listenUDPOn("0.0.0.0", 0)
 	if err != nil {

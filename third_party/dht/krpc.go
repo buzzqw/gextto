@@ -137,29 +137,29 @@ func (r *remoteNode) wasContactedRecently(ih InfoHash) bool {
 
 type getPeersResponse struct {
 	// TODO: argh, values can be a string depending on the client (e.g: original bittorrent).
-	Values []string "values"
-	Id     string   "id"
-	Nodes  string   "nodes"
-	Nodes6 string   "nodes6"
-	Token  string   "token"
+	Values []string `bencode:"values"`
+	Id     string   `bencode:"id"`
+	Nodes  string   `bencode:"nodes"`
+	Nodes6 string   `bencode:"nodes6"`
+	Token  string   `bencode:"token"`
 }
 
 type answerType struct {
-	Id       string   "id"
-	Target   string   "target"
-	InfoHash InfoHash "info_hash" // should probably be a string.
-	Port     int      "port"
-	Token    string   "token"
+	Id       string   `bencode:"id"`
+	Target   string   `bencode:"target"`
+	InfoHash InfoHash `bencode:"info_hash"` // should probably be a string.
+	Port     int      `bencode:"port"`
+	Token    string   `bencode:"token"`
 }
 
 // Generic stuff we read from the wire, not knowing what it is. This is as generic as can be.
 type responseType struct {
-	T string           "t"
-	Y string           "y"
-	Q string           "q"
-	R getPeersResponse "r"
-	E []string         "e"
-	A answerType       "a"
+	T string           `bencode:"t"`
+	Y string           `bencode:"y"`
+	Q string           `bencode:"q"`
+	R getPeersResponse `bencode:"r"`
+	E []string         `bencode:"e"`
+	A answerType       `bencode:"a"`
 	// Unsupported mainline extension for client identification.
 	// V string(?)	"v"
 }
@@ -202,21 +202,20 @@ func readResponse(p packetType, log DebugLogger) (response responseType, err err
 		log.Debugf("DHT: unmarshal error, odd or partial data during UDP read? %v, err=%s", string(p.b), e2)
 		return response, e2
 	}
-	return
 }
 
 // Message to be sent out in the wire. Must not have any extra fields.
 type queryMessage struct {
-	T string                 "t"
-	Y string                 "y"
-	Q string                 "q"
-	A map[string]interface{} "a"
+	T string                 `bencode:"t"`
+	Y string                 `bencode:"y"`
+	Q string                 `bencode:"q"`
+	A map[string]interface{} `bencode:"a"`
 }
 
 type replyMessage struct {
-	T string                 "t"
-	Y string                 "y"
-	R map[string]interface{} "r"
+	T string                 `bencode:"t"`
+	Y string                 `bencode:"y"`
+	R map[string]interface{} `bencode:"r"`
 }
 
 type packetType struct {
@@ -239,6 +238,14 @@ func listen(addr string, listenPort int, proto string, log DebugLogger) (socket 
 // Read from UDP socket, writes slice of byte into channel.
 func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena, stop chan bool, log DebugLogger) {
 	for {
+		// Check stop before blocking on a free buffer: the arena holds only a
+		// few buffers, so a burst of read errors could drain it and block Pop
+		// forever, leaving Stop() unable to join this goroutine.
+		select {
+		case <-stop:
+			return
+		default:
+		}
 		b := bytesArena.Pop()
 		n, from, err := socket.ReadFrom(b)
 		addr, _ := from.(*net.UDPAddr)
@@ -246,17 +253,26 @@ func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena
 			addr, _ = net.ResolveUDPAddr("udp", from.String())
 		}
 		if addr == nil && err == nil {
+			bytesArena.Push(b)
 			continue
 		}
 		if err != nil {
+			// Return the buffer so the arena never drains, then stop if asked.
+			bytesArena.Push(b)
 			log.Debugf("DHT: readResponse error:%s\n", err)
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			continue
 		}
 		b = b[0:n]
 		if n == maxUDPPacketSize {
 			log.Debugf("DHT: Warning. Received packet with len >= %d, some data may have been discarded.\n", maxUDPPacketSize)
 		}
 		totalReadBytes.Add(int64(n))
-		if n > 0 && err == nil {
+		if n > 0 {
 			p := packetType{b, *addr}
 			select {
 			case conChan <- p:
@@ -265,13 +281,7 @@ func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena
 				return
 			}
 		}
-		// Do a non-blocking read of the stop channel and stop this goroutine if the channel
-		// has been closed.
-		select {
-		case <-stop:
-			return
-		default:
-		}
+		bytesArena.Push(b)
 	}
 }
 

@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine vet fmt check-ui installer-test tidy package clean run measure-seeding
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht vet fmt check-ui installer-test tidy package clean run measure-seeding
 
 all: build
 
@@ -32,7 +32,7 @@ gx-torrent:
 		-o bin/gx-torrent ./cmd/gx-torrent; \
 	printf 'built bin/gx-torrent (build %s)\n' "$$GX_BUILD"
 
-test: check-ui installer-test
+test: check-ui installer-test test-dht
 	CGO_ENABLED=0 go test ./...
 
 # Tests with the embedded libtorrent engine (cgo; needs the dev headers). The
@@ -59,6 +59,11 @@ test-engine:
 		github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage \
 		github.com/buzzqw/gextto/internal/gxcore/internal/unchoker \
 		github.com/buzzqw/gextto/internal/gxcore/torrent
+
+# Tests of the vendored DHT library (third_party/dht is a separate Go module,
+# so it is not covered by the root `go test ./...`).
+test-dht:
+	cd third_party/dht && CGO_ENABLED=0 go test ./...
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.

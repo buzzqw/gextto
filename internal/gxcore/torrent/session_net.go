@@ -48,3 +48,31 @@ func listenUDPOn(host string, port int) (net.PacketConn, error) {
 		return pc, nil
 	}
 }
+
+// udpProtoForAddr picks the DHT network for a bound socket: a dual-stack
+// (unspecified) address maps to the family-agnostic "udp", which makes the DHT
+// resolve and accept both IPv4 and IPv6 (BEP 32); a specific address stays on
+// its family, so a VPN-bound or explicit address never widens.
+func udpProtoForAddr(addr net.Addr) string {
+	udp, ok := addr.(*net.UDPAddr)
+	if !ok || udp.IP == nil || udp.IP.IsUnspecified() {
+		return "udp"
+	}
+	if udp.IP.To4() != nil {
+		return "udp4"
+	}
+	return "udp6"
+}
+
+// udpProtoForHost picks the DHT network from a configured host string.
+func udpProtoForHost(host string) string {
+	ip := net.ParseIP(host)
+	switch {
+	case ip == nil || ip.IsUnspecified():
+		return "udp"
+	case ip.To4() != nil:
+		return "udp4"
+	default:
+		return "udp6"
+	}
+}

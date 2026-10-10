@@ -247,11 +247,9 @@ func hashDistance(id1 InfoHash, id2 InfoHash) (distance string) {
 	d := make([]byte, len(id1))
 	if len(id1) != len(id2) {
 		return ""
-	} else {
-		for i := 0; i < len(id1); i++ {
-			d[i] = id1[i] ^ id2[i]
-		}
-		return string(d)
 	}
-	return ""
+	for i := 0; i < len(id1); i++ {
+		d[i] = id1[i] ^ id2[i]
+	}
+	return string(d)
 }

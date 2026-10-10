@@ -724,6 +724,36 @@ func (d *DHT) pingNode(r *remoteNode) {
 	totalSentPing.Add(1)
 }
 
+// dualStack reports whether the DHT should speak both IPv4 and IPv6 (BEP 32).
+// It is true only for the family-agnostic "udp" proto; the single-family
+// "udp4" (default) and "udp6" keep their previous behavior.
+func (d *DHT) dualStack() bool {
+	return d.config.UDPProto == "udp"
+}
+
+// nodesField is a raw "nodes"/"nodes6" string together with the protocol that
+// must be used to parse and resolve the contacts it contains.
+type nodesField struct {
+	raw   string
+	proto string
+}
+
+// nodeResponseFields returns the (raw nodes string, protocol) pairs to parse
+// for the current UDPProto. Dual-stack ("udp") reads both IPv4 ("nodes") and
+// IPv6 ("nodes6"); the single-family modes read only their own field, keeping
+// the previous behavior. Note that an IPv6 contact must be parsed and resolved
+// with "udp6", never with "udp4".
+func (d *DHT) nodeResponseFields(nodes, nodes6 string) []nodesField {
+	switch {
+	case d.dualStack():
+		return []nodesField{{nodes, "udp4"}, {nodes6, "udp6"}}
+	case d.config.UDPProto == "udp6":
+		return []nodesField{{nodes6, "udp6"}}
+	default: // "udp4"
+		return []nodesField{{nodes, "udp4"}}
+	}
+}
+
 func (d *DHT) getPeersFrom(r *remoteNode, ih InfoHash) {
 	if r == nil {
 		return
@@ -739,6 +769,11 @@ func (d *DHT) getPeersFrom(r *remoteNode, ih InfoHash) {
 	queryArguments := map[string]interface{}{
 		"id":        d.nodeId,
 		"info_hash": ih,
+	}
+	// BEP 32: a dual-stack node asks for both IPv4 and IPv6 contacts. The
+	// single-family modes keep sending no "want" (udp4) as before.
+	if d.dualStack() {
+		queryArguments["want"] = []string{"n4", "n6"}
 	}
 	query := queryMessage{transId, "q", ty, queryArguments}
 	d.DebugLogger.Debugf("DHT sending get_peers. nodeID: %x@%v, InfoHash: %x , distance: %x", r.id, r.address, ih, hashDistance(InfoHash(r.id), ih))
@@ -859,13 +894,25 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 	if peerContacts := d.peersForInfoHash(ih); len(peerContacts) > 0 {
 		reply.R["values"] = peerContacts
 	} else {
-		reply.R["nodes"] = d.nodesForInfoHash(ih)
+		n4, n6 := d.nodesForInfoHash(ih)
+		// BEP 32: keep each family in its own field so that IPv4 nodes do not
+		// receive IPv6 contacts (and vice versa) and discard the whole reply.
+		if n4 != "" {
+			reply.R["nodes"] = n4
+		}
+		if n6 != "" {
+			reply.R["nodes6"] = n6
+		}
 	}
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
-func (d *DHT) nodesForInfoHash(ih InfoHash) string {
-	n := make([]string, 0, kNodes)
+// nodesForInfoHash returns the closest nodes for ih split by address family:
+// n4 holds IPv4 contacts (id + 6 byte host:port) and n6 holds IPv6 contacts
+// (id + 18 byte host:port). The binary format of each contact is unchanged.
+func (d *DHT) nodesForInfoHash(ih InfoHash) (n4, n6 string) {
+	v4 := make([]string, 0, kNodes)
+	v6 := make([]string, 0, kNodes)
 	for _, r := range d.routingTable.lookup(ih) {
 		// r is nil when the node was filtered.
 		if r != nil {
@@ -873,13 +920,15 @@ func (d *DHT) nodesForInfoHash(ih InfoHash) string {
 			if binaryHost == "" {
 				d.DebugLogger.Debugf("killing node with bogus address %v", r.address.String())
 				d.routingTable.kill(r, d.peerStore)
+			} else if r.address.IP.To4() != nil {
+				v4 = append(v4, binaryHost)
 			} else {
-				n = append(n, binaryHost)
+				v6 = append(v6, binaryHost)
 			}
 		}
 	}
-	d.DebugLogger.Debugf("replyGetPeers: Nodes only. Giving %d", len(n))
-	return strings.Join(n, "")
+	d.DebugLogger.Debugf("replyGetPeers: Nodes only. Giving %d v4, %d v6", len(v4), len(v6))
+	return strings.Join(v4, ""), strings.Join(v6, "")
 }
 
 func (d *DHT) peersForInfoHash(ih InfoHash) []string {
@@ -907,15 +956,27 @@ func (d *DHT) replyFindNode(addr net.UDPAddr, r responseType) {
 	if len(neighbors) < kNodes {
 		neighbors = append(neighbors, d.routingTable.lookup(node)...)
 	}
-	n := make([]string, 0, kNodes)
+	// BEP 32: return IPv4 contacts in "nodes" and IPv6 contacts in "nodes6",
+	// each family capped at kNodes, instead of mixing them in one field.
+	v4 := make([]string, 0, kNodes)
+	v6 := make([]string, 0, kNodes)
 	for _, r := range neighbors {
-		n = append(n, r.id+r.addressBinaryFormat)
-		if len(n) == kNodes {
-			break
+		contact := r.id + r.addressBinaryFormat
+		if r.address.IP.To4() != nil {
+			if len(v4) < kNodes {
+				v4 = append(v4, contact)
+			}
+		} else if len(v6) < kNodes {
+			v6 = append(v6, contact)
 		}
 	}
-	d.DebugLogger.Debugf("replyFindNode: Nodes only. Giving %d", len(n))
-	reply.R["nodes"] = strings.Join(n, "")
+	d.DebugLogger.Debugf("replyFindNode: Nodes only. Giving %d v4, %d v6", len(v4), len(v6))
+	if len(v4) > 0 {
+		reply.R["nodes"] = strings.Join(v4, "")
+	}
+	if len(v6) > 0 {
+		reply.R["nodes6"] = strings.Join(v6, "")
+	}
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
@@ -963,23 +1024,23 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 			}
 		}
 	}
-	var nodelist string
-
-	if d.config.UDPProto == "udp4" {
-		nodelist = resp.R.Nodes
-	} else if d.config.UDPProto == "udp6" {
-		nodelist = resp.R.Nodes6
-	}
-	d.DebugLogger.Debugf("DHT: handling get_peers results len(nodelist)=%d", len(nodelist))
-	if nodelist != "" {
-		for id, address := range parseNodesString(nodelist, d.config.UDPProto, d.DebugLogger) {
+	// Read the "nodes" (IPv4) and/or "nodes6" (IPv6) fields according to the
+	// configured protocol. Each field is parsed and resolved with its own
+	// family, so an IPv6 contact is never resolved with "udp4".
+	for _, field := range d.nodeResponseFields(resp.R.Nodes, resp.R.Nodes6) {
+		nodelist := field.raw
+		d.DebugLogger.Debugf("DHT: handling get_peers results proto=%s len(nodelist)=%d", field.proto, len(nodelist))
+		if nodelist == "" {
+			continue
+		}
+		for id, address := range parseNodesString(nodelist, field.proto, d.DebugLogger) {
 			if id == d.nodeId {
 				d.DebugLogger.Debugf("DHT got reference of self for get_peers, id %x", id)
 				continue
 			}
 
 			// If it's in our routing table already, ignore it.
-			_, addr, existed, err := d.routingTable.hostPortToNode(address, d.config.UDPProto)
+			_, addr, existed, err := d.routingTable.hostPortToNode(address, field.proto)
 			if err != nil {
 				d.DebugLogger.Debugf("DHT error parsing get peers node: %v", err)
 				continue
@@ -1000,7 +1061,7 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 				// And it is actually new. Interesting.
 				d.DebugLogger.Debugf("DHT: Got new node reference: %x@%v from %x@%v. Distance: %x.",
 					id, address, node.id, node.address, hashDistance(query.ih, InfoHash(node.id)))
-				if _, err := d.routingTable.getOrCreateNode(id, addr, d.config.UDPProto); err == nil && d.needMorePeers(query.ih) {
+				if _, err := d.routingTable.getOrCreateNode(id, addr, field.proto); err == nil && d.needMorePeers(query.ih) {
 					// Re-add this request to the queue. This would in theory
 					// batch similar requests, because new nodes are already
 					// available in the routing table and will be used at the
@@ -1031,20 +1092,19 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 
 // Process another node's response to a find_node query.
 func (d *DHT) processFindNodeResults(node *remoteNode, resp responseType) {
-	var nodelist string
 	totalRecvFindNodeReply.Add(1)
 
 	query, _ := node.pendingQueries[resp.T]
-	if d.config.UDPProto == "udp4" {
-		nodelist = resp.R.Nodes
-	} else if d.config.UDPProto == "udp6" {
-		nodelist = resp.R.Nodes6
-	}
-	d.DebugLogger.Debugf("processFindNodeResults find_node = %s len(nodelist)=%d", nettools.BinaryToDottedPort(node.addressBinaryFormat), len(nodelist))
-
-	if nodelist != "" {
-		for id, address := range parseNodesString(nodelist, d.config.UDPProto, d.DebugLogger) {
-			_, addr, existed, err := d.routingTable.hostPortToNode(address, d.config.UDPProto)
+	// Like processGetPeerResults, read "nodes" (IPv4) and/or "nodes6" (IPv6)
+	// depending on the configured protocol, each parsed with its own family.
+	for _, field := range d.nodeResponseFields(resp.R.Nodes, resp.R.Nodes6) {
+		nodelist := field.raw
+		d.DebugLogger.Debugf("processFindNodeResults find_node = %s proto=%s len(nodelist)=%d", nettools.BinaryToDottedPort(node.addressBinaryFormat), field.proto, len(nodelist))
+		if nodelist == "" {
+			continue
+		}
+		for id, address := range parseNodesString(nodelist, field.proto, d.DebugLogger) {
+			_, addr, existed, err := d.routingTable.hostPortToNode(address, field.proto)
 			if err != nil {
 				d.DebugLogger.Debugf("DHT error parsing node from find_find response: %v", err)
 				continue
@@ -1069,7 +1129,7 @@ func (d *DHT) processFindNodeResults(node *remoteNode, resp responseType) {
 				// Includes the node in the routing table and ignores errors.
 				//
 				// Only continue the search if we really have to.
-				r, err := d.routingTable.getOrCreateNode(id, addr, d.config.UDPProto)
+				r, err := d.routingTable.getOrCreateNode(id, addr, field.proto)
 				if err != nil {
 					d.DebugLogger.Debugf("processFindNodeResults calling getOrCreateNode: %v. Id=%x, Address=%q", err, id, addr)
 					continue
