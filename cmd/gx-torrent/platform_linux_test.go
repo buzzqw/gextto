@@ -65,6 +65,21 @@ func TestReplaceDirLinkIsASymlinkAndIsReplaced(t *testing.T) {
 	}
 }
 
+func TestLocalSetupURL(t *testing.T) {
+	cases := map[string]string{
+		"0.0.0.0:8890":     "http://127.0.0.1:8890/ui/setup",
+		"[::]:8890":        "http://127.0.0.1:8890/ui/setup",
+		"127.0.0.1:8080":   "http://127.0.0.1:8080/ui/setup",
+		"192.168.1.5:9000": "http://192.168.1.5:9000/ui/setup",
+		"bad-address":      "",
+	}
+	for listen, want := range cases {
+		if got := localSetupURL(listen); got != want {
+			t.Fatalf("localSetupURL(%q) = %q, want %q", listen, got, want)
+		}
+	}
+}
+
 func TestIsCrossDeviceMatchesEXDEV(t *testing.T) {
 	if !isCrossDevice(&os.LinkError{Op: "rename", Err: syscall.EXDEV}) {
 		t.Fatal("EXDEV must be detected as cross-device")

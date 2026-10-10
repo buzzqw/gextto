@@ -9,9 +9,10 @@ form{max-width:520px;margin:40px auto;background:#161d2c;border:1px solid #24304
 label{display:block;margin:10px 0;color:#93a1b5}
 input,select{width:100%;padding:8px;margin-top:4px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 button{width:100%;padding:10px;margin-top:14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+button.secondary{background:#243049;margin-top:8px}
 h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform:uppercase;letter-spacing:.03em}
 .chk{display:flex;gap:8px;align-items:center}.chk input{width:auto;margin:0}
-.m{color:#93a1b5}.err{color:#fca5a5}</style></head>
+.m{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}</style></head>
 <body><form method="post" action="/ui/setup">
 <h2>gx-torrent setup</h2>
 <p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
@@ -32,11 +33,40 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <label class="chk"><input type="checkbox" name="local-bypass" value="1" checked> Allow the LAN without a password</label>
 <h3>Network</h3>
 <label>Peer port<input type="number" name="peer-port" placeholder="6881" min="0" max="65535"></label>
+<button type="button" class="secondary" id="ptest">Test port</button>
+<p class="m" id="presult"></p>
+<h3>Bandwidth</h3>
+<label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0"></label>
+<label>Upload limit (KiB/s, 0 = unlimited)<input type="number" name="speed-upload" min="0" placeholder="0"></label>
 <h3>Indexer</h3>
 <label>Indexer name<input type="text" name="indexer-name" placeholder="Jackett" autocomplete="off"></label>
 <label>Indexer URL<input type="text" name="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off"></label>
 <label>Indexer API key<input type="text" name="indexer-key" autocomplete="off"></label>
 <p class="m">The download folder and the peer port apply at the next start.</p>
+<p class="m">The bandwidth limits apply immediately.</p>
 <button type="submit">Finish setup</button>
 <!--ERROR-->
-</form></body></html>
+</form>
+<script>
+document.getElementById('ptest').addEventListener('click', function () {
+  var out = document.getElementById('presult');
+  out.className = 'm';
+  out.textContent = 'Testing...';
+  fetch('/api/v1/portcheck').then(function (r) { return r.json(); }).then(function (j) {
+    var text;
+    if (j.error) {
+      text = 'Error: ' + j.error;
+    } else {
+      text = 'Port ' + j.port + ': ' + (j.open ? 'open' : 'closed');
+      if (j.method) { text += ' (' + j.method + ')'; }
+      if (j.external_ip) { text += ' - ' + j.external_ip; }
+    }
+    out.className = j.open ? 'm ok' : 'm err';
+    out.textContent = text;
+  }).catch(function () {
+    out.className = 'm err';
+    out.textContent = 'Port test failed';
+  });
+});
+</script>
+</body></html>

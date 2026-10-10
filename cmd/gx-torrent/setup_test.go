@@ -69,6 +69,50 @@ func TestSetupSavesSettings(t *testing.T) {
 	}
 }
 
+func TestSetupAppliesBandwidthLimits(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := setupPost(t, d, url.Values{
+		"lang":           {"en"},
+		"speed-download": {"4096"},
+		"speed-upload":   {"512"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("setup status = %d, body=%s", rec.Code, rec.Body.String())
+	}
+	cfg, _, _ := d.config()
+	if cfg.SpeedLimitDownload != 4096 || cfg.SpeedLimitUpload != 512 {
+		t.Fatalf("limits = %d/%d KiB/s, want 4096/512", cfg.SpeedLimitDownload, cfg.SpeedLimitUpload)
+	}
+}
+
+func TestSetupRejectsBadBandwidth(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := setupPost(t, d, url.Values{"lang": {"en"}, "speed-download": {"fast"}})
+	if rec.Code != http.StatusOK || d.opts.Settings.Get(setupCompleteKey, "") == "true" {
+		t.Fatalf("a non-numeric limit must be rejected: status=%d", rec.Code)
+	}
+	rec = setupPost(t, d, url.Values{"lang": {"en"}, "speed-upload": {"-1"}})
+	if rec.Code != http.StatusOK || d.opts.Settings.Get(setupCompleteKey, "") == "true" {
+		t.Fatalf("a negative limit must be rejected: status=%d", rec.Code)
+	}
+}
+
+func TestSetupPageOffersPortTestAndBandwidth(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/setup", nil)
+	d.handleUISetup(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{`name="speed-download"`, `name="speed-upload"`, `id="ptest"`, "/api/v1/portcheck", "Bandwidth", "Test port"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("the wizard is missing %q", want)
+		}
+	}
+}
+
 func TestSetupRejectsRelativeFolder(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	rec := setupPost(t, d, url.Values{"download-dir": {"relative/path"}, "lang": {"en"}})

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/auth"
@@ -77,6 +78,23 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 		d.renderSetup(w, r, "The password and the confirmation do not match.")
 		return
 	}
+	limits := map[string]json.RawMessage{}
+	for field, key := range map[string]string{
+		"speed-download": "speed_limit_download",
+		"speed-upload":   "speed_limit_upload",
+	} {
+		raw := strings.TrimSpace(r.FormValue(field))
+		if raw == "" {
+			continue
+		}
+		kib, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || kib < 0 {
+			d.renderSetup(w, r, "The bandwidth limits must be positive numbers (0 = unlimited).")
+			return
+		}
+		value, _ := json.Marshal(kib)
+		limits[key] = value
+	}
 	if !validStandaloneLang(lang) {
 		lang = "en"
 	}
@@ -122,6 +140,14 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 		logf("setup: cannot save settings: %v", err)
 		d.renderSetup(w, r, "Setup failed.")
 		return
+	}
+	// The bandwidth limits are a runtime setting (state.json), like the ones the
+	// web page changes: apply them through the same path so they take effect at
+	// once and are persisted.
+	if len(limits) > 0 {
+		if _, err := d.setConfig(limits); err != nil {
+			logf("setup: cannot apply the bandwidth limits: %v", err)
+		}
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

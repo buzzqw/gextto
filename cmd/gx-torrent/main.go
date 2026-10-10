@@ -50,6 +50,20 @@ func envOr(key, fallback string) string {
 // defaultDataDir is defined per platform (defaultdir_unix.go /
 // defaultdir_windows.go).
 
+// localSetupURL is the loopback URL of the first-run wizard: a wildcard listen
+// address becomes 127.0.0.1, so the browser opens the daemon on this machine.
+func localSetupURL(listen string) string {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(listen))
+	if err != nil || port == "" {
+		return ""
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port) + setupPath
+}
+
 // resolvePortRange picks the peer port range: the flag or environment wins,
 // then the standalone settings, then the built-in default.
 func resolvePortRange(flagValue string, store *settings.Store) (uint16, uint16, error) {
@@ -306,6 +320,16 @@ func main() {
 		logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), opts.Listen, opts.DataDir, opts.DownloadDir)
 		serverErr <- server.ListenAndServe()
 	}()
+
+	// First run in standalone: open the web wizard in the browser, so the
+	// installation is guided instead of typed. Best-effort: a headless server
+	// (no graphical session) or a missing browser is silently skipped, and the
+	// wizard stays reachable at the printed address.
+	if opts.Mode == ModeStandalone && !daemon.setupComplete() {
+		if url := localSetupURL(opts.Listen); url != "" {
+			go func() { _ = openBrowser(url) }()
+		}
+	}
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
