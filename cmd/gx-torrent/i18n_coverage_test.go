@@ -27,6 +27,8 @@ var uiI18nAllowlist = map[string]bool{
 	"English": true, "Italiano": true, "Deutsch": true, "Français": true, "Español": true, "Polski": true,
 	// Acronym kept as-is on the RSS page.
 	"RSS": true,
+	// Indexer product names used as placeholders.
+	"Jackett": true, "Prowlarr": true, "MIRCrew": true,
 }
 
 // uiI18nWorth reports whether a string is user-facing prose worth translating.

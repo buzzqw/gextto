@@ -5,12 +5,14 @@ package main
 // so the page is reachable and configured. Managed mode never uses it.
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
 
 	"github.com/buzzqw/gextto/internal/auth"
+	"github.com/buzzqw/gextto/internal/torznab"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
@@ -49,14 +51,26 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 
 	lang := strings.TrimSpace(r.FormValue("lang"))
 	download := strings.TrimSpace(r.FormValue("download-dir"))
+	temp := strings.TrimSpace(r.FormValue("temp-dir"))
 	user := strings.TrimSpace(r.FormValue("user"))
 	password := r.FormValue("password")
 	confirm := r.FormValue("password2")
 	bypass := r.FormValue("local-bypass") != ""
 	port := strings.TrimSpace(r.FormValue("peer-port"))
+	indexerName := strings.TrimSpace(r.FormValue("indexer-name"))
+	indexerURL := strings.TrimSpace(r.FormValue("indexer-url"))
+	indexerKey := strings.TrimSpace(r.FormValue("indexer-key"))
 
 	if download != "" && !filepath.IsAbs(download) {
 		d.renderSetup(w, r, "The download folder must be an absolute path.")
+		return
+	}
+	if temp != "" && !filepath.IsAbs(temp) {
+		d.renderSetup(w, r, "The temporary folder must be an absolute path.")
+		return
+	}
+	if indexerURL != "" && !strings.HasPrefix(strings.ToLower(indexerURL), "http://") && !strings.HasPrefix(strings.ToLower(indexerURL), "https://") {
+		d.renderSetup(w, r, "The indexer URL must start with http:// or https://.")
 		return
 	}
 	if password != "" && password != confirm {
@@ -74,6 +88,20 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	store.Set("lang", lang)
 	if download != "" {
 		store.Set("download-dir", filepath.Clean(download))
+	}
+	if temp != "" {
+		store.Set("temp-dir", filepath.Clean(temp))
+	}
+	if indexerURL != "" {
+		if indexerName == "" {
+			indexerName = "indexer"
+		}
+		raw, err := json.Marshal([]torznab.Indexer{{Name: indexerName, URL: indexerURL, APIKey: indexerKey}})
+		if err != nil {
+			d.renderSetup(w, r, "Setup failed.")
+			return
+		}
+		store.Set(indexersSettingKey, string(raw))
 	}
 	store.Set(standaloneUserKey, user)
 	if password != "" {

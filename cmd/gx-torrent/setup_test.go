@@ -108,3 +108,33 @@ func TestSetupRedirectsUntilComplete(t *testing.T) {
 		t.Fatalf("the wizard page itself must be reachable: status=%d called=%v", rec.Code, called)
 	}
 }
+
+func TestSetupSavesIndexerAndTemp(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := setupPost(t, d, url.Values{
+		"lang":         {"en"},
+		"temp-dir":     {"/var/tmp/gx-torrent"},
+		"indexer-name": {"Prowlarr"},
+		"indexer-url":  {"http://127.0.0.1:9696"},
+		"indexer-key":  {"secret"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("setup: %d", rec.Code)
+	}
+	if got := d.opts.Settings.Get("temp-dir", ""); got != "/var/tmp/gx-torrent" {
+		t.Fatalf("temp-dir = %q", got)
+	}
+	if got := d.opts.Settings.Get(indexersSettingKey, ""); !strings.Contains(got, "http://127.0.0.1:9696") || !strings.Contains(got, "secret") {
+		t.Fatalf("indexers = %q", got)
+	}
+
+	// Invalid values are rejected without completing the setup.
+	rec = setupPost(t, d, url.Values{"lang": {"en"}, "temp-dir": {"relative"}})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("relative temp folder must be rejected: %d", rec.Code)
+	}
+	rec = setupPost(t, d, url.Values{"lang": {"en"}, "indexer-url": {"ftp://host"}})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("non-http indexer URL must be rejected: %d", rec.Code)
+	}
+}

@@ -252,7 +252,14 @@ var uiCatalog = map[string][5]string{
 	"The download folder and the peer port apply at the next start.": {"La cartella di download e la porta peer valgono dal prossimo avvio.", "Download-Ordner und Peer-Port gelten ab dem nächsten Start.", "Le dossier de téléchargement et le port peer s'appliquent au prochain démarrage.", "La carpeta de descarga y el puerto peer se aplican en el próximo inicio.", "Folder pobierania i port peer działają od następnego uruchomienia."},
 	"The download folder must be an absolute path.":                  {"La cartella di download deve essere un percorso assoluto.", "Der Download-Ordner muss ein absoluter Pfad sein.", "Le dossier de téléchargement doit être un chemin absolu.", "La carpeta de descarga debe ser una ruta absoluta.", "Folder pobierania musi być ścieżką bezwzględną."},
 	"The password and the confirmation do not match.":                {"Le password non coincidono.", "Passwort und Bestätigung stimmen nicht überein.", "Le mot de passe et la confirmation ne correspondent pas.", "La contraseña y su confirmación no coinciden.", "Hasło i potwierdzenie nie są zgodne."},
-	"Setup failed.": {"Configurazione non riuscita.", "Einrichtung fehlgeschlagen.", "Échec de la configuration.", "Error en la configuración.", "Konfiguracja nie powiodła się."},
+	"Setup failed.":    {"Configurazione non riuscita.", "Einrichtung fehlgeschlagen.", "Échec de la configuration.", "Error en la configuración.", "Konfiguracja nie powiodła się."},
+	"Temporary folder": {"Cartella temporanea", "Temporärer Ordner", "Dossier temporaire", "Carpeta temporal", "Folder tymczasowy"},
+	"Indexer":          {"Indexer", "Indexer", "Indexeur", "Indexador", "Indekser"},
+	"Indexer name":     {"Nome indexer", "Indexer-Name", "Nom de l'indexeur", "Nombre del indexador", "Nazwa indeksera"},
+	"Indexer URL":      {"URL indexer", "Indexer-URL", "URL de l'indexeur", "URL del indexador", "URL indeksera"},
+	"Indexer API key":  {"Chiave API indexer", "Indexer-API-Schlüssel", "Clé API de l'indexeur", "Clave API del indexador", "Klucz API indeksera"},
+	"The temporary folder must be an absolute path.":       {"La cartella temporanea deve essere un percorso assoluto.", "Der temporäre Ordner muss ein absoluter Pfad sein.", "Le dossier temporaire doit être un chemin absolu.", "La carpeta temporal debe ser una ruta absoluta.", "Folder tymczasowy musi być ścieżką bezwzględną."},
+	"The indexer URL must start with http:// or https://.": {"L'URL dell'indexer deve iniziare con http:// o https://.", "Die Indexer-URL muss mit http:// oder https:// beginnen.", "L'URL de l'indexeur doit commencer par http:// ou https://.", "La URL del indexador debe empezar por http:// o https://.", "URL indeksera musi zaczynać się od http:// lub https://."},
 
 	// Strings rendered by the page's JavaScript through t().
 	"Select at least one torrent":                                      {"Seleziona almeno un torrent", "Wähle mindestens einen Torrent", "Sélectionne au moins un torrent", "Selecciona al menos un torrent", "Wybierz co najmniej jeden torrent"},

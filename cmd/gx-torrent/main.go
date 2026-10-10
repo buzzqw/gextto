@@ -232,6 +232,10 @@ func main() {
 	if downloads, err = filepath.Abs(downloads); err != nil {
 		log.Fatal(err)
 	}
+	partsDir := ""
+	if settingsStore != nil {
+		partsDir = strings.TrimSpace(settingsStore.Get("temp-dir", ""))
+	}
 	var allowed []string
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
@@ -247,6 +251,7 @@ func main() {
 		DataDir:      data,
 		LinkDir:      filepath.Join(data, "links"),
 		DownloadDir:  downloads,
+		PartsDir:     partsDir,
 		DBPath:       filepath.Join(data, "session.db"),
 		StatePath:    filepath.Join(data, "state.json"),
 		Token:        *token,

@@ -24,6 +24,7 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <option value="pl">Polski</option>
 </select></label>
 <label>Download folder<input type="text" name="download-dir" placeholder="/srv/media/downloads" autocomplete="off"></label>
+<label>Temporary folder<input type="text" name="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off"></label>
 <h3>Access</h3>
 <label>Username<input type="text" name="user" value="admin" autocomplete="username"></label>
 <label>Password<input type="password" name="password" autocomplete="new-password"></label>
@@ -31,6 +32,10 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <label class="chk"><input type="checkbox" name="local-bypass" value="1" checked> Allow the LAN without a password</label>
 <h3>Network</h3>
 <label>Peer port<input type="number" name="peer-port" placeholder="6881" min="0" max="65535"></label>
+<h3>Indexer</h3>
+<label>Indexer name<input type="text" name="indexer-name" placeholder="Jackett" autocomplete="off"></label>
+<label>Indexer URL<input type="text" name="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off"></label>
+<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off"></label>
 <p class="m">The download folder and the peer port apply at the next start.</p>
 <button type="submit">Finish setup</button>
 <!--ERROR-->
