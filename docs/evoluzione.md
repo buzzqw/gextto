@@ -151,31 +151,28 @@ bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
 
 La revisione dei commit Windows/v2 ha corretto R-001…R-013 (junction, `isDirLink`,
 scadenza delle hash request, sessione 0, job CI `windows-platform`; commit
-`95495e5`, `ebae504`, `1fae2ea`, `0363a02`). Restano queste migliorie, in
-ordine di priorità:
+`95495e5`, `ebae504`, `1fae2ea`, `0363a02`). Le migliorie emerse (M-01…M-08)
+sono state implementate in massima parte:
 
-1. **Test del flusso link su Windows**: `pointLink` → `readLink` → move tra
-   cartelle → rimozione (`protectLegacyDir` non deve spostare la junction). Oggi
-   `windows-platform` copre solo `replaceDirLink`/`isDirLink`.
-2. **Allargare `windows-platform`** ad altri test del demone (es.
-   `-run 'Setup|Storage|V2Magnet'`), escludendo con `//go:build !windows` quelli
-   legati ai path Unix.
-3. **Layer v2 in parallelo**: oggi c'è una sola hash request per file; con file da
-   migliaia di pezzi il recupero è sequenziale. Distribuire i range da 512 hash
-   su peer diversi.
-4. **Wizard**: se `setConfig` dei limiti di banda fallisce, mostrarlo nella
-   pagina (oggi va solo nel log).
-5. **`replaceDirLink` atomico su Windows**: tra `Remove` e la nuova junction un
-   lettore può non trovare il link; creare la junction con un nome temporaneo e
-   scambiarla con `MoveFileEx`.
-6. **Servizio Windows nativo** (`golang.org/x/sys/windows/svc`) e pacchetto zip
-   con istruzioni `sc create`.
-7. **Gateway Windows**: sommare la metrica dell'interfaccia
-   (`GetIpInterfaceEntry`) a `dwForwardMetric1` per scegliere la rotta di default
-   con più interfacce (VPN + LAN).
-8. **Interop v2**: servire le hash request con `base=0` leggendo i dati, o
-   documentare il limite nel README (un leecher libtorrent che scarica da noi
-   non può verificare i blocchi).
+| Item | Stato |
+| --- | --- |
+| M-01 test del flusso link su Windows (`pointLink`→`readLink`→move→rimozione, `protectLegacyDir` non sposta la junction) | fatto (`48edb97`, `TestWindowsLinkFlow`) |
+| M-02 allargare `windows-platform` ad altri test (Setup, CrossDevice) con test portabili | fatto (`48edb97`) |
+| M-03 layer v2 in parallelo: chunk da ≤512 hash per peer diverso, con retry | fatto (`92f0a84`) |
+| M-04 wizard: errore mostrato in pagina se i limiti di banda non si applicano | fatto (`fbc9eaf`) |
+| M-05 `replaceDirLink` Windows: junction costruita completa e poi scambiata | fatto (`d4e1485`) |
+| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | **aperto** (vedi sotto) |
+| M-07 gateway Windows: usare la rotta scelta da Windows (`GetBestRoute`) | fatto (`d4e1485`) |
+| M-08 interop v2 `base=0`: documentare/rillustrare il limite come seed | fatto (`5d2bff5`) |
+
+**M-06 (servizio Windows) — piano**: l'installazione su Windows è oggi il wizard
+web avviato a mano o da un'attività pianificata. Per un vero servizio serve
+`golang.org/x/sys/windows/svc`: `main` deve riconoscere `svc.IsWindowsService()`
+ed eseguire lo stesso demone dentro `svc.Run`, con un handler che avvia il server
+e lo ferma su stop dell'SCM; quindi un pacchetto zip con `gx-torrent.exe`,
+`install-service.ps1` (`New-Service`/`sc.exe create`) e README. Non è ancora
+implementato: richiede un refactor di `main` (estrarre `runDaemon`) e non è
+verificabile senza un runner Windows che installi il servizio.
 
 ---
 
