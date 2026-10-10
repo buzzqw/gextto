@@ -1211,9 +1211,6 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if req.Magnet != "" && magnetIsV2Only(req.Magnet) {
-		return "", false, errV2Only
-	}
 	if req.Magnet != "" {
 		if hash, ok := magnetInfoHash(req.Magnet); ok {
 			d.mu.Lock()

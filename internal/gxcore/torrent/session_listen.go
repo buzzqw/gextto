@@ -136,15 +136,15 @@ func (s *Session) torrentForInfoHash(ih [20]byte) *torrent {
 
 func (s *Session) routeIncoming(conn net.Conn) {
 	var target *torrent
-	lookup := func(ih [20]byte) ([20]byte, bool) {
+	lookup := func(ih [20]byte) ([20]byte, [8]byte, bool) {
 		target = s.torrentForInfoHash(ih)
 		if target == nil {
-			return [20]byte{}, false
+			return [20]byte{}, [8]byte{}, false
 		}
-		return target.peerID, true
+		return target.peerID, target.ourExtensions(), true
 	}
 	encConn, cipher, extensions, peerID, _, err := btconn.AcceptRouted(
-		conn, s.config.PeerHandshakeTimeout, s.sharedSKey, s.config.ForceIncomingEncryption, lookup, s.extensions)
+		conn, s.config.PeerHandshakeTimeout, s.sharedSKey, s.config.ForceIncomingEncryption, lookup)
 	if err != nil || target == nil {
 		conn.Close()
 		return

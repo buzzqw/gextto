@@ -122,7 +122,7 @@ func (t *torrent) dialAddresses() {
 			t.peerID,
 			t.infoHash,
 			t.outgoingHandshakerResultC,
-			t.session.extensions,
+			t.ourExtensions(),
 			t.session.config.DisableOutgoingEncryption,
 			t.session.config.ForceOutgoingEncryption,
 		)
@@ -160,6 +160,8 @@ func (t *torrent) startPeer(
 	t.session.metrics.Peers.Inc(1)
 	t.sendFirstMessage(pe)
 	t.recentlySeen.Add(pe.Addr())
+	// A new peer may be able to serve the piece layers of a v2 magnet.
+	t.startV2LayerDownload()
 }
 
 func (t *torrent) sendFirstMessage(p *peer.Peer) {

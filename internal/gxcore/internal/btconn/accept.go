@@ -20,20 +20,22 @@ func Accept(
 	hasInfoHash func([20]byte) bool,
 	ourExtensions [8]byte, ourID [20]byte) (
 	encConn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, infoHash [20]byte, err error) {
-	lookup := func(ih [20]byte) ([20]byte, bool) { return ourID, hasInfoHash(ih) }
-	return AcceptRouted(conn, handshakeTimeout, getSKey, forceEncryption, lookup, ourExtensions)
+	lookup := func(ih [20]byte) ([20]byte, [8]byte, bool) { return ourID, ourExtensions, hasInfoHash(ih) }
+	return AcceptRouted(conn, handshakeTimeout, getSKey, forceEncryption, lookup)
 }
 
 // AcceptRouted is Accept for a listener shared by many torrents (gextto
 // fork): the info hash sent by the peer selects the torrent, and lookup
-// returns the peer ID to answer with (ok=false rejects the connection).
+// returns the peer ID to answer with and the reserved bits to advertise for
+// that torrent (ok=false rejects the connection). The extensions are
+// per-torrent because the BitTorrent v2 reserved bit must only be set on a
+// torrent that actually has a v2 identity.
 func AcceptRouted(
 	conn net.Conn,
 	handshakeTimeout time.Duration,
 	getSKey func(sKeyHash [20]byte) (sKey []byte),
 	forceEncryption bool,
-	lookup func(infoHash [20]byte) (ourID [20]byte, ok bool),
-	ourExtensions [8]byte) (
+	lookup func(infoHash [20]byte) (ourID [20]byte, ourExtensions [8]byte, ok bool)) (
 	encConn net.Conn, cipher mse.CryptoMethod, peerExtensions [8]byte, peerID [20]byte, infoHash [20]byte, err error) {
 	log := logger.New("conn <- " + conn.RemoteAddr().String())
 
@@ -87,7 +89,7 @@ func AcceptRouted(
 		return
 	}
 
-	ourID, ok := lookup(infoHash)
+	ourID, ourExtensions, ok := lookup(infoHash)
 	if !ok {
 		err = errInvalidInfoHash
 		return

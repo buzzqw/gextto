@@ -39,7 +39,14 @@ func (t *torrent) start() {
 	t.resetCompletionIfWantedMissing()
 
 	if t.info != nil {
-		if t.pieces != nil {
+		if t.info.NeedsV2Layers() && !t.info.HasPieceHashes() {
+			// A v2 torrent (usually a magnet reloaded from resume) whose piece
+			// layers are still missing: fetch them before allocating files.
+			t.addFixedPeers()
+			t.startAcceptor()
+			t.startAnnouncers()
+			t.startV2LayerDownload()
+		} else if t.pieces != nil {
 			if t.bitfield != nil {
 				t.addFixedPeers()
 				t.startAcceptor()

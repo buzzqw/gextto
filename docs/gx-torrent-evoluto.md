@@ -171,9 +171,9 @@ condividere. È il costo nascosto più grosso della strada A.
 - **IPv6**: il listener a porta unica, il DHT e uTP usano socket IPv4. Decisione
   storica §4.3 ("No"); per la parità con qBittorrent non è più rinviabile, perché
   molti peer domestici sono raggiungibili solo in v6.
-- **BitTorrent v2**: il motore legge v1 e la parte v1 degli ibridi; i v2-only sono
-  rifiutati (`errV2Only`). Servono alberi di hash SHA-256, handshake con hash
-  troncato e piece layer.
+- **BitTorrent v2**: **fatto** — il motore legge v1, la parte v1 degli ibridi e i
+  solo-v2 da `.torrent` e da magnet. Alberi Merkle SHA-256, handshake con hash
+  troncato (bit riservato v2) e fetch dei `piece layers` (`hash request`/`hashes`).
 - **Qualità**: smart ban dei peer corrotti, profondità adattiva della coda
   richieste, choking rate-based, reader con readahead per lo streaming, I/O disco
   a blocchi contigui. Sono "cherry-pick" (§11), non blocchi.
@@ -493,7 +493,7 @@ rimanenti:
 | --- | --- | --- |
 | Nome e de-rain: prodotto **gx-core**, motore rinominato `internal/engine` → `internal/gxcore`, identità di rete da "Rain" a "gx-core", `rainrpc` rimosso, **de-rain anche dei commenti** nel codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
 | F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (resta solo la LSD v6) |
-| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **v2-only da `.torrent` supportato**: parsing v2, modello a **pezzi per-file** (coda più corta), verifica via **nodo Merkle** SHA-256, identità troncata a 20 byte, abilitazione end-to-end (test seed/leech su `::1`/loopback). Restano i **magnet v2** (estensioni `hash request`/`hashes`) — progetto in [gx-torrent-v2.md](gx-torrent-v2.md) |
+| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Fatto**: v2-only da `.torrent` e da **magnet** (`urn:btmh:`). Parsing v2, modello a **pezzi per-file** (coda più corta), verifica via **nodo Merkle** SHA-256, identità troncata a 20 byte, bit riservato v2 nell'handshake, fetch dei `piece layers` dai peer con `hash request`/`hashes`/`hash reject`, test seed/leech end-to-end (`.torrent` e magnet) |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
@@ -505,8 +505,9 @@ rimanenti:
 lavorato** in questa sessione (IPv6/DHT BEP 32, BitTorrent v2, API qBittorrent e
 RSS, container, de-rain) prima di considerarlo chiuso.
 
-**Aperti, da discutere dopo i precedenti:** **F4 BitTorrent v2** (restano i
-magnet v2) e i ritocchi al wizard (indexer/cartella temporanea). Il
+**Aperti, da discutere dopo i precedenti:** ritocchi al wizard
+(indexer/cartella temporanea). Il **BitTorrent v2** (BEP 52) è completo, magnet
+compresi. Il
 **distacco da rain** è
 avvenuto: nel codice non resta alcun riferimento a rain (namespace, stringhe di
 rete e commenti). I riferimenti all'**upstream** rain restano solo dove indicano

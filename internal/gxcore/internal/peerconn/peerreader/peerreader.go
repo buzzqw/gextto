@@ -250,6 +250,57 @@ func (p *PeerReader) Run() {
 				return
 			}
 			msg = em.Payload
+		case peerprotocol.HashRequest:
+			if length != peerprotocol.HashRequestHeaderSize {
+				err = fmt.Errorf("invalid hash request size: %d", length)
+				return
+			}
+			var hm peerprotocol.HashRequestMessage
+			buf := make([]byte, length)
+			_, err = io.ReadFull(p.r, buf)
+			if err != nil {
+				return
+			}
+			if err = hm.UnmarshalBinary(buf); err != nil {
+				return
+			}
+			msg = hm
+		case peerprotocol.HashReject:
+			if length != peerprotocol.HashRequestHeaderSize {
+				err = fmt.Errorf("invalid hash reject size: %d", length)
+				return
+			}
+			var hm peerprotocol.HashRejectMessage
+			buf := make([]byte, length)
+			_, err = io.ReadFull(p.r, buf)
+			if err != nil {
+				return
+			}
+			if err = hm.UnmarshalBinary(buf); err != nil {
+				return
+			}
+			msg = hm
+		case peerprotocol.Hashes:
+			if length < peerprotocol.HashRequestHeaderSize ||
+				(length-peerprotocol.HashRequestHeaderSize)%peerprotocol.HashSize != 0 {
+				err = fmt.Errorf("invalid hashes size: %d", length)
+				return
+			}
+			buf := make([]byte, length)
+			_, err = io.ReadFull(p.r, buf)
+			if err != nil {
+				return
+			}
+			var hm peerprotocol.HashesMessage
+			if err = hm.HashRequestHeader.UnmarshalBinary(buf[:peerprotocol.HashRequestHeaderSize]); err != nil {
+				return
+			}
+			tail := buf[peerprotocol.HashRequestHeaderSize:]
+			hm.Hashes = make([][peerprotocol.HashSize]byte, len(tail)/peerprotocol.HashSize)
+			for i := range hm.Hashes {
+				copy(hm.Hashes[i][:], tail[i*peerprotocol.HashSize:])
+			}
+			msg = hm
 		default:
 			p.log.Debugf("unhandled message type: %s", id)
 			p.log.Debugln("Discarding", length, "bytes...")

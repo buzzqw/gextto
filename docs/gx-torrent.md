@@ -546,11 +546,16 @@ verificato con un **nodo Merkle SHA-256** sui blocchi da 16 KiB (foglie mancanti
 = hash zero). L'identità del torrent è lo SHA-256 troncato a 20 byte, quindi
 handshake, DHT e tracker restano identici a v1.
 
-**Non** ancora supportati i torrent **solo v2** senza `piece layers`
-(cioè i **magnet** v2): servono le estensioni peer `hash request`/`hashes`
-(BEP 52) per scaricare i layer. I magnet v2 vengono quindi ancora rifiutati con
-un errore chiaro; Gextto in quel caso mette la release in blocklist e passa al
-candidato successivo. Il progetto completo è in `docs/gx-torrent-v2.md`.
+Anche i torrent **solo v2** senza `piece layers` (i **magnet** v2, `urn:btmh:`)
+sono supportati: l'info dict arriva via BEP 9 e i **`piece layers`** per-file
+vengono richiesti ai peer con i messaggi `hash request`/`hashes`/`hash reject`
+(BEP 52), verificati contro i `pieces root` e persistiti nel resume. Il bit
+riservato **v2** (byte 7, `0x10`) è annunciato nell'handshake solo per un torrent
+con identità v2, così i peer libtorrent accettano le `hash request`. Il seed
+risponde alle richieste di layer a partire dagli hash dei pezzi che già ha,
+senza leggere i file; le richieste del layer dei blocchi (`base = 0`) sono
+rifiutate con `hash reject` (servirebbe leggere i dati). Progetto completo in
+`docs/gx-torrent-v2.md`.
 
 ## Statistiche
 

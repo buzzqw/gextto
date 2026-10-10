@@ -155,6 +155,14 @@ func (r *Resumer) WriteInfo(torrentID string, value []byte) error {
 	})
 }
 
+// WritePieceLayers writes only the bencoded BEP 52 "piece layers" of a v2
+// torrent, once a magnet has fetched them from peers.
+func (r *Resumer) WritePieceLayers(torrentID string, value []byte) error {
+	return r.update(torrentID, func(b *bbolt.Bucket) error {
+		return b.Put(Keys.PieceLayers, value)
+	})
+}
+
 // WriteBitfield writes only bitfield of a torrent.
 func (r *Resumer) WriteBitfield(torrentID string, value []byte) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {

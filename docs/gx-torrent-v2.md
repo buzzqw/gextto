@@ -24,8 +24,17 @@
 `V2Hash`), abilitazione dei **`.torrent` v2** (il demone non rifiuta più i v2-only
 da file), **persistenza dei `piece layers`** nel resume (i torrent v2
 sopravvivono al riavvio e l'**export/serve del `.torrent` li include**) e **test
-end-to-end** (seed/leech multi-file con `piece length` > 16 KiB). **Resta I5**
-(magnet v2 / `.torrent` senza `piece layers`).
+end-to-end** (seed/leech multi-file con `piece length` > 16 KiB).
+
+**Realizzato (2026-10-10) — I5:** i **magnet v2** (`urn:btmh:`) sono supportati.
+L'info dict arriva via BEP 9; i `piece layers` per-file si scaricano dai peer con
+i messaggi `hash request`/`hashes`/`hash reject` (BEP 52, id 21/22/23, payload
+binario), si verificano contro i `pieces root` (uncle hash inclusi) e si
+persistono nel resume. Il **bit riservato v2** (byte 7, `0x10`) è annunciato
+nell'handshake solo per i torrent con identità v2. Il seed risponde dalle sue
+`piece layers`, senza leggere i dati; le richieste a livello blocco (`base = 0`)
+sono rifiutate con `hash reject`. Test end-to-end `TestV2MagnetTransfer` (seed e
+leech in-process).
 
 ## 2. BEP 52 in sintesi (regole che contano)
 
@@ -100,10 +109,18 @@ foglie copre un pezzo (`pieceLength/16KiB`).
   `NewPieces`.
 - **Test**: layer incoerente → torrent rifiutato; valido → verifica ok.
 
-### I5 — Estensioni `hash request`/`hashes` (L)
-- Solo per magnet v2 / `.torrent` senza `piece layers`. Codec bencode, dispatch,
-  integrazione con `merkle`, persistenza dei layer.
-- **Test**: round-trip + fuzz; "scarica i layer da un seed, validali, verifica".
+### I5 — Estensioni `hash request`/`hashes` (L) — **fatto**
+- Codec **binario** (non bencode): messaggi 21/22/23, header
+  `pieces root | base | index | length | proof layers` (32+4×4 byte);
+  `hashes` = header + hash richiesti + uncle. Dispatch in `peerreader`,
+  serializzazione `WriteTo`, fuzz sull'header.
+- Lato client: `v2LayerFile`, richieste a blocchi di ≤512 hash, verifica di ogni
+  risposta con `merkle.VerifyHashes` (ricostruzione della radice con gli uncle),
+  assemblaggio del layer e `AttachV2Pieces`, persistenza in `piece layers`.
+- Lato server: `LayerTree` costruito dagli hash dei pezzi già posseduti;
+  `hash_reject` quando il layer non è servibile (`base < piece layer`).
+- **Test**: round-trip codec + fuzz; `TestLayerTreeRoundTrip` e
+  `TestV2MagnetTransfer` (scarica i layer da un seed, li valida, verifica i pezzi).
 
 ### I6 — Abilitazione e UX (S/M)
 - Demone: accettare i v2-only (`.torrent` con layer), rilevamento basato sul

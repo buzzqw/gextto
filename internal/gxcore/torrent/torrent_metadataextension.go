@@ -1,8 +1,6 @@
 package torrent
 
 import (
-	"bytes"
-	"crypto/sha1"
 	"errors"
 	"fmt"
 
@@ -74,9 +72,9 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		}
 		pe.StopSnubTimer()
 
-		hash := sha1.New()
-		_, _ = hash.Write(id.Bytes)
-		if !bytes.Equal(hash.Sum(nil), t.infoHash[:]) {
+		// A v2 torrent is identified by the first 20 bytes of the SHA-256 of
+		// the info dict; v1 (and the v1 side of a hybrid) by its SHA-1.
+		if !t.matchesInfoHash(id.Bytes) {
 			pe.Logger().Errorln("received info does not match with hash")
 			t.closePeer(id.Peer.(*peer.Peer))
 			t.startInfoDownloaders()
@@ -107,9 +105,16 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 		}
 		if t.stopAfterMetadata {
 			t.stopAndSetStoppedOnMetadata()
-		} else {
-			t.startAllocator()
+			break
 		}
+		if info.NeedsV2Layers() && !info.HasPieceHashes() {
+			// A v2 magnet: the info dict is known but the per-file piece
+			// layers still have to come from peers (BEP 52) before any piece
+			// can be built or verified.
+			t.startV2LayerDownload()
+			break
+		}
+		t.startAllocator()
 	case peerprotocol.ExtensionMetadataMessageTypeReject:
 		id, ok := t.infoDownloaders[pe]
 		if ok {

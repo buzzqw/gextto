@@ -23,6 +23,10 @@ const (
 	Reject      = 16
 	AllowedFast = 17
 	Extension   = 20
+	// BEP 52 hash tree messages.
+	HashRequest = 21
+	Hashes      = 22
+	HashReject  = 23
 )
 
 var messageIDStrings = map[MessageID]string{
@@ -42,6 +46,9 @@ var messageIDStrings = map[MessageID]string{
 	16: "reject",
 	17: "allowed fast",
 	20: "extension",
+	21: "hash request",
+	22: "hashes",
+	23: "hash reject",
 }
 
 func (m MessageID) String() string {

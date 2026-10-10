@@ -182,8 +182,16 @@ func (i *Info) AttachV2Pieces(layers map[string][]byte) error {
 	if !i.V2 {
 		return nil
 	}
-	if err := VerifyPieceLayers(i.V2Files, int(i.PieceLength), layers); err != nil {
-		return err
+	if i.NeedsV2Layers() {
+		if len(layers) == 0 {
+			// The layers have not been fetched yet: this is a magnet whose
+			// info dict is known but whose BEP 52 "piece layers" still have to
+			// come from peers. Leave the piece hashes unattached.
+			return nil
+		}
+		if err := VerifyPieceLayers(i.V2Files, int(i.PieceLength), layers); err != nil {
+			return err
+		}
 	}
 	pieces := make([]byte, 0, int(i.NumPieces)*32)
 	for _, f := range i.V2Files {
@@ -204,6 +212,68 @@ func (i *Info) AttachV2Pieces(layers map[string][]byte) error {
 	}
 	i.pieces = pieces
 	return nil
+}
+
+// NeedsV2Layers reports whether a v2 torrent still needs its "piece layers"
+// fetched from peers: true when a non-empty file is larger than one piece and
+// its layer is not attached. A magnet link resolves its info dict first, so its
+// layers have to be requested separately (BEP 52).
+func (i *Info) NeedsV2Layers() bool {
+	if !i.V2 {
+		return false
+	}
+	for _, f := range i.V2Files {
+		if f.Length > 0 && f.HasRoot && f.Length > int64(i.PieceLength) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPieceHashes reports whether the piece hashes are attached. For a v2
+// torrent they come from the "piece layers" (a .torrent) or from a peer (a
+// magnet); building pieces before they are attached is invalid.
+func (i *Info) HasPieceHashes() bool {
+	return i.NumPieces == 0 || int64(len(i.pieces)) == int64(i.NumPieces)*int64(i.hashLen())
+}
+
+// V2FilePieces returns the piece hashes of one v2 file (its entry in the
+// concatenated piece hash blob), in file order, or nil when out of range. For a
+// file that fits in one piece the single hash is the file's pieces root.
+func (i *Info) V2FilePieces(fileIndex int) []byte {
+	if !i.V2 || fileIndex < 0 || fileIndex >= len(i.V2Files) {
+		return nil
+	}
+	hl := int(i.hashLen())
+	off := 0
+	for k := 0; k < fileIndex; k++ {
+		off += i.v2FilePieceCount(k)
+	}
+	n := i.v2FilePieceCount(fileIndex)
+	if n == 0 {
+		return nil
+	}
+	start := off * hl
+	end := start + n*hl
+	if end > len(i.pieces) {
+		return nil
+	}
+	return i.pieces[start:end]
+}
+
+// v2FilePieceCount returns the number of piece hashes a v2 file contributes.
+func (i *Info) v2FilePieceCount(fileIndex int) int {
+	if fileIndex < 0 || fileIndex >= len(i.V2Files) {
+		return 0
+	}
+	f := i.V2Files[fileIndex]
+	if f.Length == 0 {
+		return 0
+	}
+	if f.Length <= int64(i.PieceLength) {
+		return 1
+	}
+	return int((f.Length + int64(i.PieceLength) - 1) / int64(i.PieceLength))
 }
 
 // VerifyPieceLayers checks a BEP 52 "piece layers" map against the files of a

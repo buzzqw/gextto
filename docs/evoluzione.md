@@ -417,7 +417,7 @@ verità usata dall'UI.
 | Web seed | add/remove a caldo | fatto (azione `webseeds`) |
 | Sequenziale | toggle a runtime | fatto (`PiecePicker.SetOrder`) |
 | Protocollo | IPv6 | fatto (socket dual-stack, `peers6`, PEX v6, DHT BEP 32); LSD v6 non prevista |
-| Protocollo | BitTorrent v2-only | parziale (fondamenta fatte, download non ancora) |
+| Protocollo | BitTorrent v2-only | fatto (`.torrent` e magnet, BEP 52) |
 | Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
 
 **vs anacrolix/torrent**: mancano streaming con readahead (fatto, vedi sotto),
@@ -443,7 +443,7 @@ file.
 | 7 | Streaming HTTP Range + priorità pezzi | **Fatto** — `SetStreamWindow`, `/ui/stream`, redirect Gextto, pulsante ▶ |
 | 8 | Limiti connessioni/upload per-torrent | **Fatto** — `SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` |
 | 9 | IPv6 | **Fatto** — socket TCP/UDP dual-stack, risoluzione e indirizzi v6, `peers6`, PEX `added6`/`dropped6`, tracker UDP v6, `yourip` v6, blocklist CIDR v6, DHT dual-stack (BEP 32) |
-| 10 | BitTorrent v2-only | **Parziale** — parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256, magnet `btmh`, pacchetto `merkle`, validazione piece layers; manca il download end-to-end (modello file/piece, estensioni hash, abilitazione) |
+| 10 | BitTorrent v2-only | **Fatto** — parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256 troncato, pacchetto `merkle`, modello a pezzi per-file, verifica Merkle, download da `.torrent` e da **magnet**: i `piece layers` si scaricano dai peer con `hash request`/`hashes`/`hash reject` (BEP 52) e si verificano contro i `pieces root` |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `SetSuperSeeding` + azione `super-seeding`; capacità `full` |
 | 12 | Holepunching (BEP 55) | **Fatto** — `ut_holepunch` nel fork, relè peer, dial uTP, avvio dopo dial fallito; WebTorrent resta wishlist |
 | 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; super-seeding senza guadagno su sciami piccoli, opt-in; scaling su sciame reale, vedi §6 |
@@ -452,10 +452,11 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 
 ### 4.4 Wishlist residua
 
-- **BitTorrent v2-only**: **download da `.torrent` (con `piece layers`)
-  supportato** — modello a pezzi per-file, verifica via nodo Merkle SHA-256,
-  identità troncata, test end-to-end. Restano i **magnet v2** (estensioni
-  `hash request`/`hashes`). Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
+- **BitTorrent v2-only**: **supportato end-to-end** — `.torrent` con `piece
+  layers` e **magnet** (`urn:btmh:`), modello a pezzi per-file, verifica via
+  nodo Merkle SHA-256, identità troncata e **fetch dei `piece layers` dai peer**
+  (`hash request`/`hashes`, BEP 52). Test seed/leech per `.torrent` e magnet.
+  Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
 - **WebTorrent/WebRTC**: nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
   serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa

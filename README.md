@@ -79,7 +79,7 @@ takes Gextto down.
 
 | Engine | Where it runs | When to pick it |
 |---|---|---|
-| gx-torrent (default) | Separate supervised Go process | The default: pure Go, self-contained, active development. BitTorrent v1 and hybrid only (no v2-only), no WebTorrent/WebRTC |
+| gx-torrent (default) | Separate supervised Go process | The default: pure Go, self-contained, active development. BitTorrent v1, hybrid and v2-only (BEP 52, `.torrent` and magnet), no WebTorrent/WebRTC |
 | qBittorrent-nox | External daemon, driven through its Web API | You already run qBittorrent-nox or prefer its own UI. Needs path mappings and an extra process |
 | libtorrent (optional build) | Inside Gextto's process; **only if you compiled it in** (`make build-libtorrent`) | You need libtorrent's advanced controls or its compatibility; also the automatic fallback. A crash takes Gextto down too |
 

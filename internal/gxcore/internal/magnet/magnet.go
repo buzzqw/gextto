@@ -18,8 +18,11 @@ type Magnet struct {
 	Name     string
 	Trackers [][]string
 	Peers    []string
+	// HasV1 reports whether the link carried a v1 "urn:btih:" topic. For a
+	// v2-only link InfoHash is the truncated SHA-256 of the btmh topic.
+	HasV1 bool
 	// V2InfoHash is the SHA-256 info hash from a "urn:btmh:" topic (BEP 52),
-	// present on hybrid links. HasV2 reports whether it was found.
+	// present on hybrid and v2-only links. HasV2 reports whether it was found.
 	V2InfoHash [32]byte
 	HasV2      bool
 }
@@ -46,11 +49,23 @@ func New(s string) (*Magnet, error) {
 	}
 
 	var magnet Magnet
-	magnet.InfoHash, err = parseInfoHash(xts)
+	h, ok, err := parseInfoHash(xts)
 	if err != nil {
 		return nil, err
 	}
+	if ok {
+		magnet.InfoHash = h
+		magnet.HasV1 = true
+	}
 	magnet.V2InfoHash, magnet.HasV2 = parseV2InfoHash(xts)
+	if !magnet.HasV1 {
+		if !magnet.HasV2 {
+			return nil, errors.New("invalid xt param: must start with \"urn:btih:\" or \"urn:btmh:\"")
+		}
+		// A v2-only link: the identity used on the wire (handshake, DHT,
+		// tracker) is the first 20 bytes of the SHA-256 info hash.
+		copy(magnet.InfoHash[:], magnet.V2InfoHash[:20])
+	}
 
 	names := params["dn"]
 	if len(names) != 0 {
@@ -86,8 +101,22 @@ func New(s string) (*Magnet, error) {
 func (m *Magnet) String() string {
 	var b strings.Builder
 	b.Grow(2048)
-	b.WriteString("magnet:?xt=urn:btih:")
-	b.WriteString(hex.EncodeToString(m.InfoHash[:]))
+	b.WriteString("magnet:?xt=")
+	switch {
+	case m.HasV1:
+		b.WriteString("urn:btih:")
+		b.WriteString(hex.EncodeToString(m.InfoHash[:]))
+	case m.HasV2:
+		b.WriteString("urn:btmh:1220")
+		b.WriteString(hex.EncodeToString(m.V2InfoHash[:]))
+	default:
+		b.WriteString("urn:btih:")
+		b.WriteString(hex.EncodeToString(m.InfoHash[:]))
+	}
+	if m.HasV1 && m.HasV2 {
+		b.WriteString("&xt=urn:btmh:1220")
+		b.WriteString(hex.EncodeToString(m.V2InfoHash[:]))
+	}
 	if m.Name != "" {
 		b.WriteString("&dn=")
 		b.WriteString(url.QueryEscape(m.Name))
@@ -117,23 +146,20 @@ type trackerTier struct {
 	index    int
 }
 
-// parseInfoHash returns the v1 info hash found in xts.
-// Hybrid magnet links carry both a "urn:btih:" (v1) and a "urn:btmh:" (v2) topic
-// in no particular order. Only the v1 topic is usable because v2 is not supported.
-func parseInfoHash(xts []string) ([20]byte, error) {
-	var v2 bool
+// parseInfoHash returns the v1 info hash found in xts, if any. Hybrid magnet
+// links carry both a "urn:btih:" (v1) and a "urn:btmh:" (v2) topic in no
+// particular order; a v2-only link carries only the latter and returns ok=false.
+func parseInfoHash(xts []string) ([20]byte, bool, error) {
 	for _, xt := range xts {
 		if s, ok := strings.CutPrefix(xt, "urn:btih:"); ok {
-			return infoHashString(s)
-		}
-		if strings.HasPrefix(xt, "urn:btmh:") {
-			v2 = true
+			h, err := infoHashString(s)
+			if err != nil {
+				return [20]byte{}, false, err
+			}
+			return h, true, nil
 		}
 	}
-	if v2 {
-		return [20]byte{}, errors.New("magnet link has no v1 info hash: BitTorrent v2 is not supported")
-	}
-	return [20]byte{}, errors.New("invalid xt param: must start with \"urn:btih:\"")
+	return [20]byte{}, false, nil
 }
 
 // parseV2InfoHash returns the SHA-256 info hash of a "urn:btmh:" topic (BEP

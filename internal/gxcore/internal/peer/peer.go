@@ -38,7 +38,10 @@ type Peer struct {
 	ExtensionsEnabled bool
 	FastEnabled       bool
 	DHTEnabled        bool
-	EncryptionCipher  mse.CryptoMethod
+	// ProtocolV2 is set when the peer advertised BitTorrent v2 (BEP 52) in the
+	// reserved bits of the handshake.
+	ProtocolV2       bool
+	EncryptionCipher mse.CryptoMethod
 
 	ClientInterested bool
 	ClientChoking    bool
@@ -89,6 +92,7 @@ func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byt
 	fastEnabled := bf.Test(61)
 	extensionsEnabled := bf.Test(43)
 	dhtEnabled := bf.Test(63)
+	protocolV2 := bf.Test(59)
 
 	t := time.NewTimer(math.MaxInt64)
 	t.Stop()
@@ -102,6 +106,7 @@ func New(conn net.Conn, source peersource.Source, id [20]byte, extensions [8]byt
 		ExtensionsEnabled: extensionsEnabled,
 		FastEnabled:       fastEnabled,
 		DHTEnabled:        dhtEnabled,
+		ProtocolV2:        protocolV2,
 		EncryptionCipher:  cipher,
 		snubTimeout:       snubTimeout,
 		snubTimer:         t,

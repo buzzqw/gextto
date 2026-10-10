@@ -354,6 +354,9 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		if _, ok := msg.M[peerprotocol.ExtensionKeyMetadata]; ok {
 			t.startInfoDownloaders()
 		}
+		// A v2 magnet needs its piece layers from a peer, once the info dict is
+		// known (BEP 52).
+		t.startV2LayerDownload()
 		if t.session.config.PEXEnabled {
 			if _, ok := msg.M[peerprotocol.ExtensionKeyPEX]; ok {
 				if t.info != nil && !t.info.Private {
@@ -388,6 +391,12 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 	case peerprotocol.HolepunchMessage:
 		t.handleHolepunchMessage(pe, msg)
+	case peerprotocol.HashRequestMessage:
+		t.handleHashRequest(pe, msg)
+	case peerprotocol.HashesMessage:
+		t.handleHashes(pe, msg)
+	case peerprotocol.HashRejectMessage:
+		t.handleHashReject(pe, msg)
 	default:
 		t.crash(fmt.Sprintf("unhandled peer message type: %T", msg))
 	}

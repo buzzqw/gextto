@@ -724,7 +724,8 @@ dati.
   libtorrent, se è compilato. Supporta il **download sequenziale** e la **prima/ultima parte**
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
   *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
-  nuovi). Non supporta torrent **solo-v2** né WebTorrent/WebRTC.
+  nuovi). Supporta i torrent **solo-v2** (BEP 52), sia da `.torrent` sia da
+  magnet; non supporta WebTorrent/WebRTC.
 - **libtorrent (build opzionale)** — la sessione libtorrent nello stesso processo
   di Gextto, presente **solo se hai compilato Gextto con libtorrent**
   (`make build-libtorrent`); i pacchetti di release non la includono. Valgono

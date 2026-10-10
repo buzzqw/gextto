@@ -236,6 +236,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	if err != nil {
 		return nil, err
 	}
+	t.hasV2Hint = ma.HasV2
 	go s.checkTorrent(t)
 	defer func() {
 		if err != nil {

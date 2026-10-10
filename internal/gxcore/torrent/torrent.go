@@ -21,6 +21,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/outgoinghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/infodownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/mse"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
@@ -59,6 +60,11 @@ type torrent struct {
 	// Name of the torrent.
 	name string
 
+	// hasV2Hint is set while the info dict is unknown (a magnet) to remember
+	// that the torrent identity is BitTorrent v2 (a btmh topic). Once info is
+	// known, Info.HasV2 is authoritative.
+	hasV2Hint bool
+
 	// Storage implementation to save the files in torrent.
 	storage storage.Storage
 
@@ -71,6 +77,15 @@ type torrent struct {
 	// pieceLayers is the BEP 52 top-level "piece layers" of a v2 torrent,
 	// kept so the .torrent can be exported/served with them.
 	pieceLayers map[string][]byte
+
+	// BEP 52 hash request support. A v2 magnet knows its file tree but not the
+	// per-file "piece layers": they are fetched from peers with "hash
+	// request"/"hashes" before any piece can be downloaded or served.
+	v2LayerFiles  []*v2LayerFile
+	v2LayerByRoot map[string]*v2LayerFile
+	v2Trees       map[string]*merkle.LayerTree
+	v2Pending     map[*peer.Peer]*v2LayerFile
+	v2NoHashPeers map[*peer.Peer]struct{}
 
 	// Bitfield for pieces we have. It is created after we got info.
 	// Bits are set only after data is written to file.

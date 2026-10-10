@@ -513,23 +513,31 @@ func magnetInfoHash(magnet string) (string, bool) {
 	if err != nil || parsed.Scheme != "magnet" {
 		return "", false
 	}
+	var v2 string
 	for _, xt := range parsed.Query()["xt"] {
-		value, found := strings.CutPrefix(strings.ToLower(xt), "urn:btih:")
-		if !found {
+		lower := strings.ToLower(xt)
+		if value, found := strings.CutPrefix(lower, "urn:btih:"); found {
+			switch len(value) {
+			case 40:
+				if _, err := hex.DecodeString(value); err == nil {
+					return value, true
+				}
+			case 32:
+				if raw, err := base32.StdEncoding.DecodeString(strings.ToUpper(value)); err == nil {
+					return hex.EncodeToString(raw), true
+				}
+			}
 			continue
 		}
-		switch len(value) {
-		case 40:
-			if _, err := hex.DecodeString(value); err == nil {
-				return value, true
-			}
-		case 32:
-			if raw, err := base32.StdEncoding.DecodeString(strings.ToUpper(value)); err == nil {
-				return hex.EncodeToString(raw), true
+		// A v2-only magnet is identified by the first 20 bytes of its btmh
+		// digest, the same truncated hash the engine uses on the wire.
+		if value, found := strings.CutPrefix(lower, "urn:btmh:1220"); found {
+			if raw, err := hex.DecodeString(value); err == nil && len(raw) >= 20 {
+				v2 = hex.EncodeToString(raw[:20])
 			}
 		}
 	}
-	return "", false
+	return v2, v2 != ""
 }
 
 // handleIPFilter reloads the IP filter. Form fields: `url` (downloaded and
@@ -551,10 +559,6 @@ func (d *Daemon) handleIPFilter(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"rules": rules})
 }
-
-// errV2Only is returned for BitTorrent v2-only torrents: the engine speaks v1 (and
-// the v1 side of hybrid torrents) only.
-var errV2Only = errors.New("v2_unsupported: BitTorrent v2-only torrent (no v1 info hash); hybrid and v1 torrents are supported")
 
 // magnetIsV2Only reports a magnet that carries only a v2 (btmh) hash.
 func magnetIsV2Only(magnet string) bool {
