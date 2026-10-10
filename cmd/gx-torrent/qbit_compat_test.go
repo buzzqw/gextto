@@ -97,6 +97,18 @@ func TestQbitCompatibleWithGexttoClient(t *testing.T) {
 	if err := client.SetFilePriorities(ctx, "abc", []int{0}, 0); err != nil {
 		t.Fatalf("filePrio: %v", err)
 	}
+	if err := client.SetForceStart(ctx, true, "abc"); err != nil {
+		t.Fatalf("setForceStart: %v", err)
+	}
+	if err := client.SetAutoManagement(ctx, true, "abc"); err != nil {
+		t.Fatalf("setAutoManagement: %v", err)
+	}
+	if err := client.SetTorrentDownloadLimit(ctx, 1<<20, "abc"); err != nil {
+		t.Fatalf("setDownloadLimit: %v", err)
+	}
+	if err := client.SetTorrentUploadLimit(ctx, 1<<19, "abc"); err != nil {
+		t.Fatalf("setUploadLimit: %v", err)
+	}
 	if err := client.Delete(ctx, false, "abc"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"testing"
 )
 
@@ -145,5 +146,38 @@ func TestQbitExportTorrentAndFilePrio(t *testing.T) {
 		defer d.mu.Unlock()
 		_, meta := d.findLocked(hash)
 		return meta != nil && len(meta.FilePriorities) == 2 && meta.FilePriorities[0] == 0 && meta.FilePriorities[1] == 4
+	})
+}
+
+func TestQbitForceStartAndTorrentLimit(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 30_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	post := func(path string, form url.Values) {
+		t.Helper()
+		resp, err := http.PostForm(srv.URL+path, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s: status %d", path, resp.StatusCode)
+		}
+	}
+	post("/api/v2/torrents/setForceStart", url.Values{"hashes": {hash}, "value": {"true"}})
+	post("/api/v2/torrents/setDownloadLimit", url.Values{"hashes": {hash}, "limit": {strconv.Itoa(2 << 20)}})
+
+	waitFor(t, "pin and limit applied", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && meta.Pinned &&
+			meta.DownloadLimitKib != nil && *meta.DownloadLimitKib == (2<<20)/1024
 	})
 }

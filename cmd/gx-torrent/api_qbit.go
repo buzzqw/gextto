@@ -72,6 +72,10 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/editTracker", d.handleQbitEditTracker)
 	mux.HandleFunc("POST /api/v2/torrents/filePrio", d.handleQbitFilePrio)
 	mux.HandleFunc("GET /api/v2/torrents/export", d.handleQbitExport)
+	mux.HandleFunc("POST /api/v2/torrents/setForceStart", d.handleQbitSetForceStart)
+	mux.HandleFunc("POST /api/v2/torrents/setAutoManagement", d.handleQbitSetAutoManagement)
+	mux.HandleFunc("POST /api/v2/torrents/setDownloadLimit", d.handleQbitSetTorrentDownloadLimit)
+	mux.HandleFunc("POST /api/v2/torrents/setUploadLimit", d.handleQbitSetTorrentUploadLimit)
 	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
 	return d.qbitAuth(mux)
 }
@@ -506,6 +510,53 @@ func (d *Daemon) handleQbitExport(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/x-bittorrent")
 	_, _ = w.Write(data)
+}
+
+// handleQbitSetForceStart maps qBittorrent "force start" to the daemon's pin:
+// a pinned torrent is not rotated out by the queue.
+func (d *Daemon) handleQbitSetForceStart(w http.ResponseWriter, r *http.Request) {
+	enabled := strings.EqualFold(strings.TrimSpace(r.FormValue("value")), "true")
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.setPin(hash, enabled)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitSetAutoManagement is accepted as a no-op: the daemon's queue is
+// always managed by its own scheduler.
+func (d *Daemon) handleQbitSetAutoManagement(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitSetTorrentDownloadLimit and handleQbitSetTorrentUploadLimit set a
+// per-torrent limit. qBittorrent sends bytes per second; the daemon stores
+// KiB/s. A non-positive limit removes the per-torrent limit (inherit global).
+func (d *Daemon) handleQbitSetTorrentDownloadLimit(w http.ResponseWriter, r *http.Request) {
+	d.applyQbitTorrentLimit(w, r, true)
+}
+
+func (d *Daemon) handleQbitSetTorrentUploadLimit(w http.ResponseWriter, r *http.Request) {
+	d.applyQbitTorrentLimit(w, r, false)
+}
+
+func (d *Daemon) applyQbitTorrentLimit(w http.ResponseWriter, r *http.Request, download bool) {
+	limit, _ := strconv.ParseInt(strings.TrimSpace(r.FormValue("limit")), 10, 64)
+	kib := int64(-1) // no per-torrent limit: inherit the global one
+	if limit > 0 {
+		if kib = limit / 1024; kib < 1 {
+			kib = 1
+		}
+	}
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		if download {
+			value := kib
+			_ = d.setLimits(hash, &value, nil, nil, nil)
+		} else {
+			value := kib
+			_ = d.setLimits(hash, nil, &value, nil, nil)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
