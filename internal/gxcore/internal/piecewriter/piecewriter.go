@@ -31,6 +31,9 @@ func New(p *piece.Piece, source any, buf bufferpool.Buffer) *PieceWriter {
 // Run checks the hash, then writes the data in the buffer to the disk.
 func (w *PieceWriter) Run(resultC chan *PieceWriter, closeC chan struct{}, writesPerSecond, writeBytesPerSecond metrics.Meter, sem *semaphore.Semaphore) {
 	w.HashOK = w.Piece.VerifyHash(w.Buffer.Data, sha1.New())
+	if w.Piece.V2 {
+		w.HashOK = w.Piece.VerifyV2(w.Buffer.Data)
+	}
 	if w.HashOK {
 		writesPerSecond.Mark(1)
 		writeBytesPerSecond.Mark(int64(len(w.Buffer.Data)))

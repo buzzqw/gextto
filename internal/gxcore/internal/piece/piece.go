@@ -6,6 +6,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/allocator"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/filesection"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 )
 
@@ -22,6 +23,10 @@ type Piece struct {
 	Done    bool
 	// Skip is set for pieces that belong only to unwanted files.
 	Skip bool
+	// V2 marks a BitTorrent v2 piece: it belongs to a single file and its hash
+	// is a SHA-256 merkle node over V2Leaves 16 KiB block leaves (BEP 52).
+	V2       bool
+	V2Leaves int
 }
 
 // Block is part of a Piece that is specified in peerprotocol.Request messages.
@@ -32,6 +37,9 @@ type Block struct {
 
 // NewPieces returns a slice of Pieces by mapping files to the pieces.
 func NewPieces(info *metainfo.Info, files []allocator.File) []Piece {
+	if info.V2 {
+		return newPiecesV2(info, files)
+	}
 	var (
 		fileIndex  int   // index of the current file in torrent
 		fileLength int64 // length of the file in fileIndex
@@ -175,6 +183,57 @@ func (p *Piece) VerifyHash(buf []byte, h hash.Hash) bool {
 	_, _ = h.Write(buf)
 	sum := h.Sum(nil)
 	return bytes.Equal(sum, p.Hash)
+}
+
+// newPiecesV2 maps the files to pieces for a BitTorrent v2 torrent: pieces are
+// built file by file, the tail piece of a file is shorter than the piece length
+// and no piece spans two files (BEP 52).
+func newPiecesV2(info *metainfo.Info, files []allocator.File) []Piece {
+	leaves := int(info.PieceLength / BlockSize)
+	pieces := make([]Piece, 0, info.NumPieces)
+	for fi, f := range info.Files {
+		var off int64
+		for off < f.Length {
+			n := int64(info.PieceLength)
+			if left := f.Length - off; left < n {
+				n = left
+			}
+			global := uint32(len(pieces))
+			pieces = append(pieces, Piece{
+				Index:    global,
+				Length:   uint32(n),
+				Hash:     info.PieceHash(global),
+				V2:       true,
+				V2Leaves: leaves,
+				Data: filesection.Piece{{
+					File:   files[fi].Storage,
+					Offset: off,
+					Length: n,
+					Name:   files[fi].Name,
+				}},
+			})
+			off += n
+		}
+	}
+	return pieces
+}
+
+// VerifyV2 returns true when the buffer hashes to the piece's merkle node: the
+// SHA-256 tree over the piece's 16 KiB blocks, with the leaves missing to reach
+// V2Leaves set to zero (BEP 52).
+func (p *Piece) VerifyV2(buf []byte) bool {
+	if uint32(len(buf)) != p.Length {
+		return false
+	}
+	leaves := merkle.LeafHashes(buf)
+	n := p.V2Leaves
+	if n < 1 {
+		n = 1
+	}
+	full := make([][merkle.HashSize]byte, n)
+	copy(full, leaves)
+	root := merkle.Root(full)
+	return bytes.Equal(root[:], p.Hash)
 }
 
 func divmod(a, b uint32) (uint32, uint32) { return a / b, a % b }

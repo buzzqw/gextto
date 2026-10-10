@@ -452,10 +452,10 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 
 ### 4.4 Wishlist residua
 
-- **BitTorrent v2-only**: fondamenta fatte (parsing, hash SHA-256, `merkle`,
-  validazione `piece layers`); il **download end-to-end** resta il pezzo grande
-  (modello file/piece+storage, hash troncato, estensioni `hash request`/`hashes`,
-  abilitazione). Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
+- **BitTorrent v2-only**: **download da `.torrent` (con `piece layers`)
+  supportato** — modello a pezzi per-file, verifica via nodo Merkle SHA-256,
+  identità troncata, test end-to-end. Restano i **magnet v2** (estensioni
+  `hash request`/`hashes`). Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
 - **WebTorrent/WebRTC**: nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
   serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa

@@ -57,6 +57,9 @@ func (v *Verifier) Run(pieces []piece.Piece, progressC chan Progress, resultC ch
 			return
 		}
 		ok := p.VerifyHash(buf, hash)
+		if p.V2 {
+			ok = p.VerifyV2(buf)
+		}
 		if ok {
 			v.Bitfield.Set(p.Index)
 			numOK++

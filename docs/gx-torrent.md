@@ -536,20 +536,19 @@ salute dello sciame, quindi resta **opzionale e spenta di default**.
 
 ## Torrent BitTorrent v2
 
-il motore gestisce i torrent v1 e la parte v1 dei torrent ibridi (v1+v2), cioè la
-grande maggioranza. I torrent **solo v2** (magnet con solo `btmh`, `.torrent`
-senza `pieces`) vengono rifiutati con un errore chiaro. Gextto in quel caso:
+Il motore scarica i torrent **v1**, la parte v1 degli **ibridi** (v1+v2) e i
+torrent **solo v2** aggiunti da un file `.torrent` che include i **`piece
+layers`** (BEP 52). I pezzi sono costruiti **file per file**: il pezzo di coda di
+un file è più corto di `piece length` e **non** contiene padding; ogni pezzo è
+verificato con un **nodo Merkle SHA-256** sui blocchi da 16 KiB (foglie mancanti
+= hash zero). L'identità del torrent è lo SHA-256 troncato a 20 byte, quindi
+handshake, DHT e tracker restano identici a v1.
 
-1. mette la release in blocklist, così non la ritenta a ogni ciclo;
-2. passa al candidato successivo.
-
-Il supporto completo a v2 richiederebbe nel motore:
-
-- gli alberi di hash SHA-256;
-- l'handshake con l'hash troncato;
-- lo scambio dei piece layer.
-
-È un lavoro grosso, non fatto.
+**Non** ancora supportati i torrent **solo v2** senza `piece layers`
+(cioè i **magnet** v2): servono le estensioni peer `hash request`/`hashes`
+(BEP 52) per scaricare i layer. I magnet v2 vengono quindi ancora rifiutati con
+un errore chiaro; Gextto in quel caso mette la release in blocklist e passa al
+candidato successivo. Il progetto completo è in `docs/gx-torrent-v2.md`.
 
 ## Statistiche
 
@@ -928,7 +927,7 @@ Le operazioni che il motore non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- torrent solo v2 (vedi sopra);
+- magnet solo v2 / `.torrent` senza `piece layers` (vedi sopra);
 - IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati

@@ -1207,7 +1207,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if (req.Magnet != "" && magnetIsV2Only(req.Magnet)) || (req.Magnet == "" && torrentIsV2Only(req.TorrentData)) {
+	if req.Magnet != "" && magnetIsV2Only(req.Magnet) {
 		return "", false, errV2Only
 	}
 	if req.Magnet != "" {

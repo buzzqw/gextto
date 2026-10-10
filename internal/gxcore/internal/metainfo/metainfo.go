@@ -42,7 +42,25 @@ func New(r io.Reader) (*MetaInfo, error) {
 		return nil, errors.New("no info dict in torrent file")
 	}
 	info, err := NewInfo(t.Info, true, true)
-	if err != nil {
+	switch {
+	case errors.Is(err, ErrV2Only):
+		// BitTorrent v2 (BEP 52): build the per-file piece model and attach the
+		// piece hashes from the top-level "piece layers".
+		v2, verr := NewV2Info(t.Info)
+		if verr != nil {
+			return nil, verr
+		}
+		var layers map[string][]byte
+		if len(t.PieceLayers) > 0 {
+			if derr := bencode.DecodeBytes(t.PieceLayers, &layers); derr != nil {
+				return nil, derr
+			}
+		}
+		if aerr := v2.AttachV2Pieces(layers); aerr != nil {
+			return nil, aerr
+		}
+		info = v2
+	case err != nil:
 		return nil, err
 	}
 	ret.Info = *info

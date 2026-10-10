@@ -16,7 +16,14 @@
 - `internal/gxcore/internal/merkle`: alberi SHA-256 (blocchi 16 KiB, foglie
   mancanti = **hash zero**, `Layer`, `PieceLayer`, `Root`, `ZeroRoot`,
   `VerifyProof`).
-- Il resto del motore è v1-only; i v2-only sono rifiutati.
+- Il motore è v1-only per i percorsi non v2; gli **ibridi** si scaricano come v1.
+
+**Realizzato (2026-10-10):** modello a **pezzi per-file** (`NewPieces` ramo v2),
+`Piece.VerifyV2` (nodo Merkle via `merkle`), verifica SHA-256 in
+`verifier`/`piecewriter`, identità troncata (`Info.Hash` = primi 20 byte di
+`V2Hash`), abilitazione dei **`.torrent` v2** (il demone non rifiuta più i v2-only
+da file) e **test end-to-end** (seed/leech multi-file con `piece length` >
+16 KiB). **Resta I5** (magnet v2 / `.torrent` senza `piece layers`).
 
 ## 2. BEP 52 in sintesi (regole che contano)
 
