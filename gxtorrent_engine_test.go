@@ -2,7 +2,6 @@ package gextto
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -274,16 +273,6 @@ func TestGxEngineMoveEmitsStorageMoved(t *testing.T) {
 	}
 }
 
-func TestGxEngineV2Error(t *testing.T) {
-	err := error(gxAPIError{Status: 400, Message: "v2_unsupported: BitTorrent v2-only torrent"})
-	if !errors.Is(err, ErrTorrentV2Unsupported) {
-		t.Fatal("the v2 refusal must be recognizable")
-	}
-	if errors.Is(gxAPIError{Status: 400, Message: "other"}, ErrTorrentV2Unsupported) {
-		t.Fatal("other errors are not v2 refusals")
-	}
-}
-
 func TestTorrentBackendNameAcceptsGxTorrent(t *testing.T) {
 	cfg := &Config{Settings: map[string]string{"torrent_backend": "gx-torrent"}}
 	if got := TorrentBackendName(cfg); got != BackendGxTorrent {
@@ -440,7 +429,11 @@ func TestGxPeerLimitsSplitConnections(t *testing.T) {
 }
 
 func TestGxTorrentVersionNormalizes(t *testing.T) {
-	for input, want := range map[string]string{"": "v1", "v1": "v1", "hybrid": "hybrid", "HYBRID": "hybrid", "junk": "v1"} {
+	for input, want := range map[string]string{
+		"": "v1", "v1": "v1", "junk": "v1",
+		"v2": "v2", "V2": "v2",
+		"hybrid": "hybrid", "HYBRID": "hybrid",
+	} {
 		if got := gxTorrentVersion(input); got != want {
 			t.Fatalf("gxTorrentVersion(%q) = %q, want %q", input, got, want)
 		}

@@ -15,7 +15,6 @@ package gextto
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -929,18 +928,6 @@ func RunCycleDomain(
 			} else {
 				added, err = torrents.AddWithPath(release.Magnet, cfg, preferredPath)
 			}
-			if err != nil && errors.Is(err, ErrTorrentV2Unsupported) && !cfg.DryRun {
-				// It would fail the same way at every cycle: blocklist it so the
-				// next search picks another release.
-				stats.Error("add_failed")
-				if blockErr := db.Blocklist(&release, "BitTorrent v2-only, non supportato dal motore gx-torrent"); blockErr != nil {
-					logging.Debug("cannot blocklist v2-only release", "error", blockErr)
-				}
-				logging.Warn(fmt.Sprintf("⚠️ %s is a BitTorrent v2-only torrent, which gx-torrent cannot download: blocklisted, another release will be used", logTarget(&release)),
-					"release", release.Title)
-				rememberV2Skip(&release, time.Now())
-				continue
-			}
 			if err != nil {
 				// A single release refused by the engine must not abort the whole
 				// cycle: nothing was written yet, so record the failure and
@@ -1002,9 +989,6 @@ func RunCycleDomain(
 			}
 			logHash, _ := utils.MagnetHash(release.Magnet)
 			logging.Info(logMessage, "release", release.Title, "from", release.Source, "score", score, "hash", logHash)
-			if !cfg.DryRun {
-				reportV2Replacement(&release)
-			}
 			logging.Debug("download decision",
 				"target", releaseTarget(&release),
 				"quality", releaseQualityLabel(&release),
@@ -1089,9 +1073,6 @@ func RunCycleDomain(
 					"gap_episodes", episodesLabel(gapEpisodes))
 			}
 		}
-	}
-	if !cfg.DryRun {
-		reportPendingV2Skips(time.Now())
 	}
 	elapsed := cycleElapsedSeconds(stats)
 	stats.DurationSeconds = int(elapsed)

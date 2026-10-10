@@ -220,21 +220,10 @@ func (e *gxTorrentEngine) Capabilities() map[string]bool {
 // HTTP
 // ---------------------------------------------------------------------------
 
-// ErrTorrentV2Unsupported is returned when gx-torrent refuses a BitTorrent
-// v2-only torrent (the engine handles v1 and hybrid torrents).
-var ErrTorrentV2Unsupported = errors.New("BitTorrent v2-only torrent: not supported by gx-torrent")
-
 // gxAPIError is a non-2xx answer from the daemon.
 type gxAPIError struct {
 	Status  int
 	Message string
-}
-
-func (e gxAPIError) Unwrap() error {
-	if strings.HasPrefix(e.Message, "v2_unsupported") {
-		return ErrTorrentV2Unsupported
-	}
-	return nil
 }
 
 func (e gxAPIError) Error() string {
@@ -513,11 +502,13 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 	return view
 }
 
-// gxTorrentVersion normalizes the daemon's torrent version. The engine handles v1 and
-// the v1 side of hybrid (v1+v2) torrents; an unknown report falls back to v1.
+// gxTorrentVersion normalizes the daemon's torrent version, which reports v1,
+// v2 (BEP 52, v2-only) and hybrid (v1+v2). An unknown report falls back to v1.
 func gxTorrentVersion(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "hybrid", "v2":
+	case "v2":
+		return "v2"
+	case "hybrid":
 		return "hybrid"
 	default:
 		return "v1"
