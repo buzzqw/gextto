@@ -70,6 +70,8 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/addTrackers", d.handleQbitAddTrackers)
 	mux.HandleFunc("POST /api/v2/torrents/removeTrackers", d.handleQbitRemoveTrackers)
 	mux.HandleFunc("POST /api/v2/torrents/editTracker", d.handleQbitEditTracker)
+	mux.HandleFunc("POST /api/v2/torrents/filePrio", d.handleQbitFilePrio)
+	mux.HandleFunc("GET /api/v2/torrents/export", d.handleQbitExport)
 	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
 	return d.qbitAuth(mux)
 }
@@ -419,15 +421,91 @@ func (d *Daemon) handleQbitTorrentPeers(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"peers": peers, "rid": 0})
 }
 
-// qbitLines splits a qBittorrent "urls" field: one URL per line.
+// qbitLines splits a qBittorrent "urls" field: one URL per line, or pipe
+// separated (removeTrackers sends them with "|").
 func qbitLines(value string) []string {
 	var out []string
-	for _, line := range strings.Split(value, "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			out = append(out, line)
+	for _, field := range strings.FieldsFunc(value, func(r rune) bool { return r == '\n' || r == '|' }) {
+		if field = strings.TrimSpace(field); field != "" {
+			out = append(out, field)
 		}
 	}
 	return out
+}
+
+// handleQbitFilePrio sets the download/skip state of the given file indices.
+// qBittorrent priorities are 0 (skip) and 1..7 (normal..max); the engine only
+// has skip/download, so any non-zero priority means "download".
+func (d *Daemon) handleQbitFilePrio(w http.ResponseWriter, r *http.Request) {
+	hash := strings.TrimSpace(r.FormValue("hash"))
+	priority, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("priority")))
+	value := 4
+	if priority <= 0 {
+		value = 0
+	}
+	var indices []int
+	for _, id := range strings.FieldsFunc(r.FormValue("id"), func(r rune) bool {
+		return r == '|' || r == ',' || r == ' '
+	}) {
+		if n, err := strconv.Atoi(id); err == nil {
+			indices = append(indices, n)
+		}
+	}
+	if hash == "" || len(indices) == 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	d.mu.Lock()
+	t, meta := d.findLocked(hash)
+	var previous []int
+	if meta != nil {
+		previous = append([]int(nil), meta.FilePriorities...)
+	}
+	d.mu.Unlock()
+	if t == nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	files, err := t.Files()
+	if err != nil {
+		http.Error(w, "metadata not available", http.StatusConflict)
+		return
+	}
+	priorities := make([]int, len(files))
+	for i := range priorities {
+		priorities[i] = 4
+	}
+	for i := 0; i < len(priorities) && i < len(previous); i++ {
+		priorities[i] = previous[i]
+	}
+	for _, idx := range indices {
+		if idx >= 0 && idx < len(priorities) {
+			priorities[idx] = value
+		}
+	}
+	if err := d.setFilePriorities(hash, priorities); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitExport returns the torrent's .torrent bytes.
+func (d *Daemon) handleQbitExport(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	t, _ := d.findLocked(r.URL.Query().Get("hash"))
+	d.mu.Unlock()
+	if t == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	data, err := t.Torrent()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-bittorrent")
+	_, _ = w.Write(data)
 }
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {

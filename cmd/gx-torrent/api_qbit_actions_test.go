@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -106,4 +108,42 @@ func TestQbitSyncTorrentPeersShape(t *testing.T) {
 	if payload.Peers == nil {
 		t.Fatal("peers must be an (empty) object, not null")
 	}
+}
+
+func TestQbitExportTorrentAndFilePrio(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeMultiTorrent(t, src, "Season", []int{30_000, 20_000})
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	// export returns the .torrent bytes (a bencoded dictionary).
+	resp, err := http.Get(srv.URL + "/api/v2/torrents/export?hash=" + hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("export status = %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if len(body) == 0 || body[0] != 'd' {
+		t.Fatalf("export is not a bencoded torrent: %q", body)
+	}
+
+	// filePrio skips file 0 and keeps file 1 wanted: the daemon records [0, 4].
+	form := url.Values{"hash": {hash}, "id": {"0"}, "priority": {"0"}}
+	if _, err := http.PostForm(srv.URL+"/api/v2/torrents/filePrio", form); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "file priority applied", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && len(meta.FilePriorities) == 2 && meta.FilePriorities[0] == 0 && meta.FilePriorities[1] == 4
+	})
 }

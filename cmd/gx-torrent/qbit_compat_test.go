@@ -76,6 +76,27 @@ func TestQbitCompatibleWithGexttoClient(t *testing.T) {
 	if err := client.SetLocation(ctx, "/srv/movies", "abc"); err != nil {
 		t.Fatalf("setLocation: %v", err)
 	}
+	if err := client.AddTrackers(ctx, "abc", []string{"http://a/announce", "http://b/announce"}); err != nil {
+		t.Fatalf("addTrackers: %v", err)
+	}
+	if err := client.RemoveTrackers(ctx, "abc", []string{"http://a/announce"}); err != nil {
+		t.Fatalf("removeTrackers: %v", err)
+	}
+	if err := client.EditTracker(ctx, "abc", "http://b/announce", "http://c/announce"); err != nil {
+		t.Fatalf("editTracker: %v", err)
+	}
+	if err := client.ToggleSequentialDownload(ctx, "abc"); err != nil {
+		t.Fatalf("toggleSequentialDownload: %v", err)
+	}
+	if err := client.SetSuperSeeding(ctx, true, "abc"); err != nil {
+		t.Fatalf("setSuperSeeding: %v", err)
+	}
+	if _, err := client.Peers(ctx, "abc"); err != nil {
+		t.Fatalf("peers: %v", err)
+	}
+	if err := client.SetFilePriorities(ctx, "abc", []int{0}, 0); err != nil {
+		t.Fatalf("filePrio: %v", err)
+	}
 	if err := client.Delete(ctx, false, "abc"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
