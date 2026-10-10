@@ -3,6 +3,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +79,40 @@ func TestLocalSetupURL(t *testing.T) {
 		if got := localSetupURL(listen); got != want {
 			t.Fatalf("localSetupURL(%q) = %q, want %q", listen, got, want)
 		}
+	}
+}
+
+// TestPortCheckIsAvailableOnLinux pins that the wizard's "test port" button has
+// a working backend on Linux too (it is cross-platform, like on Windows).
+func TestPortCheckIsAvailableOnLinux(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := httptest.NewRecorder()
+	d.handlePortCheck(rec, httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/api/v1/portcheck", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), `"port"`) {
+		t.Fatalf("portcheck body = %s", rec.Body.String())
+	}
+}
+
+// TestGraphicalSessionDetection pins the Linux gate of the automatic browser
+// open: a headless server is skipped, a desktop session is not.
+func TestGraphicalSessionDetection(t *testing.T) {
+	t.Setenv("DISPLAY", "")
+	t.Setenv("WAYLAND_DISPLAY", "")
+	t.Setenv("XDG_SESSION_TYPE", "")
+	if graphicalSession() {
+		t.Fatal("a headless environment must not count as a graphical session")
+	}
+	t.Setenv("DISPLAY", ":0")
+	if !graphicalSession() {
+		t.Fatal("DISPLAY must mark a graphical session")
+	}
+	t.Setenv("DISPLAY", "")
+	t.Setenv("XDG_SESSION_TYPE", "wayland")
+	if !graphicalSession() {
+		t.Fatal("XDG_SESSION_TYPE=wayland must mark a graphical session")
 	}
 }
 

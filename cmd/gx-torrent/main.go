@@ -327,7 +327,12 @@ func main() {
 	// wizard stays reachable at the printed address.
 	if opts.Mode == ModeStandalone && !daemon.setupComplete() {
 		if url := localSetupURL(opts.Listen); url != "" {
-			go func() { _ = openBrowser(url) }()
+			logf("first run: open %s to configure gx-torrent", url)
+			go func() {
+				if err := openBrowser(url); err != nil {
+					logf("cannot open the browser automatically: %v (open %s by hand)", err, url)
+				}
+			}()
 		}
 	}
 
