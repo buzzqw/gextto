@@ -134,7 +134,8 @@ func TestFeedErrorNotifiesOnlyOnTransition(t *testing.T) {
 	}
 }
 
-func TestPollFeedsAddsAndDedupes(t *testing.T) {	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+func TestPollFeedsAddsAndDedupes(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(feedBody))
 	}))

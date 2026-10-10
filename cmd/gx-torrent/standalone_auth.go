@@ -53,9 +53,8 @@ func (d *Daemon) standaloneAuthActive() bool {
 	return d.standalonePassword() != ""
 }
 
-// clientIP is the address of the request's peer, read from the socket. A
-// reverse proxy header is deliberately ignored: only declared proxies could be
-// trusted, and none are configured yet.
+// clientIP is the raw peer of the connection, read from the socket. The
+// daemon method clientIP adds the trusted-proxy handling on top.
 func clientIP(r *http.Request) net.IP {
 	host := strings.TrimSpace(r.RemoteAddr)
 	if h, _, err := net.SplitHostPort(host); err == nil {
