@@ -67,7 +67,7 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   selezionabile (l'opzione non compare nella UI e la selezione è rifiutata);
   un `torrent_backend=embedded` salvato fa partire il demone su gx-torrent.
 - `build_number` è la **sorgente unica** del numero di build: checkout e CI
-  leggono lo stesso file (base attuale `1462`). La CI non usa più
+  leggono lo stesso file (base attuale `1520`). La CI non usa più
   `github.run_number`: build e `release.json` prendono il valore dal file, così
   la versione installata ha lo **stesso** `1.1.<n>` del checkout. Per far
   avanzare il numero si fa `make build` e si committa il file aggiornato. Dopo
@@ -81,8 +81,17 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - `make gx-torrent` — solo il demone (`CGO_ENABLED=0`), con lo stesso numero di
   build proprio.
 - Non usare `go build ./cmd/gx-torrent/` dalla root: scrive un binario
-  `gx-torrent` nella root (ora ignorato). Per il demone usa `make gx-torrent`
-  (produce `bin/gx-torrent`).
+  `gx-torrent` (o `gx-torrent.exe` su Windows) nella root (ora ignorati). Per il
+  demone usa `make gx-torrent` (produce `bin/gx-torrent`).
+- **Windows**: il motore (`internal/gxcore`) e il demone (`cmd/gx-torrent`) sono
+  Go puro e **cross-compilano** per Windows (amd64/arm64):
+  `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Lo strato
+  di piattaforma del demone è `cmd/gx-torrent/fsinfo_*.go`; le letture di `/proc`
+  e `/sys` degradano senza errore. La CI (`ci.yml`, job `build-test`) ha degli
+  step che cross-compilano **sia il motore sia il demone** per Windows, così il
+  supporto non regredisce. Gextto intero (`cmd/gexttod`) **non** è Windows:
+  TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
+  (vedi `docs/gx-torrent.md`, *Uso standalone → Piattaforme*).
 - `make test` — `check-ui-settings-index` + `installer-selftest` +
   `CGO_ENABLED=0 go test ./...` (Go puro; i test del motore libtorrent sono dietro
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue

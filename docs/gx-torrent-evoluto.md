@@ -600,7 +600,12 @@ Realizzato:
 - `build-release.sh` lo genera nella variante Go pura e ne controlla il
   contenuto;
 - `release.yml` e `continuous.yml` caricano l'artifact `gx-torrent-linux-<arch>`
-  (solo variante `go`) e lo pubblicano nel release (`dist/gx-torrent-linux-*`).
+  (solo variante `go`) e lo pubblicano nel release (`dist/gx-torrent-linux-*`);
+- la CI (`ci.yml`, job `build-test`) cross-compila per **Windows** (amd64/arm64)
+  sia il motore `internal/gxcore` sia il demone `cmd/gx-torrent`, così il
+  supporto non regredisce. Il pacchetto Windows (zip + servizio) non è ancora
+  prodotto: c'è solo il binario compilabile (vedi `gx-torrent.md`,
+  *Uso standalone → Piattaforme*).
 
 **Chiarimento (concordato):** il pacchetto standalone è **lo stesso binario**
 che Gextto usa come motore (regola d'oro: un solo codice). La CI non costruisce
