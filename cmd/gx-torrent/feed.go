@@ -27,10 +27,13 @@ const (
 	feedMaxAddsPerPoll  = 25
 )
 
-// feedConfig is one configured feed with its rules.
+// feedConfig is one configured feed with its rules. A feed is either an RSS
+// URL or a Torznab search query ("search"); the search results are processed by
+// the same rules as a feed.
 type feedConfig struct {
 	Name     string `json:"name"`
 	URL      string `json:"url"`
+	Search   string `json:"search,omitempty"`  // Torznab query, across all indexers
 	Include  string `json:"include,omitempty"` // comma-separated
 	Exclude  string `json:"exclude,omitempty"`
 	Category string `json:"category,omitempty"`
@@ -126,17 +129,28 @@ func (d *Daemon) pollFeeds() {
 	}
 	client := &http.Client{Timeout: feedRequestTimeout}
 	for _, feed := range feeds {
-		if strings.TrimSpace(feed.URL) == "" {
+		search := strings.TrimSpace(feed.Search)
+		if strings.TrimSpace(feed.URL) == "" && search == "" {
 			continue
+		}
+		source := feed.URL
+		if search != "" {
+			source = "search:" + search
 		}
 		name := feed.Name
 		if name == "" {
-			name = feed.URL
+			name = source
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), feedRequestTimeout)
-		items, err := rss.Fetch(ctx, client, feed.URL, name)
+		var items []rss.Item
+		var err error
+		if search != "" {
+			items, err = d.searchFeed(ctx, name, search)
+		} else {
+			items, err = rss.Fetch(ctx, client, feed.URL, name)
+		}
 		cancel()
-		status := feedStatus{Name: name, URL: feed.URL, LastCheck: time.Now().Unix()}
+		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix()}
 		if err != nil {
 			status.LastError = err.Error()
 			logf("feed %s: %v", name, err)

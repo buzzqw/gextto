@@ -280,6 +280,11 @@ li ripropone). Nella pagina compaiono un riquadro *Feeds* con *Check feeds* e
 `GET /ui/feeds`/`POST /ui/feeds/poll` per lo stato e un controllo immediato. In
 managed non è disponibile.
 
+Un feed può anche essere una **ricerca**: al posto di `url` si usa `search` (una
+query) e il worker interroga gli **indexer** Torznab configurati, trattando i
+risultati come articoli del feed (stesse regole, dedup e azioni). Esempio:
+`[{"name":"cerca-serie","search":"Serie S01","include":"1080p"}]`.
+
 Con la chiave `rules` (array JSON) si passa al **set di regole ordinate**, come
 BiglyBT: la prima regola che corrisponde decide (`fail: true` scarta, altrimenti
 aggiunge). Ogni regola ha `name`, `feeds` (per limitarla ad alcuni feed; vuoto =

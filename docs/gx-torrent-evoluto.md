@@ -498,7 +498,7 @@ rimanenti:
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
-| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (resta il feed dai risultati di ricerca) |
+| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, **feed dai risultati di ricerca**, **notifiche webhook su match/errore**) | §12.2 | fatto |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
 **Aperti, da discutere dopo i precedenti:** il completamento di **F4 IPv6**
@@ -560,18 +560,18 @@ Matrice delle capacità (fonte → obiettivo gx-torrent):
 | Azioni: cartella, categoria, tag, pausa, priorità, sequenziale, limiti per torrent, in cima | sì | sì | sì | **sì** |
 | Storico download persistito (mai due volte) | solo smart episode | last matched | sì | **sì** |
 | Articoli corrispondenti per regola | sì | sì | sì | **sì** |
-| Feed anche da risultati di ricerca | plugin | no | sì | da valutare |
-| Notifiche su match/errore | mail | mail | sì | da valutare |
+| Feed anche da risultati di ricerca | plugin | no | sì | sì (`search` sugli indexer) |
+| Notifiche su match/errore | mail | mail | sì | sì (webhook `notify-url`) |
 
 Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torznab,
 **regole ordinate PASS/FAIL (primo match)**, filtri include/exclude, regex,
 dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
 (cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
 persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
-per regola e Add manuale. Le **notifiche su match/errore** sono disponibili via
-webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, payload JSON con gli eventi
-`feed_match` e `feed_error`). Resta da completare: il feed dai risultati di
-ricerca.
+per regola e Add manuale. I **feed possono essere anche ricerche**: un feed con
+il campo `search` interroga gli indexer e i risultati passano dalle stesse
+regole. Le **notifiche su match/errore** sono disponibili via webhook
+(`-notify-url` / `GX_TORRENT_NOTIFY_URL`, eventi `feed_match` e `feed_error`).
 
 ### 12.3 CI: gx-torrent standalone
 
