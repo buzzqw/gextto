@@ -416,8 +416,8 @@ verità usata dall'UI.
 | Tracker | rimozione | fatto (`set-trackers`) |
 | Web seed | add/remove a caldo | fatto (azione `webseeds`) |
 | Sequenziale | toggle a runtime | fatto (`PiecePicker.SetOrder`) |
-| Protocollo | IPv6 | no |
-| Protocollo | BitTorrent v2-only | wishlist |
+| Protocollo | IPv6 | fatto (socket dual-stack, `peers6`, PEX v6, DHT BEP 32); LSD v6 non prevista |
+| Protocollo | BitTorrent v2-only | parziale (fondamenta fatte, download non ancora) |
 | Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
 
 **vs anacrolix/torrent**: mancano streaming con readahead (fatto, vedi sotto),
@@ -442,8 +442,8 @@ file.
 | 6 | Limiti velocità per-torrent | **Fatto** — `Limiter.SetParent`/`SetLimitKiB` + `SetSpeedLimits`, riapplicati al riavvio |
 | 7 | Streaming HTTP Range + priorità pezzi | **Fatto** — `SetStreamWindow`, `/ui/stream`, redirect Gextto, pulsante ▶ |
 | 8 | Limiti connessioni/upload per-torrent | **Fatto** — `SetMaxConnections`/`SetMaxUploads` + `Unchoker.SetNumUnchoked` |
-| 9 | IPv6 | **No** |
-| 10 | BitTorrent v2-only | **Wishlist** |
+| 9 | IPv6 | **Fatto** — socket TCP/UDP dual-stack, risoluzione e indirizzi v6, `peers6`, PEX `added6`/`dropped6`, tracker UDP v6, `yourip` v6, blocklist CIDR v6, DHT dual-stack (BEP 32) |
+| 10 | BitTorrent v2-only | **Parziale** — parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256, magnet `btmh`, pacchetto `merkle`, validazione piece layers; manca il download end-to-end (modello file/piece, estensioni hash, abilitazione) |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `SetSuperSeeding` + azione `super-seeding`; capacità `full` |
 | 12 | Holepunching (BEP 55) | **Fatto** — `ut_holepunch` nel fork, relè peer, dial uTP, avvio dopo dial fallito; WebTorrent resta wishlist |
 | 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; super-seeding senza guadagno su sciami piccoli, opt-in; scaling su sciame reale, vedi §6 |
@@ -452,7 +452,10 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 
 ### 4.4 Wishlist residua
 
-- **BitTorrent v2-only**: richiede supporto v2 nel motore (grande).
+- **BitTorrent v2-only**: fondamenta fatte (parsing, hash SHA-256, `merkle`,
+  validazione `piece layers`); il **download end-to-end** resta il pezzo grande
+  (modello file/piece+storage, hash troncato, estensioni `hash request`/`hashes`,
+  abilitazione).
 - **WebTorrent/WebRTC**: nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
   serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa
