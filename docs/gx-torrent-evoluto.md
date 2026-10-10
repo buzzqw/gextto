@@ -469,29 +469,43 @@ invariato**.
 
 Aggiornato al 2026-10-10.
 
+**Prossimi item concordati** (in ordine di lavoro), poi si riparla dei punti
+rimanenti:
+
+| Voce | Piano | Stato |
+| --- | --- | --- |
+| F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | da fare |
+| F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | da fare |
+| F2 — virtualizzazione della tabella torrent | §14.3 | da fare |
+| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | da fare |
+
+**Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2,
+spostamento del motore in `internal/engine`, e i ritocchi al wizard
+(indexer/cartella temporanea).
+
+Storico (fatto):
+
 | Voce F0 | Stato |
 | --- | --- |
 | Logica di coda estratta in `internal/queue` (con i suoi test) | fatto |
 | Test di contratto API v1 (`cmd/gx-torrent/contract_test.go`) | fatto |
 | `ui.go`: template pigro (`sync.Once`) e asset in `internal/webui/assets` (`embed.FS`) | fatto |
 | Test di guardia §8.2 (goroutine, tempo di avvio, assenza di lavoro idle) | fatto |
-| Test di guardia §8.2: RSS e CPU contro qbittorrent-nox | da fare (harness opt-in) |
 | F1: `-mode` managed/standalone (autodetect da `-fingerprint`) e store `settings.json` (base) | fatto |
 | F1: protezione CSRF/same-origin della pagina in standalone | fatto |
 | F1: DNS rebinding (`Host` IP/localhost) e classificazione sorgente LAN | fatto |
 | F1: login con password (bcrypt), sessioni, bypass LAN senza password | fatto |
 | F1: ascolto LAN senza token permesso in standalone (managed invariato) | fatto |
 | F1: wizard di primo avvio (lingua, cartella, password, LAN, porta) | fatto |
-| F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare |
 | F3: API compatibile qBittorrent (auth, app, transfer, torrents info/add/delete/pause/resume/recheck/properties/files/trackers/reannounce/setLocation + categorie/tag) | fatto |
 | F3: compatibilità verificata col client qBittorrent di Gextto (`internal/qbittorrent`) | fatto |
+| F3: app/preferences e altri endpoint qBittorrent | fatto |
 | F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
 | F2: ricerca su indexer — client Torznab (`internal/torznab`) ed endpoint `/ui/search` | fatto |
 | F2: ricerca su indexer — casella e risultati nella pagina | fatto |
 | F2: RSS con regole (feed, include/escludi, categoria/cartella, dedup persistito) + riquadro nella pagina | fatto |
 | F2: Jackett/Prowlarr/MIRCrew via Torznab (ricerca e feed) | fatto |
-| F3: app/preferences e altri endpoint qBittorrent | fatto |
-| Spostamento del motore in `internal/engine` | F4 (§11.3) |
+| F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare (dopo gli item concordati) |
 
 ---
 

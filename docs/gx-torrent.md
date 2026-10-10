@@ -277,6 +277,12 @@ li ripropone). Nella pagina compaiono un riquadro *Feeds* con *Check feeds* e
 `GET /ui/feeds`/`POST /ui/feeds/poll` per lo stato e un controllo immediato. In
 managed non è disponibile.
 
+Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
+finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
+`schedule-start`/`schedule-end` (`HH:MM`, anche a cavallo della mezzanotte) il
+demone usa `schedule-download`/`schedule-upload` (KiB/s) dentro la finestra e i
+limiti normali fuori. I limiti cambiano a caldo, senza riaprire la sessione.
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 

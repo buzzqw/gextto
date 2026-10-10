@@ -159,9 +159,12 @@ type Daemon struct {
 	trackers *trackerHealth
 	// sessions holds the standalone login sessions (nil in managed).
 	sessions *auth.Sessions
-	// feedMu guards feedStatus (the RSS feeds' last outcome).
+	// feedMu guards feedStatuses (the RSS feeds' last outcome).
 	feedMu       sync.Mutex
 	feedStatuses map[string]feedStatus
+	// appliedDL/appliedUL are the global limits currently on the session.
+	appliedDL int64
+	appliedUL int64
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
@@ -228,6 +231,8 @@ func newDaemon(opts Options) (*Daemon, error) {
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
 		trackers:  newTrackerHealth(),
+		appliedDL: -1,
+		appliedUL: -1,
 	}
 	if opts.Mode == ModeStandalone {
 		d.sessions = auth.NewSessions(30 * 24 * time.Hour)
@@ -788,6 +793,7 @@ func (d *Daemon) tick(now time.Time) {
 
 	d.limits = d.dyn.Limits(cfg, aggregate, queued, now)
 	d.adaptCacheLocked(now, activeDownloads, activeSeeds, aggregate)
+	d.applyEffectiveSpeedLimitsLocked(now)
 	plan := queue.PlanQueue(items, d.limits, cfg, now)
 	for _, id := range plan.Rotate {
 		if meta, ok := d.state.Torrents[id]; ok {
@@ -1692,10 +1698,7 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	// Speed limits and the cache size change in place: reopening the session
 	// would drop every peer and stall the transfers for seconds.
 	if previous.SpeedLimitDownload != next.SpeedLimitDownload || previous.SpeedLimitUpload != next.SpeedLimitUpload {
-		if d.session != nil {
-			d.session.SetSpeedLimits(next.SpeedLimitDownload, next.SpeedLimitUpload)
-		}
-		logf("speed limits set to %d KiB/s download, %d KiB/s upload (0 = unlimited)", next.SpeedLimitDownload, next.SpeedLimitUpload)
+		d.applyEffectiveSpeedLimitsLocked(time.Now())
 	}
 	if previous.CacheMB != next.CacheMB || !queue.SameBoolPtr(previous.Auto, next.Auto) {
 		d.cacheCheckedAt = time.Time{}
