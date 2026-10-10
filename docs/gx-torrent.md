@@ -243,7 +243,7 @@ avvio (la chiave `peer-ports` è letta quando la flag non è passata).
 In standalone il demone espone anche un'**API compatibile qBittorrent**
 (`/api/v2`) per Sonarr, Radarr e le app mobili: `auth/login` e `auth/logout`
 (cookie `SID`, la stessa password del login), `app/version`,
-`app/webapiVersion`, `transfer/info` e
+`app/webapiVersion`, `app/preferences|setPreferences`, `transfer/info` e
 `torrents/info|add|delete|pause|resume|recheck`, più categorie e tag
 (`torrents/categories`, `createCategory`, `removeCategories`, `setCategory`,
 `torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; categoria

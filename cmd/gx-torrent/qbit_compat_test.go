@@ -109,6 +109,9 @@ func TestQbitCompatibleWithGexttoClient(t *testing.T) {
 	if err := client.SetTorrentUploadLimit(ctx, 1<<19, "abc"); err != nil {
 		t.Fatalf("setUploadLimit: %v", err)
 	}
+	if err := client.SetPreferences(ctx, map[string]any{"dl_limit": 1 << 20, "queueing_enabled": false}); err != nil {
+		t.Fatalf("setPreferences: %v", err)
+	}
 	if err := client.Delete(ctx, false, "abc"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}

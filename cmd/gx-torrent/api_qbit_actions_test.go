@@ -181,3 +181,25 @@ func TestQbitForceStartAndTorrentLimit(t *testing.T) {
 			meta.DownloadLimitKib != nil && *meta.DownloadLimitKib == (2<<20)/1024
 	})
 }
+
+func TestQbitSetPreferences(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	body := `{"dl_limit":2097152,"up_limit":1048576,"queueing_enabled":false,"disk_cache":512}`
+	resp, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {body}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	d.mu.Lock()
+	dl, up := d.state.Config.SpeedLimitDownload, d.state.Config.SpeedLimitUpload
+	d.mu.Unlock()
+	if dl != 2048 || up != 1024 {
+		t.Fatalf("global limits = %d/%d KiB, want 2048/1024", dl, up)
+	}
+}

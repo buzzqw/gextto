@@ -76,6 +76,7 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/setAutoManagement", d.handleQbitSetAutoManagement)
 	mux.HandleFunc("POST /api/v2/torrents/setDownloadLimit", d.handleQbitSetTorrentDownloadLimit)
 	mux.HandleFunc("POST /api/v2/torrents/setUploadLimit", d.handleQbitSetTorrentUploadLimit)
+	mux.HandleFunc("POST /api/v2/app/setPreferences", d.handleQbitSetPreferences)
 	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
 	return d.qbitAuth(mux)
 }
@@ -871,6 +872,41 @@ func (d *Daemon) handleQbitSetUploadLimit(w http.ResponseWriter, r *http.Request
 		return
 	}
 	qbitText(w, http.StatusOK, qbitOKCode)
+}
+
+// handleQbitSetPreferences applies the qBittorrent preferences that map onto the
+// daemon's own settings (the global download/upload limits). Everything else
+// (queueing_enabled, disk_cache, ...) is accepted and ignored: the daemon
+// manages its queue and cache itself.
+func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimSpace(r.FormValue("json"))
+	if raw == "" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	var prefs map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &prefs); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	for _, m := range []struct{ pref, config string }{
+		{"dl_limit", "speed_limit_download"},
+		{"up_limit", "speed_limit_upload"},
+	} {
+		v, ok := prefs[m.pref]
+		if !ok {
+			continue
+		}
+		var limit int64
+		if json.Unmarshal(v, &limit) != nil || limit < 0 {
+			continue
+		}
+		if err := d.qbitSetSpeedLimit(m.config, strconv.FormatInt(limit, 10)); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleQbitSync answers /api/v2/sync/maindata with a full snapshot every time
