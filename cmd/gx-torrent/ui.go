@@ -92,6 +92,9 @@ type uiPageData struct {
 	Tags       []string
 	// SearchEnabled shows the indexer search box (standalone with indexers).
 	SearchEnabled bool
+	// FeedsEnabled shows the RSS feeds toolbar (standalone with feeds).
+	FeedsEnabled bool
+	FeedCount    int
 
 	Rows []uiTorrentRow
 }
@@ -1028,6 +1031,12 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 	sort.Strings(page.Categories)
 	page.Tags = d.tagsSnapshot()
 	page.SearchEnabled = d.opts.Mode == ModeStandalone && len(d.indexers()) > 0
+	if d.opts.Mode == ModeStandalone {
+		if feeds := d.feeds(); len(feeds) > 0 {
+			page.FeedsEnabled = true
+			page.FeedCount = len(feeds)
+		}
+	}
 	for _, view := range views {
 		row := uiTorrentRow{
 			Hash:      view.Hash,

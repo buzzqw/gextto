@@ -124,6 +124,9 @@ type persistedState struct {
 	Categories map[string]string `json:"categories,omitempty"`
 	// Tags is the set of known tag names (a tag can exist before it is used).
 	Tags []string `json:"tags,omitempty"`
+	// FeedSeen records the feed items already added, so a restart does not add
+	// them again (key: feed name + item guid).
+	FeedSeen map[string]int64 `json:"feed_seen,omitempty"`
 }
 
 // runtimeInfo is volatile per-torrent bookkeeping.
@@ -156,6 +159,9 @@ type Daemon struct {
 	trackers *trackerHealth
 	// sessions holds the standalone login sessions (nil in managed).
 	sessions *auth.Sessions
+	// feedMu guards feedStatus (the RSS feeds' last outcome).
+	feedMu       sync.Mutex
+	feedStatuses map[string]feedStatus
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
@@ -534,6 +540,8 @@ func (d *Daemon) poke() {
 // ---------------------------------------------------------------------------
 
 func (d *Daemon) run(stop <-chan struct{}) {
+	// The RSS engine runs beside the queue loop, only in standalone mode.
+	go d.runFeeds(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {

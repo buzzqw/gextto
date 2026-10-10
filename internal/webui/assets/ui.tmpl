@@ -154,6 +154,13 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   </div>
   <div id="searchresults"></div>
   {{end}}
+  {{if .FeedsEnabled}}
+  <div class="toolbar">
+    <span class="muted">Feeds <b>{{.FeedCount}}</b></span>
+    <button type="button" onclick="checkFeeds()">Check feeds</button>
+    <span class="muted" id="feedsinfo"></span>
+  </div>
+  {{end}}
 
   <div class="toolbar">
     <span class="muted">Selected: <b id="selcount">0</b></span>
@@ -215,6 +222,9 @@ function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator
 function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
 function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent=t('loading…');fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent=t('Cannot read the Gextto log:')+' '+e.message;document.getElementById('log-info').textContent='';});}
 function renderLog(scroll){var view=document.getElementById('log-view');var q=(document.getElementById('log-filter').value||'').toLowerCase();var nodebug=document.getElementById('log-nodebug').checked;var frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
+{{if .FeedsEnabled}}
+function checkFeeds(){var info=document.getElementById('feedsinfo');if(!info)return;info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');refresh(true);}).catch(function(){info.textContent='';});}
+{{end}}
 {{if .SearchEnabled}}
 function runSearch(){var q=(document.getElementById('searchbox').value||'').trim();var box=document.getElementById('searchresults');var info=document.getElementById('searchinfo');if(!q){box.innerHTML='';info.textContent='';return;}info.textContent=t('Searching…');fetch('/ui/search?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){info.textContent='';box.innerHTML='';if(!list.length){info.textContent=t('No results');return;}list.forEach(function(it){var row=document.createElement('div');row.className='toolbar';var name=document.createElement('span');name.textContent=it.title;row.appendChild(name);var meta=document.createElement('span');meta.className='muted';meta.textContent=fmtBytes(it.size)+' · '+t('Seeds')+' '+it.seeders;row.appendChild(meta);var b=document.createElement('button');b.type='button';b.className='primary';b.textContent=t('Add');b.onclick=function(){addSearch(it);};row.appendChild(b);box.appendChild(row);});}).catch(function(){info.textContent=t('No results');});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}

@@ -141,6 +141,11 @@ var uiCatalog = map[string][5]string{
 	"Searching…":       {"Ricerca…", "Suche…", "Recherche…", "Buscando…", "Szukam…"},
 	"No results":       {"Nessun risultato", "Keine Ergebnisse", "Aucun résultat", "Sin resultados", "Brak wyników"},
 
+	// RSS feeds (standalone).
+	"Feeds":       {"Feed", "Feeds", "Flux", "Feeds", "Kanały"},
+	"Check feeds": {"Controlla i feed", "Feeds prüfen", "Vérifier les flux", "Comprobar feeds", "Sprawdź kanały"},
+	"Checking…":   {"Controllo…", "Prüfe…", "Vérification…", "Comprobando…", "Sprawdzam…"},
+
 	// Files tab.
 	"Priority": {"Priorità", "Priorität", "Priorité", "Prioridad", "Priorytet"},
 	"Play":     {"Riproduci", "Abspielen", "Lire", "Reproducir", "Odtwórz"},
@@ -273,6 +278,7 @@ var uiClientKeys = []string{
 	"Search",
 	"Searching…",
 	"No results",
+	"Checking…",
 	"Seeds",
 	"Add",
 }

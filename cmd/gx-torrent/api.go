@@ -49,6 +49,8 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
 	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
 	root.HandleFunc("GET /ui/search", d.handleUISearch)
+	root.HandleFunc("GET /ui/feeds", d.handleUIFeeds)
+	root.HandleFunc("POST /ui/feeds/poll", d.handleUIFeedPoll)
 	root.HandleFunc("GET /ui/portcheck", d.handleUIPortCheck)
 	root.HandleFunc("GET /ui/stream", d.handleUIStream)
 	root.HandleFunc("GET /ui/login", d.handleUILogin)

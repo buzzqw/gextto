@@ -263,6 +263,18 @@ La **ricerca su indexer** (standalone) usa la chiave `indexers` di
 Prowlarr): `GET /ui/search?q=…` interroga tutti, unisce i risultati e li ordina
 per seed. Con almeno un indexer configurato compare nella pagina la **casella di
 ricerca**, con i risultati e un pulsante *Add* per aggiungere il torrent. In
+managed non è disponibile. **Jackett, Prowlarr e MIRCrew** parlano tutti Torznab
+(il servizio `mircrew-indexer` espone un endpoint Torznab), quindi si configurano
+allo stesso modo.
+
+L'**RSS** (standalone) usa la chiave `feeds`: un array JSON di feed con le
+regole, ad esempio
+`[{"name":"Serie","url":"http://…rss","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
+Un worker (ogni `feed-interval-secs`, predefinito 15 minuti) scarica ogni feed,
+applica `include`/`exclude` sul titolo e aggiunge magnet e `.torrent` non ancora
+visti (l'elenco degli elementi già aggiunti è persistito, quindi un riavvio non
+li ripropone). Nella pagina compaiono un riquadro *Feeds* con *Check feeds* e
+`GET /ui/feeds`/`POST /ui/feeds/poll` per lo stato e un controllo immediato. In
 managed non è disponibile.
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad

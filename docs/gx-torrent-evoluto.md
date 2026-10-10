@@ -488,6 +488,8 @@ Aggiornato al 2026-10-10.
 | F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
 | F2: ricerca su indexer — client Torznab (`internal/torznab`) ed endpoint `/ui/search` | fatto |
 | F2: ricerca su indexer — casella e risultati nella pagina | fatto |
+| F2: RSS con regole (feed, include/escludi, categoria/cartella, dedup persistito) + riquadro nella pagina | fatto |
+| F2: Jackett/Prowlarr/MIRCrew via Torznab (ricerca e feed) | fatto |
 | F3: app/preferences e altri endpoint qBittorrent | fatto |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
