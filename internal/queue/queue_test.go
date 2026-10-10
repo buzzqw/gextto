@@ -1,77 +1,76 @@
-package main
+package queue
 
 import (
-	"net/url"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func cfgForTest() QueueConfig {
-	cfg := defaultQueueConfig()
+func testConfig() Config {
+	cfg := DefaultConfig()
 	cfg.ActiveDownloads = 2
 	cfg.ActiveSeeds = 1
 	cfg.ActiveLimit = 4
-	return cfg.normalized()
+	return cfg.Normalized()
 }
 
-func limitsOf(cfg QueueConfig) effectiveLimits {
-	return effectiveLimits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit}
+func limitsOf(cfg Config) Limits {
+	return Limits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit}
 }
 
 func TestPlanQueueStartsInQueueOrder(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "c", Managed: true, Pos: 3},
 		{ID: "a", Managed: true, Pos: 1},
 		{ID: "b", Managed: true, Pos: 2},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Start, []string{"a", "b"}) || len(plan.Stop) != 0 {
 		t.Fatalf("unexpected plan %+v", plan)
 	}
 }
 
 func TestPlanQueueStopsOverTheSlotLimit(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "a", Managed: true, Running: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Pos: 2},
 		{ID: "c", Managed: true, Running: true, Pos: 3},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Stop, []string{"c"}) || len(plan.Start) != 0 {
 		t.Fatalf("unexpected plan %+v", plan)
 	}
 }
 
 func TestPlanQueueSlowTorrentFreesItsSlot(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "a", Managed: true, Running: true, Slow: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Pos: 2},
 		{ID: "c", Managed: true, Pos: 3},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Start, []string{"c"}) || len(plan.Stop) != 0 {
 		t.Fatalf("a slow torrent must not hold a slot: %+v", plan)
 	}
 
 	cfg.DontCountSlow = false
-	plan = planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan = PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if len(plan.Start) != 0 {
 		t.Fatalf("with dont_count_slow off the slow torrent keeps its slot: %+v", plan)
 	}
 }
 
 func TestPlanQueueNeverTouchesUnmanagedTorrents(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "paused", Pos: 1},
 		{ID: "parked-running", Running: true, Pos: 2},
 		{ID: "a", Managed: true, Pos: 3},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Start, []string{"a"}) {
 		t.Fatalf("user-paused or parked torrents must not start: %+v", plan)
 	}
@@ -81,26 +80,26 @@ func TestPlanQueueNeverTouchesUnmanagedTorrents(t *testing.T) {
 }
 
 func TestPlanQueueForcedTorrentsRunWithoutASlot(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "pinned", Forced: true, Pos: 9},
 		{ID: "a", Managed: true, Running: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Pos: 2},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Start, []string{"pinned"}) || len(plan.Stop) != 0 {
 		t.Fatalf("unexpected plan %+v", plan)
 	}
 }
 
 func TestPlanQueueSeedsUseTheirOwnSlots(t *testing.T) {
-	cfg := cfgForTest()
-	items := []queueItem{
+	cfg := testConfig()
+	items := []Item{
 		{ID: "s1", Managed: true, Complete: true, Running: true, Pos: 1},
 		{ID: "s2", Managed: true, Complete: true, Pos: 2},
 		{ID: "d1", Managed: true, Pos: 3},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Start, []string{"d1"}) || len(plan.Stop) != 0 {
 		t.Fatalf("unexpected plan %+v", plan)
 	}
@@ -110,9 +109,9 @@ func TestPlanQueueSeedsUseTheirOwnSlots(t *testing.T) {
 // so that waiting torrents get a turn, and the rotated ones are not restarted
 // until their cooldown expires.
 func TestPlanQueueRotatesSlowTorrentsAtTheCap(t *testing.T) {
-	cfg := cfgForTest()
+	cfg := testConfig()
 	now := time.Now()
-	items := []queueItem{
+	items := []Item{
 		{ID: "a", Managed: true, Running: true, Slow: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Slow: true, Pos: 2},
 		{ID: "c", Managed: true, Running: true, Slow: true, Pos: 3},
@@ -120,7 +119,7 @@ func TestPlanQueueRotatesSlowTorrentsAtTheCap(t *testing.T) {
 		{ID: "e", Managed: true, Pos: 5},
 		{ID: "f", Managed: true, Pos: 6},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, now)
+	plan := PlanQueue(items, limitsOf(cfg), cfg, now)
 	if !reflect.DeepEqual(plan.Start, []string{"e", "f"}) {
 		t.Fatalf("waiting torrents must start: %+v", plan)
 	}
@@ -130,7 +129,7 @@ func TestPlanQueueRotatesSlowTorrentsAtTheCap(t *testing.T) {
 
 	// Next round: c and d were rotated (back of the queue, cooling down); e
 	// and f are in their grace time. Nothing must change.
-	items = []queueItem{
+	items = []Item{
 		{ID: "a", Managed: true, Running: true, Slow: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Slow: true, Pos: 2},
 		{ID: "e", Managed: true, Running: true, Pos: 5},
@@ -138,55 +137,55 @@ func TestPlanQueueRotatesSlowTorrentsAtTheCap(t *testing.T) {
 		{ID: "c", Managed: true, RotatedAt: now, Pos: 7},
 		{ID: "d", Managed: true, RotatedAt: now, Pos: 8},
 	}
-	plan = planQueue(items, limitsOf(cfg), cfg, now.Add(10*time.Second))
+	plan = PlanQueue(items, limitsOf(cfg), cfg, now.Add(10*time.Second))
 	if len(plan.Start)+len(plan.Stop)+len(plan.Rotate) != 0 {
 		t.Fatalf("the queue must be stable: %+v", plan)
 	}
 
 	// e and f turn slow too: c and d are cooling down and must not churn.
 	items[2].Slow, items[3].Slow = true, true
-	plan = planQueue(items, limitsOf(cfg), cfg, now.Add(5*time.Minute))
+	plan = PlanQueue(items, limitsOf(cfg), cfg, now.Add(5*time.Minute))
 	if len(plan.Start)+len(plan.Stop)+len(plan.Rotate) != 0 {
 		t.Fatalf("cooling-down torrents must not churn: %+v", plan)
 	}
 
 	// After the cooldown, the rotated torrents get their turn back.
-	plan = planQueue(items, limitsOf(cfg), cfg, now.Add(time.Duration(cfg.SlowRotateSecs+1)*time.Second))
+	plan = PlanQueue(items, limitsOf(cfg), cfg, now.Add(time.Duration(cfg.SlowRotateSecs+1)*time.Second))
 	if !reflect.DeepEqual(plan.Start, []string{"c", "d"}) || !reflect.DeepEqual(plan.Rotate, []string{"e", "f"}) {
 		t.Fatalf("after the cooldown the slow torrents rotate: %+v", plan)
 	}
 }
 
 func TestPlanQueueCapPrefersHealthyTorrents(t *testing.T) {
-	cfg := cfgForTest()
+	cfg := testConfig()
 	cfg.ActiveLimit = 2
-	items := []queueItem{
+	items := []Item{
 		{ID: "a", Managed: true, Running: true, Pos: 1},
 		{ID: "b", Managed: true, Running: true, Slow: true, Pos: 2},
 		{ID: "s", Managed: true, Complete: true, Running: true, Pos: 3},
 	}
-	plan := planQueue(items, limitsOf(cfg), cfg, time.Now())
+	plan := PlanQueue(items, limitsOf(cfg), cfg, time.Now())
 	if !reflect.DeepEqual(plan.Stop, []string{"b"}) {
 		t.Fatalf("the slow download goes first: %+v", plan)
 	}
 }
 
 func TestDynamicQueueWidensWhenBandwidthIsUnused(t *testing.T) {
-	cfg := defaultQueueConfig()
+	cfg := DefaultConfig()
 	cfg.DynamicQueue = true
 	cfg.ActiveDownloads = 2
 	cfg.DynamicMin = 1
 	cfg.DynamicMax = 6
 	cfg.SpeedLimitDownload = 1000 // KiB/s
-	cfg = cfg.normalized()
-	var q dynamicQueue
+	cfg = cfg.Normalized()
+	var q Dynamic
 	now := time.Now()
-	limits := q.limits(cfg, 100*1024, 3, now)
+	limits := q.Limits(cfg, 100*1024, 3, now)
 	if limits.Downloads != 2 {
 		t.Fatalf("starts from active_downloads: %+v", limits)
 	}
 	for i := 1; i <= 3; i++ {
-		limits = q.limits(cfg, 100*1024, 3, now.Add(time.Duration(i)*100*time.Second))
+		limits = q.Limits(cfg, 100*1024, 3, now.Add(time.Duration(i)*100*time.Second))
 	}
 	if limits.Downloads <= 2 {
 		t.Fatalf("an idle line with queued torrents must widen the queue: %+v", limits)
@@ -197,18 +196,18 @@ func TestDynamicQueueWidensWhenBandwidthIsUnused(t *testing.T) {
 }
 
 func TestDynamicQueueNarrowsWhenSaturated(t *testing.T) {
-	cfg := defaultQueueConfig()
+	cfg := DefaultConfig()
 	cfg.DynamicQueue = true
 	cfg.ActiveDownloads = 4
 	cfg.DynamicMin = 1
 	cfg.DynamicMax = 6
 	cfg.SpeedLimitDownload = 1000
-	cfg = cfg.normalized()
-	q := dynamicQueue{}
+	cfg = cfg.Normalized()
+	q := Dynamic{}
 	start := time.Now()
-	var limits effectiveLimits
+	var limits Limits
 	for i := 0; i < 40; i++ {
-		limits = q.limits(cfg, 1000*1024, 0, start.Add(time.Duration(i)*5*time.Minute))
+		limits = q.Limits(cfg, 1000*1024, 0, start.Add(time.Duration(i)*5*time.Minute))
 	}
 	if limits.Downloads >= 4 {
 		t.Fatalf("a saturated line must narrow the queue: %+v", limits)
@@ -219,84 +218,9 @@ func TestDynamicQueueNarrowsWhenSaturated(t *testing.T) {
 }
 
 func TestDynamicQueueOffUsesStaticLimits(t *testing.T) {
-	cfg := cfgForTest()
-	var q dynamicQueue
-	if got := q.limits(cfg, 0, 10, time.Now()); got != limitsOf(cfg) {
+	cfg := testConfig()
+	var q Dynamic
+	if got := q.Limits(cfg, 0, 10, time.Now()); got != limitsOf(cfg) {
 		t.Fatalf("static limits expected, got %+v", got)
-	}
-}
-
-func TestMagnetInfoHash(t *testing.T) {
-	hexHash := "0123456789abcdef0123456789abcdef01234567"
-	if got, ok := magnetInfoHash("magnet:?xt=urn:btih:" + hexHash + "&dn=x"); !ok || got != hexHash {
-		t.Fatalf("hex magnet: %q %v", got, ok)
-	}
-	if got, ok := magnetInfoHash("magnet:?xt=urn:btih:AERUKZ4JVPG66AJDIVTYTK6N54ASGRLH"); !ok || got != hexHash {
-		t.Fatalf("base32 magnet: %q %v", got, ok)
-	}
-	if _, ok := magnetInfoHash("http://example.org/a.torrent"); ok {
-		t.Fatal("not a magnet")
-	}
-}
-
-func TestV2OnlyDetection(t *testing.T) {
-	if !magnetIsV2Only("magnet:?xt=urn:btmh:1220abcd") {
-		t.Fatal("btmh-only magnet must be v2-only")
-	}
-	if magnetIsV2Only("magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&xt=urn:btmh:1220abcd") {
-		t.Fatal("hybrid magnet is supported")
-	}
-	if !torrentIsV2Only([]byte("d4:infod9:file treed...e12:meta versioni2e4:name1:xee")) {
-		t.Fatal("v2-only torrent not detected")
-	}
-	if torrentIsV2Only([]byte("d4:infod12:meta versioni2e6:pieces20:....................ee")) {
-		t.Fatal("hybrid torrent is supported")
-	}
-}
-
-func TestNormalizeMagnetForRain(t *testing.T) {
-	hexHash := "0123456789abcdef0123456789abcdef01234567"
-	// btmh listed first: rain reads only the first xt, so btih must move in
-	// front and the btmh must be dropped.
-	hybrid := "magnet:?xt=urn:btmh:1220aabb&xt=urn:btih:" + hexHash + "&dn=Title&tr=http%3A%2F%2Ft.example"
-	got := normalizeMagnetForRain(hybrid)
-	parsed, err := url.Parse(got)
-	if err != nil {
-		t.Fatalf("normalized magnet does not parse: %v", err)
-	}
-	xts := parsed.Query()["xt"]
-	if len(xts) != 1 || xts[0] != "urn:btih:"+hexHash {
-		t.Fatalf("xt must be exactly the v1 hash first, got %v", xts)
-	}
-	if parsed.Query().Get("dn") != "Title" || len(parsed.Query()["tr"]) != 1 {
-		t.Fatalf("dn/tr must be preserved, got %q", got)
-	}
-	// A plain magnet is left usable (the v1 hash stays first).
-	if h, ok := magnetInfoHash(normalizeMagnetForRain("magnet:?xt=urn:btih:" + hexHash)); !ok || h != hexHash {
-		t.Fatalf("plain magnet broken: %q %v", h, ok)
-	}
-}
-
-func TestCacheSizes(t *testing.T) {
-	cfg := defaultQueueConfig()
-	read, write, auto := cacheSizes(cfg, 2<<30) // 2 GiB of RAM
-	if !auto || read != 64*mib || write != 128*mib {
-		t.Fatalf("2 GiB: %d %d %v", read/mib, write/mib, auto)
-	}
-	read, write, _ = cacheSizes(cfg, 64<<30) // big server: capped
-	if read != 512*mib || write != 1024*mib {
-		t.Fatalf("64 GiB: %d %d", read/mib, write/mib)
-	}
-	read, _, _ = cacheSizes(cfg, 512<<20) // tiny box: floor
-	if read != 32*mib {
-		t.Fatalf("512 MiB: %d", read/mib)
-	}
-	cfg.CacheMB = 300
-	read, write, auto = cacheSizes(cfg, 2<<30)
-	if auto || read != 300*mib || write != 300*mib {
-		t.Fatalf("manual: %d %d %v", read/mib, write/mib, auto)
-	}
-	if defaultQueueConfig().normalized().CacheMB != -1 || (QueueConfig{}).normalized().CacheMB != -1 {
-		t.Fatal("0 and unset mean automatic")
 	}
 }

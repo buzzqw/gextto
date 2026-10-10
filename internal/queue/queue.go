@@ -1,8 +1,9 @@
-package main
+package queue
 
-// queue.go is gx-torrent's own queue manager. rain has no queue, so the
-// daemon decides every few seconds which torrents run, with the same policy
-// Gextto configures on libtorrent:
+// Package queue is gx-torrent's own queue manager, extracted from the daemon's
+// package main so it can be reused and tested in isolation. rain has no queue,
+// so the daemon decides every few seconds which torrents run, with the same
+// policy Gextto configures on libtorrent:
 //
 //   - active_downloads / active_seeds slots, ordered by queue position;
 //   - dont_count_slow: a running torrent that moves no payload for
@@ -23,8 +24,8 @@ import (
 	"time"
 )
 
-// QueueConfig is the queue policy, pushed by Gextto and persisted.
-type QueueConfig struct {
+// Config is the queue policy, pushed by Gextto and persisted.
+type Config struct {
 	ActiveDownloads int   `json:"active_downloads"`
 	ActiveSeeds     int   `json:"active_seeds"`
 	ActiveLimit     int   `json:"active_limit"`
@@ -56,8 +57,9 @@ type QueueConfig struct {
 	Auto *bool `json:"auto"`
 }
 
-func defaultQueueConfig() QueueConfig {
-	return QueueConfig{
+// DefaultConfig is the queue policy of a fresh installation.
+func DefaultConfig() Config {
+	return Config{
 		ActiveDownloads: 3,
 		ActiveSeeds:     3,
 		ActiveLimit:     5,
@@ -69,22 +71,23 @@ func defaultQueueConfig() QueueConfig {
 		DynamicMax:      10,
 		CacheMB:         -1,
 		CacheTTLSecs:    300,
-		Auto:            boolPtr(true),
+		Auto:            BoolPtr(true),
 	}
 }
 
-func boolPtr(v bool) *bool { return &v }
+// BoolPtr returns a pointer to v, for the optional bool settings.
+func BoolPtr(v bool) *bool { return &v }
 
-// sameBoolPtr compares two optional flags, treating two nils as equal.
-func sameBoolPtr(a, b *bool) bool {
+// SameBoolPtr compares two optional flags, treating two nils as equal.
+func SameBoolPtr(a, b *bool) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
 	return *a == *b
 }
 
-// normalized clamps the configuration into a usable range.
-func (c QueueConfig) normalized() QueueConfig {
+// Normalized clamps the configuration into a usable range.
+func (c Config) Normalized() Config {
 	if c.ActiveDownloads < 1 {
 		c.ActiveDownloads = 1
 	}
@@ -122,13 +125,13 @@ func (c QueueConfig) normalized() QueueConfig {
 		c.CacheTTLSecs = 300
 	}
 	if c.Auto == nil {
-		c.Auto = boolPtr(true)
+		c.Auto = BoolPtr(true)
 	}
 	return c
 }
 
-// queueItem is the planner's view of one torrent.
-type queueItem struct {
+// Item is the planner's view of one torrent.
+type Item struct {
 	ID       string
 	Complete bool
 	Running  bool
@@ -143,26 +146,26 @@ type queueItem struct {
 	Pos       int64
 }
 
-// queuePlan is the outcome of one planning round.
-type queuePlan struct {
+// Plan is the outcome of one planning round.
+type Plan struct {
 	Start  []string
 	Stop   []string
 	Rotate []string // stopped for being slow: move to the back of the queue
 }
 
-// effectiveLimits are the slot counts used for one round.
-type effectiveLimits struct {
+// Limits are the slot counts used for one round.
+type Limits struct {
 	Downloads int
 	Seeds     int
 	Limit     int
 }
 
-// planQueue decides which torrents run. It is a pure function: the daemon
+// PlanQueue decides which torrents run. It is a pure function: the daemon
 // applies the plan.
-func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now time.Time) queuePlan {
-	var plan queuePlan
+func PlanQueue(items []Item, limits Limits, cfg Config, now time.Time) Plan {
+	var plan Plan
 	want := map[string]bool{}
-	var downloads, seeds []queueItem
+	var downloads, seeds []Item
 	for _, item := range items {
 		switch {
 		case item.Forced:
@@ -175,7 +178,7 @@ func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now t
 			want[item.ID] = false
 		}
 	}
-	byPos := func(list []queueItem) {
+	byPos := func(list []Item) {
 		sort.SliceStable(list, func(i, j int) bool {
 			if list[i].Pos != list[j].Pos {
 				return list[i].Pos < list[j].Pos
@@ -187,12 +190,12 @@ func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now t
 	byPos(seeds)
 
 	rotateCooldown := time.Duration(cfg.SlowRotateSecs) * time.Second
-	coolingDown := func(item queueItem) bool {
+	coolingDown := func(item Item) bool {
 		return !item.Running && !item.RotatedAt.IsZero() && now.Sub(item.RotatedAt) < rotateCooldown
 	}
 
-	var wanted []queueItem
-	fill := func(list []queueItem, slots int) {
+	var wanted []Item
+	fill := func(list []Item, slots int) {
 		counted := 0
 		for _, item := range list {
 			if counted >= slots {
@@ -213,7 +216,7 @@ func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now t
 	// out; then stop slow seeds, slow downloads, new starts, and finally
 	// healthy running torrents, always from the back of the queue.
 	if excess := len(wanted) - limits.Limit; excess > 0 {
-		rank := func(item queueItem) int {
+		rank := func(item Item) int {
 			switch {
 			case coolingDown(item):
 				return 0
@@ -231,7 +234,7 @@ func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now t
 				return 6
 			}
 		}
-		candidates := append([]queueItem(nil), wanted...)
+		candidates := append([]Item(nil), wanted...)
 		sort.SliceStable(candidates, func(i, j int) bool {
 			ri, rj := rank(candidates[i]), rank(candidates[j])
 			if ri != rj {
@@ -265,11 +268,11 @@ func planQueue(items []queueItem, limits effectiveLimits, cfg QueueConfig, now t
 	return plan
 }
 
-// dynamicQueue adapts active_downloads to the line, like the libtorrent
-// bridge: narrow when the global limit is saturated for ten minutes, widen
-// quickly when bandwidth is unused and torrents are waiting. Seeds drop to one
-// while downloads are queued, so seeding never starves a download.
-type dynamicQueue struct {
+// Dynamic adapts active_downloads to the line, like the libtorrent bridge:
+// narrow when the global limit is saturated for ten minutes, widen quickly
+// when bandwidth is unused and torrents are waiting. Seeds drop to one while
+// downloads are queued, so seeding never starves a download.
+type Dynamic struct {
 	downloads     int
 	seeds         int
 	samples       []rateSample
@@ -285,13 +288,13 @@ type rateSample struct {
 	rate int64
 }
 
-// limits returns the slot counts for this round. aggregateRate is the total
+// Limits returns the slot counts for this round. aggregateRate is the total
 // download rate of running downloads; queued counts the downloads waiting
 // for a slot.
-func (q *dynamicQueue) limits(cfg QueueConfig, aggregateRate int64, queued int, now time.Time) effectiveLimits {
+func (q *Dynamic) Limits(cfg Config, aggregateRate int64, queued int, now time.Time) Limits {
 	if !cfg.DynamicQueue {
-		*q = dynamicQueue{}
-		return effectiveLimits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit}
+		*q = Dynamic{}
+		return Limits{Downloads: cfg.ActiveDownloads, Seeds: cfg.ActiveSeeds, Limit: cfg.ActiveLimit}
 	}
 	if q.downloads == 0 {
 		q.downloads = clampInt(cfg.ActiveDownloads, cfg.DynamicMin, cfg.DynamicMax)
@@ -358,7 +361,7 @@ func (q *dynamicQueue) limits(cfg QueueConfig, aggregateRate int64, queued int, 
 	if sum := q.downloads + q.seeds + 2; sum > limit {
 		limit = sum
 	}
-	return effectiveLimits{Downloads: q.downloads, Seeds: q.seeds, Limit: limit}
+	return Limits{Downloads: q.downloads, Seeds: q.seeds, Limit: limit}
 }
 
 func clampInt(value, minimum, maximum int) int {

@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
-	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
@@ -28,8 +27,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/webui/assets"
 	"github.com/cenkalti/rain/v2/torrent"
 )
 
@@ -68,15 +69,15 @@ type uiPageData struct {
 	// IPFilterSource prefills the IP filter field with Gextto's setting.
 	IPFilterSource string
 	// GexttoLog enables the Gextto log tab.
-	GexttoLog   bool
-	CacheReadMB int64
-	CacheWB     int64
+	GexttoLog     bool
+	CacheReadMB   int64
+	CacheWB       int64
 	ReadOpsTotal  int64
 	WriteOpsTotal int64
 	IncomingConns int64
-	LSDPeers    int64
-	DiskFree    int64
-	DiskTotal   int64
+	LSDPeers      int64
+	DiskFree      int64
+	DiskTotal     int64
 
 	CountAll     int
 	CountDown    int
@@ -220,507 +221,32 @@ type uiPieceRun struct {
 	Pct   string
 }
 
-const uiStyle = `
-:root{color-scheme:light dark}
-*{box-sizing:border-box}
-body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1420;color:#e7ecf3}
-header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-header h1{font-size:20px;margin:0;font-weight:600}
-main{padding:16px 20px;max-width:none;width:100%;margin:0}
-.muted{color:#93a1b5;font-size:14px}
-a{color:#93c5fd}
-.cards{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;margin-bottom:12px}
-.card{min-width:0;background:#161d2c;border:1px solid #243049;border-radius:8px;padding:10px 14px}
-.card b{display:block;font-size:22px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card span{display:block;color:#93a1b5;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media(max-width:1100px){.cards{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
-.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:12px;margin-bottom:12px}
-.toolbar form{display:flex;gap:6px;align-items:center;margin:0;flex-wrap:wrap}
-.toolbar input[type=text],.toolbar input[type=search]{min-width:200px}
-.chk{display:flex;gap:4px;align-items:center;color:#93a1b5;font-size:12px}
-table{width:100%;border-collapse:collapse;background:#161d2c;border:1px solid #243049;border-radius:10px;overflow:hidden}
-th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #1f2839;font-size:15px;vertical-align:middle}
-th{color:#93a1b5;font-weight:500;font-size:13px;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;user-select:none}
-tr:last-child td{border-bottom:0}
-td.num,th.num{text-align:right;white-space:nowrap}
-td.sel,th.sel{width:26px;text-align:center}
-tbody.t td{border-bottom:0;padding:4px 8px}
-#torrents thead th{padding:6px 8px}
-tbody.t tr.l1 td{padding-top:7px;padding-bottom:1px}
-tbody.t tr.l2 td{padding-top:1px;padding-bottom:7px;font-size:14px}
-tbody.t+tbody.t tr.l1 td{border-top:1px solid #1f2839}
-tbody.t:hover td{background:#1a2234}
-thead tr.h1 th{border-bottom:0;padding-bottom:2px}
-td.name .nameline{display:flex;align-items:baseline;gap:10px;min-width:0}
-td.name a{flex:0 1 auto;min-width:0;font-weight:600;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-td.name a:hover{text-decoration:underline}
-td.name .muted{flex:1 1 0;min-width:60px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#torrents td.num,#torrents th.num{overflow:hidden;text-overflow:ellipsis}
-td.prog .progline{display:flex;align-items:center;gap:8px}
-td.prog .bar{flex:1 1 auto;margin-top:0;min-width:40px}
-td.prog small{flex:0 0 auto;color:#93a1b5;font-size:12px;min-width:44px;text-align:right}
-#torrents{table-layout:fixed}
-#torrents col.c-sel{width:36px}
-#torrents col.c-state{width:110px}
-#torrents col.c-done{width:165px}
-#torrents col.c-rate{width:96px}
-#torrents col.c-n{width:56px}
-#torrents col.c-ratio{width:66px}
-#torrents col.c-eta{width:84px}
-#torrents col.c-act{width:380px}
-@media(max-width:1500px){#torrents col.c-state{width:88px}#torrents col.c-done{width:170px}#torrents col.c-rate{width:80px}#torrents col.c-n{width:58px}#torrents col.c-ratio{width:58px}#torrents col.c-eta{width:70px}#torrents col.c-act{width:200px}}
-td.actions{vertical-align:middle}
-td.actions .btns{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;align-items:center}
-td.actions button{padding:5px 10px;font-size:14px}
-td.actions form{margin:0}
-.state{font-size:12px;padding:1px 8px;border-radius:999px;background:#243049;white-space:nowrap}
-.s-seeding{background:#14532d;color:#86efac}
-.s-downloading,.s-checking_files,.s-downloading_metadata{background:#172f4f;color:#93c5fd}
-.s-stalled,.s-paused{background:#4a3410;color:#fcd34d}
-.s-error{background:#4a1520;color:#fca5a5}
-.s-moving{background:#3b2a4a;color:#d8b4fe}
-.bar{height:7px;background:#243049;border-radius:99px;overflow:hidden;margin-top:3px;min-width:80px}
-.bar i{display:block;height:100%;background:#3b82f6}
-.actions{white-space:nowrap;text-align:right}
-.actions form{display:inline-block;margin:0 2px 2px 0}
-input[type=text],input[type=search],input[type=password],input[type=number],select{padding:10px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit;font-size:16px}
-button{padding:8px 14px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;color:#dbe4f0;font-size:15px;cursor:pointer}
-button:hover{background:#243049}
-button.primary{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
-button.danger{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
-.notice{padding:9px 12px;border-radius:9px;margin-bottom:12px;background:#14351f;border:1px solid #1f6b3a}
-.notice.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
-form.token{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
-form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
-.overlay{position:fixed;inset:0;background:rgba(4,8,16,.72);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
-.modal{background:#131a28;border:1px solid #243049;border-radius:12px;width:min(1100px,100%);padding:18px}
-.modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
-.modal-head h3{margin:0;font-size:15px;word-break:break-word}
-.detail-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.detail-tabs button.on{background:#2563eb;border-color:#2563eb;color:#fff}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px 18px;margin-bottom:12px}
-.stat-grid .row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed #1f2839;padding:3px 0}
-.stat-grid .row span{color:#93a1b5;font-size:13px}
-.stat-grid .row strong{font-weight:500;text-align:right;word-break:break-word}
-.form-grid{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:10px 0;padding-top:10px;border-top:1px solid #1f2839}
-.form-grid label{display:flex;flex-direction:column;gap:3px;color:#93a1b5;font-size:13px}
-.layout{display:flex;gap:14px;align-items:flex-start}
-.sidebar{display:flex;flex-direction:column;gap:4px;min-width:180px;background:#161d2c;border:1px solid #243049;border-radius:10px;padding:10px}
-.filter{display:flex;justify-content:space-between;gap:8px;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;color:#dbe4f0}
-.filter:hover{background:#243049}
-.filter.on{background:#2563eb;color:#fff}
-.content{flex:1;min-width:0}
-.statusbar{position:sticky;bottom:0;margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#131a28;border:1px solid #243049;border-radius:10px;padding:10px 14px;font-size:14px;color:#93a1b5}
-.statusbar b{color:#e7ecf3;font-weight:600}
-.statusbar button{padding:3px 8px;border-radius:7px;border:1px solid #2b3a55;background:#1b2536;color:#cbd5e1;font-size:12px;cursor:pointer}
-.portdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#6b7280}
-.portdot.ok{background:#22c55e;box-shadow:0 0 6px #22c55e}
-.portdot.warn{background:#f59e0b}
-.portdot.bad{background:#ef4444}
-.toast{position:fixed;top:14px;right:14px;z-index:80;background:#14351f;border:1px solid #1f6b3a;color:#e7ecf3;padding:10px 14px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);max-width:420px;transition:opacity .4s}
-.toast.err{background:#3a1417;border-color:#7f1d1d;color:#fca5a5}
-.tabs{display:flex;gap:6px;margin-bottom:12px}
-.tabs button.on{background:#2563eb;border-color:#2563eb;color:#fff}
-.logbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-.logview{background:#0b0f18;border:1px solid #243049;border-radius:10px;padding:10px 12px;margin:0;max-height:75vh;overflow:auto;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
-.logview .warn{color:#fcd34d}
-.logview .error{color:#fca5a5}
-.logview .debug{color:#7c8aa0}
-.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
-.flag.on{background:#14532d;color:#86efac}
-@media(max-width:760px){.layout{flex-direction:column}.sidebar{flex-direction:row;flex-wrap:wrap;min-width:0}}
-.piece-map{display:flex;width:100%;height:20px;margin:8px 0;border:1px solid #243049;border-radius:6px;overflow:hidden;background:#0b0f18}
-.piece-run{min-width:1px;height:100%}
-.piece-run.piece-have{background:#2da44e}
-.piece-run.piece-down{background:#d4a72c}
-.piece-run.piece-skip{background:#8c959f;opacity:.4}
-.piece-run.piece-missing{background:#374151}
-`
+// uiTemplates parses and compiles the web UI template once, on first use. A
+// managed daemon that never serves the page pays nothing for the parse. The
+// template source lives in internal/webui/assets (embed.FS), not in Go strings.
+var (
+	uiTemplateOnce sync.Once
+	uiTemplate     *template.Template
+)
 
-var uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
-	"percent": func(p float64) string { return fmt.Sprintf("%.1f", p) },
-	"bytes":   uiBytes,
-	"rate":    uiRate,
-	"dur":     uiDuration,
-}).Parse(uiPageTemplate + uiSharedTemplate + uiLiveTemplate + uiDetailTemplate))
-
-// uiSharedTemplate holds the form fragments used more than once, so the add
-// forms cannot drift apart.
-const uiSharedTemplate = `{{define "addopts"}}
-      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
-      <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
-      <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
-      <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>
-{{end}}`
-
-// uiFaviconSVG is the site icon of the daemon page: a download arrow into a
-// tray, in the page's blue. It is inlined in the pages (no request, no token)
-// and also served at /favicon.ico for browsers that ask for it directly.
-const uiFaviconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2563eb"/><path d="M32 12v26m-11-11 11 11 11-11" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 44v6h34v-6" fill="none" stroke="#4fd6a1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-
-// uiFaviconLink is the <link rel="icon"> of the pages. Base64 keeps the data
-// URL compact and free of characters that need escaping.
-var uiFaviconLink = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,` +
-	base64.StdEncoding.EncodeToString([]byte(uiFaviconSVG)) + `">`
+func uiTemplates() *template.Template {
+	uiTemplateOnce.Do(func() {
+		uiTemplate = template.Must(template.New("ui").Funcs(template.FuncMap{
+			"percent": func(p float64) string { return fmt.Sprintf("%.1f", p) },
+			"bytes":   uiBytes,
+			"rate":    uiRate,
+			"dur":     uiDuration,
+		}).Parse(assets.UITemplate()))
+	})
+	return uiTemplate
+}
 
 // handleFavicon serves the site icon; like the page shell it needs no token.
 func handleFavicon(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	_, _ = w.Write([]byte(uiFaviconSVG))
+	_, _ = w.Write([]byte(assets.FaviconSVG()))
 }
-
-var uiPageTemplate = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gx-torrent</title>
-` + uiFaviconLink + `
-<style>` + uiStyle + `</style>
-</head>
-<body>
-<header>
-  <h1>gx-torrent</h1>
-  <span class="muted">{{.Version}} · up for {{.Uptime}} · {{.Now}}</span>
-</header>
-<main>
-  {{if .Notice}}<div class="notice{{if .Error}} err{{end}}">{{.Notice}}</div>{{end}}
-  <div id="cards">{{template "cards" .}}</div>
-
-  <div class="toolbar">
-    <form method="post" action="/ui/add" enctype="multipart/form-data">
-      <input type="text" name="source" placeholder="paste magnet:… or https://…/file.torrent" autocomplete="off">
-      <span class="muted">or</span>
-      <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" title=".torrent file to add">
-      {{template "addopts"}}
-      <button class="primary" type="submit">Add</button>
-    </form>
-    <form method="post" action="/ui/ipfilter">
-      <span class="muted">IP filter</span>
-      <input type="text" name="source" placeholder="URL or local file" autocomplete="off" value="{{.IPFilterSource}}" style="min-width:min(520px,70vw)" title="Prefilled with the IP filter configured in Gextto">
-      <button type="submit" title="Download (if a URL) and apply the IP filter now">Load filter</button>
-    </form>
-    <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off">
-  </div>
-
-  <div class="toolbar">
-    <span class="muted">Selected: <b id="selcount">0</b></span>
-    <button type="button" onclick="bulk('resume')">▶ Resume</button>
-    <button type="button" onclick="bulk('pause')">⏸ Pause</button>
-    <button type="button" onclick="bulk('verify')">✓ Recheck</button>
-    <button type="button" onclick="bulk('reannounce')">↻ Reannounce</button>
-    <button type="button" onclick="bulk('top')">⤒ Top</button>
-    <button type="button" class="danger" onclick="bulk('remove')">✕ Remove</button>
-    <button type="button" class="danger" onclick="bulk('remove-files')">✕ Remove and delete files</button>
-  </div>
-
-  {{if .GexttoLog}}
-  <div class="tabs">
-    <button type="button" class="on" id="tab-torrents" onclick="showTab('torrents')">Torrents</button>
-    <button type="button" id="tab-log" onclick="showTab('log')">Gextto log</button>
-  </div>
-  {{end}}
-  <div id="pane-torrents"><div id="live">{{template "live" .}}</div></div>
-  {{if .GexttoLog}}
-  <div id="pane-log" style="display:none">
-    <div class="logbar">
-      <label class="chk">Lines <select id="log-lines" onchange="loadLog()"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
-      <input type="search" id="log-filter" placeholder="Filter lines…" oninput="renderLog()" autocomplete="off">
-      <label class="chk"><input type="checkbox" id="log-nodebug" checked onchange="renderLog()"> hide DEBUG</label>
-      <button type="button" onclick="loadLog()">↻ Reload</button>
-      <span class="muted" id="log-info"></span>
-    </div>
-    <pre class="logview" id="log-view">Loading…</pre>
-  </div>
-  {{end}}
-</main>
-
-<div id="detail-modal" class="overlay" style="display:none">
-  <div class="modal"><div id="detail-body"></div></div>
-</div>
-
-<script>
-function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
-function closeDetail(){document.getElementById('detail-modal').style.display='none';}
-function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();}});}
-function rowState(tr){return tr.getAttribute('data-state')||'';}
-function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
-function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
-function filterRows(){applyFilters();}
-function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
-function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
-function selectAll(box){document.querySelectorAll('.rowsel').forEach(function(c){c.checked=box.checked});updateSel();}
-function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Select at least one torrent',true);return;}if(op==='remove-files'&&!confirm('Remove the selected torrents AND delete the files? Irreversible.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
-function applySort(){var st=window.__sort;var tb=document.getElementById('torrents');if(!st||!tb)return;var groups=Array.prototype.slice.call(tb.querySelectorAll('tbody.t'));var attr='data-k-'+st.key;groups.sort(function(a,b){var av=a.getAttribute(attr)||'',bv=b.getAttribute(attr)||'';var an=parseFloat(av),bn=parseFloat(bv);var r=(!isNaN(an)&&!isNaN(bn))?an-bn:String(av).localeCompare(String(bv));return st.asc?r:-r;});groups.forEach(function(g){tb.appendChild(g)});}
-function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st.key===key&&st.asc)};applySort();}
-function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
-function testPorts(){var out=document.getElementById('portcheck-result');if(!out)return;out.textContent=' checking…';fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){out.innerHTML=h;}).catch(function(e){out.textContent=' test failed: '+e.message;});}
-function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
-function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
-function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent='loading…';fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' lines · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent='Cannot read the Gextto log: '+e.message;document.getElementById('log-info').textContent='';});}
-function renderLog(scroll){var view=document.getElementById('log-view');var q=(document.getElementById('log-filter').value||'').toLowerCase();var nodebug=document.getElementById('log-nodebug').checked;var frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
-setInterval(function(){refresh(false)},2000);
-(function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
-</script>
-</body>
-</html>`
-
-const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "cards" .}}</div><div id="frag-live">{{template "live" .}}</div>{{end}}{{define "cards"}}
-  <div class="cards">
-    <div class="card"><b>{{.Torrents}}</b><span>torrent</span></div>
-    <div class="card"><b>{{.Down}}</b><span>downloading</span></div>
-    <div class="card"><b>{{.Seeding}}</b><span>seeding</span></div>
-    <div class="card"><b>{{.Stalled}}</b><span>stalled</span></div>
-    <div class="card"><b>{{.Paused}}</b><span>paused</span></div>
-    <div class="card"><b>{{.Moving}}</b><span>moving</span></div>
-    <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
-    <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
-    <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache r/w</span></div>
-    <div class="card" title="Disk read / write operations since start"><b>{{.ReadOpsTotal}}/{{.WriteOpsTotal}}</b><span>I/O ops r/w</span></div>
-    <div class="card" title="Incoming peer connections since start"><b>{{.IncomingConns}}</b><span>incoming</span></div>
-  </div>
-{{end}}{{define "live"}}
-
-  {{if .Rows}}
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="muted">Filters</div>
-      <button type="button" class="filter on" onclick="filterByState('all',this)">All <b>{{.CountAll}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('downloading',this)">Downloading <b>{{.CountDown}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('seeding',this)">Seeding <b>{{.CountSeeding}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('paused',this)">Paused <b>{{.CountPaused}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('stalled',this)">Stalled <b>{{.CountStalled}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('moving',this)">Moving <b>{{.CountMoving}}</b></button>
-      <button type="button" class="filter" onclick="filterByState('error',this)">Error <b>{{.CountError}}</b></button>
-    </aside>
-    <div class="content">
-    <table id="torrents">
-    <colgroup>
-      <col class="c-sel"><col><col class="c-state"><col class="c-done"><col class="c-rate"><col class="c-rate"><col class="c-n"><col class="c-n"><col class="c-ratio"><col class="c-eta"><col class="c-act">
-    </colgroup>
-    <thead>
-    <tr class="h1">
-      <th class="sel" rowspan="2"><input type="checkbox" title="Select all" onclick="selectAll(this)"></th>
-      <th colspan="9" onclick="sortTable('name')">Name</th>
-      <th class="actions" rowspan="2">Actions</th>
-    </tr>
-    <tr>
-      <th onclick="sortTable('progress')">Progress</th>
-      <th onclick="sortTable('state')">State</th>
-      <th class="num" onclick="sortTable('done')">Done / Size</th>
-      <th class="num" onclick="sortTable('down')">↓</th>
-      <th class="num" onclick="sortTable('up')">↑</th>
-      <th class="num" onclick="sortTable('peers')">Peers</th>
-      <th class="num" onclick="sortTable('seeds')">Seeds</th>
-      <th class="num" onclick="sortTable('ratio')">Ratio</th>
-      <th class="num" onclick="sortTable('eta')">ETA</th>
-    </tr>
-    </thead>
-    {{range .Rows}}
-    <tbody class="t" data-name="{{.Name}}" data-state="{{.State}}" data-k-name="{{.Name}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-done="{{.TotalDone}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-peers="{{.Peers}}" data-k-seeds="{{.Seeds}}" data-k-ratio="{{.RatioVal}}" data-k-eta="{{.ETAVal}}">
-      <tr class="l1">
-        <td class="sel" rowspan="2"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
-        <td class="name" colspan="9"><div class="nameline"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="{{.Name}}">{{.Name}}</a><span class="muted" title="{{.SavePath}}">{{.SavePath}}</span></div></td>
-        <td class="actions" rowspan="2"><div class="btns">
-          <button type="button" onclick="openDetail('{{.Hash}}')" title="Details: files, peers, trackers">⋯</button>
-          {{if eq .State "paused"}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="resume"><button title="Resume">▶</button></form>
-          {{else}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="pause"><button title="Pause">⏸</button></form>
-          {{end}}
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="verify"><button title="Recheck data on disk">✓</button></form>
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="reannounce"><button title="Reannounce to trackers">↻</button></form>
-          <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Move to the top of the queue">⤒</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
-        </div></td>
-      </tr>
-      <tr class="l2">
-        <td class="prog"><div class="progline"><div class="bar"><i style="width:{{percent .Progress}}%"></i></div><small>{{.ProgressS}}</small></div></td>
-        <td><span class="state s-{{.State}}">{{.State}}</span></td>
-        <td class="num">{{.DoneSize}}</td>
-        <td class="num">{{.Down}}</td>
-        <td class="num">{{.Up}}</td>
-        <td class="num">{{.Peers}}</td>
-        <td class="num">{{.Seeds}}</td>
-        <td class="num" title="{{.RatioGoal}}">{{.Ratio}}</td>
-        <td class="num">{{.ETA}}</td>
-      </tr>
-    </tbody>
-    {{end}}
-    </table>
-    </div>
-  </div>
-  {{else}}
-  <p class="muted">No torrents in the session.</p>
-  {{end}}
-
-  <div class="statusbar">
-    <span>↓ <b>{{.DownloadRate}}</b></span>
-    <span>↑ <b>{{.UploadRate}}</b></span>
-    <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
-    <span>Free space <b>{{bytes .DiskFree}} of {{bytes .DiskTotal}}</b></span>
-    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodes{{else}}off{{end}}</b></span>
-    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b> <button type="button" onclick="testPorts()" title="Check that the peer port is listening and forwarded by the router">Test ports</button> <span id="portcheck-result"></span></span>
-    <span>Encryption <b>{{.Encryption}}</b></span>
-    {{if .PeerErrors}}<span title="Errori peer/tracker filtrati dal log, per categoria (dall'avvio)">Peer <b>{{.PeerErrors}}</b></span>{{end}}
-  </div>
-{{end}}`
-
-const uiDetailTemplate = `{{define "detail"}}
-<div class="modal-head">
-  <h3>{{.Name}}</h3>
-  <button type="button" onclick="closeDetail()">Close</button>
-</div>
-<div class="detail-tabs">
-  <button type="button" class="{{if eq .Tab "general"}}on{{end}}" onclick="openDetail('{{.Hash}}','general')">General</button>
-  <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">Files ({{len .Files}})</button>
-  <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peers ({{len .Peers}})</button>
-  <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Trackers ({{len .Trackers}})</button>
-  <button type="button" class="{{if eq .Tab "pieces"}}on{{end}}" onclick="openDetail('{{.Hash}}','pieces')">Pieces ({{.PiecesHave}}/{{.PiecesTotal}})</button>
-</div>
-{{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
-
-{{if eq .Tab "general"}}
-  <div class="stat-grid">
-    <div class="row"><span>State</span><strong>{{.State}}</strong></div>
-    <div class="row"><span>Progress</span><strong>{{percent .Progress}}%</strong></div>
-    <div class="row"><span>Size</span><strong>{{bytes .TotalSize}}</strong></div>
-    <div class="row"><span>Done</span><strong>{{bytes .TotalDone}}</strong></div>
-    <div class="row"><span>Downloaded</span><strong>{{bytes .Downloaded}}</strong></div>
-    <div class="row"><span>Uploaded</span><strong>{{bytes .Uploaded}}</strong></div>
-    <div class="row"><span>Ratio</span><strong>{{printf "%.2f" .Ratio}}</strong></div>
-    <div class="row"><span>↓ / ↑</span><strong>{{rate .DownRate}} / {{rate .UpRate}}</strong></div>
-    <div class="row"><span>Peer / Seed</span><strong>{{.NumPeers}} / {{.NumSeeds}}</strong></div>
-    <div class="row"><span>Swarm (seeds / peers)</span><strong>{{.NumComplete}} / {{.NumIncomplete}}</strong></div>
-    <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
-    <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
-    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} days)</strong></div>
-    <div class="row"><span>Pin</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
-    <div class="row"><span>Private</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
-    <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
-    <div class="row"><span>Available / total pieces</span><strong>{{.PiecesAvailable}} / {{.PiecesTotal}} ({{percent .PiecesPercent}}%)</strong></div>
-    <div class="row"><span>Completed pieces</span><strong>{{.PiecesHave}}</strong></div>
-    <div class="row"><span>Piece size</span><strong>{{bytes .PieceLength}}</strong></div>
-    <div class="row"><span>Wasted</span><strong>{{bytes .Wasted}}</strong></div>
-    <div class="row"><span>Allocated on disk</span><strong>{{bytes .Allocated}}</strong></div>
-    <div class="row"><span>Added</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
-    <div class="row"><span>Completed</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
-  </div>
-  <div class="toolbar">
-    <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Unpin{{else}}Pin (outside the queue){{end}}</button></form>
-    <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copy magnet</button>
-    <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Export .torrent</a>
-  </div>
-  <p class="muted" style="margin:12px 0 0">Limits &amp; seeding (-1 global, 0 unlimited).</p>
-  <form class="form-grid" method="post" action="/ui/seed-limits">
-    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Download limit KiB/s<input type="number" name="download_limit" value="{{.DownloadLimitKib}}"></label>
-    <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}"></label>
-    <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}"></label>
-    <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}"></label>
-    <label>Seed ratio<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
-    <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
-    <button type="submit">Save limits</button>
-  </form>
-  <form class="form-grid" method="post" action="/ui/super-seeding">
-    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="enabled" value="1"{{if .SuperSeeding}} checked{{end}}> Super-seeding (BEP 16)</label>
-    <button type="submit">Save</button>
-  </form>
-  <form class="form-grid" method="post" action="/ui/webseeds">
-    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Web seed (one URL per line)<textarea name="urls" rows="3" cols="60" placeholder="http://example/file">{{range .WebSeeds}}{{.}}
-{{end}}</textarea></label>
-    <button type="submit">Add</button>
-    <button type="submit" name="remove" value="1">Remove</button>
-  </form>
-  <form class="form-grid" method="post" action="/ui/move">
-    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
-    <button type="submit">Move</button>
-  </form>
-{{else if eq .Tab "files"}}
-  {{if .Files}}
-  <table>
-    <thead><tr><th>File</th><th class="num">Size</th><th class="num">Done</th><th>Priority</th><th>Play</th></tr></thead>
-    <tbody>
-    {{range .Files}}
-      <tr>
-        <td class="name">{{.Path}}</td>
-        <td class="num">{{bytes .Size}}</td>
-        <td class="num">{{bytes .Done}}</td>
-        <td><form method="post" action="/ui/file-priority" onchange="this.submit()">
-          <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
-          <select name="priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
-        </form></td>
-        <td><a href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" title="Stream this file with HTTP Range; the pieces of the window are downloaded first">▶</a></td>
-      </tr>
-    {{end}}
-    </tbody>
-  </table>
-  {{else}}<p class="muted">Metadata not available yet.</p>{{end}}
-{{else if eq .Tab "peers"}}
-  {{if .Peers}}
-  <table>
-    <thead><tr><th>Peer</th><th>Client</th><th>Source</th><th class="num">↓</th><th class="num">↑</th><th class="num">Prog.</th><th>Seed</th><th>Flag</th><th class="num">For</th></tr></thead>
-    <tbody>
-    {{range .Peers}}
-      <tr><td>{{.Address}}</td><td class="name">{{if .Client}}{{.Client}}{{else}}—{{end}}</td>
-      <td>{{.Source}}</td>
-      <td class="num">{{rate .Down}}</td><td class="num">{{rate .Up}}</td>
-      <td class="num">{{printf "%.1f" .Progress}}%</td><td>{{if .Seed}}yes{{else}}no{{end}}</td>
-      <td class="flags">{{if .Incoming}}<span class="flag">incoming</span>{{else}}<span class="flag">outgoing</span>{{end}}{{if .UTP}}<span class="flag">uTP</span>{{else}}<span class="flag">TCP</span>{{end}}{{if .Encrypted}}<span class="flag on">encrypted</span>{{end}}{{if .Handshake}}<span class="flag on">encrypted HS</span>{{end}}{{if .Snubbed}}<span class="flag">snubbed</span>{{end}}{{if .Optimistic}}<span class="flag on">optimistic</span>{{end}}{{if .ClientChoke}}<span class="flag">choking us</span>{{end}}{{if .PeerChoke}}<span class="flag">we choke</span>{{end}}{{if .ClientInt}}<span class="flag">interested</span>{{end}}{{if .PeerInt}}<span class="flag">interested in us</span>{{end}}{{if .Downloading}}<span class="flag">downloading</span>{{end}}</td>
-      <td class="num">{{dur .Connected}}</td></tr>
-    {{end}}
-    </tbody>
-  </table>
-  {{else}}<p class="muted">No peers connected.</p>{{end}}
-{{else if eq .Tab "trackers"}}
-  {{if .Trackers}}
-  <table>
-    <thead><tr><th>URL</th><th>State</th><th>Message</th><th class="num">Seeds</th><th class="num">Peers</th><th class="num">Next</th><th></th></tr></thead>
-    <tbody>
-    {{range .Trackers}}
-      <tr><td class="name">{{.URL}}</td><td>{{.Status}}</td><td class="name">{{.Message}}</td>
-      <td class="num">{{.Seeders}}</td><td class="num">{{.Leechers}}</td>
-      <td class="num">{{if gt .Next 0}}{{dur .Next}}{{else}}—{{end}}</td>
-      <td><form method="post" action="/ui/trackers"><input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="trackers"><input type="hidden" name="op" value="remove"><input type="hidden" name="url" value="{{.URL}}"><button type="submit" title="Remove this tracker">Remove</button></form></td></tr>
-    {{end}}
-    </tbody>
-  </table>
-  {{else}}<p class="muted">No trackers.</p>{{end}}
-  <form class="form-grid" method="post" action="/ui/trackers">
-    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="trackers">
-    <label>Add trackers (one per line)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce"></textarea></label>
-    <button type="submit">Add trackers</button>
-  </form>
-{{else if eq .Tab "pieces"}}
-  {{if .Pieces}}
-  <p class="muted">{{.PiecesHave}}/{{.PiecesTotal}} pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped.</p>
-  <div class="piece-map" role="img" aria-label="Piece map: {{.PiecesHave}} of {{.PiecesTotal}} have">
-    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}} · pieces {{.Begin}}–{{.End}}"></span>{{end}}
-  </div>
-  {{else}}<p class="muted">Piece map is not available yet (metadata missing).</p>{{end}}
-{{end}}
-{{end}}`
-
-var uiTokenPage = `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>gx-torrent</title>` + uiFaviconLink + `
-<style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
-form{max-width:360px;margin:80px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
-input,button{width:100%;padding:8px;margin:8px 0;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
-button{background:#2563eb;color:#fff;font-weight:600;border:0;cursor:pointer}.m{color:#93a1b5}</style></head>
-<body><form method="get" action="/">
-<h2 style="margin:0 0 6px">gx-torrent</h2>
-<p class="m">This instance requires the token configured in Gextto.</p>
-<input type="password" name="token" placeholder="token" autofocus autocomplete="off">
-<button type="submit">Sign in</button>
-</form></body></html>`
 
 // handleUI renders the page.
 func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
@@ -846,7 +372,7 @@ func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 	// Render to a buffer first: a template error must not leave a half-written
 	// fragment (the page would silently truncate).
 	var buf bytes.Buffer
-	if err := uiTemplate.ExecuteTemplate(&buf, "detail", data); err != nil {
+	if err := uiTemplates().ExecuteTemplate(&buf, "detail", data); err != nil {
 		http.Error(w, "rendering error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -1426,7 +952,7 @@ func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
-	_, _ = fmt.Fprint(w, uiTokenPage)
+	_, _ = fmt.Fprint(w, assets.TokenPage())
 	return false
 }
 

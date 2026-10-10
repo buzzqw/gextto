@@ -3,10 +3,12 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/buzzqw/gextto/internal/queue"
 )
 
 func TestAdaptiveCacheManualOverride(t *testing.T) {
-	read, write, reason := adaptiveCache(QueueConfig{CacheMB: 2048}, cacheInputs{ram: 16 << 30, available: 8 << 30})
+	read, write, reason := adaptiveCache(queue.Config{CacheMB: 2048}, cacheInputs{ram: 16 << 30, available: 8 << 30})
 	if read != 2048*mib || write != 2048*mib {
 		t.Fatalf("manual override ignored: read=%d write=%d", read, write)
 	}
@@ -20,7 +22,7 @@ func TestAdaptiveCacheScalesWithWorkload(t *testing.T) {
 	avail := int64(12 << 30)
 	idleWrite := int64(0)
 	for i, downloads := range []int{0, 1, 4, 8} {
-		_, write, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: ram, available: avail, activeDownloads: downloads, class: "ssd"})
+		_, write, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: ram, available: avail, activeDownloads: downloads, class: "ssd"})
 		if i == 0 {
 			idleWrite = write
 		}
@@ -28,14 +30,14 @@ func TestAdaptiveCacheScalesWithWorkload(t *testing.T) {
 			t.Fatalf("write cache shrank with more downloads: %d < %d", write, idleWrite)
 		}
 	}
-	_, writeMany, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: ram, available: avail, activeDownloads: 8, class: "ssd"})
-	_, writeIdle, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: ram, available: avail, activeDownloads: 0, class: "ssd"})
+	_, writeMany, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: ram, available: avail, activeDownloads: 8, class: "ssd"})
+	_, writeIdle, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: ram, available: avail, activeDownloads: 0, class: "ssd"})
 	if writeMany <= writeIdle {
 		t.Fatalf("more downloads must raise the write cache: %d vs %d", writeMany, writeIdle)
 	}
 
-	readIdle, _, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: ram, available: avail, class: "ssd"})
-	readSeeds, _, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: ram, available: avail, activeSeeds: 6, class: "ssd"})
+	readIdle, _, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: ram, available: avail, class: "ssd"})
+	readSeeds, _, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: ram, available: avail, activeSeeds: 6, class: "ssd"})
 	if readSeeds <= readIdle {
 		t.Fatalf("more seeds must raise the read cache: %d vs %d", readSeeds, readIdle)
 	}
@@ -43,9 +45,9 @@ func TestAdaptiveCacheScalesWithWorkload(t *testing.T) {
 
 func TestAdaptiveCacheSlowStorageLeansLarger(t *testing.T) {
 	in := cacheInputs{ram: 16 << 30, available: 12 << 30, activeDownloads: 2, class: "ssd"}
-	_, ssd, _ := adaptiveCache(QueueConfig{}, in)
+	_, ssd, _ := adaptiveCache(queue.Config{}, in)
 	in.class = "network"
-	_, network, _ := adaptiveCache(QueueConfig{}, in)
+	_, network, _ := adaptiveCache(queue.Config{}, in)
 	if network <= ssd {
 		t.Fatalf("network storage should buffer more: network=%d ssd=%d", network, ssd)
 	}
@@ -53,19 +55,19 @@ func TestAdaptiveCacheSlowStorageLeansLarger(t *testing.T) {
 
 func TestAdaptiveCacheClamps(t *testing.T) {
 	// Almost no free memory: floors, never zero.
-	read, write, _ := adaptiveCache(QueueConfig{}, cacheInputs{ram: 1 << 30, available: 16 << 20, class: "ssd"})
+	read, write, _ := adaptiveCache(queue.Config{}, cacheInputs{ram: 1 << 30, available: 16 << 20, class: "ssd"})
 	if read < cacheReadMin || write < cacheWriteMin {
 		t.Fatalf("below floors: read=%d write=%d", read, write)
 	}
 	// Huge machine: hard ceilings.
-	read, write, _ = adaptiveCache(QueueConfig{}, cacheInputs{ram: 512 << 30, available: 256 << 30, activeDownloads: 50, activeSeeds: 50, class: "network"})
+	read, write, _ = adaptiveCache(queue.Config{}, cacheInputs{ram: 512 << 30, available: 256 << 30, activeDownloads: 50, activeSeeds: 50, class: "network"})
 	if read > cacheReadMax || write > cacheWriteMax {
 		t.Fatalf("above ceilings: read=%d write=%d", read, write)
 	}
 }
 
 func TestAdaptiveCacheMissingSignalsFallsBack(t *testing.T) {
-	read, write, reason := adaptiveCache(QueueConfig{}, cacheInputs{})
+	read, write, reason := adaptiveCache(queue.Config{}, cacheInputs{})
 	if read <= 0 || write <= 0 || reason != "fallback" {
 		t.Fatalf("fallback missing: read=%d write=%d reason=%q", read, write, reason)
 	}
@@ -118,13 +120,13 @@ func TestAdaptCacheAppliesInPlaceWithoutSessionReopen(t *testing.T) {
 func TestAdaptiveCacheDisabledUsesStatic(t *testing.T) {
 	off := false
 	read, write, reason := adaptiveCache(
-		QueueConfig{Auto: &off},
+		queue.Config{Auto: &off},
 		cacheInputs{ram: 16 << 30, available: 12 << 30, activeDownloads: 8, activeSeeds: 4, class: "network"},
 	)
 	if reason != "static" {
 		t.Fatalf("reason = %q, want static", reason)
 	}
-	wantRead, wantWrite, _ := cacheSizes(QueueConfig{}, 16<<30)
+	wantRead, wantWrite, _ := cacheSizes(queue.Config{}, 16<<30)
 	if read != wantRead || write != wantWrite {
 		t.Fatalf("static sizing mismatch: got %d/%d want %d/%d", read, write, wantRead, wantWrite)
 	}
@@ -156,5 +158,29 @@ func TestAdaptCacheAppliesSmallManualChange(t *testing.T) {
 	}
 	if d.restartPending {
 		t.Fatal("the cache is resized in place: no session reopen")
+	}
+}
+
+func TestCacheSizes(t *testing.T) {
+	cfg := queue.DefaultConfig()
+	read, write, auto := cacheSizes(cfg, 2<<30) // 2 GiB of RAM
+	if !auto || read != 64*mib || write != 128*mib {
+		t.Fatalf("2 GiB: %d %d %v", read/mib, write/mib, auto)
+	}
+	read, write, _ = cacheSizes(cfg, 64<<30) // big server: capped
+	if read != 512*mib || write != 1024*mib {
+		t.Fatalf("64 GiB: %d %d", read/mib, write/mib)
+	}
+	read, _, _ = cacheSizes(cfg, 512<<20) // tiny box: floor
+	if read != 32*mib {
+		t.Fatalf("512 MiB: %d", read/mib)
+	}
+	cfg.CacheMB = 300
+	read, write, auto = cacheSizes(cfg, 2<<30)
+	if auto || read != 300*mib || write != 300*mib {
+		t.Fatalf("manual: %d %d %v", read/mib, write/mib, auto)
+	}
+	if queue.DefaultConfig().Normalized().CacheMB != -1 || (queue.Config{}).Normalized().CacheMB != -1 {
+		t.Fatal("0 and unset mean automatic")
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/cenkalti/rain/v2/torrent"
 )
 
@@ -88,7 +89,7 @@ type cacheInputs struct {
 
 // cacheSizes is the static sizing: RAM/32 read (32..512 MiB) and RAM/16 write
 // (64 MiB..1 GiB). It is the fallback when the live signals are missing.
-func cacheSizes(cfg QueueConfig, ram int64) (read, write int64, auto bool) {
+func cacheSizes(cfg queue.Config, ram int64) (read, write int64, auto bool) {
 	if cfg.CacheMB > 0 {
 		size := cfg.CacheMB * mib
 		return size, size, false
@@ -101,14 +102,14 @@ func cacheSizes(cfg QueueConfig, ram int64) (read, write int64, auto bool) {
 
 // adaptiveCache returns the read cache and the write buffer for the current
 // workload. cfg.CacheMB > 0 is a manual override and wins.
-func adaptiveCache(cfg QueueConfig, in cacheInputs) (read, write int64, reason string) {
+func adaptiveCache(cfg queue.Config, in cacheInputs) (read, write int64, reason string) {
 	if cfg.CacheMB > 0 {
 		size := cfg.CacheMB * mib
 		return size, size, "manual"
 	}
 	if cfg.Auto != nil && !*cfg.Auto {
 		// Self-management disabled: static sizing from the RAM.
-		read, write, _ := cacheSizes(QueueConfig{}, in.ram)
+		read, write, _ := cacheSizes(queue.Config{}, in.ram)
 		return read, write, "static"
 	}
 	avail := in.available

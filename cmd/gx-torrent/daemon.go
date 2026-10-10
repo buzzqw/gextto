@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/cenkalti/rain/v2/torrent"
 )
 
@@ -101,7 +102,7 @@ type torrentMeta struct {
 
 type persistedState struct {
 	Version  int                     `json:"version"`
-	Config   QueueConfig             `json:"config"`
+	Config   queue.Config            `json:"config"`
 	NextPos  int64                   `json:"next_pos"`
 	Torrents map[string]*torrentMeta `json:"torrents"`
 	// BadTrackers maps a tracker URL to the Unix time until which it stays
@@ -128,8 +129,8 @@ type Daemon struct {
 	state          persistedState
 	runtime        map[string]*runtimeInfo
 	moving         map[string]bool
-	dyn            dynamicQueue
-	limits         effectiveLimits
+	dyn            queue.Dynamic
+	limits         queue.Limits
 	restartPending bool
 	dirty          bool
 	startedAt      time.Time
@@ -255,7 +256,7 @@ func randomID() (string, error) {
 // ---------------------------------------------------------------------------
 
 func (d *Daemon) loadState() error {
-	d.state = persistedState{Version: 1, Config: defaultQueueConfig(), Torrents: map[string]*torrentMeta{}}
+	d.state = persistedState{Version: 1, Config: queue.DefaultConfig(), Torrents: map[string]*torrentMeta{}}
 	data, err := os.ReadFile(d.opts.StatePath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -270,7 +271,7 @@ func (d *Daemon) loadState() error {
 	if loaded.Torrents == nil {
 		loaded.Torrents = map[string]*torrentMeta{}
 	}
-	loaded.Config = loaded.Config.normalized()
+	loaded.Config = loaded.Config.Normalized()
 	d.state = loaded
 	d.trackers.loadDisabled(loaded.BadTrackers)
 	return nil
@@ -650,7 +651,7 @@ func (d *Daemon) tick(now time.Time) {
 	positions := d.queuePositionsLocked(torrents, statsOf)
 
 	handles := make(map[string]*torrent.Torrent, len(torrents))
-	items := make([]queueItem, 0, len(torrents))
+	items := make([]queue.Item, 0, len(torrents))
 	var aggregate int64
 	queued := 0
 	activeDownloads, activeSeeds := 0, 0
@@ -728,7 +729,7 @@ func (d *Daemon) tick(now time.Time) {
 
 		probing := !meta.ProbeUntil.IsZero()
 		blocked := meta.UserPaused || meta.Parked || meta.Error != "" || d.moving[id]
-		item := queueItem{
+		item := queue.Item{
 			ID:        id,
 			Complete:  complete,
 			Running:   running,
@@ -748,9 +749,9 @@ func (d *Daemon) tick(now time.Time) {
 		items = append(items, item)
 	}
 
-	d.limits = d.dyn.limits(cfg, aggregate, queued, now)
+	d.limits = d.dyn.Limits(cfg, aggregate, queued, now)
 	d.adaptCacheLocked(now, activeDownloads, activeSeeds, aggregate)
-	plan := planQueue(items, d.limits, cfg, now)
+	plan := queue.PlanQueue(items, d.limits, cfg, now)
 	for _, id := range plan.Rotate {
 		if meta, ok := d.state.Torrents[id]; ok {
 			meta.RotatedAt = now
@@ -1612,7 +1613,7 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 
 // setConfig merges a partial configuration. Limits rain reads only at start
 // schedule a session restart, applied by the queue loop between moves.
-func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error) {
+func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	current, err := json.Marshal(d.state.Config)
@@ -1633,11 +1634,11 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 	if err != nil {
 		return d.state.Config, err
 	}
-	var next QueueConfig
+	var next queue.Config
 	if err := json.Unmarshal(encoded, &next); err != nil {
 		return d.state.Config, err
 	}
-	next = next.normalized()
+	next = next.Normalized()
 	previous := d.state.Config
 	d.state.Config = next
 	// Speed limits and the cache size change in place: reopening the session
@@ -1648,7 +1649,7 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (QueueConfig, error
 		}
 		logf("speed limits set to %d KiB/s download, %d KiB/s upload (0 = unlimited)", next.SpeedLimitDownload, next.SpeedLimitUpload)
 	}
-	if previous.CacheMB != next.CacheMB || !sameBoolPtr(previous.Auto, next.Auto) {
+	if previous.CacheMB != next.CacheMB || !queue.SameBoolPtr(previous.Auto, next.Auto) {
 		d.cacheCheckedAt = time.Time{}
 		d.cacheAppliedAt = time.Time{}
 	}
@@ -1686,7 +1687,7 @@ func (d *Daemon) applySequentialLocked(sequential bool) {
 	d.dirty = true
 }
 
-func (d *Daemon) config() (QueueConfig, effectiveLimits, bool) {
+func (d *Daemon) config() (queue.Config, queue.Limits, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.state.Config, d.limits, d.restartPending

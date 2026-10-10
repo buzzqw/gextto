@@ -455,7 +455,7 @@ durata: la complessità è indicata come S/M/L e dipende dal tempo che ci si ded
 
 | Fase | Contenuto | Cancello (si chiude quando) | Complessità |
 | --- | --- | --- | --- |
-| **F0 · Refactor e contratto** | core in `internal/`, rain in `internal/engine`, test di contratto API v1, template `ui.go` pigro e asset `embed.FS` | Gextto invariato, `make test` verde, test di guardia §8.2 verde | M |
+| **F0 · Refactor e contratto** | core in `internal/`, test di contratto API v1, template `ui.go` pigro e asset `embed.FS` | Gextto invariato, `make test` verde, test di guardia §8.2 verde | M |
 | **F1 · Standalone minimo** | `settings.json`, login e LAN sicura, wizard, test porta, unit systemd | installazione pulita senza Gextto, primo download dal wizard | M |
 | **F2 · Parità con la WebUI di qBittorrent** | categorie e tag, cartella temporanea, RSS, ricerca indexer, scheduler, virtualizzazione tabella | checklist funzioni qBittorrent completa | L |
 | **F3 · Ecosistema** | API compatibile qBit v2, pacchetto standalone, immagine container | Sonarr aggiunge e importa un episodio senza patch | M |
@@ -464,6 +464,19 @@ durata: la complessità è indicata come S/M/L e dipende dal tempo che ci si ded
 Ogni fase si chiude **solo** quando il suo cancello è verificato. Il cancello di F0
 vale anche per tutte le fasi successive: **ogni commit deve lasciare Gextto
 invariato**.
+
+### 12.1 Stato di attuazione
+
+Aggiornato al 2026-10-10.
+
+| Voce F0 | Stato |
+| --- | --- |
+| Logica di coda estratta in `internal/queue` (con i suoi test) | fatto |
+| Test di contratto API v1 (`cmd/gx-torrent/contract_test.go`) | fatto |
+| `ui.go`: template pigro (`sync.Once`) e asset in `internal/webui/assets` (`embed.FS`) | fatto |
+| Test di guardia §8.2 (goroutine, tempo di avvio, assenza di lavoro idle) | fatto |
+| Test di guardia §8.2: RSS e CPU contro qbittorrent-nox | da fare (harness opt-in) |
+| Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
 ---
 

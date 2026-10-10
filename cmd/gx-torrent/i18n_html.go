@@ -137,9 +137,9 @@ func (d *Daemon) renderUI(w http.ResponseWriter, r *http.Request, name string, d
 	var buffer bytes.Buffer
 	var err error
 	if name == "" || name == "ui" {
-		err = uiTemplate.Execute(&buffer, data)
+		err = uiTemplates().Execute(&buffer, data)
 	} else {
-		err = uiTemplate.ExecuteTemplate(&buffer, name, data)
+		err = uiTemplates().ExecuteTemplate(&buffer, name, data)
 	}
 	if err != nil {
 		return
