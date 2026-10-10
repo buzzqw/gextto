@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,7 +84,11 @@ func (d *Daemon) routes() http.Handler {
 	return d.standaloneGuard(root)
 }
 
-// authenticate requires the shared token on every request when one is set.
+// authenticate requires the shared token on every request when one is set. In
+// standalone mode there is usually no token: the page password is then the
+// guard for /api/v1 too, with the same criteria as the page (no password set,
+// LAN bypass, or a session cookie), so a password-protected daemon does not
+// leave its whole v1 API open to anyone reaching the port.
 func (d *Daemon) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		markAPISeen()
@@ -96,6 +101,9 @@ func (d *Daemon) authenticate(next http.Handler) http.Handler {
 				writeError(w, http.StatusUnauthorized, errors.New("missing or wrong token"))
 				return
 			}
+		} else if d.opts.Mode == ModeStandalone && !d.standaloneAPIAllowed(r) {
+			writeError(w, http.StatusUnauthorized, errors.New("authentication required"))
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -494,6 +502,15 @@ func (d *Daemon) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *Daemon) handleSetConfig(w http.ResponseWriter, r *http.Request) {
+	// Standalone: a JSON body is required so a cross-site "simple request"
+	// (form/plain text) cannot reach the decoder even if origin checks are
+	// bypassed. In managed mode Gextto always sends application/json.
+	if d.opts.Mode == ModeStandalone {
+		if mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mediaType != "application/json" {
+			writeError(w, http.StatusUnsupportedMediaType, errors.New("Content-Type must be application/json"))
+			return
+		}
+	}
 	var patch map[string]json.RawMessage
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&patch); err != nil {
 		writeError(w, http.StatusBadRequest, err)

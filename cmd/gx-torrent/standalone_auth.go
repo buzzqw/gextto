@@ -69,10 +69,10 @@ func (d *Daemon) standaloneAuthorized(w http.ResponseWriter, r *http.Request) bo
 	if !d.standaloneAuthActive() {
 		return true
 	}
-	if d.standaloneLocalBypass() && lanSource(clientIP(r)) {
+	if d.standaloneLocalBypass() && lanSource(d.clientIP(r)) {
 		return true
 	}
-	if cookie, err := r.Cookie(uiSessionCookie); err == nil && d.sessions != nil && d.sessions.Valid(cookie.Value) {
+	if d.sessionCookieValid(r) {
 		return true
 	}
 	if r.Method == http.MethodGet {
@@ -85,6 +85,42 @@ func (d *Daemon) standaloneAuthorized(w http.ResponseWriter, r *http.Request) bo
 	}
 	writeError(w, http.StatusUnauthorized, errors.New("authentication required"))
 	return false
+}
+
+// standaloneAPIAllowed is the /api/v1 counterpart of standaloneAuthorized: the
+// same criteria (no password, LAN bypass, or a valid session) but it answers a
+// boolean so the caller can return 401 instead of redirecting a programmatic
+// client to the login page. Accepting both the page cookie (gx_session) and the
+// qBittorrent one (SID) lets the same session drive the page and the API.
+func (d *Daemon) standaloneAPIAllowed(r *http.Request) bool {
+	if !d.standaloneAuthActive() {
+		return true
+	}
+	if d.standaloneLocalBypass() && lanSource(d.clientIP(r)) {
+		return true
+	}
+	return d.sessionCookieValid(r)
+}
+
+// sessionCookieValid reports whether the request carries a live login session
+// in any of the cookies the standalone daemon sets.
+func (d *Daemon) sessionCookieValid(r *http.Request) bool {
+	if d.sessions == nil {
+		return false
+	}
+	for _, name := range []string{uiSessionCookie, qbitSIDCookie} {
+		if cookie, err := r.Cookie(name); err == nil && d.sessions.Valid(cookie.Value) {
+			return true
+		}
+	}
+	return false
+}
+
+// clientIP is the address of the request's peer, read from the socket. A
+// reverse proxy header is deliberately ignored: only declared proxies could be
+// trusted (see trustedProxyIPs).
+func (d *Daemon) clientIP(r *http.Request) net.IP {
+	return clientIP(r)
 }
 
 // loginMatches checks the submitted credentials against the configured ones.

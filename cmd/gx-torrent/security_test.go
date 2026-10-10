@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -107,6 +108,86 @@ func TestLanSource(t *testing.T) {
 	}
 	if lanSource(nil) {
 		t.Error("lanSource(nil) = true, want false")
+	}
+}
+
+func TestStandaloneAPIAuth(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", false)
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+
+	// No session and no bypass: the whole v1 API is behind the password.
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/add", strings.NewReader("magnet=x"))
+	req.RemoteAddr = "8.8.8.8:1234"
+	rec := httptest.NewRecorder()
+	d.authenticate(next).ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized || called {
+		t.Fatalf("standalone API without a session must be 401: status=%d called=%v", rec.Code, called)
+	}
+
+	// A valid page session opens it.
+	token := d.sessions.Create()
+	req = httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/add", strings.NewReader("magnet=x"))
+	req.RemoteAddr = "8.8.8.8:1234"
+	req.AddCookie(&http.Cookie{Name: uiSessionCookie, Value: token})
+	rec = httptest.NewRecorder()
+	called = false
+	d.authenticate(next).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("a valid session must open the API: status=%d called=%v", rec.Code, called)
+	}
+}
+
+func TestStandaloneAPILanBypass(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", true)
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/add", strings.NewReader("magnet=x"))
+	req.RemoteAddr = "192.168.1.9:1234"
+	rec := httptest.NewRecorder()
+	d.authenticate(next).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("the LAN bypass must apply to the API too: status=%d called=%v", rec.Code, called)
+	}
+}
+
+func TestStandaloneAPIRejectsCrossOrigin(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", true)
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+	handler := d.standaloneGuard(d.authenticate(next))
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/add", strings.NewReader("magnet=x"))
+	req.RemoteAddr = "8.8.8.8:1234"
+	req.Header.Set("Origin", "http://evil.example")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden || called {
+		t.Fatalf("a cross-origin API POST must be rejected: status=%d called=%v", rec.Code, called)
+	}
+}
+
+func TestStandaloneSetConfigRequiresJSON(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", true)
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/config", strings.NewReader(`{"sequential":true}`))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	d.handleSetConfig(rec, req)
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("a non-JSON config must be refused in standalone: status=%d", rec.Code)
+	}
+}
+
+func TestManagedAPIAuthUnchanged(t *testing.T) {
+	// Managed, no token: the API stays open exactly as before.
+	d := &Daemon{opts: Options{Mode: ModeManaged}}
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/api/v1/add", strings.NewReader("magnet=x"))
+	req.RemoteAddr = "8.8.8.8:1234"
+	rec := httptest.NewRecorder()
+	d.authenticate(next).ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !called {
+		t.Fatalf("managed mode must not require the standalone login: status=%d called=%v", rec.Code, called)
 	}
 }
 

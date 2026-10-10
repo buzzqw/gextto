@@ -31,15 +31,29 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 			writeError(w, http.StatusForbidden, errors.New("host not allowed: use an IP address or localhost"))
 			return
 		}
-		// The page's forms POST to /ui/*. A browser always sends Origin (or
-		// Referer) on a cross-site POST, so requiring it to match the request
-		// Host blocks a page on another site from acting on the daemon.
-		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/ui/") && !sameOrigin(r) {
+		// The page's forms POST to /ui/*; the REST API and the qBittorrent API
+		// POST to /api/*. A browser always sends Origin (or Referer) on a
+		// cross-site mutating request, so requiring it to match the request Host
+		// blocks a page on another site from acting on the daemon — including
+		// the state-changing /api routes, which have no other CSRF defence.
+		if isStateChanging(r.Method) &&
+			(strings.HasPrefix(r.URL.Path, "/ui/") || strings.HasPrefix(r.URL.Path, "/api/")) &&
+			!sameOrigin(r) {
 			writeError(w, http.StatusForbidden, errors.New("cross-origin request rejected"))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isStateChanging reports whether an HTTP method mutates state and must be
+// protected against cross-site requests.
+func isStateChanging(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	}
+	return false
 }
 
 // hostAllowed reports whether the request Host is an IP literal (IPv4 or IPv6)
