@@ -91,6 +91,32 @@ jobs:
           CGO_ENABLED: "0"
         run: go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart" ./cmd/gx-torrent/
 
+  # Install gx-torrent as a real Windows service (New-Service, the same binPath
+  # the packaged install-service.ps1 builds), start it, check it answers
+  # /api/v1/health and stop it. Non-blocking: it needs administrator rights and
+  # the Service Control Manager is asynchronous, so it can be flaky.
+  windows-service:
+    name: gx-torrent service install (Windows, non-blocking)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build the daemon
+        shell: pwsh
+        run: go build -o gx-torrent.exe ./cmd/gx-torrent
+
+      - name: Service install/start/stop selftest
+        shell: pwsh
+        run: ./scripts/gx-torrent-service-selftest.ps1 -ExePath ./gx-torrent.exe
+
   # The default build and tests are pure Go; this job keeps the opt-in embedded
   # libtorrent engine (cgo) covered. It installs the dev headers.
   libtorrent:
