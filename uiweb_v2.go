@@ -1341,23 +1341,51 @@ type v2DetailCaps struct {
 	GeneralNote string
 }
 
+// v2DetailCapsFor derives the detail-tab capabilities from capabilityLevels
+// (torrent_engine.go), the single source of truth: so the tab controls can never
+// drift from the parity matrix the API and the READMEs expose. Only the
+// human-readable notes are per engine.
 func v2DetailCapsFor(backend string) v2DetailCaps {
+	matrix := CapabilityMatrix(backend)
+	if len(matrix) == 0 {
+		// Unknown/empty backend: keep the historical default (the embedded
+		// engine) instead of hiding every control.
+		matrix = CapabilityMatrix(BackendEmbedded)
+	}
+	available := func(name string) bool {
+		level := matrix[name]
+		return level == "full" || level == "partial"
+	}
+	caps := v2DetailCaps{
+		Backend:      v2DetailBackendLabel(backend),
+		SuperSeeding: available("super_seeding"),
+		WebSeeds:     available("web_seeds"),
+		Pieces:       available("piece_diagnostics"),
+		RateLimits:   available("limits"),
+		Connections:  available("connections"),
+		FileLevels:   available("file_priorities"),
+	}
 	switch backend {
 	case BackendGxTorrent:
-		return v2DetailCaps{
-			Backend: "gx-torrent", SuperSeeding: true, WebSeeds: true, Pieces: true, RateLimits: true, Connections: true,
-			FileNote:    "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo.",
-			LimitsNote:  "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato.",
-			TrackerNote: "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse.",
-			GeneralNote: "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale e il super-seeding (BEP 16) si attivano anche a caldo, la prima/ultima parte solo quando aggiungi il torrent; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed.",
-		}
+		caps.FileNote = "gx-torrent scarica o salta ogni file (nessun livello di priorità); cambiare la selezione riavvia il torrent per un attimo."
+		caps.LimitsNote = "I limiti valgono per questo torrent: -1 usa il limite globale, 0 è illimitato."
+		caps.TrackerNote = "gx-torrent sostituisce l'intera lista dei tracker: le righe cancellate vengono rimosse."
+		caps.GeneralNote = "Con gx-torrent non è disponibile l'upload/share mode. Il download sequenziale e il super-seeding (BEP 16) si attivano anche a caldo, la prima/ultima parte solo quando aggiungi il torrent; il super-seeding vale solo a torrent completato e riduce di proposito l'upload del seed."
 	case BackendQbittorrent:
-		return v2DetailCaps{
-			Backend: "qBittorrent-nox", SuperSeeding: true, RateLimits: true, FileLevels: true,
-			LimitsNote: "qBittorrent non ha connessioni e slot di upload per singolo torrent: si impostano solo globalmente.",
-		}
+		caps.LimitsNote = "qBittorrent non ha connessioni e slot di upload per singolo torrent: si impostano solo globalmente."
+	}
+	return caps
+}
+
+// v2DetailBackendLabel is the display name of a backend in the detail view.
+func v2DetailBackendLabel(backend string) string {
+	switch backend {
+	case BackendGxTorrent:
+		return "gx-torrent"
+	case BackendQbittorrent:
+		return "qBittorrent-nox"
 	default:
-		return v2DetailCaps{Backend: "libtorrent", SuperSeeding: true, WebSeeds: true, RateLimits: true, Connections: true, FileLevels: true}
+		return "libtorrent"
 	}
 }
 
@@ -1377,8 +1405,12 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{ID: "files", Label: "Contenuto"}, {ID: "peers", Label: "Peers"},
 		{ID: "limits", Label: "Limiti"}, {ID: "storage", Label: "Storage"},
 	}
-	if _, ok := s.activeEngine().(TorrentPieceInspector); ok {
-		view.Tabs = append(view.Tabs, v2DetailTab{ID: "pieces", Label: "Pezzi"})
+	// The per-piece tab needs both the matrix (piece_diagnostics) and the
+	// engine's implementation, so the API and the UI never disagree.
+	if view.Caps.Pieces {
+		if _, ok := s.activeEngine().(TorrentPieceInspector); ok {
+			view.Tabs = append(view.Tabs, v2DetailTab{ID: "pieces", Label: "Pezzi"})
+		}
 	}
 	view.Tabs = append(view.Tabs, v2DetailTab{ID: "history", Label: "Storia"})
 	view.AcqID = logging.AcqID(hash)

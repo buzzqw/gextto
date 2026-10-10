@@ -167,7 +167,8 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "none",
 		"super_seeding": "full",
-		"ip_filter":     "full", "session_stats": "full", "web_seeds": "full",
+		"connections":   "full", "file_priorities": "full",
+		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "none",
 	},
 	BackendQbittorrent: {
@@ -177,7 +178,8 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "partial", "ramdisk": "none", "fastresume": "none",
 		"piece_diagnostics": "none", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "partial",
-		"ip_filter":     "partial", "session_stats": "partial", "web_seeds": "partial",
+		"connections":   "none", "file_priorities": "full",
+		"ip_filter": "partial", "session_stats": "partial", "web_seeds": "none",
 		"holepunch": "none",
 	},
 	BackendGxTorrent: {
@@ -187,7 +189,8 @@ var capabilityLevels = map[string]map[string]string{
 		"first_last": "full", "seed_policy": "full", "ramdisk": "full", "fastresume": "full",
 		"piece_diagnostics": "full", "categories": "full", "tags": "full", "sync": "full",
 		"super_seeding": "full",
-		"ip_filter":     "full", "session_stats": "full", "web_seeds": "full",
+		"connections":   "full", "file_priorities": "none",
+		"ip_filter": "full", "session_stats": "full", "web_seeds": "full",
 		"holepunch": "full",
 	},
 }
@@ -208,8 +211,11 @@ func capabilityNames() []string {
 	return names
 }
 
-// capabilitiesFor reports boolean capabilities for a backend. Partial support
-// counts as available (true) but is flagged in CapabilityMatrix.
+// capabilitiesFor reports boolean capabilities for a backend: a capability is
+// "available" (true) when its level is `full` or `partial`, and unavailable
+// (false) when it is `none`. The boolean is only a gate ("can the operation be
+// attempted at all"); the nuance of a `partial` lives in CapabilityMatrix and
+// must be read there by any caller that needs it.
 func capabilitiesFor(backend string) map[string]bool {
 	levels := capabilityLevels[backend]
 	out := map[string]bool{}

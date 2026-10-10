@@ -28,6 +28,19 @@ type TorrentBackend interface {
 	Capabilities() map[string]bool
 }
 
+// torrentSessionSyncer is implemented by the external backends that expose their
+// poll/sync diagnostics (the capability matrix marks `sync` as `none` for the
+// embedded engine). Using the interface keeps a single mechanism instead of a
+// concrete type switch per engine.
+type torrentSessionSyncer interface {
+	SyncStats() map[string]any
+}
+
+var (
+	_ torrentSessionSyncer = (*qbittorrentEngine)(nil)
+	_ torrentSessionSyncer = (*gxTorrentEngine)(nil)
+)
+
 // ActiveTorrentBackend returns the backend currently driving the daemon.
 func ActiveTorrentBackend(s *AppState) TorrentBackend {
 	return s.activeEngine()
@@ -73,11 +86,10 @@ func TorrentBackendStatus(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"capability_parity": CapabilityParity(),
 		"qbittorrent_url":   settingsOr(cfg, "qbittorrent_url", ""),
 	}
-	if engine, ok := active.(*qbittorrentEngine); ok {
-		payload["sync"] = engine.SyncStats()
+	if syncer, ok := active.(torrentSessionSyncer); ok {
+		payload["sync"] = syncer.SyncStats()
 	}
 	if engine, ok := active.(*gxTorrentEngine); ok {
-		payload["sync"] = engine.SyncStats()
 		payload["gxtorrent_url"] = engine.settings.BaseURL
 	}
 	jsonResponse(w, payload)

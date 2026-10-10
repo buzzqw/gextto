@@ -94,8 +94,9 @@ Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = n
 | Capacità | gx-torrent | qBittorrent-nox | libtorrent (build opzionale) |
 | --- | :--: | :--: | :--: |
 | Aggiungi, Rimuovi, Pausa, Riprendi, Elenca, Ricontrolla, Sposta, Download sequenziale, Selezione file, Limiti per torrent, Peer, Tracker, Categorie, Tag, Prima/ultima parte | sì | sì | sì |
-| Policy di seed, Super-seeding (BEP 16), Statistiche di sessione, Filtro IP, Web seed | sì | parziale | sì |
-| RAM disk, Fast resume | sì | — | sì |
+| Priorità dei file | — | sì | sì |
+| Connessioni e slot di upload per torrent, RAM disk, Fast resume, Web seed | sì | — | sì |
+| Policy di seed, Super-seeding (BEP 16), Statistiche di sessione, Filtro IP | sì | parziale | sì |
 | Diagnostica dei pezzi, Holepunching (BEP 55) | sì | — | — |
 | Sincronizzazione della sessione | sì | sì | — |
 <!-- capability-matrix:end -->

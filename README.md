@@ -93,8 +93,9 @@ Levels: **yes** = supported, **partial** = supported with limits, **—** = not 
 | Capability | gx-torrent | qBittorrent-nox | libtorrent (optional build) |
 | --- | :--: | :--: | :--: |
 | Add, Remove, Pause, Resume, List, Recheck, Move, Sequential download, File selection, Per-torrent limits, Peers, Trackers, Categories, Tags, First/last piece | yes | yes | yes |
-| Seed policy, Super-seeding (BEP 16), Session stats, IP filter, Web seeds | yes | partial | yes |
-| RAM disk, Fast resume | yes | — | yes |
+| File priorities | — | yes | yes |
+| Per-torrent connections/uploads, RAM disk, Fast resume, Web seeds | yes | — | yes |
+| Seed policy, Super-seeding (BEP 16), Session stats, IP filter | yes | partial | yes |
 | Per-piece diagnostics, Holepunching (BEP 55) | yes | — | — |
 | Session sync | yes | yes | — |
 <!-- capability-matrix:end -->

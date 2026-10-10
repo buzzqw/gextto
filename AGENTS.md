@@ -22,8 +22,14 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   (fallback automatico), qBittorrent-nox esterno. Contratto in
   `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go`,
   `libtorrent.go`, `qbittorrent_engine.go`. Matrice capacità in
-  `capabilityLevels` (`torrent_engine.go`): se il motore supporta un'opzione ma
-  la matrice dice `none`, l'UI la nasconde.
+  `capabilityLevels` (`torrent_engine.go`): è la **fonte unica**. Da lì derivano
+  l'API (`GET /api/torrent-backend`), la tabella dei README (generata) e i flag
+  della scheda di dettaglio (`v2DetailCapsFor` in `uiweb_v2.go`, test
+  `TestV2DetailCapsFollowCapabilityMatrix`). Le operazioni che un motore non ha
+  rifiutano con `ErrCapabilityUnavailable`; i blocchi solo-libtorrent usano
+  `requireEmbedded`. La **visibilità delle impostazioni** è un asse diverso
+  (`uiSettingAllowedBackends`/`uiLibtorrentEngineOnlySettings`): quali chiavi un
+  motore legge, non quali operazioni supporta.
 - `gx-torrent` è **sempre avviato e sorvegliato** da Gextto quando è il motore
   attivo (nessuna opzione per disattivarlo). Un demone esterno già in ascolto
   sull'URL viene usato così com'è.
@@ -182,7 +188,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   aggiungila anche a `capabilityDocRows` (`capability_matrix_docs_test.go`) e
   rigenera con `UPDATE_README=1 go test -run TestReadmeCapabilityMatrix .`.
   `TestReadmeCapabilityMatrix` fallisce finché README.md, README.it.md e la
-  matrice non coincidono: non modificare quelle tabelle a mano.
+  matrice non coincidono: non modificare quelle tabelle a mano. I flag della
+  scheda di dettaglio si **derivano** dalla matrice (`v2DetailCapsFor`): non
+  aggiungere mappe a mano, aggiungi una capacità. `TestCapabilitiesBooleanMatchesLevels`
+  fissa che il booleano di `Capabilities()` è vero per `full`/`partial` e falso
+  per `none`; `TestV2DetailCapsFollowCapabilityMatrix` blocca i flag UI attesi.
 - Nuova impostazione UI: aggiungi default (`uiweb_settings_defaults.go`), indice
   (`uiweb_settings.go`, con sezione e `Group` del pannello: lo script di
   verifica rifiuta le voci senza gruppo), unità/valori speciali/dipendenza

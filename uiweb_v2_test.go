@@ -45,6 +45,37 @@ func v2Request(t *testing.T, server *httptest.Server, method, path string, form 
 	return response.StatusCode, string(raw)
 }
 
+// TestV2DetailCapsFollowCapabilityMatrix locks in that the detail-tab controls
+// are derived from capabilityLevels: the expected flags per engine are asserted
+// explicitly, so an unintended matrix edit (or a new hand-kept map) is caught.
+func TestV2DetailCapsFollowCapabilityMatrix(t *testing.T) {
+	want := map[string]v2DetailCaps{
+		BackendGxTorrent:   {SuperSeeding: true, WebSeeds: true, Pieces: true, RateLimits: true, Connections: true, FileLevels: false},
+		BackendQbittorrent: {SuperSeeding: true, WebSeeds: false, Pieces: false, RateLimits: true, Connections: false, FileLevels: true},
+		BackendEmbedded:    {SuperSeeding: true, WebSeeds: true, Pieces: false, RateLimits: true, Connections: true, FileLevels: true},
+	}
+	for backend, expected := range want {
+		got := v2DetailCapsFor(backend)
+		same := got.SuperSeeding == expected.SuperSeeding && got.WebSeeds == expected.WebSeeds &&
+			got.Pieces == expected.Pieces && got.RateLimits == expected.RateLimits &&
+			got.Connections == expected.Connections && got.FileLevels == expected.FileLevels
+		if !same {
+			t.Fatalf("detail caps for %s = %+v, want flags %+v", backend, got, expected)
+		}
+		// And they must equal the matrix, the single source of truth.
+		matrix := CapabilityMatrix(backend)
+		available := func(name string) bool {
+			level := matrix[name]
+			return level == "full" || level == "partial"
+		}
+		if got.SuperSeeding != available("super_seeding") || got.WebSeeds != available("web_seeds") ||
+			got.Pieces != available("piece_diagnostics") || got.RateLimits != available("limits") ||
+			got.Connections != available("connections") || got.FileLevels != available("file_priorities") {
+			t.Fatalf("detail caps for %s drift from capabilityLevels", backend)
+		}
+	}
+}
+
 func TestV2SettingsRedirectUsesOnlyKnownLocalTargets(t *testing.T) {
 	for _, test := range []struct {
 		tab  string

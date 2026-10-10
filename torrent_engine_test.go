@@ -105,6 +105,43 @@ func TestCapabilityParityIsComplete(t *testing.T) {
 	}
 }
 
+// TestCapabilitiesBooleanMatchesLevels pins the boolean gate semantics: a
+// capability is available exactly when its level is full or partial, never when
+// it is none. It also pins the two levels fixed to match the adapters.
+func TestCapabilitiesBooleanMatchesLevels(t *testing.T) {
+	for _, backend := range []string{BackendEmbedded, BackendQbittorrent, BackendGxTorrent} {
+		boolcaps := capabilitiesFor(backend)
+		for name, level := range CapabilityMatrix(backend) {
+			want := level == "full" || level == "partial"
+			if boolcaps[name] != want {
+				t.Fatalf("%s/%s: boolean=%v but level=%q", backend, name, boolcaps[name], level)
+			}
+		}
+	}
+	// The qBittorrent Web API cannot add or remove web seeds: the matrix must
+	// not advertise a capability the adapter always refuses.
+	if CapabilityMatrix(BackendQbittorrent)["web_seeds"] != "none" {
+		t.Fatal("qbittorrent web_seeds must be none (the adapter returns a capability error)")
+	}
+	// gx-torrent selects files (skip/download) but has no priority levels.
+	if CapabilityMatrix(BackendGxTorrent)["file_priorities"] != "none" {
+		t.Fatal("gx-torrent file_priorities must be none")
+	}
+}
+
+// TestSyncCapabilityMatchesImplementations keeps the `sync` level aligned with
+// the torrentSessionSyncer interface: the embedded engine has no SyncStats.
+func TestSyncCapabilityMatchesImplementations(t *testing.T) {
+	if CapabilityMatrix(BackendEmbedded)["sync"] != "none" {
+		t.Fatal("the embedded engine has no SyncStats: sync must be none")
+	}
+	for _, backend := range []string{BackendQbittorrent, BackendGxTorrent} {
+		if CapabilityMatrix(backend)["sync"] == "none" {
+			t.Fatalf("%s implements SyncStats: sync must not be none", backend)
+		}
+	}
+}
+
 func TestSelectTorrentEngineBackends(t *testing.T) {
 	// embedded -> nil engine (the adapter is built on demand), but only when
 	// libtorrent is compiled in; a pure-Go build refuses it.
