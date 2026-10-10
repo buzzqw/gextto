@@ -45,8 +45,14 @@ jobs:
       - name: Build
         run: scripts/build-daemon.sh
 
-      # The standalone daemon is pure Go and cross-compiles to Windows; keep it
-      # that way (the platform detail lives in cmd/gx-torrent/fsinfo_*.go).
+      # The gx-core engine (internal/gxcore) and the standalone daemon are pure
+      # Go and cross-compile to Windows; keep both that way (the platform
+      # detail lives in cmd/gx-torrent/fsinfo_*.go).
+      - name: Cross-build gx-core engine for Windows
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./internal/gxcore/...
+          GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build ./internal/gxcore/...
+
       - name: Cross-build gx-torrent for Windows
         run: |
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o /dev/null ./cmd/gx-torrent/
