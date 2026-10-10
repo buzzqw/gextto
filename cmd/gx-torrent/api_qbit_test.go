@@ -243,6 +243,39 @@ func TestQbitAppEndpoints(t *testing.T) {
 	}
 }
 
+func TestQbitGlobalSpeedLimits(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/api/v2/transfer/setDownloadLimit", url.Values{"limit": {"2097152"}}) // 2048 KiB/s
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("setDownloadLimit: %d", resp.StatusCode)
+	}
+	resp, err = http.Get(srv.URL + "/api/v2/transfer/downloadLimit")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if got := strings.TrimSpace(string(body)); got != "2097152" {
+		t.Fatalf("downloadLimit = %q, want 2097152", got)
+	}
+
+	resp, err = http.PostForm(srv.URL+"/api/v2/transfer/setUploadLimit", url.Values{"limit": {"-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("a negative limit must be rejected: %d", resp.StatusCode)
+	}
+}
+
 func TestQbitStateMapping(t *testing.T) {
 	cases := map[string]string{
 		"downloading":    "downloading",

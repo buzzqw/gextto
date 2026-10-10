@@ -43,6 +43,15 @@ func TestQbitCompatibleWithGexttoClient(t *testing.T) {
 	if _, err := client.TransferInfo(ctx); err != nil {
 		t.Fatalf("transfer info: %v", err)
 	}
+	if err := client.SetGlobalDownloadLimit(ctx, 1<<20); err != nil {
+		t.Fatalf("set global download limit: %v", err)
+	}
+	if err := client.SetGlobalUploadLimit(ctx, 1<<19); err != nil {
+		t.Fatalf("set global upload limit: %v", err)
+	}
+	if _, err := client.Sync(ctx, 0); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
 	if err := client.CreateCategory(ctx, "movies", "/srv/movies"); err != nil {
 		t.Fatalf("createCategory: %v", err)
 	}

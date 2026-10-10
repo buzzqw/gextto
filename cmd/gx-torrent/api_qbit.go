@@ -6,9 +6,11 @@ package main
 // Gextto is the single master and the API is not exposed.
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,7 +37,12 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("GET /api/v2/app/preferences", d.handleQbitPreferences)
 	mux.HandleFunc("GET /api/v2/app/buildInfo", d.handleQbitBuildInfo)
 	mux.HandleFunc("GET /api/v2/transfer/info", d.handleQbitTransferInfo)
+	mux.HandleFunc("GET /api/v2/transfer/downloadLimit", d.handleQbitDownloadLimit)
+	mux.HandleFunc("GET /api/v2/transfer/uploadLimit", d.handleQbitUploadLimit)
+	mux.HandleFunc("POST /api/v2/transfer/setDownloadLimit", d.handleQbitSetDownloadLimit)
+	mux.HandleFunc("POST /api/v2/transfer/setUploadLimit", d.handleQbitSetUploadLimit)
 	mux.HandleFunc("GET /api/v2/torrents/info", d.handleQbitTorrentsInfo)
+	mux.HandleFunc("GET /api/v2/sync/maindata", d.handleQbitSync)
 	mux.HandleFunc("GET /api/v2/torrents/properties", d.handleQbitProperties)
 	mux.HandleFunc("GET /api/v2/torrents/files", d.handleQbitFiles)
 	mux.HandleFunc("POST /api/v2/torrents/add", d.handleQbitAdd)
@@ -589,4 +596,76 @@ func ratioOf(v torrentInfo) float64 {
 		return 0
 	}
 	return float64(v.Uploaded) / float64(v.TotalSize)
+}
+
+func (d *Daemon) handleQbitDownloadLimit(w http.ResponseWriter, _ *http.Request) {
+	cfg, _, _ := d.config()
+	qbitText(w, http.StatusOK, strconv.FormatInt(cfg.SpeedLimitDownload*1024, 10))
+}
+
+func (d *Daemon) handleQbitUploadLimit(w http.ResponseWriter, _ *http.Request) {
+	cfg, _, _ := d.config()
+	qbitText(w, http.StatusOK, strconv.FormatInt(cfg.SpeedLimitUpload*1024, 10))
+}
+
+// qbitSetSpeedLimit stores a global limit in KiB/s (the API speaks bytes/s).
+func (d *Daemon) qbitSetSpeedLimit(key, value string) error {
+	bytesPerSecond, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil || bytesPerSecond < 0 {
+		return fmt.Errorf("invalid limit %q", value)
+	}
+	raw, err := json.Marshal(bytesPerSecond / 1024)
+	if err != nil {
+		return err
+	}
+	_, err = d.setConfig(map[string]json.RawMessage{key: raw})
+	return err
+}
+
+func (d *Daemon) handleQbitSetDownloadLimit(w http.ResponseWriter, r *http.Request) {
+	if err := d.qbitSetSpeedLimit("speed_limit_download", r.FormValue("limit")); err != nil {
+		qbitText(w, http.StatusBadRequest, qbitInvalidCode)
+		return
+	}
+	qbitText(w, http.StatusOK, qbitOKCode)
+}
+
+func (d *Daemon) handleQbitSetUploadLimit(w http.ResponseWriter, r *http.Request) {
+	if err := d.qbitSetSpeedLimit("speed_limit_upload", r.FormValue("limit")); err != nil {
+		qbitText(w, http.StatusBadRequest, qbitInvalidCode)
+		return
+	}
+	qbitText(w, http.StatusOK, qbitOKCode)
+}
+
+// handleQbitSync answers /api/v2/sync/maindata with a full snapshot every time
+// (rid is constant): the clients that poll it get a consistent state without us
+// implementing the incremental diff.
+func (d *Daemon) handleQbitSync(w http.ResponseWriter, _ *http.Request) {
+	views := d.snapshotViews()
+	torrents := make(map[string]qbitTorrent, len(views))
+	for _, v := range views {
+		torrents[strings.ToLower(v.Hash)] = qbitView(v)
+	}
+	categories := map[string]qbitCategory{}
+	for name, savePath := range d.categoriesSnapshot() {
+		categories[name] = qbitCategory{Name: name, SavePath: savePath}
+	}
+	stats := d.stats()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"rid":              1,
+		"full_update":      true,
+		"torrents":         torrents,
+		"torrents_removed": []string{},
+		"categories":       categories,
+		"tags":             d.tagsSnapshot(),
+		"server_state": map[string]any{
+			"dl_info_speed":     stats.DownloadRate,
+			"up_info_speed":     stats.UploadRate,
+			"dl_info_data":      stats.Session["bytes_downloaded"],
+			"up_info_data":      stats.Session["bytes_uploaded"],
+			"dht_nodes":         stats.Session["dht_nodes"],
+			"connection_status": "connected",
+		},
+	})
 }
