@@ -17,7 +17,7 @@ func (t *torrent) handleNewTrackers(trackers []tracker.Tracker) {
 	}
 }
 
-// handleSetTrackers replaces the tracker list at runtime (gextto fork): the
+// handleSetTrackers replaces the tracker list at runtime: the
 // current announcers are closed, the list is swapped and the announcers are
 // restarted on the new one. The trackers that are gone get a best-effort
 // "stopped" announce so they drop us from their peer list. It runs in the

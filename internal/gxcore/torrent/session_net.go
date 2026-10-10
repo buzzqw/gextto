@@ -1,6 +1,6 @@
 package torrent
 
-// session_net.go (gextto fork, F4 IPv6): the listening sockets prefer
+// session_net.go (F4 IPv6): the listening sockets prefer
 // dual-stack, so one port serves both IPv4 and IPv6 peers like qBittorrent.
 //
 // An unspecified host ("", "0.0.0.0" or "::") opens a dual-stack socket and

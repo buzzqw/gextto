@@ -12,7 +12,7 @@ import (
 )
 
 // sessionBanTTL is how long a peer that sent a corrupt piece stays banned from
-// the whole session (gextto fork, libtorrent-style smart ban).
+// the whole session (libtorrent-style smart ban).
 const sessionBanTTL = 30 * time.Minute
 
 func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
@@ -30,7 +30,7 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 			t.log.Debugln("received corrupt piece from peer", src.String())
 			t.closePeer(src)
 			t.bannedPeerIPs[src.IP()] = struct{}{}
-			// gextto fork: ban the corrupt peer session-wide for a while, so it
+			// ban the corrupt peer session-wide for a while, so it
 			// cannot poison the other torrents either (libtorrent-style smart ban).
 			if t.session != nil {
 				t.session.BanIP(src.IP(), sessionBanTTL)

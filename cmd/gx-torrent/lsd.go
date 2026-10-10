@@ -101,7 +101,7 @@ func (s *lsdService) message(hashes []string) []byte {
 }
 
 // dueHashes lists the running public torrents to announce now. It reads the
-// lock-free snapshot (gextto fork): taking d.mu and calling t.Stats() here
+// lock-free snapshot: taking d.mu and calling t.Stats() here
 // would block the whole daemon on a torrent run loop stuck on storage I/O.
 func (s *lsdService) dueHashes(now time.Time) []string {
 	var running []string

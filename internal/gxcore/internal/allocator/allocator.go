@@ -48,7 +48,7 @@ func (a *Allocator) Run(info *metainfo.Info, sto storage.Storage, progressC chan
 }
 
 // RunSelected allocates the files, opening the skipped ones (skip is indexed
-// like info.Files) in the parts storage instead (gextto fork).
+// like info.Files) in the parts storage instead.
 func (a *Allocator) RunSelected(info *metainfo.Info, sto storage.Storage, skip []bool, parts storage.Storage, progressC chan Progress, resultC chan *Allocator) {
 	defer close(a.doneC)
 

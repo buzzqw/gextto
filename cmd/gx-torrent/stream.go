@@ -2,7 +2,7 @@ package main
 
 // stream.go serves a torrent file to a media player over HTTP with Range
 // support, while asking the engine to fetch the pieces of the requested window first
-// (gextto fork). The player can start before the download is complete.
+//. The player can start before the download is complete.
 
 import (
 	"fmt"

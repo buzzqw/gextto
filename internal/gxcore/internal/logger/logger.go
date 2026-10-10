@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	// gextto fork: guarded, NewSession may replace it while other
+	// guarded, NewSession may replace it while other
 	// sessions' goroutines create loggers.
 	handlerMu sync.RWMutex
 	handler   log.Handler

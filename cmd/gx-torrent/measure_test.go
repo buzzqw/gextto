@@ -1,6 +1,6 @@
 package main
 
-// measure_test.go is an opt-in local-swarm measurement harness (gextto fork).
+// measure_test.go is an opt-in local-swarm measurement harness.
 //
 // Unlike the deterministic unchoker harness
 // (internal/gxcore/internal/unchoker/sim_test.go), this runs real daemons over

@@ -6,7 +6,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 )
 
-// gextto fork: completed bytes per file from the bitfield of a stopped torrent.
+// completed bytes per file from the bitfield of a stopped torrent.
 func TestFileStatsFromPieces(t *testing.T) {
 	// Pieces of 10 bytes: a=0..25, padding 25..30, b=30..50, empty c, d=50..55.
 	files := []metainfo.File{

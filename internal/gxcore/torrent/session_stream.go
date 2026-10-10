@@ -1,6 +1,6 @@
 package torrent
 
-// gextto fork: prioritize the pieces a player is reading, so a media player can
+// prioritize the pieces a player is reading, so a media player can
 // stream a file while it is still being downloaded.
 
 // filePieceRange maps a byte range of the non-padding file `fileIndex` to the
@@ -46,7 +46,7 @@ func (t *torrent) filePieceRange(fileIndex int, offset, length int64) (uint32, u
 }
 
 // FilePieceRange returns the piece range covering `length` bytes at `offset` of
-// the non-padding file `fileIndex` (gextto fork).
+// the non-padding file `fileIndex`.
 func (t *Torrent) FilePieceRange(fileIndex int, offset, length int64) (begin, end uint32, ok bool) {
 	type result struct {
 		begin, end uint32
@@ -81,7 +81,7 @@ func (t *Torrent) PiecesDone(begin, end uint32) bool {
 }
 
 // SetFileStreamWindow makes the piece picker request the pieces of a file range
-// before any other (gextto fork); `length <= 0` clears the window. It returns
+// before any other; `length <= 0` clears the window. It returns
 // the piece range set.
 func (t *Torrent) SetFileStreamWindow(fileIndex int, offset, length int64) (begin, end uint32, ok bool) {
 	type result struct {

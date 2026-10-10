@@ -1,5 +1,5 @@
 // Package bandwidth provides a rate limiter whose rate can change while peers
-// hold it (gextto fork). The engine used *ratelimit.Bucket directly, fixed when the
+// hold it. The engine used *ratelimit.Bucket directly, fixed when the
 // session was created, so a new speed limit needed a session restart.
 package bandwidth
 
@@ -27,7 +27,7 @@ func New(bytesPerSecond int64) *Limiter {
 	return l
 }
 
-// SetParent makes this limiter inherit another one (gextto fork): Take and Rate
+// SetParent makes this limiter inherit another one: Take and Rate
 // forward to the parent until a new parent is set. A nil parent clears the
 // inheritance.
 func (l *Limiter) SetParent(parent *Limiter) {
@@ -36,7 +36,7 @@ func (l *Limiter) SetParent(parent *Limiter) {
 	l.mu.Unlock()
 }
 
-// SetLimitKiB sets an explicit limit in KiB/s (gextto fork). A negative value
+// SetLimitKiB sets an explicit limit in KiB/s. A negative value
 // inherits the session limiter, zero means unlimited.
 func (l *Limiter) SetLimitKiB(kib int64, session *Limiter) {
 	switch {

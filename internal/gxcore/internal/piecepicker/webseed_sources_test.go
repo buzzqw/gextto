@@ -6,7 +6,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
 )
 
-// gextto fork: adding or removing a web seed at runtime must not mutate the
+// adding or removing a web seed at runtime must not mutate the
 // caller's slice (the torrent keeps its own list) nor lose the existing ones.
 func TestAddRemoveWebseedSourcesDoNotAliasTheCaller(t *testing.T) {
 	original := webseedsource.NewList([]string{"http://a/seed"})

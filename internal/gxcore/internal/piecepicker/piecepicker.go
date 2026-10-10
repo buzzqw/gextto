@@ -47,7 +47,7 @@ type PiecePicker struct {
 	sequential bool
 
 	// Pick the pieces at both ends of every file first, then continue
-	// rarest-first (gextto fork). Independent of sequential order.
+	// rarest-first. Independent of sequential order.
 	firstLast bool
 
 	// streamBegin/streamEnd are the piece range a player is reading (gextto
@@ -103,7 +103,7 @@ func (p *myPiece) PickableBy(pe *peer.Peer) bool {
 // New returns a new PiecePicker.
 // If sequential is true, pieces are picked in sequential order instead of rarest-first.
 // If firstLast is true, the pieces at both ends of every file are picked first
-// (gextto fork; sequential mode implies it).
+// (sequential mode implies it).
 func New(pieces []piece.Piece, maxDuplicateDownload int, webseedSources []*webseedsource.WebseedSource, sequential, firstLast bool) *PiecePicker {
 	ps := make([]myPiece, len(pieces))
 	for i := range pieces {
@@ -172,7 +172,7 @@ func markFileEdges(pieces []myPiece) {
 	}
 }
 
-// SetOrder changes the piece order at runtime (gextto fork): sequential picks
+// SetOrder changes the piece order at runtime: sequential picks
 // the pieces in index order, firstLast prioritizes the ends of every file.
 // Enabling either recomputes the file-edge flags; disabling both stops using
 // them (the flags may stay set, they are consulted only when an order is on).
@@ -184,7 +184,7 @@ func (p *PiecePicker) SetOrder(sequential, firstLast bool) {
 	p.firstLast = firstLast
 }
 
-// SetStreamWindow prioritizes the pieces in [begin, end) (gextto fork): the
+// SetStreamWindow prioritizes the pieces in [begin, end): the
 // pieces a player is reading are requested before the rest. begin == end clears
 // the window.
 func (p *PiecePicker) SetStreamWindow(begin, end uint32) {
@@ -213,7 +213,7 @@ func (p *PiecePicker) pickStreaming(pe *peer.Peer) *myPiece {
 }
 
 // PieceDownloading reports whether the piece at index i is being downloaded
-// right now (gextto fork, for piece diagnostics).
+// right now (for piece diagnostics).
 func (p *PiecePicker) PieceDownloading(i uint32) bool {
 	if i >= uint32(len(p.pieces)) {
 		return false
@@ -239,7 +239,7 @@ func (p *PiecePicker) CloseWebseedDownloader(src *webseedsource.WebseedSource) {
 	src.Downloader = nil
 }
 
-// AddWebseedSource adds a web seed source at runtime (gextto fork). The list is
+// AddWebseedSource adds a web seed source at runtime. The list is
 // rebuilt so it never aliases the caller's slice.
 func (p *PiecePicker) AddWebseedSource(src *webseedsource.WebseedSource) {
 	next := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources)+1)
@@ -247,7 +247,7 @@ func (p *PiecePicker) AddWebseedSource(src *webseedsource.WebseedSource) {
 	p.webseedSources = append(next, src)
 }
 
-// RemoveWebseedSource drops a web seed source from the picker (gextto fork).
+// RemoveWebseedSource drops a web seed source from the picker.
 // Close its downloader first (CloseWebseedDownloader) to release the pieces.
 func (p *PiecePicker) RemoveWebseedSource(src *webseedsource.WebseedSource) {
 	kept := make([]*webseedsource.WebseedSource, 0, len(p.webseedSources))
@@ -385,7 +385,7 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 	// torrent. While choked they are the only pieces we can request, so this applies only
 	// after the peer unchokes us.
 	if !pe.PeerChoking {
-		// The player's streaming window comes first (gextto fork).
+		// The player's streaming window comes first.
 		if mp = p.pickStreaming(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}

@@ -17,7 +17,7 @@ const (
 	ExtensionIDMetadata
 	// ExtensionIDPEX is ID for PEX extension messages.
 	ExtensionIDPEX
-	// ExtensionIDHolepunch is ID for BEP 55 ut_holepunch messages (gextto fork).
+	// ExtensionIDHolepunch is ID for BEP 55 ut_holepunch messages.
 	ExtensionIDHolepunch
 )
 
@@ -27,7 +27,6 @@ const (
 	// ExtensionKeyPEX is the key for the PEX extension.
 	ExtensionKeyPEX = "ut_pex"
 	// ExtensionKeyHolepunch is the key for the BEP 55 holepunch extension
-	// (gextto fork).
 	ExtensionKeyHolepunch = "ut_holepunch"
 )
 
@@ -61,7 +60,7 @@ func (m ExtensionMessage) WriteTo(w io.Writer) (n int64, err error) {
 	if err != nil {
 		return
 	}
-	// Holepunch messages are a fixed binary payload, not bencoded (gextto fork).
+	// Holepunch messages are a fixed binary payload, not bencoded.
 	if hp, ok := m.Payload.(HolepunchMessage); ok {
 		var data []byte
 		data, err = hp.MarshalBinary()

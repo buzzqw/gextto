@@ -29,9 +29,8 @@ allineamento storico è da **v1.13.0 (2024-09-18) a v2.4.2 (2026-10-03)**.
   i file nuovi sono `internal/netx/netx.go`, `torrent/session_listen.go`,
   `torrent/torrent_selection.go`. Il resto è codice upstream intatto.
 
-Le modifiche sono elencate in `internal/gxcore/GEXTTO.md` e marcate nel codice
-con `gextto fork`. **Prima di toccare la base, rileggi quella tabella**: è
-l'inventario di ciò che va riapplicato.
+Le modifiche sono elencate in `internal/gxcore/GEXTTO.md`. **Prima di toccare la
+base, rileggi quella tabella**: è l'inventario di ciò che va riapplicato.
 
 ## 2. Politica di versione
 

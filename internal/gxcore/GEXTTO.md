@@ -8,9 +8,9 @@ come `github.com/buzzqw/gextto/internal/gxcore`. Lo usa solo il demone
 `cmd/gx-torrent`.
 
 **Obiettivo:** non dipendere più da rain. Il distacco è avvenuto (cartella,
-modulo e identità di rete sono nostre); questa tabella resta come **changelog
-delle modifiche** rispetto alla base upstream, con i punti ancora marcati
-`gextto fork`. L'attribuzione MIT originale resta in `LICENSE`.
+modulo, identità di rete e **marcatori nel codice** rimossi); questa tabella è
+il **changelog delle modifiche** rispetto alla base upstream. L'attribuzione MIT
+originale resta in `LICENSE`.
 
 Rimossi rispetto all'originale:
 
@@ -42,7 +42,7 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
   errori `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer`).
 
-Modifiche, tutte marcate nel codice con `gextto fork`:
+Modifiche rispetto alla base upstream:
 
 | Area | File | Cosa |
 |---|---|---|

@@ -465,7 +465,7 @@ type gxTorrentItem struct {
 	CompletedAt      int64  `json:"completed_at"`
 	CurrentTracker   string `json:"current_tracker"`
 	TorrentVersion   string `json:"torrent_version"`
-	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool `json:"super_seeding"`
 }
 
@@ -1324,7 +1324,7 @@ func (e *gxTorrentEngine) Trackers(hash string) ([]models.TrackerView, bool, err
 }
 
 // PieceRuns returns the piece states of a torrent as compact runs, for the
-// Gextto piece-diagnostics view. Run End is inclusive (gextto fork on the
+// Gextto piece-diagnostics view. Run End is inclusive (the
 // daemon side).
 func (e *gxTorrentEngine) PieceRuns(hash string) ([]TorrentPieceRun, bool, error) {
 	var payload struct {
@@ -1366,7 +1366,7 @@ func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bo
 	return true, nil
 }
 
-// SetTrackers replaces the torrent's tracker list (gextto fork on the engine: an
+// SetTrackers replaces the torrent's tracker list (the engine: an
 // empty list removes every tracker), like the embedded engine.
 func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
 	var urls []string
@@ -1401,7 +1401,7 @@ func (e *gxTorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error)
 }
 
 // SetLimits stores the per-torrent seed policy and speed limits. The engine's limits
-// are in KiB/s: -1 inherits the global, 0 is unlimited (gextto fork).
+// are in KiB/s: -1 inherits the global, 0 is unlimited.
 func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
 	form := url.Values{}
 	form.Set("download_limit", strconv.FormatInt(bytesToKib(downloadLimit), 10))
@@ -1450,13 +1450,13 @@ func kibToBytes(kib int64) int64 {
 	return kib * 1024
 }
 
-// SetMaxConnections caps the established peers of this torrent (gextto fork):
+// SetMaxConnections caps the established peers of this torrent:
 // 0 unlimited, -1 restores the session default.
 func (e *gxTorrentEngine) SetMaxConnections(hash string, value int) (bool, error) {
 	return e.setConnLimit(hash, "max_connections", value)
 }
 
-// SetMaxUploads sets the upload slots of this torrent (gextto fork): 0 unchokes
+// SetMaxUploads sets the upload slots of this torrent: 0 unchokes
 // every interested peer, -1 restores the session default.
 func (e *gxTorrentEngine) SetMaxUploads(hash string, value int) (bool, error) {
 	return e.setConnLimit(hash, "max_uploads", value)
@@ -1469,7 +1469,7 @@ func (e *gxTorrentEngine) setConnLimit(hash, field string, value int) (bool, err
 	return true, nil
 }
 
-// SetSuperSeeding toggles BEP 16 super-seeding on this torrent (gextto fork):
+// SetSuperSeeding toggles BEP 16 super-seeding on this torrent:
 // while seeding it advertises one piece at a time so the swarm spreads the data.
 // It is a seeding strategy: it does not touch the queue, the seed policy or the
 // bandwidth limits.

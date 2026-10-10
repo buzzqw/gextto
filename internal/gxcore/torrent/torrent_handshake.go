@@ -33,7 +33,7 @@ func (t *torrent) handleOutgoingHandshakeDone(oh *outgoinghandshaker.OutgoingHan
 	if oh.Error != nil {
 		delete(t.connectedPeerIPs, oh.Addr.IP.String())
 		// A direct dial failed: ask a connected peer to introduce us to the
-		// endpoint (gextto fork, BEP 55), then keep trying the normal pool.
+		// endpoint (BEP 55), then keep trying the normal pool.
 		t.tryHolepunchRendezvous(oh.Addr)
 		t.dialAddresses()
 		return

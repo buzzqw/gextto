@@ -1,6 +1,6 @@
 package peerprotocol
 
-// gextto fork: BEP 55 "Holepunch extension". The message is a fixed-size binary
+// BEP 55 "Holepunch extension". The message is a fixed-size binary
 // payload (not bencoded) carried inside the BEP 10 extension protocol under the
 // name "ut_holepunch":
 //

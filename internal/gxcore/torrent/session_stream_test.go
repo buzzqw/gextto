@@ -7,7 +7,7 @@ import (
 )
 
 // TestPiecesDone covers the targeted range check used by gx-torrent's
-// streaming wait loop (gextto fork).
+// streaming wait loop.
 func TestPiecesDone(t *testing.T) {
 	tr := &torrent{pieces: []piece.Piece{
 		{Done: true}, // 0 have

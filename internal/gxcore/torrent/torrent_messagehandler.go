@@ -165,7 +165,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 				continue
 			}
 			// Track the remote bitfield even when we are a seed and there is
-			// no piece picker (gextto fork); super-seeding needs it.
+			// no piece picker; super-seeding needs it.
 			if pe.Bitfield != nil {
 				pe.Bitfield.Set(i)
 			}
@@ -243,7 +243,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		// A super-seeding peer that downloaded the advertised pieces and has
 		// nothing else to ask for goes "not interested" (it may have skipped the
 		// redundant "have" because it knows the seed already has them): offer it
-		// a new piece so it becomes interested again (gextto fork).
+		// a new piece so it becomes interested again.
 		if t.superSeedActive() {
 			t.superSeedOfferNext(pe)
 		}
@@ -264,7 +264,6 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			break
 		}
 		// While super-seeding we serve only the pieces offered to this peer
-		// (gextto fork).
 		if t.superSeedActive() && !t.superSeedOffered(pe, int32(msg.Index)) {
 			pe.SendMessage(peerprotocol.RejectMessage{RequestMessage: msg})
 			break

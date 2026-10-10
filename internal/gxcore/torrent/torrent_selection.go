@@ -1,6 +1,6 @@
 package torrent
 
-// torrent_selection.go (gextto fork): download only some files of a torrent.
+// torrent_selection.go: download only some files of a torrent.
 
 import (
 	"path/filepath"

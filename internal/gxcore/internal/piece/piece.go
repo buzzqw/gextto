@@ -20,7 +20,7 @@ type Piece struct {
 	Hash    []byte
 	Writing bool
 	Done    bool
-	// Skip is set for pieces that belong only to unwanted files (gextto fork).
+	// Skip is set for pieces that belong only to unwanted files.
 	Skip bool
 }
 

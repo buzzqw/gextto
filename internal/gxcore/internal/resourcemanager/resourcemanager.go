@@ -10,7 +10,7 @@ type ResourceManager[T any] struct {
 	requests  map[string][]request[T]
 	requestC  chan request[T]
 	releaseC  chan int64
-	limitC    chan int64 // gextto fork: SetLimit
+	limitC    chan int64 // SetLimit
 	statsC    chan chan Stats
 	closeC    chan struct{}
 	doneC     chan struct{}
@@ -95,7 +95,7 @@ func (m *ResourceManager[T]) Request(key string, data T, n int64, notifyC chan T
 	return
 }
 
-// SetLimit changes the amount of resources (gextto fork: the write buffer is
+// SetLimit changes the amount of resources (the write buffer is
 // retuned at runtime). Shrinking below what is allocated only stops new grants
 // until enough is released.
 func (m *ResourceManager[T]) SetLimit(limit int64) {

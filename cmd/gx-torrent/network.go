@@ -42,7 +42,7 @@ type NetworkOptions struct {
 	UTP     bool
 	UTPOnly bool
 	// Holepunch enables BEP 55 holepunching over uTP, so peers behind a NAT
-	// can still be reached through a relaying peer (gextto fork).
+	// can still be reached through a relaying peer.
 	Holepunch bool
 	// LSD finds peers on the local network (BEP 14 multicast).
 	LSD    bool

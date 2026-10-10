@@ -13,7 +13,7 @@ func (t *torrent) handleStopped() {
 	t.errC <- t.lastError
 	t.errC = nil
 	t.portC = nil
-	// gextto fork: a verification restarts the torrent only after a clean
+	// a verification restarts the torrent only after a clean
 	// stop. If it stopped on an error (missing or unwritable files), starting
 	// again fails the same way: the loop logged thousands of errors a second
 	// and re-created empty files at the save path on every attempt.
@@ -104,7 +104,7 @@ func (t *torrent) stop(err error) {
 	go t.stoppedEventAnnouncer.Run()
 
 	t.addrList.Reset()
-	// gextto fork: handshakers closed above never report back, so their IPs
+	// handshakers closed above never report back, so their IPs
 	// would stay marked as connected and never be dialed again.
 	t.connectedPeerIPs = make(map[string]struct{}, len(t.peers))
 	for pe := range t.peers {

@@ -63,7 +63,7 @@ func TestFileEdgeNeverPicksSkippedPieces(t *testing.T) {
 	}
 }
 
-// FirstLast (gextto fork) prioritises the ends of every file without changing
+// FirstLast prioritises the ends of every file without changing
 // the rarest-first order of the remaining pieces.
 func TestFirstLastPicksFileEdgesFirst(t *testing.T) {
 	pieces := []piece.Piece{

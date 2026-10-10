@@ -12,7 +12,7 @@ type fileStorageProvider struct {
 	DataDir                  string
 	DataDirIncludesTorrentID bool
 	FilePermissions          fs.FileMode
-	// Preallocate reserves the full size of new files (gextto fork).
+	// Preallocate reserves the full size of new files.
 	Preallocate bool
 }
 

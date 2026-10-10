@@ -1,4 +1,4 @@
-// Package netx centralizes the engine's outbound connections (gextto fork) so that
+// Package netx centralizes the engine's outbound connections so that
 // an outgoing interface (VPN killswitch) and a proxy apply to peers,
 // trackers and web seeds alike.
 //

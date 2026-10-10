@@ -165,7 +165,7 @@ type responseType struct {
 }
 
 // sendMsg bencodes the data in 'query' and sends it to the remote node.
-// packetConn is the subset of net.PacketConn the DHT uses (gextto fork).
+// packetConn is the subset of net.PacketConn the DHT uses.
 type packetConn interface {
 	ReadFrom(p []byte) (int, net.Addr, error)
 	WriteTo(p []byte, addr net.Addr) (int, error)

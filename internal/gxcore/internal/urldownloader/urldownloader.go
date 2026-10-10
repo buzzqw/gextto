@@ -20,7 +20,7 @@ import (
 type URLDownloader struct {
 	URL                 string
 	Begin, End, current uint32             // piece index
-	bucket              *bandwidth.Limiter // gextto fork: rate changes at runtime
+	bucket              *bandwidth.Limiter // rate changes at runtime
 	closeC, doneC       chan struct{}
 }
 

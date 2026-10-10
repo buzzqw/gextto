@@ -34,7 +34,7 @@ func (t *torrent) start() {
 	t.lastError = nil
 	t.downloadSpeed = metrics.NewMeter()
 	t.uploadSpeed = metrics.NewMeter()
-	// gextto fork: a selection that grew reopens a completed torrent before
+	// a selection that grew reopens a completed torrent before
 	// peers arrive (they are ignored while it counts as completed).
 	t.resetCompletionIfWantedMissing()
 

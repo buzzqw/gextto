@@ -201,7 +201,7 @@ type uiDetailData struct {
 	// Per-torrent connection/upload-slot caps (-1 global, 0 unlimited).
 	MaxConnections int64
 	MaxUploads     int64
-	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool
 	Pinned       bool
 	Private      bool

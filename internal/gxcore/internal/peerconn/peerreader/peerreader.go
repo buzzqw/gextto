@@ -34,7 +34,7 @@ type PeerReader struct {
 	log          logger.Logger
 	pieceTimeout time.Duration
 	maxMsgSize   int
-	bucket       *bandwidth.Limiter // gextto fork: rate changes at runtime
+	bucket       *bandwidth.Limiter // rate changes at runtime
 	messages     chan any
 	stopC        chan struct{}
 	doneC        chan struct{}

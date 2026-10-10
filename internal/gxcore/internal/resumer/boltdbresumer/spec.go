@@ -27,7 +27,7 @@ type Spec struct {
 	CompleteCmdRun    bool
 	Sequential        bool
 	FirstLast         bool
-	// SuperSeeding enables BEP 16 super-seeding (gextto fork).
+	// SuperSeeding enables BEP 16 super-seeding.
 	SuperSeeding bool
 	Version      int
 }

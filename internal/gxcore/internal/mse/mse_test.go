@@ -10,7 +10,7 @@ type discardWriter struct{}
 
 func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
-// TestInPlaceStreamWriterRoundTrip verifies the gextto fork writer encrypts in
+// TestInPlaceStreamWriterRoundTrip verifies the engine writer encrypts in
 // place and that the peer can decrypt the ciphertext.
 func TestInPlaceStreamWriterRoundTrip(t *testing.T) {
 	key := make([]byte, 16)

@@ -195,7 +195,7 @@ func (r *Resumer) WriteCompleteCmdRun(torrentID string) error {
 	})
 }
 
-// WriteSuperSeeding writes the super-seeding flag of a torrent (gextto fork).
+// WriteSuperSeeding writes the super-seeding flag of a torrent.
 func (r *Resumer) WriteSuperSeeding(torrentID string, value bool) error {
 	return r.update(torrentID, func(b *bbolt.Bucket) error {
 		return b.Put(Keys.SuperSeeding, []byte(strconv.FormatBool(value)))

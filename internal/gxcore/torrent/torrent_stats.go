@@ -51,7 +51,7 @@ type Stats struct {
 		Wasted int64
 		// Bytes allocated on storage.
 		Allocated int64
-		// Selected is the size of the wanted pieces (gextto fork: file
+		// Selected is the size of the wanted pieces (file
 		// selection), SelectedCompleted the downloaded part of it. Both are
 		// computed from the bitfield, so they are valid while stopped.
 		Selected          int64

@@ -120,7 +120,7 @@ func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
 	}
 }
 
-// handleAddWebseeds appends web seed URLs at runtime (gextto fork), skipping the
+// handleAddWebseeds appends web seed URLs at runtime, skipping the
 // duplicates and the configured maximum. It runs in the torrent goroutine.
 func (t *torrent) handleAddWebseeds(urls []string) {
 	existing := make(map[string]struct{}, len(t.webseedSources)+len(urls))

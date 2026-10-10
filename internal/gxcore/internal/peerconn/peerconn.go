@@ -13,7 +13,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
 
-// gextto fork: raw peer wire bytes, counted before the message layer so the
+// raw peer wire bytes, counted before the message layer so the
 // session can report protocol/encryption overhead as wire minus payload.
 var (
 	WireBytesRead    atomic.Int64

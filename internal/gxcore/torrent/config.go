@@ -72,9 +72,9 @@ type Config struct {
 	// Time to wait when resolving host names for trackers and peers.
 	DNSResolveTimeout time.Duration `yaml:"dns-resolve-timeout"`
 	// ListenPort, when non-zero, is the single TCP port shared by all
-	// torrents (gextto fork). Zero keeps upstream's port per torrent.
+	// torrents. Zero keeps upstream's port per torrent.
 	ListenPort uint16 `yaml:"listen-port"`
-	// UTP accepts and dials peers over uTP too (gextto fork). It needs
+	// UTP accepts and dials peers over uTP too. It needs
 	// ListenPort: the UDP port is shared with the DHT.
 	UTP bool `yaml:"utp"`
 	// UTPOnly dials peers over uTP alone (tests); by default uTP and TCP are
@@ -85,19 +85,19 @@ type Config struct {
 	// fork). It needs UTP and works best with PEX enabled.
 	Holepunch bool `yaml:"holepunch"`
 	// Preallocate reserves the full size of new files instead of creating
-	// them sparse (gextto fork).
+	// them sparse.
 	Preallocate bool `yaml:"preallocate"`
 	// OutgoingInterface binds every outgoing connection to an interface name
-	// or local IPv4 (gextto fork, VPN killswitch): when it has no address,
+	// or local IPv4 (VPN killswitch): when it has no address,
 	// nothing is sent.
 	OutgoingInterface string `yaml:"outgoing-interface"`
 	// Proxy routes peers, trackers and web seeds through a proxy:
 	// socks5://[user:pass@]host:port or http://[user:pass@]host:port. UDP
-	// trackers are disabled while it is set (gextto fork).
+	// trackers are disabled while it is set.
 	Proxy string `yaml:"proxy"`
 	// FileSelection returns, for a torrent ID, the files to skip (one flag
 	// per non-padding file, true = do not download). Skipped files are kept
-	// in PartsDir/<id> instead of the save path (gextto fork). It is called
+	// in PartsDir/<id> instead of the save path. It is called
 	// from the torrent goroutine and must not block on the session.
 	FileSelection func(torrentID string) []bool `yaml:"-"`
 	// PartsDir holds the pieces of skipped files that border wanted ones.

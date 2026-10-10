@@ -479,7 +479,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 - Test percorso felice + casi limite (lista vuota, duplicati, not-found, 416,
   completato/fermo); `make test` e `make test-engine` verdi (+ pacchetto
   `unchoker` in `make test-engine`).
-- Fork marcato `gextto fork`, inventario in `internal/gxcore/GEXTTO.md`;
+- Inventario delle modifiche in `internal/gxcore/GEXTTO.md`;
   `go vet`, `gofmt` verdi; semantica `-1`/`0`/`>0` coerente.
 - Nota residua: attesa pezzi nello streaming a polling (200 ms, timeout 2 min),
   senza test end-to-end su sciame reale; coperti dati presenti e mappatura
@@ -510,8 +510,8 @@ pena fare**, con come/rischi/verifica; una voce = un task/commit.
 | 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** | — |
 
 Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
-Regole per voce (da `AGENTS.md`): modifiche a `internal/gxcore` marcate
-`// gextto fork` + riga in `GEXTTO.md`; un commit per voce; test mirati
+Regole per voce (da `AGENTS.md`): modifiche a `internal/gxcore` registrate in
+`GEXTTO.md`; un commit per voce; test mirati
 (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`, `make test`); invarianti
 degli script; mai `bin/`/`gx-torrent.build_number`/`data/`; con comportamento
 visibile aggiornare README/MANUAL/`gx-torrent.md`.

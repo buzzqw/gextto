@@ -15,7 +15,7 @@ func applyNoAtimeFlag(f int) int {
 	return f | syscall.O_NOATIME
 }
 
-// preallocate reserves the whole file on disk (gextto fork); filesystems
+// preallocate reserves the whole file on disk; filesystems
 // without fallocate fall back to a sparse file. On tmpfs (a RAM disk) the file
 // stays sparse: reserving it would take the whole size from RAM at once, even
 // for a torrent that is about to be relocated because it does not fit.

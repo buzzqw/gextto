@@ -15,7 +15,7 @@ func naiveCount(b *Bitfield) uint32 {
 	return n
 }
 
-// TestCountMatchesNaive checks the hardware-popcount Count (gextto fork)
+// TestCountMatchesNaive checks the hardware-popcount Count
 // against a bit-by-bit reference across word boundaries.
 func TestCountMatchesNaive(t *testing.T) {
 	for _, length := range []uint32{0, 1, 7, 8, 9, 63, 64, 65, 127, 128, 129, 1000, 1023, 1024, 1025} {

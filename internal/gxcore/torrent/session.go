@@ -59,12 +59,12 @@ type Session struct {
 	createdAt      time.Time
 	semWrite       *semaphore.Semaphore
 	metrics        *sessionMetrics
-	// gextto fork: limiters whose rate SetSpeedLimits changes at runtime.
+	// limiters whose rate SetSpeedLimits changes at runtime.
 	bucketDownload *bandwidth.Limiter
 	bucketUpload   *bandwidth.Limiter
 	closeC         chan struct{}
 
-	// gextto fork: peers banned session-wide for sending corrupt data, with a
+	// peers banned session-wide for sending corrupt data, with a
 	// time to live (libtorrent-style smart ban). Checked by every torrent.
 	mBannedIPs sync.Mutex
 	bannedIPs  map[string]time.Time
@@ -164,7 +164,7 @@ func NewSession(cfg Config) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	// gextto fork: one UDP socket for uTP and the DHT, like libtorrent.
+	// one UDP socket for uTP and the DHT, like libtorrent.
 	var utpSocket *utp.Socket
 	netx.SetUTPDialer(nil, false)
 	if cfg.UTP && cfg.ListenPort > 0 && strings.TrimSpace(cfg.Proxy) == "" {
@@ -332,7 +332,7 @@ func (s *Session) Close() error {
 		s.listener.Close()
 	}
 
-	// gextto fork: the DHT reads from the shared uTP socket; close it first
+	// the DHT reads from the shared uTP socket; close it first
 	// so the DHT reader returns and Stop can finish.
 	if s.utpSocket != nil {
 		netx.SetUTPDialer(nil, false)

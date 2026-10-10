@@ -7,7 +7,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
-// gextto fork: SetOrder switches the piece order on a running picker. Turning
+// SetOrder switches the piece order on a running picker. Turning
 // sequential or first_last on must mark the file edges that were not marked at
 // construction time; turning them off must stop using them.
 func TestSetOrderMarksFileEdgesAtRuntime(t *testing.T) {
@@ -47,7 +47,7 @@ func TestSetOrderMarksFileEdgesAtRuntime(t *testing.T) {
 	}
 }
 
-// gextto fork: PieceDownloading reports the pieces with an active downloader,
+// PieceDownloading reports the pieces with an active downloader,
 // used by the daemon's piece diagnostics.
 func TestPieceDownloadingTracksWritingAndRequests(t *testing.T) {
 	pieces := []piece.Piece{
@@ -68,7 +68,7 @@ func TestPieceDownloadingTracksWritingAndRequests(t *testing.T) {
 	}
 }
 
-// gextto fork: the streaming window makes the picker request those pieces
+// the streaming window makes the picker request those pieces
 // before any other.
 func TestStreamWindowPicksThosePiecesFirst(t *testing.T) {
 	pieces := []piece.Piece{

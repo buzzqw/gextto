@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// gextto fork: on tmpfs a preallocated file would take its whole size from
+// on tmpfs a preallocated file would take its whole size from
 // RAM at once; it must stay sparse.
 func TestPreallocateKeepsTmpfsFilesSparse(t *testing.T) {
 	dir, err := os.MkdirTemp("/dev/shm", "gx-prealloc-")

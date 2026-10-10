@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestFormats covers the extra blocklist formats added by the gextto fork:
+// TestFormats covers the extra blocklist formats added by the engine:
 // name:range (P2P), "a.b.c.d - a.b.c.d , level , label" (eMule) and plain
 // dotted ranges, on top of upstream CIDR.
 func TestFormats(t *testing.T) {
@@ -32,7 +32,7 @@ Bad people:1.2.3.0-1.2.3.255
 	}
 }
 
-// TestIPv6CIDR covers IPv6 CIDR rules, which the gextto fork keeps in a
+// TestIPv6CIDR covers IPv6 CIDR rules, which the engine keeps in a
 // separate interval list (the upstream engine skipped them).
 func TestIPv6CIDR(t *testing.T) {
 	rules := `2001:db8::/32

@@ -15,7 +15,6 @@ const (
 	// Incoming indicates that the peer found us. We did not found the peer.
 	Incoming
 	// Holepunch indicates that the peer was reached via a BEP 55 rendezvous
-	// (gextto fork).
 	Holepunch
 )
 

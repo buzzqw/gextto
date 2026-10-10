@@ -28,7 +28,7 @@ func TestCacheGetHitAndMiss(t *testing.T) {
 	}
 }
 
-// TestCacheSweepsExpiredWithoutAccess is the gextto fork point: expiry is
+// TestCacheSweepsExpiredWithoutAccess is the engine point: expiry is
 // handled by one sweeper, not one goroutine/timer per cached block.
 func TestCacheSweepsExpiredWithoutAccess(t *testing.T) {
 	c := New(1<<20, 30*time.Millisecond, 1)

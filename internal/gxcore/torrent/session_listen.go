@@ -1,6 +1,6 @@
 package torrent
 
-// session_listen.go (gextto fork): one listening port shared by every torrent,
+// session_listen.go: one listening port shared by every torrent,
 // like libtorrent. The upstream engine opens a port per torrent, which cannot be
 // forwarded on a NAT router. With Config.ListenPort set, the session accepts
 // all incoming peers, completes the BitTorrent/MSE handshake, picks the

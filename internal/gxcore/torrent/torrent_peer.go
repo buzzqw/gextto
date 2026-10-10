@@ -71,7 +71,7 @@ func (t *torrent) handleNewPeers(addrs []*net.TCPAddr, source peersource.Source)
 }
 
 // ipBanned reports whether a peer IP is banned, per-torrent or session-wide
-// (gextto fork: the session ban is the time-limited one set on corrupt data).
+// (the session ban is the time-limited one set on corrupt data).
 func (t *torrent) ipBanned(ip string) bool {
 	if _, ok := t.bannedPeerIPs[ip]; ok {
 		return true
@@ -98,7 +98,7 @@ func (t *torrent) dialAddresses() {
 	}
 	maxDial := t.session.config.MaxPeerDial
 	if t.maxConnections > 0 {
-		// The per-torrent cap counts every established peer (gextto fork).
+		// The per-torrent cap counts every established peer.
 		if allowed := t.maxConnections - len(t.peers) - len(t.incomingHandshakers); allowed < maxDial {
 			maxDial = allowed
 		}
@@ -184,7 +184,7 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 		msg := peerprotocol.PortMessage{Port: t.session.config.DHTPort}
 		p.SendMessage(msg)
 	}
-	// Super-seeding skips the allowed-fast set (gextto fork), like libtorrent:
+	// Super-seeding skips the allowed-fast set, like libtorrent:
 	// it would let a peer grab unadvertised pieces.
 	if p.FastEnabled && t.pieces != nil && !t.superSeedActive() {
 		p.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)

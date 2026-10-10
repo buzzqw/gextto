@@ -83,17 +83,17 @@ type torrentMeta struct {
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
 	Sequential bool `json:"sequential,omitempty"`
 	FirstLast  bool `json:"first_last,omitempty"`
-	// SuperSeeding is BEP 16 super-seeding, a seeding strategy (gextto fork).
+	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool      `json:"super_seeding,omitempty"`
 	RotatedAt    time.Time `json:"rotated_at,omitzero"`
 	SeedRatio    float64   `json:"seed_ratio"`
 	SeedDays     int64     `json:"seed_days"`
-	// Per-torrent speed limits in KiB/s (gextto fork): nil = inherit the global
+	// Per-torrent speed limits in KiB/s: nil = inherit the global
 	// limit, 0 = unlimited, >0 = explicit. Pointers so a state file written
 	// before these existed still means "inherit".
 	DownloadLimitKib *int64 `json:"download_limit_kib,omitempty"`
 	UploadLimitKib   *int64 `json:"upload_limit_kib,omitempty"`
-	// Per-torrent connection and upload-slot caps (gextto fork): nil = session
+	// Per-torrent connection and upload-slot caps: nil = session
 	// default, 0 = unlimited, >0 = explicit.
 	MaxConnections *int64 `json:"max_connections,omitempty"`
 	MaxUploads     *int64 `json:"max_uploads,omitempty"`
@@ -462,7 +462,7 @@ func (d *Daemon) reconcileLocked() {
 			t.SetMaxUploads(int(*meta.MaxUploads))
 		}
 		// Super-seeding is a per-torrent seeding strategy; keep it in sync with
-		// the daemon state (the engine persists it too, gextto fork).
+		// the daemon state (the engine persists it too).
 		_ = t.SetSuperSeeding(meta.SuperSeeding)
 		// Torrents parked or paused must not run, whatever the engine restored.
 		if meta.UserPaused || meta.Parked {
@@ -927,7 +927,7 @@ type torrentInfo struct {
 	NumIncomplete  int     `json:"num_incomplete"`
 	SeedRatio      float64 `json:"seed_ratio"`
 	SeedDays       int64   `json:"seed_days"`
-	// Per-torrent speed limits in KiB/s (gextto fork): -1 global, 0 unlimited.
+	// Per-torrent speed limits in KiB/s: -1 global, 0 unlimited.
 	DownloadLimitKib int64  `json:"download_limit_kib"`
 	UploadLimitKib   int64  `json:"upload_limit_kib"`
 	HasMetadata      bool   `json:"has_metadata"`
@@ -1181,9 +1181,9 @@ type addRequest struct {
 	StopAtMetadata bool
 	// Sequential downloads pieces in order (streaming) instead of rarest-first.
 	Sequential bool
-	// FirstLast downloads the ends of every file first (gextto fork).
+	// FirstLast downloads the ends of every file first.
 	FirstLast bool
-	// SuperSeeding enables BEP 16 super-seeding, a seeding strategy (gextto fork).
+	// SuperSeeding enables BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool
 	SeedRatio    float64
 	SeedDays     int64
@@ -1511,7 +1511,7 @@ func (d *Daemon) setConnLimits(key string, maxConnections, maxUploads *int64) er
 	})
 }
 
-// setSuperSeeding toggles BEP 16 super-seeding on a torrent (gextto fork). It
+// setSuperSeeding toggles BEP 16 super-seeding on a torrent. It
 // is a seeding strategy: it does not touch the queue, the seed policy or the
 // bandwidth limits.
 func (d *Daemon) setSuperSeeding(key string, enabled bool) error {

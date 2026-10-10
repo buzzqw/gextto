@@ -1,6 +1,6 @@
 package torrent
 
-// torrent_superseed.go implements BEP 16 super-seeding (gextto fork).
+// torrent_superseed.go implements BEP 16 super-seeding.
 //
 // While a completed torrent is super-seeding it does not advertise its full
 // bitfield. It tells each peer about a piece at a time and serves only the

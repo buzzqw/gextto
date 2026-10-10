@@ -204,7 +204,7 @@ func (s *Session) blocklistReloader(d time.Duration) {
 }
 
 // LoadBlocklist replaces the IP blocklist with the rules read from r and
-// returns how many were loaded (gextto fork: local ipfilter files).
+// returns how many were loaded (local ipfilter files).
 func (s *Session) LoadBlocklist(r io.Reader) (int, error) {
 	return s.blocklist.Reload(r)
 }

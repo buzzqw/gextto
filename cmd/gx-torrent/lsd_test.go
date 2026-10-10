@@ -31,7 +31,7 @@ func newQuietDaemon(t *testing.T) *Daemon {
 	return d
 }
 
-// TestLSDDueHashesReadsSnapshotWithoutLock locks in the gextto fork change: LSD
+// TestLSDDueHashesReadsSnapshotWithoutLock locks in the engine change: LSD
 // announces are computed from the lock-free snapshot, never by taking d.mu and
 // calling t.Stats() on the torrent run loops. Holding d.mu while calling
 // dueHashes must therefore not deadlock.

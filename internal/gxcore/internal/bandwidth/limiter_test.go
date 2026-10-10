@@ -25,7 +25,7 @@ func TestLimiterRateChangesInPlace(t *testing.T) {
 	}
 }
 
-// gextto fork: a torrent limiter inherits the session one until an explicit
+// a torrent limiter inherits the session one until an explicit
 // per-torrent limit is set.
 func TestLimiterInheritsSessionAndOverrides(t *testing.T) {
 	session := New(0)

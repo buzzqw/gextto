@@ -1,6 +1,6 @@
 package torrent
 
-// gextto fork: limits that change without reopening the session, so a speed
+// limits that change without reopening the session, so a speed
 // schedule or a cache retune does not drop every peer connection.
 
 // SetSpeedLimits changes the global download and upload limits in KiB/s
@@ -11,7 +11,7 @@ func (s *Session) SetSpeedLimits(downloadKiB, uploadKiB int64) {
 }
 
 // SetSpeedLimits changes this torrent's download and upload limits in KiB/s
-// (gextto fork): -1 inherits the session limit, 0 is unlimited, a positive
+// -1 inherits the session limit, 0 is unlimited, a positive
 // value is an explicit limit. The peers already connected use the new rate.
 func (t *Torrent) SetSpeedLimits(downloadKiB, uploadKiB int64) {
 	t.torrent.sendCommand(func() {
@@ -23,7 +23,6 @@ func (t *Torrent) SetSpeedLimits(downloadKiB, uploadKiB int64) {
 }
 
 // SpeedLimits returns this torrent's explicit limits in KiB/s (-1 = inherit)
-// (gextto fork).
 func (t *Torrent) SpeedLimits() (downloadKiB, uploadKiB int64) {
 	type limits struct{ download, upload int64 }
 	got := query(t.torrent, func() limits {
@@ -32,7 +31,7 @@ func (t *Torrent) SpeedLimits() (downloadKiB, uploadKiB int64) {
 	return got.download, got.upload
 }
 
-// SetMaxConnections caps the established peers of this torrent (gextto fork):
+// SetMaxConnections caps the established peers of this torrent:
 // 0 means unlimited, a negative value restores the session default.
 func (t *Torrent) SetMaxConnections(value int) {
 	t.torrent.sendCommand(func() {
@@ -44,7 +43,7 @@ func (t *Torrent) SetMaxConnections(value int) {
 	})
 }
 
-// SetMaxUploads sets the upload slots of this torrent (gextto fork): 0 unchokes
+// SetMaxUploads sets the upload slots of this torrent: 0 unchokes
 // every interested peer, a negative value restores the default.
 func (t *Torrent) SetMaxUploads(value int) {
 	t.torrent.sendCommand(func() {
@@ -56,7 +55,7 @@ func (t *Torrent) SetMaxUploads(value int) {
 	})
 }
 
-// MaxConnections and MaxUploads report the per-torrent caps (gextto fork).
+// MaxConnections and MaxUploads report the per-torrent caps.
 func (t *Torrent) MaxConnections() int {
 	return query(t.torrent, func() int { return t.torrent.maxConnections })
 }

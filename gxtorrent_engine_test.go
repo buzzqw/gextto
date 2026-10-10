@@ -974,7 +974,7 @@ func TestGxSetConnLimitsPosts(t *testing.T) {
 }
 
 // TestGxSetSuperSeedingPosts checks that SetSuperSeeding posts the
-// super-seeding action instead of a capability error (gextto fork).
+// super-seeding action instead of a capability error.
 func TestGxSetSuperSeedingPosts(t *testing.T) {
 	var path, form string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

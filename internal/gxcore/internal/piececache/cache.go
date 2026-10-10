@@ -18,7 +18,7 @@ type Cache struct {
 	accessList    accessList
 	m             sync.RWMutex
 	sem           *semaphore.Semaphore
-	stopC         chan struct{} // gextto fork: stops the expiry sweeper
+	stopC         chan struct{} // stops the expiry sweeper
 
 	NumCached      metrics.Meter
 	NumTotal       metrics.Meter
@@ -30,7 +30,6 @@ type Cache struct {
 type Loader func() ([]byte, error)
 
 // sweepEvery is how often expired items are swept, derived from the TTL
-// (gextto fork).
 func sweepEvery(ttl time.Duration) time.Duration {
 	d := ttl / 2
 	if d < 10*time.Millisecond {
@@ -158,7 +157,7 @@ func (c *Cache) getItem(key string) *item {
 
 	i, ok := c.items[key]
 	if ok {
-		// Drop an expired item so the caller reloads it (gextto fork: lazy TTL
+		// Drop an expired item so the caller reloads it (lazy TTL
 		// instead of a per-item timer). Items still loading have index -1 and
 		// are kept.
 		if i.index != -1 && time.Now().After(i.expireAt) {
@@ -210,7 +209,7 @@ func (c *Cache) handleNewItem(i *item) ([]byte, error) {
 		return nil, i.err
 	}
 
-	// The item was evicted or replaced while loading (gextto fork): return the
+	// The item was evicted or replaced while loading: return the
 	// data but do not cache a stale copy under the key.
 	if c.items[i.key] != i {
 		return i.value, nil
@@ -264,7 +263,7 @@ func (c *Cache) removeItem(i *item) {
 }
 
 // SetMaxSize changes the cache size, evicting the least recently used items
-// that no longer fit (gextto fork: the read cache is retuned at runtime).
+// that no longer fit (the read cache is retuned at runtime).
 func (c *Cache) SetMaxSize(maxSize int64) {
 	c.m.Lock()
 	defer c.m.Unlock()

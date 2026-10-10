@@ -174,7 +174,7 @@ func (t *Torrent) AddTracker(uri string) error {
 	return nil
 }
 
-// SetTrackers replaces the torrent's tracker list (gextto fork): an empty list
+// SetTrackers replaces the torrent's tracker list: an empty list
 // removes every tracker, like libtorrent. Peers already connected are left
 // alone; the removed trackers get a best-effort "stopped" announce, and the new
 // list is persisted so `Trackers()` and the resume data reflect the change.
@@ -222,40 +222,40 @@ func (t *Torrent) SetTrackers(uris []string) error {
 	return nil
 }
 
-// AddWebseeds adds web seed URLs to the torrent at runtime (gextto fork),
+// AddWebseeds adds web seed URLs to the torrent at runtime,
 // without reopening it; duplicates and the configured maximum are ignored.
 func (t *Torrent) AddWebseeds(urls []string) error {
 	t.torrent.sendCommand(func() { t.torrent.handleAddWebseeds(urls) })
 	return nil
 }
 
-// RemoveWebseeds removes web seed URLs (exact match) at runtime (gextto fork).
+// RemoveWebseeds removes web seed URLs (exact match) at runtime.
 func (t *Torrent) RemoveWebseeds(urls []string) error {
 	t.torrent.sendCommand(func() { t.torrent.handleRemoveWebseeds(urls) })
 	return nil
 }
 
-// SetSequential enables or disables sequential download on the running torrent
-// (gextto fork); unlike the add-time option it takes effect at once.
+// SetSequential enables or disables sequential download on the running torrent;
+// unlike the add-time option it takes effect at once.
 func (t *Torrent) SetSequential(sequential bool) error {
 	t.torrent.sendCommand(func() { t.torrent.setOrder(sequential, t.torrent.firstLast) })
 	return nil
 }
 
 // SetFirstLast enables or disables the first/last-piece priority on the running
-// torrent (gextto fork).
+// torrent.
 func (t *Torrent) SetFirstLast(firstLast bool) error {
 	t.torrent.sendCommand(func() { t.torrent.setOrder(t.torrent.sequential, firstLast) })
 	return nil
 }
 
-// Sequential reports whether sequential download is enabled (gextto fork).
+// Sequential reports whether sequential download is enabled.
 func (t *Torrent) Sequential() bool {
 	return query(t.torrent, func() bool { return t.torrent.sequential })
 }
 
 // SetSuperSeeding enables or disables BEP 16 super-seeding on the running
-// torrent (gextto fork). It takes effect when the torrent is complete: the seed
+// torrent. It takes effect when the torrent is complete: the seed
 // advertises one piece at a time and serves only that piece, so the swarm
 // spreads the data. It is a seeding strategy only and never touches the queue,
 // the seed policy or the bandwidth limits.
@@ -264,12 +264,12 @@ func (t *Torrent) SetSuperSeeding(superSeeding bool) error {
 	return nil
 }
 
-// SuperSeeding reports whether super-seeding is enabled (gextto fork).
+// SuperSeeding reports whether super-seeding is enabled.
 func (t *Torrent) SuperSeeding() bool {
 	return query(t.torrent, func() bool { return t.torrent.superSeeding })
 }
 
-// PieceStates returns the state of every piece, in index order (gextto fork):
+// PieceStates returns the state of every piece, in index order:
 // "have", "downloading", "skipped" or "" (missing). The second value is false
 // when the torrent has no metadata/pieces yet. Once completed the engine drops the
 // piece picker, so the states are derived from the pieces and the picker is

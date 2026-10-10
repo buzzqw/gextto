@@ -17,7 +17,7 @@ func (p *fakePeer) Optimistic() bool     { return p.optimistic }
 func (p *fakePeer) DownloadSpeed() int   { return 0 }
 func (p *fakePeer) UploadSpeed() int     { return 0 }
 
-// gextto fork: SetNumUnchoked changes how many interested peers are unchoked,
+// SetNumUnchoked changes how many interested peers are unchoked,
 // for the per-torrent upload slots.
 func TestSetNumUnchokedChangesSlots(t *testing.T) {
 	u := New(2, 0)

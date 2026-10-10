@@ -88,7 +88,7 @@ func (b *Bitfield) Test(i uint32) bool {
 }
 
 // Count returns the count of set bits. It uses the hardware popcount
-// (gextto fork) instead of a 256-byte lookup table.
+// instead of a 256-byte lookup table.
 func (b *Bitfield) Count() uint32 {
 	var total int
 	bytes := b.bytes

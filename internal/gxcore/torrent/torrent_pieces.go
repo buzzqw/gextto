@@ -25,7 +25,7 @@ func (t *torrent) checkCompletion() bool {
 	close(t.completeC)
 	for h := range t.outgoingHandshakers {
 		h.Close()
-		// gextto fork: a closed handshaker never reports back; release its IP.
+		// a closed handshaker never reports back; release its IP.
 		delete(t.connectedPeerIPs, h.Addr.IP.String())
 	}
 	t.outgoingHandshakers = make(map[*outgoinghandshaker.OutgoingHandshaker]struct{})
@@ -44,7 +44,7 @@ func (t *torrent) checkCompletion() bool {
 	t.updateSeedDuration(time.Now())
 	if t.superSeeding {
 		// The torrent just became a seed: start super-seeding the peers that
-		// are still connected (gextto fork).
+		// are still connected.
 		t.superSeedAllPeers()
 	}
 	if !t.completeCmdRun && len(t.session.config.OnCompleteCmd) > 0 {

@@ -9,7 +9,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 )
 
-// TestCountingConnTracksRawBytes proves the gextto fork counts the raw peer
+// TestCountingConnTracksRawBytes proves the engine counts the raw peer
 // wire bytes (framing and encryption included) separately from the payload,
 // which is what the session reports as protocol overhead.
 func TestCountingConnTracksRawBytes(t *testing.T) {

@@ -13,11 +13,11 @@ import (
 
 // SessionStats contains statistics about Session.
 type SessionStats struct {
-	// gextto fork: peer connections by transport since start.
+	// peer connections by transport since start.
 	OutgoingUTP, OutgoingTCP, IncomingUTP int64
-	// gextto fork: incoming TCP connections since start (mirrors IncomingUTP).
+	// incoming TCP connections since start (mirrors IncomingUTP).
 	IncomingTCP int64
-	// gextto fork: currently connected peers by transport.
+	// currently connected peers by transport.
 	TCPPeers, UTPPeers int
 	// UTP and DHT report whether they are active.
 	UTP bool
@@ -84,7 +84,7 @@ type SessionStats struct {
 	BytesDownloaded int64
 	// Number of bytes uploaded to peers.
 	BytesUploaded int64
-	// gextto fork: raw peer wire bytes, protocol framing and encryption
+	// raw peer wire bytes, protocol framing and encryption
 	// included (payload bytes are BytesDownloaded/BytesUploaded).
 	PeerWireDownloaded int64
 	PeerWireUploaded   int64
@@ -93,7 +93,7 @@ type SessionStats struct {
 	// Number of bytes written to disk.
 	BytesWritten int64
 
-	// gextto fork: cumulative read/write operations since start. Their rate is
+	// cumulative read/write operations since start. Their rate is
 	// ReadsPerSecond/WritesPerSecond; the meters' total is what libtorrent
 	// reports as disk.num_read_ops / disk.num_write_ops.
 	ReadOpsTotal  int64

@@ -100,7 +100,7 @@ func load(r io.Reader, logger Logger) (*stree.Stree, []ip6Range, int, int, error
 			continue
 		}
 		if err == errNotIPv4Address {
-			// Upstream skipped IPv6 rules entirely; the gextto fork keeps the
+			// Upstream skipped IPv6 rules entirely; the engine keeps the
 			// IPv6 CIDR forms in a separate interval list.
 			if r6, ok := parseV6CIDR(l); ok {
 				v6 = append(v6, r6)
@@ -134,7 +134,7 @@ type ipRange struct {
 	first, last uint32
 }
 
-// parseCIDR parses one rule. Besides CIDR (upstream), the gextto fork accepts
+// parseCIDR parses one rule. Besides CIDR (upstream), the engine accepts
 // the formats Gextto uses for libtorrent:
 //
 //	1.2.3.0-1.2.3.255              plain range
@@ -203,7 +203,7 @@ func parseIPv4(s string) net.IP {
 	return ip
 }
 
-// ip6Range is an inclusive IPv6 range (gextto fork, F4 IPv6).
+// ip6Range is an inclusive IPv6 range (F4 IPv6).
 type ip6Range struct {
 	first, last [net.IPv6len]byte
 }

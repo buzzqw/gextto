@@ -120,11 +120,11 @@ requisiti:
 
 ## 3. Stato attuale
 
-gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) su un fork di rain v2.4.2,
-con **24 aree** modificate marcate `gextto fork` (128 occorrenze nel codice; vedi
-`GEXTTO.md`). Gextto lo avvia, lo sorveglia e lo **riaggancia ai riavvii** tramite
-`fingerprint`. Il demone è già usabile da solo (`gx-torrent -listen … -data …`),
-ma è pensato come motore subordinato.
+gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) con il motore **gx-core**
+(`internal/gxcore`, ex fork di rain v2.4.2), **24 aree** modificate rispetto alla
+base upstream (vedi `GEXTTO.md`). Gextto lo avvia, lo sorveglia e lo
+**riaggancia ai riavvii** tramite `fingerprint`. Il demone è già usabile da solo
+(`gx-torrent -listen … -data …`), ma è pensato come motore subordinato.
 
 | Strato | Dove | Cosa c'è già | Dimensione (2026-10-10) |
 | --- | --- | --- | --- |
@@ -505,9 +505,9 @@ rimanenti:
 al wizard (indexer/cartella temporanea). Il **distacco da rain** è
 avvenuto: nel codice non resta alcun riferimento a rain (namespace, stringhe di
 rete e commenti). I riferimenti all'**upstream** rain restano solo dove indicano
-origine, licenza o confronto (documenti come questo, `LICENSE`). Restano da
-rimuovere in modo graduale i **marcatori `gextto fork`** (156 nel codice), che
-però non citano rain.
+origine, licenza o confronto (documenti come questo, `LICENSE`). I **marcatori
+`gextto fork`** sono stati rimossi dal codice: il changelog resta in
+`internal/gxcore/GEXTTO.md`.
 
 **Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
 continuare a funzionare (test `internal/tui` + smoke `gexttod tui` contro il

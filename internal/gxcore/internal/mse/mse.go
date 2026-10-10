@@ -73,7 +73,7 @@ func (c CryptoMethod) String() string {
 	}
 }
 
-// inPlaceStreamWriter encrypts into the caller's own buffer (gextto fork):
+// inPlaceStreamWriter encrypts into the caller's own buffer:
 // cipher.StreamWriter would allocate a fresh []byte on every Write. The caller
 // must not reuse src afterwards. This is safe on the peer wire, where the
 // encrypted buffer is discarded right after the socket write.

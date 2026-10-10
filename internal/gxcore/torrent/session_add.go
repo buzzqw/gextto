@@ -37,10 +37,10 @@ type AddTorrentOptions struct {
 	// Useful for streaming, at the cost of slower overall download and worse swarm health.
 	Sequential bool
 	// FirstLast downloads the pieces at both ends of every file first, then
-	// continues rarest-first (gextto fork). Useful for streaming without
+	// continues rarest-first. Useful for streaming without
 	// giving up the rarest-first ordering for the rest of the torrent.
 	FirstLast bool
-	// SuperSeeding enables BEP 16 super-seeding (gextto fork): once the
+	// SuperSeeding enables BEP 16 super-seeding: once the
 	// torrent is complete it advertises one piece at a time and serves only
 	// that, so the swarm spreads the data. Seeding strategy only; it does not
 	// affect the queue, the seed policy or the bandwidth limits.

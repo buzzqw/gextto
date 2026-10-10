@@ -260,10 +260,9 @@ type torrent struct {
 	sequential bool
 
 	// If true, the pieces at both ends of every file are downloaded first
-	// (gextto fork).
 	firstLast bool
 
-	// superSeeding enables BEP 16 super-seeding (gextto fork): while seeding,
+	// superSeeding enables BEP 16 super-seeding: while seeding,
 	// the torrent advertises a single piece at a time and serves only that, so
 	// the swarm spreads the data instead of the seed uploading it repeatedly.
 	// It is a per-torrent, opt-in seeding strategy and never affects the
@@ -275,7 +274,7 @@ type torrent struct {
 	// goroutine, like the rest of the torrent state.
 	superSeedPeers map[*peer.Peer]*superSeedPeer
 
-	// Per-torrent rate limiters (gextto fork). They inherit the session
+	// Per-torrent rate limiters. They inherit the session
 	// limiters until an explicit per-torrent limit is set; peers hold these, so
 	// a change applies without reconnecting.
 	bucketDownload *bandwidth.Limiter
@@ -283,7 +282,7 @@ type torrent struct {
 	// Explicit per-torrent speed limits in KiB/s (-1 = inherit the session).
 	downloadLimitKib int64
 	uploadLimitKib   int64
-	// Per-torrent connection and upload-slot caps (gextto fork). Zero means no
+	// Per-torrent connection and upload-slot caps. Zero means no
 	// per-torrent cap; the session budgets still apply.
 	maxConnections int
 	maxUploads     int
@@ -394,7 +393,7 @@ func newTorrent(
 		superSeedPeers:            make(map[*peer.Peer]*superSeedPeer),
 	}
 	// Per-torrent limiters inherit the session ones until an explicit limit is
-	// set (gextto fork).
+	// set.
 	t.bucketDownload = bandwidth.New(0)
 	t.bucketDownload.SetParent(s.bucketDownload)
 	t.bucketUpload = bandwidth.New(0)
@@ -473,7 +472,7 @@ func (t *torrent) Files() ([]File, error) {
 
 func (t *torrent) FileStats() ([]FileStats, error) {
 	if len(t.pieces) == 0 {
-		// gextto fork: a stopped torrent has no pieces in memory but keeps its
+		// a stopped torrent has no pieces in memory but keeps its
 		// verified bitfield, so the completed files of a parked or abandoned
 		// download can still be found (and imported) without restarting it.
 		return t.fileStatsFromBitfield()
@@ -539,7 +538,7 @@ func DisableLogging() {
 }
 
 // fileStatsFromBitfield computes the completed bytes of every file from the
-// verified bitfield, for a torrent whose pieces are not loaded (gextto fork).
+// verified bitfield, for a torrent whose pieces are not loaded.
 func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 	t.mBitfield.RLock()
 	defer t.mBitfield.RUnlock()
@@ -551,7 +550,7 @@ func (t *torrent) fileStatsFromBitfield() ([]FileStats, error) {
 
 // fileStatsFromPieces maps completed pieces onto the files laid end to end
 // (padding files included, as they take space in the piece stream) and returns
-// the completed bytes of each non-padding file (gextto fork).
+// the completed bytes of each non-padding file.
 func fileStatsFromPieces(files []metainfo.File, pieceLength int64, done func(uint32) bool) []FileStats {
 	stats := make([]FileStats, 0, len(files))
 	var offset int64

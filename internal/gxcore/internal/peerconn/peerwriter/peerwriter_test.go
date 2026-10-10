@@ -6,7 +6,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
 )
 
-// TestServedWindowBounded verifies the gextto fork change: the dedup window is
+// TestServedWindowBounded verifies the engine change: the dedup window is
 // bounded, evicts the oldest, and stops rejecting blocks re-requested later.
 func TestServedWindowBounded(t *testing.T) {
 	w := newServedWindow(3)

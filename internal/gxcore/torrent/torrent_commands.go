@@ -152,10 +152,10 @@ func (t *torrent) AddTrackers(trackers []tracker.Tracker) {
 }
 
 // unlimitedUnchokedPeers is used when the per-torrent upload slots are set to
-// "unlimited" (gextto fork).
+// "unlimited".
 const unlimitedUnchokedPeers = 1000
 
-// enforceConnectionLimit closes peers over the per-torrent cap (gextto fork).
+// enforceConnectionLimit closes peers over the per-torrent cap.
 // It runs in the torrent goroutine.
 func (t *torrent) enforceConnectionLimit() {
 	if t.maxConnections <= 0 {
@@ -174,7 +174,7 @@ func (t *torrent) enforceConnectionLimit() {
 	}
 }
 
-// applyMaxUploads sets the unchoker slots from maxUploads (gextto fork): zero
+// applyMaxUploads sets the unchoker slots from maxUploads: zero
 // unchokes every interested peer. It runs in the torrent goroutine.
 func (t *torrent) applyMaxUploads() {
 	if t.unchoker == nil {
@@ -187,7 +187,7 @@ func (t *torrent) applyMaxUploads() {
 	t.unchoker.SetNumUnchoked(t.maxUploads)
 }
 
-// setOrder changes the piece order at runtime and persists it (gextto fork).
+// setOrder changes the piece order at runtime and persists it.
 // It runs in the torrent goroutine.
 func (t *torrent) setOrder(sequential, firstLast bool) {
 	t.sequential = sequential
@@ -199,7 +199,7 @@ func (t *torrent) setOrder(sequential, firstLast bool) {
 }
 
 // persistOrder stores the piece order flags in the resume database, so a
-// runtime change survives a session reload (gextto fork).
+// runtime change survives a session reload.
 func (t *torrent) persistOrder() {
 	_ = t.session.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.id))
@@ -271,9 +271,9 @@ type Peer struct {
 	EncryptedStream    bool
 	DownloadSpeed      int
 	UploadSpeed        int
-	// UTP is set for peers connected over uTP (gextto fork).
+	// UTP is set for peers connected over uTP.
 	UTP bool
-	// Progress (0-1) and Seed come from the peer's bitfield (gextto fork).
+	// Progress (0-1) and Seed come from the peer's bitfield.
 	Progress float64
 	Seed     bool
 }
@@ -293,7 +293,7 @@ const (
 	// SourceManual indicates that the peer is added manually via AddPeer method.
 	SourceManual
 	// SourceHolepunch indicates that the peer was reached via a BEP 55
-	// holepunch rendezvous (gextto fork).
+	// holepunch rendezvous.
 	SourceHolepunch
 )
 

@@ -8,7 +8,7 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
-// Benchmarks for the gextto fork, to measure the cost of the picker paths that
+// Benchmarks for the engine, to measure the cost of the picker paths that
 // upstream re-scans on every call. Run with:
 //
 //	go test -run '^$' -bench 'BenchmarkPicker' -benchmem \

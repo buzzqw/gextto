@@ -17,7 +17,7 @@ import (
 const keepAlivePeriod = 2 * time.Minute
 
 // servedWindowSize bounds how many recently served blocks are remembered to
-// reject duplicate requests (gextto fork). Without a bound the map grew with
+// reject duplicate requests. Without a bound the map grew with
 // everything ever served, and legitimately re-requested blocks (e.g. after a
 // corrupt transfer) were rejected forever.
 const servedWindowSize = 1024
@@ -63,7 +63,7 @@ type PeerWriter struct {
 	writeC                chan peerprotocol.Message
 	messages              chan any
 	servedRequests        *servedWindow
-	bucket                *bandwidth.Limiter // gextto fork: rate changes at runtime
+	bucket                *bandwidth.Limiter // rate changes at runtime
 	log                   logger.Logger
 	stopC                 chan struct{}
 	doneC                 chan struct{}

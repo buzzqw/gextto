@@ -1119,7 +1119,7 @@ var (
 // fork).
 var knownNodes atomic.Int64
 
-// Stats returns the DHT counters (gextto fork).
+// Stats returns the DHT counters.
 func Stats() map[string]int64 {
 	return map[string]int64{
 		"nodes":         knownNodes.Load(),

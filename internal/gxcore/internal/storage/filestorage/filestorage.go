@@ -11,7 +11,7 @@ import (
 
 // FileStorage implements Storage interface for saving files on disk.
 type FileStorage struct {
-	// Preallocate reserves the full size of new files (gextto fork).
+	// Preallocate reserves the full size of new files.
 	Preallocate bool
 	dest        string
 	perm        fs.FileMode

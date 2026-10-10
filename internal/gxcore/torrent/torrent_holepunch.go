@@ -1,6 +1,6 @@
 package torrent
 
-// gextto fork: BEP 55 "Holepunch extension" (ut_holepunch).
+// BEP 55 "Holepunch extension" (ut_holepunch).
 //
 // A peer behind a NAT that cannot be reached with an inbound connection asks a
 // connected peer (the relay) to introduce it to a target. The relay is already
