@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"errors"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
@@ -19,6 +20,11 @@ import (
 
 // v2ChunkMax bounds one hash request; BEP 52 suggests at most 512 hashes.
 const v2ChunkMax = 512
+
+// v2HashTimeout is how long a hash request may stay unanswered. Only one request
+// per file is in flight, so a peer that keeps the connection alive but never
+// answers would otherwise stall that file's piece layer for good.
+const v2HashTimeout = 30 * time.Second
 
 // v2LayerFile tracks the download of one file's piece layer.
 type v2LayerFile struct {
@@ -36,6 +42,7 @@ type v2LayerFile struct {
 	inflightIndex int // index of the request in flight (-1 = none)
 	inflightCount int
 	inflightProof int
+	inflightAt    time.Time
 }
 
 // advertisesV2 reports whether this torrent has a BitTorrent v2 identity (a
@@ -211,6 +218,11 @@ func (t *torrent) startV2LayerDownload() {
 		if _, bad := t.v2NoHashPeers[pe]; bad {
 			continue
 		}
+		// Only a peer that set the v2 reserved bit speaks BEP 52; a v1 client
+		// may drop the connection on the unknown message id.
+		if !pe.ProtocolV2 {
+			continue
+		}
 		lf := t.nextV2LayerFile()
 		if lf == nil {
 			return
@@ -236,6 +248,7 @@ func (t *torrent) startV2LayerDownload() {
 		lf.inflightIndex = lf.next
 		lf.inflightCount = count
 		lf.inflightProof = proofLayers
+		lf.inflightAt = time.Now()
 		t.v2Pending[pe] = lf
 		pe.SendMessage(peerprotocol.HashRequestMessage{HashRequestHeader: hdr})
 	}
@@ -260,7 +273,7 @@ func (t *torrent) handleHashes(pe *peer.Peer, msg peerprotocol.HashesMessage) {
 		ProofLayers: uint32(lf.inflightProof),
 	}
 	if msg.HashRequestHeader != expected {
-		// Not a reply to our request; leave the request in flight.
+		// Not a reply to our request: drop it and ask again.
 		lf.inflightIndex = -1
 		t.startV2LayerDownload()
 		return
@@ -312,6 +325,28 @@ func (t *torrent) handleHashReject(pe *peer.Peer, msg peerprotocol.HashRejectMes
 	}
 	t.v2NoHashPeers[pe] = struct{}{}
 	t.startV2LayerDownload()
+}
+
+// expireV2HashRequests gives up on hash requests unanswered for longer than
+// v2HashTimeout: the peer is not asked again and the range goes to another one.
+// It runs on the torrent loop's periodic tick.
+func (t *torrent) expireV2HashRequests(now time.Time) {
+	expired := false
+	for pe, lf := range t.v2Pending {
+		if lf == nil || lf.inflightIndex < 0 || now.Sub(lf.inflightAt) < v2HashTimeout {
+			continue
+		}
+		delete(t.v2Pending, pe)
+		lf.inflightIndex = -1
+		if t.v2NoHashPeers == nil {
+			t.v2NoHashPeers = make(map[*peer.Peer]struct{})
+		}
+		t.v2NoHashPeers[pe] = struct{}{}
+		expired = true
+	}
+	if expired {
+		t.startV2LayerDownload()
+	}
 }
 
 // v2LayerFailed resets the in-flight request so another peer can retry it.
