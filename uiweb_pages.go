@@ -363,7 +363,7 @@ var uiAdvancedEditors = []uiListEditor{
 		},
 	},
 	{
-		Title: "Event hook", Hint: "Esegue un programma su determinati eventi.",
+		Title: "Hook eventi", Hint: "Esegue un programma su determinati eventi.",
 		GetPath: "/api/event-hooks", Unwrap: "items", PostPath: "/api/event-hooks",
 		Fields: []uiListField{
 			{Name: "name", Label: "Nome", Kind: "text"},
@@ -837,7 +837,7 @@ var uiSettingsEditorSearchEntries = []uiSearchEntry{
 	{Key: "", Label: "Gruppi custom", Tab: "scores"},
 	{Key: "", Label: "Composizione del nome", Tab: "rename"},
 	{Key: "", Label: "Regole tag → cartella", Tab: "rename"},
-	{Key: "", Label: "Event hook", Tab: "notify"},
+	{Key: "", Label: "Hook eventi", Tab: "notify"},
 	{Key: "", Label: "Traduzioni", Tab: "system"},
 }
 

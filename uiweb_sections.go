@@ -509,7 +509,7 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 					Title: "Impostazioni", Hint: "Usa il PIN dell'app Simkl per collegare l'account.", Path: "/api/simkl/settings", Submit: "Salva Simkl",
 					Wrap: "values",
 					Fields: []uiFormField{
-						{Name: "simkl_client_id", Label: "Client ID", Value: settingsOr(cfg, "simkl_client_id", ""), Hint: "Client ID dell'app Simkl."},
+						{Name: "simkl_client_id", Label: "ID client", Value: settingsOr(cfg, "simkl_client_id", ""), Hint: "ID client dell'app Simkl."},
 						{Name: "simkl_calendar_days", Label: "Giorni calendario", Value: simklCalendarDays, Hint: "Quanti giorni avanti mostrare nel calendario Simkl."},
 						{Name: "simkl_watchlist_status", Label: "Stato watchlist", Kind: "select", Hint: "Stato assegnato alle serie importate nella watchlist Simkl.", Options: []uiFormOption{
 							{Value: "plantowatch", Label: "Da guardare", Selected: settingsOr(cfg, "simkl_watchlist_status", "plantowatch") == "plantowatch"},
@@ -561,10 +561,10 @@ func uiIntegrationSections(s *AppState, cfg *Config) []uiPageSection {
 			Title: "Handler del browser",
 			Hint:  "Scarica gli script per aprire magnet e file .torrent direttamente in Gextto.",
 			Links: []uiLinkItem{
-				{Label: "Magnet handler", Href: "/api/browser-handlers/download?file=gextto-magnet"},
-				{Label: "Torrent handler", Href: "/api/browser-handlers/download?file=gextto-torrent"},
-				{Label: "Magnet .desktop", Href: "/api/browser-handlers/download?file=gextto-magnet.desktop"},
-				{Label: "Torrent .desktop", Href: "/api/browser-handlers/download?file=gextto-torrent.desktop"},
+				{Label: "Gestore magnet", Href: "/api/browser-handlers/download?file=gextto-magnet"},
+				{Label: "Gestore torrent", Href: "/api/browser-handlers/download?file=gextto-torrent"},
+				{Label: "Magnet (.desktop)", Href: "/api/browser-handlers/download?file=gextto-magnet.desktop"},
+				{Label: "Torrent (.desktop)", Href: "/api/browser-handlers/download?file=gextto-torrent.desktop"},
 				{Label: "install.sh", Href: "/api/browser-handlers/download?file=install.sh"},
 			},
 		})),

@@ -1429,7 +1429,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
 		{Label: "Versione torrent", Value: torrent.TorrentVersion},
 		{Label: "Auto-managed", Value: ternaryString(torrent.AutoManaged, "sì", "no")},
-		{Label: "Save path", Value: torrent.SavePath},
+		{Label: "Percorso di salvataggio", Value: torrent.SavePath},
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
 		{Label: "Magnet", Value: magnet},

@@ -1887,7 +1887,7 @@ Key") instead of the bare HTTP code.
 
 | Item | What it does |
 |---|---|
-| Magnet / Torrent handler | Downloads the scripts to open magnets and `.torrent` files directly in Gextto. |
+| Magnet / Torrent manager | Downloads the scripts to open magnets and `.torrent` files directly in Gextto. |
 | Magnet / Torrent `.desktop` | `.desktop` versions for Linux desktop integration. |
 | `install.sh` | Downloads the installation script. |
 | Check sources / Refresh | Checks feeds, indexers and web engines; with a query it also measures results, without changing settings. |

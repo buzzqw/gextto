@@ -1723,7 +1723,7 @@ disk; qBittorrent, che non lo supporta, scarica sempre su disco.
 
 | Impostazione | Cosa fa |
 |---|---|
-| Event hook | Esegue un programma su determinati eventi (nome, eventi, programma, argomenti, timeout). |
+| Hook eventi | Esegue un programma su determinati eventi (nome, eventi, programma, argomenti, timeout). |
 
 #### Accesso e servizi
 
@@ -1821,7 +1821,7 @@ gruppo agganciato in alto mentre scorri.
 
 | Campo / azione | Cosa fa |
 |---|---|
-| Client ID | Client ID dell'app Simkl. |
+| ID client | ID client dell'app Simkl. |
 | Giorni calendario | Quanti giorni avanti mostrare nel calendario Simkl. |
 | Stato watchlist | Stato assegnato alle serie importate: Da guardare, In visione o Completato. |
 | Segna come visto | Segna come visti su Simkl gli episodi scaricati. |
@@ -1929,7 +1929,7 @@ Key») invece del solo codice HTTP.
 
 | Voce | Cosa fa |
 |---|---|
-| Magnet / Torrent handler | Scarica gli script per aprire magnet e file `.torrent` direttamente in Gextto. |
+| Gestore magnet / torrent | Scarica gli script per aprire magnet e file `.torrent` direttamente in Gextto. |
 | Magnet / Torrent `.desktop` | Versioni `.desktop` per l'integrazione con il desktop Linux. |
 | `install.sh` | Scarica lo script di installazione. |
 | Verifica sorgenti / Aggiorna | Controlla feed, indexer e motori web; con una ricerca misura anche i risultati, senza cambiare le impostazioni. |

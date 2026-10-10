@@ -111,7 +111,7 @@ func TestSettingsEveryPreviousOptionIsStillAvailable(t *testing.T) {
 		"libtorrent":  {"Applica ora", "v2-ipfilter-panel", "Carica / aggiorna ora"},
 		"performance": {"Ottimizza", "Applica ora"},
 		"rename":      {"Composizione del nome", "Regole tag → cartella"},
-		"notify":      {"Event hook"},
+		"notify":      {"Hook eventi"},
 		"system":      {"v2-i18n-table", "Esporta YAML", "Importa YAML"},
 	} {
 		body := render(tab)
@@ -277,7 +277,7 @@ func TestSettingsSearchCoversScoresAndEditors(t *testing.T) {
 	if _, body := v2Request(t, server, http.MethodGet, "/settings/search?q=dolby", nil); !strings.Contains(body, "Dolby TrueHD") || !strings.Contains(body, "tab=scores") {
 		t.Fatalf("score weights must be searchable: %s", body)
 	}
-	if _, body := v2Request(t, server, http.MethodGet, "/settings/search?q=event", nil); !strings.Contains(body, "Event hook") || !strings.Contains(body, "tab=notify") {
+	if _, body := v2Request(t, server, http.MethodGet, "/settings/search?q=event", nil); !strings.Contains(body, "Hook eventi") || !strings.Contains(body, "tab=notify") {
 		t.Fatalf("editors must be searchable: %s", body)
 	}
 	// Words of the previous labels still find the moved settings.
