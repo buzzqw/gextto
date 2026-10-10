@@ -160,6 +160,9 @@ func (d *Daemon) handleUIRssConfig(w http.ResponseWriter, r *http.Request) {
 		d.renderRSS(w, r, "Cannot save settings: "+err.Error())
 		return
 	}
+	// A feed saved now must be checked now, not only after a restart or the
+	// manual button.
+	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
 }
 

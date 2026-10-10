@@ -162,6 +162,11 @@ type Daemon struct {
 	// feedMu guards feedStatuses (the RSS feeds' last outcome).
 	feedMu       sync.Mutex
 	feedStatuses map[string]feedStatus
+	// feedWake asks runFeeds for an immediate poll when the feeds are edited.
+	feedWake chan struct{}
+	// feedPollMu serialises polls: the loop and the manual button must not run
+	// two polls against the same feed at once.
+	feedPollMu sync.Mutex
 	// appliedDL/appliedUL are the global limits currently on the session.
 	appliedDL int64
 	appliedUL int64
@@ -230,6 +235,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		moving:    map[string]bool{},
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
+		feedWake:  make(chan struct{}, 1),
 		trackers:  newTrackerHealth(),
 		appliedDL: -1,
 		appliedUL: -1,

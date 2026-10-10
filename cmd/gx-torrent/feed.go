@@ -98,16 +98,21 @@ func (d *Daemon) feedInterval() time.Duration {
 	return secs
 }
 
-// runFeeds polls the feeds on an interval until stop is closed. It is a no-op
-// unless the daemon is standalone and at least one feed is configured.
+// runFeeds polls the feeds on an interval until stop is closed. It runs for the
+// whole standalone lifetime so feeds added at runtime (the RSS page, the
+// wizard) are picked up on the next round; with no feed configured pollFeeds is
+// a cheap no-op. In managed mode Gextto owns acquisition, so the loop never
+// starts.
 func (d *Daemon) runFeeds(stop <-chan struct{}) {
-	if d.opts.Mode != ModeStandalone || len(d.feeds()) == 0 {
+	if d.opts.Mode != ModeStandalone {
 		return
 	}
-	// A short initial delay lets the session settle before the first poll.
+	// A short initial delay lets the session settle before the first poll; a
+	// feed added meanwhile (the wizard or the RSS page) skips the wait.
 	select {
 	case <-stop:
 		return
+	case <-d.feedWake:
 	case <-time.After(30 * time.Second):
 	}
 	for {
@@ -115,14 +120,34 @@ func (d *Daemon) runFeeds(stop <-chan struct{}) {
 		select {
 		case <-stop:
 			return
+		case <-d.feedWake:
+			// The feeds were just edited: poll again now instead of waiting a
+			// whole interval.
 		case <-time.After(d.feedInterval()):
 		}
 	}
 }
 
+// pokeFeeds asks the RSS loop for an immediate poll, so a feed saved at runtime
+// (handleUIRssConfig) is checked at once instead of after the whole interval.
+func (d *Daemon) pokeFeeds() {
+	if d.feedWake == nil {
+		return
+	}
+	select {
+	case d.feedWake <- struct{}{}:
+	default:
+	}
+}
+
 // pollFeeds fetches every feed once, applies its rules and adds the matching
-// torrents that were not added before.
+// torrents that were not added before. Only one poll runs at a time: the loop
+// and the manual button must not fetch the same feed together.
 func (d *Daemon) pollFeeds() {
+	if !d.feedPollMu.TryLock() {
+		return
+	}
+	defer d.feedPollMu.Unlock()
 	feeds := d.feeds()
 	if len(feeds) == 0 {
 		return

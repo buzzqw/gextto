@@ -66,8 +66,43 @@ func feedDaemon(t *testing.T, feedsJSON string) *Daemon {
 	return newStandaloneDaemon(t, store)
 }
 
-func TestPollFeedsAddsAndDedupes(t *testing.T) {
+func TestRunFeedsKeepsRunningWithNoFeeds(t *testing.T) {
+	// The loop must stay alive with no feed configured: otherwise a feed added
+	// from the page later would only be checked after a restart.
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() { d.runFeeds(stop); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("runFeeds returned immediately with no feeds configured")
+	case <-time.After(150 * time.Millisecond):
+	}
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("runFeeds did not stop when asked")
+	}
+}
+
+func TestFeedsAddedAtRuntimeArePolled(t *testing.T) {
 	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(feedBody))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, "") // starts with no feed configured
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.pokeFeeds()
+	waitFor(t, "the feed added at runtime to be polled", func() bool {
+		return len(d.snapshotViews()) >= 1
+	})
+}
+
+func TestPollFeedsAddsAndDedupes(t *testing.T) {	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(feedBody))
 	}))
