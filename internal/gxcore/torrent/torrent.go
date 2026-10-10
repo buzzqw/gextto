@@ -68,6 +68,10 @@ type torrent struct {
 	// Contains info about files in torrent. This can be nil at start for magnet downloads.
 	info *metainfo.Info
 
+	// pieceLayers is the BEP 52 top-level "piece layers" of a v2 torrent,
+	// kept so the .torrent can be exported/served with them.
+	pieceLayers map[string][]byte
+
 	// Bitfield for pieces we have. It is created after we got info.
 	// Bits are set only after data is written to file.
 	bitfield *bitfield.Bitfield

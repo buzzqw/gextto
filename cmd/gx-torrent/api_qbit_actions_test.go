@@ -255,3 +255,74 @@ func TestQbitTorrentsInfoFilterAndAddTrackers(t *testing.T) {
 		return len(trackerURLs(t, d, hash)) == 1
 	})
 }
+
+func TestQbitSetShareLimits(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/api/v2/torrents/setShareLimits",
+		url.Values{"hash": {hash}, "ratioLimit": {"1.5"}, "seedingTimeLimit": {"1440"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	d.mu.Lock()
+	_, meta := d.findLocked(hash)
+	ratio, days := meta.SeedRatio, meta.SeedDays
+	d.mu.Unlock()
+	if ratio != 1.5 || days != 1 {
+		t.Fatalf("share limits = %v/%d, want 1.5/1", ratio, days)
+	}
+
+	// -1 means infinite: the daemon stores 0 (unlimited).
+	resp2, err := http.PostForm(srv.URL+"/api/v2/torrents/setShareLimits",
+		url.Values{"hash": {hash}, "ratioLimit": {"-1"}, "seedingTimeLimit": {"-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp2.Body.Close()
+	d.mu.Lock()
+	_, meta2 := d.findLocked(hash)
+	ratio2, days2 := meta2.SeedRatio, meta2.SeedDays
+	d.mu.Unlock()
+	if ratio2 != 0 || days2 != 0 {
+		t.Fatalf("infinite share limits = %v/%d, want 0/0", ratio2, days2)
+	}
+}
+
+func TestQbitCrossOriginPostRejected(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/api/v2/app/setPreferences", strings.NewReader("json=%7B%7D"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "http://evil.example")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin POST status = %d, want 403", resp.StatusCode)
+	}
+
+	// A same-origin/none POST (a client) is allowed.
+	r2, err := http.PostForm(srv.URL+"/api/v2/app/setPreferences", url.Values{"json": {"{}"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2.Body.Close()
+	if r2.StatusCode != http.StatusOK {
+		t.Fatalf("same-origin POST status = %d, want 200", r2.StatusCode)
+	}
+}

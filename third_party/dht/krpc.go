@@ -258,12 +258,14 @@ func readFromSocket(socket packetConn, conChan chan packetType, bytesArena arena
 		}
 		if err != nil {
 			// Return the buffer so the arena never drains, then stop if asked.
+			// A short wait avoids a tight loop if the read error is persistent
+			// and stop has not been closed yet.
 			bytesArena.Push(b)
 			log.Debugf("DHT: readResponse error:%s\n", err)
 			select {
 			case <-stop:
 				return
-			default:
+			case <-time.After(10 * time.Millisecond):
 			}
 			continue
 		}

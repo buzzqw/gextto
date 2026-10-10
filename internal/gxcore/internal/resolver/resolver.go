@@ -69,21 +69,3 @@ func resolveIP(ctx context.Context, timeout time.Duration, host string) (net.IP,
 	}
 	return nil, ErrNotIPv4Address
 }
-
-// ResolveIPv4 resolves `host` to and IPv4 address.
-func ResolveIPv4(ctx context.Context, timeout time.Duration, host string) (net.IP, error) {
-	var cancel func()
-	ctx, cancel = context.WithTimeout(ctx, timeout)
-	defer cancel()
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil {
-		return nil, err
-	}
-	for _, ia := range addrs {
-		i4 := ia.IP.To4()
-		if i4 != nil {
-			return i4, nil
-		}
-	}
-	return nil, ErrNotIPv4Address
-}

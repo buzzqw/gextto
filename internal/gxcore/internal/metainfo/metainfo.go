@@ -127,8 +127,15 @@ func isWebseedSupported(s string) bool {
 
 // NewBytes creates a new torrent metadata file from given information.
 func NewBytes(info []byte, trackers [][]string, webseeds []string, comment string) ([]byte, error) {
+	return NewBytesWithLayers(info, trackers, webseeds, nil, comment)
+}
+
+// NewBytesWithLayers is NewBytes plus a BEP 52 "piece layers" dictionary, so a
+// BitTorrent v2 torrent can be written back (export) with its layers.
+func NewBytesWithLayers(info []byte, trackers [][]string, webseeds []string, layers map[string][]byte, comment string) ([]byte, error) {
 	mi := struct {
 		Info         bencode.RawMessage `bencode:"info"`
+		PieceLayers  map[string][]byte  `bencode:"piece layers,omitempty"`
 		Announce     string             `bencode:"announce,omitempty"`
 		AnnounceList [][]string         `bencode:"announce-list,omitempty"`
 		URLList      bencode.RawMessage `bencode:"url-list,omitempty"`
@@ -137,6 +144,7 @@ func NewBytes(info []byte, trackers [][]string, webseeds []string, comment strin
 		CreatedBy    string             `bencode:"created by,omitempty"`
 	}{
 		Info:         info,
+		PieceLayers:  layers,
 		Comment:      comment,
 		CreationDate: time.Now().UTC().Unix(),
 		CreatedBy:    Creator,

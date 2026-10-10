@@ -11,6 +11,7 @@ package torrent
 import (
 	"net"
 	"strconv"
+	"strings"
 )
 
 // listenTCPOn binds a TCP listener for the given host and port.
@@ -21,6 +22,14 @@ func listenTCPOn(host string, port int) (*net.TCPListener, error) {
 		return net.ListenTCP("tcp4", &net.TCPAddr{IP: ip.To4(), Port: port})
 	case ip != nil && ip.To4() == nil && !ip.IsUnspecified():
 		return net.ListenTCP("tcp6", &net.TCPAddr{IP: ip, Port: port})
+	case ip == nil && strings.Contains(host, "%"):
+		// A scoped IPv6 literal (fe80::1%eth0): net.ParseIP fails, and the zone
+		// cannot go in a TCPAddr, so listen by address string.
+		l, err := net.Listen("tcp6", net.JoinHostPort(host, strconv.Itoa(port)))
+		if err != nil {
+			return nil, err
+		}
+		return l.(*net.TCPListener), nil
 	default:
 		// Unspecified: prefer a dual-stack socket, fall back to IPv4-only.
 		l, err := net.ListenTCP("tcp", &net.TCPAddr{Port: port})
@@ -40,6 +49,8 @@ func listenUDPOn(host string, port int) (net.PacketConn, error) {
 		return net.ListenPacket("udp4", net.JoinHostPort(ip.To4().String(), strconv.Itoa(port)))
 	case ip != nil && ip.To4() == nil && !ip.IsUnspecified():
 		return net.ListenPacket("udp6", net.JoinHostPort(ip.String(), strconv.Itoa(port)))
+	case ip == nil && strings.Contains(host, "%"):
+		return net.ListenPacket("udp6", net.JoinHostPort(host, strconv.Itoa(port)))
 	default:
 		pc, err := net.ListenPacket("udp", net.JoinHostPort("", strconv.Itoa(port)))
 		if err != nil {
@@ -73,6 +84,8 @@ func udpProtoForAddr(addr net.Addr) string {
 func udpProtoForHost(host string) string {
 	ip := net.ParseIP(host)
 	switch {
+	case ip == nil && strings.Contains(host, "%"):
+		return "udp6" // a scoped IPv6 literal (fe80::1%eth0)
 	case ip == nil || ip.IsUnspecified():
 		return "udp"
 	case ip.To4() != nil:

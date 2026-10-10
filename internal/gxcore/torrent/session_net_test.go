@@ -64,7 +64,7 @@ func TestUDPProtoSelection(t *testing.T) {
 	hosts := []struct{ host, want string }{
 		{"", "udp"}, {"0.0.0.0", "udp"}, {"::", "udp"},
 		{"127.0.0.1", "udp4"}, {"192.168.1.5", "udp4"},
-		{"::1", "udp6"}, {"2001:db8::1", "udp6"},
+		{"::1", "udp6"}, {"2001:db8::1", "udp6"}, {"fe80::1%eth0", "udp6"},
 	}
 	for _, c := range hosts {
 		if got := udpProtoForHost(c.host); got != c.want {

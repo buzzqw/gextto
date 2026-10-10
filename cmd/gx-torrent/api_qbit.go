@@ -77,14 +77,21 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/setDownloadLimit", d.handleQbitSetTorrentDownloadLimit)
 	mux.HandleFunc("POST /api/v2/torrents/setUploadLimit", d.handleQbitSetTorrentUploadLimit)
 	mux.HandleFunc("POST /api/v2/app/setPreferences", d.handleQbitSetPreferences)
+	mux.HandleFunc("POST /api/v2/torrents/setShareLimits", d.handleQbitSetShareLimits)
 	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
 	return d.qbitAuth(mux)
 }
 
 // qbitAuth requires a valid SID session for every call but the login. With no
-// password configured the API is open (fresh standalone install).
+// password configured the API is open (fresh standalone install). A cross-site
+// POST is always rejected (no CSRF token is used); programmatic clients send no
+// Origin/Referer and are allowed.
 func (d *Daemon) qbitAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && !sameOrigin(r) {
+			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
+			return
+		}
 		if r.URL.Path == "/api/v2/auth/login" || !d.standaloneAuthActive() {
 			next.ServeHTTP(w, r)
 			return
@@ -523,8 +530,8 @@ func (d *Daemon) handleQbitFilePrio(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := d.setFilePriorities(hash, priorities); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
+		// qBittorrent returns 200 for these actions; the change is best effort.
+		logf("qbit filePrio %s: %v", hash, err)
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -968,6 +975,45 @@ func (d *Daemon) handleQbitSetPreferences(w http.ResponseWriter, r *http.Request
 		if err := d.qbitSetSpeedLimit(m.config, strconv.FormatInt(limit, 10)); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitSetShareLimits maps qBittorrent share limits onto the daemon's seed
+// policy. ratioLimit: -2 keep the global, -1 infinite, >=0 explicit.
+// seedingTimeLimit is in minutes (-2 global, -1 infinite, >=0 minutes); the
+// daemon stores days, so a positive value is rounded up to the next day.
+func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request) {
+	ratio, rerr := strconv.ParseFloat(strings.TrimSpace(r.FormValue("ratioLimit")), 64)
+	minutes, merr := strconv.ParseInt(strings.TrimSpace(r.FormValue("seedingTimeLimit")), 10, 64)
+	for _, hash := range d.qbitHashParam(r) {
+		var ratioPtr *float64
+		if rerr == nil {
+			switch {
+			case ratio >= 0:
+				ratioPtr = &ratio
+			case ratio == -1: // infinite: never stop by ratio
+				zero := 0.0
+				ratioPtr = &zero
+			}
+		}
+		var daysPtr *int64
+		if merr == nil {
+			switch {
+			case minutes >= 0:
+				days := (minutes + 1439) / 1440
+				if days < 1 {
+					days = 1
+				}
+				daysPtr = &days
+			case minutes == -1:
+				zero := int64(0)
+				daysPtr = &zero
+			}
+		}
+		if ratioPtr != nil || daysPtr != nil {
+			_ = d.setLimits(hash, nil, nil, ratioPtr, daysPtr)
 		}
 	}
 	w.WriteHeader(http.StatusOK)

@@ -66,10 +66,11 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	}
 	hasStarted = spec.Started
 	var info *metainfo.Info
+	var layers map[string][]byte
 	var bf *bitfield.Bitfield
 	var private bool
 	if len(spec.Info) > 0 {
-		layers, _ := metainfo.DecodePieceLayers(spec.PieceLayers)
+		layers, _ = metainfo.DecodePieceLayers(spec.PieceLayers)
 		info2, err2 := s.parseInfo(spec.Info, spec.Version, layers)
 		if err2 != nil {
 			return nil, spec.Started, err2
@@ -122,6 +123,7 @@ func (s *Session) loadExistingTorrent(id string) (tt *Torrent, hasStarted bool, 
 	}
 	t.rawTrackers = spec.Trackers
 	t.rawWebseedSources = spec.URLList
+	t.pieceLayers = layers
 	go s.checkTorrent(t)
 	delete(s.availablePorts, spec.Port)
 

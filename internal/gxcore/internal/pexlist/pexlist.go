@@ -69,20 +69,38 @@ func (l *PEXList) Drop(addr *net.TCPAddr) {
 }
 
 // Flush returns the added and dropped parts for IPv4 and IPv6 and empties the
-// list. The IPv6 parts are encoded as compact 18-byte records (BEP 11).
+// list. The IPv6 parts are encoded as compact 18-byte records (BEP 11). Except
+// for the first message, BEP 11 caps the combined v4+v6 entries at maxPeers.
 func (l *PEXList) Flush() (added, added6, dropped, dropped6 string) {
-	added = l.flush(l.added, l.flushed)
-	added6 = l.flush6(l.added6, l.flushed)
-	dropped = l.flush(l.dropped, l.flushed)
-	dropped6 = l.flush6(l.dropped6, l.flushed)
+	limit := -1 // unlimited on the first flush
+	if l.flushed {
+		limit = maxPeers
+	}
+	added, added6 = l.flushPair(l.added, l.added6, limit)
+	dropped, dropped6 = l.flushPair(l.dropped, l.dropped6, limit)
 	l.flushed = true
 	return
 }
 
-func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit bool) string {
+// flushPair emits the IPv4 entries first and the IPv6 ones with the remaining
+// budget, so the two families share the same maxPeers cap.
+func (l *PEXList) flushPair(m4 map[tracker.CompactPeer]struct{}, m6 map[tracker.CompactPeer6]struct{}, limit int) (string, string) {
+	s4 := l.flush(m4, limit)
+	remaining := limit
+	if remaining >= 0 {
+		remaining -= len(s4) / 6
+		if remaining < 0 {
+			remaining = 0
+		}
+	}
+	s6 := l.flush6(m6, remaining)
+	return s4, s6
+}
+
+func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit int) string {
 	count := len(m)
-	if limit && count > maxPeers {
-		count = maxPeers
+	if limit >= 0 && count > limit {
+		count = limit
 	}
 
 	var s strings.Builder
@@ -103,10 +121,10 @@ func (l *PEXList) flush(m map[tracker.CompactPeer]struct{}, limit bool) string {
 	return s.String()
 }
 
-func (l *PEXList) flush6(m map[tracker.CompactPeer6]struct{}, limit bool) string {
+func (l *PEXList) flush6(m map[tracker.CompactPeer6]struct{}, limit int) string {
 	count := len(m)
-	if limit && count > maxPeers {
-		count = maxPeers
+	if limit >= 0 && count > limit {
+		count = limit
 	}
 
 	var s strings.Builder

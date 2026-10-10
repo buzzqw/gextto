@@ -231,4 +231,19 @@ func TestV2TorrentSurvivesRestart(t *testing.T) {
 	defer stop2()
 	waitFor(t, "v2 torrent reloaded", func() bool { _, ok := findInfo(d2, hash); return ok })
 	waitFor(t, "reloaded v2 seeding", func() bool { return stateOf(d2, hash) == "seeding" })
+
+	// The exported .torrent must still carry the v2 piece layers.
+	d2.mu.Lock()
+	tor, _ := d2.findLocked(hash)
+	d2.mu.Unlock()
+	if tor == nil {
+		t.Fatal("torrent not found after reload")
+	}
+	exported, err := tor.Torrent()
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if !bytes.Contains(exported, []byte("12:piece layers")) {
+		t.Fatal("the exported v2 torrent lost its piece layers")
+	}
 }
