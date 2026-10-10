@@ -44,12 +44,19 @@ funzionare come servizio.
   il torrent bloccato continua a tentare (vedi *Configurazione → Qualità e
   upgrade → Download bloccati*).
 - **Strumenti operativi inclusi:** controlli di salute, log, backup,
-  manutenzione, notifiche, percorsi NAS, gestione seeding e blocklist. La ricerca
-  nell'archivio è immediata mentre digiti e il **log di gx-torrent** è leggibile
-  da Manutenzione.
+  manutenzione, notifiche (Telegram, e-mail o webhook per Discord, Slack, ntfy,
+  Gotify e Pushover, anche su riavvii di Gextto e problemi di gx-torrent),
+  percorsi NAS, gestione seeding e blocklist. La ricerca nell'archivio è
+  immediata mentre digiti e il **log di gx-torrent** è leggibile da Manutenzione.
+- **Facile da seguire:** il riquadro **Da controllare** della dashboard raccoglie
+  download fermi, spostamenti in sospeso e avvisi; ogni riga di log su un
+  download riporta il suo **ID di acquisizione**, così se ne segue l'intera storia
+  (ricerca, scelta, trasferimento, archivio), e il pannello Ricerche mostra la
+  durata dei cicli e le sorgenti che falliscono, con avvisi a soglia.
 
 La UI è disponibile su `http://<host>:5000/` e supporta italiano, inglese,
-tedesco, francese, spagnolo e polacco. Il [manuale italiano](docs/MANUAL.it.md)
+tedesco, francese, spagnolo e polacco (come la TUI, le notifiche e la pagina
+di gx-torrent). Il [manuale italiano](docs/MANUAL.it.md)
 e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le
 sezioni dell'interfaccia.
 
@@ -64,7 +71,10 @@ controllata, mai due client sugli stessi dati.
 dipendenza C/C++), gira in un processo separato e sorvegliato, ha una pagina web
 propria, i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna, ed è
 dove arrivano prima le novità (streaming HTTP con Range, test porte integrato,
-gestione adattiva di memoria/cache, holepunching NAT con BEP 55). La build
+gestione adattiva di memoria/cache, holepunching NAT con BEP 55, IPv6 dual-stack
+DHT compreso, torrent BitTorrent v2 e ibridi, ban di sessione dei peer che
+inviano dati corrotti). Il suo nucleo, **gx-core**, è un motore nostro, nato da
+rain v2.4.2 e mantenuto in questo repository. La build
 predefinita di Gextto è **Go puro**: per funzionare serve solo gx-torrent.
 
 **qBittorrent-nox** è l'alternativa per chi lo usa già o preferisce la sua UI:

@@ -43,12 +43,19 @@ service.
   stuck torrent keeps trying (see *Configuration → Quality and upgrades → Stuck
   downloads*).
 - **Operational tools included:** health checks, logs, backups, maintenance,
-  notifications, NAS paths, seeding controls and a blocklist. The archive search
-  is instant while you type, and the **gx-torrent log** is readable from
-  Maintenance.
+  notifications (Telegram, e-mail, or webhooks for Discord, Slack, ntfy, Gotify
+  and Pushover, including Gextto restarts and gx-torrent problems), NAS paths,
+  seeding controls and a blocklist. The archive search is instant while you
+  type, and the **gx-torrent log** is readable from Maintenance.
+- **Easy to follow:** the dashboard's **To check** panel collects stuck
+  downloads, pending moves and alerts; every log line about a download carries
+  its **acquisition ID**, so the whole story of a download (search, choice,
+  transfer, archive) can be followed, and the Searches panel shows cycle
+  durations and failing sources, with threshold alerts.
 
 The UI is available at `http://<host>:5000/` and supports Italian, English,
-German, French, Spanish and Polish. The full [English manual](docs/MANUAL.en.md)
+German, French, Spanish and Polish (as do the TUI, the notifications and the
+gx-torrent page). The full [English manual](docs/MANUAL.en.md)
 and [manuale italiano](docs/MANUAL.it.md) cover setup and every section of the UI.
 
 ## Torrent engines
@@ -62,7 +69,10 @@ same data.
 at all), runs as a separate supervised process, has its own web page, its
 transfers keep running while Gextto restarts or updates, and new transfer
 features land there first (HTTP streaming with Range, a built-in peer-port test,
-adaptive memory/cache sizing, NAT holepunching with BEP 55). Gextto's default
+adaptive memory/cache sizing, NAT holepunching with BEP 55, dual-stack IPv6
+including the DHT, BitTorrent v2 and hybrid torrents, a session-wide ban of
+peers that send corrupt data). Its core, **gx-core**, is our own engine, grown
+from rain v2.4.2 and maintained inside this repository. Gextto's default
 build is **pure Go**: gx-torrent is all it needs.
 
 **qBittorrent-nox** is the alternative for those who already run it or prefer

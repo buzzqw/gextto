@@ -168,13 +168,15 @@ condividere. È il costo nascosto più grosso della strada A.
 
 ### 4.2 Lacune del motore
 
-- **IPv6**: il listener a porta unica, il DHT e uTP usano socket IPv4. Decisione
-  storica §4.3 ("No"); per la parità con qBittorrent non è più rinviabile, perché
-  molti peer domestici sono raggiungibili solo in v6.
+- **IPv6**: **fatto** — listener a porta unica, uTP e DHT su socket dual-stack;
+  `peers6` dei tracker (BEP 7), PEX `added6`/`dropped6` (BEP 11), tracker UDP,
+  `yourip`, blocklist CIDR e scoperta DHT su IPv6 (BEP 32). Resta fuori solo LSD
+  via multicast IPv6 (vedi `gx-torrent.md`, *IPv6*).
 - **BitTorrent v2**: **fatto** — il motore legge v1, la parte v1 degli ibridi e i
   solo-v2 da `.torrent` e da magnet. Alberi Merkle SHA-256, handshake con hash
   troncato (bit riservato v2) e fetch dei `piece layers` (`hash request`/`hashes`).
-- **Qualità**: smart ban dei peer corrotti, profondità adattiva della coda
+- **Qualità**: smart ban dei peer corrotti (**fatto**: ban di sessione con
+  scadenza, `Session.BanIP`), profondità adattiva della coda
   richieste, choking rate-based, reader con readahead per lo streaming, I/O disco
   a blocchi contigui. Sono "cherry-pick" (§11), non blocchi.
 
@@ -275,7 +277,7 @@ flowchart TB
         C2["webui, auth, settings<br/>login, LAN, CSRF<br/>embed.FS, sei lingue"]
         C3["moduli standalone<br/>RSS, indexer, categorie, API qBit<br/>avviati solo se configurati"]
     end
-    E["internal/gxcore: il motore (ex fork di rain, ora codice proprio)<br/>DHT, uTP, holepunch; in piano IPv6, smart ban, BitTorrent v2"]
+    E["internal/gxcore: il motore (ex fork di rain, ora codice proprio)<br/>DHT, uTP, holepunch, IPv6, smart ban, BitTorrent v2"]
     G -- "API v1, congelata" --> X
     B -- "web UI" --> X
     A -- "API qBit v2" --> X
@@ -409,24 +411,24 @@ requisito: si pubblicano le misure a ogni release, vincenti o no.
 
 ## 11. Cherry-pick dal motore e licenze
 
-Il fork di rain è già una base solida e sorvegliata. Le due lacune che pesano di
-più per uno standalone sono IPv6 e BitTorrent v2; tutto il resto è qualità che si
-porta **un algoritmo alla volta**, misurando prima e dopo. Valutazioni di memoria,
+Il fork di rain è già una base solida e sorvegliata. Le due lacune che pesavano
+di più per uno standalone, IPv6 e BitTorrent v2, sono **chiuse** (vedi §12);
+tutto il resto è qualità che si porta **un algoritmo alla volta**, misurando prima e dopo. Valutazioni di memoria,
 da verificare sul codice delle librerie prima di ogni porting.
 
 | Area | gx-torrent (motore gx-core) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
 | Linguaggio, licenza | Go, MIT | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
-| IPv6 | no (decisione §4.3: "No") | sì | sì | sì |
-| BitTorrent v2 / ibridi | v1 e ibridi letti come v1 | sì | sì | sì |
+| IPv6 | sì (dual-stack, DHT BEP 32; niente LSD v6) | sì | sì | sì |
+| BitTorrent v2 / ibridi | sì (v2-only da `.torrent` e magnet, ibridi) | sì | sì | sì |
 | uTP | sì (`anacrolix/utp`) | sì | sì, LEDBAT proprio | sì |
 | Holepunch BEP 55 | sì (fork) | sì | sì | sì |
 | Streaming | finestra + HTTP Range, attesa a polling | Reader con seek e readahead | deadline per pezzo | sì |
 | Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
 | Choking seed | default del motore, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
-| Smart ban (pezzi corrotti) | sì (banna il mittente corrotto) | sì | sì | sì |
-| API compatibile qBittorrent | no | no | — | è il riferimento |
+| Smart ban (pezzi corrotti) | sì (ban di sessione con scadenza) | sì | sì | sì |
+| API compatibile qBittorrent | sì (standalone, `/api/v2`) | no | — | è il riferimento |
 
 ### 11.1 Cosa prendere, in ordine di valore
 
