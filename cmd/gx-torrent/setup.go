@@ -45,6 +45,15 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// The wizard is a first-run step only. Once the setup is complete it must
+	// not be reachable again: otherwise any client that reaches the port could
+	// POST new credentials and take over the daemon (the handler is not behind
+	// the login, unlike every other /ui/* page). Later reconfiguration goes
+	// through the authenticated pages.
+	if d.setupComplete() {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
 	if r.Method != http.MethodPost {
 		d.renderSetup(w, r, "")
 		return

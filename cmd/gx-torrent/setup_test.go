@@ -32,6 +32,40 @@ func TestSetupCompleteDefaults(t *testing.T) {
 	}
 }
 
+func TestSetupNotReusableOnceComplete(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	rec := setupPost(t, d, url.Values{
+		"lang": {"en"}, "user": {"admin"}, "password": {"first"}, "password2": {"first"},
+	})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("first setup: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if !d.loginMatches("admin", "first") {
+		t.Fatal("the first credentials were not stored")
+	}
+	if d.standaloneLocalBypass() {
+		t.Fatal("local-bypass must have been turned off by the first setup")
+	}
+
+	// A second POST must not run the wizard again: no credential overwrite, no
+	// bypass turn-on. It is the takeover the wizard would otherwise allow.
+	rec = setupPost(t, d, url.Values{
+		"lang": {"en"}, "user": {"attacker"}, "password": {"pwned"}, "password2": {"pwned"}, "local-bypass": {"on"},
+	})
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/" {
+		t.Fatalf("the wizard must redirect home once complete: status=%d loc=%q", rec.Code, rec.Header().Get("Location"))
+	}
+	if d.loginMatches("attacker", "pwned") || !d.loginMatches("admin", "first") {
+		t.Fatal("the credentials were overwritten after the setup was complete")
+	}
+	if d.opts.Settings.Get(standaloneUserKey, "") != "admin" {
+		t.Fatalf("auth-user changed to %q", d.opts.Settings.Get(standaloneUserKey, ""))
+	}
+	if d.standaloneLocalBypass() {
+		t.Fatal("local-bypass was turned back on after the setup was complete")
+	}
+}
+
 func TestSetupSavesSettings(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	download := filepath.Join(t.TempDir(), "downloads")
@@ -175,12 +209,14 @@ func TestSetupSavesIndexerAndTemp(t *testing.T) {
 		t.Fatalf("indexers = %q", got)
 	}
 
-	// Invalid values are rejected without completing the setup.
-	rec = setupPost(t, d, url.Values{"lang": {"en"}, "temp-dir": {"relative"}})
+	// Invalid values are rejected without completing the setup. The wizard is
+	// single-use, so this runs on its own fresh daemon.
+	bad := standaloneTestDaemon(t, "", true)
+	rec = setupPost(t, bad, url.Values{"lang": {"en"}, "temp-dir": {"relative"}})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("relative temp folder must be rejected: %d", rec.Code)
 	}
-	rec = setupPost(t, d, url.Values{"lang": {"en"}, "indexer-url": {"ftp://host"}})
+	rec = setupPost(t, bad, url.Values{"lang": {"en"}, "indexer-url": {"ftp://host"}})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("non-http indexer URL must be rejected: %d", rec.Code)
 	}
