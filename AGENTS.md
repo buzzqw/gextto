@@ -44,7 +44,8 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   test da tenere verdi).
 - `third_party/dht` è la copia modificata di `nictuku/dht`.
 - Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
-  miglioramento: **`docs/evoluzione.md`** (§4–§7).
+  miglioramento: **`docs/evoluzione.md`** (§4–§7); evoluzione verso client
+  standalone (gx-nox, binario unico): §14.
 
 ## Build e test
 - `make build` — incrementa `build_number` (committato) e compila
