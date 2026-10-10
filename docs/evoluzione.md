@@ -455,7 +455,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 - **BitTorrent v2-only**: fondamenta fatte (parsing, hash SHA-256, `merkle`,
   validazione `piece layers`); il **download end-to-end** resta il pezzo grande
   (modello file/piece+storage, hash troncato, estensioni `hash request`/`hashes`,
-  abilitazione).
+  abilitazione). Progetto dettagliato in [`gx-torrent-v2.md`](gx-torrent-v2.md).
 - **WebTorrent/WebRTC**: nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
   serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa

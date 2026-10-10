@@ -51,7 +51,10 @@ type Info struct {
 	// V2Files are the files of the BEP 52 "file tree", in tree order. Only set
 	// by NewV2Info.
 	V2Files []V2File
-	pieces  []byte
+	// PieceHashLen is the length in bytes of one piece hash (0 = 20, SHA-1).
+	// It is 32 for a BitTorrent v2 torrent (SHA-256).
+	PieceHashLen uint32
+	pieces       []byte
 }
 
 // File represents a file inside a Torrent.
@@ -379,9 +382,18 @@ func NewInfoBytes(root string, paths []string, private bool, pieceLength uint32,
 
 // PieceHash returns the hash of a piece at index.
 func (i *Info) PieceHash(index uint32) []byte {
-	begin := index * sha1.Size
-	end := begin + sha1.Size
+	n := i.hashLen()
+	begin := index * n
+	end := begin + n
 	return i.pieces[begin:end]
+}
+
+// hashLen is the length of one piece hash: 20 (SHA-1) unless set for v2.
+func (i *Info) hashLen() uint32 {
+	if i.PieceHashLen > 0 {
+		return i.PieceHashLen
+	}
+	return sha1.Size
 }
 
 func findTotalLength(paths []string) (n int64, err error) {
