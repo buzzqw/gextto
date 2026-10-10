@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // openTestI18nDb creates a fresh translation database in a temp directory and
@@ -399,5 +401,56 @@ func TestDictionaryCacheAndInvalidate(t *testing.T) {
 	}
 	if after["Salva"] != "Sichern" {
 		t.Fatalf("cache not invalidated: %q", after["Salva"])
+	}
+}
+
+// TestSeedAppliesTranslationFixesOnlyToUntouchedRows covers the correction of a
+// bundled translation on a database seeded before the fix: the old bundled
+// value is replaced, a value edited by the user is kept.
+func TestSeedAppliesTranslationFixesOnlyToUntouchedRows(t *testing.T) {
+	db, err := OpenI18nDb(filepath.Join(t.TempDir(), "config.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var fixes map[string]map[string][2]string
+	if err := yaml.Unmarshal([]byte(translationFixes), &fixes); err != nil {
+		t.Fatal(err)
+	}
+	var lang, fixedKey, keptKey string
+	var fixedValues [2]string
+	for l, entries := range fixes {
+		for key, values := range entries {
+			if fixedKey == "" {
+				lang, fixedKey, fixedValues = l, key, values
+			} else if keptKey == "" {
+				keptKey = key
+			}
+		}
+		if keptKey != "" {
+			break
+		}
+	}
+	if keptKey == "" {
+		t.Skip("fewer than two fixes in one language")
+	}
+	if err := db.Set(lang, fixedKey, fixedValues[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Set(lang, keptKey, "valore scelto dall'utente"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	dict, err := db.Dictionary(lang)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := dict[fixedKey]; got != fixedValues[1] {
+		t.Fatalf("old bundled value not corrected: %q, want %q", got, fixedValues[1])
+	}
+	if got := dict[keptKey]; got != "valore scelto dall'utente" {
+		t.Fatalf("user translation overwritten: %q", got)
 	}
 }

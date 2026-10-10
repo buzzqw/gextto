@@ -320,7 +320,7 @@ func TestV2DuplicatesPanelRendersOOBToast(t *testing.T) {
 		t.Fatalf("render: %v", err)
 	}
 	out := buffer.String()
-	for _, want := range []string{`hx-swap-oob="innerHTML"`, "Trovati 1 duplicati inferiori", "480 (migliore 1080)"} {
+	for _, want := range []string{`hx-swap-oob="innerHTML"`, "Trovati 1 duplicati inferiori", "480 (<span>migliore</span> 1080)"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("panel missing %q: %s", want, out)
 		}

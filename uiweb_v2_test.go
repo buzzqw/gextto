@@ -1116,7 +1116,7 @@ func TestV2LogsSelectorReadsChosenFile(t *testing.T) {
 	for _, want := range []string{
 		`name="log"`,
 		`value="gextto.log" selected`,
-		`gextto.log (attivo)`,
+		`gextto.log (<span>attivo</span>)`,
 		`value="gextto.log.1"`,
 	} {
 		if !strings.Contains(page, want) {
@@ -1155,7 +1155,7 @@ func TestV2MaintenanceGxTorrentLog(t *testing.T) {
 		"Log gx-torrent",
 		"GX-ACTIVE-MARKER",
 		`value="gx-torrent.log" selected`,
-		"gx-torrent.log (attivo)",
+		"gx-torrent.log (<span>attivo</span>)",
 		`hx-get="/maintenance/gx-torrent/log"`,
 	} {
 		if !strings.Contains(page, want) {

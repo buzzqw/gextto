@@ -147,7 +147,7 @@ func TestV2SetupTvdbKeyWithoutTmdb(t *testing.T) {
 		t.Fatalf("tvdb key not stored: %v", key)
 	}
 	code, body := v2Request(t, server, http.MethodGet, "/?view=setup&step=4", nil)
-	if code != http.StatusOK || !strings.Contains(body, "Cerca su TVDB") {
+	if code != http.StatusOK || !strings.Contains(body, "<span>Cerca su</span> TVDB") {
 		t.Fatalf("step 4 without TMDB -> %d, missing the TVDB search", code)
 	}
 

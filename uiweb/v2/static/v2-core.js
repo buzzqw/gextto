@@ -12,6 +12,13 @@
 
   // t() reads the server-injected dictionary (window.__v2i18n); unknown keys fall back to Italian.
   function t(key) { var d = window.__v2i18n; return (d && d[key]) || key; }
+  // th() is t() escaped for markup built with innerHTML: a translation is data
+  // and must never become HTML.
+  function th(key) {
+    return t(key).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
 
   var doc = document.documentElement;
 
@@ -495,13 +502,13 @@
     filter.disabled = false;
     filter.value = "";
     status.textContent = t("Ricerca nell’archivio…");
-    panel.querySelector("[data-v2-search-body]").innerHTML = '<tr><td class="muted" colspan="4">Ricerca nell’archivio…</td></tr>';
+    panel.querySelector("[data-v2-search-body]").innerHTML = '<tr><td class="muted" colspan="4">' + th("Ricerca nell’archivio…") + '</td></tr>';
     var fullDone = false;
     dashboardSearchRequest("/api/search/archive", query).then(function (data) {
       if (token !== dashboardSearchToken || fullDone) return;
       var results = data.results || [];
       renderDashboardSearchResults(panel, results);
-      status.textContent = t("Archivio: ") + results.length + " · ricerca RSS, indexer e web in corso…";
+      status.textContent = t("Archivio: ") + results.length + " · " + t("ricerca RSS, indexer e web in corso…");
     }).catch(function () {});
     dashboardSearchRequest("/api/search/dashboard", query).then(function (data) {
       if (token !== dashboardSearchToken) return;
@@ -576,7 +583,7 @@
     var overlay = document.createElement("div");
     overlay.id = "v2-browse-overlay";
     overlay.className = "overlay";
-    overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">' + t("Sfoglia cartelle") + '</h3><button class="btn sm" type="button" data-v2-browse-close>' + t("Chiudi") + '</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="' + t("Vai alla cartella superiore") + '">\u2191 ' + t("Su") + '</button><input class="input mono" type="text" data-v2-browse-path aria-label="' + t("Percorso corrente") + '" title="' + t("Modifica il percorso e premi Invio per navigare") + '" /><button class="btn sm primary" type="button" data-v2-browse-select title="' + t("Usa questa cartella") + '">' + t("Seleziona") + '</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="' + t("Crea una nuova cartella dentro quella corrente") + '">' + t("Crea cartella") + '</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="' + t("Nome nuova cartella") + '" placeholder="' + t("Nuova cartella") + '" title="' + t("Nome della nuova cartella") + '" /><button class="btn sm primary" type="button" data-v2-browse-create title="' + t("Crea la cartella e selezionala") + '">' + t("Crea e usa") + '</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
+    overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">' + th("Sfoglia cartelle") + '</h3><button class="btn sm" type="button" data-v2-browse-close>' + th("Chiudi") + '</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="' + th("Vai alla cartella superiore") + '">\u2191 ' + th("Su") + '</button><input class="input mono" type="text" data-v2-browse-path aria-label="' + th("Percorso corrente") + '" title="' + th("Modifica il percorso e premi Invio per navigare") + '" /><button class="btn sm primary" type="button" data-v2-browse-select title="' + th("Usa questa cartella") + '">' + th("Seleziona") + '</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="' + th("Crea una nuova cartella dentro quella corrente") + '">' + th("Crea cartella") + '</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="' + th("Nome nuova cartella") + '" placeholder="' + th("Nuova cartella") + '" title="' + th("Nome della nuova cartella") + '" /><button class="btn sm primary" type="button" data-v2-browse-create title="' + th("Crea la cartella e selezionala") + '">' + th("Crea e usa") + '</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
     document.body.appendChild(overlay);
     overlay._target = input;
     overlay._current = String(input.value || "").trim();
@@ -1105,15 +1112,15 @@
     fontOverlay.hidden = true;
     fontOverlay.innerHTML =
       '<div class="modal font-modal" role="dialog" aria-modal="true" aria-labelledby="v2-font-title">' +
-      '<div class="modal-head"><h3 id="v2-font-title">Tipo di carattere</h3>' +
-      '<button class="btn sm" type="button" data-font-close>Chiudi</button></div>' +
+      '<div class="modal-head"><h3 id="v2-font-title">' + th("Tipo di carattere") + '</h3>' +
+      '<button class="btn sm" type="button" data-font-close>' + th("Chiudi") + '</button></div>' +
       '<div class="modal-body">' +
-      '<p class="setting-hint">Scegli un font predisposto o rileva quelli installati. La scelta vale solo in questo browser.</p>' +
-      '<label class="field"><span>Font dell\u2019interfaccia</span><select class="input" data-font-family></select></label>' +
-      '<div class="toolbar" style="margin-top:10px"><button class="btn" type="button" data-font-detect>Rileva font installati</button>' +
+      '<p class="setting-hint">' + th("Scegli un font predisposto o rileva quelli installati. La scelta vale solo in questo browser.") + '</p>' +
+      '<label class="field"><span>' + th("Font dell’interfaccia") + '</span><select class="input" data-font-family></select></label>' +
+      '<div class="toolbar" style="margin-top:10px"><button class="btn" type="button" data-font-detect>' + th("Rileva font installati") + '</button>' +
       '<span class="font-detect-status muted" data-font-status></span></div>' +
-      '<div class="toolbar" style="margin-top:10px"><input class="input" type="text" data-font-custom maxlength="160" placeholder="es. Noto Sans" />' +
-      '<button class="btn" type="button" data-font-apply-custom>Applica</button></div>' +
+      '<div class="toolbar" style="margin-top:10px"><input class="input" type="text" data-font-custom maxlength="160" placeholder="' + th("es. Noto Sans") + '" />' +
+      '<button class="btn" type="button" data-font-apply-custom>' + th("Applica") + '</button></div>' +
       '</div></div>';
     document.body.appendChild(fontOverlay);
 
@@ -1124,7 +1131,7 @@
       node.textContent = label;
       select.appendChild(node);
     }
-    option("system", "Sistema");
+    option("system", t("Sistema"));
     option("sans", "Sans-serif");
     option("serif", "Serif");
     option("mono", "Monospace");
@@ -1165,7 +1172,7 @@
         });
         Object.keys(families).sort(function (a, b) { return families[a].localeCompare(families[b]); })
           .forEach(function (key) { addFamily(families[key]); });
-        if (status) status.textContent = Object.keys(families).length + " font rilevati.";
+        if (status) status.textContent = Object.keys(families).length + " " + t("font rilevati.");
       }).catch(function (error) {
         if (status) status.textContent = error && error.name === "NotAllowedError" ? t("Accesso ai font non autorizzato.") : t("Rilevamento non riuscito.");
       }).then(function () { event.currentTarget.disabled = false; });

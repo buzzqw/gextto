@@ -69,6 +69,13 @@ var v2ClientKeys = []string{
 	"Tema scuro",
 	"Testo ",
 	"Tipo di carattere",
+	"Scegli un font predisposto o rileva quelli installati. La scelta vale solo in questo browser.",
+	"Font dell’interfaccia",
+	"Rileva font installati",
+	"es. Noto Sans",
+	"Applica",
+	"Sistema",
+	"font rilevati.",
 	"⏸ Ferma scorrimento",
 	"▶ Segui ultime righe",
 }

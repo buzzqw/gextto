@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -30,6 +31,12 @@ var defaultSpanishTranslations string
 
 //go:embed internal_translations_pl.yml
 var defaultPolishTranslations string
+
+// translationFixes lists corrections to bundled values as {lang: {key: [old,
+// new]}}: see applyTranslationFixes.
+//
+//go:embed internal_translations_fixes.yml
+var translationFixes string
 
 // I18nDb is the persisted interface-translation database. It shares the
 // `gextto_config.db` schema with the daemon.
@@ -58,8 +65,8 @@ func (d *I18nDb) TranslationsGeneration() uint64 {
 func (d *I18nDb) invalidateCache() {
 	d.mu.Lock()
 	d.cache = nil
-	d.mu.Unlock()
 	d.gen.Add(1)
+	d.mu.Unlock()
 }
 
 // Dictionary returns the {key: value} map for a language, building and caching
@@ -75,6 +82,10 @@ func (d *I18nDb) Dictionary(lang string) (map[string]string, error) {
 	if ok {
 		return cached, nil
 	}
+	// A write between the read below and the store would leave a stale
+	// dictionary cached until the next write: remember the generation and
+	// cache the result only if no write happened meanwhile.
+	gen := d.gen.Load()
 	items, err := d.List(lang)
 	if err != nil {
 		return nil, err
@@ -85,11 +96,25 @@ func (d *I18nDb) Dictionary(lang string) (map[string]string, error) {
 			dict[item.Key] = item.Value
 		}
 	}
-	d.mu.Lock()
-	if d.cache == nil {
-		d.cache = map[string]map[string]string{}
+	// The renderer looks up the trimmed text of a node, so a key saved with
+	// surrounding spaces ("Prossimo ciclo: ") would never match: index it by
+	// its trimmed form too, unless that form has its own translation.
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item.Key)
+		if trimmed == item.Key || trimmed == "" || item.Value == "" {
+			continue
+		}
+		if _, exists := dict[trimmed]; !exists {
+			dict[trimmed] = strings.TrimSpace(item.Value)
+		}
 	}
-	d.cache[storage] = dict
+	d.mu.Lock()
+	if d.gen.Load() == gen {
+		if d.cache == nil {
+			d.cache = map[string]map[string]string{}
+		}
+		d.cache[storage] = dict
+	}
 	d.mu.Unlock()
 	return dict, nil
 }
@@ -320,7 +345,44 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 			}
 		}
 	}
-	return inserted, nil
+	fixed, err := i.applyTranslationFixes()
+	if err != nil {
+		return inserted, err
+	}
+	return inserted + fixed, nil
+}
+
+// applyTranslationFixes brings corrected bundled translations to databases
+// seeded before the fix. INSERT OR IGNORE keeps the old row, so each fix
+// updates the row only while it still holds exactly the old bundled value:
+// a translation edited by the user is left alone.
+func (i *I18nDb) applyTranslationFixes() (int, error) {
+	var fixes map[string]map[string][2]string
+	if err := yaml.Unmarshal([]byte(translationFixes), &fixes); err != nil {
+		return 0, fmt.Errorf("parse translation fixes: %w", err)
+	}
+	tx, err := i.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin translation fixes: %w", err)
+	}
+	fixed := 0
+	for lang, entries := range fixes {
+		storage := storageLanguage(lang)
+		for key, values := range entries {
+			res, err := tx.Exec("UPDATE translations SET value=?1 WHERE lang=?2 AND key=?3 AND value=?4", values[1], storage, key, values[0])
+			if err != nil {
+				_ = tx.Rollback()
+				return fixed, err
+			}
+			affected, err := res.RowsAffected()
+			if err != nil {
+				_ = tx.Rollback()
+				return fixed, err
+			}
+			fixed += int(affected)
+		}
+	}
+	return fixed, tx.Commit()
 }
 
 // DeleteLang removes every translation row for a language. It returns how many

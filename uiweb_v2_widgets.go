@@ -321,7 +321,7 @@ func v2RamdiskViewFrom(s *AppState, r *http.Request) v2RamdiskView {
 			view.Message = v2JSONError(raw)
 		} else {
 			view = v2RamdiskState(s)
-			view.Message = "RAM disk selezionato: " + path
+			view.Message = uiText(s, "RAM disk selezionato:") + " " + path
 		}
 	}
 	return view

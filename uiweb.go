@@ -429,7 +429,7 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	}
 	data := uiHealthData{
 		Health:        health,
-		StatusReason:  healthStatusReason(health),
+		StatusReason:  healthStatusReasonIn(health, func(text string) string { return uiText(s, text) }),
 		DiskUsedPct:   usedPct,
 		Uptime:        logging.HumanDuration(saturatingInt64(health.UptimeSeconds)),
 		ProcessUptime: logging.HumanDuration(saturatingInt64(health.ProcessUptimeSeconds)),
@@ -525,15 +525,22 @@ func uiCycleWhen(cycle models.CycleHistoryEntry, now time.Time) string {
 // healthStatusReason explains a non-ok health status (or lists the missing
 // paths) so the Salute page does not show a bare "degraded".
 func healthStatusReason(health Health) string {
+	return healthStatusReasonIn(health, func(text string) string { return text })
+}
+
+// healthStatusReasonIn builds the reason with each fixed fragment passed
+// through tr, so the web UI can show it in the interface language (the whole
+// sentence carries path labels and can never match a catalog key).
+func healthStatusReasonIn(health Health, tr func(string) string) string {
 	problems := []string{}
 	if !health.DataDirWritable {
-		problems = append(problems, "cartella dati non scrivibile")
+		problems = append(problems, tr("cartella dati non scrivibile"))
 	}
 	for _, path := range health.Paths {
 		if !path.Exists {
-			problems = append(problems, path.Label+" assente")
+			problems = append(problems, path.Label+" "+tr("assente"))
 		} else if !path.Writable {
-			problems = append(problems, path.Label+" non scrivibile")
+			problems = append(problems, path.Label+" "+tr("non scrivibile"))
 		}
 	}
 	return strings.Join(problems, "; ")
@@ -558,7 +565,7 @@ func uiHealthStatusTileFrom(s *AppState) uiHealthData {
 		DataDirWritable: writable,
 		Paths:           path_checks(paths),
 	}
-	return uiHealthData{Health: health, StatusReason: healthStatusReason(health)}
+	return uiHealthData{Health: health, StatusReason: healthStatusReasonIn(health, func(text string) string { return uiText(s, text) })}
 }
 
 // uiHealthMemoryTileFrom builds the Memoria processo tile.

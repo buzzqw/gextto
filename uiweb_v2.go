@@ -40,6 +40,7 @@ import (
 	xhtml "golang.org/x/net/html"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/messages"
 	"github.com/buzzqw/gextto/internal/models"
 )
 
@@ -590,7 +591,7 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 	body, content := v2Content(s, r, view)
 	cfg := latestConfig(s)
 	page := v2ShellData{
-		Title:    v2PageLabel(view),
+		Title:    uiText(s, v2PageLabel(view)),
 		Page:     view,
 		Groups:   v2NavGroups(view, uiNavCounts(s, cfg)),
 		Content:  content,
@@ -639,18 +640,21 @@ func V2ChromeSSE(w http.ResponseWriter, r *http.Request, s *AppState) {
 			return
 		case <-tick.C:
 			chrome := uiShellChromeFrom(s)
+			// The live chrome goes through the same translation as the page;
+			// otherwise every update would put the Italian labels back.
+			dict, eng := v2Dictionaries(s)
 
 			var topBuf bytes.Buffer
 			v2Templates.ExecuteTemplate(&topBuf, "v2_live_top_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(topBuf.String(), "\n", ""))
+			fmt.Fprintf(w, "event: chrome-top\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(topBuf.String(), dict, eng), "\n", ""))
 
 			var mobBuf bytes.Buffer
 			v2Templates.ExecuteTemplate(&mobBuf, "v2_live_mobile_metrics", chrome)
-			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(mobBuf.String(), "\n", ""))
+			fmt.Fprintf(w, "event: chrome-mobile\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(mobBuf.String(), dict, eng), "\n", ""))
 
 			var statBuf bytes.Buffer
 			v2Templates.ExecuteTemplate(&statBuf, "v2_live_status", chrome)
-			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(statBuf.String(), "\n", ""))
+			fmt.Fprintf(w, "event: chrome-status\ndata: %s\n\n", strings.ReplaceAll(v2TranslateHTML(statBuf.String(), dict, eng), "\n", ""))
 
 			flusher.Flush()
 		}
@@ -700,7 +704,11 @@ func V2SetLanguage(w http.ResponseWriter, r *http.Request, s *AppState) {
 	lang := strings.TrimSpace(r.FormValue("lang"))
 	switch lang {
 	case "it", "en", "de", "fr", "es", "pl":
-		_ = s.i18n.SetLanguage(lang)
+		if err := s.i18n.SetLanguage(lang); err == nil {
+			// Keep notifications and backend messages in the same language,
+			// like the JSON endpoint does.
+			messages.SetLanguage(lang)
+		}
 	}
 	target := r.Header.Get("Referer")
 	if target == "" {
@@ -846,9 +854,10 @@ func v2TranslateText(value string, dict, eng map[string]string) string {
 }
 
 func v2TranslatableAttr(name string) bool {
-	// "label" names the <optgroup> areas of the settings section picker.
+	// "label" names the <optgroup> areas of the settings section picker;
+	// hx-confirm and the toast attributes are shown to the user as they are.
 	switch name {
-	case "title", "placeholder", "aria-label", "label":
+	case "title", "placeholder", "aria-label", "label", "hx-confirm", "data-v2-toast-title", "data-v2-toast-message":
 		return true
 	}
 	return false

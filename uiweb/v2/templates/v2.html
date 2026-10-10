@@ -162,8 +162,8 @@
   <a class="ms-chip ms-state" href="/?view=health" title="Stato del servizio"><span class="pulse"></span>{{.Status}}</a>
   {{if .DryRun}}<a class="ms-chip warn" href="/?view=settings" title="Modalità prova: non viene scaricato nulla">DRY-RUN</a>{{end}}
   <a class="ms-chip" href="/?view=downloads" title="Velocità di download e upload">↓ {{.Download}} · ↑ {{.Upload}}</a>
-  {{if .Transferring}}<a class="ms-chip" href="/?view=downloads">⬇ {{.Transferring}} in download</a>{{end}}
-  {{if .Stuck}}<a class="ms-chip warn" href="/?view=downloads" title="Download fermi: apri Scarico per i dettagli">⏸ {{.Stuck}} bloccati</a>{{end}}
+  {{if .Transferring}}<a class="ms-chip" href="/?view=downloads">⬇ {{.Transferring}} <span>in download</span></a>{{end}}
+  {{if .Stuck}}<a class="ms-chip warn" href="/?view=downloads" title="Download fermi: apri Scarico per i dettagli">⏸ {{.Stuck}} <span>bloccati</span></a>{{end}}
   <a class="ms-chip warn" href="/?view=logs&amp;level=problems" data-ms-problems hidden>⚠ <span data-ms-problems-count>0</span> nuovi avvisi</a>
 </div>
 {{end}}
@@ -198,8 +198,8 @@
     <div class="panel-body session-strip">
       <strong class="session-strip-title">In sessione</strong>
       <span>↓ {{rate .DownloadRate}} · ↑ {{rate .UploadRate}}</span>
-      <span>{{.Downloading}} in scarico · {{.Idle}} fermi a 0 B/s · {{.Seeding}} in seed{{if or .Paused .Errors}} · {{.Paused}} in pausa · {{.Errors}} in errore{{end}}</span>
-      <span class="muted">Banda 30 giorni {{bytes .Consumption.Last30}}</span>
+      <span>{{.Downloading}} <span>in scarico</span> · {{.Idle}} <span>fermi a 0 B/s</span> · {{.Seeding}} <span>in seed</span>{{if or .Paused .Errors}} · {{.Paused}} <span>in pausa</span> · {{.Errors}} <span>in errore</span>{{end}}</span>
+      <span class="muted"><span>Banda 30 giorni</span> {{bytes .Consumption.Last30}}</span>
       <a class="btn sm" href="/?view=downloads">Vai a Scarico</a>
     </div>
   </div>
@@ -226,7 +226,7 @@
       </div>
       <div class="row"><span>Prossima esecuzione</span><strong>{{if .NextCycle}}{{.NextCycle}}{{else}}non programmata{{end}}</strong></div>
       <div class="row"><span>Intervallo</span><strong>{{if .CycleInterval}}{{.CycleInterval}}{{else}}—{{end}}</strong></div>
-      <div class="row"><span>Ultimo ciclo</span><strong>{{.CycleStarted}} avviati · {{.CycleErrors}} errori · {{.CycleGaps}} gap</strong></div>
+      <div class="row"><span>Ultimo ciclo</span><strong>{{.CycleStarted}} <span>avviati</span> · {{.CycleErrors}} <span>errori</span> · {{.CycleGaps}} <span>gap</span></strong></div>
       <div class="toolbar dashboard-cycle-foot">
         <form method="post" action="/dashboard/backup" hx-post="/dashboard/backup" hx-target="#v2-toast-region" hx-swap="innerHTML" style="display:inline"><button class="btn sm" type="submit" title="Crea uno snapshot di backup dei database">Backup</button></form>
         <a class="btn sm" href="/?view=settings">Configurazione</a>
@@ -355,7 +355,7 @@
     </div>
   </details>
   <div class="panel session-panel">
-    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span></h3><span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span><div class="toolbar head-limits">
+    <div class="panel-head"><h3>Download in sessione <span class="session-count" id="v2-session-count">{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span></h3><span id="v2-temp-badge">{{template "v2_temp_badge" .}}</span><div class="toolbar head-limits">
        <label class="field inline-field" title="Limite temporaneo di download in KiB/s; 0 significa illimitato"><span>DL</span><input id="v2-temp-dl" class="input compact" type="number" min="0" name="download_kib" value="{{.TempDL}}" hx-preserve="true" /></label>
        <label class="field inline-field" title="Limite temporaneo di upload in KiB/s; 0 significa illimitato"><span>UL</span><input id="v2-temp-ul" class="input compact" type="number" min="0" name="upload_kib" value="{{.TempUL}}" hx-preserve="true" /></label>
        <label class="field inline-field" title="Durata del limite temporaneo in minuti; 0 per mantenerlo fino a rimozione manuale"><span>min</span><input id="v2-temp-minutes" class="input compact" type="number" min="0" name="minutes" value="{{.TempMinutes}}" hx-preserve="true" /></label>
@@ -369,7 +369,7 @@
 </div>
 {{end}}
 
-{{define "v2_temp_badge"}}{{if .TempActive}}<span class="badge ok" title="Limite temporaneo attivo{{if .TempMinutes}} (ancora circa {{.TempMinutes}} min){{else}} (fino a rimozione manuale){{end}}">⚡ {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(perm.){{end}}</span>{{else if .SchedActive}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{end}}
+{{define "v2_temp_badge"}}{{if .TempActive}}<span class="badge ok" {{if .TempMinutes}}title="Limite temporaneo attivo: scade dopo i minuti indicati"{{else}}title="Limite temporaneo attivo fino a rimozione manuale"{{end}}>⚡ {{if .TempMinutes}}({{ .TempMinutes }}m){{else}}(<span>perm.</span>){{end}}</span>{{else if .SchedActive}}<span class="badge warn" title="Programmazione oraria della banda attiva: {{.SchedDL}} KiB/s DL · {{.SchedUL}} KiB/s UL">⏰ {{.SchedDL}}/{{.SchedUL}}</span>{{else}}<span class="badge" title="Limiti standard: {{.BaseDL}} KiB/s DL · {{.BaseUL}} KiB/s UL">{{.BaseDL}}/{{.BaseUL}}</span>{{end}}{{end}}
 
 {{define "v2_torrents_wrap"}}
 <div id="v2-torrents-wrap">
@@ -377,7 +377,7 @@
         hx-post="/downloads/table" hx-target="#v2-torrents-wrap" hx-swap="outerHTML"
          hx-trigger="submit, input changed delay:300ms from:#v2-filter, change from:#v2-tag-filter{{if .Auto}}, every 5s{{end}}">
     {{/* Live counter for the panel head (outside the refreshed fragment). */}}
-    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · aggiornato {{.UpdatedAt}}</span>
+    <span id="v2-session-count" hx-swap-oob="innerHTML" hidden>{{.Count}} torrent · {{len .HTTPDownloads}} HTTP · <span>aggiornato</span> {{.UpdatedAt}}</span>
     <label class="mobile-torrent-sort"><span>Ordina per</span><select id="v2-sort" class="input compact" name="sort" aria-label="Ordina i torrent" onchange="this.form.requestSubmit()">{{range .Columns}}<option value="{{.Key}}"{{if eq $.Sort .Key}} selected{{end}}>{{.Label}}</option>{{end}}</select><button class="btn sm" type="submit" name="sort_click" value="{{.Sort}}" title="Inverti la direzione dell'ordinamento">{{if eq .Dir "desc"}}↓{{else}}↑{{end}}</button></label>
     <input type="hidden" name="dir" value="{{.Dir}}">
     <input type="hidden" name="auto_state" value="{{if .Auto}}1{{else}}0{{end}}">
@@ -394,7 +394,7 @@
     </div>
      <div class="toolbar download-bulk-toolbar">
        <label class="check" title="Seleziona o deseleziona tutti i torrent su cui applicare le azioni"><input type="checkbox" data-v2-select-all aria-label="Seleziona tutti i torrent" /> <span>Seleziona tutti</span></label>
-      <span class="muted" data-v2-selected-count>0 selezionati · Azioni:</span>
+      <span class="muted" data-v2-selected-count>0 <span>selezionati · Azioni:</span></span>
        <button class="btn sm" type="submit" name="bulk" value="pause" title="Metti in pausa i torrent selezionati">Pausa</button>
        <button class="btn sm" type="submit" name="bulk" value="resume" title="Riprendi i torrent selezionati">Riprendi</button>
        <button class="btn sm" type="submit" name="bulk" value="recheck" title="Forza la verifica dei dati dei torrent selezionati">Recheck</button>
@@ -428,7 +428,7 @@
               <span class="truncate" title="{{.Name}}">{{.Name}}</span>
               {{if .Archived}}<span class="badge ok" title="Copia archiviata presente">NAS</span>{{end}}
               {{if .SeedInfinite}}<span class="badge warn" title="Seed senza limiti">seed ∞</span>{{end}}
-              {{if or .Reason .Source}}<small class="origin muted">Perché: {{if .Reason}}{{.Reason}}{{else}}—{{end}} · Fonte: {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
+              {{if or .Reason .Source}}<small class="origin muted"><span>Perché:</span> {{if .Reason}}{{.Reason}}{{else}}—{{end}} · <span>Fonte:</span> {{if .Source}}{{.Source}}{{else}}—{{end}}</small>{{end}}
               {{if .Tags}}<span class="tag-chips">{{range .Tags}}<span class="tag-chip">{{.}}</span>{{end}}</span>{{end}}
             </td>
              <td class="torrent-state"><span class="badge {{.StateClass}}">{{.State}}</span></td>
@@ -540,7 +540,7 @@
 {{else if eq .Tab "pieces"}}
   {{if .TabError}}<p class="alert">{{.TabError}}</p>{{end}}
   {{if .PiecesReady}}
-    <p class="hint">{{.PiecesDone}}/{{.PieceCount}} pezzi scaricati. Verde: scaricato, giallo: in corso, grigio: mancante, spento: saltato; passa il mouse su una cella per l'intervallo.</p>
+    <p class="hint">{{.PiecesDone}}/{{.PieceCount}} <span>pezzi scaricati.</span> <span>Verde: scaricato, giallo: in corso, grigio: mancante, spento: saltato; passa il mouse su una cella per l'intervallo.</span></p>
     <div class="piece-map" role="img" aria-label="Mappa dei pezzi: {{.PiecesDone}} su {{.PieceCount}} scaricati">
       {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}scaricato{{else if eq .State "downloading"}}in corso{{else if eq .State "skipped"}}saltato{{else}}mancante{{end}} · pezzi {{.Begin}}–{{.End}}"></span>{{end}}
     </div>
@@ -838,7 +838,7 @@
   {{if .Notice}}<p class="{{if .Error}}error{{else}}muted{{end}}" role="status">{{.Notice}}</p>{{end}}
   {{if or .Query .Filters}}
     {{if .Total}}
-    <p class="muted">{{.Total}} risultati{{if .Query}} per “{{.Query}}”{{end}}{{if .Filters}} corrispondenti ai pre-filtri selezionati{{end}}. Mostro i primi {{len .Items}}.</p>
+    <p class="muted">{{.Total}} <span>risultati</span>{{if .Query}} <span>per la ricerca</span> “{{.Query}}”{{end}}{{if .Filters}} <span>corrispondenti ai pre-filtri selezionati</span>{{end}}. <span>Mostro i primi</span> {{len .Items}}.</p>
     <form method="post" action="/settings/content-archive/delete" hx-post="/settings/content-archive/delete" hx-target="#v2-content-archive-results" hx-swap="innerHTML">
       <input type="hidden" name="q" value="{{.Query}}" />
       {{range .Filters}}<input type="hidden" name="filter" value="{{.}}" />{{end}}
@@ -861,7 +861,7 @@
       </div>
     </form>
     {{else}}
-    <p class="muted">Nessun risultato{{if .Query}} per “{{.Query}}”{{end}}{{if .Filters}} con i pre-filtri selezionati{{end}}.</p>
+    <p class="muted"><span>Nessun risultato</span>{{if .Query}} <span>per la ricerca</span> “{{.Query}}”{{end}}{{if .Filters}} <span>con i pre-filtri selezionati</span>{{end}}.</p>
     {{end}}
   {{end}}
 {{end}}
@@ -1008,7 +1008,7 @@
 {{if .Matches}}
 <table class="data-table"><caption class="sr-only">Risultati della ricerca impostazioni</caption><thead><tr><th scope="col">Impostazione</th><th scope="col">Chiave</th><th scope="col">Sezione</th></tr></thead>
 <tbody>{{range .Matches}}<tr><td><a href="/?view=settings&amp;tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}#v2-setting-{{.Key}}{{end}}" hx-get="/settings/body?tab={{.Tab}}{{if .Key}}&amp;highlight={{.Key}}{{end}}" hx-target="#v2-settings-body" hx-swap="outerHTML">{{.Label}}</a></td><td>{{if .Key}}<code>{{.Key}}</code>{{end}}</td><td>{{.TabLabel}}</td></tr>{{end}}</tbody></table>
-{{else}}<p class="muted">Nessuna impostazione corrisponde a «{{.Query}}».</p>{{end}}
+{{else}}<p class="muted"><span>Nessuna impostazione corrisponde a</span> «{{.Query}}».</p>{{end}}
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -1026,7 +1026,7 @@
   <div class="grid-2">
     <div class="panel">
       <div class="panel-head"><h3>Percorsi</h3></div>
-      <div class="panel-body">{{range .Health.Paths}}<div class="row"><span>{{.Label}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · {{if .Exists}}presente{{else}}assente{{end}} · {{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></div>{{end}}</div>
+      <div class="panel-body">{{range .Health.Paths}}<div class="row"><span>{{.Label}}</span><span class="muted truncate" title="{{.Path}}">{{.Path}} · <span>{{if .Exists}}presente{{else}}assente{{end}}</span> · <span>{{if .Writable}}scrivibile{{else}}non scrivibile{{end}}</span></span></div>{{end}}</div>
     </div>
     <div class="panel">
       <div class="panel-head"><h3>Dischi</h3></div>
@@ -1081,7 +1081,7 @@
 {{end}}
 
 {{define "v2_health_tile_disk"}}
-<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} usato</strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} liberi</small></div>
+<div class="metric" id="v2-health-tile-disk" hx-get="/partial/health/tile?name=disk" hx-trigger="every 3600s" hx-swap="outerHTML"><span class="metric-sub">Disco dati</span><strong>{{.DiskUsedPct}} <span>usato</span></strong><small class="muted">{{bytesU .Health.DiskFreeBytes}} <span>liberi</span></small></div>
 {{end}}
 
 {{/* Motore torrent: stato del motore attivo, aggiornato ogni 15 s. */}}
@@ -1096,7 +1096,7 @@
 {{end}}
 
 {{define "v2_health_tile_uptime"}}
-<div class="metric" id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted">sistema {{.Uptime}}</small></div>
+<div class="metric" id="v2-health-tile-uptime" hx-get="/partial/health/tile?name=uptime" hx-trigger="every 5s" hx-swap="outerHTML"><span class="metric-sub">Uptime Gextto</span><strong>{{.ProcessUptime}}</strong><small class="muted"><span>sistema</span> {{.Uptime}}</small></div>
 {{end}}
 
 {{/* ------------------------------------------------------------------ */}}
@@ -1126,7 +1126,7 @@
          <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
          <button class="btn sm" type="button" data-v2-logs-copy title="Copia le righe di log visibili o la selezione negli appunti">📋 Copia</button>
          <select class="input" name="log" aria-label="File di log" title="Scegli quale file di log leggere; il primo è quello attivo">
-          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (attivo){{end}}</option>{{end}}
+          {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (<span>attivo</span>){{end}}</option>{{end}}
          </select>
       </form>
       {{template "v2_logs_view" .}}
@@ -1159,7 +1159,7 @@
       </select>
       <button class="btn sm primary" type="submit" title="Aggiorna le righe del log">Aggiorna</button>
       <select class="input" name="log" aria-label="File di log gx-torrent" title="Scegli quale file di log leggere; il primo è quello attivo">
-        {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (attivo){{end}}</option>{{end}}
+        {{range .LogFiles}}<option value="{{.}}"{{if eq . $.Log}} selected{{end}}>{{.}}{{if eq . $.ActiveLog}} (<span>attivo</span>){{end}}</option>{{end}}
       </select>
     </form>
     {{template "v2_gx_log_view" .}}
@@ -1269,7 +1269,7 @@
 {{define "v2_table_panel"}}
 <div class="view">
   <div class="panel" id="v2-table-panel-{{.View}}">
-    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} voci</small></div>
+    <div class="panel-head"><h3>{{.Title}}</h3><small class="muted">{{.Total}} <span>voci</span></small></div>
     <div class="panel-body">
       {{if .Note}}<p class="hint">{{.Note}}</p>{{end}}
       {{if or .Search .Filter .Refresh}}<form class="toolbar" hx-get="/table?view={{.View}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML" hx-trigger="{{if eq .BaseView "archive"}}submit, input[window.gexttoArchiveLiveAllowed && window.gexttoArchiveLiveAllowed(this, event)] changed delay:300ms{{else}}submit, input changed delay:300ms{{end}}" hx-indicator="#v2-table-panel-{{.View}} .archive-indicator">
@@ -1323,7 +1323,7 @@
   {{if gt .Pages 1}}
   <div class="table-pagination">
     <button class="btn sm" type="button"{{if le .Page 1}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Prev}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">‹ Precedente</button>
-    <span class="page-label">Pagina {{.Page}} di {{.Pages}} · {{.Total}} voci</span>
+    <span class="page-label"><span>Pagina</span> {{.Page}}/{{.Pages}} · {{.Total}} <span>voci</span></span>
     <button class="btn sm" type="button"{{if ge .Page .Pages}} disabled{{end}} hx-get="/table?view={{.View}}&amp;page={{.Next}}&amp;q={{.Query}}&amp;f={{.FilterQuery}}&amp;sort={{.Sort}}&amp;dir={{.Dir}}{{if .WebSearch}}&amp;web=1{{end}}" hx-target="#v2-table-body-{{.View}}" hx-swap="outerHTML">Successiva ›</button>
   </div>
   {{end}}
@@ -1531,12 +1531,12 @@
       </form>
       {{if .Message}}<small class="htx-status {{if .Error}}err{{else}}ok{{end}}">{{.Message}}</small>{{end}}
     </div>
-    {{if .Executed}}{{if not .Error}}<p class="muted">Rimossi {{.Removed}} file.</p>{{end}}
+    {{if .Executed}}{{if not .Error}}<p class="muted"><span>Rimossi</span> {{.Removed}} <span>file.</span></p>{{end}}
     {{else if .Items}}
     <div class="table-wrap"><table class="data-table">
       <caption class="sr-only">Duplicati video</caption>
       <thead><tr><th scope="col">Serie</th><th scope="col">Stagione</th><th scope="col">Episodio</th><th scope="col">File</th><th scope="col">Risoluzione</th></tr></thead>
-      <tbody>{{range .Items}}<tr><td>{{.Series}}</td><td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td><td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{.ResolutionRank}} (migliore {{.BestRank}})</td></tr>{{end}}</tbody>
+      <tbody>{{range .Items}}<tr><td>{{.Series}}</td><td class="numeric">{{.Season}}</td><td class="numeric">{{.Episode}}</td><td class="truncate" title="{{.Path}}">{{.Path}}</td><td>{{.ResolutionRank}} (<span>migliore</span> {{.BestRank}})</td></tr>{{end}}</tbody>
     </table></div>
     {{else if .Scanned}}<p class="muted">Nessun duplicato inferiore trovato.</p>
     {{else}}<p class="muted">Premi Anteprima per cercare i duplicati.</p>{{end}}
@@ -1547,7 +1547,7 @@
 {{define "v2_db_panel"}}
 {{if .Notify}}<div id="v2-toast-region" hx-swap-oob="innerHTML"><div class="v2-toast{{if .NotifyError}} error{{end}}" role="status"><strong>Manutenzione database</strong><span>{{.NotifyMessage}}</span></div></div>{{end}}
 <div class="panel" id="v2-db-panel">
-  <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .TotalBytes}}<small class="muted">totale: {{bytes .TotalBytes}}</small>{{end}}{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
+  <div class="panel-head"><h3>Ottimizzazione database</h3>{{if .TotalBytes}}<small class="muted"><span>totale:</span> {{bytes .TotalBytes}}</small>{{end}}{{if .Message}}<small class="muted">{{.Message}}</small>{{end}}</div>
   <div class="panel-body">
     <p class="hint">Le operazioni coinvolgono tutti i database SQLite (serie, archivio, configurazione e fumetti): VACUUM compatta i file, ANALYZE aggiorna le statistiche e Verifica controlla integrità, chiavi esterne e indici (compreso FTS dell’archivio), senza modificare dati.</p>
     <div class="table-wrap"><table class="data-table">
@@ -1664,14 +1664,14 @@
 
       {{else if eq .Step 4}}
       <h3>La tua prima serie o il tuo primo film</h3>
-      <p class="hint">Cerca un titolo su {{if .TmdbSet}}TMDB{{else}}TVDB{{end}} e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</p>
+      <p class="hint"><span>Cerca un titolo su</span> {{if .TmdbSet}}TMDB{{else}}TVDB{{end}} <span>e aggiungilo: Gextto lo cercherà e lo scaricherà al prossimo ciclo.</span></p>
       {{if or .SeriesCount .MoviesCount}}<p><span class="badge ok">In libreria</span> <span>Serie TV</span> <strong>{{.SeriesCount}}</strong> · <span>Film</span> <strong>{{.MoviesCount}}</strong></p>{{end}}
       {{if or .TmdbSet .TvdbSet}}
       {{$source := "TVDB"}}{{if .TmdbSet}}{{$source = "TMDB"}}{{end}}
       <form class="toolbar" hx-post="/tmdb/search" hx-target="#v2-tmdb-results" hx-swap="innerHTML">
         <select class="input" name="kind" aria-label="Tipo di contenuto"><option value="series">Serie TV</option><option value="movie">Film</option></select>
         <input class="input" type="search" name="query" aria-label="Titolo da cercare su {{$source}}" placeholder="Titolo da cercare su {{$source}}" />
-        <button class="btn primary" type="submit">Cerca su {{$source}}</button>
+        <button class="btn primary" type="submit"><span>Cerca su</span> {{$source}}</button>
       </form>
       <div id="v2-tmdb-results" aria-live="polite"></div>
       {{else}}
@@ -1749,7 +1749,7 @@
 
 {{define "v2_ramdisk_panel"}}
 <div class="panel" id="v2-ramdisk-panel">
-  <div class="panel-head"><h3>RAM disk</h3><small class="muted">{{if .Configured}}in uso: {{.Configured}}{{else}}non configurato{{end}}</small></div>
+  <div class="panel-head"><h3>RAM disk</h3><small class="muted">{{if .Configured}}<span>in uso:</span> {{.Configured}}{{else}}non configurato{{end}}</small></div>
   <div class="panel-body">
     {{if .Problem}}<p class="alert">{{.Problem}}</p>{{end}}
     <p class="hint">Scegli una destinazione temporanea tmpfs/ramfs scrivibile: Gextto la configura con soglia e margine consigliati. /dev/shm viene perso al riavvio.</p>
@@ -1776,7 +1776,7 @@
       </tr>{{end}}</tbody>
     </table></div>
     {{else}}<p class="muted">Nessun tmpfs/ramfs scrivibile trovato.</p>{{end}}
-    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" title="Crea una sottocartella dedicata">Crea {{.CreatePath}}</button></form>{{end}}
+    {{if .CreateAvail}}<form class="toolbar" style="margin-top:10px" hx-post="/maintenance/ramdisk" hx-target="#v2-ramdisk-panel" hx-swap="outerHTML"><input type="hidden" name="action" value="create" /><input type="hidden" name="path" value="{{.CreatePath}}" /><button class="btn sm" type="submit" title="Crea una sottocartella dedicata"><span>Crea</span> {{.CreatePath}}</button></form>{{end}}
     {{if .Warning}}<p class="muted"><small>{{.Warning}}</small></p>{{end}}
   </div>
 </div>
@@ -1825,12 +1825,12 @@
 
 {{define "v2_rename_progress"}}
 <div class="progress" role="progressbar" aria-label="Avanzamento rinomina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{.Percent}}"><span style="width:{{.Percent}}%"></span></div>
-<p class="muted">{{if .Running}}In corso: {{.Current}}/{{.Total}}{{if .Series}} · {{.Series}}{{end}}{{if .Message}} · {{.Message}}{{end}}{{else}}Nessuna rinomina in corso.{{end}}{{if .Errors}} · {{.Errors}} errori{{end}}</p>
+<p class="muted">{{if .Running}}<span>In corso:</span> {{.Current}}/{{.Total}}{{if .Series}} · {{.Series}}{{end}}{{if .Message}} · {{.Message}}{{end}}{{else}}<span>Nessuna rinomina in corso.</span>{{end}}{{if .Errors}} · {{.Errors}} <span>errori</span>{{end}}</p>
 {{end}}
 
 {{define "v2_jobs"}}
 <div class="panel" id="v2-jobs-panel" hx-get="/partial/jobs" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML"{{if not .Jobs}} style="display:none"{{end}}>
-  <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} in corso · {{len .Jobs}} recenti</small></div>
+  <div class="panel-head"><h3>Operazioni in background</h3><small class="muted">{{.Active}} <span>in corso</span> · {{len .Jobs}} <span>recenti</span></small></div>
   <div class="panel-body">
     {{if .Jobs}}
     <div class="table-wrap"><table class="data-table">
@@ -1938,7 +1938,7 @@
 
 {{define "v2_tmdb_manual"}}
 <div class="overlay" style="display:block"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="v2-manual-add-title">
-  <div class="modal-head"><h3 id="v2-manual-add-title">Aggiungi {{if eq .Kind "movie"}}film{{else}}serie{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
+  <div class="modal-head"><h3 id="v2-manual-add-title">{{if eq .Kind "movie"}}Aggiungi film{{else}}Aggiungi serie{{end}}</h3><button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
   <div class="modal-body"><form class="form-grid" method="post" action="/tmdb/add" hx-post="/tmdb/add" hx-target="#v2-tmdb-add-result" hx-swap="innerHTML">
     <input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="source" value="discover"><input type="hidden" name="redirect" value="{{.Redirect}}">
     <label class="field"><span>Titolo</span><input class="input" name="name" value="{{.Name}}" required></label><label class="field"><span>Anno</span><input class="input" name="year" value="{{.Year}}"></label>
@@ -1964,7 +1964,7 @@
 {{end}}
 
 {{define "v2_ftp_test_result"}}<span class="{{if .OK}}htx-status ok{{else}}htx-status err{{end}}">{{.Message}}</span>{{end}}
-{{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} sorgenti verificate</span>{{else}}<span class="htx-status err">Nessun risultato</span>{{end}}{{end}}
+{{define "v2_source_test_result"}}{{if .Items}}<span class="htx-status">{{len .Items}} <span>sorgenti verificate</span></span>{{else}}<span class="htx-status err">Nessun risultato</span>{{end}}{{end}}
 {{define "v2_list_test_result"}}<span class="htx-status {{if .OK}}ok{{else}}err{{end}}">{{.Message}}</span>{{end}}
 
 {{define "v2_search"}}
@@ -2039,7 +2039,7 @@
     </td>
   </tr>{{end}}</tbody>
 </table></div>
-{{else if .Searched}}<p class="muted">Nessun risultato per «{{.Query}}».</p>
+{{else if .Searched}}<p class="muted"><span>Nessun risultato per</span> «{{.Query}}».</p>
 {{else}}<p class="muted">Inserisci una ricerca.</p>{{end}}
 {{end}}
 
@@ -2052,7 +2052,7 @@
       {{if .Error}}<p class="alert">{{.Error}}</p>{{else}}
       <p><span class="badge {{if or (eq .Trace.Decision "approved") (eq .Trace.Decision "accept")}}ok{{else if eq .Trace.Decision "rejected"}}err{{else}}warn{{end}}">{{.Trace.Decision}}</span></p>
       {{if .Trace.Candidate}}<h4>{{.Trace.Candidate}}</h4>{{end}}
-      {{if .Trace.Reason}}<p class="muted">Motivo: {{.Trace.Reason}}</p>{{end}}
+      {{if .Trace.Reason}}<p class="muted"><span>Motivo:</span> {{.Trace.Reason}}</p>{{end}}
       <div class="stat-grid"><div class="row"><span>Punteggio</span><strong>{{.Trace.Score}}</strong></div><div class="row"><span>Obiettivo</span><strong>{{.Trace.Target}}</strong></div></div>
       {{if .Trace.Steps}}<table class="data-table"><thead><tr><th>Regola</th><th>Esito</th><th>Dettaglio</th></tr></thead><tbody>{{range .Trace.Steps}}<tr><td>{{.Rule}}</td><td>{{.Result}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody></table>{{end}}
       {{end}}
@@ -2084,20 +2084,20 @@
          </div>
         <div class="series-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}</div>
         <div class="series-badges">
-          {{if .Quality}}<span class="badge">Qualità {{.Quality}}</span>{{end}}
-          {{if .Language}}<span class="badge">Lingua {{.Language}}</span>{{end}}
-          <span class="badge">stagioni {{.Seasons}}</span>
-          <span class="badge">{{.DownloadedCount}}/{{.EpisodeCount}} episodi</span>
-          {{if .Gaps}}<span class="badge warn">{{.Gaps}} mancanti</span>{{end}}
+          {{if .Quality}}<span class="badge"><span>Qualità</span> {{.Quality}}</span>{{end}}
+          {{if .Language}}<span class="badge"><span>Lingua</span> {{.Language}}</span>{{end}}
+          <span class="badge"><span>stagioni</span> {{.Seasons}}</span>
+          <span class="badge">{{.DownloadedCount}}/{{.EpisodeCount}} <span>episodi</span></span>
+          {{if .Gaps}}<span class="badge warn">{{.Gaps}} <span>mancanti</span></span>{{end}}
            <span class="badge {{if .Enabled}}ok{{else}}warn{{end}}">{{if .Enabled}}attiva{{else}}in pausa{{end}}</span>
            <span class="badge">{{.StatusLabel}}</span>
-           {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge">ultima {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge">Prossima: {{.NextEpisode}}</span>{{end}}
+           {{if .Year}}<span class="badge">{{.Year}}</span>{{end}}{{if .Network}}<span class="badge">{{.Network}}</span>{{end}}{{if .Country}}<span class="badge">{{.Country}}</span>{{end}}{{if .Vote}}<span class="badge">★ {{.Vote}}</span>{{end}}{{if .LastAirDate}}<span class="badge"><span>ultima</span> {{.LastAirDate}}</span>{{end}}{{if .NextEpisode}}<span class="badge"><span>Prossima:</span> {{.NextEpisode}}</span>{{end}}
          </div>
         {{if .Genres}}<div class="series-genres">{{range .Genres}}<span class="badge">{{.}}</span>{{end}}</div>{{end}}
         {{if .Overview}}<p class="series-overview">{{.Overview}}</p>{{end}}
          {{if or .Cast .SeasonButtons}}
          <div class="series-cast-season">
-           {{if .Cast}}<p class="muted series-cast"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
+           {{if .Cast}}<p class="muted series-cast"><small><span>Cast:</span> {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
            {{if .SeasonButtons}}
            <div class="season-toggles">
              <span class="muted"><small>Stagioni (clicca per attivare/disattivare):</small></span>
@@ -2120,15 +2120,15 @@
   </div>
 
   <div class="panel">
-    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.DownloadedCount}}/{{.EpisodeCount}} · {{.Gaps}} mancanti</small></div>
+    <div class="panel-head"><h3>Episodi</h3><small class="muted">{{.DownloadedCount}}/{{.EpisodeCount}} · {{.Gaps}} <span>mancanti</span></small></div>
     <div class="panel-body">
       {{if .SeasonGroups}}
       <div class="season-list">
         {{range .SeasonGroups}}
         <details class="season-block" open>
-          <summary><strong>Stagione {{.Season}}</strong> <small class="muted">{{.Owned}}/{{.Total}} archiviati</small></summary>
+          <summary><strong><span>Stagione</span> {{.Season}}</strong> <small class="muted">{{.Owned}}/{{.Total}} <span>archiviati</span></small></summary>
           <div class="table-wrap"><table class="data-table series-episodes">
-            <caption class="sr-only">Episodi della stagione {{.Season}}</caption>
+            <caption class="sr-only"><span>Episodi della stagione</span> {{.Season}}</caption>
             <thead><tr><th scope="col">S</th><th scope="col">E</th><th scope="col">Titolo</th><th scope="col">Stato</th><th scope="col">Qualità</th><th scope="col">Dimensione</th><th scope="col">Azioni</th></tr></thead>
             <tbody>
             {{range .Rows}}
@@ -2212,8 +2212,8 @@
     <div class="panel-head"><h3>{{.Name}} {{.Year}}</h3><small class="muted">{{.Quality}} · {{.Language}}</small></div>
     <div class="panel-body">
       {{if .Poster}}<img class="detail-poster" loading="lazy" src="{{.Poster}}" alt="{{.Name}}" />{{end}}{{if .Overview}}<p>{{.Overview}}</p>{{end}}
-      <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}{{if .ReleaseDate}}<span class="badge">uscita {{.ReleaseDate}}</span>{{end}}</div>
-      {{if .Cast}}<p class="muted"><small>Cast: {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
+      <div class="toolbar detail-links">{{if .TmdbURL}}<a class="btn sm" href="{{.TmdbURL}}" target="_blank" rel="noopener">TMDB</a>{{end}}{{if .TvdbURL}}<a class="btn sm" href="{{.TvdbURL}}" target="_blank" rel="noopener">TVDB</a>{{end}}{{if .ReleaseDate}}<span class="badge"><span>uscita</span> {{.ReleaseDate}}</span>{{end}}</div>
+      {{if .Cast}}<p class="muted"><small><span>Cast:</span> {{range $index, $person := .Cast}}{{if $index}}, {{end}}{{if $person.URL}}<a href="{{$person.URL}}" target="_blank" rel="noopener">{{$person.Name}}</a>{{else}}{{$person.Name}}{{end}}{{if $person.Character}} ({{$person.Character}}){{end}}{{end}}</small></p>{{end}}
       <form class="form-grid" method="post" action="/section/form" hx-post="/section/form" hx-swap="none">
         <input type="hidden" name="view" value="movies" />
         <input type="hidden" name="redirect" value="/?view=movies&amp;movie={{.ID}}" />
@@ -2307,7 +2307,7 @@
 {{define "v2_sources_modal"}}
 <div class="overlay" style="display:block">
   <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
-    <div class="modal-head"><h3 id="v2-sources-title">Sorgenti {{.Label}}</h3>
+    <div class="modal-head"><h3 id="v2-sources-title"><span>Sorgenti</span> {{.Label}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">{{template "v2_sources_rows" .}}</div>
   </div>
@@ -2317,7 +2317,7 @@
 {{define "v2_episode_search_modal"}}
 <div class="overlay" style="display:block">
   <div class="modal v2-sources-modal" role="dialog" aria-modal="true" aria-labelledby="v2-sources-title">
-    <div class="modal-head"><h3 id="v2-sources-title">Cerca {{.Label}}</h3>
+    <div class="modal-head"><h3 id="v2-sources-title"><span>Cerca</span> {{.Label}}</h3>
       <button class="btn sm" type="button" hx-get="/empty" hx-target="#v2-modal" hx-swap="innerHTML">Chiudi</button></div>
     <div class="modal-body">
       <h4>Archivio</h4>
@@ -2331,7 +2331,7 @@
 
 {{define "v2_rename_preview"}}
 <div class="panel" id="v2-rename-preview-panel">
-  <div class="panel-head"><h3>Anteprima rinomina · {{.Series}}</h3>{{if .Executed}}<span class="badge ok">eseguita</span>{{end}}</div>
+  <div class="panel-head"><h3><span>Anteprima rinomina</span> · {{.Series}}</h3>{{if .Executed}}<span class="badge ok">eseguita</span>{{end}}</div>
   <div class="panel-body">
     {{if .Message}}<p class="{{if .Error}}alert{{else}}muted{{end}}">{{.Message}}</p>{{end}}
     {{if .Items}}
