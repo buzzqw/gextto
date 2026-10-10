@@ -14,17 +14,47 @@ import (
 var (
 	iphlpapi          = windows.NewLazySystemDLL("iphlpapi.dll")
 	getIPForwardTable = iphlpapi.NewProc("GetIpForwardTable")
+	getBestRoute      = iphlpapi.NewProc("GetBestRoute")
 )
 
 // mibIPForwardRowSize is sizeof(MIB_IPFORWARDROW) on both 32- and 64-bit
 // Windows (14 DWORDs).
 const mibIPForwardRowSize = 56
 
-// defaultGateway returns the IPv4 default route from the Windows routing table
-// (the route with destination and mask 0.0.0.0), choosing the one with the
-// lowest metric. It is not available on every system, so callers fall back to
-// letting UPnP/NAT-PMP pick the interface.
+// defaultGateway returns the IPv4 default gateway (the next hop of the route to
+// 0.0.0.0). It asks Windows for the best route first (GetBestRoute accounts for
+// the interface metric, so with a VPN and a LAN it returns the route actually
+// used) and falls back to picking the default route with the lowest route
+// metric from the table. It is not available on every system, so callers fall
+// back to letting UPnP/NAT-PMP pick the interface.
 func defaultGateway() (net.IP, error) {
+	if gateway := bestRouteNextHop(); gateway != nil {
+		return gateway, nil
+	}
+	return tableDefaultGateway()
+}
+
+// bestRouteNextHop asks Windows for the best route to 0.0.0.0 and returns its
+// next hop, or nil when it is unavailable. GetBestRoute fills a
+// MIB_IPFORWARDROW whose dwForwardNextHop is at offset 12.
+func bestRouteNextHop() net.IP {
+	var row [mibIPForwardRowSize]byte
+	ret, _, _ := getBestRoute.Call(0, 0, uintptr(unsafe.Pointer(&row[0])))
+	if ret != 0 {
+		return nil
+	}
+	nextHop := binary.LittleEndian.Uint32(row[12:16])
+	if nextHop == 0 {
+		return nil
+	}
+	ip := make(net.IP, 4)
+	binary.LittleEndian.PutUint32(ip, nextHop)
+	return ip
+}
+
+// tableDefaultGateway picks the 0.0.0.0/0 route with the lowest route metric
+// from the IPv4 forwarding table.
+func tableDefaultGateway() (net.IP, error) {
 	var size uint32
 	// The first call sizes the table (ERROR_INSUFFICIENT_BUFFER = 122). A route
 	// added in between (VPN, DHCP renewal) makes the table grow, so the sized

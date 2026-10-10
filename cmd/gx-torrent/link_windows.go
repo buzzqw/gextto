@@ -12,20 +12,32 @@ import (
 
 // replaceDirLink makes link point at dest. Windows symlinks need the
 // SeCreateSymbolicLinkPrivilege (or Developer Mode), so a directory junction is
-// used instead: it needs no privilege and os.Readlink reads it back. A previous
-// link is removed first (removing a junction never touches its target),
-// because renaming over an existing directory is not allowed on Windows.
+// used instead: it needs no privilege and os.Readlink reads it back.
+//
+// Windows cannot atomically replace a directory junction (MoveFileEx with
+// REPLACE_EXISTING does not overwrite a directory), so the new junction is
+// built complete under a temporary name first and only then swapped in: the
+// window with no link is as short as a single rename, and a failure while
+// building the new junction leaves the old link untouched.
 func replaceDirLink(link, dest string) error {
+	tmp := link + ".tmp"
+	_ = os.RemoveAll(tmp)
+	if err := os.Mkdir(tmp, 0o755); err != nil {
+		return err
+	}
+	if err := setJunction(tmp, dest); err != nil {
+		_ = os.RemoveAll(tmp)
+		return err
+	}
 	if info, err := os.Lstat(link); err == nil && isDirLink(link, info) {
+		// Removing a junction never touches its target.
 		if err := os.Remove(link); err != nil {
+			_ = os.RemoveAll(tmp)
 			return err
 		}
 	}
-	if err := os.Mkdir(link, 0o755); err != nil {
-		return err
-	}
-	if err := setJunction(link, dest); err != nil {
-		_ = os.Remove(link)
+	if err := os.Rename(tmp, link); err != nil {
+		_ = os.RemoveAll(tmp)
 		return err
 	}
 	return nil
