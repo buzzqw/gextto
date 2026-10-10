@@ -50,3 +50,28 @@ func TestPicksVariantByLanguage(t *testing.T) {
 	}
 	SetLanguage("it")
 }
+
+// TestPickUsesCatalogForExtraLanguages checks German/French/Spanish/Polish use
+// catalogIT, and unknown strings still fall back to English.
+func TestPickUsesCatalogForExtraLanguages(t *testing.T) {
+	cases := []struct {
+		lang string
+		want string
+	}{
+		{"de", "Größe"},
+		{"fr", "Taille"},
+		{"es", "Tamaño"},
+		{"pl", "Rozmiar"},
+	}
+	for _, tc := range cases {
+		SetLanguage(tc.lang)
+		if got := Pick("Dimensione", "Size"); got != tc.want {
+			t.Fatalf("%s pick = %q, want %q", tc.lang, got, tc.want)
+		}
+		// Unknown Italian source keeps the English fallback.
+		if got := Pick("stringa fuori catalogo", "not in catalog"); got != "not in catalog" {
+			t.Fatalf("%s fallback = %q", tc.lang, got)
+		}
+	}
+	SetLanguage("it")
+}

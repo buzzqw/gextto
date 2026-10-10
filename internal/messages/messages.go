@@ -47,12 +47,33 @@ func IsEnglish() bool {
 	return Language() == "en"
 }
 
-// Pick returns the English variant when the interface language is English,
-// German, French, Spanish or Polish. Non-English backend messages currently use
-// English as a fallback because these notifications have no separate catalogs.
+// Pick returns the message in the active interface language. Italian and
+// English come from the arguments; German, French, Spanish and Polish come from
+// catalogIT keyed by the Italian source, with English as the fallback.
 func Pick(italian, english string) string {
-	if IsEnglish() || Language() == "de" || Language() == "fr" || Language() == "es" || Language() == "pl" {
+	switch Language() {
+	case "en":
 		return english
+	case "de":
+		return pickCatalog(italian, english, 0)
+	case "fr":
+		return pickCatalog(italian, english, 1)
+	case "es":
+		return pickCatalog(italian, english, 2)
+	case "pl":
+		return pickCatalog(italian, english, 3)
+	default:
+		return italian
 	}
-	return italian
+}
+
+// pickCatalog returns the indexed translation for the Italian source, or the
+// English fallback when the string is not in the catalog.
+func pickCatalog(italian, english string, index int) string {
+	if entry, ok := catalogIT[italian]; ok {
+		if translated := entry[index]; translated != "" {
+			return translated
+		}
+	}
+	return english
 }
