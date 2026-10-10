@@ -111,6 +111,19 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 		user = defaultStandaloneUser
 	}
 
+	// Apply the bandwidth limits before touching the settings store: they go
+	// through setConfig (state.json) and can fail if the data folder is not
+	// writable, and a failure must not leave the in-memory password changed.
+	// They are applied before the wizard is marked done, so the operator sees
+	// the error instead of it being silently logged.
+	if len(limits) > 0 {
+		if _, err := d.setConfig(limits); err != nil {
+			logf("setup: cannot apply the bandwidth limits: %v", err)
+			d.renderSetup(w, r, "The bandwidth limits could not be applied; check that the data folder is writable.")
+			return
+		}
+	}
+
 	store := d.opts.Settings
 	store.Set("lang", lang)
 	if download != "" {
@@ -143,17 +156,6 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	store.Set(standaloneBypassKey, fmt.Sprintf("%t", bypass))
 	if port != "" {
 		store.Set("peer-ports", port)
-	}
-	// The bandwidth limits are a runtime setting (state.json), like the ones the
-	// web page changes: apply them through the same path so they take effect at
-	// once and are persisted. They are applied before the wizard is marked done,
-	// so a failure is shown to the operator instead of being silently logged.
-	if len(limits) > 0 {
-		if _, err := d.setConfig(limits); err != nil {
-			logf("setup: cannot apply the bandwidth limits: %v", err)
-			d.renderSetup(w, r, "The bandwidth limits could not be applied; check that the data folder is writable.")
-			return
-		}
 	}
 	store.Set(setupCompleteKey, "true")
 	if err := store.Save(); err != nil {
