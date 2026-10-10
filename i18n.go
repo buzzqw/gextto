@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,6 +41,17 @@ type I18nDb struct {
 	// translation changes.
 	mu    sync.RWMutex
 	cache map[string]map[string]string
+	// gen is bumped on every translation write, so caches derived from the
+	// dictionary (the client i18n JSON) can detect staleness cheaply.
+	gen atomic.Uint64
+}
+
+// TranslationsGeneration returns a counter bumped on every translation write.
+func (d *I18nDb) TranslationsGeneration() uint64 {
+	if d == nil {
+		return 0
+	}
+	return d.gen.Load()
 }
 
 // invalidateCache drops the per-language dictionaries after a write.
@@ -47,6 +59,7 @@ func (d *I18nDb) invalidateCache() {
 	d.mu.Lock()
 	d.cache = nil
 	d.mu.Unlock()
+	d.gen.Add(1)
 }
 
 // Dictionary returns the {key: value} map for a language, building and caching

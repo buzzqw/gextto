@@ -60,16 +60,22 @@ var uiCatalog = map[string][5]string{
 // uiLangIndex maps a language code to its column in uiCatalog.
 var uiLangIndex = map[string]int{"it": 0, "de": 1, "fr": 2, "es": 3, "pl": 4}
 
+// uiDicts holds one ready dictionary per language, built once at startup: the
+// catalog is static, so there is no reason to rebuild it per request.
+var uiDicts = func() map[string]map[string]string {
+	dicts := make(map[string]map[string]string, len(uiLangIndex))
+	for lang, idx := range uiLangIndex {
+		dict := make(map[string]string, len(uiCatalog))
+		for key, value := range uiCatalog {
+			dict[key] = value[idx]
+		}
+		dicts[lang] = dict
+	}
+	return dicts
+}()
+
 // uiDictionary returns the English-to-language map for lang, or nil when
 // lang is English or unknown (the page then stays as it is).
 func uiDictionary(lang string) map[string]string {
-	idx, ok := uiLangIndex[lang]
-	if !ok {
-		return nil
-	}
-	dict := make(map[string]string, len(uiCatalog))
-	for key, value := range uiCatalog {
-		dict[key] = value[idx]
-	}
-	return dict
+	return uiDicts[lang]
 }

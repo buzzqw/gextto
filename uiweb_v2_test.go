@@ -1411,3 +1411,24 @@ func TestV2DetailPiecesTab(t *testing.T) {
 		t.Fatalf("pieces API -> %d: %s", code, body)
 	}
 }
+
+// TestV2ClientI18nCacheInvalidates checks the memoized client dictionary is
+// rebuilt after a translation changes.
+func TestV2ClientI18nCacheInvalidates(t *testing.T) {
+	state := newTestAppState(t)
+	if _, err := state.i18n.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.i18n.SetLanguage("en"); err != nil {
+		t.Fatal(err)
+	}
+	if first := string(v2ClientI18nJSON(state)); !strings.Contains(first, `"Copiato":"Copied"`) {
+		t.Fatalf("first dictionary missing translation: %s", first)
+	}
+	if err := state.i18n.Set("en", "Copiato", "Copied!"); err != nil {
+		t.Fatal(err)
+	}
+	if second := string(v2ClientI18nJSON(state)); !strings.Contains(second, "Copied!") {
+		t.Fatalf("cache not invalidated after a translation change: %s", second)
+	}
+}

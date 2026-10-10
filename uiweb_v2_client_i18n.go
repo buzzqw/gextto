@@ -9,6 +9,7 @@ package gextto
 import (
 	"encoding/json"
 	"html/template"
+	"sync"
 
 	"github.com/buzzqw/gextto/internal/logging"
 )
@@ -72,10 +73,38 @@ var v2ClientKeys = []string{
 	"▶ Segui ultime righe",
 }
 
+// v2ClientI18nEntry memoizes the JSON dictionary of one i18n database and
+// language. It is keyed by the *I18nDb so two app states in the same process
+// never share it; gen detects translation edits cheaply.
+type v2ClientI18nEntry struct {
+	lang string
+	gen  uint64
+	body template.JS
+}
+
+var v2ClientI18nMemo sync.Map // *I18nDb -> v2ClientI18nEntry
+
 // v2ClientI18nJSON renders window.__v2i18n for the active language. Unknown keys
-// fall back to the Italian source, exactly like v2TranslateHTML.
+// fall back to the Italian source, exactly like v2TranslateHTML. The result is
+// cached per language and invalidated when a translation changes.
 func v2ClientI18nJSON(s *AppState) template.JS {
+	if s == nil || s.i18n == nil {
+		return v2ClientI18nBuild(nil, nil)
+	}
+	lang := v2Language(s)
+	gen := s.i18n.TranslationsGeneration()
+	if cached, ok := v2ClientI18nMemo.Load(s.i18n); ok {
+		if entry, ok := cached.(v2ClientI18nEntry); ok && entry.lang == lang && entry.gen == gen {
+			return entry.body
+		}
+	}
 	dict, eng := v2Dictionaries(s)
+	body := v2ClientI18nBuild(dict, eng)
+	v2ClientI18nMemo.Store(s.i18n, v2ClientI18nEntry{lang: lang, gen: gen, body: body})
+	return body
+}
+
+func v2ClientI18nBuild(dict, eng map[string]string) template.JS {
 	out := make(map[string]string, len(v2ClientKeys))
 	for _, key := range v2ClientKeys {
 		out[key] = v2TranslateText(key, dict, eng)
