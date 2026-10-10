@@ -480,6 +480,7 @@ Aggiornato al 2026-10-10.
 | F1: protezione CSRF/same-origin della pagina in standalone | fatto |
 | F1: DNS rebinding (`Host` IP/localhost) e classificazione sorgente LAN | fatto |
 | F1: login con password (bcrypt), sessioni, bypass LAN senza password | fatto |
+| F1: ascolto LAN senza token permesso in standalone (managed invariato) | fatto |
 | F1: wizard di primo avvio (lingua, cartella, password, LAN, porta) | fatto |
 | F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare |
 | F3: API compatibile qBittorrent (MVP: auth, app, transfer, torrents info/add/delete/pause/resume/recheck) | fatto |

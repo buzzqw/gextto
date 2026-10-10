@@ -204,6 +204,45 @@ func TestQbitCategoriesAndTags(t *testing.T) {
 	}
 }
 
+func TestQbitAppEndpoints(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v2/app/defaultSavePath")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || strings.TrimSpace(string(body)) != d.downloadDir() {
+		t.Fatalf("defaultSavePath: %d %q", resp.StatusCode, body)
+	}
+
+	resp, err = http.Get(srv.URL + "/api/v2/app/preferences")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prefs map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&prefs); err != nil {
+		t.Fatalf("preferences: %v", err)
+	}
+	resp.Body.Close()
+	if _, ok := prefs["save_path"]; !ok {
+		t.Fatalf("preferences missing save_path: %v", prefs)
+	}
+
+	// properties on an unknown hash is a 404.
+	resp, err = http.Get(srv.URL + "/api/v2/torrents/properties?hash=abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("properties unknown hash: %d", resp.StatusCode)
+	}
+}
+
 func TestQbitStateMapping(t *testing.T) {
 	cases := map[string]string{
 		"downloading":    "downloading",

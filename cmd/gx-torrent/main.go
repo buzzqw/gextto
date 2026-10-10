@@ -183,9 +183,6 @@ func main() {
 	log.SetPrefix("gx-torrent: ")
 	setupLogFile(*logFile)
 
-	if !loopback(*listen) && *token == "" && !*insecure {
-		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", *listen)
-	}
 	data, err := filepath.Abs(*dataDir)
 	if err != nil {
 		log.Fatal(err)
@@ -193,6 +190,11 @@ func main() {
 	modeValue, err := resolveMode(*mode, *fingerprint)
 	if err != nil {
 		log.Fatal(err)
+	}
+	// In managed mode a non-loopback listen without a token would expose the
+	// API with no protection; standalone has its own login/LAN model instead.
+	if modeValue != ModeStandalone && !loopback(*listen) && *token == "" && !*insecure {
+		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", *listen)
 	}
 	pageLang := strings.TrimSpace(*lang)
 	var settingsStore *settings.Store

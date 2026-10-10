@@ -281,8 +281,10 @@ le destinazioni, le valida e le limita già con le proprie regole. Il flag
 `-allowed-roots` esiste solo per l'**uso standalone** del demone (vedi sotto) e
 Gextto non lo imposta mai.
 
-Il demone rifiuta di ascoltare su un indirizzo non loopback senza token (salvo
-`-insecure`). Il server RPC interno di rain è disattivato.
+Il demone **in managed** rifiuta di ascoltare su un indirizzo non loopback senza
+token (salvo `-insecure`); **in standalone** è permesso, perché l'accesso è
+protetto dal login e dalle regole LAN (o aperto se non c'è password). Il server
+RPC interno di rain è disattivato.
 
 ## Rete
 

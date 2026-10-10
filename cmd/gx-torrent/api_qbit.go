@@ -29,8 +29,13 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/auth/logout", d.handleQbitLogout)
 	mux.HandleFunc("GET /api/v2/app/version", d.handleQbitVersion)
 	mux.HandleFunc("GET /api/v2/app/webapiVersion", d.handleQbitWebAPIVersion)
+	mux.HandleFunc("GET /api/v2/app/defaultSavePath", d.handleQbitDefaultSavePath)
+	mux.HandleFunc("GET /api/v2/app/preferences", d.handleQbitPreferences)
+	mux.HandleFunc("GET /api/v2/app/buildInfo", d.handleQbitBuildInfo)
 	mux.HandleFunc("GET /api/v2/transfer/info", d.handleQbitTransferInfo)
 	mux.HandleFunc("GET /api/v2/torrents/info", d.handleQbitTorrentsInfo)
+	mux.HandleFunc("GET /api/v2/torrents/properties", d.handleQbitProperties)
+	mux.HandleFunc("GET /api/v2/torrents/files", d.handleQbitFiles)
 	mux.HandleFunc("POST /api/v2/torrents/add", d.handleQbitAdd)
 	mux.HandleFunc("POST /api/v2/torrents/delete", d.handleQbitDelete)
 	mux.HandleFunc("POST /api/v2/torrents/pause", d.handleQbitPause)
@@ -151,10 +156,6 @@ func (d *Daemon) handleQbitTorrentsInfo(w http.ResponseWriter, _ *http.Request) 
 }
 
 func qbitView(v torrentInfo) qbitTorrent {
-	ratio := 0.0
-	if v.TotalSize > 0 {
-		ratio = float64(v.Uploaded) / float64(v.TotalSize)
-	}
 	eta := v.ETASeconds
 	if eta <= 0 || eta > qbitUnknownETA {
 		eta = qbitUnknownETA
@@ -173,7 +174,7 @@ func qbitView(v torrentInfo) qbitTorrent {
 		Tags:         strings.Join(v.Tags, ", "),
 		NumSeeds:     v.NumSeeds,
 		NumLeechs:    v.NumPeers,
-		Ratio:        ratio,
+		Ratio:        ratioOf(v),
 		ETA:          eta,
 		AddedOn:      v.AddedAt,
 		CompletionOn: v.CompletedAt,
@@ -400,4 +401,133 @@ func (d *Daemon) handleQbitRemoveTags(w http.ResponseWriter, r *http.Request) {
 		_ = d.removeTags(hash, tags)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitDefaultSavePath(w http.ResponseWriter, _ *http.Request) {
+	qbitText(w, http.StatusOK, d.downloadDir())
+}
+
+func (d *Daemon) handleQbitPreferences(w http.ResponseWriter, _ *http.Request) {
+	stats := d.stats()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"save_path":            d.downloadDir(),
+		"temp_path":            d.opts.PartsDir,
+		"listen_port":          stats.PeerPort,
+		"dht":                  stats.DHT,
+		"pex":                  true,
+		"upnp":                 true,
+		"max_connec":           stats.Session["max_peer_dial"] + stats.Session["max_peer_accept"],
+		"start_paused_enabled": false,
+	})
+}
+
+func (d *Daemon) handleQbitBuildInfo(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"application_name": "gx-torrent",
+		"bitness":          64,
+		"qt":               "n/a",
+		"libtorrent":       "n/a",
+		"boost":            "n/a",
+		"openssl":          "n/a",
+	})
+}
+
+// qbitFindView returns the published view of one torrent by hash.
+func (d *Daemon) qbitFindView(hash string) (torrentInfo, bool) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	for _, v := range d.snapshotViews() {
+		if strings.ToLower(v.Hash) == hash {
+			return v, true
+		}
+	}
+	return torrentInfo{}, false
+}
+
+func (d *Daemon) handleQbitProperties(w http.ResponseWriter, r *http.Request) {
+	v, ok := d.qbitFindView(r.URL.Query().Get("hash"))
+	if !ok {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	eta := v.ETASeconds
+	if eta <= 0 || eta > qbitUnknownETA {
+		eta = qbitUnknownETA
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"save_path":       v.SavePath,
+		"piece_size":      v.PieceLength,
+		"total_size":      v.TotalSize,
+		"total_done":      v.TotalDone,
+		"pieces_num":      v.PiecesTotal,
+		"pieces_have":     v.PiecesHave,
+		"dl_speed":        v.DownloadRate,
+		"up_speed":        v.UploadRate,
+		"eta":             eta,
+		"seeds":           v.NumSeeds,
+		"peers":           v.NumPeers,
+		"seeds_total":     v.NumComplete,
+		"peers_total":     v.NumIncomplete,
+		"share_ratio":     ratioOf(v),
+		"addition_date":   v.AddedAt,
+		"completion_date": v.CompletedAt,
+		"time_elapsed":    v.ActiveSeconds,
+		"seeding_time":    v.SeedingSeconds,
+		"dl_limit":        -1,
+		"up_limit":        -1,
+		"comment":         "",
+		"created_by":      "",
+	})
+}
+
+// qbitFile is the qBittorrent file object the clients may read.
+type qbitFile struct {
+	Name         string  `json:"name"`
+	Size         int64   `json:"size"`
+	Progress     float64 `json:"progress"`
+	Priority     int     `json:"priority"`
+	IsSeed       bool    `json:"is_seed"`
+	PieceRange   []int   `json:"piece_range"`
+	Availability float64 `json:"availability"`
+}
+
+func (d *Daemon) handleQbitFiles(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	t, _ := d.findLocked(r.URL.Query().Get("hash"))
+	d.mu.Unlock()
+	if t == nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	files, err := t.Files()
+	if err != nil {
+		writeJSON(w, http.StatusOK, []qbitFile{})
+		return
+	}
+	done := map[int]int64{}
+	if stats, err := t.FileStats(); err == nil {
+		for i, stat := range stats {
+			done[i] = stat.BytesCompleted
+		}
+	}
+	out := make([]qbitFile, 0, len(files))
+	for i, file := range files {
+		progress := 0.0
+		if file.Length() > 0 {
+			progress = float64(done[i]) / float64(file.Length())
+		}
+		out = append(out, qbitFile{
+			Name: file.Path(), Size: file.Length(), Progress: progress,
+			Priority: 1, PieceRange: []int{0, 0}, Availability: -1,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ratioOf is uploaded over downloaded (or over the data held when it came from
+// disk), the same share ratio shown in the page.
+func ratioOf(v torrentInfo) float64 {
+	if v.TotalSize <= 0 {
+		return 0
+	}
+	return float64(v.Uploaded) / float64(v.TotalSize)
 }
