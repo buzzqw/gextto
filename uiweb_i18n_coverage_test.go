@@ -92,6 +92,9 @@ func TestUIIsTranslatable(t *testing.T) {
 	templateText := regexp.MustCompile(`>([^<>{}]+)<`)
 	templateAttr := regexp.MustCompile(`(?:title|placeholder|aria-label|label)="([^"{}]+)"`)
 	goField := regexp.MustCompile(`(?:Label|Value|Title|Hint|Note|Empty|Placeholder|SearchHint|Description|Caption|Subtitle|Message|Flash):\s*"([^"\\\n]{3,})"`)
+	// uiText localizes a string at runtime; its argument must be a catalog key
+	// too, otherwise the localized message would stay Italian.
+	goUIText := regexp.MustCompile(`uiText\([^,]+,\s*"([^"\\\n]{3,})"\)`)
 
 	missing := map[string]string{}
 	record := func(source, raw string) {
@@ -127,6 +130,9 @@ func TestUIIsTranslatable(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		for _, m := range goField.FindAllStringSubmatch(string(raw), -1) {
+			record(path, m[1])
+		}
+		for _, m := range goUIText.FindAllStringSubmatch(string(raw), -1) {
 			record(path, m[1])
 		}
 	}

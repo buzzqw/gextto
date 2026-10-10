@@ -541,7 +541,7 @@ func ManualSearchDashboard(w http.ResponseWriter, r *http.Request, s *AppState) 
 
 func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRejected bool) {
 	if !gh2_setupComplete(s.cfg) {
-		jsonError(w, http.StatusConflict, "complete the initial setup first")
+		jsonError(w, http.StatusConflict, uiText(s, "completa prima la configurazione iniziale"))
 		return
 	}
 	var input SearchInput
@@ -551,7 +551,7 @@ func manualSearch(w http.ResponseWriter, r *http.Request, s *AppState, includeRe
 	}
 	query := strings.TrimSpace(input.Query)
 	if query == "" || len(query) > 256 {
-		jsonError(w, http.StatusBadRequest, "query must contain 1-256 characters")
+		jsonError(w, http.StatusBadRequest, uiText(s, "la ricerca deve contenere da 1 a 256 caratteri"))
 		return
 	}
 	searchScope := "classic"
