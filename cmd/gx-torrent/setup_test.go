@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -33,9 +34,10 @@ func TestSetupCompleteDefaults(t *testing.T) {
 
 func TestSetupSavesSettings(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
+	download := filepath.Join(t.TempDir(), "downloads")
 	rec := setupPost(t, d, url.Values{
 		"lang":         {"de"},
-		"download-dir": {"/srv/media/downloads"},
+		"download-dir": {download},
 		"user":         {"alice"},
 		"password":     {"s3cret"},
 		"password2":    {"s3cret"},
@@ -52,7 +54,7 @@ func TestSetupSavesSettings(t *testing.T) {
 	if store.Get("lang", "") != "de" {
 		t.Fatalf("lang = %q", store.Get("lang", ""))
 	}
-	if store.Get("download-dir", "") != "/srv/media/downloads" {
+	if store.Get("download-dir", "") != download {
 		t.Fatalf("download-dir = %q", store.Get("download-dir", ""))
 	}
 	if store.Get("auth-user", "") != "alice" {
@@ -155,9 +157,10 @@ func TestSetupRedirectsUntilComplete(t *testing.T) {
 
 func TestSetupSavesIndexerAndTemp(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
+	temp := filepath.Join(t.TempDir(), "tmp")
 	rec := setupPost(t, d, url.Values{
 		"lang":         {"en"},
-		"temp-dir":     {"/var/tmp/gx-torrent"},
+		"temp-dir":     {temp},
 		"indexer-name": {"Prowlarr"},
 		"indexer-url":  {"http://127.0.0.1:9696"},
 		"indexer-key":  {"secret"},
@@ -165,7 +168,7 @@ func TestSetupSavesIndexerAndTemp(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("setup: %d", rec.Code)
 	}
-	if got := d.opts.Settings.Get("temp-dir", ""); got != "/var/tmp/gx-torrent" {
+	if got := d.opts.Settings.Get("temp-dir", ""); got != temp {
 		t.Fatalf("temp-dir = %q", got)
 	}
 	if got := d.opts.Settings.Get(indexersSettingKey, ""); !strings.Contains(got, "http://127.0.0.1:9696") || !strings.Contains(got, "secret") {

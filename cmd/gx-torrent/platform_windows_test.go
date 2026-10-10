@@ -109,3 +109,53 @@ func TestWindowsRealDirectoryIsNotALink(t *testing.T) {
 		t.Fatal("a plain directory taken for a link")
 	}
 }
+
+// TestWindowsLinkFlow exercises the whole storage.go link flow on Windows:
+// pointLink creates the junction, readLink resolves it, re-pointing follows a
+// move between folders, protectLegacyDir leaves the junction alone, and
+// removing the link never deletes the payload behind it.
+func TestWindowsLinkFlow(t *testing.T) {
+	base := t.TempDir()
+	d := &Daemon{opts: Options{LinkDir: filepath.Join(base, "links"), DataDir: base}}
+	id := "abc123"
+
+	first := filepath.Join(base, "downloads")
+	second := filepath.Join(base, "library")
+	for _, dir := range []string{first, second} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := d.pointLink(id, first); err != nil {
+		t.Fatalf("pointLink: %v", err)
+	}
+	if got, ok := d.readLink(id); !ok || filepath.Clean(got) != filepath.Clean(first) {
+		t.Fatalf("readLink = %q, %v; want %q", got, ok, first)
+	}
+
+	// Moving the save folder re-points the junction.
+	if err := d.pointLink(id, second); err != nil {
+		t.Fatalf("re-point: %v", err)
+	}
+	if got, _ := d.readLink(id); filepath.Clean(got) != filepath.Clean(second) {
+		t.Fatalf("readLink after move = %q, want %q", got, second)
+	}
+
+	// protectLegacyDir must not move a junction: it is not a legacy real dir.
+	d.protectLegacyDir(id)
+	if info, err := os.Lstat(d.linkPath(id)); err != nil || !isDirLink(d.linkPath(id), info) {
+		t.Fatalf("protectLegacyDir moved the junction: %v %v", info, err)
+	}
+
+	// Removing the link must never delete the payload behind it.
+	payload := filepath.Join(second, "payload.bin")
+	if err := os.WriteFile(payload, []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(d.linkPath(id)); err != nil {
+		t.Fatalf("remove link: %v", err)
+	}
+	if _, err := os.Stat(payload); err != nil {
+		t.Fatalf("payload lost after removing the link: %v", err)
+	}
+}
