@@ -64,7 +64,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/super-seeding", d.handleUISuperSeeding)
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
-	return root
+	return d.standaloneGuard(root)
 }
 
 // authenticate requires the shared token on every request when one is set.

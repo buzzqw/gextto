@@ -217,6 +217,11 @@ cartella dati **non** viene letto (così l'impronta resta stabile); in standalon
 `settings.json` fornisce i valori che Gextto non passa, per ora la lingua
 (`{"lang": "de"}`), e una flag esplicita vince comunque.
 
+In standalone le POST della pagina (`/ui/*`) sono accettate solo se
+`Origin`/`Referer` coincide con l'host della richiesta: è la protezione CSRF per
+una pagina raggiungibile dalla LAN. In managed la pagina si comporta come prima
+(le POST dell'API v1 restano protette dal token).
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 
