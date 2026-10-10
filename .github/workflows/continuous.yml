@@ -100,6 +100,14 @@ jobs:
           path: dist/gx-torrent-linux-${{ matrix.arch }}.tar.gz*
           if-no-files-found: error
 
+      - name: Upload standalone gx-torrent for Windows
+        if: matrix.variant == 'go'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gx-torrent-windows-${{ matrix.arch }}
+          path: dist/gx-torrent-windows-*.zip*
+          if-no-files-found: error
+
   publish:
     name: publish continuous
     needs: package
@@ -137,4 +145,6 @@ jobs:
             dist/gextto-linux-*.tar.gz.sha256 \
             dist/gx-torrent-linux-*.tar.gz \
             dist/gx-torrent-linux-*.tar.gz.sha256 \
+            dist/gx-torrent-windows-*.zip \
+            dist/gx-torrent-windows-*.zip.sha256 \
             dist/release.json

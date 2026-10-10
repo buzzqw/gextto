@@ -63,7 +63,7 @@ if command -v apt-get >/dev/null 2>&1; then
   SUDO=""
   [[ "$(id -u)" == "0" ]] || SUDO="sudo"
   $SUDO apt-get update -qq
-  packages="ca-certificates curl git binutils"
+  packages="ca-certificates curl git binutils zip"
   if [[ "${GEXTTO_LIBTORRENT:-0}" == "1" ]]; then
     packages="build-essential pkg-config libtorrent-rasterbar-dev $packages"
   fi
@@ -129,4 +129,19 @@ if [[ -z "$VARIANT" ]]; then
   gx_contents="$(tar -tzf "$GX_ARCHIVE")"
   grep -qx './gx-torrent' <<< "$gx_contents" \
     || { echo "gx-torrent is missing from the standalone archive" >&2; exit 1; }
+
+  # Windows package: the daemon as a native service, built for the same
+  # architecture (the exe is static, so no glibc baseline applies).
+  case "$ARCH" in
+    x86_64) winarch=amd64 ;;
+    aarch64) winarch=arm64 ;;
+    *) winarch="" ;;
+  esac
+  if [[ -n "$winarch" ]]; then
+    WIN_ARCHIVE="$OUTPUT_DIR/gx-torrent-windows-${winarch}.zip"
+    "$ROOT/scripts/package-gx-torrent-windows.sh" --arch "$winarch" \
+      --output "$WIN_ARCHIVE" ${LABEL:+--label "$LABEL"}
+    zipinfo -1 "$WIN_ARCHIVE" | grep -qx 'gx-torrent.exe' \
+      || { echo "gx-torrent.exe is missing from the Windows archive" >&2; exit 1; }
+  fi
 fi

@@ -89,7 +89,7 @@ jobs:
       - name: Platform tests
         env:
           CGO_ENABLED: "0"
-        run: go test -run "Windows|MountPoint|Setup|CrossDevice" ./cmd/gx-torrent/
+        run: go test -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart" ./cmd/gx-torrent/
 
   # The default build and tests are pure Go; this job keeps the opt-in embedded
   # libtorrent engine (cgo) covered. It installs the dev headers.

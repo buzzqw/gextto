@@ -171,9 +171,13 @@ sono state implementate in massima parte:
 fermandolo su stop dell'SCM. `scripts/package-gx-torrent-windows.sh` produce
 `gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
 (`New-Service`), `uninstall-service.ps1` e `README.txt` (alternativa `sc create`).
-Restano da fare, se serve: generare lo zip anche in `release.yml`/`continuous.yml`
-(oggi lo produce solo la CI `build-test` come smoke) e un test su Windows reale
-che installi davvero il servizio.
+Lo zip è ora generato **dentro** `build-release.sh` (variante Go pura, dove Go è
+disponibile) e pubblicato da `continuous.yml`/`release.yml` come artifact e nel
+release (`dist/gx-torrent-windows-<arch>.zip`). `TestDaemonStartServeStop` copre
+il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
+`windows-platform`, su Windows. Resta da fare solo un test che **installi
+davvero** il servizio su Windows (`New-Service`) e ne verifichi lo stop pulito:
+richiede privilegi di amministratore nel runner e non è ancora scritto.
 
 ---
 

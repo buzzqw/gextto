@@ -332,10 +332,15 @@ func main() {
 type daemonRun struct {
 	daemon    *Daemon
 	server    *http.Server
+	addr      net.Addr
 	stop      chan struct{}
 	loopDone  chan struct{}
 	serverErr chan error
 }
+
+// Addr is the address the HTTP server is listening on (useful when the port is
+// chosen by the OS, and for the service tests).
+func (r *daemonRun) Addr() net.Addr { return r.addr }
 
 // startDaemon creates the daemon, opens the listener and starts serving. The
 // listener is opened before serving, so the first-run browser below never
@@ -383,7 +388,7 @@ func startDaemon(opts Options) (*daemonRun, error) {
 			}()
 		}
 	}
-	return &daemonRun{daemon: daemon, server: server, stop: stop, loopDone: loopDone, serverErr: serverErr}, nil
+	return &daemonRun{daemon: daemon, server: server, addr: listener.Addr(), stop: stop, loopDone: loopDone, serverErr: serverErr}, nil
 }
 
 // shutdown stops the HTTP server and the daemon run loop.

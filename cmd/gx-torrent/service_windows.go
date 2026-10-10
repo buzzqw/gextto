@@ -26,6 +26,8 @@ type gxServiceHandler struct {
 	opts Options
 }
 
+var _ svc.Handler = (*gxServiceHandler)(nil)
+
 // Execute implements svc.Handler: it starts the daemon, reports Running and
 // stops it on a Stop/Shutdown request from the Service Control Manager.
 func (h *gxServiceHandler) Execute(_ []string, requests <-chan svc.ChangeRequest, status chan<- svc.Status) (bool, uint32) {
