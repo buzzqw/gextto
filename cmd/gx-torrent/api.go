@@ -52,6 +52,8 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/stream", d.handleUIStream)
 	root.HandleFunc("GET /ui/login", d.handleUILogin)
 	root.HandleFunc("POST /ui/login", d.handleUILogin)
+	root.HandleFunc("GET /ui/setup", d.handleUISetup)
+	root.HandleFunc("POST /ui/setup", d.handleUISetup)
 	root.HandleFunc("GET /ui/torrent-file", d.handleUITorrentFile)
 	root.HandleFunc("POST /ui/action", d.handleUIAction)
 	root.HandleFunc("POST /ui/bulk", d.handleUIBulk)

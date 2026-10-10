@@ -208,6 +208,24 @@ var uiCatalog = map[string][5]string{
 	"password":                        {"password", "Passwort", "mot de passe", "contraseña", "hasło"},
 	"Wrong username or password.":     {"Nome utente o password errati.", "Benutzername oder Passwort falsch.", "Nom d'utilisateur ou mot de passe incorrect.", "Usuario o contraseña incorrectos.", "Nieprawidłowa nazwa użytkownika lub hasło."},
 
+	// Standalone first-run wizard.
+	"gx-torrent setup": {"Configurazione di gx-torrent", "gx-torrent Einrichtung", "Configuration de gx-torrent", "Configuración de gx-torrent", "Konfiguracja gx-torrent"},
+	"First run: choose how the daemon works. The settings are saved in settings.json.": {"Primo avvio: scegli come deve funzionare il demone. Le impostazioni sono salvate in settings.json.", "Erster Start: lege fest, wie der Daemon arbeitet. Die Einstellungen werden in settings.json gespeichert.", "Premier lancement : choisissez le fonctionnement du démon. Les réglages sont enregistrés dans settings.json.", "Primer inicio: elige cómo funciona el demonio. Los ajustes se guardan en settings.json.", "Pierwsze uruchomienie: wybierz, jak ma działać demon. Ustawienia są zapisywane w settings.json."},
+	"Language":                         {"Lingua", "Sprache", "Langue", "Idioma", "Język"},
+	"Download folder":                  {"Cartella di download", "Download-Ordner", "Dossier de téléchargement", "Carpeta de descarga", "Folder pobierania"},
+	"Access":                           {"Accesso", "Zugang", "Accès", "Acceso", "Dostęp"},
+	"Username":                         {"Nome utente", "Benutzername", "Nom d'utilisateur", "Usuario", "Nazwa użytkownika"},
+	"Password":                         {"Password", "Passwort", "Mot de passe", "Contraseña", "Hasło"},
+	"Confirm password":                 {"Conferma password", "Passwort bestätigen", "Confirmer le mot de passe", "Confirmar contraseña", "Potwierdź hasło"},
+	"Allow the LAN without a password": {"Consenti la LAN senza password", "LAN ohne Passwort zulassen", "Autoriser le LAN sans mot de passe", "Permitir la LAN sin contraseña", "Zezwól na LAN bez hasła"},
+	"Network":                          {"Rete", "Netzwerk", "Réseau", "Red", "Sieć"},
+	"Peer port":                        {"Porta peer", "Peer-Port", "Port peer", "Puerto peer", "Port peer"},
+	"Finish setup":                     {"Termina configurazione", "Einrichtung abschließen", "Terminer la configuration", "Finalizar configuración", "Zakończ konfigurację"},
+	"The download folder and the peer port apply at the next start.": {"La cartella di download e la porta peer valgono dal prossimo avvio.", "Download-Ordner und Peer-Port gelten ab dem nächsten Start.", "Le dossier de téléchargement et le port peer s'appliquent au prochain démarrage.", "La carpeta de descarga y el puerto peer se aplican en el próximo inicio.", "Folder pobierania i port peer działają od następnego uruchomienia."},
+	"The download folder must be an absolute path.":                  {"La cartella di download deve essere un percorso assoluto.", "Der Download-Ordner muss ein absoluter Pfad sein.", "Le dossier de téléchargement doit être un chemin absolu.", "La carpeta de descarga debe ser una ruta absoluta.", "Folder pobierania musi być ścieżką bezwzględną."},
+	"The password and the confirmation do not match.":                {"Le password non coincidono.", "Passwort und Bestätigung stimmen nicht überein.", "Le mot de passe et la confirmation ne correspondent pas.", "La contraseña y su confirmación no coinciden.", "Hasło i potwierdzenie nie są zgodne."},
+	"Setup failed.": {"Configurazione non riuscita.", "Einrichtung fehlgeschlagen.", "Échec de la configuration.", "Error en la configuración.", "Konfiguracja nie powiodła się."},
+
 	// Strings rendered by the page's JavaScript through t().
 	"Select at least one torrent":                                      {"Seleziona almeno un torrent", "Wähle mindestens einen Torrent", "Sélectionne au moins un torrent", "Selecciona al menos un torrent", "Wybierz co najmniej jeden torrent"},
 	"Remove the torrent? Files stay on disk.":                          {"Rimuovere il torrent? I file restano su disco.", "Torrent entfernen? Die Dateien bleiben auf der Festplatte.", "Retirer le torrent ? Les fichiers restent sur le disque.", "¿Quitar el torrent? Los archivos permanecen en disco.", "Usunąć torrent? Pliki pozostaną na dysku."},

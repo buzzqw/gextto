@@ -124,6 +124,7 @@ func uiTranslateHTML(raw string, dict map[string]string) string {
 }
 
 // uiLang is the language for one request: a valid ?lang= wins, otherwise the
+// standalone settings (live, so the wizard applies at once), otherwise the
 // daemon's configured language (empty or unknown means English).
 func (d *Daemon) uiLang(r *http.Request) string {
 	if v := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("lang"))); v != "" {
@@ -132,6 +133,16 @@ func (d *Daemon) uiLang(r *http.Request) string {
 		}
 		if _, ok := uiLangIndex[v]; ok {
 			return v
+		}
+	}
+	if d.opts.Mode == ModeStandalone && d.opts.Settings != nil {
+		switch v := strings.ToLower(strings.TrimSpace(d.opts.Settings.Get("lang", ""))); {
+		case v == "en":
+			return "en"
+		case v != "":
+			if _, ok := uiLangIndex[v]; ok {
+				return v
+			}
 		}
 	}
 	return d.opts.Lang

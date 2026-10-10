@@ -57,6 +57,19 @@ func defaultDataDir() string {
 	return "gx-torrent-data"
 }
 
+// resolvePortRange picks the peer port range: the flag or environment wins,
+// then the standalone settings, then the built-in default.
+func resolvePortRange(flagValue string, store *settings.Store) (uint16, uint16, error) {
+	value := strings.TrimSpace(flagValue)
+	if value == "" && store != nil {
+		value = strings.TrimSpace(store.Get("peer-ports", ""))
+	}
+	if value == "" {
+		value = "6881-6891"
+	}
+	return parsePortRange(value)
+}
+
 // parsePortRange reads "6881" or "6881-6891". "0" keeps rain's own port per
 // torrent (no shared port).
 func parsePortRange(value string) (uint16, uint16, error) {
@@ -135,7 +148,7 @@ func main() {
 	downloadDir := flag.String("download-dir", envOr("GX_TORRENT_DOWNLOAD_DIR", ""), "default save path (default <data>/downloads)")
 	token := flag.String("token", envOr("GX_TORRENT_TOKEN", ""), "shared secret required in the X-Gx-Token header")
 	roots := flag.String("allowed-roots", envOr("GX_TORRENT_ALLOWED_ROOTS", ""), "comma-separated directories a save path must be inside (empty = any absolute path)")
-	ports := flag.String("peer-ports", envOr("GX_TORRENT_PEER_PORTS", "6881-6891"), "the first free port of this range is the single peer port (TCP peers, UDP DHT); 0 = one port per torrent")
+	ports := flag.String("peer-ports", envOr("GX_TORRENT_PEER_PORTS", ""), "the first free port of this range is the single peer port (TCP peers, UDP DHT); empty = 6881-6891; 0 = one port per torrent")
 	listenIface := flag.String("listen-interface", envOr("GX_TORRENT_LISTEN_INTERFACE", ""), "IP or interface name for incoming peers (default all)")
 	outIface := flag.String("outgoing-interface", envOr("GX_TORRENT_OUTGOING_INTERFACE", ""), "bind all outgoing traffic to this interface or IP (VPN killswitch)")
 	proxyURL := flag.String("proxy", envOr("GX_TORRENT_PROXY", ""), "socks5://[user:pass@]host:port or http://host:port (disables DHT and UDP trackers)")
@@ -173,10 +186,6 @@ func main() {
 	if !loopback(*listen) && *token == "" && !*insecure {
 		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", *listen)
 	}
-	portBegin, portEnd, err := parsePortRange(*ports)
-	if err != nil {
-		log.Fatal(err)
-	}
 	data, err := filepath.Abs(*dataDir)
 	if err != nil {
 		log.Fatal(err)
@@ -200,7 +209,14 @@ func main() {
 			}
 		}
 	}
+	portBegin, portEnd, err := resolvePortRange(*ports, settingsStore)
+	if err != nil {
+		log.Fatal(err)
+	}
 	downloads := *downloadDir
+	if downloads == "" && settingsStore != nil {
+		downloads = strings.TrimSpace(settingsStore.Get("download-dir", ""))
+	}
 	if downloads == "" {
 		downloads = filepath.Join(data, "downloads")
 	}

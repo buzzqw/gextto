@@ -230,6 +230,12 @@ cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è atti
 configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`),
 `local-bypass` (`true`/`false`).
 
+Al primo avvio in standalone, finché il setup non è completato, la pagina
+reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download, utente e
+password, "LAN senza password", porta peer. Il wizard scrive `settings.json` e
+marca il setup completato; la lingua vale subito, cartella e porta al prossimo
+avvio (la chiave `peer-ports` è letta quando la flag non è passata).
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 

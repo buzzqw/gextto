@@ -19,6 +19,12 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// First run: send the browser to the wizard until it has been done.
+		if !d.setupComplete() && r.Method == http.MethodGet &&
+			(r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/ui/")) && r.URL.Path != setupPath {
+			http.Redirect(w, r, setupPath, http.StatusSeeOther)
+			return
+		}
 		// DNS rebinding: a public name that resolves to this machine must not
 		// reach the daemon. Only an IP literal or localhost is accepted.
 		if !hostAllowed(r.Host) {

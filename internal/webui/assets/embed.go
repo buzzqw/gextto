@@ -9,7 +9,7 @@ package assets
 
 import "embed"
 
-//go:embed ui.tmpl token.html login.html favicon.svg
+//go:embed ui.tmpl token.html login.html setup.html favicon.svg
 var files embed.FS
 
 // UITemplate is the html/template source of the daemon page: the page body plus
@@ -21,6 +21,9 @@ func TokenPage() string { return mustRead("token.html") }
 
 // LoginPage is the standalone sign-in form (managed mode uses the token).
 func LoginPage() string { return mustRead("login.html") }
+
+// SetupPage is the standalone first-run wizard.
+func SetupPage() string { return mustRead("setup.html") }
 
 // FaviconSVG is the site icon, inlined in the pages and served at /favicon.ico.
 func FaviconSVG() string { return mustRead("favicon.svg") }

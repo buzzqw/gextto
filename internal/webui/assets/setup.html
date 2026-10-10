@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>body{margin:0;font:16px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+form{max-width:520px;margin:40px auto;background:#161d2c;border:1px solid #243049;border-radius:12px;padding:22px}
+label{display:block;margin:10px 0;color:#93a1b5}
+input,select{width:100%;padding:8px;margin-top:4px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+button{width:100%;padding:10px;margin-top:14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform:uppercase;letter-spacing:.03em}
+.chk{display:flex;gap:8px;align-items:center}.chk input{width:auto;margin:0}
+.m{color:#93a1b5}.err{color:#fca5a5}</style></head>
+<body><form method="post" action="/ui/setup">
+<h2>gx-torrent setup</h2>
+<p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
+<label>Language<select name="lang">
+<option value="en">English</option>
+<option value="it">Italiano</option>
+<option value="de">Deutsch</option>
+<option value="fr">Français</option>
+<option value="es">Español</option>
+<option value="pl">Polski</option>
+</select></label>
+<label>Download folder<input type="text" name="download-dir" placeholder="/srv/media/downloads" autocomplete="off"></label>
+<h3>Access</h3>
+<label>Username<input type="text" name="user" value="admin" autocomplete="username"></label>
+<label>Password<input type="password" name="password" autocomplete="new-password"></label>
+<label>Confirm password<input type="password" name="password2" autocomplete="new-password"></label>
+<label class="chk"><input type="checkbox" name="local-bypass" value="1" checked> Allow the LAN without a password</label>
+<h3>Network</h3>
+<label>Peer port<input type="number" name="peer-port" placeholder="6881" min="0" max="65535"></label>
+<p class="m">The download folder and the peer port apply at the next start.</p>
+<button type="submit">Finish setup</button>
+<!--ERROR-->
+</form></body></html>
