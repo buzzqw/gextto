@@ -284,6 +284,9 @@ type v2ShellData struct {
 	FlashErr bool
 	// Update drives the "update available" badge next to the donate button.
 	Update UpdateStatus
+	// ClientI18n is the JSON dictionary window.__v2i18n for the strings the
+	// client script renders at runtime (see uiweb_v2_client_i18n.go).
+	ClientI18n template.JS
 }
 
 func v2Render(w http.ResponseWriter, status int, name string, data any, dict, eng map[string]string) {
@@ -596,6 +599,8 @@ func V2Page(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Flash:    strings.TrimSpace(r.FormValue("toast")),
 		FlashErr: r.FormValue("toast_err") == "1",
 		Update:   updates.Status(cfg),
+
+		ClientI18n: v2ClientI18nJSON(s),
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_shell", page, dict, eng)

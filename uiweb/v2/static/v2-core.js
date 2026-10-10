@@ -10,6 +10,9 @@
 (function () {
   "use strict";
 
+  // t() reads the server-injected dictionary (window.__v2i18n); unknown keys fall back to Italian.
+  function t(key) { var d = window.__v2i18n; return (d && d[key]) || key; }
+
   var doc = document.documentElement;
 
   function storageGet(key) {
@@ -21,7 +24,7 @@
 
   // ---------------------------------------------------------------- theme --
   function themeLabel() {
-    return doc.getAttribute("data-theme") === "light" ? "Tema scuro" : "Tema chiaro";
+    return doc.getAttribute("data-theme") === "light" ? t("Tema scuro") : t("Tema chiaro");
   }
   function setTheme(mode) {
     doc.setAttribute("data-theme", mode);
@@ -46,7 +49,7 @@
     doc.style.fontSize = (17 * percent / 100) + "px";
     storageSet("gextto_font_scale", String(percent));
     var labels = document.querySelectorAll("[data-font-label]");
-    for (var i = 0; i < labels.length; i++) labels[i].textContent = "Testo " + percent + "%";
+    for (var i = 0; i < labels.length; i++) labels[i].textContent = t("Testo ") + percent + "%";
   }
   setScale(readScale());
 
@@ -271,7 +274,7 @@
     var downloadsView = document.querySelector(".downloads-view");
     if (downloadsView) downloadsView.classList.toggle("has-selection", selected.length > 0);
     var label = document.querySelector("[data-v2-selected-count]");
-    if (label) label.textContent = selected.length + " selezionati · Azioni:";
+    if (label) label.textContent = selected.length + " " + t("selezionati · Azioni:");
     var all = document.querySelector("[data-v2-select-all]");
     var rows = document.querySelectorAll("[data-v2-select]");
     if (all) all.checked = rows.length > 0 && selected.length === rows.length;
@@ -343,7 +346,7 @@
 
   function updateLogsFollowButton() {
     var button = document.querySelector("[data-v2-logs-follow]");
-    if (button) button.textContent = logsFollow ? "⏸ Ferma scorrimento" : "▶ Segui ultime righe";
+    if (button) button.textContent = logsFollow ? t("⏸ Ferma scorrimento") : t("▶ Segui ultime righe");
   }
 
   // Every interactive field gets at least a localized native tooltip. Pages
@@ -372,9 +375,9 @@
       }
       text = String(text || "").replace(/\s+/g, " ").trim();
       if (!text) {
-        if (node.matches("select")) text = "Seleziona un valore";
-        else if (node.matches("textarea,input")) text = "Inserisci un valore";
-        else text = "Esegui azione";
+        if (node.matches("select")) text = t("Seleziona un valore");
+        else if (node.matches("textarea,input")) text = t("Inserisci un valore");
+        else text = t("Esegui azione");
       }
       node.setAttribute("title", text);
     }
@@ -400,7 +403,7 @@
       body: JSON.stringify({ query: query })
     }).then(function (response) {
       return response.json().then(function (data) {
-        if (!response.ok) throw new Error(data.error || "Ricerca non riuscita");
+        if (!response.ok) throw new Error(data.error || t("Ricerca non riuscita"));
         return data;
       });
     });
@@ -423,7 +426,7 @@
       var emptyCell = document.createElement("td");
       emptyCell.className = "muted";
       emptyCell.colSpan = 4;
-      emptyCell.textContent = terms.length ? "Nessun risultato con questo filtro." : "Nessun risultato compatibile.";
+      emptyCell.textContent = terms.length ? t("Nessun risultato con questo filtro.") : t("Nessun risultato compatibile.");
       emptyRow.appendChild(emptyCell);
       root.appendChild(emptyRow);
       return;
@@ -433,7 +436,7 @@
       var noMatchCell = document.createElement("td");
       noMatchCell.className = "muted";
       noMatchCell.colSpan = 4;
-      noMatchCell.textContent = "Nessun risultato con questo filtro.";
+      noMatchCell.textContent = t("Nessun risultato con questo filtro.");
       noMatch.appendChild(noMatchCell);
       root.appendChild(noMatch);
       return;
@@ -455,24 +458,24 @@
       var add = document.createElement("button");
       add.className = "btn sm primary";
       add.type = "button";
-      add.textContent = "Aggiungi";
-      add.title = "Accoda questa release";
+      add.textContent = t("Aggiungi");
+      add.title = t("Accoda questa release");
       add.addEventListener("click", function () {
         add.disabled = true;
         var form = new URLSearchParams();
         form.set("release", JSON.stringify(release));
         form.set("redirect", "/?view=dashboard");
         fetch("/search/add", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form.toString() })
-          .then(function (response) { if (!response.ok) throw new Error("Impossibile accodare la release"); add.textContent = "Accodata"; })
+          .then(function (response) { if (!response.ok) throw new Error(t("Impossibile accodare la release")); add.textContent = t("Accodata"); })
           .catch(function (error) { add.disabled = false; add.textContent = error.message; });
       });
       actions.appendChild(add);
       var copy = document.createElement("button");
       copy.className = "btn sm";
       copy.type = "button";
-      copy.textContent = "Copia";
-      copy.title = "Copia il magnet negli appunti";
-      copy.addEventListener("click", function () { if (navigator.clipboard && release.magnet) navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = "Copiato"; }); });
+      copy.textContent = t("Copia");
+      copy.title = t("Copia il magnet negli appunti");
+      copy.addEventListener("click", function () { if (navigator.clipboard && release.magnet) navigator.clipboard.writeText(String(release.magnet)).then(function () { copy.textContent = t("Copiato"); }); });
       actions.appendChild(copy);
       row.appendChild(actions);
       root.appendChild(row);
@@ -491,25 +494,25 @@
     var status = panel.querySelector("[data-v2-search-status]");
     filter.disabled = false;
     filter.value = "";
-    status.textContent = "Ricerca nell’archivio…";
+    status.textContent = t("Ricerca nell’archivio…");
     panel.querySelector("[data-v2-search-body]").innerHTML = '<tr><td class="muted" colspan="4">Ricerca nell’archivio…</td></tr>';
     var fullDone = false;
     dashboardSearchRequest("/api/search/archive", query).then(function (data) {
       if (token !== dashboardSearchToken || fullDone) return;
       var results = data.results || [];
       renderDashboardSearchResults(panel, results);
-      status.textContent = "Archivio: " + results.length + " · ricerca RSS, indexer e web in corso…";
+      status.textContent = t("Archivio: ") + results.length + " · ricerca RSS, indexer e web in corso…";
     }).catch(function () {});
     dashboardSearchRequest("/api/search/dashboard", query).then(function (data) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
       var results = data.results || [];
       renderDashboardSearchResults(panel, results);
-      status.textContent = results.length + " risultati trovati";
+      status.textContent = results.length + " " + t("risultati trovati");
     }).catch(function (error) {
       if (token !== dashboardSearchToken) return;
       fullDone = true;
-      status.textContent = "Ricerca web non riuscita: " + error.message;
+      status.textContent = t("Ricerca web non riuscita: ") + error.message;
     });
   });
   document.addEventListener("input", function (event) {
@@ -533,9 +536,9 @@
   function loadFolderBrowser(overlay) {
     var list = overlay.querySelector("[data-v2-browse-list]");
     var path = overlay.querySelector("[data-v2-browse-path]");
-    list.textContent = "Caricamento…";
+    list.textContent = t("Caricamento…");
     fetch("/api/browse_dir?path=" + encodeURIComponent(overlay._current || ""), { credentials: "same-origin" })
-      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Impossibile leggere le cartelle"); return data; }); })
+      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || t("Impossibile leggere le cartelle")); return data; }); })
       .then(function (data) {
         overlay._current = String(data.path || overlay._current || "");
         overlay._parent = data.parent || "";
@@ -544,7 +547,7 @@
         var message = overlay.querySelector("[data-v2-browse-message]");
         if (message) message.textContent = data.error || "";
         var dirs = data.dirs || [];
-        if (!dirs.length) { list.textContent = "Nessuna sottocartella."; return; }
+        if (!dirs.length) { list.textContent = t("Nessuna sottocartella."); return; }
         dirs.forEach(function (dir) {
           var button = document.createElement("button");
           button.className = "path-item";
@@ -564,7 +567,7 @@
     var base = (overlay._current || "/").replace(/\/+$/, "");
     var target = (base || "/") + "/" + name;
     fetch("/api/mkdir", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: target }) })
-      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || "Impossibile creare la cartella"); return data; }); })
+      .then(function (response) { return response.json().then(function (data) { if (!response.ok) throw new Error(data.error || t("Impossibile creare la cartella")); return data; }); })
       .then(function () { overlay._target.value = target; overlay._target.dispatchEvent(new Event("input", { bubbles: true })); closeFolderBrowser(); })
       .catch(function (error) { overlay.querySelector("[data-v2-browse-message]").textContent = error.message; });
   }
@@ -573,7 +576,7 @@
     var overlay = document.createElement("div");
     overlay.id = "v2-browse-overlay";
     overlay.className = "overlay";
-    overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">Sfoglia cartelle</h3><button class="btn sm" type="button" data-v2-browse-close>Chiudi</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="Vai alla cartella superiore">↑ Su</button><input class="input mono" type="text" data-v2-browse-path aria-label="Percorso corrente" title="Modifica il percorso e premi Invio per navigare" /><button class="btn sm primary" type="button" data-v2-browse-select title="Usa questa cartella">Seleziona</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="Crea una nuova cartella dentro quella corrente">Crea cartella</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="Nome nuova cartella" placeholder="Nuova cartella" title="Nome della nuova cartella" /><button class="btn sm primary" type="button" data-v2-browse-create title="Crea la cartella e selezionala">Crea e usa</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
+    overlay.innerHTML = '<div class="modal path-modal" role="dialog" aria-modal="true" aria-labelledby="v2-browse-title"><div class="modal-head"><h3 id="v2-browse-title">' + t("Sfoglia cartelle") + '</h3><button class="btn sm" type="button" data-v2-browse-close>' + t("Chiudi") + '</button></div><div class="modal-body"><div class="toolbar"><button class="btn sm" type="button" data-v2-browse-up title="' + t("Vai alla cartella superiore") + '">\u2191 ' + t("Su") + '</button><input class="input mono" type="text" data-v2-browse-path aria-label="' + t("Percorso corrente") + '" title="' + t("Modifica il percorso e premi Invio per navigare") + '" /><button class="btn sm primary" type="button" data-v2-browse-select title="' + t("Usa questa cartella") + '">' + t("Seleziona") + '</button><button class="btn sm" type="button" data-v2-browse-create-prompt title="' + t("Crea una nuova cartella dentro quella corrente") + '">' + t("Crea cartella") + '</button></div><div class="path-list" data-v2-browse-list></div><div class="toolbar"><input class="input" data-v2-browse-new aria-label="' + t("Nome nuova cartella") + '" placeholder="' + t("Nuova cartella") + '" title="' + t("Nome della nuova cartella") + '" /><button class="btn sm primary" type="button" data-v2-browse-create title="' + t("Crea la cartella e selezionala") + '">' + t("Crea e usa") + '</button></div><small class="muted" data-v2-browse-message aria-live="polite"></small></div></div>';
     document.body.appendChild(overlay);
     overlay._target = input;
     overlay._current = String(input.value || "").trim();
@@ -582,7 +585,7 @@
       if (event.target === overlay || event.target.closest("[data-v2-browse-close]")) closeFolderBrowser();
       else if (event.target.closest("[data-v2-browse-up]")) { overlay._current = overlay._parent || overlay._current; loadFolderBrowser(overlay); }
       else if (event.target.closest("[data-v2-browse-select]")) { input.value = overlay._current; input.dispatchEvent(new Event("input", { bubbles: true })); closeFolderBrowser(); }
-      else if (event.target.closest("[data-v2-browse-create-prompt]")) { var entered = window.prompt("Nome nuova cartella:", ""); if (entered) { overlay.querySelector("[data-v2-browse-new]").value = entered; createFolder(overlay); } }
+      else if (event.target.closest("[data-v2-browse-create-prompt]")) { var entered = window.prompt(t("Nome nuova cartella:"), ""); if (entered) { overlay.querySelector("[data-v2-browse-new]").value = entered; createFolder(overlay); } }
       else if (event.target.closest("[data-v2-browse-create]")) createFolder(overlay);
     });
     overlay.addEventListener("keydown", function (event) { if (event.key === "Enter" && event.target.matches("[data-v2-browse-path]")) { event.preventDefault(); overlay._current = event.target.value.trim(); loadFolderBrowser(overlay); } });
@@ -594,7 +597,7 @@
     if (!value) return;
     var done = function () {
       var previous = button.textContent;
-      button.textContent = "Copiato";
+      button.textContent = t("Copiato");
       window.setTimeout(function () { button.textContent = previous; }, 1200);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1151,7 +1154,7 @@
     });
     fontOverlay.querySelector("[data-font-detect]").addEventListener("click", function (event) {
       var status = fontOverlay.querySelector("[data-font-status]");
-      if (!window.queryLocalFonts) { if (status) status.textContent = "Rilevamento non supportato dal browser."; return; }
+      if (!window.queryLocalFonts) { if (status) status.textContent = t("Rilevamento non supportato dal browser."); return; }
       event.currentTarget.disabled = true;
       if (status) status.textContent = "Richiesta autorizzazione\u2026";
       window.queryLocalFonts().then(function (fonts) {
@@ -1164,7 +1167,7 @@
           .forEach(function (key) { addFamily(families[key]); });
         if (status) status.textContent = Object.keys(families).length + " font rilevati.";
       }).catch(function (error) {
-        if (status) status.textContent = error && error.name === "NotAllowedError" ? "Accesso ai font non autorizzato." : "Rilevamento non riuscito.";
+        if (status) status.textContent = error && error.name === "NotAllowedError" ? t("Accesso ai font non autorizzato.") : t("Rilevamento non riuscito.");
       }).then(function () { event.currentTarget.disabled = false; });
     });
     fontOverlay.querySelector("[data-font-close]").addEventListener("click", closeFontPicker);
@@ -1265,7 +1268,7 @@
 
     var title = trigger && trigger.getAttribute("data-v2-toast-title");
     var message = trigger && trigger.getAttribute("data-v2-toast-message");
-    if (!message) message = "Richiesta avviata.";
+    if (!message) message = t("Richiesta avviata.");
     if (config._v2ToastShown) return;
     config._v2ToastShown = true;
     config._v2ToastTitle = title || "Operazione";
@@ -1280,8 +1283,8 @@
     var response = xhr && xhr.responseText || "";
     // Some actions provide a more useful server-rendered completion toast.
     if (response.indexOf('id="v2-toast-region"') !== -1 || response.indexOf("id='v2-toast-region'") !== -1) return;
-    if (detail.successful) showToast(config._v2ToastTitle, "Richiesta completata.", false);
-    else showToast(config._v2ToastTitle, "Operazione non riuscita.", true);
+    if (detail.successful) showToast(config._v2ToastTitle, t("Richiesta completata."), false);
+    else showToast(config._v2ToastTitle, t("Operazione non riuscita."), true);
   });
 
   document.addEventListener("keydown", function (event) {
@@ -1364,7 +1367,7 @@
     var startY = null, pulled = 0;
     var hint = document.createElement("div");
     hint.className = "ptr-hint";
-    hint.textContent = "↓ Rilascia per aggiornare";
+    hint.textContent = t("↓ Rilascia per aggiornare");
     hint.hidden = true;
     document.body.appendChild(hint);
     window.addEventListener("touchstart", function (event) {

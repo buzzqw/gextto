@@ -959,6 +959,35 @@ func TestV2HealthRicerchePanel(t *testing.T) {
 	}
 }
 
+// TestV2ClientI18nDictionaryRendered checks the shell injects the client
+// dictionary (window.__v2i18n) with the active-language translations, so the
+// strings v2-core.js renders at runtime are localized too.
+func TestV2ClientI18nDictionaryRendered(t *testing.T) {
+	state := newTestAppState(t)
+	if _, err := state.i18n.SeedDefaultTranslations(); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.i18n.SetLanguage("en"); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	code, body := v2Request(t, server, http.MethodGet, "/?view=dashboard", nil)
+	if code != http.StatusOK {
+		t.Fatalf("GET /?view=dashboard -> %d", code)
+	}
+	if !strings.Contains(body, "window.__v2i18n=") {
+		t.Fatal("client i18n dictionary not injected")
+	}
+	// Italian key -> English value, from the catalogs.
+	for _, want := range []string{`"Copiato":"Copied"`, `"selezionati · Azioni:":"selected · Actions:"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("client dictionary missing %q", want)
+		}
+	}
+}
+
 // TestV2HealthTilesPollIndependently checks the Salute tiles refresh on their
 // own schedules: Stato, Memoria and Uptime every 5s, Disco dati hourly.
 func TestV2HealthTilesPollIndependently(t *testing.T) {
