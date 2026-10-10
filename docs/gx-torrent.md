@@ -214,8 +214,9 @@ gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
 `-fingerprint` (lo passa Gextto), **standalone** altrimenti. In managed le flag
 passate da Gextto hanno sempre la precedenza e il file `settings.json` nella
 cartella dati **non** viene letto (così l'impronta resta stabile); in standalone
-`settings.json` fornisce i valori che Gextto non passa, per ora la lingua
-(`{"lang": "de"}`), e una flag esplicita vince comunque.
+`settings.json` fornisce i valori che Gextto non passa — lingua, `listen`,
+`download-dir`, `peer-ports`, `auth-user`/`auth-password`, `local-bypass`,
+`indexers` — e una flag esplicita vince comunque.
 
 In standalone le POST della pagina (`/ui/*`) sono accettate solo se
 `Origin`/`Referer` coincide con l'host della richiesta (protezione CSRF) e l'host

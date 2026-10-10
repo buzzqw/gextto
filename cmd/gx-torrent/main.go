@@ -143,7 +143,7 @@ func loopback(listen string) bool {
 }
 
 func main() {
-	listen := flag.String("listen", envOr("GX_TORRENT_LISTEN", "127.0.0.1:8890"), "address of the REST API")
+	listen := flag.String("listen", envOr("GX_TORRENT_LISTEN", ""), "address of the REST API (default 127.0.0.1:8890)")
 	dataDir := flag.String("data", envOr("GX_TORRENT_DATA", defaultDataDir()), "state directory (session, links, queue state)")
 	downloadDir := flag.String("download-dir", envOr("GX_TORRENT_DOWNLOAD_DIR", ""), "default save path (default <data>/downloads)")
 	token := flag.String("token", envOr("GX_TORRENT_TOKEN", ""), "shared secret required in the X-Gx-Token header")
@@ -191,11 +191,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// In managed mode a non-loopback listen without a token would expose the
-	// API with no protection; standalone has its own login/LAN model instead.
-	if modeValue != ModeStandalone && !loopback(*listen) && *token == "" && !*insecure {
-		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", *listen)
-	}
 	pageLang := strings.TrimSpace(*lang)
 	var settingsStore *settings.Store
 	if modeValue == ModeStandalone {
@@ -210,6 +205,18 @@ func main() {
 				pageLang = strings.TrimSpace(store.Get("lang", ""))
 			}
 		}
+	}
+	// In managed mode a non-loopback listen without a token would expose the
+	// API with no protection; standalone has its own login/LAN model instead.
+	listenValue := strings.TrimSpace(*listen)
+	if listenValue == "" && settingsStore != nil {
+		listenValue = strings.TrimSpace(settingsStore.Get("listen", ""))
+	}
+	if listenValue == "" {
+		listenValue = "127.0.0.1:8890"
+	}
+	if modeValue != ModeStandalone && !loopback(listenValue) && *token == "" && !*insecure {
+		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", listenValue)
 	}
 	portBegin, portEnd, err := resolvePortRange(*ports, settingsStore)
 	if err != nil {
@@ -236,7 +243,7 @@ func main() {
 	}
 
 	opts := Options{
-		Listen:       *listen,
+		Listen:       listenValue,
 		DataDir:      data,
 		LinkDir:      filepath.Join(data, "links"),
 		DownloadDir:  downloads,
