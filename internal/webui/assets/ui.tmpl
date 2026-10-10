@@ -125,7 +125,7 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <span class="muted">{{.Version}} · up for {{.Uptime}} · {{.Now}}</span>
+  <span class="muted">{{.Version}} · <span>up for</span> {{.Uptime}} · {{.Now}}</span>
 </header>
 <main>
   {{if .Notice}}<div class="notice{{if .Error}} err{{end}}">{{.Notice}}</div>{{end}}
@@ -183,7 +183,9 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   <div class="modal"><div id="detail-body"></div></div>
 </div>
 
+<script id="ui-i18n"></script>
 <script>
+function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
@@ -195,14 +197,14 @@ function filterRows(){applyFilters();}
 function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
 function selectAll(box){document.querySelectorAll('.rowsel').forEach(function(c){c.checked=box.checked});updateSel();}
-function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast('Select at least one torrent',true);return;}if(op==='remove-files'&&!confirm('Remove the selected torrents AND delete the files? Irreversible.'))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
+function bulk(op){var hashes=Array.prototype.map.call(document.querySelectorAll('.rowsel:checked'),function(c){return c.value});if(!hashes.length){showToast(t('Select at least one torrent'),true);return;}if(op==='remove-files'&&!confirm(t('Remove the selected torrents AND delete the files? Irreversible.')))return;var f=new URLSearchParams();f.set('op',op);hashes.forEach(function(h){f.append('hashes',h)});fetch('/ui/bulk',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){location.href='/';});}
 function applySort(){var st=window.__sort;var tb=document.getElementById('torrents');if(!st||!tb)return;var groups=Array.prototype.slice.call(tb.querySelectorAll('tbody.t'));var attr='data-k-'+st.key;groups.sort(function(a,b){var av=a.getAttribute(attr)||'',bv=b.getAttribute(attr)||'';var an=parseFloat(av),bn=parseFloat(bv);var r=(!isNaN(an)&&!isNaN(bn))?an-bn:String(av).localeCompare(String(bv));return st.asc?r:-r;});groups.forEach(function(g){tb.appendChild(g)});}
 function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st.key===key&&st.asc)};applySort();}
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
-function testPorts(){var out=document.getElementById('portcheck-result');if(!out)return;out.textContent=' checking…';fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){out.innerHTML=h;}).catch(function(e){out.textContent=' test failed: '+e.message;});}
-function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast('Magnet copied',false);},function(){showToast('Copy failed',true);});}else{showToast('Copy unavailable',true);}}
+function testPorts(){var out=document.getElementById('portcheck-result');if(!out)return;out.textContent=' '+t('checking…');fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){out.innerHTML=h;}).catch(function(e){out.textContent=' '+t('test failed:')+' '+e.message;});}
+function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast(t('Magnet copied'),false);},function(){showToast(t('Copy failed'),true);});}else{showToast(t('Copy unavailable'),true);}}
 function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
-function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent='loading…';fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' lines · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent='Cannot read the Gextto log: '+e.message;document.getElementById('log-info').textContent='';});}
+function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent=t('loading…');fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent=t('Cannot read the Gextto log:')+' '+e.message;document.getElementById('log-info').textContent='';});}
 function renderLog(scroll){var view=document.getElementById('log-view');var q=(document.getElementById('log-filter').value||'').toLowerCase();var nodebug=document.getElementById('log-nodebug').checked;var frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
 setInterval(function(){refresh(false)},2000);
 (function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
@@ -225,7 +227,7 @@ setInterval(function(){refresh(false)},2000);
     <div class="card"><b>{{.Moving}}</b><span>moving</span></div>
     <div class="card"><b>{{.PeerPort}}</b><span>peer port</span></div>
     <div class="card"{{if .IPFilterPath}} title="{{.IPFilterPath}}"{{end}}><b>{{if .IPFilter}}{{.IPFilter}}{{else}}none{{end}}</b><span>IP filter rules</span></div>
-    <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} MB</b><span>cache r/w</span></div>
+    <div class="card" title="Read / write cache"><b>{{.CacheReadMB}}/{{.CacheWB}} <span>MB</span></b><span>cache r/w</span></div>
     <div class="card" title="Disk read / write operations since start"><b>{{.ReadOpsTotal}}/{{.WriteOpsTotal}}</b><span>I/O ops r/w</span></div>
     <div class="card" title="Incoming peer connections since start"><b>{{.IncomingConns}}</b><span>incoming</span></div>
   </div>
@@ -281,8 +283,8 @@ setInterval(function(){refresh(false)},2000);
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="verify"><button title="Recheck data on disk">✓</button></form>
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="reannounce"><button title="Reannounce to trackers">↻</button></form>
           <form method="post" action="/ui/action"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="op" value="top"><button title="Move to the top of the queue">⤒</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent? Files stay on disk.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
-          <form method="post" action="/ui/remove" onsubmit="return confirm('Remove the torrent AND DELETE the files? irreversible.');"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm(t('Remove the torrent? Files stay on disk.'));"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="0"><button title="Remove from the session (files stay)">✕</button></form>
+          <form method="post" action="/ui/remove" onsubmit="return confirm(t('Remove the torrent AND DELETE the files? irreversible.'));"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="delete_files" value="1"><button class="danger" title="Remove and delete the files">✕ file</button></form>
         </div></td>
       </tr>
       <tr class="l2">
@@ -309,11 +311,11 @@ setInterval(function(){refresh(false)},2000);
     <span>↓ <b>{{.DownloadRate}}</b></span>
     <span>↑ <b>{{.UploadRate}}</b></span>
     <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
-    <span>Free space <b>{{bytes .DiskFree}} of {{bytes .DiskTotal}}</b></span>
-    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodes{{else}}off{{end}}</b></span>
-    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b> <button type="button" onclick="testPorts()" title="Check that the peer port is listening and forwarded by the router">Test ports</button> <span id="portcheck-result"></span></span>
+    <span>Free space <b>{{bytes .DiskFree}} <span>of</span> {{bytes .DiskTotal}}</b></span>
+    <span>DHT <b>{{if .DHT}}{{.DHTNodes}} <span>nodes</span>{{else}}<span>off</span>{{end}}</b></span>
+    <span>Port <b>{{if .PortOpen}}<span>open</span> ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}<span>not open</span>{{end}}</b> <button type="button" onclick="testPorts()" title="Check that the peer port is listening and forwarded by the router">Test ports</button> <span id="portcheck-result"></span></span>
     <span>Encryption <b>{{.Encryption}}</b></span>
-    {{if .PeerErrors}}<span title="Errori peer/tracker filtrati dal log, per categoria (dall'avvio)">Peer <b>{{.PeerErrors}}</b></span>{{end}}
+    {{if .PeerErrors}}<span title="Peer/tracker errors filtered from the log, by category (since start)">Peer <b>{{.PeerErrors}}</b></span>{{end}}
   </div>
 {{end}}{{define "detail"}}
 <div class="modal-head">
@@ -322,10 +324,10 @@ setInterval(function(){refresh(false)},2000);
 </div>
 <div class="detail-tabs">
   <button type="button" class="{{if eq .Tab "general"}}on{{end}}" onclick="openDetail('{{.Hash}}','general')">General</button>
-  <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')">Files ({{len .Files}})</button>
-  <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')">Peers ({{len .Peers}})</button>
-  <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')">Trackers ({{len .Trackers}})</button>
-  <button type="button" class="{{if eq .Tab "pieces"}}on{{end}}" onclick="openDetail('{{.Hash}}','pieces')">Pieces ({{.PiecesHave}}/{{.PiecesTotal}})</button>
+  <button type="button" class="{{if eq .Tab "files"}}on{{end}}" onclick="openDetail('{{.Hash}}','files')"><span>Files</span> ({{len .Files}})</button>
+  <button type="button" class="{{if eq .Tab "peers"}}on{{end}}" onclick="openDetail('{{.Hash}}','peers')"><span>Peers</span> ({{len .Peers}})</button>
+  <button type="button" class="{{if eq .Tab "trackers"}}on{{end}}" onclick="openDetail('{{.Hash}}','trackers')"><span>Trackers</span> ({{len .Trackers}})</button>
+  <button type="button" class="{{if eq .Tab "pieces"}}on{{end}}" onclick="openDetail('{{.Hash}}','pieces')"><span>Pieces</span> ({{.PiecesHave}}/{{.PiecesTotal}})</button>
 </div>
 {{if .Error}}<p class="notice err">{{.Error}}</p>{{end}}
 
@@ -343,7 +345,7 @@ setInterval(function(){refresh(false)},2000);
     <div class="row"><span>Swarm (seeds / peers)</span><strong>{{.NumComplete}} / {{.NumIncomplete}}</strong></div>
     <div class="row"><span>ETA</span><strong>{{if lt .ETA 0}}—{{else}}{{dur .ETA}}{{end}}</strong></div>
     <div class="row"><span>Folder</span><strong>{{.SavePath}}</strong></div>
-    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} days)</strong></div>
+    <div class="row"><span>Seed ratio set</span><strong>{{printf "%.2f" .SeedRatio}} ({{.SeedDays}} <span>days</span>)</strong></div>
     <div class="row"><span>Pin</span><strong>{{if .Pinned}}yes{{else}}no{{end}}</strong></div>
     <div class="row"><span>Private</span><strong>{{if .Private}}yes{{else}}no{{end}}</strong></div>
     <div class="row"><span>File</span><strong>{{.FileCount}}</strong></div>
@@ -445,9 +447,9 @@ setInterval(function(){refresh(false)},2000);
   </form>
 {{else if eq .Tab "pieces"}}
   {{if .Pieces}}
-  <p class="muted">{{.PiecesHave}}/{{.PiecesTotal}} pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped.</p>
-  <div class="piece-map" role="img" aria-label="Piece map: {{.PiecesHave}} of {{.PiecesTotal}} have">
-    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}} · pieces {{.Begin}}–{{.End}}"></span>{{end}}
+  <p class="muted"><b>{{.PiecesHave}}/{{.PiecesTotal}}</b> <span>pieces downloaded. Green: have, yellow: downloading, grey: missing, dimmed: skipped.</span></p>
+  <div class="piece-map" role="img" aria-label="Piece map">
+    {{range .Pieces}}<span class="piece-run piece-{{if eq .State "have"}}have{{else if eq .State "downloading"}}down{{else if eq .State "skipped"}}skip{{else}}missing{{end}}" style="width:{{.Pct}}%" title="{{if eq .State "have"}}have{{else if eq .State "downloading"}}downloading{{else if eq .State "skipped"}}skipped{{else}}missing{{end}}"></span>{{end}}
   </div>
   {{else}}<p class="muted">Piece map is not available yet (metadata missing).</p>{{end}}
 {{end}}

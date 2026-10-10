@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,5 +23,40 @@ func TestRenderUIUnknownTemplateReturns500(t *testing.T) {
 	}
 	if body := strings.TrimSpace(rec.Body.String()); body != "page render failed" {
 		t.Fatalf("body = %q, want %q", body, "page render failed")
+	}
+}
+
+// TestUIPageTranslation checks the whole page is translated end to end for a
+// non-English language: the <html lang>, the visible text and the client
+// dictionary the JavaScript reads.
+func TestUIPageTranslation(t *testing.T) {
+	d := newTestDaemon(t)
+	server := httptest.NewServer(d.routes())
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/?lang=de")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	page := string(body)
+
+	for _, want := range []string{
+		`lang="de"`,
+		"Hinzufügen",           // Add
+		"Freier Speicherplatz", // Free space
+		"Port testen",          // Test ports
+		"window.__uiI18n",      // client dictionary injected
+		"Magnet kopiert",       // a client-dictionary value (German)
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("German page is missing %q", want)
+		}
+	}
+	for _, bad := range []string{`lang="en"`, "Free space", ">Add<", "Test ports"} {
+		if strings.Contains(page, bad) {
+			t.Errorf("German page still shows English %q", bad)
+		}
 	}
 }

@@ -7,11 +7,17 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"strings"
 
 	xhtml "golang.org/x/net/html"
 )
+
+// uiClientDictPlaceholder marks where the client dictionary script goes in the
+// page template. It is replaced at render time with window.__uiI18n. An empty
+// <script> keeps html/template from stripping it as an HTML comment.
+const uiClientDictPlaceholder = `<script id="ui-i18n"></script>`
 
 // uiTranslatableAttr lists the attributes whose value is user-facing text.
 func uiTranslatableAttr(name string) bool {
@@ -146,6 +152,41 @@ func (d *Daemon) renderUI(w http.ResponseWriter, r *http.Request, name string, d
 		http.Error(w, "page render failed", http.StatusInternalServerError)
 		return
 	}
-	body := uiTranslateHTML(buffer.String(), uiDictionary(d.uiLang(r)))
+	lang := d.uiLang(r)
+	body := buffer.String()
+	if lang != "" && lang != "en" {
+		// <html lang="en"> must reflect the language actually served.
+		body = strings.Replace(body, `lang="en"`, `lang="`+lang+`"`, 1)
+	}
+	body = uiTranslateHTML(body, uiDictionary(lang))
+	body = uiInjectClientDictionary(body, lang)
 	_, _ = w.Write([]byte(body))
+}
+
+// uiInjectClientDictionary replaces the page placeholder with a small script
+// exposing the client-side strings for the request language, so the page's
+// JavaScript (confirm dialogs, toasts) stops being English-only. The server
+// translator skips <script> content, so the values come straight from the
+// catalog; fragments have no placeholder and are left untouched.
+func uiInjectClientDictionary(body, lang string) string {
+	if !strings.Contains(body, uiClientDictPlaceholder) {
+		return body
+	}
+	dict := uiDictionary(lang)
+	values := make(map[string]string, len(uiClientKeys))
+	for _, key := range uiClientKeys {
+		if dict != nil {
+			if translated, ok := dict[key]; ok && translated != "" {
+				values[key] = translated
+				continue
+			}
+		}
+		values[key] = key
+	}
+	raw, err := json.Marshal(values)
+	if err != nil {
+		return strings.Replace(body, uiClientDictPlaceholder, "", 1)
+	}
+	script := "<script>window.__uiI18n=" + string(raw) + ";</script>"
+	return strings.Replace(body, uiClientDictPlaceholder, script, 1)
 }
