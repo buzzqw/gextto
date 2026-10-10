@@ -1,6 +1,8 @@
 package gextto
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -231,5 +233,44 @@ func TestRamdiskAdmissionDisabledForBackendsWithoutRamdisk(t *testing.T) {
 	tev_admitToRamdisk(&cfg, torrents, &models.TorrentEvent{Kind: "metadata_received", Hash: hash, Name: "fits", SavePath: disk})
 	if len(torrents.moved) != 0 {
 		t.Fatalf("a backend without ramdisk support must not admit to the RAM disk: %v", torrents.moved)
+	}
+}
+
+// TestRamdiskPendingBytesCountsPreallocatedSpace covers a download copied onto
+// the RAM disk from a preallocated file: the whole payload already occupies the
+// tmpfs, so it must not
+// require the missing bytes a second time (it was pushed off a 6 GB tmpfs
+// right after being admitted with 4.8 GB to download).
+func TestRamdiskPendingBytesCountsPreallocatedSpace(t *testing.T) {
+	dir := t.TempDir()
+	const size = 4 << 20
+	write := func(name string, allocate bool) {
+		f, err := os.Create(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if allocate {
+			if _, err := f.Write(make([]byte, size)); err != nil {
+				t.Fatal(err)
+			}
+		} else if err := f.Truncate(size); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("prealloc.mkv", true)
+	write("sparse.mkv", false)
+
+	view := models.TorrentView{Name: "prealloc.mkv", SavePath: dir, TotalSize: size, TotalDone: 1 << 20}
+	if pending := RamdiskPendingBytes(view); pending != 0 {
+		t.Fatalf("a preallocated payload still needs %d bytes, want 0", pending)
+	}
+	view.Name = "sparse.mkv"
+	if pending := RamdiskPendingBytes(view); pending != 3<<20 {
+		t.Fatalf("a sparse payload needs %d bytes, want the %d still to download", pending, 3<<20)
+	}
+	view.Name = "missing.mkv"
+	if pending := RamdiskPendingBytes(view); pending != 3<<20 {
+		t.Fatalf("a payload not created yet needs %d bytes, want %d", pending, 3<<20)
 	}
 }

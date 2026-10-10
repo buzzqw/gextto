@@ -362,6 +362,30 @@ func RamdiskFitsRemaining(thresholdBytes, marginBytes, freeBytes, uncommittedByt
 	return nil
 }
 
+// RamdiskPendingBytes is the space a torrent on the RAM disk still has to take
+// there: the bytes not downloaded yet, minus what is already allocated. A
+// payload copied onto the tmpfs from a preallocated file on disk occupies its
+// whole size from the start, so the free space already accounts for it;
+// counting the missing bytes again would require twice the torrent size and
+// push a fitting download off the RAM disk.
+func RamdiskPendingBytes(view models.TorrentView) uint64 {
+	remaining := view.TotalSize - view.TotalDone
+	if remaining <= 0 {
+		return 0
+	}
+	if view.TotalSize > 0 {
+		path := CompletionPath(&models.TorrentEvent{Hash: view.Hash, Name: view.Name, SavePath: view.SavePath})
+		unallocated := view.TotalSize - diskUsage(path)
+		if unallocated < remaining {
+			remaining = unallocated
+		}
+	}
+	if remaining <= 0 {
+		return 0
+	}
+	return uint64(remaining)
+}
+
 func nativeState(state int32, paused bool) string {
 	if paused {
 		return "paused"
@@ -579,11 +603,7 @@ func (c *LibtorrentClient) RamdiskUncommittedBytes(ramdisk string, excludeHash s
 		if !PathOnRamdisk(torrent.SavePath, ramdisk) {
 			continue
 		}
-		remaining := torrent.TotalSize - torrent.TotalDone
-		if remaining < 0 {
-			remaining = 0
-		}
-		total += uint64(remaining)
+		total += RamdiskPendingBytes(torrent)
 	}
 	return total
 }

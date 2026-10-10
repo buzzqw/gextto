@@ -1487,11 +1487,10 @@ func tev_ramdiskRelocation(cfg *Config, torrents TorrentSession, hash, savePath 
 	}
 	// Space is required for what is still to be written, not for the whole
 	// torrent: a nearly complete download must not be relocated mid-transfer.
-	remaining := torrent.TotalSize - torrent.TotalDone
-	if remaining < 0 {
-		remaining = 0
-	}
-	if err := RamdiskFitsRemaining(cfg.RamdiskThresholdBytes(), cfg.RamdiskMarginBytes(), *free, uncommitted, uint64(totalSize), uint64(remaining)); err == nil {
+	// Bytes already allocated (preallocation) are counted as written: the free
+	// space has already dropped by them.
+	remaining := RamdiskPendingBytes(torrent)
+	if err := RamdiskFitsRemaining(cfg.RamdiskThresholdBytes(), cfg.RamdiskMarginBytes(), *free, uncommitted, uint64(totalSize), remaining); err == nil {
 		return "", "", false
 	} else {
 		reason := err.Error()

@@ -1235,9 +1235,7 @@ func (e *gxTorrentEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash st
 		if view.State == "moving" || leaving[strings.ToLower(view.Hash)] {
 			continue
 		}
-		if remaining := view.TotalSize - view.TotalDone; remaining > 0 {
-			total += uint64(remaining)
-		}
+		total += RamdiskPendingBytes(view)
 	}
 	return total
 }

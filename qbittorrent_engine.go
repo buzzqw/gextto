@@ -1030,10 +1030,7 @@ func (e *qbittorrentEngine) RamdiskUncommittedBytes(ramdisk string, excludeHash 
 		if !PathOnRamdisk(view.SavePath, ramdisk) {
 			continue
 		}
-		remaining := view.TotalSize - view.TotalDone
-		if remaining > 0 {
-			total += uint64(remaining)
-		}
+		total += RamdiskPendingBytes(view)
 	}
 	return total
 }
