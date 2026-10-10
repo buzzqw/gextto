@@ -928,11 +928,12 @@ I peer IPv6 si scoprono dai tracker (campo `peers6`, BEP 7) e dallo scambio PEX
 (`added6`/`dropped6`, BEP 11); peer, tracker HTTP e **UDP**, e web seed vengono
 risolti anche su IPv6 (con preferenza per IPv4 quando il nome ne ha entrambi).
 Il campo `yourip` dell'handshake esteso è accettato sia in forma IPv4 sia IPv6,
-e il **filtro IP** accetta regole CIDR IPv6 (le forme a intervallo/P2P/eMule
-restano IPv4).
+il **filtro IP** accetta regole CIDR IPv6 (le forme a intervallo/P2P/eMule
+restano IPv4) e il motore accetta i peer **DHT** IPv6 (contatti da 18 byte,
+BEP 32).
 
-Ancora **non** coperti: il DHT su IPv6 (BEP 32) e la scoperta locale (LSD) via
-multicast IPv6.
+Ancora **non** coperti: la **scoperta** DHT su IPv6 (annunci e nodi v6, BEP 32)
+e la scoperta locale (LSD) via multicast IPv6.
 
 ## Test
 

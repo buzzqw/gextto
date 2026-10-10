@@ -50,13 +50,22 @@ func (s *Session) handleDHTtick() {
 func parseDHTPeers(peers []string) []*net.TCPAddr {
 	addrs := make([]*net.TCPAddr, 0, len(peers))
 	for _, peer := range peers {
-		// DHT returns one entry per peer. UnmarshalBinary rejects anything
-		// that isn't a 6-byte compact peer, so non-IPv4 entries are skipped.
-		var cp tracker.CompactPeer
-		if cp.UnmarshalBinary([]byte(peer)) != nil {
-			continue
+		// DHT returns one binary entry per peer: 6 bytes for IPv4 (BEP 5),
+		// 18 for IPv6 (BEP 32). Anything else is skipped.
+		switch len(peer) {
+		case 6:
+			var cp tracker.CompactPeer
+			if cp.UnmarshalBinary([]byte(peer)) != nil {
+				continue
+			}
+			addrs = append(addrs, cp.Addr())
+		case 18:
+			var cp tracker.CompactPeer6
+			if cp.UnmarshalBinary([]byte(peer)) != nil {
+				continue
+			}
+			addrs = append(addrs, cp.Addr())
 		}
-		addrs = append(addrs, cp.Addr())
 	}
 	return addrs
 }
