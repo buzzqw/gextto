@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -64,6 +65,12 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/deleteTags", d.handleQbitDeleteTags)
 	mux.HandleFunc("POST /api/v2/torrents/addTags", d.handleQbitAddTags)
 	mux.HandleFunc("POST /api/v2/torrents/removeTags", d.handleQbitRemoveTags)
+	mux.HandleFunc("POST /api/v2/torrents/toggleSequentialDownload", d.handleQbitToggleSequential)
+	mux.HandleFunc("POST /api/v2/torrents/setSuperSeeding", d.handleQbitSetSuperSeeding)
+	mux.HandleFunc("POST /api/v2/torrents/addTrackers", d.handleQbitAddTrackers)
+	mux.HandleFunc("POST /api/v2/torrents/removeTrackers", d.handleQbitRemoveTrackers)
+	mux.HandleFunc("POST /api/v2/torrents/editTracker", d.handleQbitEditTracker)
+	mux.HandleFunc("GET /api/v2/sync/torrentPeers", d.handleQbitTorrentPeers)
 	return d.qbitAuth(mux)
 }
 
@@ -322,6 +329,105 @@ func (d *Daemon) handleQbitTrackers(w http.ResponseWriter, r *http.Request) {
 		out = append(out, qbitTracker{URL: tracker.URL, Status: status, NumPeers: tracker.Seeders + tracker.Leechers, Message: message})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleQbitToggleSequential flips sequential download for the given hashes.
+func (d *Daemon) handleQbitToggleSequential(w http.ResponseWriter, r *http.Request) {
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.toggleSequential(hash)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitSetSuperSeeding toggles BEP 16 super-seeding (qBittorrent "value").
+func (d *Daemon) handleQbitSetSuperSeeding(w http.ResponseWriter, r *http.Request) {
+	enabled := strings.EqualFold(strings.TrimSpace(r.FormValue("value")), "true")
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.setSuperSeeding(hash, enabled)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitAddTrackers appends the "urls" (one per line) to the torrents.
+func (d *Daemon) handleQbitAddTrackers(w http.ResponseWriter, r *http.Request) {
+	urls := qbitLines(r.FormValue("urls"))
+	if len(urls) > 0 {
+		for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+			_ = d.addTrackers(hash, urls)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitRemoveTrackers drops the "urls" (one per line) from the torrents.
+func (d *Daemon) handleQbitRemoveTrackers(w http.ResponseWriter, r *http.Request) {
+	urls := qbitLines(r.FormValue("urls"))
+	if len(urls) > 0 {
+		for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+			_ = d.removeTrackers(hash, urls)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitEditTracker replaces origUrl with newUrl on one torrent.
+func (d *Daemon) handleQbitEditTracker(w http.ResponseWriter, r *http.Request) {
+	orig := strings.TrimSpace(r.FormValue("origUrl"))
+	newURL := strings.TrimSpace(r.FormValue("newUrl"))
+	if orig != "" && newURL != "" {
+		_ = d.editTracker(r.FormValue("hash"), orig, newURL)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleQbitTorrentPeers answers sync/torrentPeers: the connected peers keyed
+// by "ip:port", the shape qBittorrent clients parse.
+func (d *Daemon) handleQbitTorrentPeers(w http.ResponseWriter, r *http.Request) {
+	d.mu.Lock()
+	t, _ := d.findLocked(r.URL.Query().Get("hash"))
+	d.mu.Unlock()
+	peers := map[string]any{}
+	if t != nil {
+		for _, peer := range t.Peers() {
+			connection := "BT"
+			if peer.UTP {
+				connection = "μTP"
+			}
+			var flags strings.Builder
+			if peer.Source == torrent.SourceIncoming {
+				flags.WriteByte('I')
+			}
+			if peer.EncryptedStream {
+				flags.WriteByte('E')
+			}
+			ip, port := "", 0
+			if addr, ok := peer.Addr.(*net.TCPAddr); ok {
+				ip, port = addr.IP.String(), addr.Port
+			}
+			peers[peer.Addr.String()] = map[string]any{
+				"ip":         ip,
+				"port":       port,
+				"client":     peer.Client,
+				"progress":   peer.Progress,
+				"dl_speed":   peer.DownloadSpeed,
+				"up_speed":   peer.UploadSpeed,
+				"connection": connection,
+				"flags":      flags.String(),
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"peers": peers, "rid": 0})
+}
+
+// qbitLines splits a qBittorrent "urls" field: one URL per line.
+func qbitLines(value string) []string {
+	var out []string
+	for _, line := range strings.Split(value, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
 }
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {

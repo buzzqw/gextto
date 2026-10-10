@@ -1524,6 +1524,47 @@ func (d *Daemon) setSuperSeeding(key string, enabled bool) error {
 	})
 }
 
+// toggleSequential flips sequential download on a running torrent.
+func (d *Daemon) toggleSequential(key string) error {
+	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		meta.Sequential = !meta.Sequential
+		return t.SetSequential(meta.Sequential)
+	})
+}
+
+// removeTrackers drops the given tracker URLs from a torrent, keeping the rest.
+func (d *Daemon) removeTrackers(key string, urls []string) error {
+	drop := make(map[string]bool, len(urls))
+	for _, u := range urls {
+		drop[strings.TrimSpace(u)] = true
+	}
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		var keep []string
+		for _, tr := range t.Trackers() {
+			if !drop[strings.TrimSpace(tr.URL)] {
+				keep = append(keep, tr.URL)
+			}
+		}
+		return t.SetTrackers(keep)
+	})
+}
+
+// editTracker replaces one tracker URL with another.
+func (d *Daemon) editTracker(key, origURL, newURL string) error {
+	origURL = strings.TrimSpace(origURL)
+	return d.withTorrent(key, func(t *torrent.Torrent, _ *torrentMeta) error {
+		var list []string
+		for _, tr := range t.Trackers() {
+			if strings.TrimSpace(tr.URL) == origURL {
+				list = append(list, newURL)
+			} else {
+				list = append(list, tr.URL)
+			}
+		}
+		return t.SetTrackers(list)
+	})
+}
+
 // moveToTop puts a queued download at the head of the queue.
 func (d *Daemon) moveToTop(key string) error {
 	return d.withTorrent(key, func(_ *torrent.Torrent, meta *torrentMeta) error {

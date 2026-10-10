@@ -249,8 +249,9 @@ In standalone il demone espone anche un'**API compatibile qBittorrent**
 `torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; categoria
 e tag viaggiano anche su `torrents/add`), `torrents/properties|files|trackers`
 e `torrents/reannounce|setLocation` (più gli alias 5.x `stop`/`start`),
+`torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit` e
-`sync/maindata`. Senza
+`sync/maindata|torrentPeers`. Senza
 password configurata l'API è aperta. In managed **non** è esposta: comanda solo
 Gextto. La compatibilità è verificata dai test usando il client qBittorrent di
 Gextto (`internal/qbittorrent`) contro il demone.
