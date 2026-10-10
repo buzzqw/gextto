@@ -50,8 +50,9 @@ service.
 - **Easy to follow:** the dashboard's **To check** panel collects stuck
   downloads, pending moves and alerts; every log line about a download carries
   its **acquisition ID**, so the whole story of a download (search, choice,
-  transfer, archive) can be followed, and the Searches panel shows cycle
-  durations and failing sources, with threshold alerts.
+  transfer, archive) can be followed. The Searches panel shows cycle durations
+  and per-source results, and threshold alerts (log and notification) flag a
+  source failing three cycles in a row or searches that slow down or stop.
 
 The UI is available at `http://<host>:5000/` and supports Italian, English,
 German, French, Spanish and Polish (as do the TUI, the notifications and the

@@ -51,8 +51,10 @@ funzionare come servizio.
 - **Facile da seguire:** il riquadro **Da controllare** della dashboard raccoglie
   download fermi, spostamenti in sospeso e avvisi; ogni riga di log su un
   download riporta il suo **ID di acquisizione**, così se ne segue l'intera storia
-  (ricerca, scelta, trasferimento, archivio), e il pannello Ricerche mostra la
-  durata dei cicli e le sorgenti che falliscono, con avvisi a soglia.
+  (ricerca, scelta, trasferimento, archivio). Il pannello Ricerche mostra la
+  durata dei cicli e l'esito per sorgente, e gli avvisi a soglia (log e notifica)
+  segnalano una sorgente che fallisce tre cicli di fila o ricerche che rallentano
+  o si fermano.
 
 La UI è disponibile su `http://<host>:5000/` e supporta italiano, inglese,
 tedesco, francese, spagnolo e polacco (come la TUI, le notifiche e la pagina
