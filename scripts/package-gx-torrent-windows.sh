@@ -142,6 +142,10 @@ NOTES
 -----
 - The service runs in session 0: it never opens a browser; reach the wizard at
   the printed address.
+- A download folder on a network share must be a UNC path (\\server\share\...),
+  not a mapped drive letter: a mapped drive is invisible to the service. A
+  network folder is linked with a symlink, which may need Developer Mode (or the
+  symlink privilege); a local folder uses a junction and needs no privilege.
 - Only the daemon is Windows-ready. Gextto (the manager) is Linux-only.
 README
 

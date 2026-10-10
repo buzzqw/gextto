@@ -110,6 +110,37 @@ func TestWindowsRealDirectoryIsNotALink(t *testing.T) {
 	}
 }
 
+// TestWindowsUNCIsANetworkFilesystem pins that a UNC destination is classified
+// as a network filesystem, the condition that makes replaceDirLink use a
+// symlink instead of a junction.
+func TestWindowsUNCIsANetworkFilesystem(t *testing.T) {
+	if !networkFilesystem(`\\localhost\C$\Windows`) {
+		t.Fatal("a UNC path must be classified as a network filesystem")
+	}
+}
+
+// TestWindowsNetworkDirLinkUsesSymlink checks the fallback for a download folder
+// on a network share: a junction cannot target a UNC path, so a symlink is used.
+// It skips when the runner has no symlink privilege.
+func TestWindowsNetworkDirLinkUsesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	link := filepath.Join(dir, "link")
+	dest := filepath.Join(dir, "dest")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceDirLinkSymlink(link, dest); err != nil {
+		t.Skipf("no symlink privilege on this runner: %v", err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil || !isDirLink(link, info) {
+		t.Fatalf("symlink not recognised as a link: %v %v", info, err)
+	}
+	if got, err := os.Readlink(link); err != nil || filepath.Clean(got) != dest {
+		t.Fatalf("readlink = %q, %v; want %q", got, err, dest)
+	}
+}
+
 // TestWindowsLinkFlow exercises the whole storage.go link flow on Windows:
 // pointLink creates the junction, readLink resolves it, re-pointing follows a
 // move between folders, protectLegacyDir leaves the junction alone, and

@@ -246,7 +246,14 @@ la riporta come `ModeIrregular`: il demone la riconosce con `isDirLink`
 (`link_*.go`). Rimuovere la junction non tocca mai i dati a cui punta; per
 ripuntarla dopo un move la nuova junction è costruita completa sotto un nome
 temporaneo e poi scambiata, così una lettura concorrente non vede mai il link
-mancante. Su Unix
+mancante. Una junction però può puntare solo a un **volume locale**: con una
+cartella di download su una **share di rete** (`\\nas\media`, o un'unità mappata
+`DRIVE_REMOTE`) il demone usa un **symlink** (l'unico link che può puntare a una
+share) e, se manca il privilegio symlink, restituisce un errore chiaro che
+nomina la cartella di rete invece di far fallire l'aggiunta del torrent. Un
+**servizio** gira in sessione 0 e non vede le unità mappate dell'utente: per le
+cartelle di rete usare un percorso **UNC** (`\\server\share\...`), non la lettera
+di unità. Su Unix
 resta il symlink atomico. La migrazione tra volumi riconosce anche l'errore Windows
 `ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix; senza
 il privilegio symlink, un symlink del payload che punta a un file viene copiato

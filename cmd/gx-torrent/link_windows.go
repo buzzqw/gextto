@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"unsafe"
@@ -10,16 +11,22 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// replaceDirLink makes link point at dest. Windows symlinks need the
-// SeCreateSymbolicLinkPrivilege (or Developer Mode), so a directory junction is
-// used instead: it needs no privilege and os.Readlink reads it back.
+// replaceDirLink makes link point at dest. A junction (mount point) can only
+// target a local volume, so a destination on a network share (UNC or a mapped
+// remote drive) is linked with a symlink instead: that needs
+// SeCreateSymbolicLinkPrivilege (or Developer Mode), and a clear error is
+// returned when it is not available. A local destination uses a junction, which
+// needs no privilege (os.Readlink reads it back).
 //
 // Windows cannot atomically replace a directory junction (MoveFileEx with
-// REPLACE_EXISTING does not overwrite a directory), so the new junction is
-// built complete under a temporary name first and only then swapped in: the
-// window with no link is as short as a single rename, and a failure while
-// building the new junction leaves the old link untouched.
+// REPLACE_EXISTING does not overwrite a directory), so the new link is built
+// complete under a temporary name first and only then swapped in: the window
+// with no link is as short as a single rename, and a failure while building the
+// new link leaves the old one untouched.
 func replaceDirLink(link, dest string) error {
+	if networkFilesystem(dest) {
+		return replaceDirLinkSymlink(link, dest)
+	}
 	tmp := link + ".tmp"
 	_ = os.RemoveAll(tmp)
 	if err := os.Mkdir(tmp, 0o755); err != nil {
@@ -38,6 +45,29 @@ func replaceDirLink(link, dest string) error {
 	}
 	if err := os.Rename(tmp, link); err != nil {
 		_ = os.RemoveAll(tmp)
+		return err
+	}
+	return nil
+}
+
+// replaceDirLinkSymlink builds link as a symlink to a network destination, the
+// only link kind that may target a share. A symlink to a directory needs the
+// symlink privilege (or Developer Mode); without it the error names the network
+// folder so the operator knows to use a local folder or enable symlinks.
+func replaceDirLinkSymlink(link, dest string) error {
+	tmp := link + ".tmp"
+	_ = os.Remove(tmp)
+	if err := os.Symlink(dest, tmp); err != nil {
+		return fmt.Errorf("network folder %s: the link needs the symlink privilege (Developer Mode) or a local folder: %w", dest, err)
+	}
+	if info, err := os.Lstat(link); err == nil && isDirLink(link, info) {
+		if err := os.Remove(link); err != nil {
+			_ = os.Remove(tmp)
+			return err
+		}
+	}
+	if err := os.Rename(tmp, link); err != nil {
+		_ = os.Remove(tmp)
 		return err
 	}
 	return nil
