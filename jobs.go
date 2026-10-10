@@ -23,7 +23,7 @@ const (
 )
 
 // Job is the observable snapshot of one background operation. It is designed to
-// be serialised to the UI: see `docs/revisione-1.md`, section 7.
+// be serialised to the UI: see `docs/evoluzione.md`, section 8.4.
 type Job struct {
 	ID         string     `json:"id"`
 	Kind       string     `json:"kind"`

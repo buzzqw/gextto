@@ -16,11 +16,7 @@ specifiche.
 | [TUI](tui.md) | Client terminale e scorciatoie da tastiera. |
 | [Sviluppatori](DEVELOPERS.md) | Build, test e convenzioni per contributor. |
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
-| [Scelte di progetto](scelte-di-progetto.md) | Perché il progetto è fatto così: posizionamento, gestori di indexer, politica di selezione. |
-| [Proposte di migliorie](proposte-migliorie.md) | Migliorie proposte, decisioni prese e stato di ciascuna. |
-| [Lavoro di sessione](lavoro-sessione.md) | Passaggio di consegne tra sessioni di sviluppo: regole, stato, punti aperti. |
-| [Da fare](da-fare.md) | Backlog dei punti ancora aperti. |
-| [Accessibilità](accessibility-analysis.md) | Ambito, esito e limiti dell'accessibilità della UI web. |
+| [Scelte di progetto, migliorie ed evoluzione](evoluzione.md) | Backlog, migliorie implementate, piani gx-torrent, misure, revisioni e direzione strategica. |
 | [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (rain, demone, adapter). |
 | [Archivio](archive/README.md) | Report e piani storici, non più aggiornati. |
 

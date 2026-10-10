@@ -264,7 +264,7 @@ npm run test:a11y
 The current automated suite covers the main UI sections with 12 accessibility
 tests. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
-See the [accessibility analysis](docs/accessibility-analysis.md) for scope and known
+See the [accessibility analysis](docs/evoluzione.md#13-accessibilità) for scope and known
 limitations.
 
 ## Documentation
@@ -278,7 +278,7 @@ limitations.
 | Terminal client | [TUI reference](docs/tui.md) |
 | Build or contribute | [Developer manual](docs/DEVELOPERS.md) |
 | Network and data safety | [Security policy](docs/SECURITY.md) |
-| Accessibility scope and testing | [Accessibility analysis](docs/accessibility-analysis.md) |
+| Accessibility scope and testing | [Accessibility analysis](docs/evoluzione.md#13-accessibilità) |
 
 For the full documentation tree, start from the [documentation index](docs/README.md).
 

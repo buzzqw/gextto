@@ -769,7 +769,7 @@ rain.
   - caricamento del filtro IP.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) la misura seeding/choking
     su sciame locale, con byte e tempi per peer: metodo e metriche in
-    `docs/gx-torrent-misure-seeding.md`.
+    `docs/evoluzione.md` (§6).
 - `go test ./internal/blocklist` in `third_party/rain` copre i formati del
   filtro IP.
 - `make test-rain` copre anche l'harness deterministico del choking

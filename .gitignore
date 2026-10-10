@@ -18,9 +18,24 @@ coverage.xml
 *.tmp
 *.pid
 
-# Local-only project notes and superseded planning documents
+# Local-only project notes and superseded planning documents.
+# The improvement/evolution docs were consolidated into docs/evoluzione.md;
+# the originals remain as untracked local copies in docs/archive/.
 docs/internal/
-docs/revisione-1.md
+docs/archive/proposte-migliorie.md
+docs/archive/da-fare.md
+docs/archive/lavoro-sessione.md
+docs/archive/scelte-di-progetto.md
+docs/archive/accessibility-analysis.md
+docs/archive/holepunch-test-harness.md
+docs/archive/gx-torrent-migliorie.md
+docs/archive/gx-torrent-ottimizzazioni-prestazionali-v2.md
+docs/archive/gx-torrent-misure-seeding.md
+docs/archive/revisione-1.md
+docs/archive/revisione-2.md
+docs/archive/UI_V2.md
+docs/archive/gextto-terra.md
+docs/archive/pro-terra.md
 
 # The gx-torrent daemon's own build number (independent from gextto's).
 gx-torrent.build_number

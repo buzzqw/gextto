@@ -558,7 +558,7 @@ type AppState struct {
 	rename_progress_mu sync.Mutex
 	config_cache       *ConfigCache
 	// jobs tracks long-running background operations with an observable state
-	// (see docs/revisione-1.md, section 7). Handlers create and query jobs, and
+	// (see docs/evoluzione.md, section 8.4). Handlers create and query jobs, and
 	// stopBackgroundWorkers closes the manager on shutdown.
 	jobs *JobManager
 	// Background-worker lifecycle. bgStop is closed when the daemon starts

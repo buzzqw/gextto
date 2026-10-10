@@ -70,7 +70,7 @@ test-race:
 # Seeding/choking measurements (gextto fork). The deterministic unchoker harness
 # runs with `make test-rain`; this runs the opt-in local-swarm harness. Add
 # GX_MEASURE_SUPERSEED=1 to compare against super-seeding, GX_MEASURE_LEECHERS=N
-# for the swarm size. See docs/gx-torrent-misure-seeding.md.
+# for the swarm size. See docs/evoluzione.md (section 6).
 measure-seeding:
 	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
 

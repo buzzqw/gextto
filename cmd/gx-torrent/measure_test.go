@@ -22,7 +22,7 @@ package main
 // Set GX_MEASURE_SUPERSEED=1 to compare against BEP 16 super-seeding,
 // GX_MEASURE_MESH=1 for peer-to-peer exchange (2 leechers is reliable on one
 // host), and GX_MEASURE_LEECHERS=N for the swarm size. See
-// docs/gx-torrent-misure-seeding.md for the methodology.
+// docs/evoluzione.md (section 6) for the methodology.
 
 import (
 	"fmt"
