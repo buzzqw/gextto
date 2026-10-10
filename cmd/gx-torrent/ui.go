@@ -565,7 +565,7 @@ const uiLiveTemplate = `{{define "fragments"}}<div id="frag-cards">{{template "c
     <span>Totals <b>{{bytes .TotalDown}}</b> / <b>{{bytes .TotalUp}}</b></span>
     <span>Free space <b>{{bytes .DiskFree}} of {{bytes .DiskTotal}}</b></span>
     <span>DHT <b>{{if .DHT}}{{.DHTNodes}} nodes{{else}}off{{end}}</b></span>
-    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b> <button type="button" onclick="testPorts()" title="Verifica se la porta è in ascolto e inoltrata dal router">Test porte</button> <span id="portcheck-result"></span></span>
+    <span>Port <b>{{if .PortOpen}}open ({{.Router}}{{if .ExternalIP}} {{.ExternalIP}}{{end}}){{else}}not open{{end}}</b> <button type="button" onclick="testPorts()" title="Check that the peer port is listening and forwarded by the router">Test ports</button> <span id="portcheck-result"></span></span>
     <span>Encryption <b>{{.Encryption}}</b></span>
     {{if .PeerErrors}}<span title="Errori peer/tracker filtrati dal log, per categoria (dall'avvio)">Peer <b>{{.PeerErrors}}</b></span>{{end}}
   </div>
@@ -738,9 +738,7 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := uiTemplate.Execute(w, page); err != nil {
-		return
-	}
+	d.renderUI(w, r, "", page)
 }
 
 // handleUILive renders only the cards and the table, for the page's periodic
@@ -756,7 +754,7 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = uiTemplate.ExecuteTemplate(w, "fragments", page)
+	d.renderUI(w, r, "fragments", page)
 }
 
 // handleUIDetail renders one tab of a torrent's detail, as a fragment for the
@@ -854,7 +852,7 @@ func (d *Daemon) handleUIDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write(buf.Bytes())
+	_, _ = w.Write([]byte(uiTranslateHTML(buf.String(), uiDictionary(d.uiLang(r)))))
 }
 
 // handleUITorrentFile streams the .torrent of one torrent, so the page can offer

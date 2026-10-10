@@ -147,6 +147,7 @@ func main() {
 	noUPnP := flag.Bool("no-upnp", envBool("GX_TORRENT_NO_UPNP", false), "do not open the port on the router with UPnP")
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
 	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
+	lang := flag.String("lang", envOr("GX_TORRENT_LANG", "en"), "web page language (it, en, de, fr, es, pl)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
@@ -226,6 +227,7 @@ func main() {
 		Fingerprint:    *fingerprint,
 		GexttoLog:      strings.TrimSpace(*gexttoLog),
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
+		Lang:           strings.TrimSpace(*lang),
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

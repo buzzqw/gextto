@@ -100,6 +100,9 @@ operativa** pensata per chi apre quell'indirizzo dal browser, come la Web UI di
 qBittorrent. Si aggiorna da sola ogni 2 secondi senza ricaricare la pagina.
 La scheda del browser mostra l'icona del demone (una freccia di download blu),
 inclusa nella pagina e servita anche da `GET /favicon.ico` senza token.
+La pagina è **tradotta** (italiano, inglese, tedesco, francese, spagnolo,
+polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
+`-lang`, e `?lang=xx` la sovrascrive per la singola richiesta.
 
 - **Riepilogo sessione**: in cima i riquadri con i conteggi (torrent, downloading,
   seeding, stalled, paused, moving), porta peer, filtro IP e cache; i valori live

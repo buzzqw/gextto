@@ -49,6 +49,10 @@ type Options struct {
 	GexttoLog string
 	// IPFilterSource is the IP filter URL or path configured in Gextto.
 	IPFilterSource string
+	// Lang is the web page language (it, en, de, fr, es, pl; empty or unknown
+	// means English). Gextto passes its interface language when it starts the
+	// daemon; a ?lang= query overrides it per request.
+	Lang string
 	Tick           time.Duration
 	ProbeWindow    time.Duration
 }

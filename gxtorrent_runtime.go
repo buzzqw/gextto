@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/logging"
+	"github.com/buzzqw/gextto/internal/messages"
 )
 
 // gxManagedProcess is the managed daemon: one Gextto started (cmd) or one it
@@ -135,7 +136,7 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return gxManagedCommand{}, err
 	}
-	args := []string{"-listen", listen, "-data", dataDir}
+	args := []string{"-listen", listen, "-data", dataDir, "-lang", messages.Language()}
 	if !listenIsLoopback(listen) && settings.Token == "" {
 		// The daemon refuses a non-loopback listen without a token. Instead of
 		// failing to start we opt into its documented `-insecure` mode, matching
