@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cenkalti/rain/v2/torrent"
 )
 
 // bencode encodes the few types a test torrent needs.
@@ -1602,5 +1604,86 @@ func TestListEndpointAnswersWhileTheLockIsHeld(t *testing.T) {
 	var views []torrentInfo
 	if err := json.Unmarshal(body, &views); err != nil {
 		t.Fatalf("invalid list body %q: %v", body, err)
+	}
+}
+
+// TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone covers a completed
+// torrent left paused after Gextto archived and renamed its file: a recheck or
+// a resume must not make rain re-create an empty file in the library.
+func TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone(t *testing.T) {
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "library")
+	data := makeTorrent(t, src, "episode.mkv", 200_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the existing payload to seed", func() bool {
+		info, ok := findInfo(d, hash)
+		return ok && info.State == "seeding"
+	})
+	if err := d.pause(hash); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the pause", func() bool { return stateOf(d, hash) == "paused" })
+	payload := filepath.Join(src, "episode.mkv")
+	if err := os.Rename(payload, filepath.Join(src, "Episode - S01E01.mkv")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := d.verify(hash); err == nil {
+		t.Fatal("verify must be refused when the downloaded data is gone")
+	}
+	if err := d.resume(hash); err == nil {
+		t.Fatal("resume must be refused when the downloaded data is gone")
+	}
+	time.Sleep(300 * time.Millisecond)
+	if _, err := os.Lstat(payload); !os.IsNotExist(err) {
+		t.Fatalf("an empty placeholder was re-created at %s (err %v)", payload, err)
+	}
+}
+
+// TestVerifyStopsOnceWhenFilesCannotBeAllocated locks in the rain fork fix: a
+// verification whose file allocation fails stops with the error instead of
+// restarting itself in a tight loop (thousands of log lines a second).
+func TestVerifyStopsOnceWhenFilesCannotBeAllocated(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	d := newTestDaemon(t)
+	src := filepath.Join(t.TempDir(), "library")
+	data := makeTorrent(t, src, "episode.mkv", 200_000)
+	hash, _, err := d.add(addRequest{TorrentData: data, Destination: src, SeedRatio: -1, SeedDays: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the existing payload to seed", func() bool { return stateOf(d, hash) == "seeding" })
+	if err := d.pause(hash); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the pause", func() bool { return stateOf(d, hash) == "paused" })
+	if err := os.Remove(filepath.Join(src, "episode.mkv")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(src, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(src, 0o755) })
+
+	d.mu.Lock()
+	tor, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if err := tor.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the allocation error", func() bool {
+		stats := tor.Stats()
+		return stats.Status == torrent.Stopped && stats.Error != nil
+	})
+	for range 10 {
+		time.Sleep(30 * time.Millisecond)
+		if status := tor.Stats().Status; status != torrent.Stopped {
+			t.Fatalf("the verification restarted after the error (status %v)", status)
+		}
 	}
 }

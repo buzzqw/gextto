@@ -1282,10 +1282,27 @@ func (d *Daemon) pause(key string) error {
 	})
 }
 
+// errPayloadGone refuses to start or verify a finished torrent whose data is no
+// longer at its save path (archived and renamed, or deleted): rain would
+// re-create every file empty there, in the middle of the library.
+func errPayloadGone(t *torrent.Torrent, meta *torrentMeta) error {
+	if meta.CompletedAt.IsZero() || t.Name() == "" {
+		return nil
+	}
+	path := filepath.Join(meta.SavePath, t.Name())
+	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("the downloaded data is no longer in %s", path)
+	}
+	return nil
+}
+
 // resume hands the torrent back to the queue (it starts at once if a slot is
 // free) and clears a previous error.
 func (d *Daemon) resume(key string) error {
 	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if err := errPayloadGone(t, meta); err != nil {
+			return err
+		}
 		meta.UserPaused = false
 		meta.Parked = false
 		meta.RotatedAt = time.Time{}
@@ -1344,6 +1361,9 @@ func (d *Daemon) reannounce(key string) error {
 
 func (d *Daemon) verify(key string) error {
 	return d.withTorrent(key, func(t *torrent.Torrent, meta *torrentMeta) error {
+		if err := errPayloadGone(t, meta); err != nil {
+			return err
+		}
 		meta.Error = ""
 		return t.Verify()
 	})

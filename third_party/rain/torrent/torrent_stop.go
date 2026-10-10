@@ -13,6 +13,13 @@ func (t *torrent) handleStopped() {
 	t.errC <- t.lastError
 	t.errC = nil
 	t.portC = nil
+	// gextto fork: a verification restarts the torrent only after a clean
+	// stop. If it stopped on an error (missing or unwritable files), starting
+	// again fails the same way: the loop logged thousands of errors a second
+	// and re-created empty files at the save path on every attempt.
+	if t.doVerify && t.lastError != nil {
+		t.doVerify = false
+	}
 	if t.doVerify {
 		t.mBitfield.Lock()
 		t.bitfield = nil
