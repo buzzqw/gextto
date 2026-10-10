@@ -256,6 +256,23 @@ password configurata l'API è aperta. In managed **non** è esposta: comanda sol
 Gextto. La compatibilità è verificata dai test usando il client qBittorrent di
 Gextto (`internal/qbittorrent`) contro il demone.
 
+### Container
+
+Il demone standalone si può eseguire in container: il `Dockerfile` nella radice
+compila `gx-torrent` (Go puro) e lo impacchetta in `debian:12-slim` con i
+certificati CA, in **modalità standalone**, dati in `/data`, UI su `0.0.0.0:8080`
+e porta peer `6881` (TCP+UDP); il processo gira come utente non privilegiato.
+
+```sh
+docker build -t gx-torrent .
+docker run -d --name gx-torrent \
+  -p 8080:8080 -p 6881:6881 -p 6881:6881/udp \
+  -v gx-torrent-data:/data gx-torrent
+```
+
+Alla prima apertura (`http://HOST:8080/`) la pagina reindirizza al wizard
+(`/ui/setup`).
+
 In standalone la pagina ha anche un filtro **Categorie** nella barra laterale e,
 nel dettaglio *Generale*, i campi **Categoria** e **Tag** (scrivere una categoria
 nuova la crea). In managed questi controlli non compaiono e l'endpoint

@@ -1,0 +1,11 @@
+# Keep the build context small: only the Go sources and build inputs are needed.
+.git
+.github
+bin
+data
+gextto-data
+docs
+uiweb/v2/end2end
+*.log
+*.tar.gz
+gx-torrent.build_number
