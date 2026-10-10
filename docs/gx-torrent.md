@@ -235,15 +235,22 @@ sistema usano le API Win32, quindi la cache e la diagnostica restano piene:
 memoria (`GlobalMemoryStatusEx`) per dimensionare la cache, spazio libero
 (`GetDiskFreeSpaceEx`), filesystem di rete (`GetDriveType`), classe del disco
 HDD/SSD (seek penalty via `IOCTL_STORAGE_QUERY_PROPERTY`) e gateway di default
-per UPnP/NAT-PMP (tabella di routing). La cartella dati di default è
+per UPnP/NAT-PMP (`GetBestRoute`, cioè la rotta che Windows usa davvero anche
+con VPN e LAN insieme, con fallback alla rotta `0.0.0.0` a metrica minore). La
+cartella dati di default è
 `%LOCALAPPDATA%\gx-torrent`. Il **link di libreria** di ogni torrent
 (`DataDir/<id>`) è una **junction** su Windows, non un symlink: la junction non
 richiede il privilegio `SeCreateSymbolicLinkPrivilege` (né la Modalità
 sviluppatore). `os.Readlink` la legge come un symlink, ma da Go 1.23 `os.Lstat`
 la riporta come `ModeIrregular`: il demone la riconosce con `isDirLink`
-(`link_*.go`). Rimuovere la junction non tocca mai i dati a cui punta. Su Unix
+(`link_*.go`). Rimuovere la junction non tocca mai i dati a cui punta; per
+ripuntarla dopo un move la nuova junction è costruita completa sotto un nome
+temporaneo e poi scambiata, così una lettura concorrente non vede mai il link
+mancante. Su Unix
 resta il symlink atomico. La migrazione tra volumi riconosce anche l'errore Windows
-`ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix.
+`ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix; senza
+il privilegio symlink, un symlink del payload che punta a un file viene copiato
+come file invece di far fallire lo spostamento (su Unix resta un symlink).
 Restano senza equivalente nativo solo due **ottimizzazioni** di I/O — il
 readahead (`fadvise`) e la preallocazione con `fallocate` — che usano il
 fallback (`Truncate`): funzionano, senza l'ottimizzazione.
@@ -260,6 +267,24 @@ stop del servizio li ferma in modo pulito. Il pacchetto
 il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
 Installer e unit systemd restano per Linux.
 
+In breve, sul PC Windows:
+
+```powershell
+# PowerShell con privilegi di amministratore, nella cartella dello zip estratto
+.\install-service.ps1     # registra e avvia il servizio (avvio automatico)
+Stop-Service gx-torrent    # ferma
+.\uninstall-service.ps1   # rimuove il servizio (i dati restano)
+```
+
+Lo zip è pubblicato in ogni release (`gx-torrent-windows-amd64.zip`,
+`gx-torrent-windows-arm64.zip`, con checksum `.sha256`). La CI lo verifica su
+`windows-latest` a due livelli: il job `windows-platform` esegue i test di
+piattaforma (junction, memoria, gateway, setup, move tra volumi, ciclo di vita
+del demone `TestDaemonStartServeStop`); il job `windows-service`, non
+bloccante, installa davvero il servizio con lo stesso `binPath` del pacchetto,
+lo avvia, attende `/api/v1/health` e ne verifica lo stop pulito
+(`scripts/gx-torrent-service-selftest.ps1`, riusabile anche a mano).
+
 In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
 prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
 cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo
@@ -268,10 +293,21 @@ configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`)
 `local-bypass` (`true`/`false`).
 
 Al primo avvio in standalone, finché il setup non è completato, la pagina
-reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download, utente e
-password, "LAN senza password", porta peer. Il wizard scrive `settings.json` e
-marca il setup completato; la lingua vale subito, cartella e porta al prossimo
-avvio (la chiave `peer-ports` è letta quando la flag non è passata).
+reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download e cartella
+temporanea, porta peer con **test di raggiungibilità** (`/api/v1/portcheck`:
+esito, metodo UPnP/NAT-PMP, IP esterno), **limiti di banda** globali
+(download/upload in KiB/s, 0 = illimitato), utente e password, "LAN senza
+password" e indexer facoltativi. Il wizard scrive `settings.json` e marca il
+setup completato; lingua e limiti di banda valgono subito (se i limiti non si
+applicano, l'errore è mostrato nella pagina e il setup non viene marcato
+completato), cartella e porta al prossimo avvio (la chiave `peer-ports` è letta
+quando la flag non è passata).
+
+Il demone apre da solo il browser sul wizard, **dopo** che il server è in
+ascolto e solo se c'è una sessione grafica: `rundll32` su Windows (saltato in
+sessione 0, cioè servizi e attività senza utente collegato), `xdg-open` su Unix
+con fallback `gio`/`sensible-browser` (solo con `DISPLAY`, `WAYLAND_DISPLAY` o
+`XDG_SESSION_TYPE`). Negli altri casi il log stampa comunque l'URL da aprire.
 
 In standalone il demone espone anche un'**API compatibile qBittorrent**
 (`/api/v2`) per Sonarr, Radarr e le app mobili: `auth/login` e `auth/logout`

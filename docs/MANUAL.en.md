@@ -262,7 +262,7 @@ Run `/opt/gextto/gexttod --update` as root to restart `gextto.service`
 automatically; otherwise the exact
 `systemctl` command is printed. The systemd unit is not overwritten, so local
 customisations (user, ports, paths) are preserved. The same payload is the
-standalone Linux package described in the README (*Standalone Linux package*).
+release package the installer uses (README, *Install on Linux*).
 
 ## 2. Dashboard
 

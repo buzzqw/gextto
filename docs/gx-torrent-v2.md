@@ -32,9 +32,21 @@ i messaggi `hash request`/`hashes`/`hash reject` (BEP 52, id 21/22/23, payload
 binario), si verificano contro i `pieces root` (uncle hash inclusi) e si
 persistono nel resume. Il **bit riservato v2** (byte 7, `0x10`) è annunciato
 nell'handshake solo per i torrent con identità v2. Il seed risponde dalle sue
-`piece layers`, senza leggere i dati; le richieste a livello blocco (`base = 0`)
-sono rifiutate con `hash reject`. Test end-to-end `TestV2MagnetTransfer` (seed e
+`piece layers`, senza leggere i dati. Test end-to-end `TestV2MagnetTransfer` (seed e
 leech in-process).
+
+**Realizzato (2026-10-10) — layer dei pezzi in parallelo e `base = 0`:**
+- il `piece layer` di un file è diviso in chunk fissi (≤512 hash), ciascuno
+  chiesto a un peer diverso; un chunk fallito, scaduto (30 s) o rifiutato torna
+  in coda per un altro peer. Le `hash request` partono solo verso i peer che
+  annunciano il bit v2 (`TestV2LayerChunksAreAssignedAndRetried`,
+  `TestExpireV2HashRequestsReleasesStaleRequest`);
+- il seed risponde anche alle richieste del **layer dei blocchi** (`base = 0`),
+  che un leecher libtorrent usa per verificare i blocchi durante il download:
+  l'albero è costruito dai pezzi verificati (`v2BlockTree`), in cache per-file e
+  solo per un file interamente presente, altrimenti `hash reject`
+  (`TestAppendBlockLeavesMatchesContiguousHashes`; interop end-to-end con un
+  client TCP grezzo in `cmd/gx-torrent/v2_blocklayer_test.go`).
 
 ## 2. BEP 52 in sintesi (regole che contano)
 
@@ -118,7 +130,8 @@ foglie copre un pezzo (`pieceLength/16KiB`).
   risposta con `merkle.VerifyHashes` (ricostruzione della radice con gli uncle),
   assemblaggio del layer e `AttachV2Pieces`, persistenza in `piece layers`.
 - Lato server: `LayerTree` costruito dagli hash dei pezzi già posseduti;
-  `hash_reject` quando il layer non è servibile (`base < piece layer`).
+  `base = 0` (layer dei blocchi) servito dai pezzi verificati per un file
+  completo; `hash_reject` quando il layer non è servibile.
 - **Test**: round-trip codec + fuzz; `TestLayerTreeRoundTrip` e
   `TestV2MagnetTransfer` (scarica i layer da un seed, li valida, verifica i pezzi).
 
@@ -144,10 +157,9 @@ sintetico ha fallito proprio qui (progress 0: hash del pezzo sbagliato).
 | Modello pezzi sbagliato | pezzi per-file espliciti; test con coda più corta e blocco parziale |
 | Hash del pezzo sbagliato | nodo Merkle con padding a hash zero, non hash piatto; `merkle` come riferimento |
 | Identità troncata | handshake/DHT/tracker a 20 byte; test di routing |
-| `piece layers` assenti | rifiuto esplicito finché non c'è I5 |
+| `piece layers` assenti | scaricati dai peer con `hash request` (I5); un peer muto scade dopo 30 s |
 | Licenze | algoritmi riscritti (niente MPL di anacrolix); BEP 52 è pubblico dominio |
 
 ## 7. Fuori scope (per ora)
 
 - WebTorrent/WebRTC; storage alternativi; `share mode`.
-- Magnet v2 **senza** `piece layers` prima di I5.

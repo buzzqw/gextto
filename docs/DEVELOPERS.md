@@ -186,5 +186,22 @@ release in an Ubuntu 22.04 container (the libtorrent C++ ABI pins that baseline)
 It is the payload consumed by the official installer and by the advanced
 self-update command.
 
+The same release build also produces the **standalone gx-torrent** packages,
+published next to Gextto's (pure-Go variant only):
+
+| Script | Output | Contents |
+|---|---|---|
+| `scripts/package-gx-torrent.sh` | `gx-torrent-linux-<arch>.tar.gz` | binary, `run.sh`, systemd unit, README, `VERSION` |
+| `scripts/package-gx-torrent-windows.sh` | `gx-torrent-windows-<arch>.zip` (amd64, arm64) | `gx-torrent.exe` (native Windows service), `install-service.ps1`, `uninstall-service.ps1`, `README.txt` |
+
+Windows support is guarded in CI (`ci.yml`): `build-test` cross-compiles the
+engine and the daemon and runs `go vet` for Windows; `windows-platform` runs the
+platform tests on `windows-latest`; `windows-service` (non-blocking) installs
+the real service with `scripts/gx-torrent-service-selftest.ps1`, waits for
+`/api/v1/health` and checks a clean stop. Platform-specific daemon code lives
+in `cmd/gx-torrent/*_linux.go`, `*_windows.go` and `*_other.go`; on Windows a
+library link is a junction, so always test for a link with `isDirLink`, never
+with `os.ModeSymlink`.
+
 Keep generated binaries, databases, logs and local configuration out of Git.
 Release checks and CI configuration are maintained outside the user manuals.

@@ -106,11 +106,14 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   avviato da `startDaemon` (estratto e condiviso col percorso interattivo).
   `scripts/package-gx-torrent-windows.sh` produce il pacchetto
   `gx-torrent-windows-<arch>.zip` (exe + `install-service.ps1` +
-  `uninstall-service.ps1` + README). La CI (`ci.yml`, job `build-test`) ha degli
+  `uninstall-service.ps1` + README), generato da `build-release.sh` e pubblicato
+  nel release (`dist/gx-torrent-windows-*`). La CI (`ci.yml`, job `build-test`) ha degli
   step che cross-compilano **sia il motore sia il demone** per Windows, così il
   supporto non regredisce; il job `windows-platform` esegue su `windows-latest`
-  i soli test di piattaforma (`platform_windows_test.go`, `go test -run
-  "Windows|MountPoint" ./cmd/gx-torrent/`). Il buffer della junction è costruito
+  i test di piattaforma (`platform_windows_test.go` e i test portabili, `go test
+  -run "Windows|MountPoint|Setup|CrossDevice|DaemonStart" ./cmd/gx-torrent/`);
+  il job `windows-service` (non bloccante) installa davvero il servizio con
+  `scripts/gx-torrent-service-selftest.ps1` (install/start/health/stop). Il buffer della junction è costruito
   da `mountPointReparseData` (`junction.go`), testato anche su Linux. Gextto intero (`cmd/gexttod`) **non** è Windows:
   TUI, gestione processi/systemd, metadati fs e installer/updater sono Unix
   (vedi `docs/gx-torrent.md`, *Uso standalone → Piattaforme*).
@@ -141,7 +144,8 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `gx-torrent-linux-<arch>.tar.gz` (binario + unit systemd + README), che
   `build-release.sh` genera nella variante Go pura e la CI pubblica accanto a
   quelli di Gextto: è il client usabile da solo, come qbittorrent-nox, senza
-  Gextto.
+  Gextto. `scripts/package-gx-torrent-windows.sh` fa lo stesso per Windows
+  (`gx-torrent-windows-<arch>.zip`, amd64/arm64, servizio nativo).
 - `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
   `constants.BuiltAt`; `scripts/release-manifest.sh` scrive `release.json`
   (versione, commit, ultimi commit) pubblicato accanto ai pacchetti: è ciò che

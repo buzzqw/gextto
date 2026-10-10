@@ -259,7 +259,7 @@ Esegui `/opt/gextto/gexttod --update` come root per riavviare automaticamente
 `gextto.service`; altrimenti stampa il
 comando `systemctl` esatto. L'unità systemd non viene sovrascritta, così le
 personalizzazioni locali (utente, porte, percorsi) restano. Lo stesso payload è
-il pacchetto Linux autonomo descritto nel README (*Pacchetto Linux autonomo*).
+il pacchetto di release usato dall'installer (README, *Installazione Linux*).
 
 ## 2. Dashboard
 

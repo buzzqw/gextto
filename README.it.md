@@ -80,7 +80,7 @@ di esso l'opzione non compare nella tendina *Motore torrent*. Un crash del motor
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
-| gx-torrent (predefinito) | Processo Go separato e sorvegliato | Il predefinito: Go puro, autonomo, sviluppo attivo. BitTorrent v1, ibridi e solo-v2 (BEP 52, `.torrent` e magnet); cross-compila per Windows, niente WebTorrent/WebRTC |
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato | Il predefinito: Go puro, autonomo, sviluppo attivo. BitTorrent v1, ibridi e solo-v2 (BEP 52, `.torrent` e magnet); usabile anche da solo su Linux e Windows (vedi *gx-torrent come client autonomo*); niente WebTorrent/WebRTC |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
 | libtorrent (build opzionale) | Nel processo di Gextto; **solo se l'hai compilato** (`make build-libtorrent`) | Ti servono i controlli avanzati o la compatibilità di libtorrent; è anche il fallback automatico. Un crash coinvolge anche Gextto |
 
@@ -196,6 +196,43 @@ prodotto, numero di build e, se collegata, la versione di libtorrent con:
 ./bin/gexttod --version
 ```
 
+## gx-torrent come client autonomo
+
+gx-torrent è anche un client BitTorrent completo a sé, usabile senza Gextto come
+si usa `qbittorrent-nox`. È **lo stesso binario** che Gextto pilota come motore:
+nessun fork, nessun prodotto separato. In modalità standalone aggiunge un wizard
+di primo avvio, un login facoltativo (la rete locale può restare senza
+password), categorie e tag, RSS con regole di download, ricerca sugli indexer
+(Jackett, Prowlarr, MIRCrew) e un'**API compatibile qBittorrent** (`/api/v2`) per
+Sonarr, Radarr e le app mobili.
+
+Ogni release pubblica pacchetti dedicati accanto a quelli di Gextto:
+
+| Piattaforma | Pacchetto | Come gira |
+|---|---|---|
+| Linux (x86_64, aarch64) | `gx-torrent-linux-<arch>.tar.gz` | `run.sh` o la unit systemd inclusa |
+| Windows (amd64, arm64) | `gx-torrent-windows-<arch>.zip` | Servizio Windows nativo, installato da `install-service.ps1` |
+| Container | `Dockerfile` nella radice del repository | Utente non privilegiato, dati in `/data`, UI sulla porta 8080 |
+
+**Windows.** Estrai lo zip ed esegui `install-service.ps1` da un PowerShell
+**con privilegi di amministratore**: registra e avvia il servizio `gx-torrent`
+(avvio automatico), con dati e log in `%ProgramData%\gx-torrent`.
+`uninstall-service.ps1` lo rimuove; il `README.txt` incluso descrive anche
+l'alternativa `sc create`. Su Windows gx-torrent usa le API native per memoria,
+tipo di disco, spazio libero e gateway di default (UPnP/NAT-PMP) e collega ogni
+torrent con una **junction**, quindi non servono né il privilegio dei link
+simbolici né la Modalità sviluppatore. Su Windows gira solo gx-torrent; Gextto
+resta solo Linux.
+
+**Primo avvio.** Apri `http://<host>:8890/`: il wizard guida lingua, cartelle
+di download e temporanea, porta peer con test di raggiungibilità, limiti di
+banda globali, utente e password, accesso dalla LAN e indexer facoltativi. In
+una sessione desktop il browser si apre da solo sul wizard; su un server senza
+grafica o come servizio Windows il log stampa l'indirizzo da aprire.
+
+Il riferimento completo (flag, `settings.json`, API, note di piattaforma) è il
+[documento tecnico di gx-torrent](docs/gx-torrent.md).
+
 ## Primo avvio sicuro
 
 1. Apri `http://<server>:5000`: al primo avvio parte la **configurazione
@@ -283,6 +320,7 @@ limitazioni note.
 | Integrazioni HTTP | [Riferimento API](docs/API.md) |
 | Migrare un'installazione | [Guida migrazione](docs/MIGRATION.md) |
 | Client da terminale | [Riferimento TUI](docs/tui.md) |
+| Motore gx-torrent e client autonomo | [Documento tecnico di gx-torrent](docs/gx-torrent.md) |
 | Compilare o contribuire | [Manuale sviluppatori](docs/DEVELOPERS.md) |
 | Rete e protezione dati | [Politica di sicurezza](docs/SECURITY.md) |
 | Ambito e test accessibilità | [Analisi accessibilità](docs/evoluzione.md#13-accessibilità) |

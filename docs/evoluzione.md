@@ -147,12 +147,12 @@ bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
    ogni `AppState` lascia un'entry; in produzione è una sola, nei test crescono
    (`newTestAppState`). Valutare un `Reset` per i test o una chiave con cleanup.
 
-### 1.5 gx-torrent su Windows e magnet v2 (aperte, revisione del 2026-10-10)
+### 1.5 gx-torrent su Windows e magnet v2 (chiuse, revisione del 2026-10-10)
 
 La revisione dei commit Windows/v2 ha corretto R-001…R-013 (junction, `isDirLink`,
 scadenza delle hash request, sessione 0, job CI `windows-platform`; commit
 `95495e5`, `ebae504`, `1fae2ea`, `0363a02`). Le migliorie emerse (M-01…M-08)
-sono state implementate in massima parte:
+sono state **tutte implementate**:
 
 | Item | Stato |
 | --- | --- |
@@ -161,9 +161,9 @@ sono state implementate in massima parte:
 | M-03 layer v2 in parallelo: chunk da ≤512 hash per peer diverso, con retry | fatto (`92f0a84`) |
 | M-04 wizard: errore mostrato in pagina se i limiti di banda non si applicano | fatto (`fbc9eaf`) |
 | M-05 `replaceDirLink` Windows: junction costruita completa e poi scambiata | fatto (`d4e1485`) |
-| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | fatto (`service_windows.go`, `scripts/package-gx-torrent-windows.sh`) |
+| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | fatto (`b145b73`, `9120fc5`; selftest del servizio in CI `8403c71`) |
 | M-07 gateway Windows: usare la rotta scelta da Windows (`GetBestRoute`) | fatto (`d4e1485`) |
-| M-08 interop v2 `base=0`: servire il layer dei blocchi come seed | fatto (`5d2bff5` documentazione, poi codice: risposta `base=0` dai pezzi verificati, in cache per-file, solo a file completo) |
+| M-08 interop v2 `base=0`: servire il layer dei blocchi come seed | fatto (`ab0a603`: risposta `base=0` dai pezzi verificati, in cache per-file, solo a file completo; interop con client grezzo `e9d8a78`) |
 
 **M-06 (servizio Windows)** — fatto: `main` ora riconosce `svc.IsWindowsService()`
 (`service_windows.go` / `service_other.go`) e avvia lo stesso demone
@@ -175,9 +175,11 @@ Lo zip è ora generato **dentro** `build-release.sh` (variante Go pura, dove Go 
 disponibile) e pubblicato da `continuous.yml`/`release.yml` come artifact e nel
 release (`dist/gx-torrent-windows-<arch>.zip`). `TestDaemonStartServeStop` copre
 il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
-`windows-platform`, su Windows. Resta da fare solo un test che **installi
-davvero** il servizio su Windows (`New-Service`) e ne verifichi lo stop pulito:
-richiede privilegi di amministratore nel runner e non è ancora scritto.
+`windows-platform`, su Windows. L'installazione reale è coperta dal job CI
+`windows-service` (`8403c71`, non bloccante perché l'SCM è asincrono):
+`scripts/gx-torrent-service-selftest.ps1` registra il servizio con `New-Service`
+e lo stesso `binPath` del pacchetto, lo avvia, attende `/api/v1/health` e ne
+verifica lo stop pulito.
 
 ---
 
