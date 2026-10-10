@@ -995,7 +995,11 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 			// The engine handles v1 and the v1 side of hybrid torrents; the raw
 			// metainfo carries "meta version" only when a v2 layer is present.
 			if bytes.Contains(data, []byte("12:meta versioni2e")) {
-				meta.Version = "hybrid"
+				if bytes.Contains(data, []byte("6:pieces")) {
+					meta.Version = "hybrid"
+				} else {
+					meta.Version = "v2"
+				}
 			} else {
 				meta.Version = "v1"
 			}

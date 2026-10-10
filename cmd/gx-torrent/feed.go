@@ -184,7 +184,8 @@ func (d *Daemon) pollFeeds() {
 					continue
 				}
 			}
-			if err := d.addFeedItem(item, action); err != nil {
+			newlyAdded, err := d.addFeedItem(item, action)
+			if err != nil {
 				status.LastError = err.Error()
 				logf("feed %s: cannot add %q: %v", name, item.Title, err)
 				d.notify("feed_error", map[string]any{"feed": name, "title": item.Title, "error": err.Error()})
@@ -195,8 +196,10 @@ func (d *Daemon) pollFeeds() {
 				_, _, episode, _ := rss.FindEpisode(item.Title)
 				d.setSmartEpisode(smartKey, episode)
 			}
-			added++
-			addedTitles = append(addedTitles, item.Title)
+			if newlyAdded {
+				added++
+				addedTitles = append(addedTitles, item.Title)
+			}
 		}
 		status.Added = added
 		if added > 0 {
@@ -232,8 +235,9 @@ func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss
 }
 
 // addFeedItem adds one feed item with the rule's action: a magnet directly, a
-// .torrent URL downloaded first.
-func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) error {
+// .torrent URL downloaded first. It reports whether the torrent was newly added
+// (false when it was already in the session).
+func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) (bool, error) {
 	req := addRequest{
 		Destination: strings.TrimSpace(action.SavePath),
 		Paused:      action.Paused,
@@ -248,12 +252,12 @@ func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) error {
 	} else {
 		data, err := d.fetchTorrentURL(item.Link)
 		if err != nil {
-			return err
+			return false, err
 		}
 		req.TorrentData = data
 	}
-	_, _, err := d.add(req)
-	return err
+	_, existing, err := d.add(req)
+	return !existing, err
 }
 
 // rules returns the configured ordered rules (empty when none/invalid).
