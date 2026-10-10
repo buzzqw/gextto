@@ -22,8 +22,10 @@
 `Piece.VerifyV2` (nodo Merkle via `merkle`), verifica SHA-256 in
 `verifier`/`piecewriter`, identità troncata (`Info.Hash` = primi 20 byte di
 `V2Hash`), abilitazione dei **`.torrent` v2** (il demone non rifiuta più i v2-only
-da file) e **test end-to-end** (seed/leech multi-file con `piece length` >
-16 KiB). **Resta I5** (magnet v2 / `.torrent` senza `piece layers`).
+da file), **persistenza dei `piece layers`** nel resume (i torrent v2
+sopravvivono al riavvio e l'**export/serve del `.torrent` li include**) e **test
+end-to-end** (seed/leech multi-file con `piece length` > 16 KiB). **Resta I5**
+(magnet v2 / `.torrent` senza `piece layers`).
 
 ## 2. BEP 52 in sintesi (regole che contano)
 

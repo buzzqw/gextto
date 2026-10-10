@@ -321,3 +321,89 @@ func TestVerifyPieceLayers(t *testing.T) {
 		t.Fatal("missing piece layer accepted")
 	}
 }
+
+func concatHashes(l [][32]byte) []byte {
+	var b []byte
+	for _, h := range l {
+		b = append(b, h[:]...)
+	}
+	return b
+}
+
+// TestV2NumPiecesProperty checks the per-file piece count over many sizes and
+// piece lengths (a property test, not a single example).
+func TestV2NumPiecesProperty(t *testing.T) {
+	block := merkle.BlockSize
+	for _, pieceLen := range []int{block, 2 * block, 4 * block} {
+		for _, sizes := range [][]int{{0, 1, block - 1}, {block, block + 1, 3 * block}, {5 * block, 2 * block}} {
+			tree := map[string]any{}
+			var want uint32
+			for i, sz := range sizes {
+				data := bytes.Repeat([]byte{byte(i + 1)}, sz)
+				root := merkle.Root(merkle.LeafHashes(data))
+				name := "f" + string(rune('0'+i)) + ".bin"
+				tree[name] = map[string]any{"": map[string]any{"length": sz, "pieces root": root[:]}}
+				if sz > 0 {
+					want += uint32((sz + pieceLen - 1) / pieceLen)
+				}
+			}
+			info := map[string]any{"name": "p", "piece length": pieceLen, "meta version": 2, "file tree": tree}
+			raw, err := bencode.EncodeBytes(info)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := NewV2Info(raw)
+			if err != nil {
+				t.Fatalf("pieceLen=%d sizes=%v: %v", pieceLen, sizes, err)
+			}
+			if got.NumPieces != want {
+				t.Fatalf("pieceLen=%d sizes=%v: NumPieces=%d want %d", pieceLen, sizes, got.NumPieces, want)
+			}
+			if len(got.Files) != len(sizes) {
+				t.Fatalf("pieceLen=%d sizes=%v: files=%d want %d", pieceLen, sizes, len(got.Files), len(sizes))
+			}
+		}
+	}
+}
+
+// TestV2ExportRoundTrip checks that a v2 torrent survives export and re-parse
+// (the piece layers and the info hash must be preserved).
+func TestV2ExportRoundTrip(t *testing.T) {
+	block := merkle.BlockSize
+	data := bytes.Repeat([]byte{0x33}, 3*block)
+	leaves := merkle.LeafHashes(data)
+	root := merkle.Root(leaves)
+	layer := merkle.PieceLayer(leaves, 2*block)
+	infoBytes, err := bencode.EncodeBytes(map[string]any{
+		"name": "x", "piece length": 2 * block, "meta version": 2,
+		"file tree": map[string]any{"x": map[string]any{"": map[string]any{"length": len(data), "pieces root": root[:]}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	top, err := bencode.EncodeBytes(struct {
+		Info bencode.RawMessage `bencode:"info"`
+		PL   map[string][]byte  `bencode:"piece layers"`
+	}{infoBytes, map[string][]byte{string(root[:]): concatHashes(layer)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mi, err := New(bytes.NewReader(top))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	out, err := NewBytesWithLayers(mi.Info.Bytes, nil, nil, mi.PieceLayers, "")
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	mi2, err := New(bytes.NewReader(out))
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	if mi2.Info.V2Hash != mi.Info.V2Hash {
+		t.Fatal("v2 info hash changed on export")
+	}
+	if len(mi2.PieceLayers) != 1 {
+		t.Fatalf("piece layers lost on export: %d", len(mi2.PieceLayers))
+	}
+}

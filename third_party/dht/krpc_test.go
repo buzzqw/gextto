@@ -289,3 +289,11 @@ func TestNodeResponseFields(t *testing.T) {
 		})
 	}
 }
+
+func FuzzParseNodesString(f *testing.F) {
+	f.Add("AAAAAAAAAAAAAAAAAAAA\x01\x02\x03\x04\x1a\xe1", "udp4")
+	f.Add("BBBBBBBBBBBBBBBBBBBB\x20\x01\x0d\xb8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x1a\xe1", "udp6")
+	f.Fuzz(func(t *testing.T, nodes, proto string) {
+		_ = parseNodesString(nodes, proto, &nullLogger{})
+	})
+}

@@ -224,8 +224,10 @@ cartella dati **non** viene letto (così l'impronta resta stabile); in standalon
 In standalone le POST della pagina (`/ui/*`) sono accettate solo se
 `Origin`/`Referer` coincide con l'host della richiesta (protezione CSRF) e l'host
 della richiesta (`Host`) deve essere un IP o `localhost`, mai un nome che risolve
-a questa macchina (protezione DNS rebinding). In managed la pagina si comporta
-come prima (le POST dell'API v1 restano protette dal token).
+a questa macchina (protezione DNS rebinding). La stessa protezione CSRF vale per
+le **POST di `/api/v2`** (che non usano un token): un client che non manda
+`Origin`/`Referer` resta ammesso. In managed la pagina si comporta come prima (le
+POST dell'API v1 restano protette dal token).
 
 In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
 prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
@@ -249,7 +251,7 @@ In standalone il demone espone anche un'**API compatibile qBittorrent**
 `torrents/tags`, `createTags`, `deleteTags`, `addTags`, `removeTags`; categoria
 e tag viaggiano anche su `torrents/add`), `torrents/properties|files|trackers`
 e `torrents/reannounce|setLocation` (più gli alias 5.x `stop`/`start`),
-`torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit`,
+`torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit` e
 `sync/maindata|torrentPeers`. Senza
 password configurata l'API è aperta. In managed **non** è esposta: comanda solo
