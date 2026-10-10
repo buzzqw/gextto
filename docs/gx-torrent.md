@@ -229,6 +229,15 @@ le **POST di `/api/v2`** (che non usano un token): un client che non manda
 `Origin`/`Referer` resta ammesso. In managed la pagina si comporta come prima (le
 POST dell'API v1 restano protette dal token).
 
+**Piattaforme.** Il demone è Go puro e compila anche per **Windows** (amd64 e
+arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Su Windows le
+funzioni che leggono `/proc` o `/sys` (stima della RAM per la cache, distinzione
+HDD/SSD, gateway di default per UPnP/NAT-PMP) degradano senza errore: UI, API e
+download funzionano, mentre la cache usa i valori prudenti di default. Spazio
+libero e filesystem di rete sono letti con le API Win32
+(`GetDiskFreeSpaceEx`, `GetDriveType`), non con `statfs`. Installer e unit
+systemd restano per Linux.
+
 In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
 prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
 cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo

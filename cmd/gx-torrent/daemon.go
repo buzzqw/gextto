@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
@@ -22,14 +21,10 @@ import (
 )
 
 // diskFree returns the free (available to the user) and total bytes of the
-// filesystem holding path. Zeroes when the path cannot be stat'ed.
+// filesystem holding path. Zeroes when the path cannot be queried. The platform
+// detail lives in fsinfo_*.go.
 func diskFree(path string) (free, total int64) {
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(path, &st); err != nil {
-		return 0, 0
-	}
-	block := int64(st.Bsize)
-	return int64(st.Bavail) * block, int64(st.Blocks) * block
+	return diskFreeBytes(path)
 }
 
 // Options is the daemon's process configuration (flags and environment).

@@ -18,7 +18,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/torrent"
@@ -156,18 +155,14 @@ func adaptiveCache(cfg queue.Config, in cacheInputs) (read, write int64, reason 
 }
 
 // storageClass classifies where downloads are written, so the policy can lean
-// larger on slow storage. Network filesystems are detected from statfs; local
-// disks from their rotational flag.
+// larger on slow storage. Network filesystems are detected per platform (statfs
+// on Linux, the drive type on Windows); local disks from their rotational flag.
 func storageClass(path string) string {
 	if strings.TrimSpace(path) == "" {
 		return "unknown"
 	}
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(path, &st); err == nil {
-		switch uint64(st.Type) {
-		case 0x6969, 0xFF534D42, 0xFE534D42: // NFS, CIFS/SMB, SMB2
-			return "network"
-		}
+	if networkFilesystem(path) {
+		return "network"
 	}
 	if majmin := mountMajorMinor(path); majmin != "" {
 		if rotationalDevice(majmin) {
