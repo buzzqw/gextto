@@ -27,7 +27,10 @@ func standaloneTestDaemon(t *testing.T, password string, bypass bool) *Daemon {
 		store.Set(standalonePasswordKey, hash)
 	}
 	store.Set(standaloneBypassKey, fmt.Sprintf("%t", bypass))
-	return &Daemon{opts: Options{Mode: ModeStandalone, Settings: store}, sessions: auth.NewSessions(time.Hour)}
+	return &Daemon{
+		opts:     Options{Mode: ModeStandalone, Settings: store, StatePath: filepath.Join(t.TempDir(), "state.json")},
+		sessions: auth.NewSessions(time.Hour),
+	}
 }
 
 func TestStandaloneAuthNoPasswordIsOpen(t *testing.T) {

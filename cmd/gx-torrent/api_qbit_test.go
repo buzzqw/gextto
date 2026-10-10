@@ -140,6 +140,70 @@ func TestQbitMutatingEndpoints(t *testing.T) {
 	}
 }
 
+func TestQbitCategoriesAndTags(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	post := func(path string, form url.Values) int {
+		resp, err := http.PostForm(srv.URL+path, form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	getJSON := func(path string, out any) {
+		resp, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+	}
+
+	if code := post("/api/v2/torrents/createCategory", url.Values{"category": {"movies"}, "savePath": {"/srv/media/movies"}}); code != 200 {
+		t.Fatalf("createCategory: %d", code)
+	}
+	var cats map[string]qbitCategory
+	getJSON("/api/v2/torrents/categories", &cats)
+	if got := cats["movies"]; got.Name != "movies" || got.SavePath != "/srv/media/movies" {
+		t.Fatalf("categories = %+v", cats)
+	}
+
+	if code := post("/api/v2/torrents/createTags", url.Values{"tags": {"a,b"}}); code != 200 {
+		t.Fatalf("createTags: %d", code)
+	}
+	var tags []string
+	getJSON("/api/v2/torrents/tags", &tags)
+	if len(tags) != 2 || tags[0] != "a" || tags[1] != "b" {
+		t.Fatalf("tags = %v", tags)
+	}
+
+	post("/api/v2/torrents/deleteTags", url.Values{"tags": {"a"}})
+	getJSON("/api/v2/torrents/tags", &tags)
+	if len(tags) != 1 || tags[0] != "b" {
+		t.Fatalf("tags after delete = %v", tags)
+	}
+
+	post("/api/v2/torrents/removeCategories", url.Values{"categories": {"movies"}})
+	cats = nil
+	getJSON("/api/v2/torrents/categories", &cats)
+	if _, ok := cats["movies"]; ok {
+		t.Fatalf("category not removed: %+v", cats)
+	}
+
+	// setCategory / addTags on an unknown hash are accepted and ignored.
+	if code := post("/api/v2/torrents/setCategory", url.Values{"hashes": {"abc"}, "category": {"movies"}}); code != 200 {
+		t.Fatalf("setCategory: %d", code)
+	}
+	if code := post("/api/v2/torrents/addTags", url.Values{"hashes": {"abc"}, "tags": {"x"}}); code != 200 {
+		t.Fatalf("addTags: %d", code)
+	}
+}
+
 func TestQbitStateMapping(t *testing.T) {
 	cases := map[string]string{
 		"downloading":    "downloading",

@@ -106,6 +106,10 @@ type torrentMeta struct {
 	FilePriorities []int  `json:"file_priorities,omitempty"`
 	Version        string `json:"version,omitempty"`
 	Error          string `json:"error,omitempty"`
+	// Category and Tags are the qBittorrent-style labels a client assigns
+	// (standalone mode). They do not affect the transfer.
+	Category string   `json:"category,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
 }
 
 type persistedState struct {
@@ -116,6 +120,10 @@ type persistedState struct {
 	// BadTrackers maps a tracker URL to the Unix time until which it stays
 	// disabled after failing continuously (see tracker_health.go).
 	BadTrackers map[string]int64 `json:"bad_trackers,omitempty"`
+	// Categories maps a category name to its save path (qBittorrent-style).
+	Categories map[string]string `json:"categories,omitempty"`
+	// Tags is the set of known tag names (a tag can exist before it is used).
+	Tags []string `json:"tags,omitempty"`
 }
 
 // runtimeInfo is volatile per-torrent bookkeeping.
@@ -924,6 +932,9 @@ type torrentInfo struct {
 	Error            string `json:"error,omitempty"`
 	AddedAt          int64  `json:"added_at"`
 	CompletedAt      int64  `json:"completed_at,omitempty"`
+	// Category and Tags are the qBittorrent-style labels (standalone mode).
+	Category string   `json:"category,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
 }
 
 // stateFor maps rain's status and gx-torrent's flags onto Gextto's states.
@@ -1030,6 +1041,8 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		FileCount:        stats.FileCount,
 		Error:            meta.Error,
 		AddedAt:          meta.AddedAt.Unix(),
+		Category:         meta.Category,
+		Tags:             meta.Tags,
 	}
 	if info.Error == "" && stats.Error != nil {
 		info.Error = stats.Error.Error()
@@ -1154,6 +1167,9 @@ type addRequest struct {
 	SuperSeeding bool
 	SeedRatio    float64
 	SeedDays     int64
+	// Category and Tags are the qBittorrent-style labels (standalone mode).
+	Category string
+	Tags     []string
 }
 
 // add registers a torrent stopped and lets the queue start it. A torrent
@@ -1233,7 +1249,10 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		// SuperSeeding is a per-torrent seeding strategy, not a queue default.
 		SuperSeeding: req.SuperSeeding,
 		SeedRatio:    req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		Category: req.Category,
+		Tags:     req.Tags,
 	}
+	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
 	d.saveLocked()
 	d.poke()
 	return hash, false, nil
@@ -1880,4 +1899,166 @@ func (d *Daemon) stats() daemonStats {
 		out.Session["lsd_peers_found"] = out.LSD.PeersFound
 	}
 	return out
+}
+
+// ---------------------------------------------------------------------------
+// Categories and tags (standalone, qBittorrent-style)
+// ---------------------------------------------------------------------------
+
+// mergeTagNames appends new tag names, dropping empties and duplicates.
+func mergeTagNames(existing, add []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(existing)+len(add))
+	for _, list := range [][]string{existing, add} {
+		for _, tag := range list {
+			tag = strings.TrimSpace(tag)
+			if tag == "" || seen[tag] {
+				continue
+			}
+			seen[tag] = true
+			out = append(out, tag)
+		}
+	}
+	return out
+}
+
+// dropTagNames removes the given tag names.
+func dropTagNames(existing, remove []string) []string {
+	drop := map[string]bool{}
+	for _, tag := range remove {
+		drop[strings.TrimSpace(tag)] = true
+	}
+	out := make([]string, 0, len(existing))
+	for _, tag := range existing {
+		if !drop[tag] {
+			out = append(out, tag)
+		}
+	}
+	return out
+}
+
+// setCategory assigns (or, with "", clears) the category of a torrent.
+func (d *Daemon) setCategory(key, category string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, meta := d.findLocked(key)
+	if meta == nil {
+		return errNotFound
+	}
+	meta.Category = strings.TrimSpace(category)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+	return nil
+}
+
+func (d *Daemon) addTags(key string, tags []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, meta := d.findLocked(key)
+	if meta == nil {
+		return errNotFound
+	}
+	meta.Tags = mergeTagNames(meta.Tags, tags)
+	d.state.Tags = mergeTagNames(d.state.Tags, tags)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+	return nil
+}
+
+func (d *Daemon) removeTags(key string, tags []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, meta := d.findLocked(key)
+	if meta == nil {
+		return errNotFound
+	}
+	meta.Tags = dropTagNames(meta.Tags, tags)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+	return nil
+}
+
+func (d *Daemon) createCategory(name, savePath string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.Categories == nil {
+		d.state.Categories = map[string]string{}
+	}
+	d.state.Categories[name] = strings.TrimSpace(savePath)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+}
+
+// removeCategories deletes categories and clears them on the torrents that
+// used them.
+func (d *Daemon) removeCategories(names []string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		delete(d.state.Categories, name)
+		for _, meta := range d.state.Torrents {
+			if meta.Category == name {
+				meta.Category = ""
+			}
+		}
+	}
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+}
+
+func (d *Daemon) createTags(tags []string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.state.Tags = mergeTagNames(d.state.Tags, tags)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+}
+
+// deleteTags forgets tags everywhere: the known set and every torrent.
+func (d *Daemon) deleteTags(tags []string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.state.Tags = dropTagNames(d.state.Tags, tags)
+	for _, meta := range d.state.Torrents {
+		meta.Tags = dropTagNames(meta.Tags, tags)
+	}
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+}
+
+func (d *Daemon) categoriesSnapshot() map[string]string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make(map[string]string, len(d.state.Categories))
+	for name, path := range d.state.Categories {
+		out[name] = path
+	}
+	return out
+}
+
+func (d *Daemon) tagsSnapshot() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := append([]string(nil), d.state.Tags...)
+	sort.Strings(out)
+	return out
+}
+
+// categorySavePath is the configured save path of a category, if any.
+func (d *Daemon) categorySavePath(name string) string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.state.Categories[strings.TrimSpace(name)]
 }

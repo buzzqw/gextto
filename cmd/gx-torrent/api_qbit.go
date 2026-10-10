@@ -36,6 +36,15 @@ func (d *Daemon) routesQbit() http.Handler {
 	mux.HandleFunc("POST /api/v2/torrents/pause", d.handleQbitPause)
 	mux.HandleFunc("POST /api/v2/torrents/resume", d.handleQbitResume)
 	mux.HandleFunc("POST /api/v2/torrents/recheck", d.handleQbitRecheck)
+	mux.HandleFunc("GET /api/v2/torrents/categories", d.handleQbitCategories)
+	mux.HandleFunc("POST /api/v2/torrents/createCategory", d.handleQbitCreateCategory)
+	mux.HandleFunc("POST /api/v2/torrents/removeCategories", d.handleQbitRemoveCategories)
+	mux.HandleFunc("POST /api/v2/torrents/setCategory", d.handleQbitSetCategory)
+	mux.HandleFunc("GET /api/v2/torrents/tags", d.handleQbitTags)
+	mux.HandleFunc("POST /api/v2/torrents/createTags", d.handleQbitCreateTags)
+	mux.HandleFunc("POST /api/v2/torrents/deleteTags", d.handleQbitDeleteTags)
+	mux.HandleFunc("POST /api/v2/torrents/addTags", d.handleQbitAddTags)
+	mux.HandleFunc("POST /api/v2/torrents/removeTags", d.handleQbitRemoveTags)
 	return d.qbitAuth(mux)
 }
 
@@ -160,6 +169,8 @@ func qbitView(v torrentInfo) qbitTorrent {
 		ULRate:       v.UploadRate,
 		State:        qbitState(v.State),
 		SavePath:     v.SavePath,
+		Category:     v.Category,
+		Tags:         strings.Join(v.Tags, ", "),
 		NumSeeds:     v.NumSeeds,
 		NumLeechs:    v.NumPeers,
 		Ratio:        ratio,
@@ -258,6 +269,12 @@ func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
 // per line, plus savepath and paused, the way Sonarr and Radarr send them.
 func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
+	category := strings.TrimSpace(r.FormValue("category"))
+	tags := qbitList(r.FormValue("tags"))
+	if savePath == "" && category != "" {
+		// A category carries its own save path, like qBittorrent.
+		savePath = d.categorySavePath(category)
+	}
 	paused := strings.EqualFold(strings.TrimSpace(r.FormValue("paused")), "true")
 	urls := r.FormValue("urls")
 	added := false
@@ -266,7 +283,7 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 		if line == "" {
 			continue
 		}
-		req := addRequest{Destination: savePath, Paused: paused}
+		req := addRequest{Destination: savePath, Paused: paused, Category: category, Tags: tags}
 		switch {
 		case strings.HasPrefix(strings.ToLower(line), "magnet:"):
 			req.Magnet = line
@@ -306,4 +323,81 @@ func (d *Daemon) fetchTorrentURL(rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("torrent URL returned %d", resp.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, maxTorrentFile))
+}
+
+// qbitList splits a qBittorrent list parameter (comma, pipe or newline).
+func qbitList(value string) []string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '|' || r == '\n' || r == '\r'
+	})
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if field = strings.TrimSpace(field); field != "" {
+			out = append(out, field)
+		}
+	}
+	return out
+}
+
+// qbitCategory is the category object the clients read.
+type qbitCategory struct {
+	Name     string `json:"name"`
+	SavePath string `json:"savePath"`
+}
+
+func (d *Daemon) handleQbitCategories(w http.ResponseWriter, _ *http.Request) {
+	categories := d.categoriesSnapshot()
+	out := make(map[string]qbitCategory, len(categories))
+	for name, savePath := range categories {
+		out[name] = qbitCategory{Name: name, SavePath: savePath}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (d *Daemon) handleQbitCreateCategory(w http.ResponseWriter, r *http.Request) {
+	d.createCategory(r.FormValue("category"), r.FormValue("savePath"))
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitRemoveCategories(w http.ResponseWriter, r *http.Request) {
+	d.removeCategories(qbitList(r.FormValue("categories")))
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitSetCategory(w http.ResponseWriter, r *http.Request) {
+	category := strings.TrimSpace(r.FormValue("category"))
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.setCategory(hash, category)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitTags(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, d.tagsSnapshot())
+}
+
+func (d *Daemon) handleQbitCreateTags(w http.ResponseWriter, r *http.Request) {
+	d.createTags(qbitList(r.FormValue("tags")))
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitDeleteTags(w http.ResponseWriter, r *http.Request) {
+	d.deleteTags(qbitList(r.FormValue("tags")))
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitAddTags(w http.ResponseWriter, r *http.Request) {
+	tags := qbitList(r.FormValue("tags"))
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.addTags(hash, tags)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (d *Daemon) handleQbitRemoveTags(w http.ResponseWriter, r *http.Request) {
+	tags := qbitList(r.FormValue("tags"))
+	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
+		_ = d.removeTags(hash, tags)
+	}
+	w.WriteHeader(http.StatusOK)
 }
