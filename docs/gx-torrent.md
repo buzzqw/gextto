@@ -905,7 +905,7 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
 - torrent solo v2 (vedi sopra);
-- IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
+- IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
 dalla base v2.4.2 (vedi la sezione dedicata): il motore scarica per primi i bordi di
@@ -916,6 +916,21 @@ sequenziale.
 Gli slot di upload e le connessioni per torrent **non** sono un limite: si
 impostano con `conn-limits` (e i limiti di banda con `seed-limits`), come visto
 in *Limiti di banda*.
+
+### IPv6
+
+Il listener a porta unica (TCP) e la socket UDP condivisa da uTP e DHT sono
+**dual-stack**: se il host di ascolto è non specificato (`0.0.0.0`, `::` o
+vuoto) si apre un unico socket che accetta sia IPv4 sia IPv6 e, se la macchina
+non ha IPv6, si ripiega su IPv4. Un indirizzo specifico resta mono-famiglia.
+
+I peer IPv6 si scoprono dai tracker (campo `peers6`, BEP 7) e dallo scambio PEX
+(`added6`/`dropped6`, BEP 11); peer, tracker HTTP e web seed vengono risolti
+anche su IPv6 (con preferenza per IPv4 quando il nome ne ha entrambi).
+
+Ancora **non** coperti: DHT su IPv6 (BEP 32), tracker **UDP** su IPv6, i campi
+`yourip`/`external ip` in forma IPv6, il filtro IP per regole IPv6 (le regole v6
+sono ignorate) e la scoperta locale (LSD) via multicast IPv6.
 
 ## Test
 

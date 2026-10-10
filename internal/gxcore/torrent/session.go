@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -173,7 +172,7 @@ func NewSession(cfg Config) (*Session, error) {
 		if host == "" {
 			host = cfg.Host
 		}
-		pc, perr := net.ListenPacket("udp4", net.JoinHostPort(host, strconv.Itoa(int(cfg.ListenPort))))
+		pc, perr := listenUDPOn(host, int(cfg.ListenPort))
 		if perr != nil {
 			err = perr
 			return nil, err

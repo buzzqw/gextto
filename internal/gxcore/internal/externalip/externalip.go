@@ -20,15 +20,29 @@ func init() {
 		if !ok {
 			continue
 		}
-		i4 := in.IP.To4()
-		if i4 == nil {
+		if i4 := in.IP.To4(); i4 != nil {
+			if isPublicIP(i4) {
+				ips = append(ips, i4)
+			}
 			continue
 		}
-		if !isPublicIP(i4) {
-			continue
+		if isPublicIPv6(in.IP) {
+			ips = append(ips, in.IP)
 		}
-		ips = append(ips, i4)
 	}
+}
+
+// isPublicIPv6 reports whether ip is a global IPv6 address that belongs to this
+// host (so we do not dial ourselves). ULA (fc00::/7), link-local and loopback
+// are excluded.
+func isPublicIPv6(ip net.IP) bool {
+	if ip == nil || ip.To4() != nil || ip.To16() == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		return false
+	}
+	return ip.IsGlobalUnicast() && !ip.IsPrivate()
 }
 
 func isPublicIP(ip4 net.IP) bool {

@@ -49,11 +49,11 @@ func (t *torrent) addPeerString(addr string) error {
 func (t *torrent) resolveAndAddPeer(host string, port int) {
 	ctx, cancel := ctxutil.FromChan(t.closeC)
 	defer cancel()
-	ip, err := resolver.ResolveIPv4(ctx, t.session.config.DNSResolveTimeout, host)
+	ip, resolvedPort, err := resolver.Resolve(ctx, net.JoinHostPort(host, strconv.Itoa(port)), t.session.config.DNSResolveTimeout, nil)
 	if err != nil {
 		return
 	}
-	addrs := []*net.TCPAddr{{IP: ip, Port: port}}
+	addrs := []*net.TCPAddr{{IP: ip, Port: resolvedPort}}
 	t.handleNewPeers(addrs, peersource.Manual)
 }
 

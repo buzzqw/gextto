@@ -14,5 +14,6 @@ type announceResponse struct {
 	Complete       int32              `bencode:"complete"`
 	Incomplete     int32              `bencode:"incomplete"`
 	Peers          bencode.RawMessage `bencode:"peers"`
+	Peers6         bencode.RawMessage `bencode:"peers6"`
 	ExternalIP     []byte             `bencode:"external ip"`
 }

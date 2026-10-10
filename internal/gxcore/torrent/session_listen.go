@@ -28,8 +28,7 @@ func (s *Session) startSharedListener() error {
 	if !s.sharedPort() {
 		return nil
 	}
-	ip := net.ParseIP(s.config.Host)
-	listener, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: ip, Port: int(s.config.ListenPort)})
+	listener, err := listenTCPOn(s.config.Host, int(s.config.ListenPort))
 	if err != nil {
 		return err
 	}

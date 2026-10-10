@@ -80,18 +80,23 @@ func resolveInterface(name string) (net.IP, error) {
 }
 
 // choosePeerPort returns the first port of the range free for both TCP and
-// UDP on the listen address.
+// UDP on the listen address. An unspecified host is probed as dual-stack, the
+// same binding the engine will use (F4 IPv6).
 func choosePeerPort(host string, begin, end uint16) (int, error) {
 	if end < begin {
 		end = begin
 	}
+	probeHost := host
+	if ip := net.ParseIP(host); ip == nil || ip.IsUnspecified() {
+		probeHost = ""
+	}
 	for port := int(begin); port <= int(end); port++ {
-		address := net.JoinHostPort(host, fmt.Sprint(port))
-		tcp, err := net.Listen("tcp4", address)
+		address := net.JoinHostPort(probeHost, fmt.Sprint(port))
+		tcp, err := net.Listen("tcp", address)
 		if err != nil {
 			continue
 		}
-		udp, err := net.ListenPacket("udp4", address)
+		udp, err := net.ListenPacket("udp", address)
 		tcp.Close()
 		if err != nil {
 			continue

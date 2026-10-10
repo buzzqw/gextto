@@ -379,6 +379,13 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 			break
 		}
 		t.handleNewPeers(addrs, peersource.PEX)
+		// BEP 11: the IPv6 contacts travel in added6/dropped6 (18 bytes each).
+		if addrs6, err := tracker.DecodePeersCompact6([]byte(msg.Added6)); err == nil {
+			t.handleNewPeers(addrs6, peersource.PEX)
+		}
+		if addrs6, err := tracker.DecodePeersCompact6([]byte(msg.Dropped6)); err == nil {
+			t.handleNewPeers(addrs6, peersource.PEX)
+		}
 	case peerprotocol.HolepunchMessage:
 		t.handleHolepunchMessage(pe, msg)
 	default:

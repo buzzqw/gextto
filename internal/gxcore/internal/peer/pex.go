@@ -83,13 +83,15 @@ func (p *pex) Drop(addr *net.TCPAddr) {
 }
 
 func (p *pex) pexFlushPeers() {
-	added, dropped := p.pexList.Flush()
-	if len(added) == 0 && len(dropped) == 0 {
+	added, added6, dropped, dropped6 := p.pexList.Flush()
+	if len(added) == 0 && len(added6) == 0 && len(dropped) == 0 && len(dropped6) == 0 {
 		return
 	}
 	extPEXMsg := peerprotocol.ExtensionPEXMessage{
-		Added:   added,
-		Dropped: dropped,
+		Added:    added,
+		Added6:   added6,
+		Dropped:  dropped,
+		Dropped6: dropped6,
 	}
 	msg := peerprotocol.ExtensionMessage{
 		ExtendedMessageID: p.extID,

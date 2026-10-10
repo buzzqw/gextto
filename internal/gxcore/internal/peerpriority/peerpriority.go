@@ -36,11 +36,16 @@ func calculateBytes(a, b *net.TCPAddr) (ret [2][]byte) {
 		ret[1] = buf[2:4]
 		return
 	}
-	a4 := a.IP.To4()
-	b4 := b.IP.To4()
-	m := ipv4Mask(a4, b4)
-	ret[0] = a4.Mask(m)
-	ret[1] = b4.Mask(m)
+	if a4, b4 := a.IP.To4(), b.IP.To4(); a4 != nil && b4 != nil {
+		m := ipv4Mask(a4, b4)
+		ret[0] = a4.Mask(m)
+		ret[1] = b4.Mask(m)
+		return
+	}
+	// Mixed families or IPv6 (BEP 40 covers IPv4 only): use the full address
+	// plus the port so distinct peers still get distinct priorities.
+	ret[0] = append(append([]byte{}, a.IP...), byte(a.Port>>8), byte(a.Port))
+	ret[1] = append(append([]byte{}, b.IP...), byte(b.Port>>8), byte(b.Port))
 	return
 }
 

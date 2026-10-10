@@ -163,8 +163,10 @@ type ExtensionMetadataMessage struct {
 
 // ExtensionPEXMessage is the message for the PEX extension.
 type ExtensionPEXMessage struct {
-	Added   string `bencode:"added"`
-	Dropped string `bencode:"dropped"`
+	Added    string `bencode:"added"`
+	Added6   string `bencode:"added6"`
+	Dropped  string `bencode:"dropped"`
+	Dropped6 string `bencode:"dropped6"`
 }
 
 func truncateIP(ip net.IP) net.IP {

@@ -19,7 +19,7 @@ var (
 	ErrInvalidPort = errors.New("invalid port number")
 )
 
-// Resolve `hostport` to an IPv4 address.
+// Resolve `hostport` to an IP address (preferring IPv4, falling back to IPv6).
 func Resolve(ctx context.Context, hostport string, timeout time.Duration, bl *blocklist.Blocklist) (net.IP, int, error) {
 	host, portStr, err := net.SplitHostPort(hostport)
 	if err != nil {
@@ -34,19 +34,40 @@ func Resolve(ctx context.Context, hostport string, timeout time.Duration, bl *bl
 	}
 	ip := net.ParseIP(host)
 	if ip == nil {
-		ip, err = ResolveIPv4(ctx, timeout, host)
+		ip, err = resolveIP(ctx, timeout, host)
 		if err != nil {
 			return nil, 0, err
 		}
 	}
-	i4 := ip.To4()
-	if i4 == nil {
-		return nil, 0, ErrNotIPv4Address
+	if i4 := ip.To4(); i4 != nil {
+		ip = i4
 	}
 	if bl != nil && bl.Blocked(ip) {
 		return nil, 0, ErrBlocked
 	}
-	return i4, port, nil
+	return ip, port, nil
+}
+
+// resolveIP resolves `host` preferring an IPv4 address and falling back to IPv6.
+func resolveIP(ctx context.Context, timeout time.Duration, host string) (net.IP, error) {
+	var cancel func()
+	ctx, cancel = context.WithTimeout(ctx, timeout)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	for _, ia := range addrs {
+		if i4 := ia.IP.To4(); i4 != nil {
+			return i4, nil
+		}
+	}
+	for _, ia := range addrs {
+		if ia.IP.To4() == nil && ia.IP.To16() != nil {
+			return ia.IP, nil
+		}
+	}
+	return nil, ErrNotIPv4Address
 }
 
 // ResolveIPv4 resolves `host` to and IPv4 address.

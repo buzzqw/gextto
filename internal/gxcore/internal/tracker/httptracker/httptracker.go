@@ -165,6 +165,18 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	if err != nil {
 		return nil, err
 	}
+	// BEP 7: the tracker may also return compact IPv6 peers in "peers6".
+	if len(response.Peers6) > 0 {
+		var b6 []byte
+		if derr := bencode.DecodeBytes(response.Peers6, &b6); derr != nil {
+			return nil, tracker.ErrDecode
+		}
+		p6, derr := tracker.DecodePeersCompact6(b6)
+		if derr != nil {
+			return nil, derr
+		}
+		peers = append(peers, p6...)
+	}
 	t.log.Debugf("got %d peers", len(peers))
 
 	// Remove our own address from the peer list.
