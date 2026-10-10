@@ -778,18 +778,35 @@ func ProvidersStatusView(w http.ResponseWriter, r *http.Request, s *AppState) {
 			items[index].URL = gh5_providerURL(cfg, items[index].Provider)
 		}
 	}
-	// Add a live health row for the MirCrew indexer service when configured.
+	// Live service rows: MirCrew, each enabled Prowlarr manager and the
+	// gx-torrent engine. Prowlarr/gx-torrent do not leave a backoff row when
+	// they are healthy, so probe them and show their current state.
+	live := []models.ProviderStatus{}
 	if extra := gh5_mirCrewServiceStatus(cfg); extra != nil {
-		items = append(items, *extra)
+		live = append(live, *extra)
 	}
-	// Prowlarr does not leave a backoff row when it is healthy, so probe each
-	// enabled Prowlarr manager and show its live service state alongside saved
-	// provider failures.
-	items = append(items, gh5_prowlarrServiceStatuses(cfg)...)
-	// gx-torrent never leaves a backoff row: show whether the torrent engine is
-	// up, with a link to open its web page (on another port) in a new tab.
+	live = append(live, gh5_prowlarrServiceStatuses(cfg)...)
 	if extra := gh5_gxTorrentServiceStatus(r.FormValue("public_base"), s, r, cfg); extra != nil {
-		items = append(items, *extra)
+		live = append(live, *extra)
+	}
+	// A live probe supersedes a saved backoff row for the same provider: a
+	// service that has both a stale failure row and a live row showed up twice
+	// (for example Prowlarr as both "indexer" and "servizio"). The live state is
+	// the single source of truth here; the saved row is kept in the DB and
+	// cleared by the next successful search.
+	if len(live) > 0 {
+		probed := make(map[string]struct{}, len(live))
+		for _, entry := range live {
+			probed[strings.ToLower(strings.TrimSpace(entry.Provider))] = struct{}{}
+		}
+		kept := items[:0]
+		for _, entry := range items {
+			if _, ok := probed[strings.ToLower(strings.TrimSpace(entry.Provider))]; ok {
+				continue
+			}
+			kept = append(kept, entry)
+		}
+		items = append(kept, live...)
 	}
 	jsonResponse(w, map[string]any{"ok": true, "items": items})
 }
