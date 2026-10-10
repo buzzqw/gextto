@@ -105,9 +105,15 @@ saved in `settings.json` under the data directory.
 ## Interfaces
 
 - Web UI: `http://<host>:8890/` (login, torrents, categories, RSS at `/ui/rss`).
-- qBittorrent Web API: `/api/v2` (Sonarr, Radarr, mobile apps).
+- qBittorrent Web API: `/api/v2` (Sonarr, Radarr, mobile apps: add/remove, tags,
+  trackers, file priorities, peers, per-torrent limits, super-seeding).
 - Indexer search: configure Jackett/Prowlarr/MIRCrew (Torznab) in `/ui/rss` or
-  via the `indexers` key in `settings.json`.
+  via the `indexers` key in `settings.json`; a feed can also be a **search query**
+  (the `search` field) instead of an RSS URL.
+- Notifications: set `-notify-url` (or `GX_TORRENT_NOTIFY_URL`) to POST a JSON
+  webhook on RSS match and error.
+- Container: the `Dockerfile` in the project root builds a standalone image
+  (data in `/data`, web UI on port 8080).
 
 ## Manage it
 
