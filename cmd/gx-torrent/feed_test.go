@@ -104,6 +104,36 @@ func TestFeedsAddedAtRuntimeArePolled(t *testing.T) {
 	})
 }
 
+func TestFeedErrorNotifiesOnlyOnTransition(t *testing.T) {
+	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer failing.Close()
+	calls := make(chan struct{}, 16)
+	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls <- struct{}{}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer hook.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+failing.URL+`"}]`)
+	d.opts.Settings.Set(notifyURLSettingKey, hook.URL)
+
+	d.pollFeeds() // fails: the first error is notified
+	d.pollFeeds() // still failing: must not notify again
+
+	select {
+	case <-calls:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the first failure did not notify")
+	}
+	select {
+	case <-calls:
+		t.Fatal("a repeated failure notified again")
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
 func TestPollFeedsAddsAndDedupes(t *testing.T) {	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/xml")
 		_, _ = w.Write([]byte(feedBody))

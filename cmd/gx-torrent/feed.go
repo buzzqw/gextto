@@ -176,10 +176,16 @@ func (d *Daemon) pollFeeds() {
 		}
 		cancel()
 		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix()}
+		// Notify only when a feed enters the error state: a feed that keeps
+		// failing at every poll must not send the same webhook over and over.
+		wasError := d.feedErrorState(name)
+		addErrorNotified := false
 		if err != nil {
 			status.LastError = err.Error()
 			logf("feed %s: %v", name, err)
-			d.notify("feed_error", map[string]any{"feed": name, "error": err.Error()})
+			if !wasError {
+				d.notify("feed_error", map[string]any{"feed": name, "error": err.Error()})
+			}
 			d.setFeedStatus(status)
 			continue
 		}
@@ -215,7 +221,10 @@ func (d *Daemon) pollFeeds() {
 			if err != nil {
 				status.LastError = err.Error()
 				logf("feed %s: cannot add %q: %v", name, item.Title, err)
-				d.notify("feed_error", map[string]any{"feed": name, "title": item.Title, "error": err.Error()})
+				if !wasError && !addErrorNotified {
+					d.notify("feed_error", map[string]any{"feed": name, "title": item.Title, "error": err.Error()})
+					addErrorNotified = true
+				}
 				continue
 			}
 			d.markFeedSeen(name, item.GUID)
@@ -383,6 +392,16 @@ func (d *Daemon) setFeedStatus(status feedStatus) {
 		d.feedStatuses = map[string]feedStatus{}
 	}
 	d.feedStatuses[status.Name] = status
+}
+
+// feedErrorState reports whether the last poll of this feed ended with an error.
+// It is used to notify only when a feed enters (or was in) the error state,
+// instead of on every failing poll.
+func (d *Daemon) feedErrorState(name string) bool {
+	d.feedMu.Lock()
+	defer d.feedMu.Unlock()
+	status, ok := d.feedStatuses[name]
+	return ok && status.LastError != ""
 }
 
 // feedStatusesSnapshot returns the feeds' last outcomes, ordered by name.
