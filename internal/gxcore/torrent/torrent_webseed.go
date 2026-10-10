@@ -78,7 +78,7 @@ func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
 	t.pieceMessagesC.Suspend()
 	t.webseedPieceResultC.Suspend()
 
-	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer)
+	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer, t.newPieceHashFunc())
 	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
 
 	if msg.Done {
