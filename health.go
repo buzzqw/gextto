@@ -1,7 +1,9 @@
 package gextto
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -525,9 +527,14 @@ func path_checks(paths *HealthPaths) []PathCheck {
 	return checks
 }
 
+// recentErrorsTailBytes bounds how much of the log recent_errors scans: only
+// the tail can hold recent errors, so reading the whole multi-megabyte file on
+// every render is wasted I/O.
+const recentErrorsTailBytes = 256 * 1024
+
 // recent_errors returns the last `limit` ERROR log lines, most recent last.
 func recent_errors(logPath string, limit int) []string {
-	contents, err := os.ReadFile(logPath)
+	contents, err := readFileTail(logPath, recentErrorsTailBytes)
 	if err != nil {
 		return []string{}
 	}
@@ -541,6 +548,37 @@ func recent_errors(logPath string, limit int) []string {
 		errors = errors[len(errors)-limit:]
 	}
 	return errors
+}
+
+// readFileTail reads at most the last maxBytes of a file, dropping a possibly
+// truncated first line so callers only see whole lines.
+func readFileTail(path string, maxBytes int64) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	size := info.Size()
+	if size <= maxBytes {
+		return io.ReadAll(file)
+	}
+	if _, err := file.Seek(size-maxBytes, io.SeekStart); err != nil {
+		return nil, err
+	}
+	buffer := make([]byte, maxBytes)
+	read, err := io.ReadFull(file, buffer)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	buffer = buffer[:read]
+	if index := bytes.IndexByte(buffer, '\n'); index >= 0 {
+		return buffer[index+1:], nil
+	}
+	return buffer, nil
 }
 
 // disks lists real mounted filesystems (pseudo-fs excluded), deduplicated by

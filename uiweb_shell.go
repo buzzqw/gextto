@@ -1,6 +1,7 @@
 package gextto
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -98,14 +99,22 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 		Lang:         "it",
 	}
 
-	health := CheckWithPaths(uiHealthPathsFrom(s))
-	if health.Status != "" {
-		chrome.Status = s.health_status.update(health.Status, time.Now())
+	// The top bar only needs the status and the process CPU/RAM. The full
+	// CheckWithPaths (mount enumeration, trash walk, and a whole-log scan)
+	// belongs to the Salute page, not to every render: the live partial refreshes
+	// the metrics every few seconds anyway.
+	metrics := ProcessMetrics()
+	rawStatus := "degraded"
+	if dataDir := uiHealthPathsFrom(s).DataDir; dataDir != "" {
+		if info, err := os.Stat(dataDir); err == nil && info.IsDir() && write_probe(dataDir) {
+			rawStatus = "ok"
+		}
 	}
-	if health.ProcessCPUPercent != nil {
-		chrome.CPU = strconv.FormatFloat(*health.ProcessCPUPercent, 'f', 1, 64) + "%"
+	chrome.Status = s.health_status.update(rawStatus, time.Now())
+	if metrics.ProcessCPUPercent != nil {
+		chrome.CPU = strconv.FormatFloat(*metrics.ProcessCPUPercent, 'f', 1, 64) + "%"
 	}
-	chrome.RAM = logging.HumanBytesI64(saturatingInt64(health.ResidentBytes))
+	chrome.RAM = logging.HumanBytesI64(saturatingInt64(metrics.ResidentBytes))
 
 	var downloadRate, uploadRate uint64
 	var parked map[string]StallWatch

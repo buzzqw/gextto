@@ -246,3 +246,29 @@ func TestHealthTreeStats(t *testing.T) {
 		t.Fatalf("missing tree = (%d,%d), want (0,0)", files, bytes)
 	}
 }
+
+// TestReadFileTailAndRecentErrorsOnLargeLog checks the log tail is read without
+// the whole file and that recent errors survive on a log larger than the tail.
+func TestReadFileTailAndRecentErrorsOnLargeLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "big.log")
+	var builder strings.Builder
+	for builder.Len() < 4*recentErrorsTailBytes {
+		builder.WriteString("2026-01-01 00:00:00 INFO routine line\n")
+	}
+	builder.WriteString("2026-01-02 10:00:00 ERROR boom one\n")
+	builder.WriteString("2026-01-02 10:01:00 ERROR boom two\n")
+	if err := os.WriteFile(path, []byte(builder.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tail, err := readFileTail(path, recentErrorsTailBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if int64(len(tail)) > recentErrorsTailBytes {
+		t.Fatalf("tail = %d bytes, want <= %d", len(tail), recentErrorsTailBytes)
+	}
+	got := recent_errors(path, 10)
+	if len(got) != 2 || !strings.Contains(got[1], "boom two") {
+		t.Fatalf("recent_errors on a large log = %#v", got)
+	}
+}
