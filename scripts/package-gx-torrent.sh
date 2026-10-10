@@ -77,9 +77,13 @@ WorkingDirectory=/opt/gx-torrent
 ExecStart=/opt/gx-torrent/gx-torrent -mode standalone -listen 0.0.0.0:8890 -data /var/lib/gx-torrent
 Restart=on-failure
 RestartSec=3
-# NoNewPrivileges/ProtectSystem are conservative defaults; relax if your media
-# folders live elsewhere.
+# Conservative hardening: the daemon only writes under its data directory
+# (/var/lib/gx-torrent) and the download folders. If those live under /home,
+# add them explicitly, e.g. ReadWritePaths=/home/user/media.
 NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
 
 [Install]
 WantedBy=multi-user.target
