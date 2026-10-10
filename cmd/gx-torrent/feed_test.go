@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/settings"
 )
@@ -21,18 +22,48 @@ const feedBody = `<?xml version="1.0"?>
 <description><![CDATA[<a href="magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">y</a>]]></description></item>
 </channel></rss>`
 
+func newStandaloneDaemon(t *testing.T, store *settings.Store) *Daemon {
+	t.Helper()
+	data := t.TempDir()
+	opts := Options{
+		Listen:      "127.0.0.1:0",
+		DataDir:     data,
+		LinkDir:     filepath.Join(data, "links"),
+		DownloadDir: filepath.Join(data, "downloads"),
+		DBPath:      filepath.Join(data, "session.db"),
+		StatePath:   filepath.Join(data, "state.json"),
+		Network:     NetworkOptions{PortBegin: 43000, PortEnd: 43100, Encryption: 1, PEX: true},
+		Mode:        ModeStandalone,
+		Settings:    store,
+		Tick:        50 * time.Millisecond,
+		ProbeWindow: time.Minute,
+	}
+	d, err := newDaemon(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() { d.run(stop); close(done) }()
+	t.Cleanup(func() {
+		close(stop)
+		<-done
+		d.close()
+	})
+	return d
+}
+
 func feedDaemon(t *testing.T, feedsJSON string) *Daemon {
 	t.Helper()
-	d := newTestDaemon(t)
-	d.opts.Mode = ModeStandalone
+	// The options are set before the run loop starts: mutating d.opts afterwards
+	// races with the queue/RSS goroutines under -race.
 	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	store.Set("setup-complete", "true")
+	store.Set(setupCompleteKey, "true")
 	store.Set(feedsSettingKey, feedsJSON)
-	d.opts.Settings = store
-	return d
+	return newStandaloneDaemon(t, store)
 }
 
 func TestPollFeedsAddsAndDedupes(t *testing.T) {

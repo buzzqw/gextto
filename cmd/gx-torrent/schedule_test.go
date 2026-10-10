@@ -54,8 +54,6 @@ func TestScheduledSpeedLimits(t *testing.T) {
 }
 
 func TestApplyEffectiveSpeedLimitsSchedule(t *testing.T) {
-	d := newTestDaemon(t)
-	d.opts.Mode = ModeStandalone
 	store, err := settings.Load(filepath.Join(t.TempDir(), "settings.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +63,7 @@ func TestApplyEffectiveSpeedLimitsSchedule(t *testing.T) {
 	store.Set(scheduleEndKey, "23:59")
 	store.Set(scheduleDLKey, "1234")
 	store.Set(scheduleULKey, "99")
-	d.opts.Settings = store
+	d := newStandaloneDaemon(t, store)
 
 	d.mu.Lock()
 	d.applyEffectiveSpeedLimitsLocked(clockAt(12, 0))
