@@ -43,6 +43,9 @@ type Options struct {
 	AllowedRoots []string
 	Network      NetworkOptions
 	Debug        bool
+	// Mode is how the daemon is run: managed by Gextto or standalone. Gextto's
+	// flags win in managed; settings.json is authoritative in standalone.
+	Mode Mode
 	// Fingerprint is reported by /api/v1/health so Gextto can adopt a daemon
 	// it started earlier with the same binary and options.
 	Fingerprint string
@@ -53,9 +56,9 @@ type Options struct {
 	// Lang is the web page language (it, en, de, fr, es, pl; empty or unknown
 	// means English). Gextto passes its interface language when it starts the
 	// daemon; a ?lang= query overrides it per request.
-	Lang string
-	Tick           time.Duration
-	ProbeWindow    time.Duration
+	Lang        string
+	Tick        time.Duration
+	ProbeWindow time.Duration
 }
 
 // torrentMeta is what gx-torrent knows about a torrent beyond rain.
@@ -184,6 +187,10 @@ type Daemon struct {
 }
 
 func newDaemon(opts Options) (*Daemon, error) {
+	if opts.Mode == "" {
+		// Conservative default: never turn on standalone behaviour implicitly.
+		opts.Mode = ModeManaged
+	}
 	for _, dir := range []string{opts.DataDir, opts.LinkDir, opts.DownloadDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err

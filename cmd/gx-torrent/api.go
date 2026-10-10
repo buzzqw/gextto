@@ -151,7 +151,7 @@ func (d *Daemon) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	count := len(d.state.Torrents)
 	d.mu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": ok, "version": runtimeVersion(), "torrents": count,
-		"pid": os.Getpid(), "fingerprint": d.opts.Fingerprint, "data_dir": d.opts.DataDir})
+		"pid": os.Getpid(), "mode": string(d.opts.Mode), "fingerprint": d.opts.Fingerprint, "data_dir": d.opts.DataDir})
 }
 
 func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {

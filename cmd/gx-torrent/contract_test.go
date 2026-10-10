@@ -76,7 +76,7 @@ func TestContractHealthShape(t *testing.T) {
 	defer server.Close()
 
 	requireKeys(t, "health", getJSONObject(t, server, "/api/v1/health"),
-		"ok", "version", "torrents", "pid", "fingerprint", "data_dir")
+		"ok", "version", "torrents", "pid", "mode", "fingerprint", "data_dir")
 }
 
 func TestContractStatsShape(t *testing.T) {

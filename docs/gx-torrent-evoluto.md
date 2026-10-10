@@ -476,6 +476,8 @@ Aggiornato al 2026-10-10.
 | `ui.go`: template pigro (`sync.Once`) e asset in `internal/webui/assets` (`embed.FS`) | fatto |
 | Test di guardia §8.2 (goroutine, tempo di avvio, assenza di lavoro idle) | fatto |
 | Test di guardia §8.2: RSS e CPU contro qbittorrent-nox | da fare (harness opt-in) |
+| F1: `-mode` managed/standalone (autodetect da `-fingerprint`) e store `settings.json` (base) | fatto |
+| F1: login/sessioni, wizard, protezioni LAN | da fare |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
 ---

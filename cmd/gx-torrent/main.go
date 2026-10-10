@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/constants"
+	"github.com/buzzqw/gextto/internal/settings"
 )
 
 // version may be overridden at build time with -ldflags "-X main.version=...".
@@ -147,7 +148,7 @@ func main() {
 	noUPnP := flag.Bool("no-upnp", envBool("GX_TORRENT_NO_UPNP", false), "do not open the port on the router with UPnP")
 	noNATPMP := flag.Bool("no-natpmp", envBool("GX_TORRENT_NO_NATPMP", false), "do not open the port on the router with NAT-PMP")
 	ipFilter := flag.String("ipfilter", envOr("GX_TORRENT_IPFILTER", ""), "IP filter file (CIDR, ranges, P2P or eMule format)")
-	lang := flag.String("lang", envOr("GX_TORRENT_LANG", "en"), "web page language (it, en, de, fr, es, pl)")
+	lang := flag.String("lang", envOr("GX_TORRENT_LANG", ""), "web page language (it, en, de, fr, es, pl; empty = English)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
@@ -155,6 +156,7 @@ func main() {
 	logFile := flag.String("log-file", envOr("GX_TORRENT_LOG_FILE", ""), "write the log to this file, rotated at 5 MB keeping 4 files (default stderr)")
 	orphanTimeout := flag.Duration("orphan-timeout", 0, "stop when no API request arrives for this long (0 = never); Gextto sets it so a daemon it left running does not outlive it")
 	fingerprint := flag.String("fingerprint", "", "opaque value reported by /api/v1/health; Gextto uses it to recognise a daemon started with the same binary and options")
+	mode := flag.String("mode", envOr("GX_TORRENT_MODE", ""), "managed (driven by Gextto) or standalone; default: managed with -fingerprint, standalone otherwise")
 	ipFilterSource := flag.String("ipfilter-source", envOr("GX_TORRENT_IPFILTER_SOURCE", ""), "IP filter URL or path configured in Gextto, prefilled in the web page")
 	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -178,6 +180,20 @@ func main() {
 	data, err := filepath.Abs(*dataDir)
 	if err != nil {
 		log.Fatal(err)
+	}
+	modeValue, err := resolveMode(*mode, *fingerprint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	pageLang := strings.TrimSpace(*lang)
+	if modeValue == ModeStandalone {
+		// Standalone runs from settings.json; an explicit flag still wins. In
+		// managed mode the file is never read, so Gextto's flags stay in charge.
+		if store, loadErr := settings.Load(filepath.Join(data, "settings.json")); loadErr != nil {
+			log.Printf("cannot read settings.json: %v", loadErr)
+		} else if pageLang == "" {
+			pageLang = strings.TrimSpace(store.Get("lang", ""))
+		}
 	}
 	downloads := *downloadDir
 	if downloads == "" {
@@ -224,10 +240,11 @@ func main() {
 			DHTBootstrap:      parseBootstrapNodes(*dhtBootstrap),
 		},
 		Debug:          *debug,
+		Mode:           modeValue,
 		Fingerprint:    *fingerprint,
 		GexttoLog:      strings.TrimSpace(*gexttoLog),
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
-		Lang:           strings.TrimSpace(*lang),
+		Lang:           pageLang,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

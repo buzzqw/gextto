@@ -206,8 +206,16 @@ gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
            [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
            [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:porta,...]
            [-ipfilter FILE] [-ipfilter-trackers=true] [-lang it]
-           [-log-file FILE] [-insecure] [-debug] [-version]
+           [-mode managed|standalone] [-log-file FILE] [-insecure]
+           [-debug] [-version]
 ```
+
+`-mode` sceglie come gira il demone. Senza il flag: **managed** se c'è
+`-fingerprint` (lo passa Gextto), **standalone** altrimenti. In managed le flag
+passate da Gextto hanno sempre la precedenza e il file `settings.json` nella
+cartella dati **non** viene letto (così l'impronta resta stabile); in standalone
+`settings.json` fornisce i valori che Gextto non passa, per ora la lingua
+(`{"lang": "de"}`), e una flag esplicita vince comunque.
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
@@ -221,7 +229,7 @@ esempio:
   `GX_TORRENT_NO_HOLEPUNCH`, `GX_TORRENT_NO_LSD`, `GX_TORRENT_NO_UPNP`,
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
-- `GX_TORRENT_LANG`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`.
+- `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`.
 
 Alcuni flag sono interni (`-insecure`, `-version`, `-fingerprint`,
 `-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): li usa solo Gextto per
