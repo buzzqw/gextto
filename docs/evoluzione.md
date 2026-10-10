@@ -163,7 +163,7 @@ sono state implementate in massima parte:
 | M-05 `replaceDirLink` Windows: junction costruita completa e poi scambiata | fatto (`d4e1485`) |
 | M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | fatto (`service_windows.go`, `scripts/package-gx-torrent-windows.sh`) |
 | M-07 gateway Windows: usare la rotta scelta da Windows (`GetBestRoute`) | fatto (`d4e1485`) |
-| M-08 interop v2 `base=0`: documentare/rillustrare il limite come seed | fatto (`5d2bff5`) |
+| M-08 interop v2 `base=0`: servire il layer dei blocchi come seed | fatto (`5d2bff5` documentazione, poi codice: risposta `base=0` dai pezzi verificati, in cache per-file, solo a file completo) |
 
 **M-06 (servizio Windows)** — fatto: `main` ora riconosce `svc.IsWindowsService()`
 (`service_windows.go` / `service_other.go`) e avvia lo stesso demone

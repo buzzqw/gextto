@@ -84,6 +84,10 @@ type torrent struct {
 	v2LayerFiles  []*v2LayerFile
 	v2LayerByRoot map[string]*v2LayerFile
 	v2Trees       map[string]*merkle.LayerTree
+	// v2BlockTrees caches the block-layer (base=0) tree of a v2 file, built on
+	// demand from the verified piece data so a seed can answer BEP 52 hash
+	// requests at the leaf layer too.
+	v2BlockTrees  map[string]*merkle.LayerTree
 	v2Pending     map[*peer.Peer]*v2HashRequest
 	v2NoHashPeers map[*peer.Peer]struct{}
 

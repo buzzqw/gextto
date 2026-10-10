@@ -136,8 +136,7 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	}
 	fi := -1
 	for i, f := range t.info.V2Files {
-		// Only a file larger than one piece has a piece layer to serve.
-		if f.HasRoot && f.PiecesRoot == req.Root && f.Length > int64(t.info.PieceLength) {
+		if f.HasRoot && f.PiecesRoot == req.Root {
 			fi = i
 			break
 		}
@@ -145,7 +144,15 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 	if fi < 0 {
 		return nil, false
 	}
-	tree := t.v2Tree(fi)
+	var tree *merkle.LayerTree
+	if req.Base == 0 {
+		// Leaf/block layer: needs the file data, so only a file we fully have.
+		tree = t.v2BlockTree(fi)
+	} else if t.info.V2Files[fi].Length > int64(t.info.PieceLength) {
+		// The piece layer and above come from the attached piece hashes; a file
+		// that fits in one piece has no layer entry.
+		tree = t.v2Tree(fi)
+	}
 	if tree == nil {
 		return nil, false
 	}
@@ -154,6 +161,76 @@ func (t *torrent) serveHashes(req peerprotocol.HashRequestHeader) ([][merkle.Has
 		return nil, false
 	}
 	return got, true
+}
+
+// v2BlockTree returns (and caches) the block-layer tree (base=0) of a v2 file,
+// built from the data of its verified pieces, so a seed can answer leaf-layer
+// hash requests. It returns nil when the file is not fully present, because a
+// tree with missing leaves padded by zero hashes would not anchor to the file's
+// root. The build reads the file from disk, on the torrent loop, and is cached:
+// the cost is paid once per file that is actually asked for.
+func (t *torrent) v2BlockTree(fi int) *merkle.LayerTree {
+	f := t.info.V2Files[fi]
+	key := string(f.PiecesRoot[:])
+	if tree, ok := t.v2BlockTrees[key]; ok {
+		return tree
+	}
+	if t.pieces == nil || t.bitfield == nil {
+		return nil
+	}
+	start, count := t.v2FilePieceRange(fi)
+	if count == 0 || start+count > len(t.pieces) {
+		return nil
+	}
+	for i := start; i < start+count; i++ {
+		if !t.bitfield.Test(uint32(i)) {
+			return nil // not fully present
+		}
+	}
+	leaves := make([][merkle.HashSize]byte, 0, count)
+	for i := start; i < start+count; i++ {
+		p := t.pieces[i]
+		data := make([]byte, p.Length)
+		if _, err := p.Data.ReadAt(data, 0); err != nil {
+			return nil
+		}
+		leaves = appendBlockLeaves(leaves, data)
+	}
+	tree := merkle.NewLayerTree(0, leaves)
+	if tree == nil {
+		return nil
+	}
+	if t.v2BlockTrees == nil {
+		t.v2BlockTrees = make(map[string]*merkle.LayerTree)
+	}
+	t.v2BlockTrees[key] = tree
+	return tree
+}
+
+// v2FilePieceRange returns the file's piece index range in the global piece
+// address space (v2 pieces are file-aligned).
+func (t *torrent) v2FilePieceRange(fi int) (start, count int) {
+	perFile := func(i int) int {
+		f := t.info.V2Files[i]
+		switch {
+		case f.Length == 0:
+			return 0
+		case f.Length <= int64(t.info.PieceLength):
+			return 1
+		default:
+			return int((f.Length + int64(t.info.PieceLength) - 1) / int64(t.info.PieceLength))
+		}
+	}
+	for i := 0; i < fi; i++ {
+		start += perFile(i)
+	}
+	return start, perFile(fi)
+}
+
+// appendBlockLeaves appends the 16 KiB block hashes of one piece's data to
+// leaves, so concatenating a file's pieces in order yields its block layer.
+func appendBlockLeaves(leaves [][merkle.HashSize]byte, data []byte) [][merkle.HashSize]byte {
+	return append(leaves, merkle.LeafHashes(data)...)
 }
 
 // v2Tree returns (and caches) the merkle tree at and above the piece layer for

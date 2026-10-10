@@ -583,10 +583,13 @@ vengono richiesti ai peer con i messaggi `hash request`/`hashes`/`hash reject`
 (BEP 52), verificati contro i `pieces root` e persistiti nel resume. Il bit
 riservato **v2** (byte 7, `0x10`) è annunciato nell'handshake solo per un torrent
 con identità v2, così i peer libtorrent accettano le `hash request`. Il seed
-risponde alle richieste di layer a partire dagli hash dei pezzi che già ha,
-senza leggere i file; le richieste del layer dei blocchi (`base = 0`) sono
-rifiutate con `hash reject` (servirebbe leggere i dati). Progetto completo in
-`docs/gx-torrent-v2.md`.
+risponde alle richieste del **layer dei pezzi** (`base = piece layer`) dai suoi
+`piece layers`, senza leggere i file. Risponde anche alle richieste del **layer
+dei blocchi** (`base = 0`), che un leecher libtorrent usa per verificare i
+blocchi mentre li scarica: l'albero dei blocchi è costruito dai dati dei pezzi
+verificati, **in cache per-file** e solo per un file **interamente presente**
+(altrimenti `hash reject`, perché un albero con foglie mancanti non si
+ancorerebbe al `pieces root`). Progetto completo in `docs/gx-torrent-v2.md`.
 
 ## Statistiche
 
@@ -965,11 +968,10 @@ Le operazioni che il motore non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- interop v2 come **seed**: le richieste `hash request` a livello blocco
-  (`base = 0`) sono rifiutate con `hash reject` (servirebbe leggere i dati),
-  quindi un leecher libtorrent che scarica **da noi** non può verificare i
-  blocchi prima di chiederli; i leecher gx-torrent e il download da un seed
-  libtorrent funzionano (vedi *Torrent BitTorrent v2*);
+- v2 come **seed**: le richieste `hash request` del layer dei blocchi
+  (`base = 0`) sono servite solo per un file **interamente presente** e vengono
+  costruite leggendo i dati (una volta per file, poi in cache); per un file
+  incompleto rispondono `hash reject` (vedi *Torrent BitTorrent v2*);
 - IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
