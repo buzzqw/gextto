@@ -478,6 +478,7 @@ rimanenti:
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | da fare |
 | F2 — virtualizzazione della tabella torrent | §14.3 | da fare |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | da fare |
+| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, UI) | §12.2 | da fare |
 
 **Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2,
 spostamento del motore in `internal/engine`, e i ritocchi al wizard
@@ -506,6 +507,36 @@ Storico (fatto):
 | F2: RSS con regole (feed, include/escludi, categoria/cartella, dedup persistito) + riquadro nella pagina | fatto |
 | F2: Jackett/Prowlarr/MIRCrew via Torznab (ricerca e feed) | fatto |
 | F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare (dopo gli item concordati) |
+
+### 12.2 Gestore RSS (obiettivo di eccellenza)
+
+**Requisito (concordato):** il gestore RSS/filtro di gx-torrent deve essere
+**eccezionale**: il meglio tra qBittorrent, Deluge (YaRSS2) e BiglyBT, un gestore
+**integrato e completo**. I riferimenti sono i sorgenti di quei progetti:
+qBittorrent `src/rss`, Deluge `deluge-yarss-plugin` (YaRSS2), BiglyBT
+`BiglyBT-plugin-rssfeed` (guarda anche `Help.stf`) e le *Subscriptions* di
+BiglyBT. Vanno studiati prima di progettare le parti avanzate.
+
+Matrice delle capacità (fonte → obiettivo gx-torrent):
+
+| Capacità | qBittorrent | Deluge/YaRSS2 | BiglyBT | gx-torrent (obiettivo) |
+| --- | --- | --- | --- | --- |
+| Feed multipli, cartelle | sì | sì | sì | sì |
+| Intervallo per-feed e globale, TTL | sì | sì (obey TTL) | sì | sì |
+| Regole **ordinate PASS/FAIL** (primo match vince) | no | no | sì | **sì** |
+| Regex sul titolo, must-not | sì | sì | sì | sì |
+| Episodi `SxxExx`, season pack, **smart episode** (una volta sola) | sì | parziale | sì | **sì** |
+| Filtri per dimensione, seeders/peers, età | parziale | no | sì | **sì** |
+| Azioni: cartella, categoria, tag, pausa, priorità, sequenziale, limiti per torrent, in cima | sì | sì | sì | **sì** |
+| Storico download persistito (mai due volte) | solo smart episode | last matched | sì | **sì** |
+| Articoli corrispondenti per regola | sì | sì | sì | **sì** |
+| Feed anche da risultati di ricerca | plugin | no | sì | da valutare |
+| Notifiche su match/errore | mail | mail | sì | da valutare |
+
+Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torznab,
+regole include/escludi, storico persistito, worker e riquadro in pagina. Da
+evolvere verso la matrice qui sopra (regole ordinate, filtri numerici,
+smart-episode, azioni complete, UI di gestione con articoli corrispondenti).
 
 ---
 
