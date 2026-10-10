@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/rain/v2/torrent"
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 )
 
 const (

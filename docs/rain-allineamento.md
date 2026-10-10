@@ -1,25 +1,32 @@
-# Allineare rain in gextto
+# Allineare il motore (ex rain) in gextto
 
-Guida operativa per aggiornare la copia di rain in `third_party/rain` e per
-recepire in gextto le novità di upstream. Va riletta ogni volta che si aggiorna
-la base: l'ultimo allineamento è da **v1.13.0 (2024-09-18) a v2.4.2
-(2026-10-03)**.
+> [!NOTE]
+> **Aggiornamento 2026-10:** il motore è stato **portato dentro** il modulo
+> principale come `internal/engine` (`github.com/buzzqw/gextto/internal/engine`);
+> non è più un modulo a sé né un `replace` in `go.mod`. Questa guida resta valida
+> come procedura per portare nel codice interno le novità di **upstream rain**,
+> ma non è più un "rebase del fork": si integra il delta nel nostro motore. La
+> licenza MIT originale resta in `internal/engine/LICENSE`.
 
-## 1. Come è fatto il fork
+Guida operativa per aggiornare il motore in `internal/engine` con le novità di
+upstream rain. Va riletta ogni volta che si aggiorna la base: l'ultimo
+allineamento è da **v1.13.0 (2024-09-18) a v2.4.2 (2026-10-03)**.
 
-- `third_party/rain` è una **copia vendored** di rain: non è un vero fork git,
-  non ha la storia di upstream. Il modulo principale la collega con
-  `replace github.com/cenkalti/rain/v2 => ./third_party/rain` in `go.mod`.
-- Dal modulo `/v2` in poi il path è `github.com/cenkalti/rain/v2/...`; i file di
-  `cmd/gx-torrent` importano `github.com/cenkalti/rain/v2/torrent`.
-- La usano **solo** il demone `cmd/gx-torrent` e i suoi test. Gextto parla al
+## 1. Come è fatto il motore
+
+- `internal/engine` nasce da una **copia** di rain v2.4.2 (non un fork git, senza
+  la storia di upstream), ora **parte del modulo principale**: gli import sono
+  `github.com/buzzqw/gextto/internal/engine/...`.
+- I file di `cmd/gx-torrent` importano
+  `github.com/buzzqw/gextto/internal/engine/torrent`.
+- Lo usano **solo** il demone `cmd/gx-torrent` e i suoi test. Gextto parla al
   demone via REST: l'adapter è `gxtorrent_engine.go`, l'avvio/sorveglianza
   `gxtorrent_runtime.go`.
 - Il patchset gextto è piccolo e localizzato (~1.100 righe su ~20 file);
   i file nuovi sono `internal/netx/netx.go`, `torrent/session_listen.go`,
   `torrent/torrent_selection.go`. Il resto è codice upstream intatto.
 
-Le modifiche sono elencate in `third_party/rain/GEXTTO.md` e marcate nel codice
+Le modifiche sono elencate in `internal/engine/GEXTTO.md` e marcate nel codice
 con `gextto fork`. **Prima di toccare la base, rileggi quella tabella**: è
 l'inventario di ciò che va riapplicato.
 
@@ -50,7 +57,7 @@ git init -q && git config user.email a@b.c && git config user.name rb
 git -C /tmp/rain-upstream archive vVECCHIA | tar -x -C .
 git add -A && git commit -qm "base vVECCHIA"; BASE=$(git rev-parse HEAD)
 find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-rsync -a --exclude '.git' /path/gextto/third_party/rain/ ./
+rsync -a --exclude '.git' /path/gextto/internal/engine/ ./
 git add -A && git commit -qm "gextto fork"; FORK=$(git rev-parse HEAD)
 git branch gextto
 git remote add up /tmp/rain-upstream && git fetch -q up vNUOVA
@@ -112,7 +119,7 @@ Comandi utili dopo la rebase:
 
 ```sh
 go build ./...
-cd third_party/rain && go test ./internal/blocklist/ ./internal/peerconn/ ./internal/piecepicker/
+cd internal/engine && go test ./internal/blocklist/ ./internal/peerconn/ ./internal/piecepicker/
 cd - && go test ./cmd/gx-torrent/ && go test -run GxEngine .
 ```
 
@@ -139,7 +146,7 @@ esposta. Flusso completo per una nuova opzione per-torrent (esempio reale:
    - se l'impostazione è in `uiweb_settings.go`/`uiweb_settings_defaults.go`,
      assicurati che esista il tooltip (`uiweb_tooltips.go`).
 3. **Documenta**: `docs/gx-torrent.md` (opzione, API, configurazione, limiti) e
-   `third_party/rain/GEXTTO.md` se cambia l'inventario delle patch.
+   `internal/engine/GEXTTO.md` se cambia l'inventario delle patch.
 4. **Matrice capacità** (`torrent_engine.go`): aggiorna `capabilityLevels` per
    gx-torrent e, se serve, `v2DetailCapsFor`. È questo che rende l'opzione
    **visibile** in gextto: se lasci `"none"` (o `"partial"` sbagliato) l'UI
@@ -158,10 +165,10 @@ successo: usa `ErrCapabilityUnavailable`).
 |---|---|---|
 | Adapter | `go test -run GxEngine .` | stati, eventi, park/probe, coda, storage_moved, opzioni inviate al demone |
 | Demone | `go test ./cmd/gx-torrent/` | pianificatore coda, ciclo di vita reale, selezione file, trasferimenti (porta unica, cifratura, proxy, uTP, LSD), filtro IP, opzione sequenziale |
-| Fork | `cd third_party/rain && go test ./internal/blocklist/ ./internal/peerconn/ ./internal/piecepicker/` | formati filtro IP, byte di protocollo, **Skip rispettato dal picker** |
+| Fork | `cd internal/engine && go test ./internal/blocklist/ ./internal/peerconn/ ./internal/piecepicker/` | formati filtro IP, byte di protocollo, **Skip rispettato dal picker** |
 | Tutto | `go test ./...` | non-regressione generale |
 
-I test in `third_party/rain` sono **guardie di integrazione**: vanno tenuti
+I test in `internal/engine` sono **guardie di integrazione**: vanno tenuti
 anche se il resto dei test upstream è stato rimosso, perché verificano proprio
 le nostre patch (es. `sequential_skip_test.go` fallisce se un aggiornamento di
 rain introduce un percorso di scelta pezzi che ignora `Skip`).

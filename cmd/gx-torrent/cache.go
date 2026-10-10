@@ -21,8 +21,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
-	"github.com/cenkalti/rain/v2/torrent"
 )
 
 const mib = 1 << 20

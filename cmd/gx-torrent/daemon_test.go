@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/rain/v2/torrent"
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 )
 
 // bencode encodes the few types a test torrent needs.

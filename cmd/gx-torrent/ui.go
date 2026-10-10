@@ -30,8 +30,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 	"github.com/buzzqw/gextto/internal/webui/assets"
-	"github.com/cenkalti/rain/v2/torrent"
 )
 
 type uiPageData struct {

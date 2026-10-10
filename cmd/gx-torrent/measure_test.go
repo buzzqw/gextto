@@ -3,7 +3,7 @@ package main
 // measure_test.go is an opt-in local-swarm measurement harness (gextto fork).
 //
 // Unlike the deterministic unchoker harness
-// (third_party/rain/internal/unchoker/sim_test.go), this runs real daemons over
+// (internal/engine/internal/unchoker/sim_test.go), this runs real daemons over
 // loopback: one seeder and several leechers. Each peer uses its own 127.0.0.x
 // address, because rain drops a second connection from the same IP to one
 // torrent. By default the leechers dial only the seeder, which measures the

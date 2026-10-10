@@ -392,7 +392,7 @@ ricontrollo finale fatto).
 
 `gx-torrent` = motore BitTorrent **in puro Go**, alternativo a libtorrent:
 
-- **rain** (`third_party/rain`, fork v2.4.2): trasferimento;
+- **rain** (`internal/engine`, fork v2.4.2): trasferimento;
 - **demone + adapter** (`cmd/gx-torrent`, `gxtorrent_engine.go`): REST, pagina
   web, coda autogestita, ponte con Gextto (`TorrentEngine`).
 
@@ -479,7 +479,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 - Test percorso felice + casi limite (lista vuota, duplicati, not-found, 416,
   completato/fermo); `make test` e `make test-rain` verdi (+ pacchetto
   `unchoker` in `make test-rain`).
-- Fork marcato `gextto fork`, inventario in `third_party/rain/GEXTTO.md`;
+- Fork marcato `gextto fork`, inventario in `internal/engine/GEXTTO.md`;
   `go vet`, `gofmt` verdi; semantica `-1`/`0`/`>0` coerente.
 - Nota residua: attesa pezzi nello streaming a polling (200 ms, timeout 2 min),
   senza test end-to-end su sciame reale; coperti dati presenti e mappatura
@@ -510,7 +510,7 @@ pena fare**, con come/rischi/verifica; una voce = un task/commit.
 | 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** | — |
 
 Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
-Regole per voce (da `AGENTS.md`): modifiche a `third_party/rain` marcate
+Regole per voce (da `AGENTS.md`): modifiche a `internal/engine` marcate
 `// gextto fork` + riga in `GEXTTO.md`; un commit per voce; test mirati
 (`./cmd/gx-torrent/`, `GxEngine`, `make test-rain`, `make test`); invarianti
 degli script; mai `bin/`/`gx-torrent.build_number`/`data/`; con comportamento
@@ -686,7 +686,7 @@ throughput up/down, tempo di completamento, ratio e tempo a 1:1 in campagna real
 
 ### 6.3 Banco 1 — harness deterministico dell'unchoker
 
-`third_party/rain/internal/unchoker/sim_test.go` (in `make test-rain`): pilota
+`internal/engine/internal/unchoker/sim_test.go` (in `make test-rain`): pilota
 l'`Unchoker` reale con peer sintetici e fissa le proprietà (download veloci in
 download, upload veloci in seed, `FastUnchoke` immediato, optimistic che non
 ruba slot regolari e ruota, budget rispettato, fairness) + `BenchmarkTickUnchokeSeeding`.
@@ -1231,7 +1231,7 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
   avvio, verify→seed, pausa/ripresa, spostamento con symlink, kill -9 →
   riavvio, SIGTERM allo spegnimento. (Big Buck Bunny in `downloading_metadata`
   nel sandbox senza peer.)
-- **Rete, selezione file, v2**: rain vendored in `third_party/rain` (`replace`,
+- **Rete, selezione file, v2**: rain vendored in `internal/engine` (`replace`,
   inventario `GEXTTO.md`); porta unica + DHT sulla stessa UDP + UPnP/NAT-PMP
   ogni 20 min; selezione file (esclusi in `DATA/parts`, progresso sui scelti);
   interfaccia ascolto/uscente (killswitch), proxy SOCKS5/HTTP

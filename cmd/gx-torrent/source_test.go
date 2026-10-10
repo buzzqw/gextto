@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/cenkalti/rain/v2/torrent"
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 )
 
 // The daemon web UI must label every peer source, including the BEP 55 one.

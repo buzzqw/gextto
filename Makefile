@@ -43,24 +43,22 @@ test-libtorrent: check-ui installer-test
 test-real:
 	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
 
-# Tests of the vendored rain fork. Run from the root module so the fork packages
-# resolve their dependencies through the main go.sum: the nested module has no
-# complete go.sum of its own (see docs/rain-allineamento.md), so
-# `cd third_party/rain && go test ./...` would fail before it even compiles.
+# Tests of the engine (the moved-in rain code). It now lives in internal/engine
+# as part of the main module, so the packages resolve through the main go.sum.
 test-rain:
 	go test \
-		github.com/cenkalti/rain/v2/internal/bandwidth \
-		github.com/cenkalti/rain/v2/internal/bitfield \
-		github.com/cenkalti/rain/v2/internal/blocklist \
-		github.com/cenkalti/rain/v2/internal/mse \
-		github.com/cenkalti/rain/v2/internal/peerconn \
-		github.com/cenkalti/rain/v2/internal/peerconn/peerwriter \
-		github.com/cenkalti/rain/v2/internal/peerprotocol \
-		github.com/cenkalti/rain/v2/internal/piececache \
-		github.com/cenkalti/rain/v2/internal/piecepicker \
-		github.com/cenkalti/rain/v2/internal/storage/filestorage \
-		github.com/cenkalti/rain/v2/internal/unchoker \
-		github.com/cenkalti/rain/v2/torrent
+		github.com/buzzqw/gextto/internal/engine/internal/bandwidth \
+		github.com/buzzqw/gextto/internal/engine/internal/bitfield \
+		github.com/buzzqw/gextto/internal/engine/internal/blocklist \
+		github.com/buzzqw/gextto/internal/engine/internal/mse \
+		github.com/buzzqw/gextto/internal/engine/internal/peerconn \
+		github.com/buzzqw/gextto/internal/engine/internal/peerconn/peerwriter \
+		github.com/buzzqw/gextto/internal/engine/internal/peerprotocol \
+		github.com/buzzqw/gextto/internal/engine/internal/piececache \
+		github.com/buzzqw/gextto/internal/engine/internal/piecepicker \
+		github.com/buzzqw/gextto/internal/engine/internal/storage/filestorage \
+		github.com/buzzqw/gextto/internal/engine/internal/unchoker \
+		github.com/buzzqw/gextto/internal/engine/torrent
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.

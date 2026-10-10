@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/buzzqw/gextto/internal/settings"
-	"github.com/cenkalti/rain/v2/torrent"
 )
 
 // diskFree returns the free (available to the user) and total bytes of the

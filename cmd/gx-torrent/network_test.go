@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cenkalti/rain/v2/torrent"
+	"github.com/buzzqw/gextto/internal/engine/torrent"
 )
 
 func TestIPFilterBytesCache(t *testing.T) {

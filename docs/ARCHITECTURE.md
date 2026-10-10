@@ -121,7 +121,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 |---|---|
 | `torrent_engine.go` | contratto `TorrentEngine` tra Gextto e il motore. |
 | `torrent_engine_select.go` | scelta del backend da `torrent_backend` + preflight. |
-| `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | backend **gx-torrent** (Go puro, predefinito): adapter REST, avvio e sorveglianza del demone, che usa la copia di rain in `third_party/rain`. |
+| `gxtorrent_engine.go` + `gxtorrent_runtime.go` + `cmd/gx-torrent/` | backend **gx-torrent** (Go puro, predefinito): adapter REST, avvio e sorveglianza del demone, che usa la copia di rain in `internal/engine`. |
 | `libtorrent.go` + `libtorrent_cgo.go` + `libtorrent_bridge.cpp/.h` + `libtorrent_nocgo.go` | backend libtorrent (C++/cgo), **opzionale di build** (`GEXTTO_LIBTORRENT=1`; `LibtorrentCompiled()`): in una build Go pura vale lo stub `libtorrent_nocgo.go` e il backend non è selezionabile; se compilato è anche il fallback automatico di gx-torrent. |
 | `qbittorrent_engine.go` + `qbittorrent_runtime.go` | backend qBittorrent. |
 | `torrent_migration.go` | preparazione della migrazione tra backend. |

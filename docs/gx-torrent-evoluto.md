@@ -7,7 +7,7 @@ Questo documento è la **decisione e il piano**. Lo stato corrente del motore è
 [`docs/gx-torrent.md`](gx-torrent.md); il backlog del motore e le misure in
 [`docs/evoluzione.md`](evoluzione.md) (§4–§7); la procedura di rebase del fork in
 [`docs/rain-allineamento.md`](rain-allineamento.md); l'inventario delle modifiche
-a rain in [`third_party/rain/GEXTTO.md`](../third_party/rain/GEXTTO.md).
+a rain in [`internal/engine/GEXTTO.md`](../internal/engine/GEXTTO.md).
 
 > [!NOTE]
 > Nato dall'estrazione della §14 di `evoluzione.md`, che ora rimanda qui. Il
@@ -128,7 +128,7 @@ ma è pensato come motore subordinato.
 
 | Strato | Dove | Cosa c'è già | Dimensione (2026-10-10) |
 | --- | --- | --- | --- |
-| Motore | `third_party/rain`, `third_party/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree modificate |
+| Motore | `internal/engine`, `third_party/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree modificate |
 | Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 10.786 righe (14.144 col test) |
 | API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 588 righe |
 | UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.836 righe, `html/template` + JS inline |
@@ -648,7 +648,7 @@ Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
 - [`docs/evoluzione.md`](evoluzione.md) — §4–§7: lacune del motore, ottimizzazioni,
   misure di choking; §14: rimando a questo documento.
 - [`docs/rain-allineamento.md`](rain-allineamento.md) — rebase del fork di rain.
-- [`third_party/rain/GEXTTO.md`](../third_party/rain/GEXTTO.md) — inventario delle
+- [`internal/engine/GEXTTO.md`](../internal/engine/GEXTTO.md) — inventario delle
   modifiche al fork.
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — mappa del codice di Gextto.
 - [`LICENSE`](../LICENSE) — EUPL-1.2.

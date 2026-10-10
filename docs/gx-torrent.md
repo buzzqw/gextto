@@ -9,8 +9,8 @@ questo server: vedi *Interfaccia web* per aprirla alla LAN). Il motore integrato
 libtorrent resta selezionabile — sulle build che lo includono — e fa da
 fallback automatico se gx-torrent non parte.
 
-Usa una copia modificata di rain in `third_party/rain`. Le modifiche sono
-descritte in `third_party/rain/GEXTTO.md`: porta unica, interfaccia uscente,
+Usa una copia modificata di rain in `internal/engine`. Le modifiche sono
+descritte in `internal/engine/GEXTTO.md`: porta unica, interfaccia uscente,
 proxy, filtro IP, selezione dei file e alcune correzioni.
 
 Codice:
@@ -943,7 +943,7 @@ in *Limiti di banda*.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) la misura seeding/choking
     su sciame locale, con byte e tempi per peer: metodo e metriche in
     `docs/evoluzione.md` (§6).
-- `go test ./internal/blocklist` in `third_party/rain` copre i formati del
+- `go test ./internal/blocklist` in `internal/engine` copre i formati del
   filtro IP.
 - `make test-rain` copre anche l'harness deterministico del choking
   (`internal/unchoker/sim_test.go`) e il super-seeding

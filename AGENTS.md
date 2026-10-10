@@ -33,19 +33,21 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   riavvia. Si ferma da solo dopo 15 minuti senza Gextto. Dettagli in
   `docs/gx-torrent.md`, *Attivazione*.
 
-## rain (motore gx-torrent)
-- `third_party/rain` è una **copia vendored** di rain v2.4.2, modulo
-  `github.com/cenkalti/rain/v2`, collegata con un `replace` in `go.mod`. La
-  usano solo `cmd/gx-torrent` e i test del fork.
-- Le modifiche gextto sono marcate con `gextto fork`; l'inventario è in
-  `third_party/rain/GEXTTO.md`.
-- Per aggiornare la base di rain: segui **`docs/rain-allineamento.md`**
-  (procedura di rebase a 3 vie con git, trappole note, punti d'integrazione,
-  test da tenere verdi).
-- `third_party/dht` è la copia modificata di `nictuku/dht`.
+## Motore gx-torrent (`internal/engine`)
+- `internal/engine` è il **motore**, nato dalla copia di rain v2.4.2 (licenza
+  MIT, vedi `internal/engine/LICENSE`) e ora **portato dentro** il modulo
+  principale come `github.com/buzzqw/gextto/internal/engine`: non è più un
+  modulo a sé né un `replace` in `go.mod`. Lo usano `cmd/gx-torrent` e i test.
+- **Obiettivo dichiarato:** allontanarsi da rain e restarne progressivamente
+  senza (codice nostro). Finché ci sono modifiche marcate `gextto fork`,
+  l'inventario è in `internal/engine/GEXTTO.md`; l'attribuzione MIT originale
+  resta in `internal/engine/LICENSE`. Per recepire fix upstream, la procedura
+  resta descritta in `docs/rain-allineamento.md` (ora intesa come merge nel
+  codice interno).
+- `third_party/dht` è la copia modificata di `nictuku/dht` (non è rain).
 - Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
   miglioramento: **`docs/evoluzione.md`** (§4–§7); evoluzione verso client
-  standalone (gx-nox, binario unico): **`docs/gx-torrent-evoluto.md`**.
+  standalone (gx-core): **`docs/gx-torrent-evoluto.md`**.
 
 ## Build e test
 - `make build` — incrementa `build_number` (committato) e compila
@@ -84,11 +86,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
   anche quelli e richiede libtorrent.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
-- Test del fork (modulo annidato, non incluso in `./...`): usa `make test-rain`
-  (`go test` dalla root sui pacchetti con test del fork). **Non** eseguire
-  `cd third_party/rain && go test ./...`: il modulo annidato da solo non ha un
-  `go.sum` completo e fallisce in fase di setup; anche `...` dalla root include
-  `internal/jsonutil`, le cui dipendenze di test mancano dal `go.sum` principale.
+- Test del motore (`internal/engine`): `make test-rain` (`go test` dalla root sui
+  pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include
+  già; `make test-rain` resta per eseguire solo quei pacchetti.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 

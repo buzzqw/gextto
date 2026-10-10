@@ -1,0 +1,471 @@
+package torrent
+
+import (
+	"archive/tar"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/engine/internal/resumer/boltdbresumer"
+	"github.com/buzzqw/gextto/internal/engine/internal/tracker"
+	"go.etcd.io/bbolt"
+)
+
+// Torrent is created from a torrent file or a magnet link.
+type Torrent struct {
+	torrent *torrent
+}
+
+// InfoHash is the unique value that represents the files in a torrent.
+type InfoHash [20]byte
+
+// String encodes info hash in hex as 40 characters.
+func (h InfoHash) String() string {
+	return hex.EncodeToString(h[:])
+}
+
+// ID is a unique identifier in the Session.
+func (t *Torrent) ID() string {
+	return t.torrent.id
+}
+
+// Name of the torrent.
+// For magnet downloads name can change after metadata is downloaded but this method still returns the initial name.
+// Use Stats() method to get name in info dictionary.
+func (t *Torrent) Name() string {
+	return t.torrent.Name()
+}
+
+// Dir returns the directory that contains the files in the torrent.
+func (t *Torrent) Dir() string {
+	return t.torrent.Dir()
+}
+
+// Files in the torrent. An error is returned when metainfo isn't ready.
+func (t *Torrent) Files() ([]File, error) {
+	return t.torrent.Files()
+}
+
+// FileStats returns statistics about each file in the torrent. An error is returned when torrent is not running.
+func (t *Torrent) FileStats() ([]FileStats, error) {
+	return t.torrent.FileStats()
+}
+
+// InfoHash returns the hash of the info dictionary of torrent file.
+// Two different torrents may have the same info hash.
+func (t *Torrent) InfoHash() InfoHash {
+	var ih InfoHash
+	copy(ih[:], t.torrent.InfoHash())
+	return ih
+}
+
+// AddedAt returns the time that the torrent is added.
+func (t *Torrent) AddedAt() time.Time {
+	return t.torrent.addedAt
+}
+
+// Stats returns statistics about the torrent.
+func (t *Torrent) Stats() Stats {
+	return t.torrent.Stats()
+}
+
+// Magnet returns the magnet link.
+// Returns error if torrent is private.
+func (t *Torrent) Magnet() (string, error) {
+	return t.torrent.Magnet()
+}
+
+// Torrent returns the metainfo bytes (contents of .torrent file).
+// Returns error if torrent has no metadata yet.
+func (t *Torrent) Torrent() ([]byte, error) {
+	return t.torrent.Torrent()
+}
+
+// Trackers returns the list of trackers of this torrent.
+func (t *Torrent) Trackers() []Tracker {
+	return t.torrent.Trackers()
+}
+
+// Peers returns the list of connected (handshake completed) peers of the torrent.
+func (t *Torrent) Peers() []Peer {
+	return t.torrent.Peers()
+}
+
+// Webseeds returns the list of WebSeed sources in the torrent.
+func (t *Torrent) Webseeds() []Webseed {
+	return t.torrent.Webseeds()
+}
+
+// Port returns the TCP port number that the torrent is listening peers.
+func (t *Torrent) Port() int {
+	return t.torrent.port
+}
+
+// NotifyClose returns a channel for notifying removal/closure.  The
+// channel is closed once RemoveTorrent() is called, dropping it from
+// the session.
+func (t *Torrent) NotifyClose() <-chan struct{} {
+	return t.torrent.NotifyClose()
+}
+
+// NotifyStop returns a new channel for notifying stop event.
+// Value from the channel contains the error if there is any, otherwise the value is nil.
+// NotifyStop must be called after calling Start().
+func (t *Torrent) NotifyStop() <-chan error {
+	return t.torrent.NotifyError()
+}
+
+// NotifyComplete returns a channel for notifying completion.
+// The channel is closed once all torrent pieces are downloaded successfully.
+// NotifyComplete must be called after calling Start().
+func (t *Torrent) NotifyComplete() <-chan struct{} {
+	return t.torrent.NotifyComplete()
+}
+
+// NotifyMetadata returns a channel for notifying completion of metadata download from magnet links.
+// The channel is closed once all metadata pieces are downloaded successfully.
+// NotifyMetadata must be called after calling Start().
+func (t *Torrent) NotifyMetadata() <-chan struct{} {
+	return t.torrent.NotifyMetadata()
+}
+
+// AddPeer adds a new peer to the torrent. Does nothing if torrent is stopped.
+func (t *Torrent) AddPeer(addr string) error {
+	return t.torrent.addPeerString(addr)
+}
+
+// AddTracker adds a new tracker to the torrent.
+func (t *Torrent) AddTracker(uri string) error {
+	var private bool
+	if t.torrent.info != nil {
+		private = t.torrent.info.Private
+	}
+	tr, err := t.torrent.session.trackerManager.Get(uri, t.torrent.session.config.TrackerHTTPTimeout, t.torrent.session.getTrackerUserAgent(private), int64(t.torrent.session.config.TrackerHTTPMaxResponseSize))
+	if err != nil {
+		return err
+	}
+	err = t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		value := b.Get(boltdbresumer.Keys.Trackers)
+		var trackers [][]string
+		err = json.Unmarshal(value, &trackers)
+		if err != nil {
+			return err
+		}
+		trackers = append(trackers, []string{uri})
+		value, err = json.Marshal(trackers)
+		if err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.Trackers, value)
+	})
+	if err != nil {
+		return err
+	}
+	t.torrent.AddTrackers([]tracker.Tracker{tr})
+	return nil
+}
+
+// SetTrackers replaces the torrent's tracker list (gextto fork): an empty list
+// removes every tracker, like libtorrent. Peers already connected are left
+// alone; the removed trackers get a best-effort "stopped" announce, and the new
+// list is persisted so `Trackers()` and the resume data reflect the change.
+func (t *Torrent) SetTrackers(uris []string) error {
+	private := t.torrent.info != nil && t.torrent.info.Private
+	var (
+		resolved []tracker.Tracker
+		raw      [][]string
+		seen     = make(map[string]struct{}, len(uris))
+	)
+	for _, uri := range uris {
+		uri = strings.TrimSpace(uri)
+		if uri == "" {
+			continue
+		}
+		if _, dup := seen[uri]; dup {
+			continue
+		}
+		seen[uri] = struct{}{}
+		tr, err := t.torrent.session.trackerManager.Get(uri, t.torrent.session.config.TrackerHTTPTimeout, t.torrent.session.getTrackerUserAgent(private), int64(t.torrent.session.config.TrackerHTTPMaxResponseSize))
+		if err != nil {
+			return err
+		}
+		resolved = append(resolved, tr)
+		raw = append(raw, []string{uri})
+	}
+	err := t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		if b == nil {
+			return nil
+		}
+		if len(raw) == 0 {
+			return b.Delete(boltdbresumer.Keys.Trackers)
+		}
+		value, err := json.Marshal(raw)
+		if err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.Trackers, value)
+	})
+	if err != nil {
+		return err
+	}
+	t.torrent.sendCommand(func() { t.torrent.handleSetTrackers(resolved, raw) })
+	return nil
+}
+
+// AddWebseeds adds web seed URLs to the torrent at runtime (gextto fork),
+// without reopening it; duplicates and the configured maximum are ignored.
+func (t *Torrent) AddWebseeds(urls []string) error {
+	t.torrent.sendCommand(func() { t.torrent.handleAddWebseeds(urls) })
+	return nil
+}
+
+// RemoveWebseeds removes web seed URLs (exact match) at runtime (gextto fork).
+func (t *Torrent) RemoveWebseeds(urls []string) error {
+	t.torrent.sendCommand(func() { t.torrent.handleRemoveWebseeds(urls) })
+	return nil
+}
+
+// SetSequential enables or disables sequential download on the running torrent
+// (gextto fork); unlike the add-time option it takes effect at once.
+func (t *Torrent) SetSequential(sequential bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setOrder(sequential, t.torrent.firstLast) })
+	return nil
+}
+
+// SetFirstLast enables or disables the first/last-piece priority on the running
+// torrent (gextto fork).
+func (t *Torrent) SetFirstLast(firstLast bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setOrder(t.torrent.sequential, firstLast) })
+	return nil
+}
+
+// Sequential reports whether sequential download is enabled (gextto fork).
+func (t *Torrent) Sequential() bool {
+	return query(t.torrent, func() bool { return t.torrent.sequential })
+}
+
+// SetSuperSeeding enables or disables BEP 16 super-seeding on the running
+// torrent (gextto fork). It takes effect when the torrent is complete: the seed
+// advertises one piece at a time and serves only that piece, so the swarm
+// spreads the data. It is a seeding strategy only and never touches the queue,
+// the seed policy or the bandwidth limits.
+func (t *Torrent) SetSuperSeeding(superSeeding bool) error {
+	t.torrent.sendCommand(func() { t.torrent.setSuperSeeding(superSeeding) })
+	return nil
+}
+
+// SuperSeeding reports whether super-seeding is enabled (gextto fork).
+func (t *Torrent) SuperSeeding() bool {
+	return query(t.torrent, func() bool { return t.torrent.superSeeding })
+}
+
+// PieceStates returns the state of every piece, in index order (gextto fork):
+// "have", "downloading", "skipped" or "" (missing). The second value is false
+// when the torrent has no metadata/pieces yet. Once completed rain drops the
+// piece picker, so the states are derived from the pieces and the picker is
+// consulted only for the "downloading" ones.
+func (t *Torrent) PieceStates() ([]string, bool) {
+	states := query(t.torrent, func() []string {
+		pieces := t.torrent.pieces
+		if len(pieces) == 0 {
+			return nil
+		}
+		out := make([]string, len(pieces))
+		for i := range pieces {
+			switch {
+			case pieces[i].Done:
+				out[i] = "have"
+			case pieces[i].Skip:
+				out[i] = "skipped"
+			case t.torrent.piecePicker != nil && t.torrent.piecePicker.PieceDownloading(uint32(i)):
+				out[i] = "downloading"
+			default:
+				out[i] = ""
+			}
+		}
+		return out
+	})
+	return states, states != nil
+}
+
+// Start downloading the torrent. If all pieces are completed, starts seeding them.
+func (t *Torrent) Start() error {
+	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, true)
+	if err != nil {
+		return err
+	}
+	t.torrent.Start()
+	return nil
+}
+
+// Stop the torrent. Does not block. After Stop is called, the torrent switches into Stopping state.
+// During Stopping state, a stop event sent to trackers with a timeout.
+// At most 5 seconds later, the torrent switches into Stopped state.
+func (t *Torrent) Stop() error {
+	err := t.torrent.session.resumer.WriteStarted(t.torrent.id, false)
+	if err != nil {
+		return err
+	}
+	t.torrent.Stop()
+	return nil
+}
+
+// Announce the torrent to all trackers and DHT. It does not overrides the minimum interval value sent by the trackers or set in Config.
+func (t *Torrent) Announce() {
+	t.torrent.Announce()
+}
+
+// Verify pieces of torrent by reading all of the torrents files from disk.
+// After Verify called, the torrent is stopped, then verification starts and the torrent switches into Verifying state.
+// The torrent stays stopped after verification finishes.
+func (t *Torrent) Verify() error {
+	err := t.torrent.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.torrent.id))
+		return b.Delete([]byte("bitfield"))
+	})
+	if err != nil {
+		return err
+	}
+	t.torrent.Verify()
+	return nil
+}
+
+// Move torrent to another Session.
+// target must be the RPC server address in host:port form.
+func (t *Torrent) Move(target string) error {
+	t.torrent.Stop()
+	spec, err := t.torrent.session.resumer.Read(t.torrent.id)
+	if err != nil {
+		return err
+	}
+
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
+	go t.prepareBody(pw, mw, spec)
+
+	req, err := http.NewRequest(http.MethodPost, target+"/move-torrent?id="+t.torrent.id, pr) // nolint: noctx
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("http error: %d", resp.StatusCode)
+	}
+	return t.torrent.session.RemoveTorrent(t.torrent.id, true)
+}
+
+func (t *Torrent) prepareBody(pw *io.PipeWriter, mw *multipart.Writer, spec *boltdbresumer.Spec) {
+	var err error
+	defer func() { _ = pw.CloseWithError(err) }()
+
+	iw, err := mw.CreateFormField("id")
+	if err != nil {
+		t.torrent.log.Errorln("cannot create id form filed:", err)
+		return
+	}
+	_, err = iw.Write([]byte(t.torrent.id))
+	if err != nil {
+		t.torrent.log.Errorln("cannot write id:", err)
+		return
+	}
+	fw, err := mw.CreateFormField("metadata")
+	if err != nil {
+		t.torrent.log.Errorln("cannot create metadata form filed:", err)
+		return
+	}
+	err = json.NewEncoder(fw).Encode(spec)
+	if err != nil {
+		t.torrent.log.Errorln("cannot encode resumer spec:", err)
+		return
+	}
+	dw, err := mw.CreateFormField("data")
+	if err != nil {
+		t.torrent.log.Errorln("cannot create data form filed:", err)
+		return
+	}
+	tpr, tpw := io.Pipe()
+	go t.generateTar(tpw)
+	_, err = io.Copy(dw, tpr)
+	if err != nil {
+		t.torrent.log.Errorln("error copying pipe:", err)
+		return
+	}
+	err = mw.Close()
+	if err != nil {
+		t.torrent.log.Errorln("cannot close multipart writer:", err)
+		return
+	}
+}
+
+func (t *Torrent) generateTar(pw *io.PipeWriter) {
+	var err error
+	defer func() { _ = pw.CloseWithError(err) }()
+
+	provider, ok := t.torrent.session.storage.(*fileStorageProvider)
+	if !ok {
+		err = errors.New("session is not using file storage")
+		return
+	}
+	root := provider.getDataDir(t.torrent.id)
+
+	tw := tar.NewWriter(pw)
+	walkFunc := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		hdr := &tar.Header{
+			Name: path[len(root)+1:],
+			Mode: 0600,
+			Size: info.Size(),
+		}
+		err = tw.WriteHeader(hdr)
+		if err != nil {
+			t.torrent.log.Errorln("cannot write tar header:", err)
+			return err
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			t.torrent.log.Errorln("cannot open file:", err)
+			return err
+		}
+		_, err = io.Copy(tw, f)
+		f.Close()
+		if err != nil {
+			t.torrent.log.Errorln("cannot copy storage file to tar writer:", err)
+			return err
+		}
+		return nil
+	}
+	err = filepath.Walk(root, walkFunc)
+	if os.IsNotExist(err) {
+		err = nil
+		return
+	}
+	if err != nil {
+		t.torrent.log.Errorln("error walking files:", err)
+		return
+	}
+	err = tw.Close()
+	if err != nil {
+		t.torrent.log.Errorln("cannot close tar writer:", err)
+		return
+	}
+}
