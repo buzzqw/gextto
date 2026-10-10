@@ -25,7 +25,7 @@ func (t *torrent) handleNewConnection(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	if _, ok := t.bannedPeerIPs[ipstr]; ok {
+	if t.ipBanned(ipstr) {
 		t.log.Debugln("connection attempt from banned IP: ", ipstr)
 		conn.Close()
 		return

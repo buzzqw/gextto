@@ -157,7 +157,7 @@ func (t *torrent) dialHolepunch(endpoint *net.TCPAddr) {
 	if _, ok := t.connectedPeerIPs[ip]; ok {
 		return
 	}
-	if _, ok := t.bannedPeerIPs[ip]; ok {
+	if t.ipBanned(ip) {
 		return
 	}
 	h := outgoinghandshaker.New(endpoint, peersource.Holepunch)

@@ -186,7 +186,7 @@ func (t *torrent) handleRoutedConnection(h *incominghandshaker.IncomingHandshake
 		conn.Close()
 		return
 	}
-	if _, ok := t.bannedPeerIPs[ipstr]; ok {
+	if t.ipBanned(ipstr) {
 		conn.Close()
 		return
 	}

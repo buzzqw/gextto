@@ -65,6 +65,11 @@ type Session struct {
 	bucketUpload   *bandwidth.Limiter
 	closeC         chan struct{}
 
+	// gextto fork: peers banned session-wide for sending corrupt data, with a
+	// time to live (libtorrent-style smart ban). Checked by every torrent.
+	mBannedIPs sync.Mutex
+	bannedIPs  map[string]time.Time
+
 	// "stopped" event announcers of closed torrents, still running in the background.
 	detachedAnnouncers sync.WaitGroup
 
@@ -234,6 +239,7 @@ func NewSession(cfg Config) (*Session, error) {
 		createdAt:          time.Now(),
 		semWrite:           semaphore.New(int(cfg.ParallelWrites)),
 		closeC:             make(chan struct{}),
+		bannedIPs:          make(map[string]time.Time),
 		webseedClient: http.Client{
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -374,6 +380,35 @@ func (s *Session) Close() error {
 
 // ListTorrents returns all torrents in session as a slice.
 // The order of the torrents returned is different on each call.
+// BanIP bans a peer IP for ttl across every torrent of the session (gextto
+// fork: libtorrent-style smart ban, session-wide and time-limited).
+func (s *Session) BanIP(ip string, ttl time.Duration) {
+	if ip == "" {
+		return
+	}
+	s.mBannedIPs.Lock()
+	if s.bannedIPs == nil {
+		s.bannedIPs = make(map[string]time.Time)
+	}
+	s.bannedIPs[ip] = time.Now().Add(ttl)
+	s.mBannedIPs.Unlock()
+}
+
+// IsBannedIP reports whether ip is banned and the ban has not expired yet.
+func (s *Session) IsBannedIP(ip string) bool {
+	s.mBannedIPs.Lock()
+	defer s.mBannedIPs.Unlock()
+	expiry, ok := s.bannedIPs[ip]
+	if !ok {
+		return false
+	}
+	if time.Now().After(expiry) {
+		delete(s.bannedIPs, ip)
+		return false
+	}
+	return true
+}
+
 func (s *Session) ListTorrents() []*Torrent {
 	s.mTorrents.RLock()
 	defer s.mTorrents.RUnlock()

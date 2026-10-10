@@ -432,7 +432,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | # | Funzione | Fonte | Perché | Costo |
 | --- | --- | --- | --- | --- |
 | 1 | IPv6 (listener, DHT BEP 32, tracker, PEX) | anacrolix, libtorrent | senza IPv6 non c'è parità con qBittorrent; molti peer domestici sono raggiungibili solo in v6 | alto |
-| 2 | Smart ban — **estensione** (ban globale e temporizzato, e dei peer sospetti) | libtorrent, anacrolix | `rain` **già banna** il peer che invia un pezzo corrotto (`bannedPeerIPs`, in `torrent_write.go`) e disabilita il webseed corrotto: la parte base c'è; l'estensione è opzionale | basso |
+| 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | `rain`/motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
 | 3 | Profondità della coda richieste adattiva | libtorrent | la velocità su peer lontani dipende da quante richieste sono in volo | medio |
 | 4 | Reader con readahead per lo streaming | anacrolix | sostituisce l'attesa a polling (200 ms, timeout 2 min) | medio |
 | 5 | BitTorrent v2 e ibridi | anacrolix (Go, più vicino a rain) | torrent v2-only già in circolazione; serve merkle per file | alto |
@@ -492,7 +492,7 @@ rimanenti:
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
-| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (già in `rain`: banna il mittente corrotto); estensione globale/temporizzata opzionale |
+| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base in `rain` + estensione: ban di sessione con scadenza) |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (restano feed da ricerca e notifiche) |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 

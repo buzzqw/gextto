@@ -70,10 +70,19 @@ func (t *torrent) handleNewPeers(addrs []*net.TCPAddr, source peersource.Source)
 	}
 }
 
+// ipBanned reports whether a peer IP is banned, per-torrent or session-wide
+// (gextto fork: the session ban is the time-limited one set on corrupt data).
+func (t *torrent) ipBanned(ip string) bool {
+	if _, ok := t.bannedPeerIPs[ip]; ok {
+		return true
+	}
+	return t.session != nil && t.session.IsBannedIP(ip)
+}
+
 func (t *torrent) filterBannedIPs(a []*net.TCPAddr) []*net.TCPAddr {
 	b := a[:0]
 	for _, x := range a {
-		if _, ok := t.bannedPeerIPs[x.IP.String()]; !ok {
+		if !t.ipBanned(x.IP.String()) {
 			b = append(b, x)
 		}
 	}

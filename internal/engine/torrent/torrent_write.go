@@ -3,12 +3,17 @@ package torrent
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/engine/internal/peer"
 	"github.com/buzzqw/gextto/internal/engine/internal/peerprotocol"
 	"github.com/buzzqw/gextto/internal/engine/internal/piecewriter"
 	"github.com/buzzqw/gextto/internal/engine/internal/urldownloader"
 )
+
+// sessionBanTTL is how long a peer that sent a corrupt piece stays banned from
+// the whole session (gextto fork, libtorrent-style smart ban).
+const sessionBanTTL = 30 * time.Minute
 
 func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 	pw.Piece.Writing = false
@@ -25,6 +30,11 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 			t.log.Debugln("received corrupt piece from peer", src.String())
 			t.closePeer(src)
 			t.bannedPeerIPs[src.IP()] = struct{}{}
+			// gextto fork: ban the corrupt peer session-wide for a while, so it
+			// cannot poison the other torrents either (libtorrent-style smart ban).
+			if t.session != nil {
+				t.session.BanIP(src.IP(), sessionBanTTL)
+			}
 		case *urldownloader.URLDownloader:
 			t.log.Debugln("received corrupt piece from webseed", src.URL)
 			t.disableSource(src.URL, errors.New("corrupt piece"), false)
