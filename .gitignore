@@ -70,6 +70,7 @@ uiweb/end2end/playwright-report/
 
 # root-level build artifact (go build ./cmd/gx-torrent writes here)
 /gx-torrent
+/gx-torrent.exe
 # personal convenience build script (not part of the project)
 /builda-tutto.sh
 /rain-blocklist-pr.sh
