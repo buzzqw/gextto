@@ -176,6 +176,9 @@ polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
   solo quando apri la scheda o premi *Ricarica*, con filtro testuale, DEBUG
   nascosti di default e avvisi/errori colorati. Mentre è aperta la tabella
   torrent non si aggiorna.
+- **Liste grandi** (solo standalone): la tabella rende al più `?rows=` torrent
+  (predefinito 300) e mostra *Showing X of Y · Show more* per allargare la
+  finestra; in managed rende sempre tutti i torrent, come prima.
 - Scorciatoie: `/` per cercare, `Esc` per chiudere il dettaglio.
 
 Il comando definitivo resta comunque Gextto; la pagina è una comodità per

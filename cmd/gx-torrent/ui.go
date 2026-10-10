@@ -92,6 +92,11 @@ type uiPageData struct {
 	Tags       []string
 	// SearchEnabled shows the indexer search box (standalone with indexers).
 	SearchEnabled bool
+	// RowsLimited is set when only the first RowsShown of RowsTotal rows are
+	// rendered, so a very large list does not build a huge DOM (standalone).
+	RowsLimited bool
+	RowsShown   int
+	RowsTotal   int
 	// FeedsEnabled shows the RSS feeds toolbar (standalone with feeds).
 	FeedsEnabled bool
 	FeedCount    int
@@ -271,7 +276,7 @@ func (d *Daemon) handleUI(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	page, err := d.uiPageData()
+	page, err := d.uiPageData(d.uiRowLimit(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -291,7 +296,7 @@ func (d *Daemon) handleUILive(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	page, err := d.uiPageData()
+	page, err := d.uiPageData(d.uiRowLimit(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -977,7 +982,7 @@ func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
 	return false
 }
 
-func (d *Daemon) uiPageData() (uiPageData, error) {
+func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	stats := d.stats()
 	views := d.snapshotViews()
 	page := uiPageData{
@@ -1102,7 +1107,38 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 			page.CountPaused++
 		}
 	}
+	page.RowsTotal = len(page.Rows)
+	if limit > 0 && len(page.Rows) > limit {
+		page.Rows = page.Rows[:limit]
+		page.RowsLimited = true
+		page.RowsShown = limit
+	}
 	return page, nil
+}
+
+// defaultUIRowLimit bounds the rows a standalone page renders at once, so a
+// list of thousands of torrents does not build a huge DOM on every refresh.
+const defaultUIRowLimit = 300
+
+// uiRowLimit is the render window for this request: 0 (all rows) in managed,
+// which must stay identically rendered, or the default/`?rows=` window in
+// standalone.
+func (d *Daemon) uiRowLimit(r *http.Request) int {
+	if d.opts.Mode != ModeStandalone {
+		return 0
+	}
+	raw := strings.TrimSpace(r.URL.Query().Get("rows"))
+	if raw == "" {
+		return defaultUIRowLimit
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return defaultUIRowLimit
+	}
+	if n > 100000 {
+		n = 100000
+	}
+	return n
 }
 
 // uiDetailData builds one torrent's detail tab. The torrent pointers are read

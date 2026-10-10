@@ -13,6 +13,10 @@ a rain in [`third_party/rain/GEXTTO.md`](../third_party/rain/GEXTTO.md).
 > Nato dall'estrazione della §14 di `evoluzione.md`, che ora rimanda qui. Il
 > documento tecnico `gx-torrent.md` descrive **ciò che c'è**; questo descrive
 > **dove si vuole andare**, e resta separato per non mescolare i due piani.
+>
+> **Nome:** il nome definitivo del prodotto è in discussione; il candidato
+> preferito è **gx-core**. Fino a decisione, questo documento usa "gx-torrent"
+> (il binario) e "gx-nox" (la modalità standalone).
 
 ## Indice
 
@@ -476,7 +480,7 @@ rimanenti:
 | --- | --- | --- |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | da fare |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | da fare |
-| F2 — virtualizzazione della tabella torrent | §14.3 | da fare |
+| F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | da fare |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, UI) | §12.2 | da fare |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
@@ -568,6 +572,12 @@ Realizzato:
 - `release.yml` e `continuous.yml` caricano l'artifact `gx-torrent-linux-<arch>`
   (solo variante `go`) e lo pubblicano nel release (`dist/gx-torrent-linux-*`).
 
+**Chiarimento (concordato):** il pacchetto standalone è **lo stesso binario**
+che Gextto usa come motore (regola d'oro: un solo codice). La CI non costruisce
+un secondo prodotto: compila `gx-torrent` e lo pubblica **a parte** dall'archivio
+di Gextto, così l'utente lo scarica e lo usa come demone autonomo (come
+qbittorrent-nox). Nessun fork, nessuna doppia manutenzione.
+
 Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 (glibc 2.35), amd64 e arm64, e l'eventuale immagine container.
 
@@ -604,9 +614,10 @@ Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 
 Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
 
-1. **Nome pubblico**: "gx-torrent" per il binario e "gx-nox" come nome dello
-   standalone, oppure "gx-nox" solo per la release standalone? (Proposta: binario
-   `gx-torrent`, presentazione "gx-nox" nella documentazione utente.)
+1. **Nome definitivo**: candidato **"gx-core"** (piace). Resta da decidere la
+   mappa nome ↔ binario: es. binario `gx-torrent` e prodotto/release "gx-core",
+   oppure rinominare tutto a `gx-core`; "gx-nox" resta solo come ipotesi di nome
+   per la modalità standalone. Da chiudere prima di F1/F2 definitivi.
 2. **Modulo del motore**: rinominare `github.com/cenkalti/rain/v2` in un modulo
    proprio e spostare in `internal/engine` a inizio o fine di F4?
 3. **Dove vivono i moduli condivisi**: estrarre RSS/indexer in `internal/` dentro

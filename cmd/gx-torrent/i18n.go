@@ -145,6 +145,8 @@ var uiCatalog = map[string][5]string{
 	"Feeds":       {"Feed", "Feeds", "Flux", "Feeds", "Kanały"},
 	"Check feeds": {"Controlla i feed", "Feeds prüfen", "Vérifier les flux", "Comprobar feeds", "Sprawdź kanały"},
 	"Checking…":   {"Controllo…", "Prüfe…", "Vérification…", "Comprobando…", "Sprawdzam…"},
+	"Showing":     {"Mostrati", "Angezeigt", "Affichés", "Mostrando", "Wyświetlono"},
+	"Show more":   {"Mostra altri", "Mehr anzeigen", "Afficher plus", "Mostrar más", "Pokaż więcej"},
 
 	// RSS management page (standalone).
 	"Rules":      {"Regole", "Regeln", "Règles", "Reglas", "Reguły"},

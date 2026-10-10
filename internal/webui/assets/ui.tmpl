@@ -204,11 +204,12 @@ function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();}});}
+function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live'+(window.__rows?'?rows='+window.__rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();}});}
 function rowState(tr){return tr.getAttribute('data-state')||'';}
 function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
 function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';var c=window.__catFilter||'';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();var cat=tr.getAttribute('data-cat')||'';tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f)&&(!c||cat===c))?'':'none';});}
 function filterByCategory(v){window.__catFilter=v;applyFilters();}
+function showMore(){window.__rows=(window.__rows||300)*2;refresh(true);}
 function filterRows(){applyFilters();}
 function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
@@ -336,6 +337,9 @@ setInterval(function(){refresh(false)},2000);
   </div>
   {{else}}
   <p class="muted">No torrents in the session.</p>
+  {{end}}
+  {{if .RowsLimited}}
+  <p class="muted"><span>Showing</span> {{.RowsShown}} <span>of</span> {{.RowsTotal}} · <button type="button" onclick="showMore()">Show more</button></p>
   {{end}}
 
   <div class="statusbar">
