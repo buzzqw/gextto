@@ -6,6 +6,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,6 +19,12 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// DNS rebinding: a public name that resolves to this machine must not
+		// reach the daemon. Only an IP literal or localhost is accepted.
+		if !hostAllowed(r.Host) {
+			writeError(w, http.StatusForbidden, errors.New("host not allowed: use an IP address or localhost"))
+			return
+		}
 		// The page's forms POST to /ui/*. A browser always sends Origin (or
 		// Referer) on a cross-site POST, so requiring it to match the request
 		// Host blocks a page on another site from acting on the daemon.
@@ -27,6 +34,35 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// hostAllowed reports whether the request Host is an IP literal (IPv4 or IPv6)
+// or localhost. A plain hostname is rejected: it is the DNS-rebinding vector,
+// because an attacker's name can resolve to this machine.
+func hostAllowed(host string) bool {
+	name := strings.TrimSpace(host)
+	if h, _, err := net.SplitHostPort(name); err == nil {
+		name = h
+	}
+	name = strings.Trim(name, "[]")
+	if name == "" {
+		return false
+	}
+	if strings.EqualFold(name, "localhost") {
+		return true
+	}
+	return net.ParseIP(name) != nil
+}
+
+// lanSource reports whether an address is on the local network: loopback,
+// RFC 1918 (10/8, 172.16/12, 192.168/16), RFC 4193 ULA (fc00::/7) or link-local
+// (169.254/16, fe80::/10). It is the definition of "LAN" used to allow the
+// standalone page without a password.
+func lanSource(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 // sameOrigin reports whether a POST comes from the page itself. A request with

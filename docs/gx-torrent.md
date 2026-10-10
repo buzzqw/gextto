@@ -218,9 +218,10 @@ cartella dati **non** viene letto (così l'impronta resta stabile); in standalon
 (`{"lang": "de"}`), e una flag esplicita vince comunque.
 
 In standalone le POST della pagina (`/ui/*`) sono accettate solo se
-`Origin`/`Referer` coincide con l'host della richiesta: è la protezione CSRF per
-una pagina raggiungibile dalla LAN. In managed la pagina si comporta come prima
-(le POST dell'API v1 restano protette dal token).
+`Origin`/`Referer` coincide con l'host della richiesta (protezione CSRF) e l'host
+della richiesta (`Host`) deve essere un IP o `localhost`, mai un nome che risolve
+a questa macchina (protezione DNS rebinding). In managed la pagina si comporta
+come prima (le POST dell'API v1 restano protette dal token).
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:

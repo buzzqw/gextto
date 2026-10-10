@@ -478,7 +478,8 @@ Aggiornato al 2026-10-10.
 | Test di guardia §8.2: RSS e CPU contro qbittorrent-nox | da fare (harness opt-in) |
 | F1: `-mode` managed/standalone (autodetect da `-fingerprint`) e store `settings.json` (base) | fatto |
 | F1: protezione CSRF/same-origin della pagina in standalone | fatto |
-| F1: login/sessioni, wizard, protezioni LAN (DNS rebinding, sorgente LAN) | da fare |
+| F1: DNS rebinding (`Host` IP/localhost) e classificazione sorgente LAN | fatto |
+| F1: login/sessioni, wizard, bypass LAN senza password | da fare |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
 ---
