@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 const (
 	feedsSettingKey     = "feeds"
+	rulesSettingKey     = "rules"
 	feedIntervalKey     = "feed-interval-secs"
 	defaultFeedInterval = 15 * time.Minute
 	feedSeenRetention   = 30 * 24 * time.Hour
@@ -36,8 +38,8 @@ type feedConfig struct {
 	Paused   bool   `json:"paused,omitempty"`
 }
 
-func (c feedConfig) rule() rss.Rule {
-	return rss.Rule{Include: splitList(c.Include), Exclude: splitList(c.Exclude)}
+func (c feedConfig) rule() rss.TitleFilter {
+	return rss.TitleFilter{Include: splitList(c.Include), Exclude: splitList(c.Exclude)}
 }
 
 // feedStatus is the last outcome of one feed, for the page.
@@ -143,19 +145,39 @@ func (d *Daemon) pollFeeds() {
 		}
 		status.Items = len(items)
 		added := 0
-		for _, item := range feed.rule().Filter(items) {
+		rules := d.rules()
+		for _, item := range items {
 			if added >= feedMaxAddsPerPoll {
 				break
+			}
+			action, smart, ok := filterFeedItem(rules, feed, name, item, time.Now())
+			if !ok {
+				continue
 			}
 			if d.feedSeen(name, item.GUID) {
 				continue
 			}
-			if err := d.addFeedItem(feed, item); err != nil {
+			smartKey := ""
+			if smart {
+				series, season, episode, found := rss.FindEpisode(item.Title)
+				if !found {
+					continue
+				}
+				smartKey = fmt.Sprintf("%s\x00%d", series, season)
+				if episode <= d.smartEpisode(smartKey) {
+					continue
+				}
+			}
+			if err := d.addFeedItem(item, action); err != nil {
 				status.LastError = err.Error()
 				logf("feed %s: cannot add %q: %v", name, item.Title, err)
 				continue
 			}
 			d.markFeedSeen(name, item.GUID)
+			if smartKey != "" {
+				_, _, episode, _ := rss.FindEpisode(item.Title)
+				d.setSmartEpisode(smartKey, episode)
+			}
 			added++
 		}
 		status.Added = added
@@ -166,13 +188,41 @@ func (d *Daemon) pollFeeds() {
 	}
 }
 
-// addFeedItem adds one feed item: a magnet directly, a .torrent URL downloaded
-// first.
-func (d *Daemon) addFeedItem(feed feedConfig, item rss.Item) error {
+// filterFeedItem decides whether an item is added and with which action. With a
+// rule set configured the rules are ordered and the first match wins (PASS adds,
+// FAIL skips); otherwise the feed's own include/exclude filter applies.
+func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss.Item, now time.Time) (rss.Action, bool, bool) {
+	if item.Download() == "" || item.Title == "" {
+		return rss.Action{}, false, false
+	}
+	if len(rules) > 0 {
+		rule, pass, matched := rss.Evaluate(rules, feedName, item, now)
+		if !matched || !pass {
+			return rss.Action{}, false, false
+		}
+		return rule.Action, rule.Match.SmartEpisode, true
+	}
+	if !feed.rule().Match(item.Title) {
+		return rss.Action{}, false, false
+	}
+	return rss.Action{
+		SavePath: feed.SavePath,
+		Category: feed.Category,
+		Paused:   feed.Paused,
+	}, false, true
+}
+
+// addFeedItem adds one feed item with the rule's action: a magnet directly, a
+// .torrent URL downloaded first.
+func (d *Daemon) addFeedItem(item rss.Item, action rss.Action) error {
 	req := addRequest{
-		Destination: strings.TrimSpace(feed.SavePath),
-		Paused:      feed.Paused,
-		Category:    strings.TrimSpace(feed.Category),
+		Destination: strings.TrimSpace(action.SavePath),
+		Paused:      action.Paused,
+		Category:    strings.TrimSpace(action.Category),
+		Tags:        action.Tags,
+		Sequential:  action.Sequential,
+		FirstLast:   action.FirstLast,
+		QueueTop:    action.Top,
 	}
 	if item.Magnet != "" {
 		req.Magnet = item.Magnet
@@ -185,6 +235,44 @@ func (d *Daemon) addFeedItem(feed feedConfig, item rss.Item) error {
 	}
 	_, _, err := d.add(req)
 	return err
+}
+
+// rules returns the configured ordered rules (empty when none/invalid).
+func (d *Daemon) rules() []rss.Rule {
+	if d.opts.Settings == nil {
+		return nil
+	}
+	raw := strings.TrimSpace(d.opts.Settings.Get(rulesSettingKey, ""))
+	if raw == "" {
+		return nil
+	}
+	var list []rss.Rule
+	if err := json.Unmarshal([]byte(raw), &list); err != nil {
+		logf("cannot parse the rules setting: %v", err)
+		return nil
+	}
+	return list
+}
+
+// smartEpisode is the highest episode already added for a series+season key.
+func (d *Daemon) smartEpisode(key string) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.state.FeedSmart[key]
+}
+
+// setSmartEpisode records the highest episode added for a series+season key.
+func (d *Daemon) setSmartEpisode(key string, episode int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.FeedSmart == nil {
+		d.state.FeedSmart = map[string]int{}
+	}
+	if episode > d.state.FeedSmart[key] {
+		d.state.FeedSmart[key] = episode
+		d.dirty = true
+		d.saveLocked()
+	}
 }
 
 // feedSeenKey is the persisted key of one item.

@@ -81,7 +81,7 @@ func TestParseAtom(t *testing.T) {
 }
 
 func TestRuleMatchAndFilter(t *testing.T) {
-	rule := Rule{Include: []string{"1080p", "2160p"}, Exclude: []string{"cam"}}
+	rule := TitleFilter{Include: []string{"1080p", "2160p"}, Exclude: []string{"cam"}}
 	cases := map[string]bool{
 		"Movie 1080p":      true,
 		"Movie 2160p":      true,

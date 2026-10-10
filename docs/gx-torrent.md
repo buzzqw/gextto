@@ -277,6 +277,22 @@ li ripropone). Nella pagina compaiono un riquadro *Feeds* con *Check feeds* e
 `GET /ui/feeds`/`POST /ui/feeds/poll` per lo stato e un controllo immediato. In
 managed non è disponibile.
 
+Con la chiave `rules` (array JSON) si passa al **set di regole ordinate**, come
+BiglyBT: la prima regola che corrisponde decide (`fail: true` scarta, altrimenti
+aggiunge). Ogni regola ha `name`, `feeds` (per limitarla ad alcuni feed; vuoto =
+tutti), `fail`, `match` e `action`:
+
+- `match`: `include`/`exclude` (sottostringhe), `regex`/`not_regex`,
+  `min_size`/`max_size` (byte), `min_seeders`/`max_seeders`, `min_peers`,
+  `max_age_days`, `require_episode`, `smart_episode` (aggiunge un episodio di
+  una serie una volta sola, tenendo traccia dell'ultimo: come lo smart episode
+  filter di qBittorrent);
+- `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
+  `top`.
+
+Esempio:
+`[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
+
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
 `schedule-start`/`schedule-end` (`HH:MM`, anche a cavallo della mezzanotte) il

@@ -62,6 +62,45 @@ func TestPollFeedsAddsAndDedupes(t *testing.T) {
 	}
 }
 
+const episodesFeed = `<?xml version="1.0"?>
+<rss version="2.0"><channel>
+<item><title>Show S01E05 1080p</title><guid>e5</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+<item><title>Show S01E04 1080p</title><guid>e4</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:2222222222222222222222222222222222222222">x</a>]]></description></item>
+<item><title>Show S01E06 1080p CAM</title><guid>e6</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:3333333333333333333333333333333333333333">x</a>]]></description></item>
+</channel></rss>`
+
+func TestPollFeedsOrderedRulesAndSmartEpisode(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(episodesFeed))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey,
+		`[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},`+
+			`{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv"}}]`)
+
+	d.pollFeeds()
+	waitFor(t, "the newest episode", func() bool { return len(d.snapshotViews()) == 1 })
+	view := d.snapshotViews()[0]
+	if view.Hash != "1111111111111111111111111111111111111111" {
+		t.Fatalf("added %q, want S01E05", view.Hash)
+	}
+	if view.Category != "tv" {
+		t.Fatalf("category = %q, want tv", view.Category)
+	}
+
+	// A second poll adds nothing: E05 is seen and E04/E06 are filtered.
+	d.pollFeeds()
+	if len(d.snapshotViews()) != 1 {
+		t.Fatalf("re-poll added torrents: %d", len(d.snapshotViews()))
+	}
+}
+
 func TestFeedEndpoints(t *testing.T) {
 	// Standalone, open: the status is a JSON array and the poll is accepted.
 	d := standaloneTestDaemon(t, "", true)

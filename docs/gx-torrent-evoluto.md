@@ -534,9 +534,11 @@ Matrice delle capacità (fonte → obiettivo gx-torrent):
 | Notifiche su match/errore | mail | mail | sì | da valutare |
 
 Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torznab,
-regole include/escludi, storico persistito, worker e riquadro in pagina. Da
-evolvere verso la matrice qui sopra (regole ordinate, filtri numerici,
-smart-episode, azioni complete, UI di gestione con articoli corrispondenti).
+**regole ordinate PASS/FAIL (primo match)**, filtri include/exclude, regex,
+dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
+(cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
+persistito, worker e riquadro in pagina. Restano da completare: UI di gestione di
+feed e regole, articoli corrispondenti per regola, feed da ricerca, notifiche.
 
 ---
 

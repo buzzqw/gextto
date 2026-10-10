@@ -127,6 +127,8 @@ type persistedState struct {
 	// FeedSeen records the feed items already added, so a restart does not add
 	// them again (key: feed name + item guid).
 	FeedSeen map[string]int64 `json:"feed_seen,omitempty"`
+	// FeedSmart is the highest episode added per series+season (smart episode).
+	FeedSmart map[string]int `json:"feed_smart,omitempty"`
 }
 
 // runtimeInfo is volatile per-torrent bookkeeping.

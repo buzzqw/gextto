@@ -39,15 +39,17 @@ func (i Item) Download() string {
 	return i.Link
 }
 
-// Rule filters items by title. Include (when non-empty) requires at least one
-// match; any Exclude match rejects. Matching is a case-insensitive substring.
-type Rule struct {
+// TitleFilter filters items by title: Include (when non-empty) requires at
+// least one match; any Exclude match rejects. Matching is a case-insensitive
+// substring. It is the simple per-feed filter; the ordered Rule (rules.go) is
+// the advanced one.
+type TitleFilter struct {
 	Include []string `json:"include,omitempty"`
 	Exclude []string `json:"exclude,omitempty"`
 }
 
-// Match reports whether the title passes the rule.
-func (r Rule) Match(title string) bool {
+// Match reports whether the title passes the filter.
+func (r TitleFilter) Match(title string) bool {
 	lower := strings.ToLower(title)
 	if len(r.Include) > 0 {
 		ok := false
@@ -69,8 +71,8 @@ func (r Rule) Match(title string) bool {
 	return true
 }
 
-// Filter returns the items of list whose title passes the rule.
-func (r Rule) Filter(list []Item) []Item {
+// Filter returns the items of list whose title passes the filter.
+func (r TitleFilter) Filter(list []Item) []Item {
 	out := make([]Item, 0, len(list))
 	for _, item := range list {
 		if item.Title != "" && r.Match(item.Title) && item.Download() != "" {
