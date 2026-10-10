@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/messages"
 	"github.com/buzzqw/gextto/internal/models"
 	"github.com/buzzqw/gextto/internal/utils"
 )
@@ -1084,5 +1085,36 @@ func TestBuildManagedGxCommandSafeMode(t *testing.T) {
 	}
 	if normal.fingerprint == safe.fingerprint {
 		t.Fatal("safe mode must change the daemon fingerprint")
+	}
+}
+
+// TestGxFingerprintIgnoresInterfaceLanguage: switching the interface language
+// must not change the fingerprint, otherwise the next Gextto start would
+// restart gx-torrent and cut every transfer for a page label.
+func TestGxFingerprintIgnoresInterfaceLanguage(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "gx-torrent"), []byte("v1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	cfg := DefaultConfig()
+	cfg.DataDir = t.TempDir()
+	defer messages.SetLanguage(messages.Language())
+
+	messages.SetLanguage("it")
+	italian, err := buildManagedGxCommand(&cfg, gxTorrentSettings{BaseURL: "http://127.0.0.1:8890"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages.SetLanguage("de")
+	german, err := buildManagedGxCommand(&cfg, gxTorrentSettings{BaseURL: "http://127.0.0.1:8890"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if italian.fingerprint != german.fingerprint {
+		t.Fatalf("the interface language changed the fingerprint: %s vs %s", italian.fingerprint, german.fingerprint)
+	}
+	if !strings.Contains(strings.Join(german.args, " "), "-lang de") {
+		t.Fatalf("the daemon is not started with the interface language: %v", german.args)
 	}
 }

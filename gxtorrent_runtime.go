@@ -136,7 +136,7 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return gxManagedCommand{}, err
 	}
-	args := []string{"-listen", listen, "-data", dataDir, "-lang", messages.Language()}
+	args := []string{"-listen", listen, "-data", dataDir}
 	if !listenIsLoopback(listen) && settings.Token == "" {
 		// The daemon refuses a non-loopback listen without a token. Instead of
 		// failing to start we opt into its documented `-insecure` mode, matching
@@ -180,7 +180,10 @@ func buildManagedGxCommand(cfg *Config, settings gxTorrentSettings) (gxManagedCo
 	if err != nil {
 		return gxManagedCommand{}, err
 	}
-	args = append(args, "-fingerprint", fingerprint)
+	// The page language stays out of the fingerprint: changing the interface
+	// language must not restart the daemon and cut every transfer. A running
+	// daemon keeps its language; a page can still pick one with ?lang=.
+	args = append(args, "-lang", messages.Language(), "-fingerprint", fingerprint)
 	return gxManagedCommand{binary: binary, args: args, env: env, dataDir: dataDir, listen: listen, fingerprint: fingerprint}, nil
 }
 
