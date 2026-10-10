@@ -172,6 +172,7 @@ func main() {
 	mode := flag.String("mode", envOr("GX_TORRENT_MODE", ""), "managed (driven by Gextto) or standalone; default: managed with -fingerprint, standalone otherwise")
 	ipFilterSource := flag.String("ipfilter-source", envOr("GX_TORRENT_IPFILTER_SOURCE", ""), "IP filter URL or path configured in Gextto, prefilled in the web page")
 	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
+	notify := flag.String("notify-url", envOr("GX_TORRENT_NOTIFY_URL", ""), "webhook URL posted on feed match/error (empty = disabled)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -236,6 +237,10 @@ func main() {
 	if settingsStore != nil {
 		partsDir = strings.TrimSpace(settingsStore.Get("temp-dir", ""))
 	}
+	notifyURLValue := strings.TrimSpace(*notify)
+	if notifyURLValue == "" && settingsStore != nil {
+		notifyURLValue = strings.TrimSpace(settingsStore.Get(notifyURLSettingKey, ""))
+	}
 	var allowed []string
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
@@ -281,6 +286,7 @@ func main() {
 		GexttoLog:      strings.TrimSpace(*gexttoLog),
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
 		Lang:           pageLang,
+		NotifyURL:      notifyURLValue,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

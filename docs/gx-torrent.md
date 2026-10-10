@@ -319,7 +319,8 @@ esempio:
   `GX_TORRENT_NO_HOLEPUNCH`, `GX_TORRENT_NO_LSD`, `GX_TORRENT_NO_UPNP`,
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
-- `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`.
+- `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
+  `GX_TORRENT_NOTIFY_URL` (webhook per le notifiche dei feed).
 
 Alcuni flag sono interni (`-insecure`, `-version`, `-fingerprint`,
 `-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): li usa solo Gextto per
@@ -934,7 +935,8 @@ accettato sia in forma IPv4 sia IPv6, il **filtro IP** accetta regole CIDR IPv6
 (le forme a intervallo/P2P/eMule restano IPv4) e il motore accetta i peer DHT
 IPv6 (contatti da 18 byte).
 
-Manca solo la scoperta locale (LSD) via multicast IPv6.
+Manca solo la scoperta locale (LSD) via multicast IPv6: non esiste un gruppo
+multicast IPv6 standard (qBittorrent non la implementa), quindi non è prevista.
 
 ## Test
 

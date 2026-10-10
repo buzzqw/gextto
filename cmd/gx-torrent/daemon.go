@@ -61,7 +61,10 @@ type Options struct {
 	// Lang is the web page language (it, en, de, fr, es, pl; empty or unknown
 	// means English). Gextto passes its interface language when it starts the
 	// daemon; a ?lang= query overrides it per request.
-	Lang        string
+	Lang string
+	// NotifyURL is a webhook posted (JSON) on feed match/error. Empty disables
+	// notifications.
+	NotifyURL   string
 	Tick        time.Duration
 	ProbeWindow time.Duration
 }

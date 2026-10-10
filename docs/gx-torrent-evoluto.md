@@ -498,7 +498,7 @@ rimanenti:
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
-| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (restano feed da ricerca e notifiche) |
+| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (resta il feed dai risultati di ricerca) |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
 **Aperti, da discutere dopo i precedenti:** il completamento di **F4 IPv6**
@@ -536,7 +536,7 @@ Storico (fatto):
 | F2: ricerca su indexer — casella e risultati nella pagina | fatto |
 | F2: RSS con regole (feed, include/escludi, categoria/cartella, dedup persistito) + riquadro nella pagina | fatto |
 | F2: Jackett/Prowlarr/MIRCrew via Torznab (ricerca e feed) | fatto |
-| F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare (dopo gli item concordati) |
+| F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | fatto |
 
 ### 12.2 Gestore RSS (obiettivo di eccellenza)
 
@@ -568,7 +568,10 @@ Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torzna
 dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
 (cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
 persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
-per regola e Add manuale. Restano da completare: feed da ricerca e notifiche.
+per regola e Add manuale. Le **notifiche su match/errore** sono disponibili via
+webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, payload JSON con gli eventi
+`feed_match` e `feed_error`). Resta da completare: il feed dai risultati di
+ricerca.
 
 ### 12.3 CI: gx-torrent standalone
 

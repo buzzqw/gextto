@@ -140,11 +140,13 @@ func (d *Daemon) pollFeeds() {
 		if err != nil {
 			status.LastError = err.Error()
 			logf("feed %s: %v", name, err)
+			d.notify("feed_error", map[string]any{"feed": name, "error": err.Error()})
 			d.setFeedStatus(status)
 			continue
 		}
 		status.Items = len(items)
 		added := 0
+		var addedTitles []string
 		rules := d.rules()
 		for _, item := range items {
 			if added >= feedMaxAddsPerPoll {
@@ -171,6 +173,7 @@ func (d *Daemon) pollFeeds() {
 			if err := d.addFeedItem(item, action); err != nil {
 				status.LastError = err.Error()
 				logf("feed %s: cannot add %q: %v", name, item.Title, err)
+				d.notify("feed_error", map[string]any{"feed": name, "title": item.Title, "error": err.Error()})
 				continue
 			}
 			d.markFeedSeen(name, item.GUID)
@@ -179,10 +182,12 @@ func (d *Daemon) pollFeeds() {
 				d.setSmartEpisode(smartKey, episode)
 			}
 			added++
+			addedTitles = append(addedTitles, item.Title)
 		}
 		status.Added = added
 		if added > 0 {
 			logf("feed %s: added %d torrent(s)", name, added)
+			d.notify("feed_match", map[string]any{"feed": name, "added": added, "titles": addedTitles})
 		}
 		d.setFeedStatus(status)
 	}
