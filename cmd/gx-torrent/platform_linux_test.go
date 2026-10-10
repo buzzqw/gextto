@@ -124,3 +124,24 @@ func TestIsCrossDeviceMatchesEXDEV(t *testing.T) {
 		t.Fatal("EPERM is not cross-device")
 	}
 }
+
+func TestCopyTreeKeepsSymlinks(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "src")
+	if err := os.MkdirAll(source, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "file.bin"), []byte("data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("file.bin", filepath.Join(source, "alias")); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "dst")
+	if err := copyTree(source, target); err != nil {
+		t.Fatalf("copyTree: %v", err)
+	}
+	if got, err := os.Readlink(filepath.Join(target, "alias")); err != nil || got != "file.bin" {
+		t.Fatalf("symlink not preserved: %q, %v", got, err)
+	}
+}

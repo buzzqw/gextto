@@ -210,7 +210,15 @@ func copyTree(source, target string) error {
 		if err != nil {
 			return err
 		}
-		return os.Symlink(link, target)
+		if err := os.Symlink(link, target); err == nil {
+			return nil
+		} else if resolved, statErr := os.Stat(source); statErr == nil && resolved.Mode().IsRegular() {
+			// Windows without the symlink privilege: keep the file's content
+			// instead of failing the whole move.
+			return copyFile(source, target, resolved.Mode().Perm())
+		} else {
+			return err
+		}
 	case info.IsDir():
 		if err := os.MkdirAll(target, info.Mode().Perm()|0o700); err != nil {
 			return err
