@@ -954,7 +954,11 @@ Le operazioni che il motore non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
-- magnet solo v2 / `.torrent` senza `piece layers` (vedi sopra);
+- interop v2 come **seed**: le richieste `hash request` a livello blocco
+  (`base = 0`) sono rifiutate con `hash reject` (servirebbe leggere i dati),
+  quindi un leecher libtorrent che scarica **da noi** non può verificare i
+  blocchi prima di chiederli; i leecher gx-torrent e il download da un seed
+  libtorrent funzionano (vedi *Torrent BitTorrent v2*);
 - IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
