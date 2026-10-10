@@ -297,50 +297,18 @@ func main() {
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}
-	daemon, err := newDaemon(opts)
+	// Started by the Windows Service Control Manager: run the same daemon under
+	// the service dispatcher instead of the interactive signal loop.
+	if isWindowsService() {
+		if err := runWindowsService(opts); err != nil {
+			logf("service failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
+	run, err := startDaemon(opts)
 	if err != nil {
 		log.Fatalf("cannot start: %v", err)
-	}
-
-	stop := make(chan struct{})
-	loopDone := make(chan struct{})
-	go func() {
-		daemon.run(stop)
-		close(loopDone)
-	}()
-	daemon.poke()
-
-	server := &http.Server{
-		Addr:              opts.Listen,
-		Handler:           daemon.routes(),
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	serverErr := make(chan error, 1)
-	// Listen before serving, so the browser below never reaches the address
-	// ahead of the server and is not opened at all when the port is taken.
-	listener, listenErr := net.Listen("tcp", opts.Listen)
-	if listenErr != nil {
-		serverErr <- listenErr
-	} else {
-		go func() {
-			logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), opts.Listen, opts.DataDir, opts.DownloadDir)
-			serverErr <- server.Serve(listener)
-		}()
-	}
-
-	// First run in standalone: open the web wizard in the browser, so the
-	// installation is guided instead of typed. Best-effort: a headless server
-	// (no graphical session) or a missing browser is silently skipped, and the
-	// wizard stays reachable at the printed address.
-	if listenErr == nil && opts.Mode == ModeStandalone && !daemon.setupComplete() {
-		if url := localSetupURL(opts.Listen); url != "" {
-			logf("first run: open %s to configure gx-torrent", url)
-			go func() {
-				if err := openBrowser(url); err != nil {
-					logf("cannot open the browser automatically: %v (open %s by hand)", err, url)
-				}
-			}()
-		}
 	}
 
 	signals := make(chan os.Signal, 1)
@@ -350,18 +318,81 @@ func main() {
 	select {
 	case sig := <-signals:
 		logf("received %s, shutting down", sig)
-	case err := <-serverErr:
+	case err := <-run.serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logf("API server failed: %v", err)
 			exitCode = 1
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	_ = server.Shutdown(ctx)
-	cancel()
-	close(stop)
-	<-loopDone
-	daemon.close()
-	logf("stopped")
+	run.shutdown()
 	os.Exit(exitCode)
+}
+
+// daemonRun is a running daemon: its HTTP server, run loop and shutdown handles.
+type daemonRun struct {
+	daemon    *Daemon
+	server    *http.Server
+	stop      chan struct{}
+	loopDone  chan struct{}
+	serverErr chan error
+}
+
+// startDaemon creates the daemon, opens the listener and starts serving. The
+// listener is opened before serving, so the first-run browser below never
+// reaches the address ahead of the server and is not opened at all when the
+// port is taken. It is shared by the interactive process and the Windows
+// service.
+func startDaemon(opts Options) (*daemonRun, error) {
+	daemon, err := newDaemon(opts)
+	if err != nil {
+		return nil, err
+	}
+	stop := make(chan struct{})
+	loopDone := make(chan struct{})
+	go func() {
+		daemon.run(stop)
+		close(loopDone)
+	}()
+	daemon.poke()
+
+	listener, err := net.Listen("tcp", opts.Listen)
+	if err != nil {
+		close(stop)
+		<-loopDone
+		daemon.close()
+		return nil, err
+	}
+	server := &http.Server{Handler: daemon.routes(), ReadHeaderTimeout: 10 * time.Second}
+	serverErr := make(chan error, 1)
+	go func() {
+		logf("version %s listening on %s (data %s, downloads %s)", runtimeVersion(), listener.Addr(), opts.DataDir, opts.DownloadDir)
+		serverErr <- server.Serve(listener)
+	}()
+
+	// First run in standalone: open the web wizard in the browser, so the
+	// installation is guided instead of typed. Best-effort: a headless server
+	// (no graphical session), a Windows service session or a missing browser is
+	// silently skipped, and the wizard stays reachable at the printed address.
+	if opts.Mode == ModeStandalone && !daemon.setupComplete() {
+		if url := localSetupURL(opts.Listen); url != "" {
+			logf("first run: open %s to configure gx-torrent", url)
+			go func() {
+				if err := openBrowser(url); err != nil {
+					logf("cannot open the browser automatically: %v (open %s by hand)", err, url)
+				}
+			}()
+		}
+	}
+	return &daemonRun{daemon: daemon, server: server, stop: stop, loopDone: loopDone, serverErr: serverErr}, nil
+}
+
+// shutdown stops the HTTP server and the daemon run loop.
+func (r *daemonRun) shutdown() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	_ = r.server.Shutdown(ctx)
+	cancel()
+	close(r.stop)
+	<-r.loopDone
+	r.daemon.close()
+	logf("stopped")
 }

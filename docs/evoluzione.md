@@ -161,18 +161,19 @@ sono state implementate in massima parte:
 | M-03 layer v2 in parallelo: chunk da ≤512 hash per peer diverso, con retry | fatto (`92f0a84`) |
 | M-04 wizard: errore mostrato in pagina se i limiti di banda non si applicano | fatto (`fbc9eaf`) |
 | M-05 `replaceDirLink` Windows: junction costruita completa e poi scambiata | fatto (`d4e1485`) |
-| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | **aperto** (vedi sotto) |
+| M-06 servizio Windows nativo (`windows/svc`) e pacchetto zip con `sc create` | fatto (`service_windows.go`, `scripts/package-gx-torrent-windows.sh`) |
 | M-07 gateway Windows: usare la rotta scelta da Windows (`GetBestRoute`) | fatto (`d4e1485`) |
 | M-08 interop v2 `base=0`: documentare/rillustrare il limite come seed | fatto (`5d2bff5`) |
 
-**M-06 (servizio Windows) — piano**: l'installazione su Windows è oggi il wizard
-web avviato a mano o da un'attività pianificata. Per un vero servizio serve
-`golang.org/x/sys/windows/svc`: `main` deve riconoscere `svc.IsWindowsService()`
-ed eseguire lo stesso demone dentro `svc.Run`, con un handler che avvia il server
-e lo ferma su stop dell'SCM; quindi un pacchetto zip con `gx-torrent.exe`,
-`install-service.ps1` (`New-Service`/`sc.exe create`) e README. Non è ancora
-implementato: richiede un refactor di `main` (estrarre `runDaemon`) e non è
-verificabile senza un runner Windows che installi il servizio.
+**M-06 (servizio Windows)** — fatto: `main` ora riconosce `svc.IsWindowsService()`
+(`service_windows.go` / `service_other.go`) e avvia lo stesso demone
+(`startDaemon`, estratto e condiviso col percorso interattivo) dentro `svc.Run`,
+fermandolo su stop dell'SCM. `scripts/package-gx-torrent-windows.sh` produce
+`gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
+(`New-Service`), `uninstall-service.ps1` e `README.txt` (alternativa `sc create`).
+Restano da fare, se serve: generare lo zip anche in `release.yml`/`continuous.yml`
+(oggi lo produce solo la CI `build-test` come smoke) e un test su Windows reale
+che installi davvero il servizio.
 
 ---
 

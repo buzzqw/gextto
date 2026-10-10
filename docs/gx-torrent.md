@@ -246,8 +246,19 @@ resta il symlink atomico. La migrazione tra volumi riconosce anche l'errore Wind
 `ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix.
 Restano senza equivalente nativo solo due **ottimizzazioni** di I/O — il
 readahead (`fadvise`) e la preallocazione con `fallocate` — che usano il
-fallback (`Truncate`): funzionano, senza l'ottimizzazione. Installer e unit
-systemd restano per Linux.
+fallback (`Truncate`): funzionano, senza l'ottimizzazione.
+
+**Installazione su Windows.** Il demone riconosce di essere avviato dal
+Service Control Manager (`svc.IsWindowsService`, `service_windows.go`) e gira
+come **servizio nativo**: un solo comando avvia il server HTTP e i torrent, e lo
+stop del servizio li ferma in modo pulito. Il pacchetto
+`scripts/package-gx-torrent-windows.sh` produce
+`gx-torrent-windows-<arch>.zip` con `gx-torrent.exe`, `install-service.ps1`
+(`New-Service`, avviato in PowerShell elevato), `uninstall-service.ps1` e
+`README.txt` con l'alternativa `sc create`. Dati e log in
+`%ProgramData%\gx-torrent`; il servizio gira in **sessione 0**, quindi non apre
+il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
+Installer e unit systemd restano per Linux.
 
 In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
 prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un

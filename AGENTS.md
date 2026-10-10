@@ -101,7 +101,12 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   Attenzione: da Go 1.23 `os.Lstat` riporta una junction come `ModeIrregular`,
   non `ModeSymlink`: per riconoscere un link usa sempre `isDirLink`.
   Restano senza equivalente nativo solo le ottimizzazioni `fadvise` e `fallocate`
-  (fallback `Truncate`). La CI (`ci.yml`, job `build-test`) ha degli
+  (fallback `Truncate`). Il demone gira come **servizio Windows nativo**
+  (`svc.IsWindowsService` → `svc.Run`, `service_windows.go`/`service_other.go`),
+  avviato da `startDaemon` (estratto e condiviso col percorso interattivo).
+  `scripts/package-gx-torrent-windows.sh` produce il pacchetto
+  `gx-torrent-windows-<arch>.zip` (exe + `install-service.ps1` +
+  `uninstall-service.ps1` + README). La CI (`ci.yml`, job `build-test`) ha degli
   step che cross-compilano **sia il motore sia il demone** per Windows, così il
   supporto non regredisce; il job `windows-platform` esegue su `windows-latest`
   i soli test di piattaforma (`platform_windows_test.go`, `go test -run

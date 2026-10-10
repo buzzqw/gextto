@@ -63,6 +63,13 @@ jobs:
       - name: Vet for Windows
         run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./internal/gxcore/... ./cmd/gx-torrent/
 
+      # The Windows package (exe + install-service.ps1 + README) must keep
+      # building: it packs the daemon as a service installable with sc/New-Service.
+      - name: Package gx-torrent for Windows
+        run: |
+          scripts/package-gx-torrent-windows.sh --arch amd64 --output /tmp/gx-torrent-windows-amd64.zip
+          scripts/package-gx-torrent-windows.sh --arch arm64 --output /tmp/gx-torrent-windows-arm64.zip
+
   # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
   # only cross-compiles on Linux; this job runs its tests on real Windows. The
   # rest of the suite assumes Unix paths, so only the platform tests run here.
