@@ -20,6 +20,9 @@ func TestAssetsAreEmbedded(t *testing.T) {
 	if !strings.Contains(TokenPage(), "<form") {
 		t.Error("TokenPage is missing its form")
 	}
+	if !strings.Contains(LoginPage(), "<form") {
+		t.Error("LoginPage is missing its form")
+	}
 	if !strings.HasPrefix(FaviconSVG(), "<svg") {
 		t.Error("FaviconSVG is not an SVG")
 	}

@@ -479,7 +479,8 @@ Aggiornato al 2026-10-10.
 | F1: `-mode` managed/standalone (autodetect da `-fingerprint`) e store `settings.json` (base) | fatto |
 | F1: protezione CSRF/same-origin della pagina in standalone | fatto |
 | F1: DNS rebinding (`Host` IP/localhost) e classificazione sorgente LAN | fatto |
-| F1: login/sessioni, wizard, bypass LAN senza password | da fare |
+| F1: login con password (bcrypt), sessioni, bypass LAN senza password | fatto |
+| F1: wizard di primo avvio | da fare |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
 ---

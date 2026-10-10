@@ -201,6 +201,13 @@ var uiCatalog = map[string][5]string{
 	"downloading_metadata": {"download metadati", "Lädt Metadaten", "téléchargement des métadonnées", "descargando metadatos", "pobieranie metadanych"},
 	"error":                {"errore", "Fehler", "erreur", "error", "błąd"},
 
+	// Standalone sign-in page.
+	"Sign in":                         {"Accedi", "Anmelden", "Se connecter", "Iniciar sesión", "Zaloguj się"},
+	"Sign in to the gx-torrent page.": {"Accedi alla pagina di gx-torrent.", "Bei der gx-torrent-Seite anmelden.", "Connectez-vous à la page gx-torrent.", "Inicia sesión en la página de gx-torrent.", "Zaloguj się do strony gx-torrent."},
+	"user":                            {"utente", "Benutzer", "utilisateur", "usuario", "użytkownik"},
+	"password":                        {"password", "Passwort", "mot de passe", "contraseña", "hasło"},
+	"Wrong username or password.":     {"Nome utente o password errati.", "Benutzername oder Passwort falsch.", "Nom d'utilisateur ou mot de passe incorrect.", "Usuario o contraseña incorrectos.", "Nieprawidłowa nazwa użytkownika lub hasło."},
+
 	// Strings rendered by the page's JavaScript through t().
 	"Select at least one torrent":                                      {"Seleziona almeno un torrent", "Wähle mindestens einen Torrent", "Sélectionne au moins un torrent", "Selecciona al menos un torrent", "Wybierz co najmniej jeden torrent"},
 	"Remove the torrent? Files stay on disk.":                          {"Rimuovere il torrent? I file restano su disco.", "Torrent entfernen? Die Dateien bleiben auf der Festplatte.", "Retirer le torrent ? Les fichiers restent sur le disque.", "¿Quitar el torrent? Los archivos permanecen en disco.", "Usunąć torrent? Pliki pozostaną na dysku."},

@@ -15,7 +15,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/auth"
 	"github.com/buzzqw/gextto/internal/queue"
+	"github.com/buzzqw/gextto/internal/settings"
 	"github.com/cenkalti/rain/v2/torrent"
 )
 
@@ -46,6 +48,9 @@ type Options struct {
 	// Mode is how the daemon is run: managed by Gextto or standalone. Gextto's
 	// flags win in managed; settings.json is authoritative in standalone.
 	Mode Mode
+	// Settings is the standalone settings store (nil in managed, where the
+	// flags are the only source of truth).
+	Settings *settings.Store
 	// Fingerprint is reported by /api/v1/health so Gextto can adopt a daemon
 	// it started earlier with the same binary and options.
 	Fingerprint string
@@ -141,6 +146,8 @@ type Daemon struct {
 	lastPeerNoiseReport time.Time
 	// trackers drops trackers that never work (see tracker_health.go).
 	trackers *trackerHealth
+	// sessions holds the standalone login sessions (nil in managed).
+	sessions *auth.Sessions
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
@@ -207,6 +214,9 @@ func newDaemon(opts Options) (*Daemon, error) {
 		startedAt: time.Now(),
 		wake:      make(chan struct{}, 1),
 		trackers:  newTrackerHealth(),
+	}
+	if opts.Mode == ModeStandalone {
+		d.sessions = auth.NewSessions(30 * 24 * time.Hour)
 	}
 	if err := d.loadState(); err != nil {
 		return nil, err

@@ -926,6 +926,9 @@ func (d *Daemon) uiSameOrigin(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (d *Daemon) uiAuthorized(w http.ResponseWriter, r *http.Request) bool {
+	if d.opts.Mode == ModeStandalone {
+		return d.standaloneAuthorized(w, r)
+	}
 	token := strings.TrimSpace(d.opts.Token)
 	if token == "" {
 		return true

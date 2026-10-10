@@ -223,6 +223,13 @@ della richiesta (`Host`) deve essere un IP o `localhost`, mai un nome che risolv
 a questa macchina (protezione DNS rebinding). In managed la pagina si comporta
 come prima (le POST dell'API v1 restano protette dal token).
 
+In standalone, se `settings.json` contiene `auth-password` (hash bcrypt col
+prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
+cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo
+(predefinito). Senza password la pagina resta aperta, così la prima
+configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`),
+`local-bypass` (`true`/`false`).
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 

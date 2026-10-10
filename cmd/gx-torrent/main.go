@@ -186,13 +186,18 @@ func main() {
 		log.Fatal(err)
 	}
 	pageLang := strings.TrimSpace(*lang)
+	var settingsStore *settings.Store
 	if modeValue == ModeStandalone {
 		// Standalone runs from settings.json; an explicit flag still wins. In
 		// managed mode the file is never read, so Gextto's flags stay in charge.
-		if store, loadErr := settings.Load(filepath.Join(data, "settings.json")); loadErr != nil {
+		store, loadErr := settings.Load(filepath.Join(data, "settings.json"))
+		if loadErr != nil {
 			log.Printf("cannot read settings.json: %v", loadErr)
-		} else if pageLang == "" {
-			pageLang = strings.TrimSpace(store.Get("lang", ""))
+		} else {
+			settingsStore = store
+			if pageLang == "" {
+				pageLang = strings.TrimSpace(store.Get("lang", ""))
+			}
 		}
 	}
 	downloads := *downloadDir
@@ -241,6 +246,7 @@ func main() {
 		},
 		Debug:          *debug,
 		Mode:           modeValue,
+		Settings:       settingsStore,
 		Fingerprint:    *fingerprint,
 		GexttoLog:      strings.TrimSpace(*gexttoLog),
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
