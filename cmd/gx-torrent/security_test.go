@@ -201,3 +201,57 @@ func TestStandaloneGuardRejectsForeignHost(t *testing.T) {
 		t.Fatalf("standalone must reject a hostname Host (DNS rebinding): status=%d called=%v", rec.Code, called)
 	}
 }
+
+func TestAllowedHosts(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	// A configured name is accepted; other names are still rejected.
+	d.opts.Settings.Set(allowedHostsKey, "nas.local, media.box")
+	if !d.hostAllowed("nas.local:8890") || !d.hostAllowed("media.box") {
+		t.Fatal("a configured host must be allowed")
+	}
+	if d.hostAllowed("evil.example") || d.hostAllowed("nas.local.evil.example") {
+		t.Fatal("only the exact configured hosts must be allowed")
+	}
+	if !d.hostAllowed("127.0.0.1:8890") {
+		t.Fatal("the IP literal default must keep working")
+	}
+}
+
+func TestTrustedProxyClientIP(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(trustedProxiesKey, "127.0.0.1")
+
+	// A trusted proxy forwards an Internet client: the client is remote.
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/", nil)
+	req.RemoteAddr = "127.0.0.1:5555"
+	req.Header.Set("X-Forwarded-For", "8.8.8.8")
+	if ip := d.clientIP(req); ip == nil || ip.String() != "8.8.8.8" {
+		t.Fatalf("clientIP = %v, want 8.8.8.8", ip)
+	}
+
+	// A trusted proxy forwarding a LAN client keeps the bypass.
+	req.Header.Set("X-Forwarded-For", "192.168.1.20")
+	if ip := d.clientIP(req); ip == nil || !lanSource(ip) {
+		t.Fatalf("a LAN client behind a trusted proxy must be LAN: %v", ip)
+	}
+
+	// A chain "real, proxy" is reduced to the real client.
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 127.0.0.1")
+	if ip := d.clientIP(req); ip == nil || ip.String() != "203.0.113.9" {
+		t.Fatalf("clientIP = %v, want 203.0.113.9", ip)
+	}
+}
+
+func TestUntrustedLoopbackProxyNotLAN(t *testing.T) {
+	// No trusted-proxies configured: a loopback peer that carries a forwarding
+	// header is not proof of a LAN client.
+	d := standaloneTestDaemon(t, "s3cret", true)
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/", nil)
+	req.RemoteAddr = "127.0.0.1:5555"
+	req.Header.Set("X-Forwarded-For", "8.8.8.8")
+	rec := httptest.NewRecorder()
+	if d.standaloneAuthorized(rec, req) {
+		t.Fatal("an undeclared proxy forwarding an external client must not be allowed by the LAN bypass")
+	}
+}

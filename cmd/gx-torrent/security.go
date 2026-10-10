@@ -6,10 +6,23 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+)
+
+// Standalone-only settings keys (settings.json). They let an operator put the
+// daemon behind a reverse proxy or reach it by a local name, without turning
+// off the protections above.
+const (
+	// allowedHostsKey lists extra Host values (a reverse-proxy name, a NAS
+	// hostname) accepted in addition to an IP literal or localhost.
+	allowedHostsKey = "allowed-hosts"
+	// trustedProxiesKey lists the proxy addresses (IP or CIDR) whose
+	// X-Forwarded-For / X-Real-IP may be believed.
+	trustedProxiesKey = "trusted-proxies"
 )
 
 // standaloneGuard wraps the daemon's HTTP routes with the standalone security
@@ -26,9 +39,10 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 			return
 		}
 		// DNS rebinding: a public name that resolves to this machine must not
-		// reach the daemon. Only an IP literal or localhost is accepted.
-		if !hostAllowed(r.Host) {
-			writeError(w, http.StatusForbidden, errors.New("host not allowed: use an IP address or localhost"))
+		// reach the daemon. Only an IP literal, localhost, or a hostname the
+		// operator explicitly allowed (allowed-hosts) is accepted.
+		if !d.hostAllowed(r.Host) {
+			writeError(w, http.StatusForbidden, errors.New("host not allowed: use an IP address, localhost, or list the name in allowed-hosts"))
 			return
 		}
 		// The page's forms POST to /ui/*; the REST API and the qBittorrent API
@@ -72,6 +86,114 @@ func hostAllowed(host string) bool {
 		return true
 	}
 	return net.ParseIP(name) != nil
+}
+
+// hostAllowed is hostAllowed plus the operator's allowed-hosts: a reverse proxy
+// that preserves the original Host, or access by a NAS name, is accepted when
+// the name is listed in settings.json.
+func (d *Daemon) hostAllowed(host string) bool {
+	if hostAllowed(host) {
+		return true
+	}
+	name := strings.TrimSpace(host)
+	if h, _, err := net.SplitHostPort(name); err == nil {
+		name = h
+	}
+	name = strings.Trim(name, "[]")
+	if name == "" {
+		return false
+	}
+	for _, allowed := range d.allowedHosts() {
+		if strings.EqualFold(allowed, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// allowedHosts returns the extra Host values accepted (the "allowed-hosts"
+// setting: a comma/newline separated list).
+func (d *Daemon) allowedHosts() []string {
+	if d.opts.Settings == nil {
+		return nil
+	}
+	return splitList(d.opts.Settings.Get(allowedHostsKey, ""))
+}
+
+// trustedProxies returns the networks whose forwarding headers may be believed
+// (the "trusted-proxies" setting: IPs or CIDRs, comma/newline separated).
+func (d *Daemon) trustedProxies() []*net.IPNet {
+	if d.opts.Settings == nil {
+		return nil
+	}
+	var out []*net.IPNet
+	for _, item := range splitList(d.opts.Settings.Get(trustedProxiesKey, "")) {
+		if !strings.Contains(item, "/") {
+			ip := net.ParseIP(item)
+			if ip == nil {
+				continue
+			}
+			bits := 32
+			if ip.To4() == nil {
+				bits = 128
+			}
+			item = fmt.Sprintf("%s/%d", item, bits)
+		}
+		if _, network, err := net.ParseCIDR(item); err == nil {
+			out = append(out, network)
+		}
+	}
+	return out
+}
+
+// ipInNetworks reports whether ip falls in any of the given networks.
+func ipInNetworks(ip net.IP, networks []*net.IPNet) bool {
+	for _, network := range networks {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasForwardedHeader reports whether the request carries a proxy forwarding
+// header.
+func hasForwardedHeader(r *http.Request) bool {
+	return len(r.Header.Values("X-Forwarded-For")) > 0 || strings.TrimSpace(r.Header.Get("X-Real-Ip")) != ""
+}
+
+// forwardedClientIP extracts the real client address a proxy claims: the
+// rightmost X-Forwarded-For entry that is not itself a trusted proxy, else
+// X-Real-IP. It returns nil when no usable value is present.
+func forwardedClientIP(r *http.Request, trusted []*net.IPNet) net.IP {
+	var chain []string
+	for _, value := range r.Header.Values("X-Forwarded-For") {
+		for _, part := range strings.Split(value, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				chain = append(chain, part)
+			}
+		}
+	}
+	for i := len(chain) - 1; i >= 0; i-- {
+		ip := parseForwardedIP(chain[i])
+		if ip == nil || ipInNetworks(ip, trusted) {
+			continue
+		}
+		return ip
+	}
+	return parseForwardedIP(r.Header.Get("X-Real-Ip"))
+}
+
+// parseForwardedIP parses an address that may carry a port or brackets.
+func parseForwardedIP(value string) net.IP {
+	value = strings.Trim(strings.TrimSpace(value), `"`)
+	if value == "" {
+		return nil
+	}
+	if host, _, err := net.SplitHostPort(value); err == nil {
+		value = host
+	}
+	return net.ParseIP(strings.Trim(value, "[]"))
 }
 
 // lanSource reports whether an address is on the local network: loopback,

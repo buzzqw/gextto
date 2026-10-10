@@ -118,11 +118,23 @@ func (d *Daemon) sessionCookieValid(r *http.Request) bool {
 	return false
 }
 
-// clientIP is the address of the request's peer, read from the socket. A
-// reverse proxy header is deliberately ignored: only declared proxies could be
-// trusted (see trustedProxyIPs).
+// clientIP is the address used for the LAN check. Normally it is the peer of
+// the socket; when a declared reverse proxy (trusted-proxies) forwards the
+// request, the client address it names is used instead. With a proxy but no
+// declared trusted-proxies, a loopback peer is not treated as LAN when a
+// forwarding header is present, so a forwarded Internet client still logs in.
 func (d *Daemon) clientIP(r *http.Request) net.IP {
-	return clientIP(r)
+	peer := clientIP(r)
+	trusted := d.trustedProxies()
+	if len(trusted) > 0 && peer != nil && ipInNetworks(peer, trusted) {
+		if forwarded := forwardedClientIP(r, trusted); forwarded != nil {
+			return forwarded
+		}
+	}
+	if peer != nil && peer.IsLoopback() && len(trusted) == 0 && hasForwardedHeader(r) {
+		return nil
+	}
+	return peer
 }
 
 // Login rate limiting: qBittorrent bans an address after five failed attempts.

@@ -290,7 +290,33 @@ prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
 cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo
 (predefinito). Senza password la pagina resta aperta, così la prima
 configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`),
-`local-bypass` (`true`/`false`).
+`local-bypass` (`true`/`false`). La password protegge anche `/api/v1` (stessi
+criteri della pagina: nessuna password, bypass LAN, o cookie `gx_session`/`SID`)
+e tutte le richieste che cambiano stato su `/api/` sono rifiutate se cross-site
+(`Origin`/`Referer`). Dopo 5 tentativi di login falliti dallo stesso indirizzo,
+l'IP è bloccato per 15 minuti.
+
+### Reverse proxy e host ammessi
+
+Con un reverse proxy davanti al demone, ogni richiesta arriva da `127.0.0.1` e,
+se `local-bypass` è attivo, verrebbe considerata LAN (cioè senza password). Due
+chiavi di `settings.json` regolano il caso:
+
+- `trusted-proxies`: elenco (separato da virgole o a capo) di indirizzi o reti
+  CIDR **fidati** (`127.0.0.1`, `10.0.0.0/8`). Solo da questi indirizzi si
+  crede a `X-Forwarded-For`/`X-Real-IP` per stabilire il client reale; una
+  richiesta che arriva da un proxy non dichiarato con questi header **non** è
+  considerata LAN (quindi richiede il login se c'è una password). Il percorso
+  usato è l'ultimo indirizzo non fidato della catena.
+- `allowed-hosts`: elenco di nomi host accettati nell'header `Host`, oltre agli
+  IP letterali e a `localhost`. Serve quando il proxy conserva il nome originale
+  (`proxy_set_header Host $host`) o si accede con un nome tipo `nas.local`.
+  Senza questa chiave un proxy che lascia `Host` a un nome non-IP riceve
+  `403 host not allowed` (protezione anti DNS-rebinding).
+
+Il proxy deve passare l'indirizzo del client:
+`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (nginx) o
+l'equivalente di Caddy.
 
 Al primo avvio in standalone, finché il setup non è completato, la pagina
 reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download e cartella

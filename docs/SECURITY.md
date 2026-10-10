@@ -39,6 +39,13 @@ interface.
   address in `X-Forwarded-For`, `X-Real-IP` and `Forwarded` must be local too, so
   Internet clients that come through a proxy on the same host still have to
   authenticate. Turn the exemption off if your LAN is not trusted.
+  The standalone `gx-torrent` daemon (not managed by Gextto) applies the same
+  idea with explicit settings: `trusted-proxies` (the proxy addresses whose
+  forwarding headers may be believed) and `allowed-hosts` (the `Host` names
+  accepted besides IP literals and `localhost`). With a proxy and no declared
+  `trusted-proxies`, a loopback peer carrying forwarding headers is **not**
+  treated as local, so a forwarded Internet client must log in; see
+  `docs/gx-torrent.md`, *Uso standalone → Reverse proxy e host ammessi*.
 - **Use TLS for remote access**: Gextto serves plain HTTP. Put a reverse proxy
   with a certificate (or a VPN) in front of it, otherwise passwords and keys
   travel in clear text.
