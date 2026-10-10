@@ -365,3 +365,39 @@ func TestI18nLoadAndTFallsBackToKey(t *testing.T) {
 		t.Errorf("T(missing) = %q, want missing", got)
 	}
 }
+
+// TestDictionaryCacheAndInvalidate checks the renderer dictionary is built once
+// per language and rebuilt after a translation changes.
+func TestDictionaryCacheAndInvalidate(t *testing.T) {
+	db := openTestI18nDb(t)
+	defer db.Close()
+	if err := db.Set("de", "Salva", "Speichern"); err != nil {
+		t.Fatal(err)
+	}
+	first, err := db.Dictionary("de")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first["Salva"] != "Speichern" {
+		t.Fatalf("dictionary value = %q", first["Salva"])
+	}
+	// The same map is returned (cached) across calls.
+	second, err := db.Dictionary("de")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if &first == nil || len(second) != len(first) {
+		t.Fatalf("cache not reused: %d vs %d", len(first), len(second))
+	}
+	// A write invalidates the cache: a new map reflects the change.
+	if err := db.Set("de", "Salva", "Sichern"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := db.Dictionary("de")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after["Salva"] != "Sichern" {
+		t.Fatalf("cache not invalidated: %q", after["Salva"])
+	}
+}

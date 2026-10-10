@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,6 +34,51 @@ var defaultPolishTranslations string
 // `gextto_config.db` schema with the daemon.
 type I18nDb struct {
 	db *sql.DB
+	// cache holds, per storage language, the {key: value} dictionary used by the
+	// renderer. Rebuilding it from SQLite on every page (and every HTMX partial)
+	// would scan thousands of rows each time, so it is cached until a
+	// translation changes.
+	mu    sync.RWMutex
+	cache map[string]map[string]string
+}
+
+// invalidateCache drops the per-language dictionaries after a write.
+func (d *I18nDb) invalidateCache() {
+	d.mu.Lock()
+	d.cache = nil
+	d.mu.Unlock()
+}
+
+// Dictionary returns the {key: value} map for a language, building and caching
+// it on first use. The returned map is shared and must not be modified.
+func (d *I18nDb) Dictionary(lang string) (map[string]string, error) {
+	if d == nil || d.db == nil || lang == "" || lang == "it" {
+		return nil, nil
+	}
+	storage := storageLanguage(lang)
+	d.mu.RLock()
+	cached, ok := d.cache[storage]
+	d.mu.RUnlock()
+	if ok {
+		return cached, nil
+	}
+	items, err := d.List(lang)
+	if err != nil {
+		return nil, err
+	}
+	dict := make(map[string]string, len(items))
+	for _, item := range items {
+		if item.Key != "" && item.Value != "" {
+			dict[item.Key] = item.Value
+		}
+	}
+	d.mu.Lock()
+	if d.cache == nil {
+		d.cache = map[string]map[string]string{}
+	}
+	d.cache[storage] = dict
+	d.mu.Unlock()
+	return dict, nil
 }
 
 // Close closes the underlying SQLite connection (see Database.Close).
@@ -174,12 +220,14 @@ func (i *I18nDb) List(lang string) ([]Translation, error) {
 
 // Set stores (or replaces) a single translation.
 func (i *I18nDb) Set(lang, key, value string) error {
+	defer i.invalidateCache()
 	_, err := i.db.Exec("INSERT INTO translations(lang,key,value) VALUES (?1,?2,?3) ON CONFLICT(lang,key) DO UPDATE SET value=excluded.value", storageLanguage(lang), key, value)
 	return err
 }
 
 // SetBulk stores (or replaces) many translations in a single transaction.
 func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
+	defer i.invalidateCache()
 	storage := storageLanguage(lang)
 	tx, err := i.db.Begin()
 	if err != nil {
@@ -198,6 +246,7 @@ func (i *I18nDb) SetBulk(lang string, values map[string]string) error {
 // database without overwriting existing entries. It returns how many rows were
 // added.
 func (i *I18nDb) SeedDefaultTranslations() (int, error) {
+	defer i.invalidateCache()
 	// Older installations may still contain translations for the removed
 	// aMule/eD2k integration. They are not part of the current UI and would
 	// otherwise keep obsolete options visible in the translation editor.
@@ -264,6 +313,7 @@ func (i *I18nDb) SeedDefaultTranslations() (int, error) {
 // DeleteLang removes every translation row for a language. It returns how many
 // rows were deleted.
 func (i *I18nDb) DeleteLang(lang string) (int, error) {
+	defer i.invalidateCache()
 	res, err := i.db.Exec("DELETE FROM translations WHERE lang=?1", storageLanguage(lang))
 	if err != nil {
 		return 0, err

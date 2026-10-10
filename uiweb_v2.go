@@ -789,16 +789,9 @@ func v2Dictionary(s *AppState, lang string) map[string]string {
 	if s == nil || s.i18n == nil || lang == "" || lang == "it" {
 		return nil
 	}
-	items, err := s.i18n.List(lang)
-	if err != nil {
-		return nil
-	}
-	dict := make(map[string]string, len(items))
-	for _, item := range items {
-		if item.Key != "" && item.Value != "" {
-			dict[item.Key] = item.Value
-		}
-	}
+	// Dictionary caches the map per language: the renderer must not rebuild it
+	// from SQLite on every page and every HTMX partial.
+	dict, _ := s.i18n.Dictionary(lang)
 	return dict
 }
 
