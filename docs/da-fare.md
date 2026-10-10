@@ -2,7 +2,8 @@
 
 Punti aperti. Ripristinato l'8-10-2026: era finito per errore in `docs/archive/`
 pur essendo un backlog **attivo**. Dei due item recuperati dal piano di adozione
-(ora in `docs/scelte-di-progetto.md`) resta aperta solo l'osservabilità.
+(ora in `docs/scelte-di-progetto.md`) resta aperta l'osservabilità; si aggiunge
+un follow-up sull'i18n.
 
 ## Aperti
 
@@ -19,6 +20,16 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   intervalli (minimo 2 ore), e segnala il ritorno alla normalità;
 - restano: import falliti al giorno e titoli in coda con il tempo di attesa;
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`).
+
+### 2. i18n: stringhe generate dal client JS
+La chrome server-side è stata completata (2026-10-10, ~258 stringhe aggiunte ai
+cataloghi). Restano **hardcoded in italiano** le stringhe prodotte dal
+JavaScript (`uiweb/v2/static/v2-core.js`): conteggio selezione ("N selezionati ·
+Azioni:"), messaggi di copia ("Copiato"), ricerca nell'archivio, risultati
+trovati, pull-to-refresh, permessi browser. Non passano dai cataloghi e restano
+italiane in tutte le lingue: serve un meccanismo di traduzione lato client
+(dizionario iniettato o `data-`attribute + `v2TranslateText`). Idem le stringhe
+di errore costruite in Go (`uiweb_v2_problems.go`), oggi tollerate.
 
 ## Opzionale (solo se si riprende il lavoro sulle prestazioni)
 
