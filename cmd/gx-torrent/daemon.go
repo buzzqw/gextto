@@ -203,6 +203,9 @@ type Daemon struct {
 	trackers *trackerHealth
 	// sessions holds the standalone login sessions (nil in managed).
 	sessions *auth.Sessions
+	// loginFails counts the failed logins per address for the rate limit.
+	loginMu    sync.Mutex
+	loginFails map[string]loginAttempt
 	// feedMu guards feedStatuses (the RSS feeds' last outcome).
 	feedMu       sync.Mutex
 	feedStatuses map[string]feedStatus

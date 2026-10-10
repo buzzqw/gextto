@@ -63,3 +63,29 @@ func TestSessions(t *testing.T) {
 		t.Fatal("a dropped session must be invalid")
 	}
 }
+
+func TestSessionsPruneExpiredAndCap(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	s := NewSessions(time.Hour)
+	s.now = func() time.Time { return now }
+
+	// Expired sessions are dropped when a new one is created, not only when
+	// they are looked up again.
+	old := s.Create()
+	now = now.Add(2 * time.Hour)
+	fresh := s.Create()
+	if _, ok := s.tokens[old]; ok {
+		t.Fatal("an expired session was not pruned on Create")
+	}
+	if !s.Valid(fresh) {
+		t.Fatal("the new session must be valid")
+	}
+
+	// The table is capped: creating beyond the limit evicts the oldest.
+	for i := 0; i < maxSessions+10; i++ {
+		s.Create()
+	}
+	if len(s.tokens) > maxSessions {
+		t.Fatalf("session table grew to %d, above the %d cap", len(s.tokens), maxSessions)
+	}
+}

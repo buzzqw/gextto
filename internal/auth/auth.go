@@ -7,6 +7,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -62,6 +63,11 @@ func NewSessions(ttl time.Duration) *Sessions {
 	return &Sessions{ttl: ttl, now: time.Now, tokens: map[string]time.Time{}}
 }
 
+// maxSessions bounds the in-memory session table, so a client that logs in
+// repeatedly cannot grow it without limit. When full, the entries closest to
+// expiry (the oldest logins) are dropped first.
+const maxSessions = 1024
+
 // Create makes a new session and returns its token.
 func (s *Sessions) Create() string {
 	token := randomToken()
@@ -70,8 +76,39 @@ func (s *Sessions) Create() string {
 	if s.tokens == nil {
 		s.tokens = map[string]time.Time{}
 	}
-	s.tokens[token] = s.now().Add(s.ttl)
+	now := s.now()
+	// Prune the expired sessions now instead of only when they are used again,
+	// so an idle table does not keep dead tokens for the whole TTL.
+	for tok, expiry := range s.tokens {
+		if !now.Before(expiry) {
+			delete(s.tokens, tok)
+		}
+	}
+	if len(s.tokens) >= maxSessions {
+		s.dropOldestLocked(len(s.tokens) - (maxSessions - 1))
+	}
+	s.tokens[token] = now.Add(s.ttl)
 	return token
+}
+
+// dropOldestLocked removes the count sessions closest to expiry. The caller
+// holds s.mu.
+func (s *Sessions) dropOldestLocked(count int) {
+	if count <= 0 {
+		return
+	}
+	type entry struct {
+		token  string
+		expiry time.Time
+	}
+	entries := make([]entry, 0, len(s.tokens))
+	for tok, expiry := range s.tokens {
+		entries = append(entries, entry{tok, expiry})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].expiry.Before(entries[j].expiry) })
+	for i := 0; i < count && i < len(entries); i++ {
+		delete(s.tokens, entries[i].token)
+	}
 }
 
 // Valid reports whether token is a live session, pruning it when expired.

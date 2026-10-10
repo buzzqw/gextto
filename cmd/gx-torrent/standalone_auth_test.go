@@ -128,6 +128,34 @@ func TestHandleUILogin(t *testing.T) {
 	}
 }
 
+func TestLoginRateLimit(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", false)
+	ip := "8.8.8.8"
+	post := func(password string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/login",
+			strings.NewReader("user=admin&password="+password))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip + ":1234"
+		rec := httptest.NewRecorder()
+		d.handleUILogin(rec, req)
+		return rec
+	}
+	for i := 0; i < loginMaxFailures-1; i++ {
+		post("wrong")
+		if !d.loginAllowed(ip) {
+			t.Fatalf("blocked after only %d failures", i+1)
+		}
+	}
+	post("wrong") // the threshold-th failure
+	if d.loginAllowed(ip) {
+		t.Fatal("the address must be blocked after the threshold")
+	}
+	// Even the right password is refused while blocked.
+	if rec := post("s3cret"); len(rec.Result().Cookies()) != 0 {
+		t.Fatal("a blocked address must not get a session")
+	}
+}
+
 func TestManagedDoesNotUseStandaloneAuth(t *testing.T) {
 	// Managed with no token: the page stays open exactly as before.
 	d := &Daemon{opts: Options{Mode: ModeManaged}}

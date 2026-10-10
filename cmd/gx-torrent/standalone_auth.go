@@ -7,9 +7,11 @@ package main
 import (
 	"crypto/subtle"
 	"errors"
+	"html"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
 	"github.com/buzzqw/gextto/internal/webui/assets"
@@ -123,6 +125,78 @@ func (d *Daemon) clientIP(r *http.Request) net.IP {
 	return clientIP(r)
 }
 
+// Login rate limiting: qBittorrent bans an address after five failed attempts.
+// Without it, a standalone daemon with a password can be brute-forced at full
+// speed over the LAN or the Internet.
+const (
+	loginMaxFailures = 5
+	loginBlockFor    = 15 * time.Minute
+)
+
+type loginAttempt struct {
+	count        int
+	last         time.Time
+	blockedUntil time.Time
+}
+
+// clientIPString is the rate-limit key: the peer address, or "" when it cannot
+// be determined (the counter is then skipped rather than shared by everyone).
+func (d *Daemon) clientIPString(r *http.Request) string {
+	if ip := d.clientIP(r); ip != nil {
+		return ip.String()
+	}
+	return ""
+}
+
+// loginAllowed reports whether an address may try to log in; a blocked address
+// is refused before the password is even checked.
+func (d *Daemon) loginAllowed(ip string) bool {
+	if ip == "" {
+		return true
+	}
+	d.loginMu.Lock()
+	defer d.loginMu.Unlock()
+	attempt, ok := d.loginFails[ip]
+	if !ok {
+		return true
+	}
+	return !time.Now().Before(attempt.blockedUntil)
+}
+
+// recordLoginFailure counts a failed attempt and blocks the address once it
+// reaches the threshold; a long idle gap resets the counter.
+func (d *Daemon) recordLoginFailure(ip string) {
+	if ip == "" {
+		return
+	}
+	d.loginMu.Lock()
+	defer d.loginMu.Unlock()
+	if d.loginFails == nil {
+		d.loginFails = map[string]loginAttempt{}
+	}
+	now := time.Now()
+	attempt := d.loginFails[ip]
+	if now.Sub(attempt.last) > loginBlockFor {
+		attempt.count = 0
+	}
+	attempt.count++
+	attempt.last = now
+	if attempt.count >= loginMaxFailures {
+		attempt.blockedUntil = now.Add(loginBlockFor)
+	}
+	d.loginFails[ip] = attempt
+}
+
+// clearLoginFailures forgets the failures of an address after a good login.
+func (d *Daemon) clearLoginFailures(ip string) {
+	if ip == "" {
+		return
+	}
+	d.loginMu.Lock()
+	defer d.loginMu.Unlock()
+	delete(d.loginFails, ip)
+}
+
 // loginMatches checks the submitted credentials against the configured ones.
 func (d *Daemon) loginMatches(user, password string) bool {
 	if d.sessions == nil {
@@ -145,13 +219,20 @@ func (d *Daemon) handleUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		d.renderLogin(w, r, false)
+		d.renderLogin(w, r, "")
+		return
+	}
+	ip := d.clientIPString(r)
+	if !d.loginAllowed(ip) {
+		d.renderLogin(w, r, "Too many failed attempts. Try again later.")
 		return
 	}
 	if !d.loginMatches(strings.TrimSpace(r.FormValue("user")), r.FormValue("password")) {
-		d.renderLogin(w, r, true)
+		d.recordLoginFailure(ip)
+		d.renderLogin(w, r, "Wrong username or password.")
 		return
 	}
+	d.clearLoginFailures(ip)
 	token := d.sessions.Create()
 	http.SetCookie(w, &http.Cookie{
 		Name:     uiSessionCookie,
@@ -168,12 +249,13 @@ func (d *Daemon) handleUILogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
-// renderLogin writes the sign-in page, localized like the daemon page.
-func (d *Daemon) renderLogin(w http.ResponseWriter, r *http.Request, failed bool) {
+// renderLogin writes the sign-in page, localized like the daemon page. errKey
+// is shown as an error when non-empty.
+func (d *Daemon) renderLogin(w http.ResponseWriter, r *http.Request, errKey string) {
 	page := assets.LoginPage()
 	errorHTML := ""
-	if failed {
-		errorHTML = `<p class="m err">Wrong username or password.</p>`
+	if errKey != "" {
+		errorHTML = `<p class="m err">` + html.EscapeString(errKey) + `</p>`
 	}
 	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
 	lang := d.uiLang(r)

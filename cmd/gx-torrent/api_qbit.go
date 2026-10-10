@@ -111,11 +111,19 @@ func qbitText(w http.ResponseWriter, status int, body string) {
 }
 
 func (d *Daemon) handleQbitLogin(w http.ResponseWriter, r *http.Request) {
+	ip := d.clientIPString(r)
+	if !d.loginAllowed(ip) {
+		// qBittorrent answers 200 with "Fails." when the login fails.
+		qbitText(w, http.StatusOK, qbitInvalidCode)
+		return
+	}
 	if !d.loginMatches(strings.TrimSpace(r.FormValue("username")), r.FormValue("password")) {
+		d.recordLoginFailure(ip)
 		// qBittorrent answers 200 with "Fails." and no cookie.
 		qbitText(w, http.StatusOK, qbitInvalidCode)
 		return
 	}
+	d.clearLoginFailures(ip)
 	token := d.sessions.Create()
 	http.SetCookie(w, &http.Cookie{
 		Name: qbitSIDCookie, Value: token, Path: "/", HttpOnly: true,
