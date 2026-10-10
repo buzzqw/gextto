@@ -239,8 +239,10 @@ per UPnP/NAT-PMP (tabella di routing). La cartella dati di default è
 `%LOCALAPPDATA%\gx-torrent`. Il **link di libreria** di ogni torrent
 (`DataDir/<id>`) è una **junction** su Windows, non un symlink: la junction non
 richiede il privilegio `SeCreateSymbolicLinkPrivilege` (né la Modalità
-sviluppatore) ed è letta come symlink dall'engine; su Unix resta il symlink
-atomico. La migrazione tra volumi riconosce anche l'errore Windows
+sviluppatore). `os.Readlink` la legge come un symlink, ma da Go 1.23 `os.Lstat`
+la riporta come `ModeIrregular`: il demone la riconosce con `isDirLink`
+(`link_*.go`). Rimuovere la junction non tocca mai i dati a cui punta. Su Unix
+resta il symlink atomico. La migrazione tra volumi riconosce anche l'errore Windows
 `ERROR_NOT_SAME_DEVICE`, quindi il fallback copia funziona come su Unix.
 Restano senza equivalente nativo solo due **ottimizzazioni** di I/O — il
 readahead (`fadvise`) e la preallocazione con `fallocate` — che usano il

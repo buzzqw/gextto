@@ -19,3 +19,8 @@ func replaceDirLink(link, dest string) error {
 	}
 	return nil
 }
+
+// isDirLink reports whether path (with its Lstat info) is a gx-torrent link.
+func isDirLink(_ string, info os.FileInfo) bool {
+	return info.Mode()&os.ModeSymlink != 0
+}

@@ -63,6 +63,27 @@ jobs:
       - name: Vet for Windows
         run: GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./internal/gxcore/... ./cmd/gx-torrent/
 
+  # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
+  # only cross-compiles on Linux; this job runs its tests on real Windows. The
+  # rest of the suite assumes Unix paths, so only the platform tests run here.
+  windows-platform:
+    name: gx-torrent platform tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Platform tests
+        env:
+          CGO_ENABLED: "0"
+        run: go test -run "Windows|MountPoint" ./cmd/gx-torrent/
+
   # The default build and tests are pure Go; this job keeps the opt-in embedded
   # libtorrent engine (cgo) covered. It installs the dev headers.
   libtorrent:

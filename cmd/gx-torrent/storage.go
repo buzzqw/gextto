@@ -55,9 +55,9 @@ func pathWithin(path, root string) bool {
 
 // pointLink makes DataDir/<id> point at dest, replacing an older link. A real
 // directory left there by an older layout is never replaced. The link itself is
-// platform-specific (replaceDirLink): a symlink on Unix, a junction on Windows
-// (which needs no symlink privilege and is read back transparently by
-// os.Readlink/Lstat).
+// platform-specific (replaceDirLink, isDirLink): a symlink on Unix, a junction
+// on Windows (which needs no symlink privilege; os.Readlink reads it back, but
+// os.Lstat reports it as ModeIrregular, hence isDirLink).
 func (d *Daemon) pointLink(id, dest string) error {
 	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return err
@@ -66,7 +66,7 @@ func (d *Daemon) pointLink(id, dest string) error {
 		return err
 	}
 	link := d.linkPath(id)
-	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink == 0 {
+	if info, err := os.Lstat(link); err == nil && !isDirLink(link, info) {
 		return fmt.Errorf("%s is a real directory, not a gx-torrent link", link)
 	}
 	return replaceDirLink(link, dest)
@@ -80,7 +80,7 @@ func (d *Daemon) readLink(id string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	if info.Mode()&os.ModeSymlink == 0 {
+	if !isDirLink(link, info) {
 		return link, true
 	}
 	target, err := os.Readlink(link)
@@ -98,7 +98,7 @@ func (d *Daemon) readLink(id string) (string, bool) {
 func (d *Daemon) protectLegacyDir(id string) {
 	link := d.linkPath(id)
 	info, err := os.Lstat(link)
-	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+	if err != nil || isDirLink(link, info) {
 		return
 	}
 	target := filepath.Join(d.opts.DataDir, "orphaned", id)

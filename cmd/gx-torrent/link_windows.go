@@ -3,10 +3,8 @@
 package main
 
 import (
-	"encoding/binary"
 	"os"
 	"path/filepath"
-	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -14,11 +12,11 @@ import (
 
 // replaceDirLink makes link point at dest. Windows symlinks need the
 // SeCreateSymbolicLinkPrivilege (or Developer Mode), so a directory junction is
-// used instead: it needs no privilege and is read back transparently by
-// os.Readlink/os.Lstat as a symlink. A previous link is removed first, because
-// renaming over an existing directory is not allowed on Windows.
+// used instead: it needs no privilege and os.Readlink reads it back. A previous
+// link is removed first (removing a junction never touches its target),
+// because renaming over an existing directory is not allowed on Windows.
 func replaceDirLink(link, dest string) error {
-	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	if info, err := os.Lstat(link); err == nil && isDirLink(link, info) {
 		if err := os.Remove(link); err != nil {
 			return err
 		}
@@ -33,33 +31,30 @@ func replaceDirLink(link, dest string) error {
 	return nil
 }
 
-// setJunction writes the mount-point reparse point that turns the existing
-// empty directory link into a junction to dest.
-func setJunction(link, dest string) error {
-	target := `\??\` + filepath.Clean(dest)
-	if !strings.HasSuffix(target, `\`) {
-		target += `\`
+// isDirLink reports whether path (with its Lstat info) is a gx-torrent link.
+// Since Go 1.23 os.Lstat reports a junction as ModeIrregular, not ModeSymlink,
+// so a reparse point counts as a link when os.Readlink can read it: that holds
+// only for symlinks and junctions.
+func isDirLink(path string, info os.FileInfo) bool {
+	if info.Mode()&os.ModeSymlink != 0 {
+		return true
 	}
-	name, err := windows.UTF16FromString(target) // includes the NUL terminator
+	if info.Mode()&os.ModeIrregular == 0 {
+		return false
+	}
+	_, err := os.Readlink(path)
+	return err == nil
+}
+
+// setJunction writes the mount-point reparse point that turns the existing
+// empty directory link into a junction to dest. A junction target must be an
+// absolute path.
+func setJunction(link, dest string) error {
+	abs, err := filepath.Abs(dest)
 	if err != nil {
 		return err
 	}
-	nameBytes := len(name) * 2
-	const (
-		headerLen = 8
-		mountLen  = 8 // SubstituteName/PrintName offsets and lengths
-	)
-	buffer := make([]byte, headerLen+mountLen+nameBytes)
-	binary.LittleEndian.PutUint32(buffer[0:4], uint32(windows.IO_REPARSE_TAG_MOUNT_POINT))
-	binary.LittleEndian.PutUint16(buffer[4:6], uint16(mountLen+nameBytes)) // ReparseDataLength
-	binary.LittleEndian.PutUint16(buffer[6:8], 0)                          // Reserved
-	binary.LittleEndian.PutUint16(buffer[8:10], 0)                         // SubstituteNameOffset
-	binary.LittleEndian.PutUint16(buffer[10:12], uint16(nameBytes))        // SubstituteNameLength
-	binary.LittleEndian.PutUint16(buffer[12:14], uint16(nameBytes))        // PrintNameOffset
-	binary.LittleEndian.PutUint16(buffer[14:16], 0)                        // PrintNameLength
-	for i, unit := range name {
-		binary.LittleEndian.PutUint16(buffer[16+i*2:], unit)
-	}
+	buffer := mountPointReparseData(`\??\` + filepath.Clean(abs))
 	ptr, err := windows.UTF16PtrFromString(link)
 	if err != nil {
 		return err
