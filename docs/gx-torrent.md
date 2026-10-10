@@ -229,6 +229,16 @@ le **POST di `/api/v2`** (che non usano un token): un client che non manda
 `Origin`/`Referer` resta ammesso. In managed la pagina si comporta come prima (le
 POST dell'API v1 restano protette dal token).
 
+**Percorsi di salvataggio.** In standalone **non c'è alcuna restrizione di
+percorso**: una `destination` (o un save path di categoria, o `setLocation`) può
+essere qualunque percorso assoluto, come in qBittorrent, così lo strumento resta
+pienamente utilizzabile con qualsiasi cartella. Il flag opzionale
+`-allowed-roots /srv/media,/data` limita le destinazioni a quelle cartelle, per
+chi vuole chiudere l'API a percorsi controllati; **non è impostato di default**,
+proprio per non tagliare fuori l'utente. La difesa di base resta il login (e, su
+Windows, il servizio gira come account dedicato e non SYSTEM, quindi la scrittura
+è comunque confinata a ciò che quell'account può scrivere).
+
 **Piattaforme.** Il demone è Go puro e gira anche su **Windows** (amd64 e
 arm64): `GOOS=windows CGO_ENABLED=0 go build ./cmd/gx-torrent/`. Le letture di
 sistema usano le API Win32, quindi la cache e la diagnostica restano piene:
