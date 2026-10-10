@@ -492,7 +492,7 @@ rimanenti:
 | Voce | Piano | Stato |
 | --- | --- | --- |
 | Nome e de-rain: prodotto **gx-core**, motore rinominato `internal/engine` → `internal/gxcore`, identità di rete da "Rain" a "gx-core", `rainrpc` rimosso, **de-rain anche dei commenti** nel codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
-| F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11) | §14, §4.2 | parziale (restano DHT BEP 32, tracker UDP v6, PEX/DHT `yourip` v6, blocklist v6, LSD v6) |
+| F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6 | §14, §4.2 | parziale (restano DHT BEP 32 e LSD v6; le regole blocklist a intervallo restano IPv4) |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |

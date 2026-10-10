@@ -92,7 +92,7 @@ func (t *Transport) Run() {
 	var udpConn *net.UDPConn
 	laddr, listenErr := netx.UDPLocalAddr()
 	if listenErr == nil {
-		udpConn, listenErr = net.ListenUDP("udp4", laddr)
+		udpConn, listenErr = net.ListenUDP(udpNetwork(laddr), laddr)
 	}
 	if listenErr != nil {
 		t.log.Error(listenErr)
@@ -254,6 +254,20 @@ func (t *Transport) Run() {
 			close(t.doneC)
 			return
 		}
+	}
+}
+
+// udpNetwork picks the socket family for the UDP tracker transport: an
+// unspecified local address opens a dual-stack socket so IPv4 and IPv6
+// trackers both work (F4 IPv6).
+func udpNetwork(laddr *net.UDPAddr) string {
+	switch {
+	case laddr == nil || laddr.IP == nil || laddr.IP.IsUnspecified():
+		return "udp"
+	case laddr.IP.To4() != nil:
+		return "udp4"
+	default:
+		return "udp6"
 	}
 }
 

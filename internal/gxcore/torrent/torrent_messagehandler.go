@@ -348,7 +348,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 		pe.ExtensionHandshake = &msg
 
-		if len(msg.YourIP) == 4 {
+		if len(msg.YourIP) == 4 || len(msg.YourIP) == 16 {
 			t.externalIP = net.IP(msg.YourIP)
 		}
 		if _, ok := msg.M[peerprotocol.ExtensionKeyMetadata]; ok {

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +25,7 @@ type Blocklist struct {
 	logger Logger
 
 	tree  stree.Stree
+	v6    []ip6Range
 	m     sync.RWMutex
 	count int
 }
@@ -52,13 +55,14 @@ func (b *Blocklist) Blocked(ip net.IP) bool {
 	b.m.RLock()
 	defer b.m.RUnlock()
 
-	ip = ip.To4()
-	if ip == nil {
-		return false
+	if ip4 := ip.To4(); ip4 != nil {
+		val := binary.BigEndian.Uint32(ip4)
+		return b.tree.Contains(stree.ValueType(val))
 	}
-
-	val := binary.BigEndian.Uint32(ip)
-	return b.tree.Contains(stree.ValueType(val))
+	if ip16 := ip.To16(); ip16 != nil {
+		return v6Contains(b.v6, ip16)
+	}
+	return false
 }
 
 // Reload the segment tree by reading new rules from a io.Reader.
@@ -66,19 +70,21 @@ func (b *Blocklist) Reload(r io.Reader) (int, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	tree, n, err := load(r, b.logger)
+	tree, v6, nv4, nv6, err := load(r, b.logger)
 	if err != nil {
-		return n, err
+		return nv4 + nv6, err
 	}
 
 	b.tree = *tree
-	b.count = n
-	return n, nil
+	b.v6 = v6
+	b.count = nv4 + nv6
+	return b.count, nil
 }
 
-func load(r io.Reader, logger Logger) (*stree.Stree, int, error) {
+func load(r io.Reader, logger Logger) (*stree.Stree, []ip6Range, int, int, error) {
 	var tree stree.Stree
-	var n int
+	var v6 []ip6Range
+	var nv4, nv6 int
 	var hasError bool
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -89,8 +95,17 @@ func load(r io.Reader, logger Logger) (*stree.Stree, int, error) {
 		if l[0] == '#' {
 			continue
 		}
-		r, err := parseCIDR(l)
-		if err == errAllowRule || err == errNotIPv4Address {
+		r4, err := parseCIDR(l)
+		if err == errAllowRule {
+			continue
+		}
+		if err == errNotIPv4Address {
+			// Upstream skipped IPv6 rules entirely; the gextto fork keeps the
+			// IPv6 CIDR forms in a separate interval list.
+			if r6, ok := parseV6CIDR(l); ok {
+				v6 = append(v6, r6)
+				nv6++
+			}
 			continue
 		}
 		if err != nil {
@@ -100,19 +115,19 @@ func load(r io.Reader, logger Logger) (*stree.Stree, int, error) {
 			}
 			continue
 		}
-		tree.AddRange(stree.ValueType(r.first), stree.ValueType(r.last))
-		n++
+		tree.AddRange(stree.ValueType(r4.first), stree.ValueType(r4.last))
+		nv4++
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, 0, err
+		return nil, nil, 0, 0, err
 	}
-	if n == 0 && hasError {
+	if nv4+nv6 == 0 && hasError {
 		// Probably we couln't decode the stream correctly.
 		// At least one line must be correct before we consider the load operation as successful.
-		return nil, 0, errors.New("no valid rules")
+		return nil, nil, 0, 0, errors.New("no valid rules")
 	}
 	tree.Build()
-	return &tree, n, nil
+	return &tree, sortMergeV6(v6), nv4, nv6, nil
 }
 
 type ipRange struct {
@@ -126,7 +141,7 @@ type ipRange struct {
 //	Some name:1.2.3.0-1.2.3.255    P2P / PeerGuardian
 //	001.002.003.000 - 001.002.003.255 , 000 , name   eMule ipfilter.dat
 //
-// IPv6 rules are skipped (the engine blocks IPv4 only).
+// IPv4 rules and the formats below; IPv6 CIDR rules go to a separate list.
 func parseCIDR(b []byte) (r ipRange, err error) {
 	line := string(b)
 	if !strings.Contains(line, "-") {
@@ -186,4 +201,67 @@ func parseIPv4(s string) net.IP {
 		ip[i] = byte(n)
 	}
 	return ip
+}
+
+// ip6Range is an inclusive IPv6 range (gextto fork, F4 IPv6).
+type ip6Range struct {
+	first, last [net.IPv6len]byte
+}
+
+// parseV6CIDR parses an IPv6 CIDR rule. Only the CIDR form is accepted; the
+// range and P2P/eMule forms are IPv4-only.
+func parseV6CIDR(b []byte) (ip6Range, bool) {
+	line := string(b)
+	if strings.Contains(line, "-") {
+		return ip6Range{}, false
+	}
+	_, ipnet, err := net.ParseCIDR(line)
+	if err != nil || ipnet.IP.To4() != nil || len(ipnet.Mask) != net.IPv6len {
+		return ip6Range{}, false
+	}
+	first := ipnet.IP.To16()
+	if first == nil {
+		return ip6Range{}, false
+	}
+	var r ip6Range
+	copy(r.first[:], first)
+	for i := 0; i < net.IPv6len; i++ {
+		r.last[i] = first[i] | ^ipnet.Mask[i]
+	}
+	return r, true
+}
+
+// sortMergeV6 sorts the ranges and merges the overlapping ones, so a lookup is
+// a single binary search.
+func sortMergeV6(rs []ip6Range) []ip6Range {
+	if len(rs) == 0 {
+		return nil
+	}
+	slices.SortFunc(rs, func(a, b ip6Range) int { return bytes.Compare(a.first[:], b.first[:]) })
+	out := rs[:1]
+	for _, r := range rs[1:] {
+		last := &out[len(out)-1]
+		if bytes.Compare(r.first[:], last.last[:]) <= 0 {
+			if bytes.Compare(r.last[:], last.last[:]) > 0 {
+				last.last = r.last
+			}
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// v6Contains reports whether ip16 falls in any merged IPv6 range.
+func v6Contains(rs []ip6Range, ip16 net.IP) bool {
+	if len(rs) == 0 || len(ip16) != net.IPv6len {
+		return false
+	}
+	var key [net.IPv6len]byte
+	copy(key[:], ip16)
+	i := sort.Search(len(rs), func(i int) bool { return bytes.Compare(rs[i].first[:], key[:]) > 0 }) - 1
+	if i < 0 {
+		return false
+	}
+	return bytes.Compare(key[:], rs[i].last[:]) <= 0
 }
