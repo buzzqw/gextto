@@ -484,6 +484,10 @@ rimanenti:
 spostamento del motore in `internal/engine`, e i ritocchi al wizard
 (indexer/cartella temporanea).
 
+**Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
+continuare a funzionare (test `internal/tui` + smoke `gexttod tui` contro il
+daemon); il percorso managed resta invariato.
+
 Storico (fatto):
 
 | Voce F0 | Stato |
@@ -537,8 +541,8 @@ Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torzna
 **regole ordinate PASS/FAIL (primo match)**, filtri include/exclude, regex,
 dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
 (cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
-persistito, worker e riquadro in pagina. Restano da completare: UI di gestione di
-feed e regole, articoli corrispondenti per regola, feed da ricerca, notifiche.
+persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
+per regola e Add manuale. Restano da completare: feed da ricerca e notifiche.
 
 ---
 

@@ -293,6 +293,11 @@ tutti), `fail`, `match` e `action`:
 Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
+La pagina **`/ui/rss`** (standalone) gestisce tutto questo: textarea per feed,
+regole e indexer (salvate con validazione), e per ogni feed un pulsante che
+mostra gli articoli correnti con la regola che li prenderebbe e un *Add* manuale
+(la vista "articoli corrispondenti" di qBittorrent).
+
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
 `schedule-start`/`schedule-end` (`HH:MM`, anche a cavallo della mezzanotte) il

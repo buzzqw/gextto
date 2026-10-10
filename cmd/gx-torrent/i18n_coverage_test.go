@@ -25,6 +25,8 @@ var uiI18nAllowlist = map[string]bool{
 	"uTP":        true,
 	// Language endonyms in the wizard's language selector.
 	"English": true, "Italiano": true, "Deutsch": true, "Français": true, "Español": true, "Polski": true,
+	// Acronym kept as-is on the RSS page.
+	"RSS": true,
 }
 
 // uiI18nWorth reports whether a string is user-facing prose worth translating.
@@ -47,7 +49,7 @@ func uiI18nWorth(s string) bool {
 }
 
 func TestUIPageIsFullyTranslatable(t *testing.T) {
-	raw := assets.UITemplate() + "\n" + assets.LoginPage() + "\n" + assets.SetupPage()
+	raw := assets.UITemplate() + "\n" + assets.LoginPage() + "\n" + assets.SetupPage() + "\n" + assets.RSSPage()
 	text := raw
 	// <script>/<style> content is not translated (the translator skips it) and
 	// would only produce JS/CSS false positives; strip it before scanning.

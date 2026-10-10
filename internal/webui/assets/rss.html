@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+main{padding:16px 20px;max-width:1100px;margin:0 auto}
+a{color:#93c5fd}h1{font-size:20px}h2{font-size:16px;margin:22px 0 8px}
+label{display:block;margin:10px 0;color:#93a1b5}
+textarea{width:100%;box-sizing:border-box;background:#0b0f18;color:inherit;border:1px solid #243049;border-radius:8px;padding:8px;font:12.5px/1.4 ui-monospace,Menlo,Consolas,monospace}
+button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px}
+th{color:#93a1b5}
+.muted{color:#93a1b5}.err{color:#fca5a5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+button.feed{background:#1b2536;color:#dbe4f0}
+</style></head>
+<body><main>
+<h1>RSS</h1>
+<p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
+<form method="post" action="/ui/rss-config">
+<label>Feeds<textarea name="feeds" rows="8" spellcheck="false">{{FEEDS}}</textarea></label>
+<label>Rules<textarea name="rules" rows="8" spellcheck="false">{{RULES}}</textarea></label>
+<label>Indexers<textarea name="indexers" rows="4" spellcheck="false">{{INDEXERS}}</textarea></label>
+<button type="submit">Save</button>
+</form>
+<h2>Feed items</h2>
+<div class="row" id="feedbar"></div>
+<div id="items"></div>
+<!--ERROR-->
+</main>
+<script id="ui-i18n"></script>
+<script>
+var FEEDNAMES={{FEEDNAMES}};
+function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
+function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
+function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
+(function(){var bar=document.getElementById('feedbar');FEEDNAMES.forEach(function(name){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=name;b.onclick=function(){loadItems(name);};bar.appendChild(b);});})();
+</script>
+</body></html>

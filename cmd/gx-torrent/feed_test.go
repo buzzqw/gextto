@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/settings"
@@ -155,5 +158,80 @@ func TestFeedIntervalDefaults(t *testing.T) {
 	d.opts.Settings.Set(feedIntervalKey, "5") // below the 60s floor
 	if got := d.feedInterval(); got != defaultFeedInterval {
 		t.Fatalf("too-small interval must fall back to the default, got %v", got)
+	}
+}
+
+func TestUIRssPageAndConfig(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/rss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `name="feeds"`) || !strings.Contains(string(body), `name="rules"`) {
+		t.Fatalf("RSS page: status=%d", resp.StatusCode)
+	}
+
+	feedsJSON := `[{"name":"f","url":"http://example/feed"}]`
+	rulesJSON := `[{"name":"r","match":{}}]`
+	resp, err = http.PostForm(srv.URL+"/ui/rss-config", url.Values{"feeds": {feedsJSON}, "rules": {rulesJSON}, "indexers": {`[]`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if got := d.opts.Settings.Get(feedsSettingKey, ""); got != feedsJSON {
+		t.Fatalf("feeds not saved: %q", got)
+	}
+	if got := d.opts.Settings.Get(rulesSettingKey, ""); got != rulesJSON {
+		t.Fatalf("rules not saved: %q", got)
+	}
+
+	resp, err = http.PostForm(srv.URL+"/ui/rss-config", url.Values{"feeds": {`{bad`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "Invalid feeds JSON") {
+		t.Fatalf("invalid JSON must be reported: status=%d", resp.StatusCode)
+	}
+}
+
+func TestUIFeedItems(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(feedBody))
+	}))
+	defer feed.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`","include":"1080p"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/feed-items?feed=f")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var items []feedItemView
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatalf("feed-items is not JSON: %v", err)
+	}
+	resp.Body.Close()
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2", len(items))
+	}
+	byTitle := map[string]feedItemView{}
+	for _, item := range items {
+		byTitle[item.Title] = item
+	}
+	if !byTitle["Movie 1080p"].Pass || byTitle["Movie 720p"].Pass {
+		t.Fatalf("include filter not reflected: %+v", items)
 	}
 }

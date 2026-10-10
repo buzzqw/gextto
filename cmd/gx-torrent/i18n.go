@@ -146,6 +146,14 @@ var uiCatalog = map[string][5]string{
 	"Check feeds": {"Controlla i feed", "Feeds prüfen", "Vérifier les flux", "Comprobar feeds", "Sprawdź kanały"},
 	"Checking…":   {"Controllo…", "Prüfe…", "Vérification…", "Comprobando…", "Sprawdzam…"},
 
+	// RSS management page (standalone).
+	"Rules":      {"Regole", "Regeln", "Règles", "Reglas", "Reguły"},
+	"Indexers":   {"Indexer", "Indexer", "Indexeurs", "Indexadores", "Indeksery"},
+	"Feed items": {"Elementi del feed", "Feed-Elemente", "Éléments du flux", "Elementos del feed", "Elementy kanału"},
+	"Title":      {"Titolo", "Titel", "Titre", "Título", "Tytuł"},
+	"Rule":       {"Regola", "Regel", "Règle", "Regla", "Reguła"},
+	"Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.": {"Feed, regole e indexer sono salvati in settings.json. Le regole sono valutate in ordine; vince la prima che corrisponde.", "Feeds, Regeln und Indexer werden in settings.json gespeichert. Die Regeln werden der Reihe nach geprüft; die erste passende gewinnt.", "Les flux, règles et indexeurs sont enregistrés dans settings.json. Les règles sont évaluées dans l'ordre ; la première correspondance gagne.", "Los feeds, reglas e indexadores se guardan en settings.json. Las reglas se evalúan en orden; gana la primera coincidencia.", "Kanały, reguły i indeksery są zapisywane w settings.json. Reguły są sprawdzane po kolei; wygrywa pierwsza pasująca."},
+
 	// Files tab.
 	"Priority": {"Priorità", "Priorität", "Priorité", "Prioridad", "Priorytet"},
 	"Play":     {"Riproduci", "Abspielen", "Lire", "Reproducir", "Odtwórz"},
@@ -281,6 +289,9 @@ var uiClientKeys = []string{
 	"Checking…",
 	"Seeds",
 	"Add",
+	"Title",
+	"Size",
+	"Rule",
 }
 
 // uiLangIndex maps a language code to its column in uiCatalog.
