@@ -342,6 +342,17 @@ Nel cancello della fase 0 e di ogni fase dopo: un test avvia il demone in modali
 5%), numero di goroutine e thread, tempo di avvio, CPU in 60 secondi di
 inattività. Se una delle quattro peggiora, la build fallisce.
 
+In pratica, due livelli:
+
+- **sempre attivo** (`footprint_test.go`): goroutine e tempo di avvio limitati e
+  nessuna crescita a riposo: cattura i moduli standalone che partono da soli;
+- **opt-in** (`GX_FOOTPRINT=1`, `footprint_optin_test.go`): avvia il binario
+  costruito, misura RSS a riposo, thread, tempo di avvio e CPU, e li confronta
+  con la baseline `cmd/gx-torrent/testdata/footprint.json` (tolleranza 25%;
+  `GX_UPDATE_FOOTPRINT=1` la aggiorna). Con `GX_QBT=/path/qbittorrent-nox` misura
+  anche qBittorrent per il confronto. Non gira nella suite normale: è lento e
+  dipende dall'hardware.
+
 ---
 
 ## 9. Modello di sicurezza
@@ -413,7 +424,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
 | Choking seed | default di rain, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
-| Smart ban (pezzi corrotti) | no | sì | sì | sì |
+| Smart ban (pezzi corrotti) | sì (banna il mittente corrotto) | sì | sì | sì |
 | API compatibile qBittorrent | no | no | — | è il riferimento |
 
 ### 11.1 Cosa prendere, in ordine di valore
@@ -421,7 +432,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | # | Funzione | Fonte | Perché | Costo |
 | --- | --- | --- | --- | --- |
 | 1 | IPv6 (listener, DHT BEP 32, tracker, PEX) | anacrolix, libtorrent | senza IPv6 non c'è parità con qBittorrent; molti peer domestici sono raggiungibili solo in v6 | alto |
-| 2 | Smart ban | libtorrent, anacrolix | banna il peer che invia blocchi di un pezzo fallito; protegge da sciami avvelenati | basso |
+| 2 | Smart ban — **estensione** (ban globale e temporizzato, e dei peer sospetti) | libtorrent, anacrolix | `rain` **già banna** il peer che invia un pezzo corrotto (`bannedPeerIPs`, in `torrent_write.go`) e disabilita il webseed corrotto: la parte base c'è; l'estensione è opzionale | basso |
 | 3 | Profondità della coda richieste adattiva | libtorrent | la velocità su peer lontani dipende da quante richieste sono in volo | medio |
 | 4 | Reader con readahead per lo streaming | anacrolix | sostituisce l'attesa a polling (200 ms, timeout 2 min) | medio |
 | 5 | BitTorrent v2 e ibridi | anacrolix (Go, più vicino a rain) | torrent v2-only già in circolazione; serve merkle per file | alto |
@@ -478,12 +489,13 @@ rimanenti:
 
 | Voce | Piano | Stato |
 | --- | --- | --- |
-| F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | da fare |
-| F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | da fare |
+| F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
+| F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
-| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | da fare |
-| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, UI) | §12.2 | da fare |
+| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (già in `rain`: banna il mittente corrotto); estensione globale/temporizzata opzionale |
+| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (restano feed da ricerca e notifiche) |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
+
 **Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2,
 spostamento del motore in `internal/engine`, e i ritocchi al wizard
 (indexer/cartella temporanea).
