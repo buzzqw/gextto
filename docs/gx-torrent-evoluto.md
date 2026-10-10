@@ -493,7 +493,7 @@ rimanenti:
 | --- | --- | --- |
 | Nome e de-rain: prodotto **gx-core**, motore rinominato `internal/engine` → `internal/gxcore`, identità di rete da "Rain" a "gx-core", `rainrpc` rimosso, **de-rain anche dei commenti** nel codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
 | F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (resta solo la LSD v6) |
-| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | incremento 1 fatto (parsing `metainfo`: `meta version`/`file tree`/`piece layers`, info-hash SHA-256, `ErrV2Only`; magnet `btmh`; pacchetto `internal/merkle`). Restano: modello file/piece v2 + storage, verifica SHA-256/piece layers, sessione/handshake troncato, estensioni `hash request`/`hashes`, abilitazione end-to-end |
+| F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | incremento 1 fatto (parsing `metainfo`: `meta version`/`file tree`/`piece layers`, info-hash SHA-256, `ErrV2Only`; magnet `btmh`; pacchetto `internal/merkle`). Restano: modello a **pezzi per-file** (non padding sintetico), verifica via nodo Merkle, sessione/handshake troncato, estensioni `hash request`/`hashes`, abilitazione — **progetto in [gx-torrent-v2.md](gx-torrent-v2.md)** |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
@@ -663,6 +663,8 @@ Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
 - [`docs/gx-torrent.md`](gx-torrent.md) — riferimento tecnico del motore attuale.
 - [`docs/evoluzione.md`](evoluzione.md) — §4–§7: lacune del motore, ottimizzazioni,
   misure di choking; §14: rimando a questo documento.
+- [`docs/gx-torrent-v2.md`](gx-torrent-v2.md) — progetto di implementazione
+  BitTorrent v2 (BEP 52): modello a pezzi per-file, incrementi, test.
 - [`docs/motore-allineamento.md`](motore-allineamento.md) — come recepire l'upstream rain a mano.
 - [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventario delle
   modifiche al fork.
