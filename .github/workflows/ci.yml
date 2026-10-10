@@ -94,3 +94,28 @@ jobs:
 
       - name: Race test
         run: make test-race
+
+  # Build the standalone container image and smoke-test it, so the Dockerfile
+  # keeps working. Publishing is not done here (release.yml owns releases).
+  container:
+    name: container image (x86_64)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build --build-arg GX_BUILD=0 -t gx-torrent:ci .
+
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name gx-torrent-ci -p 18080:8080 gx-torrent:ci
+          code=""
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18080/ || true)
+            [ "$code" = "303" ] && break
+            sleep 1
+          done
+          docker logs gx-torrent-ci || true
+          docker rm -f gx-torrent-ci
+          [ "$code" = "303" ] || { echo "wizard redirect not seen (code=$code)"; exit 1; }
