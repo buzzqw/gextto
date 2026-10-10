@@ -40,6 +40,22 @@ func TestUICategoryRefusedInManaged(t *testing.T) {
 	}
 }
 
+func TestCategoryEditorOnlyStandalone(t *testing.T) {
+	render := func(standalone bool) string {
+		d := &Daemon{}
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/detail?tab=general", nil)
+		d.renderUI(rec, req, "detail", uiDetailData{Hash: "h", Name: "n", Tab: "general", Standalone: standalone})
+		return rec.Body.String()
+	}
+	if strings.Contains(render(false), `name="category"`) {
+		t.Fatal("managed detail must not show the category editor")
+	}
+	if !strings.Contains(render(true), `name="category"`) {
+		t.Fatal("standalone detail must show the category editor")
+	}
+}
+
 func TestCategoriesAndTagsSnapshot(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	d.createCategory("movies", "/srv/media/movies")

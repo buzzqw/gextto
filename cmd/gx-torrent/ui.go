@@ -202,6 +202,8 @@ type uiDetailData struct {
 	Category   string
 	Tags       string
 	Categories []string
+	// Standalone gates the standalone-only controls (category/tag editor).
+	Standalone bool
 
 	PiecesTotal     uint32
 	PiecesHave      uint32
@@ -1175,6 +1177,7 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		data.Categories = append(data.Categories, name)
 	}
 	sort.Strings(data.Categories)
+	data.Standalone = d.opts.Mode == ModeStandalone
 	if data.PiecesTotal > 0 {
 		data.PiecesPercent = float64(data.PiecesAvailable) * 100 / float64(data.PiecesTotal)
 	}
