@@ -18,6 +18,7 @@ specifiche.
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
 | [Scelte di progetto, migliorie ed evoluzione](evoluzione.md) | Backlog, migliorie implementate, piani gx-torrent, misure, revisioni e direzione strategica. |
 | [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (rain, demone, adapter). |
+| [gx-torrent evoluto (gx-nox)](gx-torrent-evoluto.md) | Analisi e decisione: gx-torrent come client torrent standalone (un binario, due modalità). |
 | [Archivio](archive/README.md) | Report e piani storici, non più aggiornati. |
 
 > [!NOTE]

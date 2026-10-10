@@ -4,9 +4,10 @@
 [`cenkalti/rain`](https://github.com/cenkalti/rain) (base v2.4.2). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
 gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
-espone anche una pagina web operativa apribile dal browser (per default su tutta
-la LAN). Il motore integrato libtorrent resta selezionabile e fa da fallback
-automatico se gx-torrent non parte.
+espone anche una pagina web operativa apribile dal browser (per default solo da
+questo server: vedi *Interfaccia web* per aprirla alla LAN). Il motore integrato
+libtorrent resta selezionabile — sulle build che lo includono — e fa da
+fallback automatico se gx-torrent non parte.
 
 Usa una copia modificata di rain in `third_party/rain`. Le modifiche sono
 descritte in `third_party/rain/GEXTTO.md`: porta unica, interfaccia uscente,
@@ -24,8 +25,45 @@ Codice:
 | `cmd/gx-torrent/network.go` | porta, interfacce, proxy, cifratura, filtro IP |
 | `cmd/gx-torrent/portmap.go` | apertura della porta sul router (UPnP, NAT-PMP) |
 | `cmd/gx-torrent/selection.go` | selezione dei file |
+| `cmd/gx-torrent/cache.go` | cache adattiva (RAM disponibile, carico, tipo di storage) |
+| `cmd/gx-torrent/stream.go` | streaming HTTP (Range) con readahead dei pezzi |
+| `cmd/gx-torrent/ui.go` | pagina web del demone (riepilogo, tabella, dettaglio, azioni) |
+| `cmd/gx-torrent/i18n.go` | traduzioni della pagina web (it/en/de/fr/es/pl) |
+| `cmd/gx-torrent/lsd.go` | scoperta in rete locale (BEP 14) |
+| `cmd/gx-torrent/tracker_health.go` | rimozione dei tracker che non hanno mai risposto |
+| `cmd/gx-torrent/lifecycle.go` | log ruotato del demone, watchdog degli orfani, coda del log di Gextto |
 | `gxtorrent_engine.go` | adapter `TorrentEngine` lato Gextto |
 | `gxtorrent_runtime.go` | avvio e sorveglianza del demone da parte di Gextto |
+
+## Indice
+
+- [Attivazione](#attivazione)
+- [Interfaccia web](#interfaccia-web)
+  - [Esposizione in rete](#esposizione-in-rete)
+- [Uso standalone](#uso-standalone)
+- [Rete](#rete)
+- [uTP e LSD](#utp-e-lsd)
+- [Holepunching (BEP 55)](#holepunching-bep-55)
+  - [Verifica](#verifica)
+- [Selezione dei file](#selezione-dei-file)
+- [Download sequenziale (streaming)](#download-sequenziale-streaming)
+- [Torrent BitTorrent v2](#torrent-bittorrent-v2)
+- [Statistiche](#statistiche)
+- [Diagnostica pezzi](#diagnostica-pezzi)
+- [Streaming HTTP (HTTP Range)](#streaming-http-http-range)
+- [Cache disco e preallocazione](#cache-disco-e-preallocazione)
+- [RAM disk](#ram-disk)
+- [Layout su disco e sicurezza dei dati](#layout-su-disco-e-sicurezza-dei-dati)
+- [Coda autogestita](#coda-autogestita)
+- [Stalled: divisione dei compiti](#stalled-divisione-dei-compiti)
+- [Seed](#seed)
+- [Super-seeding (BEP 16)](#super-seeding-bep-16)
+- [Scritture sul disco di stato](#scritture-sul-disco-di-stato)
+- [Limiti di banda](#limiti-di-banda)
+- [REST API (v1)](#rest-api-v1)
+- [Disponibilità dell'API (snapshot e lock)](#disponibilità-dellapi-snapshot-e-lock)
+- [Limiti noti (rain)](#limiti-noti-rain)
+- [Test](#test)
 
 ## Attivazione
 
@@ -63,11 +101,16 @@ Codice:
      richieste (`-orphan-timeout`); se il motore attivo non è più gx-torrent,
      Gextto all'avvio ferma il demone rimasto acceso. Gextto riaggancia o
      ferma solo un demone con la propria cartella dati;
-   - dopo 6 avvii/arresti anomali in 10 minuti Gextto smette di riprovare e
-     torna a libtorrent. Uno spegnimento pulito (riavvio di Gextto o del
-     servizio, ad esempio per un aggiornamento) non conta: il budget considera
-     solo le uscite inattese e gli avvii falliti, e un demone che resta attivo
-     abbastanza a lungo lo azzera.
+   - dopo 6 avvii/arresti anomali in 10 minuti Gextto smette di riprovare.
+     Su una build con libtorrent integrato torna al motore `embedded` e riavvia
+     il servizio; su una build di **puro Go** (quella predefinita) non c'è un
+     motore di ripiego, quindi continua con gx-torrent in **modalità sicura**
+     (senza uTP né holepunch) e attese crescenti tra i tentativi (1 m, 5 m,
+     15 m, 1 h). Uno spegnimento pulito (riavvio di Gextto o del servizio, ad
+     esempio per un aggiornamento) non conta: il budget considera solo le uscite
+     inattese e gli avvii falliti; un demone che resta attivo abbastanza a lungo
+     lo azzera (10 minuti per il budget degli arresti, 30 minuti per azzerare le
+     attese crescenti).
 
    Se sull'URL risponde già un gx-torrent (ad esempio un servizio systemd tuo),
    Gextto usa quello.
@@ -77,11 +120,12 @@ Impostazioni (scheda *Motore torrent*, gruppo *gx-torrent*):
 | Chiave | Default | Note |
 |---|---|---|
 | `gxtorrent_url` | `http://127.0.0.1:8890` | URL con cui Gextto raggiunge il demone |
-| `gxtorrent_listen` | `127.0.0.1:8890` | indirizzo di ascolto del demone gestito: per default pagina e API restano solo su questo server. Per aprirle a tutta la LAN usa `0.0.0.0:8890` e imposta `gxtorrent_token`. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere). Un ascolto non loopback richiede `gxtorrent_token` (senza token Gextto avvia il demone in `-insecure` e lo segnala nel log) |
+| `gxtorrent_listen` | `127.0.0.1:8890` | indirizzo di ascolto del demone gestito: per default pagina e API restano solo su questo server. Per aprirle alla LAN vedi *Interfaccia web → Esposizione in rete*. La porta viene allineata a quella di `gxtorrent_url` (Gextto deve poterlo raggiungere) |
 | `gxtorrent_token` | vuoto | header `X-Gx-Token`; obbligatorio se il demone ascolta in rete |
 | `gxtorrent_auto` | `true` | autogestione di gx-torrent: coda dinamica e cache adattiva. Disattivala per fissare a mano slot e cache |
 | `gxtorrent_request_timeout_secs` | `15` | 1–300 |
 | `gxtorrent_poll_interval_ms` | `1500` | intervallo minimo tra due letture dello stato (250–60000) |
+| `gxtorrent_proxy` | vuoto | proxy per gx-torrent: `socks5://[utente:password@]host:porta` o `http://host:porta`. Peer, tracker HTTP e web seed passano dal proxy; DHT e tracker UDP vengono spenti. Viaggia nell'ambiente del demone, non sulla riga di comando |
 
 Le impostazioni di coda e banda restano quelle della sezione *libtorrent*:
 
@@ -105,9 +149,11 @@ polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
 `-lang`, e `?lang=xx` la sovrascrive per la singola richiesta.
 
 - **Riepilogo sessione**: in cima i riquadri con i conteggi (torrent, downloading,
-  seeding, stalled, paused, moving), porta peer, filtro IP e cache; i valori live
+  seeding, stalled, paused, moving), porta peer, regole del filtro IP, cache
+  read/write, operazioni di I/O e connessioni in entrata; i valori live
   (velocità, scaricato/caricato nella sessione, spazio libero, DHT, porta,
-  cifratura) stanno nella barra di stato in basso, sempre visibile.
+  cifratura) stanno nella barra di stato in basso, sempre visibile, con il
+  pulsante *Test ports*.
 - **Aggiunta** da un'unica form: magnet, URL a un `.torrent` o file locale
   caricato, con destinazione, pausa, "in cima alla coda", download
   sequenziale, prima/ultima parte e super-seeding; i limiti di seed e velocità
@@ -123,6 +169,9 @@ polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
   *Trackers* (stato, sciame, aggiunta e **rimozione**), *Pezzi* (mappa colorata).
 - **Filtro IP** da URL o file; il campo è precompilato con il filtro
   configurato in Gextto.
+- **Test porte**: dalla barra di stato un pulsante verifica che la porta peer
+  sia in ascolto e che il router la inoltri (la stessa verifica del pulsante
+  *Test porte* di Gextto, sopra `GET /api/v1/portcheck`).
 - **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette
   solo quando apri la scheda o premi *Ricarica*, con filtro testuale, DEBUG
   nascosti di default e avvisi/errori colorati. Mentre è aperta la tabella
@@ -132,18 +181,20 @@ polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
 Il comando definitivo resta comunque Gextto; la pagina è una comodità per
 l'operatore.
 
-**Per default la pagina (e l'API) restano solo su questo server**
-(`gxtorrent_listen = 127.0.0.1:8890`). Per aprirle a tutta la LAN imposta
-`gxtorrent_listen = 0.0.0.0:8890` **e** un `gxtorrent_token`. Gextto continua a
-parlare col demone sull'URL configurato; la porta di `gxtorrent_listen` viene
-**allineata** a quella di `gxtorrent_url` per garantire che il demone resti
-raggiungibile.
+### Esposizione in rete
 
-Un ascolto non loopback richiede `gxtorrent_token`: senza token Gextto avvia il
-demone con `-insecure` (coerente con la LAN fidata di default di Gextto) e lo
-annota nel log a livello debug. Se è impostato `gxtorrent_token`, la pagina lo
-chiede al primo accesso (accetta anche `?token=…`) e lo ricorda in un cookie;
-l'API resta protetta come prima.
+**Per default pagina e API restano solo su questo server**
+(`gxtorrent_listen = 127.0.0.1:8890`). Per aprirle a tutta la LAN imposta
+`gxtorrent_listen = 0.0.0.0:8890` **e** un `gxtorrent_token`.
+
+- La porta di `gxtorrent_listen` viene **allineata** a quella di
+  `gxtorrent_url`: Gextto deve poter raggiungere il demone, quindi una porta
+  diversa non ha effetto (viene segnalato nel log).
+- Un ascolto non loopback richiede `gxtorrent_token`: senza token Gextto avvia
+  il demone in `-insecure` (coerente con la LAN fidata di default di Gextto) e
+  lo annota nel log a livello debug.
+- Con `gxtorrent_token`, la pagina lo chiede al primo accesso (accetta anche
+  `?token=…`) e lo ricorda in un cookie; l'API resta protetta come prima.
 
 ## Uso standalone
 
@@ -152,22 +203,29 @@ gx-torrent [-listen 127.0.0.1:8890] [-data ~/.local/share/gx-torrent]
            [-download-dir DIR] [-token SEGRETO] [-allowed-roots /srv/media,/data]
            [-peer-ports 6881-6891] [-listen-interface IP|iface]
            [-outgoing-interface wg0] [-proxy socks5://host:porta]
-           [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-lsd]
-           [-no-upnp] [-no-natpmp] [-dht-bootstrap host:porta,...]
-           [-ipfilter FILE] [-ipfilter-trackers=true] [-debug] [-version]
+           [-encryption 0|1|2] [-no-dht] [-no-pex] [-no-utp] [-no-holepunch]
+           [-no-lsd] [-no-upnp] [-no-natpmp] [-dht-bootstrap host:porta,...]
+           [-ipfilter FILE] [-ipfilter-trackers=true] [-lang it]
+           [-log-file FILE] [-insecure] [-debug] [-version]
 ```
 
-Ogni flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad esempio:
+La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
+esempio:
 
 - `GX_TORRENT_LISTEN`, `GX_TORRENT_DATA`, `GX_TORRENT_DOWNLOAD_DIR`;
 - `GX_TORRENT_TOKEN`, `GX_TORRENT_ALLOWED_ROOTS`;
 - `GX_TORRENT_PEER_PORTS`, `GX_TORRENT_LISTEN_INTERFACE`,
   `GX_TORRENT_OUTGOING_INTERFACE`;
 - `GX_TORRENT_PROXY`, `GX_TORRENT_ENCRYPTION`;
-- `GX_TORRENT_NO_DHT`, `GX_TORRENT_NO_PEX`, `GX_TORRENT_NO_UPNP`,
+- `GX_TORRENT_NO_DHT`, `GX_TORRENT_NO_PEX`, `GX_TORRENT_NO_UTP`,
+  `GX_TORRENT_NO_HOLEPUNCH`, `GX_TORRENT_NO_LSD`, `GX_TORRENT_NO_UPNP`,
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
-- `GX_TORRENT_DEBUG`.
+- `GX_TORRENT_LANG`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`.
+
+Alcuni flag sono interni (`-insecure`, `-version`, `-fingerprint`,
+`-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): li usa solo Gextto per
+avviare, riagganciare e sorvegliare il demone.
 
 Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
 *libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
@@ -402,6 +460,10 @@ accanto. Rispetto a libtorrent:
 - **mancano** i tempi dei job su disco e i pezzi falliti per peer: rain non li
   misura e non sono implementati.
 
+Il pulsante *Test porte* (in Gextto e nella pagina del demone) non legge
+`/api/v1/stats`: interroga `GET /api/v1/portcheck`, che risponde se la porta peer
+è in ascolto e se il router la inoltra.
+
 ## Diagnostica pezzi
 
 `GET /api/v1/torrents/{hash}/pieces` riporta lo stato di ogni pezzo come
@@ -635,8 +697,9 @@ Gextto segnala la capacità `super_seeding` per gx-torrent (`full`).
 Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
 resta sul disco locale: `session.db` è un database bbolt (mmap e lock), non
 adatto a NFS. Le scritture sono contenute: rain salva statistiche e bitfield
-ogni 2 minuti (`ResumeWriteInterval`, 30 s di default in rain), circa 100 MB
-al giorno a riposo; il log ruota a 5 MB × 4.
+ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
+`ResumeWriteInterval`), circa 100 MB al giorno a riposo; il log ruota a
+5 MB × 4.
 
 ## Limiti di banda
 
@@ -673,6 +736,7 @@ token è impostato.
 |---|---|
 | `GET /api/v1/health` | stato e versione |
 | `GET /api/v1/stats` | contatori: in download, seed, in coda, stalled, lenti, velocità, peer, slot effettivi |
+| `GET /api/v1/portcheck` | test porte: la porta peer è in ascolto e il router la inoltra |
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
 | `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
@@ -705,6 +769,9 @@ Chiavi accettate da `POST /api/v1/config`:
 - `dynamic_queue`, `dynamic_min`, `dynamic_max`;
 - `speed_limit_download`, `speed_limit_upload` (KiB/s);
 - `max_peer_dial`, `max_peer_accept`;
+- `cache_mb`, `cache_ttl_secs`, `preallocate` (cache e preallocazione: `cache_mb`
+  ≤ 0 = adattiva);
+- `auto` (autogestione: coda dinamica e cache adattiva);
 - `sequential` (predefinito per i torrent aggiunti dopo).
 
 ## Disponibilità dell'API (snapshot e lock)
@@ -746,8 +813,9 @@ ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
 l'indice. Il fork rende la prima/ultima parte **indipendente** dall'ordine
 sequenziale.
 
-Gli slot di upload e le connessioni per torrent restano quelli predefiniti di
-rain.
+Gli slot di upload e le connessioni per torrent **non** sono un limite: si
+impostano con `conn-limits` (e i limiti di banda con `seed-limits`), come visto
+in *Limiti di banda*.
 
 ## Test
 
@@ -759,6 +827,11 @@ rain.
     dati, cancellazione mirata, parcheggio e probe, persistenza dopo il riavvio
     della sessione);
   - token e configurazione;
+  - la pagina web (pagina, frammenti live, azioni, token, favicon) e le
+    traduzioni della sua lingua;
+  - l'origine dei peer (incluso `holepunch`), l'holepunch legato a uTP e il
+    test porte;
+  - la scoperta LSD, la diagnostica dei pezzi e lo streaming con `Range`;
   - trasferimenti reali tra due demoni in locale:
     - attraverso la porta unica, in chiaro e con cifratura forzata;
     - con selezione dei file e riattivazione di un file escluso;
