@@ -47,8 +47,11 @@ type Info struct {
 	// The handshake and tracker use its first 20 bytes.
 	V2Hash [32]byte
 	// HasV2 reports whether the info dictionary carried a "meta version".
-	HasV2  bool
-	pieces []byte
+	HasV2 bool
+	// V2Files are the files of the BEP 52 "file tree", in tree order. Only set
+	// by NewV2Info.
+	V2Files []V2File
+	pieces  []byte
 }
 
 // File represents a file inside a Torrent.

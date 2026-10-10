@@ -116,3 +116,80 @@ func TestPieceLayersParsed(t *testing.T) {
 }
 
 const net32 = 32
+
+func TestParseFileTree(t *testing.T) {
+	tree := map[string]any{
+		"a.txt": map[string]any{"": map[string]any{"length": 100}},
+		"dir": map[string]any{
+			"b.bin": map[string]any{"": map[string]any{"length": 200}},
+			"c.bin": map[string]any{"": map[string]any{"length": 50}},
+		},
+	}
+	raw, err := bencode.EncodeBytes(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := ParseFileTree(raw)
+	if err != nil {
+		t.Fatalf("ParseFileTree: %v", err)
+	}
+	want := []struct {
+		path   string
+		length int64
+	}{{"a.txt", 100}, {"dir/b.bin", 200}, {"dir/c.bin", 50}}
+	if len(files) != len(want) {
+		t.Fatalf("got %d files, want %d", len(files), len(want))
+	}
+	for i, w := range want {
+		if files[i].Path != w.path || files[i].Length != w.length {
+			t.Errorf("file %d = %q/%d, want %q/%d", i, files[i].Path, files[i].Length, w.path, w.length)
+		}
+	}
+}
+
+func TestParseFileTreePiecesRoot(t *testing.T) {
+	root := make([]byte, net32)
+	for i := range root {
+		root[i] = byte(i)
+	}
+	tree := map[string]any{"f": map[string]any{"": map[string]any{"length": 5, "pieces root": root}}}
+	raw, _ := bencode.EncodeBytes(tree)
+	files, err := ParseFileTree(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || !files[0].HasRoot {
+		t.Fatalf("expected one file with a pieces root, got %+v", files)
+	}
+	if files[0].PiecesRoot[net32-1] != net32-1 {
+		t.Errorf("pieces root = %x", files[0].PiecesRoot)
+	}
+}
+
+func TestNewV2InfoOnly(t *testing.T) {
+	info := map[string]any{
+		"name":         "v2only",
+		"piece length": 16384,
+		"meta version": 2,
+		"file tree": map[string]any{
+			"v2only": map[string]any{"": map[string]any{"length": 10}},
+		},
+	}
+	raw, _ := bencode.EncodeBytes(info)
+	i, err := NewV2Info(raw)
+	if err != nil {
+		t.Fatalf("NewV2Info: %v", err)
+	}
+	if i.MetaVersion != 2 || !i.HasV2 || i.NumPieces != 0 {
+		t.Fatalf("MetaVersion=%d HasV2=%v NumPieces=%d", i.MetaVersion, i.HasV2, i.NumPieces)
+	}
+	if len(i.V2Files) != 1 || i.V2Files[0].Path != "v2only" || i.V2Files[0].Length != 10 {
+		t.Fatalf("V2Files = %+v", i.V2Files)
+	}
+	if i.V2Hash != sha256.Sum256(raw) {
+		t.Errorf("v2 hash mismatch")
+	}
+	if i.Length != 10 {
+		t.Errorf("length = %d, want 10", i.Length)
+	}
+}
