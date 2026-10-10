@@ -254,6 +254,12 @@ nel dettaglio *Generale*, i campi **Categoria** e **Tag** (scrivere una categori
 nuova la crea). In managed questi controlli non compaiono e l'endpoint
 `/ui/category` rifiuta la richiesta.
 
+La **ricerca su indexer** (standalone) usa la chiave `indexers` di
+`settings.json`, un array JSON di endpoint Torznab
+(`[{"name":"Jackett","url":"http://host:9117","apikey":"…"}]`, così Jackett e
+Prowlarr): `GET /ui/search?q=…` interroga tutti, unisce i risultati e li ordina
+per seed. In managed non è disponibile.
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 
