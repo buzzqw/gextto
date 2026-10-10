@@ -119,3 +119,14 @@ fi
 contents="$(tar -tzf "$ARCHIVE")"
 grep -qx './gx-torrent' <<< "$contents" \
   || { echo "gx-torrent is missing from the release archive" >&2; exit 1; }
+
+# Standalone archive: gx-torrent on its own, usable like qbittorrent-nox. The
+# daemon is always pure Go, so it is produced once, in the default variant.
+if [[ -z "$VARIANT" ]]; then
+  GX_ARCHIVE="$OUTPUT_DIR/gx-torrent-linux-${ARCH}.tar.gz"
+  "$ROOT/scripts/package-gx-torrent.sh" --binary "$ROOT/bin/gx-torrent" --arch "$ARCH" \
+    --output "$GX_ARCHIVE" ${LABEL:+--label "$LABEL"}
+  gx_contents="$(tar -tzf "$GX_ARCHIVE")"
+  grep -qx './gx-torrent' <<< "$gx_contents" \
+    || { echo "gx-torrent is missing from the standalone archive" >&2; exit 1; }
+fi

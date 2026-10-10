@@ -104,6 +104,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `gextto-linux-<arch>-libtorrent.tar.gz` (`GEXTTO_LIBTORRENT=1`, con il motore
   libtorrent integrato). `install.sh --libtorrent` installa la seconda e
   `gexttod --update` resta sulla variante installata (`LibtorrentCompiled()`).
+- `scripts/package-gx-torrent.sh` produce l'archivio **standalone**
+  `gx-torrent-linux-<arch>.tar.gz` (binario + unit systemd + README), che
+  `build-release.sh` genera nella variante Go pura e la CI pubblica accanto a
+  quelli di Gextto: è il client usabile da solo, come qbittorrent-nox, senza
+  Gextto.
 - `scripts/build-daemon.sh` imprime nel binario `constants.Commit` e
   `constants.BuiltAt`; `scripts/release-manifest.sh` scrive `release.json`
   (versione, commit, ultimi commit) pubblicato accanto ai pacchetti: è ciò che

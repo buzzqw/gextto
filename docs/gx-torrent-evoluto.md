@@ -479,7 +479,7 @@ rimanenti:
 | F2 — virtualizzazione della tabella torrent | §14.3 | da fare |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | da fare |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, UI) | §12.2 | da fare |
-
+| CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 **Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2,
 spostamento del motore in `internal/engine`, e i ritocchi al wizard
 (indexer/cartella temporanea).
@@ -543,6 +543,33 @@ dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
 (cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
 persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
 per regola e Add manuale. Restano da completare: feed da ricerca e notifiche.
+
+### 12.3 CI: gx-torrent standalone
+
+**Requisito (concordato):** la CI di GitHub deve **costruire e pubblicare il
+`gx-torrent` standalone**, così un utente può scaricarlo e usarlo come
+`qbittorrent-nox`, senza Gextto.
+
+Stato attuale: `scripts/build-release.sh` compila `bin/gx-torrent` (build
+number proprio) e lo include nell'archivio di Gextto
+(`gextto-linux-<arch>[-libtorrent].tar.gz`, con il controllo `./gx-torrent`);
+`release.yml` e `continuous.yml` pubblicano quegli archivi. Il binario è quindi
+**già distribuito**, ma **dentro** il pacchetto di Gextto, non come prodotto a
+sé.
+
+Realizzato:
+
+- `scripts/package-gx-torrent.sh` produce l'archivio dedicato
+  `gx-torrent-linux-<arch>.tar.gz` (binario + `run.sh` + `gx-torrent.service` +
+  `README.md` + `VERSION`), con checksum; verificato in locale (il binario nel
+  pacchetto gira: `gx-torrent --version`);
+- `build-release.sh` lo genera nella variante Go pura e ne controlla il
+  contenuto;
+- `release.yml` e `continuous.yml` caricano l'artifact `gx-torrent-linux-<arch>`
+  (solo variante `go`) e lo pubblicano nel release (`dist/gx-torrent-linux-*`).
+
+Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
+(glibc 2.35), amd64 e arm64, e l'eventuale immagine container.
 
 ---
 
