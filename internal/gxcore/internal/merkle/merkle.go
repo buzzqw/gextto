@@ -144,6 +144,17 @@ func VerifyProof(leaf [HashSize]byte, index int, proof [][HashSize]byte, root [H
 	return h == root
 }
 
+// ZeroRoot returns the merkle root of a perfect tree of 2^level zero hashes:
+// the hash that fills the tree above the leaves when a file's block count is
+// padded to a power of two (BEP 52). Level 0 is the zero hash itself.
+func ZeroRoot(level int) [HashSize]byte {
+	var z [HashSize]byte
+	for i := 0; i < level; i++ {
+		z = hashPair(z, z)
+	}
+	return z
+}
+
 // hashPair returns SHA-256(left || right).
 func hashPair(left, right [HashSize]byte) [HashSize]byte {
 	var buf [2 * HashSize]byte

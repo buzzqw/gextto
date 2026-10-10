@@ -3,9 +3,11 @@ package metainfo
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"fmt"
 	"path"
 	"sort"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/zeebo/bencode"
 )
 
@@ -146,4 +148,68 @@ func NewV2Info(b []byte) (*Info, error) {
 		}
 	}
 	return i, nil
+}
+
+// VerifyPieceLayers checks a BEP 52 "piece layers" map against the files of a
+// v2 info dictionary. For every non-empty file larger than one piece, the
+// concatenated hashes must be the layer that covers one piece, and hashing that
+// layer up to the tree root (padding the tail with the zero-subtree hash) must
+// reproduce the file's "pieces root". Files that fit in one piece need no entry.
+func VerifyPieceLayers(files []V2File, pieceLength int, layers map[string][]byte) error {
+	if pieceLength < merkle.BlockSize || pieceLength%merkle.BlockSize != 0 {
+		return fmt.Errorf("piece length %d is not a multiple of %d", pieceLength, merkle.BlockSize)
+	}
+	ratio := pieceLength / merkle.BlockSize
+	if ratio&(ratio-1) != 0 {
+		return fmt.Errorf("piece length %d is not a power of two multiple of %d", pieceLength, merkle.BlockSize)
+	}
+	level := 0
+	for r := ratio; r > 1; r >>= 1 {
+		level++
+	}
+	for _, f := range files {
+		if f.Length == 0 || !f.HasRoot || f.Length <= int64(pieceLength) {
+			continue
+		}
+		layer, ok := layers[string(f.PiecesRoot[:])]
+		if !ok {
+			return fmt.Errorf("missing piece layer for %q", f.Path)
+		}
+		if len(layer) == 0 || len(layer)%merkle.HashSize != 0 {
+			return fmt.Errorf("piece layer for %q has an invalid length", f.Path)
+		}
+		blocks := int((f.Length + int64(merkle.BlockSize) - 1) / int64(merkle.BlockSize))
+		groupSize := 1 << level
+		want := (blocks + groupSize - 1) / groupSize
+		count := len(layer) / merkle.HashSize
+		if count != want {
+			return fmt.Errorf("piece layer for %q has %d hashes, want %d", f.Path, count, want)
+		}
+		full := make([][merkle.HashSize]byte, 0, nextPow2(count))
+		for i := 0; i < count; i++ {
+			var h [merkle.HashSize]byte
+			copy(h[:], layer[i*merkle.HashSize:(i+1)*merkle.HashSize])
+			full = append(full, h)
+		}
+		// Missing entries cover subtrees beyond the end of the file: they are
+		// the root of a perfect tree of zero leaves at this level.
+		for len(full) < nextPow2(count) {
+			full = append(full, merkle.ZeroRoot(level))
+		}
+		if merkle.Root(full) != f.PiecesRoot {
+			return fmt.Errorf("piece layer for %q does not match its pieces root", f.Path)
+		}
+	}
+	return nil
+}
+
+func nextPow2(n int) int {
+	if n <= 1 {
+		return 1
+	}
+	p := 1
+	for p < n {
+		p <<= 1
+	}
+	return p
 }

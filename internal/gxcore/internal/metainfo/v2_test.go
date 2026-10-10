@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/merkle"
 	"github.com/zeebo/bencode"
 )
 
@@ -191,5 +192,44 @@ func TestNewV2InfoOnly(t *testing.T) {
 	}
 	if i.Length != 10 {
 		t.Errorf("length = %d, want 10", i.Length)
+	}
+}
+
+func TestVerifyPieceLayers(t *testing.T) {
+	block := merkle.BlockSize
+	pieceLength := 2 * block
+	data := make([]byte, 5*block) // 5 blocks: last layer group is partial
+	for i := range data {
+		data[i] = byte(i*7 + 1)
+	}
+	leaves := merkle.LeafHashes(data)
+	root := merkle.Root(leaves)
+	layer := merkle.PieceLayer(leaves, pieceLength)
+	if len(layer) != 3 { // ceil(5 / 2)
+		t.Fatalf("piece layer has %d hashes, want 3", len(layer))
+	}
+	layerBytes := make([]byte, 0, len(layer)*merkle.HashSize)
+	for _, h := range layer {
+		layerBytes = append(layerBytes, h[:]...)
+	}
+	files := []V2File{{Path: "f.bin", Length: int64(len(data)), PiecesRoot: root, HasRoot: true}}
+	key := string(root[:])
+
+	if err := VerifyPieceLayers(files, pieceLength, map[string][]byte{key: layerBytes}); err != nil {
+		t.Fatalf("valid piece layer rejected: %v", err)
+	}
+	// A corrupted hash must not match the pieces root.
+	corrupt := append([]byte{}, layerBytes...)
+	corrupt[0] ^= 0xff
+	if err := VerifyPieceLayers(files, pieceLength, map[string][]byte{key: corrupt}); err == nil {
+		t.Fatal("corrupted piece layer accepted")
+	}
+	// The wrong number of hashes is rejected.
+	if err := VerifyPieceLayers(files, pieceLength, map[string][]byte{key: layerBytes[:merkle.HashSize]}); err == nil {
+		t.Fatal("short piece layer accepted")
+	}
+	// A missing entry is rejected.
+	if err := VerifyPieceLayers(files, pieceLength, nil); err == nil {
+		t.Fatal("missing piece layer accepted")
 	}
 }
