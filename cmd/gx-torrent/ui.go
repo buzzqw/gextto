@@ -87,6 +87,10 @@ type uiPageData struct {
 	CountMoving  int
 	CountError   int
 
+	// Categories and Tags are the qBittorrent-style labels (standalone mode).
+	Categories []string
+	Tags       []string
+
 	Rows []uiTorrentRow
 }
 
@@ -107,6 +111,8 @@ type uiTorrentRow struct {
 	ETA       string
 	ETAVal    int64
 	SavePath  string
+	Category  string
+	Tags      string
 
 	TotalDone int64
 	TotalSize int64
@@ -189,6 +195,11 @@ type uiDetailData struct {
 	SuperSeeding bool
 	Pinned       bool
 	Private      bool
+
+	// Category and Tags are the qBittorrent-style labels (standalone).
+	Category   string
+	Tags       string
+	Categories []string
 
 	PiecesTotal     uint32
 	PiecesHave      uint32
@@ -1007,6 +1018,11 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 		page.Router = "—"
 	}
 	page.PeerErrors = uiPeerErrors(stats.PeerErrors)
+	for name := range d.categoriesSnapshot() {
+		page.Categories = append(page.Categories, name)
+	}
+	sort.Strings(page.Categories)
+	page.Tags = d.tagsSnapshot()
 	for _, view := range views {
 		row := uiTorrentRow{
 			Hash:      view.Hash,
@@ -1021,6 +1037,8 @@ func (d *Daemon) uiPageData() (uiPageData, error) {
 			Seeds:     view.NumSeeds,
 			ETA:       "—",
 			SavePath:  view.SavePath,
+			Category:  view.Category,
+			Tags:      strings.Join(view.Tags, ", "),
 			TotalDone: view.TotalDone,
 			TotalSize: view.TotalSize,
 			DLRate:    int64(view.DownloadRate),
@@ -1119,6 +1137,8 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 	if !meta.CompletedAt.IsZero() {
 		completedAt = meta.CompletedAt.Unix()
 	}
+	metaCategory := meta.Category
+	metaTags := strings.Join(meta.Tags, ", ")
 	d.mu.Unlock()
 
 	progress := 0.0
@@ -1146,7 +1166,12 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		PiecesChecked: stats.Pieces.Checked, PieceLength: int64(stats.PieceLength),
 		Wasted: stats.Bytes.Wasted, Allocated: stats.Bytes.Allocated, FileCount: stats.FileCount,
 		AddedAt: addedAt, CompletedAt: completedAt,
+		Category: metaCategory, Tags: metaTags,
 	}
+	for name := range d.categoriesSnapshot() {
+		data.Categories = append(data.Categories, name)
+	}
+	sort.Strings(data.Categories)
 	if data.PiecesTotal > 0 {
 		data.PiecesPercent = float64(data.PiecesAvailable) * 100 / float64(data.PiecesTotal)
 	}

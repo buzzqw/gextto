@@ -246,6 +246,11 @@ In standalone il demone espone anche un'**API compatibile qBittorrent**
 e tag viaggiano anche su `torrents/add`). Senza password configurata
 l'API è aperta. In managed **non** è esposta: comanda solo Gextto.
 
+In standalone la pagina ha anche un filtro **Categorie** nella barra laterale e,
+nel dettaglio *Generale*, i campi **Categoria** e **Tag** (scrivere una categoria
+nuova la crea). In managed questi controlli non compaiono e l'endpoint
+`/ui/category` rifiuta la richiesta.
+
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:
 

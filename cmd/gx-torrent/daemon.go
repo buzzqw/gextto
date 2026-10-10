@@ -2062,3 +2062,19 @@ func (d *Daemon) categorySavePath(name string) string {
 	defer d.mu.Unlock()
 	return d.state.Categories[strings.TrimSpace(name)]
 }
+
+// setTags replaces a torrent's tags and keeps the known-tag set in sync.
+func (d *Daemon) setTags(key string, tags []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, meta := d.findLocked(key)
+	if meta == nil {
+		return errNotFound
+	}
+	meta.Tags = mergeTagNames(nil, tags)
+	d.state.Tags = mergeTagNames(d.state.Tags, tags)
+	d.dirty = true
+	d.saveLocked()
+	d.poke()
+	return nil
+}

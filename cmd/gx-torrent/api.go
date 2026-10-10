@@ -68,6 +68,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/super-seeding", d.handleUISuperSeeding)
 	root.HandleFunc("POST /ui/move", d.handleUIMove)
 	root.HandleFunc("POST /ui/pin", d.handleUIPin)
+	root.HandleFunc("POST /ui/category", d.handleUICategory)
 	if d.opts.Mode == ModeStandalone {
 		// The qBittorrent-compatible API lets *arr and the mobile apps drive
 		// the standalone daemon; managed mode is driven by Gextto only.

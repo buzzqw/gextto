@@ -192,7 +192,8 @@ function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{}
 function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live',{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();}});}
 function rowState(tr){return tr.getAttribute('data-state')||'';}
 function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
-function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f))?'':'none';});}
+function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';var c=window.__catFilter||'';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();var cat=tr.getAttribute('data-cat')||'';tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f)&&(!c||cat===c))?'':'none';});}
+function filterByCategory(v){window.__catFilter=v;applyFilters();}
 function filterRows(){applyFilters();}
 function filterByState(f,btn){window.__stateFilter=f;document.querySelectorAll('.sidebar .filter').forEach(function(b){b.classList.toggle('on',b===btn);});applyFilters();}
 function updateSel(){document.getElementById('selcount').textContent=document.querySelectorAll('.rowsel:checked').length;}
@@ -244,6 +245,13 @@ setInterval(function(){refresh(false)},2000);
       <button type="button" class="filter" onclick="filterByState('stalled',this)">Stalled <b>{{.CountStalled}}</b></button>
       <button type="button" class="filter" onclick="filterByState('moving',this)">Moving <b>{{.CountMoving}}</b></button>
       <button type="button" class="filter" onclick="filterByState('error',this)">Error <b>{{.CountError}}</b></button>
+      {{if .Categories}}
+      <div class="muted">Categories</div>
+      <select id="catfilter" onchange="filterByCategory(this.value)">
+        <option value="">All</option>
+        {{range .Categories}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+      {{end}}
     </aside>
     <div class="content">
     <table id="torrents">
@@ -269,7 +277,7 @@ setInterval(function(){refresh(false)},2000);
     </tr>
     </thead>
     {{range .Rows}}
-    <tbody class="t" data-name="{{.Name}}" data-state="{{.State}}" data-k-name="{{.Name}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-done="{{.TotalDone}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-peers="{{.Peers}}" data-k-seeds="{{.Seeds}}" data-k-ratio="{{.RatioVal}}" data-k-eta="{{.ETAVal}}">
+    <tbody class="t" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-k-name="{{.Name}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-done="{{.TotalDone}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-peers="{{.Peers}}" data-k-seeds="{{.Seeds}}" data-k-ratio="{{.RatioVal}}" data-k-eta="{{.ETAVal}}">
       <tr class="l1">
         <td class="sel" rowspan="2"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
         <td class="name" colspan="9"><div class="nameline"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="{{.Name}}">{{.Name}}</a><span class="muted" title="{{.SavePath}}">{{.SavePath}}</span></div></td>
@@ -390,6 +398,13 @@ setInterval(function(){refresh(false)},2000);
     <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
     <button type="submit">Move</button>
   </form>
+  <form class="form-grid" method="post" action="/ui/category">
+    <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
+    <label>Category<input type="text" name="category" value="{{.Category}}" list="catlist"></label>
+    <label>Tags<input type="text" name="tags" value="{{.Tags}}" placeholder="tag, tag"></label>
+    <button type="submit">Save</button>
+  </form>
+  <datalist id="catlist">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
 {{else if eq .Tab "files"}}
   {{if .Files}}
   <table>

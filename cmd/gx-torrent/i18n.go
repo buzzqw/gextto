@@ -128,6 +128,13 @@ var uiCatalog = map[string][5]string{
 	"Move data to":                               {"Sposta i dati in", "Daten verschieben nach", "Déplacer les données vers", "Mover datos a", "Przenieś dane do"},
 	"Move":                                       {"Sposta", "Verschieben", "Déplacer", "Mover", "Przenieś"},
 
+	// Categories and tags (standalone).
+	"Categories":                {"Categorie", "Kategorien", "Catégories", "Categorías", "Kategorie"},
+	"Category":                  {"Categoria", "Kategorie", "Catégorie", "Categoría", "Kategoria"},
+	"Tags":                      {"Tag", "Tags", "Étiquettes", "Etiquetas", "Tagi"},
+	"tag, tag":                  {"tag, tag", "Tag, Tag", "étiquette, étiquette", "etiqueta, etiqueta", "tag, tag"},
+	"Category and tags updated": {"Categoria e tag aggiornati", "Kategorie und Tags aktualisiert", "Catégorie et étiquettes mises à jour", "Categoría y etiquetas actualizadas", "Zaktualizowano kategorię i tagi"},
+
 	// Files tab.
 	"Priority": {"Priorità", "Priorität", "Priorité", "Prioridad", "Priorytet"},
 	"Play":     {"Riproduci", "Abspielen", "Lire", "Reproducir", "Odtwórz"},

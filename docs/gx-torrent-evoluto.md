@@ -484,6 +484,7 @@ Aggiornato al 2026-10-10.
 | F1: wizard — indexer opzionali (Jackett/Prowlarr/MIRCrew) e cartella temporanea | da fare |
 | F3: API compatibile qBittorrent (MVP: auth, app, transfer, torrents info/add/delete/pause/resume/recheck) | fatto |
 | F3: categorie e tag (modello demone + API qBittorrent) | fatto |
+| F2: categorie/tag nella pagina (filtro laterale + editor nel dettaglio) | fatto |
 | F3: app/preferences e altri endpoint qBittorrent | da fare |
 | Spostamento del motore in `internal/engine` | F4 (§11.3) |
 
