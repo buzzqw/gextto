@@ -1,6 +1,15 @@
 package messages
 
-import "testing"
+import (
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"testing"
+)
 
 func TestPicksVariantByLanguage(t *testing.T) {
 	SetLanguage("it")
@@ -74,4 +83,44 @@ func TestPickUsesCatalogForExtraLanguages(t *testing.T) {
 		}
 	}
 	SetLanguage("it")
+}
+
+// TestEveryPickIsInTheCatalog scans the module for messages.Pick calls with a
+// literal Italian source: each must be in catalogIT, otherwise German, French,
+// Spanish and Polish users silently get the English fallback.
+func TestEveryPickIsInTheCatalog(t *testing.T) {
+	pick := regexp.MustCompile(`messages\.Pick\(\s*"((?:[^"\\]|\\.)*)"`)
+	var missing []string
+	err := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() && (entry.Name() == "third_party" || strings.HasPrefix(entry.Name(), ".")) && path != "../.." {
+			return filepath.SkipDir
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, m := range pick.FindAllStringSubmatch(string(raw), -1) {
+			italian, err := strconv.Unquote(`"` + m[1] + `"`)
+			if err != nil {
+				t.Fatalf("%s: unquote %q: %v", path, m[1], err)
+			}
+			if _, ok := catalogIT[italian]; !ok {
+				missing = append(missing, path+": "+italian)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		t.Fatalf("notification strings without a catalogIT entry:\n%s", strings.Join(missing, "\n"))
+	}
 }
