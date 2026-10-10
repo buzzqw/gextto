@@ -39,6 +39,10 @@ esac
 
 [[ -n "$LABEL" ]] || LABEL="$CHANNEL"
 [[ -z "$OUTPUT" ]] && OUTPUT="${ROOT}/gx-torrent-windows-${ARCH}.zip"
+# zip runs from inside the staging directory, so the output path must be
+# absolute: create its directory first and resolve it.
+OUT_DIR="$(mkdir -p "$(dirname "$OUTPUT")" && cd "$(dirname "$OUTPUT")" && pwd)"
+OUTPUT="${OUT_DIR}/$(basename "$OUTPUT")"
 
 # The daemon's own build number, when it has already been built, so the package
 # reports the same 1.1.<n> as the checkout.
