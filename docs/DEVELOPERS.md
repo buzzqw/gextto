@@ -128,7 +128,7 @@ Run these checks before a commit:
 ```bash
 gofmt -w changed.go
 make test                 # pure Go: check-ui + installer self-test + CGO_ENABLED=0 go test ./...
-make test-rain            # tests of the vendored rain fork
+make test-engine            # tests of the gx-core engine
 CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (and the libtorrent headers)
 node --check uiweb/v2/static/v2-core.js
 git diff --check

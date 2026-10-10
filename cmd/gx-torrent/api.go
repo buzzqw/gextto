@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 const maxTorrentFile = 32 << 20
@@ -552,7 +552,7 @@ func (d *Daemon) handleIPFilter(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"rules": rules})
 }
 
-// errV2Only is returned for BitTorrent v2-only torrents: rain speaks v1 (and
+// errV2Only is returned for BitTorrent v2-only torrents: the engine speaks v1 (and
 // the v1 side of hybrid torrents) only.
 var errV2Only = errors.New("v2_unsupported: BitTorrent v2-only torrent (no v1 info hash); hybrid and v1 torrents are supported")
 
@@ -562,11 +562,11 @@ func magnetIsV2Only(magnet string) bool {
 	return strings.Contains(lower, "urn:btmh:") && !strings.Contains(lower, "urn:btih:")
 }
 
-// normalizeMagnetForRain makes the v1 (btih) hash the first xt and drops any
-// btmh. rain's magnet parser reads only the first xt and rejects a v2
+// normalizeMagnet makes the v1 (btih) hash the first xt and drops any
+// btmh. The engine's magnet parser reads only the first xt and rejects a v2
 // multihash, so a hybrid magnet that lists btmh before btih would otherwise be
 // refused even though its v1 side is downloadable.
-func normalizeMagnetForRain(magnet string) string {
+func normalizeMagnet(magnet string) string {
 	parsed, err := url.Parse(strings.TrimSpace(magnet))
 	if err != nil || parsed.Scheme != "magnet" {
 		return magnet

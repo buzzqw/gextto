@@ -13,7 +13,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 func skipMask(priorities []int) []bool {
@@ -39,7 +39,7 @@ func (d *Daemon) setSelection(id string, priorities []int) {
 	}
 }
 
-// selectionFor is rain's FileSelection callback.
+// selectionFor is the engine's FileSelection callback.
 func (d *Daemon) selectionFor(id string) []bool {
 	d.selMu.RLock()
 	defer d.selMu.RUnlock()

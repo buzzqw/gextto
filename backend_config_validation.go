@@ -73,7 +73,7 @@ func validateBackendSetting(key, value string) error {
 	return nil
 }
 
-// validateGxProxyURL accepts the proxy forms rain supports:
+// validateGxProxyURL accepts the proxy forms the engine supports:
 // socks5://[user:pass@]host:port and http://host:port. Empty clears it.
 func validateGxProxyURL(raw string) error {
 	if raw == "" {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 func newTestDaemonForTrackers() *Daemon {

@@ -1,7 +1,7 @@
 package gextto
 
 // gxtorrent_engine.go adapts the gx-torrent daemon (cmd/gx-torrent, built on
-// rain) to the TorrentEngine contract.
+// the engine) to the TorrentEngine contract.
 //
 // Unlike qBittorrent, gx-torrent owns its queue: Gextto pushes the slot policy
 // (active downloads/seeds, hard cap, slow-torrent handling, dynamic queue,
@@ -221,7 +221,7 @@ func (e *gxTorrentEngine) Capabilities() map[string]bool {
 // ---------------------------------------------------------------------------
 
 // ErrTorrentV2Unsupported is returned when gx-torrent refuses a BitTorrent
-// v2-only torrent (rain handles v1 and hybrid torrents).
+// v2-only torrent (the engine handles v1 and hybrid torrents).
 var ErrTorrentV2Unsupported = errors.New("BitTorrent v2-only torrent: not supported by gx-torrent")
 
 // gxAPIError is a non-2xx answer from the daemon.
@@ -513,7 +513,7 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 	return view
 }
 
-// gxTorrentVersion normalizes the daemon's torrent version. rain handles v1 and
+// gxTorrentVersion normalizes the daemon's torrent version. The engine handles v1 and
 // the v1 side of hybrid (v1+v2) torrents; an unknown report falls back to v1.
 func gxTorrentVersion(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
@@ -920,8 +920,8 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 		"cache_ttl_secs":   max(lt.CacheExpiry, 10),
 		"preallocate":      cfg.LibtorrentPreallocate(),
 	}
-	// rain has no single "connections limit": map the global libtorrent limit
-	// onto its outgoing dial and incoming accept budgets, keeping rain's own
+	// The engine has no single "connections limit": map the global libtorrent limit
+	// onto its outgoing dial and incoming accept budgets, keeping the engine's own
 	// 4:1 ratio so the total matches what the user configured.
 	if dial, accept := gxPeerLimits(lt.ConnectionsLimit); dial > 0 {
 		policy["max_peer_dial"] = dial
@@ -930,9 +930,9 @@ func gxQueuePolicy(cfg *Config) map[string]any {
 	return policy
 }
 
-// gxPeerLimits splits a global connections limit into rain's outgoing dial and
-// incoming accept budgets (rain defaults are 80 and 20). Zero means unlimited
-// and leaves rain's defaults in place.
+// gxPeerLimits splits a global connections limit into the engine's outgoing dial and
+// incoming accept budgets (the engine defaults are 80 and 20). Zero means unlimited
+// and leaves the engine's defaults in place.
 func gxPeerLimits(connectionsLimit int64) (dial, accept int) {
 	if connectionsLimit <= 0 {
 		return 0, 0
@@ -1366,7 +1366,7 @@ func (e *gxTorrentEngine) SetFilePriorities(hash string, priorities []int32) (bo
 	return true, nil
 }
 
-// SetTrackers replaces the torrent's tracker list (gextto fork on rain: an
+// SetTrackers replaces the torrent's tracker list (gextto fork on the engine: an
 // empty list removes every tracker), like the embedded engine.
 func (e *gxTorrentEngine) SetTrackers(hash string, trackers []TrackerEntry) (bool, error) {
 	var urls []string
@@ -1400,7 +1400,7 @@ func (e *gxTorrentEngine) WebSeeds(hash, urls string, remove bool) (bool, error)
 	return true, nil
 }
 
-// SetLimits stores the per-torrent seed policy and speed limits. rain's limits
+// SetLimits stores the per-torrent seed policy and speed limits. The engine's limits
 // are in KiB/s: -1 inherits the global, 0 is unlimited (gextto fork).
 func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int64, seedRatio float64, seedDays int64) (bool, error) {
 	form := url.Values{}
@@ -1424,7 +1424,7 @@ func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int6
 	return true, nil
 }
 
-// bytesToKib maps a Gextto per-torrent limit in bytes to rain's KiB/s (gextto
+// bytesToKib maps a Gextto per-torrent limit in bytes to the engine's KiB/s (gextto
 // fork): negative inherits the global, zero is unlimited, a positive value is
 // rounded up to at least 1 KiB.
 func bytesToKib(value int64) int64 {
@@ -1507,7 +1507,7 @@ func (e *gxTorrentEngine) SetPin(hash string, pinned bool) (bool, error) {
 }
 
 // SetSequential enables or disables sequential download for torrents added
-// afterwards. rain fixes the piece order when a torrent is added, so already
+// afterwards. The engine fixes the piece order when a torrent is added, so already
 // running torrents are not changed.
 func (e *gxTorrentEngine) SetSequential(enabled bool) (bool, error) {
 	if err := e.pushConfig(map[string]any{"sequential": enabled}, &e.sequentialPushed); err != nil {
@@ -1558,7 +1558,7 @@ func (e *gxTorrentEngine) resolveSavePath(preferredPath *string, cfg *Config) st
 	return resolveSavePath(preferredPath, use)
 }
 
-// gxWarnUnsupportedOptions notes the add-time options rain cannot apply, so a
+// gxWarnUnsupportedOptions notes the add-time options the engine cannot apply, so a
 // caller does not believe they were honored. Of the add-time options only seed
 // mode is missing.
 func gxWarnUnsupportedOptions(options AddOptions) {
@@ -1743,7 +1743,7 @@ func (e *gxTorrentEngine) LoadIPFilter(path string) (int, error) {
 }
 
 // SessionStats returns the daemon's session counters (GET
-// /api/libtorrent/session-stats). rain has fewer counters than libtorrent.
+// /api/libtorrent/session-stats). The engine has fewer counters than libtorrent.
 func (e *gxTorrentEngine) SessionStats() (map[string]int64, error) {
 	var stats struct {
 		Session map[string]int64 `json:"session"`

@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
 	"github.com/buzzqw/gextto/internal/settings"
 )
@@ -66,7 +66,7 @@ type Options struct {
 	ProbeWindow time.Duration
 }
 
-// torrentMeta is what gx-torrent knows about a torrent beyond rain.
+// torrentMeta is what gx-torrent knows about a torrent beyond the engine.
 type torrentMeta struct {
 	ID          string    `json:"id"`
 	Hash        string    `json:"hash"`
@@ -99,7 +99,7 @@ type torrentMeta struct {
 	MaxUploads     *int64 `json:"max_uploads,omitempty"`
 	SwarmSeeds     int    `json:"swarm_seeds"`
 	SwarmPeers     int    `json:"swarm_peers"`
-	// DoneBytes is the last verified amount, reported while rain cannot
+	// DoneBytes is the last verified amount, reported while the engine cannot
 	// compute it (a stopped torrent has no piece table).
 	DoneBytes int64 `json:"done_bytes,omitempty"`
 	// FilePriorities: one entry per file, 0 = skip (empty = all wanted).
@@ -141,7 +141,7 @@ type runtimeInfo struct {
 	tracker     string
 }
 
-// Daemon owns the rain session and the queue.
+// Daemon owns the engine session and the queue.
 type Daemon struct {
 	opts Options
 
@@ -188,7 +188,7 @@ type Daemon struct {
 	ipFilterData  []byte
 	ipFilterStamp string
 
-	// Adaptive disk cache (see cache.go). rain reads the cache sizes when the
+	// Adaptive disk cache (see cache.go). The engine reads the cache sizes when the
 	// session is created, so a retune reopens the session on a coarse cadence.
 	cacheRead      int64
 	cacheWrite     int64
@@ -204,7 +204,7 @@ type Daemon struct {
 	classCached    string
 	classCheckedAt time.Time
 
-	// selection is read by rain from torrent goroutines: it has its own
+	// selection is read by the engine from torrent goroutines: it has its own
 	// lock and must never wait for d.mu.
 	selMu     sync.RWMutex
 	selection map[string][]bool
@@ -351,14 +351,14 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	cfg.DataDir = d.opts.LinkDir
 	cfg.DataDirIncludesTorrentID = true
 	// Torrents are loaded stopped and started by gx-torrent's own queue on the
-	// first tick. If rain resumed them itself (ResumeOnStartup), it would start a
+	// first tick. If the engine resumed them itself (ResumeOnStartup), it would start a
 	// torrent that must stay parked/paused before reconcileLocked can stop it,
 	// and starting a torrent creates its destination files: a parked torrent
 	// whose payload was moved or removed would get zero-filled placeholders
 	// written at the old path. The queue is the single owner of start/stop.
 	cfg.ResumeOnStartup = false
 	cfg.RPCEnabled = false
-	// rain rewrites every torrent's stats and bitfield in one fsync'd bolt
+	// The engine rewrites every torrent's stats and bitfield in one fsync'd bolt
 	// transaction per interval: 30 s by default, about 300 MB a day on the
 	// state disk. Two minutes cuts that by four; the bitfield is also saved on
 	// completion and stop, so a crash only re-downloads the last pieces.
@@ -375,7 +375,7 @@ func (d *Daemon) sessionConfig() torrent.Config {
 	if d.state.Config.MaxPeerAccept > 0 {
 		cfg.MaxPeerAccept = d.state.Config.MaxPeerAccept
 	}
-	cfg.CustomLogHandler = rainLogHandler(d.opts.Debug)
+	cfg.CustomLogHandler = engineLogHandler(d.opts.Debug)
 	return cfg
 }
 
@@ -405,8 +405,8 @@ func (d *Daemon) openSessionLocked() error {
 	return nil
 }
 
-// restartSessionLocked applies settings rain reads only at session creation
-// (peer limits, cache TTL, preallocation). Torrents resume exactly as they were: rain
+// restartSessionLocked applies settings the engine reads only at session creation
+// (peer limits, cache TTL, preallocation). Torrents resume exactly as they were: the engine
 // restores the started flag and gx-torrent keeps its own state.
 func (d *Daemon) restartSessionLocked() {
 	d.restartPending = false
@@ -421,13 +421,13 @@ func (d *Daemon) restartSessionLocked() {
 		d.restartPending = true
 		return
 	}
-	// rain does not persist the per-torrent speed limits: reapply them (and the
+	// The engine does not persist the per-torrent speed limits: reapply them (and the
 	// paused/parked state) to the reloaded torrents.
 	d.reconcileLocked()
 	logf("session restarted to apply new settings")
 }
 
-// reconcileLocked aligns gx-torrent's state with the torrents rain loaded.
+// reconcileLocked aligns gx-torrent's state with the torrents the engine loaded.
 func (d *Daemon) reconcileLocked() {
 	live := map[string]bool{}
 	for _, t := range d.session.ListTorrents() {
@@ -462,9 +462,9 @@ func (d *Daemon) reconcileLocked() {
 			t.SetMaxUploads(int(*meta.MaxUploads))
 		}
 		// Super-seeding is a per-torrent seeding strategy; keep it in sync with
-		// the daemon state (rain persists it too, gextto fork).
+		// the daemon state (the engine persists it too, gextto fork).
 		_ = t.SetSuperSeeding(meta.SuperSeeding)
-		// Torrents parked or paused must not run, whatever rain restored.
+		// Torrents parked or paused must not run, whatever the engine restored.
 		if meta.UserPaused || meta.Parked {
 			_ = t.Stop()
 		}
@@ -495,7 +495,7 @@ func (d *Daemon) close() {
 	}
 }
 
-// findLocked looks a torrent up by info hash (case-insensitive) or rain ID.
+// findLocked looks a torrent up by info hash (case-insensitive) or the engine ID.
 func (d *Daemon) findLocked(key string) (*torrent.Torrent, *torrentMeta) {
 	key = strings.ToLower(strings.TrimSpace(key))
 	if key == "" || d.session == nil {
@@ -566,7 +566,7 @@ func isRunning(status torrent.Status) bool {
 	return status != torrent.Stopped && status != torrent.Stopping
 }
 
-// statsLocked returns rain's stats with the completed bytes fixed: rain
+// statsLocked returns the engine's stats with the completed bytes fixed: the engine
 // reports 0 for a stopped torrent (its piece table exists only while it
 // runs), which would make a finished, paused torrent look empty.
 func (d *Daemon) statsLocked(t *torrent.Torrent) torrent.Stats {
@@ -614,7 +614,7 @@ func isComplete(stats torrent.Stats) bool {
 }
 
 // collectedTorrent is one torrent sampled from its run loop. The sample is
-// taken before d.mu is held: rain's per-torrent calls can block on storage I/O
+// taken before d.mu is held: the engine's per-torrent calls can block on storage I/O
 // (a slow or unresponsive network mount), and holding the daemon lock through
 // them would freeze every API request.
 type collectedTorrent struct {
@@ -810,7 +810,7 @@ func (d *Daemon) tick(now time.Time) {
 			pendingStops = append(pendingStops, t)
 		}
 	}
-	// Start and stop are issued outside d.mu: rain's sendCommand waits on the
+	// Start and stop are issued outside d.mu: the engine's sendCommand waits on the
 	// torrent run loop, which can be busy on storage I/O. The queue retries on
 	// the next tick, so a delayed action is not lost.
 	var pendingStarts []*torrent.Torrent
@@ -957,7 +957,7 @@ type torrentInfo struct {
 	Tags     []string `json:"tags,omitempty"`
 }
 
-// stateFor maps rain's status and gx-torrent's flags onto Gextto's states.
+// stateFor maps the engine's status and gx-torrent's flags onto Gextto's states.
 func stateFor(meta *torrentMeta, stats torrent.Stats, moving bool) string {
 	switch {
 	case moving:
@@ -989,7 +989,7 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 	meta := d.metaLocked(t)
 	if meta.Version == "" && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
 		if data, err := t.Torrent(); err == nil && len(data) > 0 {
-			// rain handles v1 and the v1 side of hybrid torrents; the raw
+			// The engine handles v1 and the v1 side of hybrid torrents; the raw
 			// metainfo carries "meta version" only when a v2 layer is present.
 			if bytes.Contains(data, []byte("12:meta versioni2e")) {
 				meta.Version = "hybrid"
@@ -1196,9 +1196,9 @@ type addRequest struct {
 // already in the session is reported with existing=true and left untouched.
 func (d *Daemon) add(req addRequest) (string, bool, error) {
 	if req.Magnet != "" {
-		// rain reads only the first xt: keep the v1 hash in front so a hybrid
+		// The engine reads only the first xt: keep the v1 hash in front so a hybrid
 		// magnet whose btmh comes first is still downloadable.
-		req.Magnet = normalizeMagnetForRain(req.Magnet)
+		req.Magnet = normalizeMagnet(req.Magnet)
 	}
 	dest, err := d.validateDestination(req.Destination)
 	if err != nil {
@@ -1243,7 +1243,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		return "", false, err
 	}
 	hash := t.InfoHash().String()
-	// rain accepts the same info hash twice: keep the first one. Removing the
+	// The engine accepts the same info hash twice: keep the first one. Removing the
 	// duplicate only unlinks its symlink, never the payload.
 	for _, other := range d.session.ListTorrents() {
 		if other.ID() != id && other.InfoHash().String() == hash {
@@ -1340,7 +1340,7 @@ func (d *Daemon) pause(key string) error {
 }
 
 // errPayloadGone refuses to start or verify a finished torrent whose data is no
-// longer at its save path (archived and renamed, or deleted): rain would
+// longer at its save path (archived and renamed, or deleted): the engine would
 // re-create every file empty there, in the middle of the library.
 func errPayloadGone(t *torrent.Torrent, meta *torrentMeta) error {
 	if meta.CompletedAt.IsZero() || t.Name() == "" {
@@ -1449,7 +1449,7 @@ func (d *Daemon) setPin(key string, pinned bool) error {
 
 // setSeedLimits stores the per-torrent seed policy (-1 = global, 0 =
 // unlimited). Gextto enforces it.
-// kibOrInherit maps a stored per-torrent limit to the rain convention: nil means
+// kibOrInherit maps a stored per-torrent limit to the engine convention: nil means
 // inherit the global limit (-1).
 func kibOrInherit(value *int64) int64 {
 	if value == nil {
@@ -1595,8 +1595,8 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 	wasRunning := isRunning(stats.Status)
 	// A torrent that is downloading but has no verified piece yet holds only
 	// empty (sparse or preallocated) files: copying them to another disk
-	// writes gigabytes of zeros and makes rain re-check them all at the
-	// destination. They are dropped and rain recreates them there. Only a
+	// writes gigabytes of zeros and makes the engine re-check them all at the
+	// destination. They are dropped and the engine recreates them there. Only a
 	// running download qualifies: its piece table is authoritative, while a
 	// stopped or verifying torrent may sit on data not checked yet.
 	empty := !associate && stats.Status == torrent.Downloading && stats.Pieces.Have == 0 && stats.Bytes.Completed == 0
@@ -1618,7 +1618,7 @@ func (d *Daemon) move(key, destination string, associate bool) error {
 }
 
 func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name string, wasRunning, associate, empty bool) {
-	// rain stops asynchronously: wait until the files are closed.
+	// The engine stops asynchronously: wait until the files are closed.
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) && t.Stats().Status != torrent.Stopped {
 		time.Sleep(200 * time.Millisecond)
@@ -1667,7 +1667,7 @@ func (d *Daemon) finishMove(id string, t *torrent.Torrent, from, dest, name stri
 	d.poke()
 }
 
-// setConfig merges a partial configuration. Limits rain reads only at start
+// setConfig merges a partial configuration. Limits the engine reads only at start
 // schedule a session restart, applied by the queue loop between moves.
 func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, error) {
 	d.mu.Lock()
@@ -1711,7 +1711,7 @@ func (d *Daemon) setConfig(patch map[string]json.RawMessage) (queue.Config, erro
 	if previous.Sequential != next.Sequential {
 		d.applySequentialLocked(next.Sequential)
 	}
-	// Peer limits, the cache TTL and preallocation are read by rain only when
+	// Peer limits, the cache TTL and preallocation are read by the engine only when
 	// the session opens.
 	if previous.MaxPeerDial != next.MaxPeerDial || previous.MaxPeerAccept != next.MaxPeerAccept ||
 		previous.CacheTTLSecs != next.CacheTTLSecs || previous.Preallocate != next.Preallocate {
@@ -1785,7 +1785,7 @@ type daemonStats struct {
 	LSD             lsdStatus     `json:"lsd"`
 	DiskFreeBytes   int64         `json:"disk_free_bytes"`
 	DiskTotalBytes  int64         `json:"disk_total_bytes"`
-	// Session holds rain's session counters (cache, disk, transfer).
+	// Session holds the engine's session counters (cache, disk, transfer).
 	Session map[string]int64 `json:"session"`
 	// PeerErrors counts the peer/tracker errors demoted by the log filter since
 	// start-up, by category. Useful to tell a chatty swarm from a real problem

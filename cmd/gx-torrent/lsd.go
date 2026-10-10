@@ -32,7 +32,7 @@ const (
 var lsdTick = lsdTickDefault
 
 // lsdPeerHost maps the sender of an announcement to the address to dial.
-// Tests on one machine remap it: rain ignores the machine's own IPs.
+// Tests on one machine remap it: the engine ignores the machine's own IPs.
 var lsdPeerHost = func(ip net.IP) string { return ip.String() }
 
 type lsdService struct {

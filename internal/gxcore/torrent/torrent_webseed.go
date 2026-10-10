@@ -1,0 +1,211 @@
+package torrent
+
+import (
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer/boltdbresumer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/urldownloader"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
+	"github.com/rcrowley/go-metrics"
+	"go.etcd.io/bbolt"
+)
+
+func (t *torrent) handleWebseedPieceResult(msg *urldownloader.PieceResult) {
+	if msg.Error != nil {
+		t.log.Debugln("webseed download error:", msg.Error)
+		// Possible causes:
+		// * Client.Do error
+		// * Unexpected status code
+		// * Response.Body.Read error
+		t.disableSource(msg.Downloader.URL, msg.Error, true)
+		t.webseedActiveDownloads--
+		t.startPieceDownloaders()
+		return
+	}
+
+	piece := &t.pieces[msg.Index]
+
+	// The piece may have already been completed by a peer that was downloading
+	// it concurrently: webseed ranges and peer downloads can overlap, and when
+	// a peer finishes such a piece the webseed range is only truncated after
+	// the fact (see WebseedStopAt). A result that was already in flight then
+	// arrives for a piece that is now Done. Writing it again would trip the
+	// "already have the piece" check in handlePieceWriteDone, so discard the
+	// stale result. This mirrors handlePieceMessage, which drops blocks whose
+	// downloader is no longer current.
+	if piece.Done {
+		t.log.Debugf("discarding already completed piece #%d from webseed %s", msg.Index, msg.Downloader.URL)
+		t.bytesWasted.Inc(int64(len(msg.Buffer.Data)))
+		msg.Buffer.Release()
+		if msg.Done {
+			for _, src := range t.webseedSources {
+				// Match by downloader identity: the source may already have a
+				// different (or no) downloader if it was closed elsewhere, in
+				// which case there is nothing to clean up here.
+				if src.Downloader != msg.Downloader {
+					continue
+				}
+				t.closeWebseedDownloader(src)
+				t.webseedActiveDownloads--
+				t.startPieceDownloaderForWebseed(src)
+				break
+			}
+		}
+		return
+	}
+
+	t.log.Debugf("piece #%d downloaded from %s", msg.Index, msg.Downloader.URL)
+
+	t.bytesDownloaded.Inc(int64(len(msg.Buffer.Data)))
+	t.downloadSpeed.Mark(int64(len(msg.Buffer.Data)))
+	for _, src := range t.webseedSources {
+		if src.URL != msg.Downloader.URL {
+			continue
+		}
+		src.DownloadSpeed.Mark(int64(len(msg.Buffer.Data)))
+		break
+	}
+
+	if piece.Writing {
+		t.crash("piece is already writing")
+	}
+	piece.Writing = true
+
+	// Prevent receiving piece messages to avoid more than 1 write per torrent.
+	t.pieceMessagesC.Suspend()
+	t.webseedPieceResultC.Suspend()
+
+	pw := piecewriter.New(piece, msg.Downloader, msg.Buffer)
+	go pw.Run(t.pieceWriterResultC, t.doneC, t.session.metrics.WritesPerSecond, t.session.metrics.SpeedWrite, t.session.semWrite)
+
+	if msg.Done {
+		for _, src := range t.webseedSources {
+			if src.URL != msg.Downloader.URL {
+				continue
+			}
+			t.closeWebseedDownloader(src)
+			t.webseedActiveDownloads--
+			t.startPieceDownloaderForWebseed(src)
+			break
+		}
+	}
+}
+
+func (t *torrent) disableSource(srcurl string, err error, retry bool) {
+	for _, src := range t.webseedSources {
+		if src.URL != srcurl {
+			continue
+		}
+		src.Disabled = true
+		src.LastError = err
+		t.closeWebseedDownloader(src)
+		if retry {
+			go t.notifyWebseedRetry(src)
+		}
+		break
+	}
+}
+
+func (t *torrent) notifyWebseedRetry(src *webseedsource.WebseedSource) {
+	select {
+	case <-time.After(time.Minute):
+		select {
+		case t.webseedRetryC <- src:
+		case <-t.closeC:
+		}
+	case <-t.closeC:
+	}
+}
+
+// handleAddWebseeds appends web seed URLs at runtime (gextto fork), skipping the
+// duplicates and the configured maximum. It runs in the torrent goroutine.
+func (t *torrent) handleAddWebseeds(urls []string) {
+	existing := make(map[string]struct{}, len(t.webseedSources)+len(urls))
+	for _, src := range t.webseedSources {
+		existing[src.URL] = struct{}{}
+	}
+	maxSources := t.session.config.WebseedMaxSources
+	for _, url := range urls {
+		url = strings.TrimSpace(url)
+		if url == "" {
+			continue
+		}
+		if _, dup := existing[url]; dup {
+			continue
+		}
+		if maxSources > 0 && len(t.webseedSources) >= maxSources {
+			break
+		}
+		src := &webseedsource.WebseedSource{URL: url, DownloadSpeed: metrics.NilMeter{}}
+		t.webseedSources = append(t.webseedSources, src)
+		t.rawWebseedSources = append(t.rawWebseedSources, url)
+		existing[url] = struct{}{}
+		// The picker only exists between allocation and completion; while it is
+		// missing (stopped or finished) the source is used on the next start.
+		if t.piecePicker != nil {
+			t.piecePicker.AddWebseedSource(src)
+			t.startPieceDownloaderForWebseed(src)
+		}
+	}
+	t.persistWebseeds()
+}
+
+// handleRemoveWebseeds drops web seed URLs by exact match at runtime (gextto
+// fork). It runs in the torrent goroutine.
+func (t *torrent) handleRemoveWebseeds(urls []string) {
+	remove := make(map[string]struct{}, len(urls))
+	for _, url := range urls {
+		if url = strings.TrimSpace(url); url != "" {
+			remove[url] = struct{}{}
+		}
+	}
+	if len(remove) == 0 {
+		return
+	}
+	kept := make([]*webseedsource.WebseedSource, 0, len(t.webseedSources))
+	raw := make([]string, 0, len(t.rawWebseedSources))
+	for _, src := range t.webseedSources {
+		if _, drop := remove[src.URL]; drop {
+			wasDownloading := src.Downloading()
+			if t.piecePicker != nil {
+				t.closeWebseedDownloader(src)
+				t.piecePicker.RemoveWebseedSource(src)
+			}
+			// Closing the downloader does not go through
+			// handleWebseedPieceResult, so release its active slot here.
+			if wasDownloading && t.webseedActiveDownloads > 0 {
+				t.webseedActiveDownloads--
+			}
+			continue
+		}
+		kept = append(kept, src)
+		raw = append(raw, src.URL)
+	}
+	t.webseedSources = kept
+	t.rawWebseedSources = raw
+	t.persistWebseeds()
+	t.startPieceDownloaders()
+}
+
+// persistWebseeds stores the current web seed URL list in the resume database,
+// so an added or removed source survives a session reload.
+func (t *torrent) persistWebseeds() {
+	raw := t.rawWebseedSources
+	_ = t.session.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(torrentsBucket).Bucket([]byte(t.id))
+		if b == nil {
+			return nil
+		}
+		if len(raw) == 0 {
+			return b.Delete(boltdbresumer.Keys.URLList)
+		}
+		value, err := json.Marshal(raw)
+		if err != nil {
+			return err
+		}
+		return b.Put(boltdbresumer.Keys.URLList, value)
+	})
+}

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 // The daemon web UI must label every peer source, including the BEP 55 one.

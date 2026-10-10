@@ -1,0 +1,105 @@
+package torrent
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/urldownloader"
+)
+
+// sessionBanTTL is how long a peer that sent a corrupt piece stays banned from
+// the whole session (gextto fork, libtorrent-style smart ban).
+const sessionBanTTL = 30 * time.Minute
+
+func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
+	pw.Piece.Writing = false
+
+	t.pieceMessagesC.Resume()
+	t.webseedPieceResultC.Resume()
+
+	pw.Buffer.Release()
+
+	if !pw.HashOK {
+		t.bytesWasted.Inc(int64(len(pw.Buffer.Data)))
+		switch src := pw.Source.(type) {
+		case *peer.Peer:
+			t.log.Debugln("received corrupt piece from peer", src.String())
+			t.closePeer(src)
+			t.bannedPeerIPs[src.IP()] = struct{}{}
+			// gextto fork: ban the corrupt peer session-wide for a while, so it
+			// cannot poison the other torrents either (libtorrent-style smart ban).
+			if t.session != nil {
+				t.session.BanIP(src.IP(), sessionBanTTL)
+			}
+		case *urldownloader.URLDownloader:
+			t.log.Debugln("received corrupt piece from webseed", src.URL)
+			t.disableSource(src.URL, errors.New("corrupt piece"), false)
+			// disableSource closed the webseed downloader, so free its slot.
+			t.webseedActiveDownloads--
+		default:
+			t.crash("unhandled piece source")
+		}
+		t.startPieceDownloaders()
+		return
+	}
+	if pw.Error != nil {
+		t.stop(pw.Error)
+		return
+	}
+
+	pw.Piece.Done = true
+	if t.bitfield.Test(pw.Piece.Index) {
+		t.crash(fmt.Sprintf("already have the piece #%d", pw.Piece.Index))
+	}
+	t.mBitfield.Lock()
+	t.bitfield.Set(pw.Piece.Index)
+	t.mBitfield.Unlock()
+
+	if t.piecePicker != nil {
+		_, ok := pw.Source.(*urldownloader.URLDownloader)
+		src := t.piecePicker.RequestedWebseedSource(pw.Piece.Index)
+		if !ok && src != nil {
+			closed := t.piecePicker.WebseedStopAt(src, pw.Piece.Index)
+			if closed {
+				t.log.Debugf("closed webseed downloader: %s", src.URL)
+				// WebseedStopAt closed the downloader, so free its slot before
+				// trying to start a new range (which re-takes a slot on success).
+				t.webseedActiveDownloads--
+				t.startPieceDownloaderForWebseed(src)
+			}
+		}
+
+		for _, pe := range t.piecePicker.RequestedPeers(pw.Piece.Index) {
+			pd2 := t.pieceDownloaders[pe]
+			t.closePieceDownloader(pd2)
+			pd2.CancelPending()
+			t.startPieceDownloaderFor(pe)
+		}
+	}
+
+	// Tell everyone that we have this piece
+	for pe := range t.peers {
+		t.updateInterestedState(pe)
+		if pe.Bitfield.Test(pw.Piece.Index) {
+			// Skip peers having the piece to save bandwidth
+			continue
+		}
+		msg := peerprotocol.HaveMessage{Index: pw.Piece.Index}
+		pe.SendMessage(msg)
+	}
+
+	completed := t.checkCompletion()
+	if completed {
+		t.log.Info("download completed")
+		err := t.writeBitfield()
+		if err != nil {
+			t.stop(err)
+		} else if t.stopAfterDownload {
+			t.stopAndSetStoppedOnComplete()
+		}
+	}
+}

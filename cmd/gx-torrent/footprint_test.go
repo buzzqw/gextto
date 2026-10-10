@@ -17,7 +17,7 @@ func TestManagedFootprintIsBounded(t *testing.T) {
 	newTestDaemon(t)
 	ready := time.Since(start)
 
-	// Let the queue loop and the rain session settle, then measure again with
+	// Let the queue loop and the engine session settle, then measure again with
 	// no activity: the count must not creep up on its own.
 	time.Sleep(1500 * time.Millisecond)
 	settled := runtime.NumGoroutine()

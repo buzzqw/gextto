@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-rain vet fmt check-ui installer-test tidy package clean run measure-seeding
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine vet fmt check-ui installer-test tidy package clean run measure-seeding
 
 all: build
 
@@ -43,22 +43,22 @@ test-libtorrent: check-ui installer-test
 test-real:
 	CGO_ENABLED=1 go test -run 'LibtorrentLocalTransfer|LibtorrentMagnetTransfer' -v -timeout 300s ./...
 
-# Tests of the engine (the moved-in rain code). It now lives in internal/engine
-# as part of the main module, so the packages resolve through the main go.sum.
-test-rain:
+# Tests of the gx-core engine. It lives in internal/gxcore as part of the main
+# module, so the packages resolve through the main go.sum.
+test-engine:
 	go test \
-		github.com/buzzqw/gextto/internal/engine/internal/bandwidth \
-		github.com/buzzqw/gextto/internal/engine/internal/bitfield \
-		github.com/buzzqw/gextto/internal/engine/internal/blocklist \
-		github.com/buzzqw/gextto/internal/engine/internal/mse \
-		github.com/buzzqw/gextto/internal/engine/internal/peerconn \
-		github.com/buzzqw/gextto/internal/engine/internal/peerconn/peerwriter \
-		github.com/buzzqw/gextto/internal/engine/internal/peerprotocol \
-		github.com/buzzqw/gextto/internal/engine/internal/piececache \
-		github.com/buzzqw/gextto/internal/engine/internal/piecepicker \
-		github.com/buzzqw/gextto/internal/engine/internal/storage/filestorage \
-		github.com/buzzqw/gextto/internal/engine/internal/unchoker \
-		github.com/buzzqw/gextto/internal/engine/torrent
+		github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth \
+		github.com/buzzqw/gextto/internal/gxcore/internal/bitfield \
+		github.com/buzzqw/gextto/internal/gxcore/internal/blocklist \
+		github.com/buzzqw/gextto/internal/gxcore/internal/mse \
+		github.com/buzzqw/gextto/internal/gxcore/internal/peerconn \
+		github.com/buzzqw/gextto/internal/gxcore/internal/peerconn/peerwriter \
+		github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol \
+		github.com/buzzqw/gextto/internal/gxcore/internal/piececache \
+		github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker \
+		github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage \
+		github.com/buzzqw/gextto/internal/gxcore/internal/unchoker \
+		github.com/buzzqw/gextto/internal/gxcore/torrent
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.
@@ -66,7 +66,7 @@ test-race:
 	CGO_ENABLED=1 go test -race ./...
 
 # Seeding/choking measurements (gextto fork). The deterministic unchoker harness
-# runs with `make test-rain`; this runs the opt-in local-swarm harness. Add
+# runs with `make test-engine`; this runs the opt-in local-swarm harness. Add
 # GX_MEASURE_SUPERSEED=1 to compare against super-seeding, GX_MEASURE_LEECHERS=N
 # for the swarm size. See docs/evoluzione.md (section 6).
 measure-seeding:

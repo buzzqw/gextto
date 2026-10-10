@@ -1,7 +1,7 @@
 package queue
 
 // Package queue is gx-torrent's own queue manager, extracted from the daemon's
-// package main so it can be reused and tested in isolation. rain has no queue,
+// package main so it can be reused and tested in isolation. The engine has no queue,
 // so the daemon decides every few seconds which torrents run, with the same
 // policy Gextto configures on libtorrent:
 //
@@ -37,7 +37,7 @@ type Config struct {
 	DynamicMin      int   `json:"dynamic_min"`
 	DynamicMax      int   `json:"dynamic_max"`
 	// Global limits in KiB/s (0 = unlimited) and peer limits, applied to the
-	// rain session.
+	// the engine session.
 	SpeedLimitDownload int64 `json:"speed_limit_download"`
 	SpeedLimitUpload   int64 `json:"speed_limit_upload"`
 	MaxPeerDial        int   `json:"max_peer_dial"`
@@ -49,7 +49,7 @@ type Config struct {
 	CacheTTLSecs int64 `json:"cache_ttl_secs"`
 	Preallocate  bool  `json:"preallocate"`
 	// Sequential downloads new torrents in piece order (streaming) instead of
-	// rarest-first. rain applies it when a torrent is added, so it affects new
+	// rarest-first. The engine applies it when a torrent is added, so it affects new
 	// additions only.
 	Sequential bool `json:"sequential"`
 	// Auto enables gx-torrent's self-management: dynamic queue and adaptive

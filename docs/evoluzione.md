@@ -17,7 +17,7 @@ tracciate in git (vedi Appendice A per la mappa):
   `archive/pro-terra.md` (già archiviati)
 
 Restano documenti a sé, perché descrivono lo stato corrente e non un piano:
-`docs/gx-torrent.md` (riferimento tecnico del motore), `docs/rain-allineamento.md`
+`docs/gx-torrent.md` (riferimento tecnico del motore), `docs/motore-allineamento.md`
 (procedura di rebase del fork), manuali, API, architettura, sicurezza,
 migrazione, guide avanzate, TUI.
 
@@ -108,7 +108,7 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   «…» moved to the trash`. L'aggiunta normale resta `📁 … added to the library …`.
 - **Pannello "Operazioni in background"** — risolto (commit `65cb9bf`). Resta e
   funziona (polling, annullamento), ma è **nascosto quando non c'è alcun job**.
-- **Write-back cache nel fork di rain** — chiuso: la misura mostra
+- **Write-back cache nel motore gx-core** — chiuso: la misura mostra
   `write_cache=0` (storage e download di pari passo), quindi non ci sarebbe
   guadagno. Da riaprire solo con uno storage realmente più lento della rete.
 - **Campi specialistici nel form di aggiunta** — chiuso: nessuna richiesta
@@ -392,7 +392,7 @@ ricontrollo finale fatto).
 
 `gx-torrent` = motore BitTorrent **in puro Go**, alternativo a libtorrent:
 
-- **rain** (`internal/engine`, fork v2.4.2): trasferimento;
+- **motore gx-core** (`internal/gxcore`, base rain v2.4.2): trasferimento;
 - **demone + adapter** (`cmd/gx-torrent`, `gxtorrent_engine.go`): REST, pagina
   web, coda autogestita, ponte con Gextto (`TorrentEngine`).
 
@@ -452,7 +452,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 
 ### 4.4 Wishlist residua
 
-- **BitTorrent v2-only**: richiede supporto v2 in rain (grande).
+- **BitTorrent v2-only**: richiede supporto v2 nel motore (grande).
 - **WebTorrent/WebRTC**: nicchia, molto lavoro.
 - **Qualità seeding/choking**: prima tornata fatta (vedi §6); per lo scaling
   serve campagna su sciame reale (gx-torrent vs libtorrent/qBittorrent, stessa
@@ -461,7 +461,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 ### 4.5 Criterio di verifica (applicato)
 
 - Per punto: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, fork dove
-  tocca (`make test-rain`).
+  tocca (`make test-engine`).
 - Con effetto visibile: `docs/gx-torrent.md`, `MANUAL.*`, `README`.
 - Ogni miglioria visibile in **entrambe le UI** (Gextto `uiweb/v2` + pagina del
   demone `cmd/gx-torrent/ui.go`), mai solo via API.
@@ -477,9 +477,9 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 - Ogni feature visibile in entrambe le UI (tracker, web seed, limiti,
   diagnostica pezzi, streaming, super-seeding).
 - Test percorso felice + casi limite (lista vuota, duplicati, not-found, 416,
-  completato/fermo); `make test` e `make test-rain` verdi (+ pacchetto
-  `unchoker` in `make test-rain`).
-- Fork marcato `gextto fork`, inventario in `internal/engine/GEXTTO.md`;
+  completato/fermo); `make test` e `make test-engine` verdi (+ pacchetto
+  `unchoker` in `make test-engine`).
+- Fork marcato `gextto fork`, inventario in `internal/gxcore/GEXTTO.md`;
   `go vet`, `gofmt` verdi; semantica `-1`/`0`/`>0` coerente.
 - Nota residua: attesa pezzi nello streaming a polling (200 ms, timeout 2 min),
   senza test end-to-end su sciame reale; coperti dati presenti e mappatura
@@ -510,21 +510,21 @@ pena fare**, con come/rischi/verifica; una voce = un task/commit.
 | 8 | Opzionali (`findLocked` O(1), ETag/304) | **non da fare** | — |
 
 Ordine per **valore atteso = (impatto × certezza) / (sforzo × rischio)**.
-Regole per voce (da `AGENTS.md`): modifiche a `internal/engine` marcate
+Regole per voce (da `AGENTS.md`): modifiche a `internal/gxcore` marcate
 `// gextto fork` + riga in `GEXTTO.md`; un commit per voce; test mirati
-(`./cmd/gx-torrent/`, `GxEngine`, `make test-rain`, `make test`); invarianti
+(`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`, `make test`); invarianti
 degli script; mai `bin/`/`gx-torrent.build_number`/`data/`; con comportamento
 visibile aggiornare README/MANUAL/`gx-torrent.md`.
 
 | # | Intervento | Impatto | Sforzo | Rischio | Codice |
 |---|---|---|---|---|---|
 | 1 | LSD senza `d.mu` / `t.Stats()` | Alto (latenza demone) | S | S | fork (cmd) |
-| 2 | Streaming: check pezzi mirato | Medio (GC/coupling) | S | S | fork (cmd+rain) |
-| 3 | Rimozione `O_SYNC` + durabilità | **Molto alto** (disco) | M/L | M | fork (rain) |
-| 4 | MSE in-place | Medio (upload) | S | S | fork (rain) |
-| 5 | `servedRequests` a finestra | Medio (memoria) | S/M | M | fork (rain) |
-| 6 | Piece cache TTL lazy (+ sharding) | Medio (seed) | M | M | fork (rain) |
-| 7 | `Bitfield.Count` con `math/bits` | Basso | S | S | fork (rain) |
+| 2 | Streaming: check pezzi mirato | Medio (GC/coupling) | S | S | fork (cmd+motore) |
+| 3 | Rimozione `O_SYNC` + durabilità | **Molto alto** (disco) | M/L | M | fork (motore) |
+| 4 | MSE in-place | Medio (upload) | S | S | fork (motore) |
+| 5 | `servedRequests` a finestra | Medio (memoria) | S/M | M | fork (motore) |
+| 6 | Piece cache TTL lazy (+ sharding) | Medio (seed) | M | M | fork (motore) |
+| 7 | `Bitfield.Count` con `math/bits` | Basso | S | S | fork (motore) |
 | 8 | Opzionali: mappa in `findLocked`, ETag/304 | Basso | S | S | fork (cmd) |
 
 `S` ≈ mezza giornata, `M` ≈ 1–2 giorni, `L` ≈ oltre.
@@ -553,7 +553,7 @@ fatto: notifica a evento invece del polling (non necessaria finché non alloca).
 
 `filestorage.go` apre ogni file con `O_RDWR|O_SYNC` (upstream): ogni `write(2)`
 va su storage stabile — su HDD/rete il throughput è limitato dalle IOPS. **Ma
-non è un quick win**: rain affida a `O_SYNC` tutta la durabilità, e `storage.File`
+non è un quick win**: il motore affida a `O_SYNC` tutta la durabilità, e `storage.File`
 non ha `Sync()`; il bitfield è persistito solo a completamento/stop/verifica e
 ogni `ResumeWriteInterval` (2 min), non "a ogni pezzo". Il progetto (conservato
 come riferimento) richiedeva: estendere l'interfaccia con `Sync()`, togliere
@@ -571,7 +571,7 @@ vedi §5.10: su questo host il guadagno stimato era ~1,2x–1,8x su NFS (non il
 spazzatura in upload). Sostituito con writer in-place (`XORKeyStream(p, p)`) in
 `internal/mse/mse.go`: i chiamanti non riusano il buffer dopo la scrittura.
 Verifica: `mse_test.go` con `AllocsPerRun == 0` + round-trip; pacchetto aggiunto
-a `make test-rain`.
+a `make test-engine`.
 
 ### 5.6 Voce 5 — `servedRequests` a finestra limitata (fatta)
 
@@ -588,7 +588,7 @@ un `time.Timer` per pezzo con `Reset` a ogni accesso + lock esclusivo anche su
 hit. Fatto: TTL lazy (`expireAt` + ticker di sweep ~30 s, `Close()` lo ferma).
 Non fatto: sharding in 16 partizioni — solo se il profiling mostra contesa sotto
 forte seeding (refactor ampio di file upstream, non "a naso"). Verifica: sweep,
-rinnovo su hit, eviction invariata; `internal/piececache` in `make test-rain`.
+rinnovo su hit, eviction invariata; `internal/piececache` in `make test-engine`.
 
 ### 5.8 Voce 7 — `Bitfield.Count` con `math/bits` (fatta)
 
@@ -620,7 +620,7 @@ tabella rimossa. Micro-ottimizzo non su percorso critico (`Count` usato in
   1000 blocchi/s; pool condiviso, non dimostrato che tutti i percorsi riempiano
   il buffer: solo con audit completo.
 - **`FADV_RANDOM`**: la giustificazione v1 (penalizza lo streaming) non vale —
-  `stream.go` legge fuori dallo storage di rain. Al più `FADV_SEQUENTIAL` in
+  `stream.go` legge fuori dallo storage del motore. Al più `FADV_SEQUENTIAL` in
   verifica.
 - **`saveLocked` fuori da `d.mu`**: non sul polling (solo mutazioni e
   tick-quando-dirty ~1/min); `state.json` 2,5 KB, ~0,1–0,3 ms. E la proposta v1
@@ -666,7 +666,7 @@ merita** a questo carico.
 ## 6. gx-torrent: misure di choking e seeding
 
 Ex `docs/gx-torrent-misure-seeding.md`. Supporto alla voce §4.3 #13. Regola di
-fondo: **misurare prima**, poi decidere se toccare il core di rain.
+fondo: **misurare prima**, poi decidere se toccare il core del motore.
 
 ### 6.1 Vincolo: non forzare l'automazione
 
@@ -686,7 +686,7 @@ throughput up/down, tempo di completamento, ratio e tempo a 1:1 in campagna real
 
 ### 6.3 Banco 1 — harness deterministico dell'unchoker
 
-`internal/engine/internal/unchoker/sim_test.go` (in `make test-rain`): pilota
+`internal/gxcore/internal/unchoker/sim_test.go` (in `make test-engine`): pilota
 l'`Unchoker` reale con peer sintetici e fissa le proprietà (download veloci in
 download, upload veloci in seed, `FastUnchoke` immediato, optimistic che non
 ruba slot regolari e ruota, budget rispettato, fairness) + `BenchmarkTickUnchokeSeeding`.
@@ -704,7 +704,7 @@ GX_MEASURE_MESH=1 make measure-seeding      # leecher collegati tra loro
 GX_MEASURE_LEECHERS=2 make measure-seeding  # sciame di 2 peer
 ```
 
-Seeder + N leecher su loopback con IP `127.0.0.x` distinti (rain rifiuta due
+Seeder + N leecher su loopback con IP `127.0.0.x` distinti (il motore rifiuta due
 connessioni dallo stesso IP). Default: ogni leecher solo verso il seeder — si
 misura l'**upload del seed** (ciò che il super-seeding cambia). Mesh
 sperimentale su un host (connessioni multiple su loopback instabili: peer che
@@ -731,7 +731,7 @@ Seeding senza mesh (seed → 3 leecher, 5 ripetizioni): normale ~41–42 ms, see
 Mesh a 2 peer (indicativo): entrambi **1,00x** (i leecher si scambiano i pezzi).
 Mesh a 3+ peer su un host non converge.
 
-Lettura onesta: il choking di rain è **corretto e trascurabile come costo**;
+Lettura onesta: il choking del motore è **corretto e trascurabile come costo**;
 su sciami piccoli/veloci il super-seeding **non riduce** l'upload (lo scambio
 basta già) e costa throughput/variabilità. Il vantaggio BEP 16 è per l'*initial
 seeding* di torrent grandi con molti peer lenti, non riproducibile su un host.
@@ -776,7 +776,7 @@ entrambi, dial incrociato su uTP. Successo: peer con origine **`holepunch`**
 **Scelte**: firewall stateful invece di NAT (conntrack non emula un NAT
 cone port-translating: il dial diretto crea una entry locale che confligge col
 SNAT; lo stateful riproduce lo stesso osservabile e rende il test
-deterministico); seed e relay su IP diversi (rain deduplica i peer per IP);
+deterministico); seed e relay su IP diversi (il motore deduplica i peer per IP);
 `-outgoing-interface` = IP di ascolto (altrimenti announce con IP sbagliato);
 relay leecher interessato (un torrent completato non diala e scarta i non
 interessati); tracker con interval lungo (un re-annuncio attribuirebbe la
@@ -795,7 +795,7 @@ seed + B seed); `progress` 0–100 letto come 0–1; `grep` su log binari (serve
 fallimento stampa le righe `holepunch` dei log (rendezvous/connect).
 
 **Limiti**: emulazione con firewall stateful, non NAT cone reale; esito
-`holepunch`/`incoming` secondo chi vince la corsa; dedup peer per IP di rain
+`holepunch`/`incoming` secondo chi vince la corsa; dedup peer per IP del motore
 (in uno swarm reale i peer sono su IP diversi).
 
 ---
@@ -1225,18 +1225,18 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
 - **gx-torrent completato**: da scheletro non selezionabile a motore funzionante
   (coda autogestita con slot/tetto/lenti ignorati/rotazione/pin/probe/coda
   dinamica; stalled come park/probe/unpark persistente; symlink, delete sicura,
-  rename-o-copia; token + loopback-only senza token, RPC rain spento; avvio e
+  rename-o-copia; token + loopback-only senza token, RPC del motore spento; avvio e
   sorveglianza con fallback a libtorrent dopo 3 crash/10 min; impostazioni
   token/eseguibile; matrice capacità onesta; test demone + adapter). Smoke test:
   avvio, verify→seed, pausa/ripresa, spostamento con symlink, kill -9 →
   riavvio, SIGTERM allo spegnimento. (Big Buck Bunny in `downloading_metadata`
   nel sandbox senza peer.)
-- **Rete, selezione file, v2**: rain vendored in `internal/engine` (`replace`,
+- **Rete, selezione file, v2**: motore dentro `internal/gxcore` (`replace`,
   inventario `GEXTTO.md`); porta unica + DHT sulla stessa UDP + UPnP/NAT-PMP
   ogni 20 min; selezione file (esclusi in `DATA/parts`, progresso sui scelti);
   interfaccia ascolto/uscente (killswitch), proxy SOCKS5/HTTP
   (`gxtorrent_proxy`), cifratura 0/1/2, filtro IP multi-formato; v2-only
-  rifiutati con blocklist; session-stats anche per gx-torrent; bug rain (IP mai
+  rifiutati con blocklist; session-stats anche per gx-torrent; bug del motore (IP mai
   ricontattati, race logger); test reali demone↔demone (porta unica, cifratura,
   selezione, proxy, RAM disk a metà, filtro IP); smoke (flag di rete, porta
   6881, migrazione torrent, messaggio senza UPnP).

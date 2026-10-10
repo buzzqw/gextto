@@ -1,4 +1,4 @@
-// Command gx-torrent is a small BitTorrent daemon built on rain (pure Go).
+// Command gx-torrent is a small BitTorrent daemon built on the gx-core engine (pure Go).
 // Gextto drives it over a local REST API as an alternative to the embedded
 // libtorrent engine; the daemon owns its queue (slots, slow torrents, stall
 // rotation) and keeps the payload safe on removal.
@@ -70,7 +70,7 @@ func resolvePortRange(flagValue string, store *settings.Store) (uint16, uint16, 
 	return parsePortRange(value)
 }
 
-// parsePortRange reads "6881" or "6881-6891". "0" keeps rain's own port per
+// parsePortRange reads "6881" or "6881-6891". "0" keeps the engine's own port per
 // torrent (no shared port).
 func parsePortRange(value string) (uint16, uint16, error) {
 	value = strings.TrimSpace(value)
@@ -165,7 +165,7 @@ func main() {
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
-	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose rain logging")
+	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose engine logging")
 	logFile := flag.String("log-file", envOr("GX_TORRENT_LOG_FILE", ""), "write the log to this file, rotated at 5 MB keeping 4 files (default stderr)")
 	orphanTimeout := flag.Duration("orphan-timeout", 0, "stop when no API request arrives for this long (0 = never); Gextto sets it so a daemon it left running does not outlive it")
 	fingerprint := flag.String("fingerprint", "", "opaque value reported by /api/v1/health; Gextto uses it to recognise a daemon started with the same binary and options")

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 // bencode encodes the few types a test torrent needs.
@@ -220,8 +220,8 @@ func TestDaemonRestartKeepsExistingPayload(t *testing.T) {
 	}
 }
 
-// TestSessionConfigDoesNotAutoResume locks in that the queue, not rain, decides
-// which torrents start. If rain resumed torrents itself (ResumeOnStartup) it
+// TestSessionConfigDoesNotAutoResume locks in that the queue, not the engine, decides
+// which torrents start. If the engine resumed torrents itself (ResumeOnStartup) it
 // would start a parked/paused torrent before reconcileLocked can stop it, and
 // starting a torrent creates its destination files: a parked torrent whose
 // payload was moved or removed would get zero-filled placeholders written at
@@ -250,7 +250,7 @@ func TestDaemonLifecycle(t *testing.T) {
 		t.Fatalf("the duplicate must not stay in the session: %+v", d.list())
 	}
 
-	// The queue starts it, rain verifies the existing payload and seeds.
+	// The queue starts it, the engine verifies the existing payload and seeds.
 	waitFor(t, "seeding", func() bool {
 		info, _ := findInfo(d, hash)
 		return info.State == "seeding" && info.Progress == 100
@@ -529,7 +529,7 @@ func sameFile(t *testing.T, a, b string) bool {
 func TestFileSelection(t *testing.T) {
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 42400, PortEnd: 42499, Encryption: 1})
 	// The leecher sends from 127.0.0.2 (outgoing interface): on one machine
-	// the seeder would otherwise tell it "your IP is 127.0.0.1" and rain would
+	// the seeder would otherwise tell it "your IP is 127.0.0.1" and the engine would
 	// then ignore 127.0.0.1 peers as itself.
 	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 42500, PortEnd: 42599, Encryption: 1, OutgoingInterface: "127.0.0.2"})
 	src := filepath.Join(t.TempDir(), "src")
@@ -604,7 +604,7 @@ func TestFileSelection(t *testing.T) {
 			handle, _ := leecher.findLocked(hash)
 			leecher.mu.Unlock()
 			st := handle.Stats()
-			t.Logf("rain: status=%v bytes=%+v pieces=%+v peers=%+v", st.Status, st.Bytes, st.Pieces, st.Peers)
+			t.Logf("the engine: status=%v bytes=%+v pieces=%+v peers=%+v", st.Status, st.Bytes, st.Pieces, st.Peers)
 		}
 	}()
 	waitFor(t, "whole torrent downloaded", func() bool {
@@ -904,7 +904,7 @@ func TestParseLSD(t *testing.T) {
 // The leecher finds the seeder only through LSD multicast announcements.
 func TestLSDDiscovery(t *testing.T) {
 	lsdTick = 200 * time.Millisecond
-	// On one machine the sender is this host's own address, which rain
+	// On one machine the sender is this host's own address, which the engine
 	// ignores as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
 	defer func() {
@@ -1334,7 +1334,7 @@ func TestDaemonPerTorrentSpeedLimits(t *testing.T) {
 		t.Fatalf("view limits = %d/%d, want 512/0", info.DownloadLimitKib, info.UploadLimitKib)
 	}
 
-	// rain does not persist them: a session reload must reapply the stored ones.
+	// The engine does not persist them: a session reload must reapply the stored ones.
 	d.mu.Lock()
 	d.restartSessionLocked()
 	d.mu.Unlock()
@@ -1537,7 +1537,7 @@ func TestDaemonSuperSeedingOptionAndAction(t *testing.T) {
 // serves those, so completing proves the advertised pieces cycle correctly.
 func TestSuperSeedingTransfer(t *testing.T) {
 	lsdTick = 200 * time.Millisecond
-	// On one machine the sender is this host's own address, which rain ignores
+	// On one machine the sender is this host's own address, which the engine ignores
 	// as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
 	defer func() {
@@ -1609,7 +1609,7 @@ func TestListEndpointAnswersWhileTheLockIsHeld(t *testing.T) {
 
 // TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone covers a completed
 // torrent left paused after Gextto archived and renamed its file: a recheck or
-// a resume must not make rain re-create an empty file in the library.
+// a resume must not make the engine re-create an empty file in the library.
 func TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone(t *testing.T) {
 	d := newTestDaemon(t)
 	src := filepath.Join(t.TempDir(), "library")
@@ -1643,7 +1643,7 @@ func TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone(t *testing.T) {
 	}
 }
 
-// TestVerifyStopsOnceWhenFilesCannotBeAllocated locks in the rain fork fix: a
+// TestVerifyStopsOnceWhenFilesCannotBeAllocated locks in the engine fork fix: a
 // verification whose file allocation fails stops with the error instead of
 // restarting itself in a tight loop (thousands of log lines a second).
 func TestVerifyStopsOnceWhenFilesCannotBeAllocated(t *testing.T) {

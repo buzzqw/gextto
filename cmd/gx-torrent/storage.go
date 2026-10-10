@@ -2,7 +2,7 @@ package main
 
 // storage.go keeps the on-disk layout safe.
 //
-// rain stores every torrent under DataDir/<id> and, on removal, always runs
+// The engine stores every torrent under DataDir/<id> and, on removal, always runs
 // os.RemoveAll(DataDir/<id>). gx-torrent therefore makes DataDir/<id> a
 // symlink to the real save path chosen by Gextto: removing a torrent from the
 // session only unlinks the symlink, and the payload is deleted only when the
@@ -18,7 +18,7 @@ import (
 	"syscall"
 )
 
-// linkPath is the rain data directory of one torrent.
+// linkPath is the engine's data directory of one torrent.
 func (d *Daemon) linkPath(id string) string {
 	return filepath.Join(d.opts.LinkDir, id)
 }
@@ -101,7 +101,7 @@ func (d *Daemon) readLink(id string) (string, bool) {
 }
 
 // protectLegacyDir moves a real DataDir/<id> directory (older layout) out of
-// rain's reach before a removal, so the payload is never deleted implicitly.
+// the engine's reach before a removal, so the payload is never deleted implicitly.
 func (d *Daemon) protectLegacyDir(id string) {
 	link := d.linkPath(id)
 	info, err := os.Lstat(link)

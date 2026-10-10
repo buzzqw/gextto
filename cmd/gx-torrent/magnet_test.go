@@ -33,12 +33,12 @@ func TestV2OnlyDetection(t *testing.T) {
 	}
 }
 
-func TestNormalizeMagnetForRain(t *testing.T) {
+func TestNormalizeMagnet(t *testing.T) {
 	hexHash := "0123456789abcdef0123456789abcdef01234567"
-	// btmh listed first: rain reads only the first xt, so btih must move in
+	// btmh listed first: the engine reads only the first xt, so btih must move in
 	// front and the btmh must be dropped.
 	hybrid := "magnet:?xt=urn:btmh:1220aabb&xt=urn:btih:" + hexHash + "&dn=Title&tr=http%3A%2F%2Ft.example"
-	got := normalizeMagnetForRain(hybrid)
+	got := normalizeMagnet(hybrid)
 	parsed, err := url.Parse(got)
 	if err != nil {
 		t.Fatalf("normalized magnet does not parse: %v", err)
@@ -51,7 +51,7 @@ func TestNormalizeMagnetForRain(t *testing.T) {
 		t.Fatalf("dn/tr must be preserved, got %q", got)
 	}
 	// A plain magnet is left usable (the v1 hash stays first).
-	if h, ok := magnetInfoHash(normalizeMagnetForRain("magnet:?xt=urn:btih:" + hexHash)); !ok || h != hexHash {
+	if h, ok := magnetInfoHash(normalizeMagnet("magnet:?xt=urn:btih:" + hexHash)); !ok || h != hexHash {
 		t.Fatalf("plain magnet broken: %q %v", h, ok)
 	}
 }

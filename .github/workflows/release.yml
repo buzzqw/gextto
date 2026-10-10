@@ -30,8 +30,8 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Test bundled rain fork
-        run: make test-rain
+      - name: Test engine
+        run: make test-engine
 
   # Built on Ubuntu 22.04 (glibc 2.35) so the archive runs on every supported
   # distribution. See scripts/build-release.sh.

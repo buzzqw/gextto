@@ -15,13 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 // NetworkOptions mirror Gextto's libtorrent network settings.
 type NetworkOptions struct {
 	// PortBegin..PortEnd: the first free port is the single peer port (TCP
-	// for peers, UDP for the DHT). Zero keeps rain's port per torrent.
+	// for peers, UDP for the DHT). Zero keeps the engine's port per torrent.
 	PortBegin uint16
 	PortEnd   uint16
 	// ListenInterface is an IP or an interface name for incoming peers.
@@ -34,7 +34,7 @@ type NetworkOptions struct {
 	Encryption int
 	DHT        bool
 	// DHTBootstrap are the routers used to bootstrap the DHT (comma-separated
-	// from Gextto's libtorrent_dht_bootstrap_nodes); empty keeps rain's defaults.
+	// from Gextto's libtorrent_dht_bootstrap_nodes); empty keeps the engine's defaults.
 	DHTBootstrap []string
 	PEX          bool
 	// UTP adds uTP (UDP) next to TCP for peers; the UDP port is shared with
@@ -130,7 +130,7 @@ func (d *Daemon) prepareNetwork() error {
 	return nil
 }
 
-// applyNetwork fills the rain configuration.
+// applyNetwork fills the engine configuration.
 func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	n := d.opts.Network
 	cfg.Host = d.listenHost
@@ -189,7 +189,7 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 }
 
 // ipFilterBytes returns the filter file content, reusing the cached copy while
-// path, size and mtime are unchanged. The same bytes are then handed to rain,
+// path, size and mtime are unchanged. The same bytes are then handed to the engine,
 // which still parses them (its blocklist is session-scoped), but the multi-
 // megabyte disk read is skipped on every session reopen.
 func (d *Daemon) ipFilterBytes(path string) ([]byte, string, error) {

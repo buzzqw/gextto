@@ -1,7 +1,7 @@
 package main
 
 // stream.go serves a torrent file to a media player over HTTP with Range
-// support, while asking rain to fetch the pieces of the requested window first
+// support, while asking the engine to fetch the pieces of the requested window first
 // (gextto fork). The player can start before the download is complete.
 
 import (
@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 const (
@@ -117,7 +117,7 @@ func (d *Daemon) streamRange(w http.ResponseWriter, t *torrent.Torrent, fileInde
 	}
 }
 
-// waitForPieces blocks until rain reports the pieces covering the byte range as
+// waitForPieces blocks until the engine reports the pieces covering the byte range as
 // complete, or the deadline passes. A range that cannot be mapped (no metadata)
 // is treated as ready and read straight from disk.
 func (d *Daemon) waitForPieces(t *torrent.Torrent, fileIndex int, offset, length int64, deadline time.Time) bool {

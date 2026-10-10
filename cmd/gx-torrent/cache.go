@@ -1,15 +1,15 @@
 package main
 
-// cache.go sizes rain's disk cache. Gextto pushes the manual value and the
+// cache.go sizes the engine's disk cache. Gextto pushes the manual value and the
 // daemon retunes itself on a coarse cadence (see adaptCacheLocked); the fork
 // applies a new read-cache and write-buffer size to the running session, so no
 // reopen is needed.
 //
-// rain's own defaults (256 MiB read cache, 1 GiB write buffer) are fixed and do
+// The engine's own defaults (256 MiB read cache, 1 GiB write buffer) are fixed and do
 // not consider the machine. Here the values follow the available RAM and the
 // live workload: a bigger write buffer when several torrents download at once
 // (more coalescing, less starving peers) and a bigger read cache while seeding
-// (reads served from RAM instead of disk). Both are caps: rain allocates piece
+// (reads served from RAM instead of disk). Both are caps: the engine allocates piece
 // buffers on demand, so the process stays small when the load is light.
 
 import (
@@ -21,7 +21,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/queue"
 )
 
@@ -244,7 +244,7 @@ func rotationalDevice(majmin string) bool {
 	return false
 }
 
-// applyCache fills rain's cache settings from the daemon's current target.
+// applyCache fills the engine's cache settings from the daemon's current target.
 func (d *Daemon) applyCache(cfg *torrent.Config) {
 	if d.cacheRead <= 0 || d.cacheWrite <= 0 {
 		d.cacheClass = d.cachedStorageClass()

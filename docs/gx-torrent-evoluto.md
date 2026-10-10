@@ -6,17 +6,17 @@ standalone oppure creare un nuovo progetto `gx-nox`?** Data: **2026-10-10**.
 Questo documento è la **decisione e il piano**. Lo stato corrente del motore è in
 [`docs/gx-torrent.md`](gx-torrent.md); il backlog del motore e le misure in
 [`docs/evoluzione.md`](evoluzione.md) (§4–§7); la procedura di rebase del fork in
-[`docs/rain-allineamento.md`](rain-allineamento.md); l'inventario delle modifiche
-a rain in [`internal/engine/GEXTTO.md`](../internal/engine/GEXTTO.md).
+[`docs/motore-allineamento.md`](motore-allineamento.md); l'inventario delle
+modifiche rispetto a rain in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 
 > [!NOTE]
 > Nato dall'estrazione della §14 di `evoluzione.md`, che ora rimanda qui. Il
 > documento tecnico `gx-torrent.md` descrive **ciò che c'è**; questo descrive
 > **dove si vuole andare**, e resta separato per non mescolare i due piani.
 >
-> **Nome:** il nome definitivo del prodotto è in discussione; il candidato
-> preferito è **gx-core**. Fino a decisione, questo documento usa "gx-torrent"
-> (il binario) e "gx-nox" (la modalità standalone).
+> **Nome:** il nome del prodotto è **gx-core** (deciso 2026-10-10). Il binario
+> resta `gx-torrent` e "gx-nox" è solo il nome storico della modalità
+> standalone; il motore è `internal/gxcore`.
 
 ## Indice
 
@@ -128,7 +128,7 @@ ma è pensato come motore subordinato.
 
 | Strato | Dove | Cosa c'è già | Dimensione (2026-10-10) |
 | --- | --- | --- | --- |
-| Motore | `internal/engine`, `third_party/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree modificate |
+| Motore | `internal/gxcore`, `third_party/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree modificate |
 | Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 10.786 righe (14.144 col test) |
 | API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 588 righe |
 | UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.836 righe, `html/template` + JS inline |
@@ -171,7 +171,7 @@ condividere. È il costo nascosto più grosso della strada A.
 - **IPv6**: il listener a porta unica, il DHT e uTP usano socket IPv4. Decisione
   storica §4.3 ("No"); per la parità con qBittorrent non è più rinviabile, perché
   molti peer domestici sono raggiungibili solo in v6.
-- **BitTorrent v2**: rain legge v1 e la parte v1 degli ibridi; i v2-only sono
+- **BitTorrent v2**: il motore legge v1 e la parte v1 degli ibridi; i v2-only sono
   rifiutati (`errV2Only`). Servono alberi di hash SHA-256, handshake con hash
   troncato e piece layer.
 - **Qualità**: smart ban dei peer corrotti, profondità adattiva della coda
@@ -196,8 +196,9 @@ condividere. È il costo nascosto più grosso della strada A.
   standalone spente in managed.
 - **B. Nuovo gx-nox separato**: nuovo repository o nuovo `cmd/`, copia del motore,
   evoluzione indipendente.
-- **C. Core condiviso, due binari**: `internal/engine` + `internal/gxcore` usati
-  da `cmd/gx-torrent` (snello, per Gextto) e `cmd/gx-nox` (completo).
+- **C. Core condiviso, due binari**: `internal/gxcore` (il motore) + il core del
+  demone (`internal/daemon`, oggi ancora dentro `cmd/gx-torrent`) usati da
+  `cmd/gx-torrent` (snello, per Gextto) e `cmd/gx-nox` (completo).
 
 | Criterio | A. Evolvere | B. Nuovo gx-nox | C. Core + due binari |
 | --- | --- | --- | --- |
@@ -270,11 +271,11 @@ flowchart TB
     A["Sonarr, Radarr, *arr<br/>client qBittorrent esistenti"]
     X["gx-torrent: un solo binario<br/>-mode=managed se lo lancia Gextto<br/>-mode=standalone con wizard e UI completa"]
     subgraph CORE["Core condiviso (internal/)"]
-        C1["gxcore<br/>coda, stato, API v1<br/>seed policy, portcheck"]
+        C1["daemon<br/>coda, stato, API v1<br/>seed policy, portcheck"]
         C2["webui, auth, settings<br/>login, LAN, CSRF<br/>embed.FS, sei lingue"]
         C3["moduli standalone<br/>RSS, indexer, categorie, API qBit<br/>avviati solo se configurati"]
     end
-    E["internal/engine: fork di rain diventato motore proprio<br/>DHT, uTP, holepunch; in piano IPv6, smart ban, BitTorrent v2"]
+    E["internal/gxcore: il motore (ex fork di rain, ora codice proprio)<br/>DHT, uTP, holepunch; in piano IPv6, smart ban, BitTorrent v2"]
     G -- "API v1, congelata" --> X
     B -- "web UI" --> X
     A -- "API qBit v2" --> X
@@ -413,7 +414,7 @@ più per uno standalone sono IPv6 e BitTorrent v2; tutto il resto è qualità ch
 porta **un algoritmo alla volta**, misurando prima e dopo. Valutazioni di memoria,
 da verificare sul codice delle librerie prima di ogni porting.
 
-| Area | gx-torrent (rain fork) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
+| Area | gx-torrent (motore gx-core) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
 | Linguaggio, licenza | Go, MIT | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
 | IPv6 | no (decisione §4.3: "No") | sì | sì | sì |
@@ -423,7 +424,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | Streaming | finestra + HTTP Range, attesa a polling | Reader con seek e readahead | deadline per pezzo | sì |
 | Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
-| Choking seed | default di rain, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
+| Choking seed | default del motore, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
 | Smart ban (pezzi corrotti) | sì (banna il mittente corrotto) | sì | sì | sì |
 | API compatibile qBittorrent | no | no | — | è il riferimento |
 
@@ -432,7 +433,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | # | Funzione | Fonte | Perché | Costo |
 | --- | --- | --- | --- | --- |
 | 1 | IPv6 (listener, DHT BEP 32, tracker, PEX) | anacrolix, libtorrent | senza IPv6 non c'è parità con qBittorrent; molti peer domestici sono raggiungibili solo in v6 | alto |
-| 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | `rain`/motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
+| 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | il motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
 | 3 | Profondità della coda richieste adattiva | libtorrent | la velocità su peer lontani dipende da quante richieste sono in volo | medio |
 | 4 | Reader con readahead per lo streaming | anacrolix | sostituisce l'attesa a polling (200 ms, timeout 2 min) | medio |
 | 5 | BitTorrent v2 e ibridi | anacrolix (Go, più vicino a rain) | torrent v2-only già in circolazione; serve merkle per file | alto |
@@ -452,12 +453,13 @@ modificata).
 
 ### 11.3 Staccarsi da rain
 
-Il requisito 5 significa rinunciare al **rebase periodico** descritto in
-`docs/rain-allineamento.md` e trattare rain come codice proprio: modulo
-rinominato, cartella spostata da `third_party/` a `internal/engine`, inventario
-`GEXTTO.md` trasformato in changelog del motore. Va deciso **quando**: è un
-traguardo di F4, non della fase 0 (spostare il pacchetto prima del refactor
-aggiunge solo rischio).
+Il requisito 5 significa rinunciare al **rebase periodico** e trattare il motore
+come codice proprio. **Fatto (2026-10-10):** il modulo è rinominato
+(`github.com/buzzqw/gextto/internal/engine` → `.../internal/gxcore`), la
+cartella è sotto `internal/`, l'identità di rete è "gx-core", il pacchetto
+`rainrpc` (dead code) è rimosso e `GEXTTO.md` è inteso come changelog del
+motore. Procedura residua per guardare l'**upstream** rain a mano (non più un
+rebase): `docs/motore-allineamento.md`.
 
 ---
 
@@ -474,7 +476,7 @@ durata: la complessità è indicata come S/M/L e dipende dal tempo che ci si ded
 | **F1 · Standalone minimo** | `settings.json`, login e LAN sicura, wizard, test porta, unit systemd | installazione pulita senza Gextto, primo download dal wizard | M |
 | **F2 · Parità con la WebUI di qBittorrent** | categorie e tag, cartella temporanea, RSS, ricerca indexer, scheduler, virtualizzazione tabella | checklist funzioni qBittorrent completa | L |
 | **F3 · Ecosistema** | API compatibile qBit v2, pacchetto standalone, immagine container | Sonarr aggiunge e importa un episodio senza patch | M |
-| **F4 · Motore proprio** (in parallelo da F1) | IPv6, smart ban, coda richieste adattiva, readahead, BitTorrent v2, eventuale spostamento `internal/engine` | misure contro qbittorrent-nox §10 | L |
+| **F4 · Motore proprio** (in parallelo da F1) | IPv6, smart ban, coda richieste adattiva, readahead, BitTorrent v2, eventuale spostamento `internal/gxcore` | misure contro qbittorrent-nox §10 | L |
 
 Ogni fase si chiude **solo** quando il suo cancello è verificato. Il cancello di F0
 vale anche per tutte le fasi successive: **ogni commit deve lasciare Gextto
@@ -489,16 +491,21 @@ rimanenti:
 
 | Voce | Piano | Stato |
 | --- | --- | --- |
+| Nome e de-rain: prodotto **gx-core**, motore rinominato `internal/engine` → `internal/gxcore`, identità di rete da "Rain" a "gx-core", `rainrpc` rimosso, **de-rain anche dei commenti** nel codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
-| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base in `rain` + estensione: ban di sessione con scadenza) |
+| F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`) | §12.2 | fatto (restano feed da ricerca e notifiche) |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
-**Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2,
-spostamento del motore in `internal/engine`, e i ritocchi al wizard
-(indexer/cartella temporanea).
+**Aperti, da discutere dopo i precedenti:** F4 IPv6, F4 BitTorrent v2, e i
+ritocchi al wizard (indexer/cartella temporanea). Il **distacco da rain** è
+avvenuto: nel codice non resta alcun riferimento a rain (namespace, stringhe di
+rete e commenti). I riferimenti all'**upstream** rain restano solo dove indicano
+origine, licenza o confronto (documenti come questo, `LICENSE`). Restano da
+rimuovere in modo graduale i **marcatori `gextto fork`** (156 nel codice), che
+però non citano rain.
 
 **Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
 continuare a funzionare (test `internal/tui` + smoke `gexttod tui` contro il
@@ -626,12 +633,15 @@ Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 
 Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
 
-1. **Nome definitivo**: candidato **"gx-core"** (piace). Resta da decidere la
-   mappa nome ↔ binario: es. binario `gx-torrent` e prodotto/release "gx-core",
-   oppure rinominare tutto a `gx-core`; "gx-nox" resta solo come ipotesi di nome
-   per la modalità standalone. Da chiudere prima di F1/F2 definitivi.
-2. **Modulo del motore**: rinominare `github.com/cenkalti/rain/v2` in un modulo
-   proprio e spostare in `internal/engine` a inizio o fine di F4?
+1. **Nome definitivo** — **deciso (2026-10-10): `gx-core`**. Mappa nome ↔
+   modulo: il prodotto/release è **gx-core**; il **binario resta `gx-torrent`**
+   (il percorso managed di Gextto non cambia: adapter, fingerprint, unit e scope
+   systemd); il **motore** è `internal/gxcore` (il core del demone, coda/stato/API
+   v1, resta dove è oggi finché non viene estratto: `internal/daemon`). "gx-nox"
+   è solo il nome storico della modalità standalone, non un prodotto a sé.
+2. **Modulo del motore** — **deciso e fatto:** il motore è
+   `github.com/buzzqw/gextto/internal/gxcore`, dentro il modulo principale, non
+   più un modulo a sé né un `replace`.
 3. **Dove vivono i moduli condivisi**: estrarre RSS/indexer in `internal/` dentro
    il repo Gextto (condivisi dai due prodotti) o in un modulo separato?
 4. **Target di distribuzione**: solo Linux (amd64/arm64) come gextto, o anche
@@ -647,8 +657,8 @@ Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
 - [`docs/gx-torrent.md`](gx-torrent.md) — riferimento tecnico del motore attuale.
 - [`docs/evoluzione.md`](evoluzione.md) — §4–§7: lacune del motore, ottimizzazioni,
   misure di choking; §14: rimando a questo documento.
-- [`docs/rain-allineamento.md`](rain-allineamento.md) — rebase del fork di rain.
-- [`internal/engine/GEXTTO.md`](../internal/engine/GEXTTO.md) — inventario delle
+- [`docs/motore-allineamento.md`](motore-allineamento.md) — come recepire l'upstream rain a mano.
+- [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventario delle
   modifiche al fork.
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — mappa del codice di Gextto.
 - [`LICENSE`](../LICENSE) — EUPL-1.2.

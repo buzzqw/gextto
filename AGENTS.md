@@ -33,17 +33,19 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   riavvia. Si ferma da solo dopo 15 minuti senza Gextto. Dettagli in
   `docs/gx-torrent.md`, *Attivazione*.
 
-## Motore gx-torrent (`internal/engine`)
-- `internal/engine` è il **motore**, nato dalla copia di rain v2.4.2 (licenza
-  MIT, vedi `internal/engine/LICENSE`) e ora **portato dentro** il modulo
-  principale come `github.com/buzzqw/gextto/internal/engine`: non è più un
-  modulo a sé né un `replace` in `go.mod`. Lo usano `cmd/gx-torrent` e i test.
-- **Obiettivo dichiarato:** allontanarsi da rain e restarne progressivamente
-  senza (codice nostro). Finché ci sono modifiche marcate `gextto fork`,
-  l'inventario è in `internal/engine/GEXTTO.md`; l'attribuzione MIT originale
-  resta in `internal/engine/LICENSE`. Per recepire fix upstream, la procedura
-  resta descritta in `docs/rain-allineamento.md` (ora intesa come merge nel
-  codice interno).
+## Motore gx-core (`internal/gxcore`)
+- `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), nato
+  dalla copia di rain v2.4.2 (licenza MIT, vedi `internal/gxcore/LICENSE`) e ora
+  **codice nostro**, parte del modulo principale come
+  `github.com/buzzqw/gextto/internal/gxcore`: non è più un modulo a sé né un
+  `replace` in `go.mod`. Lo usano `cmd/gx-torrent` e i test.
+- **Distacco da rain: fatto.** Cartella, modulo e identità di rete sono nostre
+  ("gx-core"); `rainrpc` (dead code) rimosso. Il changelog delle modifiche
+  rispetto alla base upstream è `internal/gxcore/GEXTTO.md`; l'attribuzione MIT
+  originale resta in `internal/gxcore/LICENSE`. Per guardare i fix **upstream**
+  a mano la guida è `docs/motore-allineamento.md` (non è più un rebase
+  periodico). I riferimenti all'upstream rain restano dove indicano origine,
+  licenza o confronto.
 - `third_party/dht` è la copia modificata di `nictuku/dht` (non è rain).
 - Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
   miglioramento: **`docs/evoluzione.md`** (§4–§7); evoluzione verso client
@@ -86,9 +88,9 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `//go:build cgo`). `make test-libtorrent` (`CGO_ENABLED=1 go test ./...`) esegue
   anche quelli e richiede libtorrent.
 - Test mirati: `go test ./cmd/gx-torrent/` e `go test -run GxEngine .`.
-- Test del motore (`internal/engine`): `make test-rain` (`go test` dalla root sui
+- Test del motore (`internal/gxcore`): `make test-engine` (`go test` dalla root sui
   pacchetti del motore). Fa parte del modulo, quindi `go test ./...` lo include
-  già; `make test-rain` resta per eseguire solo quei pacchetti.
+  già; `make test-engine` resta per eseguire solo quei pacchetti.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
 

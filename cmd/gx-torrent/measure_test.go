@@ -3,9 +3,9 @@ package main
 // measure_test.go is an opt-in local-swarm measurement harness (gextto fork).
 //
 // Unlike the deterministic unchoker harness
-// (internal/engine/internal/unchoker/sim_test.go), this runs real daemons over
+// (internal/gxcore/internal/unchoker/sim_test.go), this runs real daemons over
 // loopback: one seeder and several leechers. Each peer uses its own 127.0.0.x
-// address, because rain drops a second connection from the same IP to one
+// address, because the engine drops a second connection from the same IP to one
 // torrent. By default the leechers dial only the seeder, which measures the
 // seed-side upload (throughput, ratio) that super-seeding is meant to change.
 // With GX_MEASURE_MESH=1 the leechers also dial each other, so the swarm can
@@ -87,7 +87,7 @@ func TestMeasureSeedingLocalSwarm(t *testing.T) {
 	for i := 0; i < leechers; i++ {
 		ip := fmt.Sprintf("127.0.0.%d", 10+i)
 		net := NetworkOptions{
-			// A distinct loopback source per leecher: rain drops a second
+			// A distinct loopback source per leecher: the engine drops a second
 			// connection from the same IP to one torrent.
 			OutgoingInterface: ip,
 			PortBegin:         uint16(43800 + i*100), PortEnd: uint16(43899 + i*100), Encryption: 1,

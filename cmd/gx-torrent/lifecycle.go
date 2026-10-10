@@ -29,11 +29,11 @@ const (
 	logMaxFiles = 4
 )
 
-// logOutput is where the daemon and rain write: stderr, or the rotating file
+// logOutput is where the daemon and the engine write: stderr, or the rotating file
 // chosen with -log-file.
 var logOutput io.Writer = os.Stderr
 
-// setupLogFile sends the daemon log and rain's log to a rotating file.
+// setupLogFile sends the daemon log and the engine's log to a rotating file.
 func setupLogFile(path string) {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -48,11 +48,11 @@ func setupLogFile(path string) {
 	log.SetOutput(writer)
 }
 
-// rainLogHandler keeps rain's own log to warnings, or everything with -debug.
+// engineLogHandler keeps the engine's own log to warnings, or everything with -debug.
 // Errors of single peers (handshake timeouts, resets) and failed announces to
 // one tracker are the normal life of a swarm, not daemon errors: they are
 // demoted to debug, so the log shows what matters.
-func rainLogHandler(debug bool) clog.Handler {
+func engineLogHandler(debug bool) clog.Handler {
 	handler := clog.NewWriterHandler(logOutput)
 	if debug {
 		handler.SetLevel(clog.DEBUG)
@@ -76,7 +76,7 @@ func (f *swarmNoiseFilter) Handle(rec *clog.Record) {
 	f.Handler.Handle(rec)
 }
 
-// isSwarmNoise recognises the per-peer and per-tracker errors rain logs at
+// isSwarmNoise recognises the per-peer and per-tracker errors the engine logs at
 // error level.
 func isSwarmNoise(rec *clog.Record) bool {
 	if strings.HasPrefix(rec.LoggerName, "peer ") || strings.HasPrefix(rec.LoggerName, "conn ") {

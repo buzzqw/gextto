@@ -39,8 +39,8 @@ jobs:
       - name: Test
         run: make test
 
-      - name: Test bundled rain fork
-        run: make test-rain
+      - name: Test engine
+        run: make test-engine
 
       - name: Build
         run: scripts/build-daemon.sh

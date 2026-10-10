@@ -310,12 +310,12 @@ func (p *gxManagedProcess) wait() error {
 }
 
 // managedShutdownGrace is how long the managed daemon gets to exit after
-// SIGTERM. rain flushes its resume data and closes the storage cleanly on a
+// SIGTERM. The engine flushes its resume data and closes the storage cleanly on a
 // graceful stop, so a move or a verify in progress is not truncated; only after
 // this window is the process killed.
 const managedShutdownGrace = 45 * time.Second
 
-// Stop asks the daemon to stop (SIGTERM) and waits for it so rain can save
+// Stop asks the daemon to stop (SIGTERM) and waits for it so the engine can save
 // its resume data; it is killed after managedShutdownGrace.
 func (p *gxManagedProcess) Stop() error {
 	if p == nil {
@@ -580,7 +580,7 @@ func (e *gxTorrentEngine) superviseManagedProcess() {
 }
 
 // gxListenInterface splits libtorrent's listen_interfaces ("0.0.0.0:6881-6891",
-// "wg0:6881", "[::]:6881") into host and port range. rain binds a single host,
+// "wg0:6881", "[::]:6881") into host and port range. The engine binds a single host,
 // so the first specific interface wins; wildcard entries and the SSL suffix are
 // dropped. Multiple entries no longer discard a usable host behind the first.
 func gxListenInterface(value string) (host, ports string) {

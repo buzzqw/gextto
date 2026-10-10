@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
@@ -680,7 +680,7 @@ func (d *Daemon) handleUIIPFilter(w http.ResponseWriter, r *http.Request) {
 	d.uiDone(w, r, fmt.Sprintf("IP filter loaded: %d rules", rules), nil)
 }
 
-// handleUIFilePriority selects or skips one file of a torrent. rain has no
+// handleUIFilePriority selects or skips one file of a torrent. The engine has no
 // priority levels: 0 = skip, any positive value = download.
 func (d *Daemon) handleUIFilePriority(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {

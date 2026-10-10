@@ -432,7 +432,7 @@ func TestGxPeerLimitsSplitConnections(t *testing.T) {
 		t.Fatalf("gxPeerLimits(200) = %d/%d, want 160/40", dial, accept)
 	}
 	if dial, accept := gxPeerLimits(0); dial != 0 || accept != 0 {
-		t.Fatalf("no limit must leave rain's defaults, got %d/%d", dial, accept)
+		t.Fatalf("no limit must leave the engine's defaults, got %d/%d", dial, accept)
 	}
 	if dial, accept := gxPeerLimits(1); dial < 1 || accept < 1 {
 		t.Fatalf("gxPeerLimits(1) = %d/%d, want at least 1 each", dial, accept)
@@ -510,7 +510,7 @@ func TestGxCacheMB(t *testing.T) {
 }
 
 // TestGxAddFormCarriesSequential checks that the sequential add option reaches
-// the daemon. This is the streaming mode gx-torrent gained from rain v2.
+// the daemon. This is the streaming mode gx-torrent gained with the v2 engine.
 func TestGxAddFormCarriesSequential(t *testing.T) {
 	form := gxAddForm("/dl", AddOptions{Sequential: true})
 	if form.Get("sequential") != "1" {

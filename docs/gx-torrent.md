@@ -9,8 +9,8 @@ questo server: vedi *Interfaccia web* per aprirla alla LAN). Il motore integrato
 libtorrent resta selezionabile — sulle build che lo includono — e fa da
 fallback automatico se gx-torrent non parte.
 
-Usa una copia modificata di rain in `internal/engine`. Le modifiche sono
-descritte in `internal/engine/GEXTTO.md`: porta unica, interfaccia uscente,
+Usa una copia del motore gx-core in `internal/gxcore`. Le modifiche sono
+descritte in `internal/gxcore/GEXTTO.md`: porta unica, interfaccia uscente,
 proxy, filtro IP, selezione dei file e alcune correzioni.
 
 Codice:
@@ -18,7 +18,7 @@ Codice:
 | File | Ruolo |
 |---|---|
 | `cmd/gx-torrent/main.go` | flag, avvio, segnali, spegnimento pulito |
-| `cmd/gx-torrent/daemon.go` | sessione rain, stato persistente, ciclo della coda, operazioni |
+| `cmd/gx-torrent/daemon.go` | sessione gx-core, stato persistente, ciclo della coda, operazioni |
 | `cmd/gx-torrent/queue.go` | pianificatore della coda (funzione pura) e coda dinamica |
 | `cmd/gx-torrent/storage.go` | symlink per torrent, spostamento e cancellazione sicuri |
 | `cmd/gx-torrent/api.go` | REST API con token |
@@ -62,7 +62,7 @@ Codice:
 - [Limiti di banda](#limiti-di-banda)
 - [REST API (v1)](#rest-api-v1)
 - [Disponibilità dell'API (snapshot e lock)](#disponibilità-dellapi-snapshot-e-lock)
-- [Limiti noti (rain)](#limiti-noti-rain)
+- [Limiti noti (motore)](#limiti-noti-motore)
 - [Test](#test)
 
 ## Attivazione
@@ -92,7 +92,7 @@ Codice:
      Al riavvio Gextto lo riaggancia se ha lo stesso binario e le stesse
      opzioni (`fingerprint` in `/api/v1/health`): peer, coda e trasferimenti
      proseguono senza interruzioni. Se il binario o un'opzione di avvio sono
-     cambiati, Gextto lo ferma con SIGTERM (45 secondi di grazia, rain salva i
+     cambiati, Gextto lo ferma con SIGTERM (45 secondi di grazia, il motore salva i
      resume data) e ne avvia uno nuovo. `make build` sostituisce
      `bin/gx-torrent` solo se il suo codice è cambiato
      (`bin/gx-torrent.code-sha256`), così un aggiornamento che tocca solo
@@ -329,7 +329,7 @@ Gextto, in modalità gestita, passa da solo questi valori dalle impostazioni
 *libtorrent* (porte, interfacce, cifratura, DHT, PEX, uTP, LSD, UPnP, NAT-PMP,
 filtro IP, nodi bootstrap DHT) e dall'impostazione `gxtorrent_proxy`. Il limite
 globale di connessioni (`libtorrent_connections_limit`) viene ripartito tra
-dial uscenti e accept entranti di rain. Proxy e token viaggiano nell'ambiente,
+dial uscenti e accept entranti del motore. Proxy e token viaggiano nell'ambiente,
 non sulla riga di comando. Le modifiche valgono dal riavvio di gextto.
 
 In modalità gestita il demone **non ha restrizioni di percorso**: Gextto decide
@@ -340,7 +340,7 @@ Gextto non lo imposta mai.
 Il demone **in managed** rifiuta di ascoltare su un indirizzo non loopback senza
 token (salvo `-insecure`); **in standalone** è permesso, perché l'accesso è
 protetto dal login e dalle regole LAN (o aperto se non c'è password). Il server
-RPC interno di rain è disattivato.
+RPC interno del motore è disattivato.
 
 ## Rete
 
@@ -349,7 +349,7 @@ RPC interno di rain è disattivato.
     default 6881-6891): TCP per i peer, UDP per il DHT.
   - Tutti i torrent la condividono. L'handshake, anche cifrato, sceglie il
     torrent dall'info hash.
-  - `-peer-ports 0` torna alla porta per torrent di rain originale.
+  - `-peer-ports 0` torna alla porta per torrent originale.
 - **Apertura sul router.**
   - UPnP (IGD v1 e v2) e NAT-PMP, rinnovati ogni 20 minuti e rimossi allo
     spegnimento.
@@ -422,12 +422,12 @@ libtorrent; non è il relè via nodo DHT proprietario di libtorrent.
 - Limite noto: come per `ut_metadata`/`ut_pex`, il messaggio in entrata viene
   riconosciuto tramite l'ID locale dell'estensione; un peer che assegna a
   `ut_holepunch` un ID diverso da 3 non viene capito (limite preesistente
-  dell'architettura estensioni di rain).
+  dell'architettura estensioni del motore).
 
 ### Verifica
 
 Il codec, la decisione del relè, l'inoltro della configurazione e la mappatura
-della sorgente sono coperti dai test (`make test-rain`,
+della sorgente sono coperti dai test (`make test-engine`,
 `go test ./cmd/gx-torrent/`, `go test .`). Per una prova **reale** su NAT c'è un
 harness root-only, `scripts/holepunch-netns-test.sh`:
 
@@ -464,7 +464,7 @@ dopo il dial incrociato) e rende il test deterministico. Il comportamento è
 verificato dal criterio `source`/`incoming` su `/api/v1/torrents/<hash>/peers`
 (la pagina web del demone mostra la stessa origine).
 
-Nota: seed e relay devono stare su IP diversi perché rain deduplica i peer per
+Nota: seed e relay devono stare su IP diversi perché il motore deduplica i peer per
 IP (`connectedPeerIPs`); due daemon sullo stesso IP verrebbero visti come un solo
 peer. Entrambi vanno avviati con `-outgoing-interface` uguale all'IP di ascolto,
 altrimenti annunciano al tracker il proprio IP "di default" (sbagliato).
@@ -506,20 +506,20 @@ salute dello sciame, quindi resta **opzionale e spenta di default**.
   torrent già in corso**, come libtorrent. `first_last` non ha un default di
   sessione nel demone: con *Prima/ultima parte dei file* attiva è Gextto ad
   aggiungere `first_last=1` a ogni nuovo torrent.
-- rain può cambiare l'ordine a caldo anche sul singolo torrent
+- il motore può cambiare l'ordine a caldo anche sul singolo torrent
   (`Torrent.SetSequential`/`SetFirstLast` internamente); lo stato è persistito e
   riportato in `GET /api/v1/torrents` (`sequential`, `first_last`).
 
 ## Torrent BitTorrent v2
 
-rain gestisce i torrent v1 e la parte v1 dei torrent ibridi (v1+v2), cioè la
+il motore gestisce i torrent v1 e la parte v1 dei torrent ibridi (v1+v2), cioè la
 grande maggioranza. I torrent **solo v2** (magnet con solo `btmh`, `.torrent`
 senza `pieces`) vengono rifiutati con un errore chiaro. Gextto in quel caso:
 
 1. mette la release in blocklist, così non la ritenta a ogni ciclo;
 2. passa al candidato successivo.
 
-Il supporto completo a v2 richiederebbe in rain:
+Il supporto completo a v2 richiederebbe nel motore:
 
 - gli alberi di hash SHA-256;
 - l'handshake con l'hash troncato;
@@ -552,12 +552,12 @@ Gli stessi dati sono in `GET /api/v1/stats` del demone e in
 `GET /api/libtorrent/session-stats` di gextto. I contatori condivisi usano i
 **nomi di libtorrent** anche per gx-torrent (`net.recv_payload_bytes`,
 `peer.num_tcp_peers`, `disk.num_read_ops`, …), così l'endpoint è uniforme; i
-contatori specifici di rain (cache, velocità disco, traffico DHT) restano
+contatori specifici del motore (cache, velocità disco, traffico DHT) restano
 accanto. Rispetto a libtorrent:
 
 - l'**overhead di protocollo** è disponibile (`protocol_overhead_bytes`: byte
   scambiati sulle connessioni peer meno il payload, cifratura compresa);
-- **mancano** i tempi dei job su disco e i pezzi falliti per peer: rain non li
+- **mancano** i tempi dei job su disco e i pezzi falliti per peer: il motore non li
   misura e non sono implementati.
 
 Il pulsante *Test porte* (in Gextto e nella pagina del demone) non legge
@@ -606,9 +606,9 @@ usare valori fissi.
   - Tetti: scrittura 96 MB–1,5 GB, lettura 32–512 MB, mai oltre 1/4 della RAM e
     1/8 della memoria disponibile.
   - **Isteresi**: si riapplica solo se il target cambia di oltre il 25%, al
-    massimo una volta ogni 10 minuti. Il fork di rain ridimensiona read cache e
+    massimo una volta ogni 10 minuti. Il motore ridimensiona read cache e
     buffer di scrittura sulla sessione in corso: nessuna riapertura.
-  - rain non ha una cache write-back: il valore è un **tetto sui pezzi in volo**,
+  - il motore non ha una cache write-back: il valore è un **tetto sui pezzi in volo**,
     e la cache di scrittura/coalescing vera la fa il kernel. La policy serve
     soprattutto a non sovra-dimensionare quando il carico è basso e a dare più
     read cache durante il seed.
@@ -641,7 +641,7 @@ un download al 20% da `/dev/shm` al disco.
 - Un torrent in download che non ha ancora nessun pezzo verificato viene
   spostato senza copiare i suoi file vuoti: vengono ricreati nella
   destinazione, senza scrivere gigabyte di zeri sul NAS e senza il controllo
-  completo che rain farebbe trovando file già presenti.
+  completo che il motore farebbe trovando file già presenti.
 - Un torrent con dimensione sconosciuta all'aggiunta (magnet) non parte sul RAM
   disk: resta su disco finché i metadati non rivelano la dimensione, poi viene
   spostato sul RAM disk solo se rientra nella soglia. Un file troppo grande non
@@ -652,7 +652,7 @@ un download al 20% da `/dev/shm` al disco.
 
 ## Layout su disco e sicurezza dei dati
 
-rain salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
+il motore salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
 `os.RemoveAll(DataDir/<id>)`. Per questo gx-torrent:
 
 - crea **sempre** `DATA/links/<id>` come symlink verso la cartella di
@@ -669,7 +669,7 @@ rain salva ogni torrent in `DataDir/<id>` e alla rimozione esegue sempre
 **Spostamento**:
 
 1. il torrent viene fermato;
-2. il demone attende che rain chiuda i file;
+2. il demone attende che il motore chiuda i file;
 3. il contenuto viene spostato, con `rename` oppure con copia e rimozione se
    cambia filesystem (tramite file `.gxpart`);
 4. il symlink viene ripuntato in modo atomico;
@@ -687,11 +687,11 @@ Per ogni torrent contiene:
 - dimensione dello sciame dall'ultimo scrape;
 - data di completamento ed errore.
 
-Sopravvive ai riavvii insieme al database di rain (`DATA/session.db`).
+Sopravvive ai riavvii insieme al database del motore (`DATA/session.db`).
 
 ## Coda autogestita
 
-rain non ha una coda: la gestisce il demone stesso, ogni 3 secondi (e subito
+il motore non ha una coda: la gestisce il demone stesso, ogni 3 secondi (e subito
 dopo ogni comando), con la stessa politica che Gextto applica a libtorrent.
 
 - **Slot.** I download attivi (`active_downloads`) partono in ordine di
@@ -737,7 +737,7 @@ Stati riportati a Gextto:
 | `paused` | `auto_managed=true`: in coda, in attesa di uno slot. `auto_managed=false`: in pausa utente o fermo a fine seed |
 | `stalled` | parcheggiato da Gextto, oppure messo da parte dalla coda perché non scaricava nulla. Resta `stalled` finché non riparte, così l'orologio degli stalli di Gextto non si azzera |
 | `moving` | spostamento in corso |
-| `error` | errore di rain o spostamento fallito; un `resume` o un `verify` lo azzerano |
+| `error` | errore del motore o spostamento fallito; un `resume` o un `verify` lo azzerano |
 
 ## Stalled: divisione dei compiti
 
@@ -796,7 +796,7 @@ Gextto segnala la capacità `super_seeding` per gx-torrent (`full`).
 
 Lo stato del demone (`DATA_DIR/gx-torrent`: `session.db`, `state.json`, log)
 resta sul disco locale: `session.db` è un database bbolt (mmap e lock), non
-adatto a NFS. Le scritture sono contenute: rain salva statistiche e bitfield
+adatto a NFS. Le scritture sono contenute: il motore salva statistiche e bitfield
 ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
 `ResumeWriteInterval`), circa 100 MB al giorno a riposo; il log ruota a
 5 MB × 4.
@@ -804,7 +804,7 @@ ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
 ## Limiti di banda
 
 I limiti globali cambiano a caldo (programmazione, limite temporaneo): il fork
-di rain usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
+del motore usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
 quindi nessuna riapertura della sessione e nessun peer perso. Gextto invia la
 configurazione solo quando cambia. Riaprono la sessione solo i limiti di peer
 (`max_peer_dial`/`max_peer_accept`), la scadenza della cache e la
@@ -898,9 +898,9 @@ Lo snapshot può essere vecchio al massimo di un tick (3 s predefiniti); ogni
 comando che cambia lo stato fa ripartire subito un tick, quindi la UI e Gextto
 vedono la modifica quasi immediatamente.
 
-## Limiti noti (rain)
+## Limiti noti (motore)
 
-Le operazioni che rain non supporta rispondono con un errore esplicito di
+Le operazioni che il motore non supporta rispondono con un errore esplicito di
 capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 
 - livelli di priorità dei file oltre a incluso/escluso;
@@ -908,7 +908,7 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - IPv6: il listener a porta unica, il DHT e uTP usano socket IPv4.
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
-dalla base v2.4.2 (vedi la sezione dedicata): rain scarica per primi i bordi di
+dalla base v2.4.2 (vedi la sezione dedicata): il motore scarica per primi i bordi di
 ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
 l'indice. Il fork rende la prima/ultima parte **indipendente** dall'ordine
 sequenziale.
@@ -922,7 +922,7 @@ in *Limiti di banda*.
 - `go test ./cmd/gx-torrent/` copre:
   - il pianificatore (slot, lenti, rotazione con raffreddamento, tetto rigido,
     forzati, coda dinamica);
-  - un ciclo di vita reale su una sessione rain senza rete (aggiunta, verifica,
+  - un ciclo di vita reale su una sessione gx-core senza rete (aggiunta, verifica,
     pausa utente rispettata dalla coda, spostamento, rimozione che preserva i
     dati, cancellazione mirata, parcheggio e probe, persistenza dopo il riavvio
     della sessione);
@@ -943,9 +943,9 @@ in *Limiti di banda*.
   - (opt-in, `GX_MEASURE=1` / `make measure-seeding`) la misura seeding/choking
     su sciame locale, con byte e tempi per peer: metodo e metriche in
     `docs/evoluzione.md` (§6).
-- `go test ./internal/blocklist` in `internal/engine` copre i formati del
+- `go test ./internal/blocklist` in `internal/gxcore` copre i formati del
   filtro IP.
-- `make test-rain` copre anche l'harness deterministico del choking
+- `make test-engine` copre anche l'harness deterministico del choking
   (`internal/unchoker/sim_test.go`) e il super-seeding
   (`torrent/torrent_superseed_test.go`).
 - `go test -run GxEngine .` copre l'adapter:

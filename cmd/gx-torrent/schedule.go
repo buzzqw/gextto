@@ -2,7 +2,7 @@ package main
 
 // schedule.go is the standalone bandwidth scheduler: an optional daily window
 // with alternate global speed limits, like qBittorrent's scheduler. Outside the
-// window the configured limits apply. rain changes the global limits in place,
+// window the configured limits apply. The engine changes the global limits in place,
 // so switching never reopens the session or drops peers.
 
 import (

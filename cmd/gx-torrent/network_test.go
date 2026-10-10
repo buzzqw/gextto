@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/buzzqw/gextto/internal/engine/torrent"
+	"github.com/buzzqw/gextto/internal/gxcore/torrent"
 )
 
 func TestIPFilterBytesCache(t *testing.T) {
@@ -36,7 +36,7 @@ func TestIPFilterBytesCache(t *testing.T) {
 }
 
 // Holepunching punches UDP mappings, so it follows uTP: enabling it without uTP
-// must still leave it off in the rain session.
+// must still leave it off in the engine session.
 func TestApplyNetworkHolepunchFollowsUTP(t *testing.T) {
 	d := &Daemon{}
 	d.peerPort = 51413
