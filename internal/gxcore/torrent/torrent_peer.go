@@ -239,6 +239,9 @@ func (t *torrent) handlePeerSnubbed(pe *peer.Peer) {
 			return
 		}
 		pe.Snubbed = true
+		// A peer that stopped delivering must not keep a deep request queue: it
+		// is lowered to the base, as resetRequestQueue does after a choke.
+		t.resetRequestQueue(pe)
 		t.pieceDownloadersSnubbed[pe] = pd
 		if t.piecePicker != nil {
 			t.piecePicker.HandleSnubbed(pe, pd.Piece.Index)

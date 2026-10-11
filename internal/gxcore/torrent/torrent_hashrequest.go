@@ -272,8 +272,19 @@ func (t *torrent) buildV2BlockTreeData(fi int) *merkle.LayerTree {
 	}
 	start, count := t.v2FilePieceRange(fi)
 	buf := make([]byte, int(t.info.PieceLength))
-	leaves := make([][merkle.HashSize]byte, 0, count)
+	// The leaves of the base-0 tree are 16 KiB blocks, not pieces: seed the
+	// capacity with the block count so large files do not reallocate the slice
+	// dozens of times while appending.
+	totalBlocks := int((f.Length + merkle.BlockSize - 1) / merkle.BlockSize)
+	leaves := make([][merkle.HashSize]byte, 0, totalBlocks)
 	for i := start; i < start+count; i++ {
+		// A torrent removed while the tree is building (a multi-GB read) must not
+		// keep reading the disk to the end for a peer that is no longer there.
+		select {
+		case <-t.closeC:
+			return nil
+		default:
+		}
 		p := t.pieces[i]
 		if int(p.Length) > len(buf) {
 			buf = make([]byte, p.Length)

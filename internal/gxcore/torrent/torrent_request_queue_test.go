@@ -5,6 +5,7 @@ import (
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peer"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerprotocol"
+	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 )
 
 func TestAdaptiveRequestQueue(t *testing.T) {
@@ -41,5 +42,28 @@ func TestAdaptiveRequestQueue(t *testing.T) {
 	tr.boostRequestQueue(pe2)
 	if got := tr.maxAllowedRequests(pe2); got != 20 {
 		t.Fatalf("reqq=20 after boost = %d, want 20 (capped)", got)
+	}
+}
+
+// TestSnubResetsRequestQueue locks C-07: a peer that stops delivering (snub)
+// must not keep its deep request queue, exactly like after a choke.
+func TestSnubResetsRequestQueue(t *testing.T) {
+	s := &Session{config: Config{DefaultRequestsOut: 50, MaxRequestsOut: 250}}
+	tr := &torrent{session: s}
+	pe := &peer.Peer{}
+	for i := 0; i < 1000; i++ {
+		tr.boostRequestQueue(pe)
+	}
+	if pe.RequestQueue <= 50 {
+		t.Fatalf("queue must be deeper than the base before the snub, got %d", pe.RequestQueue)
+	}
+	tr.pieceDownloaders = map[*peer.Peer]*piecedownloader.PieceDownloader{pe: {}}
+	tr.pieceDownloadersSnubbed = map[*peer.Peer]*piecedownloader.PieceDownloader{}
+	tr.handlePeerSnubbed(pe)
+	if pe.RequestQueue != 50 {
+		t.Fatalf("snub must reset the request queue to the base, got %d", pe.RequestQueue)
+	}
+	if !pe.Snubbed {
+		t.Fatal("the peer must be marked snubbed")
 	}
 }
