@@ -783,6 +783,74 @@ estensione con id in `m`, ma un header dell'handshake, più le modifiche tracker
 `Torrent.SetFileSelection`; (e) la matrice comparativa con i client esterni è
 indiziaria e non va usata come fonte.
 
+### 4.10 DHT: diagnosi, hardening e multi-path (piano e fattibilità)
+
+Nato dal confronto con **Tixati** (2026-10-11), il cui changelog (v3.39, v3.43)
+rivendica un DHT molto evoluto: screening anti-Sybil dei nodi malevoli,
+multi-path lookups, igiene dei token, DHT su I2P e diagnostica fine. Il DHT di
+gx-core (`internal/dht`) copre già **BEP 5/32/33/42/43/44** con una routing
+table ad **albero binario senza bucket**; le differenze con Tixati sono di
+**hardening e diagnostica**, non di copertura BEP (vedi [`bep.md`](bep.md)).
+Tixati è closed-source: se ne riscrive l'*idea*, non il codice.
+
+**Fatto (diagnostica, 2026-10-11).** `dht.Stats()` ora espone, oltre a nodi,
+traffico e pacchetti scartati, i contatori per RPC e di screening:
+`queries_in`/`queries_out`/`replies_in` (ping, get_peers, find_node,
+announce_peer) e `blocked_hosts`/`self_promotions`/`dupe_references`/
+`nodes_killed`. Erano già misurati come `expvar` ma non esposti; aggiunti i due
+contatori mancanti (`totalRecvPing`, `totalRecvAnnouncePeer`,
+`totalSentAnnouncePeer`). Il demone li propaga come `dht_<chiave>` (API e UI),
+quindi il lavoro è visibile end-to-end. Test: `internal/dht/stats_test.go`.
+**Perché prima:** è la base di misura degli item sotto (regola performance di
+`AGENTS.md`). Chiuso anche un residuo: il commento di origine "Taipei Torrent"
+in `dht.go` (era un marcatore che la §1.6 dà per rimosso; l'attribuzione resta
+il `LICENSE` BSD-3).
+
+**Item da aprire (ognuno con piano e misura prima/dopo):**
+
+| # | Voce | Cosa | Rischio | Sforzo | Verifica |
+|---|---|---|---|---|---|
+| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `blocked_hosts`/`self_promotions`, dimensione tabella e peer trovati su sciame reale |
+| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale |
+| 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec |
+
+**Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
+uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
+API locale restano pronti).
+
+### 4.11 Port mapping (PCP), rilevamento NAT e priorità file (fattibilità)
+
+Tre lacune rispetto a Tixati, con parere di fattibilità fondato sul codice
+attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
+
+| Voce | Stato oggi | Fattibilità | Sforzo | Valore |
+|---|---|---|---|---|
+| **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **media** | M | medio |
+| **Rilevamento tipo di NAT / porta riflessa** | `portcheck` (ascolto + inoltro UPnP/NAT-PMP); l'IP esterno arriva dal campo `ip` BEP 42 ma la **porta (2 byte) è ignorata** | **media** | S (passo 1) / M (passo 2) | medio |
+| **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **alta se si tocca il motore, bassa senza** | L | medio |
+
+- **PCP** è un protocollo binario su UDP/5351, un terzo metodo accanto a UPnP e
+  NAT-PMP. Serve un client PCP minimale (opcode MAP/PEER, nonce, rinnovo): non
+  c'è una dipendenza Go mantenuta affidabile, quindi ~150–250 righe proprie più
+  i test; si aggancia al `portMapper` come metodo aggiuntivo. Il valore è reale
+  perché alcuni CPE/ISP bloccano NAT-PMP e PCP è il suo rimpiazzo.
+- **Rilevamento NAT**: passo 1 economico e a basso rischio — catturare la porta
+  riflessa dal campo `ip` del DHT e mostrarla nel `portcheck` (oggi si legge solo
+  l'IP in `noteExternalIP`). Passo 2 (dedurre endpoint-independent vs
+  address/port-dependent) richiede di confrontare la porta riflessa da più
+  destinazioni: esperimenti su rete reale, non solo test.
+- **Priorità file graduata** è l'unica **di motore**: la selezione è una maschera
+  booleana per file (`Torrent.FileSelection`, `piecepicker`), quindi N livelli
+  richiedono modello di selezione a priorità, ordinamento del picker per priorità
+  (sopra/sotto rarest-first), API/UI in **entrambe** le UI, adapter Gextto e
+  matrice `capabilityLevels` (`file_priorities` da `none` a `full`). "Allocate on
+  demand" è invece quasi gratis: l'OS crea già file sparsi e c'è `Preallocate`;
+  manca solo una modalità esplicita.
+
+**Raccomandazione d'ordine:** prima la diagnostica DHT (fatta), poi gli item a
+basso rischio (token, passo 1 del NAT), poi l'hardening anti-Sybil e il
+multi-path (con misura su sciame reale), infine PCP e la priorità file.
+
 ---
 
 ## 5. gx-torrent: ottimizzazioni prestazionali
