@@ -148,3 +148,40 @@ func TestMagnetDHTNodes(t *testing.T) {
 		t.Errorf("round trip DHTNodes = %v, want %v", m2.DHTNodes, want)
 	}
 }
+
+func TestMagnetSources(t *testing.T) {
+	v1 := strings.Repeat("ab", 20)
+	m, err := New("magnet:?xt=urn:btih:" + v1 +
+		"&xs=https%3A%2F%2Fexact.test%2Fa.torrent&as=http%3A%2F%2Fmirror.test%2Fa.torrent&as=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"https://exact.test/a.torrent"}; !slices.Equal(m.ExactSources, want) {
+		t.Fatalf("ExactSources = %v, want %v", m.ExactSources, want)
+	}
+	if want := []string{"http://mirror.test/a.torrent"}; !slices.Equal(m.AcceptableSources, want) {
+		t.Fatalf("AcceptableSources = %v, want %v", m.AcceptableSources, want)
+	}
+
+	m2, err := New(m.String())
+	if err != nil {
+		t.Fatalf("re-parse %q: %v", m.String(), err)
+	}
+	if want := []string{"https://exact.test/a.torrent", "http://mirror.test/a.torrent"}; !slices.Equal(m2.MetadataSources(), want) {
+		t.Fatalf("round trip MetadataSources = %v, want %v", m2.MetadataSources(), want)
+	}
+}
+
+// TestMagnetMetadataSourcesSkipsNonHTTP checks that a nested magnet or a
+// malformed URL in "xs"/"as" is ignored by MetadataSources.
+func TestMagnetMetadataSourcesSkipsNonHTTP(t *testing.T) {
+	m := &Magnet{
+		ExactSources:      []string{"magnet:?xt=urn:btih:" + strings.Repeat("cd", 20), "https://exact.test/a.torrent"},
+		AcceptableSources: []string{"not a url", "http://mirror.test/a.torrent"},
+	}
+	got := m.MetadataSources()
+	want := []string{"https://exact.test/a.torrent", "http://mirror.test/a.torrent"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("MetadataSources = %v, want %v", got, want)
+	}
+}

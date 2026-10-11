@@ -1,11 +1,13 @@
 package torrent
 
 import (
+	"bytes"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -217,6 +219,12 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 			s.dht.AddNode(node)
 		}
 	}
+	// Magnet "xs"/"as": fetch the .torrent straight from the exact/acceptable
+	// source before waiting for a peer or the DHT. A failure is not fatal: the
+	// metadata download over the swarm still runs.
+	if t, err := s.addMagnetFromSources(ma, opt); err == nil {
+		return t, nil
+	}
 	id, port, sto, err := s.add(opt)
 	if err != nil {
 		return nil, err
@@ -286,6 +294,101 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		err = t2.Start()
 	}
 	return t2, err
+}
+
+// addMagnetFromSources tries the magnet "xs"/"as" URLs to obtain the .torrent
+// directly, so a link that names its source does not have to wait for the
+// swarm. It returns an error when no source yields metainfo matching the
+// magnet's info hash, so the caller can fall back to the peer/DHT download.
+func (s *Session) addMagnetFromSources(ma *magnet.Magnet, opt *AddTorrentOptions) (*Torrent, error) {
+	sources := ma.MetadataSources()
+	if len(sources) == 0 {
+		return nil, errors.New("magnet has no HTTP source")
+	}
+	client := http.Client{
+		Timeout:   s.config.TorrentAddHTTPTimeout,
+		Transport: netx.HTTPTransport(),
+	}
+	var lastErr error
+	for _, src := range sources {
+		data, err := s.fetchTorrent(src, &client)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		mi, err := metainfo.New(bytes.NewReader(data))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if !magnetInfoHashMatches(ma, &mi.Info) {
+			lastErr = fmt.Errorf("magnet source %q has a different info hash", src)
+			continue
+		}
+		o := *opt
+		if len(o.SelectOnly) == 0 {
+			o.SelectOnly = ma.SelectOnly
+		}
+		t, err := s.AddTorrent(bytes.NewReader(data), &o)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		// Keep the extra trackers and the fixed peers the magnet carried.
+		if extra := s.parseTrackers(ma.Trackers, mi.Info.Private); len(extra) > 0 {
+			t.torrent.AddTrackers(extra)
+		}
+		if peers := resolvePeers(ma.Peers); len(peers) > 0 {
+			t.torrent.AddPeers(peers)
+		}
+		return t, nil
+	}
+	return nil, lastErr
+}
+
+// fetchTorrent downloads one .torrent from a magnet source URL.
+func (s *Session) fetchTorrent(src string, client *http.Client) ([]byte, error) {
+	resp, err := client.Get(src) // nolint: noctx
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("source returned HTTP %d", resp.StatusCode)
+	}
+	if resp.ContentLength > int64(s.config.MaxTorrentSize) {
+		return nil, fmt.Errorf("torrent too large: %d", resp.ContentLength)
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, int64(s.config.MaxTorrentSize)))
+}
+
+// magnetInfoHashMatches reports whether the metainfo's identity is the one the
+// magnet names: the v1 info hash for a "urn:btih:" link, or the (truncated)
+// SHA-256 for a "urn:btmh:" link.
+func magnetInfoHashMatches(ma *magnet.Magnet, info *metainfo.Info) bool {
+	if ma.HasV1 && info.Hash == ma.InfoHash {
+		return true
+	}
+	if ma.HasV2 {
+		var v2 [20]byte
+		copy(v2[:], info.V2Hash[:20])
+		if v2 == ma.InfoHash {
+			return true
+		}
+	}
+	return false
+}
+
+// resolvePeers turns magnet "x.pe" values (host:port) into TCP addresses,
+// dropping the ones that do not resolve.
+func resolvePeers(peers []string) []*net.TCPAddr {
+	var out []*net.TCPAddr
+	for _, p := range peers {
+		if addr, err := net.ResolveTCPAddr("tcp", p); err == nil {
+			out = append(out, addr)
+		}
+	}
+	return out
 }
 
 func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {

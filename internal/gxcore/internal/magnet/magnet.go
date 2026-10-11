@@ -35,6 +35,12 @@ type Magnet struct {
 	// DHTNodes are the DHT bootstrap nodes (host:port) from the magnet "dht"
 	// parameters, like libtorrent's add_torrent_params.dht_nodes.
 	DHTNodes []string
+	// ExactSources are the magnet "xs" values: URLs (usually HTTP/HTTPS) that
+	// point at the exact .torrent this link refers to. AcceptableSources are
+	// the "as" values, a set of interchangeable sources. gx-core fetches the
+	// metainfo from them before waiting for a peer or the DHT.
+	ExactSources      []string
+	AcceptableSources []string
 }
 
 // New parses the string and returns new Magnet.
@@ -125,7 +131,44 @@ func New(s string) (*Magnet, error) {
 		}
 	}
 
+	// Magnet "xs" (exact source) and "as" (acceptable source): URLs where the
+	// .torrent can be fetched, mostly HTTP(S).
+	magnet.ExactSources = cleanSourceList(params["xs"])
+	magnet.AcceptableSources = cleanSourceList(params["as"])
+
 	return &magnet, nil
+}
+
+// cleanSourceList trims a magnet source list and drops empty entries.
+func cleanSourceList(values []string) []string {
+	var out []string
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// MetadataSources returns the HTTP(S) URLs from "xs" (exact) then "as"
+// (acceptable), de-duplicated and in order: gx-core tries them to fetch the
+// .torrent without depending on a peer or the DHT. Non-HTTP values (for example
+// a nested magnet) are ignored.
+func (m *Magnet) MetadataSources() []string {
+	seen := make(map[string]struct{}, len(m.ExactSources)+len(m.AcceptableSources))
+	var out []string
+	for _, src := range append(append([]string{}, m.ExactSources...), m.AcceptableSources...) {
+		u, err := url.Parse(src)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			continue
+		}
+		if _, ok := seen[src]; ok {
+			continue
+		}
+		seen[src] = struct{}{}
+		out = append(out, src)
+	}
+	return out
 }
 
 func (m *Magnet) String() string {
@@ -175,6 +218,14 @@ func (m *Magnet) String() string {
 	for _, node := range m.DHTNodes {
 		b.WriteString("&dht=")
 		b.WriteString(url.QueryEscape(node))
+	}
+	for _, src := range m.ExactSources {
+		b.WriteString("&xs=")
+		b.WriteString(url.QueryEscape(src))
+	}
+	for _, src := range m.AcceptableSources {
+		b.WriteString("&as=")
+		b.WriteString(url.QueryEscape(src))
 	}
 	if len(m.SelectOnly) > 0 {
 		b.WriteString("&so=")

@@ -771,6 +771,10 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   torrent e restano anche dopo un riavvio.
 - Se il magnet porta `dht=` (nodo DHT di bootstrap), il nodo viene aggiunto alla
   DHT della sessione.
+- Se il magnet porta `xs=`/`as=` (sorgente esatta/accettabile, convenzione Magnet
+  URI), il motore prova a scaricare il `.torrent` da quegli URL e lo usa **solo
+  se l'info hash corrisponde**, così i metadati arrivano subito senza sciame;
+  altrimenti ricade sul download dei metadati via peer/DHT.
 - Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
   dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
   pezzi che non vuole, e lo segnala ai **tracker** con `event=paused` a ogni
