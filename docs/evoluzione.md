@@ -2077,6 +2077,12 @@ privati) e `cmd/gx-torrent/swarmmerge_test.go` (end-to-end: B popolato da disco,
 A con contenuto identico e nome diverso si completa **senza peer**). I due test
 passano anche con `-race`. Sforzo: Fase 1 **media** (fatta), Fase 2 **grande**.
 
+**Costo.** Il merge gira una volta per torrent, alla fine dell'allocazione: il
+confronto per-pezzo (hash e lunghezza) avviene **solo** per i torrent con la
+stessa `piece length` e la stessa lunghezza totale (il filtro esterno è O(torrent)
+con due letture di campo), e solo i pezzi che superano il confronto comportano
+I/O. Nessun percorso stazionario (picker, peer, scrittura pezzi) è toccato.
+
 ### 15.3 Criterio di verifica (come §4.5)
 
 Per ogni punto: test mirati (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
