@@ -358,7 +358,13 @@ func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
 	if !d.uiAuthorized(w, r) {
 		return
 	}
-	check := d.mapper.check()
+	targetPort := 0
+	if p := strings.TrimSpace(r.URL.Query().Get("port")); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 65535 {
+			targetPort = n
+		}
+	}
+	check := d.checkPort(targetPort)
 	class, label := "bad", "porta chiusa"
 	switch {
 	case check.Port <= 0:

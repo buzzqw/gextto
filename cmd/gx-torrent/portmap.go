@@ -182,11 +182,9 @@ func (m *portMapper) mapUPnP() error {
 	return nil
 }
 
-// upnpMappingPresent reports whether the router already forwards the peer port
-// to this host for the given protocol.
-func (m *portMapper) upnpMappingPresent(ctx context.Context, client upnpClient, proto string) bool {
-	internalPort, internalClient, enabled, _, _, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(m.port), proto)
-	if err != nil || !enabled || int(internalPort) != m.port {
+func upnpMappingPresentForPort(ctx context.Context, client upnpClient, proto string, port int) bool {
+	internalPort, internalClient, enabled, _, _, err := client.GetSpecificPortMappingEntryCtx(ctx, "", uint16(port), proto)
+	if err != nil || !enabled || int(internalPort) != port {
 		return false
 	}
 	local := client.LocalAddr()
@@ -194,6 +192,12 @@ func (m *portMapper) upnpMappingPresent(ctx context.Context, client upnpClient, 
 		return false
 	}
 	return true
+}
+
+// upnpMappingPresent reports whether the router already forwards the peer port
+// to this host for the given protocol.
+func (m *portMapper) upnpMappingPresent(ctx context.Context, client upnpClient, proto string) bool {
+	return upnpMappingPresentForPort(ctx, client, proto, m.port)
 }
 
 // portCheck is the result of the "Test porte" action: whether the daemon is
@@ -229,7 +233,39 @@ func (m *portMapper) check() portCheck {
 	if m == nil {
 		return portCheck{}
 	}
-	out := portCheck{Port: m.port, Listening: checkLocalListener(m.port)}
+	return m.checkPort(m.port)
+}
+
+// checkPort reports whether the specified port is open and bindable locally,
+// and whether the router forwards the port.
+func (m *portMapper) checkPort(port int) portCheck {
+	if port <= 0 {
+		if m != nil && m.port > 0 {
+			port = m.port
+		} else {
+			return portCheck{}
+		}
+	}
+	out := portCheck{Port: port}
+	if m != nil && port == m.port {
+		out.Listening = checkLocalListener(port)
+	} else {
+		if checkLocalListener(port) {
+			out.Listening = true
+		} else {
+			ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+			if err == nil {
+				out.Listening = true
+				_ = ln.Close()
+			}
+		}
+	}
+
+	if m == nil {
+		out.Open = out.Listening
+		return out
+	}
+
 	m.mu.Lock()
 	method, external, lastErr := m.method, m.externalIP, m.lastErr
 	upnp := m.upnpClient
@@ -237,24 +273,65 @@ func (m *portMapper) check() portCheck {
 	m.mu.Unlock()
 	out.Method, out.ExternalIP, out.Error = method, external, lastErr
 
-	switch {
-	case method == "upnp" && upnp != nil:
+	if port == m.port {
+		switch {
+		case method == "upnp" && upnp != nil:
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			tcp := m.upnpMappingPresent(ctx, upnp, "TCP")
+			udp := m.upnpMappingPresent(ctx, upnp, "UDP")
+			out.Mapped = tcp && udp
+			if out.Mapped {
+				out.Detail = "mapping UPnP presente (TCP+UDP)"
+			} else {
+				out.Detail = "mapping UPnP mancante o incompleto"
+			}
+		case mappedRecently:
+			out.Mapped = true
+			out.Detail = "mapping " + strings.ToUpper(method) + " attivo"
+		default:
+			out.Mapped = false
+			out.Detail = "nessun mapping automatico: verifica l'inoltro manuale sul router"
+		}
+	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		tcp := m.upnpMappingPresent(ctx, upnp, "TCP")
-		udp := m.upnpMappingPresent(ctx, upnp, "UDP")
-		out.Mapped = tcp && udp
-		if out.Mapped {
-			out.Detail = "mapping UPnP presente (TCP+UDP)"
-		} else {
-			out.Detail = "mapping UPnP mancante o incompleto"
+		client := upnp
+		if client == nil && m.upnp {
+			client, _ = discoverIGD(ctx)
 		}
-	case mappedRecently:
-		out.Mapped = true
-		out.Detail = "mapping " + strings.ToUpper(method) + " attivo"
-	default:
-		out.Mapped = false
-		out.Detail = "nessun mapping automatico: verifica l'inoltro manuale sul router"
+		if client != nil {
+			if ext, err := client.GetExternalIPAddressCtx(ctx); err == nil && ext != "" {
+				out.ExternalIP = ext
+			}
+			tcp := upnpMappingPresentForPort(ctx, client, "TCP", port)
+			udp := upnpMappingPresentForPort(ctx, client, "UDP", port)
+			if tcp && udp {
+				out.Mapped = true
+				out.Method = "upnp"
+				out.Detail = "mapping UPnP presente (TCP+UDP)"
+			} else {
+				local := client.LocalAddr()
+				if local != nil {
+					errTCP := client.AddPortMappingCtx(ctx, "", uint16(port), "TCP", uint16(port), local.String(), true, "gx-torrent-test", uint32(portLease.Seconds()))
+					errUDP := client.AddPortMappingCtx(ctx, "", uint16(port), "UDP", uint16(port), local.String(), true, "gx-torrent-test", uint32(portLease.Seconds()))
+					if errTCP == nil && errUDP == nil {
+						out.Mapped = true
+						out.Method = "upnp"
+						out.Detail = "mapping UPnP aperto con successo"
+					} else {
+						out.Mapped = false
+						out.Detail = "richiesta mapping UPnP non riuscita"
+					}
+				} else {
+					out.Mapped = false
+					out.Detail = "mapping UPnP mancante o incompleto"
+				}
+			}
+		} else {
+			out.Mapped = false
+			out.Detail = "nessun router UPnP rilevato: verifica inoltro manuale"
+		}
 	}
 	out.Open = out.Listening && out.Mapped
 	return out

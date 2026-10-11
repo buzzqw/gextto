@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,3 +138,38 @@ func TestWantedMatchesTitleAndFilters(t *testing.T) {
 		t.Fatal("a different title must not match")
 	}
 }
+
+func TestWantedQualityMatch(t *testing.T) {
+	tests := []struct {
+		req   string
+		title string
+		want  bool
+	}{
+		{"", "Movie.1080p", true},
+		{"Any", "Movie.720p", true},
+		{"1080p", "Movie.1080p.WEB-DL", true},
+		{"1080p", "Movie.720p.WEB-DL", false},
+		{"720p+", "Movie.720p.HDTV", true},
+		{"720p+", "Movie.1080p.BluRay", true},
+		{"720p+", "Movie.2160p.UHD", true},
+		{"720p+", "Movie.480p.DVDRip", false},
+		{"1080p+", "Movie.720p.HDTV", false},
+		{"1080p+", "Movie.1080p.BluRay", true},
+		{"1080p+", "Movie.4k.UHD", true},
+		{"720p-1080p", "Movie.720p", true},
+		{"720p-1080p", "Movie.1080p", true},
+		{"720p-1080p", "Movie.2160p", false},
+		{"720p-1080p", "Movie.480p", false},
+		{"2160p 4K", "Movie.4K.HDR", true},
+		{"2160p 4K", "Movie.2160p.UHD", true},
+		{"2160p 4K", "Movie.1080p", false},
+		{"2160p+ 4K+", "Movie.2160p.HDR", true},
+		{"2160p+ 4K+", "Movie.1080p", false},
+	}
+	for _, tc := range tests {
+		if got := wantedQualityMatch(tc.req, strings.ToLower(tc.title)); got != tc.want {
+			t.Errorf("wantedQualityMatch(%q, %q) = %v, want %v", tc.req, tc.title, got, tc.want)
+		}
+	}
+}
+

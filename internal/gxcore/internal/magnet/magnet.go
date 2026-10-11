@@ -32,6 +32,9 @@ type Magnet struct {
 	SelectOnly []int
 	// WebSeeds are the HTTP web seed URLs from the BEP 53 "ws" parameters.
 	WebSeeds []string
+	// DHTNodes are the DHT bootstrap nodes (host:port) from the magnet "dht"
+	// parameters, like libtorrent's add_torrent_params.dht_nodes.
+	DHTNodes []string
 }
 
 // New parses the string and returns new Magnet.
@@ -114,6 +117,14 @@ func New(s string) (*Magnet, error) {
 		}
 	}
 
+	// Magnet "dht": DHT bootstrap nodes ("host:port"), like libtorrent's
+	// add_torrent_params.dht_nodes.
+	for _, node := range params["dht"] {
+		if node = strings.TrimSpace(node); node != "" {
+			magnet.DHTNodes = append(magnet.DHTNodes, node)
+		}
+	}
+
 	return &magnet, nil
 }
 
@@ -160,6 +171,10 @@ func (m *Magnet) String() string {
 	for _, ws := range m.WebSeeds {
 		b.WriteString("&ws=")
 		b.WriteString(url.QueryEscape(ws))
+	}
+	for _, node := range m.DHTNodes {
+		b.WriteString("&dht=")
+		b.WriteString(url.QueryEscape(node))
 	}
 	if len(m.SelectOnly) > 0 {
 		b.WriteString("&so=")

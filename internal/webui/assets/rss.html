@@ -40,7 +40,7 @@ summary{cursor:pointer;color:#93a1b5}
 <body>
 <header>
   <h1>RSS &amp; indexers</h1>
-  <nav class="nav"><a href="/">Torrents</a><a class="on" href="/ui/rss">RSS &amp; indexers</a><a href="/ui/settings">Settings</a></nav>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a class="on" href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
@@ -54,24 +54,36 @@ summary{cursor:pointer;color:#93a1b5}
   <input type="hidden" name="op" value="add">
   <input type="hidden" name="index" id="wanted-index">
   <div class="row">
-    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Serie" autocomplete="off"></label>
+    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Serie" autocomplete="off" title="Series or movie title to search for"></label>
     <datalist id="series-list"></datalist>
-    <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
-    <label>Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off"></label>
-    <label>Language<input type="text" name="language" placeholder="ita" autocomplete="off"></label>
-    <label>Quality<input type="text" name="quality" placeholder="1080p" autocomplete="off"></label>
-    <button type="button" class="sm" id="wanted-search">Search in feeds</button>
-    <button type="submit" id="wanted-submit">Add wanted</button>
-    <button type="button" class="sm" id="wanted-cancel" style="display:none">Cancel</button>
+    <label>Type<select name="kind" title="Release type: series or movie"><option value="series">Series</option><option value="movie">Movie</option></select></label>
+    <label>Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="Season numbers or range (e.g. 1+, 2-4, 1)"></label>
+    <label>Language<input type="text" name="language" placeholder="ita" autocomplete="off" title="Required language terms (e.g. ita, eng)"></label>
+    <label>Quality<select name="quality" id="wanted-quality" title="Required video quality resolution">
+      <option value="">Any</option>
+      <option value="360p">360p</option>
+      <option value="480p">480p</option>
+      <option value="576p">576p</option>
+      <option value="720p">720p</option>
+      <option value="720p+">720p+</option>
+      <option value="720p-1080p">720p-1080p</option>
+      <option value="1080p">1080p</option>
+      <option value="1080p+">1080p+</option>
+      <option value="2160p">2160p 4K</option>
+      <option value="2160p+">2160p+ 4K+</option>
+    </select></label>
+    <button type="button" class="sm" id="wanted-search" title="Search configured feeds and indexers for matching titles">Search in feeds</button>
+    <button type="submit" id="wanted-submit" title="Add title to wanted list">Add wanted</button>
+    <button type="button" class="sm" id="wanted-cancel" style="display:none" title="Cancel editing wanted title">Cancel</button>
   </div>
   <details>
     <summary>Advanced filters</summary>
     <div class="row">
-      <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-      <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off"></label>
-      <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
-      <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
-      <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
+      <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms to exclude from release titles"></label>
+      <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Specific episode filter (e.g. 1x01-05, 1x07)"></label>
+      <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+      <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+      <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
     </div>
   </details>
   <div class="row" id="wanted-results"></div>
@@ -87,12 +99,12 @@ summary{cursor:pointer;color:#93a1b5}
   <input type="hidden" name="op" value="add">
   <input type="hidden" name="index" id="indexer-index">
   <div class="row">
-    <label>Type<select name="type" id="indexer-type">{{INDEXEROPTIONS}}</select></label>
-    <label>Name<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off"></label>
-    <label>URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off"></label>
-    <label>API key<input type="text" name="apikey" id="indexer-apikey" autocomplete="off"></label>
-    <button type="submit" id="indexer-submit">Add indexer</button>
-    <button type="button" class="sm" id="indexer-cancel" style="display:none">Cancel</button>
+    <label>Type<select name="type" id="indexer-type" title="Indexer service type">{{INDEXEROPTIONS}}</select></label>
+    <label>Name<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off" title="Indexer name"></label>
+    <label>URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off" title="Torznab endpoint URL"></label>
+    <label>API key<input type="text" name="apikey" id="indexer-apikey" autocomplete="off" title="API key for authentication with the indexer"></label>
+    <button type="submit" id="indexer-submit" title="Save indexer configuration">Add indexer</button>
+    <button type="button" class="sm" id="indexer-cancel" style="display:none" title="Cancel editing indexer">Cancel</button>
   </div>
 </form>
 
@@ -104,20 +116,19 @@ summary{cursor:pointer;color:#93a1b5}
 <form class="form-card" method="post" action="/ui/rss-feed">
   <input type="hidden" name="op" value="add">
   <div class="row">
-    <label>Name<input type="text" name="name" placeholder="serie" autocomplete="off"></label>
-    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
-    <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off"></label>
-    <label>Search query<input type="text" name="search" placeholder="Serie S01" autocomplete="off"></label>
+    <label>Name<input type="text" name="name" placeholder="serie" autocomplete="off" title="Feed name"></label>
+    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off" title="Subfolder for downloaded items"></label>
+    <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" title="RSS feed URL"></label>
   </div>
   <div class="row">
-    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
-    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
-    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
-    <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
-    <button type="submit">Add feed</button>
+    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Terms that must be included in release title"></label>
+    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms that must not be in release title"></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+    <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
+    <button type="submit" title="Add RSS feed">Add feed</button>
   </div>
-  <p class="muted">A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.</p>
+  <p class="muted">A feed is an RSS URL. Its items are fetched periodically and evaluated by rules and wanted titles. Empty = the global default.</p>
 </form>
 
 <h2>Rules <span class="muted">({{RULECOUNT}})</span></h2>
@@ -128,44 +139,44 @@ summary{cursor:pointer;color:#93a1b5}
 <form class="form-card" method="post" action="/ui/rss-rule">
   <input type="hidden" name="op" value="add">
   <div class="row">
-    <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off"></label>
-    <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off"></label>
-    <label class="chk"><input type="checkbox" name="enabled" value="1" checked> Enabled</label>
-    <label class="chk"><input type="checkbox" name="fail" value="1"> Skip matching items</label>
+    <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off" title="Rule name"></label>
+    <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off" title="Feeds to apply this rule to (empty = all)"></label>
+    <label class="chk"><input type="checkbox" name="enabled" value="1" checked title="Enable this rule"> Enabled</label>
+    <label class="chk"><input type="checkbox" name="fail" value="1" title="Skip and reject matching releases"> Skip matching items</label>
   </div>
   <div class="row">
-    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
-    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-    <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off"></label>
+    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Required terms in title"></label>
+    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Excluded terms in title"></label>
+    <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Episode pattern (e.g. 1x01-05)"></label>
   </div>
   <div class="row">
-    <label class="chk"><input type="checkbox" name="require_episode" value="1"> Require episode</label>
-    <label class="chk"><input type="checkbox" name="smart_episode" value="1"> Smart episode</label>
-    <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
-    <label class="chk"><input type="checkbox" name="sequential" value="1"> sequential</label>
-    <label class="chk"><input type="checkbox" name="first_last" value="1"> first/last</label>
-    <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+    <label class="chk"><input type="checkbox" name="require_episode" value="1" title="Require a recognizable episode number"> Require episode</label>
+    <label class="chk"><input type="checkbox" name="smart_episode" value="1" title="Download each episode once and avoid duplicates"> Smart episode</label>
+    <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1" title="Download pieces in sequential order"> sequential</label>
+    <label class="chk"><input type="checkbox" name="first_last" value="1" title="Download start and end pieces of files first"> first/last</label>
+    <label class="chk"><input type="checkbox" name="top" value="1" title="Place matched torrents at top of queue"> top</label>
   </div>
   <div class="row">
-    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
-    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
-    <label>Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off"></label>
-    <button type="submit">Add rule</button>
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+    <label>Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off" title="Tags assigned to added torrents"></label>
+    <button type="submit" title="Save filter rule">Add rule</button>
   </div>
   <details>
     <summary>Advanced filters</summary>
     <div class="row">
-      <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off"></label>
-      <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off"></label>
-      <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size"></label>
-      <label>Max size (MiB)<input type="number" step="1" min="0" name="max_size"></label>
+      <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off" title="Regular expression that release title must match"></label>
+      <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off" title="Regular expression that release title must not match"></label>
+      <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size" title="Minimum release size in MiB"></label>
+      <label>Max size (MiB)<input type="number" step="1" min="0" name="max_size" title="Maximum release size in MiB"></label>
     </div>
     <div class="row">
-      <label>Min seeders<input type="number" name="min_seeders"></label>
-      <label>Max seeders<input type="number" name="max_seeders"></label>
-      <label>Min peers<input type="number" name="min_peers"></label>
-      <label>Max age (days)<input type="number" name="max_age_days"></label>
-      <label>Cooldown between matches (days)<input type="number" name="ignore_days"></label>
+      <label>Min seeders<input type="number" name="min_seeders" title="Minimum seeders required on release"></label>
+      <label>Max seeders<input type="number" name="max_seeders" title="Maximum seeders allowed on release"></label>
+      <label>Min peers<input type="number" name="min_peers" title="Minimum peers required on release"></label>
+      <label>Max age (days)<input type="number" name="max_age_days" title="Maximum age of release in days"></label>
+      <label>Cooldown between matches (days)<input type="number" name="ignore_days" title="Days to wait before matching the same title again"></label>
     </div>
   </details>
   <p class="muted">A rule filters what to download and how. With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Smart episode adds each episode of a series once.</p>
@@ -182,7 +193,7 @@ summary{cursor:pointer;color:#93a1b5}
 </details>
 
 <h2>Feed items</h2>
-<div class="row"><button type="button" onclick="pollFeeds()">Check feeds</button><span class="muted" id="pollinfo"></span></div>
+<div class="row"><button type="button" onclick="pollFeeds()" title="Fetch new items from configured RSS feeds now">Check feeds</button><span class="muted" id="pollinfo"></span></div>
 <div class="row" id="feedbar"></div>
 <div id="items"></div>
 <!--ERROR-->
@@ -200,12 +211,15 @@ var FEEDNAMES={{FEEDNAMES}};
 // Indexer test: ask the daemon to probe the endpoint with a Torznab caps request.
 (function(){Array.prototype.forEach.call(document.querySelectorAll('[data-idx-test]'),function(btn){btn.addEventListener('click',function(){var i=btn.getAttribute('data-index');var span=document.querySelector('[data-idx-status="'+i+'"]');if(span){span.className='muted';span.textContent=t('Checking…');}var f=new URLSearchParams();f.set('index',i);fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(!span){return;}if(res.ok){span.className='ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){if(span){span.className='err';span.textContent=t('test failed:');}});});});})();
 // Wanted: edit a row into the form, and search the feeds for a title.
-(function(){var form=document.getElementById('wanted-form');if(!form){return;}var idx=document.getElementById('wanted-index');var submit=document.getElementById('wanted-submit');var cancel=document.getElementById('wanted-cancel');var fields=['name','kind','seasons','language','quality','exclude','episode_filter','category','savepath'];function setField(n,v){var el=form.querySelector('[name='+n+']');if(el){el.value=v||'';}}function clear(){idx.value='';fields.forEach(function(n){setField(n,'');});form.querySelector('[name=paused]').checked=false;submit.textContent=t('Add wanted');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');setField('name',btn.getAttribute('data-name'));setField('kind',btn.getAttribute('data-kind'));setField('seasons',btn.getAttribute('data-seasons'));setField('language',btn.getAttribute('data-language'));setField('quality',btn.getAttribute('data-quality'));setField('exclude',btn.getAttribute('data-exclude'));setField('episode_filter',btn.getAttribute('data-episode'));setField('category',btn.getAttribute('data-category'));setField('savepath',btn.getAttribute('data-savepath'));form.querySelector('[name=paused]').checked=btn.getAttribute('data-paused')==='true';submit.textContent=t('Save wanted');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
+(function(){var form=document.getElementById('wanted-form');if(!form){return;}var idx=document.getElementById('wanted-index');var submit=document.getElementById('wanted-submit');var cancel=document.getElementById('wanted-cancel');var fields=['name','kind','seasons','language','quality','exclude','episode_filter','category','savepath'];function setField(n,v){var el=form.querySelector('[name='+n+']');if(!el){return;}if(el.tagName==='SELECT'&&v&&!el.querySelector('option[value="'+v+'"]')){var o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);}el.value=v||'';}function clear(){idx.value='';fields.forEach(function(n){setField(n,'');});form.querySelector('[name=paused]').checked=false;submit.textContent=t('Add wanted');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');setField('name',btn.getAttribute('data-name'));setField('kind',btn.getAttribute('data-kind'));setField('seasons',btn.getAttribute('data-seasons'));setField('language',btn.getAttribute('data-language'));setField('quality',btn.getAttribute('data-quality'));setField('exclude',btn.getAttribute('data-exclude'));setField('episode_filter',btn.getAttribute('data-episode'));setField('category',btn.getAttribute('data-category'));setField('savepath',btn.getAttribute('data-savepath'));form.querySelector('[name=paused]').checked=btn.getAttribute('data-paused')==='true';submit.textContent=t('Save wanted');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
 (function(){var btn=document.getElementById('wanted-search');if(!btn){return;}btn.addEventListener('click',function(){var form=document.getElementById('wanted-form');var box=document.getElementById('wanted-results');var name=form.querySelector('[name=name]').value.trim();if(name.length<2){box.textContent=t('type at least two characters');return;}box.textContent=t('Searching…');var p=new URLSearchParams({q:name,language:form.querySelector('[name=language]').value,quality:form.querySelector('[name=quality]').value});fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){box.innerHTML='';if(!names||!names.length){box.textContent=t('No results');return;}(names).forEach(function(n){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=n;b.onclick=function(){form.querySelector('[name=name]').value=n;};box.appendChild(b);});}).catch(function(){box.textContent=t('No results');});});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
 function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 (function(){var bar=document.getElementById('feedbar');FEEDNAMES.forEach(function(name){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=name;b.onclick=function(){loadItems(name);};bar.appendChild(b);});})();
+function ensureTooltips(root){root=root||document;var nodes=root.querySelectorAll?root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea'):[];for(var i=0;i<nodes.length;i++){var node=nodes[i];if(node.disabled)continue;if(String(node.getAttribute('title')||'').trim())continue;var text=node.getAttribute('aria-label')||node.getAttribute('placeholder')||'';if(!text){var label=node.closest&&node.closest('label');var labelText=label&&label.querySelector('span:not(.sr-only)');text=labelText?labelText.textContent:(label?label.textContent:node.textContent);}text=String(text||'').replace(/\s+/g,' ').trim();if(text){node.setAttribute('title',text);}}}
+document.addEventListener('DOMContentLoaded',function(){ensureTooltips(document);});
+ensureTooltips(document);
 </script>
 </body></html>

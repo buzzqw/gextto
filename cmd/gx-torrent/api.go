@@ -199,8 +199,28 @@ func (d *Daemon) handleStats(w http.ResponseWriter, _ *http.Request) {
 
 // handlePortCheck is the eMule-style "test ports": is the daemon listening and
 // does the router actually forward the peer port?
-func (d *Daemon) handlePortCheck(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, d.mapper.check())
+func (d *Daemon) handlePortCheck(w http.ResponseWriter, r *http.Request) {
+	targetPort := 0
+	if p := strings.TrimSpace(r.URL.Query().Get("port")); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 && n <= 65535 {
+			targetPort = n
+		}
+	}
+	writeJSON(w, http.StatusOK, d.checkPort(targetPort))
+}
+
+func (d *Daemon) checkPort(targetPort int) portCheck {
+	if targetPort > 0 {
+		if d.mapper != nil {
+			return d.mapper.checkPort(targetPort)
+		}
+		tmp := newPortMapper(targetPort, true, true)
+		return tmp.checkPort(targetPort)
+	}
+	if d.mapper != nil {
+		return d.mapper.check()
+	}
+	return portCheck{}
 }
 
 func (d *Daemon) handleList(w http.ResponseWriter, _ *http.Request) {

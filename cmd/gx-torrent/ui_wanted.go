@@ -100,7 +100,8 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
-	include := append(splitList(r.URL.Query().Get("language")), splitList(r.URL.Query().Get("quality"))...)
+	langFilters := splitList(r.URL.Query().Get("language"))
+	qualityFilter := strings.TrimSpace(r.URL.Query().Get("quality"))
 	if len([]rune(query)) < 2 {
 		writeJSON(w, http.StatusOK, []string{})
 		return
@@ -114,7 +115,7 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 		items = append(items, found...)
 	}
 	items = append(items, d.wantedRSSItems(ctx)...)
-	writeJSON(w, http.StatusOK, filterSuggestions(items, include, 20))
+	writeJSON(w, http.StatusOK, filterSuggestions(items, langFilters, qualityFilter, 20))
 }
 
 // wantedRSSItems fetches the items of every configured RSS feed (not the search
@@ -140,19 +141,19 @@ func (d *Daemon) wantedRSSItems(ctx context.Context) []rss.Item {
 
 // filterSuggestions reduces release titles to unique series names whose title
 // contains every include term, most frequent first.
-func filterSuggestions(items []rss.Item, include []string, limit int) []string {
+func filterSuggestions(items []rss.Item, includeLang []string, quality string, limit int) []string {
 	counts := map[string]int{}
 	var names []string
 	for _, item := range items {
 		title := strings.ToLower(item.Title)
 		ok := true
-		for _, term := range include {
+		for _, term := range includeLang {
 			if term = strings.ToLower(strings.TrimSpace(term)); term != "" && !strings.Contains(title, term) {
 				ok = false
 				break
 			}
 		}
-		if !ok {
+		if !ok || !wantedQualityMatch(quality, title) {
 			continue
 		}
 		series, _, _, found := rss.FindEpisode(item.Title)

@@ -234,7 +234,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			Paused:   r.FormValue("paused") != "",
 		}
 		if feed.URL == "" && feed.Search == "" {
-			d.renderRSS(w, r, "Give the feed an RSS URL or a search query.")
+			d.renderRSS(w, r, "Give the feed an RSS URL.")
 			return
 		}
 		if feed.URL != "" && !validIndexerURL(feed.URL) {

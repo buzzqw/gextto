@@ -127,3 +127,24 @@ func TestMagnetWebSeeds(t *testing.T) {
 		t.Errorf("round trip WebSeeds = %v, want %v", m2.WebSeeds, want)
 	}
 }
+
+func TestMagnetDHTNodes(t *testing.T) {
+	v1 := strings.Repeat("ab", 20)
+	// Repeated dht nodes, one with surrounding spaces, plus an empty one.
+	m, err := New("magnet:?xt=urn:btih:" + v1 +
+		"&dht=router.bittorrent.com%3A6881&dht=%20dht.example.org%3A6881%20&dht=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"router.bittorrent.com:6881", "dht.example.org:6881"}
+	if !slices.Equal(m.DHTNodes, want) {
+		t.Fatalf("DHTNodes = %v, want %v", m.DHTNodes, want)
+	}
+	m2, err := New(m.String())
+	if err != nil {
+		t.Fatalf("re-parse %q: %v", m.String(), err)
+	}
+	if !slices.Equal(m2.DHTNodes, want) {
+		t.Errorf("round trip DHTNodes = %v, want %v", m2.DHTNodes, want)
+	}
+}

@@ -221,3 +221,30 @@ func TestSetupSavesIndexerAndTemp(t *testing.T) {
 		t.Fatalf("non-http indexer URL must be rejected: %d", rec.Code)
 	}
 }
+
+func TestPortCheckCustomPort(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/api/v1/portcheck?port=7881", nil)
+	rec := httptest.NewRecorder()
+	d.handlePortCheck(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"port":7881`) {
+		t.Fatalf("expected port:7881 in response, got %s", body)
+	}
+
+	// Also test UI port check endpoint with query param
+	reqUI := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/portcheck?port=7881", nil)
+	recUI := httptest.NewRecorder()
+	d.handleUIPortCheck(recUI, reqUI)
+	if recUI.Code != http.StatusOK {
+		t.Fatalf("ui portcheck status = %d", recUI.Code)
+	}
+	uiBody := recUI.Body.String()
+	if !strings.Contains(uiBody, `class="portdot`) {
+		t.Fatalf("expected portdot in ui port check response, got %s", uiBody)
+	}
+}
+

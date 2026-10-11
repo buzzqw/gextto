@@ -74,11 +74,92 @@ func (d *Daemon) saveWanted(list []wantedEntry) error {
 	return d.opts.Settings.Save()
 }
 
-// wantedIncludes are the include substrings of a wanted entry: language and
-// quality, both matched as case-insensitive substrings.
+// wantedIncludes are the include terms of a wanted entry: language and
+// quality, formatted for display.
 func (w wantedEntry) includes() []string {
-	out := append(splitList(w.Language), splitList(w.Quality)...)
+	out := splitList(w.Language)
+	if q := strings.TrimSpace(w.Quality); q != "" && q != "any" && q != "*" {
+		out = append(out, q)
+	}
 	return out
+}
+
+func extractResolutionNumber(s string) int {
+	s = strings.TrimSpace(strings.ToLower(s))
+	for _, res := range []struct {
+		name string
+		num  int
+	}{
+		{"2160p", 2160},
+		{"4k", 2160},
+		{"1080p", 1080},
+		{"1080i", 1080},
+		{"720p", 720},
+		{"576p", 576},
+		{"480p", 480},
+		{"360p", 360},
+	} {
+		if strings.Contains(s, res.name) {
+			return res.num
+		}
+	}
+	return 0
+}
+
+func extractTitleResolution(lowerTitle string) int {
+	for _, res := range []struct {
+		name string
+		num  int
+	}{
+		{"2160p", 2160},
+		{"4k", 2160},
+		{"uhd", 2160},
+		{"1080p", 1080},
+		{"1080i", 1080},
+		{"720p", 720},
+		{"576p", 576},
+		{"480p", 480},
+		{"360p", 360},
+	} {
+		if strings.Contains(lowerTitle, res.name) {
+			return res.num
+		}
+	}
+	return 0
+}
+
+func wantedQualityMatch(qualityReq string, lowerTitle string) bool {
+	qualityReq = strings.ToLower(strings.TrimSpace(qualityReq))
+	if qualityReq == "" || qualityReq == "any" || qualityReq == "*" {
+		return true
+	}
+	titleRes := extractTitleResolution(lowerTitle)
+
+	if strings.HasSuffix(qualityReq, "+") {
+		minStr := strings.TrimSuffix(qualityReq, "+")
+		minRes := extractResolutionNumber(minStr)
+		if minRes > 0 {
+			if titleRes > 0 {
+				return titleRes >= minRes
+			}
+			return strings.Contains(lowerTitle, minStr)
+		}
+	} else if startText, endText, found := strings.Cut(qualityReq, "-"); found {
+		minRes := extractResolutionNumber(startText)
+		maxRes := extractResolutionNumber(endText)
+		if minRes > 0 && maxRes > 0 {
+			if titleRes > 0 {
+				return titleRes >= minRes && titleRes <= maxRes
+			}
+			return strings.Contains(lowerTitle, startText) || strings.Contains(lowerTitle, endText)
+		}
+	} else {
+		reqRes := extractResolutionNumber(qualityReq)
+		if reqRes > 0 && titleRes > 0 {
+			return titleRes == reqRes
+		}
+	}
+	return strings.Contains(lowerTitle, qualityReq)
 }
 
 // criteria is the match a wanted entry applies to a release title. The language
@@ -93,14 +174,17 @@ func (w wantedEntry) criteria() rss.Criteria {
 	}
 }
 
-// wantedIncludeMatch reports whether the title contains every language/quality
-// term of the wanted entry (an AND, unlike the rule engine's Include).
+// wantedIncludeMatch reports whether the title contains every language term
+// and satisfies the quality requirement.
 func wantedIncludeMatch(w wantedEntry, title string) bool {
 	lower := strings.ToLower(title)
-	for _, term := range w.includes() {
+	for _, term := range splitList(w.Language) {
 		if term = strings.ToLower(strings.TrimSpace(term)); term != "" && !strings.Contains(lower, term) {
 			return false
 		}
+	}
+	if !wantedQualityMatch(w.Quality, lower) {
+		return false
 	}
 	return true
 }

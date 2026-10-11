@@ -210,6 +210,13 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	if err != nil {
 		return nil, newInputError(err)
 	}
+	// Magnet "dht=" bootstrap nodes feed the session DHT (libtorrent's
+	// add_torrent_params.dht_nodes). Harmless when the DHT is disabled.
+	for _, node := range ma.DHTNodes {
+		if s.dht != nil {
+			s.dht.AddNode(node)
+		}
+	}
 	id, port, sto, err := s.add(opt)
 	if err != nil {
 		return nil, err

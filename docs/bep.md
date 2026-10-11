@@ -74,9 +74,10 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 52 | BitTorrent v2 (alberi Merkle SHA-256, `piece layers`) | sì (v1, ibridi, v2-only da `.torrent` e da magnet) |
 | 53 | Magnet URI extension: `so=` (Select Only) | sì |
 
-> Il parametro magnet `so=` è **BEP 53**. `xs=` (sorgente esatta), `ws=` (web
-> seed) e `as=` (sorgente accettabile) vengono dalla **convenzione Magnet URI**
-> (non da una BEP): gx-core gestisce `ws=` (sì), non `xs=`/`as=`.
+> Il parametro magnet `so=` è **BEP 53**. `ws=` (web seed), `xs=` (sorgente
+> esatta), `as=` (sorgente accettabile) e `dht=` (nodo DHT di bootstrap) vengono
+> dalla **convenzione Magnet URI** (non da una BEP): gx-core gestisce `ws=` e
+> `dht=`, non `xs=`/`as=`.
 
 ## Fuori scope / obsolete
 

@@ -132,9 +132,9 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   <span class="muted">{{.Version}} · <span>up for</span> {{.Uptime}} · {{.Now}}</span>
   {{if .Standalone}}
   <nav class="nav">
-    <a class="on" href="/">Torrents</a>
-    <a href="/ui/rss">RSS &amp; indexers</a>
-    <a href="/ui/settings">Settings</a>
+    <a class="on" href="/" title="Torrents list and transfer status">Torrents</a>
+    <a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a>
+    <a href="/ui/settings" title="Daemon configuration and options">Settings</a>
   </nav>
   {{end}}
 </header>
@@ -144,11 +144,11 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 
   <div class="toolbar">
     <form method="post" action="/ui/add" enctype="multipart/form-data">
-      <input type="text" name="source" placeholder="paste magnet:… or https://…/file.torrent" autocomplete="off">
+      <input type="text" name="source" placeholder="paste magnet:… or https://…/file.torrent" autocomplete="off" title="paste magnet:… or https://…/file.torrent">
       <span class="muted">or</span>
       <input type="file" name="torrent" accept=".torrent,application/x-bittorrent" title=".torrent file to add">
       {{template "addopts"}}
-      <button class="primary" type="submit">Add</button>
+      <button class="primary" type="submit" title="Add">Add</button>
     </form>
     <form method="post" action="/ui/ipfilter">
       <span class="muted">IP filter</span>
@@ -158,18 +158,18 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
     <details>
       <summary>Create .torrent</summary>
       <form method="post" action="/ui/create-torrent">
-        <input type="text" name="path" placeholder="Folder or file on the server" autocomplete="off" style="min-width:min(360px,60vw)">
-        <input type="text" name="name" placeholder="Name (optional)" autocomplete="off">
-        <input type="text" name="trackers" placeholder="Trackers, one per line" autocomplete="off">
-        <button type="submit">Create .torrent</button>
+        <input type="text" name="path" placeholder="Folder or file on the server" autocomplete="off" style="min-width:min(360px,60vw)" title="Folder or file on the server">
+        <input type="text" name="name" placeholder="Name (optional)" autocomplete="off" title="Name (optional)">
+        <input type="text" name="trackers" placeholder="Trackers, one per line" autocomplete="off" title="Trackers, one per line">
+        <button type="submit" title="Create .torrent">Create .torrent</button>
       </form>
     </details>
-    <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off">
+    <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off" title="Filter torrents…">
   </div>
   {{if .SearchEnabled}}
   <div class="toolbar">
-    <input type="search" id="searchbox" placeholder="Search indexers…" autocomplete="off" onkeydown="if(event.key==='Enter'){runSearch();}">
-    <button type="button" onclick="runSearch()">Search</button>
+    <input type="search" id="searchbox" placeholder="Search indexers…" autocomplete="off" onkeydown="if(event.key==='Enter'){runSearch();}" title="Search indexers…">
+    <button type="button" onclick="runSearch()" title="Search">Search</button>
     <span class="muted" id="searchinfo"></span>
   </div>
   <div id="searchresults"></div>
@@ -177,36 +177,36 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
   {{if .FeedsEnabled}}
   <div class="toolbar">
     <span class="muted">Feeds <b>{{.FeedCount}}</b></span>
-    <button type="button" onclick="checkFeeds()">Check feeds</button>
+    <button type="button" onclick="checkFeeds()" title="Check feeds">Check feeds</button>
     <span class="muted" id="feedsinfo"></span>
   </div>
   {{end}}
 
   <div class="toolbar">
     <span class="muted">Selected: <b id="selcount">0</b></span>
-    <button type="button" onclick="bulk('resume')">▶ Resume</button>
-    <button type="button" onclick="bulk('pause')">⏸ Pause</button>
-    <button type="button" onclick="bulk('verify')">✓ Recheck</button>
-    <button type="button" onclick="bulk('reannounce')">↻ Reannounce</button>
-    <button type="button" onclick="bulk('top')">⤒ Top</button>
-    <button type="button" class="danger" onclick="bulk('remove')">✕ Remove</button>
-    <button type="button" class="danger" onclick="bulk('remove-files')">✕ Remove and delete files</button>
+    <button type="button" onclick="bulk('resume')" title="▶ Resume">▶ Resume</button>
+    <button type="button" onclick="bulk('pause')" title="⏸ Pause">⏸ Pause</button>
+    <button type="button" onclick="bulk('verify')" title="✓ Recheck">✓ Recheck</button>
+    <button type="button" onclick="bulk('reannounce')" title="↻ Reannounce">↻ Reannounce</button>
+    <button type="button" onclick="bulk('top')" title="⤒ Top">⤒ Top</button>
+    <button type="button" class="danger" onclick="bulk('remove')" title="✕ Remove">✕ Remove</button>
+    <button type="button" class="danger" onclick="bulk('remove-files')" title="✕ Remove and delete files">✕ Remove and delete files</button>
   </div>
 
   {{if .GexttoLog}}
   <div class="tabs">
-    <button type="button" class="on" id="tab-torrents" onclick="showTab('torrents')">Torrents</button>
-    <button type="button" id="tab-log" onclick="showTab('log')">Gextto log</button>
+    <button type="button" class="on" id="tab-torrents" onclick="showTab('torrents')" title="Torrents">Torrents</button>
+    <button type="button" id="tab-log" onclick="showTab('log')" title="Gextto log">Gextto log</button>
   </div>
   {{end}}
   <div id="pane-torrents"><div id="live">{{template "live" .}}</div></div>
   {{if .GexttoLog}}
   <div id="pane-log" style="display:none">
     <div class="logbar">
-      <label class="chk">Lines <select id="log-lines" onchange="loadLog()"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
-      <input type="search" id="log-filter" placeholder="Filter lines…" oninput="renderLog()" autocomplete="off">
+      <label class="chk">Lines <select id="log-lines" onchange="loadLog()" title="Lines"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
+      <input type="search" id="log-filter" placeholder="Filter lines…" oninput="renderLog()" autocomplete="off" title="Filter lines…">
       <label class="chk"><input type="checkbox" id="log-nodebug" checked onchange="renderLog()"> hide DEBUG</label>
-      <button type="button" onclick="loadLog()">↻ Reload</button>
+      <button type="button" onclick="loadLog()" title="↻ Reload">↻ Reload</button>
       <span class="muted" id="log-info"></span>
     </div>
     <pre class="logview" id="log-view">Loading…</pre>
@@ -221,10 +221,11 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 <script id="ui-i18n"></script>
 <script>
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
-function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';});}
+function ensureTooltips(root){root=root||document;var nodes=root.querySelectorAll?root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea'):[];for(var i=0;i<nodes.length;i++){var node=nodes[i];if(node.disabled)continue;if(String(node.getAttribute('title')||'').trim())continue;var text=node.getAttribute('aria-label')||node.getAttribute('placeholder')||'';if(!text){var label=node.closest&&node.closest('label');var labelText=label&&label.querySelector('span:not(.sr-only)');text=labelText?labelText.textContent:(label?label.textContent:node.textContent);}text=String(text||'').replace(/\s+/g,' ').trim();if(text){node.setAttribute('title',text);}}}
+function openDetail(hash, tab){tab=tab||'general';fetch('/ui/detail?hash='+encodeURIComponent(hash)+'&tab='+encodeURIComponent(tab),{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){document.getElementById('detail-body').innerHTML=h;document.getElementById('detail-modal').style.display='flex';ensureTooltips(document.getElementById('detail-modal'));});}
 function closeDetail(){document.getElementById('detail-modal').style.display='none';}
 function detailAction(hash,tab,path,params){var f=new URLSearchParams(params||{});f.set('hash',hash);f.set('tab',tab);fetch(path,{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){openDetail(hash,tab);refresh(true);});}
-function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live'+(window.__rows?'?rows='+window.__rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();}});}
+function refresh(force){var cardsOnly=window.__tab==='log';if(!force&&!cardsOnly){if(document.querySelectorAll('.rowsel:checked').length>0)cardsOnly=true;if(document.getElementById('detail-modal').style.display==='flex')cardsOnly=true;}fetch('/ui/live'+(window.__rows?'?rows='+window.__rows:''),{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){if(!t)return;var box=document.createElement('div');box.innerHTML=t;var c=box.querySelector('#frag-cards'),l=box.querySelector('#frag-live');if(c)document.getElementById('cards').innerHTML=c.innerHTML;if(!cardsOnly&&l){document.getElementById('live').innerHTML=l.innerHTML;applySort();updateSel();applyFilters();ensureTooltips(document.getElementById('live'));}});}
 function rowState(tr){return tr.getAttribute('data-state')||'';}
 function matchesState(st,f){if(f==='all')return true;if(f==='downloading')return st==='downloading'||st==='downloading_metadata'||st==='checking_files';return st===f;}
 function applyFilters(){var q=(document.getElementById('filter').value||'').toLowerCase();var f=window.__stateFilter||'all';var c=window.__catFilter||'';document.querySelectorAll('#live tbody.t').forEach(function(tr){var n=(tr.getAttribute('data-name')||'').toLowerCase();var cat=tr.getAttribute('data-cat')||'';tr.style.display=((!q||n.indexOf(q)>=0)&&matchesState(rowState(tr),f)&&(!c||cat===c))?'':'none';});}
@@ -256,13 +257,13 @@ setInterval(function(){refresh(false)},2000);
 // The engine pushes state changes on /ui/events: refresh at once instead of
 // waiting for the next poll. Piece events are too frequent to refresh on.
 (function(){try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var e=JSON.parse(m.data);if(e.type!=='torrent_piece'){refresh(true);}}catch(_){}};}catch(_){}})();
-(function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
+(function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}document.addEventListener('DOMContentLoaded',function(){ensureTooltips(document);});ensureTooltips(document);})();
 </script>
 </body>
 </html>{{define "addopts"}}
-      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="paused" value="1"> paused</label>
-      <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+      <input type="text" name="destination" placeholder="destination (empty = default)" autocomplete="off" title="destination (empty = default)">
+      <label class="chk" title="paused"><input type="checkbox" name="paused" value="1"> paused</label>
+      <label class="chk" title="top"><input type="checkbox" name="top" value="1"> top</label>
       <label class="chk" title="Download pieces in order (streaming); slower overall"><input type="checkbox" name="sequential" value="1"> sequential</label>
       <label class="chk" title="Download the ends of every file first"><input type="checkbox" name="first_last" value="1"> first/last</label>
       <label class="chk" title="BEP 16 super-seeding: advertise one piece at a time so the swarm spreads the data. For initial seeding only; it reduces the seed's upload throughput"><input type="checkbox" name="super_seeding" value="1"> super-seeding</label>

@@ -27,7 +27,7 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <nav class="nav"><a href="/">Torrents</a><a href="/ui/rss">RSS &amp; indexers</a><a class="on" href="/ui/settings">Settings</a></nav>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a class="on" href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
@@ -35,72 +35,94 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
 <fieldset>
   <legend>Folders</legend>
   <div class="grid">
-    <label>Download folder<input type="text" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off"></label>
-    <label>Temporary folder for incomplete files<input type="text" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off"></label>
+    <label>Download folder<input type="text" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off" title="Main folder for completed downloads"></label>
+    <label>Temporary folder for incomplete files<input type="text" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off" title="Temporary folder for incomplete downloads"></label>
   </div>
 </fieldset>
 <fieldset>
   <legend>Network</legend>
   <div class="grid">
-    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="127.0.0.1:8890" autocomplete="off"></label>
-    <label>Peer port range<input type="text" name="peer-ports" value="{{PEER_PORTS}}" placeholder="6881-6891" autocomplete="off"></label>
-    <label>Incoming interface (IP or name)<input type="text" name="listen-interface" value="{{LISTEN_IFACE}}" autocomplete="off"></label>
-    <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off"></label>
-    <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off"></label>
-    <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off"></label>
-    <label>IP filter file<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off"></label>
-    <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{IPFILTER_TRACKERS}}> Apply the IP filter to trackers</label>
+    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="127.0.0.1:8890" autocomplete="off" title="IP address and port for the web interface and API"></label>
+    <label>Peer port range<input type="text" name="peer-ports" value="{{PEER_PORTS}}" placeholder="6881-6891" autocomplete="off" title="Port or port range for incoming BitTorrent peer traffic"></label>
+    <label>Incoming interface (IP or name)<input type="text" name="listen-interface" value="{{LISTEN_IFACE}}" autocomplete="off" title="Network interface or IP address for incoming connections"></label>
+    <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off" title="Network interface for outgoing traffic (VPN killswitch)"></label>
+    <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off" title="SOCKS5 or HTTP proxy URL for peer traffic"></label>
+    <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off" title="Authentication token for API requests"></label>
+    <label>IP filter file<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off" title="Path or URL to IP filter blocklist"></label>
+    <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{IPFILTER_TRACKERS}} title="Block filtered IP addresses on tracker connections too"> Apply the IP filter to trackers</label>
   </div>
 </fieldset>
 <fieldset>
   <legend>Protocols</legend>
   <div class="grid">
-    <label>Encryption<select name="encryption">{{ENC_OPTIONS}}</select></label>
-    <label>DHT bootstrap nodes<input type="text" name="dht-bootstrap" value="{{DHT_BOOTSTRAP}}" autocomplete="off"></label>
+    <label>Encryption<select name="encryption" title="BitTorrent protocol encryption policy">{{ENC_OPTIONS}}</select></label>
+    <label>DHT bootstrap nodes<input type="text" name="dht-bootstrap" value="{{DHT_BOOTSTRAP}}" autocomplete="off" title="Initial bootstrap nodes for the DHT network"></label>
   </div>
   <div class="grid">
-    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}}> DHT</label>
-    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}}> Peer exchange (PEX)</label>
-    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}}> uTP</label>
-    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}}> Holepunching</label>
-    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}}> Local discovery (LSD)</label>
-    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}}> UPnP port mapping</label>
-    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}}> NAT-PMP port mapping</label>
-    <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}}> DHT read-only (BEP 43)</label>
+    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}} title="Mainline DHT for decentralized peer discovery"> DHT</label>
+    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}} title="Peer Exchange to discover peers from connected swarms"> Peer exchange (PEX)</label>
+    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}} title="Micro Transport Protocol (UDP) for congestion-aware transfers"> uTP</label>
+    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}} title="BEP 55 NAT holepunching over uTP"> Holepunching</label>
+    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}} title="Local Service Discovery to find peers on the local network"> Local discovery (LSD)</label>
+    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}} title="UPnP automatic port forwarding on the router"> UPnP port mapping</label>
+    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}} title="NAT-PMP automatic port forwarding on the router"> NAT-PMP port mapping</label>
+    <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}} title="Run DHT in read-only mode without answering queries"> DHT read-only (BEP 43)</label>
   </div>
 </fieldset>
 <fieldset>
   <legend>Queue and cache</legend>
   <div class="grid">
-    <label>Active downloads<input type="number" min="1" name="active-downloads" value="{{ACTIVE_DL}}"></label>
-    <label>Active seeds<input type="number" min="0" name="active-seeds" value="{{ACTIVE_SEEDS}}"></label>
-    <label>Active limit (downloads + seeds)<input type="number" min="1" name="active-limit" value="{{ACTIVE_LIMIT}}"></label>
-    <label>Disk cache (MiB, 0 = automatic)<input type="number" min="0" name="cache-mb" value="{{CACHE_MB}}"></label>
-    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}}> Preallocate disk space</label>
-    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}}> Download in sequential order</label>
+    <label>Active downloads<input type="number" min="1" name="active-downloads" value="{{ACTIVE_DL}}" title="Maximum number of simultaneous downloading torrents"></label>
+    <label>Active seeds<input type="number" min="0" name="active-seeds" value="{{ACTIVE_SEEDS}}" title="Maximum number of simultaneous seeding torrents"></label>
+    <label>Active limit (downloads + seeds)<input type="number" min="1" name="active-limit" value="{{ACTIVE_LIMIT}}" title="Maximum total active torrents (downloads and seeds)"></label>
+    <label>Disk cache (MiB, 0 = automatic)<input type="number" min="0" name="cache-mb" value="{{CACHE_MB}}" title="Disk cache memory size in MiB (0 = automatic)"></label>
+    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}} title="Preallocate disk space before writing file chunks"> Preallocate disk space</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order"> Download in sequential order</label>
   </div>
 </fieldset>
 <fieldset>
   <legend>Bandwidth</legend>
-  <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}"></label>
-  <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-upload" value="{{SPEED_UL}}"></label>
+  <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
+  <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-upload" value="{{SPEED_UL}}" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
 </fieldset>
 <fieldset>
   <legend>Bandwidth scheduler</legend>
-  <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{SCHED_ENABLED}}> Enable the scheduler</label>
-  <label>Start (HH:MM)<input type="text" name="schedule-start" value="{{SCHED_START}}" placeholder="01:00"></label>
-  <label>End (HH:MM)<input type="text" name="schedule-end" value="{{SCHED_END}}" placeholder="08:00"></label>
-  <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}"></label>
-  <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}"></label>
+  <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{SCHED_ENABLED}} title="Activate time-based speed limits schedule"> Enable the scheduler</label>
+  <label>Start (HH:MM)<input type="text" name="schedule-start" value="{{SCHED_START}}" placeholder="01:00" title="Start time of the scheduled bandwidth window (HH:MM)"></label>
+  <label>End (HH:MM)<input type="text" name="schedule-end" value="{{SCHED_END}}" placeholder="08:00" title="End time of the scheduled bandwidth window (HH:MM)"></label>
+  <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}" title="Download speed limit during scheduled window in KiB/s"></label>
+  <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}" title="Upload speed limit during scheduled window in KiB/s"></label>
   <p class="muted">Inside the window the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
 </fieldset>
 <fieldset>
   <legend>Interface and notifications</legend>
-  <label>Language<select name="lang">{{LANG_OPTIONS}}</select></label>
-  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off"></label>
+  <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
+  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion"></label>
 </fieldset>
-<button type="submit">Save</button>
+<button type="submit" title="Save settings to settings.json">Save</button>
 <!--ERROR-->
 </form>
 </main>
+<script id="ui-i18n"></script>
+<script>
+function ensureTooltips(root) {
+  root = root || document;
+  var nodes = root.querySelectorAll ? root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea') : [];
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    if (node.disabled) continue;
+    if (String(node.getAttribute('title') || '').trim()) continue;
+    var text = node.getAttribute('aria-label') || node.getAttribute('placeholder') || '';
+    if (!text) {
+      var label = node.closest && node.closest('label');
+      var labelText = label && label.querySelector('span:not(.sr-only)');
+      text = labelText ? labelText.textContent : (label ? label.textContent : node.textContent);
+    }
+    text = String(text || '').replace(/\s+/g, ' ').trim();
+    if (text) { node.setAttribute('title', text); }
+  }
+}
+document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
+ensureTooltips(document);
+</script>
 </body></html>

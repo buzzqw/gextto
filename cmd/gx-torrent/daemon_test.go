@@ -787,6 +787,22 @@ func TestMagnetWebSeeds(t *testing.T) {
 	}
 }
 
+// A magnet with a "dht=" bootstrap node is accepted and added (the node feeds
+// the session DHT; the add must not fail or block).
+func TestMagnetDHTNode(t *testing.T) {
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 46300, PortEnd: 46399, Encryption: 1})
+	dst := filepath.Join(t.TempDir(), "dst")
+	magnet := "magnet:?xt=urn:btih:" + strings.Repeat("ab", 20) + "&dht=127.0.0.1%3A6881"
+	hash, existing, err := d.add(addRequest{Magnet: magnet, Destination: dst})
+	if err != nil {
+		t.Fatalf("add magnet: %v", err)
+	}
+	if existing {
+		t.Fatal("unexpected existing torrent")
+	}
+	waitFor(t, "torrent added", func() bool { return stateOf(d, hash) != "" })
+}
+
 // RAM disk flow: the download starts on a tmpfs and is moved to the disk
 // while it is still downloading (cross-filesystem copy); it must finish
 // there with the right content and leave nothing on the RAM disk.

@@ -29,7 +29,7 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <body><form method="post" action="/ui/setup">
 <h2>gx-torrent setup</h2>
 <p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
-<label>Language<select name="lang">
+<label>Language<select name="lang" title="Web interface language">
 <option value="en">English</option>
 <option value="it">Italiano</option>
 <option value="de">Deutsch</option>
@@ -37,35 +37,34 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <option value="es">Español</option>
 <option value="pl">Polski</option>
 </select></label>
-<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" placeholder="/srv/media/downloads" autocomplete="off"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" placeholder="/srv/media/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
 <h3>Access</h3>
-<label>Username<input type="text" name="user" value="admin" autocomplete="username"></label>
-<label>Password<input type="password" name="password" autocomplete="new-password"></label>
-<label>Confirm password<input type="password" name="password2" autocomplete="new-password"></label>
-<label class="chk"><input type="checkbox" name="local-bypass" value="1" checked> Allow the LAN without a password</label>
+<label>Username<input type="text" name="user" value="admin" autocomplete="username" title="Admin username for web interface login"></label>
+<label>Password<input type="password" name="password" autocomplete="new-password" title="Password for web interface login"></label>
+<label>Confirm password<input type="password" name="password2" autocomplete="new-password" title="Confirm password"></label>
+<label class="chk"><input type="checkbox" name="local-bypass" value="1" checked title="Allow access from local network without authentication"> Allow the LAN without a password</label>
 <h3>Network</h3>
-<label>Peer port<input type="number" name="peer-port" placeholder="6881" min="0" max="65535"></label>
-<button type="button" class="secondary" id="ptest">Test port</button>
-<p class="m">The test checks the port the daemon is already listening on, not the value typed above (a new port applies at the next start).</p>
+<label>Peer port<input type="number" name="peer-port" id="peer-port" placeholder="6881" min="0" max="65535" title="Port for incoming peer traffic"></label>
+<button type="button" class="secondary" id="ptest" title="Test if the peer port is reachable and forwarded">Test port</button>
 <p class="m" id="presult"></p>
 <h3>Bandwidth</h3>
-<label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0"></label>
-<label>Upload limit (KiB/s, 0 = unlimited)<input type="number" name="speed-upload" min="0" placeholder="0"></label>
+<label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0" title="Global download speed limit in KiB/s (0 = unlimited)"></label>
+<label>Upload limit (KiB/s, 0 = unlimited)<input type="number" name="speed-upload" min="0" placeholder="0" title="Global upload speed limit in KiB/s (0 = unlimited)"></label>
 <h3>Indexer</h3>
-<label>Indexer<select name="indexer-name" id="indexer-name">
+<label>Indexer<select name="indexer-name" id="indexer-name" title="Indexer service preset">
 <option value="" data-url="">None</option>
 <option value="Prowlarr" data-url="http://127.0.0.1:9696">Prowlarr</option>
 <option value="Jackett" data-url="http://127.0.0.1:9117">Jackett</option>
 <option value="MIRCrew" data-url="">MIRCrew</option>
 <option value="other" data-url="">Other</option>
 </select></label>
-<label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off"></label>
-<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off"></label>
+<label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off" title="Torznab endpoint URL"></label>
+<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off" title="API key for indexer"></label>
 <p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr and Jackett fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
 <p class="m">The download folder and the peer port apply at the next start.</p>
 <p class="m">The bandwidth limits apply immediately.</p>
-<button type="submit">Finish setup</button>
+<button type="submit" title="Complete setup and start using gx-torrent">Finish setup</button>
 <!--ERROR-->
 </form>
 <div id="browse-overlay" class="overlay" style="display:none">
@@ -83,7 +82,10 @@ document.getElementById('ptest').addEventListener('click', function () {
   var out = document.getElementById('presult');
   out.className = 'm';
   out.textContent = 'Testing...';
-  fetch('/api/v1/portcheck').then(function (r) { return r.json(); }).then(function (j) {
+  var inp = document.getElementById('peer-port') || document.querySelector('input[name="peer-port"]');
+  var p = (inp && inp.value) ? inp.value.trim() : '';
+  var url = '/api/v1/portcheck' + (p ? '?port=' + encodeURIComponent(p) : '');
+  fetch(url).then(function (r) { return r.json(); }).then(function (j) {
     var text;
     if (j.error) {
       text = 'Error: ' + j.error;
@@ -145,5 +147,24 @@ function browseChoose() {
 Array.prototype.forEach.call(document.querySelectorAll('.browse'), function (b) {
   b.addEventListener('click', function () { openBrowse(b.getAttribute('data-target')); });
 });
+function ensureTooltips(root) {
+  root = root || document;
+  var nodes = root.querySelectorAll ? root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea') : [];
+  for (var i = 0; i < nodes.length; i++) {
+    var node = nodes[i];
+    if (node.disabled) continue;
+    if (String(node.getAttribute('title') || '').trim()) continue;
+    var text = node.getAttribute('aria-label') || node.getAttribute('placeholder') || '';
+    if (!text) {
+      var label = node.closest && node.closest('label');
+      var labelText = label && label.querySelector('span:not(.sr-only)');
+      text = labelText ? labelText.textContent : (label ? label.textContent : node.textContent);
+    }
+    text = String(text || '').replace(/\s+/g, ' ').trim();
+    if (text) { node.setAttribute('title', text); }
+  }
+}
+document.addEventListener('DOMContentLoaded', function () { ensureTooltips(document); });
+ensureTooltips(document);
 </script>
 </body></html>

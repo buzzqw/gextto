@@ -720,7 +720,8 @@ dati.
   dei file (si impostano all'aggiunta, o per tutti i nuovi torrent in
   *Configurazione → Code e prestazioni → Modalità di download*; valgono per i torrent
   nuovi). Un magnet con il parametro `so=` (BEP 53) scarica da subito solo i file
-  indicati; con `ws=` aggiunge web seed. Supporta i torrent **solo-v2** (BEP 52),
+  indicati; con `ws=` aggiunge web seed e con `dht=` un nodo DHT di bootstrap.
+  Supporta i torrent **solo-v2** (BEP 52),
   sia da `.torrent` sia da
   magnet; non supporta WebTorrent/WebRTC.
 - **libtorrent (build opzionale)** — la sessione libtorrent nello stesso processo

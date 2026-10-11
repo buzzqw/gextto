@@ -486,7 +486,9 @@ Esempio:
 La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
 indexer* nella barra di ogni pagina) è pensata per l'uso quotidiano. In cima c'è
 **Cercati**: i titoli che l'operatore vuole. Ogni titolo ha tipo (serie/film),
-stagioni (`1+`, `2-4`, `1`), lingua, qualità, esclusi, filtro episodi, categoria
+stagioni (`1+`, `2-4`, `1`), lingua, qualità (selezionabile da menu a tendina
+tra *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
+*1080p+*, *2160p 4K*, *2160p+ 4K+*), esclusi, filtro episodi, categoria
 e percorso. Si aggiunge a mano, oppure si scrive un nome e si preme **Cerca nei
 feed**: vengono interrogati gli indexer e i feed RSS già configurati e la pagina
 propone i **nomi trovati** (filtrati per lingua/qualità già inserite), da
@@ -506,14 +508,19 @@ la qualità valgono in AND e i feed restano liberi per le regole avanzate.
 Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
 con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta
 Torznab `t=caps`, esito accanto alla riga) e rimuovere **indexer** (tendina
-Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS o query di ricerca,
-cartella, include/exclude, categoria, percorso, in pausa), l'**editor delle
+Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS, cartella,
+include/exclude, categoria, percorso, in pausa — i parametri di ricerca per
+titoli appartengono a *Cercati*), l'**editor delle
 regole** (una regola per riga, con frecce per cambiarne l'ordine — la prima che
 corrisponde vince; regex e filtri numerici stanno sotto *Filtri avanzati*), le
 textarea JSON avanzate per feed, regole e indexer (salvate con validazione), e
 per ogni feed un pulsante che mostra gli articoli correnti con la regola che li
 prenderebbe e un *Add* manuale (la vista "articoli corrispondenti" di qBittorrent)
 e un pulsante *Check feeds* per forzare subito un giro di controllo.
+Tutti i controlli, pulsanti e campi di inserimento della UI standalone
+dispongono di tooltip descrittivi e localizzati. Nel wizard di primo avvio
+(`/ui/setup`), il pulsante *Testa porta* verifica la porta digitata nel campo
+(tramite `/api/v1/portcheck?port=...`).
 
 Gli stessi risultati si ottengono via
 `POST /ui/rss-indexer`, `POST /ui/rss-feed`, `POST /ui/rss-rule` (op
@@ -741,6 +748,8 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   mostra gli stessi file esclusi e si possono cambiare come sempre.
 - Se il magnet porta `ws=` (BEP 53, web seed), i web seed vengono aggiunti al
   torrent e restano anche dopo un riavvio.
+- Se il magnet porta `dht=` (nodo DHT di bootstrap), il nodo viene aggiunto alla
+  DHT della sessione.
 - Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
   dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
   pezzi che non vuole, e lo segnala ai **tracker** con `event=paused` a ogni
