@@ -4,7 +4,7 @@ go 1.26.8
 
 require (
 	github.com/anacrolix/utp v0.2.0
-	github.com/cenkalti/backoff/v7 v7.0.0
+	github.com/cenkalti/backoff/v7 v7.0.1
 	github.com/cenkalti/log v1.0.0
 	github.com/fatih/structs v1.1.0
 	github.com/gofrs/uuid v4.4.0+incompatible
