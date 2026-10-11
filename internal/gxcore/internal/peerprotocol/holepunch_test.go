@@ -86,13 +86,40 @@ func TestHolepunchExtensionMessageRoundTrip(t *testing.T) {
 }
 
 func TestExtensionHandshakeAdvertisesHolepunch(t *testing.T) {
-	on := NewExtensionHandshake(0, "v", nil, 0, true)
+	on := NewExtensionHandshake(0, "v", nil, 0, true, false)
 	if _, ok := on.M[ExtensionKeyHolepunch]; !ok {
 		t.Fatal("ut_holepunch not advertised when enabled")
 	}
-	off := NewExtensionHandshake(0, "v", nil, 0, false)
+	off := NewExtensionHandshake(0, "v", nil, 0, false, false)
 	if _, ok := off.M[ExtensionKeyHolepunch]; ok {
 		t.Fatal("ut_holepunch advertised although disabled")
+	}
+}
+
+func TestExtensionHandshakeUploadOnly(t *testing.T) {
+	seed := NewExtensionHandshake(0, "v", nil, 0, false, true)
+	if seed.UploadOnly != 1 {
+		t.Fatalf("upload_only = %d, want 1 for a seed", seed.UploadOnly)
+	}
+	leech := NewExtensionHandshake(0, "v", nil, 0, false, false)
+	if leech.UploadOnly != 0 {
+		t.Fatalf("upload_only = %d, want 0 for a leecher", leech.UploadOnly)
+	}
+	// The header survives a BEP 10 extended-message round trip.
+	var buf bytes.Buffer
+	if _, err := (ExtensionMessage{ExtendedMessageID: ExtensionIDHandshake, Payload: seed}).WriteTo(&buf); err != nil {
+		t.Fatal(err)
+	}
+	var got ExtensionMessage
+	if err := got.UnmarshalBinary(buf.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	back, ok := got.Payload.(ExtensionHandshakeMessage)
+	if !ok {
+		t.Fatalf("payload type = %T", got.Payload)
+	}
+	if back.UploadOnly != 1 {
+		t.Fatalf("round trip upload_only = %d, want 1", back.UploadOnly)
 	}
 }
 

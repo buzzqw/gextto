@@ -30,6 +30,13 @@ func (t *torrent) checkCompletion() bool {
 	}
 	t.outgoingHandshakers = make(map[*outgoinghandshaker.OutgoingHandshaker]struct{})
 	t.stopWebseedDownloads()
+	// BEP 21: we are now a (partial) seed. Tell the connected peers we are not
+	// interested in downloading anything, so they stop offering us pieces.
+	for pe := range t.peers {
+		if pe.ExtensionsEnabled {
+			t.sendExtensionHandshake(pe)
+		}
+	}
 	for pe := range t.peers {
 		if !pe.PeerInterested {
 			t.closePeer(pe)

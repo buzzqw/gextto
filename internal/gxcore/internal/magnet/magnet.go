@@ -25,6 +25,11 @@ type Magnet struct {
 	// present on hybrid and v2-only links. HasV2 reports whether it was found.
 	V2InfoHash [32]byte
 	HasV2      bool
+	// SelectOnly is the sorted list of file indices to download, from the
+	// BEP 53 "so" parameter (Select Only). Empty means every file is wanted.
+	// Indices address the non-padding files, the same convention the engine's
+	// Config.FileSelection uses.
+	SelectOnly []int
 }
 
 // New parses the string and returns new Magnet.
@@ -95,6 +100,11 @@ func New(s string) (*Magnet, error) {
 
 	magnet.Peers = params["x.pe"]
 
+	// BEP 53 "so": Select Only, a list of file indices (comma separated, with
+	// ranges like "0,2,4-7"). Repeated parameters and repeated indices are
+	// accepted and de-duplicated.
+	magnet.SelectOnly = parseSelectOnly(params["so"])
+
 	return &magnet, nil
 }
 
@@ -138,7 +148,76 @@ func (m *Magnet) String() string {
 		b.WriteString("&x.pe=")
 		b.WriteString(p)
 	}
+	if len(m.SelectOnly) > 0 {
+		b.WriteString("&so=")
+		for i, idx := range m.SelectOnly {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(strconv.Itoa(idx))
+		}
+	}
 	return b.String()
+}
+
+// maxSelectOnlyRange caps the expansion of a single "lo-hi" range so a hostile
+// magnet cannot make the parser allocate an unbounded slice.
+const maxSelectOnlyRange = 1 << 20
+
+// parseSelectOnly parses the BEP 53 "so" values into a sorted, de-duplicated
+// list of file indices. Each value is a comma-separated list of indices, each
+// either a number ("3") or an inclusive range ("4-7"). Malformed parts are
+// ignored; an empty result means the parameter was absent or unusable.
+func parseSelectOnly(values []string) []int {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[int]struct{})
+	var out []int
+	add := func(n int) {
+		if n < 0 {
+			return
+		}
+		if _, ok := seen[n]; ok {
+			return
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			lo, hi, isRange := strings.Cut(part, "-")
+			if !isRange {
+				if n, err := strconv.Atoi(part); err == nil {
+					add(n)
+				}
+				continue
+			}
+			a, err1 := strconv.Atoi(strings.TrimSpace(lo))
+			b, err2 := strconv.Atoi(strings.TrimSpace(hi))
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			if a > b {
+				a, b = b, a
+			}
+			if b-a >= maxSelectOnlyRange {
+				b = a + maxSelectOnlyRange - 1
+			}
+			for n := a; n <= b; n++ {
+				add(n)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	slices.Sort(out)
+	return out
 }
 
 type trackerTier struct {

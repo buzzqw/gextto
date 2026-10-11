@@ -132,10 +132,13 @@ type ExtensionHandshakeMessage struct {
 	YourIP       string           `bencode:"yourip,omitempty"`
 	MetadataSize int              `bencode:"metadata_size,omitempty"`
 	RequestQueue int              `bencode:"reqq"`
+	// UploadOnly is the BEP 21 "upload_only" header: 1 means the peer is not
+	// interested in downloading anything (a full or partial seed).
+	UploadOnly int `bencode:"upload_only,omitempty"`
 }
 
 // NewExtensionHandshake returns a new ExtensionHandshakeMessage by filling the struct with given values.
-func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int, holepunch bool) ExtensionHandshakeMessage {
+func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, requestQueueLength int, holepunch bool, uploadOnly bool) ExtensionHandshakeMessage {
 	m := map[string]uint8{
 		ExtensionKeyMetadata: ExtensionIDMetadata,
 		ExtensionKeyPEX:      ExtensionIDPEX,
@@ -143,13 +146,17 @@ func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, r
 	if holepunch {
 		m[ExtensionKeyHolepunch] = ExtensionIDHolepunch
 	}
-	return ExtensionHandshakeMessage{
+	msg := ExtensionHandshakeMessage{
 		M:            m,
 		V:            version,
 		YourIP:       string(truncateIP(yourip)),
 		MetadataSize: int(metadataSize),
 		RequestQueue: requestQueueLength,
 	}
+	if uploadOnly {
+		msg.UploadOnly = 1
+	}
+	return msg
 }
 
 // ExtensionMetadataMessage is the message for the Metadata extension.

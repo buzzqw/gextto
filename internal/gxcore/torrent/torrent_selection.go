@@ -5,25 +5,47 @@ package torrent
 import (
 	"path/filepath"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage/filestorage"
 )
 
 // skippedInfoFiles maps Config.FileSelection (non-padding files) onto
-// info.Files. nil means every file is wanted.
+// info.Files. nil means every file is wanted. An app-provided selection takes
+// precedence; when the app has none, the BEP 53 magnet "so=" seed is used.
 func (t *torrent) skippedInfoFiles() []bool {
-	selection := t.session.config.FileSelection
-	if selection == nil || t.info == nil {
+	if t.info == nil {
 		return nil
 	}
-	flags := selection(t.id)
-	if len(flags) == 0 {
-		return nil
+	if selection := t.session.config.FileSelection; selection != nil {
+		if flags := selection(t.id); len(flags) > 0 {
+			return maskFromFlags(t.info, flags)
+		}
 	}
-	out := make([]bool, len(t.info.Files))
+	return maskFromSelectOnly(t.info, t.getSelectOnly())
+}
+
+// getSelectOnly returns the BEP 53 "so" seed. See selectOnlyMu.
+func (t *torrent) getSelectOnly() []int {
+	t.selectOnlyMu.Lock()
+	defer t.selectOnlyMu.Unlock()
+	return t.selectOnly
+}
+
+// setSelectOnly replaces the BEP 53 "so" seed. See selectOnlyMu.
+func (t *torrent) setSelectOnly(wanted []int) {
+	t.selectOnlyMu.Lock()
+	t.selectOnly = wanted
+	t.selectOnlyMu.Unlock()
+}
+
+// maskFromFlags turns a per-non-padding-file skip list into a mask indexed by
+// info.Files (padding included). nil means nothing is skipped.
+func maskFromFlags(info *metainfo.Info, flags []bool) []bool {
+	out := make([]bool, len(info.Files))
 	any := false
 	j := 0
-	for i, f := range t.info.Files {
+	for i, f := range info.Files {
 		if f.Padding {
 			continue
 		}
@@ -34,6 +56,41 @@ func (t *torrent) skippedInfoFiles() []bool {
 		j++
 	}
 	if !any {
+		return nil
+	}
+	return out
+}
+
+// maskFromSelectOnly returns the skip mask for a BEP 53 "so" selection: every
+// non-padding file whose index is not in wanted is skipped. nil means every
+// file is wanted: the parameter is ignored when it names no valid file (this
+// avoids a magnet that would download nothing).
+func maskFromSelectOnly(info *metainfo.Info, wanted []int) []bool {
+	if len(wanted) == 0 {
+		return nil
+	}
+	want := make(map[int]struct{}, len(wanted))
+	for _, i := range wanted {
+		if i >= 0 {
+			want[i] = struct{}{}
+		}
+	}
+	out := make([]bool, len(info.Files))
+	anyWanted, anySkip := false, false
+	j := 0
+	for i, f := range info.Files {
+		if f.Padding {
+			continue
+		}
+		if _, ok := want[j]; ok {
+			anyWanted = true
+		} else {
+			out[i] = true
+			anySkip = true
+		}
+		j++
+	}
+	if !anyWanted || !anySkip {
 		return nil
 	}
 	return out
@@ -99,6 +156,12 @@ func (t *torrent) wantedComplete() bool {
 		}
 	}
 	return true
+}
+
+// uploadOnly reports whether we are a full or partial seed (BEP 21): every
+// wanted piece is present, so we are not interested in downloading anything.
+func (t *torrent) uploadOnly() bool {
+	return t.completed
 }
 
 // resetCompletionIfWantedMissing reopens a torrent that was complete when

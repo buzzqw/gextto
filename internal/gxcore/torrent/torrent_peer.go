@@ -171,17 +171,8 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 	} else {
 		t.sendBitfield(p)
 	}
-	var metadataSize uint32
-	if t.info != nil {
-		metadataSize = uint32(len(t.info.Bytes))
-	}
 	if p.ExtensionsEnabled {
-		extHandshakeMsg := peerprotocol.NewExtensionHandshake(metadataSize, t.getClientVersion(), p.Addr().IP, t.session.config.MaxRequestsIn, t.session.config.Holepunch)
-		msg := peerprotocol.ExtensionMessage{
-			ExtendedMessageID: peerprotocol.ExtensionIDHandshake,
-			Payload:           extHandshakeMsg,
-		}
-		p.SendMessage(msg)
+		t.sendExtensionHandshake(p)
 	}
 	if p.DHTEnabled {
 		msg := peerprotocol.PortMessage{Port: t.session.config.DHTPort}
@@ -192,6 +183,26 @@ func (t *torrent) sendFirstMessage(p *peer.Peer) {
 	if p.FastEnabled && t.pieces != nil && !t.superSeedActive() {
 		p.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)
 	}
+}
+
+// sendExtensionHandshake sends our BEP 10 extension handshake to a peer,
+// including the BEP 21 "upload_only" header when we are a (partial) seed.
+func (t *torrent) sendExtensionHandshake(p *peer.Peer) {
+	var metadataSize uint32
+	if t.info != nil {
+		metadataSize = uint32(len(t.info.Bytes))
+	}
+	p.SendMessage(peerprotocol.ExtensionMessage{
+		ExtendedMessageID: peerprotocol.ExtensionIDHandshake,
+		Payload: peerprotocol.NewExtensionHandshake(
+			metadataSize,
+			t.getClientVersion(),
+			p.Addr().IP,
+			t.session.config.MaxRequestsIn,
+			t.session.config.Holepunch,
+			t.uploadOnly(),
+		),
+	})
 }
 
 // sendBitfield advertises our pieces to a peer: have-all/have-none for the fast

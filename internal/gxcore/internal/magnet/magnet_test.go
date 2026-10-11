@@ -2,6 +2,7 @@ package magnet
 
 import (
 	"encoding/hex"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -58,5 +59,50 @@ func TestPlainMagnetHasNoV2(t *testing.T) {
 	}
 	if m.HasV2 {
 		t.Error("plain v1 magnet reported a v2 hash")
+	}
+}
+
+func TestMagnetSelectOnly(t *testing.T) {
+	v1 := strings.Repeat("ab", 20)
+	cases := []struct {
+		name string
+		so   string
+		want []int
+	}{
+		{"absent", "", nil},
+		{"single", "&so=1", []int{1}},
+		{"list", "&so=0,2,5", []int{0, 2, 5}},
+		{"range", "&so=4-7", []int{4, 5, 6, 7}},
+		{"mixed", "&so=0,2,4-6", []int{0, 2, 4, 5, 6}},
+		{"spaces and dupes", "&so=3,+3,+1", []int{1, 3}},
+		{"repeated params", "&so=2&so=0", []int{0, 2}},
+		{"garbage ignored", "&so=a,b-", nil},
+		{"descending range", "&so=5-3", []int{3, 4, 5}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := New("magnet:?xt=urn:btih:" + v1 + tc.so)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(m.SelectOnly, tc.want) {
+				t.Errorf("SelectOnly = %v, want %v", m.SelectOnly, tc.want)
+			}
+		})
+	}
+}
+
+func TestMagnetSelectOnlyRoundTrip(t *testing.T) {
+	v1 := strings.Repeat("ab", 20)
+	m, err := New("magnet:?xt=urn:btih:" + v1 + "&so=1,3,5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m2, err := New(m.String())
+	if err != nil {
+		t.Fatalf("re-parse %q: %v", m.String(), err)
+	}
+	if !slices.Equal(m2.SelectOnly, []int{1, 3, 5}) {
+		t.Errorf("round trip SelectOnly = %v, want [1 3 5]", m2.SelectOnly)
 	}
 }

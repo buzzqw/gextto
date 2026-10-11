@@ -65,6 +65,14 @@ type torrent struct {
 	// known, Info.HasV2 is authoritative.
 	hasV2Hint bool
 
+	// selectOnly, when non-nil, restricts the download to these non-padding
+	// file indices (BEP 53 magnet "so="). It is the engine-side seed applied
+	// while the embedding app has no opinion: once Config.FileSelection
+	// returns a mask, that mask takes precedence (see skippedInfoFiles).
+	// selectOnlyMu guards it because the daemon may clear it at runtime.
+	selectOnly   []int
+	selectOnlyMu sync.Mutex
+
 	// Storage implementation to save the files in torrent.
 	storage storage.Storage
 

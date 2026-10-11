@@ -45,6 +45,11 @@ type AddTorrentOptions struct {
 	// that, so the swarm spreads the data. Seeding strategy only; it does not
 	// affect the queue, the seed policy or the bandwidth limits.
 	SuperSeeding bool
+	// SelectOnly restricts the download to these non-padding file indices
+	// (BEP 53 "so"). Empty means every file is wanted. For a magnet link the
+	// "so" parameter is used when this field is empty. An app-provided
+	// Config.FileSelection takes precedence over it.
+	SelectOnly []int
 }
 
 // AddTorrent adds a new torrent to the session by reading .torrent metainfo from reader.
@@ -120,6 +125,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		}
 	}()
 	t.pieceLayers = mi.PieceLayers
+	t.setSelectOnly(opt.SelectOnly)
 	layers, _ := metainfo.EncodePieceLayers(mi.PieceLayers)
 	rspec := &boltdbresumer.Spec{
 		InfoHash:          mi.Info.Hash[:],
@@ -238,6 +244,12 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		return nil, err
 	}
 	t.hasV2Hint = ma.HasV2
+	// BEP 53: the magnet "so" selection is the default; an explicit option wins.
+	wanted := opt.SelectOnly
+	if len(wanted) == 0 {
+		wanted = ma.SelectOnly
+	}
+	t.setSelectOnly(wanted)
 	go s.checkTorrent(t)
 	defer func() {
 		if err != nil {

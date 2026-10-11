@@ -269,6 +269,24 @@ func (t *Torrent) SuperSeeding() bool {
 	return query(t.torrent, func() bool { return t.torrent.superSeeding })
 }
 
+// SelectOnly returns the BEP 53 "so" file selection of the torrent (non-padding
+// file indices), or nil when every file is wanted. It is the seed applied while
+// the embedding app provides no Config.FileSelection of its own.
+func (t *Torrent) SelectOnly() []int {
+	wanted := t.torrent.getSelectOnly()
+	if len(wanted) == 0 {
+		return nil
+	}
+	return append([]int(nil), wanted...)
+}
+
+// ClearSelectOnly drops the BEP 53 "so" seed, so the app's Config.FileSelection
+// (or "every file wanted") is authoritative from now on. The daemon calls it
+// once it has recorded the seed as an explicit file selection.
+func (t *Torrent) ClearSelectOnly() {
+	t.torrent.setSelectOnly(nil)
+}
+
 // PieceStates returns the state of every piece, in index order:
 // "have", "downloading", "skipped" or "" (missing). The second value is false
 // when the torrent has no metadata/pieces yet. Once completed the engine drops the
