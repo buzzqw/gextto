@@ -34,7 +34,8 @@ func (d *Daemon) standaloneGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// First run: send the browser to the wizard until it has been done.
 		if !d.setupComplete() && r.Method == http.MethodGet &&
-			(r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/ui/")) && r.URL.Path != setupPath {
+			(r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/ui/")) &&
+			r.URL.Path != setupPath && r.URL.Path != uiBrowsePath {
 			http.Redirect(w, r, setupPath, http.StatusSeeOther)
 			return
 		}

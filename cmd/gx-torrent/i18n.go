@@ -162,6 +162,31 @@ var uiCatalog = map[string][5]string{
 	"Rule":       {"Regola", "Regel", "Règle", "Regla", "Reguła"},
 	"Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.": {"Feed, regole e indexer sono salvati in settings.json. Le regole sono valutate in ordine; vince la prima che corrisponde.", "Feeds, Regeln und Indexer werden in settings.json gespeichert. Die Regeln werden der Reihe nach geprüft; die erste passende gewinnt.", "Les flux, règles et indexeurs sont enregistrés dans settings.json. Les règles sont évaluées dans l'ordre ; la première correspondance gagne.", "Los feeds, reglas e indexadores se guardan en settings.json. Las reglas se evalúan en orden; gana la primera coincidencia.", "Kanały, reguły i indeksery są zapisywane w settings.json. Reguły są sprawdzane po kolei; wygrywa pierwsza pasująca."},
 
+	// Standalone navigation and the friendly indexer/feed editors.
+	"RSS & indexers": {"RSS e indexer", "RSS & Indexer", "RSS et indexeurs", "RSS e indexadores", "RSS i indeksery"},
+	"Type":           {"Tipo", "Typ", "Type", "Tipo", "Typ"},
+	"API key":        {"Chiave API", "API-Schlüssel", "Clé API", "Clave API", "Klucz API"},
+	"Add indexer":    {"Aggiungi indexer", "Indexer hinzufügen", "Ajouter un indexeur", "Añadir indexador", "Dodaj indekser"},
+	"Add feed":       {"Aggiungi feed", "Feed hinzufügen", "Ajouter un flux", "Añadir feed", "Dodaj kanał"},
+	"Feed URL":       {"URL del feed", "Feed-URL", "URL du flux", "URL del feed", "URL kanału"},
+	"Search query":   {"Query di ricerca", "Suchbegriff", "Requête de recherche", "Consulta de búsqueda", "Zapytanie wyszukiwania"},
+	"Include":        {"Includi", "Einschließen", "Inclure", "Incluir", "Dołącz"},
+	"Exclude":        {"Escludi", "Ausschließen", "Exclure", "Excluir", "Wyklucz"},
+	"Save path":      {"Percorso di salvataggio", "Speicherpfad", "Chemin d'enregistrement", "Ruta de guardado", "Ścieżka zapisu"},
+	"Advanced JSON":  {"JSON avanzato", "Erweitertes JSON", "JSON avancé", "JSON avanzado", "Zaawansowany JSON"},
+	"Other":          {"Altro", "Andere", "Autre", "Otro", "Inny"},
+	"None":           {"Nessuno", "Keine", "Aucun", "Ninguno", "Brak"},
+	"active":         {"attivo", "aktiv", "actif", "activo", "aktywny"},
+	"A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.": {"Un feed è un URL RSS, oppure una query di ricerca Torznab (Search query) su tutti gli indexer configurati. Vuoto = impostazione globale.", "Ein Feed ist eine RSS-URL oder eine Torznab-Suchanfrage (Search query) über die konfigurierten Indexer. Leer = globale Voreinstellung.", "Un flux est une URL RSS, ou une requête de recherche Torznab (Search query) sur les indexeurs configurés. Vide = valeur globale.", "Un feed es una URL RSS, o una consulta de búsqueda Torznab (Search query) en los indexadores configurados. Vacío = valor global.", "Kanał to URL RSS lub zapytanie wyszukiwania Torznab (Search query) we wszystkich skonfigurowanych indekserach. Puste = ustawienie globalne."},
+
+	// First-run wizard: folder picker and indexer presets.
+	"Choose an existing folder on the server": {"Scegli una cartella esistente sul server", "Wähle einen vorhandenen Ordner auf dem Server", "Choisir un dossier existant sur le serveur", "Elige una carpeta existente en el servidor", "Wybierz istniejący folder na serwerze"},
+	"Browse…":            {"Sfoglia…", "Durchsuchen…", "Parcourir…", "Examinar…", "Przeglądaj…"},
+	"Cancel":             {"Annulla", "Abbrechen", "Annuler", "Cancelar", "Anuluj"},
+	"↑ Parent":           {"↑ Cartella superiore", "↑ Übergeordnet", "↑ Dossier parent", "↑ Carpeta superior", "↑ Nadrzędny"},
+	"Choose this folder": {"Scegli questa cartella", "Diesen Ordner wählen", "Choisir ce dossier", "Elegir esta carpeta", "Wybierz ten folder"},
+	"Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr and Jackett fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.": {"Scegli un indexer per abilitare la ricerca; lascialo vuoto per aggiungerlo dopo dalla pagina RSS. Prowlarr e Jackett riempiono l'URL con il loro solito indirizzo locale e porta. Per qualsiasi altro servizio Torznab (un indexer MirCrew, un manager remoto) scegli Altro e digita il suo URL.", "Wähle einen Indexer, um die Suche zu aktivieren; lasse ihn leer, um ihn später auf der RSS-Seite hinzuzufügen. Prowlarr und Jackett füllen die URL mit ihrer üblichen lokalen Adresse und Port. Für jeden anderen Torznab-Dienst (ein MirCrew-Indexer, ein Remote-Manager) wähle Andere und gib seine URL ein.", "Choisissez un indexeur pour activer la recherche ; laissez-le vide pour l'ajouter plus tard depuis la page RSS. Prowlarr et Jackett remplissent l'URL avec leur adresse locale et port habituels. Pour tout autre service Torznab (un indexeur MirCrew, un manager distant) choisissez Autre et saisissez son URL.", "Elige un indexador para habilitar la búsqueda; déjalo vacío para añadirlo luego desde la página RSS. Prowlarr y Jackett rellenan la URL con su dirección local y puerto habituales. Para cualquier otro servicio Torznab (un indexador MirCrew, un gestor remoto) elige Otro y escribe su URL.", "Wybierz indekser, aby włączyć wyszukiwanie; pozostaw go puste, aby dodać go później ze strony RSS. Prowlarr i Jackett wypełniają adres URL swoim zwykłym lokalnym adresem i portem. Dla każdej innej usługi Torznab (indekser MirCrew, zdalny manager) wybierz Inny i wpisz jego URL."},
+
 	// Files tab.
 	"Priority": {"Priorità", "Priorität", "Priorité", "Prioridad", "Priorytet"},
 	"Play":     {"Riproduci", "Abspielen", "Lire", "Reproducir", "Odtwórz"},

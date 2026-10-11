@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"html"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -172,6 +173,11 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	page = strings.Replace(page, "{{FEEDS}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(feedsSettingKey, ""))), 1)
 	page = strings.Replace(page, "{{RULES}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(rulesSettingKey, ""))), 1)
 	page = strings.Replace(page, "{{INDEXERS}}", html.EscapeString(orEmptyJSON(d.opts.Settings.Get(indexersSettingKey, ""))), 1)
+	page = strings.Replace(page, "{{INDEXERROWS}}", d.uiIndexerRowsHTML(), 1)
+	page = strings.Replace(page, "{{FEEDROWS}}", d.uiFeedRowsHTML(), 1)
+	page = strings.Replace(page, "{{INDEXEROPTIONS}}", uiIndexerOptionsHTML(), 1)
+	page = strings.Replace(page, "{{INDEXERCOUNT}}", strconv.Itoa(len(d.indexers())), 1)
+	page = strings.Replace(page, "{{FEEDCOUNT}}", strconv.Itoa(len(d.feeds())), 1)
 
 	names := make([]string, 0, 8)
 	for _, feed := range d.feeds() {

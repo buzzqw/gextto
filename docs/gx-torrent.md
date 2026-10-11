@@ -346,14 +346,19 @@ l'equivalente di Caddy.
 
 Al primo avvio in standalone, finché il setup non è completato, la pagina
 reindirizza al **wizard** (`/ui/setup`): lingua, cartella di download e cartella
-temporanea, porta peer con **test di raggiungibilità** (`/api/v1/portcheck`:
+temporanea (con **selettore di cartelle**: `GET /ui/browse-dir` elenca le
+directory del server e un pulsante *Sfoglia* le fa scegliere, senza digitare il
+percorso), porta peer con **test di raggiungibilità** (`/api/v1/portcheck`:
 esito, metodo UPnP/NAT-PMP, IP esterno), **limiti di banda** globali
 (download/upload in KiB/s, 0 = illimitato), utente e password, "LAN senza
-password" e indexer facoltativi. Il wizard scrive `settings.json` e marca il
-setup completato; lingua e limiti di banda valgono subito (se i limiti non si
-applicano, l'errore è mostrato nella pagina e il setup non viene marcato
-completato), cartella e porta al prossimo avvio (la chiave `peer-ports` è letta
-quando la flag non è passata).
+password" e indexer facoltativi. Il campo **Indexer** è una tendina dei prodotti
+già supportati (Prowlarr, Jackett, MIRCrew, altre): scegliendo Prowlarr o
+Jackett l'URL viene precompilato con il loro solito indirizzo locale e porta
+(`127.0.0.1:9696` / `127.0.0.1:9117`), comunque modificabile. Il wizard scrive
+`settings.json` e marca il setup completato; lingua e limiti di banda valgono
+subito (se i limiti non si applicano, l'errore è mostrato nella pagina e il
+setup non viene marcato completato), cartella e porta al prossimo avvio (la
+chiave `peer-ports` è letta quando la flag non è passata).
 
 Il demone apre da solo il browser sul wizard, **dopo** che il server è in
 ascolto e solo se c'è una sessione grafica: `rundll32` su Windows (saltato in
@@ -443,10 +448,16 @@ tutti), `fail`, `match` e `action`:
 Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
-La pagina **`/ui/rss`** (standalone) gestisce tutto questo: textarea per feed,
-regole e indexer (salvate con validazione), e per ogni feed un pulsante che
-mostra gli articoli correnti con la regola che li prenderebbe e un *Add* manuale
-(la vista "articoli corrispondenti" di qBittorrent).
+La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
+indexer* nella barra di ogni pagina) gestisce tutto questo: elenchi con pulsanti
+per aggiungere e rimuovere **indexer** (tendina Prowlarr/Jackett/Altro, URL
+precompilato) e **feed** (URL RSS o query di ricerca, include/exclude, categoria,
+percorso, in pausa), le textarea JSON avanzate per feed, regole e indexer
+(salvate con validazione), e per ogni feed un pulsante che mostra gli articoli
+correnti con la regola che li prenderebbe e un *Add* manuale (la vista "articoli
+corrispondenti" di qBittorrent). Gli stessi risultati si ottengono via
+`POST /ui/rss-indexer` e `POST /ui/rss-feed` (op `add`/`remove`); le textarea JSON
+restano su `POST /ui/rss-config`.
 
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e

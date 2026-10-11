@@ -12,7 +12,20 @@ button{width:100%;padding:10px;margin-top:14px;border-radius:8px;border:0;backgr
 button.secondary{background:#243049;margin-top:8px}
 h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform:uppercase;letter-spacing:.03em}
 .chk{display:flex;gap:8px;align-items:center}.chk input{width:auto;margin:0}
-.m{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}</style></head>
+.m{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
+.field-row{display:flex;gap:8px;align-items:flex-end}
+.field-row input{flex:1 1 auto;min-width:0}
+.field-row button{width:auto;margin-top:4px;padding:8px 12px;white-space:nowrap;background:#243049;font-weight:500}
+.overlay{position:fixed;inset:0;background:rgba(4,8,16,.72);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50}
+.picker{background:#131a28;border:1px solid #243049;border-radius:12px;width:min(640px,100%);padding:16px}
+.picker-head{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.picker-head code{color:#93c5fd;word-break:break-all;font-size:13px}
+.picker-head button{width:auto;margin:0;padding:6px 12px;background:#243049}
+.picker-list{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto}
+.picker-list button.dir{width:100%;margin:0;text-align:left;background:#161d2c;border:1px solid #243049;font-weight:400;color:#dbe4f0}
+.picker-list button.dir:hover{background:#243049}
+.picker-foot{display:flex;gap:8px;justify-content:space-between;margin-top:12px}
+.picker-foot button{width:auto;margin:0;padding:8px 14px}.picker-foot button.primary{background:#2563eb}</style></head>
 <body><form method="post" action="/ui/setup">
 <h2>gx-torrent setup</h2>
 <p class="m">First run: choose how the daemon works. The settings are saved in settings.json.</p>
@@ -24,8 +37,8 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <option value="es">Español</option>
 <option value="pl">Polski</option>
 </select></label>
-<label>Download folder<input type="text" name="download-dir" placeholder="/srv/media/downloads" autocomplete="off"></label>
-<label>Temporary folder<input type="text" name="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off"></label>
+<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" placeholder="/srv/media/downloads" autocomplete="off"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
 <h3>Access</h3>
 <label>Username<input type="text" name="user" value="admin" autocomplete="username"></label>
 <label>Password<input type="password" name="password" autocomplete="new-password"></label>
@@ -40,14 +53,31 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0"></label>
 <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" name="speed-upload" min="0" placeholder="0"></label>
 <h3>Indexer</h3>
-<label>Indexer name<input type="text" name="indexer-name" placeholder="Jackett" autocomplete="off"></label>
-<label>Indexer URL<input type="text" name="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off"></label>
+<label>Indexer<select name="indexer-name" id="indexer-name">
+<option value="" data-url="">None</option>
+<option value="Prowlarr" data-url="http://127.0.0.1:9696">Prowlarr</option>
+<option value="Jackett" data-url="http://127.0.0.1:9117">Jackett</option>
+<option value="MIRCrew" data-url="">MIRCrew</option>
+<option value="other" data-url="">Other</option>
+</select></label>
+<label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off"></label>
 <label>Indexer API key<input type="text" name="indexer-key" autocomplete="off"></label>
+<p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr and Jackett fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
 <p class="m">The download folder and the peer port apply at the next start.</p>
 <p class="m">The bandwidth limits apply immediately.</p>
 <button type="submit">Finish setup</button>
 <!--ERROR-->
 </form>
+<div id="browse-overlay" class="overlay" style="display:none">
+  <div class="picker">
+    <div class="picker-head"><code id="browse-path"></code><button type="button" onclick="closeBrowse()">Cancel</button></div>
+    <div class="picker-list" id="browse-list"></div>
+    <div class="picker-foot">
+      <button type="button" onclick="browseUp()">↑ Parent</button>
+      <button type="button" class="primary" onclick="browseChoose()">Choose this folder</button>
+    </div>
+  </div>
+</div>
 <script>
 document.getElementById('ptest').addEventListener('click', function () {
   var out = document.getElementById('presult');
@@ -68,6 +98,52 @@ document.getElementById('ptest').addEventListener('click', function () {
     out.className = 'm err';
     out.textContent = 'Port test failed';
   });
+});
+// Indexer type → URL: choosing a known product fills the URL with its usual
+// local address and port; the field stays editable.
+(function () {
+  var sel = document.getElementById('indexer-name');
+  var url = document.getElementById('indexer-url');
+  if (!sel || !url) { return; }
+  sel.addEventListener('change', function () {
+    var option = sel.options[sel.selectedIndex];
+    var filled = option ? (option.getAttribute('data-url') || '') : '';
+    if (filled) { url.value = filled; }
+    url.focus();
+  });
+})();
+// Folder picker: /ui/browse-dir lists the daemon machine's directories.
+var browseTarget = null, browsePath = '', browseParent = '';
+function openBrowse(id) {
+  browseTarget = id;
+  document.getElementById('browse-overlay').style.display = 'flex';
+  browseGo(document.getElementById(id).value || '');
+}
+function closeBrowse() { document.getElementById('browse-overlay').style.display = 'none'; }
+function browseGo(path) {
+  var out = document.getElementById('browse-list');
+  out.textContent = '…';
+  fetch('/ui/browse-dir?path=' + encodeURIComponent(path), {cache: 'no-store'}).then(function (r) { return r.json(); }).then(function (j) {
+    browsePath = j.path || '';
+    browseParent = j.parent || '';
+    document.getElementById('browse-path').textContent = browsePath;
+    out.innerHTML = '';
+    if (j.error) { var e = document.createElement('p'); e.className = 'm err'; e.textContent = j.error; out.appendChild(e); }
+    (j.dirs || []).forEach(function (d) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'dir'; b.textContent = d.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || d; b.title = d;
+      b.addEventListener('click', function () { browseGo(d); });
+      out.appendChild(b);
+    });
+  }).catch(function () { out.textContent = '—'; });
+}
+function browseUp() { if (browseParent) { browseGo(browseParent); } }
+function browseChoose() {
+  if (browseTarget && browsePath) { document.getElementById(browseTarget).value = browsePath; }
+  closeBrowse();
+}
+Array.prototype.forEach.call(document.querySelectorAll('.browse'), function (b) {
+  b.addEventListener('click', function () { openBrowse(b.getAttribute('data-target')); });
 });
 </script>
 </body></html>

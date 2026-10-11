@@ -235,10 +235,15 @@ simbolici né la Modalità sviluppatore. Su Windows gira solo gx-torrent; Gextto
 resta solo Linux.
 
 **Primo avvio.** Apri `http://<host>:8890/`: il wizard guida lingua, cartelle
-di download e temporanea, porta peer con test di raggiungibilità, limiti di
-banda globali, utente e password, accesso dalla LAN e indexer facoltativi. In
-una sessione desktop il browser si apre da solo sul wizard; su un server senza
-grafica o come servizio Windows il log stampa l'indirizzo da aprire.
+di download e temporanea (con un **selettore di cartelle** che sfoglia il
+server), porta peer con test di raggiungibilità, limiti di banda globali, utente
+e password, accesso dalla LAN e indexer facoltativi. Scegliendo Prowlarr o
+Jackett l'URL dell'indexer viene riempito con il suo solito indirizzo locale e
+porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
+personalizzato. La pagina poi collega a **RSS e indexer**, dove feed, regole e
+indexer si gestiscono senza modificare il JSON a mano. In una sessione desktop il
+browser si apre da solo sul wizard; su un server senza grafica o come servizio
+Windows il log stampa l'indirizzo da aprire.
 
 Il riferimento completo (flag, `settings.json`, API, note di piattaforma) è il
 [documento tecnico di gx-torrent](docs/gx-torrent.md).

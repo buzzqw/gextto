@@ -5,27 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>gx-torrent</title>
 <style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:600}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
+.nav a:hover{background:#243049}
+.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
 main{padding:16px 20px;max-width:1100px;margin:0 auto}
 a{color:#93c5fd}h1{font-size:20px}h2{font-size:16px;margin:22px 0 8px}
 label{display:block;margin:10px 0;color:#93a1b5}
+input,select{padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 textarea{width:100%;box-sizing:border-box;background:#0b0f18;color:inherit;border:1px solid #243049;border-radius:8px;padding:8px;font:12.5px/1.4 ui-monospace,Menlo,Consolas,monospace}
 button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-weight:500;padding:5px 10px}
 table{width:100%;border-collapse:collapse;margin-top:8px}
-th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
 th{color:#93a1b5}
-.muted{color:#93a1b5}.err{color:#fca5a5}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.muted{color:#93a1b5}.err{color:#fca5a5}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.row label{margin:0;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.row .chk{flex-direction:row;align-items:center}
 button.feed{background:#1b2536;color:#dbe4f0}
+details{margin-top:18px;border:1px solid #243049;border-radius:10px;padding:10px 14px;background:#131a28}
+summary{cursor:pointer;color:#93a1b5}
+.form-card{border:1px solid #243049;border-radius:10px;padding:6px 14px 14px;margin-top:8px;background:#131a28}
 </style></head>
-<body><main>
-<h1>RSS</h1>
+<body>
+<header>
+  <h1>RSS &amp; indexers</h1>
+  <nav class="nav"><a href="/">Torrents</a><a class="on" href="/ui/rss">RSS &amp; indexers</a></nav>
+</header>
+<main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
-<form method="post" action="/ui/rss-config">
-<label>Feeds<textarea name="feeds" rows="8" spellcheck="false">{{FEEDS}}</textarea></label>
-<label>Rules<textarea name="rules" rows="8" spellcheck="false">{{RULES}}</textarea></label>
-<label>Indexers<textarea name="indexers" rows="4" spellcheck="false">{{INDEXERS}}</textarea></label>
-<button type="submit">Save</button>
+
+<h2>Indexers <span class="muted">({{INDEXERCOUNT}})</span></h2>
+<table>
+  <thead><tr><th>Name</th><th>URL</th><th>API key</th><th></th></tr></thead>
+  <tbody>{{INDEXERROWS}}</tbody>
+</table>
+<form class="form-card" method="post" action="/ui/rss-indexer">
+  <input type="hidden" name="op" value="add">
+  <div class="row">
+    <label>Type<select name="type" id="indexer-type">{{INDEXEROPTIONS}}</select></label>
+    <label>Name<input type="text" name="name" placeholder="prowlarr" autocomplete="off"></label>
+    <label>URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off"></label>
+    <label>API key<input type="text" name="apikey" autocomplete="off"></label>
+    <button type="submit">Add indexer</button>
+  </div>
 </form>
+
+<h2>Feeds <span class="muted">({{FEEDCOUNT}})</span></h2>
+<table>
+  <thead><tr><th>Name</th><th>Source</th><th>Include</th><th>Exclude</th><th>State</th><th></th></tr></thead>
+  <tbody>{{FEEDROWS}}</tbody>
+</table>
+<form class="form-card" method="post" action="/ui/rss-feed">
+  <input type="hidden" name="op" value="add">
+  <div class="row">
+    <label>Name<input type="text" name="name" placeholder="serie" autocomplete="off"></label>
+    <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off"></label>
+    <label>Search query<input type="text" name="search" placeholder="Serie S01" autocomplete="off"></label>
+  </div>
+  <div class="row">
+    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
+    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
+    <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
+    <button type="submit">Add feed</button>
+  </div>
+  <p class="muted">A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.</p>
+</form>
+
+<details>
+  <summary>Advanced JSON</summary>
+  <form method="post" action="/ui/rss-config">
+    <label>Feeds<textarea name="feeds" rows="6" spellcheck="false">{{FEEDS}}</textarea></label>
+    <label>Rules<textarea name="rules" rows="8" spellcheck="false">{{RULES}}</textarea></label>
+    <label>Indexers<textarea name="indexers" rows="4" spellcheck="false">{{INDEXERS}}</textarea></label>
+    <button type="submit">Save</button>
+  </form>
+</details>
+
 <h2>Feed items</h2>
 <div class="row" id="feedbar"></div>
 <div id="items"></div>
@@ -34,6 +95,8 @@ button.feed{background:#1b2536;color:#dbe4f0}
 <script id="ui-i18n"></script>
 <script>
 var FEEDNAMES={{FEEDNAMES}};
+// Choosing a known indexer fills the URL with its usual local address and port.
+(function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];var filled=o?(o.getAttribute('data-url')||''):'';if(filled){url.value=filled;}});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}

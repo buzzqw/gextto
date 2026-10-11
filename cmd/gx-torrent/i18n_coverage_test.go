@@ -29,6 +29,8 @@ var uiI18nAllowlist = map[string]bool{
 	"RSS": true,
 	// Indexer product names used as placeholders.
 	"Jackett": true, "Prowlarr": true, "MIRCrew": true,
+	// Example values used as placeholders on the RSS page.
+	"1080p, ita": true, "Serie S01": true,
 }
 
 // uiI18nWorth reports whether a string is user-facing prose worth translating.

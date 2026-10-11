@@ -102,6 +102,8 @@ type uiPageData struct {
 	// FeedsEnabled shows the RSS feeds toolbar (standalone with feeds).
 	FeedsEnabled bool
 	FeedCount    int
+	// Standalone shows the standalone navigation (torrents, RSS & indexers).
+	Standalone bool
 
 	Rows []uiTorrentRow
 }
@@ -1155,6 +1157,7 @@ func (d *Daemon) uiPageData(limit int) (uiPageData, error) {
 	page.Tags = d.tagsSnapshot()
 	page.SearchEnabled = d.opts.Mode == ModeStandalone && len(d.indexers()) > 0
 	if d.opts.Mode == ModeStandalone {
+		page.Standalone = true
 		if feeds := d.feeds(); len(feeds) > 0 {
 			page.FeedsEnabled = true
 			page.FeedCount = len(feeds)

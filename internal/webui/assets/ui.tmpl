@@ -11,6 +11,10 @@
 body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1420;color:#e7ecf3}
 header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
 header h1{font-size:20px;margin:0;font-weight:600}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
+.nav a:hover{background:#243049}
+.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
 main{padding:16px 20px;max-width:none;width:100%;margin:0}
 .muted{color:#93a1b5;font-size:14px}
 a{color:#93c5fd}
@@ -126,6 +130,12 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
 <header>
   <h1>gx-torrent</h1>
   <span class="muted">{{.Version}} · <span>up for</span> {{.Uptime}} · {{.Now}}</span>
+  {{if .Standalone}}
+  <nav class="nav">
+    <a class="on" href="/">Torrents</a>
+    <a href="/ui/rss">RSS &amp; indexers</a>
+  </nav>
+  {{end}}
 </header>
 <main>
   {{if .Notice}}<div class="notice{{if .Error}} err{{end}}">{{.Notice}}</div>{{end}}

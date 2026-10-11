@@ -70,6 +70,16 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	indexerName := strings.TrimSpace(r.FormValue("indexer-name"))
 	indexerURL := strings.TrimSpace(r.FormValue("indexer-url"))
 	indexerKey := strings.TrimSpace(r.FormValue("indexer-key"))
+	// "other" is the dropdown's custom choice: the name is left to the default
+	// and the URL is typed by the operator.
+	if strings.EqualFold(indexerName, "other") {
+		indexerName = ""
+	}
+	// A known indexer chosen from the dropdown carries its usual URL: fill it
+	// in when the URL field was left empty (e.g. with JavaScript disabled).
+	if indexerURL == "" {
+		indexerURL = uiIndexerPresetURL(indexerName)
+	}
 
 	if download != "" && !filepath.IsAbs(download) {
 		d.renderSetup(w, r, "The download folder must be an absolute path.")
