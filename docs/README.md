@@ -18,6 +18,7 @@ specifiche.
 | [Architettura](ARCHITECTURE.md) | Mappa delle cartelle e dei file del codice. |
 | [Scelte di progetto, migliorie ed evoluzione](evoluzione.md) | Backlog, migliorie implementate, piani gx-torrent, misure, revisioni e direzione strategica. |
 | [Motore gx-torrent](gx-torrent.md) | Documento tecnico del motore torrent in Go (gx-core, demone, adapter). |
+| [Conformità BEP](bep.md) | Quali specifiche BitTorrent (BEP) supporta il motore, quali mancano e la roadmap. |
 | [gx-torrent evoluto (gx-nox)](gx-torrent-evoluto.md) | Analisi e decisione: gx-torrent come client torrent standalone (un binario, due modalità). |
 | [BitTorrent v2 (BEP 52)](gx-torrent-v2.md) | Progetto di implementazione del supporto BitTorrent v2 in `gx-core`. |
 | [Archivio](archive/README.md) | Report e piani storici, non più aggiornati. |

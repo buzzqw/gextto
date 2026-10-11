@@ -11,7 +11,9 @@ fallback automatico se gx-torrent non parte.
 
 Il motore gx-core vive in `internal/gxcore`. Le funzionalità sono
 descritte in `internal/gxcore/GEXTTO.md`: porta unica, interfaccia uscente,
-proxy, filtro IP, selezione dei file e alcune correzioni.
+proxy, filtro IP, selezione dei file e alcune correzioni. Lo **stato di
+conformità alle specifiche BitTorrent (BEP)** e la roadmap sono in
+[Conformità BEP](bep.md).
 
 Codice:
 
