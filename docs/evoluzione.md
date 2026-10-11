@@ -748,6 +748,30 @@ messaggi. L'aggiunta è la **seconda famiglia**: annuncio e ascolto anche sul
 gruppo IPv6 `[ff15::efc0:988f]:6771` (best-effort: senza IPv6 multicast resta la
 v4), come anacrolix (`config.Ip6`). Stato LSD con `ipv6` in `/api/v1/status`.
 
+### 4.9 Conformità BEP: stato dopo la revisione (2026-10-11)
+
+Voce aggiunta dopo una revisione esterna (documento `analisi5.md`, tenuto fuori
+dal repo) che confrontava `gx-core` con libtorrent, Transmission, BiglyBT,
+anacrolix/torrent e rain. La revisione ha **corretto due affermazioni errate** e
+ha aperto due item che sono stati chiusi qui.
+
+| BEP / area | Stato reale | Note |
+|---|---|---|
+| **BEP 21** (`upload_only`) | **fatto (lato peer)** | Il magnet non c'entra: BEP 21 è la chiave `upload_only` nell'extension handshake BEP 10, più `event=paused` all'announce e `downloaders` nello scrape. L'header è inviato alla connessione e rinviato a tutti i peer quando il torrent diventa seed (`torrent.uploadOnly` = `completed`, quindi anche seed parziali su selection). Manca la **parte tracker** (`event=paused`) |
+| **BEP 53** (`so=`) | **fatto** | `Magnet.SelectOnly` parsa `so` (indici e range, de-duplicati). Seed sul torrent applicato da `skippedInfoFiles` **solo** quando `Config.FileSelection` non fornisce una maschera; `Torrent.SelectOnly`/`ClearSelectOnly`. Il demone lo trasforma in `FilePriorities` all'arrivo del metadata |
+| **BEP 41** (UDP tracker URLData) | **già presente** | Il documento la dava per assente: `internal/tracker/udptracker/messages.go` scrive già le opzioni TLV (tipo `0x2` = URLData, non `0x1`) da `u.RequestURI()`. Nessun lavoro |
+| **BEP 44 client iterativo + BEP 46** (`urn:btpk:`) | **da aprire solo con un consumatore** | Il DHT ha già un client verso i nodi più vicini per lo scrape (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il `get`/`put` **uscente** e la traversal generica. `evoluzione.md` §3 lo considerava speculativo senza un uso reale: resta così |
+| **BEP 17 / 34 / 35 / 51 / 54, WebTorrent, I2P** | **fuori scope** | Superate, irrilevanti o costose (WebRTC, SAM). Confermato |
+| **Pipelining 10 Gbps** | **da misurare** | La coda richieste adattiva esiste già (§4.7); un ring buffer di scrittura è speculativo. Vale solo con misure prima/dopo (regola performance di `AGENTS.md`) |
+
+Correzioni al documento esterno, tenute come nota: (a) BEP 41 **non** era
+mancante e l'opzione URLData è `0x2`; (b) BEP 21 **non** è un messaggio di
+estensione con id in `m`, ma un header dell'handshake, più le modifiche tracker;
+(c) il parser magnet **non** estraeva `ws`/`xs`, quindi BEP 53 era "assente" e non
+"parziale"; (d) il motore espone `Config.FileSelection`, non un metodo
+`Torrent.SetFileSelection`; (e) la matrice comparativa con i client esterni è
+indiziaria e non va usata come fonte.
+
 ---
 
 ## 5. gx-torrent: ottimizzazioni prestazionali

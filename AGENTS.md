@@ -246,3 +246,18 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
   (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
 - Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
+
+## Accessibilità dell'interfaccia
+- **Ogni modifica alla UI deve controllare e rispettare l'accessibilità.**
+  Vale per `uiweb/v2` (SSR + HTMX), per la pagina del demone
+  (`cmd/gx-torrent/ui.go`) e per ogni pagina HTML generata.
+- Requisiti minimi: HTML semantico e attributi ARIA corretti; ogni campo con un
+  `label` associato; contrasto sufficiente e focus visibile; navigazione da
+  tastiera completa (tab order logico, `Esc`/`Enter` coerenti, nessun controllo
+  usabile solo con il mouse); testo alternativo per icone e immagini;
+  messaggi di stato/errore annunciabili (`role="alert"`/`aria-live`).
+- Verifica sempre prima di chiudere il lavoro: test automatici o controllo
+  manuale di tastiera, focus, lettura di etichette e contrasto. Un controllo
+  nuovo o modificato senza questa verifica non è da considerarsi finito.
+- Vale anche per le stringhe tradotte (i18n): etichette e descrizioni devono
+  restare comprensibili e con `label`/`aria-label` adeguati in tutte le lingue.

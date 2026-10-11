@@ -29,7 +29,10 @@ Test del motore (girano dentro questo modulo):
 - `torrent/torrent_superseed_test.go` — rotazione dei pezzi offerti e selezione
   dei pezzi del super-seeding (mai un pezzo già posseduto o già offerto);
 - `internal/peerprotocol/holepunch_test.go` — codec BEP 55 `ut_holepunch`
-  (round-trip v4/v6, errori, framing nell'estensione, fuzz);
+  (round-trip v4/v6, errori, framing nell'estensione, fuzz) e header BEP 21
+  `upload_only` nell'extension handshake (round-trip bencode);
+- `torrent/torrent_selection_test.go` — maschere di selezione `so=` (BEP 53:
+  indici sui file non-padding) e flag `Config.FileSelection`;
 - `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
   errori `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer`).
 
@@ -71,6 +74,8 @@ Funzionalità e aree del motore:
 | Priorità graduata (streaming) | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go`, `cmd/gx-torrent/stream.go` | `PiecePicker.SetReadaheadWindow`/`pickReadahead`: la finestra del player (`SetStreamWindow`) ha priorità sulla finestra di **readahead** (nuova `Torrent.SetFileReadaheadWindow`), che precede rarest-first/allowed-fast. Il demone aggiorna entrambe (`setStreamWindows`) mentre serve il file |
 | Coda richieste adattiva | `internal/peer/peer.go` (`RequestQueue`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | La profondità delle richieste in volo parte da `DefaultRequestsOut` (o `reqq`) e **cresce di uno per blocco consegnato** fino a `MaxRequestsOut`; **reset su choke e su snub**. Un peer lento resta alla base, uno veloce scava più a fondo |
 | BEP 27 (privati) | `torrent/torrent.go` (`privateSwarm`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | Regola centralizzata in `torrent.privateSwarm()`: **DHT** (announcer), **PEX** (invio *e* ricezione) disattivati sui torrent privati; la **LSD** (demone) salta i privati su invio e ricezione. Il **PEX in ricezione** era l'unico percorso non filtrato (fix 2026-10-11), con guard test `torrent_private_test.go` |
+| BEP 53 (`so=`) | `internal/magnet/magnet.go`, `torrent/session_add.go`, `torrent/torrent_selection.go`, `torrent/torrent.go`, `torrent/session_torrent.go` | Il parametro `so` del magnet (Select Only: indici e range tipo `0,2,4-7`, de-duplicati) è parsato in `Magnet.SelectOnly` e diventa il **seed** del torrent (`AddTorrentOptions.SelectOnly`/`torrent.selectOnly`, guardato da `selectOnlyMu`). `skippedInfoFiles` usa il seed **solo** quando `Config.FileSelection` non restituisce una maschera: la scelta dell'app ha sempre la precedenza, così l'utente può ripristinarla. `Torrent.SelectOnly`/`ClearSelectOnly` leggono e azzerano il seed. Il demone lo converte in `FilePriorities` appena arriva il metadata (`docs/gx-torrent.md`) |
+| BEP 21 (`upload_only`) | `internal/peerprotocol/extension.go`, `torrent/torrent_peer.go` (`sendExtensionHandshake`), `torrent/torrent_pieces.go` (`checkCompletion`), `torrent/torrent_selection.go` (`uploadOnly`) | L'extension handshake BEP 10 include `upload_only: 1` quando il torrent è completo (`torrent.uploadOnly` = `completed`): seed pieno o **parziale** (tutti i pezzi *voluti* presenti, selection). Inviato alla connessione e **rinviato a tutti i peer** al passaggio a seed. Il valore ricevuto resta in `peer.ExtensionHandshake.UploadOnly`. Manca la parte tracker (`event=paused` all'announce e `downloaders` nello scrape), annotata come residuo |
 
 Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
 

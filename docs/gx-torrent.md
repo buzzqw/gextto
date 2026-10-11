@@ -733,6 +733,13 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   gextto riceve "completato" quando sono pronti quelli.
 - Cambiare la selezione ferma il torrent per un attimo, sposta i file
   interessati tra `parts` e destinazione e lo fa ripartire.
+- Se il **magnet link** porta il parametro `so=` (BEP 53, *Select Only*, es.
+  `so=0,2,4-7`), il motore scarica da subito solo quei file e appena arrivano i
+  metadati il demone registra la scelta come normali priorità: la scheda file
+  mostra gli stessi file esclusi e si possono cambiare come sempre.
+- Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
+  dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
+  pezzi che non vuole.
 
 ## Download sequenziale (streaming)
 

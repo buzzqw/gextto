@@ -703,9 +703,10 @@ same data.
   compiled in. It supports
   **sequential download** and **first/last piece** priority (set when adding a
   torrent, or for every new torrent in *Configuration → Queues and performance →
-  Download mode*; they apply to new torrents). It supports **v2-only** torrents
-  (BEP 52), both from a `.torrent` and from a magnet link; it does not support
-  WebTorrent/WebRTC.
+  Download mode*; they apply to new torrents). A magnet that carries the `so=`
+  parameter (BEP 53) downloads only the listed files from the start. It supports
+  **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
+  it does not support WebTorrent/WebRTC.
 - **libtorrent (optional build)** — the libtorrent session inside Gextto's own
   process, available **only if you built Gextto with it**
   (`make build-libtorrent`); release packages do not include it. Every
