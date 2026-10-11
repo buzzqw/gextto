@@ -95,6 +95,16 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
   <p class="muted">Inside the window the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
 </fieldset>
 <fieldset>
+  <legend>Latency auto-speed</legend>
+  <label class="chk"><input type="checkbox" name="autospeed-enabled" value="1"{{AUTOSPEED_ENABLED}} title="Lower the upload when the round-trip latency rises, to keep the line responsive"> Enable latency auto-speed</label>
+  <div class="grid">
+    <label>Latency target (empty = default gateway)<input type="text" name="autospeed-target" value="{{AUTOSPEED_TARGET}}" placeholder="192.168.1.1:80" autocomplete="off" title="Host, or host:port, to measure the round-trip latency against; empty uses the default gateway"></label>
+    <label>Minimum upload (KiB/s)<input type="number" min="1" name="autospeed-min" value="{{AUTOSPEED_MIN}}" title="Lowest upload the auto-speed may reduce to, in KiB/s"></label>
+  </div>
+  <p class="muted">When the upload saturates the line the round-trip latency rises; the daemon then lowers the upload below the limit above and raises it again when the line is idle. It needs a positive upload limit to act.</p>
+  <p class="muted"><span>Current latency / upload cap</span>: {{AUTOSPEED_STATUS}}</p>
+</fieldset>
+<fieldset>
   <legend>Interface and notifications</legend>
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
   <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion"></label>

@@ -244,8 +244,8 @@ modificare il JSON a mano la lista *Cercati* (i titoli da cercare, ricercati
 negli indexer e nei feed configurati, con gli episodi mancanti cercati di nuovo)
 e i feed, le regole e gli indexer — e a
 **Impostazioni**, il pannello del client: cartelle, rete e porte, protocolli
-(cifratura, DHT/uTP/LSD…), coda e cache, banda e scheduler giornaliero, lingua e
-notifiche. In
+(cifratura, DHT/uTP/LSD…), coda e cache, banda, scheduler giornaliero e
+auto-speed sulla latenza (anti-bufferbloat), lingua e notifiche. In
 una sessione desktop il browser si apre da solo sul wizard; su un server senza
 grafica o come servizio Windows il log stampa l'indirizzo da aprire.
 

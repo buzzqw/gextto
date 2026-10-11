@@ -244,6 +244,8 @@ type Daemon struct {
 	// appliedDL/appliedUL are the global limits currently on the session.
 	appliedDL int64
 	appliedUL int64
+	// autoSpeed is the latency auto-speed controller (see autospeed.go).
+	autoSpeed *autoSpeed
 
 	// snapshot is the last published torrent view list. The REST list and the
 	// web page read it without d.mu, so a slow per-torrent call — a torrent run
@@ -324,6 +326,7 @@ func newDaemon(opts Options) (*Daemon, error) {
 		trackers:  newTrackerHealth(),
 		appliedDL: -1,
 		appliedUL: -1,
+		autoSpeed: &autoSpeed{},
 	}
 	if opts.Mode == ModeStandalone {
 		d.sessions = auth.NewSessions(30 * 24 * time.Hour)
@@ -686,6 +689,8 @@ func (d *Daemon) poke() {
 func (d *Daemon) run(stop <-chan struct{}) {
 	// The RSS engine runs beside the queue loop, only in standalone mode.
 	go d.runFeeds(stop)
+	// The latency probe runs beside the queue loop while auto-speed is enabled.
+	go d.runAutoSpeed(stop)
 	ticker := time.NewTicker(d.opts.Tick)
 	defer ticker.Stop()
 	for {

@@ -83,6 +83,16 @@ func (d *Daemon) applyEffectiveSpeedLimitsLocked(now time.Time) {
 		download, upload = sd, su
 		reason = "schedule"
 	}
+	// Latency auto-speed clamps the upload below the configured (or scheduled)
+	// ceiling; it never raises it above. See autospeed.go.
+	if enabled, _, floor := d.autoSpeedSettings(); enabled {
+		if clamped, acting := d.autoSpeed.clampUpload(now, upload, floor); acting {
+			if clamped != upload {
+				reason = "auto-speed"
+			}
+			upload = clamped
+		}
+	}
 	if download == d.appliedDL && upload == d.appliedUL {
 		return
 	}

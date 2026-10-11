@@ -1120,6 +1120,26 @@ connessioni vale sulle connessioni instaurate; se lo si abbassa sotto il numero
 corrente, le eccedenti vengono chiuse subito. Gli slot di upload cambiano il
 numero di peer che l'unchoker tiene sbloccati.
 
+### Auto-speed sulla latenza (anti-bufferbloat)
+
+Opzione **standalone** (settings.json, come lo scheduler di banda), ispirata al
+*Ping Auto-Speed* di BiglyBT. Un probe misura ogni secondo la **latenza di
+andata e ritorno** con una connessione TCP verso il **gateway** (porte 80, 443,
+53) o verso un host configurato; il valore più basso degli ultimi 60 s è la
+**baseline a riposo**. Quando la latenza supera `baseline × 1.5` **e**
+`baseline + 20 ms`, il demone **abbassa l'upload** del 15% rispetto al tetto in
+vigore (mai sotto il minimo configurato); quando la linea torna a riposo lo
+rialza di `tetto/20` per volta. Riduce **solo** l'upload effettivo: il limite
+globale o programmato resta il tetto, e un limite illimitato (o l'assenza di
+misure) disattiva il clamp.
+
+Chiavi in settings.json: `autospeed-enabled` (default `false`),
+`autospeed-target` (host o `host:port`; vuoto = gateway), `autospeed-min`
+(KiB/s, default 50). Serve un **limite di upload positivo** (globale o
+programmato) perché l'auto-speed possa agire; la pagina lo impone. Le decisioni
+compaiono nel log con motivo `auto-speed` (`effective speed limits …`). La
+pagina delle impostazioni mostra la latenza misurata e il tetto corrente.
+
 ## REST API (v1)
 
 Tutte le richieste richiedono `X-Gx-Token` (o `Authorization: Bearer`) se il

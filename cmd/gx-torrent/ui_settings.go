@@ -83,6 +83,8 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 			d.renderSettings(w, r, "The queue settings could not be applied: "+err.Error(), true)
 			return
 		}
+		// Re-read the config: the upload limit below may have just changed.
+		cfg, _, _ = d.config()
 	}
 
 	// Scheduler window (settings.json).
@@ -114,6 +116,22 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	store.Set(scheduleEndKey, end)
 	store.Set(scheduleDLKey, strconv.FormatInt(scheduleDL, 10))
 	store.Set(scheduleULKey, strconv.FormatInt(scheduleUL, 10))
+
+	// Latency auto-speed (settings.json, applied at once). It needs a positive
+	// upload ceiling (global or scheduled) to have something to lower.
+	autoEnabled := formBool(r, "autospeed-enabled")
+	autoTarget := strings.TrimSpace(r.FormValue("autospeed-target"))
+	autoMin := formInt(r, "autospeed-min", autoSpeedDefaultMinKiB)
+	if autoMin < 1 {
+		autoMin = autoSpeedDefaultMinKiB
+	}
+	if autoEnabled && cfg.SpeedLimitUpload <= 0 && scheduleUL <= 0 {
+		d.renderSettings(w, r, "Latency auto-speed needs a positive upload limit (global or scheduled).", true)
+		return
+	}
+	store.Set(autospeedEnabledKey, strconv.FormatBool(autoEnabled))
+	store.Set(autospeedTargetKey, autoTarget)
+	store.Set(autospeedMinKey, strconv.FormatInt(autoMin, 10))
 
 	// Folders, network, protocols, language and notifications (settings.json,
 	// read at the next start).
@@ -228,6 +246,14 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 	repl("{{SCHED_DL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleDLKey, "0")), 10))
 	repl("{{SCHED_UL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleULKey, "0")), 10))
 	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
+	repl("{{AUTOSPEED_ENABLED}}", checkedIf(boolSetting(autospeedEnabledKey)))
+	repl("{{AUTOSPEED_TARGET}}", get(autospeedTargetKey))
+	autoSpeedMin := int64FromSetting(store.Get(autospeedMinKey, strconv.Itoa(autoSpeedDefaultMinKiB)))
+	if autoSpeedMin < 1 {
+		autoSpeedMin = autoSpeedDefaultMinKiB
+	}
+	repl("{{AUTOSPEED_MIN}}", strconv.FormatInt(autoSpeedMin, 10))
+	repl("{{AUTOSPEED_STATUS}}", html.EscapeString(d.autoSpeedStatus(time.Now())))
 
 	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
 	repl("{{TEMP_DIR}}", get("temp-dir"))

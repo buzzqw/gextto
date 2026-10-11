@@ -1978,7 +1978,7 @@ DDB, media server, plugin, WebTorrent) e non va portata. Restano due sole
 funzioni *core* davvero interessanti per gx-core: entrambe sono **backlog**, non
 lavoro fatto; qui c'è il piano, con gli agganci già presenti nel codice.
 
-### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — priorità 1
+### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — fatto
 
 **Idea.** BiglyBT misura di continuo l'RTT (verso il gateway o un host
 affidabile); quando l'upload satura la coda del modem l'RTT schizza e il motore
@@ -1987,40 +1987,37 @@ pacchetti e peggiori la navigazione/VoIP degli altri dispositivi. È un controll
 in retroazione sulla **latenza**, non sulla banda: agisce solo sul tetto, non
 tocca il data path.
 
-**Aggancio già presente.** `Session.SetSpeedLimits` cambia i bucket a **caldo**
-senza riaprire la sessione né droppare peer (`internal/gxcore/torrent/session_limits.go`);
-il demone ha già lo scheduler orario che usa esattamente quel gancio
-(`cmd/gx-torrent/schedule.go`, `applyEffectiveSpeedLimitsLocked`). L'auto-speed è
-un **terzo livello** che clampa l'upload sotto il massimo configurato/schedulato.
+**Implementato (standalone).** `cmd/gx-torrent/autospeed.go`:
 
-**Piano file-per-file.**
+- Un **probe** (`runAutoSpeed`, avviato accanto al loop della coda) misura ogni
+  secondo l'RTT con un **TCP connect** al gateway (porte 80/443/53, gateway
+  risolto dal default route) o all'`autospeed-target` configurato; la baseline a
+  riposo è il **minimo degli ultimi 60 s**.
+- Il **controllore** (`autoSpeed.clampUpload`) riduce l'upload del 15%
+  (`autoSpeedReduceNum/Den`) quando la latenza supera `baseline × 1.5` **e**
+  `baseline + 20 ms`, e lo rialza di `tetto/20` quando la linea è a riposo; mai
+  sotto `autospeed-min`. Non supera **mai** il tetto configurato o programmato.
+- L'**unico** punto che chiama `Session.SetSpeedLimits` resta
+  `applyEffectiveSpeedLimitsLocked` (`schedule.go`): base/config → scheduler →
+  clamp auto-speed, con motivo `auto-speed` nel log. Il gancio a caldo del
+  motore era già pronto (`internal/gxcore/torrent/session_limits.go`).
+- Chiavi in settings.json: `autospeed-enabled` (default `false`),
+  `autospeed-target` (vuoto = gateway), `autospeed-min` (KiB/s, default 50).
+  Serve un limite di upload positivo (globale o programmato) e la pagina lo
+  impone. L'opzione è nella pagina del demone (`settings.html`), con lo stato
+  *latenza attuale / tetto upload*; è **solo standalone** come lo scheduler di
+  banda (in managed è Gextto a governare i limiti).
 
-1. `cmd/gx-torrent/latency.go` — probe RTT: target auto-rilevato (gateway dal
-   default route) con metodi in ordine di preferenza (ICMP non privilegiato se
-   disponibile, altrimenti TCP connect verso gateway:80/443, altrimenti host
-   configurato); ~1 campione/s, impatto CPU/RAM trascurabile.
-2. `cmd/gx-torrent/autospeed.go` — controllore AIMD: baseline EWMA dell'RTT a
-   riposo; oltre `baseline × fattore` (o `+ soglia ms`) **riduce** l'upload
-   moltiplicativamente, altrimenti **cresce** additivamente verso il tetto.
-3. Integrazione nel loop del demone; un **unico** componente possiede l'ultima
-   chiamata a `SetSpeedLimits` (base/config/schedule → clamp auto-speed), così le
-   due logiche non si pestano; estendere `appliedDL/appliedUL` col valore
-   clampato.
-4. Impostazioni: nuove chiavi del demone accanto a `schedule-*` (`cmd/gx-torrent`),
-   default, pagina web del demone (`cmd/gx-torrent/ui.go`) e, dove ha senso, in
-   Gextto.
+**Test.** `cmd/gx-torrent/autospeed_test.go`: clamp su latenza alta e recupero a
+riposo, pavimento al minimo, inattività senza tetto o senza misure, `reset`,
+probe contro un listener locale, parsing dei candidati e integrazione
+`applyEffectiveSpeedLimitsLocked` (1000 → 850 KiB/s) + UI
+(`TestUISettingsSavesAutoSpeed`). La copertura i18n (`TestUIPageIsFullyTranslatable`)
+copre le nuove stringhe. **Misura**: il probe è ~1 connessione/s e non tocca il
+data path; con auto-speed **spento** non cambia nulla (nessuna regressione).
 
-Parametri: enable (**off di default**), metodo/target, finestra baseline, soglia,
-fattore di riduzione, incremento, limite minimo, tetto = limite configurato o
-schedulato. Guardie: il tetto non supera mai il limite configurato/schedulato;
-log RTT + contatori.
-
-**Test.** Unit del controllore (serie di RTT sintetica → rate atteso), derive del
-target, composizione con lo scheduler (il clamp non supera il massimo) e un test
-che con auto-speed **spento** le chiamate a `SetSpeedLimits` restino identiche
-(nessuna regressione). **Misura** prima/dopo con controllo inattivo
-(`scripts/bench-engines.sh`, `make measure-seeding`): deve essere equivalente.
-Sforzo: **piccolo-medio**.
+**Follow-up possibile.** Versione lato Gextto (managed): Gextto misura l'RTT e
+modula i limiti via `SetLimits`, così l'opzione vale anche per i motori gestiti.
 
 ### 15.2 Swarm Merging (condivisione file tra torrent) — priorità 2, per fasi
 

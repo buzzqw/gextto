@@ -202,6 +202,9 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   with real-time graphs and diagnostics, categories and tags, RSS feed rules
   with smart episode tracking, and direct multi-indexer search (Jackett,
   Prowlarr, MIRCrew).
+- **Bandwidth Control:** global and per-torrent speed limits, a daily bandwidth
+  scheduler, and a **latency auto-speed** that lowers the upload when the
+  round-trip latency rises, to keep the line responsive (anti-bufferbloat).
 - **Cross-Platform Architecture:**
   - **Linux (x86_64, aarch64):** standalone `tar.gz` package, bundled systemd unit
     (user or system service), and unprivileged Docker container (`Dockerfile`).
