@@ -248,6 +248,88 @@ func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
 }
 
+// handleUIRssFollow creates, in one step, a Torznab search feed for a title
+// and a rule scoped to it, so the operator "follows" a series or a movie: the
+// rule adds the matches with the chosen destination/category (and, for a
+// series, the smart-episode tracking). Once any rule exists it governs every
+// feed, which the page warns about.
+func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title == "" {
+		d.renderRSS(w, r, "Give the title to follow.")
+		return
+	}
+	kind := strings.ToLower(strings.TrimSpace(r.FormValue("kind")))
+	if kind != "movie" {
+		kind = "series"
+	}
+	include := splitList(r.FormValue("include"))
+	exclude := splitList(r.FormValue("exclude"))
+	savePath := strings.TrimSpace(r.FormValue("savepath"))
+	category := strings.TrimSpace(r.FormValue("category"))
+
+	// The search feed: query the configured indexers for the title.
+	feeds := d.feeds()
+	feed := feedConfig{Name: title, Search: title}
+	replaced := false
+	for i := range feeds {
+		if strings.EqualFold(feeds[i].Name, feed.Name) {
+			feeds[i] = feed
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		feeds = append(feeds, feed)
+	}
+	if err := d.saveFeeds(feeds); err != nil {
+		d.renderRSS(w, r, "Cannot save the feed: "+err.Error())
+		return
+	}
+
+	// The scoped rule: adds the matches with the action, and for a series keeps
+	// the smart-episode tracking.
+	rule := rss.Rule{
+		Name:  title,
+		Feeds: []string{feed.Name},
+		Match: rss.Criteria{Include: include, Exclude: exclude},
+		Action: rss.Action{
+			SavePath: savePath,
+			Category: category,
+		},
+	}
+	if kind == "series" {
+		rule.Match.RequireEpisode = true
+		rule.Match.SmartEpisode = true
+	}
+	rules := d.rules()
+	replaced = false
+	for i := range rules {
+		if strings.EqualFold(rules[i].Name, rule.Name) {
+			rules[i] = rule
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		rules = append(rules, rule)
+	}
+	if err := d.saveRules(rules); err != nil {
+		d.renderRSS(w, r, "Cannot save the rule: "+err.Error())
+		return
+	}
+	d.pokeFeeds()
+	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
 // uiRuleFromForm builds one rule from the add-rule form, validating the regexes.
 func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 	rule := rss.Rule{

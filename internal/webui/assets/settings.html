@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:600}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
+.nav a:hover{background:#243049}
+.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
+main{padding:16px 20px;max-width:760px;margin:0 auto}
+h2{font-size:16px;margin:22px 0 8px}
+label{display:block;margin:10px 0;color:#93a1b5}
+input{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+fieldset{border:1px solid #243049;border-radius:10px;padding:10px 14px 14px;margin:0 0 14px;background:#131a28}
+legend{color:#93a1b5;padding:0 6px}
+label.chk{display:flex;gap:8px;align-items:center}
+label.chk input{width:auto}
+button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
+</style></head>
+<body>
+<header>
+  <h1>gx-torrent</h1>
+  <nav class="nav"><a href="/">Torrents</a><a href="/ui/rss">RSS &amp; indexers</a><a class="on" href="/ui/settings">Settings</a></nav>
+</header>
+<main>
+<form method="post" action="/ui/settings">
+<fieldset>
+  <legend>Bandwidth</legend>
+  <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}"></label>
+  <label>Upload limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-upload" value="{{SPEED_UL}}"></label>
+</fieldset>
+<fieldset>
+  <legend>Bandwidth scheduler</legend>
+  <label class="chk"><input type="checkbox" name="schedule-enabled" value="1"{{SCHED_ENABLED}}> Enable the scheduler</label>
+  <label>Start (HH:MM)<input type="text" name="schedule-start" value="{{SCHED_START}}" placeholder="01:00"></label>
+  <label>End (HH:MM)<input type="text" name="schedule-end" value="{{SCHED_END}}" placeholder="08:00"></label>
+  <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}"></label>
+  <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}"></label>
+  <p class="muted">Inside the window the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
+</fieldset>
+<button type="submit">Save</button>
+<!--ERROR-->
+</form>
+</main>
+</body></html>

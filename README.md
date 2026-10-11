@@ -234,10 +234,13 @@ language, download and temporary folders (with a **folder picker** browsing the
 server), peer port with a reachability test, global bandwidth limits, user and
 password, LAN access and optional indexers. Choosing Prowlarr or Jackett fills
 the indexer URL with its usual local address and port (still editable); any
-other Torznab service is added as a custom type. The page then links to
+other Torznab service is added as a custom type. The page links to
 **RSS & indexers**, where feeds, rules and indexers are managed without hand
-editing JSON. On a desktop session the browser opens on the wizard by itself;
-on a headless server or a Windows service the log prints the address to open.
+editing JSON — including a *Follow a title* action that creates the search feed
+and its rule in one step — and to **Settings** (global bandwidth limits and the
+daily bandwidth scheduler). On a desktop session the browser opens on the wizard
+by itself; on a headless server or a Windows service the log prints the address
+to open.
 
 The full reference (flags, `settings.json`, API, platform notes) is the
 [gx-torrent technical document](docs/gx-torrent.md) (Italian).

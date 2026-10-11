@@ -9,7 +9,7 @@ package assets
 
 import "embed"
 
-//go:embed ui.tmpl token.html login.html setup.html rss.html favicon.svg
+//go:embed ui.tmpl token.html login.html setup.html rss.html settings.html favicon.svg
 var files embed.FS
 
 // UITemplate is the html/template source of the daemon page: the page body plus
@@ -27,6 +27,9 @@ func SetupPage() string { return mustRead("setup.html") }
 
 // RSSPage is the standalone RSS/feeds management page.
 func RSSPage() string { return mustRead("rss.html") }
+
+// SettingsPage is the standalone settings page (global limits and scheduler).
+func SettingsPage() string { return mustRead("settings.html") }
 
 // FaviconSVG is the site icon, inlined in the pages and served at /favicon.ico.
 func FaviconSVG() string { return mustRead("favicon.svg") }

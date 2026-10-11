@@ -240,10 +240,12 @@ server), porta peer con test di raggiungibilità, limiti di banda globali, utent
 e password, accesso dalla LAN e indexer facoltativi. Scegliendo Prowlarr o
 Jackett l'URL dell'indexer viene riempito con il suo solito indirizzo locale e
 porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
-personalizzato. La pagina poi collega a **RSS e indexer**, dove feed, regole e
-indexer si gestiscono senza modificare il JSON a mano. In una sessione desktop il
-browser si apre da solo sul wizard; su un server senza grafica o come servizio
-Windows il log stampa l'indirizzo da aprire.
+personalizzato. La pagina collega a **RSS e indexer**, dove feed, regole e
+indexer si gestiscono senza modificare il JSON a mano — incluso un *Segui un
+titolo* che crea in un colpo solo il feed di ricerca e la sua regola — e a
+**Impostazioni** (limiti globali di banda e scheduler di banda giornaliero). In
+una sessione desktop il browser si apre da solo sul wizard; su un server senza
+grafica o come servizio Windows il log stampa l'indirizzo da aprire.
 
 Il riferimento completo (flag, `settings.json`, API, note di piattaforma) è il
 [documento tecnico di gx-torrent](docs/gx-torrent.md).

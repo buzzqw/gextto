@@ -458,15 +458,22 @@ corrisponde vince), le textarea JSON avanzate per feed, regole e indexer
 (salvate con validazione), e per ogni feed un pulsante che mostra gli articoli
 correnti con la regola che li prenderebbe e un *Add* manuale (la vista "articoli
 corrispondenti" di qBittorrent) e un pulsante *Check feeds* per forzare subito un
-giro di controllo. Gli stessi risultati si ottengono via
-`POST /ui/rss-indexer`, `POST /ui/rss-feed` e `POST /ui/rss-rule` (op
-`add`/`remove`/`up`/`down`); le textarea JSON restano su `POST /ui/rss-config`.
+giro di controllo. Un **segui un titolo** crea in un colpo solo il feed di
+ricerca Torznab per quel titolo e una regola a esso limitata (con lo smart
+episode per le serie), così "seguire una serie o un film" non richiede di
+compilare a mano né il feed né la regola. Gli stessi risultati si ottengono via
+`POST /ui/rss-indexer`, `POST /ui/rss-feed`, `POST /ui/rss-rule` (op
+`add`/`remove`/`up`/`down`) e `POST /ui/rss-follow`; le textarea JSON restano su
+`POST /ui/rss-config`.
 
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
 `schedule-start`/`schedule-end` (`HH:MM`, anche a cavallo della mezzanotte) il
 demone usa `schedule-download`/`schedule-upload` (KiB/s) dentro la finestra e i
 limiti normali fuori. I limiti cambiano a caldo, senza riaprire la sessione.
+Si configura dalla pagina **`/ui/settings`** (collegamento *Impostazioni* nella
+barra di ogni pagina), insieme ai **limiti globali** di download/upload
+(`POST /ui/settings`); il salvataggio applica subito i limiti effettivi.
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:

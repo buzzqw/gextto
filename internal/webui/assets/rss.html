@@ -38,7 +38,7 @@ summary{cursor:pointer;color:#93a1b5}
 <body>
 <header>
   <h1>RSS &amp; indexers</h1>
-  <nav class="nav"><a href="/">Torrents</a><a class="on" href="/ui/rss">RSS &amp; indexers</a></nav>
+  <nav class="nav"><a href="/">Torrents</a><a class="on" href="/ui/rss">RSS &amp; indexers</a><a href="/ui/settings">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
@@ -80,6 +80,20 @@ summary{cursor:pointer;color:#93a1b5}
     <button type="submit">Add feed</button>
   </div>
   <p class="muted">A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.</p>
+</form>
+
+<h2>Follow a title</h2>
+<form class="form-card" method="post" action="/ui/rss-follow">
+  <div class="row">
+    <label>Title<input type="text" name="title" placeholder="Serie S01" autocomplete="off"></label>
+    <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
+    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
+    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
+    <button type="submit">Follow</button>
+  </div>
+  <p class="muted">Follow creates a search feed for the title and a rule scoped to it (Smart episode for series). Once any rule exists it applies to every feed.</p>
 </form>
 
 <h2>Rules <span class="muted">({{RULECOUNT}})</span></h2>
