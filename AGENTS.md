@@ -288,3 +288,11 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   nuovo o modificato senza questa verifica non è da considerarsi finito.
 - Vale anche per le stringhe tradotte (i18n): etichette e descrizioni devono
   restare comprensibili e con `label`/`aria-label` adeguati in tutte le lingue.
+- **Ogni opzione deve avere il proprio tooltip, tradotto in tutte le lingue.**
+  Vale per entrambe le UI (Gextto `uiweb/v2` e pagina del demone). Il tooltip va
+  definito esplicitamente: in Gextto `uiweb_tooltips.go` per ogni chiave
+  dell'indice `uiweb_settings.go`; nel demone un `title` (o `aria-label`) sul
+  controllo, o sul `<label>` che lo racchiude, con la voce nei cataloghi i18n.
+  Guardie automatiche: `TestSettingTooltipsAreTranslated` (Gextto),
+  `TestEveryOptionHasATooltip` e `TestUIPageIsFullyTranslatable` (demone). Un
+  tooltip mancante o non tradotto fa fallire i test.

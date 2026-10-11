@@ -234,6 +234,10 @@ var uiCatalog = map[string][5]string{
 	"Current latency / upload cap":                                            {"Latenza attuale / tetto upload", "Aktuelle Latenz / Upload-Obergrenze", "Latence actuelle / plafond d'envoi", "Latencia actual / tope de subida", "Bieżące opóźnienie / limit wysyłania"},
 	"Latency auto-speed needs a positive upload limit (global or scheduled).": {"L'auto-speed per latenza richiede un limite di upload positivo (globale o programmato).", "Latenz-Auto-Speed benötigt ein positives Upload-Limit (global oder geplant).", "L'auto-speed de latence nécessite une limite d'envoi positive (globale ou planifiée).", "La auto-velocidad por latencia necesita un límite de subida positivo (global o programado).", "Auto-prędkość na podstawie opóźnienia wymaga dodatniego limitu wysyłania (globalnego lub zaplanowanego)."},
 
+	// Tooltips of the daemon page controls.
+	"Filter by category": {"Filtra per categoria", "Nach Kategorie filtern", "Filtrer par catégorie", "Filtrar por categoría", "Filtruj według kategorii"},
+	"Select torrent":     {"Seleziona torrent", "Torrent auswählen", "Sélectionner le torrent", "Seleccionar torrent", "Wybierz torrent"},
+
 	// First-run wizard: folder picker and indexer presets.
 	"Choose an existing folder on the server": {"Scegli una cartella esistente sul server", "Wähle einen vorhandenen Ordner auf dem Server", "Choisir un dossier existant sur le serveur", "Elige una carpeta existente en el servidor", "Wybierz istniejący folder na serwerze"},
 	"Browse…":            {"Sfoglia…", "Durchsuchen…", "Parcourir…", "Examinar…", "Przeglądaj…"},

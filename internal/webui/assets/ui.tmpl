@@ -205,7 +205,7 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
     <div class="logbar">
       <label class="chk">Lines <select id="log-lines" onchange="loadLog()" title="Lines"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
       <input type="search" id="log-filter" placeholder="Filter lines…" oninput="renderLog()" autocomplete="off" title="Filter lines…">
-      <label class="chk"><input type="checkbox" id="log-nodebug" checked onchange="renderLog()"> hide DEBUG</label>
+      <label class="chk"><input type="checkbox" id="log-nodebug" checked onchange="renderLog()" title="hide DEBUG"> hide DEBUG</label>
       <button type="button" onclick="loadLog()" title="↻ Reload">↻ Reload</button>
       <span class="muted" id="log-info"></span>
     </div>
@@ -296,7 +296,7 @@ setInterval(function(){refresh(false)},2000);
       <button type="button" class="filter" onclick="filterByState('error',this)">Error <b>{{.CountError}}</b></button>
       {{if .Categories}}
       <div class="muted">Categories</div>
-      <select id="catfilter" onchange="filterByCategory(this.value)">
+      <select id="catfilter" onchange="filterByCategory(this.value)" aria-label="Filter by category">
         <option value="">All</option>
         {{range .Categories}}<option value="{{.}}">{{.}}</option>{{end}}
       </select>
@@ -328,7 +328,7 @@ setInterval(function(){refresh(false)},2000);
     {{range .Rows}}
     <tbody class="t" data-name="{{.Name}}" data-state="{{.State}}" data-cat="{{.Category}}" data-k-name="{{.Name}}" data-k-progress="{{.Progress}}" data-k-state="{{.State}}" data-k-done="{{.TotalDone}}" data-k-down="{{.DLRate}}" data-k-up="{{.ULRate}}" data-k-peers="{{.Peers}}" data-k-seeds="{{.Seeds}}" data-k-ratio="{{.RatioVal}}" data-k-eta="{{.ETAVal}}">
       <tr class="l1">
-        <td class="sel" rowspan="2"><input class="rowsel" type="checkbox" value="{{.Hash}}"></td>
+        <td class="sel" rowspan="2"><input class="rowsel" type="checkbox" value="{{.Hash}}" aria-label="Select torrent"></td>
         <td class="name" colspan="9"><div class="nameline"><a href="#" onclick="openDetail('{{.Hash}}');return false" title="{{.Name}}">{{.Name}}</a><span class="muted" title="{{.SavePath}}">{{.SavePath}}</span></div></td>
         <td class="actions" rowspan="2"><div class="btns">
           <button type="button" onclick="openDetail('{{.Hash}}')" title="Details: files, peers, trackers">⋯</button>
@@ -426,12 +426,12 @@ setInterval(function(){refresh(false)},2000);
   <p class="muted" style="margin:12px 0 0">Limits &amp; seeding (-1 global, 0 unlimited).</p>
   <form class="form-grid" method="post" action="/ui/seed-limits">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Download limit KiB/s<input type="number" name="download_limit" value="{{.DownloadLimitKib}}"></label>
-    <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}"></label>
-    <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}"></label>
-    <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}"></label>
-    <label>Seed ratio<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}"></label>
-    <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}"></label>
+    <label>Download limit KiB/s<input type="number" name="download_limit" value="{{.DownloadLimitKib}}" title="Download limit KiB/s"></label>
+    <label>Upload limit KiB/s<input type="number" name="upload_limit" value="{{.UploadLimitKib}}" title="Upload limit KiB/s"></label>
+    <label>Max connections<input type="number" name="max_connections" value="{{.MaxConnections}}" title="Max connections"></label>
+    <label>Max uploads<input type="number" name="max_uploads" value="{{.MaxUploads}}" title="Max uploads"></label>
+    <label>Seed ratio<input type="number" step="0.01" name="seed_ratio" value="{{.SeedRatio}}" title="Seed ratio"></label>
+    <label>Seed days<input type="number" name="seed_days" value="{{.SeedDays}}" title="Seed days"></label>
     <button type="submit">Save limits</button>
   </form>
   <form class="form-grid" method="post" action="/ui/super-seeding">
@@ -441,21 +441,21 @@ setInterval(function(){refresh(false)},2000);
   </form>
   <form class="form-grid" method="post" action="/ui/webseeds">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Web seed (one URL per line)<textarea name="urls" rows="3" cols="60" placeholder="http://example/file">{{range .WebSeeds}}{{.}}
+    <label>Web seed (one URL per line)<textarea name="urls" rows="3" cols="60" placeholder="http://example/file" title="Web seed (one URL per line)">{{range .WebSeeds}}{{.}}
 {{end}}</textarea></label>
     <button type="submit">Add</button>
     <button type="submit" name="remove" value="1">Remove</button>
   </form>
   <form class="form-grid" method="post" action="/ui/move">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48"></label>
+    <label>Move data to<input type="text" name="destination" value="{{.SavePath}}" size="48" title="Move data to"></label>
     <button type="submit">Move</button>
   </form>
   {{if .Standalone}}
   <form class="form-grid" method="post" action="/ui/category">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general">
-    <label>Category<input type="text" name="category" value="{{.Category}}" list="catlist"></label>
-    <label>Tags<input type="text" name="tags" value="{{.Tags}}" placeholder="tag, tag"></label>
+    <label>Category<input type="text" name="category" value="{{.Category}}" list="catlist" title="Category"></label>
+    <label>Tags<input type="text" name="tags" value="{{.Tags}}" placeholder="tag, tag" title="Tags"></label>
     <button type="submit">Save</button>
   </form>
   <datalist id="catlist">{{range .Categories}}<option value="{{.}}">{{end}}</datalist>
@@ -472,7 +472,7 @@ setInterval(function(){refresh(false)},2000);
         <td class="num">{{bytes .Done}}</td>
         <td><form method="post" action="/ui/file-priority" onchange="this.submit()">
           <input type="hidden" name="hash" value="{{$.Hash}}"><input type="hidden" name="tab" value="files"><input type="hidden" name="index" value="{{.Index}}">
-          <select name="priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
+          <select name="priority" aria-label="Priority"><option value="0"{{if not .Wanted}} selected{{end}}>Skip</option><option value="4"{{if .Wanted}} selected{{end}}>Download</option></select>
         </form></td>
         <td><a href="/ui/stream?hash={{$.Hash}}&file={{.Index}}" target="_blank" rel="noopener" title="Stream this file with HTTP Range; the pieces of the window are downloaded first">▶</a></td>
       </tr>
@@ -512,7 +512,7 @@ setInterval(function(){refresh(false)},2000);
   {{else}}<p class="muted">No trackers.</p>{{end}}
   <form class="form-grid" method="post" action="/ui/trackers">
     <input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="trackers">
-    <label>Add trackers (one per line)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce"></textarea></label>
+    <label>Add trackers (one per line)<textarea name="urls" rows="3" cols="60" placeholder="https://tracker.example/announce" title="Add trackers (one per line)"></textarea></label>
     <button type="submit">Add trackers</button>
   </form>
 {{else if eq .Tab "pieces"}}
