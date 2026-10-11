@@ -2,16 +2,75 @@ Gextto — Third-party notices
 ============================
 
 Gextto is distributed under the European Union Public Licence v. 1.2 (see
-LICENSE). Its binaries also contain the third-party components listed below,
+LICENSE). Its source and binaries also include the components listed below,
 each under its own licence. This file reproduces their copyright notices and
 licence texts, as those licences require.
 
-This file covers only third-party dependencies (libraries imported or linked).
-It does not cover Gextto/gx-core's own code, which is EUPL-1.2.
+It lists (a) source-tree components whose code is derived from permissively
+licensed projects and (b) the third-party libraries imported or linked. The
+rest of Gextto's own code is EUPL-1.2.
 
-Generated from the modules actually linked into the binaries
-(`go list -deps ./cmd/gexttod ./cmd/gx-torrent`) plus the libtorrent
-distribution. Regenerate it when the dependencies change.
+Generated from the source tree (internal/gxcore, internal/dht), the modules
+actually linked into the binaries (go list -deps ./cmd/gexttod
+./cmd/gx-torrent) and the libtorrent distribution. Regenerate it when the
+dependencies change.
+
+================================================================================
+internal/gxcore — MIT
+Source derived from rain v2.4.2. Copyright (c) 2013 Cenk Alti.
+================================================================================
+
+The MIT License (MIT)
+
+Copyright (c) 2013 Cenk Alti
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+================================================================================
+internal/dht — BSD-3-Clause
+Source derived from nictuku/dht. Copyright (c) 2011 Yves Junqueira.
+================================================================================
+
+Copyright (c) 2011 Yves Junqueira
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+3. The name of the author may not be used to endorse or promote products
+   derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
 libtorrent (BSD-3-Clause) — embedded engine, linked through CGo
