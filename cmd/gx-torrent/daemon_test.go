@@ -700,6 +700,65 @@ func TestFileSelection(t *testing.T) {
 	}
 }
 
+// A magnet with the BEP 53 "so" parameter downloads only the selected files
+// (the engine skips the rest from the metadata on), and the daemon records the
+// selection as explicit file priorities once metadata is available.
+func TestMagnetSelectOnly(t *testing.T) {
+	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 45600, PortEnd: 45699, Encryption: 1})
+	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 45700, PortEnd: 45799, Encryption: 1, OutgoingInterface: "127.0.0.2"})
+	src := filepath.Join(t.TempDir(), "src")
+	data := makeMultiTorrent(t, src, "Season", []int{50_000, 70_000, 40_000})
+	hash, _, err := seeder.add(addRequest{TorrentData: data, Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "seeder seeding", func() bool { return stateOf(seeder, hash) == "seeding" })
+
+	dst := filepath.Join(t.TempDir(), "dst")
+	magnet := "magnet:?xt=urn:btih:" + hash + "&so=0,2"
+	leechHash, _, err := leecher.add(addRequest{Magnet: magnet, Destination: dst})
+	if err != nil {
+		t.Fatalf("add magnet: %v", err)
+	}
+	if leechHash != hash {
+		t.Fatalf("magnet hash %s != torrent hash %s", leechHash, hash)
+	}
+	waitFor(t, "leecher fetching metadata", func() bool { return stateOf(leecher, hash) == "downloading_metadata" })
+	leecher.mu.Lock()
+	handle, _ := leecher.findLocked(hash)
+	leecher.mu.Unlock()
+	if handle == nil {
+		t.Fatal("leecher has no handle")
+	}
+	if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
+		t.Fatal(err)
+	}
+
+	waitFor(t, "selected files downloaded", func() bool {
+		info, _ := findInfo(leecher, hash)
+		return info.Progress == 100 && info.State == "seeding"
+	})
+	for _, i := range []int{0, 2} {
+		name := fmt.Sprintf("part%d.bin", i)
+		if !sameFile(t, filepath.Join(src, "Season", name), filepath.Join(dst, "Season", name)) {
+			t.Fatalf("%s not downloaded correctly", name)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dst, "Season", "part1.bin")); !os.IsNotExist(err) {
+		t.Fatalf("the skipped file must not appear in the save path: %v", err)
+	}
+
+	// The daemon turned the magnet "so" selection into explicit priorities.
+	waitFor(t, "selection recorded", func() bool {
+		leecher.mu.Lock()
+		defer leecher.mu.Unlock()
+		_, meta := leecher.findLocked(hash)
+		return meta != nil && len(meta.SelectOnly) == 0 &&
+			len(meta.FilePriorities) == 3 &&
+			meta.FilePriorities[0] == 4 && meta.FilePriorities[1] == 0 && meta.FilePriorities[2] == 4
+	})
+}
+
 // RAM disk flow: the download starts on a tmpfs and is moved to the disk
 // while it is still downloading (cross-filesystem copy); it must finish
 // there with the right content and leave nothing on the RAM disk.

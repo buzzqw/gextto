@@ -194,3 +194,59 @@ func relocateFile(from, to string) error {
 	}
 	return os.Remove(from)
 }
+
+// selectOnlyJob carries a BEP 53 magnet "so" selection from the tick loop
+// (under d.mu) to applySelectOnly (outside d.mu).
+type selectOnlyJob struct {
+	id     string
+	wanted []int
+}
+
+// applySelectOnly turns a BEP 53 magnet "so" selection into explicit file
+// priorities once metadata is available, and drops the engine-side seed so the
+// recorded selection is authoritative. It runs outside d.mu (setFilePriorities
+// takes it) and must not block the tick for long: setFilePriorities stops the
+// torrent and returns, with the relocation done in a goroutine.
+func (d *Daemon) applySelectOnly(id string, wanted []int) {
+	d.mu.Lock()
+	t, _ := d.findLocked(id)
+	d.mu.Unlock()
+	if t == nil {
+		return
+	}
+	files, err := t.Files()
+	if err != nil || len(files) == 0 {
+		// Metadata not ready after all: put the request back and retry.
+		d.mu.Lock()
+		if meta, ok := d.state.Torrents[id]; ok && len(meta.SelectOnly) == 0 {
+			meta.SelectOnly = wanted
+			d.dirty = true
+		}
+		d.mu.Unlock()
+		return
+	}
+	want := make(map[int]struct{}, len(wanted))
+	for _, i := range wanted {
+		if i >= 0 {
+			want[i] = struct{}{}
+		}
+	}
+	priorities := make([]int, len(files))
+	anyWanted := false
+	for i := range files {
+		if _, ok := want[i]; ok {
+			priorities[i] = 4
+			anyWanted = true
+		}
+	}
+	if !anyWanted {
+		logf("select-only %s: no valid file index in %v", id, wanted)
+		t.ClearSelectOnly()
+		return
+	}
+	if err := d.setFilePriorities(id, priorities); err != nil {
+		logf("select-only %s: %v", id, err)
+		return
+	}
+	t.ClearSelectOnly()
+}

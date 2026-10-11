@@ -104,9 +104,12 @@ type torrentMeta struct {
 	// compute it (a stopped torrent has no piece table).
 	DoneBytes int64 `json:"done_bytes,omitempty"`
 	// FilePriorities: one entry per file, 0 = skip (empty = all wanted).
-	FilePriorities []int  `json:"file_priorities,omitempty"`
-	Version        string `json:"version,omitempty"`
-	Error          string `json:"error,omitempty"`
+	FilePriorities []int `json:"file_priorities,omitempty"`
+	// SelectOnly is a pending BEP 53 magnet "so" selection (non-padding file
+	// indices) to apply once metadata arrives, then turn into FilePriorities.
+	SelectOnly []int  `json:"select_only,omitempty"`
+	Version    string `json:"version,omitempty"`
+	Error      string `json:"error,omitempty"`
 	// Category and Tags are the qBittorrent-style labels a client assigns
 	// (standalone mode). They do not affect the transfer.
 	Category string   `json:"category,omitempty"`
@@ -834,6 +837,7 @@ func (d *Daemon) tick(now time.Time) {
 	queued := 0
 	activeDownloads, activeSeeds := 0, 0
 	var pendingStops []*torrent.Torrent
+	var pendingSelectOnly []selectOnlyJob
 	for _, t := range torrents {
 		id := t.ID()
 		stats, ok := statsOf[id]
@@ -871,6 +875,13 @@ func (d *Daemon) tick(now time.Time) {
 				pendingStops = append(pendingStops, t)
 				running = false
 			}
+		}
+		// BEP 53: once metadata is available, turn the magnet "so" selection
+		// into explicit file priorities (recording it in the state and the UI).
+		if len(meta.SelectOnly) > 0 && stats.Status != torrent.DownloadingMetadata && stats.Bytes.Total > 0 {
+			pendingSelectOnly = append(pendingSelectOnly, selectOnlyJob{id: id, wanted: meta.SelectOnly})
+			meta.SelectOnly = nil
+			d.dirty = true
 		}
 		if !meta.ProbeUntil.IsZero() && now.After(meta.ProbeUntil) {
 			meta.ProbeUntil = time.Time{}
@@ -990,6 +1001,9 @@ func (d *Daemon) tick(now time.Time) {
 		if err := t.Start(); err != nil {
 			logf("queue start %s: %v", t.ID(), err)
 		}
+	}
+	for _, job := range pendingSelectOnly {
+		d.applySelectOnly(job.id, job.wanted)
 	}
 }
 
@@ -1403,7 +1417,10 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		FirstLast:  req.FirstLast,
 		// SuperSeeding is a per-torrent seeding strategy, not a queue default.
 		SuperSeeding: req.SuperSeeding,
-		SeedRatio:    req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
+		// BEP 53 "so": keep the magnet's file selection to apply when metadata
+		// arrives (the engine already uses it as a seed meanwhile).
+		SelectOnly: t.SelectOnly(),
+		SeedRatio:  req.SeedRatio, SeedDays: req.SeedDays, SwarmSeeds: -1, SwarmPeers: -1,
 		Category: req.Category,
 		Tags:     req.Tags,
 	}
