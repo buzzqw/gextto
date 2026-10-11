@@ -12,6 +12,8 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Non committare `gx-torrent.build_number`, `bin/` né directory dati (`data/`,
   `gextto-data/`). `build_number` invece **è committato**: è la sorgente unica
   del numero di build condivisa tra checkout e CI (vedi *Build e test*).
+- **Committa e pusha spesso**: cambiamenti piccoli e verificati si committano e
+  si spingono su `origin/main` subito, senza accumulare lavoro non pushato.
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
@@ -201,6 +203,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   esegue `/home/andres/gextto/bin/gexttod` dal checkout, `GEXTTO_DATA_DIR=/home/andres/gextto-data`,
   UI su `0.0.0.0:5000`. `gx-torrent` lo avvia `gexttod`, in uno scope systemd
   separato che resta vivo ai riavvii del servizio.
+- **Quando serve, builda e riavvia**: dopo modifiche a motore/demone (o per
+  verificare) esegui `make build` e `systemctl --user restart gextto`; non
+  lasciare il servizio su un binario vecchio. Il riavvio può richiedere ~1 minuto
+  (caricamento del filtro IP e handover dello scope `gx-torrent`), quindi
+  verifica dopo un'attesa, non subito.
 - Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
   `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
   running: kept as it is"; altrimenti il demone viene riavviato.
