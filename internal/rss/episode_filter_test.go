@@ -93,3 +93,34 @@ func TestEvaluateSkipsDisabledRules(t *testing.T) {
 		t.Fatalf("the enabled rule must match: rule=%q matched=%v pass=%v", rule.Name, matched, pass)
 	}
 }
+
+func TestEvaluateIgnoreDaysWindow(t *testing.T) {
+	rules := []Rule{{Name: "r", IgnoreDays: 3, Match: Criteria{Include: []string{"show"}}}}
+	last := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
+	lookup := func(name string) time.Time {
+		if name == "r" {
+			return last
+		}
+		return time.Time{}
+	}
+	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+
+	// Older than last match + 3 days (2026-01-08): ignored.
+	old := Item{Title: "Show 1080p", Published: time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC)}
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", old, now, lookup); matched {
+		t.Fatal("an item older than the ignore window must not match")
+	}
+	// Newer: accepted.
+	fresh := Item{Title: "Show 1080p", Published: time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC)}
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", fresh, now, lookup); !matched {
+		t.Fatal("an item inside the window must match")
+	}
+	// A dateless item is never rejected by the window.
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", Item{Title: "Show 1080p"}, now, lookup); !matched {
+		t.Fatal("a dateless item must match")
+	}
+	// With no last-match lookup the window is inert.
+	if _, _, matched := Evaluate(rules, "f", old, now); !matched {
+		t.Fatal("without a last match the ignore window must be inert")
+	}
+}

@@ -340,10 +340,11 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 	enabled := formBool(r, "enabled")
 	rule := rss.Rule{
-		Name:    strings.TrimSpace(r.FormValue("name")),
-		Feeds:   splitList(r.FormValue("feeds")),
-		Enabled: &enabled,
-		Fail:    formBool(r, "fail"),
+		Name:       strings.TrimSpace(r.FormValue("name")),
+		Feeds:      splitList(r.FormValue("feeds")),
+		Enabled:    &enabled,
+		IgnoreDays: int(formInt(r, "ignore_days", 0)),
+		Fail:       formBool(r, "fail"),
 		Match: rss.Criteria{
 			Include:        splitList(r.FormValue("include")),
 			Exclude:        splitList(r.FormValue("exclude")),
@@ -471,6 +472,9 @@ func uiRuleMatchSummary(rule rss.Rule) string {
 	}
 	if m.SmartEpisode {
 		parts = append(parts, "smart_episode")
+	}
+	if rule.IgnoreDays > 0 {
+		parts = append(parts, fmt.Sprintf("ignore_days=%d", rule.IgnoreDays))
 	}
 	if len(parts) == 0 {
 		return "—"

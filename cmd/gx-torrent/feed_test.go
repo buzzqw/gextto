@@ -249,6 +249,113 @@ func TestSmartEpisodeKeepsOlderEpisodeAfterNewer(t *testing.T) {
 	}
 }
 
+// TestPollFeedsAcceptsRepackOnce exercises the smart-episode repack handling
+// end to end: a repack of an already-taken episode is added once, then ignored.
+func TestPollFeedsAcceptsRepackOnce(t *testing.T) {
+	var body atomic.Value
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write(body.Load().([]byte))
+	}))
+	defer feed.Close()
+	body.Store([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Show S01E05 1080p</title><guid>e5</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+</channel></rss>`))
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey, `[{"name":"shows","match":{"smart_episode":true}}]`)
+	d.pollFeeds()
+	waitFor(t, "E05", func() bool { return len(d.snapshotViews()) == 1 })
+
+	body.Store([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Show S01E05 1080p</title><guid>e5</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+<item><title>Show S01E05 REPACK 1080p</title><guid>e5repack</guid>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:4444444444444444444444444444444444444444">x</a>]]></description></item>
+</channel></rss>`))
+	d.pollFeeds()
+	waitFor(t, "E05 REPACK", func() bool { return len(d.snapshotViews()) == 2 })
+
+	// A further poll adds nothing: the same repack was already taken.
+	d.pollFeeds()
+	if len(d.snapshotViews()) != 2 {
+		t.Fatalf("re-poll added torrents: %d", len(d.snapshotViews()))
+	}
+}
+
+// TestPollFeedsIgnoreDaysWindow exercises the ignore-days window end to end.
+func TestPollFeedsIgnoreDaysWindow(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Show S01E01 1080p</title><guid>old</guid><pubDate>Wed, 07 Jan 2026 00:00:00 +0000</pubDate>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:1111111111111111111111111111111111111111">x</a>]]></description></item>
+<item><title>Show S01E02 1080p</title><guid>new</guid><pubDate>Fri, 09 Jan 2026 00:00:00 +0000</pubDate>
+<description><![CDATA[<a href="magnet:?xt=urn:btih:2222222222222222222222222222222222222222">x</a>]]></description></item>
+</channel></rss>`))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey, `[{"name":"shows","ignore_days":3,"match":{"include":["Show"],"require_episode":true}}]`)
+	// The rule last matched on 2026-01-05: with a 3-day window, items before
+	// 2026-01-08 (E01, 01-07) are ignored and only E02 (01-09) is added.
+	d.markRuleMatch("shows", time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC))
+
+	d.pollFeeds()
+	waitFor(t, "E02 only", func() bool { return len(d.snapshotViews()) == 1 })
+	if view := d.snapshotViews()[0]; view.Hash != "2222222222222222222222222222222222222222" {
+		t.Fatalf("added %s, want only E02", view.Hash)
+	}
+}
+
+func TestSmartEpisodeRepackAndProper(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	key := "Show\x001"
+
+	// First plain E05: taken, and only the base token is recorded.
+	if tokens := d.smartEpisodeVerdict(key, "Show S01E05 1080p", 5); len(tokens) != 1 || tokens[0] != "5" {
+		t.Fatalf("first E05 verdict = %v", tokens)
+	} else {
+		d.markSmartEpisode(key, tokens)
+	}
+	// A plain re-release of E05 is skipped.
+	if tokens := d.smartEpisodeVerdict(key, "Show S01E05 1080p", 5); tokens != nil {
+		t.Fatalf("a duplicate E05 must be skipped, got %v", tokens)
+	}
+	// REPACK accepted once...
+	tokens := d.smartEpisodeVerdict(key, "Show S01E05 REPACK 1080p", 5)
+	if len(tokens) != 1 || tokens[0] != "5-REPACK" {
+		t.Fatalf("REPACK verdict = %v", tokens)
+	}
+	d.markSmartEpisode(key, tokens)
+	// ...and not again.
+	if tokens := d.smartEpisodeVerdict(key, "Show S01E05 REPACK 1080p", 5); tokens != nil {
+		t.Fatalf("the same REPACK must be skipped, got %v", tokens)
+	}
+	// A PROPER is a distinct upgrade and is accepted once.
+	tokens = d.smartEpisodeVerdict(key, "Show S01E05 PROPER 1080p", 5)
+	if len(tokens) != 1 || tokens[0] != "5-PROPER" {
+		t.Fatalf("PROPER verdict = %v", tokens)
+	}
+	d.markSmartEpisode(key, tokens)
+
+	// A brand-new episode that arrives as a REPACK records the base too, so a
+	// later plain release is not taken.
+	tokens = d.smartEpisodeVerdict(key, "Show S01E06 REPACK 1080p", 6)
+	if len(tokens) != 2 || tokens[0] != "6" || tokens[1] != "6-REPACK" {
+		t.Fatalf("new REPACK episode verdict = %v", tokens)
+	}
+	d.markSmartEpisode(key, tokens)
+	if !d.smartEpisodeSeen(key, "6") || !d.smartEpisodeSeen(key, "6-REPACK") {
+		t.Fatal("the new repack episode tokens were not recorded")
+	}
+	if tokens := d.smartEpisodeVerdict(key, "Show S01E06 1080p", 6); tokens != nil {
+		t.Fatalf("a plain release after the repack must be skipped, got %v", tokens)
+	}
+}
+
 func TestFeedSmartStateLegacyFormatLoads(t *testing.T) {
 	// A state file written before the set existed stored the highest episode as
 	// a plain integer; it must still load and behave as "seen up to there".
@@ -260,10 +367,10 @@ func TestFeedSmartStateLegacyFormatLoads(t *testing.T) {
 	if err := d.loadState(); err != nil {
 		t.Fatalf("a legacy feed_smart value must load: %v", err)
 	}
-	if !d.smartEpisodeSeen("Show\x001", 3) || !d.smartEpisodeSeen("Show\x001", 5) {
+	if !d.smartEpisodeSeen("Show\x001", "3") || !d.smartEpisodeSeen("Show\x001", "5") {
 		t.Fatal("the legacy episode set was not migrated")
 	}
-	if d.smartEpisodeSeen("Show\x001", 6) {
+	if d.smartEpisodeSeen("Show\x001", "6") {
 		t.Fatal("an episode above the legacy high-water mark must not be seen")
 	}
 }

@@ -131,13 +131,18 @@ type persistedState struct {
 	// FeedSmart is the set of episodes already taken per series+season (smart
 	// episode), each with the time it was added.
 	FeedSmart map[string]smartEpisodes `json:"feed_smart,omitempty"`
+	// RuleLastMatch records, per rule name, the published time of the last item
+	// a rule accepted (Unix seconds), for the ignore-days window.
+	RuleLastMatch map[string]int64 `json:"rule_last_match,omitempty"`
 }
 
 // smartEpisodes is the set of episodes already taken for one series+season, each
-// with the Unix time it was added. A set is needed (not just the highest number)
-// because a feed can list a newer episode before an older one: keeping only the
-// maximum loses the older episode forever.
-type smartEpisodes map[int]int64
+// with the Unix time it was added. The token is the episode number, possibly
+// suffixed with "-REPACK"/"-PROPER" so a repack or proper of an episode already
+// taken is accepted once (like qBittorrent's smart episode filter). A set is
+// needed (not just the highest number) because a feed can list a newer episode
+// before an older one: keeping only the maximum loses the older episode forever.
+type smartEpisodes map[string]int64
 
 // UnmarshalJSON accepts both the current form (a JSON object of
 // "episode": addedAt) and the older one (a single integer, the highest episode
@@ -154,7 +159,7 @@ func (s *smartEpisodes) UnmarshalJSON(data []byte) error {
 		}
 		legacy := smartEpisodes{}
 		for ep := 0; ep <= highest; ep++ {
-			legacy[ep] = 0
+			legacy[strconv.Itoa(ep)] = 0
 		}
 		*s = legacy
 		return nil
@@ -165,11 +170,10 @@ func (s *smartEpisodes) UnmarshalJSON(data []byte) error {
 	}
 	out := smartEpisodes{}
 	for key, at := range raw {
-		ep, err := strconv.Atoi(key)
-		if err != nil {
+		if strings.TrimSpace(key) == "" {
 			continue
 		}
-		out[ep] = at
+		out[key] = at
 	}
 	*s = out
 	return nil

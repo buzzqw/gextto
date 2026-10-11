@@ -296,7 +296,7 @@ func TestUIRssRuleEditor(t *testing.T) {
 	resp, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{
 		"op": {"add"}, "name": {"shows"}, "feeds": {"serie, film"}, "enabled": {"1"},
 		"min_size": {"1500"}, "min_seeders": {"3"}, "require_episode": {"1"}, "smart_episode": {"1"},
-		"episode_filter": {"1x01-05"}, "savepath": {"/srv/tv"}, "category": {"tv"}, "tags": {"hd, ita"}, "sequential": {"1"},
+		"episode_filter": {"1x01-05"}, "ignore_days": {"7"}, "savepath": {"/srv/tv"}, "category": {"tv"}, "tags": {"hd, ita"}, "sequential": {"1"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -322,6 +322,9 @@ func TestUIRssRuleEditor(t *testing.T) {
 	}
 	if shows.Match.EpisodeFilter != "1x01-05" {
 		t.Fatalf("episode_filter = %q", shows.Match.EpisodeFilter)
+	}
+	if shows.IgnoreDays != 7 {
+		t.Fatalf("ignore_days = %d", shows.IgnoreDays)
 	}
 	if !rss.RuleEnabled(shows) {
 		t.Fatal("the rule must be enabled when the checkbox is on")

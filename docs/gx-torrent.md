@@ -441,7 +441,11 @@ tutti), `fail`, `match` e `action`:
   `min_size`/`max_size` (byte), `min_seeders`/`max_seeders`, `min_peers`,
   `max_age_days`, `require_episode`, `episode_filter` e `smart_episode`
   (aggiunge un episodio di una serie una volta sola, tenendo traccia
-  dell'ultimo: come lo smart episode filter di qBittorrent);
+  dell'ultimo: come lo smart episode filter di qBittorrent; un **REPACK** o
+  **PROPER** di un episodio già preso viene accettato una volta sola);
+- `ignore_days` (0 = spento): scarta gli item più vecchi dell'ultimo match della
+  regola più N giorni, come *ignore days* di qBittorrent (l'ultimo match si
+  aggiorna a ogni item accettato);
 - ogni regola è attiva per default; `enabled: false` la disattiva senza
   cancellarla (l'editor mostra un'etichetta *Disattivata*).
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,

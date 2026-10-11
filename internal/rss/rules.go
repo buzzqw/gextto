@@ -51,10 +51,13 @@ type Rule struct {
 	Feeds []string `json:"feeds,omitempty"`
 	// Enabled is optional: nil (the common case) means enabled, a pointer to
 	// false disables the rule without deleting it.
-	Enabled *bool    `json:"enabled,omitempty"`
-	Fail    bool     `json:"fail,omitempty"` // FAIL: matching items are skipped
-	Match   Criteria `json:"match"`
-	Action  Action   `json:"action,omitempty"`
+	Enabled *bool `json:"enabled,omitempty"`
+	// IgnoreDays skips items older than the rule's last match plus this many
+	// days (0 = off), like qBittorrent's "ignore days".
+	IgnoreDays int      `json:"ignore_days,omitempty"`
+	Fail       bool     `json:"fail,omitempty"` // FAIL: matching items are skipped
+	Match      Criteria `json:"match"`
+	Action     Action   `json:"action,omitempty"`
 }
 
 // RuleEnabled reports whether a rule is active (nil Enabled means yes).
@@ -169,6 +172,13 @@ func (c Criteria) Match(item Item, now time.Time) bool {
 // for feedName: pass=true means "add it" (using the rule's Action), pass=false
 // means the rule explicitly skips it. matched is false when no rule applies.
 func Evaluate(rules []Rule, feedName string, item Item, now time.Time) (rule Rule, pass, matched bool) {
+	return EvaluateWithLastMatch(rules, feedName, item, now, nil)
+}
+
+// EvaluateWithLastMatch is Evaluate with the per-rule last-match lookup used by
+// the ignore-days window: a rule with IgnoreDays > 0 only matches an item
+// published at or after lastMatch(rule)+IgnoreDays. lastMatch may be nil.
+func EvaluateWithLastMatch(rules []Rule, feedName string, item Item, now time.Time, lastMatch func(ruleName string) time.Time) (rule Rule, pass, matched bool) {
 	for _, candidate := range rules {
 		if !RuleEnabled(candidate) {
 			continue
@@ -176,11 +186,28 @@ func Evaluate(rules []Rule, feedName string, item Item, now time.Time) (rule Rul
 		if !ruleAppliesToFeed(candidate, feedName) {
 			continue
 		}
+		if !ruleWithinIgnoreWindow(candidate, item, lastMatch) {
+			continue
+		}
 		if candidate.Match.Match(item, now) {
 			return candidate, !candidate.Fail, true
 		}
 	}
 	return Rule{}, false, false
+}
+
+// ruleWithinIgnoreWindow reports whether an item is new enough for a rule: with
+// IgnoreDays > 0 an item older than the rule's last match plus the window does
+// not match. An unknown last match or a dateless item is never rejected.
+func ruleWithinIgnoreWindow(rule Rule, item Item, lastMatch func(string) time.Time) bool {
+	if rule.IgnoreDays <= 0 || lastMatch == nil || item.Published.IsZero() {
+		return true
+	}
+	last := lastMatch(rule.Name)
+	if last.IsZero() {
+		return true
+	}
+	return !item.Published.Before(last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour))
 }
 
 func ruleAppliesToFeed(rule Rule, feedName string) bool {

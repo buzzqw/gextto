@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -197,7 +198,7 @@ func (d *Daemon) pollFeeds() {
 			if added >= feedMaxAddsPerPoll {
 				break
 			}
-			action, smart, ok := filterFeedItem(rules, feed, name, item, time.Now())
+			rule, smart, ok := filterFeedItem(rules, feed, name, item, time.Now(), d.ruleLastMatch)
 			if !ok {
 				continue
 			}
@@ -205,19 +206,19 @@ func (d *Daemon) pollFeeds() {
 				continue
 			}
 			smartKey := ""
-			smartEpisodeNum := 0
+			var smartTokens []string
 			if smart {
 				series, season, episode, found := rss.FindEpisode(item.Title)
 				if !found {
 					continue
 				}
 				smartKey = fmt.Sprintf("%s\x00%d", series, season)
-				if d.smartEpisodeSeen(smartKey, episode) {
+				smartTokens = d.smartEpisodeVerdict(smartKey, item.Title, episode)
+				if len(smartTokens) == 0 {
 					continue
 				}
-				smartEpisodeNum = episode
 			}
-			newlyAdded, err := d.addFeedItem(item, action)
+			newlyAdded, err := d.addFeedItem(item, rule.Action)
 			if err != nil {
 				status.LastError = err.Error()
 				logf("feed %s: cannot add %q: %v", name, item.Title, err)
@@ -229,7 +230,10 @@ func (d *Daemon) pollFeeds() {
 			}
 			d.markFeedSeen(name, item.GUID)
 			if smartKey != "" {
-				d.markSmartEpisode(smartKey, smartEpisodeNum)
+				d.markSmartEpisode(smartKey, smartTokens)
+			}
+			if rule.IgnoreDays > 0 {
+				d.markRuleMatch(rule.Name, item.Published)
 			}
 			if newlyAdded {
 				added++
@@ -255,26 +259,27 @@ func (d *Daemon) pollFeeds() {
 
 // filterFeedItem decides whether an item is added and with which action. With a
 // rule set configured the rules are ordered and the first match wins (PASS adds,
-// FAIL skips); otherwise the feed's own include/exclude filter applies.
-func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss.Item, now time.Time) (rss.Action, bool, bool) {
+// FAIL skips); otherwise the feed's own include/exclude filter applies. It
+// returns the matched rule so the caller can record its last-match time.
+func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss.Item, now time.Time, lastMatch func(string) time.Time) (rss.Rule, bool, bool) {
 	if item.Download() == "" || item.Title == "" {
-		return rss.Action{}, false, false
+		return rss.Rule{}, false, false
 	}
 	if len(rules) > 0 {
-		rule, pass, matched := rss.Evaluate(rules, feedName, item, now)
+		rule, pass, matched := rss.EvaluateWithLastMatch(rules, feedName, item, now, lastMatch)
 		if !matched || !pass {
-			return rss.Action{}, false, false
+			return rss.Rule{}, false, false
 		}
-		return rule.Action, rule.Match.SmartEpisode, true
+		return rule, rule.Match.SmartEpisode, true
 	}
 	if !feed.rule().Match(item.Title) {
-		return rss.Action{}, false, false
+		return rss.Rule{}, false, false
 	}
-	return rss.Action{
+	return rss.Rule{Action: rss.Action{
 		SavePath: feed.SavePath,
 		Category: feed.Category,
 		Paused:   feed.Paused,
-	}, false, true
+	}}, false, true
 }
 
 // addFeedItem adds one feed item with the rule's action: a magnet directly, a
@@ -320,23 +325,65 @@ func (d *Daemon) rules() []rss.Rule {
 	return list
 }
 
-// smartEpisodeSeen reports whether an episode of a series+season was already
-// taken (smart episode). Keeping the whole set, not just the highest number,
-// means an episode that arrives after a newer one is still accepted.
-func (d *Daemon) smartEpisodeSeen(key string, episode int) bool {
+// smartEpisodeSeen reports whether an episode token of a series+season was
+// already taken (smart episode). Keeping the whole set, not just the highest
+// number, means an episode that arrives after a newer one is still accepted.
+func (d *Daemon) smartEpisodeSeen(key, token string) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	eps, ok := d.state.FeedSmart[key]
 	if !ok {
 		return false
 	}
-	_, seen := eps[episode]
+	_, seen := eps[token]
 	return seen
 }
 
-// markSmartEpisode records an episode as taken and prunes entries older than
-// the retention window.
-func (d *Daemon) markSmartEpisode(key string, episode int) {
+// smartEpisodeVerdict decides whether a smart-episode item must be added and
+// returns the tokens to record on success (nil = skip). It mirrors qBittorrent's
+// smart episode filter: the first release of an episode is taken; a later REPACK
+// or PROPER of an already-taken episode is taken once per combination, so a
+// repack is not downloaded again and again.
+func (d *Daemon) smartEpisodeVerdict(key, title string, episode int) []string {
+	base := strconv.Itoa(episode)
+	upper := strings.ToUpper(title)
+	isRepack := strings.Contains(upper, "REPACK")
+	isProper := strings.Contains(upper, "PROPER")
+	token := base
+	if isRepack {
+		token += "-REPACK"
+	}
+	if isProper {
+		token += "-PROPER"
+	}
+	if !d.smartEpisodeSeen(key, base) {
+		if token == base {
+			return []string{base}
+		}
+		// A brand-new episode that arrives as a repack/proper: record the base
+		// too, so the plain release is not taken afterwards.
+		return []string{base, token}
+	}
+	// The episode is already taken: only a new repack/proper combination is.
+	if !isRepack && !isProper {
+		return nil
+	}
+	if d.smartEpisodeSeen(key, token) {
+		return nil
+	}
+	tokens := []string{token}
+	if isRepack && isProper {
+		tokens = append(tokens, base+"-REPACK", base+"-PROPER")
+	}
+	return tokens
+}
+
+// markSmartEpisode records the episode tokens as taken and prunes entries older
+// than the retention window.
+func (d *Daemon) markSmartEpisode(key string, tokens []string) {
+	if len(tokens) == 0 {
+		return
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.state.FeedSmart == nil {
@@ -348,14 +395,46 @@ func (d *Daemon) markSmartEpisode(key string, episode int) {
 		d.state.FeedSmart[key] = eps
 	}
 	now := time.Now()
-	eps[episode] = now.Unix()
-	for ep, at := range eps {
+	for _, token := range tokens {
+		eps[token] = now.Unix()
+	}
+	for token, at := range eps {
 		if at > 0 && now.Sub(time.Unix(at, 0)) > feedSeenRetention {
-			delete(eps, ep)
+			delete(eps, token)
 		}
 	}
 	// Only mark dirty: pollFeeds does one atomic save at the end of the cycle,
 	// instead of rewriting state.json for every item added.
+	d.dirty = true
+}
+
+// ruleLastMatch returns the published time of the last item a rule accepted, or
+// the zero time when the rule never matched (used by the ignore-days window).
+func (d *Daemon) ruleLastMatch(name string) time.Time {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	at, ok := d.state.RuleLastMatch[name]
+	if !ok || at <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(at, 0)
+}
+
+// markRuleMatch records the last accepted item time for a rule, so older items
+// are ignored for the next ignore-days window.
+func (d *Daemon) markRuleMatch(name string, published time.Time) {
+	if strings.TrimSpace(name) == "" {
+		return
+	}
+	if published.IsZero() {
+		published = time.Now()
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.state.RuleLastMatch == nil {
+		d.state.RuleLastMatch = map[string]int64{}
+	}
+	d.state.RuleLastMatch[name] = published.Unix()
 	d.dirty = true
 }
 
