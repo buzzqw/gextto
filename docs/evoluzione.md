@@ -699,9 +699,10 @@ ed25519, query `get`/`put`, API locale; vettori ufficiali in `bep44_test.go`),
 dello sciame, client verso i nodi più vicini; vettore ufficiale in
 `bloom_test.go`), esposta dal motore (`Torrent.DHTScrape`), dal demone
 (`GET /api/v1/torrents/{hash}/dhtscrape`) e dalla pagina (pulsante **DHT swarm**).
-La **BEP 44** resta senza **client iterativo di rete**: gx-core non ha un
-consumatore per l'archivio DHT, quindi non si aggiunge codice speculativo (lato
-server + API locale sono pronti se servirà).
+La **BEP 44** ha ora anche il **client iterativo di rete** (`bep44_client.go`):
+`GetImmutable`/`GetMutable` fanno una traversal bounded sui nodi più vicini e
+`PublishImmutable`/`PublishMutable` pubblicano raccogliendo prima il token con
+una `get`. È il consumatore che abilita la **BEP 46** (magnet `xs=urn:btpk:`).
 
 **Fix BEP 44 (2026-10-11).** Le richieste `get`/`put` decodificano il dizionario
 `a` con un decoder bencode proprio (`internal/dht/bencode.go`): `bencode-go`
@@ -789,7 +790,7 @@ ha aperto due item che sono stati chiusi qui.
 | **BEP 21** (`upload_only`) | **fatto (peer + tracker)** | Il magnet non c'entra: BEP 21 è la chiave `upload_only` nell'extension handshake BEP 10, più `event=paused` all'announce e `downloaders` nello scrape. L'header è inviato alla connessione e rinviato a tutti i peer quando il torrent diventa seed (`torrent.uploadOnly` = `completed`, quindi anche seed parziali su selection); un **seed parziale** annuncia `event=paused` (`tracker.EventPaused`). Manca solo il campo `downloaders` dello scrape (opzionale, lo fornisce il tracker) |
 | **BEP 53** (`so=`) + magnet `ws=`/`dht=` | **parziale** | `so=` (Select Only, BEP 53): `Magnet.SelectOnly` parsa indici e range, de-duplicati, come seed del torrent applicato da `skippedInfoFiles` **solo** quando `Config.FileSelection` non fornisce una maschera (`Torrent.SelectOnly`/`ClearSelectOnly`); il demone lo trasforma in `FilePriorities` all'arrivo del metadata. Convenzioni magnet: `ws=` (web seed) → `Magnet.WebSeeds`, persistito nel resume; `dht=` (nodo DHT di bootstrap) → `Magnet.DHTNodes`, aggiunto alla DHT di sessione. Restano `xs=`/`as=` |
 | **BEP 41** (UDP tracker URLData) | **già presente** | Il documento la dava per assente: `internal/tracker/udptracker/messages.go` scrive già le opzioni TLV (tipo `0x2` = URLData, non `0x1`) da `u.RequestURI()`. Nessun lavoro |
-| **BEP 44 client iterativo + BEP 46** (`urn:btpk:`) | **da aprire solo con un consumatore** | Il DHT ha già un client verso i nodi più vicini per lo scrape (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il `get`/`put` **uscente** e la traversal generica. `evoluzione.md` §3 lo considerava speculativo senza un uso reale: resta così |
+| **BEP 44 client iterativo + BEP 46** (`urn:btpk:`) | **fatto** | Il DHT ha ora il client uscente (`internal/dht/bep44_client.go`): `GetImmutable`/`GetMutable` con traversal bounded sui nodi più vicini, `PublishImmutable`/`PublishMutable` che raccolgono il token con una `get` e pubblicano con `put`; `handleBep44Reply` decodifica la risposta con il decoder panic-free e continua la traversal. **BEP 46**: il magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) risolve l'info hash dall'item mutabile in `Session.addMagnet`. Test: `bep44_client_test.go`, `bep46_test.go`, magnet |
 | **BEP 54** (`lt_donthave`) | **fatto (ricezione)** | Estensione BEP 10 `lt_donthave`: un `DontHave` azzera il bit del pezzo nel bitfield del peer e la disponibilità nel picker; senza Fast Extension cancella anche il download attivo di quel pezzo. Solo ricezione (gx-core non scarta pezzi). Correzione: BEP 54 **non** è STUN (errore dell'analisi esterna); non esiste una BEP per STUN |
 | **BEP 31** (`retry in`) | **fatto** | Annuncio e scrape HTTP/UDP estraggono `retry in` in minuti e lo rispettano; il valore `"never"` scarta il tracker dal tier per sempre (`tracker.Tier`, senza fermare gli altri tracker dello stesso tier). Parsing unico in `tracker.NewError`/`SetRetryIn` |
 | **BEP 38** (`similar`/`collections`) | **parziale (scoperta dei candidati)** | Hint letti dal dizionario info **e** dal livello superiore (uniti e deduplicati in `metainfo/bep38.go`), riemessi nell'export (`NewBytesWithHints`), esposti con i torrent locali che condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina del demone, dettaglio Gextto, con la simmetria del BEP). Il **riuso dei blocchi** è lo Swarm Merging (§15.2) |

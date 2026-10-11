@@ -3,6 +3,7 @@ package magnet
 
 import (
 	"cmp"
+	"crypto/ed25519"
 	"encoding/base32"
 	"encoding/hex"
 	"errors"
@@ -41,6 +42,11 @@ type Magnet struct {
 	// metainfo from them before waiting for a peer or the DHT.
 	ExactSources      []string
 	AcceptableSources []string
+	// BTPKPublicKey is the ed25519 public key from a BEP 46 "xs=urn:btpk:"
+	// value: the link then carries no "xt" and the info hash is resolved from
+	// the DHT mutable item at add time. BTPKSalt is the optional "s" salt.
+	BTPKPublicKey []byte
+	BTPKSalt      []byte
 }
 
 // New parses the string and returns new Magnet.
@@ -56,18 +62,22 @@ func New(s string) (*Magnet, error) {
 
 	params := u.Query()
 
-	xts, ok := params["xt"]
-	if !ok {
+	var magnet Magnet
+	xts := params["xt"]
+	// BEP 46: a link may carry "xs=urn:btpk:<public key>" instead of an "xt";
+	// the info hash is then resolved from the DHT mutable item at add time.
+	magnet.BTPKPublicKey, magnet.BTPKSalt = parseBTPK(params["xs"], params["s"])
+	if len(xts) == 0 && len(magnet.BTPKPublicKey) == 0 {
 		return nil, errors.New("missing xt param")
 	}
-	if len(xts) == 0 {
-		return nil, errors.New("empty xt param")
-	}
 
-	var magnet Magnet
-	h, ok, err := parseInfoHash(xts)
-	if err != nil {
-		return nil, err
+	var h [20]byte
+	ok := false
+	if len(xts) > 0 {
+		h, ok, err = parseInfoHash(xts)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if ok {
 		magnet.InfoHash = h
@@ -75,12 +85,16 @@ func New(s string) (*Magnet, error) {
 	}
 	magnet.V2InfoHash, magnet.HasV2 = parseV2InfoHash(xts)
 	if !magnet.HasV1 {
-		if !magnet.HasV2 {
+		switch {
+		case magnet.HasV2:
+			// A v2-only link: the identity used on the wire (handshake, DHT,
+			// tracker) is the first 20 bytes of the SHA-256 info hash.
+			copy(magnet.InfoHash[:], magnet.V2InfoHash[:20])
+		case len(magnet.BTPKPublicKey) > 0:
+			// BEP 46: resolved from the DHT by the caller.
+		default:
 			return nil, errors.New("invalid xt param: must start with \"urn:btih:\" or \"urn:btmh:\"")
 		}
-		// A v2-only link: the identity used on the wire (handshake, DHT,
-		// tracker) is the first 20 bytes of the SHA-256 info hash.
-		copy(magnet.InfoHash[:], magnet.V2InfoHash[:20])
 	}
 
 	names := params["dn"]
@@ -149,6 +163,43 @@ func cleanSourceList(values []string) []string {
 	}
 	return out
 }
+
+// maxBTPKSalt mirrors BEP 44's 64-byte salt ceiling.
+const maxBTPKSalt = 64
+
+// parseBTPK parses a BEP 46 "xs=urn:btpk:<public key hex>" value together with
+// the optional "s" salt (hex). It returns a nil key when no valid urn:btpk is
+// present.
+func parseBTPK(xs, salts []string) (ed25519.PublicKey, []byte) {
+	var pub ed25519.PublicKey
+	for _, x := range xs {
+		s, ok := strings.CutPrefix(strings.TrimSpace(x), "urn:btpk:")
+		if !ok {
+			continue
+		}
+		b, err := hex.DecodeString(strings.TrimSpace(s))
+		if err != nil || len(b) != ed25519.PublicKeySize {
+			continue
+		}
+		pub = b
+		break
+	}
+	if pub == nil {
+		return nil, nil
+	}
+	for _, s := range salts {
+		b, err := hex.DecodeString(strings.TrimSpace(s))
+		if err != nil || len(b) > maxBTPKSalt {
+			continue
+		}
+		return pub, b
+	}
+	return pub, nil
+}
+
+// HasBTPK reports whether the link carries a BEP 46 "urn:btpk:" source, so its
+// info hash must be resolved from the DHT before the torrent is added.
+func (m *Magnet) HasBTPK() bool { return len(m.BTPKPublicKey) > 0 }
 
 // MetadataSources returns the HTTP(S) URLs from "xs" (exact) then "as"
 // (acceptable), de-duplicated and in order: gx-core tries them to fetch the
@@ -226,6 +277,10 @@ func (m *Magnet) String() string {
 	for _, src := range m.AcceptableSources {
 		b.WriteString("&as=")
 		b.WriteString(url.QueryEscape(src))
+	}
+	if len(m.BTPKSalt) > 0 {
+		b.WriteString("&s=")
+		b.WriteString(hex.EncodeToString(m.BTPKSalt))
 	}
 	if len(m.SelectOnly) > 0 {
 		b.WriteString("&so=")

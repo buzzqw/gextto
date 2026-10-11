@@ -64,9 +64,9 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 33 | DHT Scrape (filtri Bloom `BFpe`/`BFsd`) | sì |
 | 42 | DHT Security Extension (Secure Node ID, CRC32C) | sì |
 | 43 | Read-only DHT Nodes (`ro: 1`) | sì |
-| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | **parziale**: store locale + `get`/`put` come responder; **nessun client iterativo uscente** |
+| 44 | Storing arbitrary data in the DHT (K/V Ed25519) | sì: store locale, responder `get`/`put` e **client uscente iterativo** (bounded) per leggere e pubblicare item |
 | 45 | Multiple-address Operation for DHT (multi-homed) | no |
-| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | no |
+| 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | sì (magnet `xs=urn:btpk:`, risolto dal client BEP 44 all'aggiunta) |
 | 51 | DHT Infohash Indexing (`sample_infohashes`) | no |
 
 ## BitTorrent v2 e magnet
@@ -122,12 +122,12 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
    e lo usa **solo se l'info hash corrisponde**, altrimenti ricade nel download
    dei metadati via sciame/DHT. `so=` (BEP 53) e `ws=` (web seed, con
    persistenza nel resume) erano già fatti.
-4. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
-   sui nodi più vicini tramite `get`/`put` uscenti e traversal Kademlia. Il DHT
-   oggi ha già un client verso i nodi più vicini per lo scrape
-   (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il percorso
-   uscente. Da aprire **solo con un consumatore reale** (nessun codice
-   speculativo).
+4. **BEP 44 — client iterativo uscente + BEP 46 — fatti.** Il DHT ha un client
+   uscente (`bep44_client.go`): `GetImmutable`/`GetMutable` fanno una traversal
+   bounded sui nodi più vicini, `PublishImmutable`/`PublishMutable` raccolgono i
+   token con una `get` e poi pubblicano con `put`. La **BEP 46** è cablata: un
+   magnet `xs=urn:btpk:<pubkey>` (con eventuale `s=<salt>`) risolve l'info hash
+   dall'item mutabile all'aggiunta (`Session.addMagnet`).
 5. **BEP 45 (DHT multi-address)** e **BEP 51 (`sample_infohashes`)**: marginali
    per un client domestico/NAS (multi-interfaccia; indicizzazione per crawler).
 6. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;

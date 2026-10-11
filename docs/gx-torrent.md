@@ -642,7 +642,11 @@ RPC interno del motore è disattivato.
     Gli indirizzi di rete locale sono esenti.
   - **BEP 44** (archivio chiave/valore): item immutabili (target = SHA-1 del
     valore) e mutabili (firma ed25519, `seq` monotono, `cas`), con token, limiti
-    di dimensione e TTL 2 h; query `get`/`put` e API locale.
+    di dimensione e TTL 2 h; query `get`/`put` e API locale. C'è anche il
+    **client uscente**: `GetImmutable`/`GetMutable` leggono e
+    `PublishImmutable`/`PublishMutable` pubblicano sui nodi più vicini. È la
+    base della **BEP 46**: un magnet `xs=urn:btpk:<pubkey>` (+ `s=<salt>`)
+    risolve l'info hash dall'item mutabile all'aggiunta.
   - **BEP 33** (DHT scrape): un `get_peers` con `scrape=1` riceve i filtri di
     Bloom (`BFpe`/`BFsd`) e ne stima seed/peer dello sciame; il client interroga
     i nodi più vicini e aggrega. In UI: pulsante **DHT swarm** nella scheda

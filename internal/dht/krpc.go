@@ -59,6 +59,9 @@ type queryType struct {
 	srcNode string
 	// scrape marks a BEP 33 get_peers that asked for the bloom filters.
 	scrape bool
+	// bep44 is the id of the BEP 44 outbound lookup this query belongs to (0
+	// when it is not a BEP 44 get/put).
+	bep44 uint64
 }
 
 const (

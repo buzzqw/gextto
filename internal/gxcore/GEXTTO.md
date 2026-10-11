@@ -121,6 +121,14 @@ Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
   query `get`/`put` (token; limiti 1000/64 byte; errori 205/206/207/301/302) e
   l'API locale `PutImmutable`/`PutMutable`/`Get`; item con TTL 2 h. I vettori
   ufficiali del BEP sono verificati in `bep44_test.go`;
+- **BEP 44 client uscente + BEP 46** (`bep44_client.go`): `GetImmutable`/
+  `GetMutable` fanno una traversal bounded sui nodi più vicini
+  (`bep44LookupMaxNodes`), verificando firma e target prima di accettare il
+  valore; `PublishImmutable`/`PublishMutable` raccolgono il token con una `get`
+  e pubblicano con `put`; `handleBep44Reply` decodifica la risposta con il
+  decoder panic-free. La **BEP 46** usa tutto questo: un magnet
+  `xs=urn:btpk:<pubkey>` (+ `s=<salt>`) risolve l'info hash dall'item mutabile
+  (`Session.addMagnet`);
 - **BEP 43** (read-only): con `Config.ReadOnly` il nodo non risponde alle query e
   aggiunge `ro: 1` alle proprie; un nodo che riceve una query con `ro` non
   aggiunge il mittente alla routing table. Nel demone: flag `-dht-read-only`

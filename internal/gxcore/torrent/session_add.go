@@ -2,6 +2,7 @@ package torrent
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -225,6 +226,23 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 	if t, err := s.addMagnetFromSources(ma, opt); err == nil {
 		return t, nil
 	}
+	// BEP 46: "xs=urn:btpk:" names a mutable DHT item whose value carries the
+	// info hash; resolve it before creating the (metadata-less) torrent.
+	if ma.HasBTPK() {
+		if s.dht == nil {
+			return nil, newInputError(errors.New("magnet uses xs=urn:btpk but the DHT is disabled"))
+		}
+		item, err := s.dht.GetMutable(ed25519.PublicKey(ma.BTPKPublicKey), ma.BTPKSalt, nil, bep46ResolveTimeout)
+		if err != nil {
+			return nil, newInputError(fmt.Errorf("BEP 46: cannot resolve the DHT item: %w", err))
+		}
+		ih, err := bep46InfoHash(item.Value)
+		if err != nil {
+			return nil, newInputError(err)
+		}
+		ma.InfoHash = ih
+		ma.HasV1 = true
+	}
 	id, port, sto, err := s.add(opt)
 	if err != nil {
 		return nil, err
@@ -389,6 +407,25 @@ func resolvePeers(peers []string) []*net.TCPAddr {
 		}
 	}
 	return out
+}
+
+// bep46ResolveTimeout bounds the DHT lookup for a BEP 46 magnet.
+const bep46ResolveTimeout = 8 * time.Second
+
+// bep46InfoHash extracts the info hash from a BEP 46 DHT item value, which must
+// be a dictionary with a 20-byte binary "ih" (BEP 46).
+func bep46InfoHash(value interface{}) ([20]byte, error) {
+	m, ok := value.(map[string]interface{})
+	if !ok {
+		return [20]byte{}, errors.New("BEP 46: the DHT item value is not a dictionary")
+	}
+	ih, ok := m["ih"].(string)
+	if !ok || len(ih) != 20 {
+		return [20]byte{}, errors.New("BEP 46: the DHT item has no 20-byte \"ih\"")
+	}
+	var h [20]byte
+	copy(h[:], ih)
+	return h, nil
 }
 
 func (s *Session) add(opt *AddTorrentOptions) (id string, port int, sto storage.Storage, err error) {

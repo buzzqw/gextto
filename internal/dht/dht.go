@@ -188,6 +188,12 @@ type DHT struct {
 	scrapeRequest chan scrapeRequest
 	scrapeDone    chan InfoHash
 	scrapes       map[InfoHash]*scrapeCollector
+	// BEP 44 outbound client state (run-loop owned). bep44s is keyed by the
+	// lookup id; bep44Seq hands out ids.
+	bep44Request chan bep44LookupRequest
+	bep44Done    chan uint64
+	bep44s       map[uint64]*bep44Lookup
+	bep44Seq     uint64
 }
 
 // New creates a DHT node. If config is nil, DefaultConfig will be used.
@@ -225,6 +231,9 @@ func New(config *Config) (node *DHT, err error) {
 	node.scrapeRequest = make(chan scrapeRequest, 4)
 	node.scrapeDone = make(chan InfoHash, 4)
 	node.scrapes = make(map[InfoHash]*scrapeCollector)
+	node.bep44Request = make(chan bep44LookupRequest, 4)
+	node.bep44Done = make(chan uint64, 4)
+	node.bep44s = make(map[uint64]*bep44Lookup)
 	c := openStore(cfg.Port, cfg.SaveRoutingTable)
 	node.store = c
 	if len(c.Id) != 20 {
@@ -525,6 +534,10 @@ func (d *DHT) loop() {
 			d.startScrape(req)
 		case ih := <-d.scrapeDone:
 			d.finishScrape(ih)
+		case req := <-d.bep44Request:
+			d.startBep44(req)
+		case id := <-d.bep44Done:
+			d.finishBep44(id)
 		case req := <-d.nodesRequest:
 			m := map[InfoHash]bool{req.ih: true}
 		L:
@@ -716,6 +729,9 @@ func (d *DHT) processPacket(p packetType) {
 				d.processFindNodeResults(node, r)
 			case "announce_peer":
 				// Nothing to do. In the future, update counters.
+			case "get", "put":
+				// BEP 44 outbound: a reply to our own get/put.
+				d.handleBep44Reply(node, p, query)
 			default:
 				d.DebugLogger.Debugf("DHT: Unknown query type: %v from %v", query.Type, addr)
 			}

@@ -185,3 +185,41 @@ func TestMagnetMetadataSourcesSkipsNonHTTP(t *testing.T) {
 		t.Fatalf("MetadataSources = %v, want %v", got, want)
 	}
 }
+
+// TestMagnetBTPK checks the BEP 46 "xs=urn:btpk:" magnet: the public key and the
+// optional salt are parsed, the link may omit "xt", and it round-trips.
+func TestMagnetBTPK(t *testing.T) {
+	const pub = "8543d3e6115f0f98c944077a4493dcd543e49c739fd998550a1f614ab36ed63e"
+	m, err := New("magnet:?xs=urn:btpk:" + pub + "&s=6e&tr=http%3A%2F%2Ft.test%2Fa")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.HasBTPK() {
+		t.Fatal("HasBTPK = false")
+	}
+	if got := hex.EncodeToString(m.BTPKPublicKey); got != pub {
+		t.Fatalf("public key = %s, want %s", got, pub)
+	}
+	if len(m.BTPKSalt) != 1 || m.BTPKSalt[0] != 0x6e {
+		t.Fatalf("salt = %x, want 6e", m.BTPKSalt)
+	}
+	if len(m.Trackers) != 1 || m.Trackers[0][0] != "http://t.test/a" {
+		t.Fatalf("trackers = %v", m.Trackers)
+	}
+
+	m2, err := New(m.String())
+	if err != nil {
+		t.Fatalf("re-parse %q: %v", m.String(), err)
+	}
+	if !m2.HasBTPK() || hex.EncodeToString(m2.BTPKPublicKey) != pub || len(m2.BTPKSalt) != 1 {
+		t.Fatalf("round trip lost the BTPK data: %+v", m2)
+	}
+
+	// No xt and no btpk: still an error. No salt: valid.
+	if _, err := New("magnet:?dn=x"); err == nil {
+		t.Fatal("a magnet with neither xt nor btpk must be rejected")
+	}
+	if _, err := New("magnet:?xs=urn:btpk:" + pub); err != nil {
+		t.Fatalf("a btpk magnet without salt must parse: %v", err)
+	}
+}
