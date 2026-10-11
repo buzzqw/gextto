@@ -381,6 +381,12 @@ func (d *Daemon) handleUIPortCheck(w http.ResponseWriter, r *http.Request) {
 		}
 		detail += "IP " + check.ExternalIP
 	}
+	if check.ReflectedPort > 0 {
+		if detail != "" {
+			detail += " · "
+		}
+		detail += natHint(check)
+	}
 	if check.Error != "" {
 		if detail != "" {
 			detail += " · "

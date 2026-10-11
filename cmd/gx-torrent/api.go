@@ -210,17 +210,24 @@ func (d *Daemon) handlePortCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) checkPort(targetPort int) portCheck {
-	if targetPort > 0 {
-		if d.mapper != nil {
-			return d.mapper.checkPort(targetPort)
-		}
+	var pc portCheck
+	switch {
+	case targetPort > 0 && d.mapper != nil:
+		pc = d.mapper.checkPort(targetPort)
+	case targetPort > 0:
 		tmp := newPortMapper(targetPort, true, true)
-		return tmp.checkPort(targetPort)
+		pc = tmp.checkPort(targetPort)
+	case d.mapper != nil:
+		pc = d.mapper.check()
 	}
-	if d.mapper != nil {
-		return d.mapper.check()
+	// Only the real peer port has a DHT counterpart: a wizard test of a
+	// different port has no socket behind it.
+	if targetPort == 0 && d.session != nil {
+		if rp := d.session.Stats().DHTStats["reflected_port"]; rp > 0 {
+			pc.ReflectedPort = int(rp)
+		}
 	}
-	return portCheck{}
+	return pc
 }
 
 func (d *Daemon) handleList(w http.ResponseWriter, _ *http.Request) {

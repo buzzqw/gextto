@@ -211,6 +211,18 @@ type portCheck struct {
 	Open       bool   `json:"open"`
 	Detail     string `json:"detail,omitempty"`
 	Error      string `json:"error,omitempty"`
+	// ReflectedPort is the external peer port that remote DHT nodes report for
+	// us (BEP 42 "ip" field), 0 while unknown. When it equals Port the NAT keeps
+	// the port; a different value means the NAT rewrites it.
+	ReflectedPort int `json:"reflected_port,omitempty"`
+}
+
+// natHint explains the NAT mapping from the DHT-reflected external port.
+func natHint(check portCheck) string {
+	if check.Port > 0 && check.ReflectedPort == check.Port {
+		return fmt.Sprintf("il NAT conserva la porta (riflessa %d)", check.ReflectedPort)
+	}
+	return fmt.Sprintf("porta riflessa %d: il NAT riscrive la porta", check.ReflectedPort)
 }
 
 // checkLocalListener dials the daemon's own peer port: a successful TCP

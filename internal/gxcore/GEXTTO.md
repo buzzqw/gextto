@@ -91,7 +91,7 @@ Funzionalità e aree del motore:
 Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
 
 - `Config.PacketConn`, per usare il socket uTP;
-- `Stats()` con nodi, traffico e **diagnostica per RPC** (`queries_in`/`queries_out`/`replies_in` per ping/get_peers/find_node/announce_peer) più i contatori di **screening** (`blocked_hosts`, `self_promotions`, `dupe_references`, `nodes_killed`); il demone li espone come `dht_<chiave>` in API e UI, ed è la base di misura dell'hardening anti-Sybil (test `internal/dht/stats_test.go`, dettaglio in `docs/evoluzione.md` §4.10);
+- `Stats()` con nodi, traffico e **diagnostica per RPC** (`queries_in`/`queries_out`/`replies_in` per ping/get_peers/find_node/announce_peer) più i contatori di **screening** (`blocked_hosts`, `self_promotions`, `dupe_references`, `nodes_killed`) e la **porta esterna riflessa** (`reflected_port`, con consensus su ≥2 osservazioni, BEP 42); il demone li espone come `dht_<chiave>` in API e UI, ed è la base di misura dell'hardening anti-Sybil (test `internal/dht/stats_test.go`, dettaglio in `docs/evoluzione.md` §4.10–§4.11);
 - **dual-stack IPv6 (BEP 32)**: con `Config.UDPProto == "udp"` il DHT parla
   entrambe le famiglie; i contatti v4 e v6 vengono separati nei campi
   `nodes`/`nodes6` delle risposte (`nodesForInfoHash`, `replyFindNode`), letti

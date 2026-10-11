@@ -834,11 +834,16 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   c'è una dipendenza Go mantenuta affidabile, quindi ~150–250 righe proprie più
   i test; si aggancia al `portMapper` come metodo aggiuntivo. Il valore è reale
   perché alcuni CPE/ISP bloccano NAT-PMP e PCP è il suo rimpiazzo.
-- **Rilevamento NAT**: passo 1 economico e a basso rischio — catturare la porta
-  riflessa dal campo `ip` del DHT e mostrarla nel `portcheck` (oggi si legge solo
-  l'IP in `noteExternalIP`). Passo 2 (dedurre endpoint-independent vs
-  address/port-dependent) richiede di confrontare la porta riflessa da più
-  destinazioni: esperimenti su rete reale, non solo test.
+- **Rilevamento NAT**: **passo 1 fatto (2026-10-11)** — il DHT cattura la
+  porta riflessa dal campo `ip` di BEP 42 e la pubblica come `reflected_port`
+  (consensus: serve l'accordo di ≥2 osservazioni, set limitato; parsing in
+  `parseReflected`/`recordReflected`, `internal/dht/dht_sec.go`). Il
+  `portcheck` del demone (`GET /api/v1/portcheck`, campo `reflected_port` e
+  `natHint`) dice se il NAT **conserva** la porta (riflessa = locale) o la
+  **riscrive**. Passo 2 (dedurre endpoint-independent vs address/port-dependent
+  confrontando la porta riflessa da più destinazioni) richiede esperimenti su
+  rete reale. Test: `TestParseReflected`, `TestRecordReflectedConsensus`,
+  `TestNATHint`.
 - **Priorità file graduata** è l'unica **di motore**: la selezione è una maschera
   booleana per file (`Torrent.FileSelection`, `piecepicker`), quindi N livelli
   richiedono modello di selezione a priorità, ordinamento del picker per priorità

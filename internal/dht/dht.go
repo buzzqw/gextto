@@ -680,6 +680,9 @@ func (d *DHT) processPacket(p packetType) {
 				totalNodesReached.Add(1)
 			}
 			node.lastResponseTime = time.Now()
+			// The reply answers a query we sent: trust its "ip" field enough to
+			// note our reflected external address (consensus-checked).
+			recordReflected(r.R.IP)
 			node.pastQueries[r.T] = query
 			d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
 
@@ -1286,5 +1289,9 @@ func Stats() map[string]int64 {
 		"self_promotions": totalSelfPromotions.Value(),
 		"dupe_references": totalGetPeersDupes.Value() + totalFindNodeDupes.Value(),
 		"nodes_killed":    totalKilledNodes.Value(),
+
+		// External port remote nodes report for us (BEP 42 "ip" field). 0 while
+		// unknown or unconfirmed; see recordReflected.
+		"reflected_port": reflectedPort.Load(),
 	}
 }

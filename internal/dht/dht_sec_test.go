@@ -54,3 +54,71 @@ func TestNodeIDSecureLocalNetwork(t *testing.T) {
 		}
 	}
 }
+
+// resetReflected clears the package-level reflected-address state between tests.
+func resetReflected() {
+	reflectedMu.Lock()
+	reflectedSeen = make(map[string]*reflectedSample)
+	reflectedOrder = nil
+	reflectedMu.Unlock()
+	reflectedPort.Store(0)
+}
+
+func bep42IPField(t *testing.T, ipStr string, port int) string {
+	t.Helper()
+	ip := net.ParseIP(ipStr)
+	var raw []byte
+	if v4 := ip.To4(); v4 != nil {
+		raw = append(raw, v4...)
+	} else {
+		raw = append(raw, ip.To16()...)
+	}
+	raw = append(raw, byte(port>>8), byte(port))
+	return string(raw)
+}
+
+// TestParseReflected covers the BEP 42 "ip" field decoding (v4 and v6).
+func TestParseReflected(t *testing.T) {
+	if _, _, ok := parseReflected(""); ok {
+		t.Fatal("empty field must not parse")
+	}
+	if _, _, ok := parseReflected("short"); ok {
+		t.Fatal("short field must not parse")
+	}
+	ip, port, ok := parseReflected(bep42IPField(t, "1.2.3.4", 6881))
+	if !ok || !ip.Equal(net.ParseIP("1.2.3.4")) || port != 6881 {
+		t.Fatalf("v4 field = %v %d %v", ip, port, ok)
+	}
+	ip, port, ok = parseReflected(bep42IPField(t, "2001:db8::1", 51413))
+	if !ok || !ip.Equal(net.ParseIP("2001:db8::1")) || port != 51413 {
+		t.Fatalf("v6 field = %v %d %v", ip, port, ok)
+	}
+}
+
+// TestRecordReflectedConsensus: one liar is ignored, two agreeing nodes publish
+// the port, and the most-observed pair wins.
+func TestRecordReflectedConsensus(t *testing.T) {
+	resetReflected()
+	a := bep42IPField(t, "203.0.113.7", 6881)
+	b := bep42IPField(t, "203.0.113.9", 40000)
+
+	recordReflected(a)
+	if got := reflectedPort.Load(); got != 0 {
+		t.Fatalf("a single observation published a port: %d", got)
+	}
+	recordReflected(a)
+	if got := reflectedPort.Load(); got != 6881 {
+		t.Fatalf("two agreeing observations = %d, want 6881", got)
+	}
+	// A second (bogus) pair observed three times takes over the consensus.
+	recordReflected(b)
+	recordReflected(b)
+	if got := reflectedPort.Load(); got != 6881 {
+		t.Fatalf("bogus pair tied at 2 should not win yet: %d", got)
+	}
+	recordReflected(b)
+	if got := reflectedPort.Load(); got != 40000 {
+		t.Fatalf("most-observed pair = %d, want 40000", got)
+	}
+	resetReflected()
+}

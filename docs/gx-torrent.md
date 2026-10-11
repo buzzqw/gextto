@@ -173,7 +173,10 @@ polacco): all'avvio Gextto passa la lingua dell'interfaccia al demone con
   configurato in Gextto.
 - **Test porte**: dalla barra di stato un pulsante verifica che la porta peer
   sia in ascolto e che il router la inoltri (la stessa verifica del pulsante
-  *Test porte* di Gextto, sopra `GET /api/v1/portcheck`).
+  *Test porte* di Gextto, sopra `GET /api/v1/portcheck`). Con il DHT attivo il
+  risultato mostra anche la **porta riflessa** che i nodi DHT vedono per noi
+  (campo `reflected_port`, con consensus BEP 42): se coincide con quella locale
+  il NAT conserva la porta, altrimenti la riscrive.
 - **Scheda *Gextto log***: le ultime righe di `gextto.log` (200–2000), lette
   solo quando apri la scheda o premi *Ricarica*, con filtro testuale, DEBUG
   nascosti di default e avvisi/errori colorati. Mentre è aperta la tabella
