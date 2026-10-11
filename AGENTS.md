@@ -210,9 +210,10 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   separato che resta vivo ai riavvii del servizio.
 - **Quando serve, builda e riavvia**: dopo modifiche a motore/demone (o per
   verificare) esegui `make build` e `systemctl --user restart gextto`; non
-  lasciare il servizio su un binario vecchio. Il riavvio può richiedere ~1 minuto
-  (caricamento del filtro IP e handover dello scope `gx-torrent`), quindi
-  verifica dopo un'attesa, non subito.
+  lasciare il servizio su un binario vecchio. Non c'è bisogno di buildare né di
+  riavviare se la modifica riguarda esclusivamente la documentazione. Il riavvio
+  può richiedere ~1 minuto (caricamento del filtro IP e handover dello scope
+  `gx-torrent`), quindi verifica dopo un'attesa, non subito.
 - Dopo una build: `systemctl --user restart gextto` (niente `sudo`). Se
   `bin/gx-torrent` non è cambiato il log dice "gx-torrent … was already
   running: kept as it is"; altrimenti il demone viene riavviato.
