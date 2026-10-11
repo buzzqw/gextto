@@ -812,15 +812,17 @@ mostra. I benchmark del picker e dell'unchoker restano invariati
 (`BenchmarkPickerRarestSteady` ~102 µs/op, **0 alloc/op**; unchoker 1,3 µs/op),
 quindi non serve una misura di throughput.
 
-**Revisione dei BEP esistenti (2026-10-12).** Tre migliorie a implementazioni già
-presenti: (a) **BEP 42** — il campo `ip` ora è anche **inviato** in ogni risposta
-(a ping, find_node, get_peers, announce_peer e `get`/`put` BEP 44), non solo
-letto, con il contatore `reflected_sent`; (b) **BEP 5** — `announce_peer` rispetta
-`implied_port` (usa la porta sorgente); (c) **BEP 11** — le liste
+**Revisione dei BEP esistenti (2026-10-12).** Quattro migliorie a implementazioni
+già presenti: (a) **BEP 42** — il campo `ip` ora è anche **inviato** in ogni
+risposta (a ping, find_node, get_peers, announce_peer e `get`/`put` BEP 44), non
+solo letto, con il contatore `reflected_sent`; (b) **BEP 5** — `announce_peer`
+rispetta `implied_port` (usa la porta sorgente); (c) **BEP 11** — le liste
 `dropped`/`dropped6` non sono più aggiunte come peer candidati (lo erano per
 errore, facendo dialare peer usciti dallo sciame) e una lista malformata non
-scarta più le altre. Test: `internal/dht/ipfield_test.go`,
-`torrent_pex_test.go`.
+scarta più le altre; (d) **BEP 9** — l'offset della richiesta di metadati è
+calcolato a 64 bit, quindi un indice di pezzo enorme non va più in overflow e
+non serve il pezzo sbagliato. Test: `internal/dht/ipfield_test.go`,
+`torrent_pex_test.go`, `torrent_metadataextension_test.go`.
 
 ### 4.10 DHT: diagnosi, hardening e multi-path (piano e fattibilità)
 

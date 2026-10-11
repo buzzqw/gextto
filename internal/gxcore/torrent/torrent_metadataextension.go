@@ -25,25 +25,15 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 			t.sendMetadataReject(pe, msg.Piece, extMsgID)
 			break
 		}
-		start := 16 * 1024 * msg.Piece
-		end := start + 16*1024
-		totalSize := uint32(len(t.info.Bytes))
-		if end > totalSize {
-			end = totalSize
-		}
-		if start >= totalSize {
+		data, ok := metadataPiece(t.info.Bytes, msg.Piece)
+		if !ok {
 			t.sendMetadataReject(pe, msg.Piece, extMsgID)
 			break
 		}
-		if end > totalSize {
-			t.sendMetadataReject(pe, msg.Piece, extMsgID)
-			break
-		}
-		data := t.info.Bytes[start:end]
 		dataMsg := peerprotocol.ExtensionMetadataMessage{
 			Type:      peerprotocol.ExtensionMetadataMessageTypeData,
 			Piece:     msg.Piece,
-			TotalSize: int(totalSize),
+			TotalSize: len(t.info.Bytes),
 			Data:      data,
 		}
 		extDataMsg := peerprotocol.ExtensionMessage{
@@ -122,6 +112,25 @@ func (t *torrent) handleMetadataMessage(pe *peer.Peer, msg peerprotocol.Extensio
 			t.startInfoDownloaders()
 		}
 	}
+}
+
+// metadataPieceSize is the size of one ut_metadata piece (BEP 9).
+const metadataPieceSize = 16 * 1024
+
+// metadataPiece returns the bytes of the metadata piece `piece` out of the full
+// info dictionary `data`, and whether that piece exists. The offset is computed
+// in 64 bits: a hostile 32-bit piece index must not wrap around and serve the
+// wrong piece instead of being rejected.
+func metadataPiece(data []byte, piece uint32) ([]byte, bool) {
+	start := uint64(piece) * metadataPieceSize
+	if start >= uint64(len(data)) {
+		return nil, false
+	}
+	end := start + metadataPieceSize
+	if end > uint64(len(data)) {
+		end = uint64(len(data))
+	}
+	return data[start:end], true
 }
 
 func (t *torrent) sendMetadataReject(pe *peer.Peer, i uint32, msgID uint8) {
