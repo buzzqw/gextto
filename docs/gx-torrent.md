@@ -419,7 +419,9 @@ allo stesso modo.
 
 L'**RSS** (standalone) usa la chiave `feeds`: un array JSON di feed con le
 regole, ad esempio
-`[{"name":"Serie","url":"http://…rss","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
+`[{"name":"Serie","url":"http://…rss","folder":"serie","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
+Ogni feed può avere un `folder` (gruppo) facoltativo per organizzarlo nel
+riquadro dei feed, che li raggruppa.
 Un worker (ogni `feed-interval-secs`, predefinito 15 minuti) scarica ogni feed,
 applica `include`/`exclude` sul titolo e aggiunge magnet e `.torrent` non ancora
 visti (l'elenco degli elementi già aggiunti è persistito, quindi un riavvio non

@@ -100,7 +100,7 @@ func TestUIRssFollowCreatesFeedAndRule(t *testing.T) {
 
 	resp, err := http.PostForm(srv.URL+"/ui/rss-follow", url.Values{
 		"title": {"Serie S01"}, "kind": {"series"}, "include": {"1080p"},
-		"episode": {"1x01-05"}, "savepath": {"/srv/tv"}, "category": {"tv"},
+		"episode": {"1x01-05"}, "folder": {"shows"}, "savepath": {"/srv/tv"}, "category": {"tv"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestUIRssFollowCreatesFeedAndRule(t *testing.T) {
 	resp.Body.Close()
 
 	feeds := d.feeds()
-	if len(feeds) != 1 || feeds[0].Name != "Serie S01" || feeds[0].Search != "Serie S01" {
+	if len(feeds) != 1 || feeds[0].Name != "Serie S01" || feeds[0].Search != "Serie S01" || feeds[0].Folder != "shows" {
 		t.Fatalf("feeds = %+v", feeds)
 	}
 	rules := d.rules()

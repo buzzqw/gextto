@@ -173,15 +173,26 @@ func TestUIRssAddAndRemoveFeed(t *testing.T) {
 	defer srv.Close()
 
 	resp, err := http.PostForm(srv.URL+"/ui/rss-feed", url.Values{
-		"op": {"add"}, "name": {"serie"}, "url": {"http://example/feed"}, "include": {"1080p"},
+		"op": {"add"}, "name": {"serie"}, "url": {"http://example/feed"}, "include": {"1080p"}, "folder": {"shows"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	feeds := d.feeds()
-	if len(feeds) != 1 || feeds[0].Name != "serie" || feeds[0].Include != "1080p" {
+	if len(feeds) != 1 || feeds[0].Name != "serie" || feeds[0].Include != "1080p" || feeds[0].Folder != "shows" {
 		t.Fatalf("feeds = %+v", feeds)
+	}
+
+	// The page groups the feed and shows its folder.
+	page, err := http.Get(srv.URL + "/ui/rss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	if !strings.Contains(string(body), "shows") {
+		t.Fatal("the RSS page does not show the feed folder")
 	}
 
 	// A feed without a URL or a search query is refused.

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -178,6 +179,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			Name:     strings.TrimSpace(r.FormValue("name")),
 			URL:      strings.TrimSpace(r.FormValue("url")),
 			Search:   strings.TrimSpace(r.FormValue("search")),
+			Folder:   strings.TrimSpace(r.FormValue("folder")),
 			Include:  strings.TrimSpace(r.FormValue("include")),
 			Exclude:  strings.TrimSpace(r.FormValue("exclude")),
 			Category: strings.TrimSpace(r.FormValue("category")),
@@ -274,6 +276,7 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	include := splitList(r.FormValue("include"))
 	exclude := splitList(r.FormValue("exclude"))
 	episode := strings.TrimSpace(r.FormValue("episode"))
+	folder := strings.TrimSpace(r.FormValue("folder"))
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
 	if _, err := rss.ParseEpisodeFilter(episode); err != nil {
@@ -283,7 +286,7 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 
 	// The search feed: query the configured indexers for the title.
 	feeds := d.feeds()
-	feed := feedConfig{Name: title, Search: title}
+	feed := feedConfig{Name: title, Search: title, Folder: folder}
 	replaced := false
 	for i := range feeds {
 		if strings.EqualFold(feeds[i].Name, feed.Name) {
@@ -547,14 +550,29 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 }
 
 // uiFeedRowsHTML renders the configured feeds as table rows, each with a remove
-// button; the row index is the removal key.
+// button; the row index is the removal key. The rows are grouped by folder.
 func (d *Daemon) uiFeedRowsHTML() string {
 	list := d.feeds()
 	if len(list) == 0 {
-		return `<tr><td colspan="6" class="muted">None</td></tr>`
+		return `<tr><td colspan="7" class="muted">None</td></tr>`
 	}
+	rows := make([]struct {
+		index int
+		feed  feedConfig
+	}, len(list))
+	for i, feed := range list {
+		rows[i].index = i
+		rows[i].feed = feed
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if !strings.EqualFold(rows[i].feed.Folder, rows[j].feed.Folder) {
+			return strings.ToLower(rows[i].feed.Folder) < strings.ToLower(rows[j].feed.Folder)
+		}
+		return strings.ToLower(rows[i].feed.Name) < strings.ToLower(rows[j].feed.Name)
+	})
 	var b strings.Builder
-	for index, feed := range list {
+	for _, row := range rows {
+		feed := row.feed
 		source := strings.TrimSpace(feed.URL)
 		if source == "" && strings.TrimSpace(feed.Search) != "" {
 			source = "search: " + feed.Search
@@ -564,11 +582,12 @@ func (d *Daemon) uiFeedRowsHTML() string {
 			state = "paused"
 		}
 		b.WriteString("<tr><td>" + html.EscapeString(orDefault(feed.Name, "—")) + "</td>")
+		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Folder, "—")) + "</td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(source) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Include, "—")) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Exclude, "—")) + "</td>")
 		b.WriteString("<td>" + state + "</td>")
-		b.WriteString(`<td><form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+		b.WriteString(`<td><form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(row.index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
 	}
 	return b.String()
 }

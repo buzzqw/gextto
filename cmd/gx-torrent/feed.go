@@ -35,6 +35,7 @@ type feedConfig struct {
 	Name     string `json:"name"`
 	URL      string `json:"url"`
 	Search   string `json:"search,omitempty"`  // Torznab query, across all indexers
+	Folder   string `json:"folder,omitempty"`  // optional group shown in the page
 	Include  string `json:"include,omitempty"` // comma-separated
 	Exclude  string `json:"exclude,omitempty"`
 	Category string `json:"category,omitempty"`

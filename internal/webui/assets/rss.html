@@ -61,13 +61,14 @@ summary{cursor:pointer;color:#93a1b5}
 
 <h2>Feeds <span class="muted">({{FEEDCOUNT}})</span></h2>
 <table>
-  <thead><tr><th>Name</th><th>Source</th><th>Include</th><th>Exclude</th><th>State</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Folder</th><th>Source</th><th>Include</th><th>Exclude</th><th>State</th><th></th></tr></thead>
   <tbody>{{FEEDROWS}}</tbody>
 </table>
 <form class="form-card" method="post" action="/ui/rss-feed">
   <input type="hidden" name="op" value="add">
   <div class="row">
     <label>Name<input type="text" name="name" placeholder="serie" autocomplete="off"></label>
+    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
     <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off"></label>
     <label>Search query<input type="text" name="search" placeholder="Serie S01" autocomplete="off"></label>
   </div>
@@ -87,6 +88,7 @@ summary{cursor:pointer;color:#93a1b5}
   <div class="row">
     <label>Title<input type="text" name="title" placeholder="Serie S01" autocomplete="off"></label>
     <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
+    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
     <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
     <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
     <label>Episode filter<input type="text" name="episode" placeholder="1x01-05, 1x07" autocomplete="off"></label>
