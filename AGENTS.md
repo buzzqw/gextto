@@ -1,7 +1,7 @@
 # AGENTS.md — guida per agenti su gextto
 
 Istruzioni operative per lavorare su questo repository. OpenCode carica
-automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
+automaticamente questo file, che è l'**unica** fonte delle regole operative.
 
 ## Regole commit e PR
 - Mai "Claude" o "Anthropic" in autore, committer, `Co-Authored-By`, trailer o
