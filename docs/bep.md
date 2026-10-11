@@ -26,7 +26,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 14 | Local Service Discovery (LSD, IPv4 e IPv6) | sì |
 | 19 | WebSeed ("GetRight style", HTTP Range) | sì |
 | 20 | Peer ID Conventions | sì |
-| 21 | Extension for Partial Seeds (`upload_only`) | **parziale**: peer sì; tracker (`event=paused`) in corso |
+| 21 | Extension for Partial Seeds (`upload_only`, `event=paused`) | sì |
 | 23 | Compact Peer Lists for Trackers | sì |
 | 24 | Tracker Returns External IP (`ip`) | sì |
 | 27 | Private Torrents (`private: 1`, niente DHT/PEX/LSD) | sì |
@@ -84,10 +84,12 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 
 ## Residui e roadmap
 
-1. **BEP 21 — parte tracker**: inviare `event=paused` a ogni announce mentre si è
-   *seed parziali* (tutti i pezzi *voluti* presenti, torrent non intero). Il lato
-   peer (`upload_only` nell'extension handshake) è già fatto. Il campo
-   `downloaders` dello scrape resta opzionale (dipende dal tracker).
+1. **BEP 21 — fatta.** Lato peer: `upload_only` nell'extension handshake, inviato
+   alla connessione e rinviato quando si diventa seed (pieno o parziale). Lato
+   tracker: ogni announce di un **seed parziale** (tutti i pezzi *voluti*
+   presenti, torrent non intero) porta `event=paused` (`announcer` +
+   `tracker.EventPaused`). Il campo `downloaders` dello scrape resta opzionale
+   (dipende dal tracker, che deve esporlo).
 2. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
    sui nodi più vicini tramite `get`/`put` uscenti e traversal Kademlia. Il DHT
    oggi ha già un client verso i nodi più vicini per lo scrape

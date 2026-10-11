@@ -741,7 +741,8 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   mostra gli stessi file esclusi e si possono cambiare come sempre.
 - Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
   dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
-  pezzi che non vuole.
+  pezzi che non vuole, e lo segnala ai **tracker** con `event=paused` a ogni
+  announce, così viene distinto da un downloader attivo.
 
 ## Download sequenziale (streaming)
 
