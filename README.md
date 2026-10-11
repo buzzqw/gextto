@@ -1,8 +1,8 @@
 # Gextto — EXpert Torrent Transfer Orchestrator
 
 **Gextto (EXpert Torrent Transfer Orchestrator)** is a self-hosted daemon that
-finds, selects, downloads, verifies, names and archives TV series, anime, movies
-and comics. Its web interface is the control plane; the daemon keeps running as
+finds, selects, downloads, verifies, names and archives TV series, movies and
+comics. Its web interface is the control plane; the daemon keeps running as
 a service.
 
 > **Italiano:** [README.it.md](README.it.md) · **Manual:**
@@ -35,7 +35,7 @@ a service.
 
 ### 🎯 Intelligent Automation & Decision Engine
 - **Quality-aware scoring:** deterministically scores releases by evaluating quality, source, codec, audio, HDR/DV, language, and file size. It protects higher-grade existing library files and records the exact reason for any rejected candidate in logs. An optional ceiling stops upgrades once a file is good enough; `ffprobe` can analyze archived media to enrich decisions.
-- **Series, Anime & Comics:** normalizes anime numbered by absolute episode ("Title - 1071") by mapping them to season and episode; writes standard `ComicInfo.xml` metadata for CBZ comic archives (Komga, Kavita, and readers).
+- **Comics:** writes standard `ComicInfo.xml` metadata for CBZ comic archives (Komga, Kavita, and readers).
 - **Stuck download mitigation (Anti-Stall):** downloads that stop making progress (no bytes for a while) or magnets waiting indefinitely for metadata can be superseded by a valid alternative after a configurable window (*Configuration → Quality and upgrades → Stuck downloads*), while the original torrent continues trying in the background.
 
 ### 🛡️ Library Integrity & Storage Safety

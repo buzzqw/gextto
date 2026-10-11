@@ -1,7 +1,7 @@
 # Gextto — EXpert Torrent Transfer Orchestrator
 
 **Gextto (EXpert Torrent Transfer Orchestrator)** è un demone self-hosted che
-cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, anime, film e
+cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, film e
 fumetti. L'interfaccia web è il piano di controllo; il demone continua a
 funzionare come servizio.
 
@@ -35,7 +35,7 @@ funzionare come servizio.
 
 ### 🎯 Automazione intelligente e Decision Engine
 - **Valutazione meticolosa delle release:** assegna un punteggio deterministico a ogni candidato valutando qualità video, sorgente, codec, audio, HDR/DV, lingua e dimensione. Protegge i file migliori già archiviati e registra nei log il motivo esatto di ogni scarto. Una soglia configurabile ferma gli upgrade quando il file raggiunge lo standard desiderato; `ffprobe` può analizzare i file su disco per affinare le decisioni.
-- **Serie TV, Anime e Fumetti:** normalizza i titoli anime numerati per episodio assoluto («Titolo - 1071») riconducendoli a stagione ed episodio; per i fumetti CBZ genera automaticamente metadati `ComicInfo.xml` compatibili con Komga, Kavita e i reader standard.
+- **Fumetti:** per i fumetti CBZ genera automaticamente metadati `ComicInfo.xml` compatibili con Komga, Kavita e i reader standard.
 - **Recupero dai download bloccati (Anti-Stall):** un torrent fermo da tempo (nessun byte) o un magnet in attesa prolungata dei metadati viene affiancato da un'alternativa valida dopo una finestra temporale definita (*Configurazione → Qualità e upgrade → Download bloccati*), mentre il trasferimento originale continua a tentare.
 
 ### 🛡️ Integrità della Libreria e Storage Safety
