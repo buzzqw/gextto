@@ -91,6 +91,11 @@ render compaia al render successivo (niente cache stantia).
   throughput di scrittura su disco di una cartella (`--dir`, puntala a un mount
   NFS per confrontare). Uso: `scripts/bench-engines.sh [--size MiB] [--dir DIR]
   [--leechers N]`. Fuori dalla CI: serve solo a decidere con numeri.
+- **`make measure-dht`** — misura su **DHT pubblica** riempimento della routing
+  table e successo delle query (`GX_MEASURE_DHT=5m`,
+  `internal/dht/measure_test.go`): è la base dei numeri per l'hardening
+  anti-Sybil e il multi-path (§4.10). Fuori dalla CI. C'è anche
+  `make measure-seeding` per il choking (§6).
 
 ### 1.3 Chiusi / decisioni
 
@@ -833,10 +838,34 @@ di proposito**, perché BEP 42 non è applicato ovunque e un cap per /24 punireb
 i nodi legittimi dietro CGNAT/mobile. Test: `TestSubnetKey`,
 `TestTableMetricsConcentration`.
 
-**Multi-path lookup — design, non ancora codice.** Richiede la riscrittura del
-lookup iterativo (`get_peers` su più rami e incrocio dei risultati) e la
-validazione su sciame reale; resta gated dietro l'harness di misura. Nessun
-codice speculativo.
+**Harness di misura — fatto (2026-10-11).** `make measure-dht`
+(`GX_MEASURE_DHT=5m`, `GX_MEASURE_DHT_INTERVAL=10s`; `internal/dht/measure_test.go`,
+opt-in e fuori dalla CI) avvia un nodo vero contro la DHT pubblica e stampa,
+campione per campione, riempimento della routing table ed esito delle query.
+Prima misura (45 s, 2026-10-11):
+
+| metrica | valore |
+|---|---|
+| nodi conosciuti | ~740 |
+| `subnet_share_max` (nodi nello stesso /24) | **14** |
+| `nodes_insecure_id` (ID non-BEP 42) | **312 / ~740 ≈ 42%** |
+| query out / reply in | 1089 / 339 (~31% grezzo) |
+| pacchetti scartati dal rate limit | 485 |
+| `reflected_observations` | 0 |
+
+Lette per decidere: **BEP 42 non va applicato rigidamente** (il 42% dei nodi non lo
+rispetta: scartarli dimezzerebbe la tabella), quindi il cap per subnet è il lever
+giusto e **14** è il valore da cui scegliere la soglia; `obs=0` conferma l'assenza
+del campo `ip` in questa rete.
+
+**Multi-path lookup — design.** Richiede la riscrittura del lookup iterativo
+(`get_peers` su più rami e incrocio dei risultati); ora c'è l'harness su cui
+misurare il prima/dopo. Nessun codice speculativo.
+
+**Prossimo passo sul cap anti-Sybil (con i numeri dell'harness).** Il `subnet_share_max`
+di 14 indica concentrazione reale: il cap va progettato a soglia (es. 8–16 per /24)
+e **misurato** con l'harness (tabella, successo query, peer trovati) prima di
+attivarlo, mai a scatola chiusa.
 
 **Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e

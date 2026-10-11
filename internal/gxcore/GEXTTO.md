@@ -131,5 +131,10 @@ Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
   e stima (`EstimateScrape`); il motore lo espone con `Session.DHTScrape` /
   `Torrent.DHTScrape`, il demone con `GET /api/v1/torrents/{hash}/dhtscrape` e la
   pagina con il pulsante **DHT swarm** (`GET /ui/dhtscrape`).
+- **misura** (`make measure-dht`, `internal/dht/measure_test.go`, opt-in, fuori
+  dalla CI): avvia un nodo reale contro la DHT pubblica e traccia nodi,
+  `subnet_share_max`, `nodes_insecure_id` e il successo delle query; è la base
+  dei numeri per l'hardening anti-Sybil e il multi-path (`docs/evoluzione.md`
+  §4.10).
 
 uTP usa la libreria `github.com/anacrolix/utp` come dipendenza.

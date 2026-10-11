@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-dht
 
 all: build
 
@@ -81,6 +81,12 @@ test-race:
 # for the swarm size. See docs/evoluzione.md (section 6).
 measure-seeding:
 	GX_MEASURE=1 go test ./cmd/gx-torrent/ -run MeasureSeeding -v -count=1
+
+# DHT real-swarm measurement (opt-in, outside CI): routing-table fill and query
+# success over time, the numbers behind the anti-Sybil/multi-path decisions.
+# GX_MEASURE_DHT=5m sets the duration; GX_MEASURE_DHT_INTERVAL=10s the sampling.
+measure-dht:
+	cd internal/dht && GX_MEASURE_DHT=$${GX_MEASURE_DHT:-3m} go test -run MeasureDHT -v -count=1 -timeout 30m
 
 vet:
 	CGO_ENABLED=0 go vet ./...
