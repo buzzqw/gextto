@@ -14,6 +14,10 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   del numero di build condivisa tra checkout e CI (vedi *Build e test*).
 - **Committa e pusha spesso**: cambiamenti piccoli e verificati si committano e
   si spingono su `origin/main` subito, senza accumulare lavoro non pushato.
+- **Non committare né pushare se i test non passano tutti**: esegui la suite
+  (`make test`, che include `check-ui`, `installer-test`, `test-dht` e
+  `go test ./...`) e procedi solo se è **completamente verde**. Se un test
+  fallisce, prima lo si sistema.
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è
