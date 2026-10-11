@@ -8,12 +8,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
 )
 
@@ -73,6 +76,15 @@ func (d *Daemon) saveFeeds(list []feedConfig) error {
 		return err
 	}
 	d.opts.Settings.Set(feedsSettingKey, string(raw))
+	return d.opts.Settings.Save()
+}
+
+func (d *Daemon) saveRules(list []rss.Rule) error {
+	raw, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	d.opts.Settings.Set(rulesSettingKey, string(raw))
 	return d.opts.Settings.Save()
 }
 
@@ -188,6 +200,212 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
+// handleUIRssRule adds, removes or reorders one ordered RSS rule. At least one
+// rule switches the feed loop from the simple per-feed include/exclude to the
+// ordered rule set: the first rule that matches decides (PASS adds with its
+// action, FAIL skips), and an item matched by no rule is not added.
+func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	list := d.rules()
+	switch strings.TrimSpace(r.FormValue("op")) {
+	case "remove":
+		index, err := parseFormIndex(r.FormValue("index"))
+		if err != nil || index < 0 || index >= len(list) {
+			d.renderRSS(w, r, "The rule to remove does not exist anymore.")
+			return
+		}
+		list = append(list[:index], list[index+1:]...)
+	case "up":
+		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index > 0 && index < len(list) {
+			list[index-1], list[index] = list[index], list[index-1]
+		}
+	case "down":
+		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 && index < len(list)-1 {
+			list[index+1], list[index] = list[index], list[index+1]
+		}
+	default:
+		rule, err := uiRuleFromForm(r)
+		if err != nil {
+			d.renderRSS(w, r, err.Error())
+			return
+		}
+		list = append(list, rule)
+	}
+	if err := d.saveRules(list); err != nil {
+		d.renderRSS(w, r, "Cannot save the rules: "+err.Error())
+		return
+	}
+	d.pokeFeeds()
+	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
+// uiRuleFromForm builds one rule from the add-rule form, validating the regexes.
+func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
+	rule := rss.Rule{
+		Name:  strings.TrimSpace(r.FormValue("name")),
+		Feeds: splitList(r.FormValue("feeds")),
+		Fail:  formBool(r, "fail"),
+		Match: rss.Criteria{
+			Include:        splitList(r.FormValue("include")),
+			Exclude:        splitList(r.FormValue("exclude")),
+			Regex:          strings.TrimSpace(r.FormValue("regex")),
+			NotRegex:       strings.TrimSpace(r.FormValue("not_regex")),
+			MinSize:        mibToBytes(r.FormValue("min_size")),
+			MaxSize:        mibToBytes(r.FormValue("max_size")),
+			MinSeeders:     int(formInt(r, "min_seeders", 0)),
+			MaxSeeders:     int(formInt(r, "max_seeders", 0)),
+			MinPeers:       int(formInt(r, "min_peers", 0)),
+			MaxAgeDays:     int(formInt(r, "max_age_days", 0)),
+			RequireEpisode: formBool(r, "require_episode"),
+			SmartEpisode:   formBool(r, "smart_episode"),
+		},
+		Action: rss.Action{
+			SavePath:   strings.TrimSpace(r.FormValue("savepath")),
+			Category:   strings.TrimSpace(r.FormValue("category")),
+			Tags:       splitList(r.FormValue("tags")),
+			Paused:     formBool(r, "paused"),
+			Sequential: formBool(r, "sequential"),
+			FirstLast:  formBool(r, "first_last"),
+			Top:        formBool(r, "top"),
+		},
+	}
+	for field, pattern := range map[string]string{"regex": rule.Match.Regex, "not_regex": rule.Match.NotRegex} {
+		if strings.TrimSpace(pattern) == "" {
+			continue
+		}
+		if _, err := regexp.Compile(pattern); err != nil {
+			return rule, fmt.Errorf("%s is not a valid regular expression: %v", field, err)
+		}
+	}
+	return rule, nil
+}
+
+// mibToBytes parses a size in MiB (accepting a decimal) into bytes; empty or
+// non-positive means "not enforced".
+func mibToBytes(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 {
+		return 0
+	}
+	return int64(value * 1024 * 1024)
+}
+
+// uiRuleRowsHTML renders the ordered rules as table rows, each with up/down and
+// remove buttons (the order is the precedence).
+func (d *Daemon) uiRuleRowsHTML() string {
+	list := d.rules()
+	if len(list) == 0 {
+		return `<tr><td colspan="5" class="muted">None</td></tr>`
+	}
+	var b strings.Builder
+	for index, rule := range list {
+		kind, kindClass := "Add", "flag on"
+		if rule.Fail {
+			kind, kindClass = "Skip", "flag"
+		}
+		scope := "All"
+		if len(rule.Feeds) > 0 {
+			scope = strings.Join(rule.Feeds, ", ")
+		}
+		b.WriteString("<tr><td>" + html.EscapeString(orDefault(rule.Name, "—")) + "</td>")
+		b.WriteString(`<td><span class="` + kindClass + `">` + kind + `</span> <span class="muted">` + html.EscapeString(scope) + "</span></td>")
+		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleMatchSummary(rule)) + "</td>")
+		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleActionSummary(rule)) + "</td>")
+		b.WriteString(`<td class="actions"><form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm">↑</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="down"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm">↓</button></form>`)
+		b.WriteString(`<form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+	}
+	return b.String()
+}
+
+// uiRuleMatchSummary is a compact "field=value" view of a rule's criteria.
+func uiRuleMatchSummary(rule rss.Rule) string {
+	m := rule.Match
+	var parts []string
+	if len(m.Include) > 0 {
+		parts = append(parts, "include="+strings.Join(m.Include, ","))
+	}
+	if len(m.Exclude) > 0 {
+		parts = append(parts, "exclude="+strings.Join(m.Exclude, ","))
+	}
+	if m.Regex != "" {
+		parts = append(parts, "regex="+m.Regex)
+	}
+	if m.NotRegex != "" {
+		parts = append(parts, "not_regex="+m.NotRegex)
+	}
+	if m.MinSize > 0 {
+		parts = append(parts, "min_size="+uiBytes(m.MinSize))
+	}
+	if m.MaxSize > 0 {
+		parts = append(parts, "max_size="+uiBytes(m.MaxSize))
+	}
+	if m.MinSeeders != 0 {
+		parts = append(parts, fmt.Sprintf("min_seeders=%d", m.MinSeeders))
+	}
+	if m.MaxSeeders != 0 {
+		parts = append(parts, fmt.Sprintf("max_seeders=%d", m.MaxSeeders))
+	}
+	if m.MinPeers != 0 {
+		parts = append(parts, fmt.Sprintf("min_peers=%d", m.MinPeers))
+	}
+	if m.MaxAgeDays != 0 {
+		parts = append(parts, fmt.Sprintf("max_age_days=%d", m.MaxAgeDays))
+	}
+	if m.RequireEpisode {
+		parts = append(parts, "require_episode")
+	}
+	if m.SmartEpisode {
+		parts = append(parts, "smart_episode")
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, " ")
+}
+
+// uiRuleActionSummary is a compact view of a rule's action.
+func uiRuleActionSummary(rule rss.Rule) string {
+	a := rule.Action
+	var parts []string
+	if a.SavePath != "" {
+		parts = append(parts, "savepath="+a.SavePath)
+	}
+	if a.Category != "" {
+		parts = append(parts, "category="+a.Category)
+	}
+	if len(a.Tags) > 0 {
+		parts = append(parts, "tags="+strings.Join(a.Tags, ","))
+	}
+	if a.Paused {
+		parts = append(parts, "paused")
+	}
+	if a.Sequential {
+		parts = append(parts, "sequential")
+	}
+	if a.FirstLast {
+		parts = append(parts, "first_last")
+	}
+	if a.Top {
+		parts = append(parts, "top")
+	}
+	if len(parts) == 0 {
+		return "—"
+	}
+	return strings.Join(parts, " ")
 }
 
 // uiIndexerOptionsHTML renders the "type" options of the add-indexer form: the

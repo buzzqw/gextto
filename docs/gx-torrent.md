@@ -452,12 +452,14 @@ La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
 indexer* nella barra di ogni pagina) gestisce tutto questo: elenchi con pulsanti
 per aggiungere e rimuovere **indexer** (tendina Prowlarr/Jackett/Altro, URL
 precompilato) e **feed** (URL RSS o query di ricerca, include/exclude, categoria,
-percorso, in pausa), le textarea JSON avanzate per feed, regole e indexer
+percorso, in pausa), un **editor delle regole** con tutti i criteri e le azioni
+qui sopra (una regola per riga, con frecce per cambiarne l'ordine — la prima che
+corrisponde vince), le textarea JSON avanzate per feed, regole e indexer
 (salvate con validazione), e per ogni feed un pulsante che mostra gli articoli
 correnti con la regola che li prenderebbe e un *Add* manuale (la vista "articoli
 corrispondenti" di qBittorrent). Gli stessi risultati si ottengono via
-`POST /ui/rss-indexer` e `POST /ui/rss-feed` (op `add`/`remove`); le textarea JSON
-restano su `POST /ui/rss-config`.
+`POST /ui/rss-indexer`, `POST /ui/rss-feed` e `POST /ui/rss-rule` (op
+`add`/`remove`/`up`/`down`); le textarea JSON restano su `POST /ui/rss-config`.
 
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e

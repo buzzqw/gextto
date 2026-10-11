@@ -26,6 +26,11 @@ th{color:#93a1b5}
 .row label{margin:0;display:flex;flex-direction:column;gap:3px;font-size:13px}
 .row .chk{flex-direction:row;align-items:center}
 button.feed{background:#1b2536;color:#dbe4f0}
+.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
+.flag.on{background:#14532d;color:#86efac}
+.actions{white-space:nowrap;text-align:right}
+.actions form{display:inline-block;margin:0 2px 2px 0}
+button.sm{padding:4px 8px;background:#243049;font-weight:500}
 details{margin-top:18px;border:1px solid #243049;border-radius:10px;padding:10px 14px;background:#131a28}
 summary{cursor:pointer;color:#93a1b5}
 .form-card{border:1px solid #243049;border-radius:10px;padding:6px 14px 14px;margin-top:8px;background:#131a28}
@@ -75,6 +80,49 @@ summary{cursor:pointer;color:#93a1b5}
     <button type="submit">Add feed</button>
   </div>
   <p class="muted">A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.</p>
+</form>
+
+<h2>Rules <span class="muted">({{RULECOUNT}})</span></h2>
+<table>
+  <thead><tr><th>Name</th><th>Scope</th><th>Match</th><th>Actions</th><th></th></tr></thead>
+  <tbody>{{RULEROWS}}</tbody>
+</table>
+<form class="form-card" method="post" action="/ui/rss-rule">
+  <input type="hidden" name="op" value="add">
+  <div class="row">
+    <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off"></label>
+    <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off"></label>
+    <label class="chk"><input type="checkbox" name="fail" value="1"> Skip matching items</label>
+  </div>
+  <div class="row">
+    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
+    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
+    <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off"></label>
+    <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off"></label>
+  </div>
+  <div class="row">
+    <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size"></label>
+    <label>Max size (MiB)<input type="number" step="1" min="0" name="max_size"></label>
+    <label>Min seeders<input type="number" name="min_seeders"></label>
+    <label>Max seeders<input type="number" name="max_seeders"></label>
+    <label>Min peers<input type="number" name="min_peers"></label>
+    <label>Max age (days)<input type="number" name="max_age_days"></label>
+  </div>
+  <div class="row">
+    <label class="chk"><input type="checkbox" name="require_episode" value="1"> Require episode</label>
+    <label class="chk"><input type="checkbox" name="smart_episode" value="1"> Smart episode</label>
+    <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1"> sequential</label>
+    <label class="chk"><input type="checkbox" name="first_last" value="1"> first/last</label>
+    <label class="chk"><input type="checkbox" name="top" value="1"> top</label>
+  </div>
+  <div class="row">
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
+    <label>Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off"></label>
+    <button type="submit">Add rule</button>
+  </div>
+  <p class="muted">A rule filters what to download and how. With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Smart episode adds each episode of a series once.</p>
 </form>
 
 <details>

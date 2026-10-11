@@ -280,6 +280,86 @@ func TestSetupCustomIndexerUsesDefaultName(t *testing.T) {
 	}
 }
 
+// TestUIRssRuleEditor exercises the friendly ordered-rules editor.
+func TestUIRssRuleEditor(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	// A SKIP rule (no-cam) first, then an ADD rule for shows.
+	if _, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{"op": {"add"}, "name": {"no-cam"}, "fail": {"1"}, "regex": {"(?i)cam"}}); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{
+		"op": {"add"}, "name": {"shows"}, "feeds": {"serie, film"},
+		"min_size": {"1500"}, "min_seeders": {"3"}, "require_episode": {"1"}, "smart_episode": {"1"},
+		"savepath": {"/srv/tv"}, "category": {"tv"}, "tags": {"hd, ita"}, "sequential": {"1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	rules := d.rules()
+	if len(rules) != 2 {
+		t.Fatalf("rules = %+v", rules)
+	}
+	if !rules[0].Fail || rules[0].Name != "no-cam" || rules[0].Match.Regex != "(?i)cam" {
+		t.Fatalf("first rule = %+v", rules[0])
+	}
+	shows := rules[1]
+	if shows.Match.MinSize != 1500*1024*1024 {
+		t.Fatalf("min_size = %d, want 1500 MiB", shows.Match.MinSize)
+	}
+	if len(shows.Feeds) != 2 || shows.Feeds[0] != "serie" || shows.Feeds[1] != "film" {
+		t.Fatalf("feeds = %v", shows.Feeds)
+	}
+	if !shows.Match.RequireEpisode || !shows.Match.SmartEpisode || shows.Match.MinSeeders != 3 {
+		t.Fatalf("match = %+v", shows.Match)
+	}
+	if shows.Action.SavePath != "/srv/tv" || shows.Action.Category != "tv" || !shows.Action.Sequential || len(shows.Action.Tags) != 2 {
+		t.Fatalf("action = %+v", shows.Action)
+	}
+
+	// Reorder: move the second rule up and it becomes the first.
+	if _, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{"op": {"up"}, "index": {"1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := d.rules()[0].Name; got != "shows" {
+		t.Fatalf("after up the first rule = %q, want shows", got)
+	}
+
+	// The page lists both rules.
+	page, err := http.Get(srv.URL + "/ui/rss")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	if !strings.Contains(string(body), "no-cam") || !strings.Contains(string(body), "shows") {
+		t.Fatalf("the RSS page does not list the rules")
+	}
+
+	// An invalid regex is refused and stored nowhere.
+	resp, err = http.PostForm(srv.URL+"/ui/rss-rule", url.Values{"op": {"add"}, "name": {"bad"}, "regex": {"("}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(d.rules()) != 2 {
+		t.Fatalf("a rule with an invalid regex must not be saved: %+v", d.rules())
+	}
+
+	// Remove by index.
+	if _, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{"op": {"remove"}, "index": {"0"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := d.rules(); len(got) != 1 || got[0].Name != "no-cam" {
+		t.Fatalf("after remove: %+v", got)
+	}
+}
+
 func renderUITemplate(t *testing.T, d *Daemon, standalone bool) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
