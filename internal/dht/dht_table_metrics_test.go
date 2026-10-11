@@ -1,6 +1,7 @@
 package dht
 
 import (
+	"fmt"
 	"net"
 	"testing"
 )
@@ -40,5 +41,23 @@ func TestTableMetricsConcentration(t *testing.T) {
 	}
 	if insecure != 1 {
 		t.Errorf("insecure = %d, want 1", insecure)
+	}
+}
+
+// TestSubnetCapDropsExtraNodes: with a cap of 2, a third node from the same /24
+// is dropped entirely (no tree slot, no address entry).
+func TestSubnetCapDropsExtraNodes(t *testing.T) {
+	d := newTestDHT()
+	d.routingTable.maxPerSubnet = 2
+	for i := 0; i < 4; i++ {
+		hp := fmt.Sprintf("1.2.3.%d:%d", 10+i, 7000+i)
+		ip, _, _ := net.SplitHostPort(hp)
+		d.insertTestNode(t, hp, string(generateSecureNodeID(net.ParseIP(ip))), "udp4")
+	}
+	if maxShare, _ := d.tableMetrics(); maxShare != 2 {
+		t.Errorf("subnet share = %d, want 2 (cap)", maxShare)
+	}
+	if got := len(d.routingTable.addresses); got != 2 {
+		t.Errorf("addresses = %d, want 2 (extra nodes dropped)", got)
 	}
 }

@@ -862,10 +862,11 @@ del campo `ip` in questa rete.
 (`get_peers` su più rami e incrocio dei risultati); ora c'è l'harness su cui
 misurare il prima/dopo. Nessun codice speculativo.
 
-**Prossimo passo sul cap anti-Sybil (con i numeri dell'harness).** Il `subnet_share_max`
-di 14 indica concentrazione reale: il cap va progettato a soglia (es. 8–16 per /24)
-e **misurato** con l'harness (tabella, successo query, peer trovati) prima di
-attivarlo, mai a scatola chiusa.
+**Cap anti-Sybil per subnet — implementato (2026-10-11).** `Config.MaxNodesPerSubnet`
+(default 0 = disattivato, anti-Sybil opzionale) limita i nodi nella tabella di routing
+allo stesso /24 (IPv4) o /48 (IPv6) e scarta i nodi in eccesso tracciandoli nel
+contatore `nodes_capped`. Può essere misurato sull'harness reale con
+`GX_MEASURE_DHT_SUBNET_CAP=8 make measure-dht`. Test: `TestSubnetCapDropsExtraNodes`.
 
 **Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e

@@ -29,7 +29,33 @@ type routingTable struct {
 	// How many prefix bits are shared between boundaryNode and nodeId.
 	proximity int
 
+	// maxPerSubnet caps routing-table nodes per /24 (v4) or /48 (v6); 0 = off.
+	maxPerSubnet int
+
 	log *DebugLogger
+}
+
+// subnetAtCap reports whether inserting a node with this IP would exceed the
+// per-subnet cap. exclude is skipped when counting (the node being inserted or
+// updated). Always false when the cap is disabled.
+func (r *routingTable) subnetAtCap(ip net.IP, exclude *remoteNode) bool {
+	if r.maxPerSubnet <= 0 {
+		return false
+	}
+	key := subnetKey(ip)
+	if key == "" {
+		return false
+	}
+	n := 0
+	for _, node := range r.addresses {
+		if node == exclude || node.address.IP == nil || bogusId(node.id) {
+			continue
+		}
+		if subnetKey(node.address.IP) == key {
+			n++
+		}
+	}
+	return n >= r.maxPerSubnet
 }
 
 // hostPortToNode finds a node based on the specified hostPort specification,
@@ -108,6 +134,14 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 		return fmt.Errorf("node missing from the routing table: %v", node.address.String())
 	}
 	if node.id != "" {
+		if r.subnetAtCap(node.address.IP, node) {
+			// The subnet is at the cap: drop the node entirely, so it does not
+			// linger in the address book without a tree slot.
+			totalNodesCapped.Add(1)
+			delete(r.addresses, addr)
+			knownNodes.Store(int64(len(r.addresses)))
+			return nil
+		}
 		r.nTree.insert(node)
 		totalNodes.Add(1)
 		r.addresses[addr].id = node.id
@@ -134,6 +168,12 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 	}
 	if existed {
 		return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
+	}
+	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node) {
+		// The subnet is already at the cap: drop the node entirely instead of
+		// giving it a tree slot (and do not let it fill the address book).
+		totalNodesCapped.Add(1)
+		return nil
 	}
 	r.addresses[addr] = node
 	knownNodes.Store(int64(len(r.addresses)))
@@ -305,6 +345,9 @@ var (
 	// totalNodes is a monotonically increasing counter of times nodes were added to the routing
 	// table. If a node is removed then later added again, it is counted twice.
 	totalNodes = expvar.NewInt("totalNodes")
+	// totalNodesCapped counts nodes kept out of the ID tree because their
+	// subnet already had MaxNodesPerSubnet entries (0 cap = never fires).
+	totalNodesCapped = expvar.NewInt("totalNodesCapped")
 	// reachableNodes is the count of all reachable nodes from a particular DHT node. The map
 	// key is the local node's infohash. The value is a gauge with the count of reachable nodes
 	// at the latest time the routing table was persisted on disk.

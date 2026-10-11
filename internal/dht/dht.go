@@ -56,6 +56,12 @@ type Config struct {
 	DHTRouters string
 	// Maximum number of nodes to store in the routing table. Default value: 100.
 	MaxNodes int
+	// MaxNodesPerSubnet optionally caps how many routing-table nodes may share
+	// the same /24 (IPv4) or /48 (IPv6): a cheap anti-Sybil guard against many
+	// node IDs from a few prefixes. 0 (default) disables it. Turn it on only
+	// after measuring with `make measure-dht`: peers behind CGNAT can share a
+	// prefix, so a too-strict cap drops legitimate nodes.
+	MaxNodesPerSubnet int
 	// How often to ping nodes in the network to see if they are reachable. Default value: 15 min.
 	CleanupPeriod time.Duration
 	//  If true, the node will read the routing table from disk on startup and save routing
@@ -212,6 +218,7 @@ func New(config *Config) (node *DHT, err error) {
 		clientThrottle: newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
 	}
 	routingTable := newRoutingTable(&node.DebugLogger)
+	routingTable.maxPerSubnet = cfg.MaxNodesPerSubnet
 	node.routingTable = routingTable
 	node.tokenSecrets = []string{node.newTokenSecret(), node.newTokenSecret()}
 	node.items = newItemStore()
@@ -1322,5 +1329,6 @@ func Stats() map[string]int64 {
 		// tree nodes sharing a /24 or /48, and how many have an insecure ID.
 		"subnet_share_max":  subnetShareMax.Load(),
 		"nodes_insecure_id": nodesInsecureID.Load(),
+		"nodes_capped":      totalNodesCapped.Value(),
 	}
 }

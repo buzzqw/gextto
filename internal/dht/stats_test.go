@@ -16,6 +16,7 @@ func TestStatsExposesDiagnostics(t *testing.T) {
 		"announce_ok_token", "announce_bad_token",
 		"reflected_port",
 		"reflected_observations", "nat_mapping",
+		"nodes_capped",
 		"subnet_share_max", "nodes_insecure_id",
 	} {
 		v, ok := s[key]
