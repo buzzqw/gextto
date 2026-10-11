@@ -240,3 +240,14 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 - Aggiorna sempre `README.md`/`README.it.md` e `docs/MANUAL.it.md`/`docs/MANUAL.en.md`
   quando cambia il comportamento visibile. Documento tecnico motore:
   `docs/gx-torrent.md`; architettura: `docs/ARCHITECTURE.md`.
+- **Ogni evoluzione, miglioria o altro lavoro aggiorna anche i documenti di
+  riferimento**, non solo il codice. In particolare: `docs/evoluzione.md`
+  (analisi e lacune), `docs/gx-torrent-evoluto.md` e `docs/gx-torrent-v2.md`
+  (evoluzione del demone), `internal/gxcore/GEXTTO.md` (motore gx-core),
+  `docs/gx-torrent.md` (documento tecnico del demone), `docs/ARCHITECTURE.md`,
+  `README.md`/`README.it.md` e l'indice `docs/README.md`. Una voce data per
+  «assente»/«da fare» va chiusa o riqualificata quando il codice la implementa;
+  tabelle di stato, capacità e conteggi (righe, test, versioni, percorsi) vanno
+  riallineati quando cambiano. Vale anche per il lavoro non visibile all'utente
+  (motore, coda, DHT, storage): quei documenti sono il posto dove resta tracciato.
+- Quando aggiungi o sposti documenti, aggiorna l'indice `docs/README.md`.
