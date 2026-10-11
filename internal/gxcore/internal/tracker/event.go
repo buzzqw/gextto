@@ -9,6 +9,9 @@ const (
 	EventCompleted
 	EventStarted
 	EventStopped
+	// EventPaused is the BEP 21 "paused" event, sent by a partial seed on every
+	// announce (not part of the original BEP 15 enum, which stops at 3).
+	EventPaused
 )
 
 var eventNames = [...]string{
@@ -16,6 +19,7 @@ var eventNames = [...]string{
 	"completed",
 	"started",
 	"stopped",
+	"paused",
 }
 
 // String returns the name of event as represented in HTTP tracker protocol.

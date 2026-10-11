@@ -16,6 +16,12 @@ func announce(
 	responseC chan *tracker.AnnounceResponse,
 	errC chan error,
 ) {
+	// BEP 21: a partial seed announces "paused" on every announce, so the
+	// tracker can tell it apart from an active downloader. A "stopped" event
+	// keeps its meaning.
+	if torrent.PartialSeed && e != tracker.EventStopped {
+		e = tracker.EventPaused
+	}
 	annReq := tracker.AnnounceRequest{
 		Torrent: torrent,
 		Event:   e,

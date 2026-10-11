@@ -78,6 +78,9 @@ func (t *torrent) announcerFields() tracker.Torrent {
 		tr.BytesLeft = math.MaxUint32
 	} else {
 		tr.BytesLeft = t.info.Length - t.bytesComplete()
+		// BEP 21: a partial seed has every wanted piece but not the whole
+		// torrent, so its announces carry event=paused.
+		tr.PartialSeed = t.completed && !t.bitfield.All()
 	}
 	t.mBitfield.RUnlock()
 	return tr
