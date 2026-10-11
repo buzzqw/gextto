@@ -91,6 +91,79 @@ func TestUISettingsRejectsBadWindow(t *testing.T) {
 	}
 }
 
+// TestUISettingsSavesClientOptions checks the standalone settings page writes the
+// folders, network, protocols and queue/cache options.
+func TestUISettingsSavesClientOptions(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/ui/settings", url.Values{
+		"download-dir":       {"/srv/media"},
+		"temp-dir":           {"/srv/tmp"},
+		"listen":             {"0.0.0.0:8899"},
+		"peer-ports":         {"51400-51500"},
+		"listen-interface":   {"eth0"},
+		"outgoing-interface": {"wg0"},
+		"proxy":              {"socks5://127.0.0.1:9050"},
+		"token":              {"secret"},
+		"ipfilter":           {"/etc/ipfilter.dat"},
+		"ipfilter-trackers":  {"1"},
+		"encryption":         {"2"},
+		"dht":                {"1"},
+		"dht-bootstrap":      {"router.example:6881"},
+		"lang":               {"it"},
+		"notify-url":         {"https://example/hook"},
+		"active-downloads":   {"5"},
+		"active-seeds":       {"2"},
+		"active-limit":       {"8"},
+		"cache-mb":           {"128"},
+		"preallocate":        {"1"},
+		"sequential":         {"1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	store := d.opts.Settings
+	want := map[string]string{
+		"download-dir": "/srv/media", "temp-dir": "/srv/tmp", "listen": "0.0.0.0:8899",
+		"peer-ports": "51400-51500", "listen-interface": "eth0", "outgoing-interface": "wg0",
+		"proxy": "socks5://127.0.0.1:9050", "token": "secret", "ipfilter": "/etc/ipfilter.dat",
+		"ipfilter-trackers": "true", "encryption": "2", "dht-bootstrap": "router.example:6881",
+		"lang": "it", "notify-url": "https://example/hook",
+		"no-dht": "false", "no-pex": "true", "no-utp": "true",
+	}
+	for key, value := range want {
+		if got := store.Get(key, ""); got != value {
+			t.Errorf("setting %q = %q, want %q", key, got, value)
+		}
+	}
+	cfg, _, _ := d.config()
+	if cfg.ActiveDownloads != 5 || cfg.ActiveSeeds != 2 || cfg.ActiveLimit != 8 || cfg.CacheMB != 128 || !cfg.Preallocate || !cfg.Sequential {
+		t.Fatalf("queue config = %+v", cfg)
+	}
+
+	// The page shows the saved values.
+	page, err := http.Get(srv.URL + "/ui/settings")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	for _, fragment := range []string{
+		`name="download-dir" value="/srv/media"`,
+		`name="listen" value="0.0.0.0:8899"`,
+		`name="peer-ports" value="51400-51500"`,
+	} {
+		if !strings.Contains(string(body), fragment) {
+			t.Fatalf("settings page missing %q", fragment)
+		}
+	}
+}
+
 // TestUIRssFollowCreatesFeedAndRule checks the one-click "follow a title".
 func TestUIRssFollowCreatesFeedAndRule(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)

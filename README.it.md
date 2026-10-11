@@ -241,7 +241,9 @@ porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
 personalizzato. La pagina collega a **RSS e indexer**, dove feed, regole e
 indexer si gestiscono senza modificare il JSON a mano — incluso un *Segui un
 titolo* che crea in un colpo solo il feed di ricerca e la sua regola — e a
-**Impostazioni** (limiti globali di banda e scheduler di banda giornaliero). In
+**Impostazioni**, il pannello del client: cartelle, rete e porte, protocolli
+(cifratura, DHT/uTP/LSD…), coda e cache, banda e scheduler giornaliero, lingua e
+notifiche. In
 una sessione desktop il browser si apre da solo sul wizard; su un server senza
 grafica o come servizio Windows il log stampa l'indirizzo da aprire.
 

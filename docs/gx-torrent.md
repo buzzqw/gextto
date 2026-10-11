@@ -512,8 +512,17 @@ finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
 demone usa `schedule-download`/`schedule-upload` (KiB/s) dentro la finestra e i
 limiti normali fuori. I limiti cambiano a caldo, senza riaprire la sessione.
 Si configura dalla pagina **`/ui/settings`** (collegamento *Impostazioni* nella
-barra di ogni pagina), insieme ai **limiti globali** di download/upload
-(`POST /ui/settings`); il salvataggio applica subito i limiti effettivi.
+barra di ogni pagina), che in **standalone** è il pannello completo del client:
+**Cartelle** (download, temporanea), **Rete** (indirizzo di ascolto, intervallo
+porte peer, interfaccia in entrata/uscita, proxy, token, filtro IP),
+**Protocolli** (cifratura, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, nodi bootstrap,
+DHT read-only), **Coda e cache** (download/seed attivi, limite attivi, cache
+disco, preallocazione, sequenziale), **banda** e **scheduler**, **lingua** e
+**notifiche** (`notify-url`). Banda, scheduler e limiti di coda si applicano
+subito; cartelle, rete e protocolli valgono **dal prossimo avvio**. In
+**standalone `settings.json` è autorevole**: un valore scritto qui vince sul flag
+di avvio (in *managed* il file non viene letto e i flag di Gextto restano
+sovrani).
 
 La maggior parte dei flag ha la sua variabile d'ambiente `GX_TORRENT_*`, ad
 esempio:

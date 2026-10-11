@@ -235,8 +235,9 @@ the indexer URL with its usual local address and port (still editable); any
 other Torznab service is added as a custom type. The page links to
 **RSS & indexers**, where feeds, rules and indexers are managed without hand
 editing JSON — including a *Follow a title* action that creates the search feed
-and its rule in one step — and to **Settings** (global bandwidth limits and the
-daily bandwidth scheduler). On a desktop session the browser opens on the wizard
+and its rule in one step — and to **Settings**, the client panel: folders,
+network and ports, protocols (encryption, DHT/uTP/LSD…), queue and cache,
+bandwidth and the daily scheduler, language and notifications. On a desktop session the browser opens on the wizard
 by itself; on a headless server or a Windows service the log prints the address
 to open.
 
