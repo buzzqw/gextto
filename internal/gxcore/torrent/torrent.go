@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/acceptor"
@@ -241,6 +242,11 @@ type torrent struct {
 	verifierProgressC chan verifier.Progress
 	verifierResultC   chan *verifier.Verifier
 	checkedPieces     uint32
+
+	// localData is published once the pieces exist: an immutable snapshot of the
+	// torrent's pieces and storage that another torrent may read (Swarm Merging,
+	// Fase 1) without going through this torrent's run loop. See localmerge.go.
+	localData atomic.Pointer[localDataSnapshot]
 
 	// Metrics
 	downloadSpeed   metrics.Meter

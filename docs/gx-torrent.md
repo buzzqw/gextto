@@ -835,6 +835,20 @@ verificati, **in cache per-file** e solo per un file **interamente presente**
 (altrimenti `hash reject`, perché un albero con foglie mancanti non si
 ancorerebbe al `pieces root`). Progetto completo in `docs/gx-torrent-v2.md`.
 
+## Riuso di dati locali (Swarm Merging, Fase 1)
+
+Se un altro torrent della sessione ha **lo stesso contenuto** con un layout
+identico (stessa `piece length`, stessa lunghezza e stessi hash ai medesimi
+indici), i suoi pezzi **già verificati** vengono riusati: all'allocazione il
+nuovo torrent legge i byte dalla storage dell'altro, li **riverifica contro il
+proprio hash** e li scrive nella propria, così riparte solo dai pezzi mancanti e
+può completarsi **anche senza peer**. È utile per un episodio ricaricato o per
+`.torrent` diversi dello stesso contenuto, e «resuscita» un torrent senza seeder
+quando il contenuto è già presente altrove. Il merge è **disattivato se un lato è
+un torrent privato** (BEP 27): mescolare sciami privati viola le regole dei
+tracker. È indipendente dagli hint **BEP 38**, che servono a *segnalare* i
+candidati (dettaglio in [`evoluzione.md`](evoluzione.md) §15.2).
+
 ## Statistiche
 
 La pagina **Salute** di gextto ha un pannello "Motore torrent", aggiornato

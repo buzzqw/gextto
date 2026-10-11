@@ -2029,12 +2029,12 @@ data path; con auto-speed **spento** non cambia nulla (nessuna regressione).
 **Follow-up possibile.** Versione lato Gextto (managed): Gextto misura l'RTT e
 modula i limiti via `SetLimits`, così l'opzione vale anche per i motori gestiti.
 
-### 15.2 Swarm Merging (condivisione file tra torrent) — priorità 2, per fasi
+### 15.2 Swarm Merging (condivisione file tra torrent) — Fase 1 fatta
 
 **Idea.** Far collaborare sciami diversi che contengono **lo stesso file**,
-mappando blocchi da un torrent B sui pezzi mancanti di un torrent A: resuscita
-torrent senza seeder quando esiste contenuto identico altrove. In gx-core manca
-su v1; in v2 esiste già la deduplicazione intrinseca di protocollo.
+riusando i pezzi già presenti in un altro torrent A invece di riscaricarli:
+resuscita torrent senza seeder quando esiste contenuto identico altrove. In
+gx-core manca su v1; in v2 esiste già la deduplicazione intrinseca di protocollo.
 
 **Agganci già presenti.** `piece.Piece.Data` è un `filesection.Piece` e ogni
 `FileSection{File, Offset, Length, Padding}` punta a file+offset **assoluto**
@@ -2049,29 +2049,33 @@ fornisce le foglie da 16 KiB per la verifica **per blocco**. Il problema non è 
 disco, è la **verifica**: non ci si fida dei byte di B finché non sono validati
 contro la struttura di A.
 
-**Fasi.**
+**Fase 1 (fatta, `torrent/localmerge.go`).** Merge solo tra torrent a **layout
+identico** (stessa piece length, stessa lunghezza totale e stessi hash ai medesimi
+indici): i pezzi sono direttamente interscambiabili e vengono verificati con
+l'hash di **A**. Copre il caso comune "stesso contenuto, `.torrent`/name/tracker
+diversi" a rischio corruzione ≈ nullo. Implementazione: alla fine
+dell'allocazione di A (`handleAllocationDone`) ogni torrent pubblica uno
+snapshot immutabile dei propri pezzi (`localData`); A legge gli snapshot degli
+altri torrent della sessione, per ogni pezzo **già verificato** dall'altro
+(bitfield) con hash e lunghezza uguali legge i byte dalla storage dell'altro,
+li riverifica contro il proprio hash e li scrive nella propria storage; il
+verificatore esistente marca poi i pezzi e chiude il completamento. Nessuna
+query cross-torrent (snapshot atomico + bitfield sotto lock): niente deadlock.
+Contabilità (bitfield/completamento) per-torrent.
 
-- **Fase 1 (MVP sicuro):** merge solo tra torrent a **layout identico** (stessa
-  piece length e stessi hash ai medesimi indici) → i pezzi sono direttamente
-  interscambiabili, verificati con l'hash di A. Copre il caso comune "stesso
-  contenuto, `.torrent`/name/tracker diversi" a rischio corruzione ≈ nullo.
-  Richiede un registro a livello `Session` (chiave file → torrent che lo
-  possiedono), il picker/peer con "fonti straniere" e l'etichettatura del blocco
-  col torrent proprietario per verifica/scrittura; la contabilità
-  (bitfield/completamento) resta per-torrent.
 - **Fase 2 (v2-first):** match per **radice Merkle per-file** e verifica
   **per blocco** con prova Merkle → file identici anche con layout diversi,
-  senza corruzione.
+  senza corruzione. Ancora da fare.
 - **No v1 a layout diverso:** niente euristiche ED2K/parziali di BiglyBT.
 
-**Guardia critica: BEP 27.** Disattivare il merge se A **o** B sono privati
-(`torrent.privateSwarm()`): mescolare sciami privati viola le regole dei tracker
-e inquina ratio/statistiche. Va cablata come guardia, non come opzione.
+**Guardia critica: BEP 27.** Il merge è disattivato se A **o** B sono privati
+(`info.Private`): mescolare sciami privati viola le regole dei tracker e inquina
+ratio/statistiche. È una guardia, non un'opzione.
 
-**Test/misura.** Due torrent con gli stessi pezzi, uno senza seeder e l'altro
-popolato → completamento via merge, nessuna corruzione (hash), sciami privati
-esclusi; `make measure-seeding` per throughput/CPU/RAM. Sforzo: Fase 1 **media**,
-Fase 2 **grande**.
+**Test/misura.** `torrent/localmerge_test.go` (riuso, contenuto diverso, guardia
+privati) e `cmd/gx-torrent/swarmmerge_test.go` (end-to-end: B popolato da disco,
+A con contenuto identico e nome diverso si completa **senza peer**). I due test
+passano anche con `-race`. Sforzo: Fase 1 **media** (fatta), Fase 2 **grande**.
 
 ### 15.3 Criterio di verifica (come §4.5)
 

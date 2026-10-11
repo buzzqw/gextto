@@ -35,6 +35,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 	}
 	t.pieces = pieces
 	t.applySkippedPieces()
+	t.publishLocalData()
 
 	for pe := range t.peers {
 		pe.GenerateAndSendAllowedFastMessages(t.session.config.AllowedFastSet, t.info.NumPieces, t.infoHash, t.pieces)
@@ -67,8 +68,13 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// No need to verify files if they didn't exist when we create them.
-	if !al.HasExisting {
+	// Swarm Merging (Fase 1): reuse verified pieces from other local torrents
+	// with the same piece layout before verifying this torrent's own storage.
+	merged := t.prefillLocalData()
+
+	// No need to verify files if they didn't exist when we create them and
+	// nothing was merged.
+	if !al.HasExisting && merged == 0 {
 		t.mBitfield.Lock()
 		t.bitfield = bitfield.New(t.info.NumPieces)
 		t.mBitfield.Unlock()
@@ -80,6 +86,7 @@ func (t *torrent) handleAllocationDone(al *allocator.Allocator) {
 		return
 	}
 
-	// Some files exists on the disk, need to verify pieces to create a correct bitfield.
+	// Some files exists on the disk (or were merged), need to verify pieces to
+	// create a correct bitfield.
 	t.startVerifier()
 }
