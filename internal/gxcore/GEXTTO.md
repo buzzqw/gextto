@@ -109,7 +109,13 @@ Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
   un info-hash bersaglio. L'IP esterno arriva da `Config.PublicIP` (impostato dal
   motore da `DHTHost` o dall'interfaccia uscente) o, se sconosciuto, dal campo
   `ip` delle risposte (`noteExternalIP`, adozione una tantum con ID sicuro
-  persistito). Gli indirizzi locali restano esenti;
+  persistito). Gli indirizzi locali restano esenti. Il campo `ip` è anche
+  **inviato** in ogni risposta (`addIPField`: ping, find_node, get_peers,
+  announce_peer e `get`/`put` BEP 44), così un peer dietro NAT scopre il proprio
+  indirizzo riflesso; il contatore `reflected_sent` lo rende osservabile;
+- **`implied_port` (BEP 5)**: un `announce_peer` con `implied_port: 1` usa la
+  **porta sorgente** del pacchetto al posto del campo `port`, per i peer dietro
+  NAT che non conoscono la propria porta esterna;
 - **Igiene dei token** (`dht.go`, `hostToken`/`checkToken`): il token di
   `announce_peer` è legato a **indirizzo sorgente + scope** (l'info-hash per
   `get_peers`/`announce_peer`, `nil` per i percorsi BEP 44), quindi un token

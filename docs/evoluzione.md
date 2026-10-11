@@ -948,6 +948,18 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   per-osservatore proprio perché il consensus a ≥2 non si popolava mai. Test:
   `TestParseReflected`, `TestRecordReflectedNATMapping`, `TestNATHint`,
   `TestReadResponseDecodesIPField`.
+
+  **Lato invio — fatto (2026-10-12).** Il codice **leggeva** il campo `ip` ma non
+  lo **inviava**: ogni risposta ora lo include (`addIPField`, applicato a ping,
+  find_node, get_peers, announce_peer e alle risposte `get`/`put` di BEP 44), così
+  un peer dietro NAT può imparare il proprio indirizzo riflesso da noi. Aggiunto
+  il contatore `reflected_sent` (in `Stats()`, quindi `dht_reflected_sent`) per
+  rendere osservabile anche il lato invio. Test: `TestRepliesIncludeIPField`.
+
+  **`implied_port` di BEP 5 — fatto (2026-10-12).** `announce_peer` con
+  `implied_port: 1` ora usa la **porta sorgente** del pacchetto invece del campo
+  `port` (che un peer dietro NAT spesso non conosce). Prima il campo era
+  ignorato. Test: `TestAnnouncePeerImpliedPort`.
 - **Priorità file graduata — piano (L, non implementata in questa sessione).** È
   l'unica voce **di motore** e tocca il percorso di download più critico, quindi
   vale la regola del repo (*misura prima/dopo*, nessuna modifica non misurata):

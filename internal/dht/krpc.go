@@ -163,6 +163,9 @@ type answerType struct {
 	InfoHash InfoHash `bencode:"info_hash"` // should probably be a string.
 	Port     int      `bencode:"port"`
 	Token    string   `bencode:"token"`
+	// ImpliedPort (BEP 5): when 1, the source port must be used instead of
+	// "port", for peers behind a NAT that do not know their external port.
+	ImpliedPort int `bencode:"implied_port"`
 	// BEP 33: whether the announcer is seeding, and the get_peers scrape flags.
 	Seed   int `bencode:"seed"`
 	Scrape int `bencode:"scrape"`

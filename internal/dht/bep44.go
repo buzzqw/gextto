@@ -286,7 +286,9 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 		item.Target = ImmutableTarget(encoded)
 	}
 	d.items.put(item)
-	sendMsg(d.conn, addr, replyMessage{T: req.T, Y: "r", R: map[string]interface{}{"id": d.nodeId}}, d.DebugLogger)
+	replyArgs := map[string]interface{}{"id": d.nodeId}
+	addIPField(replyArgs, addr)
+	sendMsg(d.conn, addr, replyMessage{T: req.T, Y: "r", R: replyArgs}, d.DebugLogger)
 }
 
 // replyGet handles a BEP 44 "get": it returns the stored item (the optional seq
@@ -301,6 +303,7 @@ func (d *DHT) replyGet(addr net.UDPAddr, raw []byte) {
 		return
 	}
 	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, nil, d.tokenSecrets[0])}
+	addIPField(r0, addr)
 	if n4, n6 := d.nodesForInfoHash(InfoHash(string(target))); n4 != "" || n6 != "" {
 		if n4 != "" {
 			r0["nodes"] = n4

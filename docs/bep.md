@@ -69,6 +69,10 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 46 | Updating Torrents via DHT Mutable Items (`urn:btpk:`) | sì (magnet `xs=urn:btpk:`, risolto dal client BEP 44 all'aggiunta) |
 | 51 | DHT Infohash Indexing (`sample_infohashes`) | no |
 
+> BEP 42 è completo in **entrambe le direzioni**: l'ID nodo deriva dall'IP esterno
+> e il campo `ip` è letto *e* inviato in ogni risposta (`reflected_sent`). BEP 5
+> rispetta `implied_port` in `announce_peer`.
+
 ## BitTorrent v2 e magnet
 
 | BEP | Specifica | Stato |

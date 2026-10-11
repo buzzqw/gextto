@@ -639,7 +639,11 @@ RPC interno del motore è disattivato.
     dell'interfaccia uscente), così nessuno può
     sceglierne uno vicino a un info-hash bersaglio; se l'IP non è noto all'avvio
     viene adottato dal campo `ip` delle risposte DHT e il nuovo ID è persistito.
-    Gli indirizzi di rete locale sono esenti.
+    Gli indirizzi di rete locale sono esenti. Il campo `ip` è anche **inviato**
+    in ogni risposta (ping, find_node, get_peers, announce_peer e le risposte
+    BEP 44), così un peer dietro NAT scopre il proprio indirizzo riflesso;
+    `dht_reflected_sent` conta gli invii. Un `announce_peer` con
+    `implied_port: 1` usa la porta sorgente del pacchetto al posto di `port`.
   - **BEP 44** (archivio chiave/valore): item immutabili (target = SHA-1 del
     valore) e mutabili (firma ed25519, `seq` monotono, `cas`), con token, limiti
     di dimensione e TTL 2 h; query `get`/`put` e API locale. C'è anche il

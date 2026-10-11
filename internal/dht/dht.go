@@ -822,6 +822,20 @@ func (d *DHT) readOnlyFlag() int {
 	return 0
 }
 
+// addIPField adds the BEP 42 "ip" field to a reply: the requester's address as
+// we see it, in compact form (6 bytes IPv4, 18 IPv6). BEP 42 says a response
+// SHOULD carry it; it is what lets a node learn its reflected (NAT) address — the
+// reading side already existed (recordReflected), the sending side was missing.
+func addIPField(r map[string]interface{}, addr net.UDPAddr) {
+	if len(r) == 0 {
+		return
+	}
+	if bin := encodeCompactPeerAddr(addr.String()); bin != "" {
+		r["ip"] = bin
+		reflectedSent.Add(1)
+	}
+}
+
 // nodesField is a raw "nodes"/"nodes6" string together with the protocol that
 // must be used to parse and resolve the contacts it contains.
 type nodesField struct {
@@ -953,14 +967,20 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	// from a node it doesn't yet know about.
 	if node != nil && d.checkToken(addr, []byte(ih), r.A.Token) {
 		totalAnnounceTokenOK.Add(1)
-		peerAddr := net.TCPAddr{IP: addr.IP, Port: r.A.Port}
+		// BEP 5: with "implied_port": 1 the announcer does not know its external
+		// port, so the source port of the packet is the peer's port.
+		port := r.A.Port
+		if r.A.ImpliedPort == 1 {
+			port = addr.Port
+		}
+		peerAddr := net.TCPAddr{IP: addr.IP, Port: port}
 		d.peerStore.addContact(ih, encodeCompactPeerAddr(peerAddr.String()), r.A.Seed == 1)
 		// Allow searching this node immediately, since it's telling us
 		// it has an infohash. Enables faster upgrade of other nodes to
 		// "peer" of an infohash, if the announcement is valid.
 		node.lastResponseTime = time.Now().Add(-searchRetryPeriod)
-		port := d.peerStore.hasLocalDownload(ih)
-		if port != 0 {
+		localPort := d.peerStore.hasLocalDownload(ih)
+		if localPort != 0 {
 			d.PeersRequestResults <- map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}}
 		}
 	} else {
@@ -973,6 +993,7 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 		Y: "r",
 		R: map[string]interface{}{"id": d.nodeId},
 	}
+	addIPField(reply.R, addr)
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
@@ -987,6 +1008,7 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 
 	ih := r.A.InfoHash
 	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, []byte(ih), d.tokenSecrets[0])}
+	addIPField(r0, addr)
 	reply := replyMessage{
 		T: r.T,
 		Y: "r",
@@ -1059,6 +1081,7 @@ func (d *DHT) replyFindNode(addr net.UDPAddr, r responseType) {
 
 	node := InfoHash(r.A.Target)
 	r0 := map[string]interface{}{"id": d.nodeId}
+	addIPField(r0, addr)
 	reply := replyMessage{
 		T: r.T,
 		Y: "r",
@@ -1100,6 +1123,7 @@ func (d *DHT) replyPing(addr net.UDPAddr, response responseType) {
 		Y: "r",
 		R: map[string]interface{}{"id": d.nodeId},
 	}
+	addIPField(reply.R, addr)
 	sendMsg(d.conn, addr, reply, d.DebugLogger)
 }
 
@@ -1339,6 +1363,7 @@ func Stats() map[string]int64 {
 		// while unknown; see recordReflected.
 		"reflected_port":         reflectedPort.Load(),
 		"reflected_observations": reflectedObs.Load(),
+		"reflected_sent":         reflectedSent.Load(),
 		"nat_mapping":            natMappingType.Load(),
 
 		// Routing-table composition (Sybil visibility): the largest number of

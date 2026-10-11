@@ -108,6 +108,7 @@ var (
 
 	reflectedPort  atomic.Int64 // most-frequent reflected port (0 = unknown)
 	reflectedObs   atomic.Int64 // total BEP 42 "ip" observations
+	reflectedSent  atomic.Int64 // total BEP 42 "ip" fields we sent in replies
 	natMappingType atomic.Int64 // 0 unknown, 1 endpoint-independent, 2 address/port-dependent
 )
 
