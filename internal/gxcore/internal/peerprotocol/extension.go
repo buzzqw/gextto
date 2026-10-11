@@ -19,6 +19,8 @@ const (
 	ExtensionIDPEX
 	// ExtensionIDHolepunch is ID for BEP 55 ut_holepunch messages.
 	ExtensionIDHolepunch
+	// ExtensionIDDontHave is ID for BEP 54 lt_donthave messages.
+	ExtensionIDDontHave
 )
 
 const (
@@ -28,6 +30,8 @@ const (
 	ExtensionKeyPEX = "ut_pex"
 	// ExtensionKeyHolepunch is the key for the BEP 55 holepunch extension
 	ExtensionKeyHolepunch = "ut_holepunch"
+	// ExtensionKeyDontHave is the key for the BEP 54 lt_donthave extension.
+	ExtensionKeyDontHave = "lt_donthave"
 )
 
 const (
@@ -68,6 +72,14 @@ func (m ExtensionMessage) WriteTo(w io.Writer) (n int64, err error) {
 			return
 		}
 		nn, err = w.Write(data)
+		n += int64(nn)
+		return
+	}
+	// DontHave is also a fixed binary payload (BEP 54): a 4-byte piece index.
+	if dh, ok := m.Payload.(DontHaveMessage); ok {
+		var data [4]byte
+		binary.BigEndian.PutUint32(data[:], dh.Index)
+		nn, err = w.Write(data[:])
 		n += int64(nn)
 		return
 	}
@@ -119,6 +131,11 @@ func (m *ExtensionMessage) UnmarshalBinary(data []byte) error {
 		var extMsg HolepunchMessage
 		err = extMsg.UnmarshalBinary(payload)
 		m.Payload = extMsg
+	case ExtensionIDDontHave:
+		if len(payload) < 4 {
+			return fmt.Errorf("short dont-have payload: %d bytes", len(payload))
+		}
+		m.Payload = DontHaveMessage{Index: binary.BigEndian.Uint32(payload[:4])}
 	default:
 		return fmt.Errorf("peer sent invalid extension message id: %d", m.ExtendedMessageID)
 	}
@@ -142,6 +159,8 @@ func NewExtensionHandshake(metadataSize uint32, version string, yourip net.IP, r
 	m := map[string]uint8{
 		ExtensionKeyMetadata: ExtensionIDMetadata,
 		ExtensionKeyPEX:      ExtensionIDPEX,
+		// BEP 54: we can receive DontHave messages.
+		ExtensionKeyDontHave: ExtensionIDDontHave,
 	}
 	if holepunch {
 		m[ExtensionKeyHolepunch] = ExtensionIDHolepunch
@@ -173,6 +192,12 @@ type ExtensionPEXMessage struct {
 	Added6   string `bencode:"added6"`
 	Dropped  string `bencode:"dropped"`
 	Dropped6 string `bencode:"dropped6"`
+}
+
+// DontHaveMessage is the BEP 54 `lt_donthave` message: the sender no longer has
+// the piece with this index (it reneges on a previous Have/Bitfield).
+type DontHaveMessage struct {
+	Index uint32
 }
 
 func truncateIP(ip net.IP) net.IP {

@@ -397,6 +397,8 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 	case peerprotocol.HolepunchMessage:
 		t.handleHolepunchMessage(pe, msg)
+	case peerprotocol.DontHaveMessage:
+		t.handleDontHave(pe, msg)
 	case peerprotocol.HashRequestMessage:
 		t.handleHashRequest(pe, msg)
 	case peerprotocol.HashesMessage:
@@ -442,5 +444,33 @@ func (t *torrent) updateInterestedState(pe *peer.Peer) {
 		msg := peerprotocol.NotInterestedMessage{}
 		pe.SendMessage(msg)
 		return
+	}
+}
+
+// handleDontHave applies a BEP 54 DontHave message: the peer no longer has the
+// piece, so it must not be requested from it again. If the Fast extension is
+// not negotiated the peer will not reject our outstanding requests, so the
+// active download of that piece from it is cancelled (as for a choke).
+func (t *torrent) handleDontHave(pe *peer.Peer, msg peerprotocol.DontHaveMessage) {
+	if t.pieces == nil || t.bitfield == nil {
+		return
+	}
+	if msg.Index >= t.info.NumPieces {
+		pe.Logger().Errorln("invalid dont-have index:", msg.Index)
+		t.closePeer(pe)
+		return
+	}
+	if pe.Bitfield != nil {
+		pe.Bitfield.Clear(msg.Index)
+	}
+	if t.piecePicker != nil {
+		t.piecePicker.HandleDontHave(pe, msg.Index)
+	}
+	if pe.FastEnabled {
+		return
+	}
+	if pd, ok := t.pieceDownloaders[pe]; ok && pd.Piece.Index == msg.Index {
+		t.closePieceDownloader(pd)
+		t.startPieceDownloaders()
 	}
 }

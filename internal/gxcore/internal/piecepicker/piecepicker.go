@@ -329,6 +329,15 @@ func (p *PiecePicker) HandleHave(pe *peer.Peer, i uint32) {
 	p.addHavingPeer(i, pe)
 }
 
+// HandleDontHave must be called when a peer announces with a BEP 54 DontHave
+// that it no longer has the piece (index i): availability is cleared.
+func (p *PiecePicker) HandleDontHave(pe *peer.Peer, i uint32) {
+	if pe.Bitfield != nil {
+		pe.Bitfield.Clear(i)
+	}
+	p.removeHavingPeer(int(i), pe)
+}
+
 // HandleAllowedFast must be called to set the allowed-fast status of the piece at peer.
 func (p *PiecePicker) HandleAllowedFast(pe *peer.Peer, i uint32) {
 	pe.ReceivedAllowedFast.Add(p.pieces[i].Piece)
