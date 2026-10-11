@@ -15,6 +15,7 @@ func TestStatsExposesDiagnostics(t *testing.T) {
 		"blocked_hosts", "self_promotions", "dupe_references", "nodes_killed",
 		"announce_ok_token", "announce_bad_token",
 		"reflected_port",
+		"subnet_share_max", "nodes_insecure_id",
 	} {
 		v, ok := s[key]
 		if !ok {

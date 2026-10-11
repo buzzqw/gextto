@@ -146,6 +146,61 @@ func recordReflected(raw string) {
 	}
 }
 
+// Routing-table composition, recomputed periodically by the run loop and read
+// by Stats(). Used to make Sybil concentration visible before deciding whether
+// to enforce a cap (see docs/evoluzione.md 4.10).
+var (
+	subnetShareMax  atomic.Int64
+	nodesInsecureID atomic.Int64
+)
+
+// subnetKey buckets an address into a /24 (IPv4) or /48 (IPv6), the granularity
+// a Sybil flood from a handful of prefixes would show up at.
+func subnetKey(ip net.IP) string {
+	if ip == nil {
+		return ""
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return net.IPv4(v4[0], v4[1], v4[2], 0).String()
+	}
+	if v6 := ip.To16(); v6 != nil {
+		masked := make(net.IP, net.IPv6len)
+		copy(masked, v6[:6])
+		return masked.String()
+	}
+	return ""
+}
+
+// tableMetrics reports how concentrated the routing table is: the largest
+// number of tree nodes sharing a subnet, and how many tree nodes have a BEP 42
+// insecure ID. Read-only; it runs in the DHT run loop, so it needs no locking.
+func (d *DHT) tableMetrics() (maxShare, insecure int) {
+	if d.routingTable == nil {
+		return 0, 0
+	}
+	share := make(map[string]int, len(d.routingTable.addresses))
+	for _, node := range d.routingTable.addresses {
+		if node == nil || node.address.IP == nil || bogusId(node.id) {
+			continue
+		}
+		ip := node.address.IP
+		if key := subnetKey(ip); key != "" {
+			share[key]++
+		}
+		var id [20]byte
+		copy(id[:], node.id)
+		if !NodeIDSecure(id, ip) {
+			insecure++
+		}
+	}
+	for _, n := range share {
+		if n > maxShare {
+			maxShare = n
+		}
+	}
+	return maxShare, insecure
+}
+
 // noteExternalIP adopts the external IP a remote node reports for us (BEP 42
 // "ip" field, 4/16 bytes plus a 2-byte port) and, once, regenerates a node ID
 // secure for it. Only used when the external IP was not configured at startup.

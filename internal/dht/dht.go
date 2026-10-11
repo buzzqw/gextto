@@ -554,6 +554,9 @@ func (d *DHT) loop() {
 				tokenBucket += d.config.RateLimit / 10
 			}
 		case <-cleanupTicker:
+			ms, ins := d.tableMetrics()
+			subnetShareMax.Store(int64(ms))
+			nodesInsecureID.Store(int64(ins))
 			needPing := d.routingTable.cleanup(d.config.CleanupPeriod, d.peerStore)
 			d.wg.Add(1)
 			go func() {
@@ -1310,5 +1313,10 @@ func Stats() map[string]int64 {
 		// External port remote nodes report for us (BEP 42 "ip" field). 0 while
 		// unknown or unconfirmed; see recordReflected.
 		"reflected_port": reflectedPort.Load(),
+
+		// Routing-table composition (Sybil visibility): the largest number of
+		// tree nodes sharing a /24 or /48, and how many have an insecure ID.
+		"subnet_share_max":  subnetShareMax.Load(),
+		"nodes_insecure_id": nodesInsecureID.Load(),
 	}
 }

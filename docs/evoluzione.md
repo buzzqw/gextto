@@ -810,8 +810,8 @@ il `LICENSE` BSD-3).
 
 | # | Voce | Cosa | Rischio | Sforzo | Verifica | Stato |
 |---|---|---|---|---|---|---|
-| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `blocked_hosts`/`self_promotions`, dimensione tabella e peer trovati su sciame reale | da fare |
-| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | da fare |
+| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `subnet_share_max`/`nodes_insecure_id`, dimensione tabella e peer trovati su sciame reale | osservabilità fatta; enforcement da misurare |
+| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | da fare (design + harness) |
 | 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec | **fatto** |
 
 **Igiene dei token — fatto (2026-10-11).** Il token di `announce_peer` è ora
@@ -822,6 +822,21 @@ corrispondenti* di Tixati. I percorsi BEP 44 restano legati al solo indirizzo
 (`scope = nil`), invariati. Aggiunti i contatori `announce_ok_token` /
 `announce_bad_token` (in `Stats()`, quindi visibili come `dht_announce_*`).
 Test: `TestHostTokenBindsScope`. Resta il doppio segreto rotante già presente.
+
+**Osservabilità della concentrazione — fatto (2026-10-11).** Prima di introdurre
+qualunque cap anti-Sybil, la routing table è ora **osservabile**: `Stats()`
+espone `subnet_share_max` (il massimo numero di nodi nello stesso /24, o /48 per
+IPv6) e `nodes_insecure_id` (nodi con ID non secure per BEP 42), ricalcolati a
+ogni `cleanup` dal run loop (`tableMetrics`/`subnetKey` in `dht_sec.go`). Sono i
+numeri con cui decidere *se* e *quanto* stringere; l'**enforcement non è attivo
+di proposito**, perché BEP 42 non è applicato ovunque e un cap per /24 punirebbe
+i nodi legittimi dietro CGNAT/mobile. Test: `TestSubnetKey`,
+`TestTableMetricsConcentration`.
+
+**Multi-path lookup — design, non ancora codice.** Richiede la riscrittura del
+lookup iterativo (`get_peers` su più rami e incrocio dei risultati) e la
+validazione su sciame reale; resta gated dietro l'harness di misura. Nessun
+codice speculativo.
 
 **Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
