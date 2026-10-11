@@ -72,8 +72,9 @@ transfers keep running while Gextto restarts or updates, and new transfer
 features land there first (HTTP streaming with Range, a built-in peer-port test,
 adaptive memory/cache sizing, NAT holepunching with BEP 55, dual-stack IPv6
 including the DHT, BitTorrent v2 and hybrid torrents, a session-wide ban of
-peers that send corrupt data). Its core, **gx-core**, is our own engine,
-maintained inside this repository. Gextto's default
+peers that send corrupt data). Its core, **gx-core**, is our engine, maintained
+inside this repository (it includes portions derived from MIT/BSD-licensed work;
+see `internal/gxcore/LICENSE`). Gextto's default
 build is **pure Go**: gx-torrent is all it needs.
 
 **qBittorrent-nox** is the alternative for those who already run it or prefer

@@ -200,23 +200,25 @@ il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
 e lo stesso `binPath` del pacchetto, lo avvia, attende `/api/v1/health` e ne
 verifica lo stop pulito.
 
-### 1.6 Motore presentato come codice proprio (fatto)
+### 1.6 Motore presentato come codice nostro (fatto)
 
-**Regola.** Il motore gx-core è un programma originale: nel sorgente e nella
-documentazione non compare alcuna citazione di codice copiato da altri
-programmi. Restano solo i riferimenti generici alla *funzionalità* di altri
-client (per esempio "come fa libtorrent", "come fa anacrolix") e le normali
-dipendenze di terze parti, che hanno solo il loro import e la loro licenza
+**Regola.** gx-core è il nostro motore e lo presentiamo come tale: la
+documentazione non pubblicizza l'origine del codice. L'unica attribuzione è
+quella **richiesta dalle licenze permissive** dei componenti derivati, nei file
+`internal/gxcore/LICENSE` (MIT) e `internal/dht/LICENSE` (BSD-3) e in
+`THIRD-PARTY-NOTICES`. Restano anche i riferimenti generici alla *funzionalità*
+di altri client (per esempio "come fa libtorrent", "come fa anacrolix") e le
+normali dipendenze di terze parti, con il loro import e la loro licenza
 (`github.com/anacrolix/utp` per uTP, `libtorrent` per il motore alternativo).
 
-**Fatto (2026-10-11).** Rimossi attribuzioni, changelog "rispetto alla base" e
-marcatori di origine dal codice e da tutti i documenti (inclusi archivio e
-script). Le dipendenze riconducibili agli autori del codice originario sono
-state sostituite con codice nostro: il DHT è ora `internal/dht` (decodifica
-indirizzi e throttle propri), il logger dell'engine è
-`internal/gxcore/logging` e il backoff è `internal/gxcore/internal/backoff`.
-Il peer ID prefix è `-GX`; `internal/gxcore/LICENSE` e la guida di allineamento
-sono stati eliminati; l'identità di rete è `"gx-core " + Version`.
+**Fatto (2026-10-11).** Rimossi changelog "rispetto alla base" e marcatori di
+origine dal codice e dai documenti (inclusi archivio e script); le dipendenze
+riconducibili agli autori del codice originario sono state sostituite con codice
+nostro: il DHT è ora `internal/dht` (decodifica indirizzi e throttle propri), il
+logger dell'engine è `internal/gxcore/logging` e il backoff è
+`internal/gxcore/internal/backoff`. Il peer ID prefix è `-GX`. Le licenze MIT/BSD
+dei componenti derivati sono state ripristinate nei rispettivi `LICENSE` e
+raccolte in `THIRD-PARTY-NOTICES`; l'identità di rete è `"gx-core " + Version`.
 
 ### 1.7 Controllo approfondito di performance (CPU e RAM)
 

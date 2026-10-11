@@ -76,7 +76,8 @@ dove arrivano prima le novità (streaming HTTP con Range, test porte integrato,
 gestione adattiva di memoria/cache, holepunching NAT con BEP 55, IPv6 dual-stack
 DHT compreso, torrent BitTorrent v2 e ibridi, ban di sessione dei peer che
 inviano dati corrotti). Il suo nucleo, **gx-core**, è un motore nostro,
-mantenuto in questo repository. La build
+mantenuto in questo repository (include porzioni derivate da lavoro con licenza
+MIT/BSD; vedi `internal/gxcore/LICENSE`). La build
 predefinita di Gextto è **Go puro**: per funzionare serve solo gx-torrent.
 
 **qBittorrent-nox** è l'alternativa per chi lo usa già o preferisce la sua UI:

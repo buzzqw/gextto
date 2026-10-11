@@ -41,8 +41,10 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
 
 ## Motore gx-core (`internal/gxcore`)
 - `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), codice
-  nostro, parte del modulo principale come
-  `github.com/buzzqw/gextto/internal/gxcore`. Lo usano `cmd/gx-torrent` e i test.
+  nostro con porzioni derivate da progetti MIT/BSD (vedi
+  `internal/gxcore/LICENSE` e `internal/dht/LICENSE`), parte del modulo
+  principale come `github.com/buzzqw/gextto/internal/gxcore`. Lo usano
+  `cmd/gx-torrent` e i test.
 - Panoramica e inventario delle funzionalità del motore:
   `internal/gxcore/GEXTTO.md`.
 - Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.

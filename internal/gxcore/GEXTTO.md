@@ -3,7 +3,8 @@
 Questa cartella contiene il **motore** di gx-core (il binario `gx-torrent`),
 parte del modulo principale come
 `github.com/buzzqw/gextto/internal/gxcore`. Lo usa solo il demone
-`cmd/gx-torrent`.
+`cmd/gx-torrent`. Una parte del codice deriva da lavoro con licenza MIT: vedi
+[`LICENSE`](LICENSE).
 
 Questa tabella è l'**inventario delle funzionalità** del motore e dei file che
 le implementano.

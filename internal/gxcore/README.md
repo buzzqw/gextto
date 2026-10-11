@@ -4,7 +4,8 @@ This is the BitTorrent engine of **gx-core**, the torrent daemon used by Gextto
 and shipped standalone as `gx-torrent`.
 
 It lives inside the main Gextto module as
-`github.com/buzzqw/gextto/internal/gxcore` and is **our code**.
+`github.com/buzzqw/gextto/internal/gxcore` and is **our code**, with portions
+derived from MIT-licensed work (see [`LICENSE`](LICENSE)).
 
 The public entry point is the package `torrent`
 (`github.com/buzzqw/gextto/internal/gxcore/torrent`); the `internal/`
