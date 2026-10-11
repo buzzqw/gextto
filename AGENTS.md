@@ -122,6 +122,12 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   già; `make test-engine` resta per eseguire solo quei pacchetti.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
+- **Igiene dei test**: nessun test deve lasciare file fuori dalle proprie
+  cartelle temporanee. Usa `t.TempDir()` (o `os.MkdirTemp` con
+  `t.Cleanup`/`defer os.RemoveAll`), mai percorsi relativi alla CWD. Un `Daemon`
+  costruito a mano senza `StatePath` non deve scrivere stato (`saveLocked` esce
+  subito): senza la guardia creerebbe un `.tmp` nella directory di lavoro e lo
+  lascerebbe lì perché il rename verso il percorso vuoto fallisce.
 - **La TUI di Gextto deve sempre continuare a funzionare.** Dopo ogni ciclo di
   modifiche esegui `go test ./internal/tui/` e il test d'integrazione
   `go test . -run TestTUILibraryClientAgainstTheRouter` (pilota il client TUI

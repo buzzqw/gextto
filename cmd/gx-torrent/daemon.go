@@ -294,6 +294,11 @@ func newDaemon(opts Options) (*Daemon, error) {
 	if opts.PartsDir == "" {
 		opts.PartsDir = filepath.Join(opts.DataDir, "parts")
 	}
+	if opts.StatePath == "" && opts.DataDir != "" {
+		// A daemon always has a state file under its data dir, so a caller that
+		// forgets the path cannot silently skip persistence.
+		opts.StatePath = filepath.Join(opts.DataDir, "state.json")
+	}
 	d := &Daemon{
 		opts:      opts,
 		selection: map[string][]bool{},
@@ -388,6 +393,12 @@ func (d *Daemon) loadState() error {
 // saveLocked writes the state atomically. Failures are logged: the session
 // keeps working and the next change retries.
 func (d *Daemon) saveLocked() {
+	// Without a state path there is nothing to persist (a bare Daemon built by a
+	// test). Writing would otherwise create a relative ".tmp" in the current
+	// working directory and leave it behind, because the rename target is empty.
+	if d.opts.StatePath == "" {
+		return
+	}
 	d.state.BadTrackers = d.trackers.disabledSnapshot()
 	data, err := json.MarshalIndent(d.state, "", "  ")
 	if err != nil {
@@ -400,6 +411,8 @@ func (d *Daemon) saveLocked() {
 		return
 	}
 	if err := os.Rename(tmp, d.opts.StatePath); err != nil {
+		// Never leave the temporary behind when the replace fails.
+		_ = os.Remove(tmp)
 		logf("cannot replace state: %v", err)
 		return
 	}

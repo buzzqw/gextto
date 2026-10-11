@@ -1821,3 +1821,51 @@ func TestFindLockedIndex(t *testing.T) {
 		t.Fatal("a removed torrent must not be found")
 	}
 }
+
+// TestSaveLockedWithoutStatePathLeavesNoFile locks the fix for the stray ".tmp"
+// in the working directory: a bare Daemon (a test) has no state path, so a save
+// must write nothing at all.
+func TestSaveLockedWithoutStatePathLeavesNoFile(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	d := &Daemon{}
+	d.mu.Lock()
+	d.saveLocked()
+	d.mu.Unlock()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("saveLocked left files behind: %v", names)
+	}
+}
+
+// TestNewDaemonDefaultsStatePath locks the default: a daemon created with a data
+// dir but no state path persists there instead of writing a relative ".tmp".
+func TestNewDaemonDefaultsStatePath(t *testing.T) {
+	data := t.TempDir()
+	d, err := newDaemon(Options{
+		Listen:      "127.0.0.1:0",
+		DataDir:     data,
+		LinkDir:     filepath.Join(data, "links"),
+		DownloadDir: filepath.Join(data, "downloads"),
+		DBPath:      filepath.Join(data, "session.db"),
+		Network:     NetworkOptions{PortBegin: 42900, PortEnd: 42999, Encryption: 1},
+		Tick:        50 * time.Millisecond,
+		ProbeWindow: time.Minute,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.close()
+	if want := filepath.Join(data, "state.json"); d.opts.StatePath != want {
+		t.Fatalf("StatePath = %q, want %q", d.opts.StatePath, want)
+	}
+}
