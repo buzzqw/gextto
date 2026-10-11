@@ -857,7 +857,8 @@ tabella rimossa. Micro-ottimizzo non su percorso critico (`Count` usato in
 - **`findLocked` O(1)**: `ListTorrents()` + scan per ogni lookup per hash.
   A 4 torrent la risposta `/api/v1/torrents` è 3.822 byte in 0,5–0,7 ms:
   guadagno nullo (<0,05% CPU). Misurabile solo a centinaia/migliaia di torrent
-  (~1 MB di lista): rimandato a quel carico.
+  (~1 MB di lista): rimandato a quel carico — **poi fatto** il 2026-10-11 con
+  indice hash→torrent e fallback auto-riparante (vedi §5.13).
 - **ETag/304 su `/api/v1/torrents`**: `handleList` serve già lo snapshot
   precompilato, costo = solo `json.Marshal`; durante attività i tassi cambiano a
   ogni tick e il 304 non scatterebbe. Solo con misura che lo giustifichi.
@@ -916,6 +917,57 @@ spacciandolo per tipico.
 **`saveLocked`**: 2,5 KB, ~0,1–0,3 ms per operazione utente esplicita.
 Conclusione: fuori dalle voci fatte (1, 2, 4, 5, 6, 7) **nulla altro della v1
 merita** a questo carico.
+
+### 5.13 Controllo 2026-10-11 (`controllo2`): voci applicate
+
+Revisione esterna (`/home/andres/controllo2.md`) verificata sul codice e applicata.
+Nessuna modifica cambia la matrice capacità o l'indice delle impostazioni UI; per
+le voci motore la suite `internal/gxcore/...` resta verde e non si osserva
+regressione (le modifiche sono micro-ottimizzazioni o I/O aggregato, non algoritmi
+sul percorso caldo).
+
+Motore (`internal/gxcore`):
+
+- **O-04** `buildV2BlockTreeData`: la capacità di `leaves` era il numero di
+  *pezzi*, ma le foglie a `base=0` sono *blocchi* da 16 KiB: preallocato
+  `ceil(f.Length/BlockSize)` per evitare decine di riallocazioni su file grandi.
+- **M-14** stessa funzione: controllo di `t.closeC` nel ciclo di lettura, così un
+  torrent rimosso a metà costruzione dell'albero (lettura di GB) non continua a
+  leggere il disco.
+- **C-07** `handlePeerSnubbed`: aggiunto `resetRequestQueue`, coerente con il
+  commento della funzione ("after a choke (or a stall)"); prima la coda adattiva
+  restava profonda dopo uno stallo. Test `TestSnubResetsRequestQueue`.
+
+Demone (`cmd/gx-torrent`) e DHT:
+
+- **C-02** streaming: `waitForPieces`/`streamRange` accettano il `context` della
+  richiesta, così seek/chiusura del player non lasciano la goroutine a fare
+  polling per 2 minuti con il file aperto.
+- **O-01** `trusted-proxies`/`allowed-hosts`: cache del parsing (chiave = stringa
+  grezza), azzera le allocazioni per richiesta; il valore cambiato è visto subito.
+- **O-02** feed: `markFeedSeen`/`markSmartEpisode` non chiamano più `saveLocked`
+  per item; un'unica scrittura atomica a fine `pollFeeds` (prima fino a 2N
+  riscritture di `state.json` per ciclo).
+- **O-03** DHT BEP 42: tabella CRC32C Castagnoli come variabile di pacchetto.
+- **O-05** `findLocked`: indice hash/ID con fallback auto-riparante, ricostruito
+  quando la sessione viene riaperta (§5.9).
+- **C-01** rate limit login: `loginFails` limitata e prunata (cap 2000, evizione dei
+  più vecchi) contro crescita illimitata.
+- **C-05** BEP 44 `itemStore`: cap `bep44MaxItems` + prune degli scaduti e
+  evizione del più vecchio in `put`.
+- **C-06** BEP 33: filtro Bloom vuoto stima 0 (prima il clamp dava ~0,5 → 1).
+- **C-03** Windows: un percorso UNC è rete per costruzione, senza dipendere da
+  `GetDriveType` (share offline → `DRIVE_NO_ROOT_DIR` → junction su UNC).
+- **C-04** `qbitAuth` delega a `standaloneAPIAllowed`: bypass LAN e cookie
+  `gx_session` valgono anche per `/api/v2` come per UI e `/api/v1`.
+- **M-09/M-10/M-11/M-13** parità qBittorrent: `content_path` in `torrents/info`,
+  `rid` incrementale in `sync/maindata`, priorità `autoTMM` all'add, flag
+  booleani via `formBool`; ricerche Torznab concorrenti.
+
+### 5.14 Rimandato a dopo (dal controllo `controllo2`)
+
+- **`renameFile`/`renameFolder` qBittorrent**: richiede supporto di rinomina nel
+  motore (rinomina su disco + metadati), feature a sé, non in questa tornata.
 
 ---
 

@@ -315,8 +315,9 @@ prefisso `bcrypt:`), la pagina chiede il login (`/ui/login`, sessione in un
 cookie `gx_session`) tranne che dalle sorgenti LAN quando `local-bypass` è attivo
 (predefinito). Senza password la pagina resta aperta, così la prima
 configurazione è raggiungibile. Altre chiavi: `auth-user` (predefinito `admin`),
-`local-bypass` (`true`/`false`). La password protegge anche `/api/v1` (stessi
-criteri della pagina: nessuna password, bypass LAN, o cookie `gx_session`/`SID`)
+`local-bypass` (`true`/`false`). La password protegge anche `/api/v1` e l'API
+qBittorrent `/api/v2` (stessi criteri della pagina: nessuna password, bypass LAN,
+o cookie `gx_session`/`SID`)
 e tutte le richieste che cambiano stato su `/api/` sono rifiutate se cross-site
 (`Origin`/`Referer`). Dopo 5 tentativi di login falliti dallo stesso indirizzo,
 l'IP è bloccato per 15 minuti.
@@ -371,8 +372,11 @@ e tag viaggiano anche su `torrents/add`), `torrents/properties|files|trackers`
 e `torrents/reannounce|setLocation` (più gli alias 5.x `stop`/`start`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
 `transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit` e
-`sync/maindata|torrentPeers`. Senza
-password configurata l'API è aperta. In managed **non** è esposta: comanda solo
+`sync/maindata|torrentPeers` (con `rid` incrementale e `content_path` in
+`torrents/info`, come leggono Sonarr e Radarr). L'API usa gli stessi criteri di
+accesso della pagina: senza password è aperta, altrimenti servono il bypass LAN
+(se `local-bypass` è attivo) o una sessione (`SID` qBittorrent o `gx_session`
+della pagina). In managed **non** è esposta: comanda solo
 Gextto. La compatibilità è verificata dai test usando il client qBittorrent di
 Gextto (`internal/qbittorrent`) contro il demone.
 
