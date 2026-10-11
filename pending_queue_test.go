@@ -69,11 +69,15 @@ func TestPendingQueue(t *testing.T) {
 
 func TestFailedImportsDaily(t *testing.T) {
 	db := newTestDB(t)
-	if err := db.RecordAcquisitionEvent(logging.Event{At: time.Now(), Level: logging.LevelError, Hash: "abc", Message: "torrent completion handling failed"}); err != nil {
+	// The daily summary groups by UTC day (see FailedImportsDaily), so the
+	// events must be recorded in UTC too: with local time the test would flake
+	// in the hours where the local and UTC dates differ.
+	now := time.Now().UTC()
+	if err := db.RecordAcquisitionEvent(logging.Event{At: now, Level: logging.LevelError, Hash: "abc", Message: "torrent completion handling failed"}); err != nil {
 		t.Fatal(err)
 	}
 	// A non-import error must not be counted.
-	if err := db.RecordAcquisitionEvent(logging.Event{At: time.Now(), Level: logging.LevelError, Hash: "def", Message: "some unrelated error"}); err != nil {
+	if err := db.RecordAcquisitionEvent(logging.Event{At: now, Level: logging.LevelError, Hash: "def", Message: "some unrelated error"}); err != nil {
 		t.Fatal(err)
 	}
 
