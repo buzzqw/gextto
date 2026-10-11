@@ -871,17 +871,44 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   confrontando la porta riflessa da più destinazioni) richiede esperimenti su
   rete reale. Test: `TestParseReflected`, `TestRecordReflectedConsensus`,
   `TestNATHint`.
-- **Priorità file graduata** è l'unica **di motore**: la selezione è una maschera
-  booleana per file (`Torrent.FileSelection`, `piecepicker`), quindi N livelli
-  richiedono modello di selezione a priorità, ordinamento del picker per priorità
-  (sopra/sotto rarest-first), API/UI in **entrambe** le UI, adapter Gextto e
-  matrice `capabilityLevels` (`file_priorities` da `none` a `full`). "Allocate on
-  demand" è invece quasi gratis: l'OS crea già file sparsi e c'è `Preallocate`;
-  manca solo una modalità esplicita.
+- **Priorità file graduata — piano (L, non implementata in questa sessione).** È
+  l'unica voce **di motore** e tocca il percorso di download più critico, quindi
+  vale la regola del repo (*misura prima/dopo*, nessuna modifica non misurata):
+  qui il piano, non codice. Punti di contatto reali (dal codice):
+  - **modello di selezione**: `Config.FileSelection func(torrentID) []bool`
+    (`torrent/config.go`) e `skippedInfoFiles`/`maskFromFlags`
+    (`torrent_selection.go`) sono un **bool skip** per file; serve un modello a
+    priorità;
+  - **pezzi**: `skippedPieces` → `t.pieces[i].Skip`; il picker
+    (`internal/piecepicker`) ha già stadi graduati (finestra di **stream**,
+    **readahead**, allowed-fast, rarest) e la priorità file sarebbe un nuovo
+    stadio tra readahead e allowed-fast;
+  - **demone**: `file-priorities` (`priorities=4,0,4`) e scheda File; la matrice
+    `capabilityLevels` porta `file_priorities` da `none` a `full`;
+  - **Gextto**: adapter e scheda File (oggi solo incluso/escluso).
+
+  Slice consigliati (**uno per commit**, misura a ogni passo):
+  1. modello interno a priorità (0 = skip, 1 = bassa, 4 = normale, 7 = alta, come
+     libtorrent) con l'attuale bool mappato su 0/4; test del mapping e di
+     `skippedPieces`;
+  2. nuovo stadio "alta priorità" nel `piecepicker` (sopra rarest, sotto
+     readahead) + test del picker;
+  3. API/UI demone **e** Gextto, `capabilityLevels`, traduzioni, manuali;
+  4. misura: throughput e seeding con file a priorità mista (harness locale +
+     sciame reale).
+
+  **"Allocate on demand"** è invece già coperto di fatto: con `Preallocate`
+  disattivo (default) i file nascono **sparsi** e l'OS alloca alla scrittura;
+  serve al più un'opzione esplicita che lo dichiari.
+
+  **Decisione:** aprire come progetto a sé (L) quando c'è l'harness di misura;
+  in questa sessione ci si ferma al piano, coerente con *niente modifiche al
+  motore non misurate*.
 
 **Raccomandazione d'ordine:** prima la diagnostica DHT (**fatta**), poi gli item
 a basso rischio (**token e passo 1 del NAT fatti**), poi l'hardening anti-Sybil e
-il multi-path (con misura su sciame reale), infine PCP e la priorità file.
+il multi-path (con misura su sciame reale), infine PCP (**fatto**) e la priorità
+file (l'unica di motore: **piano** nei §4.11, da aprire con l'harness di misura).
 
 ---
 
