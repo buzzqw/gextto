@@ -1,4 +1,6 @@
-// DHT node for Taipei Torrent, for tracker-less peer information exchange.
+// DHT node for tracker-less peer information exchange: Kademlia (BEP 5) with
+// IPv6 (BEP 32), scrape (BEP 33), secure node IDs (BEP 42), read-only nodes
+// (BEP 43) and a key/value store (BEP 44).
 // Status: Supports all DHT operations from the specification.
 
 package dht
@@ -733,12 +735,16 @@ func (d *DHT) processPacket(p packetType) {
 		d.DebugLogger.Debugf("DHT processing %v request", r.Q)
 		switch r.Q {
 		case "ping":
+			totalRecvPing.Add(1)
 			d.replyPing(p.raddr, r)
 		case "get_peers":
+			// totalRecvGetPeers is counted in replyGetPeers.
 			d.replyGetPeers(p.raddr, r)
 		case "find_node":
+			// totalRecvFindNode is counted in replyFindNode.
 			d.replyFindNode(p.raddr, r)
 		case "announce_peer":
+			totalRecvAnnouncePeer.Add(1)
 			d.replyAnnouncePeer(p.raddr, node, r)
 		case "get":
 			d.replyGet(p.raddr, p.b)
@@ -881,6 +887,7 @@ func (d *DHT) announcePeer(address net.UDPAddr, ih InfoHash, port int, token str
 	}
 	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	sendMsg(d.conn, address, query, d.DebugLogger)
+	totalSentAnnouncePeer.Add(1)
 }
 
 func (d *DHT) hostToken(addr net.UDPAddr, secret string) string {
@@ -1237,9 +1244,12 @@ var (
 	totalSentFindNode            = expvar.NewInt("totalSentFindNode")
 	totalRecvGetPeers            = expvar.NewInt("totalRecvGetPeers")
 	totalRecvGetPeersReply       = expvar.NewInt("totalRecvGetPeersReply")
+	totalRecvPing                = expvar.NewInt("totalRecvPing")
 	totalRecvPingReply           = expvar.NewInt("totalRecvPingReply")
 	totalRecvFindNode            = expvar.NewInt("totalRecvFindNode")
 	totalRecvFindNodeReply       = expvar.NewInt("totalRecvFindNodeReply")
+	totalRecvAnnouncePeer        = expvar.NewInt("totalRecvAnnouncePeer")
+	totalSentAnnouncePeer        = expvar.NewInt("totalSentAnnouncePeer")
 	totalPacketsFromBlockedHosts = expvar.NewInt("totalPacketsFromBlockedHosts")
 	totalDroppedPackets          = expvar.NewInt("totalDroppedPackets")
 	totalRecv                    = expvar.NewInt("totalRecv")
@@ -1248,7 +1258,8 @@ var (
 // knownNodes is the routing table size, readable from any goroutine.
 var knownNodes atomic.Int64
 
-// Stats returns the DHT counters.
+// Stats returns the DHT counters. It feeds SessionStats.DHTStats, so the keys
+// are exposed by the daemon as "dht_<key>" (API and web page).
 func Stats() map[string]int64 {
 	return map[string]int64{
 		"nodes":         knownNodes.Load(),
@@ -1259,5 +1270,21 @@ func Stats() map[string]int64 {
 		"bytes_in":      totalReadBytes.Value(),
 		"bytes_out":     totalWrittenBytes.Value(),
 		"dropped":       totalDroppedPackets.Value(),
+
+		// Traffic by the four core RPCs (ping, get_peers, find_node,
+		// announce_peer). The BEP 44 get/put queries are not counted here.
+		"queries_in": totalRecvPing.Value() + totalRecvGetPeers.Value() +
+			totalRecvFindNode.Value() + totalRecvAnnouncePeer.Value(),
+		"queries_out": totalSentPing.Value() + totalSentGetPeers.Value() +
+			totalSentFindNode.Value() + totalSentAnnouncePeer.Value(),
+		"replies_in": totalRecvPingReply.Value() + totalRecvGetPeersReply.Value() +
+			totalRecvFindNodeReply.Value(),
+
+		// Screening and health: how much noise the node rejected or ignored.
+		// Exposed so DHT hardening can be measured before/after.
+		"blocked_hosts":   totalPacketsFromBlockedHosts.Value(),
+		"self_promotions": totalSelfPromotions.Value(),
+		"dupe_references": totalGetPeersDupes.Value() + totalFindNodeDupes.Value(),
+		"nodes_killed":    totalKilledNodes.Value(),
 	}
 }
