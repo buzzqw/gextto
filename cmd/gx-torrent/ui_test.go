@@ -460,6 +460,9 @@ func TestUISummaryCardsAreNotDuplicated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The page reads the published snapshot: wait for the torrent row to be in
+	// it, so the delete form below is present.
+	waitListed(t, d, hash)
 
 	resp, err := http.Get(server.URL + "/")
 	if err != nil {

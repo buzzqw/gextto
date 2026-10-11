@@ -166,6 +166,18 @@ func waitFor(t *testing.T, what string, check func() bool) {
 	t.Fatalf("timed out waiting for %s", what)
 }
 
+// waitListed waits until the torrent appears in the published snapshot. Reads
+// of the REST list and of the web page use that snapshot, which the queue loop
+// refreshes asynchronously: without this wait, a read issued right after add
+// can race the next tick and see an empty list.
+func waitListed(t *testing.T, d *Daemon, hash string) {
+	t.Helper()
+	waitFor(t, "torrent listed in the published snapshot", func() bool {
+		_, ok := findInfo(d, hash)
+		return ok
+	})
+}
+
 func findInfo(d *Daemon, hash string) (torrentInfo, bool) {
 	for _, info := range d.list() {
 		if info.Hash == hash {
@@ -976,11 +988,16 @@ func TestParseLSD(t *testing.T) {
 // The leecher finds the seeder only through LSD multicast announcements.
 func TestLSDDiscovery(t *testing.T) {
 	lsdTick = 200 * time.Millisecond
+	// Re-announce just as often: the leecher is created only after the seeder is
+	// already seeding, so without this it could miss the seeder's announcement
+	// and wait the full production interval (5 minutes) for the next one.
+	lsdInterval = 200 * time.Millisecond
 	// On one machine the sender is this host's own address, which the engine
 	// ignores as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
 	defer func() {
 		lsdTick = lsdTickDefault
+		lsdInterval = lsdIntervalDef
 		lsdPeerHost = func(ip net.IP) string { return ip.String() }
 	}()
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43300, PortEnd: 43399, Encryption: 1, LSD: true})
@@ -1609,11 +1626,16 @@ func TestDaemonSuperSeedingOptionAndAction(t *testing.T) {
 // serves those, so completing proves the advertised pieces cycle correctly.
 func TestSuperSeedingTransfer(t *testing.T) {
 	lsdTick = 200 * time.Millisecond
+	// Re-announce just as often: the leecher is created only after the seeder is
+	// already seeding, so without this it could miss the seeder's announcement
+	// and wait the full production interval (5 minutes) for the next one.
+	lsdInterval = 200 * time.Millisecond
 	// On one machine the sender is this host's own address, which the engine ignores
 	// as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
 	defer func() {
 		lsdTick = lsdTickDefault
+		lsdInterval = lsdIntervalDef
 		lsdPeerHost = func(ip net.IP) string { return ip.String() }
 	}()
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43500, PortEnd: 43599, Encryption: 1, LSD: true})

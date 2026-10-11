@@ -225,6 +225,9 @@ func TestQbitTorrentsInfoFilterAndAddTrackers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// /torrents/info reads the published snapshot: wait for the torrent to be in
+	// it before asking, otherwise the response can still be empty.
+	waitListed(t, d, hash)
 	srv := httptest.NewServer(d.routesQbit())
 	defer srv.Close()
 

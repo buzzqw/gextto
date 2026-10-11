@@ -27,13 +27,18 @@ import (
 const (
 	lsdGroup         = "239.192.152.143:6771"
 	lsdGroup6        = "[ff15::efc0:988f]:6771"
-	lsdInterval      = 5 * time.Minute
+	lsdIntervalDef   = 5 * time.Minute
 	lsdTickDefault   = 20 * time.Second
 	lsdMaxPerMessage = 10
 )
 
 // lsdTick is how often due announcements are sent (tests shorten it).
 var lsdTick = lsdTickDefault
+
+// lsdInterval is how often the same torrent is re-announced (BEP 14). Tests
+// shorten it: a peer that joins just after an announcement would otherwise wait
+// the full interval before hearing the seeder again.
+var lsdInterval = lsdIntervalDef
 
 // lsdPeerHost maps the sender of an announcement to the address to dial.
 // Tests on one machine remap it: the engine ignores the machine's own IPs.
