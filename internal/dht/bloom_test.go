@@ -62,6 +62,23 @@ func TestBloomUnion(t *testing.T) {
 	}
 }
 
+// TestEmptyBloomEstimatesZero locks C-06: a filter with no set bits must be
+// estimated as 0, not as a swarm of one (the old clamp turned it into ~0.5,
+// which the daemon rounds to 1).
+func TestEmptyBloomEstimatesZero(t *testing.T) {
+	var b scrapeBloom
+	if got := b.estimate(); got != 0 {
+		t.Fatalf("empty filter estimate = %v, want 0", got)
+	}
+	seeders, peers, err := EstimateScrape([][]byte{b[:]}, [][]byte{b[:]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seeders != 0 || peers != 0 {
+		t.Fatalf("empty filters estimate = %.1f/%.1f, want 0/0", seeders, peers)
+	}
+}
+
 // TestEstimateScrape checks the client-side union of BFsd/BFpe filters.
 func TestEstimateScrape(t *testing.T) {
 	var seedsA, seedsB, peersA scrapeBloom

@@ -120,3 +120,27 @@ func TestBEP44LocalStore(t *testing.T) {
 		t.Fatal("stored mutable signature does not verify")
 	}
 }
+
+// TestBEP44StoreCap locks C-05: remote puts cannot grow the store without bound,
+// and the oldest items are evicted first.
+func TestBEP44StoreCap(t *testing.T) {
+	s := newItemStore()
+	target := func(i int) [20]byte {
+		return ImmutableTarget([]byte{byte(i >> 8), byte(i)})
+	}
+	for i := 0; i < bep44MaxItems+50; i++ {
+		s.put(&StoredItem{Target: target(i), Value: "v"})
+	}
+	s.mu.Lock()
+	n := len(s.items)
+	s.mu.Unlock()
+	if n > bep44MaxItems {
+		t.Fatalf("store holds %d items, want <= %d", n, bep44MaxItems)
+	}
+	if s.get(target(bep44MaxItems+49)) == nil {
+		t.Fatal("the most recently stored item was evicted")
+	}
+	if s.get(target(0)) != nil {
+		t.Fatal("the oldest item should have been evicted")
+	}
+}

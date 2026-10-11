@@ -20,6 +20,10 @@ func bep42Mask(ip net.IP) []byte {
 	return []byte{0x01, 0x03, 0x07, 0x0f, 0x1f, 0x3f, 0x7f, 0xff}
 }
 
+// castagnoliTable is built once: crc32.MakeTable allocates a 1 KiB lookup
+// array, and bep42CRC runs for every secure node ID check.
+var castagnoliTable = crc32.MakeTable(crc32.Castagnoli)
+
 // bep42CRC returns the CRC32C of the masked IP with the random bits r mixed in.
 func bep42CRC(ip net.IP, r byte) uint32 {
 	if ip4 := ip.To4(); ip4 != nil {
@@ -31,7 +35,7 @@ func bep42CRC(ip net.IP, r byte) uint32 {
 		buf[i] &= mask[i]
 	}
 	buf[0] |= (r & 7) << 5
-	return crc32.Checksum(buf[:len(mask)], crc32.MakeTable(crc32.Castagnoli))
+	return crc32.Checksum(buf[:len(mask)], castagnoliTable)
 }
 
 // SecureNodeID makes a 20-byte node ID secure for ip, in place (BEP 42). It sets

@@ -24,6 +24,10 @@ const (
 	bep44MaxSaltBytes  = 64
 	// bep44ItemTTL is how long an item is kept without being re-announced.
 	bep44ItemTTL = 2 * time.Hour
+	// bep44MaxItems bounds the store: a remote node with a valid token can put
+	// arbitrary targets, and without a cap the map would grow forever, since
+	// expired items are otherwise only noticed when they are read back.
+	bep44MaxItems = 2048
 )
 
 var errItemTooBig = errors.New("bep44: value too big")
@@ -68,8 +72,38 @@ func (s *itemStore) get(target [20]byte) *StoredItem {
 func (s *itemStore) put(it *StoredItem) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	it.expiry = time.Now().Add(bep44ItemTTL)
+	now := time.Now()
+	s.pruneLocked(now)
+	// A new target must not push the store past the cap: evict the item that
+	// expires soonest (all entries carry the same TTL, so this is the least
+	// recently stored one).
+	if _, exists := s.items[it.Target]; !exists {
+		for len(s.items) >= bep44MaxItems {
+			oldest := [20]byte{}
+			var oldestExpiry time.Time
+			first := true
+			for target, entry := range s.items {
+				if first || entry.expiry.Before(oldestExpiry) {
+					oldest, oldestExpiry, first = target, entry.expiry, false
+				}
+			}
+			if first {
+				break
+			}
+			delete(s.items, oldest)
+		}
+	}
+	it.expiry = now.Add(bep44ItemTTL)
 	s.items[it.Target] = it
+}
+
+// pruneLocked drops the entries whose TTL has passed. The caller holds s.mu.
+func (s *itemStore) pruneLocked(now time.Time) {
+	for target, entry := range s.items {
+		if now.After(entry.expiry) {
+			delete(s.items, target)
+		}
+	}
 }
 
 // ImmutableTarget is the DHT key of an immutable item: the SHA-1 of its

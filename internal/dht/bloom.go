@@ -46,8 +46,10 @@ func (b *scrapeBloom) estimate() float64 {
 	for _, by := range b {
 		zeros += 8 - bits.OnesCount8(by)
 	}
-	if zeros > scrapeBloomBits-1 {
-		zeros = scrapeBloomBits - 1
+	if zeros >= scrapeBloomBits {
+		// An empty filter: no set bits, no items estimated (the clamp below
+		// would otherwise turn it into ~0.5, rounding up to 1 to consumers).
+		return 0
 	}
 	if zeros <= 0 {
 		return math.Inf(1)
