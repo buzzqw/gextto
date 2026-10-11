@@ -107,6 +107,12 @@ cat > "$STAGE/uninstall-service.ps1" <<'PS1'
 $ErrorActionPreference = "Continue"
 if (Get-Service -Name gx-torrent -ErrorAction SilentlyContinue) {
     Stop-Service -Name gx-torrent -Force
+    # Wait for the process to exit: deleting a service that is still running
+    # marks it "for deletion" and makes an immediate reinstall fail.
+    for ($i = 0; $i -lt 20; $i++) {
+        if ((Get-Service -Name gx-torrent).Status -eq "Stopped") { break }
+        Start-Sleep -Milliseconds 500
+    }
     sc.exe delete gx-torrent | Out-Null
     Write-Host "gx-torrent service removed (data under %ProgramData%\gx-torrent was kept)."
 } else {

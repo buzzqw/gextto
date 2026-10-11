@@ -991,10 +991,13 @@ inefficaci):
   ordine (`followTitleRegex`, es. `(?i)mamma[\s._\-]+mia`). Test
   `TestFollowTitleRegex`.
 
-**Non applicate** (valutate e rinviate): A.1–A.4 (installer Linux/Windows: comodi
-ma non critici), B.4 (il fallback proposto **aggirerebbe le regole** scoped: da
-ridisegnare), B.5 (edge REPACK+PROPER marginale), B.6/B.7 (tolleranza input e
-rumore log).
+**Non applicate** (valutate e rinviate): B.4 (il fallback proposto **aggira le
+regole** scoped: da ridisegnare), B.5 (edge REPACK+PROPER marginale), B.6/B.7
+(tolleranza input e rumore log). **Applicate invece A.1–A.4** (installer):
+`install-service.sh`/`uninstall-service.sh` nel pacchetto Linux
+(`package-gx-torrent.sh`) con `StateDirectory=gx-torrent` nell'unit,
+l'attesa dello stop in `uninstall-service.ps1` e i due script di packaging
+nel `installer-selftest.sh`.
 
 ---
 

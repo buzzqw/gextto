@@ -290,7 +290,14 @@ arrivare impostando `destination`. Il pacchetto
 `uninstall-service.ps1` e `README.txt` con l'alternativa `sc create`. Dati e log
 in `%ProgramData%\gx-torrent`; il servizio gira in **sessione 0**, quindi non
 apre il browser: l'installazione guidata resta il wizard web su `/ui/setup`.
-Installer e unit systemd restano per Linux.
+Installer e unit systemd restano per Linux. Il pacchetto Linux
+`scripts/package-gx-torrent.sh` produce
+`gx-torrent-linux-<arch>.tar.gz` con il binario, l'unit, `run.sh` e **due
+script**: `sudo ./install-service.sh` crea l'utente di sistema `gx-torrent`,
+installa in `/opt/gx-torrent` e abilita il servizio; `sudo
+./uninstall-service.sh` lo rimuove lasciando i dati. L'unit usa
+`StateDirectory=gx-torrent`, quindi systemd crea e possiede
+`/var/lib/gx-torrent` prima dell'avvio (l'installer non deve crearla).
 
 In breve, sul PC Windows:
 

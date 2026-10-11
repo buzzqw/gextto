@@ -6,7 +6,7 @@
 #                                 [--label TEXT]
 #
 # Layout of the archive:
-#   gx-torrent  gx-torrent.service  run.sh  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
+#   gx-torrent  gx-torrent.service  run.sh  install-service.sh  uninstall-service.sh  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -58,6 +58,53 @@ exec "$DIR/gx-torrent" "$@"
 RUN
 chmod +x "$STAGE/run.sh"
 
+cat > "$STAGE/install-service.sh" <<'INSTALL'
+#!/usr/bin/env bash
+# Install gx-torrent as a systemd system service. Run as root:
+#   sudo ./install-service.sh
+set -euo pipefail
+if [[ "$(id -u)" != "0" ]]; then
+  echo "error: run as root (sudo ./install-service.sh)" >&2
+  exit 1
+fi
+command -v systemctl >/dev/null 2>&1 || { echo "error: systemd not found" >&2; exit 1; }
+DIR="$(cd "$(dirname "$0")" && pwd)"
+for file in gx-torrent run.sh gx-torrent.service; do
+  [[ -e "$DIR/$file" ]] || { echo "error: $file not found next to this script" >&2; exit 1; }
+done
+
+# Dedicated system user, no login. Its home is the state directory, which systemd
+# creates on first start (StateDirectory=gx-torrent in the unit).
+if ! id -u gx-torrent >/dev/null 2>&1; then
+  useradd -r -s /usr/sbin/nologin -d /var/lib/gx-torrent gx-torrent
+fi
+
+install -d -o gx-torrent -g gx-torrent /opt/gx-torrent /var/lib/gx-torrent
+install -m 0755 -o gx-torrent -g gx-torrent "$DIR/gx-torrent" /opt/gx-torrent/gx-torrent
+install -m 0755 -o gx-torrent -g gx-torrent "$DIR/run.sh" /opt/gx-torrent/run.sh
+install -m 0644 "$DIR/gx-torrent.service" /etc/systemd/system/gx-torrent.service
+systemctl daemon-reload
+systemctl enable --now gx-torrent
+echo "gx-torrent service installed and started (web UI on the listen port, default 8890)."
+INSTALL
+chmod +x "$STAGE/install-service.sh"
+
+cat > "$STAGE/uninstall-service.sh" <<'UNINSTALL'
+#!/usr/bin/env bash
+# Remove the gx-torrent systemd service. Data under /var/lib/gx-torrent is kept.
+# Run as root: sudo ./uninstall-service.sh
+set -euo pipefail
+if [[ "$(id -u)" != "0" ]]; then
+  echo "error: run as root (sudo ./uninstall-service.sh)" >&2
+  exit 1
+fi
+systemctl disable --now gx-torrent 2>/dev/null || true
+rm -f /etc/systemd/system/gx-torrent.service
+systemctl daemon-reload
+echo "gx-torrent service removed (data in /var/lib/gx-torrent kept)."
+UNINSTALL
+chmod +x "$STAGE/uninstall-service.sh"
+
 cat > "$STAGE/gx-torrent.service" <<'UNIT'
 # gx-torrent standalone, usable like qbittorrent-nox.
 # Install: copy the extracted directory to /opt/gx-torrent, adjust User/Group,
@@ -72,6 +119,8 @@ Wants=network-online.target
 Type=simple
 User=gx-torrent
 Group=gx-torrent
+# systemd creates /var/lib/gx-torrent (owned by the service user) before start.
+StateDirectory=gx-torrent
 WorkingDirectory=/opt/gx-torrent
 # First run opens the wizard at http://<host>:8890/ui/setup
 ExecStart=/opt/gx-torrent/gx-torrent -mode standalone -listen 0.0.0.0:8890 -data /var/lib/gx-torrent
@@ -136,36 +185,32 @@ Settings are automatically saved to `<data-dir>/settings.json`.
 
 To run `gx-torrent` as a permanent background service on Linux:
 
-1. **Install files**:
-   ```bash
-   sudo mkdir -p /opt/gx-torrent /var/lib/gx-torrent
-   sudo cp gx-torrent run.sh /opt/gx-torrent/
-   sudo chmod +x /opt/gx-torrent/gx-torrent /opt/gx-torrent/run.sh
-   sudo cp gx-torrent.service /etc/systemd/system/
-   ```
+```bash
+sudo ./install-service.sh
+```
 
-2. **Create a dedicated service user**:
-   ```bash
-   sudo useradd -r -s /usr/sbin/nologin -d /var/lib/gx-torrent gx-torrent || true
-   sudo chown -R gx-torrent:gx-torrent /var/lib/gx-torrent /opt/gx-torrent
-   ```
+The script creates the `gx-torrent` system user, installs the binary under
+`/opt/gx-torrent`, copies the unit to `/etc/systemd/system/`, then enables and
+starts the service. `StateDirectory=gx-torrent` makes systemd create and own
+`/var/lib/gx-torrent` (the state directory) before start. Remove the service
+with `sudo ./uninstall-service.sh`; the data under `/var/lib/gx-torrent` is kept.
 
-3. **Verify directory permissions**:
-   Ensure your target download directory (e.g. `/srv/torrents` or `/mnt/storage`) is readable and writable by the `gx-torrent` user or group.
-   *Note*: The bundled unit enables systemd security hardening (`ProtectHome=read-only`). If your media directory is under `/home`, add an override:
-   ```bash
-   sudo systemctl edit gx-torrent
-   # Add:
-   # [Service]
-   # ReadWritePaths=/home/username/downloads
-   ```
+**Download folder permissions**: ensure your target download directory (e.g.
+`/srv/torrents` or `/mnt/storage`) is readable and writable by the `gx-torrent`
+user or group. *Note*: The bundled unit enables systemd security hardening
+(`ProtectHome=read-only`). If your media directory is under `/home`, add an
+override:
+```bash
+sudo systemctl edit gx-torrent
+# Add:
+# [Service]
+# ReadWritePaths=/home/username/downloads
+```
 
-4. **Enable and start the service**:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable --now gx-torrent
-   sudo systemctl status gx-torrent
-   ```
+**Manual installation** (equivalent to the script): copy `gx-torrent` and
+`run.sh` to `/opt/gx-torrent`, create the `gx-torrent` user, copy
+`gx-torrent.service` to `/etc/systemd/system/`, then
+`sudo systemctl daemon-reload && sudo systemctl enable --now gx-torrent`.
 
 ---
 

@@ -181,6 +181,16 @@ check_package_script() {
   capture bash "$ROOT/scripts/build-release.sh" --label
   expect "build-release.sh: missing option value is rejected" 2 "requires a value"
 
+  capture bash -n "$ROOT/scripts/package-gx-torrent.sh"
+  expect "package-gx-torrent.sh: syntax" 0
+  capture bash "$ROOT/scripts/package-gx-torrent.sh" --output
+  expect "package-gx-torrent.sh: missing option value is rejected" 2 "requires a value"
+
+  capture bash -n "$ROOT/scripts/package-gx-torrent-windows.sh"
+  expect "package-gx-torrent-windows.sh: syntax" 0
+  capture bash "$ROOT/scripts/package-gx-torrent-windows.sh" --output
+  expect "package-gx-torrent-windows.sh: missing option value is rejected" 2 "requires a value"
+
   capture bash "$ROOT/scripts/release-manifest.sh" --build 12 --commits 2 --output "$TMP/release.json"
   expect "release-manifest.sh: writes the manifest" 0 "manifest:"
   if grep -q '"app_version": "1.1.12"' "$TMP/release.json" 2>/dev/null && grep -q '"commits": \[' "$TMP/release.json"; then
