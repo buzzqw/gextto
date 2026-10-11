@@ -1,7 +1,7 @@
 # Gextto — EXpert Torrent Transfer Orchestrator
 
 **Gextto (EXpert Torrent Transfer Orchestrator)** è un demone self-hosted che
-cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, film e
+cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, anime, film e
 fumetti. L'interfaccia web è il piano di controllo; il demone continua a
 funzionare come servizio.
 
@@ -10,86 +10,71 @@ funzionare come servizio.
 > [GitHub Issues](https://github.com/buzzqw/gextto/issues) ·
 > **Contribuire:** [guida sviluppatori](docs/DEVELOPERS.md)
 
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Gextto Media Orchestrator                       │
+│  Decision Engine · Parse & Scoring · Multi-Indexer · Post-Processing   │
+│  UI Server-Side (HTMX + SSR) · TUI Terminale · Integrazioni Media      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Contratto engine (torrent_engine.go)
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                  gx-torrent (Demone standalone/gestito)                │
+│  Web UI dedicata · qBittorrent Web API v2 (Sonarr/Radarr) · Feed RSS   │
+│  Servizio Linux (systemd) e Windows nativo (NTFS Junctions)            │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    gx-core Engine (internal/gxcore)                    │
+│  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
+│  DHT Dual-stack IPv6 (BEP 32/42/44) · Streaming Readahead · MSE In-Place│
+│  Zero CGO · Memory footprint: ~25 MB idle / ~100 MB picco              │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
 ## Cosa offre Gextto
 
-- **Un servizio e un piano di controllo:** il demone gestisce ricerche
-  programmate, trasferimenti torrent, post-processing e archivio. Il motore
-  predefinito è gx-torrent (Go puro, processo sorvegliato); l'alternativa è
-  qBittorrent-nox, e libtorrent è una terza scelta solo se lo compili.
-- **Serie TV, film e fumetti:** monitora i titoli, cerca nelle sorgenti
-  configurate e gestisce download e libreria da una UI web responsive, installabile
-  sul telefono, o dalla TUI terminale. Le serie anime numerate per episodio
-  assoluto («Titolo - 1071») vengono ricondotte a stagione ed episodio; nei
-  fumetti CBZ viene scritto un `ComicInfo.xml` per Komga, Kavita e i lettori.
-- **Automazione attenta alla qualità:** valuta release per qualità, sorgente,
-  codec, audio, HDR, lingua e dimensione; protegge i file migliori già presenti e
-  spiega perché un candidato è stato scartato. Una soglia facoltativa ferma gli
-  upgrade quando il file è già abbastanza buono. `ffprobe` può arricchire le
-  decisioni sui file archiviati.
-- **Sorgenti e integrazioni flessibili:** RSS, indexer Torznab come Jackett e
-  Prowlarr, motori web e FlareSolverr opzionale; integrazioni con Simkl, Jellyfin
-  e Plex (che aggiornano solo la cartella cambiata) e un calendario iCal con gli
-  arrivi in libreria, le messe in onda originali e le uscite italiane dei film.
-- **Attenzione alla libreria:** un file esistente viene sostituito solo da un
-  vero upgrade, e il file sostituito finisce nel Cestino (se configurato). Un
-  NAS smontato viene riconosciuto e mai scambiato per file cancellati; gli
-  errori temporanei (NAS irraggiungibile, disco momentaneamente pieno, timeout)
-  vengono ritentati in automatico; uno spostamento verso l'archivio interrotto
-  da un riavvio riprende da solo. Mentre un file è in seed entra in libreria come
-  hardlink, senza occupare spazio due volte (se download e libreria stanno sullo
-  stesso filesystem).
-- **Recupero dai download bloccati:** un download che non avanza più — nessun
-  byte per un po', o un magnet ancora in attesa dell'elenco file — può essere
-  sostituito da un'alternativa adeguata dopo una finestra configurabile, mentre
-  il torrent bloccato continua a tentare (vedi *Configurazione → Qualità e
-  upgrade → Download bloccati*).
-- **Strumenti operativi inclusi:** controlli di salute, log, backup,
-  manutenzione, notifiche (Telegram, e-mail o webhook per Discord, Slack, ntfy,
-  Gotify e Pushover, anche su riavvii di Gextto e problemi di gx-torrent),
-  percorsi NAS, gestione seeding e blocklist. La ricerca nell'archivio è
-  immediata mentre digiti e il **log di gx-torrent** è leggibile da Manutenzione.
-- **Facile da seguire:** il riquadro **Da controllare** della dashboard raccoglie
-  download fermi, spostamenti in sospeso e avvisi; ogni riga di log su un
-  download riporta il suo **ID di acquisizione**, così se ne segue l'intera storia
-  (ricerca, scelta, trasferimento, archivio). Il pannello Ricerche mostra la
-  durata dei cicli e l'esito per sorgente, e gli avvisi a soglia (log e notifica)
-  segnalano una sorgente che fallisce tre cicli di fila o ricerche che rallentano
-  o si fermano.
+### 🎯 Automazione intelligente e Decision Engine
+- **Valutazione meticolosa delle release:** assegna un punteggio deterministico a ogni candidato valutando qualità video, sorgente, codec, audio, HDR/DV, lingua e dimensione. Protegge i file migliori già archiviati e registra nei log il motivo esatto di ogni scarto. Una soglia configurabile ferma gli upgrade quando il file raggiunge lo standard desiderato; `ffprobe` può analizzare i file su disco per affinare le decisioni.
+- **Serie TV, Anime e Fumetti:** normalizza i titoli anime numerati per episodio assoluto («Titolo - 1071») riconducendoli a stagione ed episodio; per i fumetti CBZ genera automaticamente metadati `ComicInfo.xml` compatibili con Komga, Kavita e i reader standard.
+- **Recupero dai download bloccati (Anti-Stall):** un torrent fermo da tempo (nessun byte) o un magnet in attesa prolungata dei metadati viene affiancato da un'alternativa valida dopo una finestra temporale definita (*Configurazione → Qualità e upgrade → Download bloccati*), mentre il trasferimento originale continua a tentare.
 
-La UI è disponibile su `http://<host>:5000/` e supporta italiano, inglese,
-tedesco, francese, spagnolo e polacco (come la TUI, le notifiche e la pagina
-di gx-torrent). Il [manuale italiano](docs/MANUAL.it.md)
-e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le
-sezioni dell'interfaccia.
+### 🛡️ Integrità della Libreria e Storage Safety
+- **Hardlink immediati durante il seed:** quando download e libreria risiedono sullo stesso filesystem, il file entra istantaneamente in archivio tramite hardlink, rendendolo subito fruibile senza duplicare lo spazio occupato su disco.
+- **Protezione mount point e NAS:** rileva tempestivamente la disconnessione di una condivisione di rete (NAS smontato), evitando di scambiare l'assenza temporanea per file eliminati; gestisce retry automatici trasparenti su timeout o dischi pieni e riprende da solo i trasferimenti interrotti al riavvio.
+- **Cestino di sicurezza:** le versioni sostituite da un upgrade reale vengono spostate nel cestino configurato prima dell'eliminazione definitiva.
 
-## Motori torrent
+### 🔌 Fonti, Integrazioni e Controllo Operativo
+- **Sorgenti flessibili:** feed RSS, indexer Torznab (Jackett, Prowlarr), motori web dedicati e supporto opzionale a FlareSolverr.
+- **Notifiche e Media Server:** notifica gli eventi via Telegram, e-mail o webhook (Discord, Slack, ntfy, Gotify, Pushover), inclusi riavvii di Gextto e anomalie di gx-torrent; invia refresh mirati a Jellyfin e Plex toccando solo la cartella modificata ed esporta un calendario iCal con arrivi e uscite.
+- **Tracciabilità completa dei download:** ogni operazione ha un **ID di acquisizione** univoco tracciato in tutti i log (ricerca, selezione, download, post-processing e archivio); la dashboard **Da controllare** raccoglie i casi anomali, e gli avvisi a soglia segnalano tempestivamente se una sorgente fallisce tre cicli consecutivi o rallenta.
+- **Interfaccia Web SSR + HTMX e TUI da terminale:** UI responsive fruibile su desktop e smartphone (PWA), navigabile interamente da tastiera e verificata con axe-core per l'accessibilità; TUI nativa completa per l'amministrazione via SSH. Disponibile in 6 lingue (IT, EN, DE, FR, ES, PL).
 
-Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio)
-e sostituisce solo il motore di trasferimento in *Configurazione → Motore
-torrent*. Un motore gira alla volta, quindi il cambio è una migrazione
-controllata, mai due client sugli stessi dati.
+La UI è disponibile su `http://<host>:5000/`. Il [manuale italiano](docs/MANUAL.it.md) e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le sezioni dell'interfaccia.
 
-**gx-torrent è il motore predefinito e consigliato**: è Go puro (nessuna
-dipendenza C/C++), gira in un processo separato e sorvegliato, ha una pagina web
-propria, i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna, ed è
-dove arrivano prima le novità (streaming HTTP con Range, test porte integrato,
-gestione adattiva di memoria/cache, holepunching NAT con BEP 55, IPv6 dual-stack
-DHT compreso, torrent BitTorrent v2 e ibridi, ban di sessione dei peer che
-inviano dati corrotti). Il suo nucleo, **gx-core**, è un motore nostro,
-mantenuto in questo repository (include porzioni derivate da lavoro con licenza
-MIT/BSD; vedi `internal/gxcore/LICENSE`). La build
-predefinita di Gextto è **Go puro**: per funzionare serve solo gx-torrent.
+## Motori torrent e l'Engine gx-core
 
-**qBittorrent-nox** è l'alternativa per chi lo usa già o preferisce la sua UI:
-Gextto lo pilota via Web API.
+Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio) e delega il trasferimento dati a un motore selezionabile in *Configurazione → Motore torrent*. Un solo motore gira alla volta: il passaggio da uno all'altro è una migrazione pulita e coordinata, senza conflitti di I/O o processi concorrenti sugli stessi file.
 
-**libtorrent** è una terza scelta che esiste **solo se compili Gextto con
-libtorrent** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): il motore gira
-allora nello stesso processo di Gextto ed è anche il fallback automatico se
-gx-torrent non riesce a restare attivo. `make build` e il pacchetto di release
-predefinito non lo includono; l'installer chiede quale build installare e propone
-anche quella con libtorrent (`--libtorrent` per sceglierla senza domanda). Senza
-di esso l'opzione non compare nella tendina *Motore torrent*. Un crash del motore coinvolge anche Gextto.
+### gx-core & gx-torrent (Predefinito e consigliato)
+
+**gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii dell'orchestratore, dispone di una propria interfaccia web autonoma ed è dove arrivano per prime le innovazioni di protocollo.
+
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un motore BitTorrent ad altissime prestazioni mantenuto direttamente in questo repository (con porzioni derivate con licenza MIT/BSD; vedi `internal/gxcore/LICENSE`):
+
+- **BitTorrent v2 e Ibridi (BEP 52):** supporto completo v2-only e ibridi sia da file `.torrent` che da magnet (`urn:btmh:`). Utilizza un modello a pezzi per-file, verifica crittografica basata su alberi Merkle SHA-256 e fetch dinamico dei `piece layers` con messaggi dedicati (`hash request`, `hashes`, `hash reject`).
+- **Trasporto uTP (BEP 29) e Single-Port Listening:** un unico socket UDP gestisce simultaneamente il trasporto uTP e il traffico DHT. L'handshake BitTorrent/MSE instrada la connessione in base all'info-hash verso il torrent corrispondente, permettendo a tutti i trasferimenti di annunciare la medesima porta.
+- **NAT Traversal con Holepunching (BEP 55):** implementazione completa di `ut_holepunch` per stabilire connessioni punto-punto dirette su uTP attraverso NAT simmetrici e firewall, con supporto sia come client attivo sia come nodo di relè per altri peer.
+- **Super-seeding (BEP 16) e Choking Deterministico:** harness di simulazione deterministico dell'unchoker per ottimizzare throughput ed equità; supporto super-seeding per distribuire nuovi torrent annunciando un pezzo alla volta ed evitando upload ridondanti nel seed iniziale.
+- **Crittografia MSE/PE Zero-Alloc:** stream cipher RC4 eseguito direttamente in-place sul buffer di memoria chiamante (`inPlaceStreamWriter`), eliminando le allocazioni per blocco durante l'upload.
+- **Streaming Readahead e Priorità Dinamica:** prioritizzazione in tempo reale per la riproduzione video: il piece picker distingue tra la finestra immediata del player (`SetStreamWindow`) e il margine di avanzamento (`SetReadaheadWindow`), privilegiandoli rispetto alle strategie rarest-first.
+- **Popcount Hardware e Coda Richieste Adattiva:** conteggio del bitfield accelerato con istruzioni native della CPU (`math/bits.OnesCount64`); profondità della coda di richieste per peer (`RequestQueue`) modulata dinamicamente in base alla velocità di consegna dei blocchi.
+- **Modulo DHT Avanzato (`internal/dht`):** modulo isolato con supporto dual-stack IPv6 (BEP 32), Security Extension anti-spoofing con CRC32C Castagnoli (BEP 42), K/V store immutabile e mutabile firmato ed25519 (BEP 44) e modalità read-only per nodi di transito (BEP 43).
+- **Isolamento e Ban di Sessione:** esclusione temporanea (30 min) a livello di intera sessione per i peer che trasmettono blocchi corrotti, proteggendo tutti i torrent attivi.
+
+### Motori alternativi
+
+- **qBittorrent-nox:** l'alternativa per chi lo usa già o preferisce la sua interfaccia nativa: Gextto lo pilota via Web API.
+- **libtorrent (build opzionale):** disponibile **solo se compili Gextto con libtorrent** (`make build-libtorrent`, `GEXTTO_LIBTORRENT=1`): gira all'interno del processo di Gextto ed è anche il fallback automatico se gx-torrent non riesce a restare attivo. Un crash del motore coinvolge anche Gextto.
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
@@ -211,13 +196,25 @@ prodotto, numero di build e, se collegata, la versione di libtorrent con:
 
 ## gx-torrent come client autonomo
 
-gx-torrent è anche un client BitTorrent completo a sé, usabile senza Gextto come
-si usa `qbittorrent-nox`. È **lo stesso binario** che Gextto pilota come motore,
-non un prodotto separato. In modalità standalone aggiunge un wizard
-di primo avvio, un login facoltativo (la rete locale può restare senza
-password), categorie e tag, RSS con regole di download, ricerca sugli indexer
-(Jackett, Prowlarr, MIRCrew) e un'**API compatibile qBittorrent** (`/api/v2`) per
-Sonarr, Radarr e le app mobili.
+gx-torrent è anche un client BitTorrent completo a sé, utilizzabile senza Gextto
+esattamente come `qbittorrent-nox` o `transmission-daemon`. È **lo stesso
+binario** che Gextto pilota come motore, non un prodotto separato:
+
+- **Compatibilità Drop-in con l'ecosistema `*arr`:** implementa l'**API Web
+  v2 di qBittorrent** (`/api/v2/...`), integrandosi nativamente e senza bridge
+  con Sonarr, Radarr, Lidarr, Readarr e con le app mobili per la gestione torrent.
+- **Interfaccia Web Indipendente e Wizard di Setup:** include una UI web completa
+  con grafici e diagnostica in tempo reale, gestione categorie e tag, download
+  automatico da feed RSS con regole e tracking smart degli episodi, e ricerca
+  diretta sugli indexer (Jackett, Prowlarr, MIRCrew).
+- **Architettura Multipiattaforma:**
+  - **Linux (x86_64, aarch64):** pacchetto standalone `tar.gz`, unit systemd inclusa
+    (utente o sistema) e container Docker non privilegiato (`Dockerfile`).
+  - **Windows nativo (amd64, arm64):** gira come **servizio Windows nativo**
+    gestito da script PowerShell (`install-service.ps1` / `uninstall-service.ps1`).
+    Sfrutta le API Win32 per memoria, tipologia disco e gateway di default,
+    e gestisce i percorsi tramite **NTFS Junctions** (nessun bisogno di permessi
+    amministratore per i symlink né di Modalità sviluppatore).
 
 Ogni release pubblica pacchetti dedicati accanto a quelli di Gextto:
 
