@@ -232,8 +232,8 @@ func (d *DHT) replyError(addr net.UDPAddr, t string, code int, msg string) {
 // replyPut handles a BEP 44 "put": it validates the token, the salt, the size
 // and (for mutable items) the signature and the sequence number, then stores it.
 func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
-	var req bep44Request
-	if err := bencode.Unmarshal(bytes.NewBuffer(raw), &req); err != nil {
+	req, err := bep44RequestDecode(raw)
+	if err != nil {
 		return
 	}
 	if !d.checkToken(addr, mapString(req.A, "token")) {
@@ -292,8 +292,8 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 // replyGet handles a BEP 44 "get": it returns the stored item (the optional seq
 // suppresses an unchanged mutable value), a write token and the close nodes.
 func (d *DHT) replyGet(addr net.UDPAddr, raw []byte) {
-	var req bep44Request
-	if err := bencode.Unmarshal(bytes.NewBuffer(raw), &req); err != nil {
+	req, err := bep44RequestDecode(raw)
+	if err != nil {
 		return
 	}
 	target := []byte(mapString(req.A, "target"))

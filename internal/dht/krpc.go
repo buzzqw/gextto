@@ -205,6 +205,9 @@ func readResponse(p packetType, log DebugLogger) (response responseType, err err
 	defer func() {
 		if x := recover(); x != nil {
 			log.Debugf("DHT: !!! Recovering from panic() after bencode.Unmarshal %q, %v", string(p.b), x)
+			// Do not report success: a partial response with a nil error would
+			// be processed as if it were complete.
+			err = fmt.Errorf("bencode.Unmarshal panic: %v", x)
 		}
 	}()
 	if e2 := bencode.Unmarshal(bytes.NewBuffer(p.b), &response); e2 == nil {
