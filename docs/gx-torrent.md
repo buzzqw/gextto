@@ -739,6 +739,8 @@ qualsiasi altro valore = incluso. Si imposta dalla scheda file di gextto o con
   `so=0,2,4-7`), il motore scarica da subito solo quei file e appena arrivano i
   metadati il demone registra la scelta come normali priorità: la scheda file
   mostra gli stessi file esclusi e si possono cambiare come sempre.
+- Se il magnet porta `ws=` (BEP 53, web seed), i web seed vengono aggiunti al
+  torrent e restano anche dopo un riavvio.
 - Un **seed parziale** (tutti i file scelti completi, torrent non intero) si
   dichiara tale ai peer con `upload_only` (BEP 21), così smettono di offrirgli
   pezzi che non vuole, e lo segnala ai **tracker** con `event=paused` a ogni

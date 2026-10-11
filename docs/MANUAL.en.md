@@ -704,7 +704,8 @@ same data.
   **sequential download** and **first/last piece** priority (set when adding a
   torrent, or for every new torrent in *Configuration → Queues and performance →
   Download mode*; they apply to new torrents). A magnet that carries the `so=`
-  parameter (BEP 53) downloads only the listed files from the start. It supports
+  parameter (BEP 53) downloads only the listed files from the start, and `ws=`
+  adds web seeds. It supports
   **v2-only** torrents (BEP 52), both from a `.torrent` and from a magnet link;
   it does not support WebTorrent/WebRTC.
 - **libtorrent (optional build)** — the libtorrent session inside Gextto's own

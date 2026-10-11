@@ -70,7 +70,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | BEP | Specifica | Stato |
 |---|---|---|
 | 52 | BitTorrent v2 (alberi Merkle SHA-256, `piece layers`) | sì (v1, ibridi, v2-only da `.torrent` e da magnet) |
-| 53 | Magnet URI Extension (`so=`, `xs=`, `ws=`, `as=`) | **parziale**: `so=` (Select Only) sì; `xs=`/`ws=`/`as=` no |
+| 53 | Magnet URI Extension (`so=`, `xs=`, `ws=`, `as=`) | **parziale**: `so=` (Select Only) e `ws=` (web seed) sì; `xs=`/`as=` no |
 
 ## Fuori scope / obsolete
 
@@ -96,9 +96,9 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
    (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il percorso
    uscente. Da aprire **solo con un consumatore reale** (nessun codice
    speculativo).
-3. **BEP 53 — `xs=`/`ws=`/`as=`**: la sola parte oggi gestita è `so=`. `ws=`
-   (web seed da magnet) è la più utile e la più semplice da aggiungere; `xs=`/
-   `as=` sono raramente usati.
+3. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
+   persistenza nel resume) sono fatti; restano `xs=` (sorgente esatta) e `as=`
+   (sorgente accettabile), raramente usati.
 4. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
    ogni modifica va **misurata prima e dopo** (CPU, RAM, throughput), come da
    regola performance di `AGENTS.md`.
