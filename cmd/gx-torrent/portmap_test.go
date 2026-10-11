@@ -2,9 +2,19 @@ package main
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestNATHint(t *testing.T) {
+	if got := natHint(portCheck{Port: 6881, ReflectedPort: 6881}); !strings.Contains(got, "conserva") {
+		t.Errorf("port-preserving hint = %q, want conserva", got)
+	}
+	if got := natHint(portCheck{Port: 6881, ReflectedPort: 40000}); !strings.Contains(got, "riscrive") {
+		t.Errorf("port-rewriting hint = %q, want riscrive", got)
+	}
+}
 
 func TestPortCheckLocalListener(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
