@@ -6,7 +6,7 @@
 #                                 [--label TEXT]
 #
 # Layout of the archive:
-#   gx-torrent  gx-torrent.service  run.sh  README.md  VERSION  .sha256
+#   gx-torrent  gx-torrent.service  run.sh  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -126,6 +126,8 @@ Copy the directory to `/opt/gx-torrent`, update `gx-torrent.service`
 (`User`, `Group`, paths), then enable the unit. Or run it by hand as above.
 README
 
+cp "${ROOT}/LICENSE" "$STAGE/LICENSE"
+cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES"
 echo "$LABEL" > "$STAGE/VERSION"
 
 tar --numeric-owner -C "$STAGE" -czf "$OUTPUT" .

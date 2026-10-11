@@ -29,6 +29,8 @@ RUN apt-get update \
     && mkdir -p /data \
     && chown gx /data
 COPY --from=build /out/gx-torrent /usr/local/bin/gx-torrent
+# Licence and third-party notices of the shipped binary.
+COPY LICENSE THIRD-PARTY-NOTICES /usr/share/doc/gx-torrent/
 
 USER gx
 # Standalone mode: the first visit shows the wizard; data lives in /data.

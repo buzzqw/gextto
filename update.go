@@ -536,8 +536,9 @@ func updateInstallRelease(root, installDir string) error {
 		logging.Warn("gx-torrent is missing from the update payload: Gextto will fall back to embedded libtorrent")
 	}
 
-	// Keep the launcher and the release notes alongside the payload when shipped.
-	for _, file := range []string{"run.sh", "README.md"} {
+	// Keep the launcher, the release notes and the licence notices alongside
+	// the payload when shipped.
+	for _, file := range []string{"run.sh", "README.md", "LICENSE", "THIRD-PARTY-NOTICES"} {
 		source := filepath.Join(root, file)
 		if updateIsFile(source) {
 			destination := filepath.Join(installDir, file)

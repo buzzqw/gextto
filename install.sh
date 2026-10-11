@@ -453,6 +453,9 @@ install_files() {
   fi
   [[ -f "$work/run.sh" ]] && run install -m 0755 "$work/run.sh" "$INSTALL_DIR/run.sh"
   [[ -f "$work/VERSION" ]] && run install -m 0644 "$work/VERSION" "$INSTALL_DIR/VERSION"
+  # Licence and third-party notices of the shipped binaries.
+  [[ -f "$work/LICENSE" ]] && run install -m 0644 "$work/LICENSE" "$INSTALL_DIR/LICENSE"
+  [[ -f "$work/THIRD-PARTY-NOTICES" ]] && run install -m 0644 "$work/THIRD-PARTY-NOTICES" "$INSTALL_DIR/THIRD-PARTY-NOTICES"
 
   # Replace the bundled libraries cleanly: leftovers from a previous version
   # must not shadow the new ones.

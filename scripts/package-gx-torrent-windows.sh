@@ -7,6 +7,7 @@
 #
 # Layout of the archive:
 #   gx-torrent.exe  install-service.ps1  uninstall-service.ps1  README.txt  VERSION
+#   LICENSE.txt  THIRD-PARTY-NOTICES.txt
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -170,6 +171,8 @@ NOTES
 - Only the daemon is Windows-ready. Gextto (the manager) is Linux-only.
 README
 
+cp "${ROOT}/LICENSE" "$STAGE/LICENSE.txt"
+cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES.txt"
 echo "$LABEL" > "$STAGE/VERSION"
 
 ( cd "$STAGE" && zip -q -r "$OUTPUT" . )

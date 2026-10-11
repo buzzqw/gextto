@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build the standalone Linux archive consumed by the installer and by
 # `gexttod --update`. The Go binary embeds the server-rendered web UI, so the archive
-# ships the daemon, the bundled libtorrent shared libraries, a launcher and a
-# short README. Layout:
-#   gexttod  gx-torrent  run.sh  lib/  README.md  VERSION
+# ships the daemon, the bundled libtorrent shared libraries, a launcher, a short
+# README and the licence notices. Layout:
+#   gexttod  gx-torrent  run.sh  lib/  README.md  VERSION  LICENSE  THIRD-PARTY-NOTICES
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -88,6 +88,8 @@ RUN
 chmod +x "$STAGE/run.sh"
 
 cp "${ROOT}/README.md" "$STAGE/README.md" 2>/dev/null || true
+cp "${ROOT}/LICENSE" "$STAGE/LICENSE"
+cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES"
 echo "$LABEL" > "$STAGE/VERSION"
 
 tar --numeric-owner -C "$STAGE" -czf "$OUTPUT" .
