@@ -236,7 +236,7 @@ func (d *DHT) replyPut(addr net.UDPAddr, raw []byte) {
 	if err != nil {
 		return
 	}
-	if !d.checkToken(addr, mapString(req.A, "token")) {
+	if !d.checkToken(addr, nil, mapString(req.A, "token")) {
 		d.replyError(addr, req.T, 203, "invalid token")
 		return
 	}
@@ -300,7 +300,7 @@ func (d *DHT) replyGet(addr net.UDPAddr, raw []byte) {
 	if len(target) != 20 {
 		return
 	}
-	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, d.tokenSecrets[0])}
+	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, nil, d.tokenSecrets[0])}
 	if n4, n6 := d.nodesForInfoHash(InfoHash(string(target))); n4 != "" || n6 != "" {
 		if n4 != "" {
 			r0["nodes"] = n4

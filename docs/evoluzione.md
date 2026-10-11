@@ -808,11 +808,20 @@ il `LICENSE` BSD-3).
 
 **Item da aprire (ognuno con piano e misura prima/dopo):**
 
-| # | Voce | Cosa | Rischio | Sforzo | Verifica |
-|---|---|---|---|---|---|
-| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `blocked_hosts`/`self_promotions`, dimensione tabella e peer trovati su sciame reale |
-| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale |
-| 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec |
+| # | Voce | Cosa | Rischio | Sforzo | Verifica | Stato |
+|---|---|---|---|---|---|---|
+| 1 | Hardening anti-Sybil | limitare la concentrazione di nodi per subnet (e deprioritizzare gli ID non-BEP 42 quando la tabella è piena, **senza** rifiuto netto: BEP 42 non è applicato ovunque) | M | M | `blocked_hosts`/`self_promotions`, dimensione tabella e peer trovati su sciame reale | da fare |
+| 2 | Multi-path lookup | condurre `get_peers` su più rami in parallelo e preferire i peer confermati da ≥2 percorsi | M/A | M | peer trovati e tempo di ricerca su sciame reale | da fare |
+| 3 | Igiene dei token | rilevare replay e token presi da query non corrispondenti | S | S | test unitari sul codec | **fatto** |
+
+**Igiene dei token — fatto (2026-10-11).** Il token di `announce_peer` è ora
+legato a **indirizzo sorgente + scope** (`hostToken`/`checkToken` prendono lo
+scope; per `get_peers`/`announce_peer` è l'info-hash), quindi un token ottenuto
+per uno sciame non si riusa su un altro: è il rilevamento delle *query non
+corrispondenti* di Tixati. I percorsi BEP 44 restano legati al solo indirizzo
+(`scope = nil`), invariati. Aggiunti i contatori `announce_ok_token` /
+`announce_bad_token` (in `Stats()`, quindi visibili come `dht_announce_*`).
+Test: `TestHostTokenBindsScope`. Resta il doppio segreto rotante già presente.
 
 **Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
@@ -852,9 +861,9 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   demand" è invece quasi gratis: l'OS crea già file sparsi e c'è `Preallocate`;
   manca solo una modalità esplicita.
 
-**Raccomandazione d'ordine:** prima la diagnostica DHT (fatta), poi gli item a
-basso rischio (token, passo 1 del NAT), poi l'hardening anti-Sybil e il
-multi-path (con misura su sciame reale), infine PCP e la priorità file.
+**Raccomandazione d'ordine:** prima la diagnostica DHT (**fatta**), poi gli item
+a basso rischio (**token e passo 1 del NAT fatti**), poi l'hardening anti-Sybil e
+il multi-path (con misura su sciame reale), infine PCP e la priorità file.
 
 ---
 

@@ -13,6 +13,7 @@ func TestStatsExposesDiagnostics(t *testing.T) {
 		"packets_in", "packets_out", "bytes_in", "bytes_out", "dropped",
 		"queries_in", "queries_out", "replies_in",
 		"blocked_hosts", "self_promotions", "dupe_references", "nodes_killed",
+		"announce_ok_token", "announce_bad_token",
 		"reflected_port",
 	} {
 		v, ok := s[key]

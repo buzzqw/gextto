@@ -893,17 +893,23 @@ func (d *DHT) announcePeer(address net.UDPAddr, ih InfoHash, port int, token str
 	totalSentAnnouncePeer.Add(1)
 }
 
-func (d *DHT) hostToken(addr net.UDPAddr, secret string) string {
+// hostToken derives a per-source announce token. The scope ties the token to
+// the query it was issued for (the info-hash of a get_peers, nil for the BEP 44
+// paths), so a token obtained for one swarms cannot be replayed on another.
+func (d *DHT) hostToken(addr net.UDPAddr, scope []byte, secret string) string {
 	h := sha1.New()
 	io.WriteString(h, addr.String())
+	h.Write(scope)
 	io.WriteString(h, secret)
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func (d *DHT) checkToken(addr net.UDPAddr, token string) bool {
+// checkToken accepts a token issued for this source and scope with the current
+// or the previous rotating secret.
+func (d *DHT) checkToken(addr net.UDPAddr, scope []byte, token string) bool {
 	match := false
 	for _, secret := range d.tokenSecrets {
-		if d.hostToken(addr, secret) == token {
+		if d.hostToken(addr, scope, secret) == token {
 			match = true
 			break
 		}
@@ -919,7 +925,8 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	)
 	// node can be nil if, for example, the server just restarted and received an announce_peer
 	// from a node it doesn't yet know about.
-	if node != nil && d.checkToken(addr, r.A.Token) {
+	if node != nil && d.checkToken(addr, []byte(ih), r.A.Token) {
+		totalAnnounceTokenOK.Add(1)
 		peerAddr := net.TCPAddr{IP: addr.IP, Port: r.A.Port}
 		d.peerStore.addContact(ih, encodeCompactPeerAddr(peerAddr.String()), r.A.Seed == 1)
 		// Allow searching this node immediately, since it's telling us
@@ -930,6 +937,9 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 		if port != 0 {
 			d.PeersRequestResults <- map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}}
 		}
+	} else {
+		// Wrong, missing or mismatched-query token: not stored.
+		totalAnnounceTokenBad.Add(1)
 	}
 	// Always reply positively. jech says this is to avoid "back-tracking", not sure what that means.
 	reply := replyMessage{
@@ -950,7 +960,7 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 	}
 
 	ih := r.A.InfoHash
-	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, d.tokenSecrets[0])}
+	r0 := map[string]interface{}{"id": d.nodeId, "token": d.hostToken(addr, []byte(ih), d.tokenSecrets[0])}
 	reply := replyMessage{
 		T: r.T,
 		Y: "r",
@@ -1253,6 +1263,8 @@ var (
 	totalRecvFindNodeReply       = expvar.NewInt("totalRecvFindNodeReply")
 	totalRecvAnnouncePeer        = expvar.NewInt("totalRecvAnnouncePeer")
 	totalSentAnnouncePeer        = expvar.NewInt("totalSentAnnouncePeer")
+	totalAnnounceTokenOK         = expvar.NewInt("totalAnnounceTokenOK")
+	totalAnnounceTokenBad        = expvar.NewInt("totalAnnounceTokenBad")
 	totalPacketsFromBlockedHosts = expvar.NewInt("totalPacketsFromBlockedHosts")
 	totalDroppedPackets          = expvar.NewInt("totalDroppedPackets")
 	totalRecv                    = expvar.NewInt("totalRecv")
@@ -1289,6 +1301,11 @@ func Stats() map[string]int64 {
 		"self_promotions": totalSelfPromotions.Value(),
 		"dupe_references": totalGetPeersDupes.Value() + totalFindNodeDupes.Value(),
 		"nodes_killed":    totalKilledNodes.Value(),
+
+		// announce_peer token hygiene: accepted vs rejected (wrong, missing or
+		// issued for another info-hash).
+		"announce_ok_token":  totalAnnounceTokenOK.Value(),
+		"announce_bad_token": totalAnnounceTokenBad.Value(),
 
 		// External port remote nodes report for us (BEP 42 "ip" field). 0 while
 		// unknown or unconfirmed; see recordReflected.

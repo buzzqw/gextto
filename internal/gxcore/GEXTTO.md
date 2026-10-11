@@ -107,6 +107,12 @@ Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
   motore da `DHTHost` o dall'interfaccia uscente) o, se sconosciuto, dal campo
   `ip` delle risposte (`noteExternalIP`, adozione una tantum con ID sicuro
   persistito). Gli indirizzi locali restano esenti;
+- **Igiene dei token** (`dht.go`, `hostToken`/`checkToken`): il token di
+  `announce_peer` è legato a **indirizzo sorgente + scope** (l'info-hash per
+  `get_peers`/`announce_peer`, `nil` per i percorsi BEP 44), quindi un token
+  preso per uno sciame non si riusa su un altro (*query non corrispondente*);
+  restano il doppio segreto rotante e i contatori `announce_ok_token`/
+  `announce_bad_token`; test `dht_token_test.go`;
 - **BEP 44** (`bep44.go`): archivio chiave/valore nel DHT — item **immutabili**
   (target = SHA-1 del valore bencodato) e **mutabili** (target = SHA-1 della
   chiave ed25519 + salt, firma ed25519, `seq` monotono, `cas`). Implementate le
