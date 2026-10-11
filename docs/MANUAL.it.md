@@ -478,18 +478,6 @@ I campi più importanti sono:
 | Alias | aiuta a collegare titoli diversi alla stessa serie |
 | Esclusioni | parole nel titolo che devono bloccare la release |
 | Niente upgrade | una release migliore non sostituisce più i file già archiviati di questa serie |
-| Anime (numerazione assoluta) | per le serie le cui release numerano gli episodi senza stagioni, vedi sotto |
-
-**Anime.** Molte release anime numerano gli episodi dall'inizio, senza
-stagioni: `[SubsPlease] One Piece - 1071 (1080p)`, `One Piece Ep 1071 SUB ITA`,
-`One.Piece.1071.SUB.ITA`. Con **Anime (numerazione assoluta)** attivo Gextto
-riconosce questi titoli per la serie, converte il numero in stagione ed episodio
-secondo le stagioni di TMDB, o di TVDB senza chiave TMDB (episodio 30 con stagioni da 12, 12 e 24 = S03E06) e,
-cercando un episodio mancante, cerca anche il numero assoluto. Anche
-`Titolo S01E1071`, prodotto da alcuni indexer, viene letto come numero assoluto
-quando la stagione 1 ha meno episodi. Senza chiave TMDB né TVDB il numero assoluto vale
-come episodio della stagione 1. L'opzione riguarda solo le serie marcate:
-per le altre i titoli con un numero non vengono mai interpretati così.
 
 Lascia le stagioni non ancora disponibili abilitate se vuoi che il calendario e
 la ricerca dei mancanti continuino a funzionare. Usa *Ignora* solo per episodi
@@ -1768,9 +1756,9 @@ VPN) puoi chiedere il login a chi non è in rete locale.
 #### Metadati: TMDB o TVDB
 
 Gextto usa i metadati per sapere quanti episodi ha ogni stagione (episodi
-mancanti, pack di stagione, completezza), lo stato della serie, la numerazione
-degli anime, il calendario, i titoli degli episodi nei nomi dei file, le
-locandine e le schede di serie e film. Basta una delle due chiavi:
+mancanti, pack di stagione, completezza), lo stato della serie, il calendario,
+i titoli degli episodi nei nomi dei file, le locandine e le schede di serie e
+film. Basta una delle due chiavi:
 
 - **TMDB (consigliato)** — chiave gratuita su themoviedb.org → Impostazioni →
   API. Se è impostata, Gextto usa sempre TMDB, anche quando c'è la chiave TVDB.

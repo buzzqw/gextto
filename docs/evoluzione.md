@@ -256,11 +256,10 @@ implementate**). Confronto con Sonarr/Radarr (serie/film), Mylar3/Kapowarr
 | 4 | Autenticazione facoltativa | sì, spenta di default, LAN esente | `7dae752` |
 | 5 | Calendario iCal | sì, con date italiane dichiarate | `e78bcc2`, `a919fcd` |
 | 6 | `ComicInfo.xml` nei fumetti | sì | `6a7f739` |
-| 7 | Anime con numerazione assoluta | sì | `f4a9f8f` |
-| 8 | Mancanti: escludere gli episodi in download | sì | `e815180` |
-| 9 | Badge dei download attivi nella barra | sì | `893bc94`, `42db4b2` |
-| 9.1 | Traduzioni dei nuovi elementi in tutte le lingue | richiesta del proprietario | `698efbf` |
-| 10 | Aggiornamento della documentazione | richiesta del proprietario | commit `docs:` finale |
+| 7 | Mancanti: escludere gli episodi in download | sì | `e815180` |
+| 8 | Badge dei download attivi nella barra | sì | `893bc94`, `42db4b2` |
+| 8.1 | Traduzioni dei nuovi elementi in tutte le lingue | richiesta del proprietario | `698efbf` |
+| 9 | Aggiornamento della documentazione | richiesta del proprietario | commit `docs:` finale |
 
 ### 2.1 Hardlink invece della copia durante il seed
 
@@ -326,33 +325,18 @@ implementate**). Confronto con Sonarr/Radarr (serie/film), Mylar3/Kapowarr
   toccati: file che lo hanno già, CBR, fumetti via torrent (in seed). Un errore
   non compromette mai il download.
 
-### 2.7 Anime con numerazione assoluta
-
-- **Ora** (`anime.go`, parser, casella *Anime (numerazione assoluta)* in scheda
-  serie web/TUI): `[SubsPlease] One Piece - 1071 (1080p)`,
-  `One Piece Ep 1071 SUB ITA`, `One.Piece.1071.SUB.ITA` → stagione/episodio via
-  stagioni TMDB (senza TMDB: stagione 1). Anche `S01E1071` letto come assoluto. La
-  ricerca mancanti cerca anche il numero assoluto, online e in archivio.
-- Le serie non marcate anime non sono mai interessate.
-
-### 2.8 Mancanti senza gli episodi già in download
+### 2.7 Mancanti senza gli episodi già in download
 
 - Gli episodi con torrent attivo (anche aggiunto a mano, da cartella osservata o
   telefono) e le stagioni con season pack in corso non sono più mancanti, né nel
   ciclo né nella scheda serie. Un download in errore li fa tornare mancanti.
 
-### 2.9 Badge dei download in corso
+### 2.8 Badge dei download in corso
 
 - La voce "Scarico" mostra i download in corso (torrent non finiti + HTTP attivi,
   non i seed), ogni 5 s; sul telefono è un contatore sull'icona.
 
-### 2.10 Escluse perché già presenti o tolte di proposito
-
-Webhook HMAC, event hook, alias titoli, blocklist, ritardi (delay profile), pack
-di stagione, sottotitoli nel punteggio, Discover/Popular TMDB: già presenti.
-Trakt: rimossa di proposito (`TestTraktIntegrationRoutesRemoved`).
-
-### 2.10 Escluse perché già presenti o tolte di proposito
+### 2.9 Escluse perché già presenti o tolte di proposito
 
 Webhook HMAC, event hook, alias titoli, blocklist, ritardi (delay profile), pack
 di stagione, sottotitoli nel punteggio, Discover/Popular TMDB: già presenti.
@@ -443,7 +427,7 @@ e più configurata male — del modello `*arr`.
   `series.quality/language/subtitle/exclude` e `movies_config.*`). Riprodurre la
   **semantica Sonarr** (qualità ordinate + cutoff + custom format) è più costoso;
   i custom format (motore regex + UI) vanno valutati a parte.
-- **Maturità di import e rinomina**: multi-episodio, specials, anime assoluti,
+- **Maturità di import e rinomina**: multi-episodio, specials,
   daily, import manuale con matching e sostituzione. *Fattibilità:* si studia il
   comportamento e si reimplementa; Sonarr è GPLv3, Gextto EUPL 1.2: **non si
   copia codice né file di test**, ci si costruisce un corpus proprio da nomi
@@ -1441,7 +1425,7 @@ anteprima rinomina); test in `uiweb_v2_test.go` /
 Copertura: tutte le 16 voci di menu + dettagli (Dashboard con Prossime uscite
 etichettate; Scarico con badge download ogni 5 s, limiti/storage,
 tracker/file/web seed, storico, aggiunta, tag in massa; Serie/Film con hero
-TMDB, stagioni on/off, Anime/Niente-upgrade, rinomina; Mancanti; Esplora con
+TMDB, stagioni on/off, Niente-upgrade, rinomina; Mancanti; Esplora con
 calendario/tendenze/ricerca TMDB; Archivio con spiegazione decisione; Fumetti
 con coda HTTP e weekly; Configurazione 4 aree/13 sezioni con Predefinito,
 savebar, pannelli esperti/motore; Integrazioni Simkl/Jellyfin/Plex/FlareSolverr/
@@ -1529,7 +1513,7 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
   (`ProblemCount`); fix template Scarico (div aperto); avvisi CodeQL (host
   validati, `nosniff`, redirect `/share` con `url.URL`, conversioni sicure).
 - **Migliorie §2** (dettaglio sopra): hardlink, refresh mirato, upgrade-until,
-  auth, iCal, ComicInfo, anime, mancanti, badge, traduzioni, docs.
+  auth, iCal, ComicInfo, mancanti, badge, traduzioni, docs.
 - **gx-torrent completato**: da scheletro non selezionabile a motore funzionante
   (coda autogestita con slot/tetto/lenti ignorati/rotazione/pin/probe/coda
   dinamica; stalled come park/probe/unpark persistente; symlink, delete sicura,
@@ -1578,7 +1562,7 @@ titolo merge `281f89a`; «router port N opened» nel log demone (o apertura
 manuale TCP+UDP); con VPN impostare interfaccia uscente (killswitch);
 procedura gx-torrent (scelta motore, Big Buck Bunny, slot/pause); migliorie §2
 (hardlink con `ls -li`, scansione cartella Jellyfin/Plex, login via proxy con
-`X-Forwarded-For`, anime reale, calendario con chiave TMDB).
+`X-Forwarded-For`, calendario con chiave TMDB).
 
 ### 12.4 Ambiente e insidie (sessione cloud, riferimento)
 

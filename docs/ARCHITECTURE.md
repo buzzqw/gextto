@@ -86,8 +86,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 ### Pipeline media (release → archivio)
 | File | Ruolo |
 |---|---|
-| `parser.go` | parsing dei nomi release e della qualità (anche il numero assoluto degli anime). |
-| `anime.go` | serie anime: numero assoluto ↔ stagione/episodio con i dati TMDB, ricerche per numero assoluto. |
+| `parser.go` | parsing dei nomi release e della qualità. |
 | `upgrade_until.go` | soglia «smetti di migliorare» (`upgrade_until_score`) applicata alle decisioni di upgrade. |
 | `decision.go` | spiegazione (sola lettura) delle decisioni su una release. |
 | `cleaner.go` | indice dell'archivio, rilevamento duplicati inferiori, pulizia. |

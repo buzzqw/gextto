@@ -52,8 +52,8 @@ nell'header `X-Api-Key` di ogni richiesta. Dalla rete locale non serve.
 7. **Blocklist** — release bloccate, con rimozione interattiva.
 8. **Libreria** — Serie TV, Film e Fumetti monitorati. Serie e film si
    gestiscono da qui: aggiunta cercando su TMDB, modifica dei requisiti con un
-   modulo a campi (per le serie anche *Anime (numerazione assoluta)* e *Niente
-   upgrade*), pausa ed eliminazione. Il dettaglio di una serie mostra una
+   modulo a campi (per le serie, tra gli altri, *Niente upgrade*), pausa ed
+   eliminazione. Il dettaglio di una serie mostra una
    stagione alla volta con lo stato di ogni episodio (✓ presente, ✗ mancante,
    ↓ in download, `·` in uscita, `-` ignorato); da lì si attivano o
    disattivano le stagioni, si cercano e accodano le release, si ignorano o

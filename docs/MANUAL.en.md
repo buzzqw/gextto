@@ -475,18 +475,6 @@ The most important fields are:
 | Aliases | links alternate names to the same series |
 | Exclusions | words in a title that must block the release |
 | No upgrades | a better release no longer replaces the archived files of this series |
-| Anime (absolute numbering) | for series whose releases number episodes without seasons, see below |
-
-**Anime.** Many anime releases number episodes from the start, without seasons:
-`[SubsPlease] One Piece - 1071 (1080p)`, `One Piece Ep 1071 SUB ITA`,
-`One.Piece.1071.SUB.ITA`. With **Anime (absolute numbering)** on, Gextto
-recognises these titles for the series, maps the number to season and episode
-using the TMDB seasons, or the TVDB ones without a TMDB key (episode 30 with seasons of 12, 12 and 24 = S03E06) and,
-when it looks for a missing episode, also searches for the absolute number.
-`Title S01E1071`, produced by some indexers, is read as an absolute number too
-when season 1 has fewer episodes. Without a TMDB or TVDB key the absolute number is used
-as an episode of season 1. Only series marked this way are affected: for the
-others a title with a number is never read like this.
 
 Leave future seasons enabled if you want calendar and missing searches to keep
 working. Use *Ignore* only for episodes that should no longer be searched;
@@ -1730,7 +1718,7 @@ login from clients that are not on the local network.
 #### Metadata: TMDB or TVDB
 
 Gextto uses metadata to know how many episodes each season has (missing
-episodes, season packs, completeness), the series status, anime numbering, the
+episodes, season packs, completeness), the series status, the
 calendar, episode titles in file names, posters and the series and movie
 pages. One of the two keys is enough:
 
