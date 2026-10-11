@@ -106,3 +106,24 @@ func TestMagnetSelectOnlyRoundTrip(t *testing.T) {
 		t.Errorf("round trip SelectOnly = %v, want [1 3 5]", m2.SelectOnly)
 	}
 }
+
+func TestMagnetWebSeeds(t *testing.T) {
+	v1 := strings.Repeat("ab", 20)
+	// Repeated ws, plus an empty one that must be dropped.
+	m, err := New("magnet:?xt=urn:btih:" + v1 +
+		"&ws=http%3A%2F%2Fa.test%2Ff.bin&ws=http%3A%2F%2Fb.test%2Fx&ws=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"http://a.test/f.bin", "http://b.test/x"}
+	if !slices.Equal(m.WebSeeds, want) {
+		t.Fatalf("WebSeeds = %v, want %v", m.WebSeeds, want)
+	}
+	m2, err := New(m.String())
+	if err != nil {
+		t.Fatalf("re-parse %q: %v", m.String(), err)
+	}
+	if !slices.Equal(m2.WebSeeds, want) {
+		t.Errorf("round trip WebSeeds = %v, want %v", m2.WebSeeds, want)
+	}
+}

@@ -232,7 +232,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		nil, // info
 		nil, // bitfield
 		resumer.Stats{},
-		nil, // webseedSources
+		webseedsource.NewList(ma.WebSeeds),
 		opt.StopAfterDownload,
 		opt.StopAfterMetadata,
 		false, // completeCmdRun
@@ -261,6 +261,7 @@ func (s *Session) addMagnet(link string, opt *AddTorrentOptions) (*Torrent, erro
 		Port:              port,
 		Name:              ma.Name,
 		Trackers:          ma.Trackers,
+		URLList:           ma.WebSeeds,
 		FixedPeers:        ma.Peers,
 		AddedAt:           t.addedAt,
 		StopAfterDownload: opt.StopAfterDownload,

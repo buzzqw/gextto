@@ -30,6 +30,8 @@ type Magnet struct {
 	// Indices address the non-padding files, the same convention the engine's
 	// Config.FileSelection uses.
 	SelectOnly []int
+	// WebSeeds are the HTTP web seed URLs from the BEP 53 "ws" parameters.
+	WebSeeds []string
 }
 
 // New parses the string and returns new Magnet.
@@ -105,6 +107,13 @@ func New(s string) (*Magnet, error) {
 	// accepted and de-duplicated.
 	magnet.SelectOnly = parseSelectOnly(params["so"])
 
+	// BEP 53 "ws": HTTP web seeds for the torrent.
+	for _, ws := range params["ws"] {
+		if ws = strings.TrimSpace(ws); ws != "" {
+			magnet.WebSeeds = append(magnet.WebSeeds, ws)
+		}
+	}
+
 	return &magnet, nil
 }
 
@@ -147,6 +156,10 @@ func (m *Magnet) String() string {
 	for _, p := range m.Peers {
 		b.WriteString("&x.pe=")
 		b.WriteString(p)
+	}
+	for _, ws := range m.WebSeeds {
+		b.WriteString("&ws=")
+		b.WriteString(url.QueryEscape(ws))
 	}
 	if len(m.SelectOnly) > 0 {
 		b.WriteString("&so=")

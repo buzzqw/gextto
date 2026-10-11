@@ -759,6 +759,34 @@ func TestMagnetSelectOnly(t *testing.T) {
 	})
 }
 
+// A magnet with BEP 53 web seeds ("ws=") keeps them on the torrent.
+func TestMagnetWebSeeds(t *testing.T) {
+	d := newTestDaemonWith(t, NetworkOptions{PortBegin: 46100, PortEnd: 46199, Encryption: 1})
+	dst := filepath.Join(t.TempDir(), "dst")
+	magnet := "magnet:?xt=urn:btih:" + strings.Repeat("ab", 20) +
+		"&ws=http%3A%2F%2Fseed.test%2Ff.bin&ws=http%3A%2F%2Fseed2.test%2Ff.bin"
+	hash, _, err := d.add(addRequest{Magnet: magnet, Destination: dst})
+	if err != nil {
+		t.Fatalf("add magnet: %v", err)
+	}
+	waitFor(t, "torrent running", func() bool { return stateOf(d, hash) == "downloading_metadata" })
+	d.mu.Lock()
+	handle, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if handle == nil {
+		t.Fatal("no handle")
+	}
+	got := map[string]bool{}
+	for _, w := range handle.Webseeds() {
+		got[w.URL] = true
+	}
+	for _, want := range []string{"http://seed.test/f.bin", "http://seed2.test/f.bin"} {
+		if !got[want] {
+			t.Fatalf("web seeds = %v, missing %s", got, want)
+		}
+	}
+}
+
 // RAM disk flow: the download starts on a tmpfs and is moved to the disk
 // while it is still downloading (cross-filesystem copy); it must finish
 // there with the right content and leave nothing on the RAM disk.
