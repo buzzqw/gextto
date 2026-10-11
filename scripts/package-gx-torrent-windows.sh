@@ -144,6 +144,13 @@ with:
 
     .\uninstall-service.ps1
 
+If PowerShell blocks the script (the default execution policy is Restricted, and
+a file downloaded from the browser carries the mark-of-the-web), run it with:
+
+    powershell -ExecutionPolicy Bypass -File .\install-service.ps1
+
+or clear the block first with:  Unblock-File .\install-service.ps1
+
 Manual equivalent:
 
     sc.exe create gx-torrent binPath= "\"C:\path\gx-torrent.exe\" -mode standalone -listen 0.0.0.0:8890 -data \"C:\ProgramData\gx-torrent\" -log-file \"C:\ProgramData\gx-torrent\gx-torrent.log\"" start= auto

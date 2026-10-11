@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/auth"
@@ -206,6 +208,17 @@ type Daemon struct {
 	// loginFails counts the failed logins per address for the rate limit.
 	loginMu    sync.Mutex
 	loginFails map[string]loginAttempt
+	// qbitRID is the qBittorrent /sync/maindata response id: it only has to move
+	// forward so third-party WebUIs (VueTorrent, Shift) see a fresh snapshot.
+	qbitRID atomic.Int64
+	// secMu caches the parsed security lists (trusted-proxies, allowed-hosts).
+	// They are read on every request but only change when settings.json is
+	// rewritten, so the raw setting string is the cache key.
+	secMu      sync.Mutex
+	proxiesRaw string
+	proxies    []*net.IPNet
+	hostsRaw   string
+	hosts      []string
 	// feedMu guards feedStatuses (the RSS feeds' last outcome).
 	feedMu       sync.Mutex
 	feedStatuses map[string]feedStatus
@@ -224,6 +237,12 @@ type Daemon struct {
 	// unreachable.
 	snapMu   sync.RWMutex
 	snapshot []torrentInfo
+
+	// index is the findLocked lookup (info hash and ID to torrent). indexSession
+	// is the session it was built from: when the session is reopened the index
+	// is rebuilt on the next lookup.
+	indexSession *torrent.Session
+	index        map[string]*torrent.Torrent
 
 	listenHost    string
 	peerPort      int
@@ -552,12 +571,50 @@ func (d *Daemon) findLocked(key string) (*torrent.Torrent, *torrentMeta) {
 	if key == "" || d.session == nil {
 		return nil, nil
 	}
+	if d.indexSession != d.session {
+		d.rebuildIndexLocked()
+	}
+	if t, ok := d.index[key]; ok {
+		return t, d.metaLocked(t)
+	}
+	// Self-healing fallback: index the hit, so a torrent added by a path that
+	// did not update the index is only scanned once.
 	for _, t := range d.session.ListTorrents() {
 		if t.InfoHash().String() == key || t.ID() == key {
+			d.indexTorrentLocked(t)
 			return t, d.metaLocked(t)
 		}
 	}
 	return nil, nil
+}
+
+// indexTorrentLocked adds a torrent to the lookup index under both its info
+// hash (lowercase) and its ID. The caller holds d.mu.
+func (d *Daemon) indexTorrentLocked(t *torrent.Torrent) {
+	if d.index == nil {
+		d.index = map[string]*torrent.Torrent{}
+	}
+	d.index[strings.ToLower(t.InfoHash().String())] = t
+	d.index[t.ID()] = t
+}
+
+// unindexTorrentLocked removes a torrent from the lookup index. The caller holds
+// d.mu.
+func (d *Daemon) unindexTorrentLocked(t *torrent.Torrent) {
+	delete(d.index, strings.ToLower(t.InfoHash().String()))
+	delete(d.index, t.ID())
+}
+
+// rebuildIndexLocked rebuilds the lookup index from the current session. The
+// caller holds d.mu.
+func (d *Daemon) rebuildIndexLocked() {
+	d.index = map[string]*torrent.Torrent{}
+	if d.session != nil {
+		for _, t := range d.session.ListTorrents() {
+			d.indexTorrentLocked(t)
+		}
+	}
+	d.indexSession = d.session
 }
 
 func (d *Daemon) metaLocked(t *torrent.Torrent) *torrentMeta {
@@ -1325,6 +1382,7 @@ func (d *Daemon) add(req addRequest) (string, bool, error) {
 		Tags:     req.Tags,
 	}
 	d.state.Tags = mergeTagNames(d.state.Tags, req.Tags)
+	d.indexTorrentLocked(t)
 	d.saveLocked()
 	d.poke()
 	return hash, false, nil
@@ -1347,6 +1405,7 @@ func (d *Daemon) remove(key string, deleteFiles bool) error {
 	savePath := meta.SavePath
 	d.protectLegacyDir(id)
 	err := d.session.RemoveTorrent(id, false)
+	d.unindexTorrentLocked(t)
 	delete(d.state.Torrents, id)
 	delete(d.runtime, id)
 	d.setSelection(id, nil)

@@ -156,6 +156,21 @@ func TestLoginRateLimit(t *testing.T) {
 	}
 }
 
+// TestLoginFailuresBounded locks C-01: the failure map is pruned and capped so a
+// brute-force run from many addresses cannot grow it without bound.
+func TestLoginFailuresBounded(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", false)
+	for i := 0; i < loginFailMaxEntries+500; i++ {
+		d.recordLoginFailure(fmt.Sprintf("10.%d.%d.%d", i>>16&0xff, i>>8&0xff, i&0xff))
+	}
+	d.loginMu.Lock()
+	n := len(d.loginFails)
+	d.loginMu.Unlock()
+	if n > loginFailMaxEntries {
+		t.Fatalf("loginFails holds %d entries, want <= %d", n, loginFailMaxEntries)
+	}
+}
+
 func TestManagedDoesNotUseStandaloneAuth(t *testing.T) {
 	// Managed with no token: the page stays open exactly as before.
 	d := &Daemon{opts: Options{Mode: ModeManaged}}

@@ -329,3 +329,80 @@ func TestQbitCrossOriginPostRejected(t *testing.T) {
 		t.Fatalf("same-origin POST status = %d, want 200", r2.StatusCode)
 	}
 }
+
+// TestQbitContentPathAndRID locks M-09/M-10: torrents/info carries content_path
+// (the path Sonarr and Radarr read) and sync/maindata advances rid every call.
+func TestQbitContentPathAndRID(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitListed(t, d, hash)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v2/torrents/info?hashes=" + hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var list []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(list) != 1 {
+		t.Fatalf("info returned %d items, want 1", len(list))
+	}
+	want := filepath.Join(src, "movie.bin")
+	if got, _ := list[0]["content_path"].(string); got != want {
+		t.Fatalf("content_path = %q, want %q", got, want)
+	}
+
+	rid := func() float64 {
+		r, err := http.Get(srv.URL + "/api/v2/sync/maindata")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer r.Body.Close()
+		var out struct {
+			RID float64 `json:"rid"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out.RID
+	}
+	first, second := rid(), rid()
+	if second <= first {
+		t.Fatalf("rid did not advance: %v then %v", first, second)
+	}
+}
+
+// TestQbitAddNumericBooleans locks M-13: paused=1 (not just true) pauses the
+// added torrent, like qBittorrent clients that send numeric flags.
+func TestQbitAddNumericBooleans(t *testing.T) {
+	d := newTestDaemon(t)
+	srv := httptest.NewServer(d.routesQbit())
+	defer srv.Close()
+
+	const hash = "0123456789abcdef0123456789abcdef01234567"
+	resp, err := http.PostForm(srv.URL+"/api/v2/torrents/add", url.Values{
+		"urls":   {"magnet:?xt=urn:btih:" + hash},
+		"paused": {"1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("add status = %d", resp.StatusCode)
+	}
+	waitFor(t, "magnet added paused", func() bool {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		_, meta := d.findLocked(hash)
+		return meta != nil && meta.UserPaused
+	})
+}

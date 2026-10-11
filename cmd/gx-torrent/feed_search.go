@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
@@ -32,20 +33,43 @@ func (d *Daemon) searchFeed(ctx context.Context, name, query string) ([]rss.Item
 }
 
 // searchIndexers runs the query on each indexer and merges the results as feed
-// items. Per-indexer errors are returned alongside the items found.
+// items. Per-indexer errors are returned alongside the items found. The
+// indexers are queried concurrently, so a slow or timing-out one does not add
+// its latency to the others; the result order still follows the indexer order.
 func searchIndexers(ctx context.Context, indexers []torznab.Indexer, query string) ([]rss.Item, []error) {
 	query = strings.TrimSpace(query)
+	type result struct {
+		items []rss.Item
+		err   error
+	}
+	results := make([]result, len(indexers))
+	var wg sync.WaitGroup
+	for i, idx := range indexers {
+		wg.Add(1)
+		go func(i int, idx torznab.Indexer) {
+			defer wg.Done()
+			found, err := idx.Search(ctx, query)
+			if err != nil {
+				results[i].err = fmt.Errorf("%s: %w", idx.Name, err)
+				return
+			}
+			items := make([]rss.Item, 0, len(found))
+			for _, it := range found {
+				items = append(items, rssItemFromTorznab(it))
+			}
+			results[i].items = items
+		}(i, idx)
+	}
+	wg.Wait()
+
 	var items []rss.Item
 	var errs []error
-	for _, idx := range indexers {
-		found, err := idx.Search(ctx, query)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", idx.Name, err))
+	for _, r := range results {
+		if r.err != nil {
+			errs = append(errs, r.err)
 			continue
 		}
-		for _, it := range found {
-			items = append(items, rssItemFromTorznab(it))
-		}
+		items = append(items, r.items...)
 	}
 	return items, errs
 }

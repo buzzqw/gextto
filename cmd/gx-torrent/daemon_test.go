@@ -1781,3 +1781,43 @@ func TestVerifyStopsOnceWhenFilesCannotBeAllocated(t *testing.T) {
 		}
 	}
 }
+
+// TestFindLockedIndex locks O-05: lookups by info hash (any case) and by ID go
+// through the index, and a removed torrent stops resolving.
+func TestFindLockedIndex(t *testing.T) {
+	d := newTestDaemon(t)
+	src := t.TempDir()
+	hash, _, err := d.add(addRequest{TorrentData: makeTorrent(t, src, "movie.bin", 10_000), Destination: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d.mu.Lock()
+	byHash, _ := d.findLocked(strings.ToUpper(hash))
+	var id string
+	if byHash != nil {
+		id = byHash.ID()
+	}
+	var byID *torrent.Torrent
+	if id != "" {
+		byID, _ = d.findLocked(id)
+	}
+	d.mu.Unlock()
+
+	if byHash == nil {
+		t.Fatal("lookup by info hash failed")
+	}
+	if byID != byHash {
+		t.Fatalf("lookup by ID returned %v, want the same torrent", byID)
+	}
+
+	if err := d.remove(hash, false); err != nil {
+		t.Fatal(err)
+	}
+	d.mu.Lock()
+	gone, _ := d.findLocked(hash)
+	d.mu.Unlock()
+	if gone != nil {
+		t.Fatal("a removed torrent must not be found")
+	}
+}

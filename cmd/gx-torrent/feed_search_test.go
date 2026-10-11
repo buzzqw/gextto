@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/torznab"
 )
@@ -69,6 +71,41 @@ func TestSearchIndexersCollectsErrors(t *testing.T) {
 	}
 	if len(errs) != 1 {
 		t.Fatalf("errs = %v, want 1", errs)
+	}
+}
+
+// TestSearchIndexersRunsInParallel locks M-11: the indexers are queried at the
+// same time, so a slow one does not add its latency to the others.
+func TestSearchIndexersRunsInParallel(t *testing.T) {
+	var mu sync.Mutex
+	inFlight, maxInFlight := 0, 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		inFlight++
+		if inFlight > maxInFlight {
+			maxInFlight = inFlight
+		}
+		mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+		mu.Lock()
+		inFlight--
+		mu.Unlock()
+		_, _ = w.Write([]byte(searchFeedXML))
+	}))
+	defer srv.Close()
+
+	items, errs := searchIndexers(context.Background(), []torznab.Indexer{
+		{Name: "a", URL: srv.URL},
+		{Name: "b", URL: srv.URL},
+	}, "x")
+	if len(errs) != 0 || len(items) != 2 {
+		t.Fatalf("items=%d errs=%v, want 2 and none", len(items), errs)
+	}
+	mu.Lock()
+	got := maxInFlight
+	mu.Unlock()
+	if got < 2 {
+		t.Fatalf("indexers were queried sequentially (max in flight %d)", got)
 	}
 }
 

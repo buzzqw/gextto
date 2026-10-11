@@ -31,7 +31,9 @@ func sidOf(cookies []*http.Cookie) string {
 }
 
 func TestQbitAPIRoutes(t *testing.T) {
-	d := standaloneTestDaemon(t, "s3cret", true)
+	// Local bypass off: the unauthenticated check below must be meaningful (with
+	// it on, the loopback client would be allowed by design).
+	d := standaloneTestDaemon(t, "s3cret", false)
 	srv := httptest.NewServer(d.routes())
 	defer srv.Close()
 
@@ -82,6 +84,50 @@ func TestQbitAPIRoutes(t *testing.T) {
 	// Logout drops the session.
 	if _, body, _ := qbitLogin(t, srv.URL, "admin", "s3cret"); body != qbitOKCode {
 		t.Fatalf("login for logout failed: %q", body)
+	}
+}
+
+// TestQbitAPIUsesStandaloneAuth locks the C-04 fix: the qBittorrent API is
+// guarded like the page and /api/v1, so a LAN source with local-bypass on needs
+// no login, a remote source is refused, and the page session cookie (gx_session)
+// is accepted as well as the SID.
+func TestQbitAPIUsesStandaloneAuth(t *testing.T) {
+	handler := func(d *Daemon) (http.Handler, *bool) {
+		called := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { called = true; w.WriteHeader(http.StatusOK) })
+		return d.qbitAuth(next), &called
+	}
+
+	// LAN bypass on: a LAN source passes without a session.
+	d := standaloneTestDaemon(t, "s3cret", true)
+	h, called := handler(d)
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/api/v2/app/version", nil)
+	req.RemoteAddr = "192.168.1.9:1234"
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !*called {
+		t.Fatalf("LAN bypass must apply to the qBittorrent API: status=%d called=%v", rec.Code, *called)
+	}
+
+	// A remote source without a session is refused.
+	remote, remoteCalled := handler(d)
+	req2 := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/api/v2/app/version", nil)
+	req2.RemoteAddr = "8.8.8.8:1234"
+	rec2 := httptest.NewRecorder()
+	remote.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusForbidden || *remoteCalled {
+		t.Fatalf("a remote request without a session must be refused: status=%d called=%v", rec2.Code, *remoteCalled)
+	}
+
+	// The page cookie is accepted by the qBittorrent API.
+	withUI, uiCalled := handler(d)
+	req3 := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/api/v2/app/version", nil)
+	req3.RemoteAddr = "8.8.8.8:1234"
+	req3.AddCookie(&http.Cookie{Name: uiSessionCookie, Value: d.sessions.Create()})
+	rec3 := httptest.NewRecorder()
+	withUI.ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusOK || !*uiCalled {
+		t.Fatalf("the page session cookie must open the qBittorrent API: status=%d called=%v", rec3.Code, *uiCalled)
 	}
 }
 

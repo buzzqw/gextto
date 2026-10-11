@@ -255,3 +255,31 @@ func TestUntrustedLoopbackProxyNotLAN(t *testing.T) {
 		t.Fatal("an undeclared proxy forwarding an external client must not be allowed by the LAN bypass")
 	}
 }
+
+// TestSecurityListsCachePicksUpChanges locks O-01: the parsed trusted-proxies and
+// allowed-hosts are cached, and a settings change must still be seen.
+func TestSecurityListsCachePicksUpChanges(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", false)
+	store := d.opts.Settings
+
+	store.Set(trustedProxiesKey, "10.0.0.0/8")
+	if n := len(d.trustedProxies()); n != 1 {
+		t.Fatalf("trusted proxies = %d, want 1", n)
+	}
+	store.Set(trustedProxiesKey, "192.168.0.0/16,172.16.0.0/12")
+	if n := len(d.trustedProxies()); n != 2 {
+		t.Fatalf("trusted proxies after change = %d, want 2", n)
+	}
+
+	store.Set(allowedHostsKey, "nas.local")
+	if !d.hostAllowed("nas.local") {
+		t.Fatal("the new allowed host must be accepted")
+	}
+	store.Set(allowedHostsKey, "other.local")
+	if d.hostAllowed("nas.local") {
+		t.Fatal("the removed allowed host must be refused")
+	}
+	if !d.hostAllowed("other.local") {
+		t.Fatal("the replacement allowed host must be accepted")
+	}
+}

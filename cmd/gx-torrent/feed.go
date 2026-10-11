@@ -243,6 +243,14 @@ func (d *Daemon) pollFeeds() {
 		}
 		d.setFeedStatus(status)
 	}
+	// One atomic write at the end of the cycle: markFeedSeen/markSmartEpisode only
+	// set dirty, so a poll that adds many items does not rewrite state.json once
+	// per item (and re-scan the whole FeedSeen/FeedSmart maps each time).
+	d.mu.Lock()
+	if d.dirty {
+		d.saveLocked()
+	}
+	d.mu.Unlock()
 }
 
 // filterFeedItem decides whether an item is added and with which action. With a
@@ -346,8 +354,9 @@ func (d *Daemon) markSmartEpisode(key string, episode int) {
 			delete(eps, ep)
 		}
 	}
+	// Only mark dirty: pollFeeds does one atomic save at the end of the cycle,
+	// instead of rewriting state.json for every item added.
 	d.dirty = true
-	d.saveLocked()
 }
 
 // feedSeenKey is the persisted key of one item.
@@ -381,8 +390,9 @@ func (d *Daemon) markFeedSeen(feed, guid string) {
 			delete(d.state.FeedSeen, key)
 		}
 	}
+	// Only mark dirty: pollFeeds does one atomic save at the end of the cycle,
+	// instead of rewriting state.json for every item added.
 	d.dirty = true
-	d.saveLocked()
 }
 
 func (d *Daemon) setFeedStatus(status feedStatus) {

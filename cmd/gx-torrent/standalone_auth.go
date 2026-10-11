@@ -140,8 +140,9 @@ func (d *Daemon) clientIP(r *http.Request) net.IP {
 // Without it, a standalone daemon with a password can be brute-forced at full
 // speed over the LAN or the Internet.
 const (
-	loginMaxFailures = 5
-	loginBlockFor    = 15 * time.Minute
+	loginMaxFailures    = 5
+	loginBlockFor       = 15 * time.Minute
+	loginFailMaxEntries = 2000
 )
 
 type loginAttempt struct {
@@ -196,6 +197,32 @@ func (d *Daemon) recordLoginFailure(ip string) {
 		attempt.blockedUntil = now.Add(loginBlockFor)
 	}
 	d.loginFails[ip] = attempt
+	d.pruneLoginFailsLocked(now)
+}
+
+// pruneLoginFailsLocked drops entries whose last failure is old enough that the
+// counter would reset anyway, then, if the map is still over the cap, the
+// oldest ones. A brute-force run from many addresses (or months of ordinary
+// failures) can then not grow it without bound.
+func (d *Daemon) pruneLoginFailsLocked(now time.Time) {
+	for ip, attempt := range d.loginFails {
+		if now.Sub(attempt.last) > loginBlockFor {
+			delete(d.loginFails, ip)
+		}
+	}
+	for len(d.loginFails) > loginFailMaxEntries {
+		oldestIP := ""
+		var oldest time.Time
+		for ip, attempt := range d.loginFails {
+			if oldestIP == "" || attempt.last.Before(oldest) {
+				oldestIP, oldest = ip, attempt.last
+			}
+		}
+		if oldestIP == "" {
+			return
+		}
+		delete(d.loginFails, oldestIP)
+	}
 }
 
 // clearLoginFailures forgets the failures of an address after a good login.

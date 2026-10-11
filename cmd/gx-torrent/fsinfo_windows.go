@@ -4,6 +4,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/sys/windows"
 )
@@ -28,6 +29,13 @@ func networkFilesystem(path string) bool {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return false
+	}
+	// A UNC path (\\server\share\...) is a network path by construction. Asking
+	// GetDriveType about its volume root would answer DRIVE_NO_ROOT_DIR when the
+	// share is slow, offline or not yet authenticated, and we would then treat
+	// it as local and try a junction, which cannot target a share.
+	if strings.HasPrefix(abs, `\\`) {
+		return true
 	}
 	volume := filepath.VolumeName(abs)
 	if volume == "" {

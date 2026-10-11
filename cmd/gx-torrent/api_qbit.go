@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -82,8 +83,9 @@ func (d *Daemon) routesQbit() http.Handler {
 	return d.qbitAuth(mux)
 }
 
-// qbitAuth requires a valid SID session for every call but the login. With no
-// password configured the API is open (fresh standalone install). A cross-site
+// qbitAuth guards the qBittorrent API the same way the page and /api/v1 are
+// guarded: no password configured, a LAN source with local-bypass on, or a valid
+// session (the page's gx_session cookie or the qBittorrent SID). A cross-site
 // POST is always rejected (no CSRF token is used); programmatic clients send no
 // Origin/Referer and are allowed.
 func (d *Daemon) qbitAuth(next http.Handler) http.Handler {
@@ -92,11 +94,7 @@ func (d *Daemon) qbitAuth(next http.Handler) http.Handler {
 			http.Error(w, "cross-origin request rejected", http.StatusForbidden)
 			return
 		}
-		if r.URL.Path == "/api/v2/auth/login" || !d.standaloneAuthActive() {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if cookie, err := r.Cookie(qbitSIDCookie); err == nil && d.sessions != nil && d.sessions.Valid(cookie.Value) {
+		if r.URL.Path == "/api/v2/auth/login" || d.standaloneAPIAllowed(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -170,6 +168,7 @@ type qbitTorrent struct {
 	ULRate       int64   `json:"upspeed"`
 	State        string  `json:"state"`
 	SavePath     string  `json:"save_path"`
+	ContentPath  string  `json:"content_path"`
 	Category     string  `json:"category"`
 	Tags         string  `json:"tags"`
 	NumSeeds     int     `json:"num_seeds"`
@@ -247,6 +246,7 @@ func qbitView(v torrentInfo) qbitTorrent {
 		ULRate:       v.UploadRate,
 		State:        qbitState(v.State),
 		SavePath:     v.SavePath,
+		ContentPath:  filepath.Join(v.SavePath, v.Name),
 		Category:     v.Category,
 		Tags:         strings.Join(v.Tags, ", "),
 		NumSeeds:     v.NumSeeds,
@@ -610,7 +610,7 @@ func (d *Daemon) applyQbitTorrentLimit(w http.ResponseWriter, r *http.Request, d
 }
 
 func (d *Daemon) handleQbitDelete(w http.ResponseWriter, r *http.Request) {
-	deleteFiles := strings.EqualFold(strings.TrimSpace(r.FormValue("deleteFiles")), "true")
+	deleteFiles := formBool(r, "deleteFiles")
 	for _, hash := range d.qbitHashes(r.FormValue("hashes")) {
 		_ = d.remove(hash, deleteFiles)
 	}
@@ -624,13 +624,18 @@ func (d *Daemon) handleQbitAdd(w http.ResponseWriter, r *http.Request) {
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
 	tags := qbitList(r.FormValue("tags"))
-	if savePath == "" && category != "" {
+	switch {
+	case formBool(r, "autoTMM") && category != "":
+		// With automatic torrent management the category decides the path, even
+		// when a savepath is also sent (qBittorrent behaviour).
+		savePath = d.categorySavePath(category)
+	case savePath == "" && category != "":
 		// A category carries its own save path, like qBittorrent.
 		savePath = d.categorySavePath(category)
 	}
-	paused := strings.EqualFold(strings.TrimSpace(r.FormValue("paused")), "true")
-	sequential := strings.EqualFold(strings.TrimSpace(r.FormValue("sequentialDownload")), "true")
-	firstLast := strings.EqualFold(strings.TrimSpace(r.FormValue("firstLastPiecePrio")), "true")
+	paused := formBool(r, "paused")
+	sequential := formBool(r, "sequentialDownload")
+	firstLast := formBool(r, "firstLastPiecePrio")
 	added := false
 
 	// Uploaded .torrent files (multipart field "torrents").
@@ -1027,9 +1032,9 @@ func (d *Daemon) handleQbitSetShareLimits(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleQbitSync answers /api/v2/sync/maindata with a full snapshot every time
-// (rid is constant): the clients that poll it get a consistent state without us
-// implementing the incremental diff.
+// handleQbitSync answers /api/v2/sync/maindata. It always sends a full snapshot
+// (no incremental diff); rid only has to move forward so clients that compare it
+// see each poll as a new revision.
 func (d *Daemon) handleQbitSync(w http.ResponseWriter, _ *http.Request) {
 	views := d.snapshotViews()
 	torrents := make(map[string]qbitTorrent, len(views))
@@ -1042,7 +1047,7 @@ func (d *Daemon) handleQbitSync(w http.ResponseWriter, _ *http.Request) {
 	}
 	stats := d.stats()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"rid":              1,
+		"rid":              d.qbitRID.Add(1),
 		"full_update":      true,
 		"torrents":         torrents,
 		"torrents_removed": []string{},

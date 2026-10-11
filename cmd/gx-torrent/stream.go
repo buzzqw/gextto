@@ -5,6 +5,7 @@ package main
 //. The player can start before the download is complete.
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -85,7 +86,7 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	d.streamRange(w, t, fileIndex, f, start, length)
+	d.streamRange(r.Context(), w, t, fileIndex, f, start, length)
 }
 
 // setStreamWindows tells the engine which pieces the player needs now (the next
@@ -97,8 +98,9 @@ func setStreamWindows(t *torrent.Torrent, fileIndex int, pos int64) {
 }
 
 // streamRange writes `length` bytes of the file from `start`, waiting for the
-// pieces the player has not downloaded yet.
-func (d *Daemon) streamRange(w http.ResponseWriter, t *torrent.Torrent, fileIndex int, f *os.File, start, length int64) {
+// pieces the player has not downloaded yet. The request context stops the wait
+// when the player seeks away or closes the connection.
+func (d *Daemon) streamRange(ctx context.Context, w http.ResponseWriter, t *torrent.Torrent, fileIndex int, f *os.File, start, length int64) {
 	flusher, _ := w.(http.Flusher)
 	deadline := time.Now().Add(streamWaitTimeout)
 	buf := make([]byte, streamChunk)
@@ -107,7 +109,7 @@ func (d *Daemon) streamRange(w http.ResponseWriter, t *torrent.Torrent, fileInde
 		if n > length-written {
 			n = length - written
 		}
-		if !d.waitForPieces(t, fileIndex, start+written, n, deadline) {
+		if !d.waitForPieces(ctx, t, fileIndex, start+written, n, deadline) {
 			return
 		}
 		m, err := f.ReadAt(buf[:n], start+written)
@@ -131,7 +133,7 @@ func (d *Daemon) streamRange(w http.ResponseWriter, t *torrent.Torrent, fileInde
 // waitForPieces blocks until the engine reports the pieces covering the byte range as
 // complete, or the deadline passes. A range that cannot be mapped (no metadata)
 // is treated as ready and read straight from disk.
-func (d *Daemon) waitForPieces(t *torrent.Torrent, fileIndex int, offset, length int64, deadline time.Time) bool {
+func (d *Daemon) waitForPieces(ctx context.Context, t *torrent.Torrent, fileIndex int, offset, length int64, deadline time.Time) bool {
 	begin, end, ok := t.FilePieceRange(fileIndex, offset, length)
 	if !ok {
 		return true
@@ -143,7 +145,11 @@ func (d *Daemon) waitForPieces(t *torrent.Torrent, fileIndex int, offset, length
 		if time.Now().After(deadline) {
 			return false
 		}
-		time.Sleep(streamPollEvery)
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(streamPollEvery):
+		}
 	}
 }
 

@@ -112,22 +112,37 @@ func (d *Daemon) hostAllowed(host string) bool {
 }
 
 // allowedHosts returns the extra Host values accepted (the "allowed-hosts"
-// setting: a comma/newline separated list).
+// setting: a comma/newline separated list). The parsed list is cached: the
+// setting only changes when settings.json is rewritten.
 func (d *Daemon) allowedHosts() []string {
 	if d.opts.Settings == nil {
 		return nil
 	}
-	return splitList(d.opts.Settings.Get(allowedHostsKey, ""))
+	raw := d.opts.Settings.Get(allowedHostsKey, "")
+	d.secMu.Lock()
+	defer d.secMu.Unlock()
+	if raw == d.hostsRaw {
+		return d.hosts
+	}
+	d.hostsRaw, d.hosts = raw, splitList(raw)
+	return d.hosts
 }
 
 // trustedProxies returns the networks whose forwarding headers may be believed
-// (the "trusted-proxies" setting: IPs or CIDRs, comma/newline separated).
+// (the "trusted-proxies" setting: IPs or CIDRs, comma/newline separated). The
+// parsed networks are cached (a request calls this on every clientIP).
 func (d *Daemon) trustedProxies() []*net.IPNet {
 	if d.opts.Settings == nil {
 		return nil
 	}
+	raw := d.opts.Settings.Get(trustedProxiesKey, "")
+	d.secMu.Lock()
+	defer d.secMu.Unlock()
+	if raw == d.proxiesRaw {
+		return d.proxies
+	}
 	var out []*net.IPNet
-	for _, item := range splitList(d.opts.Settings.Get(trustedProxiesKey, "")) {
+	for _, item := range splitList(raw) {
 		if !strings.Contains(item, "/") {
 			ip := net.ParseIP(item)
 			if ip == nil {
@@ -143,6 +158,7 @@ func (d *Daemon) trustedProxies() []*net.IPNet {
 			out = append(out, network)
 		}
 	}
+	d.proxiesRaw, d.proxies = raw, out
 	return out
 }
 

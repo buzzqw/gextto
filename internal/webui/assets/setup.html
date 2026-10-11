@@ -34,6 +34,7 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <h3>Network</h3>
 <label>Peer port<input type="number" name="peer-port" placeholder="6881" min="0" max="65535"></label>
 <button type="button" class="secondary" id="ptest">Test port</button>
+<p class="m">The test checks the port the daemon is already listening on, not the value typed above (a new port applies at the next start).</p>
 <p class="m" id="presult"></p>
 <h3>Bandwidth</h3>
 <label>Download limit (KiB/s, 0 = unlimited)<input type="number" name="speed-download" min="0" placeholder="0"></label>
