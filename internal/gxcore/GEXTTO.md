@@ -134,7 +134,8 @@ Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
 - **misura e anti-Sybil** (`make measure-dht`, `internal/dht/measure_test.go`, opt-in, fuori
   dalla CI): avvia un nodo reale contro la DHT pubblica e traccia nodi,
   `subnet_share_max`, `nodes_insecure_id` e il successo delle query (`docs/evoluzione.md`
-  §4.10); `Config.MaxNodesPerSubnet` applica un cap opzionale per /24 (/48 v6) con contatore
-  `nodes_capped`.
+  §4.10); `Config.MaxNodesPerSubnet` applica un cap opzionale per /24 (/48 v6),
+  **default disattivato**, con contatore `nodes_capped`; i nodi oltre soglia
+  restano noti ma fuori dall'albero (`noTree`), per non ri-scoprirli in loop.
 
 uTP usa la libreria `github.com/anacrolix/utp` come dipendenza.

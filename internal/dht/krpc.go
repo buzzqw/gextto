@@ -33,7 +33,11 @@ type remoteNode struct {
 	lastResponseTime time.Time
 	lastSearchTime   time.Time
 	ActiveDownloads  []string // List of infohashes we know this peer is downloading.
-	log              *DebugLogger
+	// noTree marks a node kept in the address book but denied a routing-table
+	// tree slot because its subnet was at the anti-Sybil cap. Keeping it avoids
+	// re-discovering and re-processing it in a loop.
+	noTree bool
+	log    *DebugLogger
 }
 
 func newRemoteNode(addr net.UDPAddr, id string, log *DebugLogger) *remoteNode {

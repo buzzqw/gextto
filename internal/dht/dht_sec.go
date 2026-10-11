@@ -194,7 +194,7 @@ func (d *DHT) tableMetrics() (maxShare, insecure int) {
 	}
 	share := make(map[string]int, len(d.routingTable.addresses))
 	for _, node := range d.routingTable.addresses {
-		if node == nil || node.address.IP == nil || bogusId(node.id) {
+		if node == nil || node.noTree || node.address.IP == nil || bogusId(node.id) {
 			continue
 		}
 		ip := node.address.IP

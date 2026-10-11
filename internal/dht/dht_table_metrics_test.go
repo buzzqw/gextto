@@ -44,9 +44,9 @@ func TestTableMetricsConcentration(t *testing.T) {
 	}
 }
 
-// TestSubnetCapDropsExtraNodes: with a cap of 2, a third node from the same /24
-// is dropped entirely (no tree slot, no address entry).
-func TestSubnetCapDropsExtraNodes(t *testing.T) {
+// TestSubnetCapKeepsTreeBounded: with a cap of 2, a third node from the same
+// /24 stays known (so it is not re-discovered in a loop) but gets no tree slot.
+func TestSubnetCapKeepsTreeBounded(t *testing.T) {
 	d := newTestDHT()
 	d.routingTable.maxPerSubnet = 2
 	for i := 0; i < 4; i++ {
@@ -57,7 +57,16 @@ func TestSubnetCapDropsExtraNodes(t *testing.T) {
 	if maxShare, _ := d.tableMetrics(); maxShare != 2 {
 		t.Errorf("subnet share = %d, want 2 (cap)", maxShare)
 	}
-	if got := len(d.routingTable.addresses); got != 2 {
-		t.Errorf("addresses = %d, want 2 (extra nodes dropped)", got)
+	if got := len(d.routingTable.addresses); got != 4 {
+		t.Errorf("addresses = %d, want 4 (kept, no re-discovery loop)", got)
+	}
+	noTree := 0
+	for _, n := range d.routingTable.addresses {
+		if n.noTree {
+			noTree++
+		}
+	}
+	if noTree != 2 {
+		t.Errorf("noTree nodes = %d, want 2", noTree)
 	}
 }

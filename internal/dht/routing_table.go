@@ -48,7 +48,7 @@ func (r *routingTable) subnetAtCap(ip net.IP, exclude *remoteNode) bool {
 	}
 	n := 0
 	for _, node := range r.addresses {
-		if node == exclude || node.address.IP == nil || bogusId(node.id) {
+		if node == exclude || node.noTree || node.address.IP == nil || bogusId(node.id) {
 			continue
 		}
 		if subnetKey(node.address.IP) == key {
@@ -135,13 +135,15 @@ func (r *routingTable) update(node *remoteNode, proto string) error {
 	}
 	if node.id != "" {
 		if r.subnetAtCap(node.address.IP, node) {
-			// The subnet is at the cap: drop the node entirely, so it does not
-			// linger in the address book without a tree slot.
+			// The subnet is at the cap: keep the node in the address book but
+			// deny it a tree slot, so it is not re-discovered and re-processed
+			// in a loop.
 			totalNodesCapped.Add(1)
-			delete(r.addresses, addr)
-			knownNodes.Store(int64(len(r.addresses)))
+			node.noTree = true
+			r.addresses[addr].id = node.id
 			return nil
 		}
+		node.noTree = false
 		r.nTree.insert(node)
 		totalNodes.Add(1)
 		r.addresses[addr].id = node.id
@@ -170,15 +172,16 @@ func (r *routingTable) insert(node *remoteNode, proto string) error {
 		return nil // fmt.Errorf("node already existed in routing table: %v", node.address.String())
 	}
 	if !bogusId(node.id) && r.subnetAtCap(node.address.IP, node) {
-		// The subnet is already at the cap: drop the node entirely instead of
-		// giving it a tree slot (and do not let it fill the address book).
+		// The subnet is already at the cap: keep the node in the address book
+		// but deny it a tree slot (noTree), so it is not re-processed in a
+		// loop and does not count towards the cap itself.
 		totalNodesCapped.Add(1)
-		return nil
+		node.noTree = true
 	}
 	r.addresses[addr] = node
 	knownNodes.Store(int64(len(r.addresses)))
 	// We don't know the ID of all nodes.
-	if !bogusId(node.id) {
+	if !bogusId(node.id) && !node.noTree {
 		// recursive version of node insertion.
 		r.nTree.insert(node)
 		totalNodes.Add(1)

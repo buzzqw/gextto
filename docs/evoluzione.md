@@ -422,6 +422,9 @@ Conseguenze (tutte implementate):
   (misurato): non vengono inoltrati; anche `type` non ha effetto osservato;
 - la lista indexer di **Jackett non è raggiungibile** con la chiave Torznab (la
   sua API risponde con redirect al login): irrilevante, serve solo l'aggregato.
+  Jackett espone Torznab su `/api/v2.0/indexers/all/results/torznab/api` invece del
+  generico `/api` (che risponde 404): `internal/torznab` lo deduce dalla porta `:9117`
+  o dal nome con fallback automatico su 404, condiviso tra Gextto e `gx-torrent`.
 
 ### 3.3 FlareSolverr
 
@@ -862,11 +865,23 @@ del campo `ip` in questa rete.
 (`get_peers` su più rami e incrocio dei risultati); ora c'è l'harness su cui
 misurare il prima/dopo. Nessun codice speculativo.
 
-**Cap anti-Sybil per subnet — implementato (2026-10-11).** `Config.MaxNodesPerSubnet`
-(default 0 = disattivato, anti-Sybil opzionale) limita i nodi nella tabella di routing
-allo stesso /24 (IPv4) o /48 (IPv6) e scarta i nodi in eccesso tracciandoli nel
-contatore `nodes_capped`. Può essere misurato sull'harness reale con
-`GX_MEASURE_DHT_SUBNET_CAP=8 make measure-dht`. Test: `TestSubnetCapDropsExtraNodes`.
+**Cap anti-Sybil per subnet — implementato e misurato (2026-10-11).**
+`Config.MaxNodesPerSubnet` (default 0 = disattivato) limita i nodi **nell'albero**
+di routing allo stesso /24 (IPv4) o /48 (IPv6); i nodi oltre soglia restano nel
+libretto degli indirizzi con `noTree` (così non vengono ri-scoperti in loop) e si
+contano in `nodes_capped`. Si misura con
+`GX_MEASURE_DHT_SUBNET_CAP=8 make measure-dht`.
+
+**La misura ha trovato e corretto un bug reale.** La prima versione scartava del
+tutto i nodi oltre soglia e il DHT li ri-scopriva e ri-processava a ogni giro:
+tempesta di query (`q_out` **14.352** contro ~1.089 senza cap, successo **10%**
+contro 31%, nodi **4.640** contro ~740). Tenendo il nodo in `noTree` la tempesta
+sparisce (nodi ~814, `q_out` ~1.975). Due avvertenze: il cap **non è attivo di
+default**, e la soglia va scelta con più run — in un campione con cap=8 non è mai
+scattato (`capped=0`, `subnet_max` 6, mentre un run senza cap aveva visto **14**),
+quindi la concentrazione varia molto tra run e il **successo delle query è
+rumoroso** (17% e 31% senza differenze di cap). Test:
+`TestSubnetCapKeepsTreeBounded`.
 
 **Fuori scope:** DHT su I2P (nessun I2P nel progetto) e BEP 44/46 **client
 uscente** (nessun consumatore: regola "niente codice speculativo"; lato server e
