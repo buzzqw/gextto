@@ -32,6 +32,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 27 | Private Torrents (`private: 1`, niente DHT/PEX/LSD) | sì |
 | 40 | Canonical Peer Priority (tie-break) | sì |
 | 47 | Padding Files (`.pad/`) | sì |
+| 54 | The `lt_donthave` extension (un peer non ha più un pezzo) | no |
 
 ## Trasporto, cifratura e NAT
 
@@ -47,6 +48,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 |---|---|---|
 | 7 | IPv6 Tracker Extension (`peers6`) | sì |
 | 15 | UDP Tracker Protocol (connect/announce/scrape) | sì |
+| 31 | Tracker Failure Retry Extension | no (backoff interno) |
 | 41 | UDP Tracker Protocol Extensions (`URLData`, opzione `0x2`) | sì |
 | 48 | Tracker Scrape (HTTP `/scrape` e UDP) | sì |
 | 34 | DNS Tracker Preferences (record SRV) | no (usata da pochissimi tracker) |
@@ -76,11 +78,19 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 
 | BEP / tecnologia | Motivo |
 |---|---|
+| 8 (Tracker Peer Obfuscation) | deferred dal processo BEP |
 | 17 (HTTP Seeding "Hoffman") | superata da BEP 19 |
+| 18 (Search Engine) / 22 (Local Tracker Discovery) / 26 (Zeroconf) / 28 (Tracker exchange) | deferred |
+| 30 (Merkle tree torrent extension, v1) | superata da BEP 52 (v2) |
 | 35 (Torrent signing) | standard mai affermatosi |
-| 54 (STUN NAT Traversal) | costo/complessità oltre il beneficio |
+| 36 / 39 / 49 (Feed RSS, aggiornamento via feed, feed distribuiti) | livello applicativo: Gextto ha già RSS/Torznab |
+| 50 (Publish/Subscribe Protocol) | nicchia (pub/sub su DHT); costo > beneficio |
 | WebTorrent (WebRTC) | richiede lo stack WebRTC; componente esterno, non nel core |
 | I2P SAM nativo | usabili proxy SOCKS5/HTTP; SAM nativo fuori scope |
+
+> Nota: BEP 54 è **`lt_donthave`**, non STUN (errore di una versione precedente
+> di questo documento e dell'analisi esterna). Non esiste una BEP per il NAT
+> traversal via STUN.
 
 ## Residui e roadmap
 
@@ -90,16 +100,23 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
    presenti, torrent non intero) porta `event=paused` (`announcer` +
    `tracker.EventPaused`). Il campo `downloaders` dello scrape resta opzionale
    (dipende dal tracker, che deve esporlo).
-2. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
+2. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
+   persistenza nel resume) sono fatti; restano `xs=` (sorgente esatta, URL del
+   `.torrent`) e `as=` (sorgente accettabile), raramente usati.
+3. **BEP 54 — `lt_donthave`** (piccola, consigliata): aggiungere `lt_donthave` al
+   dizionario `m` dell'extension handshake e gestire il messaggio `DontHave`
+   in ricezione (aggiornare il bitfield remoto, cancellare/rifiutare le richieste
+   pendenti di quel pezzo). Lato invio serve solo se si scartano pezzi di torrent
+   attivi (non è il caso di gx-core).
+4. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
    sui nodi più vicini tramite `get`/`put` uscenti e traversal Kademlia. Il DHT
    oggi ha già un client verso i nodi più vicini per lo scrape
    (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il percorso
    uscente. Da aprire **solo con un consumatore reale** (nessun codice
    speculativo).
-3. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
-   persistenza nel resume) sono fatti; restano `xs=` (sorgente esatta) e `as=`
-   (sorgente accettabile), raramente usati.
-4. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
+5. **BEP 45 (DHT multi-address)** e **BEP 51 (`sample_infohashes`)**: marginali
+   per un client domestico/NAS (multi-interfaccia; indicizzazione per crawler).
+6. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
    ogni modifica va **misurata prima e dopo** (CPU, RAM, throughput), come da
    regola performance di `AGENTS.md`.
 
