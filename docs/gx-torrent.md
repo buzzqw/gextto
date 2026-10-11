@@ -1133,7 +1133,7 @@ token è impostato.
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
 | `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
-| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: crea un `.torrent` da un file o cartella del server e lo restituisce come download (mktorrent-style) |
+| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: crea un `.torrent` da un file o cartella del server e lo restituisce come download (mktorrent-style). `piece_length` (multiplo di 16 KiB, 0 = automatico) è limitato a 16 MiB per non trasformare un valore arbitrario in un'allocazione enorme |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
 | `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato; `scrape` interroga i tracker per seeders/leechers, BEP 48; `dhtscrape` stima lo sciame dal DHT, BEP 33) |

@@ -277,14 +277,34 @@ func (d *Daemon) handleUILogin(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secureRequest(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(d.sessions.TTL().Seconds()),
 	})
-	target := strings.TrimSpace(r.URL.Query().Get("next"))
-	if !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") {
-		target = "/"
-	}
+	target := safeLoginRedirect(strings.TrimSpace(r.URL.Query().Get("next")))
 	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+// safeLoginRedirect keeps the post-login ?next= target local: it must be an
+// absolute path with a single leading slash, so neither "//host"
+// (protocol-relative) nor "/\host" (which browsers normalize to the same) can
+// take the freshly logged-in user off-site.
+func safeLoginRedirect(target string) string {
+	if !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") || strings.HasPrefix(target, "/\\") {
+		return "/"
+	}
+	return target
+}
+
+// secureRequest reports whether the client reached the daemon over TLS, either
+// directly or through a proxy that forwarded the original scheme. It is used to
+// set cookie Secure only when the connection is actually encrypted, so the
+// plain-HTTP LAN deployment keeps working.
+func secureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https")
 }
 
 // renderLogin writes the sign-in page, localized like the daemon page. errKey

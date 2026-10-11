@@ -22,6 +22,7 @@ var (
 	errZeroPieceLength  = errors.New("torrent has zero piece length")
 	errZeroPieces       = errors.New("torrent has zero pieces")
 	errPieceLength      = errors.New("piece length must be multiple of 16K")
+	errPieceLengthBig   = errors.New("piece length is too large")
 	// ErrV2Only marks a BitTorrent v2-only torrent (BEP 52): it has a
 	// "meta version" of 2 and a "file tree" but no v1 "pieces".
 	ErrV2Only = errors.New("torrent is BitTorrent v2 only")
@@ -29,6 +30,11 @@ var (
 	// "meta version".
 	ErrUnknownMetaVersion = errors.New("unsupported meta version")
 )
+
+// maxPieceLength bounds a requested piece size. The largest standard v1 piece
+// is 16 MiB and calculatePieceLength never exceeds it; the cap keeps a crafted
+// create-torrent request from forcing an oversized buffer allocation.
+const maxPieceLength = 16 << 20
 
 // Info contains information about torrent.
 type Info struct {
@@ -306,6 +312,12 @@ func NewInfoBytes(root string, paths []string, private bool, pieceLength uint32,
 		log.Infof("Calculated piece length: %d K", pieceLength>>10)
 	} else if pieceLength%(16<<10) != 0 {
 		return nil, errPieceLength
+	}
+	// pieceLength is user-provided (create-torrent API) and feeds the hash
+	// buffer below, so an oversized value must not turn into a multi-gigabyte
+	// allocation. calculatePieceLength already stays within maxPieceLength.
+	if pieceLength > maxPieceLength {
+		return nil, errPieceLengthBig
 	}
 	buf := make([]byte, pieceLength)
 	offset := 0

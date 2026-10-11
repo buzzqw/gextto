@@ -7,6 +7,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -184,7 +185,7 @@ func (d *Daemon) renderSetup(w http.ResponseWriter, r *http.Request, errKey stri
 	page := assets.SetupPage()
 	errorHTML := ""
 	if errKey != "" {
-		errorHTML = `<p class="m err">` + errKey + `</p>`
+		errorHTML = `<p class="m err">` + html.EscapeString(errKey) + `</p>`
 	}
 	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
 	lang := d.uiLang(r)

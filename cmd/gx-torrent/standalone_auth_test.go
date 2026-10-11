@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -125,6 +126,54 @@ func TestHandleUILogin(t *testing.T) {
 	}
 	if got := rec.Header().Get("Location"); got != "/?open=abc" {
 		t.Fatalf("redirect target = %q, want ?open=abc", got)
+	}
+}
+
+// TestSafeLoginRedirect locks C-xx: the post-login ?next= must stay on-site.
+// "//host" is protocol-relative and "/\host" is normalized by browsers to the
+// same, so both must fall back to the root.
+func TestSafeLoginRedirect(t *testing.T) {
+	cases := map[string]string{
+		"":                "/",
+		"//evil.example":  "/",
+		"/\\evil.example": "/",
+		"http://evil":     "/",
+		"/ui/settings":    "/ui/settings",
+		"/?open=abc":      "/?open=abc",
+	}
+	for in, want := range cases {
+		if got := safeLoginRedirect(in); got != want {
+			t.Errorf("safeLoginRedirect(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestLoginCookieSecureOnlyOverTLS locks that the session cookie is marked
+// Secure only when the request actually arrived over TLS, so plain-HTTP LAN use
+// keeps working.
+func TestLoginCookieSecureOnlyOverTLS(t *testing.T) {
+	d := standaloneTestDaemon(t, "s3cret", true)
+	sessionCookie := func(overTLS bool) *http.Cookie {
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8890/ui/login",
+			strings.NewReader("user=admin&password=s3cret"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if overTLS {
+			req.TLS = &tls.ConnectionState{}
+		}
+		rec := httptest.NewRecorder()
+		d.handleUILogin(rec, req)
+		for _, c := range rec.Result().Cookies() {
+			if c.Name == uiSessionCookie {
+				return c
+			}
+		}
+		return nil
+	}
+	if c := sessionCookie(false); c == nil || c.Secure {
+		t.Fatalf("plain-HTTP session cookie must not be Secure: %+v", c)
+	}
+	if c := sessionCookie(true); c == nil || !c.Secure {
+		t.Fatalf("TLS session cookie must be Secure: %+v", c)
 	}
 }
 

@@ -125,6 +125,7 @@ func (d *Daemon) handleQbitLogin(w http.ResponseWriter, r *http.Request) {
 	token := d.sessions.Create()
 	http.SetCookie(w, &http.Cookie{
 		Name: qbitSIDCookie, Value: token, Path: "/", HttpOnly: true,
+		Secure:   secureRequest(r),
 		SameSite: http.SameSiteLaxMode, MaxAge: int(d.sessions.TTL().Seconds()),
 	})
 	qbitText(w, http.StatusOK, qbitOKCode)
@@ -134,7 +135,7 @@ func (d *Daemon) handleQbitLogout(w http.ResponseWriter, r *http.Request) {
 	if cookie, err := r.Cookie(qbitSIDCookie); err == nil && d.sessions != nil {
 		d.sessions.Drop(cookie.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: qbitSIDCookie, Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: qbitSIDCookie, Value: "", Path: "/", Secure: secureRequest(r), MaxAge: -1})
 	qbitText(w, http.StatusOK, qbitOKCode)
 }
 

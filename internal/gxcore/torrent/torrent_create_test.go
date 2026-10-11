@@ -80,3 +80,19 @@ func TestCreateTorrentMissingPath(t *testing.T) {
 		t.Fatal("expected an error for a missing path")
 	}
 }
+
+// TestCreateTorrentRejectsOversizedPieceLength locks the cap on the requested
+// piece size: it is user-provided and feeds a buffer allocation, so a value far
+// beyond the standard 16 MiB must be refused instead of allocating gigabytes.
+func TestCreateTorrentRejectsOversizedPieceLength(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.bin"), []byte("payload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateTorrent(dir, CreateOptions{PieceLength: 1 << 30}); err == nil {
+		t.Fatal("expected an error for an oversized piece length")
+	}
+	if _, err := CreateTorrent(dir, CreateOptions{PieceLength: 16 << 10}); err != nil {
+		t.Fatalf("a valid piece length was rejected: %s", err)
+	}
+}
