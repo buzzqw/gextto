@@ -72,7 +72,11 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | BEP | Specifica | Stato |
 |---|---|---|
 | 52 | BitTorrent v2 (alberi Merkle SHA-256, `piece layers`) | sì (v1, ibridi, v2-only da `.torrent` e da magnet) |
-| 53 | Magnet URI Extension (`so=`, `xs=`, `ws=`, `as=`) | **parziale**: `so=` (Select Only) e `ws=` (web seed) sì; `xs=`/`as=` no |
+| 53 | Magnet URI extension: `so=` (Select Only) | sì |
+
+> Il parametro magnet `so=` è **BEP 53**. `xs=` (sorgente esatta), `ws=` (web
+> seed) e `as=` (sorgente accettabile) vengono dalla **convenzione Magnet URI**
+> (non da una BEP): gx-core gestisce `ws=` (sì), non `xs=`/`as=`.
 
 ## Fuori scope / obsolete
 
@@ -106,9 +110,10 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
    disponibilità nel picker; senza Fast Extension viene cancellato anche il
    download attivo di quel pezzo da quel peer. Il lato **invio** non serve
    (gx-core non scarta pezzi di torrent attivi).
-3. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
-   persistenza nel resume) sono fatti; restano `xs=` (sorgente esatta, URL del
-   `.torrent`) e `as=` (sorgente accettabile), raramente usati.
+3. **Magnet `xs=`/`as=`** (convenzione Magnet URI, **non** BEP 53): restano da
+   fare `xs=` (sorgente esatta, URL del `.torrent`) e `as=` (sorgente
+   accettabile), raramente usati. `so=` (BEP 53) e `ws=` (web seed, con
+   persistenza nel resume) sono fatti.
 4. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
    sui nodi più vicini tramite `get`/`put` uscenti e traversal Kademlia. Il DHT
    oggi ha già un client verso i nodi più vicini per lo scrape
