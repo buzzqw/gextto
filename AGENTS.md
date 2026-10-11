@@ -248,9 +248,15 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - Una nuova feature visibile va esposta **sia** nella UI di Gextto
   (`uiweb/v2`) **sia**, dove ha senso, nella pagina web del demone
   (`cmd/gx-torrent/ui.go`): non lasciarla raggiungibile solo via API.
-- Aggiorna sempre `README.md`/`README.it.md` e `docs/MANUAL.it.md`/`docs/MANUAL.en.md`
-  quando cambia il comportamento visibile. Documento tecnico motore:
-  `docs/gx-torrent.md`; architettura: `docs/ARCHITECTURE.md`.
+- **Il `README` è documentazione a tutti gli effetti e va aggiornato a ogni
+  modifica impattante per l'utente**, soprattutto quando è particolarmente utile
+  o quando mette in risalto la bontà e la potenza di Gextto o di gx-core: non va
+  lasciato indietro. Vale insieme per `README.md` e `README.it.md` (stessa
+  sostanza nelle due lingue) e per `docs/MANUAL.it.md`/`docs/MANUAL.en.md` quando
+  cambia il comportamento visibile (i manuali sono **embeddati** nel binario:
+  vedi *Servizio in esecuzione*, quindi servono `make build` e riavvio).
+  Documento tecnico motore: `docs/gx-torrent.md`; architettura:
+  `docs/ARCHITECTURE.md`.
 - **La documentazione va sempre tenuta aggiornata.** Nessuna modifica (codice,
   configurazione, comportamento visibile, roadmap) è da considerarsi finita
   finché i documenti di riferimento non la riflettono; vale anche per i

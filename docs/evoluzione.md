@@ -145,6 +145,16 @@ render compaia al render successivo (niente cache stantia).
 - **Dashboard: diagnostica "Ultimi trovati nelle sorgenti"** — già fatto
   (route `GET /dashboard/feed`, `uiweb_v2.go`).
 - **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
+- **README allineato alla copertura BEP — fatto (2026-10-11).** Le sezioni
+  *Motore torrent* di `README.md`/`README.it.md` ora riassumono **tutta** la
+  copertura BitTorrent coi numeri di BEP (wire 3, Fast Extension 6,
+  `ut_metadata` 9, Extension Protocol 10, PEX v4/v6 11, multitracker 12, LSD
+  v4/v6 14, Web Seed 19, `upload_only` 21, padding 47, `lt_donthave` 54; tracker
+  IPv6 7, UDP 15, URLData 41, scrape 48; DHT 5/32/33/42/43/44; v2 52, magnet
+  `so=` 53) e rimandano a `docs/bep.md` come fonte unica; i BEP deprecati/di
+  nicchia e WebTorrent/I2P sono dichiarati fuori scope. Regola generale aggiunta
+  ad `AGENTS.md`: il README è documentazione e va aggiornato a ogni modifica
+  impattante per l'utente.
 
 ### 1.4 Micro-ottimizzazioni UI/i18n (fatte, misurate il 2026-10-10)
 
