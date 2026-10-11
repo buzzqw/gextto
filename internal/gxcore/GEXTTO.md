@@ -34,6 +34,12 @@ Test del motore (girano dentro questo modulo):
 - `internal/announcer/announce_test.go` — BEP 21 lato tracker: un seed parziale
   annuncia `event=paused`, `stopped` resta `stopped`, un downloader resta
   `empty`;
+- `internal/peerprotocol/donthave_test.go` — codec BEP 54 `lt_donthave`
+  (round-trip, annuncio nell'handshake, payload corto rifiutato);
+- `internal/piecepicker/donthave_test.go` — `HandleDontHave` azzera il bitfield
+  e la disponibilità del pezzo;
+- `torrent/torrent_donthave_test.go` — `handleDontHave` azzera il bitfield del
+  peer;
 - `torrent/torrent_selection_test.go` — maschere di selezione `so=` (BEP 53:
   indici sui file non-padding) e flag `Config.FileSelection`;
 - `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
@@ -79,6 +85,7 @@ Funzionalità e aree del motore:
 | BEP 27 (privati) | `torrent/torrent.go` (`privateSwarm`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | Regola centralizzata in `torrent.privateSwarm()`: **DHT** (announcer), **PEX** (invio *e* ricezione) disattivati sui torrent privati; la **LSD** (demone) salta i privati su invio e ricezione. Il **PEX in ricezione** era l'unico percorso non filtrato (fix 2026-10-11), con guard test `torrent_private_test.go` |
 | BEP 53 (`so=`, `ws=`) | `internal/magnet/magnet.go`, `torrent/session_add.go`, `torrent/torrent_selection.go`, `torrent/torrent.go`, `torrent/session_torrent.go` | Il parametro `so` del magnet (Select Only: indici e range tipo `0,2,4-7`, de-duplicati) è parsato in `Magnet.SelectOnly` e diventa il **seed** del torrent (`AddTorrentOptions.SelectOnly`/`torrent.selectOnly`, guardato da `selectOnlyMu`). `skippedInfoFiles` usa il seed **solo** quando `Config.FileSelection` non restituisce una maschera: la scelta dell'app ha sempre la precedenza, così l'utente può ripristinarla. `Torrent.SelectOnly`/`ClearSelectOnly` leggono e azzerano il seed. Il demone lo converte in `FilePriorities` appena arriva il metadata (`docs/gx-torrent.md`). Il parametro `ws=` (web seed) è parsato in `Magnet.WebSeeds` e passato come web seed del torrent, persistito nel resume (`Spec.URLList`). Restano `xs=`/`as=` |
 | BEP 21 (`upload_only`, `event=paused`) | `internal/peerprotocol/extension.go`, `torrent/torrent_peer.go` (`sendExtensionHandshake`), `torrent/torrent_pieces.go` (`checkCompletion`), `torrent/torrent_selection.go` (`uploadOnly`), `torrent/torrent_announce.go` (`PartialSeed`), `internal/tracker/event.go`, `internal/announcer/announce.go` | L'extension handshake BEP 10 include `upload_only: 1` quando il torrent è completo (`torrent.uploadOnly` = `completed`): seed pieno o **parziale** (tutti i pezzi *voluti* presenti, selection). Inviato alla connessione e **rinviato a tutti i peer** al passaggio a seed. Il valore ricevuto resta in `peer.ExtensionHandshake.UploadOnly`. **Lato tracker**: un seed parziale (`tracker.Torrent.PartialSeed`, da `announcerFields`) annuncia `event=paused` (`tracker.EventPaused`) su ogni announce non-`stopped`; il `stopped` resta invariato. Manca solo il campo `downloaders` dello scrape (lo fornisce il tracker, opzionale) |
+| BEP 54 (`lt_donthave`) | `internal/peerprotocol/extension.go` (`DontHaveMessage`, `ExtensionKeyDontHave`), `torrent/torrent_messagehandler.go` (`handleDontHave`), `internal/piecepicker/piecepicker.go` (`HandleDontHave`) | `lt_donthave` è annunciato nell'extension handshake; un `DontHave` in arrivo (`op 20`, subop, **indice a 4 byte** big-endian) azzera il bit del pezzo nel bitfield del peer e la sua disponibilità nel picker (`removeHavingPeer`); se la **Fast Extension** non è negoziata viene cancellato anche il download attivo di quel pezzo da quel peer (`closePieceDownloader`, come per un choke). Solo **ricezione**: gx-core non scarta pezzi di torrent attivi, quindi non invia `DontHave` |
 
 Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
 

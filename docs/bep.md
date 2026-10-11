@@ -32,7 +32,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 27 | Private Torrents (`private: 1`, niente DHT/PEX/LSD) | sì |
 | 40 | Canonical Peer Priority (tie-break) | sì |
 | 47 | Padding Files (`.pad/`) | sì |
-| 54 | The `lt_donthave` extension (un peer non ha più un pezzo) | no |
+| 54 | The `lt_donthave` extension (un peer non ha più un pezzo) | sì (ricezione) |
 
 ## Trasporto, cifratura e NAT
 
@@ -100,14 +100,15 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
    presenti, torrent non intero) porta `event=paused` (`announcer` +
    `tracker.EventPaused`). Il campo `downloaders` dello scrape resta opzionale
    (dipende dal tracker, che deve esporlo).
-2. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
+2. **BEP 54 — `lt_donthave` — fatta (ricezione).** `lt_donthave` è nel dizionario
+   `m` dell'extension handshake; un messaggio `DontHave` in arrivo (`op 20`,
+   subop, indice a 4 byte) azzera il bit del pezzo nel bitfield del peer e la sua
+   disponibilità nel picker; senza Fast Extension viene cancellato anche il
+   download attivo di quel pezzo da quel peer. Il lato **invio** non serve
+   (gx-core non scarta pezzi di torrent attivi).
+3. **BEP 53 — `xs=`/`as=`**: `so=` (Select Only) e `ws=` (web seed, con
    persistenza nel resume) sono fatti; restano `xs=` (sorgente esatta, URL del
    `.torrent`) e `as=` (sorgente accettabile), raramente usati.
-3. **BEP 54 — `lt_donthave`** (piccola, consigliata): aggiungere `lt_donthave` al
-   dizionario `m` dell'extension handshake e gestire il messaggio `DontHave`
-   in ricezione (aggiornare il bitfield remoto, cancellare/rifiutare le richieste
-   pendenti di quel pezzo). Lato invio serve solo se si scartano pezzi di torrent
-   attivi (non è il caso di gx-core).
 4. **BEP 44 — client iterativo uscente + BEP 46**: pubblicare e reperire item
    sui nodi più vicini tramite `get`/`put` uscenti e traversal Kademlia. Il DHT
    oggi ha già un client verso i nodi più vicini per lo scrape
