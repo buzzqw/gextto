@@ -51,9 +51,29 @@ chmod +x "$STAGE/gx-torrent"
 
 cat > "$STAGE/run.sh" <<'RUN'
 #!/usr/bin/env bash
-# Launch gx-torrent from an extracted archive.
+# Launch gx-torrent from an extracted archive or install it as a system service.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
+export GX_TORRENT_DATA="${GX_TORRENT_DATA:-$DIR/data}"
+
+if [[ -t 0 && $# -eq 0 ]]; then
+  echo "================================================="
+  echo " gx-torrent — Standalone BitTorrent Client"
+  echo "================================================="
+  echo "1) Avvia gx-torrent direttamente / Start gx-torrent directly"
+  echo "2) Installa il servizio systemd / Install systemd service (gx-torrent.service)"
+  read -r -p "Scelta / Choice [1/2] (default 1): " choice
+  if [[ "$choice" == "2" ]]; then
+    if [[ -x "$DIR/install-service.sh" ]]; then
+      if [[ "$(id -u)" != "0" ]]; then
+        exec sudo "$DIR/install-service.sh"
+      else
+        exec "$DIR/install-service.sh"
+      fi
+    fi
+  fi
+fi
+
 exec "$DIR/gx-torrent" "$@"
 RUN
 chmod +x "$STAGE/run.sh"

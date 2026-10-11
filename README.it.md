@@ -59,17 +59,21 @@ Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio
 
 **gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii dell'orchestratore, dispone di una propria interfaccia web autonoma ed è dove arrivano per prime le innovazioni di protocollo.
 
-Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un motore BitTorrent ad altissime prestazioni mantenuto direttamente in questo repository (con porzioni derivate con licenza MIT/BSD; vedi `internal/gxcore/LICENSE`):
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un motore BitTorrent ad altissime prestazioni mantenuto direttamente in questo repository (con porzioni derivate con licenza MIT/BSD; vedi `internal/gxcore/LICENSE`). Offre un supporto di protocollo completo e all'avanguardia con prestazioni elevate:
 
-- **BitTorrent v2 e Ibridi (BEP 52):** supporto completo v2-only e ibridi sia da file `.torrent` che da magnet (`urn:btmh:`). Utilizza un modello a pezzi per-file, verifica crittografica basata su alberi Merkle SHA-256 e fetch dinamico dei `piece layers` con messaggi dedicati (`hash request`, `hashes`, `hash reject`).
-- **Trasporto uTP (BEP 29) e Single-Port Listening:** un unico socket UDP gestisce simultaneamente il trasporto uTP e il traffico DHT. L'handshake BitTorrent/MSE instrada la connessione in base all'info-hash verso il torrent corrispondente, permettendo a tutti i trasferimenti di annunciare la medesima porta.
-- **NAT Traversal con Holepunching (BEP 55):** implementazione completa di `ut_holepunch` per stabilire connessioni punto-punto dirette su uTP attraverso NAT simmetrici e firewall, con supporto sia come client attivo sia come nodo di relè per altri peer.
+- **BitTorrent v1, v2 e Ibridi (BEP 52):** supporto completo per v1, v2-only e ibridi sia da file `.torrent` che da magnet (`urn:btmh:`). Utilizza un modello a pezzi per-file (nessun padding block tra file diversi), verifica crittografica basata su alberi Merkle SHA-256 e fetch dinamico dei `piece layers` direttamente dai peer (`hash request`, `hashes`, `hash reject`).
+- **Trasporto uTP (BEP 29) e Single-Port Listening:** motore dual-transport con esecuzione parallela di TCP e uTP e fallback automatico. Un unico socket UDP gestisce simultaneamente il trasporto uTP e il traffico DHT sulla medesima porta, con multiplexing delle connessioni e instradamento dell'handshake in base all'info-hash così che tutti gli swarm annuncino la stessa porta.
+- **NAT Traversal con Holepunching (BEP 55):** implementazione completa dell'estensione `ut_holepunch` per stabilire connessioni punto-punto dirette su uTP attraverso NAT simmetrici e firewall senza necessità di aprire porte sul router, con supporto sia come client attivo sia come nodo di relè per altri peer.
+- **Port Mapping e Integrazione di Rete:** apertura automatica delle porte sul router via UPnP e NAT-PMP, supporto proxy SOCKS5 e HTTP CONNECT, e killswitch vincolato all'interfaccia (`outgoing-interface`) per confinare tutto il traffico BitTorrent ai soli tunnel VPN.
 - **Super-seeding (BEP 16) e Choking Deterministico:** harness di simulazione deterministico dell'unchoker per ottimizzare throughput ed equità; supporto super-seeding per distribuire nuovi torrent annunciando un pezzo alla volta ed evitando upload ridondanti nel seed iniziale.
+- **Streaming Multimediale nel Browser e Priorità Graduata:** prioritizzazione in tempo reale per la riproduzione video: il piece picker distingue tra la finestra immediata del player (`SetStreamWindow`) e il margine di avanzamento (`SetReadaheadWindow`), privilegiandoli rispetto alle strategie rarest-first e servendo file video MKV/MP4 direttamente al browser o a VLC via richieste HTTP Range.
 - **Crittografia MSE/PE Zero-Alloc:** stream cipher RC4 eseguito direttamente in-place sul buffer di memoria chiamante (`inPlaceStreamWriter`), eliminando le allocazioni per blocco durante l'upload.
-- **Streaming Readahead e Priorità Dinamica:** prioritizzazione in tempo reale per la riproduzione video: il piece picker distingue tra la finestra immediata del player (`SetStreamWindow`) e il margine di avanzamento (`SetReadaheadWindow`), privilegiandoli rispetto alle strategie rarest-first.
-- **Popcount Hardware e Coda Richieste Adattiva:** conteggio del bitfield accelerato con istruzioni native della CPU (`math/bits.OnesCount64`); profondità della coda di richieste per peer (`RequestQueue`) modulata dinamicamente in base alla velocità di consegna dei blocchi.
-- **Modulo DHT Avanzato (`internal/dht`):** modulo isolato con supporto dual-stack IPv6 (BEP 32), Security Extension anti-spoofing con CRC32C Castagnoli (BEP 42), K/V store immutabile e mutabile firmato ed25519 (BEP 44) e modalità read-only per nodi di transito (BEP 43).
-- **Isolamento e Ban di Sessione:** esclusione temporanea (30 min) a livello di intera sessione per i peer che trasmettono blocchi corrotti, proteggendo tutti i torrent attivi.
+- **Accelerazione Hardware e Coda Adattiva:** conteggio del bitfield accelerato con istruzioni native della CPU (`math/bits.OnesCount64`); profondità della coda di richieste per peer (`RequestQueue`) modulata dinamicamente in base alla velocità di consegna dei blocchi e azzerata su choke/snub.
+- **Architettura di Memoria e Disco ad Alte Prestazioni:** cache di lettura dinamica in RAM con sweeper a scadenza lazy, limitatore del buffer di scrittura, allocazione file sparsi e preallocazione con `fallocate` (con protezione su tmpfs), e supporto per RAM disk per download temporanei.
+- **Filtro IP a Ricerca Binaria Ottimizzato:** supporta formati CIDR, intervalli, P2P ed eMule `.dat` fusi in intervalli ordinati e non sovrapposti in memoria, eseguendo lookup a ricerca binaria senza allocazioni con footprint trascurabile (~byte per regola).
+- **Modulo DHT Avanzato (`internal/dht`):** modulo isolato con supporto dual-stack IPv6 (BEP 32), Security Extension anti-spoofing con CRC32C Castagnoli (BEP 42), K/V store immutabile e mutabile firmato ed25519 (BEP 44), modalità read-only per nodi di transito (BEP 43) e tracker scrape (BEP 48 HTTP/UDP).
+- **Protezione Swarm, Diagnostica e Resilienza:** conformità rigorosa a BEP 27 per torrent privati (disattiva automaticamente DHT, PEX in/out e LSD); esclusione temporanea (30 min) di sessione per peer che trasmettono blocchi corrotti; WebSeed (BEP 19); diagnostica per-pezzo; resume persistente (BoltDB); diagnosi granulare degli errori di storage; e bus eventi live Server-Sent Events (`/ui/events`).
+- **Multipiattaforma e Client Standalone:** eseguibile sia come motore interno di Gextto sia come client autonomo (`gx-torrent`) dotato di propria Web UI, API compatibile qBittorrent (`/api/v2`), regole RSS con smart episode tracking, demone systemd su Linux e servizio nativo Windows Service su Windows (amd64/arm64).
 
 ### Motori alternativi
 
@@ -83,21 +87,6 @@ Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un motore BitTorrent ad alt
 | libtorrent (build opzionale) | Nel processo di Gextto; **solo se l'hai compilato** (`make build-libtorrent`) | Ti servono i controlli avanzati o la compatibilità di libtorrent; è anche il fallback automatico. Un crash coinvolge anche Gextto |
 
 Come includere libtorrent: vedi *Installazione dal sorgente* più sotto.
-
-### Matrice delle capacità
-
-Livelli: **sì** = supportato, **parziale** = supportato con limiti, **—** = non disponibile. La tabella è generata da `capabilityLevels` in [`torrent_engine.go`](torrent_engine.go), l'unica fonte di verità usata dalla UI; un test la tiene allineata, quindi la matrice si modifica lì, mai qui.
-
-<!-- capability-matrix:start -->
-| Capacità | gx-torrent | qBittorrent-nox | libtorrent (build opzionale) |
-| --- | :--: | :--: | :--: |
-| Aggiungi, Rimuovi, Pausa, Riprendi, Elenca, Ricontrolla, Sposta, Download sequenziale, Selezione file, Limiti per torrent, Peer, Tracker, Categorie, Tag, Prima/ultima parte | sì | sì | sì |
-| Priorità dei file | — | sì | sì |
-| Connessioni e slot di upload per torrent, RAM disk, Fast resume, Web seed | sì | — | sì |
-| Policy di seed, Super-seeding (BEP 16), Statistiche di sessione, Filtro IP | sì | parziale | sì |
-| Diagnostica dei pezzi, Holepunching (BEP 55) | sì | — | — |
-| Sincronizzazione della sessione | sì | sì | — |
-<!-- capability-matrix:end -->
 
 Le statistiche del motore attivo — torrent per stato, velocità e slot,
 porta/router, DHT/uTP/LSD, cifratura, proxy, filtro IP, cache, **connessioni in

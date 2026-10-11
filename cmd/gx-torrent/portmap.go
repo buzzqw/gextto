@@ -39,6 +39,7 @@ type portMapper struct {
 	stop   chan struct{}
 	done   chan struct{}
 
+	started    bool
 	mu         sync.Mutex
 	method     string
 	externalIP string
@@ -53,10 +54,21 @@ func newPortMapper(port int, upnp, pmp bool) *portMapper {
 }
 
 func (m *portMapper) start() {
-	if m == nil || (!m.upnp && !m.natpmp) || m.port <= 0 {
-		close(m.done)
+	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	if m.started {
+		m.mu.Unlock()
+		return
+	}
+	m.started = true
+	if (!m.upnp && !m.natpmp) || m.port <= 0 {
+		close(m.done)
+		m.mu.Unlock()
+		return
+	}
+	m.mu.Unlock()
 	go func() {
 		defer close(m.done)
 		for {
@@ -75,6 +87,12 @@ func (m *portMapper) close() {
 	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	if !m.started {
+		m.mu.Unlock()
+		return
+	}
+	m.mu.Unlock()
 	select {
 	case <-m.stop:
 	default:

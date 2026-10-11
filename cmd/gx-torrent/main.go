@@ -67,14 +67,44 @@ func localSetupURL(listen string) string {
 // resolvePortRange picks the peer port range: the flag or environment wins,
 // then the standalone settings, then the built-in default.
 func resolvePortRange(flagValue string, store *settings.Store) (uint16, uint16, error) {
-	value := strings.TrimSpace(flagValue)
-	if value == "" && store != nil {
-		value = strings.TrimSpace(store.Get("peer-ports", ""))
-	}
+	value := optStr(store, "peer-ports", flagValue)
 	if value == "" {
 		value = "6881-6891"
 	}
 	return parsePortRange(value)
+}
+
+// optStr returns the standalone settings value when set, otherwise the flag
+// value. In managed mode store is nil, so the flag always wins.
+func optStr(store *settings.Store, key, flagValue string) string {
+	if store != nil {
+		if v := strings.TrimSpace(store.Get(key, "")); v != "" {
+			return v
+		}
+	}
+	return strings.TrimSpace(flagValue)
+}
+
+// optBool returns the settings value when set, otherwise the flag value.
+func optBool(store *settings.Store, key string, flagValue bool) bool {
+	if store != nil {
+		if v := strings.TrimSpace(store.Get(key, "")); v != "" {
+			return strings.EqualFold(v, "true")
+		}
+	}
+	return flagValue
+}
+
+// optInt returns the settings value when set and valid, otherwise the flag value.
+func optInt(store *settings.Store, key string, flagValue int) int {
+	if store != nil {
+		if v := strings.TrimSpace(store.Get(key, "")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				return n
+			}
+		}
+	}
+	return flagValue
 }
 
 // parsePortRange reads "6881" or "6881-6891". "0" keeps the engine's own port per
@@ -200,55 +230,58 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pageLang := strings.TrimSpace(*lang)
 	var settingsStore *settings.Store
 	if modeValue == ModeStandalone {
-		// Standalone runs from settings.json; an explicit flag still wins. In
-		// managed mode the file is never read, so Gextto's flags stay in charge.
 		store, loadErr := settings.Load(filepath.Join(data, "settings.json"))
 		if loadErr != nil {
 			log.Printf("cannot read settings.json: %v", loadErr)
 		} else {
 			settingsStore = store
-			if pageLang == "" {
-				pageLang = strings.TrimSpace(store.Get("lang", ""))
-			}
 		}
 	}
+	// In standalone settings.json is authoritative: a value there wins over the
+	// startup flag (the packaged unit passes fixed flags, and the settings page
+	// must be able to change them). In managed mode the store is nil, so
+	// Gextto's flags stay in charge. See optStr/optBool/optInt.
+	tokenValue := optStr(settingsStore, "token", *token)
 	// In managed mode a non-loopback listen without a token would expose the
 	// API with no protection; standalone has its own login/LAN model instead.
-	listenValue := strings.TrimSpace(*listen)
-	if listenValue == "" && settingsStore != nil {
-		listenValue = strings.TrimSpace(settingsStore.Get("listen", ""))
-	}
+	listenValue := optStr(settingsStore, "listen", *listen)
 	if listenValue == "" {
 		listenValue = "127.0.0.1:8890"
 	}
-	if modeValue != ModeStandalone && !loopback(listenValue) && *token == "" && !*insecure {
+	if modeValue != ModeStandalone && !loopback(listenValue) && tokenValue == "" && !*insecure {
 		log.Fatalf("refusing to listen on %s without a token: set -token/GX_TORRENT_TOKEN or use -insecure", listenValue)
 	}
 	portBegin, portEnd, err := resolvePortRange(*ports, settingsStore)
 	if err != nil {
 		log.Fatal(err)
 	}
-	downloads := *downloadDir
-	if downloads == "" && settingsStore != nil {
-		downloads = strings.TrimSpace(settingsStore.Get("download-dir", ""))
-	}
+	downloads := optStr(settingsStore, "download-dir", *downloadDir)
 	if downloads == "" {
 		downloads = filepath.Join(data, "downloads")
 	}
 	if downloads, err = filepath.Abs(downloads); err != nil {
 		log.Fatal(err)
 	}
-	partsDir := ""
-	if settingsStore != nil {
-		partsDir = strings.TrimSpace(settingsStore.Get("temp-dir", ""))
-	}
-	notifyURLValue := strings.TrimSpace(*notify)
-	if notifyURLValue == "" && settingsStore != nil {
-		notifyURLValue = strings.TrimSpace(settingsStore.Get(notifyURLSettingKey, ""))
-	}
+	partsDir := optStr(settingsStore, "temp-dir", "")
+	notifyURLValue := optStr(settingsStore, notifyURLSettingKey, *notify)
+	langValue := optStr(settingsStore, "lang", *lang)
+	listenIfaceValue := optStr(settingsStore, "listen-interface", *listenIface)
+	outIfaceValue := optStr(settingsStore, "outgoing-interface", *outIface)
+	proxyValue := optStr(settingsStore, "proxy", *proxyURL)
+	ipFilterValue := optStr(settingsStore, "ipfilter", *ipFilter)
+	ipFilterTrackersValue := optBool(settingsStore, "ipfilter-trackers", *ipFilterTrackers)
+	encryptionValue := optInt(settingsStore, "encryption", *encryption)
+	noDHTValue := optBool(settingsStore, "no-dht", *noDHT)
+	noPEXValue := optBool(settingsStore, "no-pex", *noPEX)
+	noUTPValue := optBool(settingsStore, "no-utp", *noUTP)
+	noHolepunchValue := optBool(settingsStore, "no-holepunch", *noHolepunch)
+	noLSDValue := optBool(settingsStore, "no-lsd", *noLSD)
+	noUPnPValue := optBool(settingsStore, "no-upnp", *noUPnP)
+	noNATPMPValue := optBool(settingsStore, "no-natpmp", *noNATPMP)
+	dhtBootstrapValue := optStr(settingsStore, "dht-bootstrap", *dhtBootstrap)
+	dhtReadOnlyValue := optBool(settingsStore, "dht-read-only", *dhtReadOnly)
 	var allowed []string
 	for _, root := range strings.Split(*roots, ",") {
 		if root = strings.TrimSpace(root); root != "" {
@@ -267,26 +300,26 @@ func main() {
 		PartsDir:     partsDir,
 		DBPath:       filepath.Join(data, "session.db"),
 		StatePath:    filepath.Join(data, "state.json"),
-		Token:        *token,
+		Token:        tokenValue,
 		AllowedRoots: allowed,
 		Network: NetworkOptions{
 			PortBegin:         portBegin,
 			PortEnd:           portEnd,
-			ListenInterface:   *listenIface,
-			OutgoingInterface: *outIface,
-			Proxy:             *proxyURL,
-			Encryption:        *encryption,
-			DHT:               !*noDHT,
-			PEX:               !*noPEX,
-			UTP:               !*noUTP,
-			Holepunch:         !*noHolepunch,
-			LSD:               !*noLSD,
-			UPnP:              !*noUPnP,
-			NATPMP:            !*noNATPMP,
-			IPFilter:          *ipFilter,
-			IPFilterTrackers:  *ipFilterTrackers,
-			DHTBootstrap:      parseBootstrapNodes(*dhtBootstrap),
-			DHTReadOnly:       *dhtReadOnly,
+			ListenInterface:   listenIfaceValue,
+			OutgoingInterface: outIfaceValue,
+			Proxy:             proxyValue,
+			Encryption:        encryptionValue,
+			DHT:               !noDHTValue,
+			PEX:               !noPEXValue,
+			UTP:               !noUTPValue,
+			Holepunch:         !noHolepunchValue,
+			LSD:               !noLSDValue,
+			UPnP:              !noUPnPValue,
+			NATPMP:            !noNATPMPValue,
+			IPFilter:          ipFilterValue,
+			IPFilterTrackers:  ipFilterTrackersValue,
+			DHTBootstrap:      parseBootstrapNodes(dhtBootstrapValue),
+			DHTReadOnly:       dhtReadOnlyValue,
 		},
 		Debug:          *debug,
 		Mode:           modeValue,
@@ -294,7 +327,7 @@ func main() {
 		Fingerprint:    *fingerprint,
 		GexttoLog:      strings.TrimSpace(*gexttoLog),
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
-		Lang:           pageLang,
+		Lang:           langValue,
 		NotifyURL:      notifyURLValue,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,

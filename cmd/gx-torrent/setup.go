@@ -173,6 +173,9 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 		d.renderSetup(w, r, "Setup failed.")
 		return
 	}
+	if d.mapper != nil {
+		d.mapper.start()
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 

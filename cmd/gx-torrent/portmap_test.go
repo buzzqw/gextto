@@ -47,3 +47,15 @@ func TestPortMapperCheckRecentMapping(t *testing.T) {
 		t.Fatalf("status not copied: %+v", got)
 	}
 }
+
+func TestPortMapperLifecycle(t *testing.T) {
+	// Case 1: Close without start must return immediately without blocking.
+	m1 := newPortMapper(6881, true, true)
+	m1.close()
+
+	// Case 2: Start with disabled mapping or port 0 must close cleanly.
+	m2 := newPortMapper(0, false, false)
+	m2.start()
+	m2.start() // idempotent
+	m2.close()
+}

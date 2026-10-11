@@ -23,7 +23,7 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `torrent_engine.go`; adapter `gxtorrent_engine.go`/`gxtorrent_runtime.go`,
   `libtorrent.go`, `qbittorrent_engine.go`. Matrice capacità in
   `capabilityLevels` (`torrent_engine.go`): è la **fonte unica**. Da lì derivano
-  l'API (`GET /api/torrent-backend`), la tabella dei README (generata) e i flag
+  l'API (`GET /api/torrent-backend`) e i flag
   della scheda di dettaglio (`v2DetailCapsFor` in `uiweb_v2.go`, test
   `TestV2DetailCapsFollowCapabilityMatrix`). Le operazioni che un motore non ha
   rifiutano con `ErrCapabilityUnavailable`; i blocchi solo-libtorrent usano
@@ -216,12 +216,7 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   (`gxtorrent_engine.go`), matrice `capabilityLevels` (`torrent_engine.go`),
   poi documentazione. Le opzioni legate alla creazione del picker valgono solo
   per i torrent aggiunti dopo: dichiarale `"partial"`, mai falso successo.
-- **Capacità dei motori**: `capabilityLevels` è l'unica fonte di verità. La
-  matrice capacità dei README è **generata** da lì: se aggiungi una capacità,
-  aggiungila anche a `capabilityDocRows` (`capability_matrix_docs_test.go`) e
-  rigenera con `UPDATE_README=1 go test -run TestReadmeCapabilityMatrix .`.
-  `TestReadmeCapabilityMatrix` fallisce finché README.md, README.it.md e la
-  matrice non coincidono: non modificare quelle tabelle a mano. I flag della
+- **Capacità dei motori**: `capabilityLevels` è l'unica fonte di verità. I flag della
   scheda di dettaglio si **derivano** dalla matrice (`v2DetailCapsFor`): non
   aggiungere mappe a mano, aggiungi una capacità. `TestCapabilitiesBooleanMatchesLevels`
   fissa che il booleano di `Capabilities()` è vero per `full`/`partial` e falso

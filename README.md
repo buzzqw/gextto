@@ -59,17 +59,21 @@ Gextto keeps the control plane (queue, scoring, post-processing, archiving) and 
 
 **gx-torrent** is the default engine and compiles as **pure Go** (`CGO_ENABLED=0`) with zero C/C++ dependencies. It runs as a separate supervised process, survives orchestrator restarts and updates, provides its own web interface, and receives protocol innovations first.
 
-Its engine core, **`gx-core`** (`internal/gxcore`), is an advanced, high-performance BitTorrent implementation developed directly in this repository (with portions derived under MIT/BSD licenses; see `internal/gxcore/LICENSE`):
+Its engine core, **`gx-core`** (`internal/gxcore`), is an advanced, high-performance BitTorrent implementation developed directly in this repository (with portions derived under MIT/BSD licenses; see `internal/gxcore/LICENSE`). It provides comprehensive, cutting-edge protocol support and enterprise-grade performance:
 
-- **BitTorrent v2 and Hybrids (BEP 52):** full support for v2-only and hybrid torrents from both `.torrent` files and magnet links (`urn:btmh:`). Uses a per-file piece layout, SHA-256 Merkle tree verification, and dynamic `piece layers` retrieval using protocol messages (`hash request`, `hashes`, `hash reject`).
-- **uTP Transport (BEP 29) & Single-Port Listening:** a unified UDP socket handles both uTP transport and DHT traffic on a single session port. Handshakes route by info-hash to the matching torrent, allowing all swarms to advertise the same port.
-- **NAT Traversal via Holepunching (BEP 55):** full `ut_holepunch` extension implementation to establish direct peer-to-peer uTP connections across symmetric NATs and firewalls, serving both as active client and as relay node for other peers.
-- **Super-seeding (BEP 16) & Deterministic Choking:** unchoker simulation harness for throughput and fairness optimization; super-seeding support to distribute new torrents one piece at a time without redundant initial uploads.
+- **BitTorrent v1, v2 and Hybrids (BEP 52):** full support for v1, v2-only and hybrid torrents from both `.torrent` files and magnet links (`urn:btmh:`). Uses a modern per-file piece layout (no cross-file padding blocks), SHA-256 Merkle tree verification, and dynamic `piece layers` retrieval directly from peers (`hash request`, `hashes`, `hash reject`).
+- **uTP Transport (BEP 29) & Single-Port Listening:** dual-transport engine running TCP and uTP in parallel with automatic fallback. A single UDP socket handles both uTP transport and DHT traffic on one session port, multiplexing connections and routing handshakes by info-hash so all swarms advertise the same port.
+- **NAT Traversal via Holepunching (BEP 55):** full `ut_holepunch` extension implementation to establish direct peer-to-peer uTP connections across symmetric NATs and firewalls without router configuration, acting both as active client and as relay node for other peers.
+- **Port Mapping & Network Integration:** automatic UPnP and NAT-PMP router port mapping, SOCKS5 and HTTP CONNECT proxy support, and an interface-binding killswitch (`outgoing-interface`) to restrict all BitTorrent traffic strictly to VPN tunnels.
+- **Super-seeding (BEP 16) & Deterministic Choking:** unchoker simulation harness for throughput and fairness optimization; super-seeding support to distribute new torrents piece-by-piece to seed swarms without redundant initial uploads.
+- **In-Browser Media Streaming & Graduated Priority:** real-time piece prioritization for instant media playback: piece picker distinguishes between the immediate player playhead window (`SetStreamWindow`) and the readahead horizon (`SetReadaheadWindow`), prioritizing streaming over rarest-first and serving MKV/MP4 videos directly to web browsers or VLC via HTTP Range requests.
 - **Zero-Alloc In-Place MSE/PE:** stream cipher RC4 encryption executed directly in-place inside the caller's network buffer (`inPlaceStreamWriter`), eliminating per-block heap allocations during uploads.
-- **Streaming Readahead & Dynamic Priority:** real-time piece prioritization for media playback: piece picker distinguishes between the immediate player window (`SetStreamWindow`) and the readahead horizon (`SetReadaheadWindow`), prioritizing them over rarest-first strategies.
-- **Hardware Popcount & Adaptive Request Queue:** bitfield bit counting accelerated by CPU native instructions (`math/bits.OnesCount64`); per-peer request queue depth (`RequestQueue`) modulated dynamically based on block delivery speed.
-- **Advanced DHT Subsystem (`internal/dht`):** standalone module with dual-stack IPv6 support (BEP 32), Security Extension anti-spoofing via CRC32C Castagnoli (BEP 42), immutable/mutable K/V storage with ed25519 signatures (BEP 44), and read-only mode for transit nodes (BEP 43).
-- **Session-Wide Peer Ban:** 30-minute quarantine across the entire session for peers that transmit corrupt blocks, shielding all active swarms.
+- **Hardware Acceleration & Adaptive Queue:** bitfield bit counting accelerated by native CPU instructions (`math/bits.OnesCount64`); per-peer request queue depth (`RequestQueue`) modulated dynamically based on block delivery speed and reset on choke/snub.
+- **High-Performance Memory & Disk Architecture:** dynamic in-memory read cache with lazy expiration sweeper, write buffer limiter, sparse file allocation and `fallocate` preallocation (with tmpfs safety), and RAM disk support for temporary downloads.
+- **Optimized Binary-Search IP Blocklist:** supports CIDR, IP range, P2P and eMule `.dat` formats merged into sorted non-overlapping intervals in memory, performing zero-allocation binary search lookups with negligible memory footprint (~bytes per rule).
+- **Advanced DHT Subsystem (`internal/dht`):** standalone module with dual-stack IPv6 support (BEP 32), Security Extension anti-spoofing via CRC32C Castagnoli (BEP 42), cryptographic immutable/mutable K/V storage with ed25519 signatures (BEP 44), read-only mode for transit nodes (BEP 43), and tracker scrape (BEP 48 HTTP/UDP).
+- **Swarm Protection, Diagnostics & Autonomy:** strict BEP 27 private swarm compliance (automatically disables DHT, PEX in/out, and LSD); 30-minute session-wide quarantine for peers transmitting corrupt blocks; WebSeeds (BEP 19); per-piece state diagnostics; persistent resume data (BoltDB); granular storage error diagnostics; and live real-time Server-Sent Events (`/ui/events`).
+- **Cross-Platform & Standalone Client:** runs both as Gextto's internal engine and as a standalone client (`gx-torrent`) with its own web UI, qBittorrent-compatible Web API (`/api/v2`), RSS rules with smart episode tracking, systemd daemon on Linux, and native Windows Service on Windows (amd64/arm64).
 
 ### Alternative engines
 
@@ -83,21 +87,6 @@ Its engine core, **`gx-core`** (`internal/gxcore`), is an advanced, high-perform
 | libtorrent (optional build) | Inside Gextto's process; **only if you compiled it in** (`make build-libtorrent`) | You need libtorrent's advanced controls or its compatibility; also the automatic fallback. A crash takes Gextto down too |
 
 How to include libtorrent: see *Install from source* below.
-
-### Capability matrix
-
-Levels: **yes** = supported, **partial** = supported with limits, **—** = not available. The table is generated from `capabilityLevels` in [`torrent_engine.go`](torrent_engine.go), the single source of truth the UI uses; a test keeps it in sync, so the matrix is edited there, never here.
-
-<!-- capability-matrix:start -->
-| Capability | gx-torrent | qBittorrent-nox | libtorrent (optional build) |
-| --- | :--: | :--: | :--: |
-| Add, Remove, Pause, Resume, List, Recheck, Move, Sequential download, File selection, Per-torrent limits, Peers, Trackers, Categories, Tags, First/last piece | yes | yes | yes |
-| File priorities | — | yes | yes |
-| Per-torrent connections/uploads, RAM disk, Fast resume, Web seeds | yes | — | yes |
-| Seed policy, Super-seeding (BEP 16), Session stats, IP filter | yes | partial | yes |
-| Per-piece diagnostics, Holepunching (BEP 55) | yes | — | — |
-| Session sync | yes | yes | — |
-<!-- capability-matrix:end -->
 
 The active engine's statistics — torrents by state, speed and queue slots,
 port/router, DHT/uTP/LSD, encryption, proxy, IP filter, cache, **incoming

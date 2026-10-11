@@ -11,14 +11,16 @@ header h1{font-size:20px;margin:0;font-weight:600}
 .nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
 .nav a:hover{background:#243049}
 .nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
-main{padding:16px 20px;max-width:760px;margin:0 auto}
+main{padding:16px 20px;max-width:820px;margin:0 auto}
 h2{font-size:16px;margin:22px 0 8px}
 label{display:block;margin:10px 0;color:#93a1b5}
-input{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
 fieldset{border:1px solid #243049;border-radius:10px;padding:10px 14px 14px;margin:0 0 14px;background:#131a28}
 legend{color:#93a1b5;padding:0 6px}
 label.chk{display:flex;gap:8px;align-items:center}
 label.chk input{width:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}}
 button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
 .muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}
 </style></head>
@@ -28,7 +30,56 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
   <nav class="nav"><a href="/">Torrents</a><a href="/ui/rss">RSS &amp; indexers</a><a class="on" href="/ui/settings">Settings</a></nav>
 </header>
 <main>
+<p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
 <form method="post" action="/ui/settings">
+<fieldset>
+  <legend>Folders</legend>
+  <div class="grid">
+    <label>Download folder<input type="text" name="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/downloads" autocomplete="off"></label>
+    <label>Temporary folder for incomplete files<input type="text" name="temp-dir" value="{{TEMP_DIR}}" autocomplete="off"></label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Network</legend>
+  <div class="grid">
+    <label>Web UI / API listen address<input type="text" name="listen" value="{{LISTEN}}" placeholder="127.0.0.1:8890" autocomplete="off"></label>
+    <label>Peer port range<input type="text" name="peer-ports" value="{{PEER_PORTS}}" placeholder="6881-6891" autocomplete="off"></label>
+    <label>Incoming interface (IP or name)<input type="text" name="listen-interface" value="{{LISTEN_IFACE}}" autocomplete="off"></label>
+    <label>Outgoing interface (VPN killswitch)<input type="text" name="outgoing-interface" value="{{OUT_IFACE}}" autocomplete="off"></label>
+    <label>Proxy (socks5:// or http://)<input type="text" name="proxy" value="{{PROXY}}" autocomplete="off"></label>
+    <label>API token<input type="text" name="token" value="{{TOKEN}}" autocomplete="off"></label>
+    <label>IP filter file<input type="text" name="ipfilter" value="{{IPFILTER}}" autocomplete="off"></label>
+    <label class="chk"><input type="checkbox" name="ipfilter-trackers" value="1"{{IPFILTER_TRACKERS}}> Apply the IP filter to trackers</label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Protocols</legend>
+  <div class="grid">
+    <label>Encryption<select name="encryption">{{ENC_OPTIONS}}</select></label>
+    <label>DHT bootstrap nodes<input type="text" name="dht-bootstrap" value="{{DHT_BOOTSTRAP}}" autocomplete="off"></label>
+  </div>
+  <div class="grid">
+    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}}> DHT</label>
+    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}}> Peer exchange (PEX)</label>
+    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}}> uTP</label>
+    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}}> Holepunching</label>
+    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}}> Local discovery (LSD)</label>
+    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}}> UPnP port mapping</label>
+    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}}> NAT-PMP port mapping</label>
+    <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}}> DHT read-only (BEP 43)</label>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Queue and cache</legend>
+  <div class="grid">
+    <label>Active downloads<input type="number" min="1" name="active-downloads" value="{{ACTIVE_DL}}"></label>
+    <label>Active seeds<input type="number" min="0" name="active-seeds" value="{{ACTIVE_SEEDS}}"></label>
+    <label>Active limit (downloads + seeds)<input type="number" min="1" name="active-limit" value="{{ACTIVE_LIMIT}}"></label>
+    <label>Disk cache (MiB, 0 = automatic)<input type="number" min="0" name="cache-mb" value="{{CACHE_MB}}"></label>
+    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}}> Preallocate disk space</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}}> Download in sequential order</label>
+  </div>
+</fieldset>
 <fieldset>
   <legend>Bandwidth</legend>
   <label>Download limit (KiB/s, 0 = unlimited)<input type="number" min="0" name="speed-download" value="{{SPEED_DL}}"></label>
@@ -42,6 +93,11 @@ button{padding:9px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff
   <label>Scheduled download (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-download" value="{{SCHED_DL}}"></label>
   <label>Scheduled upload (KiB/s, 0 = unlimited)<input type="number" min="0" name="schedule-upload" value="{{SCHED_UL}}"></label>
   <p class="muted">Inside the window the scheduled limits apply; outside, the global limits above (0 = unlimited). The window may cross midnight.</p>
+</fieldset>
+<fieldset>
+  <legend>Interface and notifications</legend>
+  <label>Language<select name="lang">{{LANG_OPTIONS}}</select></label>
+  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off"></label>
 </fieldset>
 <button type="submit">Save</button>
 <!--ERROR-->

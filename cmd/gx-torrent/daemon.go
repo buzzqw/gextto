@@ -340,7 +340,9 @@ func newDaemon(opts Options) (*Daemon, error) {
 	d.publishViewsLocked(d.buildViewsLocked())
 	if d.peerPort > 0 {
 		d.mapper = newPortMapper(d.peerPort, opts.Network.UPnP, opts.Network.NATPMP)
-		d.mapper.start()
+		if d.opts.Mode != ModeStandalone || d.setupComplete() {
+			d.mapper.start()
+		}
 	}
 	n := opts.Network
 	if n.LSD && d.peerPort > 0 && n.Proxy == "" && n.OutgoingInterface == "" {

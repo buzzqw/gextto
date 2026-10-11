@@ -1,13 +1,15 @@
 package main
 
-// ui_settings.go is the standalone settings page: the global bandwidth limits
-// and the bandwidth scheduler (an alternate daily window, like qBittorrent).
-// The limits live in the queue config (state.json), the scheduler window in
-// settings.json; both are applied to the running session at once.
+// ui_settings.go is the standalone settings page: folders, network, protocols,
+// queue/cache, bandwidth and scheduler, language and notifications.
+//
+// In standalone settings.json is authoritative (read at startup; see optStr in
+// main.go). Folders, network and protocol changes apply from the next start;
+// the queue limits live in the queue config (state.json) and apply at once,
+// like the bandwidth and the scheduler.
 
 import (
 	"encoding/json"
-	"fmt"
 	"html"
 	"net/http"
 	"net/url"
@@ -40,28 +42,45 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.ParseForm()
 
-	// Global limits (state.json): a blank field keeps the current value.
+	store := d.opts.Settings
+
+	// Queue cache and limits (queue config, applied at once). A value equal to
+	// the current one is left out of the patch.
 	cfg, _, _ := d.config()
-	download, downloadSet := parseFormKib(r.FormValue("speed-download"))
-	upload, uploadSet := parseFormKib(r.FormValue("speed-upload"))
-	if !downloadSet {
-		download = cfg.SpeedLimitDownload
-	}
-	if !uploadSet {
-		upload = cfg.SpeedLimitUpload
-	}
 	patch := map[string]json.RawMessage{}
-	if download != cfg.SpeedLimitDownload {
-		raw, _ := json.Marshal(download)
-		patch["speed_limit_download"] = raw
+	putInt := func(key string, value int64) {
+		raw, _ := json.Marshal(value)
+		patch[key] = raw
 	}
-	if upload != cfg.SpeedLimitUpload {
-		raw, _ := json.Marshal(upload)
-		patch["speed_limit_upload"] = raw
+	if v, ok := parseFormKib(r.FormValue("speed-download")); ok && v != cfg.SpeedLimitDownload {
+		putInt("speed_limit_download", v)
+	}
+	if v, ok := parseFormKib(r.FormValue("speed-upload")); ok && v != cfg.SpeedLimitUpload {
+		putInt("speed_limit_upload", v)
+	}
+	if v := formInt(r, "active-downloads", int64(cfg.ActiveDownloads)); v > 0 && int(v) != cfg.ActiveDownloads {
+		putInt("active_downloads", v)
+	}
+	if v := formInt(r, "active-seeds", int64(cfg.ActiveSeeds)); v >= 0 && int(v) != cfg.ActiveSeeds {
+		putInt("active_seeds", v)
+	}
+	if v := formInt(r, "active-limit", int64(cfg.ActiveLimit)); v > 0 && int(v) != cfg.ActiveLimit {
+		putInt("active_limit", v)
+	}
+	if v := formInt(r, "cache-mb", cfg.CacheMB); v != cfg.CacheMB {
+		putInt("cache_mb", v)
+	}
+	if v := formBool(r, "preallocate"); v != cfg.Preallocate {
+		raw, _ := json.Marshal(v)
+		patch["preallocate"] = raw
+	}
+	if v := formBool(r, "sequential"); v != cfg.Sequential {
+		raw, _ := json.Marshal(v)
+		patch["sequential"] = raw
 	}
 	if len(patch) > 0 {
 		if _, err := d.setConfig(patch); err != nil {
-			d.renderSettings(w, r, "The bandwidth limits could not be applied: "+err.Error(), true)
+			d.renderSettings(w, r, "The queue settings could not be applied: "+err.Error(), true)
 			return
 		}
 	}
@@ -73,10 +92,10 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 	scheduleDL, dlSet := parseFormKib(r.FormValue("schedule-download"))
 	scheduleUL, ulSet := parseFormKib(r.FormValue("schedule-upload"))
 	if !dlSet {
-		scheduleDL = int64FromSetting(d.opts.Settings.Get(scheduleDLKey, "0"))
+		scheduleDL = int64FromSetting(store.Get(scheduleDLKey, "0"))
 	}
 	if !ulSet {
-		scheduleUL = int64FromSetting(d.opts.Settings.Get(scheduleULKey, "0"))
+		scheduleUL = int64FromSetting(store.Get(scheduleULKey, "0"))
 	}
 	if enabled {
 		startMinute, okStart := parseClock(start)
@@ -90,12 +109,31 @@ func (d *Daemon) handleUISettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	store := d.opts.Settings
-	store.Set(scheduleEnabledKey, fmt.Sprintf("%t", enabled))
+	store.Set(scheduleEnabledKey, strconv.FormatBool(enabled))
 	store.Set(scheduleStartKey, start)
 	store.Set(scheduleEndKey, end)
 	store.Set(scheduleDLKey, strconv.FormatInt(scheduleDL, 10))
 	store.Set(scheduleULKey, strconv.FormatInt(scheduleUL, 10))
+
+	// Folders, network, protocols, language and notifications (settings.json,
+	// read at the next start).
+	for _, key := range []string{
+		"download-dir", "temp-dir", "listen", "peer-ports", "listen-interface",
+		"outgoing-interface", "proxy", "token", "ipfilter", "dht-bootstrap",
+		"notify-url", "lang",
+	} {
+		store.Set(key, strings.TrimSpace(r.FormValue(key)))
+	}
+	encryption := int(formInt(r, "encryption", 1))
+	if encryption < 0 || encryption > 2 {
+		encryption = 1
+	}
+	store.Set("encryption", strconv.Itoa(encryption))
+	store.Set("ipfilter-trackers", strconv.FormatBool(formBool(r, "ipfilter-trackers")))
+	store.Set("dht-read-only", strconv.FormatBool(formBool(r, "dht-read-only")))
+	for _, toggle := range []string{"dht", "pex", "utp", "holepunch", "lsd", "upnp", "natpmp"} {
+		store.Set("no-"+toggle, strconv.FormatBool(!formBool(r, toggle)))
+	}
 	if err := store.Save(); err != nil {
 		d.renderSettings(w, r, "Cannot save the settings: "+err.Error(), true)
 		return
@@ -126,21 +164,105 @@ func (d *Daemon) applyScheduleNow() {
 	d.applyEffectiveSpeedLimitsLocked(time.Now())
 }
 
+// encryptionOptions renders the encryption select, marking the current value.
+func encryptionOptions(selected string) string {
+	selected = strings.TrimSpace(selected)
+	var b strings.Builder
+	for _, option := range []struct{ value, label string }{
+		{"0", "Disabled (0)"},
+		{"1", "Enabled (1)"},
+		{"2", "Forced (2)"},
+	} {
+		mark := ""
+		if option.value == selected {
+			mark = " selected"
+		}
+		b.WriteString(`<option value="` + option.value + `"` + mark + `>` + html.EscapeString(option.label) + `</option>`)
+	}
+	return b.String()
+}
+
+// languageOptions renders the UI language select with the endonyms.
+func languageOptions(selected string) string {
+	selected = strings.ToLower(strings.TrimSpace(selected))
+	names := []struct{ code, name string }{
+		{"en", "English"}, {"it", "Italiano"}, {"de", "Deutsch"},
+		{"fr", "Français"}, {"es", "Español"}, {"pl", "Polski"},
+	}
+	var b strings.Builder
+	for _, item := range names {
+		mark := ""
+		if item.code == selected || (selected == "" && item.code == "en") {
+			mark = " selected"
+		}
+		b.WriteString(`<option value="` + item.code + `"` + mark + `>` + item.name + `</option>`)
+	}
+	return b.String()
+}
+
 // renderSettings writes the settings page, localized like the daemon page.
 func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey string, isError bool) {
 	cfg, _, _ := d.config()
+	store := d.opts.Settings
 	page := assets.SettingsPage()
-	page = strings.Replace(page, "{{SPEED_DL}}", strconv.FormatInt(cfg.SpeedLimitDownload, 10), 1)
-	page = strings.Replace(page, "{{SPEED_UL}}", strconv.FormatInt(cfg.SpeedLimitUpload, 10), 1)
-	page = strings.Replace(page, "{{SCHED_START}}", html.EscapeString(d.opts.Settings.Get(scheduleStartKey, "")), 1)
-	page = strings.Replace(page, "{{SCHED_END}}", html.EscapeString(d.opts.Settings.Get(scheduleEndKey, "")), 1)
-	page = strings.Replace(page, "{{SCHED_DL}}", strconv.FormatInt(int64FromSetting(d.opts.Settings.Get(scheduleDLKey, "0")), 10), 1)
-	page = strings.Replace(page, "{{SCHED_UL}}", strconv.FormatInt(int64FromSetting(d.opts.Settings.Get(scheduleULKey, "0")), 10), 1)
-	checked := ""
-	if strings.EqualFold(strings.TrimSpace(d.opts.Settings.Get(scheduleEnabledKey, "false")), "true") {
-		checked = " checked"
+	repl := func(placeholder, value string) {
+		page = strings.Replace(page, placeholder, value, 1)
 	}
-	page = strings.Replace(page, "{{SCHED_ENABLED}}", checked, 1)
+	checkedIf := func(cond bool) string {
+		if cond {
+			return " checked"
+		}
+		return ""
+	}
+	boolSetting := func(key string) bool {
+		return strings.EqualFold(strings.TrimSpace(store.Get(key, "")), "true")
+	}
+	// A protocol is enabled unless its "no-<x>" flag is set.
+	featureOn := func(key string) bool { return !boolSetting("no-" + key) }
+	get := func(key string) string { return html.EscapeString(store.Get(key, "")) }
+
+	repl("{{SPEED_DL}}", strconv.FormatInt(cfg.SpeedLimitDownload, 10))
+	repl("{{SPEED_UL}}", strconv.FormatInt(cfg.SpeedLimitUpload, 10))
+	repl("{{SCHED_START}}", html.EscapeString(store.Get(scheduleStartKey, "")))
+	repl("{{SCHED_END}}", html.EscapeString(store.Get(scheduleEndKey, "")))
+	repl("{{SCHED_DL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleDLKey, "0")), 10))
+	repl("{{SCHED_UL}}", strconv.FormatInt(int64FromSetting(store.Get(scheduleULKey, "0")), 10))
+	repl("{{SCHED_ENABLED}}", checkedIf(boolSetting(scheduleEnabledKey)))
+
+	repl("{{DOWNLOAD_DIR}}", get("download-dir"))
+	repl("{{TEMP_DIR}}", get("temp-dir"))
+	repl("{{LISTEN}}", get("listen"))
+	repl("{{PEER_PORTS}}", get("peer-ports"))
+	repl("{{LISTEN_IFACE}}", get("listen-interface"))
+	repl("{{OUT_IFACE}}", get("outgoing-interface"))
+	repl("{{PROXY}}", get("proxy"))
+	repl("{{TOKEN}}", get("token"))
+	repl("{{IPFILTER}}", get("ipfilter"))
+	repl("{{IPFILTER_TRACKERS}}", checkedIf(!strings.EqualFold(strings.TrimSpace(store.Get("ipfilter-trackers", "true")), "false")))
+	repl("{{ENC_OPTIONS}}", encryptionOptions(store.Get("encryption", "1")))
+	repl("{{DHT_BOOTSTRAP}}", get("dht-bootstrap"))
+	repl("{{DHT_ON}}", checkedIf(featureOn("dht")))
+	repl("{{PEX_ON}}", checkedIf(featureOn("pex")))
+	repl("{{UTP_ON}}", checkedIf(featureOn("utp")))
+	repl("{{HOLEPUNCH_ON}}", checkedIf(featureOn("holepunch")))
+	repl("{{LSD_ON}}", checkedIf(featureOn("lsd")))
+	repl("{{UPNP_ON}}", checkedIf(featureOn("upnp")))
+	repl("{{NATPMP_ON}}", checkedIf(featureOn("natpmp")))
+	repl("{{DHT_READONLY}}", checkedIf(boolSetting("dht-read-only")))
+
+	repl("{{ACTIVE_DL}}", strconv.Itoa(cfg.ActiveDownloads))
+	repl("{{ACTIVE_SEEDS}}", strconv.Itoa(cfg.ActiveSeeds))
+	repl("{{ACTIVE_LIMIT}}", strconv.Itoa(cfg.ActiveLimit))
+	cacheMB := cfg.CacheMB
+	if cacheMB < 0 {
+		cacheMB = 0
+	}
+	repl("{{CACHE_MB}}", strconv.FormatInt(cacheMB, 10))
+	repl("{{PREALLOCATE}}", checkedIf(cfg.Preallocate))
+	repl("{{SEQUENTIAL}}", checkedIf(cfg.Sequential))
+
+	repl("{{LANG_OPTIONS}}", languageOptions(store.Get("lang", "")))
+	repl("{{NOTIFY_URL}}", get("notify-url"))
 
 	errorHTML := ""
 	if errKey != "" {
@@ -150,7 +272,7 @@ func (d *Daemon) renderSettings(w http.ResponseWriter, r *http.Request, errKey s
 		}
 		errorHTML = `<p class="` + class + `">` + html.EscapeString(errKey) + `</p>`
 	}
-	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
+	repl("<!--ERROR-->", errorHTML)
 
 	lang := d.uiLang(r)
 	if lang != "" && lang != "en" {
