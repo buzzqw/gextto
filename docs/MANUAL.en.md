@@ -435,7 +435,10 @@ is removed from the torrent session).
 ## 4. Series
 
 Add a series via TMDB search or manually (title, quality, languages, seasons,
-aliases, exclusions, NAS path, subtitles, timeframe).
+aliases, exclusions, NAS path, subtitles, timeframe). The NAS path is pre-filled
+with *library folder + title*: keep “Create folder” on to create it when adding
+(clear the check to edit the path by hand). “Subfolders per season” stores
+episodes in *Season 01*, *Season 02*, … inside the series folder.
 
 - The list shows Name, Seasons, Quality, Language, Episodes (downloaded/total),
   Completeness, Last download; filter it with the search box.

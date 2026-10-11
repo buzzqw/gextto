@@ -1212,6 +1212,9 @@ func V2TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		Exclude:     strings.TrimSpace(r.FormValue("exclude")),
 		Subtitle:    strings.TrimSpace(r.FormValue("subtitle")),
 		Aliases:     strings.TrimSpace(r.FormValue("aliases")),
+
+		CreateFolder:     r.FormValue("create_folder") != "",
+		SeasonSubfolders: r.FormValue("season_subfolders") != "",
 	}
 	if payload.Kind == "" {
 		payload.Kind = "series"
@@ -1256,13 +1259,63 @@ func V2TmdbManual(w http.ResponseWriter, r *http.Request, s *AppState) {
 		"Year": strings.TrimSpace(r.FormValue("year")), "TmdbID": strings.TrimSpace(r.FormValue("tmdb_id")),
 		"TvdbID": strings.TrimSpace(r.FormValue("tvdb_id")), "Quality": strings.TrimSpace(r.FormValue("quality")),
 		"Language": strings.TrimSpace(r.FormValue("language")), "Seasons": "1+",
-		"Redirect": strings.TrimSpace(r.FormValue("redirect")),
+		"ArchivePath": v2ProposedArchivePath(s, name),
+		"Redirect":    strings.TrimSpace(r.FormValue("redirect")),
 	}
 	if view["Redirect"] == "" {
 		view["Redirect"] = "/?view=search"
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, "v2_tmdb_manual", view, dict, eng)
+}
+
+// v2ProposedArchivePath is the default series folder offered by the add modal:
+// <archive_root>/<name>. Empty when no archive root is configured, so the path
+// field stays editable and nothing is created.
+func v2ProposedArchivePath(s *AppState, name string) string {
+	return proposedArchivePath(latestConfig(s), name)
+}
+
+// proposedArchivePath is the default folder the add modal offers for a new
+// series: <series library root>/<name>. The series root is inferred from the
+// already-configured series (the most common parent of their archive paths), so
+// it matches where the library actually stores series; when there are none it
+// falls back to the global archive_root. Empty when neither is available.
+func proposedArchivePath(cfg *Config, name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || cfg == nil {
+		return ""
+	}
+	if root := seriesLibraryRoot(cfg); root != "" {
+		return filepath.Join(root, name)
+	}
+	if cfg.ArchiveRoot != nil {
+		if root := strings.TrimSpace(*cfg.ArchiveRoot); root != "" {
+			return filepath.Join(root, name)
+		}
+	}
+	return ""
+}
+
+// seriesLibraryRoot is the most common parent folder of the configured series
+// archive paths, i.e. where the library keeps series. Empty when no series has
+// a path.
+func seriesLibraryRoot(cfg *Config) string {
+	counts := map[string]int{}
+	for i := range cfg.Series {
+		path := strings.TrimSpace(cfg.Series[i].ArchivePath)
+		if path == "" {
+			continue
+		}
+		counts[filepath.Dir(path)]++
+	}
+	best, bestCount := "", 0
+	for dir, count := range counts {
+		if count > bestCount || (count == bestCount && dir < best) {
+			best, bestCount = dir, count
+		}
+	}
+	return best
 }
 
 func v2AnyString(value any) string {

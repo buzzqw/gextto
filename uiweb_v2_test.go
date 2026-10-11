@@ -408,6 +408,78 @@ func TestV2TmdbSeriesAddKeepsSubtitle(t *testing.T) {
 	t.Fatal("series was not added")
 }
 
+// TestV2TmdbSeriesAddCreatesFolderAndSeasonSubfolders covers the add modal's
+// "Crea cartella" and "Sottocartelle per stagione": the archive folder is
+// created from the submitted path and the per-season flag reaches the config.
+func TestV2TmdbSeriesAddCreatesFolderAndSeasonSubfolders(t *testing.T) {
+	state := newTestAppState(t)
+	server := httptest.NewServer(Router(state))
+	t.Cleanup(server.Close)
+
+	// The modal offers both checks and the "Crea cartella" label.
+	code, body := v2Request(t, server, http.MethodGet, "/tmdb/manual?kind=series&name=Mamma+Mia", nil)
+	if code != http.StatusOK || !strings.Contains(body, `name="create_folder"`) || !strings.Contains(body, `name="season_subfolders"`) || !strings.Contains(body, "Crea cartella") {
+		t.Fatalf("manual modal -> %d: %s", code, body)
+	}
+
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "Mamma Mia")
+	form := url.Values{
+		"kind":              {"series"},
+		"name":              {"Mamma Mia"},
+		"tmdb_id":           {"111"},
+		"create_folder":     {"1"},
+		"archive_path":      {archive},
+		"season_subfolders": {"1"},
+	}
+	code, _ = v2Request(t, server, http.MethodPost, "/tmdb/add", form)
+	if code != http.StatusOK && code != http.StatusNoContent {
+		t.Fatalf("series add -> %d", code)
+	}
+	if info, err := os.Stat(archive); err != nil || !info.IsDir() {
+		t.Fatalf("archive folder not created: %v", err)
+	}
+	cfg, err := LoadConfig(state.config_path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, series := range cfg.Series {
+		if series.Name == "Mamma Mia" {
+			if series.ArchivePath != archive {
+				t.Fatalf("archive_path = %q, want %q", series.ArchivePath, archive)
+			}
+			if !series.SeasonSubfolders {
+				t.Fatal("season_subfolders was not set")
+			}
+			return
+		}
+	}
+	t.Fatal("series was not added")
+}
+
+// TestProposedArchivePath covers the default path offered by the add modal: the
+// most common parent of the configured series, then archive_root, then nothing.
+func TestProposedArchivePath(t *testing.T) {
+	cfg := &Config{Series: []SeriesConfig{
+		{Name: "A", ArchivePath: "/media/serie/A"},
+		{Name: "B", ArchivePath: "/media/serie/B"},
+		{Name: "C", ArchivePath: "/other/place/C"},
+	}}
+	if got := proposedArchivePath(cfg, "  Mamma Mia  "); got != "/media/serie/Mamma Mia" {
+		t.Fatalf("inferred = %q, want /media/serie/Mamma Mia", got)
+	}
+	root := "/media/libreria"
+	if got := proposedArchivePath(&Config{ArchiveRoot: &root}, "Mamma Mia"); got != "/media/libreria/Mamma Mia" {
+		t.Fatalf("fallback = %q, want /media/libreria/Mamma Mia", got)
+	}
+	if got := proposedArchivePath(&Config{}, "Mamma Mia"); got != "" {
+		t.Fatalf("no root -> %q, want empty", got)
+	}
+	if got := proposedArchivePath(&Config{ArchiveRoot: &root}, ""); got != "" {
+		t.Fatalf("no name -> %q, want empty", got)
+	}
+}
+
 func TestV2DownloadsPageAndActions(t *testing.T) {
 	state := newTestAppState(t)
 	server := httptest.NewServer(Router(state))

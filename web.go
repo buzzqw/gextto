@@ -988,6 +988,11 @@ type TmdbAddInput struct {
 	Exclude     string `json:"exclude"`
 	Subtitle    string `json:"subtitle"`
 	Aliases     string `json:"aliases"`
+	// CreateFolder makes the series' archive folder (ArchivePath, or
+	// <archive_root>/<name> when empty) before adding the series.
+	CreateFolder bool `json:"create_folder"`
+	// SeasonSubfolders archives episodes in a per-season subfolder.
+	SeasonSubfolders bool `json:"season_subfolders"`
 }
 
 // DiscoverInput is the input of `tmdb_discover`.

@@ -1547,12 +1547,27 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 		if language == "" {
 			language = "ita"
 		}
+		// "Crea cartella": make the series' archive folder. When the path is
+		// empty fall back to <archive_root>/<name>, mirroring the default the
+		// add modal proposes.
+		archivePath := strings.TrimSpace(input.ArchivePath)
+		if input.CreateFolder {
+			if archivePath == "" {
+				archivePath = proposedArchivePath(&cfg, input.Name)
+			}
+			if archivePath != "" {
+				if err := os.MkdirAll(archivePath, 0o755); err != nil {
+					jsonError(w, http.StatusInternalServerError, "impossibile creare la cartella: "+err.Error())
+					return
+				}
+			}
+		}
 		cfg.Series = append(cfg.Series, SeriesConfig{
 			Name:             strings.TrimSpace(input.Name),
 			Seasons:          seasons,
 			Quality:          strings.TrimSpace(input.Quality),
 			Language:         language,
-			ArchivePath:      strings.TrimSpace(input.ArchivePath),
+			ArchivePath:      archivePath,
 			Timeframe:        0,
 			Aliases:          splitAliases(input.Aliases),
 			TmdbID:           strings.TrimSpace(input.TmdbId),
@@ -1561,7 +1576,7 @@ func TmdbAdd(w http.ResponseWriter, r *http.Request, s *AppState) {
 			Exclude:          strings.TrimSpace(input.Exclude),
 			Enabled:          true,
 			IgnoredSeasons:   nil,
-			SeasonSubfolders: false,
+			SeasonSubfolders: input.SeasonSubfolders,
 			DisableUpgrades:  false,
 		})
 	}

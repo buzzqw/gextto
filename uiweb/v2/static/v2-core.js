@@ -622,6 +622,12 @@
   }
 
   document.addEventListener("change", function (event) {
+    if (event.target.matches && event.target.matches("[data-v2-create-folder]")) {
+      var cfScope = event.target.closest("form") || event.target.closest(".modal");
+      var cfPath = cfScope && cfScope.querySelector('[name="archive_path"]');
+      if (cfPath) cfPath.readOnly = event.target.checked;
+      return;
+    }
     if (event.target.matches && event.target.matches("[data-v2-select-all]")) {
       var rows = document.querySelectorAll("[data-v2-select]");
       for (var i = 0; i < rows.length; i++) rows[i].checked = event.target.checked;

@@ -438,7 +438,11 @@ automaticamente (viene rimossa solo la voce dalla sessione torrent).
 ## 4. Serie TV
 
 Aggiungi una serie via ricerca TMDB o manualmente (titolo, qualità, lingue,
-stagioni, alias, esclusioni, percorso NAS, sottotitoli, timeframe).
+stagioni, alias, esclusioni, percorso NAS, sottotitoli, timeframe). Il percorso
+NAS è precompilato con *cartella libreria + titolo*: lascia attivo «Crea
+cartella» per crearlo all'aggiunta (togli la spunta per modificare il percorso a
+mano). «Sottocartelle per stagione» archivia gli episodi in *Stagione 01*,
+*Stagione 02*, … dentro la cartella della serie.
 
 - La lista mostra Nome, Stagioni, Qualità, Lingua, Episodi (scaricati/totali),
   Completezza, Ultimo download; filtrala con la casella di ricerca.
