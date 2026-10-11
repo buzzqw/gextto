@@ -561,7 +561,9 @@ are using the API directly.
   search to indexers and online engines: it is much slower and therefore only
   runs when you press **Search**, not on every keystroke. The **Source** column
   shows only the provider/domain (the full URL is in the tooltip), and every row
-  offers **Why not this one?** like the search table.
+  offers **Why not this one?** like the search table. The title wraps over
+  multiple lines and the row actions are compact icons (⬇️ queue, 🔍 why not
+  this one, 🧲 copy magnet, 🗑️ delete) so the release name gets the room.
 - **Seen from feed** — every release seen in the sources, grouped by title
   (movies/series) with count, best resolution and score; expand a group to
   queue a single release. Populated by each cycle, even for unmonitored titles.

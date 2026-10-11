@@ -763,6 +763,20 @@ func TestV2GenericTableFragmentAndActions(t *testing.T) {
 	if !strings.Contains(archiveAction, `\"title\":\"Minions 2026\"`) {
 		t.Fatalf("archiveAction missing substituted title: %s", archiveAction)
 	}
+	// An action with an Icon shows the icon and keeps the label as tooltip; the
+	// label stays the visible text when no icon is set.
+	iconAction := v2RenderAction("archive", map[string]any{"magnet": "magnet:?xt=x"}, uiAction{
+		Label: "Copia magnet", Icon: "🧲", Kind: "copy-magnet",
+	}, uiTableSpec{})
+	if !strings.Contains(iconAction, ">🧲</button>") || !strings.Contains(iconAction, `title="Copia magnet"`) || strings.Contains(iconAction, ">Copia magnet<") {
+		t.Fatalf("icon action = %q", iconAction)
+	}
+	textAction := v2RenderAction("archive", map[string]any{"magnet": "magnet:?xt=x"}, uiAction{
+		Label: "Copia magnet", Kind: "copy-magnet",
+	}, uiTableSpec{})
+	if !strings.Contains(textAction, ">Copia magnet</button>") {
+		t.Fatalf("text action = %q", textAction)
+	}
 
 	// Action execution preserves filter query 'q' and returns an out-of-band toast notice.
 	code, body := v2Request(t, server, http.MethodPost, "/table/action", url.Values{

@@ -568,7 +568,10 @@ manualmente il JSON se non stai usando direttamente l'API.
   web** estende la ricerca a indexer e motori online: è molto più lenta e per
   questo parte solo quando premi **Cerca**, non a ogni tasto. La colonna
   **Sorgente** mostra solo il provider/dominio (l'URL completo è nel tooltip) e
-  ogni riga offre **Perché non questa?** come nella tabella dei risultati.
+  ogni riga offre **Perché non questa?** come nella tabella dei risultati. Il
+  titolo va a capo su più righe e le azioni di riga sono icone compatte (⬇️
+  accoda, 🔍 Perché non questa?, 🧲 copia magnet, 🗑️ elimina) per lasciare spazio
+  al nome della release.
 - **Visti dai feed** — ogni release vista nelle sorgenti, raggruppata per titolo
   (film/serie) con numero, risoluzione e score migliori; espandi un gruppo per
   accodare una singola release. Popolata ad ogni ciclo, anche per titoli non

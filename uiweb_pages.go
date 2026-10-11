@@ -33,6 +33,9 @@ type uiAction struct {
 	// "library-toggle" (enable/disable) or "library-remove" (delete), both
 	// implemented as a read-modify-write of /api/config/library.
 	Kind string `json:"kind,omitempty"`
+	// Icon, when set, is shown instead of the label (which becomes the tooltip
+	// and the accessible name): compact action columns on dense tables.
+	Icon string `json:"icon,omitempty"`
 }
 
 type uiTableSpec struct {

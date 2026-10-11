@@ -849,6 +849,18 @@ func v2RenderActions(view string, item map[string]any, actions []uiAction, spec 
 	return template.HTML(out.String())
 }
 
+// v2ActionInner is the content of an action button: the icon when the action
+// sets one (with the label as tooltip and accessible name), otherwise the
+// label. The boolean reports whether the icon replaced the text.
+func v2ActionInner(action uiAction) (inner, extra, class string, iconic bool) {
+	class = "btn sm"
+	if action.Icon == "" {
+		return stdhtml.EscapeString(action.Label), "", class, false
+	}
+	label := stdhtml.EscapeString(action.Label)
+	return stdhtml.EscapeString(action.Icon), ` title="` + label + `" aria-label="` + label + `"`, class + " icon", true
+}
+
 func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTableSpec) string {
 	switch action.Kind {
 	case "library-toggle", "library-remove":
@@ -890,14 +902,19 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 		}
 		encoded, _ := json.Marshal(release)
 		escapedJSON := strings.ReplaceAll(stdhtml.EscapeString(string(encoded)), `"`, "&#34;")
-		return `<form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="btn sm" type="submit">` + stdhtml.EscapeString(action.Label) + `</button></form>`
+		inner, extra, class, _ := v2ActionInner(action)
+		return `<form method="post" action="/search/explain" hx-post="/search/explain" hx-target="#v2-modal" hx-swap="innerHTML" style="display:inline"><input type="hidden" name="release" value="` + escapedJSON + `" /><button class="` + class + `" type="submit"` + extra + `>` + inner + `</button></form>`
 	case "copy-magnet":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		disabled := ""
 		if magnet == "" {
 			disabled = " disabled"
 		}
-		return `<button class="btn sm" type="button" data-v2-copy="` + stdhtml.EscapeString(magnet) + `"` + disabled + ` title="Copia il magnet negli appunti">` + stdhtml.EscapeString(action.Label) + `</button>`
+		inner, extra, class, iconic := v2ActionInner(action)
+		if !iconic {
+			extra = ` title="Copia il magnet negli appunti"`
+		}
+		return `<button class="` + class + `" type="button" data-v2-copy="` + stdhtml.EscapeString(magnet) + `"` + disabled + extra + `>` + inner + `</button>`
 	case "comic-weekly-force":
 		magnet := strings.TrimSpace(v2String(item["magnet"]))
 		torrent := strings.TrimSpace(v2String(item["torrent_url"]))
@@ -918,7 +935,11 @@ func v2RenderAction(view string, item map[string]any, action uiAction, spec uiTa
 	if action.Confirm != "" {
 		attrs += ` hx-confirm="` + stdhtml.EscapeString(action.Confirm) + `"`
 	}
-	return `<button class="btn sm ` + stdhtml.EscapeString(action.Class) + `" type="button" ` + attrs + `>` + stdhtml.EscapeString(action.Label) + `</button>`
+	inner, extra, class, _ := v2ActionInner(action)
+	if action.Class != "" {
+		class += " " + stdhtml.EscapeString(action.Class)
+	}
+	return `<button class="` + class + `" type="button" ` + attrs + extra + `>` + inner + `</button>`
 }
 
 // v2Substitute replaces {key} placeholders with the row value (URL-escaped for
