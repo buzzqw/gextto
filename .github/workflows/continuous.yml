@@ -86,7 +86,7 @@ jobs:
           scripts/build-release.sh --in-container --label "continuous-${GITHUB_SHA::12}" --output-dir dist
 
       - name: Upload archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gextto-linux-${{ matrix.arch }}${{ matrix.suffix }}
           path: dist/gextto-linux-${{ matrix.arch }}${{ matrix.suffix }}.tar.gz*
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload standalone gx-torrent archive
         if: matrix.variant == 'go'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gx-torrent-linux-${{ matrix.arch }}
           path: dist/gx-torrent-linux-${{ matrix.arch }}.tar.gz*
@@ -102,7 +102,7 @@ jobs:
 
       - name: Upload standalone gx-torrent for Windows
         if: matrix.variant == 'go'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gx-torrent-windows-${{ matrix.arch }}
           path: dist/gx-torrent-windows-*.zip*
