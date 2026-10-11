@@ -991,13 +991,23 @@ inefficaci):
   ordine (`followTitleRegex`, es. `(?i)mamma[\s._\-]+mia`). Test
   `TestFollowTitleRegex`.
 
-**Non applicate** (valutate e rinviate): B.4 (il fallback proposto **aggira le
-regole** scoped: da ridisegnare), B.5 (edge REPACK+PROPER marginale), B.6/B.7
-(tolleranza input e rumore log). **Applicate invece A.1–A.4** (installer):
-`install-service.sh`/`uninstall-service.sh` nel pacchetto Linux
-(`package-gx-torrent.sh`) con `StateDirectory=gx-torrent` nell'unit,
-l'attesa dello stop in `uninstall-service.ps1` e i due script di packaging
-nel `installer-selftest.sh`.
+- **B.4 feed scoped**: aggiunto `rss.FeedCoveredByRules`; il fallback ai filtri
+  locali del feed vale **solo se nessuna regola copre quel feed** (la proposta
+  del documento lo applicava anche quando una regola lo copriva, aggirandola).
+  Test `TestScopedRulesDoNotDisableOtherFeeds`.
+- **B.5 REPACK+PROPER al primo download**: `smartEpisodeVerdict` registra anche i
+  token inferiori. Test `TestSmartEpisodeFirstRepackAndProper`.
+- **B.6 filtro episodi**: `ParseEpisodeFilter` accetta `S01E01-E05` e la sola
+  stagione `S01`/`s1`.
+- **B.7 log `/ui/rss-suggest`**: `searchFeedSuggest` non logga gli errori per
+  indexer mentre si digita.
+- **A.1–A.4 installer**: `install-service.sh`/`uninstall-service.sh` nel
+  pacchetto Linux (`package-gx-torrent.sh`) con `StateDirectory=gx-torrent`
+  nell'unit, l'attesa dello stop in `uninstall-service.ps1` e i due script di
+  packaging nel `installer-selftest.sh`.
+
+Con questo la revisione `analisi4.md` è **applicata per intero** (A.1–A.4,
+B.1–B.7).
 
 ---
 

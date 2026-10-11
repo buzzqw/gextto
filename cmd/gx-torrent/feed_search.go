@@ -18,13 +18,26 @@ import (
 // searchFeed queries every configured indexer and returns the results as feed
 // items. It fails only when nothing came back and at least one indexer errored.
 func (d *Daemon) searchFeed(ctx context.Context, name, query string) ([]rss.Item, error) {
+	return d.searchFeedLogged(ctx, name, query, true)
+}
+
+// searchFeedSuggest is searchFeed for the interactive title suggestions: it does
+// not log per-indexer errors, so a down indexer does not flood the log while the
+// operator types.
+func (d *Daemon) searchFeedSuggest(ctx context.Context, query string) ([]rss.Item, error) {
+	return d.searchFeedLogged(ctx, "suggest", query, false)
+}
+
+func (d *Daemon) searchFeedLogged(ctx context.Context, name, query string, logErrors bool) ([]rss.Item, error) {
 	indexers := d.indexers()
 	if len(indexers) == 0 {
 		return nil, fmt.Errorf("no indexers configured")
 	}
 	items, errs := searchIndexers(ctx, indexers, query)
-	for _, err := range errs {
-		logf("feed %s: %v", name, err)
+	if logErrors {
+		for _, err := range errs {
+			logf("feed %s: %v", name, err)
+		}
 	}
 	if len(items) == 0 && len(errs) > 0 {
 		return nil, errs[0]

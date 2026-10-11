@@ -363,6 +363,33 @@ func TestSmartEpisodeRepackAndProper(t *testing.T) {
 	}
 }
 
+// TestSmartEpisodeFirstRepackAndProper covers the first release of an episode
+// that is both REPACK and PROPER: every lower token is recorded, so a later
+// single REPACK or PROPER is not downloaded again.
+func TestSmartEpisodeFirstRepackAndProper(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	key := "Show\x001"
+
+	tokens := d.smartEpisodeVerdict(key, "Show S01E05 REPACK PROPER 1080p", 5)
+	want := map[string]bool{"5": true, "5-REPACK": true, "5-PROPER": true, "5-REPACK-PROPER": true}
+	if len(tokens) != len(want) {
+		t.Fatalf("first repack+proper verdict = %v", tokens)
+	}
+	for _, tok := range tokens {
+		if !want[tok] {
+			t.Fatalf("unexpected token %q in %v", tok, tokens)
+		}
+	}
+	d.markSmartEpisode(key, tokens)
+
+	if got := d.smartEpisodeVerdict(key, "Show S01E05 REPACK 1080p", 5); got != nil {
+		t.Fatalf("a later single REPACK must be skipped, got %v", got)
+	}
+	if got := d.smartEpisodeVerdict(key, "Show S01E05 PROPER 1080p", 5); got != nil {
+		t.Fatalf("a later single PROPER must be skipped, got %v", got)
+	}
+}
+
 func TestFeedSmartStateLegacyFormatLoads(t *testing.T) {
 	// A state file written before the set existed stored the highest episode as
 	// a plain integer; it must still load and behave as "seen up to there".
@@ -545,5 +572,34 @@ func TestPollFeedsOnceDisablesRule(t *testing.T) {
 	d.pollFeeds()
 	if got := len(d.snapshotViews()); got != 1 {
 		t.Fatalf("after the once rule is off, %d torrents, want 1", got)
+	}
+}
+
+// TestScopedRulesDoNotDisableOtherFeeds covers B.4: a rule scoped to one feed
+// must not stop another feed from using its own include/exclude filter.
+func TestScopedRulesDoNotDisableOtherFeeds(t *testing.T) {
+	rules := []rss.Rule{{
+		Name:  "shows",
+		Feeds: []string{"a"},
+		Match: rss.Criteria{Include: []string{"Show"}},
+	}}
+	now := time.Now()
+	item := rss.Item{Title: "Movie 1080p", GUID: "x", Link: "http://example/x.torrent"}
+
+	// Feed "a" is covered by the rule: an item that does not match is dropped.
+	if _, _, ok := filterFeedItem(rules, feedConfig{Name: "a"}, "a", item, now, nil); ok {
+		t.Fatal("an item that does not match the covering rule must be dropped")
+	}
+	// Feed "b" has no covering rule: its own include/exclude filter still works.
+	if _, _, ok := filterFeedItem(rules, feedConfig{Name: "b", Include: "Movie"}, "b", item, now, nil); !ok {
+		t.Fatal("a feed with no covering rule must still use its local include filter")
+	}
+	if _, _, ok := filterFeedItem(rules, feedConfig{Name: "b", Include: "Sport"}, "b", item, now, nil); ok {
+		t.Fatal("the local include filter must still reject a non-matching title")
+	}
+	// A rule with no Feeds covers every feed and governs it.
+	global := []rss.Rule{{Name: "all", Match: rss.Criteria{Include: []string{"Show"}}}}
+	if _, _, ok := filterFeedItem(global, feedConfig{Name: "b", Include: "Movie"}, "b", item, now, nil); ok {
+		t.Fatal("a global rule must govern every feed")
 	}
 }

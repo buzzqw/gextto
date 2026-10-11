@@ -457,7 +457,10 @@ tutti), `fail`, `match` e `action`:
   match successivi per N giorni"); non dipende dalla data di pubblicazione degli
   item, quindi un episodio uscito due giorni dopo il precedente non viene perso;
 - ogni regola è attiva per default; `enabled: false` la disattiva senza
-  cancellarla (l'editor mostra un'etichetta *Disattivata*).
+  cancellarla (l'editor mostra un'etichetta *Disattivata*). Una regola copre i
+  feed elencati in `feeds` (vuoto = tutti); un feed **senza alcuna regola che lo
+  copra** continua a usare i propri `include`/`exclude`, quindi aggiungere una
+  regola per un feed non ferma gli altri.
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
   `top`, `once` (disattiva la regola dopo il primo download; lo usa *Segui un
   titolo* per i film).
@@ -465,9 +468,10 @@ tutti), `fail`, `match` e `action`:
 Il **filtro episodi** `episode_filter` usa la sintassi di qBittorrent: `1x01`
 (singolo), `1x01-05` (intervallo nella stagione), `1x01-1x05` (a cavallo di due
 stagioni), `1x01-` (aperto), `1x??`/`1x*` (tutta la stagione), separati da virgole
-o punti e virgola (`1x01, 1x03, 2x01-`); è accettata anche la forma `S01E01`. Il
-filtro vale solo per i titoli con un episodio riconoscibile; un filtro non valido
-non fa mai match (l'editor lo rifiuta prima di salvare).
+o punti e virgola (`1x01, 1x03, 2x01-`); sono accettate anche le forme `S01E01`,
+il range con coda `S01E01-E05` e la sola stagione `S01`/`s1`. Il filtro vale solo
+per i titoli con un episodio riconoscibile; un filtro non valido non fa mai match
+(l'editor lo rifiuta prima di salvare).
 
 Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.

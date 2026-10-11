@@ -270,15 +270,16 @@ func (d *Daemon) pollFeeds() {
 	d.mu.Unlock()
 }
 
-// filterFeedItem decides whether an item is added and with which action. With a
-// rule set configured the rules are ordered and the first match wins (PASS adds,
-// FAIL skips); otherwise the feed's own include/exclude filter applies. It
-// returns the matched rule so the caller can record its last-match time.
+// filterFeedItem decides whether an item is added and with which action. When at
+// least one rule covers the feed the rules are ordered and the first match wins
+// (PASS adds, FAIL skips); otherwise the feed's own include/exclude filter
+// applies. It returns the matched rule so the caller can record its last-match
+// time.
 func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss.Item, now time.Time, lastMatch func(string) time.Time) (rss.Rule, bool, bool) {
 	if item.Download() == "" || item.Title == "" {
 		return rss.Rule{}, false, false
 	}
-	if len(rules) > 0 {
+	if rss.FeedCoveredByRules(rules, feedName) {
 		rule, pass, matched := rss.EvaluateWithLastMatch(rules, feedName, item, now, lastMatch)
 		if !matched || !pass {
 			return rss.Rule{}, false, false
@@ -370,12 +371,21 @@ func (d *Daemon) smartEpisodeVerdict(key, title string, episode int) []string {
 		token += "-PROPER"
 	}
 	if !d.smartEpisodeSeen(key, base) {
-		if token == base {
-			return []string{base}
-		}
 		// A brand-new episode that arrives as a repack/proper: record the base
-		// too, so the plain release is not taken afterwards.
-		return []string{base, token}
+		// (so the plain release is not taken afterwards) and every lower token,
+		// so a later single REPACK or PROPER of the same episode is not taken a
+		// second time.
+		tokens := []string{base}
+		if isRepack {
+			tokens = append(tokens, base+"-REPACK")
+		}
+		if isProper {
+			tokens = append(tokens, base+"-PROPER")
+		}
+		if isRepack && isProper {
+			tokens = append(tokens, token)
+		}
+		return tokens
 	}
 	// The episode is already taken: only a new repack/proper combination is.
 	if !isRepack && !isProper {

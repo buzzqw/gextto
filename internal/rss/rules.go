@@ -226,3 +226,16 @@ func ruleAppliesToFeed(rule Rule, feedName string) bool {
 	}
 	return false
 }
+
+// FeedCoveredByRules reports whether at least one enabled rule targets feedName
+// (a rule with no Feeds applies to every feed). When no rule covers a feed, the
+// feed's own include/exclude filter still governs it: adding a rule for one feed
+// must not silently stop the other feeds.
+func FeedCoveredByRules(rules []Rule, feedName string) bool {
+	for _, rule := range rules {
+		if RuleEnabled(rule) && ruleAppliesToFeed(rule, feedName) {
+			return true
+		}
+	}
+	return false
+}

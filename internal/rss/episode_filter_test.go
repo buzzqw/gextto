@@ -42,6 +42,17 @@ func TestEpisodeFilterMatch(t *testing.T) {
 
 		// SxxExx spelling is accepted.
 		{"S02E10", "Show S02E10", true},
+
+		// Range with an SxxExx tail: "S01E01-E05".
+		{"S01E01-E05", "Show S01E03", true},
+		{"S01E01-E05", "Show S01E05", true},
+		{"S01E01-E05", "Show S01E06", false},
+
+		// A bare season means the whole season.
+		{"S01", "Show S01E01", true},
+		{"S01", "Show S01E99", true},
+		{"S01", "Show S02E01", false},
+		{"s1", "Show S01E10", true},
 	}
 
 	for _, tc := range cases {

@@ -10,6 +10,8 @@ package rss
 //	1x01-          open-ended: episode 1 and later of that season
 //	1x??  1x*      every episode of that season
 //	S01E01 …       the SxxExx form is accepted too
+//	S01E01-E05     the SxxExx form with an episode-range tail
+//	S01  s1        a whole season
 //
 // The filter matches only titles that carry a recognisable season/episode
 // marker, like qBittorrent's episode filter.
@@ -42,6 +44,12 @@ func (f EpisodeFilter) Empty() bool { return len(f.groups) == 0 }
 // sxxexx matches the "S01E02" spelling anywhere in a spec.
 var sxxexx = regexp.MustCompile(`(?i)s(\d{1,4})e(\d{1,4})`)
 
+// dashE matches the "-E05" tail of a range written as "S01E01-E05".
+var dashE = regexp.MustCompile(`(?i)-e(\d{1,4})`)
+
+// seasonW matches a bare "S01" season spec (word-delimited).
+var seasonW = regexp.MustCompile(`(?i)\bs(\d{1,4})\b`)
+
 // ParseEpisodeFilter reads the friendly episode syntax. A blank value yields an
 // empty filter (matches every episode); a malformed spec is an error.
 func ParseEpisodeFilter(raw string) (EpisodeFilter, error) {
@@ -49,8 +57,11 @@ func ParseEpisodeFilter(raw string) (EpisodeFilter, error) {
 	if raw == "" {
 		return EpisodeFilter{}, nil
 	}
-	// Accept SxxExx so a user can paste a normal episode name.
+	// Accept the common spellings before the "SxE" parser: "S01E02" -> "01x02",
+	// the "-E05" tail of a range -> "-05", and a bare season "S01" -> "01x*".
 	normalized := sxxexx.ReplaceAllString(raw, "${1}x${2}")
+	normalized = dashE.ReplaceAllString(normalized, "-${1}")
+	normalized = seasonW.ReplaceAllString(normalized, "${1}x*")
 
 	var filter EpisodeFilter
 	for _, token := range strings.FieldsFunc(normalized, func(r rune) bool { return r == ',' || r == ';' }) {

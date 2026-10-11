@@ -271,7 +271,7 @@ func (d *Daemon) handleUIRssSuggest(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	items, _ := d.searchFeed(ctx, "suggest", query)
+	items, _ := d.searchFeedSuggest(ctx, query)
 	writeJSON(w, http.StatusOK, seriesSuggestions(items, 12))
 }
 
