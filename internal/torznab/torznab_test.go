@@ -154,3 +154,30 @@ func TestMagnetLinkBecomesMagnet(t *testing.T) {
 		t.Fatalf("Download() = %q, want a magnet", got)
 	}
 }
+
+func TestJackettEndpointAndFallback(t *testing.T) {
+	// 1. URL with :9117 automatically routes to Jackett endpoint
+	idx9117 := Indexer{Name: "jackett", URL: "http://192.168.1.161:9117"}
+	if got := idx9117.Endpoint(); got != "http://192.168.1.161:9117/api/v2.0/indexers/all/results/torznab/api" {
+		t.Fatalf("endpoint = %q", got)
+	}
+
+	// 2. Fallback when server returns 404 on /api but 200 on Jackett path
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Path == "/api/v2.0/indexers/all/results/torznab/api" && r.URL.Query().Get("t") == "caps" {
+			_, _ = w.Write([]byte(`<?xml version="1.0"?><caps><server version="1.0"/></caps>`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	customIdx := Indexer{Name: "custom", URL: srv.URL}
+	if err := customIdx.Ping(context.Background()); err != nil {
+		t.Fatalf("ping should succeed via fallback: %v", err)
+	}
+}

@@ -66,13 +66,48 @@ type rssItem struct {
 	} `xml:"attr"`
 }
 
-// Search queries one indexer and returns its results.
-func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
+// Endpoint returns the Torznab API endpoint for the indexer.
+func (idx Indexer) Endpoint() string {
 	base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
 	if base == "" {
+		return ""
+	}
+	if strings.HasSuffix(base, "/api") {
+		return base
+	}
+	if strings.Contains(base, "/results/torznab") || strings.Contains(base, "/torznab") {
+		return base + "/api"
+	}
+	lower := strings.ToLower(base)
+	// Jackett default port or jackett in URL (e.g. http://host:9117 or http://jackett/...)
+	if strings.Contains(lower, "jackett") || strings.Contains(lower, ":9117") {
+		return base + "/api/v2.0/indexers/all/results/torznab/api"
+	}
+	return base + "/api"
+}
+
+// Search queries one indexer and returns its results.
+func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
+	ep := idx.Endpoint()
+	if ep == "" {
 		return nil, fmt.Errorf("torznab: empty indexer URL")
 	}
-	endpoint, err := url.Parse(base + "/api")
+	items, err := idx.searchEndpoint(ctx, ep, query)
+	if err != nil {
+		base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
+		jackettURL := base + "/api/v2.0/indexers/all/results/torznab/api"
+		if strings.Contains(err.Error(), "HTTP 404") && ep != jackettURL {
+			if fbItems, fbErr := idx.searchEndpoint(ctx, jackettURL, query); fbErr == nil {
+				return fbItems, nil
+			}
+		}
+		return nil, err
+	}
+	return items, nil
+}
+
+func (idx Indexer) searchEndpoint(ctx context.Context, endpointStr, query string) ([]Item, error) {
+	endpoint, err := url.Parse(endpointStr)
 	if err != nil {
 		return nil, fmt.Errorf("torznab: invalid indexer URL: %w", err)
 	}
@@ -102,11 +137,26 @@ func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
 // Ping checks that the indexer answers a Torznab `t=caps` request. It validates
 // reachability and the API key without depending on a query returning results.
 func (idx Indexer) Ping(ctx context.Context) error {
-	base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
-	if base == "" {
+	ep := idx.Endpoint()
+	if ep == "" {
 		return fmt.Errorf("torznab: empty indexer URL")
 	}
-	endpoint, err := url.Parse(base + "/api")
+	err := idx.pingEndpoint(ctx, ep)
+	if err != nil {
+		base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
+		jackettURL := base + "/api/v2.0/indexers/all/results/torznab/api"
+		if strings.Contains(err.Error(), "HTTP 404") && ep != jackettURL {
+			if fbErr := idx.pingEndpoint(ctx, jackettURL); fbErr == nil {
+				return nil
+			}
+		}
+		return err
+	}
+	return nil
+}
+
+func (idx Indexer) pingEndpoint(ctx context.Context, endpointStr string) error {
+	endpoint, err := url.Parse(endpointStr)
 	if err != nil {
 		return fmt.Errorf("torznab: invalid indexer URL: %w", err)
 	}

@@ -54,7 +54,7 @@ summary{cursor:pointer;color:#93a1b5}
   <input type="hidden" name="op" value="add">
   <input type="hidden" name="index" id="wanted-index">
   <div class="row">
-    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Serie" autocomplete="off" title="Series or movie title to search for"></label>
+    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Title" autocomplete="off" title="Series or movie title to search for"></label>
     <datalist id="series-list"></datalist>
     <label>Type<select name="kind" title="Release type: series or movie"><option value="series">Series</option><option value="movie">Movie</option></select></label>
     <label>Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="Season numbers or range (e.g. 1+, 2-4, 1)"></label>
@@ -110,22 +110,14 @@ summary{cursor:pointer;color:#93a1b5}
 
 <h2>Feeds <span class="muted">({{FEEDCOUNT}})</span></h2>
 <table>
-  <thead><tr><th>Name</th><th>Folder</th><th>Source</th><th>Include</th><th>Exclude</th><th>State</th><th></th></tr></thead>
+  <thead><tr><th>Name</th><th>Feed URL</th><th>State</th><th></th></tr></thead>
   <tbody>{{FEEDROWS}}</tbody>
 </table>
 <form class="form-card" method="post" action="/ui/rss-feed">
   <input type="hidden" name="op" value="add">
   <div class="row">
-    <label>Name<input type="text" name="name" placeholder="serie" autocomplete="off" title="Feed name"></label>
-    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off" title="Subfolder for downloaded items"></label>
+    <label>Name<input type="text" name="name" placeholder="Feed name" autocomplete="off" title="Feed name"></label>
     <label>Feed URL<input type="text" name="url" placeholder="http://…/rss" autocomplete="off" title="RSS feed URL"></label>
-  </div>
-  <div class="row">
-    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off" title="Terms that must be included in release title"></label>
-    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms that must not be in release title"></label>
-    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
-    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
-    <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
     <button type="submit" title="Add RSS feed">Add feed</button>
   </div>
   <p class="muted">A feed is an RSS URL. Its items are fetched periodically and evaluated by rules and wanted titles. Empty = the global default.</p>

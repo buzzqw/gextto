@@ -513,9 +513,9 @@ la qualità valgono in AND e i feed restano liberi per le regole avanzate.
 Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
 con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta
 Torznab `t=caps`, esito accanto alla riga) e rimuovere **indexer** (tendina
-Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS, cartella,
-include/exclude, categoria, percorso, in pausa — i parametri di ricerca per
-titoli appartengono a *Cercati*), l'**editor delle
+Prowlarr/Jackett/Altro, URL precompilato) e **feed** (nome e URL RSS: i feed
+caricano le sorgenti, mentre i parametri di ricerca, qualità e cartella appartengono
+a *Cercati* e alle regole), l'**editor delle
 regole** (una regola per riga, con frecce per cambiarne l'ordine — la prima che
 corrisponde vince; regex e filtri numerici stanno sotto *Filtri avanzati*), le
 textarea JSON avanzate per feed, regole e indexer (salvate con validazione), e

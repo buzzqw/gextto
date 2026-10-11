@@ -602,11 +602,11 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 }
 
 // uiFeedRowsHTML renders the configured feeds as table rows, each with a remove
-// button; the row index is the removal key. The rows are grouped by folder.
+// button; the row index is the removal key.
 func (d *Daemon) uiFeedRowsHTML() string {
 	list := d.feeds()
 	if len(list) == 0 {
-		return `<tr><td colspan="7" class="muted">None</td></tr>`
+		return `<tr><td colspan="4" class="muted">None</td></tr>`
 	}
 	rows := make([]struct {
 		index int
@@ -633,11 +633,12 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		if feed.Paused {
 			state = "paused"
 		}
-		b.WriteString("<tr><td>" + html.EscapeString(orDefault(feed.Name, "—")) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Folder, "—")) + "</td>")
+		name := orDefault(feed.Name, "—")
+		if feed.Folder != "" {
+			name += " (" + feed.Folder + ")"
+		}
+		b.WriteString("<tr><td>" + html.EscapeString(name) + "</td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(source) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Include, "—")) + "</td>")
-		b.WriteString("<td>" + html.EscapeString(orDefault(feed.Exclude, "—")) + "</td>")
 		b.WriteString("<td>" + state + "</td>")
 		b.WriteString(`<td><form method="post" action="/ui/rss-feed"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(row.index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
 	}
