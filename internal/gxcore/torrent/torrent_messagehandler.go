@@ -13,7 +13,6 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecedownloader"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piecewriter"
-	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 )
 
 func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
@@ -376,24 +375,14 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		if t.privateSwarm() {
 			break
 		}
-		addrs, err := tracker.DecodePeersCompact([]byte(msg.Added))
-		if err != nil {
-			t.log.Error(err)
-			break
+		// BEP 11: only the "added"/"added6" lists are candidates; the "dropped"
+		// lists are informational (see pexCandidates).
+		added4, added6 := pexCandidates(msg)
+		if len(added4) > 0 {
+			t.handleNewPeers(added4, peersource.PEX)
 		}
-		t.handleNewPeers(addrs, peersource.PEX)
-		addrs, err = tracker.DecodePeersCompact([]byte(msg.Dropped))
-		if err != nil {
-			t.log.Error(err)
-			break
-		}
-		t.handleNewPeers(addrs, peersource.PEX)
-		// BEP 11: the IPv6 contacts travel in added6/dropped6 (18 bytes each).
-		if addrs6, err := tracker.DecodePeersCompact6([]byte(msg.Added6)); err == nil {
-			t.handleNewPeers(addrs6, peersource.PEX)
-		}
-		if addrs6, err := tracker.DecodePeersCompact6([]byte(msg.Dropped6)); err == nil {
-			t.handleNewPeers(addrs6, peersource.PEX)
+		if len(added6) > 0 {
+			t.handleNewPeers(added6, peersource.PEX)
 		}
 	case peerprotocol.HolepunchMessage:
 		t.handleHolepunchMessage(pe, msg)
