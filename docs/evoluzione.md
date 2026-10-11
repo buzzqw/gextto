@@ -40,7 +40,8 @@ strategico e il documento tecnico del motore.
 12. [Handover tra sessioni di lavoro](#12-handover-tra-sessioni-di-lavoro)
 13. [Accessibilità](#13-accessibilita)
 14. [gx-torrent standalone (gx-nox): rimando](#14-gx-torrent-standalone-gx-nox-rimando)
-15. [Appendice A: file consolidati](#appendice-a-file-consolidati)
+15. [Estensioni ad alto valore dal confronto con BiglyBT](#15-estensioni-ad-alto-valore-dal-confronto-con-biglybt)
+16. [Appendice A: file consolidati](#appendice-a-file-consolidati)
 
 ---
 
@@ -1966,6 +1967,109 @@ la decisione in una riga: **si evolve gx-torrent**, e "gx-nox" è il nome pubbli
 della modalità standalone, non un secondo progetto. Il lavoro RSS/UI dello
 standalone (editor guidati, `/ui/settings`, `/ui/browse-dir`) è tracciato in
 [`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12.
+
+---
+
+## 15. Estensioni ad alto valore dal confronto con BiglyBT
+
+Ex analisi comparativa con **BiglyBT** (client Java, erede di Azureus/Vuze). La
+maggior parte delle sue capacità è **applicativa o storica** (chat/amici, Vuze
+DDB, media server, plugin, WebTorrent) e non va portata. Restano due sole
+funzioni *core* davvero interessanti per gx-core: entrambe sono **backlog**, non
+lavoro fatto; qui c'è il piano, con gli agganci già presenti nel codice.
+
+### 15.1 Ping-Based Auto-Speed (anti-bufferbloat) — priorità 1
+
+**Idea.** BiglyBT misura di continuo l'RTT (verso il gateway o un host
+affidabile); quando l'upload satura la coda del modem l'RTT schizza e il motore
+**riduce dinamicamente il limite di upload** prima che la connessione perda
+pacchetti e peggiori la navigazione/VoIP degli altri dispositivi. È un controllo
+in retroazione sulla **latenza**, non sulla banda: agisce solo sul tetto, non
+tocca il data path.
+
+**Aggancio già presente.** `Session.SetSpeedLimits` cambia i bucket a **caldo**
+senza riaprire la sessione né droppare peer (`internal/gxcore/torrent/session_limits.go`);
+il demone ha già lo scheduler orario che usa esattamente quel gancio
+(`cmd/gx-torrent/schedule.go`, `applyEffectiveSpeedLimitsLocked`). L'auto-speed è
+un **terzo livello** che clampa l'upload sotto il massimo configurato/schedulato.
+
+**Piano file-per-file.**
+
+1. `cmd/gx-torrent/latency.go` — probe RTT: target auto-rilevato (gateway dal
+   default route) con metodi in ordine di preferenza (ICMP non privilegiato se
+   disponibile, altrimenti TCP connect verso gateway:80/443, altrimenti host
+   configurato); ~1 campione/s, impatto CPU/RAM trascurabile.
+2. `cmd/gx-torrent/autospeed.go` — controllore AIMD: baseline EWMA dell'RTT a
+   riposo; oltre `baseline × fattore` (o `+ soglia ms`) **riduce** l'upload
+   moltiplicativamente, altrimenti **cresce** additivamente verso il tetto.
+3. Integrazione nel loop del demone; un **unico** componente possiede l'ultima
+   chiamata a `SetSpeedLimits` (base/config/schedule → clamp auto-speed), così le
+   due logiche non si pestano; estendere `appliedDL/appliedUL` col valore
+   clampato.
+4. Impostazioni: nuove chiavi del demone accanto a `schedule-*` (`cmd/gx-torrent`),
+   default, pagina web del demone (`cmd/gx-torrent/ui.go`) e, dove ha senso, in
+   Gextto.
+
+Parametri: enable (**off di default**), metodo/target, finestra baseline, soglia,
+fattore di riduzione, incremento, limite minimo, tetto = limite configurato o
+schedulato. Guardie: il tetto non supera mai il limite configurato/schedulato;
+log RTT + contatori.
+
+**Test.** Unit del controllore (serie di RTT sintetica → rate atteso), derive del
+target, composizione con lo scheduler (il clamp non supera il massimo) e un test
+che con auto-speed **spento** le chiamate a `SetSpeedLimits` restino identiche
+(nessuna regressione). **Misura** prima/dopo con controllo inattivo
+(`scripts/bench-engines.sh`, `make measure-seeding`): deve essere equivalente.
+Sforzo: **piccolo-medio**.
+
+### 15.2 Swarm Merging (condivisione file tra torrent) — priorità 2, per fasi
+
+**Idea.** Far collaborare sciami diversi che contengono **lo stesso file**,
+mappando blocchi da un torrent B sui pezzi mancanti di un torrent A: resuscita
+torrent senza seeder quando esiste contenuto identico altrove. In gx-core manca
+su v1; in v2 esiste già la deduplicazione intrinseca di protocollo.
+
+**Agganci già presenti.** `piece.Piece.Data` è un `filesection.Piece` e ogni
+`FileSection{File, Offset, Length, Padding}` punta a file+offset **assoluto**
+(`internal/filesection/section.go`): scrivere un pezzo è `File.WriteAt(buf, off)`.
+La verifica c'è già (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
+`metainfo.V2Files[fi].Root` è l'**identità per-file**, e `internal/merkle`
+fornisce le foglie da 16 KiB per la verifica **per blocco**. Il problema non è il
+disco, è la **verifica**: non ci si fida dei byte di B finché non sono validati
+contro la struttura di A.
+
+**Fasi.**
+
+- **Fase 1 (MVP sicuro):** merge solo tra torrent a **layout identico** (stessa
+  piece length e stessi hash ai medesimi indici) → i pezzi sono direttamente
+  interscambiabili, verificati con l'hash di A. Copre il caso comune "stesso
+  contenuto, `.torrent`/name/tracker diversi" a rischio corruzione ≈ nullo.
+  Richiede un registro a livello `Session` (chiave file → torrent che lo
+  possiedono), il picker/peer con "fonti straniere" e l'etichettatura del blocco
+  col torrent proprietario per verifica/scrittura; la contabilità
+  (bitfield/completamento) resta per-torrent.
+- **Fase 2 (v2-first):** match per **radice Merkle per-file** e verifica
+  **per blocco** con prova Merkle → file identici anche con layout diversi,
+  senza corruzione.
+- **No v1 a layout diverso:** niente euristiche ED2K/parziali di BiglyBT.
+
+**Guardia critica: BEP 27.** Disattivare il merge se A **o** B sono privati
+(`torrent.privateSwarm()`): mescolare sciami privati viola le regole dei tracker
+e inquina ratio/statistiche. Va cablata come guardia, non come opzione.
+
+**Test/misura.** Due torrent con gli stessi pezzi, uno senza seeder e l'altro
+popolato → completamento via merge, nessuna corruzione (hash), sciami privati
+esclusi; `make measure-seeding` per throughput/CPU/RAM. Sforzo: Fase 1 **media**,
+Fase 2 **grande**.
+
+### 15.3 Criterio di verifica (come §4.5)
+
+Per ogni punto: test mirati (`./cmd/gx-torrent/`, `GxEngine`, `make test-engine`,
+`make test`); con effetto visibile anche la documentazione (`docs/gx-torrent.md`,
+`MANUAL.*`, `README*`) e **entrambe le UI** (Gextto `uiweb/v2` + pagina del
+demone), mai solo via API. **Misura prima/dopo** CPU, RAM e throughput, come da
+regola performance di `AGENTS.md`; i nuovi controlli UI rispettano
+l'accessibilità e l'i18n.
 
 ---
 
