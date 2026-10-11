@@ -254,6 +254,15 @@ esercizio: RSS di `gx-torrent` **295 MB → ~105 MB** (RssAnon 275 → 92 MB) a
 parità di regole caricate. Restano in cache i 34 MB del file grezzo (rilettura
 rara su ricarica manuale): rimovibili in seguito.
 
+**Terza tornata (2026-10-11, Intel N97) — page cache SQLite.** La `cache_size`
+delle connessioni SQLite (`sqlite.go`) passa da 8 MB a **2 MB** (default di
+SQLite). Misura isolata sul DB archivio reale (510 MB, FTS5; query
+`Archive.Browse` e `CountMatches`, provate fino a 16 MB di cache): la latenza è
+**piatta**, entro il rumore anche sul `MATCH` ampio (~1,14 s), perché a servire
+il file è la page cache dell'OS, non quella di SQLite. Live su `gexttod`, a parità
+di uptime (2 minuti): RSS **109,7 → 67,6 MB** (RssAnon 88,4 → 46,2 MB, RssFile
+invariato); il delta sono le page cache delle 4 connessioni.
+
 ---
 
 ## 2. Migliorie Gextto implementate
