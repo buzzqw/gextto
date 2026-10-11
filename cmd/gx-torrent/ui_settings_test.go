@@ -100,7 +100,7 @@ func TestUIRssFollowCreatesFeedAndRule(t *testing.T) {
 
 	resp, err := http.PostForm(srv.URL+"/ui/rss-follow", url.Values{
 		"title": {"Serie S01"}, "kind": {"series"}, "include": {"1080p"},
-		"savepath": {"/srv/tv"}, "category": {"tv"},
+		"episode": {"1x01-05"}, "savepath": {"/srv/tv"}, "category": {"tv"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -117,6 +117,9 @@ func TestUIRssFollowCreatesFeedAndRule(t *testing.T) {
 	}
 	if !rules[0].Match.RequireEpisode || !rules[0].Match.SmartEpisode {
 		t.Fatalf("a followed series must require and track episodes: %+v", rules[0].Match)
+	}
+	if rules[0].Match.EpisodeFilter != "1x01-05" {
+		t.Fatalf("episode filter = %q", rules[0].Match.EpisodeFilter)
 	}
 	if rules[0].Action.SavePath != "/srv/tv" || rules[0].Action.Category != "tv" {
 		t.Fatalf("action = %+v", rules[0].Action)

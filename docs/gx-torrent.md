@@ -439,11 +439,20 @@ tutti), `fail`, `match` e `action`:
 
 - `match`: `include`/`exclude` (sottostringhe), `regex`/`not_regex`,
   `min_size`/`max_size` (byte), `min_seeders`/`max_seeders`, `min_peers`,
-  `max_age_days`, `require_episode`, `smart_episode` (aggiunge un episodio di
-  una serie una volta sola, tenendo traccia dell'ultimo: come lo smart episode
-  filter di qBittorrent);
+  `max_age_days`, `require_episode`, `episode_filter` e `smart_episode`
+  (aggiunge un episodio di una serie una volta sola, tenendo traccia
+  dell'ultimo: come lo smart episode filter di qBittorrent);
+- ogni regola è attiva per default; `enabled: false` la disattiva senza
+  cancellarla (l'editor mostra un'etichetta *Disattivata*).
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
   `top`.
+
+Il **filtro episodi** `episode_filter` usa la sintassi di qBittorrent: `1x01`
+(singolo), `1x01-05` (intervallo nella stagione), `1x01-1x05` (a cavallo di due
+stagioni), `1x01-` (aperto), `1x??`/`1x*` (tutta la stagione), separati da virgole
+o punti e virgola (`1x01, 1x03, 2x01-`); è accettata anche la forma `S01E01`. Il
+filtro vale solo per i titoli con un episodio riconoscibile; un filtro non valido
+non fa mai match (l'editor lo rifiuta prima di salvare).
 
 Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.

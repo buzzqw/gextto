@@ -273,8 +273,13 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	}
 	include := splitList(r.FormValue("include"))
 	exclude := splitList(r.FormValue("exclude"))
+	episode := strings.TrimSpace(r.FormValue("episode"))
 	savePath := strings.TrimSpace(r.FormValue("savepath"))
 	category := strings.TrimSpace(r.FormValue("category"))
+	if _, err := rss.ParseEpisodeFilter(episode); err != nil {
+		d.renderRSS(w, r, err.Error())
+		return
+	}
 
 	// The search feed: query the configured indexers for the title.
 	feeds := d.feeds()
@@ -300,7 +305,7 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	rule := rss.Rule{
 		Name:  title,
 		Feeds: []string{feed.Name},
-		Match: rss.Criteria{Include: include, Exclude: exclude},
+		Match: rss.Criteria{Include: include, Exclude: exclude, EpisodeFilter: episode},
 		Action: rss.Action{
 			SavePath: savePath,
 			Category: category,
@@ -330,12 +335,15 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
 }
 
-// uiRuleFromForm builds one rule from the add-rule form, validating the regexes.
+// uiRuleFromForm builds one rule from the add-rule form, validating the regexes
+// and the episode filter.
 func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
+	enabled := formBool(r, "enabled")
 	rule := rss.Rule{
-		Name:  strings.TrimSpace(r.FormValue("name")),
-		Feeds: splitList(r.FormValue("feeds")),
-		Fail:  formBool(r, "fail"),
+		Name:    strings.TrimSpace(r.FormValue("name")),
+		Feeds:   splitList(r.FormValue("feeds")),
+		Enabled: &enabled,
+		Fail:    formBool(r, "fail"),
 		Match: rss.Criteria{
 			Include:        splitList(r.FormValue("include")),
 			Exclude:        splitList(r.FormValue("exclude")),
@@ -349,6 +357,7 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 			MaxAgeDays:     int(formInt(r, "max_age_days", 0)),
 			RequireEpisode: formBool(r, "require_episode"),
 			SmartEpisode:   formBool(r, "smart_episode"),
+			EpisodeFilter:  strings.TrimSpace(r.FormValue("episode_filter")),
 		},
 		Action: rss.Action{
 			SavePath:   strings.TrimSpace(r.FormValue("savepath")),
@@ -367,6 +376,9 @@ func uiRuleFromForm(r *http.Request) (rss.Rule, error) {
 		if _, err := regexp.Compile(pattern); err != nil {
 			return rule, fmt.Errorf("%s is not a valid regular expression: %v", field, err)
 		}
+	}
+	if _, err := rss.ParseEpisodeFilter(rule.Match.EpisodeFilter); err != nil {
+		return rule, err
 	}
 	return rule, nil
 }
@@ -402,8 +414,12 @@ func (d *Daemon) uiRuleRowsHTML() string {
 		if len(rule.Feeds) > 0 {
 			scope = strings.Join(rule.Feeds, ", ")
 		}
+		flags := `<span class="` + kindClass + `">` + kind + `</span>`
+		if !rss.RuleEnabled(rule) {
+			flags += ` <span class="flag">Disabled</span>`
+		}
 		b.WriteString("<tr><td>" + html.EscapeString(orDefault(rule.Name, "—")) + "</td>")
-		b.WriteString(`<td><span class="` + kindClass + `">` + kind + `</span> <span class="muted">` + html.EscapeString(scope) + "</span></td>")
+		b.WriteString("<td>" + flags + ` <span class="muted">` + html.EscapeString(scope) + "</span></td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleMatchSummary(rule)) + "</td>")
 		b.WriteString(`<td class="mono">` + html.EscapeString(uiRuleActionSummary(rule)) + "</td>")
 		b.WriteString(`<td class="actions"><form method="post" action="/ui/rss-rule"><input type="hidden" name="op" value="up"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="sm">↑</button></form>`)
@@ -449,6 +465,9 @@ func uiRuleMatchSummary(rule rss.Rule) string {
 	}
 	if m.RequireEpisode {
 		parts = append(parts, "require_episode")
+	}
+	if m.EpisodeFilter != "" {
+		parts = append(parts, "episode="+m.EpisodeFilter)
 	}
 	if m.SmartEpisode {
 		parts = append(parts, "smart_episode")

@@ -89,6 +89,7 @@ summary{cursor:pointer;color:#93a1b5}
     <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
     <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
     <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
+    <label>Episode filter<input type="text" name="episode" placeholder="1x01-05, 1x07" autocomplete="off"></label>
     <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
     <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
     <button type="submit">Follow</button>
@@ -107,12 +108,14 @@ summary{cursor:pointer;color:#93a1b5}
     <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off"></label>
     <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off"></label>
     <label class="chk"><input type="checkbox" name="fail" value="1"> Skip matching items</label>
+    <label class="chk"><input type="checkbox" name="enabled" value="1" checked> Enabled</label>
   </div>
   <div class="row">
     <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
     <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
     <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off"></label>
     <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off"></label>
+    <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off"></label>
   </div>
   <div class="row">
     <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size"></label>

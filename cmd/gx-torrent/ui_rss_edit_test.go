@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/buzzqw/gextto/internal/rss"
 )
 
 // TestUIBrowseDirListsDirectories checks the folder picker endpoint: it lists
@@ -292,9 +294,9 @@ func TestUIRssRuleEditor(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp, err := http.PostForm(srv.URL+"/ui/rss-rule", url.Values{
-		"op": {"add"}, "name": {"shows"}, "feeds": {"serie, film"},
+		"op": {"add"}, "name": {"shows"}, "feeds": {"serie, film"}, "enabled": {"1"},
 		"min_size": {"1500"}, "min_seeders": {"3"}, "require_episode": {"1"}, "smart_episode": {"1"},
-		"savepath": {"/srv/tv"}, "category": {"tv"}, "tags": {"hd, ita"}, "sequential": {"1"},
+		"episode_filter": {"1x01-05"}, "savepath": {"/srv/tv"}, "category": {"tv"}, "tags": {"hd, ita"}, "sequential": {"1"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -317,6 +319,12 @@ func TestUIRssRuleEditor(t *testing.T) {
 	}
 	if !shows.Match.RequireEpisode || !shows.Match.SmartEpisode || shows.Match.MinSeeders != 3 {
 		t.Fatalf("match = %+v", shows.Match)
+	}
+	if shows.Match.EpisodeFilter != "1x01-05" {
+		t.Fatalf("episode_filter = %q", shows.Match.EpisodeFilter)
+	}
+	if !rss.RuleEnabled(shows) {
+		t.Fatal("the rule must be enabled when the checkbox is on")
 	}
 	if shows.Action.SavePath != "/srv/tv" || shows.Action.Category != "tv" || !shows.Action.Sequential || len(shows.Action.Tags) != 2 {
 		t.Fatalf("action = %+v", shows.Action)
@@ -349,6 +357,16 @@ func TestUIRssRuleEditor(t *testing.T) {
 	resp.Body.Close()
 	if len(d.rules()) != 2 {
 		t.Fatalf("a rule with an invalid regex must not be saved: %+v", d.rules())
+	}
+
+	// An invalid episode filter is refused too.
+	resp, err = http.PostForm(srv.URL+"/ui/rss-rule", url.Values{"op": {"add"}, "name": {"bad-episode"}, "episode_filter": {"nope"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(d.rules()) != 2 {
+		t.Fatalf("a rule with an invalid episode filter must not be saved: %+v", d.rules())
 	}
 
 	// Remove by index.

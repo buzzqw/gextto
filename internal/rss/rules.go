@@ -28,6 +28,9 @@ type Criteria struct {
 
 	RequireEpisode bool `json:"require_episode,omitempty"`
 	SmartEpisode   bool `json:"smart_episode,omitempty"` // daemon keeps the state
+	// EpisodeFilter restricts the rule to some episodes (qBittorrent-style
+	// syntax: "1x01", "1x01-05", "1x01-", "1x??"). Empty = every episode.
+	EpisodeFilter string `json:"episode_filter,omitempty"`
 }
 
 // Action is what happens when a PASS rule matches.
@@ -45,10 +48,18 @@ type Action struct {
 type Rule struct {
 	Name string `json:"name,omitempty"`
 	// Feeds scopes the rule to some feeds by name; empty = every feed.
-	Feeds  []string `json:"feeds,omitempty"`
-	Fail   bool     `json:"fail,omitempty"` // FAIL: matching items are skipped
-	Match  Criteria `json:"match"`
-	Action Action   `json:"action,omitempty"`
+	Feeds []string `json:"feeds,omitempty"`
+	// Enabled is optional: nil (the common case) means enabled, a pointer to
+	// false disables the rule without deleting it.
+	Enabled *bool    `json:"enabled,omitempty"`
+	Fail    bool     `json:"fail,omitempty"` // FAIL: matching items are skipped
+	Match   Criteria `json:"match"`
+	Action  Action   `json:"action,omitempty"`
+}
+
+// RuleEnabled reports whether a rule is active (nil Enabled means yes).
+func RuleEnabled(rule Rule) bool {
+	return rule.Enabled == nil || *rule.Enabled
 }
 
 // FindEpisode extracts the series, season and episode from a title like
@@ -143,6 +154,14 @@ func (c Criteria) Match(item Item, now time.Time) bool {
 			return false
 		}
 	}
+	if c.EpisodeFilter != "" {
+		// A malformed filter never matches: a typo must not download the whole
+		// season. The rule editor refuses invalid filters before saving.
+		filter, err := ParseEpisodeFilter(c.EpisodeFilter)
+		if err != nil || !filter.Match(title) {
+			return false
+		}
+	}
 	return true
 }
 
@@ -151,6 +170,9 @@ func (c Criteria) Match(item Item, now time.Time) bool {
 // means the rule explicitly skips it. matched is false when no rule applies.
 func Evaluate(rules []Rule, feedName string, item Item, now time.Time) (rule Rule, pass, matched bool) {
 	for _, candidate := range rules {
+		if !RuleEnabled(candidate) {
+			continue
+		}
 		if !ruleAppliesToFeed(candidate, feedName) {
 			continue
 		}
