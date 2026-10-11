@@ -91,59 +91,73 @@ func parseReflected(raw string) (net.IP, int, bool) {
 }
 
 // Reflected external address, learned from the BEP 42 "ip" field of responses
-// to our own queries. A single node can lie, so the port is only published once
-// at least two observations agree on the same ip:port; the consensus is the
-// most-observed pair. The sample set is bounded so a flood of bogus values
-// cannot grow it. Exposed by Stats() as "reflected_port" (0 while unknown) and
-// used by the daemon's port check to tell a port-preserving NAT from one that
-// rewrites the port.
-const reflectedMaxSamples = 32
+// to our own queries, and the NAT mapping type inferred from it.
+//
+// The port is the most-frequent one seen (so a single node cannot easily move
+// it, and a report is useful right away). The mapping type needs at least two
+// observers in different subnets: if they all report the same port the NAT is
+// endpoint-independent (cone), if they differ it is address/port-dependent
+// (symmetric). The observer set is bounded so a flood cannot grow it. Exposed
+// by Stats() and used by the daemon's port check.
+const reflectedMaxObservers = 16
 
 var (
 	reflectedMu    sync.Mutex
-	reflectedSeen  = make(map[string]*reflectedSample)
+	reflectedPorts = make(map[string]int) // observer subnet -> last reflected port
 	reflectedOrder []string
-	reflectedPort  atomic.Int64
+
+	reflectedPort  atomic.Int64 // most-frequent reflected port (0 = unknown)
+	reflectedObs   atomic.Int64 // total BEP 42 "ip" observations
+	natMappingType atomic.Int64 // 0 unknown, 1 endpoint-independent, 2 address/port-dependent
 )
 
-type reflectedSample struct {
-	port int
-	n    int
-}
-
-// recordReflected notes the external address a remote node reported for us.
-func recordReflected(raw string) {
+// recordReflected notes the external address a remote node (observerIP) reports
+// for us and refreshes the NAT mapping estimate.
+func recordReflected(raw string, observerIP net.IP) {
 	_, port, ok := parseReflected(raw)
 	if !ok || port == 0 {
 		return
 	}
+	reflectedObs.Add(1)
+	subnet := subnetKey(observerIP)
+	if subnet == "" {
+		return
+	}
 	reflectedMu.Lock()
-	s := reflectedSeen[raw]
-	if s == nil {
-		if len(reflectedOrder) >= reflectedMaxSamples {
-			delete(reflectedSeen, reflectedOrder[0])
+	if _, seen := reflectedPorts[subnet]; !seen {
+		if len(reflectedOrder) >= reflectedMaxObservers {
+			delete(reflectedPorts, reflectedOrder[0])
 			reflectedOrder = reflectedOrder[1:]
 		}
-		s = &reflectedSample{port: port}
-		reflectedSeen[raw] = s
-		reflectedOrder = append(reflectedOrder, raw)
+		reflectedOrder = append(reflectedOrder, subnet)
 	}
-	s.n++
-	// Deterministic consensus: the most-observed confirmed pair, ties broken by
-	// the smaller port (map iteration order is random).
-	bestN, bestPort := 0, 0
-	for _, smp := range reflectedSeen {
-		if smp.n < 2 {
-			continue
-		}
-		if smp.n > bestN || (smp.n == bestN && smp.port < bestPort) {
-			bestN, bestPort = smp.n, smp.port
-		}
+	reflectedPorts[subnet] = port
+	counts := make(map[int]int, len(reflectedPorts))
+	observers := len(reflectedPorts)
+	for _, p := range reflectedPorts {
+		counts[p]++
 	}
 	reflectedMu.Unlock()
+
+	// Most-frequent port, ties broken by the smaller port for determinism.
+	bestPort, bestN := 0, 0
+	for p, n := range counts {
+		if n > bestN || (n == bestN && p < bestPort) {
+			bestPort, bestN = p, n
+		}
+	}
 	if bestPort > 0 {
 		reflectedPort.Store(int64(bestPort))
 	}
+	mapping := int64(0)
+	if observers >= 2 {
+		if len(counts) == 1 {
+			mapping = 1 // endpoint-independent (cone)
+		} else {
+			mapping = 2 // address/port-dependent (symmetric)
+		}
+	}
+	natMappingType.Store(mapping)
 }
 
 // Routing-table composition, recomputed periodically by the run loop and read

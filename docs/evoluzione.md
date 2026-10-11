@@ -850,7 +850,7 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
 | Voce | Stato oggi | Fattibilità | Sforzo | Valore |
 |---|---|---|---|---|
 | **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **fatto (2026-10-11)** | M | medio |
-| **Rilevamento tipo di NAT / porta riflessa** | `portcheck` (ascolto + inoltro UPnP/NAT-PMP); l'IP esterno arriva dal campo `ip` BEP 42 ma la **porta (2 byte) è ignorata** | **media** | S (passo 1) / M (passo 2) | medio |
+| **Rilevamento tipo di NAT / porta riflessa** | `reflected_port`/`nat_mapping` nel `portcheck`, dal campo `ip` BEP 42 | **fatto** | S/M | medio |
 | **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **alta se si tocca il motore, bassa senza** | L | medio |
 
 - **PCP — fatto (2026-10-11).** Client MAP minimale in `cmd/gx-torrent/pcp.go`
@@ -861,16 +861,27 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
   impostazione UI). Test con un finto server PCP su loopback
   (`TestPCPMapSuccess`, `TestPCPMapNonceMismatch`, `TestPCPMapErrorResult`,
   `TestPCPMapRequestShape`).
-- **Rilevamento NAT**: **passo 1 fatto (2026-10-11)** — il DHT cattura la
-  porta riflessa dal campo `ip` di BEP 42 e la pubblica come `reflected_port`
-  (consensus: serve l'accordo di ≥2 osservazioni, set limitato; parsing in
-  `parseReflected`/`recordReflected`, `internal/dht/dht_sec.go`). Il
-  `portcheck` del demone (`GET /api/v1/portcheck`, campo `reflected_port` e
-  `natHint`) dice se il NAT **conserva** la porta (riflessa = locale) o la
-  **riscrive**. Passo 2 (dedurre endpoint-independent vs address/port-dependent
-  confrontando la porta riflessa da più destinazioni) richiede esperimenti su
-  rete reale. Test: `TestParseReflected`, `TestRecordReflectedConsensus`,
-  `TestNATHint`.
+- **Rilevamento NAT — fatto (2026-10-11).** Il DHT cattura la porta riflessa dal
+  campo `ip` di BEP 42 (`reflected_port`, la più frequente tra gli osservatori;
+  `reflected_observations` conta i campi ricevuti) e deduce il **tipo di mapping**
+  (`nat_mapping`) confrontando la porta vista da osservatori in /24 (o /48)
+  diversi: tutti d'accordo = endpoint-independent (*cone*), disaccordo =
+  address/port-dependent (*simmetrico*); con meno di 2 osservatori resta ignoto.
+  Set per-osservatore limitato; parsing in `parseReflected`/`recordReflected`
+  (`internal/dht/dht_sec.go`). Il `portcheck` del demone
+  (`GET /api/v1/portcheck`) riporta `reflected_port`/`nat_mapping` e `natHint`
+  dice se il NAT conserva o riscrive la porta.
+
+  **Misura live (2026-10-11).** Sul DHT pubblico `reflected_observations` resta
+  **0** dopo 500+ query: il campo `ip` di BEP 42 — che la spec dice *SHOULD* in
+  ogni risposta — **non arriva** dal traffico reale (il codec è corretto,
+  `TestReadResponseDecodesIPField`). La funzione è quindi pronta ma **non
+  osservabile in questa rete**: si attiva dove i nodi lo includono (tipicamente
+  dietro NAT). È il motivo per cui esiste `reflected_observations`, che dice se
+  il dato c'è; la classificazione del consensus è stata sostituita con quella
+  per-osservatore proprio perché il consensus a ≥2 non si popolava mai. Test:
+  `TestParseReflected`, `TestRecordReflectedNATMapping`, `TestNATHint`,
+  `TestReadResponseDecodesIPField`.
 - **Priorità file graduata — piano (L, non implementata in questa sessione).** È
   l'unica voce **di motore** e tocca il percorso di download più critico, quindi
   vale la regola del repo (*misura prima/dopo*, nessuna modifica non misurata):

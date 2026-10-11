@@ -226,14 +226,27 @@ type portCheck struct {
 	// us (BEP 42 "ip" field), 0 while unknown. When it equals Port the NAT keeps
 	// the port; a different value means the NAT rewrites it.
 	ReflectedPort int `json:"reflected_port,omitempty"`
+	// NATMapping is the mapping type inferred from DHT observations: "cone"
+	// (endpoint-independent) or "symmetric" (address/port-dependent), empty
+	// while unknown.
+	NATMapping string `json:"nat_mapping,omitempty"`
 }
 
 // natHint explains the NAT mapping from the DHT-reflected external port.
 func natHint(check portCheck) string {
+	var hint string
 	if check.Port > 0 && check.ReflectedPort == check.Port {
-		return fmt.Sprintf("il NAT conserva la porta (riflessa %d)", check.ReflectedPort)
+		hint = fmt.Sprintf("il NAT conserva la porta (riflessa %d)", check.ReflectedPort)
+	} else {
+		hint = fmt.Sprintf("porta riflessa %d: il NAT riscrive la porta", check.ReflectedPort)
 	}
-	return fmt.Sprintf("porta riflessa %d: il NAT riscrive la porta", check.ReflectedPort)
+	switch check.NATMapping {
+	case "cone":
+		hint += " · mapping endpoint-independent (cone)"
+	case "symmetric":
+		hint += " · mapping address/port-dependent (simmetrico)"
+	}
+	return hint
 }
 
 // checkLocalListener dials the daemon's own peer port: a successful TCP

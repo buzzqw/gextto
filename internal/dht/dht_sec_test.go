@@ -58,10 +58,12 @@ func TestNodeIDSecureLocalNetwork(t *testing.T) {
 // resetReflected clears the package-level reflected-address state between tests.
 func resetReflected() {
 	reflectedMu.Lock()
-	reflectedSeen = make(map[string]*reflectedSample)
+	reflectedPorts = make(map[string]int)
 	reflectedOrder = nil
 	reflectedMu.Unlock()
 	reflectedPort.Store(0)
+	reflectedObs.Store(0)
+	natMappingType.Store(0)
 }
 
 func bep42IPField(t *testing.T, ipStr string, port int) string {
@@ -95,30 +97,38 @@ func TestParseReflected(t *testing.T) {
 	}
 }
 
-// TestRecordReflectedConsensus: one liar is ignored, two agreeing nodes publish
-// the port, and the most-observed pair wins.
-func TestRecordReflectedConsensus(t *testing.T) {
+// TestRecordReflectedNATMapping: the port is published from the first observer,
+// the mapping stays unknown until two subnets report, then it is cone (same
+// port) or symmetric (different ports).
+func TestRecordReflectedNATMapping(t *testing.T) {
 	resetReflected()
 	a := bep42IPField(t, "203.0.113.7", 6881)
-	b := bep42IPField(t, "203.0.113.9", 40000)
+	b := bep42IPField(t, "203.0.113.7", 40000)
 
-	recordReflected(a)
-	if got := reflectedPort.Load(); got != 0 {
-		t.Fatalf("a single observation published a port: %d", got)
-	}
-	recordReflected(a)
+	recordReflected(a, net.ParseIP("198.51.100.1"))
 	if got := reflectedPort.Load(); got != 6881 {
-		t.Fatalf("two agreeing observations = %d, want 6881", got)
+		t.Fatalf("reflected port = %d, want 6881", got)
 	}
-	// A second (bogus) pair observed three times takes over the consensus.
-	recordReflected(b)
-	recordReflected(b)
+	if got := natMappingType.Load(); got != 0 {
+		t.Fatalf("one observer must not classify the NAT: %d", got)
+	}
+
+	// A second observer in another subnet reports the same port: cone.
+	recordReflected(a, net.ParseIP("203.0.113.9"))
+	if got := natMappingType.Load(); got != 1 {
+		t.Fatalf("agreeing observers = %d, want 1 (endpoint-independent)", got)
+	}
+
+	// A third observer reports a different port: symmetric.
+	recordReflected(b, net.ParseIP("192.0.2.5"))
+	if got := natMappingType.Load(); got != 2 {
+		t.Fatalf("disagreeing observers = %d, want 2 (address/port-dependent)", got)
+	}
 	if got := reflectedPort.Load(); got != 6881 {
-		t.Fatalf("bogus pair tied at 2 should not win yet: %d", got)
+		t.Fatalf("most-frequent reflected port = %d, want 6881", got)
 	}
-	recordReflected(b)
-	if got := reflectedPort.Load(); got != 40000 {
-		t.Fatalf("most-observed pair = %d, want 40000", got)
+	if got := reflectedObs.Load(); got != 3 {
+		t.Fatalf("observations = %d, want 3", got)
 	}
 	resetReflected()
 }

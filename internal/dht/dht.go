@@ -684,8 +684,8 @@ func (d *DHT) processPacket(p packetType) {
 			}
 			node.lastResponseTime = time.Now()
 			// The reply answers a query we sent: trust its "ip" field enough to
-			// note our reflected external address (consensus-checked).
-			recordReflected(r.R.IP)
+			// note our reflected external address (and the NAT mapping type).
+			recordReflected(r.R.IP, p.raddr.IP)
 			node.pastQueries[r.T] = query
 			d.routingTable.neighborhoodUpkeep(node, d.config.UDPProto, d.peerStore)
 
@@ -1310,9 +1310,13 @@ func Stats() map[string]int64 {
 		"announce_ok_token":  totalAnnounceTokenOK.Value(),
 		"announce_bad_token": totalAnnounceTokenBad.Value(),
 
-		// External port remote nodes report for us (BEP 42 "ip" field). 0 while
-		// unknown or unconfirmed; see recordReflected.
-		"reflected_port": reflectedPort.Load(),
+		// External port remote nodes report for us (BEP 42 "ip" field) and the
+		// NAT mapping type inferred from it: 0 unknown, 1 endpoint-independent
+		// (cone), 2 address/port-dependent (symmetric). reflected_port is 0
+		// while unknown; see recordReflected.
+		"reflected_port":         reflectedPort.Load(),
+		"reflected_observations": reflectedObs.Load(),
+		"nat_mapping":            natMappingType.Load(),
 
 		// Routing-table composition (Sybil visibility): the largest number of
 		// tree nodes sharing a /24 or /48, and how many have an insecure ID.

@@ -163,6 +163,35 @@ func TestReadResponseDualStackFields(t *testing.T) {
 	}
 }
 
+// TestReadResponseDecodesIPField pins the BEP 42 "ip" field decoding: the NAT
+// reflected address depends on it. It confirms the gap seen live is the field
+// being absent from the traffic, not a codec bug.
+func TestReadResponseDecodesIPField(t *testing.T) {
+	field := string([]byte{1, 2, 3, 4, 0x1a, 0xe1}) // 1.2.3.4:6881
+	payload := map[string]interface{}{
+		"t": "bb",
+		"y": "r",
+		"r": map[string]interface{}{
+			"id": strings.Repeat("I", 20),
+			"ip": field,
+		},
+	}
+	var b bytes.Buffer
+	if err := bencode.Marshal(&b, payload); err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	resp, err := readResponse(packetType{b: b.Bytes()}, &nullLogger{})
+	if err != nil {
+		t.Fatalf("readResponse: %v", err)
+	}
+	if resp.R.IP != field {
+		t.Fatalf("ip field = %q, want %q", resp.R.IP, field)
+	}
+	if _, port, ok := parseReflected(resp.R.IP); !ok || port != 6881 {
+		t.Fatalf("parseReflected(decoded ip) = port %d, ok %v", port, ok)
+	}
+}
+
 // newTestDHT builds a DHT with an empty routing table, enough for the
 // pure functions under test that do not talk to the network.
 func newTestDHT() *DHT {

@@ -223,8 +223,15 @@ func (d *Daemon) checkPort(targetPort int) portCheck {
 	// Only the real peer port has a DHT counterpart: a wizard test of a
 	// different port has no socket behind it.
 	if targetPort == 0 && d.session != nil {
-		if rp := d.session.Stats().DHTStats["reflected_port"]; rp > 0 {
+		dht := d.session.Stats().DHTStats
+		if rp := dht["reflected_port"]; rp > 0 {
 			pc.ReflectedPort = int(rp)
+		}
+		switch dht["nat_mapping"] {
+		case 1:
+			pc.NATMapping = "cone"
+		case 2:
+			pc.NATMapping = "symmetric"
 		}
 	}
 	return pc

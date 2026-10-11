@@ -14,6 +14,12 @@ func TestNATHint(t *testing.T) {
 	if got := natHint(portCheck{Port: 6881, ReflectedPort: 40000}); !strings.Contains(got, "riscrive") {
 		t.Errorf("port-rewriting hint = %q, want riscrive", got)
 	}
+	if got := natHint(portCheck{Port: 6881, ReflectedPort: 6881, NATMapping: "cone"}); !strings.Contains(got, "endpoint-independent") {
+		t.Errorf("cone hint = %q", got)
+	}
+	if got := natHint(portCheck{Port: 6881, ReflectedPort: 40000, NATMapping: "symmetric"}); !strings.Contains(got, "address/port-dependent") {
+		t.Errorf("symmetric hint = %q", got)
+	}
 }
 
 func TestPortCheckLocalListener(t *testing.T) {
