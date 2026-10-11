@@ -24,8 +24,8 @@ func Accept(
 	return AcceptRouted(conn, handshakeTimeout, getSKey, forceEncryption, lookup)
 }
 
-// AcceptRouted is Accept for a listener shared by many torrents (gextto
-// fork): the info hash sent by the peer selects the torrent, and lookup
+// AcceptRouted is Accept for a listener shared by many torrents: the info
+// hash sent by the peer selects the torrent, and lookup
 // returns the peer ID to answer with and the reserved bits to advertise for
 // that torrent (ok=false rejects the connection). The extensions are
 // per-torrent because the BitTorrent v2 reserved bit must only be set on a

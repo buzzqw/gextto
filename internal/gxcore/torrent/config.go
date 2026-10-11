@@ -4,13 +4,13 @@ import (
 	"io/fs"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
-	"github.com/cenkalti/log"
 )
 
 var (
-	publicPeerIDPrefix                    = "-RN" + Version + "-"
+	publicPeerIDPrefix                    = "-GX" + Version + "-"
 	publicExtensionHandshakeClientVersion = "gx-core " + Version
 	trackerHTTPPublicUserAgent            = "gx-core/" + Version
 )
@@ -72,7 +72,7 @@ type Config struct {
 	// Time to wait when resolving host names for trackers and peers.
 	DNSResolveTimeout time.Duration `yaml:"dns-resolve-timeout"`
 	// ListenPort, when non-zero, is the single TCP port shared by all
-	// torrents. Zero keeps upstream's port per torrent.
+	// torrents. Zero keeps one port per torrent, the classic behaviour.
 	ListenPort uint16 `yaml:"listen-port"`
 	// UTP accepts and dials peers over uTP too. It needs
 	// ListenPort: the UDP port is shared with the DHT.
@@ -81,8 +81,8 @@ type Config struct {
 	// tried together and the first to connect wins.
 	UTPOnly bool `yaml:"utp-only"`
 	// Holepunch advertises and honors the BEP 55 ut_holepunch extension, so a
-	// peer behind a NAT can still be reached through a relaying peer (gextto
-	// fork). It needs UTP and works best with PEX enabled.
+	// peer behind a NAT can still be reached through a relaying peer. It needs
+	// UTP and works best with PEX enabled.
 	Holepunch bool `yaml:"holepunch"`
 	// Preallocate reserves the full size of new files instead of creating
 	// them sparse.
@@ -235,7 +235,7 @@ type Config struct {
 	OnCompleteCmd []string `yaml:"on-complete-cmd"`
 
 	// Replace default log handler
-	CustomLogHandler log.Handler `yaml:"-"`
+	CustomLogHandler logger.Handler `yaml:"-"`
 	// Replace default storage provider
 	CustomStorage storage.Provider `yaml:"-"`
 
@@ -255,7 +255,7 @@ var DefaultConfig = Config{
 	MaxOpenFiles:                           10240,
 	PEXEnabled:                             true,
 	ResumeWriteInterval:                    30 * time.Second,
-	PrivatePeerIDPrefix:                    "-RN" + Version + "-",
+	PrivatePeerIDPrefix:                    "-GX" + Version + "-",
 	PrivateExtensionHandshakeClientVersion: "gx-core " + Version,
 	BlocklistUpdateInterval:                24 * time.Hour,
 	BlocklistUpdateTimeout:                 10 * time.Minute,

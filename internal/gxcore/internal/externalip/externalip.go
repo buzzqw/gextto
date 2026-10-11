@@ -4,7 +4,7 @@ import (
 	"net"
 	"slices"
 
-	"github.com/cenkalti/log"
+	"github.com/buzzqw/gextto/internal/gxcore/logging"
 )
 
 var ips []net.IP
@@ -12,7 +12,7 @@ var ips []net.IP
 func init() {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		log.Warningln("cannot get interface addresses:", err)
+		logging.Warningln("cannot get interface addresses:", err)
 		return
 	}
 	for _, addr := range addrs {

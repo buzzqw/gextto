@@ -1,7 +1,7 @@
 # gx-torrent: il motore torrent alternativo in puro Go
 
-`gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra la libreria
-[`cenkalti/rain`](https://github.com/cenkalti/rain) (base v2.4.2). È il motore predefinito di
+`gx-torrent` è un piccolo demone BitTorrent scritto in Go puro sopra il motore
+**gx-core** (`internal/gxcore`). È il motore predefinito di
 Gextto (`torrent_backend = gx-torrent`): non richiede `libtorrent-rasterbar`,
 gira in un processo separato e si controlla via REST su `127.0.0.1:8890`, dove
 espone anche una pagina web operativa apribile dal browser (per default solo da
@@ -9,7 +9,7 @@ questo server: vedi *Interfaccia web* per aprirla alla LAN). Il motore integrato
 libtorrent resta selezionabile — sulle build che lo includono — e fa da
 fallback automatico se gx-torrent non parte.
 
-Usa una copia del motore gx-core in `internal/gxcore`. Le modifiche sono
+Il motore gx-core vive in `internal/gxcore`. Le funzionalità sono
 descritte in `internal/gxcore/GEXTTO.md`: porta unica, interfaccia uscente,
 proxy, filtro IP, selezione dei file e alcune correzioni.
 
@@ -978,8 +978,8 @@ ogni 2 minuti (il demone alza a 2 minuti i 30 s predefiniti di
 
 ## Limiti di banda
 
-I limiti globali cambiano a caldo (programmazione, limite temporaneo): il fork
-del motore usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
+I limiti globali cambiano a caldo (programmazione, limite temporaneo): il motore
+usa un limitatore il cui ritmo si aggiorna mentre i peer lo usano,
 quindi nessuna riapertura della sessione e nessun peer perso. Gextto invia la
 configurazione solo quando cambia. Riaprono la sessione solo i limiti di peer
 (`max_peer_dial`/`max_peer_accept`), la scadenza della cache e la
@@ -1088,9 +1088,9 @@ capacità (`ErrCapabilityUnavailable`), mai con un falso successo:
 - IPv6: **supporto parziale** (vedi *IPv6* qui sotto).
 
 Il **download sequenziale** e la priorità **prima/ultima parte** sono supportati
-dalla base v2.4.2 (vedi la sezione dedicata): il motore scarica per primi i bordi di
+(vedi la sezione dedicata): il motore scarica per primi i bordi di
 ogni file (~1% della dimensione, fino a 8 MB), così i player trovano subito
-l'indice. Il fork rende la prima/ultima parte **indipendente** dall'ordine
+l'indice. La prima/ultima parte è **indipendente** dall'ordine
 sequenziale.
 
 Gli slot di upload e le connessioni per torrent **non** sono un limite: si

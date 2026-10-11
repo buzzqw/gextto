@@ -11,7 +11,6 @@ import (
 	"time"
 
 	bencode "github.com/jackpal/bencode-go"
-	"github.com/nictuku/nettools"
 )
 
 // Search a node again after some time.
@@ -40,7 +39,7 @@ type remoteNode struct {
 func newRemoteNode(addr net.UDPAddr, id string, log *DebugLogger) *remoteNode {
 	return &remoteNode{
 		address:             addr,
-		addressBinaryFormat: nettools.DottedPortToBinary(addr.String()),
+		addressBinaryFormat: encodeCompactPeerAddr(addr.String()),
 		lastQueryID:         newTransactionId(),
 		id:                  id,
 		reachable:           false,
@@ -92,7 +91,7 @@ func parseNodesString(nodes string, proto string, log DebugLogger) (parsed map[s
 	}
 	for i := 0; i < len(nodes); i += nodeContactLen {
 		id := nodes[i : i+nodeIdLen]
-		address := nettools.BinaryToDottedPort(nodes[i+nodeIdLen : i+nodeContactLen])
+		address := decodeCompactPeerAddr(nodes[i+nodeIdLen : i+nodeContactLen])
 		parsed[id] = address
 	}
 	return
@@ -334,5 +333,5 @@ func DecodeInfoHash(x string) (b InfoHash, err error) {
 // DecodePeerAddress transforms the binary-encoded host:port address into a
 // human-readable format. So, "abcdef" becomes 97.98.99.100:25958.
 func DecodePeerAddress(x string) string {
-	return nettools.BinaryToDottedPort(x)
+	return decodeCompactPeerAddr(x)
 }

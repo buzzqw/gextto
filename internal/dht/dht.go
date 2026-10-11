@@ -39,8 +39,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/nictuku/nettools"
 )
 
 // Config for the DHT Node. Use NewConfig to create a configuration with default values.
@@ -80,9 +78,8 @@ type Config struct {
 	ThrottlerTrackedClients int64
 	//Protocol for UDP connections, udp4= IPv4, udp6 = IPv6
 	UDPProto string
-	// PacketConn, when set, is used instead of opening a UDP socket (gextto
-	// fork): a uTP socket shares its port with the DHT this way. The DHT does
-	// not close it.
+	// PacketConn, when set, is used instead of opening a UDP socket: a uTP
+	// socket shares its port with the DHT this way. The DHT does not close it.
 	PacketConn net.PacketConn
 	// PublicIP, when set, is the external IP others see (BEP 42): the node ID is
 	// derived from it, so it cannot be spoofed and enforcing peers do not ignore
@@ -172,7 +169,7 @@ type DHT struct {
 	removeInfoHash         chan InfoHash
 	stop                   chan bool
 	wg                     sync.WaitGroup
-	clientThrottle         *nettools.ClientThrottle
+	clientThrottle         *clientThrottle
 	store                  *dhtStore
 	tokenSecrets           []string
 	// publicIP is the external IP we are reached at (BEP 42), once known.
@@ -210,7 +207,7 @@ func New(config *Config) (node *DHT, err error) {
 		pingRequest:    make(chan *remoteNode),
 		portRequest:    make(chan int),
 		removeInfoHash: make(chan InfoHash),
-		clientThrottle: nettools.NewThrottler(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
+		clientThrottle: newClientThrottle(cfg.ClientPerMinuteLimit, cfg.ThrottlerTrackedClients),
 	}
 	routingTable := newRoutingTable(&node.DebugLogger)
 	node.routingTable = routingTable
@@ -914,14 +911,14 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	// from a node it doesn't yet know about.
 	if node != nil && d.checkToken(addr, r.A.Token) {
 		peerAddr := net.TCPAddr{IP: addr.IP, Port: r.A.Port}
-		d.peerStore.addContact(ih, nettools.DottedPortToBinary(peerAddr.String()), r.A.Seed == 1)
+		d.peerStore.addContact(ih, encodeCompactPeerAddr(peerAddr.String()), r.A.Seed == 1)
 		// Allow searching this node immediately, since it's telling us
 		// it has an infohash. Enables faster upgrade of other nodes to
 		// "peer" of an infohash, if the announcement is valid.
 		node.lastResponseTime = time.Now().Add(-searchRetryPeriod)
 		port := d.peerStore.hasLocalDownload(ih)
 		if port != 0 {
-			d.PeersRequestResults <- map[InfoHash][]string{ih: {nettools.DottedPortToBinary(peerAddr.String())}}
+			d.PeersRequestResults <- map[InfoHash][]string{ih: {encodeCompactPeerAddr(peerAddr.String())}}
 		}
 	}
 	// Always reply positively. jech says this is to avoid "back-tracking", not sure what that means.
@@ -986,7 +983,7 @@ func (d *DHT) nodesForInfoHash(ih InfoHash) (n4, n6 string) {
 	for _, r := range d.routingTable.lookup(ih) {
 		// r is nil when the node was filtered.
 		if r != nil {
-			binaryHost := r.id + nettools.DottedPortToBinary(r.address.String())
+			binaryHost := r.id + encodeCompactPeerAddr(r.address.String())
 			if binaryHost == "" {
 				d.DebugLogger.Debugf("killing node with bogus address %v", r.address.String())
 				d.routingTable.kill(r, d.peerStore)
@@ -1172,7 +1169,7 @@ func (d *DHT) processFindNodeResults(node *remoteNode, resp responseType) {
 	// depending on the configured protocol, each parsed with its own family.
 	for _, field := range d.nodeResponseFields(resp.R.Nodes, resp.R.Nodes6) {
 		nodelist := field.raw
-		d.DebugLogger.Debugf("processFindNodeResults find_node = %s proto=%s len(nodelist)=%d", nettools.BinaryToDottedPort(node.addressBinaryFormat), field.proto, len(nodelist))
+		d.DebugLogger.Debugf("processFindNodeResults find_node = %s proto=%s len(nodelist)=%d", decodeCompactPeerAddr(node.addressBinaryFormat), field.proto, len(nodelist))
 		if nodelist == "" {
 			continue
 		}
@@ -1248,8 +1245,7 @@ var (
 	totalRecv                    = expvar.NewInt("totalRecv")
 )
 
-// knownNodes is the routing table size, readable from any goroutine (gextto
-// fork).
+// knownNodes is the routing table size, readable from any goroutine.
 var knownNodes atomic.Int64
 
 // Stats returns the DHT counters.

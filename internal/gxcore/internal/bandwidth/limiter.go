@@ -11,8 +11,8 @@ import (
 )
 
 // Limiter is a token bucket shared by the peers that hold it. A nil Limiter or
-// a zero rate means unlimited. A limiter may also inherit another one (gextto
-// fork): a torrent without an explicit limit forwards to the session limiter.
+// a zero rate means unlimited. A limiter may also inherit another one: a torrent
+// without an explicit limit forwards to the session limiter.
 type Limiter struct {
 	mu     sync.RWMutex
 	bucket *ratelimit.Bucket

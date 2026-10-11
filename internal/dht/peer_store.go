@@ -68,7 +68,7 @@ func (p *peerContactsSet) next() []string {
 
 // put adds a peerContact to an infohash contacts set. peerContact must be a binary encoded contact
 // address: either 6 bytes (4 bytes IPv4 + 2 bytes port) or 18 bytes (16 bytes IPv6 + 2 bytes port),
-// as produced by nettools.DottedPortToBinary. peerContact with less than 6 bytes will not be stored,
+// as produced by encodeCompactPeerAddr. peerContact with less than 6 bytes will not be stored,
 // so both families are accepted (and existing behavior is preserved).
 func (p *peerContactsSet) put(peerContact string) bool {
 	if len(peerContact) < 6 {

@@ -9,7 +9,7 @@ import (
 )
 
 // Benchmarks for the engine, to measure the cost of the picker paths that
-// upstream re-scans on every call. Run with:
+// re-scan on every call. Run with:
 //
 //	go test -run '^$' -bench 'BenchmarkPicker' -benchmem \
 //	    github.com/buzzqw/gextto/internal/gxcore/internal/piecepicker
@@ -92,7 +92,7 @@ func BenchmarkPickerSequentialNearlyDone(b *testing.B) {
 }
 
 // BenchmarkPickerFileEdgeFullScan forces pickFileEdge to visit every piece
-// (no pickable edge), which is the worst case of the fork's edge pass.
+// (no pickable edge), which is the worst case of the edge pass.
 func BenchmarkPickerFileEdgeFullScan(b *testing.B) {
 	const n = 27250
 	pp := New(benchPieces(n), 8, nil, false, true)

@@ -1,9 +1,9 @@
 package torrent
 
 import (
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peerconn"
-	"github.com/nictuku/dht"
 	"strconv"
 	"time"
 

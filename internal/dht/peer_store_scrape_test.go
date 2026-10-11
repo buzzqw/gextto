@@ -2,8 +2,6 @@ package dht
 
 import (
 	"testing"
-
-	"github.com/nictuku/nettools"
 )
 
 // TestPeerStoreScrapeFilters checks the BEP 33 filters split seeds from peers.
@@ -11,9 +9,9 @@ func TestPeerStoreScrapeFilters(t *testing.T) {
 	h := newPeerStore(10, 100)
 	ih := InfoHash("01234567890123456789")
 
-	h.addContact(ih, nettools.DottedPortToBinary("1.2.3.4:6881"), false)
-	h.addContact(ih, nettools.DottedPortToBinary("1.2.3.5:6882"), false)
-	h.addContact(ih, nettools.DottedPortToBinary("5.6.7.8:6883"), true)
+	h.addContact(ih, encodeCompactPeerAddr("1.2.3.4:6881"), false)
+	h.addContact(ih, encodeCompactPeerAddr("1.2.3.5:6882"), false)
+	h.addContact(ih, encodeCompactPeerAddr("5.6.7.8:6883"), true)
 
 	pe, sd := h.scrapeFilters(ih)
 	if pe == nil || sd == nil {
@@ -36,7 +34,7 @@ func TestPeerStoreScrapeFilters(t *testing.T) {
 func TestPeerStoreNoSeed(t *testing.T) {
 	h := newPeerStore(10, 100)
 	ih := InfoHash("01234567890123456789")
-	h.addContact(ih, nettools.DottedPortToBinary("5.6.7.8:6883"), true)
+	h.addContact(ih, encodeCompactPeerAddr("5.6.7.8:6883"), true)
 
 	if all := h.peerContacts(ih, false); len(all) != 1 {
 		t.Fatalf("all contacts = %d, want 1", len(all))
@@ -51,7 +49,7 @@ func TestPeerStoreNoSeed(t *testing.T) {
 func TestPeerStoreSeedStatusUpdated(t *testing.T) {
 	h := newPeerStore(10, 100)
 	ih := InfoHash("01234567890123456789")
-	c := nettools.DottedPortToBinary("5.6.7.8:6883")
+	c := encodeCompactPeerAddr("5.6.7.8:6883")
 	h.addContact(ih, c, true)
 	h.addContact(ih, c, false)
 

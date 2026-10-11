@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	clog "github.com/cenkalti/log"
+	clog "github.com/buzzqw/gextto/internal/gxcore/logging"
 )
 
 // captureHandler records what the filter forwarded, with the final level.

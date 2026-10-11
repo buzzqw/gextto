@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	clog "github.com/cenkalti/log"
+	clog "github.com/buzzqw/gextto/internal/gxcore/logging"
 
 	"github.com/buzzqw/gextto/internal/logging"
 )
@@ -53,12 +53,15 @@ func setupLogFile(path string) {
 // one tracker are the normal life of a swarm, not daemon errors: they are
 // demoted to debug, so the log shows what matters.
 func engineLogHandler(debug bool) clog.Handler {
-	handler := clog.NewWriterHandler(logOutput)
+	level := clog.WARNING
 	if debug {
-		handler.SetLevel(clog.DEBUG)
-	} else {
-		handler.SetLevel(clog.WARNING)
+		level = clog.DEBUG
 	}
+	handler := clog.NewWriterHandler(logOutput)
+	handler.SetLevel(level)
+	// Let the engine drop records below the handler level before building
+	// them; the handler would filter them out anyway.
+	clog.SetEngineLevel(level)
 	return &swarmNoiseFilter{Handler: handler}
 }
 

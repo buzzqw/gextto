@@ -251,8 +251,8 @@ type torrent struct {
 	// Peers that are sending corrupt data are banned.
 	bannedPeerIPs map[string]struct{}
 
-	// Endpoints already reached through a BEP 55 holepunch rendezvous (gextto
-	// fork): one rendezvous attempt per endpoint, so a failing dial does not
+	// Endpoints already reached through a BEP 55 holepunch rendezvous: one
+	// rendezvous attempt per endpoint, so a failing dial does not
 	// flood relays.
 	holepunchAttempted map[string]struct{}
 

@@ -9,11 +9,10 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/piece"
 )
 
-// These tests guard the gextto file-selection integration across the engine
-// upgrades. Upstream picks pieces in several different code paths; every one of
-// them must honour piece.Piece.Skip, otherwise the fork would download pieces
-// that belong only to excluded files. When merging a new upstream release, run
-// `go test ./internal/piecepicker/` and keep these green.
+// These tests guard the file-selection integration across the engine. Pieces
+// are picked in several different code paths; every one of them must honour
+// piece.Piece.Skip, otherwise the engine would download pieces that belong only
+// to excluded files. Run `go test ./internal/piecepicker/` and keep these green.
 
 const testPieceLength = 16 * 1024
 

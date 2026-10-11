@@ -75,8 +75,8 @@ propria, i trasferimenti proseguono mentre Gextto si riavvia o si aggiorna, ed �
 dove arrivano prima le novità (streaming HTTP con Range, test porte integrato,
 gestione adattiva di memoria/cache, holepunching NAT con BEP 55, IPv6 dual-stack
 DHT compreso, torrent BitTorrent v2 e ibridi, ban di sessione dei peer che
-inviano dati corrotti). Il suo nucleo, **gx-core**, è un motore nostro, nato da
-rain v2.4.2 e mantenuto in questo repository. La build
+inviano dati corrotti). Il suo nucleo, **gx-core**, è un motore nostro,
+mantenuto in questo repository. La build
 predefinita di Gextto è **Go puro**: per funzionare serve solo gx-torrent.
 
 **qBittorrent-nox** è l'alternativa per chi lo usa già o preferisce la sua UI:
@@ -211,8 +211,8 @@ prodotto, numero di build e, se collegata, la versione di libtorrent con:
 ## gx-torrent come client autonomo
 
 gx-torrent è anche un client BitTorrent completo a sé, usabile senza Gextto come
-si usa `qbittorrent-nox`. È **lo stesso binario** che Gextto pilota come motore:
-nessun fork, nessun prodotto separato. In modalità standalone aggiunge un wizard
+si usa `qbittorrent-nox`. È **lo stesso binario** che Gextto pilota come motore,
+non un prodotto separato. In modalità standalone aggiunge un wizard
 di primo avvio, un login facoltativo (la rete locale può restare senza
 password), categorie e tag, RSS con regole di download, ricerca sugli indexer
 (Jackett, Prowlarr, MIRCrew) e un'**API compatibile qBittorrent** (`/api/v2`) per

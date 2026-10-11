@@ -50,8 +50,8 @@ type PiecePicker struct {
 	// rarest-first. Independent of sequential order.
 	firstLast bool
 
-	// streamBegin/streamEnd are the piece range a player is reading (gextto
-	// fork): those pieces are requested before any other. Empty when equal.
+	// streamBegin/streamEnd are the piece range a player is reading:
+	// those pieces are requested before any other. Empty when equal.
 	streamBegin, streamEnd uint32
 
 	// readaheadBegin/readaheadEnd are the pieces the player is likely to read

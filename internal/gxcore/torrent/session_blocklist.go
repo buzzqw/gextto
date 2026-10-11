@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/ctxutil"
-	"github.com/cenkalti/backoff/v7"
 	"go.etcd.io/bbolt"
 )
 

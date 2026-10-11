@@ -1,7 +1,7 @@
 package main
 
 // cache.go sizes the engine's disk cache. Gextto pushes the manual value and the
-// daemon retunes itself on a coarse cadence (see adaptCacheLocked); the fork
+// daemon retunes itself on a coarse cadence (see adaptCacheLocked); the engine
 // applies a new read-cache and write-buffer size to the running session, so no
 // reopen is needed.
 //
@@ -179,7 +179,7 @@ func (d *Daemon) downloadDir() string {
 }
 
 // adaptCacheLocked recomputes the cache target from the live workload and
-// applies it to the running session when it moved enough (the fork resizes
+// applies it to the running session when it moved enough (the engine resizes
 // the read cache and the write buffer in place). Hysteresis and a coarse
 // cadence keep it from changing at every queue move.
 func (d *Daemon) adaptCacheLocked(now time.Time, activeDownloads, activeSeeds int, downloadRate int64) {

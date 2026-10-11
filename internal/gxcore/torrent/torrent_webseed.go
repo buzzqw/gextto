@@ -153,8 +153,8 @@ func (t *torrent) handleAddWebseeds(urls []string) {
 	t.persistWebseeds()
 }
 
-// handleRemoveWebseeds drops web seed URLs by exact match at runtime (gextto
-// fork). It runs in the torrent goroutine.
+// handleRemoveWebseeds drops web seed URLs by exact match at runtime. It runs
+// in the torrent goroutine.
 func (t *torrent) handleRemoveWebseeds(urls []string) {
 	remove := make(map[string]struct{}, len(urls))
 	for _, url := range urls {

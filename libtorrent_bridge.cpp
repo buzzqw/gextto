@@ -2,7 +2,7 @@
 //
 // Build notes (P1.6): this file targets libtorrent >= 2.0. A few libtorrent 2.0
 // APIs used here (half_open_limit, cache_size, cache_expiry, torrent_status::error,
-// ...) are marked TORRENT_DEPRECATED upstream to steer new code toward their
+// ...) are marked TORRENT_DEPRECATED by libtorrent to steer new code toward their
 // replacements, but they still work in every supported 2.0.x release and their
 // replacements are not available across all the distributions we ship for. The
 // deprecation warnings the compiler prints are expected and tracked, not build

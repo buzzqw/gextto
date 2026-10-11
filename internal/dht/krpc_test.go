@@ -7,17 +7,16 @@ import (
 	"testing"
 
 	bencode "github.com/jackpal/bencode-go"
-	"github.com/nictuku/nettools"
 )
 
 // binaryContact builds the binary host:port part of a compact node/peer
-// contact (6 bytes for IPv4, 18 bytes for IPv6) using the same nettools
-// encoding the library uses on the wire.
+// contact (6 bytes for IPv4, 18 bytes for IPv6) using the engine's compact
+// encoding, the same one used on the wire.
 func binaryContact(t *testing.T, hostPort string) string {
 	t.Helper()
-	c := nettools.DottedPortToBinary(hostPort)
+	c := encodeCompactPeerAddr(hostPort)
 	if c == "" {
-		t.Fatalf("DottedPortToBinary(%q) returned empty", hostPort)
+		t.Fatalf("encodeCompactPeerAddr(%q) returned empty", hostPort)
 	}
 	return c
 }

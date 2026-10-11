@@ -95,7 +95,7 @@ func TestEveryPickIsInTheCatalog(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() && (entry.Name() == "third_party" || strings.HasPrefix(entry.Name(), ".")) && path != "../.." {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), ".") && path != "../.." {
 			return filepath.SkipDir
 		}
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {

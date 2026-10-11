@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/magnet"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/metainfo"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resumer"
@@ -18,7 +19,6 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/webseedsource"
 	"github.com/gofrs/uuid"
-	"github.com/nictuku/dht"
 )
 
 // AddTorrentOptions contains options for adding a new torrent.

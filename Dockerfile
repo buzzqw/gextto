@@ -11,7 +11,7 @@
 
 FROM golang:1.27 AS build
 WORKDIR /src
-# Copy everything first: go.mod has a replace to ./third_party/dht, so the
+# Copy everything first: go.mod has a replace to ./internal/dht, so the
 # module graph cannot be resolved before that path exists.
 COPY . .
 RUN go mod download

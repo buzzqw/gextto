@@ -5,9 +5,8 @@ standalone oppure creare un nuovo progetto `gx-nox`?** Data: **2026-10-10**.
 
 Questo documento è la **decisione e il piano**. Lo stato corrente del motore è in
 [`docs/gx-torrent.md`](gx-torrent.md); il backlog del motore e le misure in
-[`docs/evoluzione.md`](evoluzione.md) (§4–§7); la procedura di rebase del fork in
-[`docs/motore-allineamento.md`](motore-allineamento.md); l'inventario delle
-modifiche rispetto a rain in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
+[`docs/evoluzione.md`](evoluzione.md) (§4–§7); l'inventario delle funzionalità
+del motore in [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md).
 
 > [!NOTE]
 > Nato dall'estrazione della §14 di `evoluzione.md`, che ora rimanda qui. Il
@@ -48,7 +47,7 @@ Gextto) e `-mode=standalone` quando è un prodotto a sé (comanda gx-torrent).
 secondo progetto.
 
 Il motivo decisivo non è la fatica iniziale, è il **requisito 5** (a tendere:
-staccarsi da rain e fare cherry-pick da libtorrent/anacrolix). Quel percorso
+fare cherry-pick per valore da libtorrent/anacrolix). Quel percorso
 trasforma il motore in codice vostro: con due progetti ci sarebbero **due
 divergenze dello stesso motore**, e ogni porting andrebbe fatto due volte.
 Prima o poi `gx-torrent` resterebbe indietro e Gextto si ritroverebbe col motore
@@ -56,7 +55,7 @@ peggiore dei due.
 
 Il **requisito 1** (compatibilità perfetta con Gextto) è la ragione per cui la
 strada nuova è rischiosa: si garantisce con **un solo motore + test di contratto
-sull'API v1**, non con due fork da risincronizzare a mano.
+sull'API v1**, non con due alberi di codice da risincronizzare a mano.
 
 Il punto di partenza è più avanti di quanto sembri: gx-torrent ha già REST API,
 pagina web in sei lingue, coda, limiti per torrent, streaming, super-seeding,
@@ -100,7 +99,7 @@ va respinta o messa dietro un flag.
 | 2 | Client efficace, potente, parsimonioso, migliore di qbittorrent-nox | obiettivo | misure contro qbittorrent-nox; niente funzioni che consumano se non usate |
 | 3 | Interfaccia web ottima, facile e completa come qBittorrent | obiettivo | UI come applicazione (asset, impostazioni, categorie/tag, RSS, ricerca), non una pagina operativa |
 | 4 | Wizard di primo avvio | obiettivo | lingua, cartelle, password, LAN senza password (default sì), porte + test porta, indexer Jackett/Prowlarr/MIRCrew |
-| 5 | A tendere staccarsi da rain; cherry-pick da rain/anacrolix/libtorrent | direzione | motore trattato come codice proprio; un solo motore condiviso dai due usi |
+| 5 | A tendere cherry-pick per valore da anacrolix/libtorrent | direzione | motore trattato come codice proprio; un solo motore condiviso dai due usi |
 
 ### 2.3 Criteri di valutazione
 
@@ -108,7 +107,7 @@ Per scegliere tra le strade (§5) uso sette criteri, valutati a parità di
 requisiti:
 
 1. **Compatibilità con Gextto** (requisito 1): quanto è garantita per costruzione.
-2. **Manutenzione del motore**: quanti fork/alberi di codice vanno tenuti.
+2. **Manutenzione del motore**: quanti alberi di codice vanno tenuti.
 3. **Propagazione di fix e migliorie**: una modifica arriva a entrambi gli usi o
    va portata a mano?
 4. **Peso del binario gestito**: cosa Gextto si porta dietro anche se non lo usa.
@@ -121,14 +120,13 @@ requisiti:
 ## 3. Stato attuale
 
 gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) con il motore **gx-core**
-(`internal/gxcore`, ex fork di rain v2.4.2), **24 aree** modificate rispetto alla
-base upstream (vedi `GEXTTO.md`). Gextto lo avvia, lo sorveglia e lo
+(`internal/gxcore`), **24 aree** descritte in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
 **riaggancia ai riavvii** tramite `fingerprint`. Il demone è già usabile da solo
 (`gx-torrent -listen … -data …`), ma è pensato come motore subordinato.
 
 | Strato | Dove | Cosa c'è già | Dimensione (2026-10-10) |
 | --- | --- | --- | --- |
-| Motore | `internal/gxcore`, `third_party/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree modificate |
+| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree |
 | Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 10.786 righe (14.144 col test) |
 | API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 588 righe |
 | UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.836 righe, `html/template` + JS inline |
@@ -205,7 +203,7 @@ condividere. È il costo nascosto più grosso della strada A.
 | Criterio | A. Evolvere | B. Nuovo gx-nox | C. Core + due binari |
 | --- | --- | --- | --- |
 | Compatibilità Gextto (req. 1) | garantita dai test esistenti | da risincronizzare a mano | garantita: Gextto usa il binario snello |
-| Manutenzione del motore | un fork di rain | due fork che divergono | un fork |
+| Manutenzione del motore | un albero di codice | due alberi che divergono | un albero |
 | Propagazione di fix e migliorie | arrivano a entrambi | portate a mano | arrivano a entrambi |
 | Peso del binario per Gextto | cresce con UI, RSS, ricerca | invariato | invariato |
 | Superficie d'attacco in managed | più codice, ma spento | invariata | invariata |
@@ -231,7 +229,7 @@ giustificassero.
 **Stato**: accettata (2026-10-10).
 
 **Contesto**: si vuole anche un client standalone, senza rompere l'uso come motore
-di Gextto, e con la prospettiva di staccarsi da rain.
+di Gextto.
 
 **Decisione**: **strada A**. Un solo binario `gx-torrent`, due modalità decise
 all'avvio:
@@ -243,7 +241,7 @@ all'avvio:
 "gx-nox" resta il **nome pubblico** con cui lo standalone si presenta agli
 utenti/documentazione; non è un secondo binario né un secondo repository.
 
-**Conseguenze positive**: un fork di rain; fix e ottimizzazioni arrivano a
+**Conseguenze positive**: un solo albero di codice; fix e ottimizzazioni arrivano a
 entrambi; compatibilità Gextto garantita per costruzione; tempo al primo
 standalone usabile minimo.
 
@@ -252,7 +250,7 @@ codice standalone (mitigato dalle regole del §8); l'API e la UI standalone
 convivono con la v1 congelata (mitigato dall'additività).
 
 **Alternative scartate**: B perché raddoppia la manutenzione del motore proprio
-mentre lo si vuole staccare da rain; C perché il beneficio (demone snello) si
+mentre lo si vuole unificare; C perché il beneficio (demone snello) si
 ottiene già con l'avvio pigro dei moduli, senza introdurre due binari.
 
 **Cosa farebbe riaprire la decisione**: se Gextto abbandonasse gx-torrent per
@@ -277,7 +275,7 @@ flowchart TB
         C2["webui, auth, settings<br/>login, LAN, CSRF<br/>embed.FS, sei lingue"]
         C3["moduli standalone<br/>RSS, indexer, categorie, API qBit<br/>avviati solo se configurati"]
     end
-    E["internal/gxcore: il motore (ex fork di rain, ora codice proprio)<br/>DHT, uTP, holepunch, IPv6, smart ban, BitTorrent v2"]
+    E["internal/gxcore: il motore (codice proprio)<br/>DHT, uTP, holepunch, IPv6, smart ban, BitTorrent v2"]
     G -- "API v1, congelata" --> X
     B -- "web UI" --> X
     A -- "API qBit v2" --> X
@@ -411,18 +409,18 @@ requisito: si pubblicano le misure a ogni release, vincenti o no.
 
 ## 11. Cherry-pick dal motore e licenze
 
-Il fork di rain è già una base solida e sorvegliata. Le due lacune che pesavano
+Il motore è già una base solida e sorvegliata. Le due lacune che pesavano
 di più per uno standalone, IPv6 e BitTorrent v2, sono **chiuse** (vedi §12);
 tutto il resto è qualità che si porta **un algoritmo alla volta**, misurando prima e dopo. Valutazioni di memoria,
 da verificare sul codice delle librerie prima di ogni porting.
 
 | Area | gx-torrent (motore gx-core) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
-| Linguaggio, licenza | Go, MIT | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
+| Linguaggio, licenza | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
 | IPv6 | sì (dual-stack, DHT BEP 32; niente LSD v6) | sì | sì | sì |
 | BitTorrent v2 / ibridi | sì (v2-only da `.torrent` e magnet, ibridi) | sì | sì | sì |
 | uTP | sì (`anacrolix/utp`) | sì | sì, LEDBAT proprio | sì |
-| Holepunch BEP 55 | sì (fork) | sì | sì | sì |
+| Holepunch BEP 55 | sì | sì | sì | sì |
 | Streaming | finestra + HTTP Range, attesa a polling | Reader con seek e readahead | deadline per pezzo | sì |
 | Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
@@ -438,7 +436,7 @@ da verificare sul codice delle librerie prima di ogni porting.
 | 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | il motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
 | 3 | Profondità della coda richieste adattiva | libtorrent | la velocità su peer lontani dipende da quante richieste sono in volo | medio |
 | 4 | Reader con readahead per lo streaming | anacrolix | sostituisce l'attesa a polling (200 ms, timeout 2 min) | medio |
-| 5 | BitTorrent v2 e ibridi | anacrolix (Go, più vicino a rain) | torrent v2-only già in circolazione; serve merkle per file | alto |
+| 5 | BitTorrent v2 e ibridi | anacrolix | torrent v2-only già in circolazione; serve merkle per file | alto |
 | 6 | Choking rate-based e anti-leech | libtorrent | qualità del seeding; da validare con l'harness `unchoker/sim_test.go` | medio |
 | 7 | Disk I/O: scrittura in blocchi contigui, hash su pool | libtorrent | CPU e usura disco su NAS lenti | medio |
 | 8 | Share mode | libtorrent | già scartato per Gextto (§4.3, decisione 2); per lo standalone vale come opzione | basso |
@@ -459,22 +457,14 @@ Gextto è **EUPL-1.2**. Da **libtorrent** (BSD-3) si può portare codice con
 l'attribuzione. Da **anacrolix** (MPL-2.0) il codice copiato resta MPL file per
 file: meglio **riscrivere l'algoritmo** che copiare i file. Da **qBittorrent**
 (GPL) non si copia nulla; reimplementare il suo protocollo Web API è lecito.
-rain è MIT, `nictuku/dht` è BSD, `anacrolix/utp` è MPL-2.0 (dipendenza non
-modificata).
+`anacrolix/utp` è MPL-2.0 (dipendenza non modificata).
 
-### 11.3 Staccarsi da rain
+### 11.3 Motore come codice proprio
 
-Il requisito 5 significa rinunciare al **rebase periodico** e trattare il motore
-come codice proprio. **Fatto (2026-10-10):** il modulo è rinominato
-(`github.com/buzzqw/gextto/internal/engine` → `.../internal/gxcore`), la
-cartella è sotto `internal/`, l'identità di rete è "gx-core", il pacchetto
-`rainrpc` (dead code) è rimosso e `GEXTTO.md` è inteso come changelog del
-motore. Procedura residua per guardare l'**upstream** rain a mano (non più un
-rebase): `docs/motore-allineamento.md`.
-
-**Follow-up (studio):** quali riferimenti residui a rain in documenti e
-artefatti si possono togliere (e quali restano per licenza/origine) è tracciato
-in [`evoluzione.md` §1.6](evoluzione.md). Il **codice Go è già pulito**.
+Il requisito 5 significa trattare il motore come codice proprio. **Fatto
+(2026-10-10):** il modulo è `github.com/buzzqw/gextto/internal/gxcore`, la
+cartella è sotto `internal/`, l'identità di rete è "gx-core" e `GEXTTO.md` è
+l'inventario delle funzionalità del motore.
 
 ---
 
@@ -506,7 +496,7 @@ rimanenti:
 
 | Voce | Piano | Stato |
 | --- | --- | --- |
-| Nome e de-rain: prodotto **gx-core**, motore rinominato `internal/engine` → `internal/gxcore`, identità di rete da "Rain" a "gx-core", `rainrpc` rimosso, **de-rain anche dei commenti** nel codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
+| Nome e identità: prodotto **gx-core**, motore in `internal/gxcore`, identità di rete "gx-core", **marcatori di origine rimossi** dai commenti del codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
 | F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (resta solo la LSD v6) |
 | F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Fatto**: v2-only da `.torrent` e da **magnet** (`urn:btmh:`). Parsing v2, modello a **pezzi per-file** (coda più corta), verifica via **nodo Merkle** SHA-256, identità troncata a 20 byte, bit riservato v2 nell'handshake, fetch dei `piece layers` dai peer con `hash request`/`hashes`/`hash reject`, test seed/leech end-to-end (`.torrent` e magnet) |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
@@ -518,17 +508,12 @@ rimanenti:
 
 **Punto finale:** al termine, **controllo approfondito di tutto il codice
 lavorato** in questa sessione (IPv6/DHT BEP 32, BitTorrent v2, API qBittorrent e
-RSS, container, de-rain) prima di considerarlo chiuso.
+RSS, container) prima di considerarlo chiuso.
 
 **Aperti, da discutere dopo i precedenti:** ritocchi al wizard
 (indexer/cartella temporanea). Il **BitTorrent v2** (BEP 52) è completo, magnet
-compresi. Il
-**distacco da rain** è
-avvenuto: nel codice non resta alcun riferimento a rain (namespace, stringhe di
-rete e commenti). I riferimenti all'**upstream** rain restano solo dove indicano
-origine, licenza o confronto (documenti come questo, `LICENSE`). I **marcatori
-`gextto fork`** sono stati rimossi dal codice: il changelog resta in
-`internal/gxcore/GEXTTO.md`.
+compresi. Nel codice non resta alcun marcatore di origine; l'inventario delle
+funzionalità del motore è in `internal/gxcore/GEXTTO.md`.
 
 **Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
 continuare a funzionare — `go test ./internal/tui/` e il test d'integrazione
@@ -633,7 +618,7 @@ Realizzato:
 che Gextto usa come motore (regola d'oro: un solo codice). La CI non costruisce
 un secondo prodotto: compila `gx-torrent` e lo pubblica **a parte** dall'archivio
 di Gextto, così l'utente lo scarica e lo usa come demone autonomo (come
-qbittorrent-nox). Nessun fork, nessuna doppia manutenzione.
+qbittorrent-nox). Nessuna doppia manutenzione.
 
 Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 (glibc 2.35), amd64 e arm64, e l'eventuale immagine container.
@@ -648,7 +633,7 @@ Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 | 2. Efficienza | avvio pigro dei moduli; cache adattiva; misure contro qbittorrent-nox | F1, F4 | le 4 metriche del §10 |
 | 3. UI alla pari di qBittorrent | asset `embed.FS`, impostazioni da UI, categorie/tag, RSS, ricerca, grafici, telefono, tema scuro | F2, F3 | checklist qBittorrent + test Playwright (come `uiweb/v2/end2end`) |
 | 4. Wizard | lingua, cartelle, accesso (LAN senza password default sì + 3 protezioni), porte + test porta, indexer Jackett/Prowlarr/MIRCrew | F1 | setup da zero in meno di 5 minuti |
-| 5. Staccarsi da rain | motore trattato come codice proprio; cherry-pick per valore; licenze rispettate | F4 | misura prima/dopo ogni porting; changelog del motore |
+| 5. Motore come codice proprio | cherry-pick per valore da anacrolix/libtorrent; licenze rispettate | F4 | misura prima/dopo ogni porting; inventario del motore |
 
 ---
 
@@ -660,9 +645,9 @@ Da verificare: la prima esecuzione in CI su **Debian 12 / Ubuntu 22.04**
 | Due padroni della stessa coda | torrent spostati due volte, limiti sovrascritti | modalità decisa all'avvio, mai cambiata a caldo |
 | LAN senza password sfruttata | un sito esterno aggiunge o cancella torrent dal browser dell'utente | controllo `Origin` e `Host`, LAN letta dal socket, `X-Forwarded-For` solo da proxy dichiarati |
 | UI che cresce in una stringa Go | modifiche lente, regressioni visive | asset in `embed.FS` e test Playwright come quelli di `uiweb/v2/end2end` |
-| Porting dal motore costoso | IPv6 e v2 toccano DHT, tracker, picker, storage | un porting per volta, con test del fork e misura prima/dopo |
+| Porting dal motore costoso | IPv6 e v2 toccano DHT, tracker, picker, storage | un porting per volta, con test del motore e misura prima/dopo |
 | Licenze | codice MPL dentro file EUPL | riscrivere gli algoritmi di anacrolix invece di copiarli |
-| Fine del rebase su rain | si perdono eventuali fix upstream | upstream è lento; controllare a mano i suoi commit una volta a trimestre |
+| Porting da altri motori | si perdono eventuali fix altrui | controllare a mano i loro commit una volta a trimestre |
 | Estrazione di RSS/ricerca dal pacchetto radice | refactor ampio, possibile instabilità in Gextto | estrarre in `internal/` a comportamento costante, con i test esistenti come rete |
 
 ---
@@ -697,8 +682,7 @@ Decisioni da prendere **prima** di F1/F2, non urgenti in F0:
   misure di choking; §14: rimando a questo documento.
 - [`docs/gx-torrent-v2.md`](gx-torrent-v2.md) — progetto di implementazione
   BitTorrent v2 (BEP 52): modello a pezzi per-file, incrementi, test.
-- [`docs/motore-allineamento.md`](motore-allineamento.md) — come recepire l'upstream rain a mano.
 - [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md) — inventario delle
-  modifiche al fork.
+  funzionalità del motore.
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — mappa del codice di Gextto.
 - [`LICENSE`](../LICENSE) — EUPL-1.2.

@@ -8,7 +8,7 @@ import (
 
 // TestFormats covers the extra blocklist formats added by the engine:
 // name:range (P2P), "a.b.c.d - a.b.c.d , level , label" (eMule) and plain
-// dotted ranges, on top of upstream CIDR.
+// dotted ranges, on top of CIDR.
 func TestFormats(t *testing.T) {
 	rules := `# comment
 10.0.0.0/8
@@ -33,7 +33,7 @@ Bad people:1.2.3.0-1.2.3.255
 }
 
 // TestIPv6CIDR covers IPv6 CIDR rules, which the engine keeps in a
-// separate interval list (the upstream engine skipped them).
+// separate interval list.
 func TestIPv6CIDR(t *testing.T) {
 	rules := `2001:db8::/32
 fd00::/8

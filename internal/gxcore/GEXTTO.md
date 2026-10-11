@@ -1,24 +1,14 @@
-# Motore gx-core (ex rain) — inventario
+# Motore gx-core — panoramica
 
-Questa cartella contiene il **motore** di gx-core (il binario `gx-torrent`):
-nasce dalla copia di
-[`github.com/cenkalti/rain`](https://github.com/cenkalti/rain) v2.4.2 (licenza
-MIT, vedi `LICENSE`) ed è ora **codice nostro**, parte del modulo principale
-come `github.com/buzzqw/gextto/internal/gxcore`. Lo usa solo il demone
+Questa cartella contiene il **motore** di gx-core (il binario `gx-torrent`),
+parte del modulo principale come
+`github.com/buzzqw/gextto/internal/gxcore`. Lo usa solo il demone
 `cmd/gx-torrent`.
 
-**Obiettivo:** non dipendere più da rain. Il distacco è avvenuto (cartella,
-modulo, identità di rete e **marcatori nel codice** rimossi); questa tabella è
-il **changelog delle modifiche** rispetto alla base upstream. L'attribuzione MIT
-originale resta in `LICENSE`.
+Questa tabella è l'**inventario delle funzionalità** del motore e dei file che
+le implementano.
 
-Rimossi rispetto all'originale:
-
-- la CLI (`main.go`, `internal/command`, `internal/console`);
-- i test upstream e i loro dati (`torrent/testdata`);
-- logo, screenshot e file di CI (`.github`, `.goreleaser.yml`, `.golangci.yml`).
-
-Test del fork mantenuti (girano dentro questo modulo):
+Test del motore (girano dentro questo modulo):
 
 - `internal/blocklist/blocklist_test.go` — formati del filtro IP;
 - `internal/mse/mse_test.go` — scrittura MSE in place: round-trip di cifratura e zero allocazioni per blocco;
@@ -42,7 +32,7 @@ Test del fork mantenuti (girano dentro questo modulo):
 - `torrent/torrent_holepunch_test.go` — decisione del relè (connect a entrambi,
   errori `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer`).
 
-Modifiche rispetto alla base upstream:
+Funzionalità e aree del motore:
 
 | Area | File | Cosa |
 |---|---|---|
@@ -69,7 +59,7 @@ Modifiche rispetto alla base upstream:
 | Connessioni/upload per-torrent | `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_run.go`, `internal/unchoker/unchoker.go`, `torrent/session_limits.go` | `Torrent.SetMaxConnections`/`SetMaxUploads`: tetto alle connessioni instaurate (chiude le eccedenti al tick) e `Unchoker.SetNumUnchoked` per gli slot di upload |
 | Streaming | `internal/piecepicker/piecepicker.go`, `torrent/session_stream.go` | `PiecePicker.SetStreamWindow` e `Torrent.FilePieceRange`/`SetFileStreamWindow`: i pezzi della finestra letta da un player vengono scelti per primi. `Torrent.PiecesDone(begin,end)`: check mirato del range, senza allocare uno stato per ogni pezzo |
 | File completati da fermo | `torrent/torrent.go` (`fileStatsFromBitfield`, `fileStatsFromPieces`) | `FileStats` di un torrent fermo (pezzi non in memoria) calcola i byte completati di ogni file dal bitfield verificato, padding incluso negli offset, invece di rispondere con un errore: Gextto recupera così gli episodi già completi di un pack parcheggiato o abbandonato. Test `filestats_bitfield_test.go` |
-| Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 sul torrent in corso, attivo solo a torrent completato. Annuncia un pezzo alla volta e serve solo i pezzi *offerti* a quel peer; i pezzi offerti non si ripetono, `have`/`not-interested` e un tick di ritentativo fanno avanzare, e a esaurimento il peer viene liberato col bitfield pieno. Il flag è persistito nel resume. Il fork traccia anche il bitfield remoto quando il piece picker è `nil` (seed), che il super-seeding richiede |
+| Super-seeding | `torrent/torrent_superseed.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_run.go`, `torrent/torrent_pieces.go`, `torrent/session_torrent.go`, `torrent/session_add.go`, `torrent/session_load.go`, `internal/resumer/boltdbresumer` | `Torrent.SetSuperSeeding`: BEP 16 sul torrent in corso, attivo solo a torrent completato. Annuncia un pezzo alla volta e serve solo i pezzi *offerti* a quel peer; i pezzi offerti non si ripetono, `have`/`not-interested` e un tick di ritentativo fanno avanzare, e a esaurimento il peer viene liberato col bitfield pieno. Il flag è persistito nel resume. Il motore traccia anche il bitfield remoto quando il piece picker è `nil` (seed), che il super-seeding richiede |
 | Holepunching | `internal/peerprotocol/holepunch.go`, `internal/peerprotocol/extension.go`, `internal/peersource`, `torrent/config.go`, `torrent/torrent.go`, `torrent/torrent_peer.go`, `torrent/torrent_messagehandler.go`, `torrent/torrent_handshake.go`, `torrent/torrent_holepunch.go`, `torrent/torrent_stats.go`, `torrent/torrent_commands.go`, `torrent/session_rpc_handler.go` | BEP 55 `ut_holepunch`: `Config.Holepunch` annuncia l'estensione e abilita il relè peer. Quando un dial fallisce, `tryHolepunchRendezvous` (una volta per endpoint, max 8 relè) chiede l'introduzione; il relè risponde con `connect` a entrambi e ogni lato dial su uTP (`peersource.Holepunch`, sorgente `SourceHolepunch`). `planHolepunchRendezvous` è pura e testata. Log di debug (`holepunch rendezvous …`) per seguire invio e ricezione del rendezvous |
 | Ban di sessione | `torrent/session.go`, `torrent/torrent_write.go`, `torrent/torrent_peer.go`, `torrent/torrent_connection.go`, `torrent/session_listen.go`, `torrent/torrent_holepunch.go` | `Session.BanIP`/`IsBannedIP`: un peer che invia un pezzo corrotto viene bannato, **con scadenza** (`sessionBanTTL`, 30 min), da **tutta la sessione** e non solo dal torrent; `Torrent.ipBanned` unifica il controllo (per-torrent + sessione) in tutti i punti di connessione/dial/holepunch |
 | BitTorrent v2 | `internal/metainfo`, `internal/merkle`, `internal/piece`, `internal/verifier`, `internal/piecewriter`, `internal/magnet`, `internal/peerprotocol`, `torrent/session_add.go`, `torrent/torrent_hashrequest.go` | Supporto **v2-only da `.torrent` e da magnet** (`urn:btmh:`): parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256 (troncato a 20 byte per l'identità), modello a **pezzi per-file** (coda più corta, nessun padding nel pezzo), verifica via **nodo Merkle** SHA-256 e **fetch dei `piece layers` dai peer** con i messaggi `hash request`/`hashes`/`hash reject` (id 21/22/23). Il bit riservato v2 è annunciato nell'handshake solo per i torrent con identità v2; il seed risponde dalle sue `piece layers` (le richieste a livello blocco sono rifiutate). Gli **ibridi** restano scaricati come v1 |
@@ -81,7 +71,7 @@ Modifiche rispetto alla base upstream:
 | Coda richieste adattiva | `internal/peer/peer.go` (`RequestQueue`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | La profondità delle richieste in volo parte da `DefaultRequestsOut` (o `reqq`) e **cresce di uno per blocco consegnato** fino a `MaxRequestsOut`; **reset sul choke**. Un peer lento resta alla base, uno veloce scava più a fondo |
 | BEP 27 (privati) | `torrent/torrent.go` (`privateSwarm`), `torrent/torrent_start.go`, `torrent/torrent_messagehandler.go` | Regola centralizzata in `torrent.privateSwarm()`: **DHT** (announcer), **PEX** (invio *e* ricezione) disattivati sui torrent privati; la **LSD** (demone) salta i privati su invio e ricezione. Il **PEX in ricezione** era l'unico percorso non filtrato (fix 2026-10-11), con guard test `torrent_private_test.go` |
 
-Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
+Il DHT vive in `internal/dht` (modulo a sé). Caratteristiche:
 
 - `Config.PacketConn`, per usare il socket uTP;
 - `Stats()` con i nodi conosciuti e il traffico;
@@ -119,32 +109,4 @@ Anche `nictuku/dht` (licenza BSD) è incluso in `third_party/dht`. Modifiche:
   `Torrent.DHTScrape`, il demone con `GET /api/v1/torrents/{hash}/dhtscrape` e la
   pagina con il pulsante **DHT swarm** (`GET /ui/dhtscrape`).
 
-uTP usa `github.com/anacrolix/utp` (MPL-2.0) come dipendenza non modificata.
-
-## Correzioni e integrazioni con upstream
-
-Dalla v1.13.0 (base precedente) la v2.4.2 porta con sé mesi di fix upstream
-(sicurezza, race, leak, protocollo). Le nostre modifiche sono state riapplicate
-sopra la nuova base; i punti dove il nostro codice incontra quello nuovo sono:
-
-- **Selezione file + nuovo picker.** Upstream ha aggiunto il download
-  sequenziale e la priorità ai bordi dei file. Il nostro flag `Skip` è stato
-  aggiunto in `myPiece.PickableBy` e in `pickSequential`, che altrimenti
-  sceglierebbero pezzi di file esclusi. Guardato da
-  `sequential_skip_test.go`.
-- **Prima/ultima parte indipendente dal sequenziale.** Upstream marca i bordi
-  dei file solo in modalità sequenziale. Il fork ha separato le due cose con un
-  flag `firstLast` (`AddTorrentOptions.FirstLast`, campo `torrent.firstLast`,
-  chiave resumer `first_last`, parametro extra di `piecepicker.New`), così
-  l'opzione "prima/ultima parte" funziona senza forzare l'ordine sequenziale.
-- **Preallocazione + provider di storage.** Upstream ha spostato la creazione
-  dello storage in `torrent/session_storage.go`; il flag `Preallocate` ora è un
-  campo del provider e viene applicato in `GetStorage`.
-- **Rimozione torrent.** `Session.RemoveTorrent` ha un nuovo parametro
-  `keepData`; il demone passa `false` per continuare a rimuovere solo il
-  symlink in `LinkDir/<id>`.
-
-Le correzioni storiche del fork (IP degli handshake chiusi, race del gestore di
-log, verbi di formato) sono ora in gran parte superate dai fix upstream.
-
-Come aggiornare la base in futuro: vedi `docs/motore-allineamento.md`.
+uTP usa la libreria `github.com/anacrolix/utp` come dipendenza.

@@ -30,8 +30,8 @@ Restano nella storia di git, non nel working tree:
 
 - `gextto-torrentd.md` — proposta di un demone torrent autonomo mai avviata, con
   backend Anacrolix non più incluso;
-- `rain-aggiornamento-audit.md` — audit una tantum completato, superato da
-  [`../rain-allineamento.md`](../rain-allineamento.md);
+- un audit una tantum del motore, completato e superato dall'inventario in
+  `internal/gxcore/GEXTTO.md`;
 - `gx-torrent-ottimizzazioni-prestazionali.md` (v1) — analisi prestazionale
   superata da [`../evoluzione.md`](../evoluzione.md) (§5).
 

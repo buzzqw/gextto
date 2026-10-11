@@ -56,7 +56,7 @@ type Peer struct {
 	Downloading bool
 
 	// RequestQueue is the adaptive number of block requests kept in flight for
-	// this peer (gextto fork). It starts at DefaultRequestsOut (or the peer's
+	// this peer. It starts at DefaultRequestsOut (or the peer's
 	// reqq) and grows towards MaxRequestsOut while the peer delivers; a choke
 	// resets it. Accessed only from the torrent goroutine.
 	RequestQueue int

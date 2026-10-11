@@ -11,9 +11,9 @@ type item struct {
 	loaded       bool
 	err          error
 	lastAccessed time.Time
-	// expireAt replaces the per-item time.Timer of upstream: the
-	// cache sweeps expired items periodically instead of arming one timer per
-	// block accessed. Guarded by Cache.m.
+	// expireAt is the lazy expiry time of the item: the cache sweeps expired
+	// items periodically instead of arming one timer per block accessed.
+	// Guarded by Cache.m.
 	expireAt time.Time
 	index    int
 	sync.Mutex

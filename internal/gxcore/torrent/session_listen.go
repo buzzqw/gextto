@@ -1,8 +1,8 @@
 package torrent
 
-// session_listen.go: one listening port shared by every torrent,
-// like libtorrent. The upstream engine opens a port per torrent, which cannot be
-// forwarded on a NAT router. With Config.ListenPort set, the session accepts
+// session_listen.go: one listening port shared by every torrent, like
+// libtorrent. Opening a port per torrent cannot be forwarded on a NAT router.
+// With Config.ListenPort set, the session accepts
 // all incoming peers, completes the BitTorrent/MSE handshake, picks the
 // torrent from the info hash and hands it the ready connection.
 
@@ -11,10 +11,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/btconn"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/handshaker/incominghandshaker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/peersource"
-	"github.com/nictuku/dht"
 )
 
 // maxRoutedHandshakes bounds concurrent incoming handshakes on the shared port.

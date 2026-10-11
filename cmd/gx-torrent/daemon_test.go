@@ -1715,7 +1715,7 @@ func TestVerifyRefusesAFinishedTorrentWhosePayloadIsGone(t *testing.T) {
 	}
 }
 
-// TestVerifyStopsOnceWhenFilesCannotBeAllocated locks in the engine fork fix: a
+// TestVerifyStopsOnceWhenFilesCannotBeAllocated locks in the engine behaviour: a
 // verification whose file allocation fails stops with the error instead of
 // restarting itself in a tight loop (thousands of log lines a second).
 func TestVerifyStopsOnceWhenFilesCannotBeAllocated(t *testing.T) {

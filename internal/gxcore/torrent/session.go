@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bitfield"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
@@ -30,7 +31,6 @@ import (
 	"github.com/buzzqw/gextto/internal/gxcore/internal/storage"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/trackermanager"
-	"github.com/nictuku/dht"
 	"go.etcd.io/bbolt"
 	berrors "go.etcd.io/bbolt/errors"
 )
@@ -401,8 +401,8 @@ func (s *Session) Close() error {
 
 // ListTorrents returns all torrents in session as a slice.
 // The order of the torrents returned is different on each call.
-// BanIP bans a peer IP for ttl across every torrent of the session (gextto
-// fork: libtorrent-style smart ban, session-wide and time-limited).
+// BanIP bans a peer IP for ttl across every torrent of the session
+// (libtorrent-style smart ban, session-wide and time-limited).
 func (s *Session) BanIP(ip string, ttl time.Duration) {
 	if ip == "" {
 		return

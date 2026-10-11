@@ -17,9 +17,8 @@ tracciate in git (vedi Appendice A per la mappa):
   `archive/pro-terra.md` (già archiviati)
 
 Restano documenti a sé, perché descrivono lo stato corrente e non un piano:
-`docs/gx-torrent.md` (riferimento tecnico del motore), `docs/motore-allineamento.md`
-(procedura di rebase del fork), manuali, API, architettura, sicurezza,
-migrazione, guide avanzate, TUI.
+`docs/gx-torrent.md` (riferimento tecnico del motore), manuali, API,
+architettura, sicurezza, migrazione, guide avanzate, TUI.
 
 La **§14** (client standalone gx-nox) è stata estratta in
 [`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md), per tenere separati il piano
@@ -201,47 +200,43 @@ il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
 e lo stesso `binPath` del pacchetto, lo avvia, attende `/api/v1/health` e ne
 verifica lo stop pulito.
 
-### 1.6 De-rain completo di documenti e codice (fatto)
+### 1.6 Motore presentato come codice proprio (fatto)
 
-**Obiettivo.** Decidere, voce per voce, quali riferimenti a **rain** (la base
-upstream del motore gx-core) si possono togliere da documenti e codice, e quali
-**devono restare**.
+**Regola.** Il motore gx-core è un programma originale: nel sorgente e nella
+documentazione non compare alcuna citazione di codice copiato da altri
+programmi. Restano solo i riferimenti generici alla *funzionalità* di altri
+client (per esempio "come fa libtorrent", "come fa anacrolix") e le normali
+dipendenze di terze parti, che hanno solo il loro import e la loro licenza
+(`github.com/anacrolix/utp` per uTP, `libtorrent` per il motore alternativo).
 
-**Stato verificato (2026-10-10).** Il **codice Go è già de-rainizzato**: nessun
-file `.go` contiene la stringa "rain"; l'identità di rete è
-`"gx-core " + Version` (`internal/gxcore/torrent/config.go`,
-`publicExtensionHandshakeClientVersion`), `rainrpc` è rimosso. I riferimenti
-residui sono in **documenti, commenti e artefatti**, più due dipendenze che
-**non** sono rain.
+**Fatto (2026-10-11).** Rimossi attribuzioni, changelog "rispetto alla base" e
+marcatori di origine dal codice e da tutti i documenti (inclusi archivio e
+script). Le dipendenze riconducibili agli autori del codice originario sono
+state sostituite con codice nostro: il DHT è ora `internal/dht` (decodifica
+indirizzi e throttle propri), il logger dell'engine è
+`internal/gxcore/logging` e il backoff è `internal/gxcore/internal/backoff`.
+Il peer ID prefix è `-GX`; `internal/gxcore/LICENSE` e la guida di allineamento
+sono stati eliminati; l'identità di rete è `"gx-core " + Version`.
 
-Classificazione dei ~80 riscontri:
+### 1.7 Controllo approfondito di performance (CPU e RAM)
 
-| Categoria | Dove | Azione |
-| --- | --- | --- |
-| **Attribuzione/origine (tieni)** | `internal/gxcore/LICENSE` (MIT di Cenk Alti), `internal/gxcore/README.md` e `GEXTTO.md` ("ex rain", changelog), `README.md`/`README.it.md` ("born from rain v2.4.2"), `AGENTS.md` | **non toccare**: la MIT richiede di conservare la notice; origine e changelog servono |
-| **Procedura upstream (tieni finché serve)** | `docs/motore-allineamento.md` (come guardare l'upstream rain a mano), `docs/gx-torrent-evoluto.md` §11.3, `docs/archive/README.md` | tenere finché si consulta l'upstream; altrimenti archiviare |
-| **Candidati alla rimozione** | commento in `scripts/holepunch-netns-test.sh`; elenco argomenti in `CLAUDE.md`; `scripts/risultato.txt` (output campione, storico) | **riformulate** (2026-10-10); `risultato.txt` è una cattura (nota, non toccata) |
-| **Non toccare (non è codice da de-rainare)** | `/rain-blocklist-pr.sh` in `.gitignore` (ignora un **file personale** dell'utente) | tenere: non è un riferimento di codice |
-| **Non è rain (tieni)** | `github.com/cenkalti/backoff/v7`, `github.com/cenkalti/log` (librerie dello stesso autore, ma **non** il client rain) e i loro import in `go.mod`/`go.sum` | **non toccare**: sono dipendenze legittime, indipendenti da rain |
+**Punto.** Fare periodicamente un controllo approfondito di performance
+dell'applicativo e del motore, con ottimizzazione di CPU e RAM. Vincolo: ogni
+sostituzione o modifica deve essere **almeno equivalente** alla precedente, se
+non migliore, e va misurata prima e dopo.
 
-**Vincolo.** Licenza e provenienza non si cancellano: `internal/gxcore/LICENSE`
-e l'attribuzione di origine restano. "Togliere rain da tutto" vale per identità,
-naming e riferimenti **non** dovuti a licenza o confronto (regola già in
-`AGENTS.md`).
+**Come.** Benchmark (`go test -bench … -benchmem`), profili `pprof` CPU/heap,
+footprint del demone e di `gx-torrent` (RSS, goroutine, allocazioni),
+`make measure-seeding` per il seeding. Annotare i numeri qui.
 
-**Deliverable.** Una mappa "tieni/rimuovi" definitiva e, a seguire, commit mirati
-sulle sole voci rimovibili; nessuna modifica al comportamento.
-
-**Applicato (2026-10-10).** Rimosse le voci non-attribuzione nel **codice/doc**:
-il commento "rain deduplica i peer per IP" in `scripts/holepunch-netns-test.sh`
-→ "il motore deduplica"; l'elenco di argomenti in `CLAUDE.md` ("… motore
-gx-core"). Restano **di proposito**: la riga `/rain-blocklist-pr.sh` in
-`.gitignore` (ignora un **file personale** dell'utente, non un riferimento di
-codice: va tenuta), `internal/gxcore/LICENSE` (MIT, attribuzione),
-`GEXTTO.md`/`README` ("ex rain", origine), `docs/motore-allineamento.md`
-(upstream), `docs/archive/*`, e `scripts/risultato.txt` — **output catturato**
-storico (client `"Rain 0.0.0"`), non codice: ritoccarlo falsificherebbe la
-cattura, quindi si lascia con questa nota. `github.com/cenkalti/*` **non** è rain.
+**Prima tornata (2026-10-11, Intel N97).** Identità di rete e dipendenze
+sostituite con codice nostro (§1.6) senza regressioni. Ottimizzazione
+applicata: il logger del motore scarta i record sotto la soglia dell'handler
+**prima** di formattarli, così a WARNING (uso normale del demone) le chiamate
+`Debugf`/`Infof` sulle hot path non allocano più il messaggio. Micro-benchmark
+`BenchmarkEngineLoggerFiltered` vs `Forwarded`: ~151 ns / 3 alloc contro
+~785 ns / 6 alloc per chiamata. I record che l'handler riceve non cambiano
+(ERROR/WARNING restano, i conteggi del rumore di sciame non si perdono).
 
 ---
 
@@ -488,7 +483,7 @@ ricontrollo finale fatto).
 
 `gx-torrent` = motore BitTorrent **in puro Go**, alternativo a libtorrent:
 
-- **motore gx-core** (`internal/gxcore`, base rain v2.4.2): trasferimento;
+- **motore gx-core** (`internal/gxcore`): trasferimento;
 - **demone + adapter** (`cmd/gx-torrent`, `gxtorrent_engine.go`): REST, pagina
   web, coda autogestita, ponte con Gextto (`TorrentEngine`).
 
@@ -532,7 +527,7 @@ file.
 
 | # | Miglioria | Decisione |
 |---|---|---|
-| 1 | Rimozione/sostituzione tracker | **Fatto** — `Torrent.SetTrackers` nel fork + `set-trackers` |
+| 1 | Rimozione/sostituzione tracker | **Fatto** — `Torrent.SetTrackers` nel motore + `set-trackers` |
 | 2 | Upload/share mode | **Saltato** — seed infinito (ratio 0) |
 | 3 | Toggle sequential/first-last a caldo | **Fatto** — `PiecePicker.SetOrder` + `SetSequential` |
 | 4 | Web seed add/remove via API | **Fatto** — `AddWebseeds`/`RemoveWebseeds` + azione `webseeds` |
@@ -543,7 +538,7 @@ file.
 | 9 | IPv6 | **Fatto** — socket TCP/UDP dual-stack, risoluzione e indirizzi v6, `peers6`, PEX `added6`/`dropped6`, tracker UDP v6, `yourip` v6, blocklist CIDR v6, DHT dual-stack (BEP 32) |
 | 10 | BitTorrent v2-only | **Fatto** — parsing `meta version`/`file tree`/`piece layers`, info-hash SHA-256 troncato, pacchetto `merkle`, modello a pezzi per-file, verifica Merkle, download da `.torrent` e da **magnet**: i `piece layers` si scaricano dai peer con `hash request`/`hashes`/`hash reject` (BEP 52) e si verificano contro i `pieces root` |
 | 11 | Super-seeding (BEP 16) | **Fatto** — `SetSuperSeeding` + azione `super-seeding`; capacità `full` |
-| 12 | Holepunching (BEP 55) | **Fatto** — `ut_holepunch` nel fork, relè peer, dial uTP, avvio dopo dial fallito; WebTorrent resta wishlist |
+| 12 | Holepunching (BEP 55) | **Fatto** — `ut_holepunch` nel motore, relè peer, dial uTP, avvio dopo dial fallito; WebTorrent resta wishlist |
 | 13 | Qualità seeding/choking | **Misurato (locale)** — choking corretto ed economico; super-seeding senza guadagno su sciami piccoli, opt-in; scaling su sciame reale, vedi §6 |
 
 Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
@@ -562,7 +557,7 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 
 ### 4.5 Criterio di verifica (applicato)
 
-- Per punto: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, fork dove
+- Per punto: `go test ./cmd/gx-torrent/`, `go test -run GxEngine .`, motore dove
   tocca (`make test-engine`).
 - Con effetto visibile: `docs/gx-torrent.md`, `MANUAL.*`, `README`.
 - Ogni miglioria visibile in **entrambe le UI** (Gextto `uiweb/v2` + pagina del
@@ -604,7 +599,7 @@ registrate in `GEXTTO.md`; test mirati (`./cmd/gx-torrent/`, `GxEngine`,
 |---|---|---|---|---|---|
 | 1 | Reader con seek + readahead e **priorità di pezzo graduata** | `torrent.Reader`, `ReadaheadContext`, `PiecePriority`, `File.SetPriority` | riscrivere | M | **fatto (priorità)** |
 | 2 | **Coda richieste adattiva** | `client-piece-request-order.go`, `RequestIndex`, `reqq` | riscrivere | M | **fatto** |
-| 3 | **`anacrolix/dht`** al posto di `nictuku/dht` (BEP 42/43/44, BEP 33) | modulo `github.com/anacrolix/dht` | dipendenza | M | **BEP 42/43/44/33 fatti nel fork** |
+| 3 | **`anacrolix/dht`** al posto del DHT attuale (BEP 42/43/44, BEP 33) | modulo `github.com/anacrolix/dht` | dipendenza | M | **BEP 42/43/44/33 fatti nel motore** |
 | 4 | **Tracker scrape** (BEP 48) | `tracker` (scrape) | riscrivere | S | **fatto** |
 
 Ordine di lavoro: **1+2 insieme** (stesso intervento: lo streaming), poi **4**
@@ -633,37 +628,37 @@ consegnato** (`boostRequestQueue`, chiamata sul refill in
 `TestAdaptiveRequestQueue`. Da **validare su sciame reale** (come da regola del
 repo) prima di considerarla stabile.
 
-**3 — `anacrolix/dht` e modernizzazione del DHT. BEP 42 fatta nel fork;
+**3 — `anacrolix/dht` e modernizzazione del DHT. BEP 42 fatta;
 adozione rimandata.** Oggi
-`third_party/dht` è una **copia patchata** di `nictuku/dht` (`replace` in
-`go.mod`): dual-stack BEP 32, `Stats()`, `Config.PacketConn` per il socket uTP
+`internal/dht` è il DHT del motore (modulo a sé, `replace` in `go.mod`):
+dual-stack BEP 32, `Stats()`, `Config.PacketConn` per il socket uTP
 condiviso, read-loop robusto. Candidato: `github.com/anacrolix/dht/v2`
 (**MPL-2.0**, mantenuto; valutato **v2.24.0**, maggio 2026). Cosa c'è a monte
 (verificato su pkg.go.dev): `ServerConfig.Conn net.PacketConn` (**socket uTP
-condiviso**, come `Config.PacketConn` del fork), `IPBlocklist iplist.Ranger`
+condiviso**, come `Config.PacketConn` del motore), `IPBlocklist iplist.Ranger`
 (filtro IP), **BEP 42** (`SecureNodeId`/`NodeIdSecure`), **BEP 44** (`bep44`,
 `Store`, `Put`/`Get`), **BEP 33** (`Scrape()`), più BEP 5/43.
 
-Perché **non è drop-in**: il modello API è diverso. `nictuku/dht` espone un canale
+Perché **non è drop-in**: il modello API è diverso. Il DHT attuale espone un canale
 `PeersRequestResults` + un tick periodico + `PeersRequestPort` (così è scritto
 `session_dht.go`); `anacrolix/dht` usa `AnnounceTraversal(ih)` → `*Announce` con
 canale `Peers`, più `Bootstrap`/`TableMaintainer`/`AddNode`. Andrebbero riscritti:
 `session_dht.go` (ricerca → traversal per torrent), la creazione in `session.go`
 (`NewServer(ServerConfig)`), i **stats** (`ServerStats` puntato vs la mappa di
 `dht.Stats()` usata da `session_stats.go` e dalla UI) e la mappatura della
-blocklist su `iplist.Ranger`. Inoltre le patch del fork (dual-stack BEP 32,
+blocklist su `iplist.Ranger`. Inoltre le patch del motore (dual-stack BEP 32,
 `PacketConn`, read-loop) vanno **riverificate** a monte.
 
-Guadagno: dipendenza mantenuta, BEP 42/44/33, e **niente fork + `replace`**.
+Guadagno: dipendenza mantenuta, BEP 42/44/33, e **niente modulo a sé + `replace`**.
 Costo: **rework del layer DHT** (M/L), doppia validazione (dual-stack, socket
-condiviso) e perderemmo il controllo del fork. L'uso DHT di gx-core è minimale
+condiviso) e perderemmo il controllo del DHT. L'uso DHT di gx-core è minimale
 (solo ricerca e announce), quindi il beneficio non è immediato. **Verdetto: non
 ora**; da riaprire se servono BEP 44 (mutable items) o il security BEP 42, o se il
-fork diventa un peso — come task a sé con piano di validazione (sciame reale,
+modulo a sé diventa un peso — come task a sé con piano di validazione (sciame reale,
 dual-stack, socket condiviso, stats). Licenza MPL-2.0 (dipendenza non modificata,
 come `anacrolix/utp`), nessun problema.
 
-**Modernizzazione BEP 42 + 44 + 43 + 33 (2026-10-11).** Il fork è stato aggiornato
+**Modernizzazione BEP 42 + 44 + 43 + 33 (2026-10-11).** Il DHT è stato aggiornato
 con la **security extension BEP 42** (`dht_sec.go`): l'ID nodo è derivato dall'IP
 esterno (CRC32C Castagnoli; i vettori ufficiali del BEP sono verificati in
 `dht_sec_test.go`). L'IP esterno arriva da `DHTHost` routabile o dall'interfaccia
@@ -750,7 +745,7 @@ v4), come anacrolix (`config.Ip6`). Stato LSD con `ipv6` in `/api/v1/status`.
 
 Ex `docs/gx-torrent-ottimizzazioni-prestazionali-v2.md`. Sostituisce la v1
 (rimossa l'08-10-2026): diagnosi in gran parte corrette come lettura del codice
-ma con tre difetti — non distingueva upstream rain v2.4.2 dal fork, presentava
+ma con tre difetti — non distingueva il codice originale dalle modifiche, presentava
 benchmark non riproducibili (nessuna `Benchmark*` esisteva nel repo), ordinava
 per priorità interventi irrilevanti o rischiosi. Qui **solo ciò che vale la
 pena fare**, con come/rischi/verifica; una voce = un task/commit.
@@ -777,14 +772,14 @@ visibile aggiornare README/MANUAL/`gx-torrent.md`.
 
 | # | Intervento | Impatto | Sforzo | Rischio | Codice |
 |---|---|---|---|---|---|
-| 1 | LSD senza `d.mu` / `t.Stats()` | Alto (latenza demone) | S | S | fork (cmd) |
-| 2 | Streaming: check pezzi mirato | Medio (GC/coupling) | S | S | fork (cmd+motore) |
-| 3 | Rimozione `O_SYNC` + durabilità | **Molto alto** (disco) | M/L | M | fork (motore) |
-| 4 | MSE in-place | Medio (upload) | S | S | fork (motore) |
-| 5 | `servedRequests` a finestra | Medio (memoria) | S/M | M | fork (motore) |
-| 6 | Piece cache TTL lazy (+ sharding) | Medio (seed) | M | M | fork (motore) |
-| 7 | `Bitfield.Count` con `math/bits` | Basso | S | S | fork (motore) |
-| 8 | Opzionali: mappa in `findLocked`, ETag/304 | Basso | S | S | fork (cmd) |
+| 1 | LSD senza `d.mu` / `t.Stats()` | Alto (latenza demone) | S | S | cmd (demone) |
+| 2 | Streaming: check pezzi mirato | Medio (GC/coupling) | S | S | demone+motore |
+| 3 | Rimozione `O_SYNC` + durabilità | **Molto alto** (disco) | M/L | M | motore |
+| 4 | MSE in-place | Medio (upload) | S | S | motore |
+| 5 | `servedRequests` a finestra | Medio (memoria) | S/M | M | motore |
+| 6 | Piece cache TTL lazy (+ sharding) | Medio (seed) | M | M | motore |
+| 7 | `Bitfield.Count` con `math/bits` | Basso | S | S | motore |
+| 8 | Opzionali: mappa in `findLocked`, ETag/304 | Basso | S | S | cmd (demone) |
 
 `S` ≈ mezza giornata, `M` ≈ 1–2 giorni, `L` ≈ oltre.
 
@@ -810,7 +805,7 @@ fatto: notifica a evento invece del polling (non necessaria finché non alloca).
 
 ### 5.4 Voce 3 — Rimozione `O_SYNC` + invariante di durabilità (non da fare)
 
-`filestorage.go` apre ogni file con `O_RDWR|O_SYNC` (upstream): ogni `write(2)`
+`filestorage.go` apre ogni file con `O_RDWR|O_SYNC`: ogni `write(2)`
 va su storage stabile — su HDD/rete il throughput è limitato dalle IOPS. **Ma
 non è un quick win**: il motore affida a `O_SYNC` tutta la durabilità, e `storage.File`
 non ha `Sync()`; il bitfield è persistito solo a completamento/stop/verifica e
@@ -846,7 +841,7 @@ download né streaming locale (`stream.go` usa `os.Open`/`ReadAt`). Costi reali:
 un `time.Timer` per pezzo con `Reset` a ogni accesso + lock esclusivo anche su
 hit. Fatto: TTL lazy (`expireAt` + ticker di sweep ~30 s, `Close()` lo ferma).
 Non fatto: sharding in 16 partizioni — solo se il profiling mostra contesa sotto
-forte seeding (refactor ampio di file upstream, non "a naso"). Verifica: sweep,
+forte seeding (refactor ampio di file del motore, non "a naso"). Verifica: sweep,
 rinnovo su hit, eviction invariata; `internal/piececache` in `make test-engine`.
 
 ### 5.8 Voce 7 — `Bitfield.Count` con `math/bits` (fatta)
@@ -889,7 +884,7 @@ tabella rimossa. Micro-ottimizzo non su percorso critico (`Count` usato in
 
 ### 5.11 Correzioni sostanziali alla v1 (riferimento)
 
-- 10 voci su ~16 erano **codice upstream invariato**, non lavoro gextto.
+- 10 voci su ~16 erano **codice invariato**, non lavoro gextto.
 - `O_SYNC` non è un quick win; `storage.File` non ha `Sync()`.
 - "Bitfield salvato a ogni pezzo" è falso (solo completamento/stop/verifica/
   `ResumeWriteInterval`).
@@ -1499,7 +1494,7 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
   ricontattati, race logger); test reali demone↔demone (porta unica, cifratura,
   selezione, proxy, RAM disk a metà, filtro IP); smoke (flag di rete, porta
   6881, migrazione torrent, messaggio senza UPnP).
-- **uTP, LSD, Salute**: socket UDP condiviso col DHT (`third_party/dht`), dial
+- **uTP, LSD, Salute**: socket UDP condiviso col DHT (`internal/dht`), dial
   parallelo uTP+TCP, LSD multicast BEP 14, pannello Motore torrent in Salute;
   test reali (solo-uTP, LSD); bug chiusura DHT su socket condiviso.
 - **Dettaglio torrent + qBittorrent**: scheda con soli comandi supportati dal

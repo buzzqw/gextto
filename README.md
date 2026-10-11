@@ -72,8 +72,8 @@ transfers keep running while Gextto restarts or updates, and new transfer
 features land there first (HTTP streaming with Range, a built-in peer-port test,
 adaptive memory/cache sizing, NAT holepunching with BEP 55, dual-stack IPv6
 including the DHT, BitTorrent v2 and hybrid torrents, a session-wide ban of
-peers that send corrupt data). Its core, **gx-core**, is our own engine, grown
-from rain v2.4.2 and maintained inside this repository. Gextto's default
+peers that send corrupt data). Its core, **gx-core**, is our own engine,
+maintained inside this repository. Gextto's default
 build is **pure Go**: gx-torrent is all it needs.
 
 **qBittorrent-nox** is the alternative for those who already run it or prefer
@@ -206,7 +206,7 @@ version, build number and, if linked, the libtorrent version with:
 
 gx-torrent is also a complete BitTorrent client on its own, usable without
 Gextto in the same way as `qbittorrent-nox`. It is **the same binary** Gextto
-drives as its engine: no fork, no separate product. In standalone mode it adds a
+drives as its engine, not a separate product. In standalone mode it adds a
 first-run setup wizard, an optional login (the local network can stay
 password-free), categories and tags, RSS with download rules, indexer search
 (Jackett, Prowlarr, MIRCrew) and a **qBittorrent-compatible API** (`/api/v2`) for

@@ -40,19 +40,12 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `docs/gx-torrent.md`, *Attivazione*.
 
 ## Motore gx-core (`internal/gxcore`)
-- `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), nato
-  dalla copia di rain v2.4.2 (licenza MIT, vedi `internal/gxcore/LICENSE`) e ora
-  **codice nostro**, parte del modulo principale come
-  `github.com/buzzqw/gextto/internal/gxcore`: non è più un modulo a sé né un
-  `replace` in `go.mod`. Lo usano `cmd/gx-torrent` e i test.
-- **Distacco da rain: fatto.** Cartella, modulo e identità di rete sono nostre
-  ("gx-core"); `rainrpc` (dead code) rimosso. Il changelog delle modifiche
-  rispetto alla base upstream è `internal/gxcore/GEXTTO.md`; l'attribuzione MIT
-  originale resta in `internal/gxcore/LICENSE`. Per guardare i fix **upstream**
-  a mano la guida è `docs/motore-allineamento.md` (non è più un rebase
-  periodico). I riferimenti all'upstream rain restano dove indicano origine,
-  licenza o confronto.
-- `third_party/dht` è la copia modificata di `nictuku/dht` (non è rain).
+- `internal/gxcore` è il **motore** di gx-core (il binario `gx-torrent`), codice
+  nostro, parte del modulo principale come
+  `github.com/buzzqw/gextto/internal/gxcore`. Lo usano `cmd/gx-torrent` e i test.
+- Panoramica e inventario delle funzionalità del motore:
+  `internal/gxcore/GEXTTO.md`.
+- Il DHT vive in `internal/dht`, un modulo a sé sotto il modulo principale.
 - Analisi delle lacune rispetto a libtorrent/qBittorrent/anacrolix e piano di
   miglioramento: **`docs/evoluzione.md`** (§4–§7); evoluzione verso client
   standalone (gx-core): **`docs/gx-torrent-evoluto.md`**.
@@ -132,6 +125,13 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   `go test . -run TestTUILibraryClientAgainstTheRouter` (pilota il client TUI
   contro l'API reale), più lo smoke `gexttod tui` contro il daemon. Includi
   sempre la verifica TUI nel giro finale di controllo.
+- **Performance (CPU e RAM).** Dopo ogni ciclo di modifiche al motore o al
+  demone fai un **controllo approfondito di performance**: CPU, RAM (RSS e
+  allocazioni) e latenza/throughput dei trasferimenti. Ogni sostituzione o
+  ottimizzazione deve essere **almeno equivalente** alla precedente, se non
+  migliore: misura prima e dopo (`go test -bench … -benchmem`, profili `pprof`
+  CPU/heap, footprint del demone e di `gx-torrent`, `make measure-seeding`) e
+  annota i numeri in `docs/evoluzione.md`.
 
 ## Release, installer e aggiornamenti
 - Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35, libtorrent

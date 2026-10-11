@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
-	"github.com/nictuku/dht"
 )
 
 // TestDHTIPv6AnnounceAndDiscover starts two DHT nodes on ::1 with the

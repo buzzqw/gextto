@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	clog "github.com/cenkalti/log"
+	clog "github.com/buzzqw/gextto/internal/gxcore/logging"
 )
 
 func TestUIPageServes(t *testing.T) {

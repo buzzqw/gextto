@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net"
 	"time"
-
-	"github.com/nictuku/nettools"
 )
 
 func newRoutingTable(log *DebugLogger) *routingTable {
@@ -177,7 +175,7 @@ func (r *routingTable) kill(n *remoteNode, p *peerStore) {
 	if r.boundaryNode != nil && n.id == r.boundaryNode.id {
 		r.resetNeighborhoodBoundary()
 	}
-	p.killContact(nettools.BinaryToDottedPort(n.addressBinaryFormat))
+	p.killContact(decodeCompactPeerAddr(n.addressBinaryFormat))
 }
 
 func (r *routingTable) resetNeighborhoodBoundary() {
@@ -276,7 +274,7 @@ func (r *routingTable) addNewNeighbor(n *remoteNode, displaceBoundary bool, prot
 	} else {
 		r.resetNeighborhoodBoundary()
 	}
-	(*r.log).Debugf("New neighbor added %s with proximity %d", nettools.BinaryToDottedPort(n.addressBinaryFormat), r.proximity)
+	(*r.log).Debugf("New neighbor added %s with proximity %d", decodeCompactPeerAddr(n.addressBinaryFormat), r.proximity)
 }
 
 // pingSlowly pings the remote nodes in needPing, distributing the pings

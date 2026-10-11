@@ -11,7 +11,7 @@ func clientID(id string) string {
 	}
 
 	// gx-core convention
-	if strings.HasPrefix(id, "-RN") {
+	if strings.HasPrefix(id, "-GX") {
 		i := strings.IndexRune(id[1:], '-')
 		if i != -1 {
 			return id[:i+2]

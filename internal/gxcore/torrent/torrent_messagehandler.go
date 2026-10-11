@@ -64,23 +64,23 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 		return
 	case piecedownloader.ErrBlockDuplicate:
 		if pe.FastEnabled {
-			pe.Logger().Warningf("received duplicate block index:", msg.Index, "begin:", msg.Begin, "length:", len(msg.Buffer.Data))
+			pe.Logger().Warningf("received duplicate block index: %d begin: %d length: %d", msg.Index, msg.Begin, len(msg.Buffer.Data))
 		} else {
 			// If peer does not support fast extension, we cancel all pending requests on choke message.
 			// After an unchoke we request them again. Some clients appears to be sending the same block
 			// if we request it twice.
-			pe.Logger().Debugf("received duplicate block index:", msg.Index, "begin:", msg.Begin, "length:", len(msg.Buffer.Data))
+			pe.Logger().Debugf("received duplicate block index: %d begin: %d length: %d", msg.Index, msg.Begin, len(msg.Buffer.Data))
 		}
 		t.bytesWasted.Inc(l)
 		msg.Buffer.Release()
 		return
 	case piecedownloader.ErrBlockNotRequested:
 		if pe.FastEnabled {
-			pe.Logger().Warningf("received not requested block index:", msg.Index, "begin:", msg.Begin, "length:", len(msg.Buffer.Data))
+			pe.Logger().Warningf("received not requested block index: %d begin: %d length: %d", msg.Index, msg.Begin, len(msg.Buffer.Data))
 		} else {
 			// If peer does not support fast extension, we cancel all pending requests on choke message.
 			// That's why we think that we have received an unrequested block.
-			pe.Logger().Debugf("received not requested block index:", msg.Index, "begin:", msg.Begin, "length:", len(msg.Buffer.Data))
+			pe.Logger().Debugf("received not requested block index: %d begin: %d length: %d", msg.Index, msg.Begin, len(msg.Buffer.Data))
 		}
 	case nil:
 	default:

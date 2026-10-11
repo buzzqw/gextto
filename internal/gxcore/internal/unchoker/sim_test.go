@@ -1,7 +1,7 @@
 package unchoker
 
-// sim_test.go is a deterministic harness for the choking algorithm (gextto
-// fork). It drives the real Unchoker with synthetic peers whose download and
+// sim_test.go is a deterministic harness for the choking algorithm. It drives
+// the real Unchoker with synthetic peers whose download and
 // upload speeds are scripted, so the allocation decisions can be characterized
 // and compared across algorithm changes without a real swarm.
 //

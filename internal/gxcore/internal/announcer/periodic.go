@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resolver"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker/httptracker"
-	"github.com/cenkalti/backoff/v7"
 )
 
 // Status of the announcer.

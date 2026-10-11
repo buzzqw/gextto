@@ -1415,8 +1415,8 @@ func (e *gxTorrentEngine) SetLimits(hash string, downloadLimit, uploadLimit int6
 	return true, nil
 }
 
-// bytesToKib maps a Gextto per-torrent limit in bytes to the engine's KiB/s (gextto
-// fork): negative inherits the global, zero is unlimited, a positive value is
+// bytesToKib maps a Gextto per-torrent limit in bytes to the engine's KiB/s:
+// negative inherits the global, zero is unlimited, a positive value is
 // rounded up to at least 1 KiB.
 func bytesToKib(value int64) int64 {
 	switch {

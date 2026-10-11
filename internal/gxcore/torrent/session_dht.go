@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/dht"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
-	"github.com/nictuku/dht"
 )
 
 func (s *Session) processDHTResults() {

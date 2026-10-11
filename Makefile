@@ -65,17 +65,17 @@ test-engine:
 		github.com/buzzqw/gextto/internal/gxcore/internal/unchoker \
 		github.com/buzzqw/gextto/internal/gxcore/torrent
 
-# Tests of the vendored DHT library (third_party/dht is a separate Go module,
+# Tests of the DHT library (internal/dht is a separate Go module,
 # so it is not covered by the root `go test ./...`).
 test-dht:
-	cd third_party/dht && CGO_ENABLED=0 go test ./...
+	cd internal/dht && CGO_ENABLED=0 go test ./...
 
 # Race detector run (technical review, phase 0). Kept separate from `test` so it
 # can stay non-blocking until the shared state has been audited.
 test-race:
 	CGO_ENABLED=1 go test -race ./...
 
-# Seeding/choking measurements (gextto fork). The deterministic unchoker harness
+# Seeding/choking measurements. The deterministic unchoker harness
 # runs with `make test-engine`; this runs the opt-in local-swarm harness. Add
 # GX_MEASURE_SUPERSEED=1 to compare against super-seeding, GX_MEASURE_LEECHERS=N
 # for the swarm size. See docs/evoluzione.md (section 6).

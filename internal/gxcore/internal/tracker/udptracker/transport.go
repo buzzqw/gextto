@@ -12,11 +12,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/logger"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/resolver"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
-	"github.com/cenkalti/backoff/v7"
 	"github.com/zeebo/bencode"
 )
 

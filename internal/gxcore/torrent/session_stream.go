@@ -73,8 +73,8 @@ func (t *torrent) piecesDone(begin, end uint32) bool {
 	return true
 }
 
-// PiecesDone reports whether every piece in [begin, end) is present (gextto
-// fork, for the streaming wait loop). Unlike PieceStates it scans only the
+// PiecesDone reports whether every piece in [begin, end) is present, for the
+// streaming wait loop. Unlike PieceStates it scans only the
 // requested range and allocates nothing.
 func (t *Torrent) PiecesDone(begin, end uint32) bool {
 	return query(t.torrent, func() bool { return t.torrent.piecesDone(begin, end) })
