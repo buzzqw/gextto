@@ -684,6 +684,16 @@ La **BEP 44** resta senza **client iterativo di rete**: gx-core non ha un
 consumatore per l'archivio DHT, quindi non si aggiunge codice speculativo (lato
 server + API locale sono pronti se servirà).
 
+**Fix BEP 44 (2026-10-11).** Le richieste `get`/`put` decodificano il dizionario
+`a` con un decoder bencode proprio (`internal/dht/bencode.go`): `bencode-go`
+v1.0.0 andava in **panico** (`reflect: reflect.Value.Set using unaddressable
+value`) sui valori stringa di un `map[string]interface{}`, cioè su **ogni**
+`get`/`put`, facendo crashare l'intero demone (`exit status 2`, riavvio di
+Gextto). Il decoder non usa reflection, ha un tetto di profondità (32) e
+restituisce errori invece di panico; `readResponse` ora segnala l'errore quando
+recupera un panico, invece di restituire dati parziali con errore `nil`. Test in
+`bencode_test.go`.
+
 **4 — Tracker scrape (BEP 48).** **Fatto.** `Scrape` è stato aggiunto
 all'interfaccia `tracker.Tracker` e implementato in **HTTP** (`/scrape`, con
 `scrapeURL` che mappa `…/announce` → `…/scrape` tenendo la passkey) e **UDP**
