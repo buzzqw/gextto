@@ -288,6 +288,14 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
   nuovo o modificato senza questa verifica non è da considerarsi finito.
 - Vale anche per le stringhe tradotte (i18n): etichette e descrizioni devono
   restare comprensibili e con `label`/`aria-label` adeguati in tutte le lingue.
+- **I campi dell'interfaccia devono essere sempre tradotti in tutte le lingue
+  disponibili** (`it`, `en`, `de`, `fr`, `es`, `pl`). Etichette, descrizioni,
+  tooltip, placeholder, messaggi e nomi dei campi non possono restare in una
+  sola lingua: ogni stringa nuova va nei cataloghi (`internal_translations*.yml`
+  per Gextto, `uiCatalog` per il demone) con la traduzione in **ogni** lingua.
+  Guardie: `TestBundledCatalogsAreWellFormed`/`TestBundledCatalogsShareKeys` e
+  `TestUIIsTranslatable` (Gextto), `TestUIPageIsFullyTranslatable` e
+  `TestUICatalogTranslatedInEveryLanguage` (demone).
 - **Ogni opzione deve avere il proprio tooltip, tradotto in tutte le lingue.**
   Vale per entrambe le UI (Gextto `uiweb/v2` e pagina del demone). Il tooltip va
   definito esplicitamente: in Gextto `uiweb_tooltips.go` per ogni chiave

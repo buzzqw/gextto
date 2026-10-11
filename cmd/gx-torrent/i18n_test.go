@@ -19,6 +19,21 @@ func TestUIDictionaryLanguages(t *testing.T) {
 	}
 }
 
+// TestUICatalogTranslatedInEveryLanguage enforces the rule that every UI field
+// is translated in all available languages: each uiCatalog entry must carry a
+// non-empty translation in every column (it, de, fr, es, pl), so a new field
+// cannot ship translated in Italian only.
+func TestUICatalogTranslatedInEveryLanguage(t *testing.T) {
+	langs := []string{"it", "de", "fr", "es", "pl"}
+	for key, value := range uiCatalog {
+		for idx, lang := range langs {
+			if strings.TrimSpace(value[idx]) == "" {
+				t.Errorf("catalog entry %q has no %s translation", key, lang)
+			}
+		}
+	}
+}
+
 func TestUITranslateHTML(t *testing.T) {
 	dict := uiDictionary("it")
 	in := `<button title="Test ports" onclick="f()">Test ports</button><script>var x = "Test ports";</script>`
