@@ -1429,7 +1429,7 @@ Recalculate scores* after changing weights.
 | PEX | Peer Exchange: exchange peers with other clients. |
 | LSD | Local Service Discovery: finds peers on the local network. |
 | UPnP | Opens router ports automatically with UPnP. |
-| NAT-PMP | Opens router ports automatically with NAT-PMP. |
+| NAT-PMP | Opens router ports automatically with NAT-PMP (PCP, RFC 6887, is tried too). |
 | uTP | Enable the uTP (UDP) protocol in addition to TCP. |
 | Holepunching (BEP 55) | Opens a direct connection to peers behind NAT through a relaying peer (BEP 55). Requires uTP. |
 | DHT bootstrap nodes | Initial DHT nodes (host:port separated by comma). |

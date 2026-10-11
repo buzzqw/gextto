@@ -593,10 +593,13 @@ RPC interno del motore è disattivato.
     torrent dall'info hash.
   - `-peer-ports 0` torna alla porta per torrent originale.
 - **Apertura sul router.**
-  - UPnP (IGD v1 e v2) e NAT-PMP, rinnovati ogni 20 minuti e rimossi allo
-    spegnimento.
+  - UPnP (IGD v1 e v2), quindi **PCP** (RFC 6887, sul default gateway) e infine
+    NAT-PMP, provati in quest'ordine; i mapping sono rinnovati ogni 20 minuti e
+    rimossi allo spegnimento. PCP è un client MAP minimale, senza dipendenze
+    esterne; su un router che non lo parla la richiesta scade e si passa a
+    NAT-PMP.
   - Esito e indirizzo esterno sono in `GET /api/v1/stats` (`port_mapping`).
-  - Se nessuno dei due funziona, il log dice di aprire la porta a mano.
+  - Se nessuno dei tre funziona, il log dice di aprire la porta a mano.
 - **Interfaccia in ascolto**: `-listen-interface` accetta un IP o un nome di
   interfaccia. Da gextto arriva da `libtorrent_listen_interfaces`
   (es. `wg0:51413`), che ha la precedenza su `libtorrent_port_min/max`.

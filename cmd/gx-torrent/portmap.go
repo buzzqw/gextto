@@ -36,6 +36,7 @@ type portMapper struct {
 	port   int
 	upnp   bool
 	natpmp bool
+	pcp    bool
 	stop   chan struct{}
 	done   chan struct{}
 
@@ -47,10 +48,13 @@ type portMapper struct {
 	mappedAt   time.Time
 	upnpClient upnpClient
 	pmpClient  *natpmp.Client
+	pcpGateway net.IP
 }
 
 func newPortMapper(port int, upnp, pmp bool) *portMapper {
-	return &portMapper{port: port, upnp: upnp, natpmp: pmp, stop: make(chan struct{}), done: make(chan struct{})}
+	// PCP is tried whenever NAT-PMP is enabled: both target the default gateway
+	// and PCP is its successor, so no separate switch is needed.
+	return &portMapper{port: port, upnp: upnp, natpmp: pmp, pcp: pmp, stop: make(chan struct{}), done: make(chan struct{})}
 }
 
 func (m *portMapper) start() {
@@ -63,7 +67,7 @@ func (m *portMapper) start() {
 		return
 	}
 	m.started = true
-	if (!m.upnp && !m.natpmp) || m.port <= 0 {
+	if (!m.upnp && !m.natpmp && !m.pcp) || m.port <= 0 {
 		close(m.done)
 		m.mu.Unlock()
 		return
@@ -128,6 +132,13 @@ func (m *portMapper) refresh() {
 			return
 		} else {
 			errs = append(errs, "UPnP: "+err.Error())
+		}
+	}
+	if m.pcp {
+		if err := m.mapPCP(); err == nil {
+			return
+		} else {
+			errs = append(errs, "PCP: "+err.Error())
 		}
 	}
 	if m.natpmp {
@@ -386,6 +397,31 @@ func (m *portMapper) mapNATPMP() error {
 	return nil
 }
 
+// mapPCP opens TCP and UDP on the gateway with PCP (RFC 6887).
+func (m *portMapper) mapPCP() error {
+	gateway, err := defaultGateway()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	external := ""
+	for _, proto := range []byte{pcpProtoTCP, pcpProtoUDP} {
+		_, extIP, err := pcpMap(ctx, gateway, pcpPort, proto, uint16(m.port), uint32(portLease.Seconds()))
+		if err != nil {
+			return err
+		}
+		if external == "" && extIP != nil && !extIP.IsUnspecified() {
+			external = extIP.String()
+		}
+	}
+	m.mu.Lock()
+	m.pcpGateway = gateway
+	m.mu.Unlock()
+	m.recordSuccess("pcp", external, nil, nil)
+	return nil
+}
+
 func (m *portMapper) recordSuccess(method, external string, upnp upnpClient, pmp *natpmp.Client) {
 	m.mu.Lock()
 	first := m.method != method || m.externalIP != external
@@ -403,13 +439,18 @@ func (m *portMapper) recordSuccess(method, external string, upnp upnpClient, pmp
 
 func (m *portMapper) unmap() {
 	m.mu.Lock()
-	upnp, pmp := m.upnpClient, m.pmpClient
+	upnp, pmp, pcpGateway := m.upnpClient, m.pmpClient, m.pcpGateway
 	m.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if upnp != nil {
 		for _, proto := range []string{"TCP", "UDP"} {
 			_ = upnp.DeletePortMappingCtx(ctx, "", uint16(m.port), proto)
+		}
+	}
+	if pcpGateway != nil {
+		for _, proto := range []byte{pcpProtoTCP, pcpProtoUDP} {
+			_, _, _ = pcpMap(ctx, pcpGateway, pcpPort, proto, uint16(m.port), 0)
 		}
 	}
 	if pmp != nil {

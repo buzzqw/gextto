@@ -849,15 +849,18 @@ attuale (`cmd/gx-torrent/portmap.go`, `torrent_engine.go`, `piecepicker`).
 
 | Voce | Stato oggi | Fattibilità | Sforzo | Valore |
 |---|---|---|---|---|
-| **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **media** | M | medio |
+| **PCP** (RFC 6887) per l'apertura porta | solo UPnP + NAT-PMP (`portMapper`) | **fatto (2026-10-11)** | M | medio |
 | **Rilevamento tipo di NAT / porta riflessa** | `portcheck` (ascolto + inoltro UPnP/NAT-PMP); l'IP esterno arriva dal campo `ip` BEP 42 ma la **porta (2 byte) è ignorata** | **media** | S (passo 1) / M (passo 2) | medio |
 | **Priorità file graduata** (+ allocate on demand) | solo incluso/escluso (`file_priorities: none`) | **alta se si tocca il motore, bassa senza** | L | medio |
 
-- **PCP** è un protocollo binario su UDP/5351, un terzo metodo accanto a UPnP e
-  NAT-PMP. Serve un client PCP minimale (opcode MAP/PEER, nonce, rinnovo): non
-  c'è una dipendenza Go mantenuta affidabile, quindi ~150–250 righe proprie più
-  i test; si aggancia al `portMapper` come metodo aggiuntivo. Il valore è reale
-  perché alcuni CPE/ISP bloccano NAT-PMP e PCP è il suo rimpiazzo.
+- **PCP — fatto (2026-10-11).** Client MAP minimale in `cmd/gx-torrent/pcp.go`
+  (RFC 6887: header, nonce, verifica del result code e del nonce, mappatura
+  lifetime 0 per rimuovere): ~120 righe proprie, nessuna dipendenza. Si aggancia
+  al `portMapper` come terzo metodo, provato **dopo UPnP e prima di NAT-PMP**
+  (abilitato quando NAT-PMP è attivo: stesso gateway e nessuna nuova
+  impostazione UI). Test con un finto server PCP su loopback
+  (`TestPCPMapSuccess`, `TestPCPMapNonceMismatch`, `TestPCPMapErrorResult`,
+  `TestPCPMapRequestShape`).
 - **Rilevamento NAT**: **passo 1 fatto (2026-10-11)** — il DHT cattura la
   porta riflessa dal campo `ip` di BEP 42 e la pubblica come `reflected_port`
   (consensus: serve l'accordo di ≥2 osservazioni, set limitato; parsing in
