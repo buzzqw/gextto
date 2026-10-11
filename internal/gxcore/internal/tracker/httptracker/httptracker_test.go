@@ -85,3 +85,46 @@ func TestHTTPScrapeFailure(t *testing.T) {
 		t.Fatalf("got %#v, want a tracker.Error with the failure reason", err)
 	}
 }
+
+// TestHTTPAnnounceFailureRetryIn checks that the BEP 31 "retry in" value from an
+// announce failure is carried through the HTTP tracker: a number of minutes, or
+// the "never" flag.
+func TestHTTPAnnounceFailureRetryIn(t *testing.T) {
+	cases := []struct {
+		retryIn string
+		want    time.Duration
+		never   bool
+	}{
+		{"10", 10 * time.Minute, false},
+		{"never", 0, true},
+	}
+	for _, c := range cases {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			body, _ := bencode.EncodeBytes(announceResponse{
+				FailureReason: "unregistered torrent",
+				RetryIn:       c.retryIn,
+			})
+			_, _ = w.Write(body)
+		}))
+
+		u, _ := url.Parse(srv.URL + "/announce")
+		tr := New(srv.URL+"/announce", u, 5*time.Second, &http.Transport{}, "test", 1<<20)
+
+		_, err := tr.Announce(context.Background(), tracker.AnnounceRequest{
+			Torrent: tracker.Torrent{InfoHash: [20]byte{1}, PeerID: [20]byte{2}, Port: 6881},
+		})
+		terr, ok := err.(*tracker.Error)
+		if !ok {
+			srv.Close()
+			t.Fatalf("retry in %q: got %#v, want a tracker.Error", c.retryIn, err)
+		}
+		if terr.FailureReason != "unregistered torrent" {
+			t.Errorf("retry in %q: failure reason = %q", c.retryIn, terr.FailureReason)
+		}
+		if terr.RetryIn != c.want || terr.NeverRetry != c.never {
+			t.Errorf("retry in %q: RetryIn=%v NeverRetry=%v, want %v/%v",
+				c.retryIn, terr.RetryIn, terr.NeverRetry, c.want, c.never)
+		}
+		srv.Close()
+	}
+}

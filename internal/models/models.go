@@ -532,20 +532,24 @@ type TorrentView struct {
 	TotalDone         int64   `json:"total_done"`
 	Stalled           bool    `json:"stalled"`
 	// Rich status exposed by libtorrent that the UI and diagnostics can use.
-	Error             string  `json:"error"`
-	CurrentTracker    string  `json:"current_tracker"`
-	NumComplete       int     `json:"num_complete"`
-	NumIncomplete     int     `json:"num_incomplete"`
-	NumConnections    int     `json:"num_connections"`
-	ConnectCandidates int     `json:"connect_candidates"`
-	FinishedSeconds   int64   `json:"finished_seconds"`
-	ActiveSeconds     int64   `json:"active_seconds"`
-	IsSeeding         bool    `json:"is_seeding"`
-	Sequential        bool    `json:"sequential_download"`
-	SuperSeeding      bool    `json:"super_seeding"`
-	UploadMode        bool    `json:"upload_mode"`
-	ShareMode         bool    `json:"share_mode"`
-	DistributedCopies float64 `json:"distributed_copies"`
+	Error             string `json:"error"`
+	CurrentTracker    string `json:"current_tracker"`
+	NumComplete       int    `json:"num_complete"`
+	NumIncomplete     int    `json:"num_incomplete"`
+	NumConnections    int    `json:"num_connections"`
+	ConnectCandidates int    `json:"connect_candidates"`
+	FinishedSeconds   int64  `json:"finished_seconds"`
+	ActiveSeconds     int64  `json:"active_seconds"`
+	IsSeeding         bool   `json:"is_seeding"`
+	Sequential        bool   `json:"sequential_download"`
+	SuperSeeding      bool   `json:"super_seeding"`
+	// Collections and Similar are the BEP 38 hints: the collections the torrent
+	// belongs to, and the info hashes (hex) of torrents that might share files.
+	Collections       []string `json:"collections,omitempty"`
+	Similar           []string `json:"similar,omitempty"`
+	UploadMode        bool     `json:"upload_mode"`
+	ShareMode         bool     `json:"share_mode"`
+	DistributedCopies float64  `json:"distributed_copies"`
 	// Diagnosis is a short machine code explaining the torrent's situation
 	// (downloading, metadata, dead_swarm, no_connected_seed, stalled, no_peers,
 	// seeding, error). See GET /api/torrents/{hash}/why for the human reason.

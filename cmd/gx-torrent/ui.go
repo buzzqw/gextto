@@ -237,6 +237,11 @@ type uiDetailData struct {
 	Trackers []uiTrackerRow
 	Pieces   []uiPieceRun
 	WebSeeds []string
+	// BEP 38 hints (see bep38.go), shown only when the torrent carries some.
+	HasBEP38       bool
+	CollectionsStr string
+	SimilarCount   int
+	LocalDataStr   string
 }
 
 // uiPieceRun is one run of consecutive pieces sharing a state, with the width
@@ -1372,6 +1377,24 @@ func (d *Daemon) uiDetailData(hash, tab string) (uiDetailData, error) {
 		webseeds = append(webseeds, ws.URL)
 	}
 	data.WebSeeds = webseeds
+
+	// BEP 38: the torrent's collection/similar hints and the local torrents
+	// whose data could be reused. Shown only when there is something to show.
+	cols := t.Collections()
+	similar := t.SimilarTorrents()
+	d.mu.Lock()
+	local := d.collectionsLocked(t)
+	d.mu.Unlock()
+	var localNames []string
+	for _, c := range local.Local {
+		localNames = append(localNames, c.Name)
+	}
+	if len(cols) > 0 || len(similar) > 0 || len(localNames) > 0 {
+		data.HasBEP38 = true
+		data.CollectionsStr = strings.Join(cols, ", ")
+		data.SimilarCount = len(similar)
+		data.LocalDataStr = strings.Join(localNames, ", ")
+	}
 	switch tab {
 	case "files":
 		files, err := t.Files()

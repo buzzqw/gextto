@@ -456,6 +456,9 @@ type gxTorrentItem struct {
 	TorrentVersion   string `json:"torrent_version"`
 	// SuperSeeding is BEP 16 super-seeding, a seeding strategy.
 	SuperSeeding bool `json:"super_seeding"`
+	// BEP 38 hints.
+	Collections []string `json:"collections,omitempty"`
+	Similar     []string `json:"similar,omitempty"`
 }
 
 func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.TorrentView {
@@ -494,6 +497,8 @@ func (e *gxTorrentEngine) toView(item gxTorrentItem, now time.Time) models.Torre
 		Error:             strings.TrimSpace(item.Error),
 		Stalled:           item.State == "stalled",
 		SuperSeeding:      item.SuperSeeding,
+		Collections:       item.Collections,
+		Similar:           item.Similar,
 	}
 	if item.CompletedAt > 0 {
 		view.FinishedSeconds = int64(now.Sub(time.Unix(item.CompletedAt, 0)).Seconds())

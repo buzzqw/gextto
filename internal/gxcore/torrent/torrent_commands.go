@@ -119,7 +119,7 @@ func (t *torrent) Torrent() ([]byte, error) {
 	for i, ws := range t.webseedSources {
 		webseeds[i] = ws.URL
 	}
-	return metainfo.NewBytesWithLayers(t.info.Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "")
+	return metainfo.NewBytesWithHints(t.info.Bytes, t.getTieredTrackers(), webseeds, t.pieceLayers, "", t.info.Collections, t.info.Similar)
 }
 
 func (t *torrent) getTieredTrackers() [][]string {

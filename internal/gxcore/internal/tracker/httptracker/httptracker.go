@@ -114,11 +114,7 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 	}
 
 	if response.FailureReason != "" {
-		retryIn, _ := strconv.Atoi(response.RetryIn)
-		return nil, &tracker.Error{
-			FailureReason: response.FailureReason,
-			RetryIn:       time.Duration(retryIn) * time.Minute,
-		}
+		return nil, tracker.NewError(response.FailureReason, response.RetryIn)
 	}
 
 	if response.TrackerID != "" {
@@ -224,11 +220,7 @@ func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*t
 		return nil, tracker.ErrDecode
 	}
 	if response.FailureReason != "" {
-		retryIn, _ := strconv.Atoi(response.RetryIn)
-		return nil, &tracker.Error{
-			FailureReason: response.FailureReason,
-			RetryIn:       time.Duration(retryIn) * time.Minute,
-		}
+		return nil, tracker.NewError(response.FailureReason, response.RetryIn)
 	}
 	file, ok := response.Files[string(req.Torrent.InfoHash[:])]
 	if !ok {

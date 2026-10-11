@@ -417,6 +417,14 @@ setInterval(function(){refresh(false)},2000);
     <div class="row"><span>Added</span><strong>{{if .AddedStr}}{{.AddedStr}}{{else}}—{{end}}</strong></div>
     <div class="row"><span>Completed</span><strong>{{if .CompletedStr}}{{.CompletedStr}}{{else}}—{{end}}</strong></div>
   </div>
+  {{if .HasBEP38}}
+  <p class="muted" style="margin:12px 0 0">BEP 38 local data hints</p>
+  <div class="stat-grid">
+    <div class="row"><span>Collections</span><strong>{{.CollectionsStr}}</strong></div>
+    <div class="row"><span>Similar torrents</span><strong>{{.SimilarCount}}</strong></div>
+    {{if .LocalDataStr}}<div class="row"><span>Local data to reuse</span><strong>{{.LocalDataStr}}</strong></div>{{end}}
+  </div>
+  {{end}}
   <div class="toolbar">
     <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Unpin{{else}}Pin (outside the queue){{end}}</button></form>
     <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copy magnet</button>

@@ -24,12 +24,14 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 | 11 | Peer Exchange (`ut_pex`, IPv4 + `added6`/`dropped6`) | sì |
 | 12 | Multitracker Metadata Extension (`announce-list` a livelli) | sì |
 | 14 | Local Service Discovery (LSD, IPv4 e IPv6) | sì |
+| 16 | Super-seeding (initial seeding, una parte alla volta) | sì |
 | 19 | WebSeed ("GetRight style", HTTP Range) | sì |
 | 20 | Peer ID Conventions | sì |
 | 21 | Extension for Partial Seeds (`upload_only`, `event=paused`) | sì |
 | 23 | Compact Peer Lists for Trackers | sì |
 | 24 | Tracker Returns External IP (`ip`) | sì |
 | 27 | Private Torrents (`private: 1`, niente DHT/PEX/LSD) | sì |
+| 38 | Finding Local Data Via Torrent File Hints (`similar`/`collections`) | **parziale**: hint letti (info + top-level, uniti), esposti con i torrent locali candidati e riscritti nell'export; il riuso a livello di blocco è Swarm Merging |
 | 40 | Canonical Peer Priority (tie-break) | sì |
 | 47 | Padding Files (`.pad/`) | sì |
 | 54 | The `lt_donthave` extension (un peer non ha più un pezzo) | sì (ricezione) |
@@ -48,7 +50,7 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 |---|---|---|
 | 7 | IPv6 Tracker Extension (`peers6`) | sì |
 | 15 | UDP Tracker Protocol (connect/announce/scrape) | sì |
-| 31 | Tracker Failure Retry Extension | no (backoff interno) |
+| 31 | Tracker Failure Retry Extension | sì (`retry in` in minuti e `never`, che scarta il tracker dal tier) |
 | 41 | UDP Tracker Protocol Extensions (`URLData`, opzione `0x2`) | sì |
 | 48 | Tracker Scrape (HTTP `/scrape` e UDP) | sì |
 | 34 | DNS Tracker Preferences (record SRV) | no (usata da pochissimi tracker) |
@@ -126,6 +128,16 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 6. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
    ogni modifica va **misurata prima e dopo** (CPU, RAM, throughput), come da
    regola performance di `AGENTS.md`.
+7. **BEP 38 — `similar`/`collections` — parziale.** Gli hint sono letti dal
+   dizionario info **e** dal livello superiore (uniti, deduplicati), riemessi
+   nell'export del `.torrent` e mostrati insieme ai torrent locali che
+   condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina
+   del demone, dettaglio in Gextto). Il **riuso effettivo dei blocchi** — il
+   vero guadagno del BEP — è lo **Swarm Merging** (`evoluzione.md` §15.2): qui
+   c'è solo la scoperta dei candidati.
+8. **BEP 31 — `retry in` — fatta.** Il valore in minuti (HTTP e UDP, announce e
+   scrape) rinvia il prossimo annuncio; `"never"` scarta il tracker dal tier per
+   sempre (`tracker.Tier`), senza fermare gli altri tracker dello stesso tier.
 
 ## Manutenzione
 

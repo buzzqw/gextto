@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -66,7 +68,35 @@ var ErrDecode = errors.New("cannot decode response")
 // Error is the string that is sent by the tracker from announce or scrape.
 type Error struct {
 	FailureReason string
-	RetryIn       time.Duration
+	// RetryIn is the BEP 31 "retry in" interval, in minutes, before the next
+	// announce. Zero when the tracker did not send it.
+	RetryIn time.Duration
+	// NeverRetry is BEP 31's "retry in: never": the tracker must not be
+	// contacted again, so the tier drops it for good.
+	NeverRetry bool
 }
 
 func (e *Error) Error() string { return e.FailureReason }
+
+// SetRetryIn parses the BEP 31 "retry in" value: a number of minutes, or the
+// string "never" meaning the tracker must not be retried. Anything else (an
+// empty or malformed value) leaves RetryIn unset, so the announcer falls back
+// to its own backoff.
+func (e *Error) SetRetryIn(s string) {
+	if strings.EqualFold(strings.TrimSpace(s), "never") {
+		e.NeverRetry = true
+		return
+	}
+	if minutes, err := strconv.Atoi(strings.TrimSpace(s)); err == nil && minutes > 0 {
+		e.RetryIn = time.Duration(minutes) * time.Minute
+	}
+}
+
+// NewError builds the tracker.Error for a failure, parsing the BEP 31
+// "retry in" value. It is the single place the field is decoded, shared by the
+// HTTP and UDP trackers for both announce and scrape.
+func NewError(failureReason, retryIn string) *Error {
+	e := &Error{FailureReason: failureReason}
+	e.SetRetryIn(retryIn)
+	return e
+}

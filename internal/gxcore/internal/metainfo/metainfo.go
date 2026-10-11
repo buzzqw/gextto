@@ -33,6 +33,8 @@ func New(r io.Reader) (*MetaInfo, error) {
 		AnnounceList bencode.RawMessage `bencode:"announce-list"`
 		URLList      bencode.RawMessage `bencode:"url-list"`
 		PieceLayers  bencode.RawMessage `bencode:"piece layers"`
+		Collections  bencode.RawMessage `bencode:"collections"`
+		Similar      bencode.RawMessage `bencode:"similar"`
 	}
 	err := bencode.NewDecoder(r).Decode(&t)
 	if err != nil {
@@ -64,6 +66,10 @@ func New(r io.Reader) (*MetaInfo, error) {
 		return nil, err
 	}
 	ret.Info = *info
+	// BEP 38: the "collections" and "similar" hints may also live at the top
+	// level; the values from both places are merged.
+	ret.Info.Collections = mergeCollections(ret.Info.Collections, decodeCollections(t.Collections))
+	ret.Info.Similar = mergeSimilar(ret.Info.Similar, decodeSimilar(t.Similar))
 	if len(t.AnnounceList) > 0 {
 		var ll [][]string
 		err = bencode.DecodeBytes(t.AnnounceList, &ll)
@@ -133,9 +139,22 @@ func NewBytes(info []byte, trackers [][]string, webseeds []string, comment strin
 // NewBytesWithLayers is NewBytes plus a BEP 52 "piece layers" dictionary, so a
 // BitTorrent v2 torrent can be written back (export) with its layers.
 func NewBytesWithLayers(info []byte, trackers [][]string, webseeds []string, layers map[string][]byte, comment string) ([]byte, error) {
+	return NewBytesWithHints(info, trackers, webseeds, layers, comment, nil, nil)
+}
+
+// NewBytesWithHints is NewBytesWithLayers plus the BEP 38 hints, written back at
+// the top level of the torrent so an exported file keeps the "collections" and
+// "similar" metadata the info dictionary may not carry.
+func NewBytesWithHints(info []byte, trackers [][]string, webseeds []string, layers map[string][]byte, comment string, collections []string, similar [][20]byte) ([]byte, error) {
+	similarStrings := make([]string, len(similar))
+	for i, h := range similar {
+		similarStrings[i] = string(h[:])
+	}
 	mi := struct {
 		Info         bencode.RawMessage `bencode:"info"`
 		PieceLayers  map[string][]byte  `bencode:"piece layers,omitempty"`
+		Collections  []string           `bencode:"collections,omitempty"`
+		Similar      []string           `bencode:"similar,omitempty"`
 		Announce     string             `bencode:"announce,omitempty"`
 		AnnounceList [][]string         `bencode:"announce-list,omitempty"`
 		URLList      bencode.RawMessage `bencode:"url-list,omitempty"`
@@ -145,6 +164,8 @@ func NewBytesWithLayers(info []byte, trackers [][]string, webseeds []string, lay
 	}{
 		Info:         info,
 		PieceLayers:  layers,
+		Collections:  collections,
+		Similar:      similarStrings,
 		Comment:      comment,
 		CreationDate: time.Now().UTC().Unix(),
 		CreatedBy:    Creator,

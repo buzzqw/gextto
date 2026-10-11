@@ -650,6 +650,19 @@ RPC interno del motore è disattivato.
   - **BEP 43** (read-only): un nodo può non rispondere alle query e chiedere di
     non essere inserito nelle routing table (`ro`); si attiva con
     `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
+- **Tracker e BEP 31** (`retry in`).
+  - Un tracker che risponde con `failure reason` e `retry in: N` rinvia il
+    prossimo annuncio di N minuti (announce e scrape, HTTP e UDP).
+  - `retry in: never` **scarta il tracker dal tier**: non viene più
+    ricontattato, ma gli altri tracker dello stesso tier continuano a essere
+    usati; solo se il tier si esaurisce il torrent smette di annunciare a quel
+    tier.
+- **Hint BEP 38** (`similar`/`collections`).
+  - Gli hint del `.torrent` (dal dizionario info e dal livello superiore, uniti)
+    sono mostrati nella scheda Generale insieme ai torrent **locali** che
+    condividono un hint (dati che si potrebbero riusare), restano su
+    `GET /api/v1/torrents/{hash}/collections` e sono riscritti nell'export del
+    `.torrent`.
 
 ## uTP e LSD
 
@@ -1156,7 +1169,7 @@ token è impostato.
 | `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: crea un `.torrent` da un file o cartella del server e lo restituisce come download (mktorrent-style). `piece_length` (multiplo di 16 KiB, 0 = automatico) è limitato a 16 MiB per non trasformare un valore arbitrario in un'allocazione enorme |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
-| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato; `scrape` interroga i tracker per seeders/leechers, BEP 48; `dhtscrape` stima lo sciame dal DHT, BEP 33) |
+| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape\|collections` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato; `scrape` interroga i tracker per seeders/leechers, BEP 48; `dhtscrape` stima lo sciame dal DHT, BEP 33; `collections` riporta gli hint BEP 38 — `collections`, `similar` in hex e i torrent locali che condividono un hint) |
 | `POST /api/v1/pins/clear` | toglie tutti i pin |
 | `POST /api/v1/ipfilter` | ricarica il filtro IP (`path` facoltativo) |
 | `GET /api/v1/config` | configurazione e slot effettivi |

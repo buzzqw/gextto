@@ -481,6 +481,22 @@ func (t *torrent) Name() string {
 	return t.name
 }
 
+// Collections returns the BEP 38 "collections" identifiers of the torrent.
+func (t *torrent) Collections() []string {
+	if t.info == nil {
+		return nil
+	}
+	return append([]string(nil), t.info.Collections...)
+}
+
+// Similar returns the BEP 38 "similar" info hashes of the torrent.
+func (t *torrent) Similar() [][20]byte {
+	if t.info == nil {
+		return nil
+	}
+	return append([][20]byte(nil), t.info.Similar...)
+}
+
 func (t *torrent) InfoHash() []byte {
 	b := make([]byte, 20)
 	copy(b, t.infoHash[:])

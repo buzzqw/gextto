@@ -1094,17 +1094,21 @@ type torrentInfo struct {
 	Slow             bool   `json:"slow"`
 	Private          bool   `json:"private"`
 	TorrentVersion   string `json:"torrent_version"`
-	PiecesTotal      uint32 `json:"pieces_total"`
-	PiecesHave       uint32 `json:"pieces_have"`
-	PiecesAvailable  uint32 `json:"pieces_available"`
-	PiecesChecked    uint32 `json:"pieces_checked"`
-	PieceLength      uint32 `json:"piece_length"`
-	Wasted           int64  `json:"wasted"`
-	Allocated        int64  `json:"allocated"`
-	FileCount        int    `json:"file_count"`
-	Error            string `json:"error,omitempty"`
-	AddedAt          int64  `json:"added_at"`
-	CompletedAt      int64  `json:"completed_at,omitempty"`
+	// BEP 38 hints (see bep38.go): the collections the torrent belongs to and
+	// the info hashes of torrents that might share files, both read-only.
+	Collections     []string `json:"collections,omitempty"`
+	Similar         []string `json:"similar,omitempty"`
+	PiecesTotal     uint32   `json:"pieces_total"`
+	PiecesHave      uint32   `json:"pieces_have"`
+	PiecesAvailable uint32   `json:"pieces_available"`
+	PiecesChecked   uint32   `json:"pieces_checked"`
+	PieceLength     uint32   `json:"piece_length"`
+	Wasted          int64    `json:"wasted"`
+	Allocated       int64    `json:"allocated"`
+	FileCount       int      `json:"file_count"`
+	Error           string   `json:"error,omitempty"`
+	AddedAt         int64    `json:"added_at"`
+	CompletedAt     int64    `json:"completed_at,omitempty"`
 	// Category and Tags are the qBittorrent-style labels (standalone mode).
 	Category string   `json:"category,omitempty"`
 	Tags     []string `json:"tags,omitempty"`
@@ -1208,6 +1212,8 @@ func (d *Daemon) infoLocked(t *torrent.Torrent, stats torrent.Stats, rt *runtime
 		Slow:             rt.slow,
 		Private:          stats.Private,
 		TorrentVersion:   torrentVersion,
+		Collections:      t.Collections(),
+		Similar:          similarHex(t.SimilarTorrents()),
 		PiecesTotal:      stats.Pieces.Total,
 		PiecesHave:       stats.Pieces.Have,
 		PiecesAvailable:  stats.Pieces.Available,

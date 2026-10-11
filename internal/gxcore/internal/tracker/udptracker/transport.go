@@ -9,7 +9,6 @@ import (
 	"errors"
 	"github.com/buzzqw/gextto/internal/gxcore/internal/netx"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/backoff"
@@ -230,11 +229,7 @@ func (t *Transport) Run() {
 				if err != nil {
 					err = tracker.ErrDecode
 				} else {
-					retryIn, _ := strconv.Atoi(terr.RetryIn)
-					err = &tracker.Error{
-						FailureReason: terr.FailureReason,
-						RetryIn:       time.Duration(retryIn) * time.Minute,
-					}
+					err = tracker.NewError(terr.FailureReason, terr.RetryIn)
 				}
 			}
 			trx.request.SetResponse(buf, err)

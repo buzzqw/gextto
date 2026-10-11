@@ -44,6 +44,19 @@ func (t *Torrent) Name() string {
 	return t.torrent.Name()
 }
 
+// Collections returns the BEP 38 "collections" identifiers of the torrent: the
+// groups it belongs to, used to find local data that can be reused. Empty when
+// the torrent carries no hint (or its metadata is not ready yet).
+func (t *Torrent) Collections() []string {
+	return t.torrent.Collections()
+}
+
+// SimilarTorrents returns the BEP 38 "similar" info hashes of the torrent:
+// torrents that might share files with it, used to find local data to reuse.
+func (t *Torrent) SimilarTorrents() [][20]byte {
+	return t.torrent.Similar()
+}
+
 // Dir returns the directory that contains the files in the torrent.
 func (t *Torrent) Dir() string {
 	return t.torrent.Dir()

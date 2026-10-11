@@ -1529,6 +1529,41 @@ func TestV2DetailPiecesTab(t *testing.T) {
 	}
 }
 
+// fakeBEP38Engine returns one torrent view carrying the BEP 38 hints.
+type fakeBEP38Engine struct {
+	TorrentEngine
+	hash string
+}
+
+func (fakeBEP38Engine) Name() string { return BackendGxTorrent }
+
+func (f fakeBEP38Engine) List() []models.TorrentView {
+	return []models.TorrentView{{
+		Hash: f.hash, Name: "movie", State: "downloading",
+		Collections: []string{"com.example.s1", "com.example.s2"},
+		Similar:     []string{strings.Repeat("a", 40), strings.Repeat("b", 40)},
+	}}
+}
+
+// TestV2DetailShowsBEP38 checks the general tab lists the BEP 38 hint rows.
+func TestV2DetailShowsBEP38(t *testing.T) {
+	state := newTestAppState(t)
+	hash := strings.Repeat("b", 40)
+	state.setActiveEngine(fakeBEP38Engine{hash: hash})
+
+	view := v2DetailViewFrom(state, hash, "general")
+	rows := map[string]string{}
+	for _, kv := range view.General {
+		rows[kv.Label] = kv.Value
+	}
+	if got := rows["Collezioni BEP 38"]; got != "com.example.s1, com.example.s2" {
+		t.Fatalf("collections row = %q", got)
+	}
+	if got := rows["Torrent simili BEP 38"]; got != "2" {
+		t.Fatalf("similar row = %q", got)
+	}
+}
+
 // TestV2ClientI18nCacheInvalidates checks the memoized client dictionary is
 // rebuilt after a translation changes.
 func TestV2ClientI18nCacheInvalidates(t *testing.T) {

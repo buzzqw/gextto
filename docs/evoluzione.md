@@ -791,6 +791,8 @@ ha aperto due item che sono stati chiusi qui.
 | **BEP 41** (UDP tracker URLData) | **già presente** | Il documento la dava per assente: `internal/tracker/udptracker/messages.go` scrive già le opzioni TLV (tipo `0x2` = URLData, non `0x1`) da `u.RequestURI()`. Nessun lavoro |
 | **BEP 44 client iterativo + BEP 46** (`urn:btpk:`) | **da aprire solo con un consumatore** | Il DHT ha già un client verso i nodi più vicini per lo scrape (`scrape_client.go`) e il loop `get_peers` è iterativo; manca il `get`/`put` **uscente** e la traversal generica. `evoluzione.md` §3 lo considerava speculativo senza un uso reale: resta così |
 | **BEP 54** (`lt_donthave`) | **fatto (ricezione)** | Estensione BEP 10 `lt_donthave`: un `DontHave` azzera il bit del pezzo nel bitfield del peer e la disponibilità nel picker; senza Fast Extension cancella anche il download attivo di quel pezzo. Solo ricezione (gx-core non scarta pezzi). Correzione: BEP 54 **non** è STUN (errore dell'analisi esterna); non esiste una BEP per STUN |
+| **BEP 31** (`retry in`) | **fatto** | Annuncio e scrape HTTP/UDP estraggono `retry in` in minuti e lo rispettano; il valore `"never"` scarta il tracker dal tier per sempre (`tracker.Tier`, senza fermare gli altri tracker dello stesso tier). Parsing unico in `tracker.NewError`/`SetRetryIn` |
+| **BEP 38** (`similar`/`collections`) | **parziale (scoperta dei candidati)** | Hint letti dal dizionario info **e** dal livello superiore (uniti e deduplicati in `metainfo/bep38.go`), riemessi nell'export (`NewBytesWithHints`), esposti con i torrent locali che condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina del demone, dettaglio Gextto, con la simmetria del BEP). Il **riuso dei blocchi** è lo Swarm Merging (§15.2) |
 | **BEP 17 / 34 / 35 / 51, WebTorrent, I2P** | **fuori scope** | Superate, irrilevanti o costose (WebRTC, SAM). Confermato; 45/51 marginali |
 | **Pipelining 10 Gbps** | **da misurare** | La coda richieste adattiva esiste già (§4.7); un ring buffer di scrittura è speculativo. Vale solo con misure prima/dopo (regola performance di `AGENTS.md`) |
 
@@ -801,6 +803,13 @@ estensione con id in `m`, ma un header dell'handshake, più le modifiche tracker
 "parziale"; (d) il motore espone `Config.FileSelection`, non un metodo
 `Torrent.SetFileSelection`; (e) la matrice comparativa con i client esterni è
 indiziaria e non va usata come fonte.
+
+**Performance (BEP 31 e 38).** Nessuna modifica al *data path*: il BEP 31 tocca
+solo l'announce (il `Tier` passa da `atomic.Int32` a un mutex sull'indice, fuori
+dal percorso dei dati) e il BEP 38 legge due campi opzionali del metainfo e li
+mostra. I benchmark del picker e dell'unchoker restano invariati
+(`BenchmarkPickerRarestSteady` ~102 µs/op, **0 alloc/op**; unchoker 1,3 µs/op),
+quindi non serve una misura di throughput.
 
 ### 4.10 DHT: diagnosi, hardening e multi-path (piano e fattibilità)
 
@@ -2029,6 +2038,10 @@ su v1; in v2 esiste già la deduplicazione intrinseca di protocollo.
 **Agganci già presenti.** `piece.Piece.Data` è un `filesection.Piece` e ogni
 `FileSection{File, Offset, Length, Padding}` punta a file+offset **assoluto**
 (`internal/filesection/section.go`): scrivere un pezzo è `File.WriteAt(buf, off)`.
+Gli hint **BEP 38** (`similar`/`collections`) sono già letti e uniti
+(`internal/gxcore/internal/metainfo/bep38.go`) e i torrent locali che li
+condividono sono già trovati (`cmd/gx-torrent/bep38.go`): è la scoperta dei
+candidati, il punto di partenza del merge.
 La verifica c'è già (`Piece.VerifyHash` v1, `Piece.VerifyV2` v2); in v2
 `metainfo.V2Files[fi].Root` è l'**identità per-file**, e `internal/merkle`
 fornisce le foglie da 16 KiB per la verifica **per blocco**. Il problema non è il

@@ -551,6 +551,13 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"seeders": seeders, "peers": peers})
+	case "collections":
+		// BEP 38: the torrent's "collections"/"similar" hints and the local
+		// torrents whose data could be reused.
+		d.mu.Lock()
+		info := d.collectionsLocked(t)
+		d.mu.Unlock()
+		writeJSON(w, http.StatusOK, info)
 	case "pieces":
 		states, ready := t.PieceStates()
 		if !ready {

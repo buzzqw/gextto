@@ -928,12 +928,18 @@ func TestGxSetLimitsPostsKibAndMapsThemBack(t *testing.T) {
 		t.Fatalf("inherit: dl=%q ul=%q", download, upload)
 	}
 
-	view := e.toView(gxTorrentItem{Hash: "abc", DownloadLimitKib: 512, UploadLimitKib: -1, SuperSeeding: true}, time.Now())
+	view := e.toView(gxTorrentItem{
+		Hash: "abc", DownloadLimitKib: 512, UploadLimitKib: -1, SuperSeeding: true,
+		Collections: []string{"com.example.s1"}, Similar: []string{strings.Repeat("ab", 20)},
+	}, time.Now())
 	if view.DownloadLimit != 512*1024 || view.UploadLimit != -1 {
 		t.Fatalf("view limits = %d/%d, want %d/-1", view.DownloadLimit, view.UploadLimit, 512*1024)
 	}
 	if !view.SuperSeeding {
 		t.Fatal("super-seeding flag not mapped to the view")
+	}
+	if len(view.Collections) != 1 || view.Collections[0] != "com.example.s1" || len(view.Similar) != 1 {
+		t.Fatalf("BEP 38 hints not mapped to the view: %v / %v", view.Collections, view.Similar)
 	}
 }
 

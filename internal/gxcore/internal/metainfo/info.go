@@ -63,7 +63,13 @@ type Info struct {
 	// PieceHashLen is the length in bytes of one piece hash (0 = 20, SHA-1).
 	// It is 32 for a BitTorrent v2 torrent (SHA-256).
 	PieceHashLen uint32
-	pieces       []byte
+	// Collections is the BEP 38 "collections" list: identifiers of the groups
+	// the torrent belongs to, merged from the info and top-level dictionaries.
+	Collections []string
+	// Similar is the BEP 38 "similar" list: info hashes of torrents that might
+	// share files, merged from the info and top-level dictionaries.
+	Similar [][20]byte
+	pieces  []byte
 }
 
 // File represents a file inside a Torrent.
@@ -104,6 +110,9 @@ type infoType struct {
 	// BEP 52 (BitTorrent v2)
 	MetaVersion int64              `bencode:"meta version"`
 	FileTree    bencode.RawMessage `bencode:"file tree"`
+	// BEP 38 hints, when they live inside the info dictionary.
+	Collections []string `bencode:"collections"`
+	Similar     []string `bencode:"similar"`
 }
 
 func (ib *infoType) overrideUTF8Keys() {
@@ -159,6 +168,10 @@ func NewInfo(b []byte, utf8 bool, pad bool) (*Info, error) {
 		Private:     parsePrivateField(ib.Private),
 		MetaVersion: ib.MetaVersion,
 		HasV2:       ib.MetaVersion != 0 || len(ib.FileTree) > 0,
+		// BEP 38 hints, when they live inside the info dictionary. The
+		// top-level ones are merged by MetaInfo.New after this returns.
+		Collections: normalizeCollections(ib.Collections),
+		Similar:     normalizeSimilar(ib.Similar),
 	}
 	multiFile := len(ib.Files) > 0
 	if multiFile {

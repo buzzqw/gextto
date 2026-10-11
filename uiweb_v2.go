@@ -1485,6 +1485,14 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	if torrent.Error != "" {
 		view.General = append(view.General, v2KV{Label: "Errore", Value: torrent.Error})
 	}
+	// BEP 38: show the collection/similar hints only when the torrent has some,
+	// so the common torrent keeps its short general list.
+	if len(torrent.Collections) > 0 {
+		view.General = append(view.General, v2KV{Label: "Collezioni BEP 38", Value: strings.Join(torrent.Collections, ", ")})
+	}
+	if len(torrent.Similar) > 0 {
+		view.General = append(view.General, v2KV{Label: "Torrent simili BEP 38", Value: fmt.Sprintf("%d", len(torrent.Similar))})
+	}
 	view.General = append(view.General, v2KV{Label: "Motore", Value: view.Caps.Backend})
 	for index := range view.General {
 		if strings.TrimSpace(view.General[index].Value) == "" {

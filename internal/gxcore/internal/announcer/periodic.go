@@ -305,6 +305,9 @@ func (a *PeriodicalAnnouncer) newAnnounceError(err error) (e *AnnounceError) {
 	case tracker.ErrDecode:
 		e.Message = "invalid response from tracker"
 		return
+	case tracker.ErrTierExhausted:
+		e.Message = "all trackers in the tier asked to not be retried"
+		return
 	}
 	if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
 		e.Message = "timeout contacting tracker"
