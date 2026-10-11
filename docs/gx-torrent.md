@@ -457,7 +457,8 @@ qui sopra (una regola per riga, con frecce per cambiarne l'ordine — la prima c
 corrisponde vince), le textarea JSON avanzate per feed, regole e indexer
 (salvate con validazione), e per ogni feed un pulsante che mostra gli articoli
 correnti con la regola che li prenderebbe e un *Add* manuale (la vista "articoli
-corrispondenti" di qBittorrent). Gli stessi risultati si ottengono via
+corrispondenti" di qBittorrent) e un pulsante *Check feeds* per forzare subito un
+giro di controllo. Gli stessi risultati si ottengono via
 `POST /ui/rss-indexer`, `POST /ui/rss-feed` e `POST /ui/rss-rule` (op
 `add`/`remove`/`up`/`down`); le textarea JSON restano su `POST /ui/rss-config`.
 

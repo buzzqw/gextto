@@ -136,6 +136,7 @@ summary{cursor:pointer;color:#93a1b5}
 </details>
 
 <h2>Feed items</h2>
+<div class="row"><button type="button" onclick="pollFeeds()">Check feeds</button><span class="muted" id="pollinfo"></span></div>
 <div class="row" id="feedbar"></div>
 <div id="items"></div>
 <!--ERROR-->
@@ -146,6 +147,7 @@ var FEEDNAMES={{FEEDNAMES}};
 // Choosing a known indexer fills the URL with its usual local address and port.
 (function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];var filled=o?(o.getAttribute('data-url')||''):'';if(filled){url.value=filled;}});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
+function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
 function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
 (function(){var bar=document.getElementById('feedbar');FEEDNAMES.forEach(function(name){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=name;b.onclick=function(){loadItems(name);};bar.appendChild(b);});})();
