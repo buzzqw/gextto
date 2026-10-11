@@ -82,14 +82,18 @@ func TestPCPMapErrorResult(t *testing.T) {
 }
 
 func TestPCPMapRequestShape(t *testing.T) {
-	var got []byte
-	srv, stop := startFakePCP(t, func(req, _ []byte) { got = append([]byte(nil), req...) })
+	// The responder runs in its own goroutine: hand the captured request back
+	// through a channel so the read below is ordered after the write (the
+	// server sends before it answers, so the value is already buffered).
+	requests := make(chan []byte, 1)
+	srv, stop := startFakePCP(t, func(req, _ []byte) { requests <- append([]byte(nil), req...) })
 	defer stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if _, _, err := pcpMap(ctx, srv.IP, srv.Port, pcpProtoTCP, 6881, 3600); err != nil {
 		t.Fatalf("pcpMap: %v", err)
 	}
+	got := <-requests
 	if len(got) != pcpRequestLen {
 		t.Fatalf("request length = %d, want %d", len(got), pcpRequestLen)
 	}

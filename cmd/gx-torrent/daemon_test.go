@@ -724,17 +724,18 @@ func TestMagnetSelectOnly(t *testing.T) {
 		t.Fatalf("magnet hash %s != torrent hash %s", leechHash, hash)
 	}
 	waitFor(t, "leecher fetching metadata", func() bool { return stateOf(leecher, hash) == "downloading_metadata" })
-	leecher.mu.Lock()
-	handle, _ := leecher.findLocked(hash)
-	leecher.mu.Unlock()
-	if handle == nil {
-		t.Fatal("leecher has no handle")
-	}
-	if err := handle.AddPeer(fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)); err != nil {
-		t.Fatal(err)
-	}
-
+	seederAddr := fmt.Sprintf("127.0.0.1:%d", seeder.peerPort)
+	// Applying the "so" selection restarts the torrent (it relocates the
+	// skipped file's data), which drops the manual peer. Keep re-adding it
+	// while waiting, so the download resumes after the restart instead of
+	// stalling; production peers come back from trackers/DHT/LSD/PEX.
 	waitFor(t, "selected files downloaded", func() bool {
+		leecher.mu.Lock()
+		handle, _ := leecher.findLocked(hash)
+		leecher.mu.Unlock()
+		if handle != nil {
+			_ = handle.AddPeer(seederAddr)
+		}
 		info, _ := findInfo(leecher, hash)
 		return info.Progress == 100 && info.State == "seeding"
 	})
@@ -1098,11 +1099,15 @@ func TestLSDDiscovery(t *testing.T) {
 	// On one machine the sender is this host's own address, which the engine
 	// ignores as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
-	defer func() {
+	// Restore the knobs with t.Cleanup, not defer: cleanups run LIFO, so
+	// registering this before the daemons makes it run after their Close (which
+	// stops the LSD goroutines). A defer would rewrite the package variables
+	// while the running daemons are still reading them, a data race under -race.
+	t.Cleanup(func() {
 		lsdTick = lsdTickDefault
 		lsdInterval = lsdIntervalDef
 		lsdPeerHost = func(ip net.IP) string { return ip.String() }
-	}()
+	})
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43300, PortEnd: 43399, Encryption: 1, LSD: true})
 	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43400, PortEnd: 43499, Encryption: 1, LSD: true})
 	waitFor(t, "LSD started", func() bool {
@@ -1736,11 +1741,13 @@ func TestSuperSeedingTransfer(t *testing.T) {
 	// On one machine the sender is this host's own address, which the engine ignores
 	// as itself: dial loopback instead.
 	lsdPeerHost = func(net.IP) string { return "127.0.0.1" }
-	defer func() {
+	// As in TestLSDDiscovery: reset via t.Cleanup so it runs after the daemons
+	// close and the LSD goroutines stop, avoiding a data race on the knobs.
+	t.Cleanup(func() {
 		lsdTick = lsdTickDefault
 		lsdInterval = lsdIntervalDef
 		lsdPeerHost = func(ip net.IP) string { return ip.String() }
-	}()
+	})
 	seeder := newTestDaemonWith(t, NetworkOptions{PortBegin: 43500, PortEnd: 43599, Encryption: 1, LSD: true})
 	leecher := newTestDaemonWith(t, NetworkOptions{PortBegin: 43600, PortEnd: 43699, Encryption: 1, LSD: true})
 	waitFor(t, "LSD started", func() bool {
