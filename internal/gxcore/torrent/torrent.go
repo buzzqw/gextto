@@ -560,6 +560,13 @@ func (t *torrent) announceDHT() {
 	t.session.mPeerRequests.Unlock()
 }
 
+// privateSwarm reports whether peer discovery outside the tracker (DHT, PEX,
+// LSD) must be disabled for this torrent (BEP 27). Unknown metadata is treated
+// as non-private; a private magnet is stopped as soon as the info dict arrives.
+func (t *torrent) privateSwarm() bool {
+	return t.info != nil && t.info.Private
+}
+
 // DisableLogging disables all log messages printed to console.
 // This function needs to be called before creating a Session.
 func DisableLogging() {

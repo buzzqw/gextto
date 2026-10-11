@@ -102,7 +102,7 @@ func (t *torrent) startAnnouncers() {
 			t.startNewAnnouncer(tr)
 		}
 	}
-	if t.dhtAnnouncer == nil && t.session.config.DHTEnabled && (t.info == nil || !t.info.Private) {
+	if t.dhtAnnouncer == nil && t.session.config.DHTEnabled && !t.privateSwarm() {
 		t.dhtAnnouncer = announcer.NewDHTAnnouncer()
 		go t.dhtAnnouncer.Run(t.announceDHT, t.session.config.DHTAnnounceInterval, t.session.config.DHTMinAnnounceInterval, t.log)
 	}
@@ -118,6 +118,19 @@ func (t *torrent) startNewAnnouncer(tr tracker.Tracker) {
 		t.addrsFromTrackers,
 		t.log,
 	)
+	an.SetResultHook(func(resp *tracker.AnnounceResponse, err error) {
+		if t.session == nil {
+			return
+		}
+		ev := t.baseEvent(EventTrackerAnnounce)
+		if err != nil {
+			ev.Error = err.Error()
+		} else {
+			ev.Seeders = int(resp.Seeders)
+			ev.Leechers = int(resp.Leechers)
+		}
+		t.session.emit(ev)
+	})
 	t.announcers = append(t.announcers, an)
 	go an.Run()
 }
@@ -258,12 +271,48 @@ func (t *torrent) startSinglePieceDownloader(pe *peer.Peer) {
 }
 
 func (t *torrent) maxAllowedRequests(pe *peer.Peer) int {
-	ret := t.session.config.DefaultRequestsOut
-	if pe.ExtensionHandshake != nil && pe.ExtensionHandshake.RequestQueue > 0 {
-		ret = pe.ExtensionHandshake.RequestQueue
+	cap := t.requestQueueCap(pe)
+	if pe.RequestQueue <= 0 {
+		pe.RequestQueue = min(t.session.config.DefaultRequestsOut, cap)
 	}
-	if ret > t.session.config.MaxRequestsOut {
-		ret = t.session.config.MaxRequestsOut
+	if pe.RequestQueue > cap {
+		pe.RequestQueue = cap
 	}
-	return ret
+	if pe.RequestQueue < 1 {
+		pe.RequestQueue = 1
+	}
+	return pe.RequestQueue
+}
+
+// requestQueueCap is the hard cap on in-flight requests for the peer: its
+// advertised reqq (if any) or MaxRequestsOut, never above MaxRequestsOut.
+func (t *torrent) requestQueueCap(pe *peer.Peer) int {
+	cap := t.session.config.MaxRequestsOut
+	if pe.ExtensionHandshake != nil && pe.ExtensionHandshake.RequestQueue > 0 && pe.ExtensionHandshake.RequestQueue < cap {
+		cap = pe.ExtensionHandshake.RequestQueue
+	}
+	if cap < 1 {
+		cap = 1
+	}
+	return cap
+}
+
+// boostRequestQueue raises the peer's in-flight target by one, up to the cap, as
+// the peer keeps delivering blocks. This is the adaptive part of the request
+// queue depth: a fast peer slides towards MaxRequestsOut instead of staying at
+// the fixed DefaultRequestsOut.
+func (t *torrent) boostRequestQueue(pe *peer.Peer) {
+	cap := t.requestQueueCap(pe)
+	if pe.RequestQueue <= 0 {
+		pe.RequestQueue = min(t.session.config.DefaultRequestsOut, cap)
+	}
+	if pe.RequestQueue < cap {
+		pe.RequestQueue++
+	}
+}
+
+// resetRequestQueue lowers the target back to the base after a choke (or a
+// stall), so a peer that stops delivering is not kept with a deep queue.
+func (t *torrent) resetRequestQueue(pe *peer.Peer) {
+	pe.RequestQueue = min(t.session.config.DefaultRequestsOut, t.requestQueueCap(pe))
 }

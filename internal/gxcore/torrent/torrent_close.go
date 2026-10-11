@@ -60,6 +60,11 @@ func (t *torrent) closePeer(pe *peer.Peer) {
 	t.pexDropPeer(pe.Addr())
 	t.dialAddresses()
 	t.session.metrics.Peers.Dec(1)
+	// A peer that goes away while the torrent is running is worth reporting;
+	// the mass close during a stop is not (it would flood subscribers).
+	if s := t.status(); s != Stopping && s != Stopped {
+		t.emitPeer(EventPeerDisconnected, pe.Addr().String())
+	}
 }
 
 func (t *torrent) closeWebseedDownloader(src *webseedsource.WebseedSource) {

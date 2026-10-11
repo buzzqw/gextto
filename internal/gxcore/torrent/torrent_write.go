@@ -47,7 +47,7 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 		return
 	}
 	if pw.Error != nil {
-		t.stop(pw.Error)
+		t.stop(t.storageWriteError(pw.Piece.Index, pw.Error))
 		return
 	}
 
@@ -58,6 +58,7 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 	t.mBitfield.Lock()
 	t.bitfield.Set(pw.Piece.Index)
 	t.mBitfield.Unlock()
+	t.emitPiece(pw.Piece.Index)
 
 	if t.piecePicker != nil {
 		_, ok := pw.Source.(*urldownloader.URLDownloader)
@@ -95,6 +96,7 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 	completed := t.checkCompletion()
 	if completed {
 		t.log.Info("download completed")
+		t.emit(EventTorrentCompleted, nil)
 		err := t.writeBitfield()
 		if err != nil {
 			t.stop(err)
@@ -102,4 +104,17 @@ func (t *torrent) handlePieceWriteDone(pw *piecewriter.PieceWriter) {
 			t.stopAndSetStoppedOnComplete()
 		}
 	}
+}
+
+// storageWriteError wraps a piece-write failure with the storage root, so a bad
+// disk or mount is identifiable (and not mistaken for a network problem), and
+// counts it in the session. The original error is kept for errors.Is/As.
+func (t *torrent) storageWriteError(index uint32, err error) error {
+	if t.storage == nil {
+		return err
+	}
+	if t.session != nil {
+		t.session.storageErrors.Add(1)
+	}
+	return fmt.Errorf("storage %q could not write piece #%d: %w", t.storage.RootDir(), index, err)
 }

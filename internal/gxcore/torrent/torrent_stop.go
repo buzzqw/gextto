@@ -27,6 +27,11 @@ func (t *torrent) handleStopped() {
 		t.start()
 	} else {
 		t.log.Info("torrent has stopped")
+		if t.lastError != nil {
+			t.emit(EventTorrentError, t.lastError)
+		} else {
+			t.emit(EventTorrentStopped, nil)
+		}
 	}
 }
 

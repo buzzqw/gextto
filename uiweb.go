@@ -196,6 +196,25 @@ type uiHealthData struct {
 	// Cycles is the recent search-cycle history (newest first), for the
 	// "Ricerche" panel: duration and per-source outcome over time.
 	Cycles []uiCycleRow
+	// Queued is the delay-profile queue with the wait time of each title.
+	Queued []uiQueueRow
+	// FailedImports is the failed-import count per day (last week).
+	FailedImports []uiDailyRow
+}
+
+// uiQueueRow is one title held by the delay profile, as shown in the Salute
+// "Coda titoli" panel.
+type uiQueueRow struct {
+	Title   string
+	Label   string
+	Waiting string
+	Due     string
+}
+
+// uiDailyRow is one day of a daily metric (failed imports).
+type uiDailyRow struct {
+	Day   string
+	Count int
 }
 
 // uiCycleRow is one search cycle as shown in the Salute "Ricerche" panel.
@@ -477,11 +496,43 @@ func uiHealthDataFrom(s *AppState) uiHealthData {
 	if cycles, err := s.db.RecentCycleStats(uiHealthCycleRows); err == nil {
 		data.Cycles = uiCycleRowsFrom(cycles, time.Now())
 	}
+	if queue, err := s.db.PendingQueue(time.Now().UTC()); err == nil {
+		data.Queued = uiQueueRowsFrom(queue)
+	}
+	if failed, err := s.db.FailedImportsDaily(uiHealthFailedImportDays); err == nil {
+		data.FailedImports = uiDailyRowsFrom(failed)
+	}
 	return data
 }
 
 // uiHealthCycleRows is how many recent cycles the Salute "Ricerche" panel shows.
 const uiHealthCycleRows = 12
+
+// uiHealthFailedImportDays is the window of the "Import falliti" panel.
+const uiHealthFailedImportDays = 7
+
+// uiQueueRowsFrom turns the delay-profile queue into display rows.
+func uiQueueRowsFrom(items []PendingQueueItem) []uiQueueRow {
+	rows := make([]uiQueueRow, 0, len(items))
+	for _, it := range items {
+		rows = append(rows, uiQueueRow{
+			Title:   it.Title,
+			Label:   it.Label,
+			Waiting: logging.HumanDuration(int64(max(it.Waiting, 0) / time.Second)),
+			Due:     logging.HumanDuration(int64(max(it.Due, 0) / time.Second)),
+		})
+	}
+	return rows
+}
+
+// uiDailyRowsFrom turns the daily failed-import counts into display rows.
+func uiDailyRowsFrom(daily []DailyCount) []uiDailyRow {
+	rows := make([]uiDailyRow, 0, len(daily))
+	for _, d := range daily {
+		rows = append(rows, uiDailyRow{Day: d.Day, Count: d.Count})
+	}
+	return rows
+}
 
 // uiCycleRowsFrom turns the stored cycles into display rows, computing for each
 // the number of sources that failed and their last error (for the tooltip).

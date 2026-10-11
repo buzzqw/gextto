@@ -38,6 +38,17 @@ func (t *Tier) URL() string {
 	return t.Trackers[t.loadIndex()].URL()
 }
 
+// Scrape queries the current Tracker in the Tier for swarm statistics. On
+// error the next Scrape goes to the next Tracker, as Announce does.
+func (t *Tier) Scrape(ctx context.Context, req ScrapeRequest) (*ScrapeResponse, error) {
+	index := t.loadIndex()
+	resp, err := t.Trackers[index].Scrape(ctx, req)
+	if err != nil {
+		t.index.CompareAndSwap(index, index+1)
+	}
+	return resp, err
+}
+
 func (t *Tier) loadIndex() int32 {
 	index := t.index.Load()
 	if index >= int32(len(t.Trackers)) {

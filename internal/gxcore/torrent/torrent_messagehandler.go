@@ -93,6 +93,7 @@ func (t *torrent) handlePieceMessage(pm peer.PieceMessage) {
 	if !pd.Done() {
 		pe := pd.Peer.(*peer.Peer)
 		if pd.AllowedFast || !pe.PeerChoking {
+			t.boostRequestQueue(pe)
 			pd.RequestBlocks(t.maxAllowedRequests(pe))
 			pe.ResetSnubTimer()
 		}
@@ -221,6 +222,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		}
 	case peerprotocol.ChokeMessage:
 		pe.PeerChoking = true
+		t.resetRequestQueue(pe)
 		pd, ok := t.pieceDownloaders[pe]
 		if !ok {
 			break
@@ -359,7 +361,7 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		t.startV2LayerDownload()
 		if t.session.config.PEXEnabled {
 			if _, ok := msg.M[peerprotocol.ExtensionKeyPEX]; ok {
-				if t.info != nil && !t.info.Private {
+				if !t.privateSwarm() {
 					pe.StartPEX(t.peers, &t.recentlySeen)
 				}
 			}
@@ -368,6 +370,10 @@ func (t *torrent) handlePeerMessage(pm peer.Message) {
 		t.handleMetadataMessage(pe, msg)
 	case peerprotocol.ExtensionPEXMessage:
 		if !t.session.config.PEXEnabled {
+			break
+		}
+		// BEP 27: never use PEX for a private torrent (neither send nor receive).
+		if t.privateSwarm() {
 			break
 		}
 		addrs, err := tracker.DecodePeersCompact([]byte(msg.Added))

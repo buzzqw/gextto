@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -93,5 +94,21 @@ func TestLSDDueHashesInterval(t *testing.T) {
 	}
 	if _, ok := s.announced["aa"]; ok {
 		t.Fatal("stopped torrent still tracked as announced")
+	}
+}
+
+// TestLSDMessageIPv6 checks the announce message carries the IPv6 group as
+// Host and round-trips through parseLSD (BEP 14 over ff15::efc0:988f).
+func TestLSDMessageIPv6(t *testing.T) {
+	s := &lsdService{port: 6881, cookie: "abcd"}
+	hash := "0123456789abcdef0123456789abcdef01234567"
+	raw := s.message(lsdGroup6, []string{hash})
+
+	if !bytes.Contains(raw, []byte("Host: "+lsdGroup6)) {
+		t.Fatalf("message missing IPv6 host header:\n%s", raw)
+	}
+	port, hashes, cookie, ok := parseLSD(raw)
+	if !ok || port != 6881 || cookie != "abcd" || !slices.Equal(hashes, []string{hash}) {
+		t.Fatalf("parseLSD = %d %v %q %v", port, hashes, cookie, ok)
 	}
 }

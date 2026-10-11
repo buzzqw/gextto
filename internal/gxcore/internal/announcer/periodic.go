@@ -54,8 +54,11 @@ type PeriodicalAnnouncer struct {
 	HasAnnounced  bool
 	responseC     chan *tracker.AnnounceResponse
 	errC          chan error
-	closeC        chan struct{}
-	doneC         chan struct{}
+	// onResult, when set, is called after every announce with the response (or
+	// the error). It runs in the announcer goroutine and must not block.
+	onResult func(*tracker.AnnounceResponse, error)
+	closeC   chan struct{}
+	doneC    chan struct{}
 
 	needMorePeers  bool
 	mNeedMorePeers sync.RWMutex
@@ -86,6 +89,13 @@ func NewPeriodicalAnnouncer(trk tracker.Tracker, numWant int, minInterval time.D
 			MaxInterval:         30 * time.Minute,
 		},
 	}
+}
+
+// SetResultHook registers a callback invoked after every announce with the
+// response (or the error). It must be called before Run and must not block: it
+// runs in the announcer goroutine.
+func (a *PeriodicalAnnouncer) SetResultHook(f func(*tracker.AnnounceResponse, error)) {
+	a.onResult = f
 }
 
 // Close the announcer.
@@ -163,6 +173,9 @@ func (a *PeriodicalAnnouncer) Run() {
 			a.status = Working
 			a.seeders = int(resp.Seeders)
 			a.leechers = int(resp.Leechers)
+			if a.onResult != nil {
+				a.onResult(resp, nil)
+			}
 			a.warningMsg = resp.WarningMessage
 			if a.warningMsg != "" {
 				a.log.Debugln("announce warning:", a.warningMsg)
@@ -184,6 +197,9 @@ func (a *PeriodicalAnnouncer) Run() {
 			}()
 		case err := <-a.errC:
 			a.status = NotWorking
+			if a.onResult != nil {
+				a.onResult(nil, err)
+			}
 			// Give more friendly error to the user
 			a.lastError = a.newAnnounceError(err)
 			if a.lastError.Unknown {

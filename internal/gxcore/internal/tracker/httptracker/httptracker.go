@@ -91,30 +91,7 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 
 	t.log.Debugf("making request to: %q", sb.String())
 
-	httpReq, err := http.NewRequest(http.MethodGet, sb.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	httpReq = httpReq.WithContext(ctx)
-
-	httpReq.Header.Set("User-Agent", t.userAgent)
-
-	doReq := func() (int, http.Header, []byte, error) {
-		resp, err := t.http.Do(httpReq)
-		if err != nil {
-			return 0, nil, nil, err
-		}
-		t.log.Debugf("tracker responded %d with %d bytes body", resp.StatusCode, resp.ContentLength)
-		defer resp.Body.Close()
-		if resp.ContentLength > t.maxResponseLength {
-			return 0, resp.Header, nil, fmt.Errorf("tracker respsonse too large: %d", resp.ContentLength)
-		}
-		r := io.LimitReader(resp.Body, t.maxResponseLength)
-		data, err := io.ReadAll(r)
-		return resp.StatusCode, resp.Header, data, err
-	}
-
-	code, header, body, err := doReq()
+	code, header, body, err := t.fetch(ctx, sb.String())
 	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
 		return nil, context.Canceled
 	}
@@ -190,6 +167,104 @@ func (t *HTTPTracker) Announce(ctx context.Context, req tracker.AnnounceRequest)
 		Peers:          peers,
 		WarningMessage: response.WarningMessage,
 	}, nil
+}
+
+// fetch performs the GET and reads the body, capped at maxResponseLength.
+func (t *HTTPTracker) fetch(ctx context.Context, rawURL string) (int, http.Header, []byte, error) {
+	httpReq, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	httpReq = httpReq.WithContext(ctx)
+	httpReq.Header.Set("User-Agent", t.userAgent)
+
+	resp, err := t.http.Do(httpReq)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	t.log.Debugf("tracker responded %d with %d bytes body", resp.StatusCode, resp.ContentLength)
+	defer resp.Body.Close()
+	if resp.ContentLength > t.maxResponseLength {
+		return 0, resp.Header, nil, fmt.Errorf("tracker respsonse too large: %d", resp.ContentLength)
+	}
+	r := io.LimitReader(resp.Body, t.maxResponseLength)
+	data, err := io.ReadAll(r)
+	return resp.StatusCode, resp.Header, data, err
+}
+
+// Scrape asks the tracker for swarm statistics (BEP 48). The scrape URL is the
+// announce URL with its final path segment switched from "announce" to
+// "scrape", keeping any passkey in the query.
+func (t *HTTPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tracker.ScrapeResponse, error) {
+	su := scrapeURL(t.rawURL)
+	var sb strings.Builder
+	sb.WriteString(su)
+	if strings.ContainsRune(su, '?') {
+		sb.WriteString("&info_hash=")
+	} else {
+		sb.WriteString("?info_hash=")
+	}
+	sb.WriteString(percentEscape(req.Torrent.InfoHash))
+	t.log.Debugf("making scrape request to: %q", sb.String())
+
+	code, header, body, err := t.fetch(ctx, sb.String())
+	if uerr, ok := err.(*url.Error); ok && uerr.Err == context.Canceled {
+		return nil, context.Canceled
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var response scrapeResponse
+	err = bencode.DecodeBytes(body, &response)
+	if err != nil {
+		if code != 200 {
+			return nil, &StatusError{Code: code, Header: header, Body: string(body)}
+		}
+		return nil, tracker.ErrDecode
+	}
+	if response.FailureReason != "" {
+		retryIn, _ := strconv.Atoi(response.RetryIn)
+		return nil, &tracker.Error{
+			FailureReason: response.FailureReason,
+			RetryIn:       time.Duration(retryIn) * time.Minute,
+		}
+	}
+	file, ok := response.Files[string(req.Torrent.InfoHash[:])]
+	if !ok {
+		// Some trackers answer with a single entry even if the binary key is
+		// not reusable; accept the only element in that case.
+		if len(response.Files) == 1 {
+			for _, f := range response.Files {
+				file, ok = f, true
+			}
+		}
+	}
+	if !ok {
+		return nil, tracker.ErrDecode
+	}
+	return &tracker.ScrapeResponse{
+		Seeders:    file.Complete,
+		Leechers:   file.Incomplete,
+		Downloaded: file.Downloaded,
+	}, nil
+}
+
+// scrapeURL maps an announce URL to its scrape URL (BEP 48).
+func scrapeURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	switch {
+	case strings.HasSuffix(u.Path, "/announce"):
+		u.Path = strings.TrimSuffix(u.Path, "/announce") + "/scrape"
+	case u.Path == "" || u.Path == "/":
+		u.Path = "/scrape"
+	default:
+		u.Path = strings.TrimSuffix(u.Path, "/") + "/scrape"
+	}
+	return u.String()
 }
 
 // filterExternalIP returns peers with any entry matching the client's own

@@ -1007,6 +1007,13 @@ the others.
   took more than three hours, or when no cycle without errors has completed for
   three intervals (at least two hours); it also reports when everything is
   healthy again.
+- **Title queue** — panel with the titles held by the *delay profile* (series and
+  movies) before the download: title, how long they have been waiting
+  (`first_seen_at`) and how long until `due_at`. Shows a queue that keeps growing
+  or a title stuck.
+- **Failed imports** — panel with the number of failed imports per day (last 7),
+  derived from the acquisition events; useful to spot a disk or NAS refusing
+  moves.
 - **Web logs** — live SSE stream with text filter, line count and follow/pause.
   Lines are English and explicitly formatted as `date time  LEVEL message ·
   key: value`, with highlighted keywords (NAS, download, sources, filters,

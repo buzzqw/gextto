@@ -1,10 +1,13 @@
 package torrent
 
 import (
+	"errors"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/tracker"
+	"github.com/nictuku/dht"
 )
 
 func (s *Session) processDHTResults() {
@@ -45,6 +48,49 @@ func (s *Session) handleDHTtick() {
 		delete(s.dhtPeerRequests, t)
 		return
 	}
+}
+
+// DHTScrape asks the DHT for the approximate swarm size of an info hash
+// (BEP 33): the number of seeders and peers. It needs a running DHT.
+func (s *Session) DHTScrape(ih [20]byte, timeout time.Duration) (seeders, peers float64, err error) {
+	if s.dht == nil {
+		return 0, 0, errors.New("dht disabled")
+	}
+	est, err := s.dht.Scrape(dht.InfoHash(string(ih[:])), timeout)
+	if err != nil {
+		return 0, 0, err
+	}
+	return est.Seeders, est.Peers, nil
+}
+
+// publicIPForConfig returns the external IP the node is reached at, when it is
+// known: the configured DHT host if it is a specific routable address, or the IP
+// of the outgoing interface (VPN killswitch). It feeds the BEP 42 secure node
+// ID; nil means "learn it from the network".
+func publicIPForConfig(cfg Config) net.IP {
+	if ip := net.ParseIP(strings.TrimSpace(cfg.DHTHost)); ip != nil && !ip.IsUnspecified() && !isLocalNetworkAddr(ip) {
+		return ip
+	}
+	if cfg.OutgoingInterface != "" {
+		if iface, err := net.InterfaceByName(cfg.OutgoingInterface); err == nil {
+			if addrs, err := iface.Addrs(); err == nil {
+				for _, a := range addrs {
+					ipnet, ok := a.(*net.IPNet)
+					if !ok {
+						continue
+					}
+					if ip := ipnet.IP; ip != nil && !ip.IsUnspecified() && !isLocalNetworkAddr(ip) {
+						return ip
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func isLocalNetworkAddr(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate()
 }
 
 func parseDHTPeers(peers []string) []*net.TCPAddr {

@@ -158,6 +158,7 @@ func (t *torrent) startPeer(
 	}
 	go pe.Run(t.messages, t.pieceMessagesC.SendC(), t.peerSnubbedC, t.peerDisconnectedC)
 	t.session.metrics.Peers.Inc(1)
+	t.emitPeer(EventPeerConnected, pe.Addr().String())
 	t.sendFirstMessage(pe)
 	t.recentlySeen.Add(pe.Addr())
 	// A new peer may be able to serve the piece layers of a v2 magnet.

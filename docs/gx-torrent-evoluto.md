@@ -444,6 +444,15 @@ da verificare sul codice delle librerie prima di ogni porting.
 | 8 | Share mode | libtorrent | già scartato per Gextto (§4.3, decisione 2); per lo standalone vale come opzione | basso |
 | 9 | WebTorrent | anacrolix | nicchia | alto |
 
+**Shortlist concordata (2026-10-10) per il prelievo da anacrolix:** reader con
+seek e readahead + **priorità di pezzo graduata**, **coda richieste adattiva**,
+`anacrolix/dht` come dipendenza (BEP 42/43/44), **tracker scrape**. Dettaglio,
+vie di prelievo (riscrittura vs dipendenza) e verifiche in
+[`evoluzione.md` §4.7](evoluzione.md). Le voci 3 e 4 della tabella qui sopra sono
+incluse; lo **scrape** è già implementato. Altri quattro punti (bus di eventi,
+creazione `.torrent` da cartella, bad-storage, BEP 14) in
+[`evoluzione.md` §4.8](evoluzione.md).
+
 ### 11.2 Licenze
 
 Gextto è **EUPL-1.2**. Da **libtorrent** (BSD-3) si può portare codice con
@@ -462,6 +471,10 @@ cartella è sotto `internal/`, l'identità di rete è "gx-core", il pacchetto
 `rainrpc` (dead code) è rimosso e `GEXTTO.md` è inteso come changelog del
 motore. Procedura residua per guardare l'**upstream** rain a mano (non più un
 rebase): `docs/motore-allineamento.md`.
+
+**Follow-up (studio):** quali riferimenti residui a rain in documenti e
+artefatti si possono togliere (e quali restano per licenza/origine) è tracciato
+in [`evoluzione.md` §1.6](evoluzione.md). Il **codice Go è già pulito**.
 
 ---
 
@@ -518,8 +531,9 @@ origine, licenza o confronto (documenti come questo, `LICENSE`). I **marcatori
 `internal/gxcore/GEXTTO.md`.
 
 **Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
-continuare a funzionare (test `internal/tui` + smoke `gexttod tui` contro il
-daemon); il percorso managed resta invariato.
+continuare a funzionare — `go test ./internal/tui/` e il test d'integrazione
+`go test . -run TestTUILibraryClientAgainstTheRouter`, più smoke `gexttod tui`
+contro il daemon; il percorso managed resta invariato.
 
 Storico (fatto):
 

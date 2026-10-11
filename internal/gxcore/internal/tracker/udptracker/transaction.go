@@ -23,7 +23,10 @@ type transaction struct {
 type udpRequest interface {
 	io.WriterTo
 	SetTransactionID(int32)
+	SetConnectionID(int64)
 	GetContext() context.Context
+	GetDest() string
+	Done() <-chan struct{}
 	GetResponse() (data []byte, err error)
 	SetResponse(data []byte, err error)
 }

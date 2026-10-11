@@ -98,6 +98,10 @@ type SessionStats struct {
 	// reports as disk.num_read_ops / disk.num_write_ops.
 	ReadOpsTotal  int64
 	WriteOpsTotal int64
+
+	// StorageErrors is the number of piece writes that failed at the storage
+	// layer (full disk, unwritable file, broken mount) since start.
+	StorageErrors int64
 }
 
 // Stats returns current statistics about the Session.
@@ -114,6 +118,7 @@ func (s *Session) Stats() SessionStats {
 	out.TCPPeers = out.Peers - out.UTPPeers
 	out.ReadOpsTotal = s.metrics.ReadsPerSecond.Count()
 	out.WriteOpsTotal = s.metrics.WritesPerSecond.Count()
+	out.StorageErrors = s.storageErrors.Load()
 	out.UTP = s.utpSocket != nil
 	out.DHT = s.config.DHTEnabled
 	out.PeerWireDownloaded = peerconn.WireBytesRead.Load()

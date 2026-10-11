@@ -58,10 +58,13 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prioritize the requested window plus a readahead, so the player keeps
-	// finding the next pieces ready while it reads.
-	t.SetFileStreamWindow(fileIndex, start, length+streamReadahead)
-	defer t.SetFileStreamWindow(fileIndex, 0, 0)
+	// The bytes the player needs now are prioritised first; the readahead just
+	// after, so the next pieces are ready while it reads.
+	setStreamWindows(t, fileIndex, start)
+	defer func() {
+		t.SetFileStreamWindow(fileIndex, 0, 0)
+		t.SetFileReadaheadWindow(fileIndex, 0, 0)
+	}()
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -83,6 +86,14 @@ func (d *Daemon) handleUIStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d.streamRange(w, t, fileIndex, f, start, length)
+}
+
+// setStreamWindows tells the engine which pieces the player needs now (the next
+// streamChunk bytes are the stream window) and which it will read next (the
+// readahead window). Splitting the two keeps the playhead ahead of the prefetch.
+func setStreamWindows(t *torrent.Torrent, fileIndex int, pos int64) {
+	t.SetFileStreamWindow(fileIndex, pos, streamChunk)
+	t.SetFileReadaheadWindow(fileIndex, pos+streamChunk, streamReadahead)
 }
 
 // streamRange writes `length` bytes of the file from `start`, waiting for the
@@ -108,8 +119,8 @@ func (d *Daemon) streamRange(w http.ResponseWriter, t *torrent.Torrent, fileInde
 				flusher.Flush()
 			}
 			written += int64(m)
-			// Move the readahead window forward.
-			t.SetFileStreamWindow(fileIndex, start+written, streamReadahead)
+			// Move the stream and readahead windows forward.
+			setStreamWindows(t, fileIndex, start+written)
 		}
 		if err != nil {
 			return

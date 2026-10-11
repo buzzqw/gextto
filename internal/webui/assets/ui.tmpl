@@ -144,6 +144,15 @@ form.token input,form.token button{width:100%;padding:8px;margin:8px 0}
       <input type="text" name="source" placeholder="URL or local file" autocomplete="off" value="{{.IPFilterSource}}" style="min-width:min(520px,70vw)" title="Prefilled with the IP filter configured in Gextto">
       <button type="submit" title="Download (if a URL) and apply the IP filter now">Load filter</button>
     </form>
+    <details>
+      <summary>Create .torrent</summary>
+      <form method="post" action="/ui/create-torrent">
+        <input type="text" name="path" placeholder="Folder or file on the server" autocomplete="off" style="min-width:min(360px,60vw)">
+        <input type="text" name="name" placeholder="Name (optional)" autocomplete="off">
+        <input type="text" name="trackers" placeholder="Trackers, one per line" autocomplete="off">
+        <button type="submit">Create .torrent</button>
+      </form>
+    </details>
     <input type="search" id="filter" placeholder="Filter torrents…" oninput="filterRows()" autocomplete="off">
   </div>
   {{if .SearchEnabled}}
@@ -220,6 +229,7 @@ function sortTable(key){var st=window.__sort;window.__sort={key:key,asc:!(st&&st
 function showToast(msg,err){var t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},450);},4000);}
 function testPorts(){var out=document.getElementById('portcheck-result');if(!out)return;out.textContent=' '+t('checking…');fetch('/ui/portcheck',{cache:'no-store'}).then(function(r){return r.text()}).then(function(h){out.innerHTML=h;}).catch(function(e){out.textContent=' '+t('test failed:')+' '+e.message;});}
 function copyMagnet(el){var text=el.getAttribute('data-magnet')||'';if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){showToast(t('Magnet copied'),false);},function(){showToast(t('Copy failed'),true);});}else{showToast(t('Copy unavailable'),true);}}
+function dhtScrape(hash){showToast(t('DHT swarm')+'…',false);fetch('/ui/dhtscrape?hash='+encodeURIComponent(hash),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(d){showToast(t('DHT swarm (seeders / peers):')+' ~'+d.seeders+' / ~'+d.peers,false);}).catch(function(){showToast(t('DHT swarm')+': '+t('Copy failed'),true);});}
 function showTab(name){window.__tab=name;document.getElementById('pane-torrents').style.display=name==='torrents'?'':'none';document.getElementById('pane-log').style.display=name==='log'?'':'none';document.getElementById('tab-torrents').classList.toggle('on',name==='torrents');document.getElementById('tab-log').classList.toggle('on',name==='log');if(name==='log'){loadLog();}else{refresh(true);}}
 function loadLog(){var n=document.getElementById('log-lines').value;document.getElementById('log-info').textContent=t('loading…');fetch('/ui/gextto-log?lines='+encodeURIComponent(n),{cache:'no-store'}).then(function(r){return r.ok?r.json():r.text().then(function(t){throw new Error(t)})}).then(function(d){window.__log=d.lines||[];document.getElementById('log-info').textContent=d.path+' · '+(d.lines||[]).length+' '+t('lines')+' · '+new Date().toLocaleTimeString();renderLog(true);}).catch(function(e){document.getElementById('log-view').textContent=t('Cannot read the Gextto log:')+' '+e.message;document.getElementById('log-info').textContent='';});}
 function renderLog(scroll){var view=document.getElementById('log-view');var q=(document.getElementById('log-filter').value||'').toLowerCase();var nodebug=document.getElementById('log-nodebug').checked;var frag=document.createDocumentFragment();(window.__log||[]).forEach(function(line){if(nodebug&&/\sDEBUG\s/.test(line))return;if(q&&line.toLowerCase().indexOf(q)<0)return;var row=document.createElement('div');if(/\s(ERROR|FATAL)\s/.test(line))row.className='error';else if(/\sWARN(ING)?\s/.test(line))row.className='warn';else if(/\sDEBUG\s/.test(line))row.className='debug';row.textContent=line;frag.appendChild(row);});view.textContent='';view.appendChild(frag);if(scroll!==false)view.scrollTop=view.scrollHeight;}
@@ -232,6 +242,9 @@ function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=
 function addSearch(it){var f=new URLSearchParams();f.set('source',it.magnet||it.link);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){runSearch();refresh(true);});}
 {{end}}
 setInterval(function(){refresh(false)},2000);
+// The engine pushes state changes on /ui/events: refresh at once instead of
+// waiting for the next poll. Piece events are too frequent to refresh on.
+(function(){try{var es=new EventSource('/ui/events');es.onmessage=function(m){try{var e=JSON.parse(m.data);if(e.type!=='torrent_piece'){refresh(true);}}catch(_){}};}catch(_){}})();
 (function(){document.addEventListener('change',function(e){if(e.target.classList.contains('rowsel'))updateSel();});document.addEventListener('keydown',function(e){if(e.key==='/'&&['INPUT','TEXTAREA','SELECT'].indexOf(document.activeElement.tagName)<0){e.preventDefault();document.getElementById('filter').focus();}if(e.key==='Escape'){closeDetail();}});var n=document.querySelector('.notice');if(n){showToast(n.textContent,n.classList.contains('err'));n.remove();}var p=new URLSearchParams(location.search);if(p.get('open')){openDetail(p.get('open'),p.get('tab')||'general');}})();
 </script>
 </body>
@@ -395,6 +408,7 @@ setInterval(function(){refresh(false)},2000);
   <div class="toolbar">
     <form method="post" action="/ui/pin"><input type="hidden" name="hash" value="{{.Hash}}"><input type="hidden" name="tab" value="general"><input type="hidden" name="pinned" value="{{if .Pinned}}0{{else}}1{{end}}"><button type="submit">{{if .Pinned}}Unpin{{else}}Pin (outside the queue){{end}}</button></form>
     <button type="button" onclick="copyMagnet(this)" data-magnet="{{.Magnet}}">Copy magnet</button>
+    <button type="button" onclick="dhtScrape('{{.Hash}}')">DHT swarm</button>
     <a class="btn" style="padding:5px 10px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536" href="/ui/torrent-file?hash={{.Hash}}" download>Export .torrent</a>
   </div>
   <p class="muted" style="margin:12px 0 0">Limits &amp; seeding (-1 global, 0 unlimited).</p>

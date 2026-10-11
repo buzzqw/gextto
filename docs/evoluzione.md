@@ -50,10 +50,18 @@ strategico e il documento tecnico del motore.
 Ex `docs/da-fare.md`. Ripristinato l'8-10-2026: era finito per errore in
 `docs/archive/` pur essendo un backlog **attivo**.
 
-### 1.1 Osservabilità: metriche nel tempo (aperta)
+**Verifiche ricorrenti (ogni chiusura di ciclo).** `make test` (`check-ui` +
+`installer-test` + `test-dht` + `CGO_ENABLED=0 go test ./...`), `make test-engine`
+e `make vet`; invarianti `scripts/check-ui-settings-index.sh` /
+`scripts/installer-selftest.sh`. **La TUI di Gextto deve sempre funzionare**:
+`go test ./internal/tui/` + `go test . -run TestTUILibraryClientAgainstTheRouter`
+(+ smoke `gexttod tui` contro il daemon) — vedi §12.1 di
+[`gx-torrent-evoluto.md`](gx-torrent-evoluto.md).
 
-ID di correlazione e runbook sono fatti (vedi §1.3). Resta la parte metriche:
-andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
+### 1.1 Osservabilità: metriche nel tempo (fatto)
+
+ID di correlazione e runbook sono fatti (vedi §1.3). Le metriche nel tempo sono
+salvate nel database e mostrate in *Salute*, senza Prometheus:
 
 - ~~durata delle ricerche e sorgenti che non rispondono, ciclo per ciclo~~ —
   fatto (2026-10-10): `CycleStats` salva durata ed esito per sorgente nel ciclo
@@ -63,14 +71,27 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   (riga WARN + notifica) se una sorgente ha fallito in 3 delle ultime ricerche,
   se l'ultima ricerca supera 3 ore o se non c'è un ciclo senza errori da 3
   intervalli (minimo 2 ore), e segnala il ritorno alla normalità;
-- **restano: import falliti al giorno e titoli in coda con il tempo di attesa**;
+- ~~titoli in coda con il tempo di attesa~~ — fatto (2026-10-10): pannello **Coda
+  titoli** in *Salute* (`Database.PendingQueue`, `pending_queue.go`), con
+  titolo, attesa da `first_seen_at` e tempo al `due_at` (serie e film);
+- ~~import falliti al giorno~~ — fatto (2026-10-10): pannello **Import falliti**
+  in *Salute* (`Database.FailedImportsDaily`, `acquisition.go`), che conta per
+  giorno gli ERROR di import dagli `acquisition_events`;
 - la salute degli indexer del manager è già in Sources (`indexer_health.go`).
 
-### 1.2 Opzionale (solo se si riprende il lavoro sulle prestazioni)
+**Freschezza della UI.** I due pannelli si aggiornano da soli ogni 60 s (HTMX
+`hx-trigger`, endpoint `GET /partial/health/queue`); i riquadri hanno già
+`TestV2HealthTilesPollIndependently`. Il render è sempre fresco:
+`TestV2HealthRefreshesWhenDataChanges` fissa che un dato aggiunto dopo il primo
+render compaia al render successivo (niente cache stantia).
 
-- Script di benchmark RAM/throughput dei motori, riproducibile in `scripts/`
-  (workload noto, web seed locale con Range, staging locale vs NFS). Non serve
-  di per sé: è utile solo per prendere decisioni future con numeri.
+### 1.2 Benchmark del motore gx-core (fatto)
+
+- **`scripts/bench-engines.sh`** — sonda riproducibile RAM/throughput di gx-core:
+  throughput dello sciame su loopback (harness esistente, con RSS di picco) e
+  throughput di scrittura su disco di una cartella (`--dir`, puntala a un mount
+  NFS per confrontare). Uso: `scripts/bench-engines.sh [--size MiB] [--dir DIR]
+  [--leechers N]`. Fuori dalla CI: serve solo a decidere con numeri.
 
 ### 1.3 Chiusi / decisioni
 
@@ -121,7 +142,7 @@ andamenti salvati nel database e mostrati in *Salute*, senza Prometheus:
   (route `GET /dashboard/feed`, `uiweb_v2.go`).
 - **Verifica live del flusso RAM disk con gx-torrent** — fatto (2026-10-07).
 
-### 1.4 Micro-ottimizzazioni UI/i18n (aperte, misurate il 2026-10-10)
+### 1.4 Micro-ottimizzazioni UI/i18n (fatte, misurate il 2026-10-10)
 
 Follow-up dei commit `06c9128`/`6cf568e`/`7f43b44`. Nessuno è un collo di
 bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
@@ -132,20 +153,19 @@ bottiglia: vanno prese solo come rifiniture, con i numeri sotto.
 | 2 | Test di identità della cache dizionario | riuso confermato: due `Dictionary("de")` = **stesso puntatore** | solo qualità del test, nessun effetto runtime |
 | 3 | Memo client i18n per `AppState` | **+1 entry per stato**, ~**2,4 KB/entry** (20 stati → 20 entry, 47.240 byte) | nullo in produzione (1 entry); pulizia solo per i test |
 
-1. **Cachare o saltare il `write_probe` nel percorso live.** `uiShellChromeFrom`
-   (`uiweb_shell.go`) gira a ogni pagina, ogni partial (`V2ChromePartial`) e
-   ogni tick SSE (5 s per tab aperta, `V2ChromeSSE` in `uiweb_v2.go`), e ogni
-   volta fa `os.Stat` + `write_probe` (`health.go`: create con `O_EXCL`, `Sync`,
-   close, remove). Non è una regressione (il probe c'era già dentro
-   `CheckWithPaths`), ma la scrivibilità del datadir non cambia da un secondo
-   all'altro: cachare l'esito 30–60 s o saltare il probe in SSE/partial.
-2. **Rafforzare `TestDictionaryCacheAndInvalidate`** (`i18n_test.go`): oggi
-   confronta solo le lunghezze e contiene `if &first == nil` (vacuo: l'indirizzo
-   di una variabile non è mai nil) — una rebuild a ogni chiamata passerebbe lo
-   stesso. Confrontare l'identità con `reflect.ValueOf(m).Pointer()`.
-3. **Pulire `v2ClientI18nMemo`** (`uiweb_v2_client_i18n.go`, chiave `*I18nDb`):
-   ogni `AppState` lascia un'entry; in produzione è una sola, nei test crescono
-   (`newTestAppState`). Valutare un `Reset` per i test o una chiave con cleanup.
+1. **Probe di scrivibilità cachato nel chrome. Fatto.** `uiShellChromeFrom` ora
+   usa `dataDirWritable` (`uiweb_shell.go`), che riusa l'esito per
+   `dataDirWritableTTL` (30 s): niente `create+fsync+delete` a ogni pagina,
+   partial e tick SSE. Test `TestDataDirWritableCache` (riuso entro il TTL,
+   ricalcolo dopo).
+2. **Test di identità della cache dizionario. Fatto.**
+   `TestDictionaryCacheAndInvalidate` confronta l'identità con
+   `reflect.ValueOf(first).Pointer() == reflect.ValueOf(second).Pointer()`: una
+   rebuild a ogni chiamata ora fallisce.
+3. **Pulizia di `v2ClientI18nMemo`. Fatto.** `resetV2ClientI18nMemo()`
+   (`uiweb_v2_client_i18n.go`) svuota la cache; `newTestAppState` lo chiama, così
+   i test non accumulano entry (in produzione resta una sola). Test
+   `TestV2ClientI18nMemoIsReset`.
 
 ### 1.5 gx-torrent su Windows e magnet v2 (chiuse, revisione del 2026-10-10)
 
@@ -180,6 +200,48 @@ il ciclo di vita condiviso (`startDaemon`/`shutdown`) su Linux e, col filtro
 `scripts/gx-torrent-service-selftest.ps1` registra il servizio con `New-Service`
 e lo stesso `binPath` del pacchetto, lo avvia, attende `/api/v1/health` e ne
 verifica lo stop pulito.
+
+### 1.6 De-rain completo di documenti e codice (fatto)
+
+**Obiettivo.** Decidere, voce per voce, quali riferimenti a **rain** (la base
+upstream del motore gx-core) si possono togliere da documenti e codice, e quali
+**devono restare**.
+
+**Stato verificato (2026-10-10).** Il **codice Go è già de-rainizzato**: nessun
+file `.go` contiene la stringa "rain"; l'identità di rete è
+`"gx-core " + Version` (`internal/gxcore/torrent/config.go`,
+`publicExtensionHandshakeClientVersion`), `rainrpc` è rimosso. I riferimenti
+residui sono in **documenti, commenti e artefatti**, più due dipendenze che
+**non** sono rain.
+
+Classificazione dei ~80 riscontri:
+
+| Categoria | Dove | Azione |
+| --- | --- | --- |
+| **Attribuzione/origine (tieni)** | `internal/gxcore/LICENSE` (MIT di Cenk Alti), `internal/gxcore/README.md` e `GEXTTO.md` ("ex rain", changelog), `README.md`/`README.it.md` ("born from rain v2.4.2"), `AGENTS.md` | **non toccare**: la MIT richiede di conservare la notice; origine e changelog servono |
+| **Procedura upstream (tieni finché serve)** | `docs/motore-allineamento.md` (come guardare l'upstream rain a mano), `docs/gx-torrent-evoluto.md` §11.3, `docs/archive/README.md` | tenere finché si consulta l'upstream; altrimenti archiviare |
+| **Candidati alla rimozione** | commento in `scripts/holepunch-netns-test.sh`; elenco argomenti in `CLAUDE.md`; `scripts/risultato.txt` (output campione, storico) | **riformulate** (2026-10-10); `risultato.txt` è una cattura (nota, non toccata) |
+| **Non toccare (non è codice da de-rainare)** | `/rain-blocklist-pr.sh` in `.gitignore` (ignora un **file personale** dell'utente) | tenere: non è un riferimento di codice |
+| **Non è rain (tieni)** | `github.com/cenkalti/backoff/v7`, `github.com/cenkalti/log` (librerie dello stesso autore, ma **non** il client rain) e i loro import in `go.mod`/`go.sum` | **non toccare**: sono dipendenze legittime, indipendenti da rain |
+
+**Vincolo.** Licenza e provenienza non si cancellano: `internal/gxcore/LICENSE`
+e l'attribuzione di origine restano. "Togliere rain da tutto" vale per identità,
+naming e riferimenti **non** dovuti a licenza o confronto (regola già in
+`AGENTS.md`).
+
+**Deliverable.** Una mappa "tieni/rimuovi" definitiva e, a seguire, commit mirati
+sulle sole voci rimovibili; nessuna modifica al comportamento.
+
+**Applicato (2026-10-10).** Rimosse le voci non-attribuzione nel **codice/doc**:
+il commento "rain deduplica i peer per IP" in `scripts/holepunch-netns-test.sh`
+→ "il motore deduplica"; l'elenco di argomenti in `CLAUDE.md` ("… motore
+gx-core"). Restano **di proposito**: la riga `/rain-blocklist-pr.sh` in
+`.gitignore` (ignora un **file personale** dell'utente, non un riferimento di
+codice: va tenuta), `internal/gxcore/LICENSE` (MIT, attribuzione),
+`GEXTTO.md`/`README` ("ex rain", origine), `docs/motore-allineamento.md`
+(upstream), `docs/archive/*`, e `scripts/risultato.txt` — **output catturato**
+storico (client `"Rain 0.0.0"`), non codice: ritoccarlo falsificherebbe la
+cattura, quindi si lascia con questa nota. `github.com/cenkalti/*` **non** è rain.
 
 ---
 
@@ -454,8 +516,10 @@ verità usata dall'UI.
 | Protocollo | BitTorrent v2-only | fatto (`.torrent` e magnet, BEP 52) |
 | Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
 
-**vs anacrolix/torrent**: mancano streaming con readahead (fatto, vedi sotto),
-WebTorrent/WebRTC (wishlist), storage alternativi. gx-torrent ha invece daemon
+**vs anacrolix/torrent**: lo **streaming HTTP Range è fatto** (§4.3 #7), ma
+mancano il **reader con seek e readahead** di anacrolix (shortlist e piano in
+§4.7) e gli **storage alternativi** (mmap/blob/bolt/sqlite); WebTorrent/WebRTC
+(wishlist). gx-torrent ha invece daemon
 sorvegliato, UI web, REST, UPnP/NAT-PMP, porta unica, proxy SOCKS/HTTP, filtro
 IP multi-formato, killswitch VPN, preallocazione, cache adattiva.
 
@@ -522,6 +586,163 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 - Nota residua: attesa pezzi nello streaming a polling (200 ms, timeout 2 min),
   senza test end-to-end su sciame reale; coperti dati presenti e mappatura
   byte→pezzi.
+
+### 4.7 Cherry-pick da anacrolix (shortlist concordata, 2026-10-10)
+
+Fonte: `github.com/anacrolix/torrent` v1.61 (Go, **MPL-2.0**). Due vie di
+prelievo, coerenti con la politica del repo (**non si copia il codice di terzi;
+si riscrive l'algoritmo** — l'idea non è coperta da copyright, l'espressione
+sì — oppure si adotta il modulo come **dipendenza** MPL-2.0, come già
+`github.com/anacrolix/utp`). Nessun cambio di licenza di Gextto/gx-core.
+
+Regole: un item = un commit; **misura prima/dopo**; modifiche a `internal/gxcore`
+registrate in `GEXTTO.md`; test mirati (`./cmd/gx-torrent/`, `GxEngine`,
+`make test-engine`, `make test`); con effetto visibile anche le due UI (Gextto
+`uiweb/v2` e pagina del demone).
+
+| # | Voce | Fonte anacrolix | Via | Sforzo | Stato |
+|---|---|---|---|---|---|
+| 1 | Reader con seek + readahead e **priorità di pezzo graduata** | `torrent.Reader`, `ReadaheadContext`, `PiecePriority`, `File.SetPriority` | riscrivere | M | **fatto (priorità)** |
+| 2 | **Coda richieste adattiva** | `client-piece-request-order.go`, `RequestIndex`, `reqq` | riscrivere | M | **fatto** |
+| 3 | **`anacrolix/dht`** al posto di `nictuku/dht` (BEP 42/43/44, BEP 33) | modulo `github.com/anacrolix/dht` | dipendenza | M | **BEP 42/43/44/33 fatti nel fork** |
+| 4 | **Tracker scrape** (BEP 48) | `tracker` (scrape) | riscrivere | S | **fatto** |
+
+Ordine di lavoro: **1+2 insieme** (stesso intervento: lo streaming), poi **4**
+(pronto), poi **3** (valutato, sotto). Stato: **1** e **4** fatti, **2** fatto
+(da misurare su sciame), **3** rimandato con motivazione.
+
+**1 — Reader con seek, readahead e priorità di pezzo. Fatto (priorità).** Lo
+streaming ora usa **due finestre graduate**: `SetFileStreamWindow` (i byte che il
+player legge adesso) ha priorità sul **nuovo** `SetFileReadaheadWindow` (il
+prefetch), che a sua volta precede il rarest-first. Nel picker:
+`SetReadaheadWindow`/`pickReadahead`, provati prima delle allowed-fast e del
+rarest; test `TestReadaheadWindowAfterStreamWindow`. Il demone aggiorna entrambe
+le finestre mentre scrive (`setStreamWindows`). Il **reader con seek** non è un
+tipo nuovo del motore: la funzione è già coperta dal gestore HTTP `Range`
+(ogni richiesta imposta la finestra), e i test del picker coprono le due
+finestre.
+
+**2 — Coda richieste adattiva. Fatto.** La profondità delle richieste in volo per
+peer era fissa a `DefaultRequestsOut` (50), con tetto `MaxRequestsOut` (250) o il
+`reqq` annunciato. Ora `peer.RequestQueue` **cresce di uno a ogni blocco
+consegnato** (`boostRequestQueue`, chiamata sul refill in
+`torrent_messagehandler.go`) fino al tetto, e **si azzera sul choke**
+(`resetRequestQueue`): un peer lento resta alla base, uno veloce scivola verso
+`MaxRequestsOut`; con `reqq` piccolo il tetto resta quello. Logica in
+`torrent_start.go` (`maxAllowedRequests`/`requestQueueCap`/`boost`/`reset`), test
+`TestAdaptiveRequestQueue`. Da **validare su sciame reale** (come da regola del
+repo) prima di considerarla stabile.
+
+**3 — `anacrolix/dht` e modernizzazione del DHT. BEP 42 fatta nel fork;
+adozione rimandata.** Oggi
+`third_party/dht` è una **copia patchata** di `nictuku/dht` (`replace` in
+`go.mod`): dual-stack BEP 32, `Stats()`, `Config.PacketConn` per il socket uTP
+condiviso, read-loop robusto. Candidato: `github.com/anacrolix/dht/v2`
+(**MPL-2.0**, mantenuto; valutato **v2.24.0**, maggio 2026). Cosa c'è a monte
+(verificato su pkg.go.dev): `ServerConfig.Conn net.PacketConn` (**socket uTP
+condiviso**, come `Config.PacketConn` del fork), `IPBlocklist iplist.Ranger`
+(filtro IP), **BEP 42** (`SecureNodeId`/`NodeIdSecure`), **BEP 44** (`bep44`,
+`Store`, `Put`/`Get`), **BEP 33** (`Scrape()`), più BEP 5/43.
+
+Perché **non è drop-in**: il modello API è diverso. `nictuku/dht` espone un canale
+`PeersRequestResults` + un tick periodico + `PeersRequestPort` (così è scritto
+`session_dht.go`); `anacrolix/dht` usa `AnnounceTraversal(ih)` → `*Announce` con
+canale `Peers`, più `Bootstrap`/`TableMaintainer`/`AddNode`. Andrebbero riscritti:
+`session_dht.go` (ricerca → traversal per torrent), la creazione in `session.go`
+(`NewServer(ServerConfig)`), i **stats** (`ServerStats` puntato vs la mappa di
+`dht.Stats()` usata da `session_stats.go` e dalla UI) e la mappatura della
+blocklist su `iplist.Ranger`. Inoltre le patch del fork (dual-stack BEP 32,
+`PacketConn`, read-loop) vanno **riverificate** a monte.
+
+Guadagno: dipendenza mantenuta, BEP 42/44/33, e **niente fork + `replace`**.
+Costo: **rework del layer DHT** (M/L), doppia validazione (dual-stack, socket
+condiviso) e perderemmo il controllo del fork. L'uso DHT di gx-core è minimale
+(solo ricerca e announce), quindi il beneficio non è immediato. **Verdetto: non
+ora**; da riaprire se servono BEP 44 (mutable items) o il security BEP 42, o se il
+fork diventa un peso — come task a sé con piano di validazione (sciame reale,
+dual-stack, socket condiviso, stats). Licenza MPL-2.0 (dipendenza non modificata,
+come `anacrolix/utp`), nessun problema.
+
+**Modernizzazione BEP 42 + 44 + 43 + 33 (2026-10-11).** Il fork è stato aggiornato
+con la **security extension BEP 42** (`dht_sec.go`): l'ID nodo è derivato dall'IP
+esterno (CRC32C Castagnoli; i vettori ufficiali del BEP sono verificati in
+`dht_sec_test.go`). L'IP esterno arriva da `DHTHost` routabile o dall'interfaccia
+uscente; se sconosciuto, il nodo lo apprende dal campo `ip` delle risposte e
+adotta un ID sicuro (persistito). Gli indirizzi locali sono esenti. Aggiunti
+anche **BEP 44** (`bep44.go`: archivio chiave/valore immutabile e mutabile firmato
+ed25519, query `get`/`put`, API locale; vettori ufficiali in `bep44_test.go`),
+**BEP 43** (read-only: `Config.ReadOnly`, flag demone `-dht-read-only`) e **BEP 33**
+(`bloom.go` + `peer_store.go` + `scrape_client.go`: filtri `BFpe`/`BFsd`, stima
+dello sciame, client verso i nodi più vicini; vettore ufficiale in
+`bloom_test.go`), esposta dal motore (`Torrent.DHTScrape`), dal demone
+(`GET /api/v1/torrents/{hash}/dhtscrape`) e dalla pagina (pulsante **DHT swarm**).
+La **BEP 44** resta senza **client iterativo di rete**: gx-core non ha un
+consumatore per l'archivio DHT, quindi non si aggiunge codice speculativo (lato
+server + API locale sono pronti se servirà).
+
+**4 — Tracker scrape (BEP 48).** **Fatto.** `Scrape` è stato aggiunto
+all'interfaccia `tracker.Tracker` e implementato in **HTTP** (`/scrape`, con
+`scrapeURL` che mappa `…/announce` → `…/scrape` tenendo la passkey) e **UDP**
+(nuova azione BEP 15, request generalizzato a `udpRequest` con
+`GetDest`/`SetConnectionID`/`Done`). `Tier.Scrape` delega al tracker corrente e
+avanza sull'errore come `Announce`. Esposto come `Torrent.Scrape` (scrape
+concorrente di tutti i tracker, errore per-tracker) e dal demone con
+`GET /api/v1/torrents/{hash}/scrape`. Test: `httptracker_test.go`,
+`udptracker_test.go`. Resta il pulsante nella pagina del demone.
+
+**Nota (voci 1‑2, 2026-10-10).** Dopo lo studio, la **#2** si è rivelata
+implementabile **senza** il pipelining multi-pezzo di anacrolix:
+`DefaultRequestsOut` (50) è una base reale sotto il tetto `MaxRequestsOut` (250),
+quindi la profondità può adattarsi **entro** l'architettura attuale (un pezzo per
+peer). La **#1** resta la priorità graduata (stream > readahead); il "reader con
+seek" è coperto dal gestore HTTP `Range`. Entrambe vanno **misurate su sciame
+reale** prima di considerarle chiuse.
+
+### 4.8 Oltre la shortlist (nuovi punti, 2026-10-10)
+
+Quattro punti emersi dal confronto con anacrolix/libtorrent, **oltre** alla
+shortlist §4.7. Stesse regole: riscrittura dell'algoritmo (o dipendenza MPL-2.0),
+un item = un commit, misura/test, `GEXTTO.md`, entrambe le UI.
+
+| # | Voce | Fonte | Via | Sforzo | Stato |
+|---|---|---|---|---|---|
+| 1 | **Bus di eventi del motore** (stato pezzi, peer/messaggi, tracker) | anacrolix `SubscribePieceStateChanges`, `PeerMessageEvent`, `StatusEvent`; libtorrent *alerts* | riscrivere | M | **fatto** |
+| 2 | **Creazione `.torrent` da una cartella** (`mktorrent`-style) | anacrolix `metainfo` | riscrivere | M | **fatto** |
+| 3 | **Bad-storage / errori di scrittura a runtime** | anacrolix `bad-storage.go`, `SetOnWriteChunkError` | riscrivere | S/M | **fatto (diagnosi)** |
+| 4 | **LSD IPv6** (BEP 14, gruppo `ff15::efc0:988f`) | anacrolix `bep14.go` (`Ip6`) | riscrivere | S | **fatto** |
+
+**1 — Bus di eventi del motore. Fatto.** `Session.Subscribe()` (`torrent/events.go`)
+restituisce un canale di `Event`; l'engine non blocca mai su un subscriber lento
+(scarta se il buffer da 64 è pieno). Tipi: `torrent_added`,
+`torrent_completed`, `torrent_stopped`, `torrent_error`, **`torrent_piece`**
+(alta frequenza), **`peer_connected`/`peer_disconnected`**, **`tracker_announce`**
+(con seeders/leechers, o l'errore). Emessi in `session_add.go`,
+`torrent_write.go`, `torrent_peer.go`, `torrent_close.go`, `torrent_stop.go` e dal
+gancio sull'announcer (`SetResultHook`). Esposto dal demone come **SSE `GET
+/ui/events`** e consumato dalla pagina, che si aggiorna subito sugli eventi di
+stato invece di aspettare il polling (2 s) — il polling resta come rete di
+sicurezza.
+
+**2 — Creazione `.torrent` da una cartella. Fatto.** La parte di
+`internal/metainfo` che scrive l'info dict esisteva già (`NewInfoBytes` +
+`NewBytes`); mancava l'esposizione. Aggiunta `torrent.CreateTorrent(path, opt)`
+(`torrent_create.go`) e, nel demone, un **form nella pagina** (`POST
+/ui/create-torrent`) e l'endpoint **`POST /api/v1/create-torrent`**, che
+restituiscono il `.torrent` come download. Verifica: il `.torrent` creato è
+riletto da `metainfo.New`.
+
+**3 — Bad-storage / errori di scrittura. Fatto (diagnosi).** Il motore **già**
+ferma il torrent su errore di scrittura senza loop (`handleStopped` con
+`lastError`). Il valore aggiunto è la diagnosi: l'errore ora identifica la
+**cartella di storage** (`storage %q could not write piece #N`) e i guasti sono
+contati (`SessionStats.StorageErrors`, esposto come `storage_errors` nei dati del
+demone). Non è una macchina a stati separata come in anacrolix.
+
+**4 — LSD IPv6 (BEP 14). Fatto.** Correzione: **BEP 14 è la Local Service
+Discovery**, già presente (`cmd/gx-torrent/lsd.go`), non la negoziazione dei
+messaggi. L'aggiunta è la **seconda famiglia**: annuncio e ascolto anche sul
+gruppo IPv6 `[ff15::efc0:988f]:6771` (best-effort: senza IPv6 multicast resta la
+v4), come anacrolix (`config.Ip6`). Stato LSD con `ipv6` in `/api/v1/status`.
 
 ---
 

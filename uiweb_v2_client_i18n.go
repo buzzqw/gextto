@@ -91,6 +91,13 @@ type v2ClientI18nEntry struct {
 
 var v2ClientI18nMemo sync.Map // *I18nDb -> v2ClientI18nEntry
 
+// resetV2ClientI18nMemo drops the per-AppState client dictionary cache. It
+// exists so tests that build many AppStates do not accumulate entries; in
+// production there is a single AppState and the map holds one entry.
+func resetV2ClientI18nMemo() {
+	v2ClientI18nMemo = sync.Map{}
+}
+
 // v2ClientI18nJSON renders window.__v2i18n for the active language. Unknown keys
 // fall back to the Italian source, exactly like v2TranslateHTML. The result is
 // cached per language and invalidated when a translation changes.

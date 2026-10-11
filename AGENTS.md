@@ -127,6 +127,11 @@ automaticamente questo file (V2 legge **solo** `AGENTS.md`, non `CLAUDE.md`).
   già; `make test-engine` resta per eseguire solo quei pacchetti.
 - Invarianti da non rompere: `scripts/check-ui-settings-index.sh` (indice
   impostazioni UI) e `scripts/installer-selftest.sh`.
+- **La TUI di Gextto deve sempre continuare a funzionare.** Dopo ogni ciclo di
+  modifiche esegui `go test ./internal/tui/` e il test d'integrazione
+  `go test . -run TestTUILibraryClientAgainstTheRouter` (pilota il client TUI
+  contro l'API reale), più lo smoke `gexttod tui` contro il daemon. Includi
+  sempre la verifica TUI nel giro finale di controllo.
 
 ## Release, installer e aggiornamenti
 - Il pacchetto di release si compila **su Ubuntu 22.04** (glibc 2.35, libtorrent

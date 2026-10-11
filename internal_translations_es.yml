@@ -4961,3 +4961,14 @@ spa:
   "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.": "Escribe el título y busca en TMDB, o usa «Añadir manualmente» para completar los requisitos."
   "Il contenuto di /dev/shm non sopravvive al riavvio della macchina.": "El contenido de /dev/shm no sobrevive al reinicio de la máquina."
   "Il contenuto di /dev/shm e degli altri tmpfs non sopravvive al riavvio della macchina.": "El contenido de /dev/shm y de los demás tmpfs no sobrevive al reinicio de la máquina."
+
+  # Observability: delay-profile queue and failed imports (Salute panel)
+  "Coda titoli": "Cola de títulos"
+  "Titoli in attesa nella coda": "Títulos en espera en la cola"
+  "Attesa": "Espera"
+  "Dovuto": "Previsto"
+  "Nessun titolo in attesa.": "Ningún título en espera."
+  "Import falliti": "Importaciones fallidas"
+  "Import falliti per giorno": "Importaciones fallidas por día"
+  "Giorno": "Día"
+  "Nessun import fallito negli ultimi 7 giorni.": "Ninguna importación fallida en los últimos 7 días."

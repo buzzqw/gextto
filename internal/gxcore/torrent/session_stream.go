@@ -105,3 +105,29 @@ func (t *Torrent) SetFileStreamWindow(fileIndex int, offset, length int64) (begi
 	})
 	return got.begin, got.end, got.ok
 }
+
+// SetFileReadaheadWindow prioritizes the pieces of a file range after the
+// streaming window (SetFileStreamWindow): the data the player is likely to read
+// next. `length <= 0` clears the window.
+func (t *Torrent) SetFileReadaheadWindow(fileIndex int, offset, length int64) (begin, end uint32, ok bool) {
+	type result struct {
+		begin, end uint32
+		ok         bool
+	}
+	got := query(t.torrent, func() result {
+		if t.torrent.piecePicker == nil {
+			return result{}
+		}
+		if length <= 0 {
+			t.torrent.piecePicker.SetReadaheadWindow(0, 0)
+			return result{}
+		}
+		b, e, found := t.torrent.filePieceRange(fileIndex, offset, length)
+		if !found {
+			return result{}
+		}
+		t.torrent.piecePicker.SetReadaheadWindow(b, e)
+		return result{b, e, true}
+	})
+	return got.begin, got.end, got.ok
+}

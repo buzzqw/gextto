@@ -23,6 +23,14 @@ func (r *requestBase) GetContext() context.Context {
 	return r.ctx
 }
 
+func (r *requestBase) GetDest() string {
+	return r.dest
+}
+
+func (r *requestBase) Done() <-chan struct{} {
+	return r.done
+}
+
 func (r *requestBase) GetResponse() (data []byte, err error) {
 	return r.response, r.err
 }

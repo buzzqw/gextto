@@ -1036,6 +1036,13 @@ la pulizia degli altri.
   ultime ricerche, se l'ultima ricerca ha impiegato più di tre ore o se non c'è
   una ricerca senza errori da tre intervalli (minimo due ore); avvisa anche
   quando tutto torna regolare.
+- **Coda titoli** — riquadro con i titoli trattenuti dal *delay profile* (serie e
+  film) prima del download: titolo, da quanto sono in attesa (`first_seen_at`) e
+  quanto manca al `due_at`. Serve a vedere quando la coda cresce o un titolo
+  resta fermo.
+- **Import falliti** — riquadro con il numero di import falliti per giorno (ultimi
+  7), ricavato dagli eventi di acquisizione; utile a riconoscere un disco o un NAS
+  che rifiuta gli spostamenti.
 - **Log web** — stream SSE live con filtro testuale, numero righe e segui/pausa.
   Le righe sono in inglese e in formato esplicito: `data ora  LIVELLO messaggio
   · campo: valore`, con parole chiave evidenziate (NAS, download, sorgenti,

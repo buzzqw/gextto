@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/base32"
 	"encoding/hex"
@@ -37,6 +38,7 @@ func (d *Daemon) routes() http.Handler {
 	api.HandleFunc("POST /api/v1/ipfilter", d.handleIPFilter)
 	api.HandleFunc("GET /api/v1/config", d.handleGetConfig)
 	api.HandleFunc("POST /api/v1/config", d.handleSetConfig)
+	api.HandleFunc("POST /api/v1/create-torrent", d.handleCreateTorrent)
 
 	root := http.NewServeMux()
 	// The API keeps the token middleware; the read-only page below is served
@@ -47,6 +49,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /favicon.ico", handleFavicon)
 	root.HandleFunc("GET /ui", d.handleUI)
 	root.HandleFunc("GET /ui/live", d.handleUILive)
+	root.HandleFunc("GET /ui/events", d.handleUIEvents)
 	root.HandleFunc("GET /ui/detail", d.handleUIDetail)
 	root.HandleFunc("GET /ui/gextto-log", d.handleUIGexttoLog)
 	root.HandleFunc("GET /ui/search", d.handleUISearch)
@@ -57,6 +60,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/rss-config", d.handleUIRssConfig)
 	root.HandleFunc("GET /ui/portcheck", d.handleUIPortCheck)
 	root.HandleFunc("GET /ui/stream", d.handleUIStream)
+	root.HandleFunc("GET /ui/dhtscrape", d.handleUIDhtScrape)
 	root.HandleFunc("GET /ui/login", d.handleUILogin)
 	root.HandleFunc("POST /ui/login", d.handleUILogin)
 	root.HandleFunc("GET /ui/setup", d.handleUISetup)
@@ -70,6 +74,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/ipfilter", d.handleUIIPFilter)
 	root.HandleFunc("POST /ui/file-priority", d.handleUIFilePriority)
 	root.HandleFunc("POST /ui/trackers", d.handleUITrackers)
+	root.HandleFunc("POST /ui/create-torrent", d.handleUICreateTorrent)
 	root.HandleFunc("POST /ui/webseeds", d.handleUIWebSeeds)
 	root.HandleFunc("POST /ui/seed-limits", d.handleUISeedLimits)
 	root.HandleFunc("POST /ui/super-seeding", d.handleUISuperSeeding)
@@ -381,6 +386,15 @@ type trackerInfo struct {
 	NextAnnounce int64  `json:"next_announce"`
 }
 
+// scrapeInfo is the live swarm statistic of one tracker (BEP 48).
+type scrapeInfo struct {
+	URL        string `json:"url"`
+	Seeders    int    `json:"seeders"`
+	Leechers   int    `json:"leechers"`
+	Downloaded int    `json:"downloaded"`
+	Error      string `json:"error,omitempty"`
+}
+
 // pieceRun is a compact run of consecutive pieces sharing a state. End is
 // inclusive, matching the Gextto piece-diagnostics contract.
 type pieceRun struct {
@@ -472,6 +486,27 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 			out = append(out, item)
 		}
 		writeJSON(w, http.StatusOK, out)
+	case "scrape":
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		out := []scrapeInfo{}
+		for _, stat := range t.Scrape(ctx) {
+			out = append(out, scrapeInfo{
+				URL:        stat.URL,
+				Seeders:    stat.Seeders,
+				Leechers:   stat.Leechers,
+				Downloaded: stat.Downloaded,
+				Error:      stat.Error,
+			})
+		}
+		writeJSON(w, http.StatusOK, out)
+	case "dhtscrape":
+		seeders, peers, err := t.DHTScrape(6 * time.Second)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"seeders": seeders, "peers": peers})
 	case "pieces":
 		states, ready := t.PieceStates()
 		if !ready {
@@ -490,6 +525,44 @@ func (d *Daemon) handleInspect(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusNotFound, errors.New("unknown resource"))
 	}
+}
+
+// handleCreateTorrent builds a .torrent from a path on the server (mktorrent
+// style) and returns it as a download. Token-protected like the rest of the API.
+func (d *Daemon) handleCreateTorrent(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path        string   `json:"path"`
+		Name        string   `json:"name"`
+		Trackers    []string `json:"trackers"`
+		Webseeds    []string `json:"webseeds"`
+		Private     bool     `json:"private"`
+		PieceLength uint32   `json:"piece_length"`
+		Comment     string   `json:"comment"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	data, err := torrent.CreateTorrent(strings.TrimSpace(req.Path), torrent.CreateOptions{
+		Name:        req.Name,
+		Trackers:    req.Trackers,
+		Webseeds:    req.Webseeds,
+		Private:     req.Private,
+		PieceLength: req.PieceLength,
+		Comment:     req.Comment,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = req.Path
+	}
+	w.Header().Set("Content-Type", "application/x-bittorrent")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+safeFilename(name)+`.torrent"`)
+	_, _ = w.Write(data)
 }
 
 func (d *Daemon) handleGetConfig(w http.ResponseWriter, _ *http.Request) {

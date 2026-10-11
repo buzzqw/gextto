@@ -172,6 +172,7 @@ func registerV2Routes(s *AppState, mux *http.ServeMux) {
 	v2Handle(s, mux, "GET /partial/chrome/sse", V2ChromeSSE)
 	// Salute: singoli riquadri con cadenze di aggiornamento diverse.
 	v2Handle(s, mux, "GET /partial/health/tile", V2HealthTilePartial)
+	v2Handle(s, mux, "GET /partial/health/queue", V2HealthQueuePartial)
 
 	// Tabelle generiche (Serie TV, Film, Mancanti, Archivio, Blocklist, Fumetti).
 	v2Handle(s, mux, "GET /table", V2Table)
@@ -691,6 +692,13 @@ func V2HealthTilePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
 	}
 	dict, eng := v2Dictionaries(s)
 	v2Render(w, http.StatusOK, templateName, data, dict, eng)
+}
+
+// V2HealthQueuePartial refreshes the "Coda titoli" and "Import falliti" panels
+// without reloading the page.
+func V2HealthQueuePartial(w http.ResponseWriter, r *http.Request, s *AppState) {
+	dict, eng := v2Dictionaries(s)
+	v2Render(w, http.StatusOK, "v2_health_queue", uiHealthDataFrom(s), dict, eng)
 }
 
 // V2Empty clears a modal container.

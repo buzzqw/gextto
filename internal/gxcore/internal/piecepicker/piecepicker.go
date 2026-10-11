@@ -53,6 +53,10 @@ type PiecePicker struct {
 	// streamBegin/streamEnd are the piece range a player is reading (gextto
 	// fork): those pieces are requested before any other. Empty when equal.
 	streamBegin, streamEnd uint32
+
+	// readaheadBegin/readaheadEnd are the pieces the player is likely to read
+	// next: requested after the stream window, but before the rest.
+	readaheadBegin, readaheadEnd uint32
 }
 
 type myPiece struct {
@@ -206,6 +210,33 @@ func (p *PiecePicker) pickStreaming(pe *peer.Peer) *myPiece {
 		}
 		mp := &p.pieces[i]
 		if mp.PickableBy(pe) {
+			return mp
+		}
+	}
+	return nil
+}
+
+// SetReadaheadWindow prioritizes the pieces in [begin, end) after the streaming
+// window (SetStreamWindow): the player is likely to read them next. begin ==
+// end clears it. It is independent of SetStreamWindow.
+func (p *PiecePicker) SetReadaheadWindow(begin, end uint32) {
+	if end > uint32(len(p.pieces)) {
+		end = uint32(len(p.pieces))
+	}
+	if begin > end {
+		begin = end
+	}
+	p.readaheadBegin, p.readaheadEnd = begin, end
+}
+
+// pickReadahead returns the first piece in the readahead window the peer can
+// download right now.
+func (p *PiecePicker) pickReadahead(pe *peer.Peer) *myPiece {
+	for i := p.readaheadBegin; i < p.readaheadEnd; i++ {
+		if i >= uint32(len(p.pieces)) {
+			return nil
+		}
+		if mp := &p.pieces[i]; mp.PickableBy(pe) {
 			return mp
 		}
 	}
@@ -387,6 +418,10 @@ func (p *PiecePicker) findPiece(pe *peer.Peer) (mp *myPiece, allowedFast bool) {
 	if !pe.PeerChoking {
 		// The player's streaming window comes first.
 		if mp = p.pickStreaming(pe); mp != nil {
+			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
+		}
+		// Then the readahead window (what the player will read next).
+		if mp = p.pickReadahead(pe); mp != nil {
 			return mp, pe.ReceivedAllowedFast.Has(mp.Piece)
 		}
 	}

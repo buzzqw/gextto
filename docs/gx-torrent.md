@@ -527,6 +527,24 @@ RPC interno del motore è disattivato.
     scarica la lista se è un URL e la ricarica nel demone.
   - Il file viene **aggiornato all'avvio del servizio** e poi **una volta a
     settimana** mentre il servizio resta attivo (oltre al pulsante manuale).
+- **DHT** (BEP 5), condiviso sulla stessa porta UDP dei peer uTP.
+  - Scoperta IPv6 **BEP 32** dual-stack: nodi v4 e v6 tenuti separati
+    (`nodes`/`nodes6`, `want: n4/n6`).
+  - **Security extension BEP 42**: l'ID nodo è derivato dall'IP esterno quando è
+    noto (`-dht-host` routabile o interfaccia uscente), così nessuno può
+    sceglierne uno vicino a un info-hash bersaglio; se l'IP non è noto all'avvio
+    viene adottato dal campo `ip` delle risposte DHT e il nuovo ID è persistito.
+    Gli indirizzi di rete locale sono esenti.
+  - **BEP 44** (archivio chiave/valore): item immutabili (target = SHA-1 del
+    valore) e mutabili (firma ed25519, `seq` monotono, `cas`), con token, limiti
+    di dimensione e TTL 2 h; query `get`/`put` e API locale.
+  - **BEP 33** (DHT scrape): un `get_peers` con `scrape=1` riceve i filtri di
+    Bloom (`BFpe`/`BFsd`) e ne stima seed/peer dello sciame; il client interroga
+    i nodi più vicini e aggrega. In UI: pulsante **DHT swarm** nella scheda
+    Generale (`GET /ui/dhtscrape`), oltre a `GET /api/v1/torrents/{hash}/dhtscrape`.
+  - **BEP 43** (read-only): un nodo può non rispondere alle query e chiedere di
+    non essere inserito nelle routing table (`ro`); si attiva con
+    `-dht-read-only` (`GX_TORRENT_DHT_READ_ONLY`).
 
 ## uTP e LSD
 
@@ -538,8 +556,9 @@ RPC interno del motore è disattivato.
   - Con un proxy uTP è spento; con l'interfaccia uscente il socket UDP è
     legato all'IP della VPN.
 - **LSD**, la scoperta in rete locale (BEP 14, `libtorrent_lsd`).
-  - Annunci multicast su 239.192.152.143:6771 ogni 5 minuti per ogni torrent
-    attivo non privato.
+  - Annunci multicast su 239.192.152.143:6771 (IPv4) e, se disponibile,
+    `[ff15::efc0:988f]:6771` (IPv6) ogni 5 minuti per ogni torrent attivo non
+    privato.
   - I peer della LAN che annunciano gli stessi torrent vengono aggiunti.
   - È spento con proxy o interfaccia uscente, per non annunciare i torrent
     fuori dal tunnel.
@@ -734,6 +753,11 @@ supporta una singola intestazione `Range: bytes=…` (risposta `206` con
 circa 16 MB di readahead, vengono chiesti per primi; se un pezzo non è ancora
 arrivato il demone aspetta (fino a 2 minuti) invece di servire zeri. Richieste
 non soddisfacibili rispondono `416`.
+
+I pezzi sono ordinati su **due livelli**: la finestra che il player legge ora
+(`SetFileStreamWindow`) ha priorità sul **readahead** (`SetFileReadaheadWindow`),
+che a sua volta precede il rarest-first. Così il playhead non resta dietro al
+prefetch.
 
 L'autenticazione è quella della pagina web (cookie, header o `?token=`), quindi
 anche un player esterno (VLC, mpv) può usare l'URL completo di token. Da Gextto
@@ -991,13 +1015,15 @@ token è impostato.
 | `GET /api/v1/torrents` | lista completa (progresso %, dimensioni, velocità, peer, sciame, stato, percorso, limiti di seed, flag di coda) |
 | `POST /api/v1/add` | campi form: `magnet`, `destination`, `paused`, `top`, `sequential`, `first_last`, `super_seeding`, `stop_at_metadata`, `seed_ratio`, `seed_days`. Risponde `{hash, existing}` |
 | `POST /api/v1/add-file` | multipart `torrent` più gli stessi campi |
+| `POST /api/v1/create-torrent` | JSON `path`/`name`/`trackers`/`webseeds`/`private`/`piece_length`/`comment`: crea un `.torrent` da un file o cartella del server e lo restituisce come download (mktorrent-style) |
 | `DELETE /api/v1/torrents/{hash}?delete_files=1` | rimozione |
 | `POST /api/v1/torrents/{hash}/{azione}` | vedi elenco sotto |
-| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato) |
+| `GET /api/v1/torrents/{hash}/files\|peers\|trackers\|pieces\|torrent-file\|scrape\|dhtscrape` | ispezione (i file includono `priority`; `pieces` riporta gli intervalli di stato; `scrape` interroga i tracker per seeders/leechers, BEP 48; `dhtscrape` stima lo sciame dal DHT, BEP 33) |
 | `POST /api/v1/pins/clear` | toglie tutti i pin |
 | `POST /api/v1/ipfilter` | ricarica il filtro IP (`path` facoltativo) |
 | `GET /api/v1/config` | configurazione e slot effettivi |
 | `POST /api/v1/config` | JSON parziale: chiavi sconosciute rifiutate |
+| `GET /ui/events` | SSE degli eventi di sessione (`torrent_added`, `torrent_completed`, `torrent_stopped`, `torrent_error`, `torrent_piece`, `peer_connected`, `peer_disconnected`, `tracker_announce`); la pagina li usa per aggiornarsi subito |
 
 Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 
@@ -1088,8 +1114,10 @@ accettato sia in forma IPv4 sia IPv6, il **filtro IP** accetta regole CIDR IPv6
 (le forme a intervallo/P2P/eMule restano IPv4) e il motore accetta i peer DHT
 IPv6 (contatti da 18 byte).
 
-Manca solo la scoperta locale (LSD) via multicast IPv6: non esiste un gruppo
-multicast IPv6 standard (qBittorrent non la implementa), quindi non è prevista.
+Manca solo l'annuncio LSD su **IPv6** nelle reti dove il multicast v6 non è
+disponibile: se il listener v6 non si apre, la LSD resta attiva su IPv4. Negli
+altri casi la LSD annuncia e ascolta anche sul gruppo `[ff15::efc0:988f]:6771`
+(come anacrolix).
 
 ## Test
 

@@ -129,6 +129,9 @@ type Config struct {
 	DHTEnabled bool `yaml:"dht-enabled"`
 	// DHT node will listen on this IP.
 	DHTHost string `yaml:"dht-host"`
+	// DHTReadOnly runs the DHT node read-only (BEP 43): it does not answer
+	// queries and asks other nodes not to add it to their routing tables.
+	DHTReadOnly bool `yaml:"dht-read-only"`
 	// DHT node will listen on this UDP port.
 	DHTPort uint16 `yaml:"dht-port"`
 	// DHT announce interval

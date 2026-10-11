@@ -1,7 +1,7 @@
 # Istruzioni
 
-> Le note operative complete (build, test, motori torrent, servizio, rain) sono
-> in **AGENTS.md**, che è il file letto da OpenCode. Questo `CLAUDE.md` resta per
+> Le note operative complete (build, test, motori torrent, servizio, motore
+> gx-core) sono in **AGENTS.md**, che è il file letto da OpenCode. Questo `CLAUDE.md` resta per
 > Claude Code.
 
 ## Regole per commit e PR

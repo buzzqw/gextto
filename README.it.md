@@ -92,7 +92,7 @@ di esso l'opzione non compare nella tendina *Motore torrent*. Un crash del motor
 
 | Motore | Dove gira | Quando sceglierlo |
 |---|---|---|
-| gx-torrent (predefinito) | Processo Go separato e sorvegliato | Il predefinito: Go puro, autonomo, sviluppo attivo. BitTorrent v1, ibridi e solo-v2 (BEP 52, `.torrent` e magnet); usabile anche da solo su Linux e Windows (vedi *gx-torrent come client autonomo*); niente WebTorrent/WebRTC |
+| gx-torrent (predefinito) | Processo Go separato e sorvegliato | Il predefinito: Go puro, autonomo, sviluppo attivo. BitTorrent v1, ibridi e solo-v2 (BEP 52, `.torrent` e magnet), DHT (IPv6, security BEP 42, read-only, scrape) e cifratura MSE/PE; usabile anche da solo su Linux e Windows (vedi *gx-torrent come client autonomo*); niente WebTorrent/WebRTC |
 | qBittorrent-nox | Demone esterno, pilotato via Web API | Hai già qBittorrent-nox o preferisci la sua UI. Servono le mappature percorsi e un processo in più |
 | libtorrent (build opzionale) | Nel processo di Gextto; **solo se l'hai compilato** (`make build-libtorrent`) | Ti servono i controlli avanzati o la compatibilità di libtorrent; è anche il fallback automatico. Un crash coinvolge anche Gextto |
 

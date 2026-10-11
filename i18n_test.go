@@ -383,13 +383,14 @@ func TestDictionaryCacheAndInvalidate(t *testing.T) {
 	if first["Salva"] != "Speichern" {
 		t.Fatalf("dictionary value = %q", first["Salva"])
 	}
-	// The same map is returned (cached) across calls.
+	// The same map is returned (cached) across calls: compare identity, not
+	// just the length, so a silent rebuild on every call fails the test.
 	second, err := db.Dictionary("de")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if &first == nil || len(second) != len(first) {
-		t.Fatalf("cache not reused: %d vs %d", len(first), len(second))
+	if reflect.ValueOf(first).Pointer() != reflect.ValueOf(second).Pointer() {
+		t.Fatal("cache not reused: Dictionary returned a different map")
 	}
 	// A write invalidates the cache: a new map reflects the change.
 	if err := db.Set("de", "Salva", "Sichern"); err != nil {

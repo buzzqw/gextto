@@ -10,7 +10,7 @@ type connection struct {
 	*connectRequest
 
 	// holds the announce requests that needs to be sent after the connection is successful.
-	requests []*transportRequest
+	requests []udpRequest
 
 	// These fields are set by Transport.Run loop if connected successfully.
 	addr        *net.UDPAddr
@@ -20,10 +20,10 @@ type connection struct {
 
 var _ udpRequest = (*connection)(nil)
 
-func newConnection(req *transportRequest) *connection {
+func newConnection(req udpRequest) *connection {
 	return &connection{
-		requestBase:    newRequestBase(req.ctx, req.dest),
+		requestBase:    newRequestBase(req.GetContext(), req.GetDest()),
 		connectRequest: newConnectRequest(),
-		requests:       []*transportRequest{req},
+		requests:       []udpRequest{req},
 	}
 }

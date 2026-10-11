@@ -84,6 +84,15 @@ type Config struct {
 	// fork): a uTP socket shares its port with the DHT this way. The DHT does
 	// not close it.
 	PacketConn net.PacketConn
+	// PublicIP, when set, is the external IP others see (BEP 42): the node ID is
+	// derived from it, so it cannot be spoofed and enforcing peers do not ignore
+	// us. Left nil, the ID is random until an external IP is learned from the
+	// network (see the BEP 42 "ip" field handling).
+	PublicIP net.IP
+	// ReadOnly runs the node in BEP 43 read-only mode: it does not answer
+	// queries and asks not to be added to other nodes' routing tables. Useful
+	// behind a restrictive NAT or to reduce traffic.
+	ReadOnly bool
 }
 
 // Creates a *Config populated with default values.
@@ -166,6 +175,14 @@ type DHT struct {
 	clientThrottle         *nettools.ClientThrottle
 	store                  *dhtStore
 	tokenSecrets           []string
+	// publicIP is the external IP we are reached at (BEP 42), once known.
+	publicIP net.IP
+	// items holds the BEP 44 items this node stores.
+	items *itemStore
+	// BEP 33 scrape client state (run-loop owned).
+	scrapeRequest chan scrapeRequest
+	scrapeDone    chan InfoHash
+	scrapes       map[InfoHash]*scrapeCollector
 }
 
 // New creates a DHT node. If config is nil, DefaultConfig will be used.
@@ -198,6 +215,10 @@ func New(config *Config) (node *DHT, err error) {
 	routingTable := newRoutingTable(&node.DebugLogger)
 	node.routingTable = routingTable
 	node.tokenSecrets = []string{node.newTokenSecret(), node.newTokenSecret()}
+	node.items = newItemStore()
+	node.scrapeRequest = make(chan scrapeRequest, 4)
+	node.scrapeDone = make(chan InfoHash, 4)
+	node.scrapes = make(map[InfoHash]*scrapeCollector)
 	c := openStore(cfg.Port, cfg.SaveRoutingTable)
 	node.store = c
 	if len(c.Id) != 20 {
@@ -208,6 +229,18 @@ func New(config *Config) (node *DHT, err error) {
 		}
 		node.DebugLogger.Debugf("Using a new random node ID: %x %d", c.Id, len(c.Id))
 		saveStore(*c)
+	}
+	// BEP 42: derive the node ID from our external IP when it is known, so it
+	// cannot be spoofed and enforcing peers do not ignore us.
+	node.publicIP = cfg.PublicIP
+	if ip := cfg.PublicIP; ip != nil {
+		var idArr [20]byte
+		copy(idArr[:], c.Id)
+		if !NodeIDSecure(idArr, ip) {
+			c.Id = generateSecureNodeID(ip)
+			saveStore(*c)
+			node.DebugLogger.Infof("DHT: using a BEP 42 secure node ID for external IP %s", ip)
+		}
 	}
 	// The types don't match because JSON marshalling needs []byte.
 	node.nodeId = string(c.Id)
@@ -482,6 +515,10 @@ func (d *DHT) loop() {
 
 		case ih := <-d.removeInfoHash:
 			d.peerStore.removeLocalDownload(ih)
+		case req := <-d.scrapeRequest:
+			d.startScrape(req)
+		case ih := <-d.scrapeDone:
+			d.finishScrape(ih)
 		case req := <-d.nodesRequest:
 			m := map[InfoHash]bool{req.ih: true}
 		L:
@@ -614,6 +651,9 @@ func (d *DHT) processPacket(p packetType) {
 			d.DebugLogger.Debugf("DHT received reply from self, id %x", r.A.Id)
 			return
 		}
+		// BEP 42: the responder tells us our external IP; adopt a secure node
+		// ID for it once, if the external IP was not configured at startup.
+		d.noteExternalIP(r.R.IP)
 		node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
 		if err != nil {
 			d.DebugLogger.Debugf("DHT readResponse error processing response: %v", err)
@@ -676,12 +716,18 @@ func (d *DHT) processPacket(p packetType) {
 			d.DebugLogger.Debugf("DHT received packet from self, id %x", r.A.Id)
 			return
 		}
+		// BEP 43: a read-only node does not answer queries.
+		if d.config.ReadOnly {
+			return
+		}
 		node, addr, existed, err := d.routingTable.hostPortToNode(p.raddr.String(), d.config.UDPProto)
 		if err != nil {
 			d.DebugLogger.Debugf("Error readResponse error processing query: %v", err)
 			return
 		}
-		if !existed {
+		// BEP 43: never add a read-only sender to the routing table (it would
+		// waste a ping and cause it more traffic).
+		if !existed && r.Ro != 1 {
 			// Another candidate for the routing table. See if it's reachable.
 			if d.routingTable.length() < d.config.MaxNodes {
 				d.ping(addr)
@@ -697,6 +743,10 @@ func (d *DHT) processPacket(p packetType) {
 			d.replyFindNode(p.raddr, r)
 		case "announce_peer":
 			d.replyAnnouncePeer(p.raddr, node, r)
+		case "get":
+			d.replyGet(p.raddr, p.b)
+		case "put":
+			d.replyPut(p.raddr, p.b)
 		default:
 			d.DebugLogger.Debugf("DHT: non-implemented handler for type %v", r.Q)
 		}
@@ -719,7 +769,7 @@ func (d *DHT) pingNode(r *remoteNode) {
 	t := r.newQuery("ping")
 
 	queryArguments := map[string]interface{}{"id": d.nodeId}
-	query := queryMessage{t, "q", "ping", queryArguments}
+	query := queryMessage{t, "q", "ping", queryArguments, d.readOnlyFlag()}
 	sendMsg(d.conn, r.address, query, d.DebugLogger)
 	totalSentPing.Add(1)
 }
@@ -729,6 +779,15 @@ func (d *DHT) pingNode(r *remoteNode) {
 // "udp4" (default) and "udp6" keep their previous behavior.
 func (d *DHT) dualStack() bool {
 	return d.config.UDPProto == "udp"
+}
+
+// readOnlyFlag is the BEP 43 flag added to every outgoing query in read-only
+// mode: it asks other nodes not to add us to their routing table.
+func (d *DHT) readOnlyFlag() int {
+	if d.config.ReadOnly {
+		return 1
+	}
+	return 0
 }
 
 // nodesField is a raw "nodes"/"nodes6" string together with the protocol that
@@ -775,7 +834,7 @@ func (d *DHT) getPeersFrom(r *remoteNode, ih InfoHash) {
 	if d.dualStack() {
 		queryArguments["want"] = []string{"n4", "n6"}
 	}
-	query := queryMessage{transId, "q", ty, queryArguments}
+	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	d.DebugLogger.Debugf("DHT sending get_peers. nodeID: %x@%v, InfoHash: %x , distance: %x", r.id, r.address, ih, hashDistance(InfoHash(r.id), ih))
 	r.lastSearchTime = time.Now()
 	sendMsg(d.conn, r.address, query, d.DebugLogger)
@@ -799,7 +858,7 @@ func (d *DHT) findNodeFrom(r *remoteNode, id string) {
 		"id":     d.nodeId,
 		"target": id,
 	}
-	query := queryMessage{transId, "q", ty, queryArguments}
+	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	d.DebugLogger.Debugf("DHT sending find_node. nodeID: %x@%v, target ID: %x , distance: %x", r.id, r.address, id, hashDistance(InfoHash(r.id), ih))
 	r.lastSearchTime = time.Now()
 	sendMsg(d.conn, r.address, query, d.DebugLogger)
@@ -823,7 +882,7 @@ func (d *DHT) announcePeer(address net.UDPAddr, ih InfoHash, port int, token str
 		"port":      port,
 		"token":     token,
 	}
-	query := queryMessage{transId, "q", ty, queryArguments}
+	query := queryMessage{transId, "q", ty, queryArguments, d.readOnlyFlag()}
 	sendMsg(d.conn, address, query, d.DebugLogger)
 }
 
@@ -855,7 +914,7 @@ func (d *DHT) replyAnnouncePeer(addr net.UDPAddr, node *remoteNode, r responseTy
 	// from a node it doesn't yet know about.
 	if node != nil && d.checkToken(addr, r.A.Token) {
 		peerAddr := net.TCPAddr{IP: addr.IP, Port: r.A.Port}
-		d.peerStore.addContact(ih, nettools.DottedPortToBinary(peerAddr.String()))
+		d.peerStore.addContact(ih, nettools.DottedPortToBinary(peerAddr.String()), r.A.Seed == 1)
 		// Allow searching this node immediately, since it's telling us
 		// it has an infohash. Enables faster upgrade of other nodes to
 		// "peer" of an infohash, if the announcement is valid.
@@ -891,9 +950,20 @@ func (d *DHT) replyGetPeers(addr net.UDPAddr, r responseType) {
 		R: r0,
 	}
 
-	if peerContacts := d.peersForInfoHash(ih); len(peerContacts) > 0 {
+	if r.A.Scrape == 1 {
+		// BEP 33: the requester wants swarm counts, not peers.
+		if pe, sd := d.peerStore.scrapeFilters(ih); pe != nil || sd != nil {
+			if pe != nil {
+				reply.R["BFpe"] = string(pe[:])
+			}
+			if sd != nil {
+				reply.R["BFsd"] = string(sd[:])
+			}
+		}
+	} else if peerContacts := d.peersForInfoHash(ih, r.A.NoSeed == 1); len(peerContacts) > 0 {
 		reply.R["values"] = peerContacts
-	} else {
+	}
+	if _, hasValues := reply.R["values"]; !hasValues {
 		n4, n6 := d.nodesForInfoHash(ih)
 		// BEP 32: keep each family in its own field so that IPv4 nodes do not
 		// receive IPv6 contacts (and vice versa) and discard the whole reply.
@@ -931,8 +1001,8 @@ func (d *DHT) nodesForInfoHash(ih InfoHash) (n4, n6 string) {
 	return strings.Join(v4, ""), strings.Join(v6, "")
 }
 
-func (d *DHT) peersForInfoHash(ih InfoHash) []string {
-	peerContacts := d.peerStore.peerContacts(ih)
+func (d *DHT) peersForInfoHash(ih InfoHash, noseed bool) []string {
+	peerContacts := d.peerStore.peerContacts(ih, noseed)
 	if len(peerContacts) > 0 {
 		d.DebugLogger.Debugf("replyGetPeers: Giving peers! %x was requested, and we knew %d peers!", ih, len(peerContacts))
 	}
@@ -999,6 +1069,9 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 	totalRecvGetPeersReply.Add(1)
 
 	query, _ := node.pendingQueries[resp.T]
+	if query.scrape {
+		d.collectScrape(query.ih, resp.R)
+	}
 	port := d.peerStore.hasLocalDownload(query.ih)
 	if port != 0 {
 		d.announcePeer(node.address, query.ih, port, resp.R.Token)
@@ -1008,7 +1081,7 @@ func (d *DHT) processGetPeerResults(node *remoteNode, resp responseType) {
 		for _, peerContact := range resp.R.Values {
 			// send peer even if we already have it in store
 			// the underlying client does/should handle dupes
-			d.peerStore.addContact(query.ih, peerContact)
+			d.peerStore.addContact(query.ih, peerContact, false)
 			peers = append(peers, peerContact)
 		}
 		if len(peers) > 0 {

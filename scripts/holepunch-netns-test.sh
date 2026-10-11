@@ -20,8 +20,8 @@
 #   relay 10.1.0.1:51410 <-- vr2 10.1.0.2
 #                            vbr 10.20.0.1  <--- gx-b 10.20.0.2 (seed,   filtrato)
 #
-# (seed e relay su IP diversi: rain deduplica i peer per IP, quindi due daemon
-# sullo stesso IP verrebbero visti come un solo peer.)
+# (seed e relay su IP diversi: il motore deduplica i peer per IP, quindi due
+# daemon sullo stesso IP verrebbero visti come un solo peer.)
 # Due reti client **distinte** dietro firewall stateful (nessun NAT): i client
 # conservano il loro IP e la loro porta peer, ma il firewall DROPa le nuove
 # connessioni in entrata e accetta solo le risposte (ESTABLISHED/RELATED). E'

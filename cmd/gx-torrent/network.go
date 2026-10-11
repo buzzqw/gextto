@@ -33,6 +33,9 @@ type NetworkOptions struct {
 	// Encryption: 0 disabled, 1 enabled (default), 2 forced.
 	Encryption int
 	DHT        bool
+	// DHTReadOnly runs the DHT in read-only mode (BEP 43): it does not answer
+	// queries and asks not to be added to other nodes' routing tables.
+	DHTReadOnly bool
 	// DHTBootstrap are the routers used to bootstrap the DHT (comma-separated
 	// from Gextto's libtorrent_dht_bootstrap_nodes); empty keeps the engine's defaults.
 	DHTBootstrap []string
@@ -145,6 +148,7 @@ func (d *Daemon) applyNetwork(cfg *torrent.Config) {
 	}
 	cfg.DHTHost = d.listenHost
 	cfg.DHTEnabled = n.DHT
+	cfg.DHTReadOnly = n.DHTReadOnly
 	if len(n.DHTBootstrap) > 0 {
 		cfg.DHTBootstrapNodes = n.DHTBootstrap
 	}

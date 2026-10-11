@@ -5,6 +5,9 @@ package main
 // libtorrent does. Private torrents are never announced. LSD is off behind
 // a proxy or an outgoing (VPN) interface: it would reveal the torrents
 // outside the tunnel.
+//
+// Both families are used: IPv4 on 239.192.152.143:6771 and, best-effort,
+// IPv6 on [ff15::efc0:988f]:6771.
 
 import (
 	"bufio"
@@ -23,6 +26,7 @@ import (
 
 const (
 	lsdGroup         = "239.192.152.143:6771"
+	lsdGroup6        = "[ff15::efc0:988f]:6771"
 	lsdInterval      = 5 * time.Minute
 	lsdTickDefault   = 20 * time.Second
 	lsdMaxPerMessage = 10
@@ -39,11 +43,14 @@ type lsdService struct {
 	d      *Daemon
 	port   int
 	cookie string
-	group  *net.UDPAddr
-	listen *net.UDPConn
-	send   *net.UDPConn
-	stop   chan struct{}
-	done   sync.WaitGroup
+
+	group4, group6   *net.UDPAddr
+	listen4, listen6 *net.UDPConn
+	send4, send6     *net.UDPConn
+	ipv6             bool
+
+	stop chan struct{}
+	done sync.WaitGroup
 
 	mu        sync.Mutex
 	announced map[string]time.Time
@@ -53,28 +60,46 @@ type lsdService struct {
 }
 
 func newLSD(d *Daemon, port int) (*lsdService, error) {
-	group, err := net.ResolveUDPAddr("udp4", lsdGroup)
+	group4, err := net.ResolveUDPAddr("udp4", lsdGroup)
 	if err != nil {
 		return nil, err
 	}
-	listen, err := net.ListenMulticastUDP("udp4", nil, group)
+	listen4, err := net.ListenMulticastUDP("udp4", nil, group4)
 	if err != nil {
 		return nil, fmt.Errorf("join %s: %w", lsdGroup, err)
 	}
-	send, err := net.ListenUDP("udp4", &net.UDPAddr{})
+	send4, err := net.ListenUDP("udp4", &net.UDPAddr{})
 	if err != nil {
-		listen.Close()
+		listen4.Close()
 		return nil, err
 	}
 	cookie := make([]byte, 8)
 	_, _ = rand.Read(cookie)
 	s := &lsdService{
-		d: d, port: port, cookie: hex.EncodeToString(cookie), group: group,
-		listen: listen, send: send, stop: make(chan struct{}), announced: map[string]time.Time{},
+		d: d, port: port, cookie: hex.EncodeToString(cookie),
+		group4: group4, listen4: listen4, send4: send4,
+		stop: make(chan struct{}), announced: map[string]time.Time{},
 	}
+
+	// IPv6 LSD (BEP 14, group ff15::efc0:988f) is best-effort: a host without
+	// IPv6 multicast keeps working over IPv4 only, so a failure is not fatal.
+	if group6, err := net.ResolveUDPAddr("udp6", lsdGroup6); err == nil {
+		if listen6, err := net.ListenMulticastUDP("udp6", nil, group6); err == nil {
+			if send6, err := net.ListenUDP("udp6", &net.UDPAddr{}); err == nil {
+				s.group6, s.listen6, s.send6, s.ipv6 = group6, listen6, send6, true
+			} else {
+				listen6.Close()
+			}
+		}
+	}
+
 	s.done.Add(2)
-	go s.receiveLoop()
+	go s.receiveLoop(listen4)
 	go s.announceLoop()
+	if s.ipv6 {
+		s.done.Add(1)
+		go s.receiveLoop(s.listen6)
+	}
 	return s, nil
 }
 
@@ -83,15 +108,21 @@ func (s *lsdService) close() {
 		return
 	}
 	close(s.stop)
-	s.listen.Close()
-	s.send.Close()
+	s.listen4.Close()
+	s.send4.Close()
+	if s.listen6 != nil {
+		s.listen6.Close()
+	}
+	if s.send6 != nil {
+		s.send6.Close()
+	}
 	s.done.Wait()
 }
 
-func (s *lsdService) message(hashes []string) []byte {
+func (s *lsdService) message(host string, hashes []string) []byte {
 	var b bytes.Buffer
 	b.WriteString("BT-SEARCH * HTTP/1.1\r\n")
-	b.WriteString("Host: " + lsdGroup + "\r\n")
+	b.WriteString("Host: " + host + "\r\n")
 	b.WriteString("Port: " + strconv.Itoa(s.port) + "\r\n")
 	for _, hash := range hashes {
 		b.WriteString("Infohash: " + hash + "\r\n")
@@ -142,8 +173,13 @@ func (s *lsdService) announceLoop() {
 		due := s.dueHashes(time.Now())
 		for start := 0; start < len(due); start += lsdMaxPerMessage {
 			batch := due[start:min(start+lsdMaxPerMessage, len(due))]
-			if _, err := s.send.WriteToUDP(s.message(batch), s.group); err != nil {
+			if _, err := s.send4.WriteToUDP(s.message(lsdGroup, batch), s.group4); err != nil {
 				s.lastErr.Store(err.Error())
+			}
+			if s.send6 != nil {
+				if _, err := s.send6.WriteToUDP(s.message(lsdGroup6, batch), s.group6); err != nil {
+					s.lastErr.Store(err.Error())
+				}
 			}
 		}
 		select {
@@ -175,11 +211,12 @@ func parseLSD(data []byte) (port int, hashes []string, cookie string, ok bool) {
 	return port, hashes, strings.TrimSpace(req.Header.Get("Cookie")), len(hashes) > 0
 }
 
-func (s *lsdService) receiveLoop() {
+func (s *lsdService) receiveLoop(conn *net.UDPConn) {
 	defer s.done.Done()
+	// A larger buffer holds an IPv6 address comfortably.
 	buf := make([]byte, 1500)
 	for {
-		n, from, err := s.listen.ReadFromUDP(buf)
+		n, from, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			select {
 			case <-s.stop:
@@ -210,6 +247,7 @@ func (s *lsdService) receiveLoop() {
 
 type lsdStatus struct {
 	Enabled    bool   `json:"enabled"`
+	IPv6       bool   `json:"ipv6"`
 	PeersFound int64  `json:"peers_found"`
 	Error      string `json:"error,omitempty"`
 }
@@ -218,7 +256,7 @@ func (s *lsdService) status() lsdStatus {
 	if s == nil {
 		return lsdStatus{}
 	}
-	out := lsdStatus{Enabled: true, PeersFound: s.peersFound.Load()}
+	out := lsdStatus{Enabled: true, IPv6: s.ipv6, PeersFound: s.peersFound.Load()}
 	if err, ok := s.lastErr.Load().(string); ok {
 		out.Error = err
 	}

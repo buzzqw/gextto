@@ -141,6 +141,7 @@ func (s *Session) addTorrentStopped(r io.Reader, opt *AddTorrentOptions) (*Torre
 		return nil, err
 	}
 	t2 := s.insertTorrent(t)
+	t2.torrent.emit(EventTorrentAdded, nil)
 	return t2, nil
 }
 

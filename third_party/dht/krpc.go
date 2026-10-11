@@ -54,6 +54,8 @@ type queryType struct {
 	Type    string
 	ih      InfoHash
 	srcNode string
+	// scrape marks a BEP 33 get_peers that asked for the bloom filters.
+	scrape bool
 }
 
 const (
@@ -142,6 +144,11 @@ type getPeersResponse struct {
 	Nodes  string   `bencode:"nodes"`
 	Nodes6 string   `bencode:"nodes6"`
 	Token  string   `bencode:"token"`
+	// IP is our external IP:port as seen by the responder (BEP 42, "ip" field).
+	IP string `bencode:"ip"`
+	// BFpe and BFsd are the BEP 33 scrape bloom filters (256 bytes each).
+	BFpe string `bencode:"BFpe"`
+	BFsd string `bencode:"BFsd"`
 }
 
 type answerType struct {
@@ -150,6 +157,10 @@ type answerType struct {
 	InfoHash InfoHash `bencode:"info_hash"` // should probably be a string.
 	Port     int      `bencode:"port"`
 	Token    string   `bencode:"token"`
+	// BEP 33: whether the announcer is seeding, and the get_peers scrape flags.
+	Seed   int `bencode:"seed"`
+	Scrape int `bencode:"scrape"`
+	NoSeed int `bencode:"noseed"`
 }
 
 // Generic stuff we read from the wire, not knowing what it is. This is as generic as can be.
@@ -160,6 +171,8 @@ type responseType struct {
 	R getPeersResponse `bencode:"r"`
 	E []string         `bencode:"e"`
 	A answerType       `bencode:"a"`
+	// Ro is the BEP 43 read-only flag on an incoming query (top-level "ro": 1).
+	Ro int `bencode:"ro"`
 	// Unsupported mainline extension for client identification.
 	// V string(?)	"v"
 }
@@ -210,6 +223,8 @@ type queryMessage struct {
 	Y string                 `bencode:"y"`
 	Q string                 `bencode:"q"`
 	A map[string]interface{} `bencode:"a"`
+	// Ro is the BEP 43 read-only flag: 1 in a read-only node's queries.
+	Ro int `bencode:"ro,omitempty"`
 }
 
 type replyMessage struct {

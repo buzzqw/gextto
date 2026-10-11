@@ -171,6 +171,7 @@ func main() {
 	lang := flag.String("lang", envOr("GX_TORRENT_LANG", ""), "web page language (it, en, de, fr, es, pl; empty = English)")
 	ipFilterTrackers := flag.Bool("ipfilter-trackers", envBool("GX_TORRENT_IPFILTER_TRACKERS", true), "apply the IP filter to trackers too")
 	dhtBootstrap := flag.String("dht-bootstrap", envOr("GX_TORRENT_DHT_BOOTSTRAP", ""), "comma-separated DHT router addresses (empty = built-in bootstrap nodes)")
+	dhtReadOnly := flag.Bool("dht-read-only", envBool("GX_TORRENT_DHT_READ_ONLY", false), "read-only DHT (BEP 43): do not answer queries and ask not to be added to routing tables")
 	insecure := flag.Bool("insecure", false, "allow a non-loopback listen address without a token")
 	debug := flag.Bool("debug", os.Getenv("GX_TORRENT_DEBUG") == "1", "verbose engine logging")
 	logFile := flag.String("log-file", envOr("GX_TORRENT_LOG_FILE", ""), "write the log to this file, rotated at 5 MB keeping 4 files (default stderr)")
@@ -285,6 +286,7 @@ func main() {
 			IPFilter:          *ipFilter,
 			IPFilterTrackers:  *ipFilterTrackers,
 			DHTBootstrap:      parseBootstrapNodes(*dhtBootstrap),
+			DHTReadOnly:       *dhtReadOnly,
 		},
 		Debug:          *debug,
 		Mode:           modeValue,

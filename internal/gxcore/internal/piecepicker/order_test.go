@@ -89,3 +89,33 @@ func TestStreamWindowPicksThosePiecesFirst(t *testing.T) {
 		}
 	}
 }
+
+// The stream window is graded above the readahead window: the piece the player
+// is reading now comes before the prefetch, whatever the piece index.
+func TestReadaheadWindowAfterStreamWindow(t *testing.T) {
+	pieces := []piece.Piece{
+		{Index: 0, Length: testPieceLength}, {Index: 1, Length: testPieceLength},
+		{Index: 2, Length: testPieceLength}, {Index: 3, Length: testPieceLength},
+	}
+	pe := testPeer(len(pieces))
+	pp := New(pieces, 2, nil, false, false)
+	for i := range pieces {
+		pp.HandleHave(pe, uint32(i))
+	}
+	// Deliberately out of order: the stream window (2) must win over the
+	// readahead window (0).
+	pp.SetStreamWindow(2, 3)
+	pp.SetReadaheadWindow(0, 1)
+
+	if got, _ := pp.PickFor(pe); got == nil || got.Index != 2 {
+		t.Fatalf("first pick = %v, want the stream piece 2", got)
+	}
+	if got, _ := pp.PickFor(pe); got == nil || got.Index != 0 {
+		t.Fatalf("second pick = %v, want the readahead piece 0", got)
+	}
+	// Clearing the readahead window removes the preference.
+	pp.SetReadaheadWindow(0, 0)
+	if pp.readaheadBegin != 0 || pp.readaheadEnd != 0 {
+		t.Fatalf("readahead window not cleared: [%d,%d)", pp.readaheadBegin, pp.readaheadEnd)
+	}
+}

@@ -32,7 +32,7 @@ type Transport struct {
 	dnsTimeout time.Duration
 
 	// Transport.Do will send messages to this channel.
-	requestC chan *transportRequest
+	requestC chan udpRequest
 
 	// read loop will send data read from UDP connection and send them to this channel.
 	readC chan []byte
@@ -50,7 +50,7 @@ func NewTransport(bl *blocklist.Blocklist, dnsTimeout time.Duration) *Transport 
 		blocklist:  bl,
 		log:        logger.New("udp tracker transport"),
 		dnsTimeout: dnsTimeout,
-		requestC:   make(chan *transportRequest),
+		requestC:   make(chan udpRequest),
 		readC:      make(chan []byte),
 		closeC:     make(chan struct{}),
 		doneC:      make(chan struct{}),
@@ -64,22 +64,22 @@ func (t *Transport) Close() {
 }
 
 // Do sends the transaction to the tracker. Retries on failure.
-func (t *Transport) Do(req *transportRequest) ([]byte, error) {
+func (t *Transport) Do(req udpRequest) ([]byte, error) {
 	var errTransportClosed = errors.New("udp transport closed")
 
 	select {
 	case t.requestC <- req:
-	case <-req.ctx.Done():
-		return nil, req.ctx.Err()
+	case <-req.GetContext().Done():
+		return nil, req.GetContext().Err()
 	case <-t.closeC:
 		return nil, errTransportClosed
 	}
 
 	select {
-	case <-req.done:
-		return req.response, req.err
-	case <-req.ctx.Done():
-		return nil, req.ctx.Err()
+	case <-req.Done():
+		return req.GetResponse()
+	case <-req.GetContext().Done():
+		return nil, req.GetContext().Err()
 	case <-t.closeC:
 		return nil, errTransportClosed
 	}
@@ -128,19 +128,19 @@ func (t *Transport) Run() {
 				req.SetResponse(nil, listenErr)
 				break
 			}
-			conn, ok := connections[req.dest]
+			conn, ok := connections[req.GetDest()]
 			if !ok {
 				conn = newConnection(req)
-				connections[req.dest] = conn
+				connections[req.GetDest()] = conn
 				trx, err := beginTransaction(conn)
 				if err != nil {
 					conn.SetResponse(nil, err)
 				} else {
-					go resolveDestinationAndConnect(trx, req.dest, udpConn, t.dnsTimeout, t.blocklist, connectDone, t.closeC)
+					go resolveDestinationAndConnect(trx, req.GetDest(), udpConn, t.dnsTimeout, t.blocklist, connectDone, t.closeC)
 				}
 			} else {
 				if !conn.connectedAt.IsZero() {
-					req.ConnectionID = conn.id
+					req.SetConnectionID(conn.id)
 					trx, err := beginTransaction(req)
 					if err != nil {
 						req.SetResponse(nil, err)
@@ -188,7 +188,7 @@ func (t *Transport) Run() {
 
 			// Start announce transaction for all waiting requests.
 			for _, req := range conn.requests {
-				req.ConnectionID = conn.id
+				req.SetConnectionID(conn.id)
 				trx, err := beginTransaction(req)
 				if err != nil {
 					req.SetResponse(nil, err)

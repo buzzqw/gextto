@@ -216,6 +216,37 @@ func (d *Database) AcquisitionProblemsSince(since time.Time, limit int) ([]Acqui
 		ORDER BY e.id DESC LIMIT ?2`, since.Format(acquisitionTimeLayout), limit)
 }
 
+// DailyCount is one day of a daily metric.
+type DailyCount struct {
+	Day   string `json:"day"`
+	Count int    `json:"count"`
+}
+
+// FailedImportsDaily counts failed library imports per day over the last `days`
+// days, newest first. An import failure is an ERROR acquisition event with the
+// completion-handling failure message or the integrity-validation refusal (both
+// logged with the torrent hash at the import choke point).
+func (d *Database) FailedImportsDaily(days int) ([]DailyCount, error) {
+	since := time.Now().UTC().AddDate(0, 0, -clampInt(days, 1, 90)).Format(acquisitionTimeLayout)
+	rows, err := d.db.Query(`SELECT substr(at,1,10), COUNT(*) FROM acquisition_events
+		WHERE at >= ?1 AND level='ERROR'
+		AND (message LIKE '%completion handling failed%' OR message LIKE '%not archiving%')
+		GROUP BY 1 ORDER BY 1 DESC`, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]DailyCount, 0)
+	for rows.Next() {
+		var c DailyCount
+		if err := rows.Scan(&c.Day, &c.Count); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
 func (d *Database) queryAcquisitionEvents(clause string, args ...any) ([]AcquisitionEvent, error) {
 	return d.scanAcquisitionEvents(`SELECT id, hash, first_at, at, repeat, level, message, fields, kind, title, series_name, season, episode
 		FROM acquisition_events `+clause, args...)

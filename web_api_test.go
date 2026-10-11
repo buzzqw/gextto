@@ -35,6 +35,7 @@ import (
 // with `cfg.DryRun == true`) and keeps the state usable, so we use it here.
 func newTestAppState(t *testing.T) *AppState {
 	t.Helper()
+	resetV2ClientI18nMemo()
 	dir := t.TempDir()
 
 	db, err := OpenDatabase(filepath.Join(dir, "gextto.db"))

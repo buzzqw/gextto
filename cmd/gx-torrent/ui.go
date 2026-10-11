@@ -19,11 +19,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -608,6 +610,122 @@ func (d *Daemon) handleUIAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	req, err := uiBuildAddRequest(r)
 	d.uiFinishAdd(w, r, req, err)
+}
+
+// handleUIDhtScrape returns the BEP 33 DHT swarm estimate (seeders, peers) for
+// one torrent, for the page's "DHT swarm" button.
+func (d *Daemon) handleUIDhtScrape(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	d.mu.Lock()
+	t, _ := d.findLocked(strings.TrimSpace(r.URL.Query().Get("hash")))
+	d.mu.Unlock()
+	if t == nil {
+		http.Error(w, "torrent not found", http.StatusNotFound)
+		return
+	}
+	seeders, peers, err := t.DHTScrape(6 * time.Second)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"seeders": seeders, "peers": peers})
+}
+
+// handleUICreateTorrent builds a .torrent from a folder or file on the server
+// and returns it as a download: the standalone convenience mirror of mktorrent.
+// The path is typed by the operator (the page is authenticated).
+func (d *Daemon) handleUICreateTorrent(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	_ = r.ParseForm()
+	path := strings.TrimSpace(r.FormValue("path"))
+	name := strings.TrimSpace(r.FormValue("name"))
+	var trackers []string
+	for _, line := range strings.Split(r.FormValue("trackers"), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			trackers = append(trackers, line)
+		}
+	}
+	data, err := torrent.CreateTorrent(path, torrent.CreateOptions{Name: name, Trackers: trackers})
+	if err != nil {
+		d.uiDone(w, r, "", err)
+		return
+	}
+	if name == "" {
+		name = path
+	}
+	name = safeFilename(name)
+	w.Header().Set("Content-Type", "application/x-bittorrent")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.torrent"`)
+	_, _ = w.Write(data)
+}
+
+// safeFilename turns a path (or a suggested name) into a bare file name free of
+// separators and characters that would break the Content-Disposition header.
+func safeFilename(name string) string {
+	name = filepath.Base(name)
+	name = strings.Map(func(r rune) rune {
+		if r < 32 || r == '"' || r == '\\' || r == '/' || r == ':' {
+			return '_'
+		}
+		return r
+	}, name)
+	if name == "" || name == "." || name == ".." {
+		return "torrent"
+	}
+	return name
+}
+
+// handleUIEvents streams session events (torrent added/completed/stopped/error)
+// as Server-Sent Events, so a client can react instead of polling. The
+// subscription is cancelled when the client disconnects.
+func (d *Daemon) handleUIEvents(w http.ResponseWriter, r *http.Request) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	session := d.session
+	if session == nil {
+		http.Error(w, "session not ready", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ch, cancel := session.Subscribe()
+	defer cancel()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(ev)
+			if err != nil {
+				continue
+			}
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
 }
 
 // fetchRemoteTorrent downloads a .torrent from an http(s) URL, bounded in size

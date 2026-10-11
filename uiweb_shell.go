@@ -83,6 +83,39 @@ type uiShellChrome struct {
 	ActiveDownloads string
 }
 
+// dataDirWritableTTL is how long the data-dir writability result is reused. The
+// chrome is rendered on every page, every partial and every SSE tick (5 s per
+// open tab); the datadir does not change from one second to the next, and the
+// probe does a create+fsync+delete that is expensive on a network datadir.
+// It is a var so tests can disable the cache.
+var dataDirWritableTTL = 30 * time.Second
+
+type dataDirWritableEntry struct {
+	ok bool
+	at time.Time
+}
+
+var dataDirWritableCache sync.Map // string -> dataDirWritableEntry
+
+// dataDirWritable reports whether the data directory exists and is writable,
+// reusing the result for dataDirWritableTTL.
+func dataDirWritable(path string) bool {
+	if path == "" {
+		return false
+	}
+	if v, ok := dataDirWritableCache.Load(path); ok {
+		if e, ok := v.(dataDirWritableEntry); ok && time.Since(e.at) < dataDirWritableTTL {
+			return e.ok
+		}
+	}
+	ok := false
+	if info, err := os.Stat(path); err == nil && info.IsDir() && write_probe(path) {
+		ok = true
+	}
+	dataDirWritableCache.Store(path, dataDirWritableEntry{ok: ok, at: time.Now()})
+	return ok
+}
+
 func uiShellChromeFrom(s *AppState) uiShellChrome {
 	cfg := latestConfig(s)
 	chrome := uiShellChrome{
@@ -106,7 +139,7 @@ func uiShellChromeFrom(s *AppState) uiShellChrome {
 	metrics := ProcessMetrics()
 	rawStatus := "degraded"
 	if dataDir := uiHealthPathsFrom(s).DataDir; dataDir != "" {
-		if info, err := os.Stat(dataDir); err == nil && info.IsDir() && write_probe(dataDir) {
+		if dataDirWritable(dataDir) {
 			rawStatus = "ok"
 		}
 	}

@@ -11,6 +11,22 @@ type peerContactsSet struct {
 	set map[string]bool
 	// Needed to ensure different peers are returned each time.
 	ring *ring.Ring
+	// BEP 33: the unique IPs (raw, without the 2-byte port) announced for the
+	// infohash, with the seed status (true = seed). Used to build the scrape
+	// bloom filters and to honor "noseed".
+	ips map[string]bool
+}
+
+// markIP records the seed status of a contact's IP (BEP 33). The status is the
+// latest announced: a seed that stops seeding becomes a peer again.
+func (p *peerContactsSet) markIP(peerContact string, seed bool) {
+	if len(peerContact) < 6 {
+		return
+	}
+	if p.ips == nil {
+		p.ips = make(map[string]bool)
+	}
+	p.ips[peerContact[:len(peerContact)-2]] = seed
 }
 
 // next returns up to 8 peer contacts, if available. Further calls will return a
@@ -169,24 +185,60 @@ func (h *peerStore) alive(ih InfoHash) int {
 	return peers.Alive()
 }
 
-// peerContacts returns a random set of 8 peers for the ih InfoHash.
-func (h *peerStore) peerContacts(ih InfoHash) []string {
+// peerContacts returns a random set of 8 peers for the ih InfoHash. With noseed,
+// seeders are excluded (BEP 33).
+func (h *peerStore) peerContacts(ih InfoHash, noseed bool) []string {
 	peers := h.get(ih)
 	if peers == nil {
 		return nil
 	}
-	return peers.next()
+	list := peers.next()
+	if !noseed || len(peers.ips) == 0 {
+		return list
+	}
+	kept := list[:0]
+	for _, c := range list {
+		if len(c) < 6 {
+			continue
+		}
+		if seed := peers.ips[c[:len(c)-2]]; seed {
+			continue
+		}
+		kept = append(kept, c)
+	}
+	return kept
 }
 
-// addContact as a peer for the provided ih. Returns true if the contact was
-// added, false otherwise (e.g: already present, or invalid).
-func (h *peerStore) addContact(ih InfoHash, peerContact string) bool {
+// scrapeFilters builds the BEP 33 bloom filters for ih: the peers (non-seed) and
+// the seeds. Either is non-nil only when there is something to report.
+func (h *peerStore) scrapeFilters(ih InfoHash) (peersBloom, seedsBloom *scrapeBloom) {
+	peers := h.get(ih)
+	if peers == nil || len(peers.ips) == 0 {
+		return nil, nil
+	}
+	peersBloom = new(scrapeBloom)
+	seedsBloom = new(scrapeBloom)
+	for ip, seed := range peers.ips {
+		if seed {
+			seedsBloom.insert([]byte(ip))
+		} else {
+			peersBloom.insert([]byte(ip))
+		}
+	}
+	return peersBloom, seedsBloom
+}
+
+// addContact adds a peer for the provided ih, with its seed status (BEP 33).
+// Returns true if the contact was added, false otherwise (e.g: already present,
+// or invalid).
+func (h *peerStore) addContact(ih InfoHash, peerContact string, seed bool) bool {
 	var peers *peerContactsSet
 	p, ok := h.infoHashPeers.Get(string(ih))
 	if ok {
 		var okType bool
 		peers, okType = p.(*peerContactsSet)
 		if okType && peers != nil {
+			peers.markIP(peerContact, seed)
 			if peers.Size() >= h.maxInfoHashPeers {
 				if _, ok := peers.set[peerContact]; ok {
 					return false
@@ -201,6 +253,7 @@ func (h *peerStore) addContact(ih InfoHash, peerContact string) bool {
 		// Bogus peer contacts, reset them.
 	}
 	peers = &peerContactsSet{set: make(map[string]bool)}
+	peers.markIP(peerContact, seed)
 	h.infoHashPeers.Add(string(ih), peers)
 	return peers.put(peerContact)
 }

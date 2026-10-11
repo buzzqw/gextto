@@ -36,3 +36,20 @@ func newTransportRequest(ctx context.Context, req tracker.AnnounceRequest, dest 
 		},
 	}
 }
+
+// transportScrapeRequest carries one info hash to a UDP tracker (BEP 15, action 2).
+type transportScrapeRequest struct {
+	*requestBase
+	*scrapeRequest
+}
+
+var _ udpRequest = (*transportScrapeRequest)(nil)
+
+func newTransportScrapeRequest(ctx context.Context, infoHash [20]byte, dest string) *transportScrapeRequest {
+	request := &scrapeRequest{InfoHash: infoHash}
+	request.Action = actionScrape
+	return &transportScrapeRequest{
+		requestBase:   newRequestBase(ctx, dest),
+		scrapeRequest: request,
+	}
+}

@@ -4955,3 +4955,14 @@ pol:
   "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.": "Wpisz tytuł i wyszukaj w TMDB albo użyj „Dodaj ręcznie”, aby uzupełnić wymagania."
   "Il contenuto di /dev/shm non sopravvive al riavvio della macchina.": "Zawartość /dev/shm nie przetrwa ponownego uruchomienia komputera."
   "Il contenuto di /dev/shm e degli altri tmpfs non sopravvive al riavvio della macchina.": "Zawartość /dev/shm i pozostałych tmpfs nie przetrwa ponownego uruchomienia komputera."
+
+  # Observability: delay-profile queue and failed imports (Salute panel)
+  "Coda titoli": "Kolejka tytułów"
+  "Titoli in attesa nella coda": "Tytuły oczekujące w kolejce"
+  "Attesa": "Oczekiwanie"
+  "Dovuto": "Termin"
+  "Nessun titolo in attesa.": "Brak oczekujących tytułów."
+  "Import falliti": "Nieudane importy"
+  "Import falliti per giorno": "Nieudane importy dziennie"
+  "Giorno": "Dzień"
+  "Nessun import fallito negli ultimi 7 giorni.": "Brak nieudanych importów w ciągu ostatnich 7 dni."

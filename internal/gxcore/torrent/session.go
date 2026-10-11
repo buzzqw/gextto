@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/buzzqw/gextto/internal/gxcore/internal/bandwidth"
@@ -68,6 +69,15 @@ type Session struct {
 	// time to live (libtorrent-style smart ban). Checked by every torrent.
 	mBannedIPs sync.Mutex
 	bannedIPs  map[string]time.Time
+
+	// storageErrors counts piece writes that failed at the storage layer
+	// (full disk, unwritable file, broken network mount) since start.
+	storageErrors atomic.Int64
+
+	// event subscribers (see events.go). The mutex guards the map only.
+	subMu   sync.Mutex
+	subs    map[int]chan Event
+	subNext int
 
 	// "stopped" event announcers of closed torrents, still running in the background.
 	detachedAnnouncers sync.WaitGroup
@@ -211,6 +221,10 @@ func NewSession(cfg Config) (*Session, error) {
 		dhtConfig.DHTRouters = strings.Join(cfg.DHTBootstrapNodes, ",")
 		dhtConfig.SaveRoutingTable = false
 		dhtConfig.NumTargetPeers = 0
+		// BEP 42: make the node ID secure for our external IP when we know it.
+		dhtConfig.PublicIP = publicIPForConfig(cfg)
+		// BEP 43: read-only mode.
+		dhtConfig.ReadOnly = cfg.DHTReadOnly
 		dhtNode, err = dht.New(dhtConfig)
 		if err != nil {
 			return nil, err

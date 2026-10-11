@@ -5008,3 +5008,14 @@ fra:
   "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.": "Saisissez le titre et recherchez sur TMDB, ou utilisez « Ajouter manuellement » pour renseigner les critères."
   "Il contenuto di /dev/shm non sopravvive al riavvio della macchina.": "Le contenu de /dev/shm ne survit pas au redémarrage de la machine."
   "Il contenuto di /dev/shm e degli altri tmpfs non sopravvive al riavvio della macchina.": "Le contenu de /dev/shm et des autres tmpfs ne survit pas au redémarrage de la machine."
+
+  # Observability: delay-profile queue and failed imports (Salute panel)
+  "Coda titoli": "File de titres"
+  "Titoli in attesa nella coda": "Titres en attente dans la file"
+  "Attesa": "Attente"
+  "Dovuto": "Prévu"
+  "Nessun titolo in attesa.": "Aucun titre en attente."
+  "Import falliti": "Imports échoués"
+  "Import falliti per giorno": "Imports échoués par jour"
+  "Giorno": "Jour"
+  "Nessun import fallito negli ultimi 7 giorni.": "Aucun import échoué ces 7 derniers jours."

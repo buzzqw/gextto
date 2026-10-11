@@ -82,3 +82,40 @@ func (t *UDPTracker) parseAnnounceResponse(data []byte) (*udpAnnounceResponse, [
 	}
 	return &response, peers, nil
 }
+
+// Scrape asks the UDP tracker for swarm statistics (BEP 15, action 2).
+func (t *UDPTracker) Scrape(ctx context.Context, req tracker.ScrapeRequest) (*tracker.ScrapeResponse, error) {
+	scrape := newTransportScrapeRequest(ctx, req.Torrent.InfoHash, t.dest)
+
+	reply, err := t.transport.Do(scrape)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := t.parseScrapeResponse(reply)
+	if err != nil {
+		return nil, tracker.ErrDecode
+	}
+	t.log.Debugf("Scrape response: %#v", response)
+	return response, nil
+}
+
+func (t *UDPTracker) parseScrapeResponse(data []byte) (*tracker.ScrapeResponse, error) {
+	var header udpMessageHeader
+	if err := binary.Read(bytes.NewReader(data), binary.BigEndian, &header); err != nil {
+		return nil, err
+	}
+	if header.Action != actionScrape {
+		return nil, errors.New("invalid action")
+	}
+	var response udpScrapeResponse
+	err := binary.Read(bytes.NewReader(data[binary.Size(header):]), binary.BigEndian, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &tracker.ScrapeResponse{
+		Seeders:    response.Seeders,
+		Leechers:   response.Leechers,
+		Downloaded: response.Completed,
+	}, nil
+}

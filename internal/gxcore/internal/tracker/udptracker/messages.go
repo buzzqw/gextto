@@ -15,6 +15,10 @@ type udpMessageHeader struct {
 
 func (h *udpMessageHeader) SetTransactionID(id int32) { h.TransactionID = id }
 
+// SetConnectionID sets the connection id on requests that carry one (announce
+// and scrape). The Transport fills it after the connect transaction succeeds.
+func (h *udpRequestHeader) SetConnectionID(id int64) { h.ConnectionID = id }
+
 type udpRequestHeader struct {
 	ConnectionID int64
 	udpMessageHeader
@@ -88,4 +92,16 @@ func (r *transferAnnounceRequest) WriteTo(w io.Writer) (int64, error) {
 	}
 
 	return buf.WriteTo(w)
+}
+
+// scrapeRequest asks a UDP tracker (BEP 15) for the swarm statistics of one
+// info hash. Multiple hashes per packet are allowed by the protocol; the
+// gx-core client scrapes one torrent at a time.
+type scrapeRequest struct {
+	udpRequestHeader
+	InfoHash [20]byte
+}
+
+func (r *scrapeRequest) WriteTo(w io.Writer) (int64, error) {
+	return 0, binary.Write(w, binary.BigEndian, r)
 }

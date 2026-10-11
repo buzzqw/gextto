@@ -5015,3 +5015,14 @@ deu:
   "Scrivi il titolo e cerca su TMDB, oppure usa \"Aggiungi manualmente\" per compilare i requisiti.": "Gib den Titel ein und suche auf TMDB, oder verwende „Manuell hinzufügen“, um die Anforderungen auszufüllen."
   "Il contenuto di /dev/shm non sopravvive al riavvio della macchina.": "Der Inhalt von /dev/shm übersteht keinen Neustart des Rechners."
   "Il contenuto di /dev/shm e degli altri tmpfs non sopravvive al riavvio della macchina.": "Der Inhalt von /dev/shm und der anderen tmpfs übersteht keinen Neustart des Rechners."
+
+  # Observability: delay-profile queue and failed imports (Salute panel)
+  "Coda titoli": "Titel-Warteschlange"
+  "Titoli in attesa nella coda": "Wartende Titel in der Warteschlange"
+  "Attesa": "Wartezeit"
+  "Dovuto": "Fällig"
+  "Nessun titolo in attesa.": "Kein Titel wartet."
+  "Import falliti": "Fehlgeschlagene Importe"
+  "Import falliti per giorno": "Fehlgeschlagene Importe pro Tag"
+  "Giorno": "Tag"
+  "Nessun import fallito negli ultimi 7 giorni.": "Keine fehlgeschlagenen Importe in den letzten 7 Tagen."

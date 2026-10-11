@@ -1015,6 +1015,48 @@
 {{/* Salute                                                              */}}
 {{/* ------------------------------------------------------------------ */}}
 
+{{define "v2_health_queue"}}
+<div id="v2-health-queue" hx-get="/partial/health/queue" hx-trigger="every 60s" hx-swap="outerHTML">
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-head"><h3>Coda titoli</h3></div>
+      <div class="panel-body">
+        {{if .Queued}}
+        <div class="table-wrap"><table class="data-table">
+          <caption class="sr-only">Titoli in attesa nella coda</caption>
+          <thead><tr><th scope="col">Titolo</th><th scope="col">Attesa</th><th scope="col">Dovuto</th></tr></thead>
+          <tbody>{{range .Queued}}<tr>
+            <td>{{.Title}} <small class="muted">{{.Label}}</small></td>
+            <td class="nowrap">{{.Waiting}}</td>
+            <td class="nowrap">{{.Due}}</td>
+          </tr>{{end}}</tbody>
+        </table></div>
+        {{else}}
+        <p class="muted">Nessun titolo in attesa.</p>
+        {{end}}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Import falliti</h3></div>
+      <div class="panel-body">
+        {{if .FailedImports}}
+        <div class="table-wrap"><table class="data-table">
+          <caption class="sr-only">Import falliti per giorno</caption>
+          <thead><tr><th scope="col">Giorno</th><th scope="col">Errori</th></tr></thead>
+          <tbody>{{range .FailedImports}}<tr>
+            <td class="nowrap">{{.Day}}</td>
+            <td class="numeric">{{.Count}}</td>
+          </tr>{{end}}</tbody>
+        </table></div>
+        {{else}}
+        <p class="muted">Nessun import fallito negli ultimi 7 giorni.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{define "v2_health"}}
 <div class="view">
   <div class="grid-4">
@@ -1063,6 +1105,7 @@
       {{end}}
     </div>
   </div>
+  {{template "v2_health_queue" .}}
   {{if .Health.LastErrors}}
   <div class="panel"><div class="panel-head"><h3>Ultimi errori</h3></div><div class="panel-body">{{range .Health.LastErrors}}<div class="row"><span class="hl-err">{{.}}</span></div>{{end}}</div></div>
   {{end}}
