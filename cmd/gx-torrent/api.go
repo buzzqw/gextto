@@ -71,6 +71,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("POST /ui/setup", d.handleUISetup)
 	root.HandleFunc("GET "+uiBrowsePath, d.handleUIBrowseDir)
 	root.HandleFunc("POST /ui/rss-indexer", d.handleUIRssIndexer)
+	root.HandleFunc("POST /ui/rss-indexer-test", d.handleUIRssIndexerTest)
 	root.HandleFunc("POST /ui/rss-feed", d.handleUIRssFeed)
 	root.HandleFunc("POST /ui/rss-rule", d.handleUIRssRule)
 	root.HandleFunc("GET /ui/torrent-file", d.handleUITorrentFile)

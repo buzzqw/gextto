@@ -489,7 +489,9 @@ separatori), così i risultati fuzzy degli indexer su parole comuni non entrano;
 per un **film** la regola è `once`: prende una release e si disattiva, invece di
 accodare tutte le versioni restituite.
 
-Sotto: elenchi con pulsanti per aggiungere e rimuovere **indexer** (tendina
+Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
+con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta
+Torznab `t=caps`, esito accanto alla riga) e rimuovere **indexer** (tendina
 Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS o query di ricerca,
 cartella, include/exclude, categoria, percorso, in pausa), l'**editor delle
 regole** (una regola per riga, con frecce per cambiarne l'ordine — la prima che

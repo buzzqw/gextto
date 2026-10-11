@@ -98,3 +98,35 @@ func TestSearchRejectsBadStatus(t *testing.T) {
 		t.Fatal("a non-2xx answer must be an error")
 	}
 }
+
+func TestIndexerPing(t *testing.T) {
+	caps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("t") != "caps" {
+			http.Error(w, "want t=caps", http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><caps><server version="1.0"/></caps>`))
+	}))
+	defer caps.Close()
+	if err := (Indexer{Name: "caps", URL: caps.URL}).Ping(context.Background()); err != nil {
+		t.Fatalf("a caps document must pass the ping: %v", err)
+	}
+
+	// A reachable but non-Torznab page (login HTML) must not pass.
+	htmlPage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body>login</body></html>`))
+	}))
+	defer htmlPage.Close()
+	if err := (Indexer{Name: "html", URL: htmlPage.URL}).Ping(context.Background()); err == nil {
+		t.Fatal("a page without a caps document must fail the ping")
+	}
+
+	// An HTTP error must fail.
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer down.Close()
+	if err := (Indexer{Name: "down", URL: down.URL}).Ping(context.Background()); err == nil {
+		t.Fatal("an HTTP 500 must fail the ping")
+	}
+}

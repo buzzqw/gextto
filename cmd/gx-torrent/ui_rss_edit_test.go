@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/buzzqw/gextto/internal/rss"
@@ -402,6 +403,90 @@ func renderUITemplate(t *testing.T, d *Daemon, standalone bool) string {
 		t.Fatalf("render status = %d", rec.Code)
 	}
 	return rec.Body.String()
+}
+
+// TestUIRssEditIndexerByIndex edits an existing indexer by its row index; a
+// rename must replace the entry in place and an empty API key must be kept.
+func TestUIRssEditIndexerByIndex(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	post := func(values url.Values) {
+		t.Helper()
+		resp, err := http.PostForm(srv.URL+"/ui/rss-indexer", values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	post(url.Values{"op": {"add"}, "name": {"a"}, "url": {"http://127.0.0.1:9001"}, "apikey": {"k1"}})
+	post(url.Values{"op": {"add"}, "name": {"b"}, "url": {"http://127.0.0.1:9002"}, "apikey": {"k2"}})
+
+	// Edit the second one by index: rename it and change the URL; the blank API
+	// key keeps the stored one.
+	post(url.Values{"op": {"add"}, "index": {"1"}, "name": {"bee"}, "url": {"http://127.0.0.1:9003"}, "apikey": {""}})
+	list := d.indexers()
+	if len(list) != 2 {
+		t.Fatalf("indexers = %v", list)
+	}
+	if list[0].Name != "a" {
+		t.Fatalf("the first indexer changed: %+v", list[0])
+	}
+	if list[1].Name != "bee" || list[1].URL != "http://127.0.0.1:9003" || list[1].APIKey != "k2" {
+		t.Fatalf("edit by index = %+v", list[1])
+	}
+}
+
+// TestUIRssIndexerTestEndpoint probes a configured indexer with a Torznab caps
+// request and reports success or failure.
+func TestUIRssIndexerTestEndpoint(t *testing.T) {
+	var capsHits int32
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&capsHits, 1)
+		if r.URL.Query().Get("t") != "caps" {
+			http.Error(w, "want t=caps", http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><caps><server version="1.0"/></caps>`))
+	}))
+	defer indexer.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+indexer.URL+`","apikey":"k"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.PostForm(srv.URL+"/ui/rss-indexer-test", url.Values{"index": {"0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), `"ok":true`) {
+		t.Fatalf("test result = %s", body)
+	}
+	if atomic.LoadInt32(&capsHits) == 0 {
+		t.Fatal("the indexer was not probed")
+	}
+
+	// A failing endpoint reports ok:false.
+	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer down.Close()
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"down","url":"`+down.URL+`","apikey":""}]`)
+	resp, err = http.PostForm(srv.URL+"/ui/rss-indexer-test", url.Values{"index": {"0"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(body), `"ok":false`) {
+		t.Fatalf("down indexer test = %s", body)
+	}
 }
 
 // TestFollowTitleRegex checks the regex a followed title generates: the title's

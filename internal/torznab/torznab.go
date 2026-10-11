@@ -5,6 +5,7 @@
 package torznab
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -96,6 +97,43 @@ func (idx Indexer) Search(ctx context.Context, query string) ([]Item, error) {
 		return nil, fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
 	}
 	return Parse(resp.Body, idx.Name)
+}
+
+// Ping checks that the indexer answers a Torznab `t=caps` request. It validates
+// reachability and the API key without depending on a query returning results.
+func (idx Indexer) Ping(ctx context.Context) error {
+	base := strings.TrimRight(strings.TrimSpace(idx.URL), "/")
+	if base == "" {
+		return fmt.Errorf("torznab: empty indexer URL")
+	}
+	endpoint, err := url.Parse(base + "/api")
+	if err != nil {
+		return fmt.Errorf("torznab: invalid indexer URL: %w", err)
+	}
+	params := endpoint.Query()
+	params.Set("t", "caps")
+	if key := strings.TrimSpace(idx.APIKey); key != "" {
+		params.Set("apikey", key)
+	}
+	endpoint.RawQuery = params.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("torznab: %s returned HTTP %d", idx.Name, resp.StatusCode)
+	}
+	if !bytes.Contains(body, []byte("<caps")) {
+		return fmt.Errorf("torznab: %s answered without a caps document (check URL and API key)", idx.Name)
+	}
+	return nil
 }
 
 // Parse reads a Torznab RSS body into items.

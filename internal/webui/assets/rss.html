@@ -22,7 +22,7 @@ button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-wei
 table{width:100%;border-collapse:collapse;margin-top:8px}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
 th{color:#93a1b5}
-.muted{color:#93a1b5}.err{color:#fca5a5}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
 .row label{margin:0;display:flex;flex-direction:column;gap:3px;font-size:13px}
 .row .chk{flex-direction:row;align-items:center}
@@ -72,14 +72,16 @@ summary{cursor:pointer;color:#93a1b5}
   <thead><tr><th>Name</th><th>URL</th><th>API key</th><th></th></tr></thead>
   <tbody>{{INDEXERROWS}}</tbody>
 </table>
-<form class="form-card" method="post" action="/ui/rss-indexer">
+<form class="form-card" id="indexer-form" method="post" action="/ui/rss-indexer">
   <input type="hidden" name="op" value="add">
+  <input type="hidden" name="index" id="indexer-index">
   <div class="row">
     <label>Type<select name="type" id="indexer-type">{{INDEXEROPTIONS}}</select></label>
-    <label>Name<input type="text" name="name" placeholder="prowlarr" autocomplete="off"></label>
+    <label>Name<input type="text" name="name" id="indexer-name" placeholder="prowlarr" autocomplete="off"></label>
     <label>URL<input type="text" name="url" id="indexer-url" placeholder="http://127.0.0.1:9696" autocomplete="off"></label>
-    <label>API key<input type="text" name="apikey" autocomplete="off"></label>
-    <button type="submit">Add indexer</button>
+    <label>API key<input type="text" name="apikey" id="indexer-apikey" autocomplete="off"></label>
+    <button type="submit" id="indexer-submit">Add indexer</button>
+    <button type="button" class="sm" id="indexer-cancel" style="display:none">Cancel</button>
   </div>
 </form>
 
@@ -182,6 +184,10 @@ var FEEDNAMES={{FEEDNAMES}};
 // Typeahead for the followed title: suggestions come from the configured
 // indexers, so the series name does not have to be typed exactly.
 (function(){var input=document.getElementById('follow-title');var list=document.getElementById('series-list');if(!input||!list){return;}var timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2){return;}timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},350);});})();
+// Indexer edit: fill the add form with the row's values and remember the index.
+(function(){var form=document.getElementById('indexer-form');if(!form){return;}var idx=document.getElementById('indexer-index');var nameEl=document.getElementById('indexer-name');var urlEl=document.getElementById('indexer-url');var keyEl=document.getElementById('indexer-apikey');var submit=document.getElementById('indexer-submit');var cancel=document.getElementById('indexer-cancel');function clear(){idx.value='';nameEl.value='';urlEl.value='';keyEl.value='';keyEl.placeholder='';submit.textContent=t('Add indexer');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-idx-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');nameEl.value=btn.getAttribute('data-name')||'';urlEl.value=btn.getAttribute('data-url')||'';keyEl.value='';keyEl.placeholder=t('leave blank to keep');submit.textContent=t('Save indexer');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
+// Indexer test: ask the daemon to probe the endpoint with a Torznab caps request.
+(function(){Array.prototype.forEach.call(document.querySelectorAll('[data-idx-test]'),function(btn){btn.addEventListener('click',function(){var i=btn.getAttribute('data-index');var span=document.querySelector('[data-idx-status="'+i+'"]');if(span){span.className='muted';span.textContent=t('Checking…');}var f=new URLSearchParams();f.set('index',i);fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(!span){return;}if(res.ok){span.className='ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){if(span){span.className='err';span.textContent=t('test failed:');}});});});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
 function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}

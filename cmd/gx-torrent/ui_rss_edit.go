@@ -137,16 +137,29 @@ func (d *Daemon) handleUIRssIndexer(w http.ResponseWriter, r *http.Request) {
 			URL:    strings.TrimRight(indexerURL, "/"),
 			APIKey: strings.TrimSpace(r.FormValue("apikey")),
 		}
-		replaced := false
-		for i := range list {
-			if strings.EqualFold(list[i].Name, indexer.Name) {
-				list[i] = indexer
-				replaced = true
-				break
+		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 {
+			// Editing an existing entry: replace it in place, so a rename works.
+			if index >= len(list) {
+				d.renderRSS(w, r, "The indexer to edit does not exist anymore.")
+				return
 			}
-		}
-		if !replaced {
-			list = append(list, indexer)
+			// A blank API key keeps the stored one (the page never shows it).
+			if strings.TrimSpace(r.FormValue("apikey")) == "" {
+				indexer.APIKey = list[index].APIKey
+			}
+			list[index] = indexer
+		} else {
+			replaced := false
+			for i := range list {
+				if strings.EqualFold(list[i].Name, indexer.Name) {
+					list[i] = indexer
+					replaced = true
+					break
+				}
+			}
+			if !replaced {
+				list = append(list, indexer)
+			}
 		}
 	}
 	if err := d.saveIndexers(list); err != nil {
@@ -155,6 +168,35 @@ func (d *Daemon) handleUIRssIndexer(w http.ResponseWriter, r *http.Request) {
 	}
 	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
+// handleUIRssIndexerTest checks one configured indexer with a Torznab `t=caps`
+// request and returns the outcome, so the page can offer a Test button.
+func (d *Daemon) handleUIRssIndexerTest(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	list := d.indexers()
+	index, err := parseFormIndex(r.FormValue("index"))
+	if err != nil || index < 0 || index >= len(list) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": false, "error": "indexer not found"})
+		return
+	}
+	idx := list[index]
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	start := time.Now()
+	err = idx.Ping(ctx)
+	out := map[string]any{"ok": err == nil, "name": idx.Name, "ms": time.Since(start).Milliseconds()}
+	if err != nil {
+		out["error"] = err.Error()
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // handleUIRssFeed adds or removes one RSS feed (or a Torznab search feed).
@@ -644,7 +686,11 @@ func (d *Daemon) uiIndexerRowsHTML() string {
 			keyState = "set"
 		}
 		b.WriteString("<td>" + keyState + "</td>")
-		b.WriteString(`<td><form method="post" action="/ui/rss-indexer"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
+		b.WriteString(`<td class="actions">`)
+		b.WriteString(`<button type="button" class="sm" data-idx-edit data-index="` + strconv.Itoa(index) + `" data-name="` + html.EscapeString(indexer.Name) + `" data-url="` + html.EscapeString(indexer.URL) + `">Edit</button> `)
+		b.WriteString(`<button type="button" class="sm" data-idx-test data-index="` + strconv.Itoa(index) + `">Test</button> `)
+		b.WriteString(`<span class="muted" data-idx-status="` + strconv.Itoa(index) + `"></span> `)
+		b.WriteString(`<form method="post" action="/ui/rss-indexer"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form></td></tr>`)
 	}
 	return b.String()
 }
