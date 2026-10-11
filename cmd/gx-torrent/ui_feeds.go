@@ -180,6 +180,8 @@ func (d *Daemon) renderRSS(w http.ResponseWriter, r *http.Request, errKey string
 	page = strings.Replace(page, "{{FEEDCOUNT}}", strconv.Itoa(len(d.feeds())), 1)
 	page = strings.Replace(page, "{{RULEROWS}}", d.uiRuleRowsHTML(), 1)
 	page = strings.Replace(page, "{{RULECOUNT}}", strconv.Itoa(len(d.rules())), 1)
+	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
+	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(d.wantedList())), 1)
 
 	names := make([]string, 0, 8)
 	for _, feed := range d.feeds() {

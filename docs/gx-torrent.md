@@ -482,17 +482,23 @@ Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
 La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
-indexer* nella barra di ogni pagina) è pensata per l'uso quotidiano: in cima c'è
-**Segui un titolo**, una sola casella dove si scrive il nome della serie o del
-film. Mentre si digita, `GET /ui/rss-suggest` interroga gli indexer e propone i
-**nomi trovati** (ridotti dai titoli delle release), così non serve scrivere il
-nome esatto né conoscere sintassi. *Segui* crea in un colpo solo il feed di
-ricerca Torznab e una regola a esso limitata (con lo smart episode per le serie);
-i filtri facoltativi (include/exclude, filtro episodi) stanno sotto *Filtri
-avanzati*. La regola generata **richiede il titolo** (come regex tollerante ai
-separatori), così i risultati fuzzy degli indexer su parole comuni non entrano;
-per un **film** la regola è `once`: prende una release e si disattiva, invece di
-accodare tutte le versioni restituite.
+indexer* nella barra di ogni pagina) è pensata per l'uso quotidiano. In cima c'è
+**Cercati**: i titoli che l'operatore vuole. Ogni titolo ha tipo (serie/film),
+stagioni (`1+`, `2-4`, `1`), lingua, qualità, esclusi, filtro episodi, categoria
+e percorso. Si aggiunge a mano, oppure si scrive un nome e si preme **Cerca nei
+feed**: vengono interrogati gli indexer e i feed RSS già configurati e la pagina
+propone i **nomi trovati** (filtrati per lingua/qualità già inserite), da
+scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separatori,
+quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
+**AND**.
+
+Il demone, a ogni ciclo, cerca ogni titolo negli indexer e nei feed RSS e prende
+gli episodi che compaiono; tiene un **registro** (nel file di stato) di cosa è
+apparso e cosa è stato scaricato, mostra i **mancanti** nella tabella e li
+**ricerca di nuovo** (gap search, con query `Titolo SxxEyy`) finché non li trova.
+Per un **film** prende una release e non ne cerca altre. La lista non crea feed o
+regole: è il motore a interrogare indexer e feed per il titolo, così la lingua e
+la qualità valgono in AND e i feed restano liberi per le regole avanzate.
 
 Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
 con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta

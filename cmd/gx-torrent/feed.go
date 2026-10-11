@@ -257,6 +257,9 @@ func (d *Daemon) pollFeeds() {
 				}
 			}
 		}
+		// Wanted titles: record what appeared and take the missing episodes (or
+		// the movie) from the same items, after the rules path.
+		d.applyWanted(time.Now(), name, items)
 		status.Added = added
 		if added > 0 {
 			logf("feed %s: added %d torrent(s)", name, added)
@@ -275,6 +278,12 @@ func (d *Daemon) pollFeeds() {
 		d.saveLocked()
 	}
 	d.mu.Unlock()
+
+	// Wanted titles: search the indexers and take the missing episodes/movies,
+	// plus the gap search for what appeared but was not downloaded.
+	gapCtx, cancelGap := context.WithTimeout(context.Background(), 5*time.Minute)
+	d.pollWanted(gapCtx)
+	cancelGap()
 }
 
 // filterFeedItem decides whether an item is added and with which action. When at

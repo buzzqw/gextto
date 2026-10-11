@@ -45,26 +45,38 @@ summary{cursor:pointer;color:#93a1b5}
 <main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
 
-<h2>Follow a title</h2>
-<form class="form-card lead" method="post" action="/ui/rss-follow">
+<h2>Wanted <span class="muted">({{WANTEDCOUNT}})</span></h2>
+<table>
+  <thead><tr><th>Title</th><th>Type</th><th>Seasons</th><th>Include</th><th>Missing</th><th>State</th><th></th></tr></thead>
+  <tbody>{{WANTEDROWS}}</tbody>
+</table>
+<form class="form-card lead" id="wanted-form" method="post" action="/ui/wanted">
+  <input type="hidden" name="op" value="add">
+  <input type="hidden" name="index" id="wanted-index">
   <div class="row">
-    <label>Title<input type="text" id="follow-title" name="title" list="series-list" placeholder="Serie S01" autocomplete="off"></label>
+    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Serie" autocomplete="off"></label>
     <datalist id="series-list"></datalist>
     <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
-    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
-    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
-    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
-    <button type="submit">Follow</button>
+    <label>Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off"></label>
+    <label>Language<input type="text" name="language" placeholder="ita" autocomplete="off"></label>
+    <label>Quality<input type="text" name="quality" placeholder="1080p" autocomplete="off"></label>
+    <button type="button" class="sm" id="wanted-search">Search in feeds</button>
+    <button type="submit" id="wanted-submit">Add wanted</button>
+    <button type="button" class="sm" id="wanted-cancel" style="display:none">Cancel</button>
   </div>
-  <p class="muted">Type the title: suggestions come from the configured indexers (add one below if there are none). Follow creates the search feed and its rule for you.</p>
   <details>
     <summary>Advanced filters</summary>
     <div class="row">
-      <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
       <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-      <label>Episode filter<input type="text" name="episode" placeholder="1x01-05, 1x07" autocomplete="off"></label>
+      <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off"></label>
+      <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
+      <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
+      <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
+      <label class="chk"><input type="checkbox" name="paused" value="1"> Paused</label>
     </div>
   </details>
+  <div class="row" id="wanted-results"></div>
+  <p class="muted">A wanted title is searched in the indexers and in the configured RSS feeds; its missing episodes are fetched again. Fill language/quality and press Search in feeds to pick a title from what the feeds return.</p>
 </form>
 
 <h2>Indexers <span class="muted">({{INDEXERCOUNT}})</span></h2>
@@ -181,13 +193,16 @@ summary{cursor:pointer;color:#93a1b5}
 var FEEDNAMES={{FEEDNAMES}};
 // Choosing a known indexer fills the URL with its usual local address and port.
 (function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];var filled=o?(o.getAttribute('data-url')||''):'';if(filled){url.value=filled;}});})();
-// Typeahead for the followed title: suggestions come from the configured
+// Typeahead for the wanted title: suggestions come from the configured
 // indexers, so the series name does not have to be typed exactly.
-(function(){var input=document.getElementById('follow-title');var list=document.getElementById('series-list');if(!input||!list){return;}var timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2){return;}timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},350);});})();
+(function(){var input=document.getElementById('wanted-name');var list=document.getElementById('series-list');if(!input||!list){return;}var timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2){return;}timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},350);});})();
 // Indexer edit: fill the add form with the row's values and remember the index.
 (function(){var form=document.getElementById('indexer-form');if(!form){return;}var idx=document.getElementById('indexer-index');var nameEl=document.getElementById('indexer-name');var urlEl=document.getElementById('indexer-url');var keyEl=document.getElementById('indexer-apikey');var submit=document.getElementById('indexer-submit');var cancel=document.getElementById('indexer-cancel');function clear(){idx.value='';nameEl.value='';urlEl.value='';keyEl.value='';keyEl.placeholder='';submit.textContent=t('Add indexer');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-idx-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');nameEl.value=btn.getAttribute('data-name')||'';urlEl.value=btn.getAttribute('data-url')||'';keyEl.value='';keyEl.placeholder=t('leave blank to keep');submit.textContent=t('Save indexer');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
 // Indexer test: ask the daemon to probe the endpoint with a Torznab caps request.
 (function(){Array.prototype.forEach.call(document.querySelectorAll('[data-idx-test]'),function(btn){btn.addEventListener('click',function(){var i=btn.getAttribute('data-index');var span=document.querySelector('[data-idx-status="'+i+'"]');if(span){span.className='muted';span.textContent=t('Checking…');}var f=new URLSearchParams();f.set('index',i);fetch('/ui/rss-indexer-test',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){return r.json();}).then(function(res){if(!span){return;}if(res.ok){span.className='ok';span.textContent='✓ '+res.ms+' ms';}else{span.className='err';span.textContent=t('test failed:')+' '+(res.error||'');}}).catch(function(){if(span){span.className='err';span.textContent=t('test failed:');}});});});})();
+// Wanted: edit a row into the form, and search the feeds for a title.
+(function(){var form=document.getElementById('wanted-form');if(!form){return;}var idx=document.getElementById('wanted-index');var submit=document.getElementById('wanted-submit');var cancel=document.getElementById('wanted-cancel');var fields=['name','kind','seasons','language','quality','exclude','episode_filter','category','savepath','folder'];function setField(n,v){var el=form.querySelector('[name='+n+']');if(el){el.value=v||'';}}function clear(){idx.value='';fields.forEach(function(n){setField(n,'');});form.querySelector('[name=paused]').checked=false;submit.textContent=t('Add wanted');cancel.style.display='none';}Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-edit]'),function(btn){btn.addEventListener('click',function(){idx.value=btn.getAttribute('data-index');setField('name',btn.getAttribute('data-name'));setField('kind',btn.getAttribute('data-kind'));setField('seasons',btn.getAttribute('data-seasons'));setField('language',btn.getAttribute('data-language'));setField('quality',btn.getAttribute('data-quality'));setField('exclude',btn.getAttribute('data-exclude'));setField('episode_filter',btn.getAttribute('data-episode'));setField('category',btn.getAttribute('data-category'));setField('savepath',btn.getAttribute('data-savepath'));setField('folder',btn.getAttribute('data-folder'));form.querySelector('[name=paused]').checked=btn.getAttribute('data-paused')==='true';submit.textContent=t('Save wanted');cancel.style.display='';form.scrollIntoView({behavior:'smooth',block:'center'});});});if(cancel){cancel.addEventListener('click',clear);}})();
+(function(){var btn=document.getElementById('wanted-search');if(!btn){return;}btn.addEventListener('click',function(){var form=document.getElementById('wanted-form');var box=document.getElementById('wanted-results');var name=form.querySelector('[name=name]').value.trim();if(name.length<2){box.textContent=t('type at least two characters');return;}box.textContent=t('Searching…');var p=new URLSearchParams({q:name,language:form.querySelector('[name=language]').value,quality:form.querySelector('[name=quality]').value});fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){box.innerHTML='';if(!names||!names.length){box.textContent=t('No results');return;}(names).forEach(function(n){var b=document.createElement('button');b.type='button';b.className='feed';b.textContent=n;b.onclick=function(){form.querySelector('[name=name]').value=n;};box.appendChild(b);});}).catch(function(){box.textContent=t('No results');});});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
 function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}

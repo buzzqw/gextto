@@ -1018,6 +1018,28 @@ inefficaci):
 Con questo la revisione `analisi4.md` è **applicata per intero** (A.1–A.4,
 B.1–B.7).
 
+### 5.16 Cercati (`wanted`) nel demone standalone (2026-10-11)
+
+Su richiesta del proprietario, la pagina `/ui/rss` del demone standalone cambia
+modello: da "feed + regole" a **Cercati** (titoli che si vogliono). Ogni titolo
+ha tipo (serie/film), stagioni, lingua, qualità, esclusi, filtro episodi,
+categoria e percorso; si aggiunge a mano o con **Cerca nei feed**, che interroga
+indexer e feed RSS configurati e propone i nomi trovati (filtrati per
+lingua/qualità). Il **titolo è richiesto** come regex tollerante ai separatori e
+lingua/qualità sono in **AND** (l'`Include` del motore delle regole è un OR, non
+andava bene).
+
+Il motore (`cmd/gx-torrent/wanted.go`) a ogni ciclo cerca ogni titolo negli
+indexer e nei feed RSS (`applyWanted` sugli item dei feed, ricerca per titolo
+sugli indexer) e prende gli episodi che compaiono; un **registro** in
+`state.json` (`wanted_seen` / `wanted_taken`) dice cosa è apparso e cosa è stato
+scaricato, la tabella mostra i **mancanti** e una **gap search** (query
+`Titolo SxxEyy`, throttled a 30 min, max 3 a ciclo) li ricerca finché non li
+trova: è il "gx-core sa che manca e lo scarica" richiesto. Per un film prende una
+release e non ne cerca altre. La lista non genera feed/regole, così i feed
+restano liberi per le regole avanzate. UI in `ui_wanted.go` + sezione in
+`rss.html`; test in `wanted_test.go`.
+
 ---
 
 ## 6. gx-torrent: misure di choking e seeding

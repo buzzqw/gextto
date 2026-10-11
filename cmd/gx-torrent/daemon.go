@@ -134,6 +134,13 @@ type persistedState struct {
 	// RuleLastMatch records, per rule name, the published time of the last item
 	// a rule accepted (Unix seconds), for the ignore-days window.
 	RuleLastMatch map[string]int64 `json:"rule_last_match,omitempty"`
+	// WantedSeen/WantedTaken are the episode ledger of the "wanted" titles: what
+	// appeared in the feeds/indexers and what was downloaded, per title+season.
+	// The difference is what gx-torrent still has to find (gap search).
+	WantedSeen  map[string]smartEpisodes `json:"wanted_seen,omitempty"`
+	WantedTaken map[string]smartEpisodes `json:"wanted_taken,omitempty"`
+	// WantedGapLast throttles the missing-episode gap search per wanted title.
+	WantedGapLast map[string]int64 `json:"wanted_gap_last,omitempty"`
 }
 
 // smartEpisodes is the set of episodes already taken for one series+season, each
