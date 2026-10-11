@@ -240,6 +240,20 @@ applicata: il logger del motore scarta i record sotto la soglia dell'handler
 ~785 ns / 6 alloc per chiamata. I record che l'handler riceve non cambiano
 (ERROR/WARNING restano, i conteggi del rumore di sciame non si perdono).
 
+**Seconda tornata (2026-10-11, Intel N97) — filtro IP.** Diagnosi: con la
+blocklist Aetherinox (34 MB, **666 763 regole**) `gx-torrent` teneva ~295 MB di
+RSS, di cui **~190 MB** nel segment tree a puntatori del filtro IP
+(`internal/blocklist/stree`) più i 34 MB del file grezzo tenuti in cache dal
+demone. Sostituzione: le regole IPv4, come già le IPv6, stanno in **intervalli
+ordinati e uniti** con ricerca binaria (`sortMergeV4`/`v4Contains`),
+`stree` rimosso. Misura isolata sul file reale: heap vivo **190 MB → 5,4 MB**
+(666 763 regole → 343 024 intervalli dopo il merge); `BenchmarkBlocked`:
+**18,6 ns/op, 0 alloc/op** (prima `stree.Contains` allocava una `map` e una
+slice a ogni lookup, sul percorso di ogni connessione peer/tracker). In
+esercizio: RSS di `gx-torrent` **295 MB → ~105 MB** (RssAnon 275 → 92 MB) a
+parità di regole caricate. Restano in cache i 34 MB del file grezzo (rilettura
+rara su ricarica manuale): rimovibili in seguito.
+
 ---
 
 ## 2. Migliorie Gextto implementate

@@ -6,26 +6,29 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 	"net"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/buzzqw/gextto/internal/gxcore/internal/blocklist/stree"
 )
 
 var errNotIPv4Address = errors.New("address is not ipv4")
 
 var errAllowRule = errors.New("allow rule")
 
-// Blocklist holds a list of IP ranges in a Segment Tree structure for faster lookups.
+// Blocklist holds the blocked IP ranges. IPv4 and IPv6 rules are kept as
+// sorted, merged interval slices and queried with a binary search: one rule
+// costs a few bytes, instead of the segment-tree node per interval endpoint
+// used before, and a lookup allocates nothing.
 type Blocklist struct {
 	logger Logger
 
-	tree  stree.Stree
-	v6    []ip6Range
+	v4 []ipRange
+	v6 []ip6Range
+
 	m     sync.RWMutex
 	count int
 }
@@ -56,8 +59,7 @@ func (b *Blocklist) Blocked(ip net.IP) bool {
 	defer b.m.RUnlock()
 
 	if ip4 := ip.To4(); ip4 != nil {
-		val := binary.BigEndian.Uint32(ip4)
-		return b.tree.Contains(stree.ValueType(val))
+		return v4Contains(b.v4, binary.BigEndian.Uint32(ip4))
 	}
 	if ip16 := ip.To16(); ip16 != nil {
 		return v6Contains(b.v6, ip16)
@@ -65,24 +67,24 @@ func (b *Blocklist) Blocked(ip net.IP) bool {
 	return false
 }
 
-// Reload the segment tree by reading new rules from a io.Reader.
+// Reload the rules by reading new rules from a io.Reader.
 func (b *Blocklist) Reload(r io.Reader) (int, error) {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	tree, v6, nv4, nv6, err := load(r, b.logger)
+	v4, v6, nv4, nv6, err := load(r, b.logger)
 	if err != nil {
 		return nv4 + nv6, err
 	}
 
-	b.tree = *tree
+	b.v4 = v4
 	b.v6 = v6
 	b.count = nv4 + nv6
 	return b.count, nil
 }
 
-func load(r io.Reader, logger Logger) (*stree.Stree, []ip6Range, int, int, error) {
-	var tree stree.Stree
+func load(r io.Reader, logger Logger) ([]ipRange, []ip6Range, int, int, error) {
+	var v4 []ipRange
 	var v6 []ip6Range
 	var nv4, nv6 int
 	var hasError bool
@@ -115,7 +117,7 @@ func load(r io.Reader, logger Logger) (*stree.Stree, []ip6Range, int, int, error
 			}
 			continue
 		}
-		tree.AddRange(stree.ValueType(r4.first), stree.ValueType(r4.last))
+		v4 = append(v4, r4)
 		nv4++
 	}
 	if err := scanner.Err(); err != nil {
@@ -126,10 +128,10 @@ func load(r io.Reader, logger Logger) (*stree.Stree, []ip6Range, int, int, error
 		// At least one line must be correct before we consider the load operation as successful.
 		return nil, nil, 0, 0, errors.New("no valid rules")
 	}
-	tree.Build()
-	return &tree, sortMergeV6(v6), nv4, nv6, nil
+	return sortMergeV4(v4), sortMergeV6(v6), nv4, nv6, nil
 }
 
+// ipRange is an inclusive IPv4 range.
 type ipRange struct {
 	first, last uint32
 }
@@ -229,6 +231,50 @@ func parseV6CIDR(b []byte) (ip6Range, bool) {
 		r.last[i] = first[i] | ^ipnet.Mask[i]
 	}
 	return r, true
+}
+
+// sortMergeV4 sorts the ranges and merges the overlapping (or adjacent) ones,
+// so a lookup is a single binary search.
+func sortMergeV4(rs []ipRange) []ipRange {
+	if len(rs) == 0 {
+		return nil
+	}
+	slices.SortFunc(rs, func(a, b ipRange) int {
+		if a.first != b.first {
+			if a.first < b.first {
+				return -1
+			}
+			return 1
+		}
+		if a.last < b.last {
+			return -1
+		}
+		if a.last > b.last {
+			return 1
+		}
+		return 0
+	})
+	out := rs[:1]
+	for _, r := range rs[1:] {
+		last := &out[len(out)-1]
+		if r.first <= last.last || (last.last < math.MaxUint32 && r.first == last.last+1) {
+			if r.last > last.last {
+				last.last = r.last
+			}
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// v4Contains reports whether v falls in any merged IPv4 range.
+func v4Contains(rs []ipRange, v uint32) bool {
+	i := sort.Search(len(rs), func(i int) bool { return rs[i].first > v }) - 1
+	if i < 0 {
+		return false
+	}
+	return v <= rs[i].last
 }
 
 // sortMergeV6 sorts the ranges and merges the overlapping ones, so a lookup is
