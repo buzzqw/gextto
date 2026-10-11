@@ -17,7 +17,8 @@ automaticamente questo file, che è l'**unica** fonte delle regole operative.
 - **Non committare né pushare se i test non passano tutti**: esegui la suite
   (`make test`, che include `check-ui`, `installer-test`, `test-dht` e
   `go test ./...`) e procedi solo se è **completamente verde**. Se un test
-  fallisce, prima lo si sistema.
+  fallisce, prima lo si sistema. Non c'è bisogno di far girare tutta la suite di
+  test se la modifica riguarda esclusivamente la documentazione (es. file `.md`).
 
 ## Che cos'è gextto
 - Daemon Go per acquisizione media e archiviazione. Il package principale è

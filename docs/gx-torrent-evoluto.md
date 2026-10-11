@@ -505,8 +505,8 @@ rimanenti:
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
-| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, **feed dai risultati di ricerca**, **notifiche webhook su match/errore**) | §12.2 | fatto |
-| F2 — RSS/UI guidati: editor di feed e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), cartelle dei feed (`feedConfig.Folder`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), cooldown `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **lista Cercati** con registro episodi e gap search (`cmd/gx-torrent/wanted.go`; suggerimenti `GET /ui/rss-suggest`/`GET /ui/wanted-search`), pulsante **Check feeds**, pagina `/ui/settings` (cartelle, rete e porte, protocolli, coda e cache, banda, scheduler, lingua, notifiche), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
+| F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, notifiche webhook su match/errore) | §12.2 | fatto |
+| F2 — RSS/UI guidati: editor di feed (solo nome e URL sorgente, senza parametri serie/filtri che risiedono in *Cercati* e regole) e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), cooldown `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **lista Cercati** con tendina qualità, registro episodi e gap search (`cmd/gx-torrent/wanted.go`; suggerimenti `GET /ui/rss-suggest`/`GET /ui/wanted-search`), pulsante **Check feeds**, pagina `/ui/settings` (cartelle, rete e porte, protocolli, coda e cache, banda, scheduler, lingua, notifiche), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
 **Punto finale:** al termine, **controllo approfondito di tutto il codice
@@ -579,18 +579,19 @@ Stato attuale (base già in `internal/rss` e `feed.go`): parsing RSS/Atom/Torzna
 dimensione, seeders/peers, età, `require_episode`, **smart-episode**, azioni
 (cartella, categoria, tag, pausa, sequenziale, prima/ultima, in cima), storico
 persistito, worker e **pagina di gestione `/ui/rss`** con articoli corrispondenti
-per regola e Add manuale. I **feed possono essere anche ricerche**: un feed con
-il campo `search` interroga gli indexer e i risultati passano dalle stesse
-regole. Le **notifiche su match/errore** sono disponibili via webhook
-(`-notify-url` / `GX_TORRENT_NOTIFY_URL`, eventi `feed_match` e `feed_error`).
+per regola e Add manuale. I **feed caricano le release periodiche**: i parametri di
+ricerca e watchlist di serie/film sono centralizzati nella sezione **Cercati**
+(Wanted), così la configurazione è chiara e non si duplicano filtri. Le **notifiche su match/errore**
+sono disponibili via webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, eventi `feed_match` e `feed_error`).
 
 L'editing è **guidato** (`cmd/gx-torrent/ui_rss_edit.go`): menu a tendina del tipo
-di indexer con URL preimpostati (`uiIndexerPresets`), **cartelle dei feed**
-(`feedConfig.Folder`), editor delle **regole ordinate** con sposta su/giù e
+di indexer con URL preimpostati (`uiIndexerPresets`), form dei feed essenziale
+(nome e URL RSS), editor delle **regole ordinate** con sposta su/giù e
 disabilita, `episode_filter` in stile qBittorrent
 (`internal/rss/episode_filter.go`) e cooldown `ignore_days`
 (`internal/rss/rules.go`). Lo **smart-episode** riconosce anche REPACK/PROPER
-(`cmd/gx-torrent/feed.go`). La lista **Cercati** tiene i titoli da cercare: il
+(`cmd/gx-torrent/feed.go`). La lista **Cercati** tiene i titoli da cercare (con menu
+a tendina per le qualità, tipo serie/film, cartella e categoria opzionali): il
 nome della serie viene suggerito dai risultati degli indexer
 (`GET /ui/rss-suggest`) e `GET /ui/wanted-search` propone i titoli trovati nei
 feed e negli indexer. Il motore (`cmd/gx-torrent/wanted.go`) cerca ogni titolo
