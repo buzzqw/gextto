@@ -330,7 +330,10 @@ inferior to the archived file.
   includes copy magnet, per-torrent limits/seed-days, reannounce, pin, restart,
   mark-failed, move storage. **General** also offers **Export .torrent**,
   **Super seeding** (with gx-torrent it only applies once the torrent is complete
-  and it deliberately lowers the seed's upload) and web-seed add/remove; **Tracker** lets you edit the whole
+  and it deliberately lowers the seed's upload) and web-seed add/remove; with
+  gx-torrent the **General** tab also lists the **BEP 38 hints**
+  (`collections`/`similar`) with the local torrents that share them, when the
+  torrent carries any; **Tracker** lets you edit the whole
   list (`tier|url` per line); **Content** sets the **per-file priority**
   (Skip/Normal/High/Maximum). **Pieces** shows the piece map (green have, yellow
   downloading, grey missing, dimmed skipped) on engines that expose it

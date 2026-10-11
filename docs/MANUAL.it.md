@@ -329,7 +329,10 @@ bloccata, già presente o inferiore al file archiviato.
   copia magnet, limiti per torrent/giorni di seed, reannounce, pin, riavvia,
   segna come fallito, sposta storage. In **Generale** trovi anche **Esporta
   .torrent**, **Super seeding** (con gx-torrent vale solo a torrent completato e
-  riduce di proposito l'upload del seed) e l'aggiunta/rimozione di **web seed**; in
+  riduce di proposito l'upload del seed) e l'aggiunta/rimozione di **web seed**;
+  con gx-torrent la scheda **Generale** elenca anche gli **hint BEP 38**
+  (`collections`/`similar`) con i torrent locali che li condividono, quando il
+  torrent ne ha; in
   **Tracker** puoi modificare l'intera lista (`tier|url` per riga); in
   **Contenuto** imposti la **priorità per file** (Salta/Normale/Alta/Massima).
   In **Pezzi** c'è la mappa dei pezzi (verde scaricato, giallo in corso, grigio
