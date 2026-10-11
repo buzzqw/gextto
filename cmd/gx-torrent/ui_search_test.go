@@ -63,3 +63,54 @@ func TestUISearchDisabledInManaged(t *testing.T) {
 		t.Fatalf("managed must not expose the search: %d", rec.Code)
 	}
 }
+
+const suggestFeed = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+<item><title>The.Last.of.Us.S01E01.1080p</title><enclosure url="http://t/1.torrent" length="10"/></item>
+<item><title>The.Last.of.Us.S01E02.1080p</title><enclosure url="http://t/2.torrent" length="10"/></item>
+<item><title>Breaking.Bad.S05E14.720p</title><enclosure url="http://t/3.torrent" length="10"/></item>
+<item><title>Some.Movie.2024.1080p</title><enclosure url="http://t/4.torrent" length="10"/></item>
+</channel></rss>`
+
+// TestUIRssSuggest checks the follow box suggestions: release titles are reduced
+// to unique series names, most frequent first, title-cased.
+func TestUIRssSuggest(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(suggestFeed))
+	}))
+	defer feed.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+feed.URL+`","apikey":"k"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/rss-suggest?q=the")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var names []string
+	if err := json.NewDecoder(resp.Body).Decode(&names); err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 2 || names[0] != "The Last Of Us" || names[1] != "Breaking Bad" {
+		t.Fatalf("suggestions = %v, want [The Last Of Us Breaking Bad]", names)
+	}
+
+	// A one-character query is ignored (no indexer hit, no suggestions).
+	resp2, err := http.Get(srv.URL + "/ui/rss-suggest?q=t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	var short []string
+	if err := json.NewDecoder(resp2.Body).Decode(&short); err != nil {
+		t.Fatal(err)
+	}
+	if len(short) != 0 {
+		t.Fatalf("a one-character query must return no suggestions, got %v", short)
+	}
+}

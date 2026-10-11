@@ -464,19 +464,26 @@ Esempio:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
 La pagina **`/ui/rss`** (standalone, raggiungibile dal collegamento *RSS e
-indexer* nella barra di ogni pagina) gestisce tutto questo: elenchi con pulsanti
-per aggiungere e rimuovere **indexer** (tendina Prowlarr/Jackett/Altro, URL
-precompilato) e **feed** (URL RSS o query di ricerca, include/exclude, categoria,
-percorso, in pausa), un **editor delle regole** con tutti i criteri e le azioni
-qui sopra (una regola per riga, con frecce per cambiarne l'ordine — la prima che
-corrisponde vince), le textarea JSON avanzate per feed, regole e indexer
-(salvate con validazione), e per ogni feed un pulsante che mostra gli articoli
-correnti con la regola che li prenderebbe e un *Add* manuale (la vista "articoli
-corrispondenti" di qBittorrent) e un pulsante *Check feeds* per forzare subito un
-giro di controllo. Un **segui un titolo** crea in un colpo solo il feed di
-ricerca Torznab per quel titolo e una regola a esso limitata (con lo smart
-episode per le serie), così "seguire una serie o un film" non richiede di
-compilare a mano né il feed né la regola. Gli stessi risultati si ottengono via
+indexer* nella barra di ogni pagina) è pensata per l'uso quotidiano: in cima c'è
+**Segui un titolo**, una sola casella dove si scrive il nome della serie o del
+film. Mentre si digita, `GET /ui/rss-suggest` interroga gli indexer e propone i
+**nomi trovati** (ridotti dai titoli delle release), così non serve scrivere il
+nome esatto né conoscere sintassi. *Segui* crea in un colpo solo il feed di
+ricerca Torznab e una regola a esso limitata (con lo smart episode per le serie);
+i filtri facoltativi (include/exclude, filtro episodi) stanno sotto *Filtri
+avanzati*.
+
+Sotto: elenchi con pulsanti per aggiungere e rimuovere **indexer** (tendina
+Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS o query di ricerca,
+cartella, include/exclude, categoria, percorso, in pausa), l'**editor delle
+regole** (una regola per riga, con frecce per cambiarne l'ordine — la prima che
+corrisponde vince; regex e filtri numerici stanno sotto *Filtri avanzati*), le
+textarea JSON avanzate per feed, regole e indexer (salvate con validazione), e
+per ogni feed un pulsante che mostra gli articoli correnti con la regola che li
+prenderebbe e un *Add* manuale (la vista "articoli corrispondenti" di qBittorrent)
+e un pulsante *Check feeds* per forzare subito un giro di controllo.
+
+Gli stessi risultati si ottengono via
 `POST /ui/rss-indexer`, `POST /ui/rss-feed`, `POST /ui/rss-rule` (op
 `add`/`remove`/`up`/`down`) e `POST /ui/rss-follow`; le textarea JSON restano su
 `POST /ui/rss-config`.

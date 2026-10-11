@@ -7,6 +7,7 @@ package main
 // the page's advanced textareas (/ui/rss-config).
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -16,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/torznab"
@@ -248,6 +250,74 @@ func (d *Daemon) handleUIRssRule(w http.ResponseWriter, r *http.Request) {
 	}
 	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
+// handleUIRssSuggest returns series-name suggestions for the follow box, derived
+// from the configured indexers: it runs the typed prefix as a query and reduces
+// the release titles to unique series names, so the operator does not have to
+// type the name exactly.
+func (d *Daemon) handleUIRssSuggest(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(query)) < 2 || len(d.indexers()) == 0 {
+		writeJSON(w, http.StatusOK, []string{})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	items, _ := d.searchFeed(ctx, "suggest", query)
+	writeJSON(w, http.StatusOK, seriesSuggestions(items, 12))
+}
+
+// seriesSuggestions reduces release titles to unique series names, the most
+// frequent first, title-cased for display. Only titles carrying an episode
+// marker are considered.
+func seriesSuggestions(items []rss.Item, limit int) []string {
+	counts := map[string]int{}
+	var names []string
+	for _, item := range items {
+		series, _, _, ok := rss.FindEpisode(item.Title)
+		if !ok || len([]rune(series)) < 2 {
+			continue
+		}
+		if _, seen := counts[series]; !seen {
+			names = append(names, series)
+		}
+		counts[series]++
+	}
+	sort.SliceStable(names, func(i, j int) bool {
+		if counts[names[i]] != counts[names[j]] {
+			return counts[names[i]] > counts[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	if len(names) > limit {
+		names = names[:limit]
+	}
+	out := make([]string, len(names))
+	for i, name := range names {
+		out[i] = titleCase(name)
+	}
+	return out
+}
+
+// titleCase upper-cases the first letter of every word.
+func titleCase(value string) string {
+	words := strings.Fields(value)
+	for i, word := range words {
+		runes := []rune(word)
+		if len(runes) == 0 {
+			continue
+		}
+		words[i] = strings.ToUpper(string(runes[0])) + string(runes[1:])
+	}
+	return strings.Join(words, " ")
 }
 
 // handleUIRssFollow creates, in one step, a Torznab search feed for a title

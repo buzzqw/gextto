@@ -59,6 +59,7 @@ func (d *Daemon) routes() http.Handler {
 	root.HandleFunc("GET /ui/rss", d.handleUIRss)
 	root.HandleFunc("POST /ui/rss-config", d.handleUIRssConfig)
 	root.HandleFunc("POST /ui/rss-follow", d.handleUIRssFollow)
+	root.HandleFunc("GET /ui/rss-suggest", d.handleUIRssSuggest)
 	root.HandleFunc("GET /ui/settings", d.handleUISettings)
 	root.HandleFunc("POST /ui/settings", d.handleUISettings)
 	root.HandleFunc("GET /ui/portcheck", d.handleUIPortCheck)

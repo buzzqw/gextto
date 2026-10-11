@@ -15,6 +15,7 @@ main{padding:16px 20px;max-width:1100px;margin:0 auto}
 a{color:#93c5fd}h1{font-size:20px}h2{font-size:16px;margin:22px 0 8px}
 label{display:block;margin:10px 0;color:#93a1b5}
 input,select{padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+input[type=text][list]{min-width:220px}
 textarea{width:100%;box-sizing:border-box;background:#0b0f18;color:inherit;border:1px solid #243049;border-radius:8px;padding:8px;font:12.5px/1.4 ui-monospace,Menlo,Consolas,monospace}
 button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
 button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-weight:500;padding:5px 10px}
@@ -31,9 +32,10 @@ button.feed{background:#1b2536;color:#dbe4f0}
 .actions{white-space:nowrap;text-align:right}
 .actions form{display:inline-block;margin:0 2px 2px 0}
 button.sm{padding:4px 8px;background:#243049;font-weight:500}
-details{margin-top:18px;border:1px solid #243049;border-radius:10px;padding:10px 14px;background:#131a28}
+details{margin-top:12px;border:1px solid #243049;border-radius:10px;padding:8px 14px;background:#10151f}
 summary{cursor:pointer;color:#93a1b5}
 .form-card{border:1px solid #243049;border-radius:10px;padding:6px 14px 14px;margin-top:8px;background:#131a28}
+.lead{border-color:#2563eb}
 </style></head>
 <body>
 <header>
@@ -42,6 +44,28 @@ summary{cursor:pointer;color:#93a1b5}
 </header>
 <main>
 <p class="muted">Feeds, rules and indexers are saved in settings.json. The rules are evaluated in order; the first match wins.</p>
+
+<h2>Follow a title</h2>
+<form class="form-card lead" method="post" action="/ui/rss-follow">
+  <div class="row">
+    <label>Title<input type="text" id="follow-title" name="title" list="series-list" placeholder="Serie S01" autocomplete="off"></label>
+    <datalist id="series-list"></datalist>
+    <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
+    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
+    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
+    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
+    <button type="submit">Follow</button>
+  </div>
+  <p class="muted">Type the title: suggestions come from the configured indexers (add one below if there are none). Follow creates the search feed and its rule for you.</p>
+  <details>
+    <summary>Advanced filters</summary>
+    <div class="row">
+      <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
+      <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
+      <label>Episode filter<input type="text" name="episode" placeholder="1x01-05, 1x07" autocomplete="off"></label>
+    </div>
+  </details>
+</form>
 
 <h2>Indexers <span class="muted">({{INDEXERCOUNT}})</span></h2>
 <table>
@@ -83,22 +107,6 @@ summary{cursor:pointer;color:#93a1b5}
   <p class="muted">A feed is an RSS URL, or a Torznab search query (Search query) across the configured indexers. Empty = the global default.</p>
 </form>
 
-<h2>Follow a title</h2>
-<form class="form-card" method="post" action="/ui/rss-follow">
-  <div class="row">
-    <label>Title<input type="text" name="title" placeholder="Serie S01" autocomplete="off"></label>
-    <label>Type<select name="kind"><option value="series">Series</option><option value="movie">Movie</option></select></label>
-    <label>Folder<input type="text" name="folder" placeholder="shows" autocomplete="off"></label>
-    <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
-    <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-    <label>Episode filter<input type="text" name="episode" placeholder="1x01-05, 1x07" autocomplete="off"></label>
-    <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off"></label>
-    <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off"></label>
-    <button type="submit">Follow</button>
-  </div>
-  <p class="muted">Follow creates a search feed for the title and a rule scoped to it (Smart episode for series). Once any rule exists it applies to every feed.</p>
-</form>
-
 <h2>Rules <span class="muted">({{RULECOUNT}})</span></h2>
 <table>
   <thead><tr><th>Name</th><th>Scope</th><th>Match</th><th>Actions</th><th></th></tr></thead>
@@ -109,24 +117,13 @@ summary{cursor:pointer;color:#93a1b5}
   <div class="row">
     <label>Rule name<input type="text" name="name" placeholder="shows" autocomplete="off"></label>
     <label>Feeds (comma)<input type="text" name="feeds" placeholder="serie" autocomplete="off"></label>
-    <label class="chk"><input type="checkbox" name="fail" value="1"> Skip matching items</label>
     <label class="chk"><input type="checkbox" name="enabled" value="1" checked> Enabled</label>
+    <label class="chk"><input type="checkbox" name="fail" value="1"> Skip matching items</label>
   </div>
   <div class="row">
     <label>Include<input type="text" name="include" placeholder="1080p, ita" autocomplete="off"></label>
     <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off"></label>
-    <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off"></label>
-    <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off"></label>
     <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off"></label>
-  </div>
-  <div class="row">
-    <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size"></label>
-    <label>Max size (MiB)<input type="number" step="1" min="0" name="max_size"></label>
-    <label>Min seeders<input type="number" name="min_seeders"></label>
-    <label>Max seeders<input type="number" name="max_seeders"></label>
-    <label>Min peers<input type="number" name="min_peers"></label>
-    <label>Max age (days)<input type="number" name="max_age_days"></label>
-    <label>Ignore older than (days)<input type="number" name="ignore_days"></label>
   </div>
   <div class="row">
     <label class="chk"><input type="checkbox" name="require_episode" value="1"> Require episode</label>
@@ -142,6 +139,22 @@ summary{cursor:pointer;color:#93a1b5}
     <label>Tags<input type="text" name="tags" placeholder="tag, tag" autocomplete="off"></label>
     <button type="submit">Add rule</button>
   </div>
+  <details>
+    <summary>Advanced filters</summary>
+    <div class="row">
+      <label>Regex<input type="text" name="regex" placeholder="S0E0" autocomplete="off"></label>
+      <label>Not regex<input type="text" name="not_regex" placeholder="cam" autocomplete="off"></label>
+      <label>Min size (MiB)<input type="number" step="1" min="0" name="min_size"></label>
+      <label>Max size (MiB)<input type="number" step="1" min="0" name="max_size"></label>
+    </div>
+    <div class="row">
+      <label>Min seeders<input type="number" name="min_seeders"></label>
+      <label>Max seeders<input type="number" name="max_seeders"></label>
+      <label>Min peers<input type="number" name="min_peers"></label>
+      <label>Max age (days)<input type="number" name="max_age_days"></label>
+      <label>Ignore older than (days)<input type="number" name="ignore_days"></label>
+    </div>
+  </details>
   <p class="muted">A rule filters what to download and how. With at least one rule, only items matching a rule are added: a Skip rule rejects, an Add rule accepts with its save path, category, tags and flags. Smart episode adds each episode of a series once.</p>
 </form>
 
@@ -166,6 +179,9 @@ summary{cursor:pointer;color:#93a1b5}
 var FEEDNAMES={{FEEDNAMES}};
 // Choosing a known indexer fills the URL with its usual local address and port.
 (function(){var sel=document.getElementById('indexer-type');var url=document.getElementById('indexer-url');if(!sel||!url){return;}sel.addEventListener('change',function(){var o=sel.options[sel.selectedIndex];var filled=o?(o.getAttribute('data-url')||''):'';if(filled){url.value=filled;}});})();
+// Typeahead for the followed title: suggestions come from the configured
+// indexers, so the series name does not have to be typed exactly.
+(function(){var input=document.getElementById('follow-title');var list=document.getElementById('series-list');if(!input||!list){return;}var timer=null;input.addEventListener('input',function(){clearTimeout(timer);var q=input.value.trim();if(q.length<2){return;}timer=setTimeout(function(){fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){list.innerHTML='';(names||[]).forEach(function(n){var o=document.createElement('option');o.value=n;list.appendChild(o);});}).catch(function(){});},350);});})();
 function loadItems(name){var box=document.getElementById('items');box.textContent='…';fetch('/ui/feed-items?feed='+encodeURIComponent(name),{cache:'no-store'}).then(function(r){return r.ok?r.json():[]}).then(function(list){box.innerHTML='';if(!list.length){box.textContent='—';return;}var table=document.createElement('table');var head=document.createElement('tr');[t('Title'),t('Size'),t('Seeds'),t('Rule')].forEach(function(h){var th=document.createElement('th');th.textContent=h;head.appendChild(th);});table.appendChild(head);list.forEach(function(it){var tr=document.createElement('tr');var td=document.createElement('td');td.textContent=it.title;tr.appendChild(td);var s=document.createElement('td');s.textContent=fmtBytes(it.size);tr.appendChild(s);var sd=document.createElement('td');sd.textContent=it.seeders;tr.appendChild(sd);var r=document.createElement('td');r.textContent=it.rule;tr.appendChild(r);var a=document.createElement('td');var b=document.createElement('button');b.textContent=t('Add');b.onclick=function(){var f=new URLSearchParams();f.set('source',it.download);fetch('/ui/add',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(){b.disabled=true;});};a.appendChild(b);tr.appendChild(a);table.appendChild(tr);});box.appendChild(table);}).catch(function(){box.textContent='—';});}
 function pollFeeds(){var info=document.getElementById('pollinfo');if(!info){return;}info.textContent=t('Checking…');fetch('/ui/feeds/poll',{method:'POST'}).then(function(){return fetch('/ui/feeds',{cache:'no-store'})}).then(function(r){return r.ok?r.json():[]}).then(function(list){var errs=list.filter(function(f){return f.last_error;}).map(function(f){return f.name+': '+f.last_error;});info.textContent=errs.join(' · ');}).catch(function(){info.textContent='';});}
 function fmtBytes(n){if(!n||n<0)return '';var u=['B','KiB','MiB','GiB','TiB'],i=0;while(n>=1024&&i<u.length-1){n/=1024;i++;}return (i?n.toFixed(1):n)+' '+u[i];}
