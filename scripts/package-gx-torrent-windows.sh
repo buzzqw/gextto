@@ -155,11 +155,25 @@ Manual equivalent:
 
     sc.exe create gx-torrent binPath= "\"C:\path\gx-torrent.exe\" -mode standalone -listen 0.0.0.0:8890 -data \"C:\ProgramData\gx-torrent\" -log-file \"C:\ProgramData\gx-torrent\gx-torrent.log\"" start= auto
 
-INTERFACES
-----------
-- Web UI:        http://<host>:8890/  (login, torrents, categories, RSS).
-- qBittorrent:   /api/v2 (Sonarr, Radarr, mobile apps).
+INTERFACES & AUTOMATION
+-----------------------
+- Web UI:        http://<host>:8890/  (login, torrents, categories, tags, streaming, RSS).
+- qBittorrent:   /api/v2 (Sonarr, Radarr, Lidarr, mobile apps).
+                 Configure in Sonarr/Radarr as download client "qBittorrent"
+                 Host: localhost (or server IP), Port: 8890,
+                 Username: admin, Password: (set in setup wizard).
 - Indexer search (Torznab) and RSS notifications, configured in /ui/rss.
+- In-browser streaming: play videos in browser or VLC via HTTP Range streaming.
+
+FLAGS & SETTINGS
+----------------
+-listen <addr>      Web UI / API bind address (default: 127.0.0.1:8890)
+-data <path>        State folder (default: %ProgramData%\gx-torrent)
+-download-dir <dir> Default downloads folder (default: <data>\downloads)
+-peer-ports <range> Incoming peer port range (default: 6881-6891)
+-proxy <url>        SOCKS5 or HTTP CONNECT proxy
+-encryption <0|1|2> MSE/PE stream encryption (0 disabled, 1 enabled, 2 forced)
+-no-dht / -no-utp   Disable DHT or uTP protocols
 
 NOTES
 -----

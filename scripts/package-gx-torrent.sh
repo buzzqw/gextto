@@ -90,40 +90,196 @@ WantedBy=multi-user.target
 UNIT
 
 cat > "$STAGE/README.md" <<'README'
-# gx-torrent (standalone)
+# gx-torrent — Standalone BitTorrent Client & Daemon
 
-`gx-torrent` is a BitTorrent client with a web UI, a qBittorrent-compatible API
-and RSS, usable on its own like `qbittorrent-nox` (it is the same binary Gextto
-drives as its torrent engine).
+`gx-torrent` is a lightweight, pure-Go BitTorrent client and daemon designed as
+a drop-in replacement for `qbittorrent-nox` and `transmission-daemon`. It features
+a modern web UI, full qBittorrent Web API v2 compatibility for automation suites,
+RSS rules with smart episode tracking, and direct multi-indexer search.
 
-## Run
+It is powered by **gx-core**, an advanced engine supporting BitTorrent v1,
+hybrids, and v2-only (BEP 52 Merkle trees), uTP (BEP 29), NAT holepunching
+(BEP 55), Super-seeding (BEP 16), IPv6 dual-stack DHT (BEP 32/42/44), and
+zero-allocation MSE/PE stream encryption, with a tiny footprint (~25 MB idle).
+
+---
+
+## 1. Quick Start
+
+### Running Directly
 
 ```bash
 ./run.sh -mode standalone -listen 0.0.0.0:8890 -data /var/lib/gx-torrent
 ```
 
-Then open `http://<host>:8890/`: the first run shows the **setup wizard**
-(language, download and temporary folders, peer port with a reachability test,
-bandwidth limits, password, LAN access, indexers). The settings are saved in
-`settings.json` under the data directory.
+Or using the binary directly:
+```bash
+./gx-torrent -mode standalone -listen 0.0.0.0:8890 -data /var/lib/gx-torrent
+```
 
-## Interfaces
+### Initial Setup Wizard
 
-- Web UI: `http://<host>:8890/` (login, torrents, categories, RSS at `/ui/rss`).
-- qBittorrent Web API: `/api/v2` (Sonarr, Radarr, mobile apps: add/remove, tags,
-  trackers, file priorities, peers, per-torrent limits, super-seeding).
-- Indexer search: configure Jackett/Prowlarr/MIRCrew (Torznab) in `/ui/rss` or
-  via the `indexers` key in `settings.json`; a feed can also be a **search query**
-  (the `search` field) instead of an RSS URL.
-- Notifications: set `-notify-url` (or `GX_TORRENT_NOTIFY_URL`) to POST a JSON
-  webhook on RSS match and error.
-- Container: the `Dockerfile` in the project root builds a standalone image
-  (data in `/data`, web UI on port 8080).
+Open your browser at `http://<server-ip>:8890/`.
+On the first launch, the interactive **Setup Wizard** guides you through:
+1. **Interface Language**: Select English, Italian, German, French, Spanish, or Polish.
+2. **Storage Paths**: Configure the default download folder and temporary incomplete folder.
+3. **Connectivity & Port Test**: Select the incoming peer port (default `6881`) and run the built-in reachability test to verify router port forwarding (UPnP / NAT-PMP).
+4. **Global Bandwidth Limits**: Set optional download and upload rate limits.
+5. **Security & Authentication**: Set the admin username and password. You can optionally allow password-free access from the local area network (LAN).
+6. **Indexer Integration**: Optionally pre-configure Torznab indexers (Jackett, Prowlarr, MIRCrew).
 
-## Manage it
+Settings are automatically saved to `<data-dir>/settings.json`.
 
-Copy the directory to `/opt/gx-torrent`, update `gx-torrent.service`
-(`User`, `Group`, paths), then enable the unit. Or run it by hand as above.
+---
+
+## 2. Production Service Setup (systemd)
+
+To run `gx-torrent` as a permanent background service on Linux:
+
+1. **Install files**:
+   ```bash
+   sudo mkdir -p /opt/gx-torrent /var/lib/gx-torrent
+   sudo cp gx-torrent run.sh /opt/gx-torrent/
+   sudo chmod +x /opt/gx-torrent/gx-torrent /opt/gx-torrent/run.sh
+   sudo cp gx-torrent.service /etc/systemd/system/
+   ```
+
+2. **Create a dedicated service user**:
+   ```bash
+   sudo useradd -r -s /usr/sbin/nologin -d /var/lib/gx-torrent gx-torrent || true
+   sudo chown -R gx-torrent:gx-torrent /var/lib/gx-torrent /opt/gx-torrent
+   ```
+
+3. **Verify directory permissions**:
+   Ensure your target download directory (e.g. `/srv/torrents` or `/mnt/storage`) is readable and writable by the `gx-torrent` user or group.
+   *Note*: The bundled unit enables systemd security hardening (`ProtectHome=read-only`). If your media directory is under `/home`, add an override:
+   ```bash
+   sudo systemctl edit gx-torrent
+   # Add:
+   # [Service]
+   # ReadWritePaths=/home/username/downloads
+   ```
+
+4. **Enable and start the service**:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now gx-torrent
+   sudo systemctl status gx-torrent
+   ```
+
+---
+
+## 3. Web UI Features & Usage
+
+Access the dashboard at `http://<server-ip>:8890/`:
+
+- **Torrent Management**:
+  - **Add Torrents**: Add via `.torrent` file upload, magnet link, or direct HTTP/HTTPS URL. Set initial category, tags, start paused, or select specific files.
+  - **Control**: Pause, resume, recheck integrity, force announce to trackers, and relocate download files to a different path on the fly.
+  - **Removal**: Delete the torrent metadata only, or remove both torrent and downloaded data.
+
+- **Detailed Inspector Tabs**:
+  - **General**: Progress, ratio, download/upload speed, transfer totals, ETA, info-hash, and piece availability map.
+  - **Files**: Inspect all files, toggle individual file selection (skip unwanted files), and monitor completion percentages.
+  - **Trackers**: Real-time status of all tracker tiers, seeders/leechers counts, announce intervals, and scrape responses.
+  - **Peers**: Connected peers list with client identification, IP, country, flags, transfer rates, transport protocol (TCP vs uTP), and encryption status.
+  - **HTTP Seeds**: Manage WebSeed URLs (BEP 19).
+  - **Limits**: Configure per-torrent maximum download/upload rates, connection limits, and upload slot allocations.
+
+- **Categories & Tags**:
+  - Create custom categories with dedicated save paths (e.g. `movies` -> `/data/movies`, `tv` -> `/data/tv`). New torrents assigned to a category automatically inherit its destination path.
+  - Filter and organize swarms using custom color-coded tags.
+
+- **In-Browser Media Streaming**:
+  - Stream MKV and MP4 video files directly inside your browser or open them in an external media player (VLC, mpv) while downloading via HTTP Range streaming.
+  - The engine's dynamic piece picker automatically shifts piece priority to the video playhead window and readahead buffer.
+
+- **RSS Automation & Multi-Indexer Search (`/ui/rss`)**:
+  - Add standard RSS feeds or configure Torznab indexers (Jackett, Prowlarr, MIRCrew).
+  - Create automated download rules using regular expressions, required/excluded keywords, target categories, and quality tags.
+  - **Smart Episode Filter**: Remembers downloaded series and seasons to prevent re-fetching duplicate or older episodes.
+
+---
+
+## 4. Automation & *arr Integration (Sonarr, Radarr, Lidarr, Mobile Apps)
+
+`gx-torrent` provides native, drop-in compatibility with the **qBittorrent Web API v2** (`/api/v2`). You can connect Sonarr, Radarr, Lidarr, Readarr, and mobile management apps without any proxy or bridge.
+
+In Sonarr / Radarr (*Settings → Download Clients → Add → qBittorrent*):
+- **Name**: `gx-torrent`
+- **Host**: `<server-ip>` (or `localhost` if on the same host)
+- **Port**: `8890` (or your configured port)
+- **Username**: `admin` (or the username set in the wizard)
+- **Password**: The password configured in the setup wizard
+- **Category**: Set as needed (e.g. `tv-sonarr` or `radarr`)
+
+---
+
+## 5. Command-Line Reference & Environment Variables
+
+| Flag | Environment Variable | Default | Description |
+|---|---|---|---|
+| `-mode` | `GX_TORRENT_MODE` | `standalone` | Operating mode: `standalone` or `managed` (by Gextto) |
+| `-listen` | `GX_TORRENT_LISTEN` | `127.0.0.1:8890` | Web UI and REST API bind address (use `0.0.0.0:8890` for LAN) |
+| `-data` | `GX_TORRENT_DATA` | `~/.local/share/gx-torrent` | State directory (`settings.json`, session database, resume states) |
+| `-download-dir` | `GX_TORRENT_DOWNLOAD_DIR` | `<data>/downloads` | Default save path for downloaded files |
+| `-peer-ports` | `GX_TORRENT_PEER_PORTS` | `6881-6891` | Peer listening port range (uses first free port; `0` = dynamic per torrent) |
+| `-listen-interface` | `GX_TORRENT_LISTEN_INTERFACE` | all | Network interface or IP for incoming peer connections |
+| `-outgoing-interface`| `GX_TORRENT_OUTGOING_INTERFACE`| default | Bind outgoing traffic to interface/IP (VPN killswitch) |
+| `-proxy` | `GX_TORRENT_PROXY` | empty | SOCKS5 or HTTP CONNECT proxy (`socks5://user:pass@host:port`) |
+| `-ipfilter` | `GX_TORRENT_IPFILTER` | empty | IP blocklist file path (supports CIDR, P2P, and eMule `.dat`) |
+| `-encryption` | `GX_TORRENT_ENCRYPTION` | `1` | MSE/PE encryption: `0` = disabled, `1` = enabled, `2` = forced |
+| `-no-dht` | `GX_TORRENT_NO_DHT` | `false` | Disable Mainline DHT |
+| `-no-pex` | `GX_TORRENT_NO_PEX` | `false` | Disable Peer Exchange (PEX) |
+| `-no-utp` | `GX_TORRENT_NO_UTP` | `false` | Disable uTP protocol (TCP peers only) |
+| `-no-holepunch` | `GX_TORRENT_NO_HOLEPUNCH` | `false` | Disable BEP 55 NAT holepunching |
+| `-no-lsd` | `GX_TORRENT_NO_LSD` | `false` | Disable Local Service Discovery |
+| `-no-upnp` | `GX_TORRENT_NO_UPNP` | `false` | Disable UPnP automatic port forwarding |
+| `-no-natpmp` | `GX_TORRENT_NO_NATPMP` | `false` | Disable NAT-PMP port forwarding |
+| `-token` | `GX_TORRENT_TOKEN` | empty | Shared secret required in `X-Gx-Token` header (API authentication) |
+| `-log-file` | `GX_TORRENT_LOG_FILE` | stderr | Log output file (automatically rotated at 5 MB x 4 files) |
+| `-notify-url` | `GX_TORRENT_NOTIFY_URL` | empty | Webhook URL to POST JSON payloads on RSS match or error |
+| `-debug` | `GX_TORRENT_DEBUG` | `false` | Enable verbose engine debug logging |
+
+---
+
+## 6. Docker Container
+
+A standalone Docker image can be built from the repository root:
+
+```bash
+docker build -t gx-torrent .
+docker run -d \
+  --name gx-torrent \
+  -p 8890:8080 \
+  -p 6881:6881 \
+  -p 6881:6881/udp \
+  -v /path/to/data:/data \
+  -v /path/to/downloads:/downloads \
+  gx-torrent
+```
+
+Web UI is exposed on port `8890` (mapped from container port `8080`).
+
+---
+
+## 7. Configuration File (`settings.json`)
+
+The daemon maintains its runtime configuration inside `<data-dir>/settings.json`:
+- `standalone_password`: Bcrypt-hashed login password.
+- `bypass_local`: `"true"` to allow unauthenticated access from private IP subnets (LAN).
+- `categories`: Map of category names to target directory paths.
+- `rules`: Configured RSS automation rules.
+- `indexers`: Configured Torznab indexer URLs and API keys.
+
+To reset a forgotten password, simply stop the daemon, remove the `standalone_password` entry from `settings.json`, and restart: the web interface will prompt for setup.
+
+---
+
+## 8. License
+
+`gx-torrent` is open source distributed under the [EUPL 1.2](LICENSE) license.
+Third-party component notices and licenses are listed in [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
 README
 
 cp "${ROOT}/LICENSE" "$STAGE/LICENSE"

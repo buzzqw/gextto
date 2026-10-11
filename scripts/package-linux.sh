@@ -88,6 +88,7 @@ RUN
 chmod +x "$STAGE/run.sh"
 
 cp "${ROOT}/README.md" "$STAGE/README.md" 2>/dev/null || true
+cp "${ROOT}/README.it.md" "$STAGE/README.it.md" 2>/dev/null || true
 cp "${ROOT}/LICENSE" "$STAGE/LICENSE"
 cp "${ROOT}/THIRD-PARTY-NOTICES" "$STAGE/THIRD-PARTY-NOTICES"
 echo "$LABEL" > "$STAGE/VERSION"
