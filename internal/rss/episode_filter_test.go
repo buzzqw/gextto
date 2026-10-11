@@ -96,31 +96,30 @@ func TestEvaluateSkipsDisabledRules(t *testing.T) {
 
 func TestEvaluateIgnoreDaysWindow(t *testing.T) {
 	rules := []Rule{{Name: "r", IgnoreDays: 3, Match: Criteria{Include: []string{"show"}}}}
-	last := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
-	lookup := func(name string) time.Time {
-		if name == "r" {
-			return last
-		}
-		return time.Time{}
-	}
 	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+	// The item dates are irrelevant now: the cooldown is wall-clock.
+	item := Item{Title: "Show 1080p", Published: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	// Older than last match + 3 days (2026-01-08): ignored.
-	old := Item{Title: "Show 1080p", Published: time.Date(2026, 1, 7, 0, 0, 0, 0, time.UTC)}
-	if _, _, matched := EvaluateWithLastMatch(rules, "f", old, now, lookup); matched {
-		t.Fatal("an item older than the ignore window must not match")
+	// A match 2 days ago is inside the 3-day window: the rule does not match.
+	recent := func(string) time.Time { return now.Add(-2 * 24 * time.Hour) }
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", item, now, recent); matched {
+		t.Fatal("a rule inside its ignore-days cooldown must not match")
 	}
-	// Newer: accepted.
-	fresh := Item{Title: "Show 1080p", Published: time.Date(2026, 1, 9, 0, 0, 0, 0, time.UTC)}
-	if _, _, matched := EvaluateWithLastMatch(rules, "f", fresh, now, lookup); !matched {
-		t.Fatal("an item inside the window must match")
+	// A match older than the window lets the rule match again.
+	stale := func(string) time.Time { return now.Add(-4 * 24 * time.Hour) }
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", item, now, stale); !matched {
+		t.Fatal("after the cooldown the rule must match again")
 	}
-	// A dateless item is never rejected by the window.
-	if _, _, matched := EvaluateWithLastMatch(rules, "f", Item{Title: "Show 1080p"}, now, lookup); !matched {
-		t.Fatal("a dateless item must match")
+	// An unknown last match never blocks.
+	zero := func(string) time.Time { return time.Time{} }
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", item, now, zero); !matched {
+		t.Fatal("an unknown last match must not block")
 	}
 	// With no last-match lookup the window is inert.
-	if _, _, matched := Evaluate(rules, "f", old, now); !matched {
+	if _, _, matched := EvaluateWithLastMatch(rules, "f", item, now, nil); !matched {
+		t.Fatal("without a last match the ignore window must be inert")
+	}
+	if _, _, matched := Evaluate(rules, "f", item, now); !matched {
 		t.Fatal("without a last match the ignore window must be inert")
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -401,4 +402,25 @@ func renderUITemplate(t *testing.T, d *Daemon, standalone bool) string {
 		t.Fatalf("render status = %d", rec.Code)
 	}
 	return rec.Body.String()
+}
+
+// TestFollowTitleRegex checks the regex a followed title generates: the title's
+// words in order, case-insensitive and tolerant of the usual separators, so
+// fuzzy indexer results do not slip into the rule.
+func TestFollowTitleRegex(t *testing.T) {
+	cases := map[string]string{
+		"Mamma Mia":                     `(?i)mamma[\s._\-]+mia`,
+		"FROM":                          `(?i)from`,
+		"Star Trek: Strange New Worlds": `(?i)star[\s._\-]+trek[\s._\-]+strange[\s._\-]+new[\s._\-]+worlds`,
+		"...":                           "",
+	}
+	for title, want := range cases {
+		if got := followTitleRegex(title); got != want {
+			t.Errorf("followTitleRegex(%q) = %q, want %q", title, got, want)
+		}
+	}
+	re := regexp.MustCompile(followTitleRegex("Mamma Mia"))
+	if !re.MatchString("Mamma.Mia.2024.1080p") || re.MatchString("The.Mamma.Man") {
+		t.Fatalf("mamma mia regex must require both words: %q", followTitleRegex("Mamma Mia"))
+	}
 }

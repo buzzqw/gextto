@@ -193,7 +193,7 @@ var uiCatalog = map[string][5]string{
 	"Max seeders":              {"Seed massimi", "Max. Seeder", "Seeds max.", "Seeds máx.", "Maks. seedy"},
 	"Min peers":                {"Peer minimi", "Min. Peers", "Pairs min.", "Pares mín.", "Min. peery"},
 	"Max age (days)":           {"Età massima (giorni)", "Max. Alter (Tage)", "Âge max. (jours)", "Antigüedad máx. (días)", "Maks. wiek (dni)"},
-	"Ignore older than (days)": {"Ignora più vecchi di (giorni)", "Älter als ignorieren (Tage)", "Ignorer plus anciens que (jours)", "Ignorar más antiguos que (días)", "Pomijaj starsze niż (dni)"},
+	"Cooldown between matches (days)": {"Attesa tra match (giorni)", "Wartezeit zwischen Treffern (Tage)", "Délai entre correspondances (jours)", "Espera entre coincidencias (días)", "Odstęp między trafieniami (dni)"},
 	"Require episode":          {"Richiedi episodio", "Folge erforderlich", "Exiger un épisode", "Requerir episodio", "Wymagaj odcinka"},
 	"Smart episode":            {"Smart episode", "Smart Episode", "Smart episode", "Smart episode", "Smart episode"},
 	"Episode filter":           {"Filtro episodi", "Episodenfilter", "Filtre d'épisodes", "Filtro de episodios", "Filtr odcinków"},

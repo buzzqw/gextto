@@ -374,11 +374,18 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The scoped rule: adds the matches with the action, and for a series keeps
-	// the smart-episode tracking.
+	// the smart-episode tracking. The title itself is required (as a tolerant
+	// regex), so fuzzy indexer results for common words do not slip in; a
+	// followed movie downloads once.
 	rule := rss.Rule{
 		Name:  title,
 		Feeds: []string{feed.Name},
-		Match: rss.Criteria{Include: include, Exclude: exclude, EpisodeFilter: episode},
+		Match: rss.Criteria{
+			Include:       include,
+			Exclude:       exclude,
+			Regex:         followTitleRegex(title),
+			EpisodeFilter: episode,
+		},
 		Action: rss.Action{
 			SavePath: savePath,
 			Category: category,
@@ -387,6 +394,8 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	if kind == "series" {
 		rule.Match.RequireEpisode = true
 		rule.Match.SmartEpisode = true
+	} else {
+		rule.Action.Once = true
 	}
 	rules := d.rules()
 	replaced = false
@@ -406,6 +415,27 @@ func (d *Daemon) handleUIRssFollow(w http.ResponseWriter, r *http.Request) {
 	}
 	d.pokeFeeds()
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+}
+
+// followTitleRegex turns a followed title into a case-insensitive regex that
+// requires the title's words, in order and separated by any of the usual
+// separators (. _ - space). Without it a rule built only from the optional
+// "include" words also matches unrelated releases returned by fuzzy indexer
+// queries (e.g. any release carrying "1080p").
+func followTitleRegex(title string) string {
+	words := strings.FieldsFunc(strings.ToLower(title), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+	})
+	quoted := make([]string, 0, len(words))
+	for _, word := range words {
+		if word != "" {
+			quoted = append(quoted, regexp.QuoteMeta(word))
+		}
+	}
+	if len(quoted) == 0 {
+		return ""
+	}
+	return "(?i)" + strings.Join(quoted, `[\s._\-]+`)
 }
 
 // uiRuleFromForm builds one rule from the add-rule form, validating the regexes

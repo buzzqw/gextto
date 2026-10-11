@@ -155,6 +155,8 @@ func (d *Daemon) pollFeeds() {
 		return
 	}
 	client := &http.Client{Timeout: feedRequestTimeout}
+	var rulesOnce []string
+	onceHit := map[string]bool{}
 	for _, feed := range feeds {
 		search := strings.TrimSpace(feed.Search)
 		if strings.TrimSpace(feed.URL) == "" && search == "" {
@@ -203,6 +205,9 @@ func (d *Daemon) pollFeeds() {
 			if !ok {
 				continue
 			}
+			if rule.Action.Once && onceHit[rule.Name] {
+				continue
+			}
 			if d.feedSeen(name, item.GUID) {
 				continue
 			}
@@ -234,11 +239,15 @@ func (d *Daemon) pollFeeds() {
 				d.markSmartEpisode(smartKey, smartTokens)
 			}
 			if rule.IgnoreDays > 0 {
-				d.markRuleMatch(rule.Name, item.Published)
+				d.markRuleMatch(rule.Name, time.Now())
 			}
 			if newlyAdded {
 				added++
 				addedTitles = append(addedTitles, item.Title)
+				if rule.Action.Once {
+					onceHit[rule.Name] = true
+					rulesOnce = append(rulesOnce, rule.Name)
+				}
 			}
 		}
 		status.Added = added
@@ -247,6 +256,9 @@ func (d *Daemon) pollFeeds() {
 			d.notify("feed_match", map[string]any{"feed": name, "added": added, "titles": addedTitles})
 		}
 		d.setFeedStatus(status)
+	}
+	if len(rulesOnce) > 0 {
+		d.disableRules(rulesOnce)
 	}
 	// One atomic write at the end of the cycle: markFeedSeen/markSmartEpisode only
 	// set dirty, so a poll that adds many items does not rewrite state.json once
@@ -409,8 +421,8 @@ func (d *Daemon) markSmartEpisode(key string, tokens []string) {
 	d.dirty = true
 }
 
-// ruleLastMatch returns the published time of the last item a rule accepted, or
-// the zero time when the rule never matched (used by the ignore-days window).
+// ruleLastMatch returns the wall-clock time a rule last accepted an item, or the
+// zero time when the rule never matched (used by the ignore-days cooldown).
 func (d *Daemon) ruleLastMatch(name string) time.Time {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -421,22 +433,56 @@ func (d *Daemon) ruleLastMatch(name string) time.Time {
 	return time.Unix(at, 0)
 }
 
-// markRuleMatch records the last accepted item time for a rule, so older items
-// are ignored for the next ignore-days window.
-func (d *Daemon) markRuleMatch(name string, published time.Time) {
+// markRuleMatch records the wall-clock time a rule last accepted an item, so the
+// ignore-days cooldown is measured from the match, not from item dates.
+func (d *Daemon) markRuleMatch(name string, at time.Time) {
 	if strings.TrimSpace(name) == "" {
 		return
 	}
-	if published.IsZero() {
-		published = time.Now()
+	if at.IsZero() {
+		at = time.Now()
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.state.RuleLastMatch == nil {
 		d.state.RuleLastMatch = map[string]int64{}
 	}
-	d.state.RuleLastMatch[name] = published.Unix()
+	d.state.RuleLastMatch[name] = at.Unix()
 	d.dirty = true
+}
+
+// disableRules turns off the named rules (Once rules, after they added an item)
+// and saves once for all of them. The rule stays in the list so the operator can
+// re-enable it.
+func (d *Daemon) disableRules(names []string) {
+	wanted := map[string]bool{}
+	for _, name := range names {
+		wanted[name] = true
+	}
+	rules := d.rules()
+	changed := false
+	var disabled []string
+	for i := range rules {
+		if !wanted[rules[i].Name] {
+			continue
+		}
+		if rules[i].Enabled == nil || *rules[i].Enabled {
+			off := false
+			rules[i].Enabled = &off
+			changed = true
+			disabled = append(disabled, rules[i].Name)
+		}
+	}
+	if !changed {
+		return
+	}
+	if err := d.saveRules(rules); err != nil {
+		logf("cannot disable once rules %v: %v", disabled, err)
+		return
+	}
+	for _, name := range disabled {
+		logf("rule %q disabled after the first download (download once)", name)
+	}
 }
 
 // feedSeenKey is the persisted key of one item.

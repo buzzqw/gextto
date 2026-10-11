@@ -42,6 +42,9 @@ type Action struct {
 	Sequential bool     `json:"sequential,omitempty"`
 	FirstLast  bool     `json:"first_last,omitempty"`
 	Top        bool     `json:"top,omitempty"`
+	// Once disables the rule after it adds an item, so following a movie does
+	// not queue every release the indexer returns.
+	Once bool `json:"once,omitempty"`
 }
 
 // Rule is one entry of the ordered rule set.
@@ -52,8 +55,9 @@ type Rule struct {
 	// Enabled is optional: nil (the common case) means enabled, a pointer to
 	// false disables the rule without deleting it.
 	Enabled *bool `json:"enabled,omitempty"`
-	// IgnoreDays skips items older than the rule's last match plus this many
-	// days (0 = off), like qBittorrent's "ignore days".
+	// IgnoreDays is a cooldown: after the rule matches, it does not match again
+	// for this many days of wall-clock time (like qBittorrent's "ignore
+	// subsequent matches"). 0 = off.
 	IgnoreDays int      `json:"ignore_days,omitempty"`
 	Fail       bool     `json:"fail,omitempty"` // FAIL: matching items are skipped
 	Match      Criteria `json:"match"`
@@ -186,7 +190,7 @@ func EvaluateWithLastMatch(rules []Rule, feedName string, item Item, now time.Ti
 		if !ruleAppliesToFeed(candidate, feedName) {
 			continue
 		}
-		if !ruleWithinIgnoreWindow(candidate, item, lastMatch) {
+		if !ruleWithinIgnoreWindow(candidate, now, lastMatch) {
 			continue
 		}
 		if candidate.Match.Match(item, now) {
@@ -196,18 +200,19 @@ func EvaluateWithLastMatch(rules []Rule, feedName string, item Item, now time.Ti
 	return Rule{}, false, false
 }
 
-// ruleWithinIgnoreWindow reports whether an item is new enough for a rule: with
-// IgnoreDays > 0 an item older than the rule's last match plus the window does
-// not match. An unknown last match or a dateless item is never rejected.
-func ruleWithinIgnoreWindow(rule Rule, item Item, lastMatch func(string) time.Time) bool {
-	if rule.IgnoreDays <= 0 || lastMatch == nil || item.Published.IsZero() {
+// ruleWithinIgnoreWindow reports whether a rule may match at time now. With
+// IgnoreDays > 0 the rule is a wall-clock cooldown: it does not match again
+// until that many days have passed since its last match (like qBittorrent's
+// "ignore subsequent matches for N days"). An unknown last match means "match".
+func ruleWithinIgnoreWindow(rule Rule, now time.Time, lastMatch func(string) time.Time) bool {
+	if rule.IgnoreDays <= 0 || lastMatch == nil {
 		return true
 	}
 	last := lastMatch(rule.Name)
 	if last.IsZero() {
 		return true
 	}
-	return !item.Published.Before(last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour))
+	return !now.Before(last.Add(time.Duration(rule.IgnoreDays) * 24 * time.Hour))
 }
 
 func ruleAppliesToFeed(rule Rule, feedName string) bool {

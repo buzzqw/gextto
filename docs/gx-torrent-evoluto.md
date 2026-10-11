@@ -505,7 +505,7 @@ rimanenti:
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, **feed dai risultati di ricerca**, **notifiche webhook su match/errore**) | §12.2 | fatto |
-| F2 — RSS/UI guidati: editor di feed e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), cartelle dei feed (`feedConfig.Folder`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), finestra `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **segui un titolo** con suggerimenti (`GET /ui/rss-suggest`), pulsante **Check feeds**, pagina `/ui/settings` (banda globale + scheduler), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
+| F2 — RSS/UI guidati: editor di feed e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), cartelle dei feed (`feedConfig.Folder`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), cooldown `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **segui un titolo** con suggerimenti (`GET /ui/rss-suggest`), pulsante **Check feeds**, pagina `/ui/settings` (banda globale + scheduler), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
 **Punto finale:** al termine, **controllo approfondito di tutto il codice
@@ -587,10 +587,11 @@ L'editing è **guidato** (`cmd/gx-torrent/ui_rss_edit.go`): menu a tendina del t
 di indexer con URL preimpostati (`uiIndexerPresets`), **cartelle dei feed**
 (`feedConfig.Folder`), editor delle **regole ordinate** con sposta su/giù e
 disabilita, `episode_filter` in stile qBittorrent
-(`internal/rss/episode_filter.go`) e finestra `ignore_days`
+(`internal/rss/episode_filter.go`) e cooldown `ignore_days`
 (`internal/rss/rules.go`). Lo **smart-episode** riconosce anche REPACK/PROPER
 (`cmd/gx-torrent/feed.go`). Con **"segui un titolo"** il nome della serie viene
-suggerito dai risultati degli indexer (`GET /ui/rss-suggest`) e il pulsante
+suggerito dai risultati degli indexer (`GET /ui/rss-suggest`); la regola generata
+richiede il titolo e, per un film, è `once` (un solo download). Il pulsante
 **Check feeds** forza subito il controllo di tutti i feed. Banda globale e
 scheduler si impostano dalla pagina `/ui/settings`, la cartella di download dal
 selettore `/ui/browse-dir`.

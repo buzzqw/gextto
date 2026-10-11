@@ -445,13 +445,15 @@ tutti), `fail`, `match` e `action`:
   (aggiunge un episodio di una serie una volta sola, tenendo traccia
   dell'ultimo: come lo smart episode filter di qBittorrent; un **REPACK** o
   **PROPER** di un episodio già preso viene accettato una volta sola);
-- `ignore_days` (0 = spento): scarta gli item più vecchi dell'ultimo match della
-  regola più N giorni, come *ignore days* di qBittorrent (l'ultimo match si
-  aggiorna a ogni item accettato);
+- `ignore_days` (0 = spento): **cooldown** in tempo reale — dopo un match la regola
+  non fa più match per N giorni, come *ignore days* di qBittorrent ("ignora i
+  match successivi per N giorni"); non dipende dalla data di pubblicazione degli
+  item, quindi un episodio uscito due giorni dopo il precedente non viene perso;
 - ogni regola è attiva per default; `enabled: false` la disattiva senza
   cancellarla (l'editor mostra un'etichetta *Disattivata*).
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
-  `top`.
+  `top`, `once` (disattiva la regola dopo il primo download; lo usa *Segui un
+  titolo* per i film).
 
 Il **filtro episodi** `episode_filter` usa la sintassi di qBittorrent: `1x01`
 (singolo), `1x01-05` (intervallo nella stagione), `1x01-1x05` (a cavallo di due
@@ -471,7 +473,10 @@ film. Mentre si digita, `GET /ui/rss-suggest` interroga gli indexer e propone i
 nome esatto né conoscere sintassi. *Segui* crea in un colpo solo il feed di
 ricerca Torznab e una regola a esso limitata (con lo smart episode per le serie);
 i filtri facoltativi (include/exclude, filtro episodi) stanno sotto *Filtri
-avanzati*.
+avanzati*. La regola generata **richiede il titolo** (come regex tollerante ai
+separatori), così i risultati fuzzy degli indexer su parole comuni non entrano;
+per un **film** la regola è `once`: prende una release e si disattiva, invece di
+accodare tutte le versioni restituite.
 
 Sotto: elenchi con pulsanti per aggiungere e rimuovere **indexer** (tendina
 Prowlarr/Jackett/Altro, URL precompilato) e **feed** (URL RSS o query di ricerca,

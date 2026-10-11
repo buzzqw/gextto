@@ -967,6 +967,35 @@ Demone (`cmd/gx-torrent`) e DHT:
 - **`renameFile`/`renameFolder` qBittorrent**: richiede supporto di rinomina nel
   motore (rinomina su disco + metadati), feature a sé, non in questa tornata.
 
+### 5.15 Revisione `analisi4.md` (2026-10-11): voci verificate e applicate
+
+Revisione esterna (`/home/andres/analisi4.md`) su installer standalone e gestore
+RSS, verificata sul codice prima di applicare. **Applicate** le tre voci RSS
+d'impatto reale, nella forma corretta (le proposte del documento erano in parte
+inefficaci):
+
+- **B.1 `ignore_days`**: era un filtro sulla *data di pubblicazione* rispetto
+  all'ultimo match, così un episodio uscito poco dopo il precedente non veniva
+  più preso. Ora è un **cooldown wall-clock** (`internal/rss/rules.go`,
+  `ruleWithinIgnoreWindow`), e `markRuleMatch` registra l'istante del match
+  (`cmd/gx-torrent/feed.go`), non la `pubDate`. Etichetta UI aggiornata
+  (*Attesa tra match*). Test `TestEvaluateIgnoreDaysWindow`,
+  `TestPollFeedsIgnoreDaysWindow`.
+- **B.2 film "download once"**: *Segui un titolo* su un film rende la regola
+  `once` (`rss.Action.Once`): prende una release e disattiva la regola, anche a
+  più risultati nello stesso ciclo (`disableRules`, `onceHit` in `pollFeeds`).
+  Test `TestPollFeedsOnceDisablesRule`.
+- **B.3 titolo nei criteri**: la proposta del documento (aggiungere il titolo a
+  `Match.Include`) **non funziona**: `Include` è un OR, quindi allarga i match.
+  Applicata invece una **regex tollerante** che richiede le parole del titolo in
+  ordine (`followTitleRegex`, es. `(?i)mamma[\s._\-]+mia`). Test
+  `TestFollowTitleRegex`.
+
+**Non applicate** (valutate e rinviate): A.1–A.4 (installer Linux/Windows: comodi
+ma non critici), B.4 (il fallback proposto **aggirerebbe le regole** scoped: da
+ridisegnare), B.5 (edge REPACK+PROPER marginale), B.6/B.7 (tolleranza input e
+rumore log).
+
 ---
 
 ## 6. gx-torrent: misure di choking e seeding

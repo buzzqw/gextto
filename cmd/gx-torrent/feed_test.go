@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/buzzqw/gextto/internal/rss"
 	"github.com/buzzqw/gextto/internal/settings"
 )
 
@@ -299,14 +300,20 @@ func TestPollFeedsIgnoreDaysWindow(t *testing.T) {
 
 	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
 	d.opts.Settings.Set(rulesSettingKey, `[{"name":"shows","ignore_days":3,"match":{"include":["Show"],"require_episode":true}}]`)
-	// The rule last matched on 2026-01-05: with a 3-day window, items before
-	// 2026-01-08 (E01, 01-07) are ignored and only E02 (01-09) is added.
-	d.markRuleMatch("shows", time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC))
-
+	// The cooldown is wall-clock: a match 2 days ago keeps the rule inside the
+	// 3-day window, so nothing is added regardless of the items' pubDate.
+	d.markRuleMatch("shows", time.Now().Add(-2*24*time.Hour))
 	d.pollFeeds()
-	waitFor(t, "E02 only", func() bool { return len(d.snapshotViews()) == 1 })
-	if view := d.snapshotViews()[0]; view.Hash != "2222222222222222222222222222222222222222" {
-		t.Fatalf("added %s, want only E02", view.Hash)
+	if got := len(d.snapshotViews()); got != 0 {
+		t.Fatalf("inside the cooldown added %d torrent(s), want 0", got)
+	}
+	// Past the window the rule matches again: the first item is taken and the
+	// cooldown restarts, so the second one waits for the next window.
+	d.markRuleMatch("shows", time.Now().Add(-4*24*time.Hour))
+	d.pollFeeds()
+	waitFor(t, "one episode after the cooldown", func() bool { return len(d.snapshotViews()) == 1 })
+	if view := d.snapshotViews()[0]; view.Hash != "1111111111111111111111111111111111111111" {
+		t.Fatalf("added %s, want the first episode", view.Hash)
 	}
 }
 
@@ -504,5 +511,39 @@ func TestUIFeedItems(t *testing.T) {
 	}
 	if !byTitle["Movie 1080p"].Pass || byTitle["Movie 720p"].Pass {
 		t.Fatalf("include filter not reflected: %+v", items)
+	}
+}
+
+// TestPollFeedsOnceDisablesRule covers Action.Once: a followed movie takes one
+// release, disables its rule and does not queue the other results.
+func TestPollFeedsOnceDisablesRule(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Movie 1080p</title><guid>a</guid><description><![CDATA[<a href="magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">x</a>]]></description></item>
+<item><title>Movie 2160p</title><guid>b</guid><description><![CDATA[<a href="magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb">x</a>]]></description></item>
+</channel></rss>`))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(rulesSettingKey, `[{"name":"m","match":{"include":["Movie"]},"action":{"once":true}}]`)
+
+	d.pollFeeds()
+	waitFor(t, "one torrent only", func() bool { return len(d.snapshotViews()) == 1 })
+
+	disabled := false
+	for _, rule := range d.rules() {
+		if rule.Name == "m" && !rss.RuleEnabled(rule) {
+			disabled = true
+		}
+	}
+	if !disabled {
+		t.Fatal("the once rule must be disabled after the first download")
+	}
+	// A second poll adds nothing more.
+	d.pollFeeds()
+	if got := len(d.snapshotViews()); got != 1 {
+		t.Fatalf("after the once rule is off, %d torrents, want 1", got)
 	}
 }
