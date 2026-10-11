@@ -153,6 +153,12 @@ func Parse(r io.Reader, indexerName string) ([]Item, error) {
 		if item.Link == "" {
 			item.Link = strings.TrimSpace(raw.Link)
 		}
+		// A magnet in the link/enclosure is a magnet, not a .torrent URL: some
+		// indexers (MirCrew among them) put the magnet there and not in a
+		// magneturl attribute, and fetching it over HTTP would fail.
+		if item.Magnet == "" && strings.HasPrefix(strings.ToLower(item.Link), "magnet:") {
+			item.Magnet = item.Link
+		}
 		item.Size = raw.Enclosure.Length
 		for _, attr := range raw.Attrs {
 			switch strings.ToLower(strings.TrimSpace(attr.Name)) {

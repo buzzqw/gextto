@@ -422,7 +422,12 @@ per seed. Con almeno un indexer configurato compare nella pagina la **casella di
 ricerca**, con i risultati e un pulsante *Add* per aggiungere il torrent. In
 managed non è disponibile. **Jackett, Prowlarr e MIRCrew** parlano tutti Torznab
 (il servizio `mircrew-indexer` espone un endpoint Torznab), quindi si configurano
-allo stesso modo.
+allo stesso modo: URL che finisce in `/api` (per MIRCrew la porta è scelta a
+mano, non ha un default). Un indexer può mettere il **magnet nel link o
+nell'enclosure** invece che in un attributo `magneturl` (è il caso di MIRCrew):
+viene riconosciuto e aggiunto come magnet, senza tentare di scaricarlo via HTTP.
+Le ricerche automatiche in un feed di ricerca attendono ogni indexer **fino a 45
+secondi**, perché MIRCrew può cercare sul forum prima di rispondere.
 
 L'**RSS** (standalone) usa la chiave `feeds`: un array JSON di feed con le
 regole, ad esempio

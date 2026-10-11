@@ -130,3 +130,27 @@ func TestIndexerPing(t *testing.T) {
 		t.Fatal("an HTTP 500 must fail the ping")
 	}
 }
+
+// TestMagnetLinkBecomesMagnet covers the MirCrew shape: the magnet is in
+// link/enclosure with no magneturl attribute, so Item.Magnet must be populated
+// (otherwise the caller tries to fetch a magnet: URL over HTTP).
+func TestMagnetLinkBecomesMagnet(t *testing.T) {
+	body := `<?xml version="1.0"?><rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>` +
+		`<item><title>FBI.Most.Wanted-1x02-DLMux-1080p.mkv</title><pubDate>Mon, 05 Oct 2026 10:17:44 +0000</pubDate>` +
+		`<link>magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&amp;dn=FBI</link>` +
+		`<enclosure url="magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567&amp;dn=FBI" length="0" type="application/x-bittorrent"/>` +
+		`<torznab:attr name="seeders" value="0"/></item></channel></rss>`
+	items, err := Parse(strings.NewReader(body), "mircrew")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("items = %d", len(items))
+	}
+	if !strings.HasPrefix(items[0].Magnet, "magnet:") {
+		t.Fatalf("a magnet link must populate Magnet, got %+v", items[0])
+	}
+	if got := items[0].Download(); !strings.HasPrefix(got, "magnet:") {
+		t.Fatalf("Download() = %q, want a magnet", got)
+	}
+}

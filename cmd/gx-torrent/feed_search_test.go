@@ -114,4 +114,12 @@ func TestRSSItemFromTorznabPrefersMagnetAsGUID(t *testing.T) {
 	if it.GUID != "http://x/a.torrent" {
 		t.Fatalf("GUID = %q, want the link when there is no magnet", it.GUID)
 	}
+	// A magnet (MirCrew puts it in link/enclosure, and Parse fills Magnet) must
+	// stay a magnet, so the engine adds it directly instead of fetching a
+	// magnet: URL over HTTP.
+	magnet := "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+	withMagnet := rssItemFromTorznab(torznab.Item{Title: "t", Magnet: magnet, Link: magnet})
+	if withMagnet.Magnet != magnet || withMagnet.GUID != magnet {
+		t.Fatalf("magnet item = %+v, want Magnet and GUID = %q", withMagnet, magnet)
+	}
 }

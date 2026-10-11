@@ -38,6 +38,9 @@ type uiIndexerPreset struct {
 var uiIndexerPresets = []uiIndexerPreset{
 	{Name: "Prowlarr", URL: "http://127.0.0.1:9696"},
 	{Name: "Jackett", URL: "http://127.0.0.1:9117"},
+	// MirCrew's local indexer serves Torznab on a port of its choosing (often
+	// 9118): the URL is typed by hand, the name just fills the field.
+	{Name: "MIRCrew", URL: ""},
 }
 
 // uiIndexerPresetURL returns the default URL of a preset by name (case

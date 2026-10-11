@@ -25,7 +25,10 @@ const (
 	defaultFeedInterval = 15 * time.Minute
 	feedSeenRetention   = 30 * 24 * time.Hour
 	feedRequestTimeout  = 30 * time.Second
-	feedMaxAddsPerPoll  = 25
+	// indexerSearchTimeout gives a Torznab indexer more room than a plain RSS
+	// fetch: MirCrew, for instance, may search its forum before answering.
+	indexerSearchTimeout = 45 * time.Second
+	feedMaxAddsPerPoll   = 25
 )
 
 // feedConfig is one configured feed with its rules. A feed is either an RSS
@@ -170,7 +173,11 @@ func (d *Daemon) pollFeeds() {
 		if name == "" {
 			name = source
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), feedRequestTimeout)
+		timeout := feedRequestTimeout
+		if search != "" {
+			timeout = indexerSearchTimeout
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		var items []rss.Item
 		var err error
 		if search != "" {
