@@ -105,9 +105,9 @@ func (d *Daemon) feedInterval() time.Duration {
 
 // runFeeds polls the feeds on an interval until stop is closed. It runs for the
 // whole standalone lifetime so feeds added at runtime (the RSS page, the
-// wizard) are picked up on the next round; with no feed configured pollFeeds is
-// a cheap no-op. In managed mode Gextto owns acquisition, so the loop never
-// starts.
+// wizard) are picked up on the next round; with no feed configured it still
+// drives the wanted titles, which search the indexers directly. In managed mode
+// Gextto owns acquisition, so the loop never starts.
 func (d *Daemon) runFeeds(stop <-chan struct{}) {
 	if d.opts.Mode != ModeStandalone {
 		return
@@ -153,10 +153,10 @@ func (d *Daemon) pollFeeds() {
 		return
 	}
 	defer d.feedPollMu.Unlock()
+	// The wanted titles run even with no feed configured: pollWanted searches
+	// the indexers directly, so a standalone client that only has indexers and
+	// wanted titles is still driven. Do not return early when feeds is empty.
 	feeds := d.feeds()
-	if len(feeds) == 0 {
-		return
-	}
 	client := &http.Client{Timeout: feedRequestTimeout}
 	var rulesOnce []string
 	onceHit := map[string]bool{}

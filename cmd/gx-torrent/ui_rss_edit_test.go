@@ -489,10 +489,10 @@ func TestUIRssIndexerTestEndpoint(t *testing.T) {
 	}
 }
 
-// TestFollowTitleRegex checks the regex a followed title generates: the title's
+// TestTitleMatchRegex checks the regex a wanted title generates: the title's
 // words in order, case-insensitive and tolerant of the usual separators, so
-// fuzzy indexer results do not slip into the rule.
-func TestFollowTitleRegex(t *testing.T) {
+// fuzzy indexer results do not slip into the match.
+func TestTitleMatchRegex(t *testing.T) {
 	cases := map[string]string{
 		"Mamma Mia":                     `(?i)mamma[\s._\-]+mia`,
 		"FROM":                          `(?i)from`,
@@ -500,12 +500,12 @@ func TestFollowTitleRegex(t *testing.T) {
 		"...":                           "",
 	}
 	for title, want := range cases {
-		if got := followTitleRegex(title); got != want {
-			t.Errorf("followTitleRegex(%q) = %q, want %q", title, got, want)
+		if got := titleMatchRegex(title); got != want {
+			t.Errorf("titleMatchRegex(%q) = %q, want %q", title, got, want)
 		}
 	}
-	re := regexp.MustCompile(followTitleRegex("Mamma Mia"))
+	re := regexp.MustCompile(titleMatchRegex("Mamma Mia"))
 	if !re.MatchString("Mamma.Mia.2024.1080p") || re.MatchString("The.Mamma.Man") {
-		t.Fatalf("mamma mia regex must require both words: %q", followTitleRegex("Mamma Mia"))
+		t.Fatalf("mamma mia regex must require both words: %q", titleMatchRegex("Mamma Mia"))
 	}
 }

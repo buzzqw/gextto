@@ -492,7 +492,8 @@ scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separator
 quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
 **AND**.
 
-Il demone, a ogni ciclo, cerca ogni titolo negli indexer e nei feed RSS e prende
+Il demone, a ogni ciclo, cerca ogni titolo negli indexer e nei feed RSS (anche
+senza alcun feed configurato: bastano gli indexer) e prende
 gli episodi che compaiono; tiene un **registro** (nel file di stato) di cosa è
 apparso e cosa è stato scaricato, mostra i **mancanti** nella tabella e li
 **ricerca di nuovo** (gap search, con query `Titolo SxxEyy`) finché non li trova.
@@ -514,7 +515,7 @@ e un pulsante *Check feeds* per forzare subito un giro di controllo.
 
 Gli stessi risultati si ottengono via
 `POST /ui/rss-indexer`, `POST /ui/rss-feed`, `POST /ui/rss-rule` (op
-`add`/`remove`/`up`/`down`) e `POST /ui/rss-follow`; le textarea JSON restano su
+`add`/`remove`/`up`/`down`) e `POST /ui/wanted`; le textarea JSON restano su
 `POST /ui/rss-config`.
 
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una

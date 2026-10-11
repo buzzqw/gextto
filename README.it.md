@@ -238,9 +238,10 @@ server), porta peer con test di raggiungibilità, limiti di banda globali, utent
 e password, accesso dalla LAN e indexer facoltativi. Scegliendo Prowlarr o
 Jackett l'URL dell'indexer viene riempito con il suo solito indirizzo locale e
 porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
-personalizzato. La pagina collega a **RSS e indexer**, dove feed, regole e
-indexer si gestiscono senza modificare il JSON a mano — incluso un *Segui un
-titolo* che crea in un colpo solo il feed di ricerca e la sua regola — e a
+personalizzato. La pagina collega a **RSS e indexer**, dove si gestiscono senza
+modificare il JSON a mano la lista *Cercati* (i titoli da cercare, ricercati
+negli indexer e nei feed configurati, con gli episodi mancanti cercati di nuovo)
+e i feed, le regole e gli indexer — e a
 **Impostazioni**, il pannello del client: cartelle, rete e porte, protocolli
 (cifratura, DHT/uTP/LSD…), coda e cache, banda e scheduler giornaliero, lingua e
 notifiche. In

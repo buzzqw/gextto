@@ -105,6 +105,22 @@ func TestWantedSeenTakenMissing(t *testing.T) {
 	}
 }
 
+// TestPollFeedsDrivesWantedWithoutFeeds guards the wanted engine running even
+// when no RSS feed is configured: the wanted list searches the indexers
+// directly, so pollFeeds must not return early and skip pollWanted.
+func TestPollFeedsDrivesWantedWithoutFeeds(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Reacher","kind":"series","seasons":"1+"}]`)
+	if len(d.feeds()) != 0 {
+		t.Fatal("this test needs zero feeds")
+	}
+	d.pollFeeds()
+	if _, ok := d.state.WantedGapLast["Reacher"]; !ok {
+		t.Fatalf("pollWanted did not run without feeds: WantedGapLast=%v", d.state.WantedGapLast)
+	}
+}
+
 func TestWantedMatchesTitleAndFilters(t *testing.T) {
 	w := wantedEntry{Name: "Mamma Mia", Kind: "series", Seasons: "1", Language: "ita", Quality: "1080p"}
 	now := time.Now()

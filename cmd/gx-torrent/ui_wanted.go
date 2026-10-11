@@ -1,10 +1,13 @@
 package main
 
 // ui_wanted.go is the "wanted" section of the RSS page: the titles the operator
-// is looking for. Adding one generates a Torznab search feed and a rule (see
-// wanted.go); the list is edited here. The "search in feeds" step probes the
-// indexers and the configured RSS feeds for candidate series, filtered by the
-// language/quality typed so far.
+// is looking for. The list is edited here; the engine (see wanted.go) searches
+// the configured indexers and the RSS feeds for each title. The "search in
+// feeds" step probes the indexers and the configured RSS feeds for candidate
+// series, filtered by the language/quality typed so far.
+//
+// A wanted title does not generate a feed or a rule: it is the engine that
+// queries the indexers and the feeds for it.
 
 import (
 	"context"
@@ -18,8 +21,7 @@ import (
 	"github.com/buzzqw/gextto/internal/rss"
 )
 
-// handleUIWanted adds, edits or removes one wanted title and keeps the generated
-// feeds and rules in sync.
+// handleUIWanted adds, edits or removes one wanted title.
 func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
 		http.NotFound(w, r)
@@ -49,7 +51,6 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 			EpisodeFilter: strings.TrimSpace(r.FormValue("episode_filter")),
 			Category:      strings.TrimSpace(r.FormValue("category")),
 			SavePath:      strings.TrimSpace(r.FormValue("savepath")),
-			Folder:        strings.TrimSpace(r.FormValue("folder")),
 			Paused:        formBool(r, "paused"),
 		}
 		if entry.Name == "" {
@@ -226,7 +227,6 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-episode="` + html.EscapeString(w.EpisodeFilter) + `"` +
 			` data-category="` + html.EscapeString(w.Category) + `"` +
 			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
-			` data-folder="` + html.EscapeString(w.Folder) + `"` +
 			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
 		b.WriteString(`<button type="button" class="sm" ` + attrs + `>Edit</button> `)
 		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form>`)

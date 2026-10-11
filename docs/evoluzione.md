@@ -990,15 +990,16 @@ inefficaci):
   (`cmd/gx-torrent/feed.go`), non la `pubDate`. Etichetta UI aggiornata
   (*Attesa tra match*). Test `TestEvaluateIgnoreDaysWindow`,
   `TestPollFeedsIgnoreDaysWindow`.
-- **B.2 film "download once"**: *Segui un titolo* su un film rende la regola
-  `once` (`rss.Action.Once`): prende una release e disattiva la regola, anche a
+- **B.2 film "download once"**: la funzione *Segui un titolo* di allora (oggi
+  sostituita dalla lista **Cercati**, §5.16) rendeva la regola `once`
+  (`rss.Action.Once`): prende una release e disattiva la regola, anche a
   più risultati nello stesso ciclo (`disableRules`, `onceHit` in `pollFeeds`).
   Test `TestPollFeedsOnceDisablesRule`.
 - **B.3 titolo nei criteri**: la proposta del documento (aggiungere il titolo a
   `Match.Include`) **non funziona**: `Include` è un OR, quindi allarga i match.
   Applicata invece una **regex tollerante** che richiede le parole del titolo in
-  ordine (`followTitleRegex`, es. `(?i)mamma[\s._\-]+mia`). Test
-  `TestFollowTitleRegex`.
+  ordine (`titleMatchRegex` — allora `followTitleRegex` —, es.
+  `(?i)mamma[\s._\-]+mia`). Test `TestTitleMatchRegex`.
 
 - **B.4 feed scoped**: aggiunto `rss.FeedCoveredByRules`; il fallback ai filtri
   locali del feed vale **solo se nessuna regola copre quel feed** (la proposta
@@ -1039,6 +1040,15 @@ trova: è il "gx-core sa che manca e lo scarica" richiesto. Per un film prende u
 release e non ne cerca altre. La lista non genera feed/regole, così i feed
 restano liberi per le regole avanzate. UI in `ui_wanted.go` + sezione in
 `rss.html`; test in `wanted_test.go`.
+
+**Correzioni successive (revisione 2026-10-11).** Il motore era invocato solo
+alla fine di `pollFeeds`, che usciva subito quando non c'erano feed: una
+configurazione con soli indexer e titoli cercati non veniva mai servita. Ora
+`pollFeeds` non esce più presto e `pollWanted` gira anche senza feed. Rimossi i
+residui della vecchia funzione *Segui un titolo* (endpoint `POST /ui/rss-follow`,
+chiavi i18n, test), il campo inerte `Folder` delle voci cercate e i commenti che
+descrivevano il vecchio modello «un titolo = feed + regola»; `followTitleRegex`
+è diventato `titleMatchRegex`.
 
 ---
 

@@ -1,11 +1,12 @@
 package main
 
 // wanted.go implements the standalone "wanted" list: the titles the operator is
-// looking for. Each wanted entry generates a Torznab search feed and a rule
-// scoped to it, so the existing feed engine does the acquisition; a per-title
-// episode ledger in the state records what appeared in the feeds/indexers and
-// what was downloaded, and the difference is searched again (gap search) so a
-// missing episode is fetched even when it does not show up in the regular poll.
+// looking for. The list does not create feeds or rules: each cycle the engine
+// searches the configured indexers for every title and evaluates the items of
+// the RSS feeds, so the advanced rules stay free for the feeds. A per-title
+// episode ledger in the state records what appeared in feeds/indexers and what
+// was downloaded, and the difference is searched again (gap search) so a missing
+// episode is fetched even when it does not show up in the regular poll.
 
 import (
 	"context"
@@ -39,7 +40,6 @@ type wantedEntry struct {
 	EpisodeFilter string `json:"episode_filter,omitempty"`
 	Category      string `json:"category,omitempty"`
 	SavePath      string `json:"savepath,omitempty"`
-	Folder        string `json:"folder,omitempty"`
 	Paused        bool   `json:"paused,omitempty"`
 }
 
@@ -87,7 +87,7 @@ func (w wantedEntry) includes() []string {
 func (w wantedEntry) criteria() rss.Criteria {
 	return rss.Criteria{
 		Exclude:        splitList(w.Exclude),
-		Regex:          followTitleRegex(w.Name),
+		Regex:          titleMatchRegex(w.Name),
 		EpisodeFilter:  w.episodeFilter(),
 		RequireEpisode: w.kind() != "movie",
 	}
