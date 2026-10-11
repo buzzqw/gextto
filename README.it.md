@@ -170,7 +170,7 @@ gruppo.
 
 ### Installazione dal sorgente
 
-Serve Go 1.26+; la build predefinita è in **Go puro**. Solo per includere il
+Serve Go 1.26.8+; la build predefinita è in **Go puro**. Solo per includere il
 motore opzionale **libtorrent** servono anche un compilatore C++17 e gli header
 di sviluppo libtorrent-rasterbar.
 La build normale include la UI web: non è richiesto un build frontend separato.
@@ -194,6 +194,12 @@ prodotto, numero di build e, se collegata, la versione di libtorrent con:
 ./bin/gexttod --version
 ```
 
+Il demone `gx-torrent` ha un **proprio** contatore di build, separato da quello
+di Gextto: `make build` e `make gx-torrent` fanno avanzare
+`gx-torrent.build_number` (tramite `scripts/next-gx-build-number.sh`) solo
+quando il suo codice cambia davvero. È il numero che `./bin/gx-torrent --version`
+e l'endpoint `/api/v1/health` del demone riportano come `1.1.<n>`.
+
 ## gx-torrent come client autonomo
 
 gx-torrent è anche un client BitTorrent completo a sé, utilizzabile senza Gextto
@@ -203,6 +209,9 @@ binario** che Gextto pilota come motore, non un prodotto separato:
 - **Compatibilità Drop-in con l'ecosistema `*arr`:** implementa l'**API Web
   v2 di qBittorrent** (`/api/v2/...`), integrandosi nativamente e senza bridge
   con Sonarr, Radarr, Lidarr, Readarr e con le app mobili per la gestione torrent.
+- **API JSON nativa e login:** espone una propria API JSON (`/api/v1/...`), la
+  stessa con cui Gextto lo pilota, più una pagina di accesso (`/ui/login`) quando
+  è attiva l'autenticazione standalone.
 - **Interfaccia Web Indipendente e Wizard di Setup:** include una UI web completa
   con grafici e diagnostica in tempo reale, gestione categorie e tag, download
   automatico da feed RSS con regole e tracking smart degli episodi, e ricerca
@@ -322,7 +331,7 @@ npm ci
 npm run test:a11y
 ```
 
-La suite automatica attuale copre le sezioni principali della UI con 12 test di
+La suite automatica attuale copre le sezioni principali della UI con 13 test di
 accessibilità. Questo non costituisce da solo una certificazione normativa:
 servono ancora test manuali con screen reader, tastiera e tecnologie assistive.
 Consulta l'[analisi di accessibilità](docs/evoluzione.md#13-accessibilità) per ambito e

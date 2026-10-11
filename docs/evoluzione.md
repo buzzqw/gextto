@@ -493,14 +493,14 @@ verità usata dall'UI.
 | Tracker | rimozione | fatto (`set-trackers`) |
 | Web seed | add/remove a caldo | fatto (azione `webseeds`) |
 | Sequenziale | toggle a runtime | fatto (`PiecePicker.SetOrder`) |
-| Protocollo | IPv6 | fatto (socket dual-stack, `peers6`, PEX v6, DHT BEP 32); LSD v6 non prevista |
+| Protocollo | IPv6 | fatto (socket dual-stack, `peers6`, PEX v6, DHT BEP 32); LSD v6 fatto |
 | Protocollo | BitTorrent v2-only | fatto (`.torrent` e magnet, BEP 52) |
 | Qualità | algoritmi di seeding/choking | misurato, vedi §6 |
 
-**vs anacrolix/torrent**: lo **streaming HTTP Range è fatto** (§4.3 #7), ma
-mancano il **reader con seek e readahead** di anacrolix (shortlist e piano in
-§4.7) e gli **storage alternativi** (mmap/blob/bolt/sqlite); WebTorrent/WebRTC
-(wishlist). gx-torrent ha invece daemon
+**vs anacrolix/torrent**: lo **streaming HTTP Range è fatto** (§4.3 #7) e anche il
+**reader con seek e readahead** è fatto (finestra graduata, §4.7); mancano gli
+**storage alternativi** (mmap/blob/bolt/sqlite) e WebTorrent/WebRTC (wishlist).
+gx-torrent ha invece daemon
 sorvegliato, UI web, REST, UPnP/NAT-PMP, porta unica, proxy SOCKS/HTTP, filtro
 IP multi-formato, killswitch VPN, preallocazione, cache adattiva.
 
@@ -553,8 +553,8 @@ Semantica limiti: **-1 = eredita il globale, 0 = illimitato** (come libtorrent).
 ### 4.6 Ricontrollo finale (fatto)
 
 - `capabilityLevels`: gx-torrent `full` per `limits`, `trackers`, `sequential`,
-  `piece_diagnostics`, `web_seeds`, `super_seeding`, `session_stats`; resta
-  `partial` `first_last` (solo all'aggiunta lato Gextto).
+  `piece_diagnostics`, `web_seeds`, `super_seeding`, `session_stats`; anche
+  `first_last` e `holepunch` sono `full`.
 - Note/testi aggiornati: `v2DetailCapsFor`, "Limiti noti", `gx-torrent.md`,
   `API.md`, `MANUAL.*`, `README*`.
 - Ogni feature visibile in entrambe le UI (tracker, web seed, limiti,
@@ -1527,8 +1527,9 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
   inventario `GEXTTO.md`); porta unica + DHT sulla stessa UDP + UPnP/NAT-PMP
   ogni 20 min; selezione file (esclusi in `DATA/parts`, progresso sui scelti);
   interfaccia ascolto/uscente (killswitch), proxy SOCKS5/HTTP
-  (`gxtorrent_proxy`), cifratura 0/1/2, filtro IP multi-formato; v2-only
-  rifiutati con blocklist; session-stats anche per gx-torrent; bug del motore (IP mai
+  (`gxtorrent_proxy`), cifratura 0/1/2, filtro IP multi-formato; **v2-only ora
+  accettati end-to-end** (§4.4; all'epoca erano rifiutati con blocklist e poi
+  superati); session-stats anche per gx-torrent; bug del motore (IP mai
   ricontattati, race logger); test reali demone↔demone (porta unica, cifratura,
   selezione, proxy, RAM disk a metà, filtro IP); smoke (flag di rete, porta
   6881, migrazione torrent, messaggio senza UPnP).
@@ -1550,7 +1551,12 @@ Ex `docs/lavoro-sessione.md` (aggiornato al 2026-10-07; copre dal commit
   override); impostazioni rete/coda/cache condivise non più disabilitate con
   gx-torrent; README + `gx-torrent.md` aggiornati.
 
-### 12.3 Punti aperti al 07/10 (da rivalutare: alcuni potrebbero essere chiusi)
+### 12.3 Punti aperti al 07/10 (storico; vari chiusi/superati)
+
+> Elenco **datato 07/10/2026**, tenuto come storico. Nel frattempo sono stati
+> chiusi il wizard/indexer e il supporto v2 (vedi §4.4 e
+> [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12), quindi alcuni punti qui
+> sotto vanno riletti come superati.
 
 Da decidere: doppia notifica "completato — in seed" in `move_episodes`
 (proposto di togliere la prima); backup Telegram come didascalia dell'ultima
@@ -1632,7 +1638,9 @@ usabile per tabelle/tab/progress/errori; nessun regresso su desktop e mobile.
 binario e due modalità oppure creare un nuovo `gx-nox` — sono in
 [`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Qui resta solo il rimando e
 la decisione in una riga: **si evolve gx-torrent**, e "gx-nox" è il nome pubblico
-della modalità standalone, non un secondo progetto.
+della modalità standalone, non un secondo progetto. Il lavoro RSS/UI dello
+standalone (editor guidati, `/ui/settings`, `/ui/browse-dir`) è tracciato in
+[`docs/gx-torrent-evoluto.md`](gx-torrent-evoluto.md) §12.
 
 ---
 

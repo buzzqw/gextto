@@ -70,9 +70,9 @@ Tre condizioni perché la scelta regga (dettaglio in §6–§8):
 - **Una sola regola di potere**: in managed comanda Gextto (coda, categorie, RSS
   restano suoi); in standalone comanda gx-torrent. Le funzioni standalone si
   **spengono**, non si duplicano, quando Gextto è presente.
-- **Prima il refactor, poi le funzioni**: `cmd/gx-torrent` è oggi un unico
-  `package main` da ~10.800 righe (14.100 col test); va spezzato in pacchetti
-  riusabili prima di aggiungerne altre.
+- **Prima il refactor, poi le funzioni**: `cmd/gx-torrent` resta un unico
+  `package main` da 12.573 righe (20.742 col test), ma i pacchetti riusabili
+  sono già stati estratti in `internal/` (`queue`, `webui`, `rss`, `torznab`).
 - **Il contratto con Gextto diventa un test**: le risposte dell'API v1 usate da
   `gxtorrent_engine.go` vanno fissate in test di contratto che girano a ogni
   build. È il cancello che rende innocuo tutto il resto.
@@ -120,16 +120,16 @@ requisiti:
 ## 3. Stato attuale
 
 gx-torrent è un demone Go puro (build `CGO_ENABLED=0`) con il motore **gx-core**
-(`internal/gxcore`), **24 aree** descritte in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
+(`internal/gxcore`), **34 aree** descritte in `GEXTTO.md`. Gextto lo avvia, lo sorveglia e lo
 **riaggancia ai riavvii** tramite `fingerprint`. Il demone è già usabile da solo
-(`gx-torrent -listen … -data …`), ma è pensato come motore subordinato.
+(`gx-torrent -listen … -data …`), anche come client standalone.
 
-| Strato | Dove | Cosa c'è già | Dimensione (2026-10-10) |
+| Strato | Dove | Cosa c'è già | Dimensione (2026-10-11) |
 | --- | --- | --- | --- |
-| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 24 aree |
-| Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 10.786 righe (14.144 col test) |
-| API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 588 righe |
-| UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.836 righe, `html/template` + JS inline |
+| Motore | `internal/gxcore`, `internal/dht`, `anacrolix/utp` | porta unica, uTP, DHT, PEX, LSD, MSE, holepunch BEP 55, super-seeding BEP 16, web seed e tracker a caldo, limiti per torrent, streaming con finestra, filtro IP multi-formato, proxy, killswitch VPN, preallocazione, cache regolabile a caldo | 34 aree |
+| Demone | `cmd/gx-torrent` | coda dinamica con slot, seed ratio/giorni per torrent, tracker health, UPnP/NAT-PMP, `portcheck`, stato in `state.json` | 12.573 righe (20.742 col test) |
+| API | `cmd/gx-torrent/api.go` | REST v1 con header `X-Gx-Token`: health, stats, portcheck, torrents, add, azioni, config, ipfilter | 706 righe |
+| UI | `cmd/gx-torrent/ui.go` | tabella, filtri per stato, dettaglio a schede (generale, file, peer, tracker, pezzi), azioni di gruppo, sei lingue | 1.562 righe; asset in `internal/webui/assets` (`embed.FS`) |
 | Adapter | `gxtorrent_engine.go`, `gxtorrent_runtime.go` | contratto `TorrentEngine`, matrice `capabilityLevels`, avvio in scope systemd | 1.801 + 728 righe |
 
 Misure grezze, come base per il requisito 2: `bin/gx-torrent` pesa **13,7 MB**; il
@@ -137,39 +137,40 @@ demone in esercizio su questa macchina usa **~307 MB di RSS** e 10 thread, quasi
 tutti di cache dei pezzi.
 
 Cose oggi legate **solo** a Gextto: `-orphan-timeout`, `-fingerprint`,
-`-gextto-log`, `-ipfilter-source`. Tutte le altre opzioni sono flag o variabili
-d'ambiente **lette solo all'avvio**: non esiste un file di impostazioni
-modificabile dalla UI.
+`-gextto-log`, `-ipfilter-source`. In **standalone** le impostazioni vivono in
+`settings.json` (`cmd/gx-torrent/ui_settings.go`) e si modificano dalla pagina
+`/ui/settings`; in **managed** i flag passati da Gextto vincono sempre sul file,
+che quindi non ne cambia il comportamento.
 
 ---
 
 ## 4. Gap analysis
 
-### 4.1 Funzioni che oggi fornisce Gextto, non il demone
+### 4.1 Funzioni che Gextto forniva e che il demone standalone ha ripreso
 
-| Funzione | Oggi in Gextto | In gx-torrent | Dove andrà |
+| Funzione | Oggi in Gextto | In gx-torrent | Dove sta |
 | --- | --- | --- | --- |
-| Login, sessioni, password | UI v2 (`authEnabledSetting`, argon2/bcrypt) | solo token condiviso | `internal/webui` + `internal/auth` |
-| Impostazioni persistenti da UI | `uiweb_v2_settings*` | flag d'avvio | `settings.json` + `internal/settings` |
-| Wizard primo avvio | `uiweb_v2_setup.go` (527 righe, 5 passi: Accesso, Cartelle, Fonti, Primo titolo, Attiva) | assente | `internal/webui/setup` |
-| Categorie, tag, percorso per categoria | sì | assente | `internal/gxcore` |
-| RSS con regole di scarico | `rss.go` (2.588 righe) | assente | `internal/rss` (estratto) |
-| Ricerca Torznab/Prowlarr/Jackett/MIRCrew | `websearch.go` (863), `torznab_caps.go` (243), `indexer_health.go` (121) | assente | `internal/indexer` (estratto) |
-| Scheduler di banda, limiti alternativi | sì | solo limiti fissi | `internal/gxcore` |
-| Notifiche, hook a fine download | `notifier.go`, `hooks.go` | assente | `internal/gxcore` (opzionale) |
-| Spostamento a fine download, cartella temporanea | `postprocess.go` | solo sposta manuale | `internal/gxcore` |
+| Login, sessioni, password | UI v2 (`authEnabledSetting`, argon2/bcrypt) | fatto (`standalone_auth.go`: login bcrypt, sessioni, bypass LAN) | `internal/webui` + `internal/auth` |
+| Impostazioni persistenti da UI | `uiweb_v2_settings*` | fatto (`settings.json`, pagina `/ui/settings`) | `settings.json` + `internal/settings` |
+| Wizard primo avvio | `uiweb_v2_setup.go` (527 righe, 5 passi: Accesso, Cartelle, Fonti, Primo titolo, Attiva) | fatto (`cmd/gx-torrent/setup.go`, `internal/webui/assets/setup.html`) | `internal/webui/setup` |
+| Categorie, tag, percorso per categoria | sì | fatto (`cmd/gx-torrent/ui_categories.go`) | `internal/gxcore` |
+| RSS con regole di scarico | `rss.go` (2.588 righe) | fatto (`internal/rss`, `cmd/gx-torrent/feed.go`, `ui_feeds.go`) | `internal/rss` (estratto) |
+| Ricerca Torznab/Prowlarr/Jackett/MIRCrew | `websearch.go` (863), `torznab_caps.go` (243), `indexer_health.go` (121) | fatto (`internal/torznab`, `cmd/gx-torrent/ui_search.go`) | `internal/torznab` (estratto) |
+| Scheduler di banda, limiti alternativi | sì | fatto (`cmd/gx-torrent/schedule.go`, `/ui/settings`) | `internal/gxcore` |
+| Notifiche, hook a fine download | `notifier.go`, `hooks.go` | parziale (webhook `cmd/gx-torrent/notify.go`; mancano gli hook di fine download) | `internal/gxcore` (opzionale) |
+| Spostamento a fine download, cartella temporanea | `postprocess.go` | parziale (cartella temporanea impostata dal wizard; lo spostamento automatico a fine download resta manuale) | `internal/gxcore` |
 
-**Vincolo di codice, non di volontà**: ricerca e RSS stanno nel **pacchetto
-radice** `gextto` (240 file `.go`) e non sono importabili dal demone senza
-trascinarsi dietro tutto Gextto. Vanno **estratti in `internal/`** prima di poterli
-condividere. È il costo nascosto più grosso della strada A.
+**Vincolo di codice, non di volontà**: ricerca e RSS stavano nel **pacchetto
+radice** `gextto` (240 file `.go`) e non erano importabili dal demone senza
+trascinarsi dietro tutto Gextto. Sono stati **estratti in `internal/rss` e
+`internal/torznab`**, così sono condivisi dai due prodotti.
 
 ### 4.2 Lacune del motore
 
 - **IPv6**: **fatto** — listener a porta unica, uTP e DHT su socket dual-stack;
   `peers6` dei tracker (BEP 7), PEX `added6`/`dropped6` (BEP 11), tracker UDP,
-  `yourip`, blocklist CIDR e scoperta DHT su IPv6 (BEP 32). Resta fuori solo LSD
-  via multicast IPv6 (vedi `gx-torrent.md`, *IPv6*).
+  `yourip`, blocklist CIDR e scoperta DHT su IPv6 (BEP 32), **LSD anche sul
+  gruppo IPv6** `[ff15::efc0:988f]:6771` (`cmd/gx-torrent/lsd.go`, BEP 14).
 - **BitTorrent v2**: **fatto** — il motore legge v1, la parte v1 degli ibridi e i
   solo-v2 da `.torrent` e da magnet. Alberi Merkle SHA-256, handshake con hash
   troncato (bit riservato v2) e fetch dei `piece layers` (`hash request`/`hashes`).
@@ -178,15 +179,14 @@ condividere. È il costo nascosto più grosso della strada A.
   richieste, choking rate-based, reader con readahead per lo streaming, I/O disco
   a blocchi contigui. Sono "cherry-pick" (§11), non blocchi.
 
-### 4.3 Debito tecnico che ostacola tutto
+### 4.3 Debito tecnico (risolto)
 
-- `cmd/gx-torrent` è un **monolite `package main`**; senza refactor ogni funzione
-  nuova va infilata lì dentro.
-- `ui.go` tiene HTML in stringhe Go: con categorie/tag, RSS, ricerca, grafici e
-  gestione di migliaia di torrent non regge. Serve una cartella asset con
-  `embed.FS`.
-- La logica di coda è già pura (`queue.go`) e ben testata: è il primo pezzo da
-  promuovere a pacchetto.
+- Da `cmd/gx-torrent` sono stati estratti i pacchetti riusabili: la logica di
+  coda in `internal/queue`, il web layer e gli asset in `internal/webui`, RSS e
+  Torznab in `internal/rss` e `internal/torznab`.
+- Gli asset della UI vivono in `internal/webui/assets` dietro `embed.FS` e il
+  template di `ui.go` è compilato **pigramente** al primo uso (`sync.Once`), non
+  in stringhe Go all'avvio.
 
 ---
 
@@ -307,7 +307,7 @@ del motore arriva a entrambi gli usi senza alcun porting.
   Prowlarr e le app mobili la parlano già. Gextto ha un client qBittorrent
   completo in `qbittorrent_engine.go`: si può usare come **banco di prova
   automatico** di questa API.
-- **Indexer e RSS**: estratti dal pacchetto radice in `internal/indexer` e
+- **Indexer e RSS**: estratti dal pacchetto radice in `internal/torznab` e
   `internal/rss`, condivisi dai due prodotti.
 - **Distribuzione**: binario statico per amd64 e arm64, unit systemd, immagine
   container. Il pacchetto di Gextto continua a includere solo `gx-torrent`.
@@ -324,8 +324,9 @@ memoria. Il rischio vero sono le cose che **partono da sole all'avvio**.
 ### 8.1 Regole per ogni modulo standalone
 
 1. **Niente lavoro in `init()` né in variabili di pacchetto.** Template, cataloghi,
-   regex e client HTTP si costruiscono al primo uso con `sync.Once`. Oggi
-   `uiTemplate` in `ui.go` viene già compilato all'avvio: va reso pigro anche lui.
+   regex e client HTTP si costruiscono al primo uso con `sync.Once`. **Fatto**:
+   `uiTemplate` in `ui.go` è compilato pigramente (`sync.Once`) e gli asset
+   stanno in `internal/webui/assets` (`embed.FS`).
 2. **Nessuna goroutine o ticker se il modulo è spento.** Il poller RSS, il
    controllo degli indexer e lo scheduler partono solo se in `settings.json` c'è
    almeno un feed, un indexer o una regola. In managed non partono mai.
@@ -417,11 +418,11 @@ da verificare sul codice delle librerie prima di ogni porting.
 | Area | gx-torrent (motore gx-core) | anacrolix/torrent | libtorrent 2.0 | qbittorrent-nox |
 | --- | --- | --- | --- | --- |
 | Linguaggio, licenza | Go, EUPL-1.2 | Go, MPL-2.0 | C++, BSD-3 | C++/Qt, GPL-2+ |
-| IPv6 | sì (dual-stack, DHT BEP 32; niente LSD v6) | sì | sì | sì |
+| IPv6 | sì (dual-stack, DHT BEP 32, LSD v6 incluso) | sì | sì | sì |
 | BitTorrent v2 / ibridi | sì (v2-only da `.torrent` e magnet, ibridi) | sì | sì | sì |
 | uTP | sì (`anacrolix/utp`) | sì | sì, LEDBAT proprio | sì |
 | Holepunch BEP 55 | sì | sì | sì | sì |
-| Streaming | finestra + HTTP Range, attesa a polling | Reader con seek e readahead | deadline per pezzo | sì |
+| Streaming | finestra graduata + HTTP Range, seek e readahead | Reader con seek e readahead | deadline per pezzo | sì |
 | Storage | file | file, mmap, bolt, sqlite, pluggable | file, mmap (2.0) | libtorrent |
 | WebTorrent | no | sì | no | no |
 | Choking seed | default del motore, misurato corretto | semplice | più algoritmi (rate-based, anti-leech) | libtorrent |
@@ -434,8 +435,8 @@ da verificare sul codice delle librerie prima di ogni porting.
 | --- | --- | --- | --- | --- |
 | 1 | IPv6 (listener, DHT BEP 32, tracker, PEX) | anacrolix, libtorrent | senza IPv6 non c'è parità con qBittorrent; molti peer domestici sono raggiungibili solo in v6 | alto |
 | 2 | Smart ban — **estensione** (ban globale e temporizzato) | libtorrent, anacrolix | il motore **già bannava** il peer che invia un pezzo corrotto nel singolo torrent (`bannedPeerIPs`); ora il ban è **di sessione, con scadenza** (`Session.BanIP`, 30 min) e vale per tutti i torrent e i punti di connessione | fatto |
-| 3 | Profondità della coda richieste adattiva | libtorrent | la velocità su peer lontani dipende da quante richieste sono in volo | medio |
-| 4 | Reader con readahead per lo streaming | anacrolix | sostituisce l'attesa a polling (200 ms, timeout 2 min) | medio |
+| 3 | Profondità della coda richieste adattiva | libtorrent, anacrolix | la velocità su peer lontani dipende da quante richieste sono in volo; ora la profondità cresce di uno per blocco consegnato (`RequestQueue`) | fatto |
+| 4 | Reader con readahead per lo streaming | anacrolix | il prefetch ha priorità sul rarest-first (`SetFileReadaheadWindow`), al posto dell'attesa a polling (200 ms, timeout 2 min) | fatto |
 | 5 | BitTorrent v2 e ibridi | anacrolix | torrent v2-only già in circolazione; serve merkle per file | alto |
 | 6 | Choking rate-based e anti-leech | libtorrent | qualità del seeding; da validare con l'harness `unchoker/sim_test.go` | medio |
 | 7 | Disk I/O: scrittura in blocchi contigui, hash su pool | libtorrent | CPU e usura disco su NAS lenti | medio |
@@ -489,7 +490,7 @@ invariato**.
 
 ### 12.1 Stato di attuazione
 
-Aggiornato al 2026-10-10.
+Aggiornato al 2026-10-11.
 
 **Prossimi item concordati** (in ordine di lavoro), poi si riparla dei punti
 rimanenti:
@@ -497,23 +498,26 @@ rimanenti:
 | Voce | Piano | Stato |
 | --- | --- | --- |
 | Nome e identità: prodotto **gx-core**, motore in `internal/gxcore`, identità di rete "gx-core", **marcatori di origine rimossi** dai commenti del codice, doc riallineate | §15, §11.3 | fatto (binario `gx-torrent` invariato) |
-| F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (resta solo la LSD v6) |
+| F4 — IPv6: socket dual-stack (TCP peer + UDP uTP/DHT), risoluzione e indirizzi v6, peer compatti **`peers6`** dei tracker (BEP 7), **PEX `added6`/`dropped6`** (BEP 11), tracker **UDP** v6, `yourip` v6, **blocklist** CIDR v6, **scoperta DHT v6** (BEP 32: dual-stack della libreria, `want`, split `nodes`/`nodes6`) | §14, §4.2 | fatto (LSD v6 inclusa) |
 | F4 — BitTorrent v2 (BEP 52) | §11, §4.2 | **Fatto**: v2-only da `.torrent` e da **magnet** (`urn:btmh:`). Parsing v2, modello a **pezzi per-file** (coda più corta), verifica via **nodo Merkle** SHA-256, identità troncata a 20 byte, bit riservato v2 nell'handshake, fetch dei `piece layers` dai peer con `hash request`/`hashes`/`hash reject`, test seed/leech end-to-end (`.torrent` e magnet) |
 | F0 — harness opt-in RSS/CPU contro qbittorrent-nox | §8.2 | fatto (`TestFootprint` opt-in, baseline `testdata/footprint.json`) |
 | F2 — scheduler di banda (limiti alternativi a orario) | §14.3 | fatto |
 | F2 — virtualizzazione della tabella torrent | §14.3 | fatto (finestra di rendering `?rows=` + *Show more*) |
 | F4 — smart ban (banna il peer che manda blocchi di un pezzo fallito) | §14.4 | fatto (base nel motore + estensione: ban di sessione con scadenza) |
 | F2 — gestore RSS completo (regole ordinate PASS/FAIL, filtri numerici, smart-episode, azioni, pagina `/ui/rss`, **feed dai risultati di ricerca**, **notifiche webhook su match/errore**) | §12.2 | fatto |
+| F2 — RSS/UI guidati: editor di feed e indexer con preset (`ui_rss_edit.go`, `uiIndexerPresets`), cartelle dei feed (`feedConfig.Folder`), regole ordinate con su/giù/disabilita, `episode_filter` in stile qBittorrent (`internal/rss/episode_filter.go`), finestra `ignore_days` (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **segui un titolo** con suggerimenti (`GET /ui/rss-suggest`), pulsante **Check feeds**, pagina `/ui/settings` (banda globale + scheduler), selettore cartella `/ui/browse-dir` nel wizard | §12.2 | fatto |
 | CI — pubblicare il gx-torrent standalone (artifact/release usabile come qbittorrent-nox) | §12.3 | fatto |
 
 **Punto finale:** al termine, **controllo approfondito di tutto il codice
 lavorato** in questa sessione (IPv6/DHT BEP 32, BitTorrent v2, API qBittorrent e
 RSS, container) prima di considerarlo chiuso.
 
-**Aperti, da discutere dopo i precedenti:** ritocchi al wizard
-(indexer/cartella temporanea). Il **BitTorrent v2** (BEP 52) è completo, magnet
-compresi. Nel codice non resta alcun marcatore di origine; l'inventario delle
-funzionalità del motore è in `internal/gxcore/GEXTTO.md`.
+**Punti aperti:** nessuno tra i precedenti; sono chiusi i ritocchi al wizard
+(indexer/cartella temporanea) — il wizard usa il selettore di cartella
+`/ui/browse-dir` e i preset indexer (`uiIndexerPresets` in `setup.go`). Il
+**BitTorrent v2** (BEP 52) è completo, magnet compresi. Nel codice non resta alcun
+marcatore di origine; l'inventario delle funzionalità del motore è in
+`internal/gxcore/GEXTTO.md`.
 
 **Verifiche ricorrenti:** a ogni ciclo di modifiche, la **TUI di Gextto** deve
 continuare a funzionare — `go test ./internal/tui/` e il test d'integrazione
@@ -578,6 +582,18 @@ per regola e Add manuale. I **feed possono essere anche ricerche**: un feed con
 il campo `search` interroga gli indexer e i risultati passano dalle stesse
 regole. Le **notifiche su match/errore** sono disponibili via webhook
 (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, eventi `feed_match` e `feed_error`).
+
+L'editing è **guidato** (`cmd/gx-torrent/ui_rss_edit.go`): menu a tendina del tipo
+di indexer con URL preimpostati (`uiIndexerPresets`), **cartelle dei feed**
+(`feedConfig.Folder`), editor delle **regole ordinate** con sposta su/giù e
+disabilita, `episode_filter` in stile qBittorrent
+(`internal/rss/episode_filter.go`) e finestra `ignore_days`
+(`internal/rss/rules.go`). Lo **smart-episode** riconosce anche REPACK/PROPER
+(`cmd/gx-torrent/feed.go`). Con **"segui un titolo"** il nome della serie viene
+suggerito dai risultati degli indexer (`GET /ui/rss-suggest`) e il pulsante
+**Check feeds** forza subito il controllo di tutti i feed. Banda globale e
+scheduler si impostano dalla pagina `/ui/settings`, la cartella di download dal
+selettore `/ui/browse-dir`.
 
 ### 12.3 CI: gx-torrent standalone
 

@@ -5,24 +5,27 @@ mani** per i compiti più comuni. È pensato per chi legge il codice, non per
 l'utente finale: per l'installazione e l'uso vedi il [manuale](MANUAL.it.md).
 
 > [!NOTE]
-> Gextto è un daemon Go. Tutta la logica applicativa vive in **un unico
+> Gextto è un daemon Go. La logica applicativa di Gextto vive in **un unico
 > package Go** (`github.com/buzzqw/gextto`) nella cartella principale del repo;
-> `cmd/gexttod` è solo l'eseguibile. I file della root sono quindi tanti, ma
-> **raggruppati per prefisso**: le sezioni qui sotto sono la mappa di quei
-> prefissi.
+> `cmd/gexttod` ne è solo l'eseguibile. Il repository contiene però anche il
+> demone torrent standalone `cmd/gx-torrent` e il motore torrent `internal/gxcore`
+> (Go puro), oltre ai pacchetti condivisi in `internal/`. I file della root sono
+> quindi tanti, ma **raggruppati per prefisso**: le sezioni qui sotto sono la
+> mappa di quei prefissi.
 
 ## 1. Panoramica delle cartelle
 
 ```text
 gextto/
-├── cmd/gexttod/            eseguibile (main): smista i comandi e avvia il daemon
-├── *.go                    il package gextto: tutta la logica (vedi §3 e §4)
+├── cmd/gexttod/            eseguibile di Gextto (main): smista i comandi e avvia il daemon
+├── cmd/gx-torrent/         eseguibile standalone del motore torrent: demone, UI e API
+├── *.go                    il package gextto: la logica di Gextto (vedi §3 e §4)
 ├── *_test.go               test, accanto al codice che verificano
-├── internal/               pacchetti condivisi (vedi §5)
+├── internal/               pacchetti condivisi e librerie (vedi §5), incluso gxcore (motore torrent)
 ├── uiweb/v2/               UI server-side: template HTML e asset statici
 │   ├── templates/*.html
-│   ├── static/*            CSS, htmx, JS (v2-core.js)
-│   └── end2end/            test Playwright (Node, non Go)
+│   └── static/*            CSS, htmx, JS (v2-core.js)
+├── uiweb/end2end/          test Playwright (Node, non Go)
 ├── docs/                   documentazione (questo file, manuali, API...)
 ├── scripts/                build, update, packaging e service helper
 ├── systemd/                unit file di esempio per il servizio
@@ -40,13 +43,21 @@ Cartelle **generate/locali** da non confondere con il codice: `bin/` (build),
 ## 2. Come nasce il binario
 
 ```
-cmd/gexttod/main.go  →  gextto.Parse(args)  →  gextto.Run(...)   (cli.go/run)
-                                            →  NewAppState(...)  (appstate.go)
-                                            →  avvio server web  (web_serve.go)
+cmd/gexttod/main.go  →  gextto.Parse(args)
+  ├── comando daemon  →  runDaemon(...)                 (cmd/gexttod/main.go)
+  │                       →  LoadConfig → PrepareDirs
+  │                       →  OpenDatabase / OpenArchive / OpenComicsDb / OpenI18nDb
+  │                       →  NewLibtorrentClient(...)
+  │                       →  NewAppState(...)           (appstate.go)
+  │                       →  Serve(...)                 (web_serve.go)
+  └── --update        →  gextto.Run(...)                (update.go)
 ```
 
-Il **numero di build** è generato dallo script `scripts/build-daemon.sh`
-(e `scripts/next-build-number.sh`) e inciso nel binario.
+Il **numero di build** di Gextto è generato dallo script `scripts/build-daemon.sh`
+(e `scripts/next-build-number.sh`) e inciso nel binario. Anche il demone
+`gx-torrent` ha un **proprio** contatore, indipendente: cresce di uno a ogni
+build reale tramite `scripts/next-gx-build-number.sh` e vive in
+`gx-torrent.build_number` (non committato).
 
 La build predefinita è in **Go puro** (gx-torrent, nessun libtorrent). Il
 **bridge C++** per libtorrent è **opt-in**: è la coppia nella root
@@ -136,6 +147,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `web_handlers_g0.go` … `web_handlers_g7.go` | gruppi di handler portati dal progetto di riferimento. |
 | `web_handlers_compat.go` | endpoint di compatibilità/diagnostica. |
 | `web_handlers_jobs.go`, `web_handlers_libtorrent.go`, `web_handlers_torrent_backend.go`, `web_handlers_torrent_diag.go` | handler specifici (job, libtorrent, backend, diagnostica). |
+| `web_handlers_series.go`, `web_handlers_torrent_stream.go` | handler delle serie (`/api/series/{name}`) e redirect verso lo streaming del demone gx-torrent, con il token aggiunto lato server. |
 | `web_torrent_events.go` | macchina a eventi del ciclo di vita dei torrent. |
 | `web_background.go` | worker di background di lunga durata. |
 | `web_workers_media.go` | worker media: backup schedulato, backfill MediaInfo, calendario. |
@@ -147,10 +159,10 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `health_monitor.go` | monitor che logga lo stato `degraded` con motivo e recupero. |
 | `jobs.go` | gestore dei job di background. |
 
-### UI server-side (`uiweb` v1 classica e v2)
+### UI server-side (`uiweb` v2)
 | File | Ruolo |
 |---|---|
-| `uiweb.go` | view-model e formatter condivisi; embed di manuali e licenza. |
+| `uiweb.go` | view-model e formatter condivisi usati dalla UI v2 SSR/HTMX; embed di manuali e licenza. |
 | `uiweb_pages.go` | pagine lista/azione guidate dai dati. |
 | `uiweb_sections.go` | sezioni riutilizzabili (tabella, azioni, form, progresso...). |
 | `uiweb_detail.go` | pagine di dettaglio serie/film. |
@@ -162,6 +174,11 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `uiweb_v2_settings_extras.go` | editor strutturati della Configurazione v2. |
 | `uiweb_v2_table.go` | renderer generico di tabelle server-side. |
 | `uiweb_v2_widgets.go` | widget migrati (duplicati, database, RAM disk, rinomina, OAuth, job...). |
+| `uiweb_engine_stats.go` | pannello "Motore torrent" della pagina Salute. |
+| `uiweb_v2_setup.go` | configurazione guidata di primo avvio (`/?view=setup`). |
+| `uiweb_v2_pwa.go` | supporto PWA (installazione come app, condivisione magnet/`.torrent`). |
+| `uiweb_v2_problems.go` | dashboard "Da controllare" (cosa richiede attenzione). |
+| `uiweb_v2_client_i18n.go` | dizionario per le stringhe impostate a runtime dal client. |
 
 ## 4. Convenzioni di naming dei file
 
@@ -169,7 +186,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
   progetto di riferimento. Il numero **non** indica una priorità: serve solo a
   spezzare l'enorme tabella di handler in file maneggiabili.
 - `uiweb_v2_*.go`: tutto ciò che riguarda la **UI v2** (SSR + HTMX). `uiweb_*.go`
-  senza `_v2` è il livello condiviso/classico.
+  senza `_v2` è il livello condiviso (view-model e formatter) usato dalla UI v2.
 - `libtorrent_*`, `gxtorrent_*`, `qbittorrent_*`: i backend torrent.
 - `*_test.go`: test accanto al file che verificano.
 - Gli helper privati di un gruppo usano il prefisso del gruppo (`gh2_...`,
@@ -189,17 +206,45 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `internal/messages` | messaggi/testi. |
 | `internal/qbittorrent` | client dell'API qBittorrent. |
 | `internal/tui` | client terminale (TUI). |
+| `internal/auth` | controllo d'accesso del demone standalone: hashing password e sessioni di login (`/ui/login`); la modalità gestita non lo usa. |
+| `internal/dht` | implementazione DHT, un modulo a sé sotto il modulo principale. |
+| `internal/gxcore` | motore torrent gx-core (il binario `gx-torrent`): codice nostro con porzioni derivate da progetti MIT/BSD. |
+| `internal/queue` | gestore della coda di gx-torrent (quali torrent far girare). |
+| `internal/rss` | parsing/normalizzazione dei feed RSS e filtro episodi per le regole delle serie. |
+| `internal/settings` | store chiave/valore persistente della modalità standalone di gx-torrent. |
+| `internal/torznab` | client per indexer Torznab (Jackett, Prowlarr e simili). |
+| `internal/webui` | template e asset incorporati della UI del demone gx-torrent (vedi §7). |
 
-## 6. Asset incorporati nel binario (`go:embed`)
+## 6. Il demone gx-torrent (`cmd/gx-torrent`)
 
-- `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — UI web.
+Il demone standalone del motore torrent (`gx-torrent`, Go puro) ha una propria
+architettura, distinta dal package principale di Gextto. Espone sia la propria
+UI web sia due API: quella JSON nativa usata da Gextto e quella compatibile con
+qBittorrent.
+
+| File | Ruolo |
+|---|---|
+| `main.go`, `daemon.go`, `lifecycle.go`, `mode.go` | avvio e ciclo di vita del demone (modalità gestita o standalone). |
+| `ui.go`, `ui_search.go`, `ui_categories.go` | UI web del demone (`handleUI`), frammenti live, ricerca e categorie. |
+| `internal/webui/assets/*` | template e asset incorporati della UI del demone (vedi §7). |
+| `api.go` | rotte dell'API JSON nativa (`/api/v1/...`) e pagine `/ui/...`. |
+| `api_qbit.go` | API compatibile con qBittorrent (`/api/v2/...`). |
+| `setup.go` | configurazione guidata di primo avvio (`/ui/setup`). |
+| `ui_feeds.go`, `ui_rss_edit.go` | pagina RSS: feed, regole e suggerimenti. |
+| `ui_settings.go` | pagina Impostazioni (limiti di banda e scheduler). |
+| `ui_browse.go` | selettore di cartelle lato server. |
+
+## 7. Asset incorporati nel binario (`go:embed`)
+
+- `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — UI web di Gextto.
+- `internal/webui/assets/*` — UI del demone gx-torrent (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `token.html`, `favicon.svg`).
 - `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manuale mostrato nella UI.
 - `internal_translations*.yml` — traduzioni.
 - `LICENSE` — licenza servita dall'app.
 
 Se modifichi questi file **serve ricompilare** il binario per vederli.
 
-## 7. Dove mettere le mani (compiti comuni)
+## 8. Dove mettere le mani (compiti comuni)
 
 | Voglio... | File da toccare |
 |---|---|
@@ -212,14 +257,15 @@ Se modifichi questi file **serve ricompilare** il binario per vederli.
 | Toccare un motore torrent | `torrent_engine*.go` e il backend specifico |
 | Cambiare il bridge C++ | `libtorrent_bridge.cpp` + `libtorrent_bridge.h` (root), `libtorrent_cgo.go` |
 
-## 8. Note di manutenzione
+## 9. Note di manutenzione
 
 - **Una sola copia del bridge C++.** `libtorrent_bridge.cpp` è l'unico file
   compilato da cgo; l'header deve restare accanto a lui nella root. Non
   ricreare copie "di riferimento" in sottocartelle: cgo **non** compila file
   fuori dalla cartella del package e le copie divergono silenziosamente.
-- **Un unico grande package.** Al momento non è diviso in sottopackage: ogni
-  refactor in quel senso va fatto per fasi, con build e test verdi a ogni passo.
+- **La logica di Gextto resta in un unico package principale.** I nuovi moduli
+  condivisi vanno in `internal/`; un'eventuale divisione del package principale
+  va fatta per fasi, con build e test verdi a ogni passo.
 - **Aggiornare i test.** Ogni modifica al comportamento dovrebbe aggiornare il
   test accanto al file interessato; `go test ./...` è la rete di sicurezza.
 

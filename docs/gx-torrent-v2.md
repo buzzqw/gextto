@@ -6,7 +6,7 @@
 > [`gx-torrent-evoluto.md`](gx-torrent-evoluto.md). Obiettivo: attivare tutto
 > **solo** per `meta version == 2`, così v1 (usato da Gextto) resta invariato.
 
-## 1. Stato attuale (fondamenta fatte)
+## 1. Stato attuale (implementato)
 
 - `internal/gxcore/internal/metainfo`: legge `meta version`, `file tree`,
   `piece layers`; calcola l'info-hash SHA-256 (`Info.V2Hash`) e il troncato;
@@ -96,9 +96,9 @@ Conseguenza: `piece.NewPieces` (o un costruttore v2) deve ricevere gli hash dei
 pezzi **per file** (dal `piece layers`), e `Piece` deve sapere che è v2 e quante
 foglie copre un pezzo (`pieceLength/16KiB`).
 
-## 4. Incrementi (in ordine di dipendenza)
+## 4. Incrementi (in ordine di dipendenza, tutti realizzati)
 
-### I1 — Modello pezzi per-file (L)
+### I1 — Modello pezzi per-file (L) — **fatto**
 - `piece.NewPieces`: ramo v2 che costruisce i pezzi file per file (coda più
   corta, nessun padding), indicizzandoli globalmente e prendendo l'hash di ogni
   pezzo dal layer del file.
@@ -108,18 +108,18 @@ foglie copre un pezzo (`pieceLength/16KiB`).
 - **Test**: pezzo pieno, pezzo di coda più corto, ultimo blocco parziale; con un
   `pieceLength` > 16 KiB (per esercitare i nodi Merkle, non solo le foglie).
 
-### I2 — Verifica/verificatore v2 (M)
+### I2 — Verifica/verificatore v2 (M) — **fatto**
 - `verifier`/`piecewriter`: se `Piece.V2`, usare `VerifyV2`; altrimenti
   `VerifyHash(buf, sha1.New())`. Per v1 nulla cambia.
 - **Test**: pezzo v2 valido/corrotto (nodo Merkle) + regressione v1.
 
-### I3 — Identità e sessione (M)
+### I3 — Identità e sessione (M) — **fatto**
 - v2-only: identità = primi 20 byte di `V2Hash`; handshake/DHT/tracker invariati.
 - Metadata BEP 9 con SHA-256 troncato per v2; persistenza `piece layers` nel
   resumer.
 - **Test**: routing a porta unica col troncato; ricarica da resume.
 
-### I4 — Collegare i piece layers (S/M)
+### I4 — Collegare i piece layers (S/M) — **fatto**
 - `metainfo.New`: per `meta version == 2`, costruire l'info v2 (parse file tree),
   validare i `piece layers` (`VerifyPieceLayers`) e fornire gli hash per-file a
   `NewPieces`.
@@ -139,7 +139,7 @@ foglie copre un pezzo (`pieceLength/16KiB`).
 - **Test**: round-trip codec + fuzz; `TestLayerTreeRoundTrip` e
   `TestV2MagnetTransfer` (scarica i layer da un seed, li valida, verifica i pezzi).
 
-### I6 — Abilitazione e UX (S/M)
+### I6 — Abilitazione e UX (S/M) — **fatto**
 - Demone: accettare i v2-only (`.torrent` con layer), rilevamento basato sul
   modello, `torrent_version` in UI; togliere la blocklist/rimozione v2 in Gextto.
 - **Test**: `add` v2 con seed/leech locale; aggiornare `TestV2OnlyDetection`.

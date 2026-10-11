@@ -166,7 +166,7 @@ instead. When the library lives on a NAS owned by another user,
 
 ### Install from source
 
-Go 1.26+ is required; the default build is **pure Go**. Only to include the
+Go 1.26.8+ is required; the default build is **pure Go**. Only to include the
 optional **libtorrent** engine, also install a C++17 compiler and the
 libtorrent-rasterbar development headers. The
 normal build embeds the web UI; no separate frontend build is required. See the
@@ -190,6 +190,12 @@ version, build number and, if linked, the libtorrent version with:
 ./bin/gexttod --version
 ```
 
+The `gx-torrent` daemon keeps its **own** build counter, separate from Gextto's:
+`make build` and `make gx-torrent` advance `gx-torrent.build_number` (through
+`scripts/next-gx-build-number.sh`) only when its code actually changes. That
+number is what `./bin/gx-torrent --version` and the daemon's `/api/v1/health`
+report as `1.1.<n>`.
+
 ## gx-torrent as a standalone client
 
 gx-torrent is also a complete BitTorrent client on its own, usable without
@@ -199,6 +205,9 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
 - **Drop-in Compatibility with the `*arr` ecosystem:** implements the
   **qBittorrent Web API v2** (`/api/v2/...`), seamlessly integrating with Sonarr,
   Radarr, Lidarr, Readarr, and third-party mobile torrent managers.
+- **Native JSON API and login:** exposes its own JSON API (`/api/v1/...`), the
+  same one Gextto drives it with, plus a sign-in page (`/ui/login`) when
+  standalone authentication is enabled.
 - **Standalone Web UI & Setup Wizard:** features a dedicated, full-featured web UI
   with real-time graphs and diagnostics, categories and tags, RSS feed rules
   with smart episode tracking, and direct multi-indexer search (Jackett,
@@ -316,7 +325,7 @@ npm ci
 npm run test:a11y
 ```
 
-The current automated suite covers the main UI sections with 12 accessibility
+The current automated suite covers the main UI sections with 13 accessibility
 tests. This is not, by itself, a legal accessibility certification: manual
 screen-reader, keyboard and assistive-technology testing is still required.
 See the [accessibility analysis](docs/evoluzione.md#13-accessibilità) for scope and known

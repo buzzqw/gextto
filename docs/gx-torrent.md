@@ -19,7 +19,7 @@ Codice:
 |---|---|
 | `cmd/gx-torrent/main.go` | flag, avvio, segnali, spegnimento pulito |
 | `cmd/gx-torrent/daemon.go` | sessione gx-core, stato persistente, ciclo della coda, operazioni |
-| `cmd/gx-torrent/queue.go` | pianificatore della coda (funzione pura) e coda dinamica |
+| `internal/queue/queue.go` | pianificatore della coda (funzione pura) e coda dinamica |
 | `cmd/gx-torrent/storage.go` | symlink per torrent, spostamento e cancellazione sicuri |
 | `cmd/gx-torrent/api.go` | REST API con token |
 | `cmd/gx-torrent/network.go` | porta, interfacce, proxy, cifratura, filtro IP |
@@ -376,8 +376,8 @@ In standalone il demone espone anche un'**API compatibile qBittorrent**
 e tag viaggiano anche su `torrents/add`), `torrents/properties|files|trackers`
 e `torrents/reannounce|setLocation` (più gli alias 5.x `stop`/`start`),
 `torrents/toggleSequentialDownload|setSuperSeeding|addTrackers|removeTrackers|editTracker|filePrio|export|setForceStart|setAutoManagement|setDownloadLimit|setUploadLimit|setShareLimits`,
-`transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit` e
-`sync/maindata|torrentPeers` (con `rid` incrementale e `content_path` in
+`transfer/downloadLimit|uploadLimit|setDownloadLimit|setUploadLimit`, `sync/maindata` (con `rid` incrementale) e
+`sync/torrentPeers` (che riporta `rid: 0`), e `content_path` in
 `torrents/info`, come leggono Sonarr e Radarr). L'API usa gli stessi criteri di
 accesso della pagina: senza password è aperta, altrimenti servono il bypass LAN
 (se `local-bypass` è attivo) o una sessione (`SID` qBittorrent o `gx_session`
@@ -567,7 +567,8 @@ RPC interno del motore è disattivato.
 - **Filtro IP.**
   - Formati accettati: CIDR, intervalli `a.b.c.d-e.f.g.h`, P2P
     (`nome:inizio-fine`) ed eMule `ipfilter.dat`. Le regole eMule con livello
-    ≥ 128 consentono il traffico; le righe IPv6 vengono ignorate.
+    ≥ 128 consentono il traffico; le regole IPv6 in forma CIDR sono applicate
+    (intervalli/P2P/eMule restano solo IPv4).
   - Il filtro si applica ai peer in entrata e in uscita, e ai tracker se
     `libtorrent_apply_ip_filter` è attivo.
   - Il pulsante "Aggiorna IP filter" di gextto funziona anche con gx-torrent:
@@ -578,7 +579,8 @@ RPC interno del motore è disattivato.
   - Scoperta IPv6 **BEP 32** dual-stack: nodi v4 e v6 tenuti separati
     (`nodes`/`nodes6`, `want: n4/n6`).
   - **Security extension BEP 42**: l'ID nodo è derivato dall'IP esterno quando è
-    noto (`-dht-host` routabile o interfaccia uscente), così nessuno può
+    noto (l'indirizzo di ascolto routabile da `-listen-interface`, o l'IP
+    dell'interfaccia uscente), così nessuno può
     sceglierne uno vicino a un info-hash bersaglio; se l'IP non è noto all'avvio
     viene adottato dal campo `ip` delle risposte DHT e il nuovo ID è persistito.
     Gli indirizzi di rete locale sono esenti.
@@ -1044,9 +1046,10 @@ l'altro e il demone li riapplica alla sessione ricaricata.
 
 Ogni torrent ha anche un **limite di connessioni** e di **slot di upload**
 propri (`POST /api/v1/torrents/{hash}/conn-limits`, campi `max_connections` e
-`max_uploads`; `-1` globale, `0` illimitato). Il limite di connessioni vale
-sulle connessioni instaurate; se lo si abbassa sotto il numero corrente, le
-eccedenti vengono chiuse al tick successivo. Gli slot di upload cambiano il
+`max_uploads`; `-1` e `0` significano entrambi nessun tetto per-torrent — il
+budget globale `max_peer_dial`/`max_peer_accept` resta). Il limite di
+connessioni vale sulle connessioni instaurate; se lo si abbassa sotto il numero
+corrente, le eccedenti vengono chiuse subito. Gli slot di upload cambiano il
 numero di peer che l'unchoker tiene sbloccati.
 
 ## REST API (v1)
@@ -1079,7 +1082,7 @@ Azioni disponibili su `POST /api/v1/torrents/{hash}/{azione}`:
 - `pin` (con `pinned=1/0`), `top`;
 - `move` e `associate` (con `destination`);
 - `seed-limits` (`seed_ratio`, `seed_days`, `download_limit`, `upload_limit` in KiB/s: -1 globale, 0 illimitato);
-- `conn-limits` (`max_connections`, `max_uploads`: -1 globale, 0 illimitato);
+- `conn-limits` (`max_connections`, `max_uploads`: -1 e 0 = nessun tetto per-torrent);
 - `trackers` (con `urls`, uno per riga);
 - `set-trackers` (con `urls`, uno per riga: **sostituisce** la lista, elenco vuoto la azzera);
 - `webseeds` (con `urls`, uno per riga, e `remove=1` per rimuoverli);
