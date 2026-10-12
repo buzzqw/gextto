@@ -210,7 +210,7 @@ fornisce gli stub (`//go:build !cgo`), `libtorrent.go` resta invariato e
 | `internal/dht` | implementazione DHT, un modulo a sé sotto il modulo principale. |
 | `internal/gxcore` | motore torrent gx-core (il binario `gx-torrent`): codice nostro con porzioni derivate da progetti MIT/BSD. |
 | `internal/queue` | gestore della coda di gx-torrent (quali torrent far girare). |
-| `internal/rss` | parsing/normalizzazione dei feed RSS e filtro episodi per le regole delle serie. |
+| `internal/rss` | parsing dei feed RSS/Atom/Torznab e degli elenchi HTML (ext.to, TorrentGalaxy: `listing.go`), regole ordinate e filtro episodi. |
 | `internal/settings` | store chiave/valore persistente della modalità standalone di gx-torrent. |
 | `internal/torznab` | client per indexer Torznab (Jackett, Prowlarr e simili). |
 | `internal/webui` | template e asset incorporati della UI del demone gx-torrent (vedi §7). |
@@ -230,14 +230,18 @@ qBittorrent.
 | `api.go` | rotte dell'API JSON nativa (`/api/v1/...`) e pagine `/ui/...`. |
 | `api_qbit.go` | API compatibile con qBittorrent (`/api/v2/...`). |
 | `setup.go` | configurazione guidata di primo avvio (`/ui/setup`). |
-| `ui_feeds.go`, `ui_rss_edit.go` | pagina RSS: feed, regole e suggerimenti. |
-| `ui_settings.go` | pagina Impostazioni (limiti di banda e scheduler). |
+| `ui_feeds.go`, `ui_rss_edit.go` | pagina RSS: feed (stato, ricarica, modifica, attiva/disattiva), regole (modifica, anteprima), indexer, opzioni RSS. |
+| `feed.go`, `feed_search.go`, `wanted.go` | motore RSS: poll dei feed (anche di uno solo), regole, ricerche Torznab, titoli cercati. |
+| `feed_archive.go`, `ui_archive.go` | archivio dei feed (bbolt `feed-archive.db` con indice compatto) e pagina Archivio. |
+| `ui_settings.go` | pagina Impostazioni (cartelle, rete, protocolli, coda, banda e scheduler). |
+| `ipfilter_refresh.go` | IP filter da file o URL: caricamento all'avvio, aggiornamento periodico, stato. |
+| `optimize.go` | ottimizzazione con un clic (coda, cache, banda) e stato dei picchi misurati. |
 | `ui_browse.go` | selettore di cartelle lato server. |
 
 ## 7. Asset incorporati nel binario (`go:embed`)
 
 - `uiweb/v2/templates/*.html`, `uiweb/v2/static/*` — UI web di Gextto.
-- `internal/webui/assets/*` — UI del demone gx-torrent (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `token.html`, `favicon.svg`).
+- `internal/webui/assets/*` — UI del demone gx-torrent (`ui.tmpl`, `login.html`, `setup.html`, `rss.html`, `settings.html`, `archive.html`, `token.html`, `favicon.svg`).
 - `docs/MANUAL.it.md`, `docs/MANUAL.en.md` — manuale mostrato nella UI.
 - `internal_translations*.yml` — traduzioni.
 - `LICENSE` — licenza servita dall'app.

@@ -381,6 +381,30 @@ Webhook HMAC, event hook, alias titoli, blocklist, ritardi (delay profile), pack
 di stagione, sottotitoli nel punteggio, Discover/Popular TMDB: già presenti.
 Trakt: rimossa di proposito (`TestTraktIntegrationRoutesRemoved`).
 
+### 2.10 Rimozione con dati, rinuncia allo stallo e tabelle (2026-10-12)
+
+Caso reale: «Morgane…S04E01-08» (0%) non spariva con *Torrent + dati*.
+- **Ordine sbagliato in `SafeRemoveTorrent`:** i file venivano spostati nel
+  cestino *prima* di togliere il torrent dal motore. Con cestino e download su
+  due condivisioni NFS diverse lo spostamento è una copia (8 file preallocati,
+  18,8 GB di zeri) fatta dentro la richiesta HTTP, mentre gx-torrent teneva i file
+  aperti: il `.nfsXXXX` "busy" faceva fallire la copia e il torrent ricompariva.
+  Ora il torrent esce prima dal motore; il rename sullo stesso filesystem resta
+  sincrono, la copia tra filesystem va in background (log a fine copia); un
+  torrent senza byte scaricati non passa dal cestino (elimina il motore); il log
+  non dice più "file eliminati" quando lo spostamento fallisce. Test
+  `TestSafeRemoveTorrentNothingDownloadedSkipsTrash`.
+- **Rinuncia allo stallo senza blocklist:** dopo il *Gave up* la ricerca
+  successiva aveva ripreso la stessa release (da un hit d'archivio). Ora la
+  release va in blocklist (`stalled_dead_swarm`), come già faceva il ramo
+  *magnet morto*.
+- **Tabelle del pannello Download:** a 1366 px la tabella dei torrent chiedeva
+  1489 px (scroll orizzontale anche a 1600 px), lo *Storico download* 1451 px.
+  Layout fisso + container query in `em` (seguono A−/A+): le colonne secondarie
+  confluiscono nella cella di avanzamento. Misurato con Chromium headless a
+  1024/1280/1366/1600/1920 px e testo 85/100/140%: nessun overflow da 1366 px in
+  su; l'Archivio con testo al 140% non trabocca più (colonna azioni in rem).
+
 ---
 
 ## 3. Direzione strategica
@@ -1445,6 +1469,54 @@ residui della vecchia funzione *Segui un titolo* (endpoint `POST /ui/rss-follow`
 chiavi i18n, test), il campo inerte `Folder` delle voci cercate e i commenti che
 descrivevano il vecchio modello «un titolo = feed + regola»; `followTitleRegex`
 è diventato `titleMatchRegex`.
+
+### 5.17 RSS standalone completo, archivio dei feed, IP filter e ottimizzazione (2026-10-12)
+
+Revisione del gx-core standalone su richiesta del proprietario, con l'obiettivo
+di un pannello RSS all'altezza di qBittorrent e Deluge/YaRSS2.
+
+- **Elenchi HTML come feed** (`internal/rss/listing.go`): le pagine di ext.to e
+  TorrentGalaxy davano `XML syntax error … <meta> closed by </head>`. Ora: magnet
+  diretti, pagine `/post-detail/` risolte (3 worker, cache), feed pubblicizzati
+  seguiti, errore chiaro altrimenti. Misurato sui due URL reali: 50 elementi in
+  0,3 s (ext.to) e 50 in 1,9 s (TorrentGalaxy, prima volta; poi dalla cache).
+- **Pannello RSS:** stato per feed (ultimo controllo, elementi, nuovi, aggiunti,
+  errore), ↻ ricarica sincrona, modifica, attiva/disattiva (`disabled`),
+  intervallo configurabile e prossimo controllo; regole modificabili, attiva/
+  disattiva, `once` nel form e **anteprima** sull'archivio; link alla pagina web
+  dell'indexer.
+- **Bug delle regole disattivate:** una regola disattivata non copriva più il
+  feed, che ricadeva sul proprio filtro (vuoto = prende tutto): una regola
+  *once* che si spegneva da sola faceva scaricare al giro dopo le altre release
+  dello stesso film. Il test `TestPollFeedsOnceDisablesRule` lo nascondeva
+  perché contava lo snapshot asincrono; ora conta lo stato e la copertura vale
+  anche per le regole disattivate.
+- **Archivio dei feed** (`feed_archive.go`, `ui_archive.go`, `archive.html`):
+  bbolt (già linkato), indice compatto separato dal JSON. Benchmark
+  `BenchmarkFeedArchiveSearch` (100.000 elementi, Intel N97):
+
+  | Versione | ns/op | B/op | allocs/op |
+  |---|---:|---:|---:|
+  | prima stesura (decodifica JSON di ogni elemento) | 362.613.936 | 126.176.356 | 1.300.727 |
+  | indice compatto, JSON solo per la pagina | 7.429.315 | 44.643 | 337 |
+
+  49× più veloce, 2.800× meno memoria allocata.
+- **IP filter** (`ipfilter_refresh.go`): un URL in `settings.json` non veniva
+  caricato (la sessione faceva `os.Stat` sull'URL). Ora: copia locale subito,
+  download all'avvio e ogni `ipfilter-refresh-hours`, file locale ricaricato se
+  cambia; stato e *Carica ora* nelle impostazioni.
+- **Ottimizzazione** (`optimize.go`): coda (base di Gextto), cache (automatica),
+  banda (80% del picco di upload misurato nel `tick`, auto-speed attivo).
+- **UI Torrents:** tile cache/I/O nascoste in standalone, pallino della porta peer.
+
+**Impronta del demone** (build `-s -w`, standalone, nessun torrent, DHT/UPnP/
+NAT-PMP/LSD spenti, misurato dopo il primo giro dei feed):
+
+| | prima (9ac13b4) | dopo |
+|---|---:|---:|
+| binario | 14.774.432 B | 15.093.920 B (+2,2%: pagine, traduzioni, handler) |
+| VmRSS a riposo | 19.048 kB | 19.324 kB (+1,4%) |
+| CPU a riposo | 0,0% | 0,0% |
 
 ---
 

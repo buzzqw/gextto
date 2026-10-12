@@ -1,33 +1,71 @@
 # Gextto — EXpert Torrent Transfer Orchestrator
 
-**Gextto (EXpert Torrent Transfer Orchestrator)** è un demone self-hosted che
-cerca, seleziona, scarica, verifica, rinomina e archivia serie TV, film e
-fumetti. L'interfaccia web è il piano di controllo; il demone continua a
-funzionare come servizio.
+**Di' a Gextto cosa vuoi vedere. Trova la release migliore, la scarica, la
+controlla, le dà il nome giusto e la archivia nella tua libreria — poi continua
+a cercarne una copia migliore.** Un solo demone self-hosted, un'interfaccia web
+veloce e un motore BitTorrent proprio, scritto da zero in Go puro.
+
+[![Licenza: EUPL-1.2](https://img.shields.io/badge/licenza-EUPL--1.2-blue.svg)](LICENSE)
+![Go](https://img.shields.io/badge/Go-puro%2C%20zero%20CGO-00ADD8?logo=go)
+![Piattaforme](https://img.shields.io/badge/piattaforme-Linux%20%C2%B7%20Windows%20(gx--torrent)-informational)
+![BEP](https://img.shields.io/badge/BEP%20BitTorrent-34%20implementati-success)
+![Lingue](https://img.shields.io/badge/UI-IT%20%C2%B7%20EN%20%C2%B7%20DE%20%C2%B7%20FR%20%C2%B7%20ES%20%C2%B7%20PL-lightgrey)
 
 > **English:** [README.md](README.md) · **Manuale:**
 > [italiano](docs/MANUAL.it.md) · **Segnalazioni e proposte:**
 > [GitHub Issues](https://github.com/buzzqw/gextto/issues) ·
 > **Contribuire:** [guida sviluppatori](docs/DEVELOPERS.md)
 
+## Perché Gextto
+
+- **Decide come un esperto, e ti dice perché.** Ogni release candidata riceve un
+  punteggio su risoluzione, sorgente, codec, audio, HDR/Dolby Vision, lingua e
+  dimensione; vince la migliore, e ogni scartata conserva nel log il motivo
+  esatto. Gli upgrade si fermano quando il file è abbastanza buono.
+- **Non perde mai la tua libreria.** Hardlink invece di copie durante il seed,
+  una guardia che distingue un NAS smontato da un file cancellato, un cestino
+  per i file sostituiti, spostamenti che riprendono dopo un riavvio.
+- **Ha un motore suo.** `gx-core` è un'implementazione BitTorrent costruita per
+  questo progetto: BitTorrent v2, uTP, holepunching NAT, DHT IPv6, streaming —
+  in un processo che a riposo occupa **~25 MB** dove qBittorrent arriva ai
+  gigabyte.
+- **Funziona anche senza Gextto.** Lo stesso motore esiste come **gx-torrent**,
+  un client autonomo per Linux e Windows con UI web completa, API compatibile
+  con qBittorrent per Sonarr/Radarr e un gestore RSS all'altezza dei migliori.
+- **È software onesto.** Go puro, nessuna dipendenza C, un binario per
+  componente, circa 1.600 funzioni di test, accessibilità verificata con
+  axe-core, sei lingue nell'interfaccia.
+
+### In breve
+
+| | |
+|---|---|
+| **Memoria del motore** | ~25 MB a riposo, ~100 MB a 100 MB/s con 50 torrent (qBittorrent-nox: fino a ~5 GB) |
+| **Protocollo** | BitTorrent v1, v2 e ibridi (BEP 52) · 34 BEP implementati e testati ([elenco](docs/bep.md)) |
+| **Rete** | TCP + uTP su una porta · UPnP, NAT-PMP, PCP · holepunching BEP 55 · proxy SOCKS5/HTTP · killswitch VPN |
+| **Automazione** | Serie TV, film, fumetti · Torznab (Jackett, Prowlarr) · RSS · ricerca web · sostituzione dei download bloccati |
+| **Integrazioni** | Jellyfin, Plex, Telegram, e-mail, Discord/Slack/ntfy/Gotify/Pushover, iCal |
+| **Interfacce** | UI web (SSR + HTMX, PWA installabile) · TUI da terminale via SSH · API JSON |
+| **Build** | Go puro (`CGO_ENABLED=0`) · motore libtorrent opzionale · Linux x86_64/aarch64 · gx-torrent anche su Windows |
+
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        Gextto Media Orchestrator                       │
 │  Decision Engine · Parse & Scoring · Multi-Indexer · Post-Processing   │
-│  UI Server-Side (HTMX + SSR) · TUI Terminale · Integrazioni Media      │
+│  Server-Side UI (HTMX + SSR) · Terminal TUI · Media Integrations       │
 └───────────────────────────────────┬────────────────────────────────────┘
-                                    │ Contratto engine (torrent_engine.go)
+                                    │ Engine contract (torrent_engine.go)
 ┌───────────────────────────────────▼────────────────────────────────────┐
-│                  gx-torrent (Demone standalone/gestito)                │
-│  Web UI dedicata · qBittorrent Web API v2 (Sonarr/Radarr) · Feed RSS   │
-│  Servizio Linux (systemd) e Windows nativo (NTFS Junctions)            │
+│                  gx-torrent (Managed / Standalone Daemon)              │
+│  Web UI · qBittorrent Web API v2 · RSS rules, archive, wanted titles   │
+│  Linux Service (systemd) and Native Windows Service (NTFS Junctions)   │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼────────────────────────────────────┐
 │                    gx-core Engine (internal/gxcore)                    │
 │  BitTorrent v1 / v2 (BEP 52 Merkle) · uTP (BEP 29) · Holepunch (BEP 55)│
-│  DHT Dual-stack IPv6 (BEP 32/42/44) · Streaming Readahead · MSE In-Place│
-│  Zero CGO · Memory footprint: ~25 MB idle / ~100 MB picco              │
+│  Dual-Stack IPv6 DHT (BEP 32/42/44) · Streaming Readahead · MSE In-Place│
+│  Zero CGO · Memory footprint: ~25 MB idle / ~100 MB peak               │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -36,18 +74,18 @@ funzionare come servizio.
 ### 🎯 Automazione intelligente e Decision Engine
 - **Valutazione meticolosa delle release:** assegna un punteggio deterministico a ogni candidato valutando qualità video, sorgente, codec, audio, HDR/DV, lingua e dimensione. Protegge i file migliori già archiviati e registra nei log il motivo esatto di ogni scarto. Una soglia configurabile ferma gli upgrade quando il file raggiunge lo standard desiderato; `ffprobe` può analizzare i file su disco per affinare le decisioni.
 - **Fumetti:** per i fumetti CBZ genera automaticamente metadati `ComicInfo.xml` compatibili con Komga, Kavita e i reader standard.
-- **Recupero dai download bloccati (Anti-Stall):** un torrent fermo da tempo (nessun byte) o un magnet in attesa prolungata dei metadati viene affiancato da un'alternativa valida dopo una finestra temporale definita (*Configurazione → Qualità e upgrade → Download bloccati*), mentre il trasferimento originale continua a tentare.
+- **Recupero dai download bloccati (Anti-Stall):** un torrent fermo da tempo (nessun byte) o un magnet in attesa prolungata dei metadati viene affiancato da un'alternativa valida dopo una finestra temporale definita (*Configurazione → Qualità e upgrade → Download bloccati*), mentre il trasferimento originale continua a tentare. Una release a cui Gextto rinuncia va in blocklist, così la ricerca successiva sceglie un'altra versione invece della stessa release morta.
 
 ### 🛡️ Integrità della Libreria e Storage Safety
 - **Hardlink immediati durante il seed:** quando download e libreria risiedono sullo stesso filesystem, il file entra istantaneamente in archivio tramite hardlink, rendendolo subito fruibile senza duplicare lo spazio occupato su disco.
 - **Protezione mount point e NAS:** rileva tempestivamente la disconnessione di una condivisione di rete (NAS smontato), evitando di scambiare l'assenza temporanea per file eliminati; gestisce retry automatici trasparenti su timeout o dischi pieni e riprende da solo i trasferimenti interrotti al riavvio.
-- **Cestino di sicurezza:** le versioni sostituite da un upgrade reale vengono spostate nel cestino configurato prima dell'eliminazione definitiva.
+- **Cestino di sicurezza:** le versioni sostituite da un upgrade reale, e i file di un torrent rimosso "con i dati", vengono spostati nel cestino configurato prima dell'eliminazione definitiva. Il torrent esce prima dal motore (nessun file tenuto aperto su NFS) e la copia tra filesystem diversi gira in background, così la pagina risponde subito.
 
 ### 🔌 Fonti, Integrazioni e Controllo Operativo
-- **Sorgenti flessibili:** feed RSS, indexer Torznab (Jackett, Prowlarr), motori web dedicati e supporto opzionale a FlareSolverr.
+- **Sorgenti flessibili:** feed RSS, elenchi HTML (ext.to, TorrentGalaxy, Corsaro), indexer Torznab (Jackett, Prowlarr), motori web dedicati e supporto opzionale a FlareSolverr.
 - **Notifiche e Media Server:** notifica gli eventi via Telegram, e-mail o webhook (Discord, Slack, ntfy, Gotify, Pushover), inclusi riavvii di Gextto e anomalie di gx-torrent; invia refresh mirati a Jellyfin e Plex toccando solo la cartella modificata ed esporta un calendario iCal con arrivi e uscite.
 - **Tracciabilità completa dei download:** ogni operazione ha un **ID di acquisizione** univoco tracciato in tutti i log (ricerca, selezione, download, post-processing e archivio); la dashboard **Da controllare** raccoglie i casi anomali, e gli avvisi a soglia segnalano tempestivamente se una sorgente fallisce tre cicli consecutivi o rallenta.
-- **Interfaccia Web SSR + HTMX e TUI da terminale:** UI responsive fruibile su desktop e smartphone (PWA), navigabile interamente da tastiera e verificata con axe-core per l'accessibilità; TUI nativa completa per l'amministrazione via SSH. Disponibile in 6 lingue (IT, EN, DE, FR, ES, PL).
+- **Interfaccia Web SSR + HTMX e TUI da terminale:** UI responsive fruibile su desktop e smartphone (PWA), navigabile interamente da tastiera e verificata con axe-core per l'accessibilità; tabelle che stanno nella finestra a qualsiasi dimensione del testo; TUI nativa completa per l'amministrazione via SSH. Disponibile in 6 lingue (IT, EN, DE, FR, ES, PL).
 
 La UI è disponibile su `http://<host>:5000/`. Il [manuale italiano](docs/MANUAL.it.md) e l'[English manual](docs/MANUAL.en.md) spiegano la configurazione e tutte le sezioni dell'interfaccia.
 
@@ -57,26 +95,36 @@ Gextto conserva il piano di controllo (coda, punteggi, post-processing, archivio
 
 ### gx-core & gx-torrent (Predefinito e consigliato)
 
-**gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii dell'orchestratore, dispone di una propria interfaccia web autonoma ed è dove arrivano per prime le innovazioni di protocollo.
+**gx-torrent** è il motore predefinito ed è compilato in **Go puro** (`CGO_ENABLED=0`), senza alcuna dipendenza C/C++. Gira in un processo separato sorvegliato da Gextto, sopravvive ai riavvii e agli aggiornamenti dell'orchestratore (Gextto lo riaggancia se binario e opzioni coincidono), dispone di una propria interfaccia web ed è dove arrivano per prime le innovazioni di protocollo.
 
-Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un motore BitTorrent ad altissime prestazioni mantenuto direttamente in questo repository (con porzioni derivate con licenza MIT/BSD; vedi `internal/gxcore/LICENSE`). Offre un supporto di protocollo completo e all'avanguardia con prestazioni elevate:
+Il suo nucleo, **`gx-core`** (`internal/gxcore`), è un'implementazione BitTorrent sviluppata in questo repository (con porzioni derivate da progetti MIT/BSD; vedi `internal/gxcore/LICENSE`). Per chi conosce BitTorrent, ecco cosa c'è dentro.
 
-- **BitTorrent v1, v2 e Ibridi (BEP 52):** supporto completo per v1, v2-only e ibridi sia da file `.torrent` che da magnet (`urn:btmh:`). Utilizza un modello a pezzi per-file (nessun padding block tra file diversi), verifica crittografica basata su alberi Merkle SHA-256 e fetch dinamico dei `piece layers` direttamente dai peer (`hash request`, `hashes`, `hash reject`).
-- **Ampia copertura BitTorrent (BEP) — la fonte unica è [`docs/bep.md`](docs/bep.md):** protocollo wire di base (BEP 3), reserved bits (4), Fast Extension (6), `ut_metadata` da magnet (9), Extension Protocol (10), Peer Exchange `ut_pex` con IPv4 e IPv6 `added6`/`dropped6` (11), multitracker `announce-list` (12), Local Service Discovery IPv4/IPv6 (14), super-seeding (16), Web Seed con HTTP Range (19), convenzioni del peer ID (20), seed parziali `upload_only`/`event=paused` (21), liste compact di peer (23), campo IP esterno del tracker (24), torrent privati (27), hint del file torrent `similar`/`collections` (38), canonical peer priority (40), padding file (47) e `lt_donthave` (54); tracker: IPv6 `peers6` (7), tracker UDP (15), estensioni UDP `URLData` (41), ritentativo su errore `retry in`/`never` (31) e scrape (48); DHT: mainline (5), IPv6 (32), DHT scrape (33), node ID sicuri (42), nodi read-only (43) e store K/V con il client uscente `get`/`put` (44), più aggiornamento dei magnet da item mutabili `urn:btpk:` (46); più BitTorrent v2 (52) e selezione magnet `so=` (53). I BEP deprecati o di nicchia e WebTorrent/I2P sono fuori scope, con la motivazione nello stesso documento.
-- **Trasporto uTP (BEP 29) e Single-Port Listening:** motore dual-transport con esecuzione parallela di TCP e uTP e fallback automatico. Un unico socket UDP gestisce simultaneamente il trasporto uTP e il traffico DHT sulla medesima porta, con multiplexing delle connessioni e instradamento dell'handshake in base all'info-hash così che tutti gli swarm annuncino la stessa porta.
-- **NAT Traversal con Holepunching (BEP 55):** implementazione completa dell'estensione `ut_holepunch` per stabilire connessioni punto-punto dirette su uTP attraverso NAT simmetrici e firewall senza necessità di aprire porte sul router, con supporto sia come client attivo sia come nodo di relè per altri peer.
-- **Port Mapping e Integrazione di Rete:** apertura automatica delle porte sul router via UPnP, NAT-PMP e **PCP** (RFC 6887), più rilevamento del tipo di NAT basato sul DHT nel test porte (porta riflessa, cone vs simmetrico), supporto proxy SOCKS5 e HTTP CONNECT, e killswitch vincolato all'interfaccia (`outgoing-interface`) per confinare tutto il traffico BitTorrent ai soli tunnel VPN.
-- **Super-seeding (BEP 16) e Choking Deterministico:** harness di simulazione deterministico dell'unchoker per ottimizzare throughput ed equità; supporto super-seeding per distribuire nuovi torrent annunciando un pezzo alla volta ed evitando upload ridondanti nel seed iniziale.
-- **Hint di dati locali (BEP 38):** legge gli hint `similar`/`collections` di un torrent (dal dizionario info e dal livello superiore, uniti), li conserva nell'export e segnala **gli altri torrent locali che condividono un hint** — la base per riusare dati già su disco invece di riscaricarli. Mostrati nella pagina del demone e in Gextto, e serviti su `GET /api/v1/torrents/{hash}/collections`.
-- **Riuso di dati locali (Swarm Merging, Fase 1):** se un altro torrent ha **lo stesso contenuto** con layout identico, i suoi pezzi già verificati vengono riusati — letti, riverificati contro l'hash di questo torrent e riscritti — così un repack o un torrent senza seeder si completa senza riscaricare quei dati. I torrent privati non vengono mai mescolati (BEP 27).
-- **Streaming Multimediale nel Browser e Priorità Graduata:** prioritizzazione in tempo reale per la riproduzione video: il piece picker distingue tra la finestra immediata del player (`SetStreamWindow`) e il margine di avanzamento (`SetReadaheadWindow`), privilegiandoli rispetto alle strategie rarest-first, e una **priorità per file graduata** (0 = salta, 1–4 = normale, 5–7 = alta, scala libtorrent/qBittorrent) così i file ad alta priorità vengono scaricati prima; serve file video MKV/MP4 direttamente al browser o a VLC via richieste HTTP Range.
-- **Crittografia MSE/PE Zero-Alloc:** stream cipher RC4 eseguito direttamente in-place sul buffer di memoria chiamante (`inPlaceStreamWriter`), eliminando le allocazioni per blocco durante l'upload.
-- **Accelerazione Hardware e Coda Adattiva:** conteggio del bitfield accelerato con istruzioni native della CPU (`math/bits.OnesCount64`); profondità della coda di richieste per peer (`RequestQueue`) modulata dinamicamente in base alla velocità di consegna dei blocchi e azzerata su choke/snub.
-- **Architettura di Memoria e Disco ad Alte Prestazioni:** cache di lettura dinamica in RAM con sweeper a scadenza lazy, limitatore del buffer di scrittura, allocazione file sparsi e preallocazione con `fallocate` (con protezione su tmpfs), supporto per RAM disk per download temporanei, **durabilità a batch** (`fdatasync` prima di persistere il bitfield di resume, niente `O_SYNC` per scrittura) e uno **storage mmap opt-in** (`-mmap`, Linux) le cui scritture sono asincrone in page cache.
-- **Filtro IP a Ricerca Binaria Ottimizzato:** supporta formati CIDR, intervalli, P2P ed eMule `.dat` fusi in intervalli ordinati e non sovrapposti in memoria, eseguendo lookup a ricerca binaria senza allocazioni con footprint trascurabile (~byte per regola).
-- **Modulo DHT Avanzato (`internal/dht`):** modulo mainline DHT (BEP 5) isolato con supporto dual-stack IPv6 (BEP 32), DHT scrape (BEP 33), Security Extension anti-spoofing con CRC32C Castagnoli (BEP 42), K/V store immutabile e mutabile firmato ed25519 (BEP 44) **più un client uscente `get`/`put`**, modalità read-only per nodi di transito (BEP 43), aggiornamento dei magnet da item mutabili `urn:btpk:` (BEP 46) e tracker scrape (BEP 48 HTTP/UDP).
-- **Protezione Swarm, Diagnostica e Resilienza:** conformità rigorosa a BEP 27 per torrent privati (disattiva automaticamente DHT, PEX in/out e LSD); esclusione temporanea (30 min) di sessione per peer che trasmettono blocchi corrotti; ritentativo dei tracker con `retry in`/`never` (BEP 31: un tracker che risponde *never* viene scartato dal suo tier); WebSeed (BEP 19); diagnostica per-pezzo; resume persistente (BoltDB); diagnosi granulare degli errori di storage; e bus eventi live Server-Sent Events (`/ui/events`).
-- **Multipiattaforma e Client Standalone:** eseguibile sia come motore interno di Gextto sia come client autonomo (`gx-torrent`) dotato di propria Web UI, API compatibile qBittorrent (`/api/v2`), regole RSS con smart episode tracking, demone systemd su Linux e servizio nativo Windows Service su Windows (amd64/arm64).
+#### Protocollo
+
+- **BitTorrent v1, v2 e ibridi (BEP 52):** torrent v1, solo-v2 e ibridi sia da file `.torrent` sia da magnet (`urn:btmh:`), con layout dei pezzi per file (nessun blocco di padding tra file), verifica con albero Merkle SHA-256 e `piece layers` ricevuti dai peer (`hash request`, `hashes`, `hash reject`).
+- **34 BEP implementati e testati — [`docs/bep.md`](docs/bep.md) è la fonte di verità:** wire di base (BEP 3), bit riservati (4), Fast Extension (6), `ut_metadata` da magnet (9), Extension Protocol (10), Peer Exchange `ut_pex` con IPv4 e IPv6 `added6`/`dropped6` (11), multitracker `announce-list` (12), Local Service Discovery IPv4/IPv6 (14), super-seeding (16), Web Seed con HTTP Range (19), convenzioni del peer ID (20), seed parziali `upload_only`/`event=paused` (21), liste peer compatte (23), IP esterno dal tracker (24), torrent privati (27), hint `similar`/`collections` (38), priorità canonica dei peer (40), file di padding (47) e `lt_donthave` (54); tracker: IPv6 `peers6` (7), tracker UDP (15), estensioni UDP `URLData` (41), retry `retry in`/`never` (31) e scrape (48); DHT: mainline (5), IPv6 (32), scrape DHT (33), node ID sicuri (42), nodi read-only (43) e store K/V con client `get`/`put` in uscita (44), più aggiornamenti magnet `urn:btpk:` (46); infine BitTorrent v2 (52) e la selezione `so=` dei magnet (53). BEP deprecati o di nicchia e WebTorrent/I2P sono fuori scope, con le motivazioni nello stesso documento.
+- **Hint di dati locali (BEP 38) e swarm merging:** legge gli hint `similar`/`collections`, li conserva nell'export e indica gli altri torrent locali che condividono un hint (`GET /api/v1/torrents/{hash}/collections`); quando un altro torrent ha esattamente lo stesso contenuto, i suoi pezzi verificati vengono ri-hashati e riusati, così un re-pack o un torrent senza seed si completa senza riscaricare quei dati. I torrent privati non vengono mai mescolati (BEP 27).
+- **Super-seeding (BEP 16) e choking deterministico:** un banco di simulazione dell'unchoker ottimizza throughput ed equità; il super-seeding diffonde un torrent nuovo un pezzo alla volta.
+
+#### Rete e NAT
+
+- **uTP (BEP 29) su una sola porta:** TCP e uTP in parallelo con fallback automatico; un solo socket UDP porta uTP e DHT, instradando gli handshake per info-hash, così ogni swarm annuncia la stessa porta.
+- **Holepunching (BEP 55):** l'estensione `ut_holepunch` completa apre connessioni uTP dirette attraverso i NAT senza configurare il router, come client e come relay per gli altri peer.
+- **Mappatura porte e diagnostica:** UPnP, NAT-PMP e **PCP** (RFC 6887), un test della porta che legge anche la porta esterna vista dal DHT (NAT cone o simmetrico), proxy SOCKS5 e HTTP CONNECT e un killswitch per interfaccia (`outgoing-interface`) che tiene tutto il traffico BitTorrent sulla VPN.
+- **Sottosistema DHT (`internal/dht`):** mainline (BEP 5), IPv6 dual-stack (32), scrape (33), node ID sicuri con CRC32C (42), modalità read-only (43, spenta di default: un client completo deve servire il DHT che usa), store K/V firmato immutabile/mutabile con client `get`/`put` in uscita (44), aggiornamenti magnet `urn:btpk:` (46).
+
+#### Disco, memoria e CPU
+
+- **Nessuna cache gigante, per scelta:** i pezzi vengono scritti subito e la page cache del sistema (recuperabile) fa l'accorpamento; una cache di lettura con scadenza pigra e un limitatore di scrittura dimensionati su RAM e tipo di disco (HDD, SSD, NFS) tengono l'impronta nelle decine di MB.
+- **Durabilità a lotti:** `fdatasync` prima di salvare il bitfield di resume, mai `O_SYNC` per scrittura; file sparsi e preallocazione `fallocate` (sicura su tmpfs); cartelle temporanee su RAM disk; storage mmap opzionale su Linux (`-mmap`).
+- **Percorsi critici senza allocazioni:** RC4 di MSE/PE cifra sul posto nel buffer di rete (nessuna allocazione per blocco), i bitfield si contano con `math/bits.OnesCount64` e la profondità della coda di richieste per peer si adatta alla sua velocità di consegna.
+- **Blocklist IP in microsecondi:** formati CIDR, intervalli, P2P ed eMule uniti in intervalli ordinati e cercati per bisezione senza allocazioni; una lista da URL viene riscaricata a intervalli regolari.
+
+#### Streaming, sicurezza e gestione
+
+- **Streaming:** il selettore dei pezzi distingue la finestra del player (`SetStreamWindow`) dall'orizzonte di readahead (`SetReadaheadWindow`), e le priorità per file (0 = salta, 1–4 normale, 5–7 alta) si applicano a caldo; MKV/MP4 serviti al browser o a VLC con HTTP Range.
+- **Protezione degli swarm:** torrent privati BEP 27 rigorosi (niente DHT, PEX, LSD), quarantena di 30 minuti per i peer che inviano blocchi corrotti, tracker rimossi dopo `never` (BEP 31) o un lungo guasto, diagnostica per pezzo, dati di resume in BoltDB, Server-Sent Events in tempo reale (`/ui/events`).
+- **Ovunque:** motore interno di Gextto o client autonomo con UI web e API compatibile qBittorrent, come servizio systemd su Linux e servizio Windows nativo su Windows (amd64/arm64).
 
 ### Motori alternativi
 
@@ -205,9 +253,34 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   stessa con cui Gextto lo pilota, più una pagina di accesso (`/ui/login`) quando
   è attiva l'autenticazione standalone.
 - **Interfaccia Web Indipendente e Wizard di Setup:** include una UI web completa
-  con grafici e diagnostica in tempo reale, gestione categorie e tag, download
-  automatico da feed RSS con regole e tracking smart degli episodi, e ricerca
-  diretta sugli indexer (Jackett, Prowlarr, MIRCrew).
+  con grafici e diagnostica in tempo reale, gestione categorie e tag e ricerca
+  diretta sugli indexer (Jackett, Prowlarr, MIRCrew), ognuno con il link alla
+  propria pagina web.
+- **Un gestore RSS all'altezza di qBittorrent e Deluge/YaRSS2:** i feed sono URL
+  RSS o elenchi HTML (pagine uploader di ext.to e TorrentGalaxy), ognuno con
+  ultimo controllo, elementi, nuovi e aggiunti ed errori, un pulsante
+  **↻ Ricarica**, modifica e attiva/disattiva; **regole** ordinate PASS/FAIL
+  (include/escludi, regex, dimensione, seed, età, filtro episodi, smart
+  episode, *scarica una volta*, pausa tra corrispondenze) con percorso,
+  categoria, tag e opzioni, modificabili sul posto e con **anteprima** di ciò
+  che catturerebbero; una lista **Wanted** che riprende gli episodi mancanti; un
+  intervallo di aggiornamento configurabile.
+- **Archivio:** ogni elemento mai restituito dai feed resta in un database
+  locale (deduplicato per info-hash) e si può cercare — parole, frasi tra
+  virgolette, parole `-escluse`, per feed, solo scaricati, ordinati per data,
+  seed, dimensione o titolo — con badge di risoluzione ed episodio, aggiungi,
+  copia magnet ed elimina. Una ricerca su 100.000 release richiede ~7 ms.
+- **Controllo della banda:** limiti globali e per torrent, programmazione
+  giornaliera della banda e un'**auto-velocità sulla latenza** che abbassa
+  l'upload quando il ping sale, per tenere la linea reattiva (anti-bufferbloat).
+- **Ottimizzazione con un clic:** *Ottimizza coda* (3 download, 3 seed, coda
+  dinamica tra 1 e 10 slot), *Ottimizza cache* (dimensionata su RAM e disco) e
+  *Ottimizza banda* (upload all'80% del picco misurato, auto-velocità sulla
+  latenza attiva), come l'*Ottimizza* di Gextto.
+- **IP filter sempre aggiornato:** un file locale o un URL (P2P, eMule, CIDR,
+  semplice o gzip), caricato a richiesta con *Carica ora*, riscaricato ogni N ore
+  e mostrato con numero di regole, ora di caricamento e prossimo aggiornamento.
+  La tile della porta peer diventa verde quando la porta è raggiungibile.
 - **Architettura Multipiattaforma:**
   - **Linux (x86_64, aarch64):** pacchetto standalone `tar.gz`, unit systemd inclusa
     (utente o sistema) e container Docker non privilegiato (`Dockerfile`).
@@ -244,9 +317,10 @@ porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
 personalizzato. La pagina collega a **RSS e indexer**, dove si gestiscono senza
 modificare il JSON a mano la lista *Cercati* (i titoli da cercare, ricercati
 negli indexer e nei feed configurati, con gli episodi mancanti cercati di nuovo)
-e i feed, le regole e gli indexer — e a
-**Impostazioni**, il pannello del client: cartelle, rete e porte, protocolli
-(cifratura, DHT/uTP/LSD…), coda e cache, banda, scheduler giornaliero e
+e i feed, le regole e gli indexer — all'**Archivio** di tutto ciò che i feed
+hanno trovato, e a **Impostazioni**, il pannello del client: cartelle, rete e
+porte, IP filter, protocolli (cifratura, DHT/uTP/LSD…), coda e cache,
+ottimizzazione con un clic, banda, scheduler giornaliero e
 auto-speed sulla latenza (anti-bufferbloat), lingua e notifiche. In
 una sessione desktop il browser si apre da solo sul wizard; su un server senza
 grafica o come servizio Windows il log stampa l'indirizzo da aprire.

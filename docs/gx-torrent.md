@@ -43,6 +43,7 @@ Codice:
 - [Interfaccia web](#interfaccia-web)
   - [Esposizione in rete](#esposizione-in-rete)
 - [Uso standalone](#uso-standalone)
+  - [Archivio dei feed](#archivio-dei-feed)
 - [Rete](#rete)
 - [uTP e LSD](#utp-e-lsd)
 - [Holepunching (BEP 55)](#holepunching-bep-55)
@@ -441,12 +442,30 @@ regole, ad esempio
 `[{"name":"Serie","url":"http://…rss","folder":"serie","include":"1080p,ita","exclude":"cam","category":"tv","savepath":"/srv/tv"}]`.
 Ogni feed può avere un `folder` (gruppo) facoltativo per organizzarlo nel
 riquadro dei feed, che li raggruppa.
-Un worker (ogni `feed-interval-secs`, predefinito 15 minuti) scarica ogni feed,
-applica `include`/`exclude` sul titolo e aggiunge magnet e `.torrent` non ancora
-visti (l'elenco degli elementi già aggiunti è persistito, quindi un riavvio non
-li ripropone). Nella pagina compaiono un riquadro *Feeds* con *Check feeds* e
-`GET /ui/feeds`/`POST /ui/feeds/poll` per lo stato e un controllo immediato. In
-managed non è disponibile.
+Un worker (ogni `feed-interval-secs`, predefinito 15 minuti, modificabile dalla
+pagina RSS in minuti) scarica ogni feed attivo, applica `include`/`exclude` sul
+titolo e aggiunge magnet e `.torrent` non ancora visti (l'elenco degli elementi
+già aggiunti è persistito, quindi un riavvio non li ripropone). `disabled: true`
+sospende i controlli automatici di un feed senza cancellarlo (il *disable feed*
+di qBittorrent; il pulsante ↻ della riga funziona comunque). Ogni elemento letto
+finisce anche nell'**archivio dei feed** (sotto). Nella pagina compaiono un
+riquadro *Feeds* con *Check feeds* e `GET /ui/feeds`/`POST /ui/feeds/poll` per lo
+stato e un controllo immediato; `POST /ui/feeds/poll` con `feed=<nome>` controlla
+**un solo feed in modo sincrono** e risponde con il suo stato (`items`, `new` =
+elementi mai visti prima, `added`, `last_error`, `last_check`), così la riga si
+aggiorna con l'esito; se un giro è già in corso risponde 409. In managed non è
+disponibile.
+
+Un feed può essere anche la **pagina HTML di un elenco** invece di un RSS, come
+in Gextto: una pagina uploader o di ricerca di **ext.to** (link magnet diretti:
+titolo dal testo o dal `dn`, dedup per info-hash) o di **TorrentGalaxy**
+(`/get-posts/user:NOME/`: le righe puntano a pagine `/post-detail/` lette con 3
+richieste parallele e una cache in memoria, quindi un giro costa una richiesta
+per release nuova). Una pagina che pubblicizza un feed (`<link rel="alternate"
+type="application/rss+xml">`) viene seguita; una pagina HTML senza link torrent
+dà un errore chiaro (*pagina HTML senza link torrent, non un feed RSS*) invece
+del vecchio `XML syntax error`. Le richieste usano uno User-Agent da browser
+(`internal/rss/listing.go`).
 
 Un feed può anche essere una **ricerca**: al posto di `url` si usa `search` (una
 query) e il worker interroga gli **indexer** Torznab configurati, trattando i
@@ -469,10 +488,13 @@ tutti), `fail`, `match` e `action`:
   match successivi per N giorni"); non dipende dalla data di pubblicazione degli
   item, quindi un episodio uscito due giorni dopo il precedente non viene perso;
 - ogni regola è attiva per default; `enabled: false` la disattiva senza
-  cancellarla (l'editor mostra un'etichetta *Disattivata*). Una regola copre i
-  feed elencati in `feeds` (vuoto = tutti); un feed **senza alcuna regola che lo
-  copra** continua a usare i propri `include`/`exclude`, quindi aggiungere una
-  regola per un feed non ferma gli altri.
+  cancellarla (l'editor mostra un'etichetta *Disattivata* e un pulsante
+  *Attiva/Disattiva*). Una regola copre i feed elencati in `feeds` (vuoto =
+  tutti); un feed **senza alcuna regola che lo copra** continua a usare i propri
+  `include`/`exclude`, quindi aggiungere una regola per un feed non ferma gli
+  altri. Anche una regola **disattivata** copre i suoi feed: spegnere l'unica
+  regola di un feed (o una regola *once* che si spegne da sola) ferma i download
+  invece di ricadere sul filtro del feed, che vuoto prenderebbe tutto.
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
   `top`, `once` (disattiva la regola dopo il primo download; lo usa *Segui un
   titolo* per i film).
@@ -513,24 +535,69 @@ la qualità valgono in AND e i feed restano liberi per le regole avanzate.
 Sotto: elenchi con pulsanti per aggiungere, **modificare** (il form si riempie
 con i valori della riga; una chiave API vuota la mantiene) **testare** (richiesta
 Torznab `t=caps`, esito accanto alla riga) e rimuovere **indexer** (tendina
-Prowlarr/Jackett/Altro, URL precompilato) e **feed** (nome e URL RSS: i feed
-caricano le sorgenti, mentre i parametri di ricerca, qualità e cartella appartengono
-a *Cercati* e alle regole), l'**editor delle
-regole** (una regola per riga, con frecce per cambiarne l'ordine — la prima che
-corrisponde vince; regex e filtri numerici stanno sotto *Filtri avanzati*), le
-textarea JSON avanzate per feed, regole e indexer (salvate con validazione), e
-per ogni feed un pulsante che mostra gli articoli correnti con la regola che li
-prenderebbe e un *Add* manuale (la vista "articoli corrispondenti" di qBittorrent)
-e un pulsante *Check feeds* per forzare subito un giro di controllo.
+Prowlarr/Jackett/Altro, URL precompilato; il nome è un **link alla pagina web
+dell'indexer**, cioè schema e host dell'URL Torznab, aperto in una nuova scheda).
+I **feed** hanno una tabella con stato (*attivo*/*disattivato*, *aggiunge in
+pausa*), **ultimo controllo** con elementi, nuovi e aggiunti o l'errore, e per
+riga i pulsanti **↻ Ricarica** (a sinistra di *Rimuovi*: legge subito quel feed
+e aggiorna la riga), **Modifica** (il form si riempie, comprese le *Opzioni del
+feed*: cartella, include/escludi, categoria, percorso, pausa, disattivato),
+**Attiva/Disattiva** e **Rimuovi**. Un riquadro **opzioni RSS** imposta
+l'intervallo di aggiornamento (minuti) e la conservazione dell'archivio (giorni)
+e mostra l'ora del prossimo controllo automatico. L'**editor delle regole** ha
+una regola per riga con **Modifica** (carica la regola nel form; salvando resta al
+suo posto nell'ordine), **Attiva/Disattiva**, frecce per cambiarne l'ordine — la
+prima che corrisponde vince — e *Rimuovi*; il form ha anche *Scarica una volta*
+(`once`) e **Anteprima corrispondenze**: prova la regola del form, salvata o no,
+sugli ultimi 5.000 elementi dell'archivio e mostra quelli che prenderebbe (la
+vista "articoli corrispondenti" di qBittorrent, istantanea e senza richieste di
+rete). Regex e filtri numerici stanno sotto *Filtri avanzati*. Seguono le
+textarea JSON avanzate per feed, regole e indexer (salvate con validazione) e,
+per ogni feed, un pulsante che legge subito gli articoli correnti con la regola
+che li prenderebbe e un *Add* manuale.
 Tutti i controlli, pulsanti e campi di inserimento della UI standalone
 dispongono di tooltip descrittivi e localizzati. Nel wizard di primo avvio
 (`/ui/setup`), il pulsante *Testa porta* verifica la porta digitata nel campo
 (tramite `/api/v1/portcheck?port=...`).
 
 Gli stessi risultati si ottengono via
-`POST /ui/rss-indexer`, `POST /ui/rss-feed`, `POST /ui/rss-rule` (op
-`add`/`remove`/`up`/`down`) e `POST /ui/wanted`; le textarea JSON restano su
+`POST /ui/rss-indexer`, `POST /ui/rss-feed` (op `add` — con `index` modifica sul
+posto —, `toggle`, `remove`), `POST /ui/rss-rule` (op `add` — con `index` modifica
+—, `toggle`, `remove`, `up`, `down`), `POST /ui/rss-rule-preview` (stessi campi
+del form, risponde `{matches, scanned}`), `POST /ui/rss-settings` (`interval` in
+minuti, `archive_days`) e `POST /ui/wanted`; le textarea JSON restano su
 `POST /ui/rss-config`.
+
+### Archivio dei feed
+
+Ogni elemento restituito da un feed (RSS, elenco HTML o ricerca) viene
+conservato in **`<data>/feed-archive.db`** (bbolt, già usato per il resume: nessuna
+dipendenza in più), **deduplicato** per info-hash (o per link `.torrent`), con
+titolo, link, dimensione, seed/leech (aggiornati quando il feed li ripropone),
+feed d'origine, data di prima e ultima apparizione e il flag *scaricato* (messo
+quando una regola, il filtro del feed o l'utente lo aggiungono). La pagina
+**`/ui/archive`** (voce *Archivio* nella barra) lo cerca come l'Archivio di
+Gextto: parole (tutte presenti, ignorando maiuscole e separatori `. _ -`),
+**frasi tra virgolette**, **`-parole` escluse**, filtro per feed e *solo
+scaricati*, ordinamento per data, seed, dimensione o titolo, paginazione da 50,
+badge di risoluzione ed episodio, *nella sessione*/*scaricato*, e per riga
+*Aggiungi*, *Copia magnet* ed elimina; la sezione *Pulizia* elimina i risultati
+della ricerca corrente (mai l'intero archivio con una ricerca vuota) o gli
+elementi più vecchi di N giorni.
+
+La conservazione automatica è `archive-days` (predefinito 180, `0` = tieni
+tutto), con un tetto di 200.000 elementi; la potatura gira alla fine di ogni giro
+completo dei feed e parte dagli elementi più vecchi fermandosi al primo da
+tenere, quindi costa quasi nulla. Il database ha un **indice compatto** (titolo
+già normalizzato, feed, dimensione, seed, flag) accanto al JSON degli elementi:
+la ricerca scorre solo l'indice e decodifica il JSON delle sole righe della
+pagina — su 100.000 elementi **~7 ms e ~44 KB per ricerca** (vedi
+`docs/evoluzione.md`). L'indice si ricostruisce da solo all'apertura se manca.
+
+Endpoint: `GET /ui/archive/items?q=&feed=&added=1&sort=new|old|seeds|size|title&page=N`
+(JSON con `items`, `total`, `page`, `pages`, `entries`, `size_bytes`),
+`POST /ui/archive/add` (`id`), `POST /ui/archive/delete` (`id` ripetibile, oppure
+`all=1` con `q`/`feed`/`added`, oppure `days=N`).
 
 Lo **scheduler di banda** (standalone) applica limiti globali alternativi in una
 finestra oraria quotidiana, come qBittorrent: con `schedule-enabled` attivo e
@@ -540,12 +607,46 @@ limiti normali fuori. I limiti cambiano a caldo, senza riaprire la sessione.
 Si configura dalla pagina **`/ui/settings`** (collegamento *Impostazioni* nella
 barra di ogni pagina), che in **standalone** è il pannello completo del client:
 **Cartelle** (download, temporanea), **Rete** (indirizzo di ascolto, intervallo
-porte peer, interfaccia in entrata/uscita, proxy, token, filtro IP),
+porte peer, interfaccia in entrata/uscita, proxy, token), **IP filter** (sotto),
 **Protocolli** (cifratura, DHT/PEX/uTP/holepunch/LSD/UPnP/NAT-PMP, nodi bootstrap,
 DHT read-only), **Coda e cache** (download/seed attivi, limite attivi, cache
-disco, preallocazione, sequenziale), **banda** e **scheduler**, **lingua** e
-**notifiche** (`notify-url`). Banda, scheduler e limiti di coda si applicano
-subito; cartelle, rete e protocolli valgono **dal prossimo avvio**. In
+disco, preallocazione, sequenziale), **Ottimizzazione** (sotto), **banda** e
+**scheduler**, **lingua** e **notifiche** (`notify-url`). Banda, scheduler e
+limiti di coda si applicano subito; cartelle, rete e protocolli valgono **dal
+prossimo avvio**. Il **DHT read-only (BEP 43)** resta spento di default: un nodo
+read-only non risponde alle query e chiede di non entrare nelle tabelle altrui,
+utile per nodi con poca banda o dietro NAT simmetrici, ma un client completo che
+usa il DHT deve anche servirlo (è anche la scelta di libtorrent e qBittorrent).
+
+L'**IP filter** (`ipfilter`) è un file locale o un **URL** (formato P2P, eMule o
+CIDR, semplice o gzip). Un URL viene scaricato in `<data>/ipfilter.dat` all'avvio
+(la sessione usa subito la copia scaricata l'ultima volta, se c'è) e di nuovo
+ogni `ipfilter-refresh-hours` (predefinito 24, `0` = mai); un file locale viene
+ricaricato quando cambia su disco (dimensione o mtime, controllati ogni 10
+minuti). Il riquadro mostra regole caricate, ora e percorso del caricamento,
+prossimo aggiornamento ed eventuale errore; **Carica ora** applica subito il
+valore del campo (anche non salvato) senza salvare il resto della pagina
+(`POST /ui/ipfilter` con `return=settings`). Prima di questa modifica un URL
+scritto nelle impostazioni non veniva caricato all'avvio.
+
+L'**Ottimizzazione** è l'equivalente del pulsante *Ottimizza* di Gextto, diviso
+in tre azioni (`POST /ui/optimize` con `optimize=queue|cache|bandwidth`), ognuna
+delle quali cambia solo le proprie impostazioni: **coda** = la base di Gextto (3
+download, 3 seed, 5 attivi, coda dinamica tra 1 e 10 slot, torrent lenti non
+conteggiati, autogestione attiva); **cache** = di nuovo automatica (dimensionata
+su RAM e tipo di disco, TTL 300 s); **banda** = download illimitato e upload
+all'**80% del picco di upload misurato dall'avvio** (un upstream saturo ritarda
+gli ACK dei download), con l'auto-speed sulla latenza attivo e minimo a un decimo
+del limite. Se non è ancora stato misurato abbastanza upload (meno di 50 KiB/s)
+l'azione rifiuta con una spiegazione; se l'upload era già al limite attuale la
+capacità della linea non è nota: il limite resta e si attiva solo l'auto-speed.
+Il riquadro mostra i picchi ↓/↑ misurati.
+
+Nella pagina **Torrents** in standalone non compaiono le tile *cache r/w* e *I/O
+ops r/w* (diagnostica utile a Gextto, non all'utente del client) e la tile della
+**porta peer** ha un pallino **verde** quando la porta è raggiungibile — mapping
+UPnP/NAT-PMP/PCP attivo oppure connessioni in ingresso già ricevute — e **rosso**
+altrimenti. In
 **standalone `settings.json` è autorevole**: un valore scritto qui vince sul flag
 di avvio (in *managed* il file non viene letto e i flag di Gextto restano
 sovrani).
