@@ -43,7 +43,14 @@ Engine tests (they run inside this module):
 - `torrent/torrent_selection_test.go` — `so=` selection masks (BEP 53:
   indices on non-padding files) and `Config.FileSelection` flag;
 - `torrent/torrent_holepunch_test.go` — relay decision (connect to both,
-  `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer` errors).
+  `NotConnected`/`NoSupport`/`NoSelf`/`NoSuchPeer` errors);
+- `internal/storage/filestorage/dirty_test.go` — ranged mmap flush: dirty
+  intervals merge on sequential writes and coalesce when scattered, and the
+  flush persists writes near the end of a multi-page file;
+- `internal/resourcemanager/resourcemanager_test.go` — the global budget's
+  liveness guarantee (an isolated over-limit request is granted) and the
+  queued-request accounting;
+- `torrent/torrent_evict_test.go` — the deterministic worst-connection order.
 
 Features and areas of the engine:
 
@@ -57,7 +64,9 @@ Features and areas of the engine:
 | uTP | `torrent/session.go`, `torrent/session_listen.go`, `internal/netx` | `Config.UTP`: a UDP socket on the single port, shared with the DHT; on the outgoing side uTP and TCP in parallel; uTP peers reported in `Peer.UTP`; counters in `SessionStats` |
 | Preallocation | `internal/storage/filestorage`, `torrent/session_storage.go`, `torrent/session_add.go`, `torrent/session_load.go` | `Config.Preallocate`: new files are reserved with `fallocate` instead of being created sparse. The flag travels in the storage provider, so it applies both to adding and to reloading |
 | I/O durability | `internal/storage/storage.go`, `internal/storage/filestorage`, `internal/storage/padding.go`, `torrent/torrent_pieces.go`, `torrent/session_stats.go` | No `O_SYNC` for writes: `storage.File.Sync()` (no-op on padding, `fdatasync` on Linux) and `torrent.syncPieces()` on the run loop. `writeBitfield()` orders snapshot→fsync→write and `updateStats` is in two phases. `filestorage.Mmap` (opt-in) serves files from a shared mapping: asynchronous writes into the page cache |
-| Storage mmap | `internal/storage/filestorage/mapped.go`, `mapped_linux.go`, `mapped_other.go`, `torrent/config.go`, `torrent/session_storage.go` | `Config.Mmap` (daemon flag `-mmap`): `ReadAt`/`WriteAt` copy from/to the mapping, `Sync` uses `msync`. Fallback to regular files outside Linux or on mapping error |
+| Storage mmap | `internal/storage/filestorage/mapped.go`, `mapped_linux.go`, `mapped_other.go`, `torrent/config.go`, `torrent/session_storage.go` | `Config.Mmap` (daemon flag `-mmap`): `ReadAt`/`WriteAt` copy from/to the mapping, `Sync` uses msync. **Ranged flush**: the file tracks the byte ranges written since the last `Sync` (intervals merged on sequential writes and coalesced when scattered, guarded by a mutex because the piece writer and the run loop touch it concurrently) and `Sync` msyncs only those, so the periodic resume tick no longer walks the whole mapping of every clean file. Fallback to regular files outside Linux or on mapping error |
+| Global in-flight budget | `internal/resourcemanager/resourcemanager.go`, `torrent/session.go` (`ram`), `torrent/torrent_start.go`, `torrent/torrent_close.go`, `torrent/config.go` (`WriteCacheSize`), `torrent/session_limits.go` | One piece buffer per in-flight piece downloader, reserved **session-wide** (default 1 GiB), released when the downloader closes: it bounds the downloaded-but-unverified bytes across all torrents. Liveness guarantee: an isolated request larger than the whole limit is still granted, so a write buffer smaller than one piece cannot wedge every torrent. Web seeds stay bounded by the count `WebseedMaxDownloads` |
+| Drop the worst connection | `torrent/torrent_evict.go`, `torrent/torrent_run.go`, `torrent/session_limits.go`, `internal/bitfield/bitfield.go` (`HasAnyNotIn`) | `enforceConnectionLimit` closes the peers over the per-torrent cap by a deterministic total order (useless → snubbed → slowest → newest → lowest BEP 40 priority → address); a peer is useful when it advertises a piece we are missing, is serving one, or is interested in us. `prunePeers` (unchoke tick) also frees one slot held by a useless peer when candidate addresses are queued |
 | Protocol bytes | `internal/peerconn/peerconn.go`, `torrent/session_stats.go` | Counter of the raw read/write bytes for protocol overhead |
 | In-place MSE | `internal/mse/mse.go` | `inPlaceStreamWriter`: encrypts RC4 in the caller's own buffer, eliminating the per-block allocation of `cipher.StreamWriter` on the upload path |
 | Served request dedup | `internal/peerconn/peerwriter/peerwriter.go` | `servedWindow`: bounded window (1024) instead of the unbounded map; avoids unbounded growth and the permanent rejection of retransmissions |

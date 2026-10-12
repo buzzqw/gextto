@@ -120,6 +120,9 @@ func newTestDaemonWith(t *testing.T, network NetworkOptions) *Daemon {
 		Debug:       os.Getenv("GX_TEST_DEBUG") == "1",
 		Tick:        50 * time.Millisecond,
 		ProbeWindow: time.Minute,
+		// Opt-in mmap storage, so the local-swarm harness can exercise the
+		// ranged-flush path under real concurrent piece writes.
+		Mmap: os.Getenv("GX_MMAP") == "1",
 	}
 	d, err := newDaemon(opts)
 	if err != nil {

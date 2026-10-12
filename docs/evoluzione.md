@@ -1153,6 +1153,67 @@ Out of scope by choice (documented in `bep.md`): BEP 8/17/18/22/26/28/30/34/35/
 **measurement** (performance rule of `AGENTS.md`) and with the same discipline as the
 other items: one item = one commit, `GEXTTO.md` updated, both UIs, i18n.
 
+### 4.14 Three ideas from anacrolix, done our way (2026-10-13)
+
+Follow-up on the comparison with `anacrolix/torrent` v1.61 (§4.7–§4.8): three
+interventions on the engine, algorithm **rewritten** (no MPL code copied, as per
+repo policy). None adds an option and none changes what the user sees: all three
+are internal to `internal/gxcore`.
+
+| # | Item | Where | anacrolix | Way | Status |
+|---|---|---|---|---|---|
+| 1 | Ranged mmap flush | `internal/storage/filestorage` | `undirtied-chunks-iter.go`, `file-io-mmap.go` | rewrite | **done** |
+| 2 | Global in-flight budget: liveness guarantee | `internal/resourcemanager` | `MaxUnverifiedBytes` + `alloclim` | rewrite | **done (delta)** |
+| 3 | Drop the worst connection, not a random one | `torrent/torrent_evict.go` | `worse-conns.go`, `prioritized-peers.go` | rewrite | **done** |
+
+**1 — Ranged mmap flush.** Each mmap-backed file now tracks the byte ranges
+written since the last `Sync` (intervals merged on sequential writes, coalesced
+to a single range if a scattered workload fills the list) and `Sync` msyncs only
+those, instead of the whole mapping. The dirty list is guarded by a small mutex:
+the piece-writer goroutine appends while the torrent run loop flushes. The win is
+**not** the writeback (only dirty pages are written back either way) but the
+page-table walk of the whole mapping that `syncPieces` paid on **every** open
+file every `ResumeWriteInterval` (30 s), mostly on files with no new data.
+Measured on ext4 (NVMe, Intel N97), 512 MiB populated mapping:
+
+| Case | Whole-file msync | Ranged `Sync` |
+|---|---|---|
+| Clean mapping (no writes since last Sync) | 477 µs/op | **13 ns/op** (no-op) |
+| One 256 KiB piece dirtied | 1166 µs/op | 1154 µs/op (writeback-bound, ~1%) |
+
+So the gain grows with the number of open files that were not written since the
+tick (up to ~0.48 ms each). Cost: 16 B/op, one allocation per **dirty** flush.
+
+**2 — Global in-flight budget.** The "global cap on unverified bytes" already
+existed: `session.ram` (`resourcemanager`) sized by `WriteCacheSize` (default
+1 GiB) reserves one piece buffer per in-flight piece downloader **across all
+torrents**, released when the downloader closes. The delta is a **liveness
+guarantee**: an isolated request larger than the whole limit is now granted, so a
+write buffer smaller than a single piece can no longer wedge every torrent
+(before, such a request waited forever). Cost unchanged in the common path
+(`Request`+`Release` round trip ≈ 1.8 µs). Web seed downloads stay bounded by the
+**count** `WebseedMaxDownloads`, deliberately not folded into the byte budget: it
+would need asynchronous per-source state for no measurable gain.
+
+**3 — Drop the worst connection.** `enforceConnectionLimit` used to close an
+arbitrary peer; it now drops the **worst** by a deterministic total order:
+useless → snubbed → slowest → newest → lowest BEP 40 priority → address (so the
+choice never depends on map iteration order). A peer is *useful* when it
+advertises a piece we lack (`Bitfield.HasAnyNotIn`, 3.1 ns/op on 1M pieces,
+0 alloc), is serving one, or is interested in what we hold. The unchoke tick also
+calls `prunePeers`, which releases one slot held by a useless peer when candidate
+addresses are queued, so a dead connection cannot block a fresh dial.
+
+Verification: `internal/gxcore/...` green (new tests in
+`storage/filestorage`, `bitfield`, `resourcemanager`, `torrent`), `make test`
+green, TUI unchanged (`go test ./internal/tui/` and
+`TestTUILibraryClientAgainstTheRouter` green). End to end on a **real** swarm
+with mmap on: the current Debian netinst torrent (792 MB, official tracker) went
+to 100% (all pieces hash-verified) in ~88 s
+(`GX_REAL_TORRENT=… GX_MMAP=1 go test -run TestManualRealTorrent ./cmd/gx-torrent/`,
+opt-in harness in `cmd/gx-torrent/real_torrent_test.go`), and the local-swarm
+harness under `-race` with mmap passed.
+
 ---
 
 ## 5. gx-torrent: performance optimisations
