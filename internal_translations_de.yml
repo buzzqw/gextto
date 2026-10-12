@@ -329,7 +329,6 @@ deu:
   Auto-gestione (sperimentale): Auto-Verwaltung (experimentell)
   Auto-gestione Download/Upload: Download/Upload Auto-Verwaltung
   Auto-gestione dinamica coda e risorse: Dynamische Warteschlangen- und Ressourcenselbstverwaltung
-  Auto-managed: Selbstverwaltet
   Componenti di terze parti: Komponenten von Drittanbietern
   Auto-scorri verso il basso quando arrivano nuove stringhe log.: Automatisch nach unten scrollen, wenn neue Log-Einträge eintreffen.
   Auto-scroll: Auto-Scroll
@@ -3225,6 +3224,10 @@ deu:
   Tema crema: Cremefarbenes Thema
   Tema scuro: Dunkles Thema
   "Tema personale": "Eigenes Thema"
+  "forzato fuori coda": "außerhalb der Warteschlange erzwungen"
+  "parcheggiato (in stallo)": "geparkt (blockiert)"
+  "gestito dalla coda": "von der Warteschlange verwaltet"
+  "Auto-gestito": "Selbstverwaltet"
   "Dettaglio tecnico": "Technisches Detail"
   "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Dienst mircrew-indexer erreichbar, aber die Anmeldung im MirCrew-Forum ist fehlgeschlagen."
   "Nessun problema rilevato.": "Kein Problem festgestellt."

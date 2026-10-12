@@ -328,7 +328,6 @@ fra:
   Auto-gestione (sperimentale): Gestion automatique (expérimental)
   Auto-gestione Download/Upload: Gestion automatique Download/Upload
   Auto-gestione dinamica coda e risorse: Auto-gestion dynamique de la file d'attente et des ressources
-  Auto-managed: Auto-managed
   Componenti di terze parti: Composants tiers
   Auto-scorri verso il basso quando arrivano nuove stringhe log.: Défilement automatique vers le bas à l'arrivée de nouvelles lignes de journal.
   Auto-scroll: Défilement auto
@@ -3214,6 +3213,10 @@ fra:
   Tema crema: Thème crème
   Tema scuro: Thème sombre
   "Tema personale": "Thème personnalisé"
+  "forzato fuori coda": "forcé hors de la file d'attente"
+  "parcheggiato (in stallo)": "mis de côté (bloqué)"
+  "gestito dalla coda": "géré par la file d'attente"
+  "Auto-gestito": "Auto-géré"
   "Dettaglio tecnico": "Détail technique"
   "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Service mircrew-indexer joignable, mais la connexion au forum MirCrew a échoué."
   "Nessun problema rilevato.": "Aucun problème détecté."

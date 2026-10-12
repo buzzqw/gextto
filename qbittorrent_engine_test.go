@@ -208,9 +208,9 @@ func TestQbittorrentEngineQueueManagement(t *testing.T) {
 		managed, pinned bool
 		label           string
 	}{
-		"aa": {true, false, "managed"},
-		"bb": {false, true, "pinned"},
-		"cc": {false, false, "paused"},
+		"aa": {true, false, v2SchedManaged},
+		"bb": {false, true, v2SchedPinned},
+		"cc": {false, false, v2SchedPaused},
 	}
 	views := engine.List()
 	if len(views) != len(want) {

@@ -320,7 +320,6 @@ pol:
   Auto-gestione (sperimentale): Samozarządzanie (eksperymentalne)
   Auto-gestione Download/Upload: Samozarządzanie Pobieranie/przesyłanie
   Auto-gestione dinamica coda e risorse: Dynamiczne samodzielne zarządzanie kolejkami i zasobami
-  Auto-managed: Samorządne
   Componenti di terze parti: Komponenty stron trzecich
   Auto-scorri verso il basso quando arrivano nuove stringhe log.: Automatyczne przewijanie w dół po nadejściu nowych ciągów dziennika.
   Auto-scroll: Automatyczne przewijanie
@@ -3168,6 +3167,10 @@ pol:
   Tema crema: Motyw kremowy
   Tema scuro: Ciemny motyw
   "Tema personale": "Motyw własny"
+  "forzato fuori coda": "wymuszony poza kolejką"
+  "parcheggiato (in stallo)": "odstawiony (zablokowany)"
+  "gestito dalla coda": "zarządzany przez kolejkę"
+  "Auto-gestito": "Samozarządzany"
   "Dettaglio tecnico": "Szczegóły techniczne"
   "Servizio mircrew-indexer raggiungibile, ma il login al forum MirCrew non è riuscito.": "Usługa mircrew-indexer jest osiągalna, ale logowanie na forum MirCrew nie powiodło się."
   "Nessun problema rilevato.": "Nie wykryto problemów."

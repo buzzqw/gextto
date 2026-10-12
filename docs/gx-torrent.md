@@ -1242,15 +1242,18 @@ Statuses reported to Gextto:
 | `error` | engine error or failed move; a `resume` or a `verify` resets it |
 
 The `auto_managed` flag (with `parked` and `pinned`) is what Gextto summarises in the
-**Auto-managed** row of the torrent detail, with the term for *who* controls the
-scheduling: `managed` when the queue manages it, `paused` when you paused it
-yourself, `parked` when it is stalled and has been set aside, `pinned` when it is
-forced out of the queue. It is therefore not a simple yes/no. The same terms are
-used for every engine: with qBittorrent-nox `pinned` is `force_start` and the queue
-owns every torrent that is neither force-started nor stopped (qBittorrent's
-`auto_tmm` is the automatic management of save paths, not of the queue, so it
-does not count); a torrent outside the queue that is not transferring (stopped,
-checking, in error) reads `paused`. The TUI shows the same row.
+**Auto-managed** row (*Auto-gestito* in Italian) of the torrent detail, naming *who*
+controls the scheduling, translated in every interface language: *managed by the
+queue* (*gestito dalla coda*) when the queue manages it, *paused* (*in pausa*) when
+it is stopped outside the queue, *parked (stalled)* (*parcheggiato (in stallo)*)
+when it is stalled and has been set aside, *forced outside the queue* (*forzato
+fuori coda*) when it is force-started. It is therefore not a simple yes/no. The
+same values are used for every engine: with qBittorrent-nox the forced case is
+`force_start` and the queue owns every torrent that is neither force-started nor
+stopped (qBittorrent's `auto_tmm` is the automatic management of save paths, not
+of the queue, so it does not count); a torrent outside the queue that is not
+transferring (stopped, checking, in error) reads *paused*. The TUI shows the same
+row (`sched.*` keys of its catalog).
 
 ## Stalled: division of tasks
 

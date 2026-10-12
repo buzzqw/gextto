@@ -1476,7 +1476,7 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 		{Label: "Posizione coda", Value: fmt.Sprintf("%d", torrent.QueuePosition)},
 		{Label: "Metadata", Value: ternaryString(torrent.HasMetadata, "presenti", "in attesa")},
 		{Label: "Versione torrent", Value: torrent.TorrentVersion},
-		{Label: "Auto-managed", Value: v2AutoManagedLabel(torrent)},
+		{Label: "Auto-gestito", Value: v2AutoManagedLabel(torrent)},
 		{Label: "Percorso di salvataggio", Value: torrent.SavePath},
 		{Label: "Tracker corrente", Value: torrent.CurrentTracker},
 		{Label: "Non rinominare", Value: fmt.Sprintf("%t", noRename)},
@@ -1542,29 +1542,33 @@ func v2DetailViewFrom(s *AppState, hash, tab string) v2DetailView {
 	return view
 }
 
+// The values of the "Auto-gestito" row: Italian catalog keys, translated with
+// the rest of the page, naming what controls a torrent's scheduling.
+const (
+	v2SchedManaged = "gestito dalla coda"       // the queue owns it
+	v2SchedPaused  = "in pausa"                 // stopped, outside the queue
+	v2SchedParked  = "parcheggiato (in stallo)" // set aside by the stall handling
+	v2SchedPinned  = "forzato fuori coda"       // force-started (pin/force start)
+)
+
 // v2AutoManagedLabel names what controls a torrent's scheduling, so the detail
-// tab never shows a bare "no" that looks like the torrent left the queue:
-//
-//   - "managed":   the queue owns it (it runs or waits for a slot on its own);
-//   - "paused":    paused by the user (a pause is not the queue stopping it);
-//   - "parked":    set aside by Gextto's stall handling, retried later;
-//   - "pinned":    force-started outside the queue (pin/force start).
+// tab never shows a bare "no" that looks like the torrent left the queue.
 func v2AutoManagedLabel(torrent models.TorrentView) string {
 	switch {
 	case torrent.Pinned:
-		return "pinned"
+		return v2SchedPinned
 	case torrent.AutoManaged:
-		return "managed"
+		return v2SchedManaged
 	case torrent.Stalled:
-		return "parked"
+		return v2SchedParked
 	case v2TorrentRunning(torrent.State):
 		// Not auto-managed but still running: a force start the engine did not
 		// flag explicitly (libtorrent clears auto_managed on a pin).
-		return "pinned"
+		return v2SchedPinned
 	default:
 		// Paused, queued, checking or in error and outside the queue: it does
 		// not run until someone resumes it.
-		return "paused"
+		return v2SchedPaused
 	}
 }
 

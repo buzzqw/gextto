@@ -1540,7 +1540,7 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 		{m.Tr.T("label.superseeding"), boolLabel(torrent.SuperSeeding)},
 		{m.Tr.T("label.metadata"), metadata},
 		{m.Tr.T("label.version2"), torrent.TorrentVersion},
-		{m.Tr.T("label.automanaged"), autoManagedLabel(listed)},
+		{m.Tr.T("label.automanaged"), m.Tr.T(autoManagedLabel(listed))},
 		{m.Tr.T("label.norename"), boolLabel(m.Detail.NoRename)},
 		{m.Tr.T("label.archived"), boolLabel(torrent.Archived)},
 		{m.Tr.T("label.source"), firstNonEmpty(torrent.Source, "-")},
@@ -1556,23 +1556,23 @@ func (m *Model) renderDetail(width, contentHeight int) []Line {
 	return lines
 }
 
-// autoManagedLabel names what controls a torrent's scheduling, matching the web
-// UI so the two never disagree: the queue ("managed"), a user pause, Gextto's
-// parking of a stalled torrent, or a force start ("pinned").
+// autoManagedLabel returns the catalog key of what controls a torrent's
+// scheduling, matching the web UI so the two never disagree: the queue, a stop
+// outside the queue, Gextto's parking of a stalled torrent, or a force start.
 func autoManagedLabel(t Torrent) string {
 	switch {
 	case t.Pinned:
-		return "pinned"
+		return "sched.pinned"
 	case t.AutoManaged:
-		return "managed"
+		return "sched.managed"
 	case t.Stalled:
-		return "parked"
+		return "sched.parked"
 	}
 	switch t.State {
 	case "downloading", "downloading_metadata", "seeding", "stalled", "finished":
-		return "pinned"
+		return "sched.pinned"
 	}
-	return "paused"
+	return "sched.paused"
 }
 
 // renderDetailSelectable lists the files or trackers of the open torrent

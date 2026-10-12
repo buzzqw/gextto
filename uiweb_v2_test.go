@@ -1573,19 +1573,29 @@ func TestV2AutoManagedLabel(t *testing.T) {
 		in   models.TorrentView
 		want string
 	}{
-		{"queue", models.TorrentView{AutoManaged: true}, "managed"},
-		{"user pause", models.TorrentView{State: "paused"}, "paused"},
-		{"queued", models.TorrentView{State: "queued"}, "paused"},
-		{"parked", models.TorrentView{State: "stalled", Stalled: true}, "parked"},
-		{"pinned", models.TorrentView{Pinned: true}, "pinned"},
-		{"forced running", models.TorrentView{State: "downloading"}, "pinned"},
-		{"error outside the queue", models.TorrentView{State: "error"}, "paused"},
-		{"checking outside the queue", models.TorrentView{State: "checking_files"}, "paused"},
-		{"forced seeding", models.TorrentView{State: "seeding"}, "pinned"},
+		{"queue", models.TorrentView{AutoManaged: true}, v2SchedManaged},
+		{"user pause", models.TorrentView{State: "paused"}, v2SchedPaused},
+		{"queued", models.TorrentView{State: "queued"}, v2SchedPaused},
+		{"parked", models.TorrentView{State: "stalled", Stalled: true}, v2SchedParked},
+		{"pinned", models.TorrentView{Pinned: true}, v2SchedPinned},
+		{"forced running", models.TorrentView{State: "downloading"}, v2SchedPinned},
+		{"error outside the queue", models.TorrentView{State: "error"}, v2SchedPaused},
+		{"checking outside the queue", models.TorrentView{State: "checking_files"}, v2SchedPaused},
+		{"forced seeding", models.TorrentView{State: "seeding"}, v2SchedPinned},
 	}
 	for _, tc := range cases {
 		if got := v2AutoManagedLabel(tc.in); got != tc.want {
 			t.Fatalf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+	// Label and values are Italian catalog keys: each one must be translated
+	// in every language, so the row never stays in Italian or English.
+	for _, file := range bundledCatalogs() {
+		_, entries := parseCatalog(t, file)
+		for _, key := range []string{"Auto-gestito", v2SchedManaged, v2SchedPaused, v2SchedParked, v2SchedPinned} {
+			if entries[key] == "" {
+				t.Errorf("%s: %q has no translation", file.name, key)
+			}
 		}
 	}
 }
