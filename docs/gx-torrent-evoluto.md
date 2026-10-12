@@ -508,8 +508,8 @@ points:
 | F2 — bandwidth scheduler (alternative limits by schedule) | §14.3 | done |
 | F2 — torrent table virtualisation | §14.3 | done (rendering window `?rows=` + *Show more*) |
 | F4 — smart ban (bans the peer that sends blocks of a failed piece) | §14.4 | done (base in the engine + extension: session ban with expiry) |
-| F2 — complete RSS manager (ordered PASS/FAIL rules, numeric filters, smart-episode, actions, page `/ui/rss`, webhook notifications on match/error) | §12.2 | done |
-| F2 — guided RSS/UI: feed editor (only name and source URL, without series/filter parameters that live in *Wanted* and rules) and indexers with presets (`ui_rss_edit.go`, `uiIndexerPresets`), ordered rules with up/down/disable, `episode_filter` in qBittorrent style (`internal/rss/episode_filter.go`), `ignore_days` cooldown (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **Wanted list** with quality dropdown, episode log and gap search (`cmd/gx-torrent/wanted.go`; suggestions `GET /ui/rss-suggest`/`GET /ui/wanted-search`), **Check feeds** button, page `/ui/settings` (folders, network and ports, protocols, queue and cache, bandwidth, scheduler, language, notifications), folder selector `/ui/browse-dir` in the wizard | §12.2 | done |
+| F2 — complete RSS manager (ordered PASS/FAIL rules, numeric filters, smart-episode, actions, pages `/ui/rss` and `/ui/wanted`, webhook notifications on match/error) | §12.2 | done |
+| F2 — guided RSS/UI: feed editor (only name and source URL, without series/filter parameters that live in *Wanted* and rules) and indexers with presets (`ui_rss_edit.go`, `uiIndexerPresets`), ordered rules with up/down/disable, `episode_filter` in qBittorrent style (`internal/rss/episode_filter.go`), `ignore_days` cooldown (`internal/rss/rules.go`), smart-episode REPACK/PROPER (`cmd/gx-torrent/feed.go`), **Wanted list & page `/ui/wanted`** with quality dropdown, episode log, gap search and instant on-demand search (`cmd/gx-torrent/wanted.go`; suggestions `GET /ui/rss-suggest`/`GET /ui/wanted-search`), **Check feeds** button with real-time feedback, page `/ui/settings` (folders, network and ports, protocols, queue and cache, bandwidth, scheduler, language, notifications), folder selector `/ui/browse-dir` in the wizard | §12.2 | done |
 | CI — publish the standalone gx-torrent (artefact/release usable as qbittorrent-nox) | §12.3 | done |
 
 **Final point:** at the end, **in-depth review of all the code worked on**
@@ -581,8 +581,9 @@ Current status (base already in `internal/rss` and `feed.go`): RSS/Atom/Torznab 
 **ordered PASS/FAIL rules (first match)**, include/exclude filters, regex,
 size, seeders/peers, age, `require_episode`, **smart-episode**, actions
 (folder, category, tag, pause, sequential, first/last, top), persisted history,
-worker and **management page `/ui/rss`** with matching articles
-per rule and manual Add. **Feeds load releases periodically**: the search
+worker, **management page `/ui/rss`** with matching articles
+per rule and manual Add, and dedicated **Wanted page `/ui/wanted`** with gap search
+and instant manual search. **Feeds load releases periodically**: the search
 parameters and the series/movie watchlist are centralised in the **Wanted**
 section, so the configuration is clear and filters are not duplicated. **Notifications on match/error**
 are available via webhook (`-notify-url` / `GX_TORRENT_NOTIFY_URL`, events `feed_match` and `feed_error`).

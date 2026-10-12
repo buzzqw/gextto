@@ -255,49 +255,93 @@ func seasonAllowed(seasons string, season int) bool {
 	return err == nil && season == n
 }
 
-// pollWanted drives the wanted titles each feed cycle: it searches the indexers
-// for each title and hands the results to applyWanted (which also runs over the
-// RSS feed items), then searches the indexers for the episodes seen but not
-// downloaded (gap search). Every step is bounded and throttled.
+// wantedPollResult is the summary outcome of a wanted titles search.
+type wantedPollResult struct {
+	OK      bool     `json:"ok"`
+	Checked int      `json:"checked"`
+	Added   int      `json:"added"`
+	Titles  []string `json:"titles,omitempty"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
+// pollWanted drives the wanted titles each feed cycle.
 func (d *Daemon) pollWanted(ctx context.Context) {
+	d.pollWantedLocked(ctx, "")
+}
+
+// pollWantedTitles triggers a wanted search on demand (all or a single title).
+func (d *Daemon) pollWantedTitles(ctx context.Context, onlyName string) wantedPollResult {
+	if !d.feedPollMu.TryLock() {
+		return wantedPollResult{OK: false, Errors: []string{"a check is already running"}}
+	}
+	defer d.feedPollMu.Unlock()
+	return d.pollWantedLocked(ctx, onlyName)
+}
+
+// pollWantedLocked searches the indexers and archive for wanted titles and
+// executes the gap search for missing episodes. The caller must hold feedPollMu.
+func (d *Daemon) pollWantedLocked(ctx context.Context, onlyName string) wantedPollResult {
 	wanteds := d.wantedList()
 	if len(wanteds) == 0 {
-		return
+		return wantedPollResult{OK: true}
 	}
 	now := time.Now()
+	var (
+		checked     int
+		addedCount  int
+		addedTitles []string
+		errorsList  []string
+	)
 
-	// Indexer results and archived material for each title (the current RSS
-	// feed items are handled by applyWanted from pollFeeds). A feed only grows
-	// the archive, so the wanted title is what turns it into downloads: it
-	// searches the indexers and the archived releases together.
 	for _, w := range wanteds {
+		if onlyName != "" && !strings.EqualFold(w.Name, onlyName) {
+			continue
+		}
 		if w.Paused {
 			continue
 		}
 		if ctx.Err() != nil {
-			return
+			errorsList = append(errorsList, "timeout during search")
+			break
 		}
+		checked++
 		var items []rss.Item
 		if len(d.indexers()) > 0 {
-			found, _ := d.searchFeedSuggest(ctx, w.Name)
-			items = append(items, found...)
+			found, err := d.searchFeedSuggest(ctx, w.Name)
+			if err != nil {
+				errorsList = append(errorsList, w.Name+": "+err.Error())
+			} else {
+				items = append(items, found...)
+			}
 		}
 		items = append(items, d.archiveWantedItems(w.Name, wantedArchiveScan)...)
 		if len(items) > 0 {
-			d.applyWanted(now, "wanted:"+strings.TrimSpace(w.Name), items)
+			n, titles := d.applyWanted(now, "wanted:"+strings.TrimSpace(w.Name), items)
+			addedCount += n
+			addedTitles = append(addedTitles, titles...)
+		}
+
+		if w.kind() != "movie" {
+			if onlyName != "" || d.wantedGapDue(w.Name, now) {
+				n, titles := d.wantedGapSearch(ctx, now, w)
+				addedCount += n
+				addedTitles = append(addedTitles, titles...)
+				d.markWantedGap(w.Name, now)
+			}
 		}
 	}
+	d.mu.Lock()
+	if d.dirty {
+		d.saveLocked()
+	}
+	d.mu.Unlock()
 
-	// Missing episodes that the feeds did not bring.
-	for _, w := range wanteds {
-		if w.Paused || w.kind() == "movie" {
-			continue
-		}
-		if !d.wantedGapDue(w.Name, now) {
-			continue
-		}
-		d.wantedGapSearch(ctx, now, w)
-		d.markWantedGap(w.Name, now)
+	return wantedPollResult{
+		OK:      true,
+		Checked: checked,
+		Added:   addedCount,
+		Titles:  addedTitles,
+		Errors:  errorsList,
 	}
 }
 
@@ -409,12 +453,13 @@ func wantedItemEpisode(w wantedEntry, title string) (int, int) {
 // what appeared and downloads the episodes (or movie) not taken yet. It runs
 // after the rules loop, so items already added there are only recorded, not
 // added again.
-func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) {
+func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) (int, []string) {
 	wanteds := d.wantedList()
 	if len(wanteds) == 0 {
-		return
+		return 0, nil
 	}
 	added := 0
+	var addedTitles []string
 	for _, item := range items {
 		if added >= feedMaxAddsPerPoll {
 			break
@@ -441,27 +486,30 @@ func (d *Daemon) applyWanted(now time.Time, feedName string, items []rss.Item) {
 				d.markFeedSeen(feedName, item.GUID)
 				d.recordWantedTaken(w, season, episode)
 				added++
+				addedTitles = append(addedTitles, item.Title)
 				logf("wanted %q: added %s S%02dE%02d", w.Name, item.Title, season, episode)
 			}
 		}
 	}
+	return added, addedTitles
 }
 
 // wantedGapSearch searches the indexers for the missing episodes of one wanted
 // series, so an episode seen before but not downloaded is fetched even if it
 // does not show up again in the regular poll.
-func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEntry) {
+func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEntry) (int, []string) {
 	missing := d.wantedMissing(w)
 	if len(missing) == 0 {
-		return
+		return 0, nil
 	}
 	if len(missing) > wantedGapMaxPerCycle {
 		missing = missing[:wantedGapMaxPerCycle]
 	}
 	total := 0
+	var addedTitles []string
 	for _, ep := range missing {
 		if ctx.Err() != nil {
-			return
+			return total, addedTitles
 		}
 		query := fmt.Sprintf("%s S%02dE%02d", w.Name, ep.season, ep.episode)
 		items, err := d.searchFeedSuggest(ctx, query)
@@ -481,6 +529,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 			if newly, err := d.addFeedItem(item, action); err == nil && newly {
 				d.recordWantedTaken(w, ep.season, ep.episode)
 				total++
+				addedTitles = append(addedTitles, item.Title)
 				break
 			}
 		}
@@ -488,6 +537,7 @@ func (d *Daemon) wantedGapSearch(ctx context.Context, now time.Time, w wantedEnt
 	if total > 0 {
 		logf("wanted %q: gap search added %d missing episode(s)", w.Name, total)
 	}
+	return total, addedTitles
 }
 
 func (d *Daemon) wantedGapDue(name string, now time.Time) bool {

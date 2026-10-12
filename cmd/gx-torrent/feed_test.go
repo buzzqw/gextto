@@ -649,3 +649,26 @@ func TestScopedRulesDoNotDisableOtherFeeds(t *testing.T) {
 		t.Fatal("a global rule must govern every feed")
 	}
 }
+
+func TestUIFeedPollReturnsJSON(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Post(srv.URL+"/ui/feeds/poll", "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	var res feedPollResult
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		t.Fatalf("decode feedPollResult error: %v", err)
+	}
+	if !res.OK {
+		t.Fatalf("res not OK: %+v", res)
+	}
+}

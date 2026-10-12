@@ -165,13 +165,34 @@ func (d *Daemon) pollFeeds() {
 	d.pollFeedsOnly("")
 }
 
+// feedPollResult is the summary outcome of polling RSS feeds.
+type feedPollResult struct {
+	OK     bool     `json:"ok"`
+	Feeds  int      `json:"feeds"`
+	Items  int      `json:"items"`
+	New    int      `json:"new"`
+	Added  int      `json:"added"`
+	Errors []string `json:"errors,omitempty"`
+}
+
 // pollFeedsOnly is pollFeeds limited to one feed (by name or URL) when only is
 // set: the feed page's reload button. A single-feed poll skips the wanted
 // search and the archive pruning, which belong to the full cycle. It reports
 // false when another poll was already running.
 func (d *Daemon) pollFeedsOnly(only string) bool {
+	res := d.pollFeedsOnlyDetailed(only)
+	return res.OK
+}
+
+// pollFeedsAll polls all configured feeds and wanted titles synchronously.
+func (d *Daemon) pollFeedsAll() feedPollResult {
+	return d.pollFeedsOnlyDetailed("")
+}
+
+// pollFeedsOnlyDetailed executes the poll and returns summary statistics.
+func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 	if !d.feedPollMu.TryLock() {
-		return false
+		return feedPollResult{OK: false, Errors: []string{"a feed check is already running"}}
 	}
 	defer d.feedPollMu.Unlock()
 	// The wanted titles run even with no feed configured: pollWanted searches
@@ -181,6 +202,13 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 	client := &http.Client{Timeout: feedRequestTimeout}
 	var rulesOnce []string
 	onceHit := map[string]bool{}
+	var (
+		feedsChecked int
+		totalItems   int
+		totalNew     int
+		totalAdded   int
+		errorsList   []string
+	)
 	for _, feed := range feeds {
 		if only != "" && feed.Name != only && feed.URL != only {
 			continue
@@ -213,6 +241,7 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 			items, err = rss.Fetch(ctx, client, feed.URL, name)
 		}
 		cancel()
+		feedsChecked++
 		status := feedStatus{Name: name, URL: source, LastCheck: time.Now().Unix()}
 		// Notify only when a feed enters the error state: a feed that keeps
 		// failing at every poll must not send the same webhook over and over.
@@ -220,6 +249,7 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 		addErrorNotified := false
 		if err != nil {
 			status.LastError = err.Error()
+			errorsList = append(errorsList, name+": "+err.Error())
 			logf("feed %s: %v", name, err)
 			if !wasError {
 				d.notify("feed_error", map[string]any{"feed": name, "error": err.Error()})
@@ -228,10 +258,12 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 			continue
 		}
 		status.Items = len(items)
+		totalItems += len(items)
 		if newItems, err := d.archive().record(name, items, time.Now()); err != nil {
 			logf("feed %s: cannot archive the items: %v", name, err)
 		} else {
 			status.New = newItems
+			totalNew += newItems
 		}
 		added := 0
 		var addedTitles []string
@@ -295,7 +327,10 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 		}
 		// Wanted titles: record what appeared and take the missing episodes (or
 		// the movie) from the same items, after the rules path.
-		d.applyWanted(time.Now(), name, items)
+		wantedAdded, wantedTitles := d.applyWanted(time.Now(), name, items)
+		added += wantedAdded
+		addedTitles = append(addedTitles, wantedTitles...)
+		totalAdded += added
 		status.Added = added
 		if added > 0 {
 			logf("feed %s: added %d torrent(s)", name, added)
@@ -316,16 +351,33 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 	d.mu.Unlock()
 
 	if only != "" {
-		return true
+		return feedPollResult{
+			OK:     true,
+			Feeds:  feedsChecked,
+			Items:  totalItems,
+			New:    totalNew,
+			Added:  totalAdded,
+			Errors: errorsList,
+		}
 	}
 	d.pruneArchive(time.Now())
 
 	// Wanted titles: search the indexers and take the missing episodes/movies,
 	// plus the gap search for what appeared but was not downloaded.
 	gapCtx, cancelGap := context.WithTimeout(context.Background(), 5*time.Minute)
-	d.pollWanted(gapCtx)
+	wRes := d.pollWantedLocked(gapCtx, "")
 	cancelGap()
-	return true
+	totalAdded += wRes.Added
+	errorsList = append(errorsList, wRes.Errors...)
+
+	return feedPollResult{
+		OK:     true,
+		Feeds:  feedsChecked,
+		Items:  totalItems,
+		New:    totalNew,
+		Added:  totalAdded,
+		Errors: errorsList,
+	}
 }
 
 // feedTakesEverything reports whether a feed would download every item it

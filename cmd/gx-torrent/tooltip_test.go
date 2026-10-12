@@ -22,6 +22,7 @@ import (
 func TestEveryOptionHasATooltip(t *testing.T) {
 	pages := []struct{ name, html string }{
 		{"ui.tmpl", assets.UITemplate()},
+		{"wanted.html", assets.WantedPage()},
 		{"rss.html", assets.RSSPage()},
 		{"settings.html", assets.SettingsPage()},
 		{"archive.html", assets.ArchivePage()},
@@ -49,7 +50,7 @@ func TestEveryOptionHasATooltip(t *testing.T) {
 // hasTooltip reports whether a tag carries a tooltip the translator localizes.
 func hasTooltip(tag string) bool {
 	lower := strings.ToLower(tag)
-	return strings.Contains(lower, " title=") || strings.Contains(lower, " aria-label=")
+	return strings.Contains(lower, " title=")
 }
 
 // labelHasTooltipBefore reports whether the control starting at idx sits inside

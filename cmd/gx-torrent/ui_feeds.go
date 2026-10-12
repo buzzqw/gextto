@@ -55,10 +55,12 @@ func (d *Daemon) handleUIFeedPoll(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, errNotFound)
 		return
 	}
-	// Poll in the background: fetching several feeds can take seconds, and the
-	// page must stay responsive.
-	go d.pollFeeds()
-	w.WriteHeader(http.StatusOK)
+	res := d.pollFeedsAll()
+	if !res.OK {
+		writeJSON(w, http.StatusConflict, res)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleUIRssSettings saves the RSS page's global options: the polling interval

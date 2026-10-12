@@ -42,10 +42,10 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <h3>Access</h3>
 <label>Username<input type="text" name="user" value="admin" autocomplete="username" title="Admin username for web interface login"></label>
 <label>Password<input type="password" name="password" autocomplete="new-password" title="Password for web interface login"></label>
-<label>Confirm password<input type="password" name="password2" autocomplete="new-password" title="Confirm password"></label>
+<label>Confirm password<input type="password" name="password2" autocomplete="new-password" title="Confirm password to prevent typos"></label>
 <label class="chk"><input type="checkbox" name="local-bypass" value="1" checked title="Allow access from local network without authentication"> Allow the LAN without a password</label>
 <h3>Network</h3>
-<label>Peer port<input type="number" name="peer-port" id="peer-port" placeholder="6881" min="0" max="65535" title="Port for incoming peer traffic"></label>
+<label>Peer port<input type="number" name="peer-port" id="peer-port" placeholder="6881" min="0" max="65535" title="TCP and UDP port for incoming BitTorrent peer traffic (0 = random)"></label>
 <button type="button" class="secondary" id="ptest" title="Test if the peer port is reachable and forwarded">Test port</button>
 <p class="m" id="presult"></p>
 <h3>Bandwidth</h3>
@@ -60,7 +60,7 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <option value="other" data-url="">Other</option>
 </select></label>
 <label>Indexer URL<input type="text" name="indexer-url" id="indexer-url" placeholder="http://127.0.0.1:9117" autocomplete="off" title="Torznab endpoint URL"></label>
-<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off" title="API key for indexer"></label>
+<label>Indexer API key<input type="text" name="indexer-key" autocomplete="off" title="API key for authentication with the Torznab indexer"></label>
 <p class="m">Pick an indexer to enable the search; leave it empty to add one later from the RSS page. Prowlarr and Jackett fill the URL with their usual local address and port. For any other Torznab service (a MirCrew indexer, a remote manager) choose Other and type its URL.</p>
 <p class="m">The download folder and the peer port apply at the next start.</p>
 <p class="m">The bandwidth limits apply immediately.</p>
@@ -69,11 +69,11 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 </form>
 <div id="browse-overlay" class="overlay" style="display:none">
   <div class="picker">
-    <div class="picker-head"><code id="browse-path"></code><button type="button" onclick="closeBrowse()">Cancel</button></div>
+    <div class="picker-head"><code id="browse-path"></code><button type="button" onclick="closeBrowse()" title="Cancel folder selection">Cancel</button></div>
     <div class="picker-list" id="browse-list"></div>
     <div class="picker-foot">
-      <button type="button" onclick="browseUp()">↑ Parent</button>
-      <button type="button" class="primary" onclick="browseChoose()">Choose this folder</button>
+      <button type="button" onclick="browseUp()" title="Navigate to parent directory">↑ Parent</button>
+      <button type="button" class="primary" onclick="browseChoose()" title="Select the current directory as destination folder">Choose this folder</button>
     </div>
   </div>
 </div>

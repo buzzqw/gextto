@@ -21,15 +21,23 @@ import (
 	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
+	"github.com/buzzqw/gextto/internal/webui/assets"
 )
 
-// handleUIWanted adds, edits or removes one wanted title.
+// handleUIWanted adds, edits, pauses/resumes or removes one wanted title.
 func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
 		http.NotFound(w, r)
 		return
 	}
-	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	if r.Method == http.MethodGet {
+		d.handleUIWantedGet(w, r)
+		return
+	}
+	if !d.uiSameOrigin(w, r) {
 		return
 	}
 	_ = r.ParseForm()
@@ -38,10 +46,17 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 	case "remove":
 		index, err := parseFormIndex(r.FormValue("index"))
 		if err != nil || index < 0 || index >= len(list) {
-			d.renderRSS(w, r, "The wanted title to remove does not exist anymore.")
+			d.renderWanted(w, r, "The wanted title to remove does not exist anymore.")
 			return
 		}
 		list = append(list[:index], list[index+1:]...)
+	case "toggle-pause", "pause":
+		index, err := parseFormIndex(r.FormValue("index"))
+		if err != nil || index < 0 || index >= len(list) {
+			d.renderWanted(w, r, "The wanted title to pause or resume does not exist anymore.")
+			return
+		}
+		list[index].Paused = !list[index].Paused
 	default:
 		entry := wantedEntry{
 			Name:          strings.TrimSpace(r.FormValue("name")),
@@ -56,16 +71,16 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 			Paused:        formBool(r, "paused"),
 		}
 		if entry.Name == "" {
-			d.renderRSS(w, r, "A wanted title needs a name.")
+			d.renderWanted(w, r, "A wanted title needs a name.")
 			return
 		}
 		if _, err := rss.ParseEpisodeFilter(entry.episodeFilter()); err != nil {
-			d.renderRSS(w, r, err.Error())
+			d.renderWanted(w, r, err.Error())
 			return
 		}
 		if index, err := parseFormIndex(r.FormValue("index")); err == nil && index >= 0 {
 			if index >= len(list) {
-				d.renderRSS(w, r, "The wanted title to edit does not exist anymore.")
+				d.renderWanted(w, r, "The wanted title to edit does not exist anymore.")
 				return
 			}
 			list[index] = entry
@@ -84,11 +99,72 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := d.saveWanted(list); err != nil {
-		d.renderRSS(w, r, "Cannot save the wanted list: "+err.Error())
+		d.renderWanted(w, r, "Cannot save the wanted list: "+err.Error())
 		return
 	}
 	d.pokeFeeds()
-	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
+	http.Redirect(w, r, "/ui/wanted", http.StatusSeeOther)
+}
+
+func (d *Daemon) handleUIWantedGet(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone || d.opts.Settings == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) {
+		return
+	}
+	d.renderWanted(w, r, "")
+}
+
+func (d *Daemon) renderWanted(w http.ResponseWriter, r *http.Request, errKey string) {
+	page := assets.WantedPage()
+	wanteds := d.wantedList()
+	activeCount := 0
+	pausedCount := 0
+	for _, w := range wanteds {
+		if w.Paused {
+			pausedCount++
+		} else {
+			activeCount++
+		}
+	}
+	page = strings.Replace(page, "{{WANTEDCOUNT}}", strconv.Itoa(len(wanteds)), 1)
+	page = strings.Replace(page, "{{WANTEDACTIVE}}", strconv.Itoa(activeCount), 1)
+	page = strings.Replace(page, "{{WANTEDPAUSED}}", strconv.Itoa(pausedCount), 1)
+	page = strings.Replace(page, "{{WANTEDROWS}}", d.uiWantedRowsHTML(), 1)
+
+	errorHTML := ""
+	if errKey != "" {
+		errorHTML = `<p class="err">` + html.EscapeString(errKey) + `</p>`
+	}
+	page = strings.Replace(page, "<!--ERROR-->", errorHTML, 1)
+
+	lang := d.uiLang(r)
+	if lang != "" && lang != "en" {
+		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
+	}
+	page = uiTranslateHTML(page, uiDictionary(lang))
+	page = uiInjectClientDictionary(page, lang)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write([]byte(page))
+}
+
+func (d *Daemon) handleUIWantedPoll(w http.ResponseWriter, r *http.Request) {
+	if d.opts.Mode != ModeStandalone {
+		http.NotFound(w, r)
+		return
+	}
+	if !d.uiAuthorized(w, r) || !d.uiSameOrigin(w, r) {
+		return
+	}
+	_ = r.ParseForm()
+	name := strings.TrimSpace(r.FormValue("name"))
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	res := d.pollWantedTitles(ctx, name)
+	writeJSON(w, http.StatusOK, res)
 }
 
 // wantedSearchResult is the answer of the wanted-title search step: the series
@@ -400,8 +476,8 @@ func baseNameSuggestions(query string, items []rss.Item, includeLang []string, q
 	return out
 }
 
-// uiWantedRowsHTML renders the wanted titles as table rows, each with Edit and
-// Remove, and the missing episodes found so far.
+// uiWantedRowsHTML renders the wanted titles as table rows, each with Search,
+// Edit, Pause/Resume and Remove actions, and the missing episodes found so far.
 func (d *Daemon) uiWantedRowsHTML() string {
 	list := d.wantedList()
 	if len(list) == 0 {
@@ -426,18 +502,26 @@ func (d *Daemon) uiWantedRowsHTML() string {
 				missingLabel = strings.Join(parts, " ")
 			}
 		}
-		state := "active"
+		stateClass := "flag on"
+		stateText := "active"
+		pauseBtnText := "Pause"
+		pauseBtnTitle := "Pause monitoring this wanted title"
 		if w.Paused {
-			state = "paused"
+			stateClass = "flag"
+			stateText = "paused"
+			pauseBtnText = "Resume"
+			pauseBtnTitle = "Resume monitoring this wanted title"
 		}
+		idxStr := strconv.Itoa(index)
 		b.WriteString("<tr><td>" + html.EscapeString(w.Name) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(w.kind()) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(orDefault(w.Seasons, "—")) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(strings.Join(w.includes(), ", ")) + "</td>")
 		b.WriteString("<td>" + html.EscapeString(missingLabel) + "</td>")
-		b.WriteString("<td>" + state + "</td>")
+		b.WriteString(`<td><span class="` + stateClass + `">` + stateText + `</span></td>`)
 		b.WriteString(`<td class="actions">`)
-		attrs := `data-wanted-edit data-index="` + strconv.Itoa(index) + `"` +
+		b.WriteString(`<button type="button" class="sm" data-wanted-poll data-index="` + idxStr + `" data-name="` + html.EscapeString(w.Name) + `" title="Search this title now">Search</button> `)
+		attrs := `data-wanted-edit data-index="` + idxStr + `"` +
 			` data-name="` + html.EscapeString(w.Name) + `"` +
 			` data-kind="` + w.kind() + `"` +
 			` data-seasons="` + html.EscapeString(w.Seasons) + `"` +
@@ -448,8 +532,10 @@ func (d *Daemon) uiWantedRowsHTML() string {
 			` data-category="` + html.EscapeString(w.Category) + `"` +
 			` data-savepath="` + html.EscapeString(w.SavePath) + `"` +
 			` data-paused="` + strconv.FormatBool(w.Paused) + `"`
-		b.WriteString(`<button type="button" class="sm" ` + attrs + `>Edit</button> `)
-		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + strconv.Itoa(index) + `"><button type="submit" class="danger">Remove</button></form>`)
+		b.WriteString(`<button type="button" class="sm" ` + attrs + ` title="Edit wanted title">Edit</button> `)
+		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="toggle-pause"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="secondary" title="` + pauseBtnTitle + `">` + pauseBtnText + `</button></form> `)
+		b.WriteString(`<form method="post" action="/ui/wanted"><input type="hidden" name="op" value="remove"><input type="hidden" name="index" value="` + idxStr + `"><button type="submit" class="danger" title="Remove this wanted title">Remove</button></form> `)
+		b.WriteString(`<span class="muted" data-wanted-status="` + idxStr + `" style="margin-left:6px"></span>`)
 		b.WriteString("</td></tr>")
 	}
 	return b.String()

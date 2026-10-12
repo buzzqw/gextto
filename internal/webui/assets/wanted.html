@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gx-torrent</title>
+<style>body{margin:0;font:15px system-ui,sans-serif;background:#0f1420;color:#e7ecf3}
+header{padding:14px 20px;border-bottom:1px solid #223;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+header h1{font-size:20px;margin:0;font-weight:600}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav a{padding:5px 12px;border-radius:8px;border:1px solid #2b3a55;background:#1b2536;text-decoration:none;color:#dbe4f0;font-size:14px;white-space:nowrap}
+.nav a:hover{background:#243049}
+.nav a.on{background:#2563eb;border-color:#2563eb;color:#fff}
+main{padding:16px 20px;max-width:1100px;margin:0 auto}
+a{color:#93c5fd}h1{font-size:20px}h2{font-size:16px;margin:22px 0 8px}
+label{display:block;margin:10px 0;color:#93a1b5}
+input,select{padding:8px;border-radius:8px;border:1px solid #243049;background:#0f1420;color:inherit}
+input[type=text][list]{min-width:220px}
+button{padding:8px 14px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+button.danger{background:#3a1417;color:#fca5a5;border:1px solid #7f1d1d;font-weight:500;padding:5px 10px}
+button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-weight:500;padding:5px 10px}
+table{width:100%;border-collapse:collapse;margin-top:8px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #1f2839;font-size:14px;vertical-align:middle}
+th{color:#93a1b5}
+.muted{color:#93a1b5}.err{color:#fca5a5}.ok{color:#86efac}.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin:8px 0}
+.row label{margin:0;display:flex;flex-direction:column;gap:3px;font-size:13px}
+.row .chk{flex-direction:row;align-items:center}
+button.feed{background:#1b2536;color:#dbe4f0}
+.flag{font-size:12px;padding:1px 6px;border-radius:6px;background:#243049;color:#93a1b5;white-space:nowrap}
+.flag.on{background:#14532d;color:#86efac}
+.actions{white-space:nowrap;text-align:right}
+.actions form{display:inline-block;margin:0 2px 2px 0}
+button.sm{padding:4px 8px;background:#243049;font-weight:500}
+details{margin-top:12px;border:1px solid #243049;border-radius:10px;padding:8px 14px;background:#10151f}
+summary{cursor:pointer;color:#93a1b5}
+.form-card{border:1px solid #243049;border-radius:10px;padding:6px 14px 14px;margin-top:8px;background:#131a28}
+.lead{border-color:#2563eb}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.wrap{overflow-wrap:anywhere}
+:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+</style></head>
+<body>
+<header>
+  <h1>Wanted</h1>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a class="on" href="/ui/wanted" aria-current="page" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and rules">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a href="/ui/settings" title="Daemon configuration and options">Settings</a></nav>
+</header>
+<main>
+<p class="muted">TV shows and movies monitored for automated downloading from indexers and RSS feeds. Missing episodes are fetched automatically.</p>
+
+<div class="row" style="justify-content:space-between;align-items:center">
+  <div class="row" style="margin:0">
+    <button type="button" id="wanted-poll-all" title="Search configured indexers and feeds for all wanted titles now">Search all wanted</button>
+    <span class="muted" id="wanted-poll-info" aria-live="polite"></span>
+  </div>
+  <span class="muted"><span>Total</span>: <b>{{WANTEDCOUNT}}</b> · <span>Active</span>: <b>{{WANTEDACTIVE}}</b> · <span>Paused</span>: <b>{{WANTEDPAUSED}}</b></span>
+</div>
+
+<h2>Wanted titles</h2>
+<table>
+  <thead><tr><th>Title</th><th>Type</th><th>Seasons</th><th>Include</th><th>Missing</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead>
+  <tbody>{{WANTEDROWS}}</tbody>
+</table>
+
+<form class="form-card lead" id="wanted-form" method="post" action="/ui/wanted">
+  <input type="hidden" name="op" value="add">
+  <input type="hidden" name="index" id="wanted-index">
+  <div class="row">
+    <label>Title<input type="text" name="name" id="wanted-name" list="series-list" placeholder="Title" autocomplete="off" title="Series or movie title to search for"></label>
+    <datalist id="series-list"></datalist>
+    <label>Type<select name="kind" title="Release type: series or movie"><option value="series">Series</option><option value="movie">Movie</option></select></label>
+    <label>Seasons<input type="text" name="seasons" placeholder="1+ / 2-4 / 1" autocomplete="off" title="Season numbers or range (e.g. 1+, 2-4, 1)"></label>
+    <label>Language<input type="text" name="language" placeholder="ita" autocomplete="off" title="Required language terms (e.g. ita, eng)"></label>
+    <label>Quality<select name="quality" id="wanted-quality" title="Required video quality resolution">
+      <option value="">Any</option>
+      <option value="360p">360p</option>
+      <option value="480p">480p</option>
+      <option value="576p">576p</option>
+      <option value="720p">720p</option>
+      <option value="720p+">720p+</option>
+      <option value="720p-1080p">720p-1080p</option>
+      <option value="1080p">1080p</option>
+      <option value="1080p+">1080p+</option>
+      <option value="2160p">2160p 4K</option>
+      <option value="2160p+">2160p+ 4K+</option>
+    </select></label>
+    <button type="button" class="sm" id="wanted-search" title="Search configured feeds and indexers for matching titles">Search in feeds</button>
+    <button type="submit" id="wanted-submit" title="Add title to wanted list">Add wanted</button>
+    <button type="button" class="sm" id="wanted-cancel" style="display:none" title="Cancel editing wanted title">Cancel</button>
+  </div>
+  <details>
+    <summary>Advanced filters</summary>
+    <div class="row">
+      <label>Exclude<input type="text" name="exclude" placeholder="cam" autocomplete="off" title="Terms to exclude from release titles"></label>
+      <label>Episode filter<input type="text" name="episode_filter" placeholder="1x01-05, 1x07" autocomplete="off" title="Specific episode filter (e.g. 1x01-05, 1x07)"></label>
+      <label>Category<input type="text" name="category" placeholder="tv" autocomplete="off" title="Category assigned to added torrents"></label>
+      <label>Save path<input type="text" name="savepath" placeholder="/srv/tv" autocomplete="off" title="Folder on disk where files will be saved"></label>
+      <label class="chk"><input type="checkbox" name="paused" value="1" title="Add matched torrents in paused state"> Paused</label>
+    </div>
+  </details>
+  <div class="row" id="wanted-results" aria-live="polite"></div>
+  <p class="muted" id="wanted-search-source" aria-live="polite"></p>
+  <p class="muted">A wanted title is searched in the indexers and in the configured RSS feeds; its missing episodes are fetched again. Fill language/quality and press Search in feeds to pick a title from what the feeds return.</p>
+</form>
+<!--ERROR-->
+</main>
+<script id="ui-i18n"></script>
+<script>
+function t(s){return (window.__uiI18n&&window.__uiI18n[s])||s;}
+
+// Typeahead for wanted title.
+(function(){
+  var input=document.getElementById('wanted-name');
+  var list=document.getElementById('series-list');
+  if(!input||!list)return;
+  var timer=null;
+  input.addEventListener('input',function(){
+    clearTimeout(timer);
+    var q=input.value.trim();
+    if(q.length<2)return;
+    timer=setTimeout(function(){
+      fetch('/ui/rss-suggest?q='+encodeURIComponent(q),{cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).then(function(names){
+        list.innerHTML='';
+        (names||[]).forEach(function(n){
+          var o=document.createElement('option');
+          o.value=n;
+          list.appendChild(o);
+        });
+      }).catch(function(){});
+    },350);
+  });
+})();
+
+// Edit wanted row.
+(function(){
+  var form=document.getElementById('wanted-form');
+  if(!form)return;
+  var idx=document.getElementById('wanted-index');
+  var submit=document.getElementById('wanted-submit');
+  var cancel=document.getElementById('wanted-cancel');
+  var fields=['name','kind','seasons','language','quality','exclude','episode_filter','category','savepath'];
+  function setField(n,v){
+    var el=form.querySelector('[name='+n+']');
+    if(!el)return;
+    if(el.tagName==='SELECT'&&v&&!el.querySelector('option[value="'+v+'"]')){
+      var o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);
+    }
+    el.value=v||'';
+  }
+  function clear(){
+    idx.value='';
+    fields.forEach(function(n){setField(n,'');});
+    form.querySelector('[name=paused]').checked=false;
+    submit.textContent=t('Add wanted');
+    cancel.style.display='none';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-edit]'),function(btn){
+    btn.addEventListener('click',function(){
+      idx.value=btn.getAttribute('data-index');
+      setField('name',btn.getAttribute('data-name'));
+      setField('kind',btn.getAttribute('data-kind'));
+      setField('seasons',btn.getAttribute('data-seasons'));
+      setField('language',btn.getAttribute('data-language'));
+      setField('quality',btn.getAttribute('data-quality'));
+      setField('exclude',btn.getAttribute('data-exclude'));
+      setField('episode_filter',btn.getAttribute('data-episode'));
+      setField('category',btn.getAttribute('data-category'));
+      setField('savepath',btn.getAttribute('data-savepath'));
+      form.querySelector('[name=paused]').checked=btn.getAttribute('data-paused')==='true';
+      submit.textContent=t('Save wanted');
+      cancel.style.display='';
+      form.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+  });
+  if(cancel){cancel.addEventListener('click',clear);}
+})();
+
+// Search in feeds button for candidate titles.
+(function(){
+  var btn=document.getElementById('wanted-search');
+  if(!btn)return;
+  btn.addEventListener('click',function(){
+    var form=document.getElementById('wanted-form');
+    var box=document.getElementById('wanted-results');
+    var hint=document.getElementById('wanted-search-source');
+    var name=form.querySelector('[name=name]').value.trim();
+    if(name.length<2){
+      box.textContent=t('type at least two characters');
+      if(hint){hint.textContent='';}
+      return;
+    }
+    box.textContent=t('Searching…');
+    if(hint){hint.textContent='';}
+    var p=new URLSearchParams({q:name,language:form.querySelector('[name=language]').value,quality:form.querySelector('[name=quality]').value});
+    fetch('/ui/wanted-search?'+p.toString(),{cache:'no-store'}).then(function(r){return r.ok?r.json():Promise.reject();}).then(function(res){
+      res=res||{};
+      box.innerHTML='';
+      var names=res.names||[];
+      if(!names.length){box.textContent=t('No results');}
+      names.forEach(function(n){
+        var b=document.createElement('button');
+        b.type='button';
+        b.className='feed';
+        b.textContent=n;
+        b.setAttribute('title', n);
+        b.onclick=function(){form.querySelector('[name=name]').value=n;};
+        box.appendChild(b);
+      });
+      if(hint){
+        var counts=t('Indexer')+': '+(res.indexer_hits||0)+' · '+t('Feed')+': '+(res.feed_hits||0)+' · '+t('Archive')+': '+(res.archive_hits||0);
+        if(!res.indexers){hint.textContent=t('No indexers configured')+' · '+counts;}
+        else if(res.indexer_error){hint.textContent=counts+' · '+t('Error')+': '+res.indexer_error;}
+        else{hint.textContent=counts;}
+      }
+    }).catch(function(){
+      box.textContent=t('No results');
+      if(hint){hint.textContent=t('Error');}
+    });
+  });
+})();
+
+// Manual poll for wanted titles (global & per row).
+function pollWanted(name, statusEl, btnEl){
+  if(btnEl)btnEl.disabled=true;
+  if(statusEl){
+    statusEl.className='muted';
+    statusEl.textContent=t('Searching…');
+  }
+  var f=new URLSearchParams();
+  if(name)f.set('name',name);
+  fetch('/ui/wanted-poll',{method:'POST',body:f,headers:{'Content-Type':'application/x-www-form-urlencoded'}}).then(function(r){
+    if(!r.ok){throw new Error(r.status);}
+    return r.json();
+  }).then(function(res){
+    if(!statusEl)return;
+    if(res.errors && res.errors.length){
+      statusEl.className='err';
+      statusEl.textContent=res.errors.join(' · ');
+    } else if(res.added>0){
+      statusEl.className='ok';
+      var extra=(res.titles&&res.titles.length)?' ('+res.titles.join(', ')+')':'';
+      statusEl.textContent='✓ '+res.added+' '+t('added')+extra;
+    } else {
+      statusEl.className='ok';
+      statusEl.textContent='✓ '+t('Up to date');
+    }
+  }).catch(function(e){
+    if(statusEl){
+      statusEl.className='err';
+      statusEl.textContent=t('Error')+': '+(e.message||'');
+    }
+  }).then(function(){
+    if(btnEl)btnEl.disabled=false;
+  });
+}
+
+(function(){
+  var pollAll=document.getElementById('wanted-poll-all');
+  var info=document.getElementById('wanted-poll-info');
+  if(pollAll){
+    pollAll.addEventListener('click',function(){
+      pollWanted('',info,pollAll);
+    });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-wanted-poll]'),function(btn){
+    btn.addEventListener('click',function(){
+      var name=btn.getAttribute('data-name');
+      var idx=btn.getAttribute('data-index');
+      var statusEl=document.querySelector('[data-wanted-status="'+idx+'"]');
+      pollWanted(name,statusEl,btn);
+    });
+  });
+})();
+
+function ensureTooltips(root){
+  root=root||document;
+  var nodes=root.querySelectorAll?root.querySelectorAll('button,a.btn,input:not([type="hidden"]),select,textarea'):[];
+  for(var i=0;i<nodes.length;i++){
+    var node=nodes[i];
+    if(node.disabled)continue;
+    if(String(node.getAttribute('title')||'').trim())continue;
+    var text=node.getAttribute('aria-label')||node.getAttribute('placeholder')||'';
+    if(!text){
+      var label=node.closest&&node.closest('label');
+      var labelText=label&&label.querySelector('span:not(.sr-only)');
+      text=labelText?labelText.textContent:(label?label.textContent:node.textContent);
+    }
+    text=String(text||'').replace(/\s+/g,' ').trim();
+    if(text){node.setAttribute('title',text);}
+  }
+}
+document.addEventListener('DOMContentLoaded',function(){ensureTooltips(document);});
+ensureTooltips(document);
+</script>
+</body></html>

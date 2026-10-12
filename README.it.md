@@ -261,18 +261,11 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   esattamente come in Gextto: il percorso Torznab aggregato di Jackett, l'API di
   ricerca aggregata di Prowlarr e l'`/api` di un servizio Torznab diretto vengono
   ricavati da soli.
-- **Un gestore RSS all'altezza di qBittorrent e Deluge/YaRSS2:** i feed sono URL
-  RSS o elenchi HTML (pagine uploader di ext.to e TorrentGalaxy), ognuno con
-  ultimo controllo, elementi, nuovi e aggiunti ed errori, un pulsante
-  **↻ Ricarica**, modifica e attiva/disattiva; **regole** ordinate PASS/FAIL
-  (include/escludi, regex, dimensione, seed, età, filtro episodi, smart
-  episode, *scarica una volta*, pausa tra corrispondenze) con percorso,
-  categoria, tag e opzioni, modificabili sul posto e con **anteprima** di ciò
-  che catturerebbero; una lista **Wanted** che riprende gli episodi mancanti; un
-  intervallo di aggiornamento configurabile. I feed **ingrossano l'archivio**: un
-  feed senza regole e senza include/escludi non scarica nulla (c'è il flag *prendi
-  tutto* per seguirlo per intero), e i titoli cercati cercano nell'indicizzato **e**
-  nell'archiviato.
+- **Una suite RSS e automazione all'altezza di qBittorrent e Deluge/YaRSS2:**
+  - **Schede dedicate:** separazione pulita tra **Wanted** (`/ui/wanted`) per serie TV e film con tracciamento degli episodi mancanti (gap search) e ricerche manuali istantanee, e **RSS & Indexer** (`/ui/rss`) per feed, indexer e regole di automazione.
+  - **Feed & Indexer:** i feed sono URL RSS o elenchi HTML (pagine uploader di ext.to e TorrentGalaxy), con ultimo controllo, elementi, contatori nuovi/aggiunti, riscontro istantaneo al click su **Controlla feed** (`✓ N feed controllati: X nuovi · Y aggiunti`) e ricarica per singola riga; preset indexer Torznab (Jackett, Prowlarr) con test in tempo reale.
+  - **Regole di automazione:** regole ordinate PASS/FAIL (include/escludi, regex, dimensione, seed, età, filtro episodi, smart episode, *scarica una volta*, pausa tra corrispondenze) con percorso, categoria, tag e opzioni, modificabili sul posto e con **anteprima dal vivo** di ciò che catturerebbero.
+  - **Lista Wanted & Gap search:** traccia serie TV e film cercati con menu a discesa per lingua e qualità (fino a 2160p 4K+), ricerca automatica degli episodi mancanti (gap search) su indexer e archivio, pulsante di ricerca manuale istantanea globale o per singolo titolo e stato visuale immediato. I feed **ingrossano l'archivio**: un feed senza regole e senza include/escludi non scarica nulla (c'è il flag *prendi tutto* per seguirlo per intero), e i titoli cercati cercano nell'indicizzato **e** nell'archiviato.
 - **Archivio:** ogni elemento mai restituito dai feed resta in un database
   locale (deduplicato per info-hash) e si può cercare — parole, frasi tra
   virgolette, parole `-escluse`, per feed, solo scaricati, ordinati per data,

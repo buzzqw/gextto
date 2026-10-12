@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -190,5 +192,52 @@ func TestWantedQualityMatch(t *testing.T) {
 		if got := wantedQualityMatch(tc.req, strings.ToLower(tc.title)); got != tc.want {
 			t.Errorf("wantedQualityMatch(%q, %q) = %v, want %v", tc.req, tc.title, got, tc.want)
 		}
+	}
+}
+
+func TestUIWantedPageAndPollEndpoints(t *testing.T) {
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(wantedSettingKey, `[{"name":"Show","kind":"series","seasons":"1+"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	// GET /ui/wanted serves HTML page.
+	resp, err := http.Get(srv.URL + "/ui/wanted")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /ui/wanted status = %d", resp.StatusCode)
+	}
+	if !strings.Contains(string(raw), "Wanted titles") {
+		t.Fatalf("page missing Wanted titles: %s", string(raw))
+	}
+
+	// POST /ui/wanted toggle-pause
+	post := func(path string, vals url.Values) *http.Response {
+		r, err := http.PostForm(srv.URL+path, vals)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	r := post("/ui/wanted", url.Values{"op": {"toggle-pause"}, "index": {"0"}})
+	r.Body.Close()
+	if list := d.wantedList(); len(list) != 1 || !list[0].Paused {
+		t.Fatalf("wanted[0] not paused: %+v", list)
+	}
+
+	// POST /ui/wanted-poll returns JSON.
+	r = post("/ui/wanted-poll", url.Values{"name": {"Show"}})
+	var pollRes wantedPollResult
+	if err := json.NewDecoder(r.Body).Decode(&pollRes); err != nil {
+		t.Fatalf("poll JSON error: %v", err)
+	}
+	r.Body.Close()
+	if !pollRes.OK {
+		t.Fatalf("pollRes not OK: %+v", pollRes)
 	}
 }

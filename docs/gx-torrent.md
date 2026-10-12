@@ -533,9 +533,8 @@ to titles with a recognisable episode; an invalid filter never matches
 Example:
 `[{"name":"no-cam","fail":true,"match":{"regex":"(?i)cam"}},{"name":"shows","match":{"require_episode":true,"smart_episode":true},"action":{"category":"tv","savepath":"/srv/tv"}}]`.
 
-The **`/ui/rss`** page (standalone, reachable from the *RSS and indexers* link
-in the bar of every page) is designed for daily use. At the top there is
-**Wanted**: the titles the operator wants. Each title has type (series/movie),
+The **`/ui/wanted`** page (tab *Wanted* in the navigation bar) is dedicated to managing
+the titles the operator wants. Each title has type (series/movie),
 seasons (`1+`, `2-4`, `1`), language, quality (selectable from a drop-down
 among *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
 *1080p+*, *2160p 4K*, *2160p+ 4K+*), excluded, episode filter, category
@@ -552,6 +551,12 @@ error: so you can
 immediately tell an absent or unresponsive indexer from the results of the
 feeds alone.
 
+At the top of the *Wanted* page, the **Search all wanted** button triggers an immediate
+manual search across indexers, RSS feeds and the archive for all configured titles and
+gap searches missing episodes, displaying real-time feedback with items added and status.
+Each row in the table provides individual **Search**, **Edit**, **Pause/Resume** and
+**Remove** actions, missing episodes ledger and real-time status.
+
 The daemon, at every cycle, searches every title in the **indexers**, in the **RSS
 feeds** and in the **archive** (where feeds deposit everything they find, even what
 is no longer in the feed; indexers suffice if there are no feeds) and takes
@@ -562,16 +567,18 @@ For a **movie** it takes one release and does not look for others. The list does
 rules: it is the engine that queries indexers and feeds for the title, so language and
 quality apply in AND and feeds remain free for advanced rules.
 
-Below: lists with buttons to add, **edit** (the form is filled
-with the row's values; an empty API key keeps it) **test** (Torznab request
-`t=caps`, outcome next to the row) and remove **indexers** (drop-down
-Prowlarr/Jackett/Other, pre-filled URL; the name is a **link to the indexer's web
-page**, i.e. scheme and host of the Torznab URL, opened in a new tab).
-The **feeds** have a table with status (*active*/*disabled*, *adds
-paused*), **last check** with items, new and added or the error, and per
-row the buttons **↻ Reload** (to the left of *Remove*: reads that feed immediately
-and refreshes the row), **Edit** (the form is filled, including the *Feed
-options*: folder, include/exclude, category, path, pause, disabled),
+The **`/ui/rss`** page (tab *RSS & indexers*) is dedicated to feeds, indexers and rule
+definitions without cluttering the view with wanted titles. The **Check feeds** button
+runs a complete check and provides immediate visual feedback (`✓ N feeds checked: X new · Y added`
+or error indicators) rather than running silently in the background. Below: lists with
+buttons to add, **edit** (the form is filled with the row's values; an empty API key keeps it)
+**test** (Torznab request `t=caps`, outcome next to the row) and remove **indexers** (drop-down
+Prowlarr/Jackett/Other, pre-filled URL; the name is a **link to the indexer's web page**, i.e.
+scheme and host of the Torznab URL, opened in a new tab).
+The **feeds** have a table with status (*active*/*disabled*, *adds paused*), **last check**
+with items, new and added or the error, and per row the buttons **↻ Reload** (to the left of
+*Remove*: reads that feed immediately and refreshes the row), **Edit** (the form is filled,
+including the *Feed options*: folder, include/exclude, category, path, pause, disabled),
 **Enable/Disable** and **Remove**. An **RSS options** box sets
 the refresh interval (minutes) and the archive retention (days)
 and shows the time of the next automatic check. The **rule editor** has

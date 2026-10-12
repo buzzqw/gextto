@@ -9,7 +9,7 @@ package assets
 
 import "embed"
 
-//go:embed ui.tmpl token.html login.html setup.html rss.html settings.html archive.html favicon.svg
+//go:embed ui.tmpl token.html login.html setup.html rss.html wanted.html settings.html archive.html favicon.svg
 var files embed.FS
 
 // UITemplate is the html/template source of the daemon page: the page body plus
@@ -24,6 +24,9 @@ func LoginPage() string { return mustRead("login.html") }
 
 // SetupPage is the standalone first-run wizard.
 func SetupPage() string { return mustRead("setup.html") }
+
+// WantedPage is the standalone wanted series and movies management page.
+func WantedPage() string { return mustRead("wanted.html") }
 
 // RSSPage is the standalone RSS/feeds management page.
 func RSSPage() string { return mustRead("rss.html") }

@@ -30,7 +30,7 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
 <body>
 <header>
   <h1>gx-torrent</h1>
-  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a></nav>
+  <nav class="nav"><a href="/" title="Torrents list and transfer status">Torrents</a><a href="/ui/wanted" title="TV shows and movies wanted list">Wanted</a><a href="/ui/rss" title="RSS feeds, indexers and wanted list">RSS &amp; indexers</a><a href="/ui/archive" title="Everything the feeds found, searchable">Archive</a><a class="on" href="/ui/settings" aria-current="page" title="Daemon configuration and options">Settings</a></nav>
 </header>
 <main>
 <p class="muted">Folders, network, ports and the engine options apply from the next start; the bandwidth, queue limits and language apply at once.</p>
@@ -69,17 +69,17 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
 <fieldset>
   <legend>Protocols</legend>
   <div class="grid">
-    <label>Encryption<select name="encryption" title="BitTorrent protocol encryption policy">{{ENC_OPTIONS}}</select></label>
+    <label>Encryption<select name="encryption" title="Protocol encryption policy: plain, preferred, or required encryption (MSE/PE)">{{ENC_OPTIONS}}</select></label>
     <label>DHT bootstrap nodes<input type="text" name="dht-bootstrap" value="{{DHT_BOOTSTRAP}}" autocomplete="off" title="Initial bootstrap nodes for the DHT network"></label>
   </div>
   <div class="grid">
-    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}} title="Mainline DHT for decentralized peer discovery"> DHT</label>
-    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}} title="Peer Exchange to discover peers from connected swarms"> Peer exchange (PEX)</label>
-    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}} title="Micro Transport Protocol (UDP) for congestion-aware transfers"> uTP</label>
-    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}} title="BEP 55 NAT holepunching over uTP"> Holepunching</label>
-    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}} title="Local Service Discovery to find peers on the local network"> Local discovery (LSD)</label>
-    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}} title="UPnP automatic port forwarding on the router"> UPnP port mapping</label>
-    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}} title="NAT-PMP automatic port forwarding on the router"> NAT-PMP port mapping</label>
+    <label class="chk"><input type="checkbox" name="dht" value="1"{{DHT_ON}} title="Mainline DHT for decentralized peer discovery without trackers (BEP 5)"> DHT</label>
+    <label class="chk"><input type="checkbox" name="pex" value="1"{{PEX_ON}} title="Peer Exchange (PEX) to discover peers from connected swarms (BEP 11)"> Peer exchange (PEX)</label>
+    <label class="chk"><input type="checkbox" name="utp" value="1"{{UTP_ON}} title="Micro Transport Protocol (uTP) over UDP for congestion-aware transfers (BEP 29)"> uTP</label>
+    <label class="chk"><input type="checkbox" name="holepunch" value="1"{{HOLEPUNCH_ON}} title="BEP 55 NAT traversal holepunching over uTP via relay peers"> Holepunching</label>
+    <label class="chk"><input type="checkbox" name="lsd" value="1"{{LSD_ON}} title="Local Service Discovery (LSD) via multicast on LAN (BEP 14)"> Local discovery (LSD)</label>
+    <label class="chk"><input type="checkbox" name="upnp" value="1"{{UPNP_ON}} title="UPnP automatic port forwarding on the router gateway"> UPnP port mapping</label>
+    <label class="chk"><input type="checkbox" name="natpmp" value="1"{{NATPMP_ON}} title="NAT-PMP / PCP automatic port forwarding on the router gateway"> NAT-PMP port mapping</label>
     <label class="chk"><input type="checkbox" name="dht-read-only" value="1"{{DHT_READONLY}} title="Run DHT in read-only mode without answering queries"> DHT read-only (BEP 43)</label>
   </div>
 </fieldset>
@@ -90,8 +90,8 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
     <label>Active seeds<input type="number" min="0" name="active-seeds" value="{{ACTIVE_SEEDS}}" title="Maximum number of simultaneous seeding torrents"></label>
     <label>Active limit (downloads + seeds)<input type="number" min="1" name="active-limit" value="{{ACTIVE_LIMIT}}" title="Maximum total active torrents (downloads and seeds)"></label>
     <label>Disk cache (MiB, 0 = automatic)<input type="number" min="0" name="cache-mb" value="{{CACHE_MB}}" title="Disk cache memory size in MiB (0 = automatic)"></label>
-    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}} title="Preallocate disk space before writing file chunks"> Preallocate disk space</label>
-    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order"> Download in sequential order</label>
+    <label class="chk"><input type="checkbox" name="preallocate" value="1"{{PREALLOCATE}} title="Preallocate disk space before writing file chunks to avoid disk fragmentation"> Preallocate disk space</label>
+    <label class="chk"><input type="checkbox" name="sequential" value="1"{{SEQUENTIAL}} title="Download torrent pieces in sequential order for media streaming preview"> Download in sequential order</label>
   </div>
 </fieldset>
 <fieldset id="optimize">
@@ -131,7 +131,7 @@ button.secondary{background:#243049;color:#dbe4f0;border:1px solid #2b3a55;font-
 <fieldset>
   <legend>Interface and notifications</legend>
   <label>Language<select name="lang" title="Web interface language">{{LANG_OPTIONS}}</select></label>
-  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion"></label>
+  <label>Notification webhook URL<input type="text" name="notify-url" value="{{NOTIFY_URL}}" autocomplete="off" title="Webhook URL to receive notifications on torrent completion or feed events"></label>
 </fieldset>
 <button type="submit" title="Save settings to settings.json">Save</button>
 <!--ERROR-->
