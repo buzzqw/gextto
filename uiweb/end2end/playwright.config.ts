@@ -13,6 +13,8 @@ const testDataDir = `/tmp/opencode/gextto-playwright-${process.pid}`;
  */
 export default defineConfig({
   testDir: "./tests",
+  /* A fresh data dir shows the first-run wizard; complete it once. */
+  globalSetup: "./global-setup.ts",
   /* Maximum time one test can run for. */
   timeout: 30 * 1000,
   expect: {

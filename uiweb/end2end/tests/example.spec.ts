@@ -27,7 +27,7 @@ test("dashboard and configuration areas are usable", async ({ page }) => {
 
   await nav(page, "Integrazioni").click();
   await expect(page.getByRole("heading", { name: "Simkl", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Magnet handler" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Magnet (.desktop)" })).toBeVisible();
 
   await nav(page, "Archivio").click();
   await expect(page.locator("h1").filter({ hasText: "Archivio" })).toBeVisible();

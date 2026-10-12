@@ -3,7 +3,7 @@ BINARY := gexttod
 CMD := ./cmd/gexttod
 OUT := bin/$(BINARY)
 
-.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht
+.PHONY: all build build-libtorrent fast fast-libtorrent gx-torrent test test-libtorrent test-race test-real test-engine test-dht test-ui container vet fmt check-ui installer-test tidy package clean run measure-seeding measure-pipeline measure-dht
 
 all: build
 
@@ -74,6 +74,15 @@ test-dht:
 # can stay non-blocking until the shared state has been audited.
 test-race:
 	CGO_ENABLED=1 go test -race ./...
+
+# End-to-end UI tests (Playwright + Node, in uiweb/end2end). They build the
+# daemon, start it in dry-run on their own port and drive the real UI in a
+# browser; they cover the pages, the mobile layout, the i18n and the axe
+# accessibility checks. Kept out of `make test` because they need Node and a
+# browser. Run `npm ci` automatically when node_modules is missing.
+test-ui:
+	scripts/build-daemon.sh
+	cd uiweb/end2end && { [ -d node_modules ] || npm ci --no-audit --no-fund; } && npx playwright test
 
 # Seeding/choking measurements. The deterministic unchoker harness
 # runs with `make test-engine`; this runs the opt-in local-swarm harness. Add

@@ -54,7 +54,7 @@ Conteggio (2026-10-12):
 | File `_test.go` | 289 |
 | Pacchetti Go | 79, di cui **44 con test** |
 | Modulo separato `internal/dht` | testato da `make test-dht` (fuori da `go test ./...`) |
-| Test end2end Playwright (`uiweb/end2end`) | 48 |
+| Test end2end Playwright (`uiweb/end2end`) | 51 |
 
 Tempi locali (`-count=1`, quindi **non cachati**):
 
@@ -69,9 +69,11 @@ Il giro `make test` è `check-ui-settings-index` + `installer-selftest` +
 (`check-ui` ~0,03 s, `installer-test` ~0,6 s, `test-dht` ~0,1 s): **tutto il
 tempo è la suite Go**.
 
-Gli end2end Playwright **non** sono agganciati a `make` né alla CI (e il loro
-harness parte dalla procedura guidata di primo avvio, quindi da una dir vuota
-falliscono): è annotato in `docs/archive/da-fare.md`.
+Gli end2end Playwright si eseguono con **`make test-ui`** (costruisce il daemon,
+lo avvia in dry-run e guida la UI vera) e girano nella CI nel job **`ui-e2e`**;
+l'harness completa da solo il wizard di primo avvio
+(`uiweb/end2end/global-setup.ts`), quindi una data dir vuota non è più un
+problema.
 
 ## CI (GitHub Actions)
 

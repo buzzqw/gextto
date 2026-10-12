@@ -70,6 +70,44 @@ jobs:
           scripts/package-gx-torrent-windows.sh --arch amd64 --output /tmp/gx-torrent-windows-amd64.zip
           scripts/package-gx-torrent-windows.sh --arch arm64 --output /tmp/gx-torrent-windows-arm64.zip
 
+  # The end-to-end UI suite (Playwright) drives the real SSR interface in a
+  # browser: pages, mobile layout, i18n and the axe accessibility checks. Kept
+  # separate from build-test because it needs Node and a browser.
+  ui-e2e:
+    name: UI end2end (Playwright)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: uiweb/end2end/package-lock.json
+
+      - name: Install the end2end dependencies
+        working-directory: uiweb/end2end
+        run: npm ci --no-audit --no-fund
+
+      - name: Install the browser
+        working-directory: uiweb/end2end
+        run: npx playwright install --with-deps chrome
+
+      - name: Build the daemon
+        run: scripts/build-daemon.sh
+
+      - name: Run the end2end suite
+        working-directory: uiweb/end2end
+        run: npx playwright test
+
   # The Win32 layer of the daemon (junctions, memory, gateway, storage class)
   # only cross-compiles on Linux; this job runs its tests on real Windows. The
   # rest of the suite assumes Unix paths, so only the platform tests run here.

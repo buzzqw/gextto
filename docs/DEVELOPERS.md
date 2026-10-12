@@ -129,6 +129,7 @@ Run these checks before a commit:
 gofmt -w changed.go
 make test                 # pure Go: check-ui + installer self-test + CGO_ENABLED=0 go test ./...
 make test-engine            # tests of the gx-core engine
+make test-ui              # UI end2end (Playwright): pages, mobile, a11y (needs Node + a browser)
 CGO_ENABLED=1 go test -race ./...   # race detector needs cgo (and the libtorrent headers)
 node --check uiweb/v2/static/v2-core.js
 git diff --check
@@ -139,17 +140,17 @@ git diff --check
 (requires the libtorrent headers) when you touch the embedded engine, the cgo
 bridge or the capability gating.
 
-The end-to-end suite is under `uiweb/end2end` and requires a running daemon:
+The end-to-end suite is under `uiweb/end2end` (Playwright + Node). `make test-ui`
+builds the daemon, starts it in dry-run on its own port, completes the first-run
+wizard once in `global-setup.ts` and drives the real interface in a browser:
 
 ```bash
-cd uiweb/end2end
-npx playwright test
-npm run test:a11y
+make test-ui              # pages, mobile layout, i18n, axe-core accessibility
 ```
 
-`test:a11y` runs the axe-core checks and keyboard/reflow accessibility
-regressions. It should pass before changing UI templates, styles or client-side
-interaction code.
+It runs in CI in the `ui-e2e` job. `tests/accessibility.spec.ts` holds the
+axe-core checks and the keyboard/reflow regressions: it should pass before
+changing UI templates, styles or client-side interaction code.
 
 ## Concurrency and safety
 
