@@ -562,7 +562,7 @@ label.field > span, .field > span, .field-label { color: var(--muted); font-size
 .torrent-modal .form-grid { margin-top: 10px; }
 
 /* tables */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
+.table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-sm); }
 .data-table { width: 100%; border-collapse: collapse; min-width: 560px; font-size: 0.95rem; }
 .data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); }
 .data-table thead th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
@@ -1197,8 +1197,10 @@ pre.log-view { margin: 0; }
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  /* Optional nav items move into the Sistema panel on phones. */
-  .sidebar .nav-optional { display: none !important; }
+  /* Optional nav items move into the Sistema panel on phones and appear when
+     that panel is open: the closed-group rule just below keeps them hidden
+     until then, so no extra hide is needed here. */
+  .sidebar .system-group:not(.open) .nav-optional { display: none !important; }
   .sidebar .nav-search,
   .sidebar .nav-mobile-hidden { display: none !important; }
   .sidebar .nav-group.system-group:not(.open) .nav-item:not(.nav-mobile-always) {

@@ -210,6 +210,10 @@ test.describe("mobile", () => {
     await expect(page.locator(".nav-prefs [data-theme-toggle]")).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Esplora" })).toBeVisible();
     await expect(page.locator(".nav-mobile-system-extra").filter({ hasText: "Archivio" })).toBeVisible();
+    // Le voci facoltative (Blocklist, Licenza) vivono solo nel pannello: se non
+    // comparissero qui resterebbero irraggiungibili dal telefono.
+    await expect(page.locator('aside .nav-item[data-nav="blocklist"]')).toBeVisible();
+    await expect(page.locator('aside .nav-item[data-nav="license"]')).toBeVisible();
   });
 
   test("le pagine di sistema non aprono il menu da sole", async ({ page }) => {
