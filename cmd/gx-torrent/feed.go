@@ -269,7 +269,7 @@ func (d *Daemon) pollFeedsOnlyDetailed(only string) feedPollResult {
 		var addedTitles []string
 		rules := d.rules()
 		if feedTakesEverything(rules, feed, name) {
-			logf("feed %s: no rule and no include/exclude, archive only (%d items); set the feed to \"take everything\" or add a filter to download", name, len(items))
+			d.logArchiveOnlyOnce(name, len(items))
 		}
 		for _, item := range items {
 			if added >= feedMaxAddsPerPoll {
@@ -390,6 +390,25 @@ func feedTakesEverything(rules []rss.Rule, feed feedConfig, feedName string) boo
 		return false
 	}
 	return strings.TrimSpace(feed.Include) == "" && strings.TrimSpace(feed.Exclude) == ""
+}
+
+// logArchiveOnlyOnce prints the "archive only" notice for a feed the first time
+// it is polled, never again: a feed that only grows the archive is a valid,
+// intentional configuration (the search for series and movies reads the
+// archive), so repeating the line at every cycle is noise, not a warning.
+func (d *Daemon) logArchiveOnlyOnce(name string, items int) {
+	d.archiveOnlyMu.Lock()
+	seen := d.archiveOnlyLogged[name]
+	if !seen {
+		if d.archiveOnlyLogged == nil {
+			d.archiveOnlyLogged = map[string]bool{}
+		}
+		d.archiveOnlyLogged[name] = true
+	}
+	d.archiveOnlyMu.Unlock()
+	if !seen {
+		logf("feed %s: archive only (%d items), no rule or filter to download", name, items)
+	}
 }
 
 // filterFeedItem decides whether an item is added and with which action. When at

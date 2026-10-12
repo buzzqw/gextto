@@ -245,6 +245,12 @@ type Daemon struct {
 	// feedPollMu serialises polls: the loop and the manual button must not run
 	// two polls against the same feed at once.
 	feedPollMu sync.Mutex
+	// archiveOnlyLogged remembers the feeds whose "archive only" notice was
+	// already printed: a feed with no rule and no filter is a valid, intentional
+	// configuration that only grows the archive, so the notice must not repeat at
+	// every poll.
+	archiveOnlyMu     sync.Mutex
+	archiveOnlyLogged map[string]bool
 	// adding holds the ids being added (d.add runs the engine call without
 	// d.mu): the queue loop leaves them alone until their state is recorded.
 	adding map[string]bool

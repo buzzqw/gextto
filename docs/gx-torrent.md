@@ -535,7 +535,8 @@ all), `fail`, `match` and `action`:
   rule of a feed (or an *once* rule that turns itself off) stops the downloads
   instead of falling back to the feed filter. A feed **without Include/Exclude and
   without rules** downloads nothing: it only grows the **archive** (its row
-  reports it with *archive only*, and the log says so at every round), unless
+  reports it with *archive only*, and the log notes it once, when the feed is
+  first polled — not at every round), unless
   the operator turns on the **Take all** flag. Adding a feed, then, does not
   mean pulling down what it contains: it means that material is there, and
   what to download is decided by the rules and the **Wanted** list.
