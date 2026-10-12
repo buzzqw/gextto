@@ -943,19 +943,6 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 		return
 	}
 	cfg := latestConfig(s)
-	var globalRatio *float64
-	if cfg.Libtorrent.SeedRatio > 0.0 {
-		value := cfg.Libtorrent.SeedRatio
-		globalRatio = &value
-	}
-	var globalTime *int64
-	if cfg.Libtorrent.SeedTimeDays > 0 {
-		value := cfg.Libtorrent.SeedTimeDays * 86_400
-		globalTime = &value
-	} else if cfg.Libtorrent.SeedTimeMinutes > 0 {
-		value := cfg.Libtorrent.SeedTimeMinutes * 60
-		globalTime = &value
-	}
 	removed := []string{}
 	removedNames := []string{}
 	skipped := 0
@@ -990,24 +977,10 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 				continue
 			}
 		}
-		if torrent.SeedRatio == 0.0 || torrent.SeedDays == 0 {
-			skipped++
-			continue
-		}
-		var ratioLimit *float64
-		if torrent.SeedRatio > 0.0 {
-			value := torrent.SeedRatio
-			ratioLimit = &value
-		} else {
-			ratioLimit = globalRatio
-		}
-		var timeLimit *int64
-		if torrent.SeedDays > 0 {
-			value := torrent.SeedDays * 86_400
-			timeLimit = &value
-		} else {
-			timeLimit = globalTime
-		}
+		// Effective limits: the torrent's own when positive, the globals when
+		// negative (inherit), none when zero (unlimited). A torrent that only
+		// inherits the global limits must still be removable.
+		ratioLimit, timeLimit := seedLimitsForTorrent(cfg, torrent.SeedRatio, torrent.SeedDays)
 		ratioReached := false
 		if ratioLimit != nil {
 			download := gh6_effectiveDownloadForRatio(torrent)

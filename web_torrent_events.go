@@ -1036,6 +1036,33 @@ func tev_effectiveDownloadForRatio(torrent *models.TorrentView) float64 {
 	return float64(totalSize)
 }
 
+// seedLimitsForTorrent returns the seed ratio and time limit that apply to a
+// torrent: its own when positive, the global ones when negative (inherit), none
+// when zero (unlimited). A nil pointer means no such limit (seed forever).
+func seedLimitsForTorrent(cfg *Config, seedRatio float64, seedDays int64) (ratio *float64, timeLimit *int64) {
+	if seedRatio > 0 {
+		value := seedRatio
+		ratio = &value
+	} else if seedRatio < 0 && cfg != nil && cfg.Libtorrent.SeedRatio > 0 {
+		value := cfg.Libtorrent.SeedRatio
+		ratio = &value
+	}
+	if seedDays > 0 {
+		value := seedDays * 86_400
+		timeLimit = &value
+	} else if seedDays < 0 && cfg != nil {
+		switch {
+		case cfg.Libtorrent.SeedTimeDays > 0:
+			value := cfg.Libtorrent.SeedTimeDays * 86_400
+			timeLimit = &value
+		case cfg.Libtorrent.SeedTimeMinutes > 0:
+			value := cfg.Libtorrent.SeedTimeMinutes * 60
+			timeLimit = &value
+		}
+	}
+	return ratio, timeLimit
+}
+
 // tev_seedLimitsReached implements `seed_limits_reached`.
 func tev_seedLimitsReached(cfg *Config, torrent *models.TorrentView) (bool, bool) {
 	globalRatio := 0.0

@@ -715,6 +715,7 @@ func uiTorrentsDataFrom(s *AppState) uiTorrentsData {
 
 func uiTorrentRows(s *AppState) []uiTorrentRow {
 	views := s.activeEngine().List()
+	cfg := latestConfig(s)
 	tags := make(map[string]string)
 	if pairs, err := s.db.TorrentTags(); err == nil {
 		for _, pair := range pairs {
@@ -778,7 +779,8 @@ func uiTorrentRows(s *AppState) []uiTorrentRow {
 			}
 		}
 		if view.State == "seeding" || view.State == "finished" {
-			row.SeedInfinite = view.SeedRatio == 0 || view.SeedDays == 0
+			ratio, timeLimit := seedLimitsForTorrent(cfg, view.SeedRatio, view.SeedDays)
+			row.SeedInfinite = ratio == nil && timeLimit == nil
 		}
 		rows = append(rows, row)
 	}
