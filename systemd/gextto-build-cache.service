@@ -1,0 +1,17 @@
+[Unit]
+Description=Gextto: refresh the Go build cache when it grows too large
+Documentation=https://github.com/buzzqw/gextto/blob/main/docs/DEVELOPERS.md
+# Run after the machine has settled, so a rebuild does not compete with boot.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Installed by `scripts/refresh-build-cache.sh --install`, which replaces
+# __SCRIPT__ with the absolute path of the script in the checkout.
+ExecStart=__SCRIPT__
+# The rebuild and the test suite can take minutes; do not cut them off.
+TimeoutStartSec=1h
+# Stay out of the way of interactive work.
+Nice=10
+IOSchedulingClass=idle

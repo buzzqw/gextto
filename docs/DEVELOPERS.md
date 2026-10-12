@@ -152,6 +152,34 @@ It runs in CI in the `ui-e2e` job. `tests/accessibility.spec.ts` holds the
 axe-core checks and the keyboard/reflow regressions: it should pass before
 changing UI templates, styles or client-side interaction code.
 
+## Build cache
+
+The Go build cache (`GOCACHE`, normally `~/.cache/go-build`) grows over time and
+balloons with CGO builds (the embedded libtorrent engine): a few gigabytes are
+normal on a busy machine. `scripts/refresh-build-cache.sh` keeps it in check:
+when the cache passes a threshold (default 8 GiB; override with
+`GEXTTO_BUILD_CACHE_LIMIT_GB` or `--limit-gb N`) it runs `go clean -cache`, then
+`go build ./...` and `make test`, so the cache is left **clean and warm** rather
+than cold. A fresh rebuild is usually far smaller than the accumulated one (for
+example 4.3 GiB → 0.5 GiB in a real run). It deliberately does **not** run
+`make build`, which would bump the committed `build_number` and dirty the
+checkout.
+
+```bash
+scripts/refresh-build-cache.sh --dry-run   # size and decision only
+scripts/refresh-build-cache.sh --status    # size, limit and the user timer
+scripts/refresh-build-cache.sh --force     # clean + rebuild + test regardless
+scripts/refresh-build-cache.sh             # clean + rebuild + test only if over the limit
+scripts/refresh-build-cache.sh --install   # weekly systemd user timer
+make cache-refresh                         # same check, via Make
+```
+
+`--install` copies `systemd/gextto-build-cache.{service,timer}` into
+`~/.config/systemd/user`, points `ExecStart` at the script in the checkout and
+enables the timer (`systemctl --user list-timers gextto-build-cache.timer`);
+`--uninstall` removes it. The timer runs weekly and does nothing when the cache
+is still under the limit.
+
 ## Concurrency and safety
 
 The daemon mixes HTTP handlers, long-lived workers and (in a build made with

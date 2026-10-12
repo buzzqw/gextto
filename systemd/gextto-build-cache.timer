@@ -1,0 +1,15 @@
+[Unit]
+Description=Gextto: periodic Go build cache refresh
+
+[Timer]
+# Weekly is enough: the cache only grows with real builds, and the service
+# itself does nothing when the cache is still under the limit.
+OnCalendar=weekly
+# If the machine was off at the scheduled time, run once after boot.
+Persistent=true
+# Spread the (rare) rebuild so it does not always hit at the same minute.
+RandomizedDelaySec=1h
+Unit=gextto-build-cache.service
+
+[Install]
+WantedBy=timers.target
