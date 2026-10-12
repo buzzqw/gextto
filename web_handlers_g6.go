@@ -277,21 +277,6 @@ func gh6_effectiveDownloadForRatio(torrent models.TorrentView) float64 {
 	return 0
 }
 
-func gh6_torrentFilesAreDisposable(db *Database, hash string) bool {
-	meta, err := db.TorrentMeta(hash)
-	if err != nil || meta == nil {
-		return false
-	}
-	if !meta.Release.IsPack {
-		return false
-	}
-	status, err := db.TorrentStatus(hash)
-	if err != nil || status == nil {
-		return false
-	}
-	return *status == "completed"
-}
-
 func gh6_countIpfilterRules(path string) int {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -1022,18 +1007,18 @@ func RemoveCompletedTorrents(w http.ResponseWriter, r *http.Request, s *AppState
 			removedNames = append(removedNames, label)
 			continue
 		}
-		deleteFiles := input.DeleteFiles || gh6_torrentFilesAreDisposable(s.db, torrent.Hash)
+		// "Pulisci completati" only drops the finished torrents from the session.
+		// Deleting or trashing their files can be a huge cross-filesystem copy (a
+		// pack can be tens of GB) and blocked the request for minutes, so the
+		// button looked like it did nothing. Files are reclaimed by the automatic
+		// removal and by an explicit "remove and delete the files".
+		deleteFiles := input.DeleteFiles
 		source := CompletionPath(&models.TorrentEvent{
 			Kind:     "torrent_finished",
 			Hash:     torrent.Hash,
 			Name:     torrent.Name,
 			SavePath: torrent.SavePath,
 		})
-		if deleteFiles && !input.DeleteFiles {
-			if !tev_completedSourceDisposable(s.db, torrent.Hash, torrent.SavePath) {
-				deleteFiles = false
-			}
-		}
 		if deleteFiles && cfg.TrashPath != nil && strings.TrimSpace(*cfg.TrashPath) != "" && cfg.CleanupAction != "delete" {
 			if _, statErr := os.Stat(source); statErr == nil {
 				if target, moveErr := MoveToTrash(source, *cfg.TrashPath); moveErr != nil {
