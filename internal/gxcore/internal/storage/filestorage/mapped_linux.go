@@ -20,11 +20,21 @@ func unmapFile(b []byte) error {
 	return unix.Munmap(b)
 }
 
-func syncMapped(b []byte) error {
-	if len(b) == 0 {
+// syncMappedRange flushes [begin, end) of the mapping to disk. msync requires
+// the address to be page-aligned, so the range is widened to page boundaries
+// (the mapping base is page-aligned, so the shifted slice stays aligned) and
+// clamped to the mapping.
+func syncMappedRange(data []byte, begin, end int64) error {
+	if len(data) == 0 || begin >= end {
 		return nil
 	}
-	return unix.Msync(b, unix.MS_SYNC)
+	page := int64(os.Getpagesize())
+	begin = max(begin/page*page, 0)
+	end = min((end+page-1)/page*page, int64(len(data)))
+	if begin >= end {
+		return nil
+	}
+	return unix.Msync(data[begin:end], unix.MS_SYNC)
 }
 
 // dataSync flushes file data (not metadata) to stable storage.
