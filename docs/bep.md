@@ -103,101 +103,18 @@ Legenda stato: **sì** = implementato e testato; **parziale** = solo una parte;
 
 ## Residui e roadmap
 
-1. **BEP 21 — fatta.** Lato peer: `upload_only` nell'extension handshake, inviato
-   alla connessione e rinviato quando si diventa seed (pieno o parziale). Lato
-   tracker: ogni announce di un **seed parziale** (tutti i pezzi *voluti*
-   presenti, torrent non intero) porta `event=paused` (`announcer` +
-   `tracker.EventPaused`). Il campo `downloaders` dello scrape resta opzionale
-   (dipende dal tracker, che deve esporlo).
-2. **BEP 54 — `lt_donthave` — fatta (ricezione).** `lt_donthave` è nel dizionario
-   `m` dell'extension handshake; un messaggio `DontHave` in arrivo (`op 20`,
-   subop, indice a 4 byte) azzera il bit del pezzo nel bitfield del peer e la sua
-   disponibilità nel picker; senza Fast Extension viene cancellato anche il
-   download attivo di quel pezzo da quel peer. Il lato **invio** non serve
-   (gx-core non scarta pezzi di torrent attivi).
-3. **Magnet `xs=`/`as=`** (convenzione Magnet URI, **non** BEP 53): **fatti.**
-   `xs=` (sorgente esatta) e `as=` (sorgente accettabile) sono letti in
-   `magnet.ExactSources`/`AcceptableSources`; `Session.addMagnet` prova a
-   scaricare il `.torrent` da quegli URL (prima gli esatti, poi gli accettabili)
-   e lo usa **solo se l'info hash corrisponde**, altrimenti ricade nel download
-   dei metadati via sciame/DHT. `so=` (BEP 53) e `ws=` (web seed, con
-   persistenza nel resume) erano già fatti.
-4. **BEP 44 — client iterativo uscente + BEP 46 — fatti.** Il DHT ha un client
-   uscente (`bep44_client.go`): `GetImmutable`/`GetMutable` fanno una traversal
-   bounded sui nodi più vicini, `PublishImmutable`/`PublishMutable` raccolgono i
-   token con una `get` e poi pubblicano con `put`. La **BEP 46** è cablata: un
-   magnet `xs=urn:btpk:<pubkey>` (con eventuale `s=<salt>`) risolve l'info hash
-   dall'item mutabile all'aggiunta (`Session.addMagnet`).
-5. **BEP 45 (DHT multi-address)** e **BEP 51 (`sample_infohashes`)**: marginali
+1. **BEP 45 (DHT multi-address)** e **BEP 51 (`sample_infohashes`)**: marginali
    per un client domestico/NAS (multi-interfaccia; indicizzazione per crawler).
-6. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
+2. **Throughput 10 Gbps (pipelining)**: la coda richieste adattiva esiste già;
    ogni modifica va **misurata prima e dopo** (CPU, RAM, throughput), come da
    regola performance di `AGENTS.md`.
-7. **BEP 38 — `similar`/`collections` — parziale.** Gli hint sono letti dal
+3. **BEP 38 — `similar`/`collections` — parziale.** Gli hint sono letti dal
    dizionario info **e** dal livello superiore (uniti, deduplicati), riemessi
    nell'export del `.torrent` e mostrati insieme ai torrent locali che
    condividono un hint (API `GET /api/v1/torrents/{hash}/collections`, pagina
    del demone, dettaglio in Gextto). Il **riuso effettivo dei blocchi** — il
    vero guadagno del BEP — è lo **Swarm Merging** (`evoluzione.md` §15.2): qui
    c'è solo la scoperta dei candidati.
-8. **BEP 31 — `retry in` — fatta.** Il valore in minuti (HTTP e UDP, announce e
-   scrape) rinvia il prossimo annuncio; `"never"` scarta il tracker dal tier per
-   sempre (`tracker.Tier`), senza fermare gli altri tracker dello stesso tier.
-
-## Revisione del 2026-10-12
-
-Revisione del lavoro BEP dei giorni precedenti (commit 48eb417, 9e50b76,
-aa686ec, 145eb98, c64d248, a8fd3e2, d53d71a, 7d13243, 7cad4cc, 672d06b). Esito:
-
-- **BEP 42, campo `ip` (bug).** Letto e scritto *dentro* il dizionario `r`, mentre
-  la specifica (e libtorrent/qBittorrent, la quasi totalità della rete) lo vuole
-  al primo livello della risposta. Sul nodo reale: 745 nodi, 666 `ip` inviati,
-  **0 osservazioni** ricevute, quindi porta riflessa e tipo di NAT non venivano
-  mai rilevati. Ora `replyMessage.IP`/`responseType.IP` di primo livello (`r.ip`
-  letto ancora come ripiego); dopo il riavvio 89 osservazioni in pochi minuti,
-  porta riflessa e NAT *cone* rilevati.
-- **BEP 5, `announce_peer` con porta non valida.** Porta 0 (senza
-  `implied_port`) o oltre 65535 veniva memorizzata e servita agli altri nodi come
-  peer: ora non viene memorizzata (la query riceve comunque risposta).
-- **BEP 44, pubblicazione.** Il `put` partiva verso ogni nodo che rispondeva con
-  un token durante la traversal (fino a 32, anche lontani); ora i token si
-  raccolgono e alla chiusura il `put` va agli 8 più vicini per distanza XOR.
-- **BEP 46 / magnet `xs=`/`as=`, disponibilità.** Il demone chiamava `AddURI`
-  tenendo il lock globale: la risoluzione DHT (fino a 10 s) o il download del
-  `.torrent` da una sorgente lenta bloccavano API, pagina e coda. Ora l'aggiunta
-  gira senza lock (gli id in aggiunta sono esclusi dal ciclo della coda).
-- **BEP 53, `so=` (bug di sicurezza).** Un intervallo che termina al massimo
-  intero faceva girare il parser **all'infinito** (overflow del contatore) e molti
-  intervalli potevano espandersi a centinaia di milioni di indici: ora indice
-  massimo 1.048.575 e al più 65.536 indici, con ciclo senza overflow.
-- **BEP 9, `ut_metadata`.** Un blocco ricevuto due volte contava due volte e
-  faceva risultare finito un download di metadati incompleto (poi scartato
-  dall'hash): ora i duplicati sono ignorati.
-- **BEP 54, `lt_donthave`.** Dopo un DontHave si ricalcola l'interesse verso il
-  peer (prima restavamo *interested* anche senza più nulla da chiedere);
-  `updateInterestedState` ora tollera un peer senza bitfield.
-- **Swarm Merging.** Un candidato senza bitfield (in allocazione o verifica)
-  veniva letto e hashato per intero senza poter dare alcun pezzo: ora si salta.
-
-Verificati e corretti senza modifiche: BEP 11 (solo `added`/`added6` come
-candidati), BEP 9 (offset a 64 bit, `metadata_size` limitato a 30 MB), BEP 31
-(`never` gestito anche per tracker singoli, sempre avvolti in un `Tier`), BEP 38
-(parsing robusto), BEP 21 (`paused` = 4 anche verso i tracker UDP, come
-libtorrent), binding dei token all'info-hash (coerente con libtorrent, nessun
-problema di interoperabilità), firma BEP 44 (`seq` int64, chiavi ordinate nella
-ricodifica).
-
-**Protezione SSRF (fatta lo stesso giorno).** `xs=`/`as=` e i web seed (`ws=` dei
-magnet e `url-list` dei `.torrent`) sono URL scelti da chi crea il torrent, anche
-da un feed non fidato: di default **non possono raggiungere indirizzi privati**
-(RFC 1918, loopback, link-local, CGNAT, ULA IPv6, multicast…). Il nome viene
-risolto e la connessione va all'IP verificato, quindi un rebinding DNS non aggira
-il controllo, anche con proxy o interfaccia VPN (`netx.DialPublic`,
-`netx.CheckPublicTCPAddr`). Chi ha davvero un web seed in LAN abilita
-`web-sources-allow-private` (flag, `GX_TORRENT_WEB_SOURCES_ALLOW_PRIVATE`,
-`settings.json` o casella in *Impostazioni → Rete*; nel motore
-`Config.WebSourcesAllowPrivate`). Il link `.torrent` incollato dall'operatore
-resta libero.
 
 ## Manutenzione
 
