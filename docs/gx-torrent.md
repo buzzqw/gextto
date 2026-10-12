@@ -527,7 +527,10 @@ feed**: vengono interrogati gli indexer e i feed RSS già configurati e la pagin
 propone i **nomi trovati** (filtrati per lingua/qualità già inserite), da
 scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separatori,
 quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
-**AND**.
+**AND**. Il risultato dice anche **da dove arrivano i nomi** (`Indexer: N ·
+Feed: M`), oppure *Nessun indexer configurato* o l'errore dell'indexer: così si
+distingue subito un indexer assente o che non risponde dai soli risultati dei
+feed.
 
 Il demone, a ogni ciclo, cerca ogni titolo negli indexer e nei feed RSS (anche
 senza alcun feed configurato: bastano gli indexer) e prende

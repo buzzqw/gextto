@@ -89,6 +89,18 @@ func (d *Daemon) handleUIWanted(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/ui/rss", http.StatusSeeOther)
 }
 
+// wantedSearchResult is the answer of the wanted-title search step: the series
+// names found, plus where they came from. The counts let the page say whether
+// the indexers were queried (and whether they answered) instead of leaving the
+// operator guessing why only feed names showed up.
+type wantedSearchResult struct {
+	Names        []string `json:"names"`
+	Indexers     int      `json:"indexers"`
+	IndexerHits  int      `json:"indexer_hits"`
+	FeedHits     int      `json:"feed_hits"`
+	IndexerError string   `json:"indexer_error,omitempty"`
+}
+
 // handleUIWantedSearch searches the indexers and the configured RSS feeds for
 // candidate series, applying the language/quality filters typed so far.
 func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
@@ -103,19 +115,28 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	langFilters := splitList(r.URL.Query().Get("language"))
 	qualityFilter := strings.TrimSpace(r.URL.Query().Get("quality"))
 	if len([]rune(query)) < 2 {
-		writeJSON(w, http.StatusOK, []string{})
+		writeJSON(w, http.StatusOK, wantedSearchResult{Names: []string{}})
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), indexerSearchTimeout)
 	defer cancel()
 
+	result := wantedSearchResult{Names: []string{}}
 	var items []rss.Item
-	if len(d.indexers()) > 0 {
-		found, _ := d.searchFeedSuggest(ctx, query)
+	result.Indexers = len(d.indexers())
+	if result.Indexers > 0 {
+		found, err := d.searchFeedSuggest(ctx, query)
+		if err != nil {
+			result.IndexerError = err.Error()
+		}
+		result.IndexerHits = len(found)
 		items = append(items, found...)
 	}
-	items = append(items, d.wantedRSSItems(ctx)...)
-	writeJSON(w, http.StatusOK, filterSuggestions(items, langFilters, qualityFilter, 20))
+	feedItems := d.wantedRSSItems(ctx)
+	result.FeedHits = len(feedItems)
+	items = append(items, feedItems...)
+	result.Names = filterSuggestions(items, langFilters, qualityFilter, 20)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // wantedRSSItems fetches the items of every configured RSS feed (not the search

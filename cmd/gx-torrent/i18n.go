@@ -719,6 +719,8 @@ var uiClientKeys = []string{
 	"Delete the items found more than this many days ago?",
 	"Searching the indexers…",
 	"No indexers configured",
+	"Indexer",
+	"Feed",
 }
 
 // uiLangIndex maps a language code to its column in uiCatalog.
