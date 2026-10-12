@@ -366,7 +366,13 @@ directory del server e un pulsante *Sfoglia* le fa scegliere, senza digitare il
 percorso), porta peer con **test di raggiungibilità** (`/api/v1/portcheck`:
 esito, metodo UPnP/NAT-PMP, IP esterno), **limiti di banda** globali
 (download/upload in KiB/s, 0 = illimitato), utente e password, "LAN senza
-password" e indexer facoltativi. Il campo **Indexer** è una tendina dei prodotti
+password" e indexer facoltativi. Le due cartelle sono **precompilate** con due
+sottocartelle della directory che contiene il binario del demone (la cartella
+principale prende il nome dalla lingua scelta — `download` in inglese, `scarico`
+in italiano, `telechargements`, `descargas`, `pobrane`; quella temporanea è
+sempre `download-temp`): sono solo proposte, accettabili, modificabili o
+svuotabili, così un'installazione da archivio tiene i download accanto a sé. Il
+campo **Indexer** è una tendina dei prodotti
 già supportati (Prowlarr, Jackett, MIRCrew, altre): scegliendo Prowlarr o
 Jackett l'URL viene precompilato con il loro solito indirizzo locale e porta
 (`127.0.0.1:9696` / `127.0.0.1:9117`), comunque modificabile. Il wizard scrive

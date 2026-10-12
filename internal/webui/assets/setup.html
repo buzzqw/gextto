@@ -37,8 +37,8 @@ h2{margin:0 0 6px}h3{margin:18px 0 0;font-size:14px;color:#93a1b5;text-transform
 <option value="es">Español</option>
 <option value="pl">Polski</option>
 </select></label>
-<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" placeholder="/srv/media/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
-<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" placeholder="/var/tmp/gx-torrent" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+<label>Download folder<span class="field-row"><input type="text" name="download-dir" id="download-dir" value="{{DOWNLOAD_DIR}}" placeholder="/srv/media/downloads" autocomplete="off" title="Main folder for completed downloads"><button type="button" class="browse" data-target="download-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
+<label>Temporary folder<span class="field-row"><input type="text" name="temp-dir" id="temp-dir" value="{{TEMP_DIR}}" placeholder="/var/tmp/gx-torrent" autocomplete="off" title="Temporary folder for incomplete downloads"><button type="button" class="browse" data-target="temp-dir" title="Choose an existing folder on the server">Browse…</button></span></label>
 <h3>Access</h3>
 <label>Username<input type="text" name="user" value="admin" autocomplete="username" title="Admin username for web interface login"></label>
 <label>Password<input type="password" name="password" autocomplete="new-password" title="Password for web interface login"></label>

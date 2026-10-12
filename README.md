@@ -304,7 +304,9 @@ Mode. Only gx-torrent runs on Windows; Gextto itself remains Linux-only.
 
 **First run.** Open `http://<host>:8890/`: the wizard guides you through
 language, download and temporary folders (with a **folder picker** browsing the
-server), peer port with a reachability test, global bandwidth limits, user and
+server; both are pre-filled with two subfolders of the daemon's own directory —
+`download`/its word in the chosen language and `download-temp` — ready to accept
+or change), peer port with a reachability test, global bandwidth limits, user and
 password, LAN access and optional indexers. Choosing Prowlarr or Jackett fills
 the indexer URL with its usual local address and port (still editable); any
 other Torznab service is added as a custom type. The page links to

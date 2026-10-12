@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +22,18 @@ import (
 const (
 	setupCompleteKey = "setup-complete"
 	setupPath        = "/ui/setup"
+
+	// setupTempFolderName is the name the wizard proposes for the temporary
+	// (incomplete) downloads folder. It is the same in every language so the
+	// path stays predictable when the interface language changes later.
+	setupTempFolderName = "download-temp"
+)
+
+// setupDirToken and setupTempToken are placeholders in assets/setup.html that
+// renderSetup fills with the proposed storage folders.
+const (
+	setupDirToken  = "{{DOWNLOAD_DIR}}"
+	setupTempToken = "{{TEMP_DIR}}"
 )
 
 // setupComplete reports whether the standalone wizard has run. With no settings
@@ -180,6 +193,52 @@ func (d *Daemon) handleUISetup(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// setupDefaultDirs returns the folders the wizard proposes for the first run:
+// two subfolders of the directory that holds the daemon binary, so a standalone
+// install keeps its downloads next to itself and the operator does not have to
+// type a path. The main folder name follows the interface language (download,
+// scarico, …); the temporary one is always "download-temp". Empty strings mean
+// "no proposal" and leave the field blank.
+func setupDefaultDirs(lang string) (download, temp string) {
+	base := daemonDir()
+	if base == "" {
+		return "", ""
+	}
+	return filepath.Join(base, setupDownloadFolderName(lang)), filepath.Join(base, setupTempFolderName)
+}
+
+// daemonDir is the directory that holds the running daemon binary, with symlinks
+// resolved so a packaged install points at its real folder. It is empty when the
+// path cannot be determined.
+func daemonDir() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = resolved
+	}
+	return filepath.Dir(exe)
+}
+
+// setupDownloadFolderName is the localized name of the main download folder:
+// plain "download" for English and the languages where the word is used as-is,
+// a local word otherwise.
+func setupDownloadFolderName(lang string) string {
+	switch lang {
+	case "it":
+		return "scarico"
+	case "fr":
+		return "telechargements"
+	case "es":
+		return "descargas"
+	case "pl":
+		return "pobrane"
+	default:
+		return "download"
+	}
+}
+
 // renderSetup writes the wizard page, localized like the daemon page.
 func (d *Daemon) renderSetup(w http.ResponseWriter, r *http.Request, errKey string) {
 	page := assets.SetupPage()
@@ -193,6 +252,12 @@ func (d *Daemon) renderSetup(w http.ResponseWriter, r *http.Request, errKey stri
 		page = strings.Replace(page, `lang="en"`, `lang="`+lang+`"`, 1)
 	}
 	page = uiTranslateHTML(page, uiDictionary(lang))
+	// Propose the storage folders (subfolders of the daemon's own directory):
+	// pre-filled only, so the operator can accept, change or clear them. Fill the
+	// tokens after translation, escaping every value as an HTML attribute.
+	download, temp := setupDefaultDirs(lang)
+	page = strings.Replace(page, setupDirToken, html.EscapeString(download), 1)
+	page = strings.Replace(page, setupTempToken, html.EscapeString(temp), 1)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write([]byte(page))

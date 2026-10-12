@@ -311,8 +311,10 @@ resta solo Linux.
 
 **Primo avvio.** Apri `http://<host>:8890/`: il wizard guida lingua, cartelle
 di download e temporanea (con un **selettore di cartelle** che sfoglia il
-server), porta peer con test di raggiungibilità, limiti di banda globali, utente
-e password, accesso dalla LAN e indexer facoltativi. Scegliendo Prowlarr o
+server; entrambe sono precompilate con due sottocartelle della directory del
+demone — `scarico`/il termine della lingua scelta e `download-temp` — pronte da
+accettare o cambiare), porta peer con test di raggiungibilità, limiti di banda
+globali, utente e password, accesso dalla LAN e indexer facoltativi. Scegliendo Prowlarr o
 Jackett l'URL dell'indexer viene riempito con il suo solito indirizzo locale e
 porta (comunque modificabile); ogni altro servizio Torznab si aggiunge come tipo
 personalizzato. La pagina collega a **RSS e indexer**, dove si gestiscono senza

@@ -149,6 +149,54 @@ func TestSetupPageOffersPortTestAndBandwidth(t *testing.T) {
 	}
 }
 
+func TestSetupProposesDaemonFolderDefaults(t *testing.T) {
+	base := daemonDir()
+	if base == "" {
+		t.Skip("cannot resolve the test binary directory")
+	}
+	for _, tc := range []struct{ lang, folder string }{
+		{"en", "download"},
+		{"it", "scarico"},
+		{"de", "download"},
+		{"fr", "telechargements"},
+		{"es", "descargas"},
+		{"pl", "pobrane"},
+		{"", "download"},
+	} {
+		download, temp := setupDefaultDirs(tc.lang)
+		if want := filepath.Join(base, tc.folder); download != want {
+			t.Errorf("setupDefaultDirs(%q) download = %q, want %q", tc.lang, download, want)
+		}
+		if want := filepath.Join(base, setupTempFolderName); temp != want {
+			t.Errorf("setupDefaultDirs(%q) temp = %q, want %q", tc.lang, temp, want)
+		}
+	}
+}
+
+func TestSetupPagePrefillsDaemonFolders(t *testing.T) {
+	base := daemonDir()
+	if base == "" {
+		t.Skip("cannot resolve the test binary directory")
+	}
+	d := standaloneTestDaemon(t, "", true)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8890/ui/setup?lang=it", nil)
+	d.handleUISetup(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, setupDirToken) || strings.Contains(body, setupTempToken) {
+		t.Fatal("the wizard left an unfilled folder token in the page")
+	}
+	if want := `value="` + filepath.Join(base, "scarico") + `"`; !strings.Contains(body, want) {
+		t.Errorf("the download field is not pre-filled with %q", want)
+	}
+	if want := `value="` + filepath.Join(base, setupTempFolderName) + `"`; !strings.Contains(body, want) {
+		t.Errorf("the temp field is not pre-filled with %q", want)
+	}
+}
+
 func TestSetupRejectsRelativeFolder(t *testing.T) {
 	d := standaloneTestDaemon(t, "", true)
 	rec := setupPost(t, d, url.Values{"download-dir": {"relative/path"}, "lang": {"en"}})

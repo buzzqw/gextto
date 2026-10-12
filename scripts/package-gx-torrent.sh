@@ -191,7 +191,7 @@ Or using the binary directly:
 Open your browser at `http://<server-ip>:8890/`.
 On the first launch, the interactive **Setup Wizard** guides you through:
 1. **Interface Language**: Select English, Italian, German, French, Spanish, or Polish.
-2. **Storage Paths**: Configure the default download folder and temporary incomplete folder.
+2. **Storage Paths**: The default download folder and the temporary (incomplete) folder are pre-filled with two subfolders of the directory that holds the daemon binary (`download`, or its word in the chosen language, and `download-temp`); accept them or point the fields at your own paths.
 3. **Connectivity & Port Test**: Select the incoming peer port (default `6881`) and run the built-in reachability test to verify router port forwarding (UPnP / NAT-PMP).
 4. **Global Bandwidth Limits**: Set optional download and upload rate limits.
 5. **Security & Authentication**: Set the admin username and password. You can optionally allow password-free access from the local area network (LAN).
