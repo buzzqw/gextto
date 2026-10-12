@@ -169,6 +169,7 @@ func (d *Daemon) applyCache(cfg *torrent.Config) {
 	cfg.WriteCacheSize = d.cacheWrite
 	cfg.ReadCacheTTL = time.Duration(d.state.Config.CacheTTLSecs) * time.Second
 	cfg.Preallocate = d.state.Config.Preallocate
+	cfg.Mmap = d.opts.Mmap
 }
 
 func (d *Daemon) downloadDir() string {

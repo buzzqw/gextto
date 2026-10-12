@@ -211,6 +211,7 @@ func main() {
 	ipFilterSource := flag.String("ipfilter-source", envOr("GX_TORRENT_IPFILTER_SOURCE", ""), "IP filter URL or path configured in Gextto, prefilled in the web page")
 	gexttoLog := flag.String("gextto-log", envOr("GX_TORRENT_GEXTTO_LOG", ""), "Gextto log file shown in the web page's Gextto log tab")
 	notify := flag.String("notify-url", envOr("GX_TORRENT_NOTIFY_URL", ""), "webhook URL posted on feed match/error (empty = disabled)")
+	mmapStorage := flag.Bool("mmap", envBool("GX_TORRENT_MMAP", false), "serve torrent files from a shared memory mapping (Linux, experimental): writes are page-cache memcpy and reads avoid a syscall")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -329,6 +330,7 @@ func main() {
 		IPFilterSource: strings.TrimSpace(*ipFilterSource),
 		Lang:           langValue,
 		NotifyURL:      notifyURLValue,
+		Mmap:           *mmapStorage,
 		Tick:           3 * time.Second,
 		ProbeWindow:    15 * time.Minute,
 	}

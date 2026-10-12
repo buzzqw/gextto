@@ -172,4 +172,3 @@ func TestWantedQualityMatch(t *testing.T) {
 		}
 	}
 }
-

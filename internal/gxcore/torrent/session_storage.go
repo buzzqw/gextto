@@ -14,6 +14,8 @@ type fileStorageProvider struct {
 	FilePermissions          fs.FileMode
 	// Preallocate reserves the full size of new files.
 	Preallocate bool
+	// Mmap serves the files from a shared memory mapping (Linux).
+	Mmap bool
 }
 
 func newFileStorageProvider(cfg *Config) *fileStorageProvider {
@@ -22,6 +24,7 @@ func newFileStorageProvider(cfg *Config) *fileStorageProvider {
 		DataDirIncludesTorrentID: cfg.DataDirIncludesTorrentID,
 		FilePermissions:          cfg.FilePermissions,
 		Preallocate:              cfg.Preallocate,
+		Mmap:                     cfg.Mmap,
 	}
 }
 
@@ -31,6 +34,7 @@ func (p *fileStorageProvider) GetStorage(torrentID string) (storage.Storage, err
 		return nil, err
 	}
 	sto.Preallocate = p.Preallocate
+	sto.Mmap = p.Mmap
 	return sto, nil
 }
 

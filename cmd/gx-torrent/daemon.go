@@ -62,7 +62,10 @@ type Options struct {
 	Lang string
 	// NotifyURL is a webhook posted (JSON) on feed match/error. Empty disables
 	// notifications.
-	NotifyURL   string
+	NotifyURL string
+	// Mmap serves torrent files from a shared memory mapping (Linux), so piece
+	// writes are asynchronous page-cache writes. Experimental/opt-in.
+	Mmap        bool
 	Tick        time.Duration
 	ProbeWindow time.Duration
 }

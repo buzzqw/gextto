@@ -247,4 +247,3 @@ func TestPortCheckCustomPort(t *testing.T) {
 		t.Fatalf("expected portdot in ui port check response, got %s", uiBody)
 	}
 }
-

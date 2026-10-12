@@ -959,6 +959,13 @@ usare valori fissi.
   `fallocate`; i file esclusi dalla selezione restano sparsi, e su tmpfs (RAM
   disk) restano sparsi sempre: riservarli toglierebbe subito tutta la loro
   dimensione alla RAM.
+- **`-mmap`** (sperimentale, Linux): i file del torrent vengono serviti da una
+  **mappatura in memoria condivisa** invece che con `read`/`write`. Le scritture
+  dei pezzi diventano copie nella page cache (writeback asincrono del kernel) e le
+  letture evitano la syscall: benchmark `filestorage` su tmpfs ~7,0 GB/s contro
+  ~5,9 GB/s di `pwrite`. È **opt-in** (anche `GX_TORRENT_MMAP=1`) perché mappa
+  ogni file aperto: con torrent da migliaia di file si avvicina al limite
+  `vm.max_map_count`. Fuori da Linux è ignorato (si usano file normali).
 - **"Ottimizza impostazioni"**: con gx-torrent riporta la cache in automatico e
   la applica subito.
 - La dimensione della cache cambia a caldo; scadenza della cache e

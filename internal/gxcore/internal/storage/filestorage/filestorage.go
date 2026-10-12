@@ -13,8 +13,13 @@ import (
 type FileStorage struct {
 	// Preallocate reserves the full size of new files.
 	Preallocate bool
-	dest        string
-	perm        fs.FileMode
+	// Mmap serves the files from a shared memory mapping (Linux): writes are
+	// memcpy into the page cache, with the kernel writeback asynchronous, and
+	// reads avoid a syscall. It falls back to plain OS files elsewhere or when
+	// the mapping cannot be created.
+	Mmap bool
+	dest string
+	perm fs.FileMode
 }
 
 // New returns a new FileStorage at the destination.
@@ -42,16 +47,21 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 		return
 	}
 
-	// Make sure OS file is closed in case of any error.
+	// Make sure OS file is closed in case of any error, and wrap the result:
+	// mmap-backed when requested (Linux), otherwise fdatasync-backed.
 	var of *os.File
 	defer func() {
 		if err == nil && of != nil {
 			err = disableReadAhead(of)
 		}
-		if err != nil && of != nil {
-			_ = of.Close()
-		} else {
-			f = of
+		if err != nil {
+			if of != nil {
+				_ = of.Close()
+			}
+			return
+		}
+		if of != nil {
+			f = s.wrap(of, size)
 		}
 	}()
 
@@ -93,3 +103,17 @@ func (s *FileStorage) Open(name string, size int64) (f storage.File, exists bool
 func (s *FileStorage) RootDir() string {
 	return s.dest
 }
+
+// wrap returns the storage.File for an opened OS file: an mmap-backed file when
+// Mmap is set (Linux; it falls back to the OS file elsewhere or on failure),
+// otherwise a plain OS file whose Sync uses fdatasync.
+func (s *FileStorage) wrap(of *os.File, size int64) storage.File {
+	if s.Mmap && size > 0 && size <= int64(maxInt()) {
+		if data, err := mapFile(of, int(size)); err == nil {
+			return &mmapFile{f: of, data: data}
+		}
+	}
+	return osFile{of}
+}
+
+func maxInt() int { return int(^uint(0) >> 1) }

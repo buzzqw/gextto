@@ -87,6 +87,10 @@ type Config struct {
 	// Preallocate reserves the full size of new files instead of creating
 	// them sparse.
 	Preallocate bool `yaml:"preallocate"`
+	// Mmap serves torrent files from a shared memory mapping on Linux: writes
+	// become asynchronous page-cache writes (memcpy) and reads avoid a
+	// syscall. It falls back to plain files elsewhere or on mapping failure.
+	Mmap bool `yaml:"mmap"`
 	// OutgoingInterface binds every outgoing connection to an interface name
 	// or local IPv4 (VPN killswitch): when it has no address,
 	// nothing is sent.

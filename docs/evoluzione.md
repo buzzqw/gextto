@@ -1077,7 +1077,7 @@ Fonti: [`internal/gxcore/GEXTTO.md`](../internal/gxcore/GEXTTO.md),
 | --- | --- | --- | --- |
 | Choking / seeding | choking rate-based, anti-leech, peer classes | speed-based + optimistic, harness deterministico (`unchoker/sim_test.go`) | algoritmi di qualità assenti; misure **solo locali** (§6.6) |
 | Pipelining | multi-pezzo per peer, ring buffer | coda adattiva (50→250), un pezzo per peer | 10 Gbps dato per «da misurare» (`bep.md` §6); **nessun harness** |
-| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | **`O_SYNC` rimosso (2026-10-12)**: `storage.File.Sync()` + invariante snapshot→fsync→bitfield e `updateStats` in due fasi; restano niente mmap/AIO/contiguo | ridotto (§5.4) |
+| I/O disco | mmap, storage pluggable, O_DIRECT/AIO, scritture contigue + hash su pool | **`O_SYNC` rimosso, `fdatasync`, mmap opt-in (2026-10-12)**; restano niente O_DIRECT/io_uring/contiguo esplicito (analisi: la page cache già coalesce e Go già sovrappone I/O) | ridotto (§5.4) |
 | Priorità file | 0–7 graduate | **fatte (0 = salta, 1..4 = normale, 5..7 = alta)**; `capabilityLevels.file_priorities = full`; misura con file misti da fare (§4.11) | chiuso (misura residua) |
 | DHT | multi-path, anti-Sybil attivo | BEP 5/32/33/42/43/44/46, dedup; cap e multi-path spenti | hardening **non attivo** (§4.10) |
 | v2 / merge | seed v2 completo, riuso per blocco | v2-only download; seed v2 solo file interi (`hash reject`); merge fase 1 | seed v2 incompleto, merge fase 2 (§15.2) |
@@ -1197,6 +1197,28 @@ coperto dai test del demone. Progetto storico: estendere l'interfaccia con
 (niente transazione Bolt aperta durante gli fsync) — tutto applicato. Misura
 vedi §5.10: su questo host il guadagno stimato era ~1,2x–1,8x su NFS (non il
 "+300–800%" della v1).
+
+**Seguito — mmap, `fdatasync`, AIO (2026-10-12).**
+- **`fdatasync`** invece di `fsync` per i dati dei pezzi (`osFile.Sync` su
+  Linux): non serve flushare i metadati, il file è già dimensionato.
+- **mmap opt-in** (`-mmap`, `Config.Mmap`): `filestorage` serve i file da una
+  mappatura condivisa; `WriteAt` è una copia in page cache (writeback asincrono,
+  nessun `pwrite`), `ReadAt` una copia dalla page cache, `Sync` un `msync`.
+  Benchmark su tmpfs: **~7,0 GB/s** contro **~5,9 GB/s** di `pwrite`
+  (`BenchmarkStorageWrite{,Mmap}`). Caveat: mappa ogni file aperto, quindi
+  sconsigliato con torrent da migliaia di file (`vm.max_map_count`); fuori da
+  Linux è ignorato.
+- **AIO (io_uring): non aggiunto di proposito.** Il motore scrive i pezzi da
+  goroutine (pipeline `piecewriter` + `fadvise`/`fallocate`) e con mmap la
+  scrittura è già asincrona via writeback del kernel; Go non espone io_uring
+  senza dipendenza o cgo. Senza una misura che mostri un guadagno reale,
+  introdurre io_uring violerebbe la regola "niente codice speculativo" e
+  rischierebbe regressioni. La voce "AIO" della §4.12 è quindi coperta dal
+  percorso asincrono esistente + mmap, non da io_uring.
+- **Scritture contigue:** ogni pezzo è già scritto con una singola `WriteAt`
+  (fino a 2 MiB contigui) e la page cache unisce i writeback adiacenti; un
+  buffer di coalescing esplicito non ha mostrato necessità, quindi non è stato
+  aggiunto (misura prima/dopo non disponibile a favore).
 
 ### 5.5 Voce 4 — MSE `StreamWriter` in-place (fatta)
 
