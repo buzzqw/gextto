@@ -135,7 +135,7 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	feedItems := d.wantedRSSItems(ctx)
 	result.FeedHits = len(feedItems)
 	items = append(items, feedItems...)
-	result.Names = filterSuggestions(items, langFilters, qualityFilter, 20)
+	result.Names = filterSuggestions(query, items, langFilters, qualityFilter, 20)
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -160,13 +160,29 @@ func (d *Daemon) wantedRSSItems(ctx context.Context) []rss.Item {
 	return out
 }
 
+// titleHasAllTerms reports whether the lower-cased title contains every term.
+func titleHasAllTerms(lowerTitle string, terms []string) bool {
+	for _, term := range terms {
+		if term != "" && !strings.Contains(lowerTitle, term) {
+			return false
+		}
+	}
+	return true
+}
+
 // filterSuggestions reduces release titles to unique series names whose title
-// contains every include term, most frequent first.
-func filterSuggestions(items []rss.Item, includeLang []string, quality string, limit int) []string {
+// contains every word of the query and every include term, most frequent first.
+// The query matters because the RSS feeds hand over their whole current content,
+// not a search: without it the suggestions list unrelated series of the feeds.
+func filterSuggestions(query string, items []rss.Item, includeLang []string, quality string, limit int) []string {
+	terms := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
 	counts := map[string]int{}
 	var names []string
 	for _, item := range items {
 		title := strings.ToLower(item.Title)
+		if !titleHasAllTerms(title, terms) {
+			continue
+		}
 		ok := true
 		for _, term := range includeLang {
 			if term = strings.ToLower(strings.TrimSpace(term)); term != "" && !strings.Contains(title, term) {

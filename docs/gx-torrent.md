@@ -528,7 +528,9 @@ tra *Any*, *360p*, *480p*, *576p*, *720p*, *720p+*, *720p-1080p*, *1080p*,
 *1080p+*, *2160p 4K*, *2160p+ 4K+*), esclusi, filtro episodi, categoria
 e percorso. Si aggiunge a mano, oppure si scrive un nome e si preme **Cerca nei
 feed**: vengono interrogati gli indexer e i feed RSS già configurati e la pagina
-propone i **nomi trovati** (filtrati per lingua/qualità già inserite), da
+propone i **nomi trovati** (filtrati per lingua/qualità già inserite e per le
+parole cercate: i feed consegnano tutto il loro contenuto attuale, non una
+ricerca, quindi i loro nomi estranei alla query non compaiono), da
 scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separatori,
 quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
 **AND**. Il risultato dice anche **da dove arrivano i nomi** (`Indexer: N ·

@@ -81,3 +81,50 @@ func TestUIWantedSearchReportsWhenNoIndexerIsConfigured(t *testing.T) {
 		t.Fatalf("no indexer expected: %+v", result)
 	}
 }
+
+// TestUIWantedSearchKeepsOnlyQueryMatches: the RSS feeds hand over their whole
+// current content, so their unrelated series must not appear among the
+// suggestions of "mandalorian" (they used to, and looked like a broken search).
+func TestUIWantedSearchKeepsOnlyQueryMatches(t *testing.T) {
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(wantedIndexerFeed))
+	}))
+	defer indexer.Close()
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Arcane S01E01 1080p ITA WEB-DL</title><link>http://t/a.torrent</link></item>
+<item><title>Silo S02E03 1080p ITA WEB-DL</title><link>http://t/s.torrent</link></item>
+</channel></rss>`))
+	}))
+	defer feed.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+indexer.URL+`","apikey":"k"}]`)
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.FeedHits == 0 {
+		t.Fatalf("the feed was not fetched: %+v", result)
+	}
+	for _, name := range result.Names {
+		if name == "Arcane" || name == "Silo" {
+			t.Fatalf("feed series unrelated to the query in %v", result.Names)
+		}
+	}
+	if len(result.Names) != 1 || result.Names[0] != "The Mandalorian" {
+		t.Fatalf("names = %v, want [The Mandalorian]", result.Names)
+	}
+}
