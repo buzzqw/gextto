@@ -279,6 +279,15 @@ OS page cache that serves the file, not SQLite's. Live on `gexttod`, with the sa
 uptime (2 minutes): RSS **109.7 → 67.6 MB** (RssAnon 88.4 → 46.2 MB, RssFile
 unchanged); the delta is the page caches of the 4 connections.
 
+**Fourth round (2026-10-12, Intel N97) — lenient Torznab XML.** The Torznab
+answers are now decoded with `Strict=false` and the HTML entity table (a raw
+`&` or `&egrave;` in a scraped title no longer makes the whole answer
+unreadable). Benchmark on a 100-item answer (error probe + feed, 5 runs):
+strict `xml.Unmarshal` **2.24–2.32 ms/op, 642.8 kB/op, 17179 allocs/op**;
+lenient decoder **2.22–2.29 ms/op, 642.8 kB/op, 17179 allocs/op**: equivalent,
+no regression. Prowlarr's aggregate search is read as JSON (one
+`json.Unmarshal` into a slice of small structs), outside the XML path.
+
 ---
 
 ## 2. Gextto improvements implemented
