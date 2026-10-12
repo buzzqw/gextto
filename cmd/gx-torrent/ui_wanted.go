@@ -188,6 +188,12 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	result.ArchiveHits = len(archiveItems)
 	items = append(items, archiveItems...)
 	result.Names = filterSuggestions(query, items, langFilters, qualityFilter, 20)
+	if len(result.Names) == 0 {
+		// No release carried an episode marker (a movie, or a pack without an
+		// SxxExx): fall back to the matching titles themselves, so the search
+		// is still useful instead of showing only "No results".
+		result.Names = fallbackTitles(query, items, langFilters, qualityFilter, 20)
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -266,6 +272,56 @@ func filterSuggestions(query string, items []rss.Item, includeLang []string, qua
 	out := make([]string, len(names))
 	for i, name := range names {
 		out[i] = titleCase(name)
+	}
+	return out
+}
+
+// fallbackTitles returns the matching release titles themselves, best seeded
+// first and deduplicated, when no series name can be parsed (a movie, or a pack
+// without an episode marker). It applies the same query/language/quality filters
+// as filterSuggestions, so an unrelated feed item never sneaks in.
+func fallbackTitles(query string, items []rss.Item, includeLang []string, quality string, limit int) []string {
+	terms := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
+	type candidate struct {
+		title   string
+		seeders int
+	}
+	seen := map[string]bool{}
+	var candidates []candidate
+	for _, item := range items {
+		title := strings.TrimSpace(item.Title)
+		lower := strings.ToLower(title)
+		if title == "" || !titleHasAllTerms(lower, terms) {
+			continue
+		}
+		ok := true
+		for _, term := range includeLang {
+			if term = strings.ToLower(strings.TrimSpace(term)); term != "" && !strings.Contains(lower, term) {
+				ok = false
+				break
+			}
+		}
+		if !ok || !wantedQualityMatch(quality, lower) {
+			continue
+		}
+		if seen[lower] {
+			continue
+		}
+		seen[lower] = true
+		candidates = append(candidates, candidate{title: title, seeders: item.Seeders})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].seeders != candidates[j].seeders {
+			return candidates[i].seeders > candidates[j].seeders
+		}
+		return candidates[i].title < candidates[j].title
+	})
+	if len(candidates) > limit {
+		candidates = candidates[:limit]
+	}
+	out := make([]string, len(candidates))
+	for i, c := range candidates {
+		out[i] = c.title
 	}
 	return out
 }

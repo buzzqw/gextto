@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -56,6 +57,47 @@ func TestUIWantedSearchQueriesIndexers(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("indexer results missing from %v", result.Names)
+	}
+}
+
+// wantedIndexerMovieFeed is a Torznab answer with no episode marker (a movie),
+// so no series name can be parsed.
+const wantedIndexerMovieFeed = `<?xml version="1.0"?>
+<rss version="2.0" xmlns:torznab="http://torznab.com/schemas/2015/feed"><channel>
+<item><title>The Mandalorian 2019 1080p BluRay x264</title><enclosure url="http://t/m.torrent" length="10"/>
+<torznab:attr name="seeders" value="42"/></item>
+</channel></rss>`
+
+// TestUIWantedSearchFallsBackToTitles: when no release carries an episode
+// marker the search must still suggest the matching titles, instead of showing
+// "No results" while the hit counters are full.
+func TestUIWantedSearchFallsBackToTitles(t *testing.T) {
+	indexer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(wantedIndexerMovieFeed))
+	}))
+	defer indexer.Close()
+
+	d := standaloneTestDaemon(t, "", true)
+	d.opts.Settings.Set(setupCompleteKey, "true")
+	d.opts.Settings.Set(indexersSettingKey, `[{"name":"fake","url":"`+indexer.URL+`","apikey":"k"}]`)
+	srv := httptest.NewServer(d.routes())
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/ui/wanted-search?q=mandalorian")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var result wantedSearchResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if result.IndexerHits == 0 {
+		t.Fatalf("indexer hits = 0: %+v", result)
+	}
+	if len(result.Names) != 1 || !strings.Contains(result.Names[0], "Mandalorian") {
+		t.Fatalf("fallback titles = %v, want the matching release title", result.Names)
 	}
 }
 
