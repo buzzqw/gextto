@@ -563,7 +563,8 @@ esempio:
   `GX_TORRENT_NO_NATPMP`, `GX_TORRENT_DHT_BOOTSTRAP`;
 - `GX_TORRENT_IPFILTER`, `GX_TORRENT_IPFILTER_TRACKERS`;
 - `GX_TORRENT_LANG`, `GX_TORRENT_MODE`, `GX_TORRENT_LOG_FILE`, `GX_TORRENT_DEBUG`,
-  `GX_TORRENT_NOTIFY_URL` (webhook per le notifiche dei feed).
+  `GX_TORRENT_NOTIFY_URL` (webhook per le notifiche dei feed);
+- `GX_TORRENT_MMAP` (storage mmap opt-in, Linux: flag `-mmap`).
 
 Alcuni flag sono interni (`-insecure`, `-version`, `-fingerprint`,
 `-orphan-timeout`, `-ipfilter-source`, `-gextto-log`): li usa solo Gextto per
