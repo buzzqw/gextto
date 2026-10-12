@@ -107,6 +107,27 @@ func (b *Bitfield) All() bool {
 	return b.Count() == b.length
 }
 
+// HasAnyNotIn reports whether b has a bit set where other has it clear, i.e.
+// there is at least one piece b has that other does not. It is used to decide
+// whether a peer still advertises something we are missing. Both bitfields must
+// have the same length; the caller guarantees it (they come from the same
+// torrent) and the shorter one bounds the scan.
+func (b *Bitfield) HasAnyNotIn(other *Bitfield) bool {
+	n := min(len(b.bytes), len(other.bytes))
+	i := 0
+	for ; i+8 <= n; i += 8 {
+		if binary.LittleEndian.Uint64(b.bytes[i:])&^binary.LittleEndian.Uint64(other.bytes[i:]) != 0 {
+			return true
+		}
+	}
+	for ; i < n; i++ {
+		if b.bytes[i]&^other.bytes[i] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Bitfield) checkIndex(i uint32) {
 	if i >= b.Len() {
 		panic("index out of bound")

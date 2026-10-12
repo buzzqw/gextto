@@ -155,25 +155,6 @@ func (t *torrent) AddTrackers(trackers []tracker.Tracker) {
 // "unlimited".
 const unlimitedUnchokedPeers = 1000
 
-// enforceConnectionLimit closes peers over the per-torrent cap.
-// It runs in the torrent goroutine.
-func (t *torrent) enforceConnectionLimit() {
-	if t.maxConnections <= 0 {
-		return
-	}
-	for len(t.peers) > t.maxConnections {
-		closed := false
-		for pe := range t.peers {
-			t.closePeer(pe)
-			closed = true
-			break
-		}
-		if !closed {
-			return
-		}
-	}
-}
-
 // applyMaxUploads sets the unchoker slots from maxUploads: zero
 // unchokes every interested peer. It runs in the torrent goroutine.
 func (t *torrent) applyMaxUploads() {

@@ -55,7 +55,7 @@ func (t *torrent) run() {
 		case pe := <-t.peerSnubbedC:
 			t.handlePeerSnubbed(pe)
 		case <-t.unchokeTicker.C:
-			t.enforceConnectionLimit()
+			t.prunePeers()
 			t.unchoker.TickUnchoke(t.getPeersForUnchoker(), t.completed)
 			t.superSeedTick(time.Now())
 			t.expireV2HashRequests(time.Now())

@@ -49,3 +49,50 @@ func TestCountAllAndNone(t *testing.T) {
 		t.Fatal("All() = false for a full bitfield")
 	}
 }
+
+// TestHasAnyNotIn checks the "does the peer have a piece we are missing" test
+// against a bit-by-bit reference across word boundaries.
+func TestHasAnyNotIn(t *testing.T) {
+	for _, length := range []uint32{0, 1, 7, 8, 9, 63, 64, 65, 127, 128, 129, 1000} {
+		for iter := 0; iter < 50; iter++ {
+			have := New(length)
+			peer := New(length)
+			for i := uint32(0); i < length; i++ {
+				if rand.Intn(2) == 0 {
+					have.Set(i)
+				}
+				if rand.Intn(2) == 0 {
+					peer.Set(i)
+				}
+			}
+			want := false
+			for i := uint32(0); i < length; i++ {
+				if peer.Test(i) && !have.Test(i) {
+					want = true
+					break
+				}
+			}
+			if got := peer.HasAnyNotIn(have); got != want {
+				t.Fatalf("length %d: HasAnyNotIn = %v, want %v", length, got, want)
+			}
+		}
+	}
+}
+
+func BenchmarkHasAnyNotIn(b *testing.B) {
+	const n = 1 << 20 // 1M pieces
+	have := New(n)
+	peer := New(n)
+	for i := uint32(0); i < n; i += 4 {
+		have.Set(i)
+	}
+	for i := uint32(1); i < n; i += 3 {
+		peer.Set(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if !peer.HasAnyNotIn(have) {
+			b.Fatal("expected a useful piece")
+		}
+	}
+}
