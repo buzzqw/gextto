@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -120,6 +121,25 @@ func TestPollFeedsDrivesWantedWithoutFeeds(t *testing.T) {
 	if _, ok := d.state.WantedGapLast["Reacher"]; !ok {
 		t.Fatalf("pollWanted did not run without feeds: WantedGapLast=%v", d.state.WantedGapLast)
 	}
+}
+
+// TestPollWantedTakesFromTheArchive fixes the model: feeds only grow the
+// archive, and a wanted title turns the archived material into downloads.
+func TestPollWantedTakesFromTheArchive(t *testing.T) {
+	d := feedDaemon(t, "")
+	if _, err := d.archive().record("feedA", []rss.Item{{
+		Title:  "The Mandalorian S01E01 1080p ITA WEB-DL",
+		Magnet: "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
+	}}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.saveWanted([]wantedEntry{{Name: "The Mandalorian", Kind: "series", Seasons: "1+", Language: "ita", Quality: "1080p"}}); err != nil {
+		t.Fatal(err)
+	}
+	d.pollWanted(context.Background())
+	waitFor(t, "the archived episode to be taken", func() bool {
+		return len(d.snapshotViews()) == 1
+	})
 }
 
 func TestWantedMatchesTitleAndFilters(t *testing.T) {

@@ -47,6 +47,11 @@ type feedConfig struct {
 	// Disabled stops the automatic polling of the feed without deleting it
 	// (qBittorrent's "disable feed"); its reload button still works.
 	Disabled bool `json:"disabled,omitempty"`
+	// All downloads every item the feed returns even without a covering rule
+	// and without include/exclude. By default such a feed only grows the
+	// archive: the operator decides what to download with rules and wanted
+	// titles, and those also search the archived material.
+	All bool `json:"all,omitempty"`
 }
 
 func (c feedConfig) rule() rss.TitleFilter {
@@ -231,6 +236,9 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 		added := 0
 		var addedTitles []string
 		rules := d.rules()
+		if feedTakesEverything(rules, feed, name) {
+			logf("feed %s: no rule and no include/exclude, archive only (%d items); set the feed to \"take everything\" or add a filter to download", name, len(items))
+		}
 		for _, item := range items {
 			if added >= feedMaxAddsPerPoll {
 				break
@@ -320,6 +328,18 @@ func (d *Daemon) pollFeedsOnly(only string) bool {
 	return true
 }
 
+// feedTakesEverything reports whether a feed would download every item it
+// returns: no rule covers it, it has no include/exclude of its own, and the
+// operator has not explicitly asked for all of it. Such a feed only grows the
+// archive; downloads come from rules and wanted titles, which also search the
+// archived material.
+func feedTakesEverything(rules []rss.Rule, feed feedConfig, feedName string) bool {
+	if feed.All || rss.FeedCoveredByRules(rules, feedName) {
+		return false
+	}
+	return strings.TrimSpace(feed.Include) == "" && strings.TrimSpace(feed.Exclude) == ""
+}
+
 // filterFeedItem decides whether an item is added and with which action. When at
 // least one rule covers the feed the rules are ordered and the first match wins
 // (PASS adds, FAIL skips); otherwise the feed's own include/exclude filter
@@ -335,6 +355,11 @@ func filterFeedItem(rules []rss.Rule, feed feedConfig, feedName string, item rss
 			return rss.Rule{}, false, false
 		}
 		return rule, rule.Match.SmartEpisode, true
+	}
+	// A feed with no covering rule and no include/exclude of its own would take
+	// everything: by default it only grows the archive (see feedTakesEverything).
+	if feedTakesEverything(rules, feed, feedName) {
+		return rss.Rule{}, false, false
 	}
 	if !feed.rule().Match(item.Title) {
 		return rss.Rule{}, false, false

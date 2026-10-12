@@ -240,6 +240,7 @@ func (d *Daemon) handleUIRssFeed(w http.ResponseWriter, r *http.Request) {
 			SavePath: strings.TrimSpace(r.FormValue("savepath")),
 			Paused:   r.FormValue("paused") != "",
 			Disabled: r.FormValue("disabled") != "",
+			All:      r.FormValue("all") != "",
 		}
 		if feed.URL == "" && feed.Search == "" {
 			d.renderRSS(w, r, "Give the feed an RSS URL.")
@@ -678,6 +679,7 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		return strings.ToLower(rows[i].feed.Name) < strings.ToLower(rows[j].feed.Name)
 	})
 	var b strings.Builder
+	rules := d.rules()
 	for _, row := range rows {
 		feed := row.feed
 		index := strconv.Itoa(row.index)
@@ -699,6 +701,9 @@ func (d *Daemon) uiFeedRowsHTML() string {
 		}
 		if feed.Paused {
 			state += ` <span class="flag" title="Torrents from this feed are added paused">adds paused</span>`
+		}
+		if feedTakesEverything(rules, feed, key) {
+			state += ` <span class="flag" title="No rule and no Include/Exclude: this feed only grows the archive, nothing is downloaded">archive only</span>`
 		}
 		b.WriteString(`<tr data-feed-row="` + html.EscapeString(key) + `"><td>` + html.EscapeString(name) + "</td>")
 		b.WriteString(`<td class="mono wrap">` + html.EscapeString(source) + "</td>")

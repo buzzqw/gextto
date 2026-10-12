@@ -265,7 +265,10 @@ binario** che Gextto pilota come motore, non un prodotto separato:
   episode, *scarica una volta*, pausa tra corrispondenze) con percorso,
   categoria, tag e opzioni, modificabili sul posto e con **anteprima** di ciò
   che catturerebbero; una lista **Wanted** che riprende gli episodi mancanti; un
-  intervallo di aggiornamento configurabile.
+  intervallo di aggiornamento configurabile. I feed **ingrossano l'archivio**: un
+  feed senza regole e senza include/escludi non scarica nulla (c'è il flag *prendi
+  tutto* per seguirlo per intero), e i titoli cercati cercano nell'indicizzato **e**
+  nell'archiviato.
 - **Archivio:** ogni elemento mai restituito dai feed resta in un database
   locale (deduplicato per info-hash) e si può cercare — parole, frasi tra
   virgolette, parole `-escluse`, per feed, solo scaricati, ordinati per data,

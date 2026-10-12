@@ -98,7 +98,7 @@ func TestFeedsAddedAtRuntimeArePolled(t *testing.T) {
 	defer feed.Close()
 
 	d := feedDaemon(t, "") // starts with no feed configured
-	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.opts.Settings.Set(feedsSettingKey, `[{"name":"f","url":"`+feed.URL+`","all":true}]`)
 	d.pokeFeeds()
 	waitFor(t, "the feed added at runtime to be polled", func() bool {
 		return len(d.snapshotViews()) >= 1
@@ -163,6 +163,48 @@ func TestPollFeedsAddsAndDedupes(t *testing.T) {
 	if statuses := d.feedStatusesSnapshot(); len(statuses) != 1 || statuses[0].Added != 0 {
 		t.Fatalf("second poll re-added items: %+v", statuses)
 	}
+}
+
+// TestPollFeedsWithoutFilterArchivesOnly: a feed with no covering rule and no
+// include/exclude grows the archive and downloads nothing; the operator decides
+// what to download with rules, wanted titles or the "take everything" flag.
+func TestPollFeedsWithoutFilterArchivesOnly(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(feedBody))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`"}]`)
+	d.pollFeeds()
+
+	statuses := d.feedStatusesSnapshot()
+	if len(statuses) != 1 || statuses[0].Items != 2 || statuses[0].Added != 0 {
+		t.Fatalf("unfiltered feed status = %+v, want 2 items and 0 added", statuses)
+	}
+	if n := len(d.snapshotViews()); n != 0 {
+		t.Fatalf("unfiltered feed downloaded %d torrent(s)", n)
+	}
+	page, err := d.archive().search(archiveQuery{}, "new", 1, 50)
+	if err != nil || page.Total != 2 {
+		t.Fatalf("archive = %+v (%v), want the 2 items archived", page, err)
+	}
+}
+
+// TestPollFeedsTakeEverythingDownloads: the explicit per-feed flag restores the
+// old behaviour for a feed that the operator really wants in full.
+func TestPollFeedsTakeEverythingDownloads(t *testing.T) {
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(feedBody))
+	}))
+	defer feed.Close()
+
+	d := feedDaemon(t, `[{"name":"f","url":"`+feed.URL+`","all":true}]`)
+	d.pollFeeds()
+	waitFor(t, "the two items to be downloaded with the take-all flag", func() bool {
+		return len(d.snapshotViews()) == 2
+	})
 }
 
 const episodesFeed = `<?xml version="1.0"?>

@@ -259,7 +259,10 @@ Gextto in the same way as `qbittorrent-nox` or `transmission-daemon`. It is
   regex, size, seeders, age, episode filter, smart episode, *download once*,
   cooldown) with save path, category, tags and flags, editable in place and
   with a **live preview** of what they would match; a **Wanted** list that
-  fetches the missing episodes again; a configurable refresh interval.
+  fetches the missing episodes again; a configurable refresh interval. Feeds
+  **grow the archive**: a feed with no rule and no include/exclude downloads
+  nothing (use the *take everything* flag to follow one in full), and wanted
+  titles search the indexed **and** archived material.
 - **Archive:** every item the feeds ever returned is kept in a local database
   (deduplicated by info-hash) and searchable — words, phrases in quotes,
   `-excluded` words, per feed, downloaded only, sorted by date, seeders, size or

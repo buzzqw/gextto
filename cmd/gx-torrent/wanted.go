@@ -266,20 +266,25 @@ func (d *Daemon) pollWanted(ctx context.Context) {
 	}
 	now := time.Now()
 
-	// Indexer results for each title (the RSS feed items are handled by
-	// applyWanted from pollFeeds).
-	if len(d.indexers()) > 0 {
-		for _, w := range wanteds {
-			if w.Paused {
-				continue
-			}
-			if ctx.Err() != nil {
-				return
-			}
-			items, _ := d.searchFeedSuggest(ctx, w.Name)
-			if len(items) > 0 {
-				d.applyWanted(now, "wanted:"+strings.TrimSpace(w.Name), items)
-			}
+	// Indexer results and archived material for each title (the current RSS
+	// feed items are handled by applyWanted from pollFeeds). A feed only grows
+	// the archive, so the wanted title is what turns it into downloads: it
+	// searches the indexers and the archived releases together.
+	for _, w := range wanteds {
+		if w.Paused {
+			continue
+		}
+		if ctx.Err() != nil {
+			return
+		}
+		var items []rss.Item
+		if len(d.indexers()) > 0 {
+			found, _ := d.searchFeedSuggest(ctx, w.Name)
+			items = append(items, found...)
+		}
+		items = append(items, d.archiveWantedItems(w.Name, wantedArchiveScan)...)
+		if len(items) > 0 {
+			d.applyWanted(now, "wanted:"+strings.TrimSpace(w.Name), items)
 		}
 	}
 

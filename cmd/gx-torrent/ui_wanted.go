@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/buzzqw/gextto/internal/rss"
 )
@@ -98,7 +99,55 @@ type wantedSearchResult struct {
 	Indexers     int      `json:"indexers"`
 	IndexerHits  int      `json:"indexer_hits"`
 	FeedHits     int      `json:"feed_hits"`
+	ArchiveHits  int      `json:"archive_hits"`
 	IndexerError string   `json:"indexer_error,omitempty"`
+}
+
+// wantedArchiveScan bounds how many archive entries the wanted step reads.
+const wantedArchiveScan = 500
+
+// archiveWantedItems returns the archived releases whose title matches the
+// query, as feed items. The archive is where the feeds keep what they find, so
+// a wanted title searches it too, next to the indexers.
+func (d *Daemon) archiveWantedItems(query string, limit int) []rss.Item {
+	archive := d.archive()
+	if archive == nil || strings.TrimSpace(query) == "" {
+		return nil
+	}
+	page, err := archive.search(parseArchiveQuery(query, "", false), "seeds", 1, wantedArchiveScan)
+	if err != nil {
+		return nil
+	}
+	out := make([]rss.Item, 0, len(page.Items))
+	for _, entry := range page.Items {
+		if len(out) >= limit {
+			break
+		}
+		out = append(out, archiveItemToRSS(entry))
+	}
+	return out
+}
+
+// archiveItemToRSS maps an archived entry to the feed item shape used by the
+// rules and wanted pipeline.
+func archiveItemToRSS(entry archiveEntry) rss.Item {
+	item := rss.Item{
+		Title:    entry.Title,
+		Size:     entry.Size,
+		Seeders:  entry.Seeders,
+		Leechers: entry.Leechers,
+		Source:   entry.Feed,
+		GUID:     entry.Download,
+	}
+	if strings.HasPrefix(entry.Download, "magnet:") {
+		item.Magnet = entry.Download
+	} else {
+		item.Link = entry.Download
+	}
+	if entry.Published > 0 {
+		item.Published = time.Unix(entry.Published, 0)
+	}
+	return item
 }
 
 // handleUIWantedSearch searches the indexers and the configured RSS feeds for
@@ -135,6 +184,9 @@ func (d *Daemon) handleUIWantedSearch(w http.ResponseWriter, r *http.Request) {
 	feedItems := d.wantedRSSItems(ctx)
 	result.FeedHits = len(feedItems)
 	items = append(items, feedItems...)
+	archiveItems := d.archiveWantedItems(query, wantedArchiveScan)
+	result.ArchiveHits = len(archiveItems)
+	items = append(items, archiveItems...)
 	result.Names = filterSuggestions(query, items, langFilters, qualityFilter, 20)
 	writeJSON(w, http.StatusOK, result)
 }

@@ -500,11 +500,16 @@ tutti), `fail`, `match` e `action`:
 - ogni regola è attiva per default; `enabled: false` la disattiva senza
   cancellarla (l'editor mostra un'etichetta *Disattivata* e un pulsante
   *Attiva/Disattiva*). Una regola copre i feed elencati in `feeds` (vuoto =
-  tutti); un feed **senza alcuna regola che lo copra** continua a usare i propri
+  tutti); un feed **senza alcuna regola che lo copra** usa i propri
   `include`/`exclude`, quindi aggiungere una regola per un feed non ferma gli
   altri. Anche una regola **disattivata** copre i suoi feed: spegnere l'unica
   regola di un feed (o una regola *once* che si spegne da sola) ferma i download
-  invece di ricadere sul filtro del feed, che vuoto prenderebbe tutto.
+  invece di ricadere sul filtro del feed. Un feed **senza Include/Escludi e
+  senza regole** non scarica nulla: fa solo crescere l'**archivio** (la sua riga
+  lo segnala con *solo archivio*, e il log lo dice a ogni giro), a meno che
+  l'operatore accenda il flag **Prendi tutto**. Aggiungere un feed, quindi, non
+  significa tirare giù quello che contiene: significa che quel materiale c'è, e
+  a scaricarlo decidono le regole e i **Cercati**.
 - `action`: `savepath`, `category`, `tags`, `paused`, `sequential`, `first_last`,
   `top`, `once` (disattiva la regola dopo il primo download; lo usa *Segui un
   titolo* per i film).
@@ -534,12 +539,14 @@ ricerca, quindi i loro nomi estranei alla query non compaiono), da
 scegliere con un clic. Il **titolo è richiesto** (regex tollerante ai separatori,
 quindi i risultati fuzzy su parole comuni non entrano) e lingua/qualità sono in
 **AND**. Il risultato dice anche **da dove arrivano i nomi** (`Indexer: N ·
-Feed: M`), oppure *Nessun indexer configurato* o l'errore dell'indexer: così si
+Feed: M · Archive: K`), oppure *Nessun indexer configurato* o l'errore
+dell'indexer: così si
 distingue subito un indexer assente o che non risponde dai soli risultati dei
 feed.
 
-Il demone, a ogni ciclo, cerca ogni titolo negli indexer e nei feed RSS (anche
-senza alcun feed configurato: bastano gli indexer) e prende
+Il demone, a ogni ciclo, cerca ogni titolo negli **indexer**, nei **feed RSS** e
+nell'**archivio** (dove i feed depositano tutto ciò che trovano, anche ciò che
+non è più nel feed; bastano gli indexer se non ci sono feed) e prende
 gli episodi che compaiono; tiene un **registro** (nel file di stato) di cosa è
 apparso e cosa è stato scaricato, mostra i **mancanti** nella tabella e li
 **ricerca di nuovo** (gap search, con query `Titolo SxxEyy`) finché non li trova.
